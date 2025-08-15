@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/global",
-  "version": "1.0.13",
+  "version": "1.1.0",
   "description": "ESM bundle for MCP-B browser injection via Chrome MV3 scripting",
   "keywords": [
     "mcp",
