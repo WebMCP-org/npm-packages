@@ -138,12 +138,11 @@ export class PermissionsApiTools extends BaseApiTools {
               permissions: permissions || [],
               origins: origins || [],
             });
-          } else {
-            return this.formatSuccess('Permissions request denied by user', {
-              permissions: permissions || [],
-              origins: origins || [],
-            });
           }
+          return this.formatSuccess('Permissions request denied by user', {
+            permissions: permissions || [],
+            origins: origins || [],
+          });
         } catch (error) {
           return this.formatError(error);
         }
@@ -296,15 +295,14 @@ export class PermissionsApiTools extends BaseApiTools {
               permissions: permissions || [],
               origins: origins || [],
             });
-          } else {
-            return this.formatSuccess(
-              'Permissions could not be removed (may be required permissions)',
-              {
-                permissions: permissions || [],
-                origins: origins || [],
-              }
-            );
           }
+          return this.formatSuccess(
+            'Permissions could not be removed (may be required permissions)',
+            {
+              permissions: permissions || [],
+              origins: origins || [],
+            }
+          );
         } catch (error) {
           return this.formatError(error);
         }

@@ -84,6 +84,37 @@ This is a **pnpm workspace monorepo** containing the official NPM packages for M
 - Packages depend on `@modelcontextprotocol/sdk` as a peer dependency
 - Chrome Extension API tools are auto-generated from Chrome types
 
+## pnpm Workspace Configuration
+
+This monorepo uses pnpm's advanced features for optimal dependency management and publishing:
+
+### Workspace Protocol
+- Internal package dependencies use `workspace:*` protocol
+- Automatically converted to actual versions during publishing
+- Example: `"@mcp-b/transports": "workspace:*"`
+
+### Catalog Protocol
+All shared dependencies are managed through the pnpm catalog in `pnpm-workspace.yaml`:
+- TypeScript, build tools, and types use `catalog:` protocol
+- Single source of truth for dependency versions
+- Reduces merge conflicts and simplifies upgrades
+- Example: `"typescript": "catalog:"` resolves to version in catalog
+
+### pnpm Settings (.npmrc)
+Key configurations for optimal monorepo performance:
+- `catalog-mode=prefer` - Automatically use catalog versions when adding deps
+- `link-workspace-packages=true` - Auto-link workspace packages
+- `prefer-workspace-packages=true` - Prioritize workspace packages
+- `node-linker=isolated` - Better module isolation
+- `engine-strict=true` - Enforce Node version requirements
+- `publish-branch=main` - Restrict publishing to main branch
+
+### Publishing Configuration
+- All packages have `publishConfig` with public access
+- Workspace and catalog protocols are automatically replaced during publish
+- Changesets handle version management and changelogs
+- GitHub Actions automate the entire publish process
+
 ## Development Workflow
 
 ### Making Changes
@@ -165,3 +196,7 @@ The commit-msg hook will reject commits that don't follow this format!
 - **Type errors**: Ensure peer dependencies are installed
 - **Publishing issues**: Verify NPM_TOKEN is set in GitHub secrets
 - **Changeset issues**: Make sure you're on a feature branch, not main
+- **Dependency conflicts**: Run `pnpm dedupe` to resolve duplicates
+- **Catalog issues**: Use `pnpm update` to sync with catalog versions
+- **Workspace linking**: Ensure package is listed in `pnpm-workspace.yaml`
+- **Peer dependency warnings**: Check catalog version matches requirements

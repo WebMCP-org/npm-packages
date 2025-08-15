@@ -322,11 +322,10 @@ export class NotificationsApiTools extends BaseApiTools {
               notificationId,
               updatedFields: Object.keys(options),
             });
-          } else {
-            return this.formatSuccess('Notification not found or could not be updated', {
-              notificationId,
-            });
           }
+          return this.formatSuccess('Notification not found or could not be updated', {
+            notificationId,
+          });
         } catch (error) {
           return this.formatError(error);
         }
@@ -356,12 +355,13 @@ export class NotificationsApiTools extends BaseApiTools {
           });
 
           if (wasCleared) {
-            return this.formatSuccess('Notification cleared successfully', { notificationId });
-          } else {
-            return this.formatSuccess('Notification not found or already cleared', {
+            return this.formatSuccess('Notification cleared successfully', {
               notificationId,
             });
           }
+          return this.formatSuccess('Notification not found or already cleared', {
+            notificationId,
+          });
         } catch (error) {
           return this.formatError(error);
         }

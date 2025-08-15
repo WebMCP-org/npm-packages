@@ -229,13 +229,12 @@ export class DevtoolsPanelsApiTools extends BaseApiTools {
             return this.formatSuccess('Open resource handler enabled', {
               handlerEnabled: true,
             });
-          } else {
-            chrome.devtools.panels.setOpenResourceHandler(undefined);
-
-            return this.formatSuccess('Open resource handler disabled', {
-              handlerEnabled: false,
-            });
           }
+          chrome.devtools.panels.setOpenResourceHandler(undefined);
+
+          return this.formatSuccess('Open resource handler disabled', {
+            handlerEnabled: false,
+          });
         } catch (error) {
           return this.formatError(error);
         }

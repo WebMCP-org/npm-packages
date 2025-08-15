@@ -1,7 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { type ApiAvailability, BaseApiTools } from '../BaseApiTools';
 import zodToJsonSchema from 'zod-to-json-schema';
+import { type ApiAvailability, BaseApiTools } from '../BaseApiTools';
 
 export interface TabGroupsApiToolsOptions {
   get?: boolean;
@@ -129,28 +129,40 @@ export class TabGroupsApiTools extends BaseApiTools {
                 params: toJson(this.getSchema, 'GetTabGroupParams'),
                 description: 'Retrieve a tab group by its ID',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             case 'query': {
               const paramsAndDescription = {
                 params: toJson(this.querySchema, 'QueryTabGroupsParams'),
                 description: 'Search for tab groups that match specified criteria',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             case 'update': {
               const paramsAndDescription = {
                 params: toJson(this.updateSchema, 'UpdateTabGroupParams'),
                 description: 'Modify properties of a tab group',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             case 'move': {
               const paramsAndDescription = {
                 params: toJson(this.moveSchema, 'MoveTabGroupParams'),
                 description: 'Move a tab group within its window or to a new window',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             default:
               return this.formatError(new Error(`Action "${action}" is not supported`));

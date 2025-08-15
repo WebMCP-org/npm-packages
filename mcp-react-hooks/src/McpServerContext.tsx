@@ -167,7 +167,14 @@ export function McpServerProvider({
 
   return (
     <McpServerContext.Provider
-      value={{ server, isConnected, isConnecting, error, elicitInput, registerTool }}
+      value={{
+        server,
+        isConnected,
+        isConnecting,
+        error,
+        elicitInput,
+        registerTool,
+      }}
     >
       {children}
     </McpServerContext.Provider>

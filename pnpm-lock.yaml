@@ -31,8 +31,8 @@ catalogs:
       specifier: ^5.8.3
       version: 5.9.2
     zod:
-      specifier: 3.23.8
-      version: 3.23.8
+      specifier: 3.24.1
+      version: 3.24.1
 
 importers:
 
@@ -80,10 +80,10 @@ importers:
         version: 1.15.0
       zod:
         specifier: 'catalog:'
-        version: 3.23.8
+        version: 3.24.1
       zod-to-json-schema:
         specifier: ^3.24.5
-        version: 3.24.6(zod@3.23.8)
+        version: 3.24.6(zod@3.24.1)
     devDependencies:
       '@anthropic-ai/sdk':
         specifier: ^0.60.0
@@ -154,7 +154,7 @@ importers:
         version: 5.9.2
       zod:
         specifier: 'catalog:'
-        version: 3.23.8
+        version: 3.24.1
 
   mcp-react-hooks:
     dependencies:
@@ -197,11 +197,27 @@ importers:
         version: 1.17.3
       zod:
         specifier: 'catalog:'
-        version: 3.23.8
+        version: 3.24.1
     devDependencies:
       '@types/chrome':
         specifier: 'catalog:'
         version: 0.0.326
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.17.2
+      tsup:
+        specifier: 'catalog:'
+        version: 8.5.0(@microsoft/api-extractor@7.52.10(@types/node@22.17.2))(jiti@2.5.1)(postcss@8.5.6)(tsx@4.20.4)(typescript@5.9.2)(yaml@2.8.1)
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.2
+
+  web-tools:
+    dependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: 'catalog:'
+        version: 1.15.0
+    devDependencies:
       '@types/node':
         specifier: 'catalog:'
         version: 22.17.2
@@ -2799,8 +2815,8 @@ packages:
     peerDependencies:
       zod: ^3.24.1
 
-  zod@3.23.8:
-    resolution: {integrity: sha512-XBx9AXhXktjUqnepgTiE5flcKIYWi/rme0Eaj+5Y0lftuGBq+jyRu/md4WnuxqgP1ubdpNCsYEYPxrzVHD8d6g==}
+  zod@3.24.1:
+    resolution: {integrity: sha512-muH7gBL9sI1nciMZV67X5fTKKBLtwpZ5VBp1vsOQzj1MhrBZ4wlVCm3gedKZWLp0Oyel8sIGfeiz54Su+OVT+A==}
 
   zod@4.0.17:
     resolution: {integrity: sha512-1PHjlYRevNxxdy2JZ8JcNAw7rX8V9P1AKkP+x/xZfxB0K5FYfuV+Ug6P/6NVSR2jHQ+FzDDoDHS04nYUsOIyLQ==}
@@ -3348,8 +3364,8 @@ snapshots:
       express-rate-limit: 7.5.1(express@5.1.0)
       pkce-challenge: 5.0.0
       raw-body: 3.0.0
-      zod: 3.23.8
-      zod-to-json-schema: 3.24.6(zod@3.23.8)
+      zod: 3.24.1
+      zod-to-json-schema: 3.24.6(zod@3.24.1)
     transitivePeerDependencies:
       - supports-color
 
@@ -3365,8 +3381,8 @@ snapshots:
       express-rate-limit: 7.5.1(express@5.1.0)
       pkce-challenge: 5.0.0
       raw-body: 3.0.0
-      zod: 3.23.8
-      zod-to-json-schema: 3.24.6(zod@3.23.8)
+      zod: 3.24.1
+      zod-to-json-schema: 3.24.6(zod@3.24.1)
     transitivePeerDependencies:
       - supports-color
 
@@ -5398,11 +5414,11 @@ snapshots:
 
   yocto-queue@1.2.1: {}
 
-  zod-to-json-schema@3.24.6(zod@3.23.8):
+  zod-to-json-schema@3.24.6(zod@3.24.1):
     dependencies:
-      zod: 3.23.8
+      zod: 3.24.1
 
-  zod@3.23.8: {}
+  zod@3.24.1: {}
 
   zod@4.0.17: {}
 

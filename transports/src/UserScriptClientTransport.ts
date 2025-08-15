@@ -127,7 +127,9 @@ export class UserScriptClientTransport implements Transport {
       try {
         // Connect to the extension. From a user script, this triggers onUserScriptConnect on the extension side.
         if (this._extensionId) {
-          this._port = chrome.runtime.connect(this._extensionId, { name: this._portName });
+          this._port = chrome.runtime.connect(this._extensionId, {
+            name: this._portName,
+          });
         } else {
           this._port = chrome.runtime.connect({ name: this._portName });
         }

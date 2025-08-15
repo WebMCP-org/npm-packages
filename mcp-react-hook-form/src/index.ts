@@ -1,6 +1,9 @@
 // Hook for use with context
 
-export type { McpServerProviderProps, MpcServerContextValue } from './context.js';
+export type {
+  McpServerProviderProps,
+  MpcServerContextValue,
+} from './context.js';
 // Context provider (optional)
 export { McpServerProvider, useMcpServer } from './context.js';
 export type { RegisterFormOptions } from './registerFormAsMcpTool.js';

@@ -278,7 +278,9 @@ export class BrowsingDataApiTools extends BaseApiTools {
             });
           });
 
-          return this.formatSuccess('Appcache data removed successfully', { options });
+          return this.formatSuccess('Appcache data removed successfully', {
+            options,
+          });
         } catch (error) {
           return this.formatError(error);
         }
@@ -380,7 +382,9 @@ export class BrowsingDataApiTools extends BaseApiTools {
             });
           });
 
-          return this.formatSuccess('Cache storage removed successfully', { options });
+          return this.formatSuccess('Cache storage removed successfully', {
+            options,
+          });
         } catch (error) {
           return this.formatError(error);
         }
@@ -431,7 +435,9 @@ export class BrowsingDataApiTools extends BaseApiTools {
             });
           });
 
-          return this.formatSuccess('Cookies removed successfully', { options });
+          return this.formatSuccess('Cookies removed successfully', {
+            options,
+          });
         } catch (error) {
           return this.formatError(error);
         }
@@ -475,7 +481,9 @@ export class BrowsingDataApiTools extends BaseApiTools {
             });
           });
 
-          return this.formatSuccess('Download list removed successfully', { options });
+          return this.formatSuccess('Download list removed successfully', {
+            options,
+          });
         } catch (error) {
           return this.formatError(error);
         }
@@ -526,7 +534,9 @@ export class BrowsingDataApiTools extends BaseApiTools {
             });
           });
 
-          return this.formatSuccess('File systems removed successfully', { options });
+          return this.formatSuccess('File systems removed successfully', {
+            options,
+          });
         } catch (error) {
           return this.formatError(error);
         }
@@ -570,7 +580,9 @@ export class BrowsingDataApiTools extends BaseApiTools {
             });
           });
 
-          return this.formatSuccess('Form data removed successfully', { options });
+          return this.formatSuccess('Form data removed successfully', {
+            options,
+          });
         } catch (error) {
           return this.formatError(error);
         }
@@ -614,7 +626,9 @@ export class BrowsingDataApiTools extends BaseApiTools {
             });
           });
 
-          return this.formatSuccess('History removed successfully', { options });
+          return this.formatSuccess('History removed successfully', {
+            options,
+          });
         } catch (error) {
           return this.formatError(error);
         }
@@ -665,7 +679,9 @@ export class BrowsingDataApiTools extends BaseApiTools {
             });
           });
 
-          return this.formatSuccess('IndexedDB data removed successfully', { options });
+          return this.formatSuccess('IndexedDB data removed successfully', {
+            options,
+          });
         } catch (error) {
           return this.formatError(error);
         }
@@ -716,7 +732,9 @@ export class BrowsingDataApiTools extends BaseApiTools {
             });
           });
 
-          return this.formatSuccess('Local storage removed successfully', { options });
+          return this.formatSuccess('Local storage removed successfully', {
+            options,
+          });
         } catch (error) {
           return this.formatError(error);
         }
@@ -760,7 +778,9 @@ export class BrowsingDataApiTools extends BaseApiTools {
             });
           });
 
-          return this.formatSuccess('Passwords removed successfully', { options });
+          return this.formatSuccess('Passwords removed successfully', {
+            options,
+          });
         } catch (error) {
           return this.formatError(error);
         }
@@ -811,7 +831,9 @@ export class BrowsingDataApiTools extends BaseApiTools {
             });
           });
 
-          return this.formatSuccess('Service workers removed successfully', { options });
+          return this.formatSuccess('Service workers removed successfully', {
+            options,
+          });
         } catch (error) {
           return this.formatError(error);
         }
@@ -862,7 +884,9 @@ export class BrowsingDataApiTools extends BaseApiTools {
             });
           });
 
-          return this.formatSuccess('WebSQL data removed successfully', { options });
+          return this.formatSuccess('WebSQL data removed successfully', {
+            options,
+          });
         } catch (error) {
           return this.formatError(error);
         }

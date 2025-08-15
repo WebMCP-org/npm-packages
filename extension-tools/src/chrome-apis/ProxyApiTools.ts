@@ -326,7 +326,9 @@ export class ProxyApiTools extends BaseApiTools {
             });
           });
 
-          return this.formatSuccess('Proxy settings cleared successfully', { scope });
+          return this.formatSuccess('Proxy settings cleared successfully', {
+            scope,
+          });
         } catch (error) {
           return this.formatError(error);
         }

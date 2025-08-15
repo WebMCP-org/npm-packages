@@ -1,6 +1,4 @@
 {
-	"*.{js,jsx,ts,tsx,mjs,cjs,json,md,yml,yaml}": [
-		"biome check --write --no-errors-on-unmatched"
-	],
-	"package.json": ["pnpm dlx sort-package-json"]
+  "*.{js,jsx,ts,tsx,mjs,cjs,json,md,yml,yaml}": ["biome check --write --no-errors-on-unmatched"],
+  "package.json": ["pnpm dlx sort-package-json"]
 }

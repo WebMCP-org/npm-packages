@@ -1,76 +1,76 @@
 {
-	"name": "@mcp-b/mcp-react-hooks",
-	"version": "0.2.1",
-	"description": "React hooks for MCP (Model Context Protocol) client",
-	"keywords": [
-		"mcp",
-		"model-context-protocol",
-		"react",
-		"hooks",
-		"react-hooks",
-		"browser",
-		"ai",
-		"assistant"
-	],
-	"homepage": "https://github.com/MiguelsPizza/WebMCP#readme",
-	"bugs": {
-		"url": "https://github.com/MiguelsPizza/WebMCP/issues"
-	},
-	"repository": {
-		"type": "git",
-		"url": "git+https://github.com/MiguelsPizza/WebMCP.git",
-		"directory": "packages/mcp-react-hooks"
-	},
-	"license": "MIT",
-	"author": "mcp-b Team",
-	"type": "module",
-	"exports": {
-		".": {
-			"import": "./dist/index.js",
-			"types": "./dist/index.d.ts"
-		}
-	},
-	"main": "./dist/index.js",
-	"files": [
-		"dist"
-	],
-	"scripts": {
-		"build": "tsup",
-		"check": "biome check --write .",
-		"clean": "rm -rf dist .turbo",
-		"format": "biome format --write .",
-		"lint": "biome lint --write .",
-		"prepublishOnly": "pnpm run build",
-		"publish:dry": "pnpm publish --access public --dry-run",
-		"publish:npm": "pnpm publish --access public",
-		"typecheck": "tsc --noEmit",
-		"version:major": "pnpm version major --no-git-tag-version",
-		"version:minor": "pnpm version minor --no-git-tag-version",
-		"version:patch": "pnpm version patch --no-git-tag-version"
-	},
-	"dependencies": {
-		"@mcp-b/transports": "workspace:*",
-		"@modelcontextprotocol/sdk": "catalog:"
-	},
-	"devDependencies": {
-		"@types/chrome": "catalog:",
-		"@types/node": "catalog:",
-		"@types/react": "catalog:",
-		"tsup": "catalog:",
-		"typescript": "catalog:"
-	},
-	"peerDependencies": {
-		"@assistant-ui/react": "^0.10.41",
-		"react": "catalog:",
-		"react-dom": "catalog:"
-	},
-	"peerDependenciesMeta": {
-		"@assistant-ui/react": {
-			"optional": true
-		}
-	},
-	"publishConfig": {
-		"access": "public",
-		"registry": "https://registry.npmjs.org/"
-	}
+  "name": "@mcp-b/mcp-react-hooks",
+  "version": "0.2.1",
+  "description": "React hooks for MCP (Model Context Protocol) client",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "react",
+    "hooks",
+    "react-hooks",
+    "browser",
+    "ai",
+    "assistant"
+  ],
+  "homepage": "https://github.com/MiguelsPizza/WebMCP#readme",
+  "bugs": {
+    "url": "https://github.com/MiguelsPizza/WebMCP/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MiguelsPizza/WebMCP.git",
+    "directory": "packages/mcp-react-hooks"
+  },
+  "license": "MIT",
+  "author": "mcp-b Team",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "main": "./dist/index.js",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "check": "biome check --write .",
+    "clean": "rm -rf dist .turbo",
+    "format": "biome format --write .",
+    "lint": "biome lint --write .",
+    "prepublishOnly": "pnpm run build",
+    "publish:dry": "pnpm publish --access public --dry-run",
+    "publish:npm": "pnpm publish --access public",
+    "typecheck": "tsc --noEmit",
+    "version:major": "pnpm version major --no-git-tag-version",
+    "version:minor": "pnpm version minor --no-git-tag-version",
+    "version:patch": "pnpm version patch --no-git-tag-version"
+  },
+  "dependencies": {
+    "@mcp-b/transports": "workspace:*",
+    "@modelcontextprotocol/sdk": "catalog:"
+  },
+  "devDependencies": {
+    "@types/chrome": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "tsup": "catalog:",
+    "typescript": "catalog:"
+  },
+  "peerDependencies": {
+    "@assistant-ui/react": "^0.10.41",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "peerDependenciesMeta": {
+    "@assistant-ui/react": {
+      "optional": true
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
 }

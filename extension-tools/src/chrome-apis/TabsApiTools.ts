@@ -1,7 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { type ApiAvailability, BaseApiTools } from '../BaseApiTools';
 import zodToJsonSchema from 'zod-to-json-schema';
+import { type ApiAvailability, BaseApiTools } from '../BaseApiTools';
 
 export interface TabsApiToolsOptions {
   listActiveTabs?: boolean;
@@ -191,14 +191,20 @@ export class TabsApiTools extends BaseApiTools {
                 params: toJson(this.listActiveTabsSchema, 'ListActiveTabsParams'),
                 description: 'Lists all tabs grouped by domain',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             case 'createTab': {
               const paramsAndDescription = {
                 params: toJson(this.createTabSchema, 'CreateTabParams'),
                 description: 'Create a new browser tab',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             case 'updateTab': {
               const paramsAndDescription = {
@@ -206,21 +212,30 @@ export class TabsApiTools extends BaseApiTools {
                 description:
                   'Update properties of an existing tab. If no tabId is specified, operates on the currently active tab',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             case 'closeTabs': {
               const paramsAndDescription = {
                 params: toJson(this.closeTabsSchema, 'CloseTabsParams'),
                 description: 'Close one or more tabs',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             case 'getAllTabs': {
               const paramsAndDescription = {
                 params: toJson(this.getAllTabsSchema, 'GetAllTabsParams'),
                 description: 'Get information about all open tabs',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             case 'navigateHistory': {
               const paramsAndDescription = {
@@ -228,7 +243,10 @@ export class TabsApiTools extends BaseApiTools {
                 description:
                   "Navigate forward or backward in a tab's history. If no tabId is specified, operates on the currently active tab",
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             case 'reloadTab': {
               const paramsAndDescription = {
@@ -236,7 +254,10 @@ export class TabsApiTools extends BaseApiTools {
                 description:
                   'Reload a tab. If no tabId is specified, operates on the currently active tab',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             case 'captureVisibleTab': {
               const paramsAndDescription = {
@@ -244,14 +265,20 @@ export class TabsApiTools extends BaseApiTools {
                 description:
                   'Take a screenshot of the visible area of the currently active tab in a window. Once the screenshot is captured',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             case 'detectLanguage': {
               const paramsAndDescription = {
                 params: toJson(this.detectLanguageSchema, 'DetectLanguageParams'),
                 description: 'Detect the primary language of the content in a tab',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             case 'discardTab': {
               const paramsAndDescription = {
@@ -259,70 +286,100 @@ export class TabsApiTools extends BaseApiTools {
                 description:
                   'Discards a tab from memory. Discarded tabs are still visible but need to reload when activated',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             case 'duplicateTab': {
               const paramsAndDescription = {
                 params: toJson(this.duplicateTabSchema, 'DuplicateTabParams'),
                 description: 'Duplicate a tab',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             case 'getTab': {
               const paramsAndDescription = {
                 params: toJson(this.getTabSchema, 'GetTabParams'),
                 description: 'Retrieves details about a specific tab',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             case 'getZoom': {
               const paramsAndDescription = {
                 params: toJson(this.getZoomSchema, 'GetZoomParams'),
                 description: 'Retrieves the current zoom level of a tab',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             case 'getZoomSettings': {
               const paramsAndDescription = {
                 params: toJson(this.getZoomSettingsSchema, 'GetZoomSettingsParams'),
                 description: 'Gets the current zoom settings of a tab',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             case 'setZoom': {
               const paramsAndDescription = {
                 params: toJson(this.setZoomSchema, 'SetZoomParams'),
                 description: 'Sets the zoom factor of a tab',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             case 'setZoomSettings': {
               const paramsAndDescription = {
                 params: toJson(this.setZoomSettingsSchema, 'SetZoomSettingsParams'),
                 description: 'Sets zoom settings for a tab (how zoom changes are handled)',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             case 'groupTabs': {
               const paramsAndDescription = {
                 params: toJson(this.groupTabsSchema, 'GroupTabsParams'),
                 description: 'Groups one or more tabs together',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             case 'ungroupTabs': {
               const paramsAndDescription = {
                 params: toJson(this.ungroupTabsSchema, 'UngroupTabsParams'),
                 description: 'Removes tabs from their groups',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             case 'highlightTabs': {
               const paramsAndDescription = {
                 params: toJson(this.highlightTabsSchema, 'HighlightTabsParams'),
                 description: 'Highlights the given tabs and focuses on the first one',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             case 'moveTabs': {
               const paramsAndDescription = {
@@ -330,14 +387,20 @@ export class TabsApiTools extends BaseApiTools {
                 description:
                   'Moves tabs to a new position within their window or to another window',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             case 'sendMessage': {
               const paramsAndDescription = {
                 params: toJson(this.sendMessageSchema, 'SendMessageParams'),
                 description: 'Sends a message to content scripts in a specific tab',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             default:
               return this.formatError(new Error(`Action "${action}" is not supported`));

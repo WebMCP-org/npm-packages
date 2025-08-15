@@ -128,7 +128,10 @@ export class ScriptingApiTools extends BaseApiTools {
       async ({ tabId, code, allFrames = false, world = 'MAIN' }) => {
         try {
           if (tabId === undefined) {
-            const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            const [activeTab] = await chrome.tabs.query({
+              active: true,
+              currentWindow: true,
+            });
             if (!activeTab || !activeTab.id) {
               return this.formatError(new Error('No active tab found'));
             }
@@ -204,7 +207,10 @@ export class ScriptingApiTools extends BaseApiTools {
       async ({ tabId, code, allFrames = false, world = 'USER_SCRIPT' }) => {
         try {
           if (tabId === undefined) {
-            const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            const [activeTab] = await chrome.tabs.query({
+              active: true,
+              currentWindow: true,
+            });
             if (!activeTab || !activeTab.id) {
               return this.formatError(new Error('No active tab found'));
             }
@@ -258,7 +264,10 @@ export class ScriptingApiTools extends BaseApiTools {
       async ({ tabId, code, allFrames = false }) => {
         try {
           if (tabId === undefined) {
-            const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            const [activeTab] = await chrome.tabs.query({
+              active: true,
+              currentWindow: true,
+            });
             if (!activeTab || !activeTab.id) {
               return this.formatError(new Error('No active tab found'));
             }
@@ -363,7 +372,10 @@ export class ScriptingApiTools extends BaseApiTools {
       async ({ tabId, css, allFrames = false }) => {
         try {
           if (tabId === undefined) {
-            const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            const [activeTab] = await chrome.tabs.query({
+              active: true,
+              currentWindow: true,
+            });
             if (!activeTab || !activeTab.id) {
               return this.formatError(new Error('No active tab found'));
             }
@@ -406,7 +418,10 @@ export class ScriptingApiTools extends BaseApiTools {
       async ({ tabId, css, allFrames = false }) => {
         try {
           if (tabId === undefined) {
-            const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            const [activeTab] = await chrome.tabs.query({
+              active: true,
+              currentWindow: true,
+            });
             if (!activeTab || !activeTab.id) {
               return this.formatError(new Error('No active tab found'));
             }

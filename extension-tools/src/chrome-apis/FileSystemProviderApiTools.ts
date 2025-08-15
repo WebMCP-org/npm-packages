@@ -191,7 +191,9 @@ export class FileSystemProviderApiTools extends BaseApiTools {
             });
           });
 
-          return this.formatSuccess('File system unmounted successfully', { fileSystemId });
+          return this.formatSuccess('File system unmounted successfully', {
+            fileSystemId,
+          });
         } catch (error) {
           return this.formatError(error);
         }

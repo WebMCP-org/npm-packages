@@ -210,7 +210,9 @@ export class WebAuthenticationProxyApiTools extends BaseApiTools {
             });
           });
 
-          return this.formatSuccess('Create request completed successfully', { requestId });
+          return this.formatSuccess('Create request completed successfully', {
+            requestId,
+          });
         } catch (error) {
           return this.formatError(error);
         }
@@ -262,7 +264,9 @@ export class WebAuthenticationProxyApiTools extends BaseApiTools {
             });
           });
 
-          return this.formatSuccess('Get request completed successfully', { requestId });
+          return this.formatSuccess('Get request completed successfully', {
+            requestId,
+          });
         } catch (error) {
           return this.formatError(error);
         }

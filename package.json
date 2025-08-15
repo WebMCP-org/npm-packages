@@ -1,43 +1,43 @@
 {
-	"name": "@mcp-b/npm-packages",
-	"version": "1.0.0",
-	"private": true,
-	"type": "module",
-	"scripts": {
-		"build": "turbo run build",
-		"changeset": "changeset",
-		"changeset:publish": "pnpm build && changeset publish",
-		"changeset:version": "changeset version",
-		"check": "biome check --write .",
-		"check-all": "pnpm run typecheck && biome ci --linter-enabled --formatter-enabled .",
-		"check:ci": "biome ci .",
-		"ci:publish": "pnpm publish -r --access public",
-		"clean": "git clean -xdf .cache .turbo node_modules",
-		"format": "biome format --write .",
-		"format:check": "biome format .",
-		"lint": "biome lint --write .",
-		"lint:check": "biome lint .",
-		"prepare": "husky",
-		"typecheck": "turbo run typecheck"
-	},
-	"dependencies": {
-		"dotenv": "^17.2.1",
-		"pnpm": "^10.11.0",
-		"tslib": "^2.0.0",
-		"turbo": "^2.5.6"
-	},
-	"devDependencies": {
-		"@biomejs/biome": "^2.2.0",
-		"@changesets/cli": "^2.29.5",
-		"@commitlint/cli": "^19.8.1",
-		"@commitlint/config-conventional": "^19.8.1",
-		"husky": "^9.1.7",
-		"jiti": "^2.5.1",
-		"lint-staged": "^16.1.5"
-	},
-	"packageManager": "pnpm@10.12.1",
-	"engines": {
-		"node": ">=22.12",
-		"pnpm": "^10"
-	}
+  "name": "@mcp-b/npm-packages",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "turbo run build",
+    "changeset": "changeset",
+    "changeset:publish": "pnpm build && changeset publish",
+    "changeset:version": "changeset version",
+    "check": "biome check --write .",
+    "check-all": "pnpm run typecheck && biome ci --linter-enabled --formatter-enabled .",
+    "check:ci": "biome ci .",
+    "ci:publish": "pnpm publish -r --access public",
+    "clean": "git clean -xdf .cache .turbo node_modules",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "lint": "biome lint --write .",
+    "lint:check": "biome lint .",
+    "prepare": "husky",
+    "typecheck": "turbo run typecheck"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.1",
+    "pnpm": "^10.11.0",
+    "tslib": "^2.0.0",
+    "turbo": "^2.5.6"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.2.0",
+    "@changesets/cli": "^2.29.5",
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
+    "husky": "^9.1.7",
+    "jiti": "^2.5.1",
+    "lint-staged": "^16.1.5"
+  },
+  "packageManager": "pnpm@10.12.1",
+  "engines": {
+    "node": ">=22.12",
+    "pnpm": "^10"
+  }
 }

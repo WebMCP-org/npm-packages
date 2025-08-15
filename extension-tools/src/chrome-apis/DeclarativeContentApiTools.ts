@@ -221,7 +221,8 @@ export class DeclarativeContentApiTools extends BaseApiTools {
               actions: rule.actions.map((action) => {
                 if (action.type === 'ShowAction') {
                   return new chrome.declarativeContent.ShowAction();
-                } else if (action.type === 'SetIcon') {
+                }
+                if (action.type === 'SetIcon') {
                   const setIconParams: any = {};
                   if (action.imageData) {
                     setIconParams.imageData = action.imageData;
@@ -289,9 +290,8 @@ export class DeclarativeContentApiTools extends BaseApiTools {
             return this.formatSuccess('Specified declarative content rules removed successfully', {
               removedRuleIds: ruleIds,
             });
-          } else {
-            return this.formatSuccess('All declarative content rules removed successfully');
           }
+          return this.formatSuccess('All declarative content rules removed successfully');
         } catch (error) {
           return this.formatError(error);
         }

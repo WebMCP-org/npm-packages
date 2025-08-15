@@ -1,73 +1,73 @@
 {
-	"name": "@mcp-b/transports",
-	"version": "1.0.2",
-	"description": "Transports for the in browser transport protocols",
-	"keywords": [
-		"mcp",
-		"model-context-protocol",
-		"browser",
-		"transport",
-		"browser-extension",
-		"tab-transport",
-		"chrome-extension"
-	],
-	"homepage": "https://github.com/MiguelsPizza/WebMCP#readme",
-	"bugs": {
-		"url": "https://github.com/MiguelsPizza/WebMCP/issues"
-	},
-	"repository": {
-		"type": "git",
-		"url": "git+https://github.com/MiguelsPizza/WebMCP.git",
-		"directory": "packages/transports"
-	},
-	"license": "MIT",
-	"author": "Alex Nahas",
-	"type": "module",
-	"exports": {
-		".": {
-			"import": "./dist/index.js",
-			"types": "./dist/index.d.ts"
-		}
-	},
-	"main": "./dist/index.js",
-	"module": "./dist/index.js",
-	"types": "./dist/index.d.ts",
-	"files": [
-		"dist"
-	],
-	"scripts": {
-		"build": "tsup",
-		"check": "biome check --write .",
-		"clean": "rm -rf dist .turbo",
-		"format": "biome format --write .",
-		"lint": "biome lint --write .",
-		"prepublishOnly": "pnpm run build",
-		"publish:dry": "pnpm publish --access public --dry-run",
-		"publish:npm": "pnpm publish --access public",
-		"typecheck": "tsc --noEmit",
-		"version:major": "pnpm version major --no-git-tag-version",
-		"version:minor": "pnpm version minor --no-git-tag-version",
-		"version:patch": "pnpm version patch --no-git-tag-version"
-	},
-	"dependencies": {
-		"zod": "catalog:"
-	},
-	"devDependencies": {
-		"@types/chrome": "catalog:",
-		"@types/node": "catalog:",
-		"tsup": "catalog:",
-		"typescript": "catalog:"
-	},
-	"peerDependencies": {
-		"@modelcontextprotocol/sdk": "^1.15.0"
-	},
-	"peerDependenciesMeta": {
-		"@modelcontextprotocol/sdk": {
-			"optional": false
-		}
-	},
-	"publishConfig": {
-		"access": "public",
-		"registry": "https://registry.npmjs.org/"
-	}
+  "name": "@mcp-b/transports",
+  "version": "1.0.2",
+  "description": "Transports for the in browser transport protocols",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "browser",
+    "transport",
+    "browser-extension",
+    "tab-transport",
+    "chrome-extension"
+  ],
+  "homepage": "https://github.com/MiguelsPizza/WebMCP#readme",
+  "bugs": {
+    "url": "https://github.com/MiguelsPizza/WebMCP/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MiguelsPizza/WebMCP.git",
+    "directory": "packages/transports"
+  },
+  "license": "MIT",
+  "author": "Alex Nahas",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "check": "biome check --write .",
+    "clean": "rm -rf dist .turbo",
+    "format": "biome format --write .",
+    "lint": "biome lint --write .",
+    "prepublishOnly": "pnpm run build",
+    "publish:dry": "pnpm publish --access public --dry-run",
+    "publish:npm": "pnpm publish --access public",
+    "typecheck": "tsc --noEmit",
+    "version:major": "pnpm version major --no-git-tag-version",
+    "version:minor": "pnpm version minor --no-git-tag-version",
+    "version:patch": "pnpm version patch --no-git-tag-version"
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/chrome": "catalog:",
+    "@types/node": "catalog:",
+    "tsup": "catalog:",
+    "typescript": "catalog:"
+  },
+  "peerDependencies": {
+    "@modelcontextprotocol/sdk": "^1.15.0"
+  },
+  "peerDependenciesMeta": {
+    "@modelcontextprotocol/sdk": {
+      "optional": false
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
 }
