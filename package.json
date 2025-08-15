@@ -34,7 +34,7 @@
     "jiti": "^2.5.1",
     "lint-staged": "^16.1.5"
   },
-  "packageManager": "pnpm@10.12.1",
+  "packageManager": "pnpm@10.14.0",
   "engines": {
     "node": ">=22.12",
     "pnpm": "^10"
