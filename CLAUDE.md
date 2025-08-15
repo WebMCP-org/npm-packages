@@ -64,10 +64,9 @@ This is a **pnpm workspace monorepo** containing the official NPM packages for M
 
 1. **@mcp-b/transports** - Core browser transport implementations (postMessage, Chrome runtime messaging)
 2. **@mcp-b/mcp-react-hooks** - React hooks for MCP integration  
-3. **@mcp-b/web-tools** - MCP tools for web APIs (Prompt API, etc.)
-4. **@mcp-b/extension-tools** - Auto-generated tools for Chrome Extension APIs
-5. **@mcp-b/mcp-react-hook-form** - React Hook Form integration
-6. **@mcp-b/global** - Shared type definitions (internal use)
+3. **@mcp-b/extension-tools** - Auto-generated tools for Chrome Extension APIs
+4. **@mcp-b/mcp-react-hook-form** - React Hook Form integration
+5. **@mcp-b/global** - Shared type definitions (internal use)
 
 ### Build System
 
@@ -92,6 +91,7 @@ This monorepo uses pnpm's advanced features for optimal dependency management an
 - Internal package dependencies use `workspace:*` protocol
 - Automatically converted to actual versions during publishing
 - Example: `"@mcp-b/transports": "workspace:*"`
+- Packages list in pnpm-workspace.yaml must match actual package directories
 
 ### Catalog Protocol
 All shared dependencies are managed through the pnpm catalog in `pnpm-workspace.yaml`:
@@ -151,7 +151,7 @@ Key configurations for optimal monorepo performance:
    # Format: <type>(<scope>): <subject>
    # Examples:
    git commit -m "feat(transports): add timeout option"
-   git commit -m "fix(web-tools): handle worker context"
+   git commit -m "fix(extension-tools): handle chrome runtime errors"
    git commit -m "chore(deps): update dependencies"
    git push origin feature/your-feature-name
    ```
@@ -161,7 +161,7 @@ Key configurations for optimal monorepo performance:
 **All commits must follow this format:** `<type>(<scope>): <subject>`
 
 Valid scopes:
-- Package scopes: `transports`, `web-tools`, `extension-tools`, `mcp-react-hooks`, `mcp-react-hook-form`, `global`
+- Package scopes: `transports`, `extension-tools`, `mcp-react-hooks`, `mcp-react-hook-form`, `global`
 - Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*` (multiple packages)
 
 Valid types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`

@@ -17,9 +17,6 @@ npm install @mcp-b/transports
 # React integration
 npm install @mcp-b/mcp-react-hooks
 
-# Web API tools
-npm install @mcp-b/web-tools
-
 # Chrome Extension API tools
 npm install @mcp-b/extension-tools
 ```
@@ -30,7 +27,6 @@ npm install @mcp-b/extension-tools
 |---------|-----|-------------|---------------|
 | [@mcp-b/transports](./transports) | [![npm](https://img.shields.io/npm/v/@mcp-b/transports)](https://www.npmjs.com/package/@mcp-b/transports) | Browser-specific MCP transport implementations | [Docs](./transports/README.md) |
 | [@mcp-b/mcp-react-hooks](./mcp-react-hooks) | [![npm](https://img.shields.io/npm/v/@mcp-b/mcp-react-hooks)](https://www.npmjs.com/package/@mcp-b/mcp-react-hooks) | React hooks for MCP integration | [Docs](./mcp-react-hooks/README.md) |
-| [@mcp-b/web-tools](./web-tools) | [![npm](https://img.shields.io/npm/v/@mcp-b/web-tools)](https://www.npmjs.com/package/@mcp-b/web-tools) | MCP tools for web APIs (Prompt API, etc.) | [Docs](./web-tools/README.md) |
 | [@mcp-b/extension-tools](./extension-tools) | [![npm](https://img.shields.io/npm/v/@mcp-b/extension-tools)](https://www.npmjs.com/package/@mcp-b/extension-tools) | MCP tools for Chrome Extension APIs | [Docs](./extension-tools/README.md) |
 | [@mcp-b/mcp-react-hook-form](./mcp-react-hook-form) | [![npm](https://img.shields.io/npm/v/@mcp-b/mcp-react-hook-form)](https://www.npmjs.com/package/@mcp-b/mcp-react-hook-form) | React Hook Form integration for MCP | [Docs](./mcp-react-hook-form/README.md) |
 | [@mcp-b/global](./global) | Internal | Global type definitions | Internal use |
@@ -83,8 +79,8 @@ These packages implement the Model Context Protocol for browser environments:
 
 - **Transports**: Handle communication between MCP servers and clients using browser-specific mechanisms (postMessage, Chrome runtime messaging)
 - **React Hooks**: Provide React-friendly APIs for MCP integration
-- **Web Tools**: Pre-built MCP tools for common web APIs
 - **Extension Tools**: Auto-generated tools for Chrome Extension APIs
+- **React Hook Form**: Integration with React Hook Form for form handling
 
 ## 🔧 Development
 
@@ -166,7 +162,7 @@ Contributions are welcome! Please see our [Contributing Guide](./CONTRIBUTING.md
 
 ## 📄 License
 
-MIT - see [LICENSE](../LICENSE) for details.
+MIT - see [LICENSE](./LICENSE) for details.
 
 ## 🔗 Links
 

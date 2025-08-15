@@ -121,7 +121,6 @@ We follow the [Conventional Commits](https://www.conventionalcommits.org/) speci
 #### Scopes (Required)
 Package scopes:
 - `transports` - Changes to @mcp-b/transports
-- `web-tools` - Changes to @mcp-b/web-tools
 - `extension-tools` - Changes to @mcp-b/extension-tools
 - `mcp-react-hooks` - Changes to @mcp-b/mcp-react-hooks
 - `mcp-react-hook-form` - Changes to @mcp-b/mcp-react-hook-form
@@ -139,7 +138,7 @@ Repository-wide scopes:
 ```bash
 # Package-specific changes
 git commit -m "feat(transports): add postMessage timeout option to TabServerTransport"
-git commit -m "fix(web-tools): handle undefined window.prompt in workers"
+git commit -m "fix(extension-tools): handle chrome.runtime errors gracefully"
 git commit -m "docs(mcp-react-hooks): update usage examples"
 
 # Repository-wide changes
@@ -181,7 +180,6 @@ git commit -m "refactor(*): update to new MCP SDK types"
 npm-packages/
 ├── transports/           # Core transport implementations
 ├── mcp-react-hooks/      # React hooks for MCP
-├── web-tools/            # Web API tools
 ├── extension-tools/      # Chrome Extension API tools
 ├── mcp-react-hook-form/  # React Hook Form integration
 ├── global/               # Shared types (internal)
@@ -201,11 +199,6 @@ When contributing to a specific package:
 - Follow React best practices
 - Ensure proper cleanup in useEffect
 - Add proper TypeScript types for hooks
-
-### @mcp-b/web-tools
-- Only use browser-available APIs
-- Add proper error handling
-- Document API requirements
 
 ### @mcp-b/extension-tools
 - Test in Chrome extension context
