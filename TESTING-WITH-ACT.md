@@ -21,6 +21,7 @@ Create a `.secrets` file in the project root with your tokens:
 
 ```bash
 GITHUB_TOKEN=ghp_YOUR_GITHUB_TOKEN_HERE
+PAT_TOKEN=ghp_YOUR_PERSONAL_ACCESS_TOKEN_HERE
 NPM_TOKEN=npm_YOUR_NPM_TOKEN_HERE
 ```
 
@@ -28,10 +29,16 @@ NPM_TOKEN=npm_YOUR_NPM_TOKEN_HERE
 
 #### Getting Tokens
 
-- **GitHub Token**: 
+- **GitHub Token (GITHUB_TOKEN)**: 
   1. Go to https://github.com/settings/tokens/new
   2. Select scopes: `repo`, `workflow`, `write:packages`
   3. Generate and copy the token
+
+- **Personal Access Token (PAT_TOKEN)**: 
+  1. Go to https://github.com/settings/tokens/new
+  2. Select scopes: `repo`, `workflow`, `write:packages`, `pull_request`
+  3. Generate and copy the token
+  4. Add this token as a repository secret named `PAT_TOKEN` in Settings → Secrets and variables → Actions
 
 - **NPM Token**:
   1. Go to https://www.npmjs.com/settings/YOUR_USERNAME/tokens
