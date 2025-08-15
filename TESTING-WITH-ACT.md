@@ -103,14 +103,14 @@ On Apple Silicon Macs, always use the `--container-architecture linux/amd64` fla
 act push --container-architecture linux/amd64
 ```
 
-### 2. pnpm Path Issues
+### 2. pnpm Version Mismatch
 
-You may encounter pnpm module resolution errors in act:
+Ensure the pnpm version in `package.json`'s `packageManager` field matches the version specified in GitHub Actions workflows. If they don't match, you'll see:
 ```
-Error: Cannot find module '../dist/pnpm.cjs'
+Error: Multiple versions of pnpm specified
 ```
 
-This is a known issue with act's environment simulation and doesn't affect actual GitHub Actions. The workaround is to use the test workflows or run commands directly.
+Fix by updating `packageManager` in `package.json` to match the workflow version.
 
 ### 3. Git Authentication
 
