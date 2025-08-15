@@ -128,6 +128,11 @@ pnpm dev
 - **Type Safety**: Full TypeScript with strict mode enabled
 - **CI/CD**: GitHub Actions for automated testing and publishing
 
+### Testing Locally
+
+- **GitHub Actions**: Test workflows locally with [act](./TESTING-WITH-ACT.md)
+- **Unit Tests**: Run tests with `pnpm test` (when implemented)
+
 ### Publishing
 
 We use [changesets](https://github.com/changesets/changesets) for version management:

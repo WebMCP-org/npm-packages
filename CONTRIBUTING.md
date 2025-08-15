@@ -207,12 +207,22 @@ When contributing to a specific package:
 
 ## Testing
 
-While we don't have automated tests yet, please:
+### Manual Testing
 
 1. Manually test your changes thoroughly
 2. Test in different browsers when applicable
 3. Test in both development and production builds
 4. Include testing steps in your PR description
+
+### Testing GitHub Actions Locally
+
+You can test GitHub Actions workflows locally before pushing:
+
+1. Install [act](https://github.com/nektos/act) (simulates GitHub Actions)
+2. Set up your tokens and configuration
+3. Run workflows locally
+
+See our [Testing with Act Guide](./TESTING-WITH-ACT.md) for detailed instructions.
 
 ## Documentation
 
