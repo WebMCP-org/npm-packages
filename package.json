@@ -1,0 +1,61 @@
+{
+  "name": "@mcp-b/npm-packages",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "packageManager": "pnpm@10.12.1",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "dev:mcp": "turbo run dev --filter=@mcp-b/extension --filter=@mcp-b/native-server",
+    "lint": "biome lint --write .",
+    "lint:check": "biome lint .",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "check": "biome check --write .",
+    "check:ci": "biome ci .",
+    "lint:turbo": "turbo run lint",
+    "format:turbo": "turbo run format",
+    "test": "turbo run test --continue",
+    "test:e2e": "turbo run test --filter=@mcp-b/e2e-tests",
+    "clean": "git clean -xdf .cache .turbo node_modules",
+    "clear-configs": "node scripts/clear-native-configs.js",
+    "typecheck": "turbo run typecheck",
+    "check-all": "pnpm run typecheck && biome ci --linter-enabled --formatter-enabled .",
+    "publish:packages": "turbo run publish:npm --filter='./packages/*'",
+    "publish:dry": "turbo run publish:dry --filter='./packages/*'",
+    "publish:github": "pnpm publish:packages",
+    "changeset": "changeset",
+    "changeset:version": "changeset version",
+    "changeset:publish": "turbo run build --filter='./packages/*' && changeset publish",
+    "version:patch": "turbo run version:patch --filter='./packages/*'",
+    "version:minor": "turbo run version:minor --filter='./packages/*'",
+    "version:major": "turbo run version:major --filter='./packages/*'",
+    "build:packages": "turbo run build --filter='./packages/*'",
+    "prepare:publish": "turbo run prepare:publish --filter='./packages/*' --filter='./native-server'",
+    "publish:wizard": "./scripts/publish-packages.sh",
+    "prepare": "husky"
+  },
+  "engines": {
+    "node": ">=22.12",
+    "pnpm": "^10"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.0.6",
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
+    "husky": "^9.1.7",
+    "jiti": "^2.4.2",
+    "lint-staged": "^16.1.2",
+    "tsup": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:"
+  },
+  "dependencies": {
+    "@changesets/cli": "^2.27.12",
+    "dotenv": "catalog:",
+    "pnpm": "^10.11.0",
+    "tslib": "^2.0.0",
+    "turbo": "^2.3.3"
+  }
+}
