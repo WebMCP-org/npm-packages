@@ -1,70 +1,69 @@
 {
-  "name": "@mcp-b/mcp-react-hook-form",
-  "version": "0.0.2",
-  "description": "React Hook Form integration for MCP tools - transform forms into AI-callable tools",
-  "type": "module",
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    }
-  },
-  "files": [
-    "dist"
-  ],
-  "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
-    "clean": "rm -rf dist",
-    "typecheck": "tsc --noEmit",
-    "prepublishOnly": "pnpm run build",
-    "prepare:publish": "node ../../scripts/replace-workspace-deps.cjs ./package.json",
-    "lint": "biome lint --write .",
-    "format": "biome format --write .",
-    "check": "biome check --write ."
-  },
-  "keywords": [
-    "mcp",
-    "react",
-    "hook-form",
-    "forms",
-    "react-hook-form",
-    "zod",
-    "ai",
-    "tools"
-  ],
-  "author": "Alex Nahas",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/MiguelsPizza/WebMCP.git",
-    "directory": "packages/mcp-react-hook-form"
-  },
-  "homepage": "https://github.com/MiguelsPizza/WebMCP/tree/main/packages/mcp-react-hook-form#readme",
-  "bugs": {
-    "url": "https://github.com/MiguelsPizza/WebMCP/issues"
-  },
-  "peerDependencies": {
-    "@hookform/resolvers": "^3.0.0",
-    "@modelcontextprotocol/sdk": "^1.0.0",
-    "react": "^18.0.0 || ^19.0.0",
-    "react-hook-form": "^7.0.0",
-    "zod": "^3.0.0"
-  },
-  "devDependencies": {
-    "@hookform/resolvers": "catalog:",
-    "@modelcontextprotocol/sdk": "catalog:",
-    "@types/react": "catalog:",
-    "react": "catalog:",
-    "react-hook-form": "catalog:",
-    "typescript": "catalog:",
-    "zod": "catalog:"
-  },
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
-  }
+	"name": "@mcp-b/mcp-react-hook-form",
+	"version": "0.0.2",
+	"description": "React Hook Form integration for MCP tools - transform forms into AI-callable tools",
+	"keywords": [
+		"mcp",
+		"react",
+		"hook-form",
+		"forms",
+		"react-hook-form",
+		"zod",
+		"ai",
+		"tools"
+	],
+	"homepage": "https://github.com/MiguelsPizza/WebMCP/tree/main/packages/mcp-react-hook-form#readme",
+	"bugs": {
+		"url": "https://github.com/MiguelsPizza/WebMCP/issues"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/MiguelsPizza/WebMCP.git",
+		"directory": "packages/mcp-react-hook-form"
+	},
+	"license": "MIT",
+	"author": "Alex Nahas",
+	"type": "module",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		}
+	},
+	"main": "./dist/index.js",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsc",
+		"check": "biome check --write .",
+		"clean": "rm -rf dist",
+		"dev": "tsc --watch",
+		"format": "biome format --write .",
+		"lint": "biome lint --write .",
+		"prepublishOnly": "pnpm run build",
+		"typecheck": "tsc --noEmit"
+	},
+	"devDependencies": {
+		"@hookform/resolvers": "^5.2.1",
+		"@modelcontextprotocol/sdk": "catalog:",
+		"@types/react": "catalog:",
+		"react": "catalog:",
+		"react-hook-form": "^7.62.0",
+		"typescript": "catalog:",
+		"zod": "catalog:"
+	},
+	"peerDependencies": {
+		"@hookform/resolvers": "^3.0.0",
+		"@modelcontextprotocol/sdk": "^1.0.0",
+		"react": "^18.0.0 || ^19.0.0",
+		"react-hook-form": "^7.0.0",
+		"zod": "^3.0.0"
+	},
+	"publishConfig": {
+		"access": "public",
+		"registry": "https://registry.npmjs.org/"
+	}
 }

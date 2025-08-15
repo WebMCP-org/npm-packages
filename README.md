@@ -88,7 +88,14 @@ These packages implement the Model Context Protocol for browser environments:
 
 ## 🔧 Development
 
-This is a pnpm workspace monorepo. To work with these packages locally:
+This is a pnpm workspace monorepo using Turbo for build orchestration.
+
+### Prerequisites
+
+- Node.js >= 22.12 (see `.nvmrc`)
+- pnpm >= 10.0.0
+
+### Getting Started
 
 ```bash
 # Clone the repository
@@ -101,26 +108,49 @@ pnpm install
 # Build all packages
 pnpm build
 
-# Run tests
-pnpm test
-
 # Development mode with watch
 pnpm dev
 ```
 
+### Available Scripts
+
+| Script | Description |
+|--------|-------------|
+| `pnpm build` | Build all packages |
+| `pnpm dev` | Start development mode with watch |
+| `pnpm typecheck` | Run TypeScript type checking |
+| `pnpm check` | Run Biome linting and formatting (with fixes) |
+| `pnpm check:ci` | Run Biome checks (CI mode) |
+| `pnpm changeset` | Create a new changeset |
+| `pnpm changeset:version` | Update versions based on changesets |
+| `pnpm changeset:publish` | Build and publish packages to npm |
+
+### Code Quality
+
+- **Linting & Formatting**: We use [Biome](https://biomejs.dev/) for fast, unified linting and formatting
+- **Pre-commit Hooks**: Automatic formatting via Husky and lint-staged
+- **Type Safety**: Full TypeScript with strict mode enabled
+- **CI/CD**: GitHub Actions for automated testing and publishing
+
 ### Publishing
 
-We use changesets for version management:
+We use [changesets](https://github.com/changesets/changesets) for version management:
 
 ```bash
-# Create a changeset for your changes
+# 1. Create a changeset for your changes
 pnpm changeset
 
-# Version packages
-pnpm changeset:version
+# 2. Commit the changeset file
+git add .changeset/*.md
+git commit -m "Add changeset"
 
-# Build and publish to npm
-pnpm changeset:publish
+# 3. Push to main branch
+git push origin main
+
+# GitHub Actions will automatically:
+# - Create a Version PR
+# - Update versions when merged
+# - Publish to npm
 ```
 
 ## 📚 Documentation
@@ -132,7 +162,7 @@ pnpm changeset:publish
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please see our [Contributing Guide](../CONTRIBUTING.md) for details.
+Contributions are welcome! Please see our [Contributing Guide](./CONTRIBUTING.md) for details.
 
 ## 📄 License
 
