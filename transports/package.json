@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/transports",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Transports for the in browser transport protocols",
   "keywords": [
     "mcp",

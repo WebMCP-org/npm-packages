@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/mcp-react-hook-form",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "React Hook Form integration for MCP tools - transform forms into AI-callable tools",
   "keywords": [
     "mcp",

@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/mcp-react-hooks",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "React hooks for MCP (Model Context Protocol) client",
   "keywords": [
     "mcp",

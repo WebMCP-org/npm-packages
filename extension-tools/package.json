@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/extension-tools",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Chrome Extension API tools for Model Context Protocol (MCP) - provides MCP-compatible wrappers for browser extension APIs",
   "keywords": [
     "mcp",
