@@ -375,7 +375,9 @@ export class DownloadsApiTools extends BaseApiTools {
             });
           });
 
-          return this.formatSuccess('Download paused successfully', { downloadId });
+          return this.formatSuccess('Download paused successfully', {
+            downloadId,
+          });
         } catch (error) {
           return this.formatError(error);
         }
@@ -404,7 +406,9 @@ export class DownloadsApiTools extends BaseApiTools {
             });
           });
 
-          return this.formatSuccess('Download resumed successfully', { downloadId });
+          return this.formatSuccess('Download resumed successfully', {
+            downloadId,
+          });
         } catch (error) {
           return this.formatError(error);
         }
@@ -433,7 +437,9 @@ export class DownloadsApiTools extends BaseApiTools {
             });
           });
 
-          return this.formatSuccess('Download cancelled successfully', { downloadId });
+          return this.formatSuccess('Download cancelled successfully', {
+            downloadId,
+          });
         } catch (error) {
           return this.formatError(error);
         }
@@ -495,7 +501,9 @@ export class DownloadsApiTools extends BaseApiTools {
       async ({ downloadId }) => {
         try {
           chrome.downloads.open(downloadId);
-          return this.formatSuccess('Download opened successfully', { downloadId });
+          return this.formatSuccess('Download opened successfully', {
+            downloadId,
+          });
         } catch (error) {
           return this.formatError(error);
         }
@@ -515,7 +523,9 @@ export class DownloadsApiTools extends BaseApiTools {
       async ({ downloadId }) => {
         try {
           chrome.downloads.show(downloadId);
-          return this.formatSuccess('Download shown in file manager', { downloadId });
+          return this.formatSuccess('Download shown in file manager', {
+            downloadId,
+          });
         } catch (error) {
           return this.formatError(error);
         }
@@ -662,7 +672,9 @@ export class DownloadsApiTools extends BaseApiTools {
             });
           });
 
-          return this.formatSuccess('Downloaded file removed successfully', { downloadId });
+          return this.formatSuccess('Downloaded file removed successfully', {
+            downloadId,
+          });
         } catch (error) {
           return this.formatError(error);
         }
@@ -691,7 +703,9 @@ export class DownloadsApiTools extends BaseApiTools {
             });
           });
 
-          return this.formatSuccess('Dangerous download accepted', { downloadId });
+          return this.formatSuccess('Dangerous download accepted', {
+            downloadId,
+          });
         } catch (error) {
           return this.formatError(error);
         }

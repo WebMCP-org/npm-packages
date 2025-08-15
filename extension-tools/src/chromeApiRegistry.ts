@@ -915,8 +915,13 @@ export function isApiAvailable(
   const metadata = CHROME_API_REGISTRY[api];
 
   // Check context
-  // @ts-expect-error - this is a hack to get the type to work
-  if (!metadata.contexts.includes(context) && !metadata.contexts.includes('all')) {
+  if (
+    // @ts-expect-error - this is a hack to get the type to work
+    !metadata.contexts.includes(context) &&
+    // @ts-expect-error - this is a hack to get the type to work
+
+    !metadata.contexts.includes('all')
+  ) {
     return false;
   }
 

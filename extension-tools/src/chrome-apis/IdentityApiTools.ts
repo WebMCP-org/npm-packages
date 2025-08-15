@@ -332,7 +332,9 @@ export class IdentityApiTools extends BaseApiTools {
             });
           });
 
-          return this.formatSuccess('Token removed from cache successfully', { token });
+          return this.formatSuccess('Token removed from cache successfully', {
+            token,
+          });
         } catch (error) {
           return this.formatError(error);
         }

@@ -7,7 +7,7 @@
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
-  "ignore": ["@mcp-b/e2e-tests", "mcp-b"],
+  "ignore": [],
   "privatePackages": {
     "version": false,
     "tag": false

@@ -2,17 +2,6 @@
   "name": "@mcp-b/global",
   "version": "1.0.11",
   "description": "ESM bundle for MCP-B browser injection via Chrome MV3 scripting",
-  "license": "MIT",
-  "author": "Alex Nahas",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/MiguelsPizza/WebMCP.git",
-    "directory": "packages/global"
-  },
-  "homepage": "https://github.com/MiguelsPizza/WebMCP#readme",
-  "bugs": {
-    "url": "https://github.com/MiguelsPizza/WebMCP/issues"
-  },
   "keywords": [
     "mcp",
     "model-context-protocol",
@@ -22,48 +11,58 @@
     "injection",
     "esm"
   ],
+  "homepage": "https://github.com/MiguelsPizza/WebMCP#readme",
+  "bugs": {
+    "url": "https://github.com/MiguelsPizza/WebMCP/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MiguelsPizza/WebMCP.git",
+    "directory": "packages/global"
+  },
+  "license": "MIT",
+  "author": "Alex Nahas",
+  "sideEffects": true,
   "type": "module",
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "browser": "./dist/index.js",
   "exports": {
     ".": "./dist/index.js"
   },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "browser": "./dist/index.js",
   "files": [
     "dist"
   ],
   "scripts": {
     "build": "vite build",
-    "preview": "vite preview",
-    "typecheck": "tsc --noEmit",
+    "check": "biome check --write .",
     "clean": "rm -rf dist .turbo",
-    "prepublishOnly": "pnpm run build",
-    "prepare:publish": "node ../../scripts/replace-workspace-deps.cjs ./package.json",
-    "publish:npm": "npm publish --access public --no-git-checks",
-    "publish:dry": "pnpm publish --access public --no-git-checks --dry-run",
-    "version:patch": "pnpm version patch --no-git-tag-version",
-    "version:minor": "pnpm version minor --no-git-tag-version",
-    "version:major": "pnpm version major --no-git-tag-version",
-    "lint": "biome lint --write .",
     "format": "biome format --write .",
-    "check": "biome check --write ."
+    "lint": "biome lint --write .",
+    "prepublishOnly": "pnpm run build",
+    "preview": "vite preview",
+    "publish:dry": "pnpm publish --access public --dry-run",
+    "publish:npm": "pnpm publish --access public",
+    "typecheck": "tsc --noEmit",
+    "version:major": "pnpm version major --no-git-tag-version",
+    "version:minor": "pnpm version minor --no-git-tag-version",
+    "version:patch": "pnpm version patch --no-git-tag-version"
   },
   "dependencies": {
     "@mcp-b/transports": "workspace:*",
-    "@modelcontextprotocol/sdk": "^1.17.2"
+    "@modelcontextprotocol/sdk": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "vite-plugin-monkey": "^6.0.1",
+    "typescript": "catalog:",
     "vite": "^7.1.1",
-    "typescript": "catalog:"
+    "vite-plugin-monkey": "^6.0.1"
+  },
+  "engines": {
+    "node": ">=18"
   },
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
-  },
-  "sideEffects": true,
-  "engines": {
-    "node": ">=18"
   }
 }

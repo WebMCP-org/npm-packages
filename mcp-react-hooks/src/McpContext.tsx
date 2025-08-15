@@ -12,7 +12,7 @@ const McpContext = createContext<McpContextValue | null>(null);
 /**
  * Check if we're running in a browser environment with MCP server available
  */
-function isBrowserMcpEnvironment(globalNamespace: string = 'mcp'): boolean {
+function isBrowserMcpEnvironment(globalNamespace = 'mcp'): boolean {
   try {
     if (typeof window === 'undefined') return false;
 
@@ -108,6 +108,6 @@ export function useBrowserTransport(): Transport {
  * }
  * ```
  */
-export function checkBrowserMcpAvailability(globalNamespace: string = 'mcp'): boolean {
+export function checkBrowserMcpAvailability(globalNamespace = 'mcp'): boolean {
   return isBrowserMcpEnvironment(globalNamespace);
 }

@@ -316,7 +316,7 @@ async function pollBatchStatus(batchId: string): Promise<void> {
     const batch = await anthropic.messages.batches.retrieve(batchId);
 
     console.log(`Batch status: ${batch.processing_status}`);
-    console.log(`Request counts:`, batch.request_counts);
+    console.log('Request counts:', batch.request_counts);
 
     if (batch.processing_status === 'ended' || batch.processing_status === 'canceling') {
       // Clear the batch ID if it's already ended or canceling
@@ -352,7 +352,11 @@ async function processBatchResults(batchId: string) {
   // Ensure output directory exists
   await fs.mkdir(OUTPUT_DIR, { recursive: true });
 
-  const successfulApis: { api: ChromeApi; className: string; fileName: string }[] = [];
+  const successfulApis: {
+    api: ChromeApi;
+    className: string;
+    fileName: string;
+  }[] = [];
 
   for (const result of results) {
     // Convert custom_id back to original API name (replace underscores with dots)
@@ -461,7 +465,9 @@ Use --force-refetch to update the documentation from the Chrome docs website.
     const requests = await createBatchRequests();
 
     console.log(`Creating batch with ${requests.length} requests...`);
-    const batch = await anthropic.messages.batches.create({ requests: requests });
+    const batch = await anthropic.messages.batches.create({
+      requests: requests,
+    });
 
     // Store the batch ID for cleanup
     currentBatchId = batch.id;

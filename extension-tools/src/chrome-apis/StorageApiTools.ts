@@ -1,7 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { type ApiAvailability, BaseApiTools } from '../BaseApiTools';
 import zodToJsonSchema from 'zod-to-json-schema';
+import { type ApiAvailability, BaseApiTools } from '../BaseApiTools';
 
 export interface StorageApiToolsOptions {
   getStorage?: boolean;
@@ -143,35 +143,50 @@ export class StorageApiTools extends BaseApiTools {
                 params: toJson(this.getStorageSchema, 'GetStorageParams'),
                 description: 'Get data from extension storage',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             case 'setStorage': {
               const paramsAndDescription = {
                 params: toJson(this.setStorageSchema, 'SetStorageParams'),
                 description: 'Set data in extension storage',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             case 'removeStorage': {
               const paramsAndDescription = {
                 params: toJson(this.removeStorageSchema, 'RemoveStorageParams'),
                 description: 'Remove specific keys from extension storage',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             case 'clearStorage': {
               const paramsAndDescription = {
                 params: toJson(this.clearStorageSchema, 'ClearStorageParams'),
                 description: 'Clear all data from a storage area',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             case 'getBytesInUse': {
               const paramsAndDescription = {
                 params: toJson(this.getBytesInUseSchema, 'GetBytesInUseParams'),
                 description: 'Get the amount of storage space used',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             default:
               return this.formatError(new Error(`Action "${action}" is not supported`));
@@ -349,6 +364,6 @@ export class StorageApiTools extends BaseApiTools {
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / k ** i).toFixed(2)) + ' ' + sizes[i];
+    return Number.parseFloat((bytes / k ** i).toFixed(2)) + ' ' + sizes[i];
   }
 }

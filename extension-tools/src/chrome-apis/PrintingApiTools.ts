@@ -303,7 +303,9 @@ export class PrintingApiTools extends BaseApiTools {
             });
           });
 
-          return this.formatSuccess('Print job cancelled successfully', { jobId });
+          return this.formatSuccess('Print job cancelled successfully', {
+            jobId,
+          });
         } catch (error) {
           return this.formatError(error);
         }

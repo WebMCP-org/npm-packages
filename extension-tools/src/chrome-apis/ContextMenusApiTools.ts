@@ -317,7 +317,9 @@ export class ContextMenusApiTools extends BaseApiTools {
             });
           });
 
-          return this.formatSuccess('Context menu item removed successfully', { id });
+          return this.formatSuccess('Context menu item removed successfully', {
+            id,
+          });
         } catch (error) {
           return this.formatError(error);
         }

@@ -2,17 +2,6 @@
   "name": "@mcp-b/extension-tools",
   "version": "0.2.1",
   "description": "Chrome Extension API tools for Model Context Protocol (MCP) - provides MCP-compatible wrappers for browser extension APIs",
-  "license": "MIT",
-  "author": "Alex Nahas",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/MiguelsPizza/WebMCP.git",
-    "directory": "packages/extension-tools"
-  },
-  "homepage": "https://github.com/MiguelsPizza/WebMCP/tree/main/packages/extension-tools#readme",
-  "bugs": {
-    "url": "https://github.com/MiguelsPizza/WebMCP/issues"
-  },
   "keywords": [
     "mcp",
     "model-context-protocol",
@@ -25,46 +14,58 @@
     "storage-api",
     "browser-automation"
   ],
+  "homepage": "https://github.com/MiguelsPizza/WebMCP/tree/main/packages/extension-tools#readme",
+  "bugs": {
+    "url": "https://github.com/MiguelsPizza/WebMCP/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MiguelsPizza/WebMCP.git",
+    "directory": "packages/extension-tools"
+  },
+  "license": "MIT",
+  "author": "Alex Nahas",
   "type": "module",
-  "main": "./dist/index.js",
   "exports": {
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     }
   },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "files": [
     "dist",
     "README.md"
   ],
   "scripts": {
     "build": "tsup",
-    "typecheck": "tsc --noEmit",
+    "check": "biome check --write .",
     "clean": "rm -rf dist .turbo",
-    "prepublishOnly": "pnpm run build",
-    "prepare:publish": "node ../../scripts/replace-workspace-deps.cjs ./package.json",
-    "generate-chrome-api-tools": "pnpx tsx src/aiScripts/generate-chrome-api-tools.ts",
-    "publish:npm": "npm publish --access public --no-git-checks",
-    "publish:dry": "pnpm publish --access public --no-git-checks --dry-run",
-    "version:patch": "pnpm version patch --no-git-tag-version",
-    "version:minor": "pnpm version minor --no-git-tag-version",
-    "version:major": "pnpm version major --no-git-tag-version",
-    "lint": "biome lint --write .",
     "format": "biome format --write .",
-    "check": "biome check --write ."
+    "generate-chrome-api-tools": "pnpx tsx src/aiScripts/generate-chrome-api-tools.ts",
+    "lint": "biome lint --write .",
+    "prepublishOnly": "pnpm run build",
+    "publish:dry": "pnpm publish --access public --dry-run",
+    "publish:npm": "pnpm publish --access public",
+    "typecheck": "tsc --noEmit",
+    "version:major": "pnpm version major --no-git-tag-version",
+    "version:minor": "pnpm version minor --no-git-tag-version",
+    "version:patch": "pnpm version patch --no-git-tag-version"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.15.0",
-    "zod": "^3.25.74",
+    "@modelcontextprotocol/sdk": "catalog:",
+    "zod": "catalog:",
     "zod-to-json-schema": "^3.24.5"
   },
   "devDependencies": {
-    "@anthropic-ai/sdk": "catalog:",
+    "@anthropic-ai/sdk": "^0.60.0",
     "@types/chrome": "catalog:",
     "@types/node": "catalog:",
-    "cheerio": "catalog:",
-    "dotenv": "catalog:",
-    "playwright": "catalog:",
+    "cheerio": "^1.1.2",
+    "dotenv": "^17.2.1",
+    "playwright": "^1.54.2",
     "tsup": "catalog:",
     "typescript": "catalog:"
   },

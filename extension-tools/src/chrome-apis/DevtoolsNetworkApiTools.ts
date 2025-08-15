@@ -167,14 +167,13 @@ export class DevtoolsNetworkApiTools extends BaseApiTools {
               listening: true,
               event: 'onNavigated',
             });
-          } else {
-            chrome.devtools.network.onNavigated.removeListener(() => {});
-
-            return this.formatSuccess('Navigation listener disabled', {
-              listening: false,
-              event: 'onNavigated',
-            });
           }
+          chrome.devtools.network.onNavigated.removeListener(() => {});
+
+          return this.formatSuccess('Navigation listener disabled', {
+            listening: false,
+            event: 'onNavigated',
+          });
         } catch (error) {
           return this.formatError(error);
         }
@@ -212,14 +211,13 @@ export class DevtoolsNetworkApiTools extends BaseApiTools {
               listening: true,
               event: 'onRequestFinished',
             });
-          } else {
-            chrome.devtools.network.onRequestFinished.removeListener(() => {});
-
-            return this.formatSuccess('Request finished listener disabled', {
-              listening: false,
-              event: 'onRequestFinished',
-            });
           }
+          chrome.devtools.network.onRequestFinished.removeListener(() => {});
+
+          return this.formatSuccess('Request finished listener disabled', {
+            listening: false,
+            event: 'onRequestFinished',
+          });
         } catch (error) {
           return this.formatError(error);
         }

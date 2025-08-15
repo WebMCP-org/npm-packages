@@ -12,6 +12,7 @@ export default defineConfig({
   target: 'esnext',
   platform: 'browser',
   external: ['react', 'react-dom'],
+  tsconfig: './tsconfig.json',
   esbuildOptions(options) {
     options.banner = {
       js: '"use client"',

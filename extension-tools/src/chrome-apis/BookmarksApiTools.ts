@@ -163,13 +163,21 @@ export class BookmarksApiTools extends BaseApiTools {
           switch (action as BookmarkAction) {
             case 'create': {
               const paramsJsonSchema = toJson(this.createSchema, 'BookmarksCreateParams');
-              const example = { title: 'My Site', url: 'https://example.com', parentId: '1' };
+              const example = {
+                title: 'My Site',
+                url: 'https://example.com',
+                parentId: '1',
+              };
               const paramAndDescription = {
                 params: paramsJsonSchema,
                 description:
                   'Create a bookmark or folder under the specified parent. A folder must have a title and no url',
               };
-              return this.formatJson({ ...payloadBase, ...paramAndDescription, example });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramAndDescription,
+                example,
+              });
             }
             case 'get': {
               const paramsJsonSchema = toJson(this.getSchema, 'BookmarksGetParams');
@@ -178,7 +186,11 @@ export class BookmarksApiTools extends BaseApiTools {
                 params: paramsJsonSchema,
                 description: 'Retrieve the specified bookmark(s) by ID',
               };
-              return this.formatJson({ ...payloadBase, ...paramAndDescription, example });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramAndDescription,
+                example,
+              });
             }
             case 'getChildren': {
               const paramsJsonSchema = toJson(this.getChildrenSchema, 'BookmarksGetChildrenParams');
@@ -187,7 +199,11 @@ export class BookmarksApiTools extends BaseApiTools {
                 params: paramsJsonSchema,
                 description: 'Retrieve the children of the specified bookmark folder',
               };
-              return this.formatJson({ ...payloadBase, ...paramAndDescription, example });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramAndDescription,
+                example,
+              });
             }
             case 'getRecent': {
               const paramsJsonSchema = toJson(this.getRecentSchema, 'BookmarksGetRecentParams');
@@ -196,7 +212,11 @@ export class BookmarksApiTools extends BaseApiTools {
                 params: paramsJsonSchema,
                 description: 'Retrieve the recently added bookmarks',
               };
-              return this.formatJson({ ...payloadBase, ...paramAndDescription, example });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramAndDescription,
+                example,
+              });
             }
             case 'getSubTree': {
               const paramsJsonSchema = toJson(this.getSubTreeSchema, 'BookmarksGetSubTreeParams');
@@ -206,7 +226,11 @@ export class BookmarksApiTools extends BaseApiTools {
                 description:
                   'Retrieve part of the bookmarks hierarchy, starting at the specified node',
               };
-              return this.formatJson({ ...payloadBase, ...paramAndDescription, example });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramAndDescription,
+                example,
+              });
             }
             case 'getTree': {
               // No params required
@@ -220,7 +244,11 @@ export class BookmarksApiTools extends BaseApiTools {
                 params: paramsJsonSchema,
                 description: 'Retrieve the entire bookmarks hierarchy',
               };
-              return this.formatJson({ ...payloadBase, ...paramAndDescription, example });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramAndDescription,
+                example,
+              });
             }
             case 'move': {
               const paramsJsonSchema = toJson(this.moveSchema, 'BookmarksMoveParams');
@@ -229,7 +257,11 @@ export class BookmarksApiTools extends BaseApiTools {
                 params: paramsJsonSchema,
                 description: 'Move the specified bookmark or folder to a new location',
               };
-              return this.formatJson({ ...payloadBase, ...paramAndDescription, example });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramAndDescription,
+                example,
+              });
             }
             case 'remove': {
               const paramsJsonSchema = toJson(this.removeSchema, 'BookmarksRemoveParams');
@@ -238,7 +270,11 @@ export class BookmarksApiTools extends BaseApiTools {
                 params: paramsJsonSchema,
                 description: 'Remove the specified bookmark or empty folder',
               };
-              return this.formatJson({ ...payloadBase, ...paramAndDescription, example });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramAndDescription,
+                example,
+              });
             }
             case 'removeTree': {
               const paramsJsonSchema = toJson(this.removeTreeSchema, 'BookmarksRemoveTreeParams');
@@ -247,7 +283,11 @@ export class BookmarksApiTools extends BaseApiTools {
                 params: paramsJsonSchema,
                 description: 'Recursively remove a bookmark folder and all its contents',
               };
-              return this.formatJson({ ...payloadBase, ...paramAndDescription, example });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramAndDescription,
+                example,
+              });
             }
             case 'search': {
               const paramsJsonSchema = toJson(this.searchSchema, 'BookmarksSearchParams');
@@ -256,7 +296,11 @@ export class BookmarksApiTools extends BaseApiTools {
                 params: paramsJsonSchema,
                 description: 'Search for bookmarks matching the given query',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription, example });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+                example,
+              });
             }
             case 'update': {
               const paramsJsonSchema = toJson(this.updateSchema, 'BookmarksUpdateParams');
@@ -266,7 +310,11 @@ export class BookmarksApiTools extends BaseApiTools {
                 description:
                   'Update the properties of a bookmark or folder. Only title and url can be changed',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription, example });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+                example,
+              });
             }
             default:
               return this.formatError(`Unknown action: ${String(action)}`);

@@ -5,7 +5,9 @@ import { useEffect, useState } from 'react';
 
 // Example showing how to handle elicitation requests on the client side
 function ClientWithElicitationHandler() {
-  const transport = new TabClientTransport('mcp', { clientInstanceId: 'elicitation-client' });
+  const transport = new TabClientTransport('mcp', {
+    clientInstanceId: 'elicitation-client',
+  });
 
   return (
     <McpClientProvider client={client} transport={transport}>

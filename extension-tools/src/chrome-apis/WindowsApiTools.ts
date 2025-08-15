@@ -1,7 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { type ApiAvailability, BaseApiTools } from '../BaseApiTools';
 import zodToJsonSchema from 'zod-to-json-schema';
+import { type ApiAvailability, BaseApiTools } from '../BaseApiTools';
 
 export interface WindowsApiToolsOptions {
   create?: boolean;
@@ -143,49 +143,70 @@ export class WindowsApiTools extends BaseApiTools {
                 description:
                   'Create a new browser window with optional sizing, position, or default URL',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             case 'get': {
               const paramsAndDescription = {
                 params: toJson(this.getSchema, 'GetWindowSchema'),
                 description: 'Get details about a specific window',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             case 'getAll': {
               const paramsAndDescription = {
                 params: toJson(this.getAllSchema, 'GetAllWindowsSchema'),
                 description: 'Get all browser windows',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             case 'getCurrent': {
               const paramsAndDescription = {
                 params: toJson(this.getCurrentSchema, 'GetCurrentWindowSchema'),
                 description: 'Get the current window',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             case 'getLastFocused': {
               const paramsAndDescription = {
                 params: toJson(this.getLastFocusedSchema, 'GetLastFocusedWindowSchema'),
                 description: 'Get the window that was most recently focused',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             case 'remove': {
               const paramAndDescription = {
                 params: toJson(this.removeSchema, 'RemoveWindowSchema'),
                 description: 'Remove (close) a window and all the tabs inside it',
               };
-              return this.formatJson({ ...payloadBase, ...paramAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramAndDescription,
+              });
             }
             case 'update': {
               const paramsAndDescription = {
                 params: toJson(this.updateSchema, 'UpdateWindowSchema'),
                 description: 'Update the properties of a window',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             default: {
               return this.formatError(`Unknown action: ${String(action)}`);

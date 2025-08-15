@@ -196,9 +196,8 @@ export class WebRequestApiTools extends BaseApiTools {
               extraInfoSpec: extraInfo,
               blocking: blocking || false,
             });
-          } else {
-            return this.formatError(`Invalid webRequest event: ${event}`);
           }
+          return this.formatError(`Invalid webRequest event: ${event}`);
         } catch (error) {
           return this.formatError(error);
         }
@@ -237,9 +236,8 @@ export class WebRequestApiTools extends BaseApiTools {
               event,
               note: 'All listeners for this event type have been targeted for removal',
             });
-          } else {
-            return this.formatError(`Invalid webRequest event: ${event}`);
           }
+          return this.formatError(`Invalid webRequest event: ${event}`);
         } catch (error) {
           return this.formatError(error);
         }
@@ -277,9 +275,8 @@ export class WebRequestApiTools extends BaseApiTools {
               event,
               hasListener,
             });
-          } else {
-            return this.formatError(`Invalid webRequest event: ${event}`);
           }
+          return this.formatError(`Invalid webRequest event: ${event}`);
         } catch (error) {
           return this.formatError(error);
         }

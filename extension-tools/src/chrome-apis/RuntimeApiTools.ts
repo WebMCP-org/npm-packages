@@ -536,9 +536,10 @@ export class RuntimeApiTools extends BaseApiTools {
 
           if (seconds === -1) {
             return this.formatSuccess('Scheduled restart cancelled');
-          } else {
-            return this.formatSuccess('Device restart scheduled', { delaySeconds: seconds });
           }
+          return this.formatSuccess('Device restart scheduled', {
+            delaySeconds: seconds,
+          });
         } catch (error) {
           return this.formatError(error);
         }
@@ -666,7 +667,9 @@ export class RuntimeApiTools extends BaseApiTools {
             });
           });
 
-          return this.formatSuccess('Uninstall URL set successfully', { url: url });
+          return this.formatSuccess('Uninstall URL set successfully', {
+            url: url,
+          });
         } catch (error) {
           return this.formatError(error);
         }

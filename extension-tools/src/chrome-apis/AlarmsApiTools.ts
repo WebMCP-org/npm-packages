@@ -1,5 +1,5 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod/v3';
+import { z } from 'zod';
 import { type ApiAvailability, BaseApiTools } from '../BaseApiTools';
 
 export interface AlarmsApiToolsOptions {
@@ -215,7 +215,9 @@ export class AlarmsApiTools extends BaseApiTools {
           });
 
           if (!alarm) {
-            return this.formatSuccess('No alarm found', { name: name || 'unnamed' });
+            return this.formatSuccess('No alarm found', {
+              name: name || 'unnamed',
+            });
           }
 
           return this.formatJson({
@@ -303,10 +305,13 @@ export class AlarmsApiTools extends BaseApiTools {
           });
 
           if (wasCleared) {
-            return this.formatSuccess('Alarm cleared successfully', { name: name || 'unnamed' });
-          } else {
-            return this.formatSuccess('No alarm found to clear', { name: name || 'unnamed' });
+            return this.formatSuccess('Alarm cleared successfully', {
+              name: name || 'unnamed',
+            });
           }
+          return this.formatSuccess('No alarm found to clear', {
+            name: name || 'unnamed',
+          });
         } catch (error) {
           return this.formatError(error);
         }
@@ -349,9 +354,8 @@ export class AlarmsApiTools extends BaseApiTools {
               clearedCount: alarmsBefore.length,
               clearedAlarms: alarmsBefore.map((alarm) => alarm.name),
             });
-          } else {
-            return this.formatSuccess('No alarms to clear');
           }
+          return this.formatSuccess('No alarms to clear');
         } catch (error) {
           return this.formatError(error);
         }

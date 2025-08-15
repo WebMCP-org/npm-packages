@@ -204,21 +204,22 @@ export class PlatformKeysApiTools extends BaseApiTools {
           }
           const certificateBuffer = bytes.buffer;
 
-          const keyPair = await new Promise<{ publicKey: CryptoKey; privateKey: CryptoKey | null }>(
-            (resolve, reject) => {
-              chrome.platformKeys.getKeyPair(
-                certificateBuffer,
-                parameters,
-                (publicKey, privateKey) => {
-                  if (chrome.runtime.lastError) {
-                    reject(new Error(chrome.runtime.lastError.message));
-                  } else {
-                    resolve({ publicKey, privateKey });
-                  }
+          const keyPair = await new Promise<{
+            publicKey: CryptoKey;
+            privateKey: CryptoKey | null;
+          }>((resolve, reject) => {
+            chrome.platformKeys.getKeyPair(
+              certificateBuffer,
+              parameters,
+              (publicKey, privateKey) => {
+                if (chrome.runtime.lastError) {
+                  reject(new Error(chrome.runtime.lastError.message));
+                } else {
+                  resolve({ publicKey, privateKey });
                 }
-              );
-            }
-          );
+              }
+            );
+          });
 
           return this.formatSuccess('Key pair retrieved successfully', {
             hasPublicKey: !!keyPair.publicKey,
@@ -265,21 +266,22 @@ export class PlatformKeysApiTools extends BaseApiTools {
           }
           const spkiBuffer = bytes.buffer;
 
-          const keyPair = await new Promise<{ publicKey: CryptoKey; privateKey: CryptoKey | null }>(
-            (resolve, reject) => {
-              chrome.platformKeys.getKeyPairBySpki(
-                spkiBuffer,
-                parameters,
-                (publicKey, privateKey) => {
-                  if (chrome.runtime.lastError) {
-                    reject(new Error(chrome.runtime.lastError.message));
-                  } else {
-                    resolve({ publicKey, privateKey });
-                  }
+          const keyPair = await new Promise<{
+            publicKey: CryptoKey;
+            privateKey: CryptoKey | null;
+          }>((resolve, reject) => {
+            chrome.platformKeys.getKeyPairBySpki(
+              spkiBuffer,
+              parameters,
+              (publicKey, privateKey) => {
+                if (chrome.runtime.lastError) {
+                  reject(new Error(chrome.runtime.lastError.message));
+                } else {
+                  resolve({ publicKey, privateKey });
                 }
-              );
-            }
-          );
+              }
+            );
+          });
 
           return this.formatSuccess('Key pair retrieved successfully by SPKI', {
             hasPublicKey: !!keyPair.publicKey,

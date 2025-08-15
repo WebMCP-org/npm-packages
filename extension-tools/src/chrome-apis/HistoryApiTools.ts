@@ -1,7 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { type ApiAvailability, BaseApiTools } from '../BaseApiTools';
 import zodToJsonSchema from 'zod-to-json-schema';
+import { type ApiAvailability, BaseApiTools } from '../BaseApiTools';
 
 export interface HistoryApiToolsOptions {
   addUrl?: boolean;
@@ -141,14 +141,20 @@ export class HistoryApiTools extends BaseApiTools {
                 description:
                   'Add a URL to the history at the current time with a transition type of "link"',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             case 'deleteAll': {
               const paramsAndDescription = {
                 params: toJson(this.deleteAllSchema, 'DeleteAllParams'),
                 description: 'Delete all items from the browser history',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             case 'deleteRange': {
               const paramsAndDescription = {
@@ -156,21 +162,30 @@ export class HistoryApiTools extends BaseApiTools {
                 description:
                   'Remove all items within the specified date range from history. Pages will not be removed unless all visits fall within the range',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             case 'deleteUrl': {
               const paramsAndDescription = {
                 params: toJson(this.deleteUrlSchema, 'DeleteUrlParams'),
                 description: 'Remove all occurrences of the given URL from history',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             case 'getVisits': {
               const paramsAndDescription = {
                 params: toJson(this.getVisitsSchema, 'GetVisitsParams'),
                 description: 'Retrieve information about visits to a specific URL',
               };
-              return this.formatJson({ ...payloadBase, ...paramsAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramsAndDescription,
+              });
             }
             case 'search': {
               const paramAndDescription = {
@@ -178,7 +193,10 @@ export class HistoryApiTools extends BaseApiTools {
                 description:
                   'Search the history for the last visit time of each page matching the query',
               };
-              return this.formatJson({ ...payloadBase, ...paramAndDescription });
+              return this.formatJson({
+                ...payloadBase,
+                ...paramAndDescription,
+              });
             }
             default:
               return this.formatError(`Unknown action: ${String(action)}`);

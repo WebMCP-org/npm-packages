@@ -50,7 +50,7 @@ function ServerWithElicitation() {
           };
         } catch (error) {
           return {
-            content: [{ type: 'text', text: `Error: Invalid expression` }],
+            content: [{ type: 'text', text: 'Error: Invalid expression' }],
             isError: true,
           };
         }
@@ -102,7 +102,7 @@ function ServerWithElicitation() {
           content: [
             {
               type: 'text',
-              text: `File deletion cancelled`,
+              text: 'File deletion cancelled',
             },
           ],
         };

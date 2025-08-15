@@ -138,9 +138,8 @@ export class SystemStorageApiTools extends BaseApiTools {
               result: result,
               message: message,
             });
-          } else {
-            return this.formatError(`Failed to eject device: ${message}`);
           }
+          return this.formatError(`Failed to eject device: ${message}`);
         } catch (error) {
           return this.formatError(error);
         }
@@ -205,6 +204,6 @@ export class SystemStorageApiTools extends BaseApiTools {
     const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
 
-    return parseFloat((bytes / k ** i).toFixed(2)) + ' ' + sizes[i];
+    return Number.parseFloat((bytes / k ** i).toFixed(2)) + ' ' + sizes[i];
   }
 }

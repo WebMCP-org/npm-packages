@@ -17,9 +17,6 @@ npm install @mcp-b/transports
 # React integration
 npm install @mcp-b/mcp-react-hooks
 
-# Web API tools
-npm install @mcp-b/web-tools
-
 # Chrome Extension API tools
 npm install @mcp-b/extension-tools
 ```
@@ -30,7 +27,6 @@ npm install @mcp-b/extension-tools
 |---------|-----|-------------|---------------|
 | [@mcp-b/transports](./transports) | [![npm](https://img.shields.io/npm/v/@mcp-b/transports)](https://www.npmjs.com/package/@mcp-b/transports) | Browser-specific MCP transport implementations | [Docs](./transports/README.md) |
 | [@mcp-b/mcp-react-hooks](./mcp-react-hooks) | [![npm](https://img.shields.io/npm/v/@mcp-b/mcp-react-hooks)](https://www.npmjs.com/package/@mcp-b/mcp-react-hooks) | React hooks for MCP integration | [Docs](./mcp-react-hooks/README.md) |
-| [@mcp-b/web-tools](./web-tools) | [![npm](https://img.shields.io/npm/v/@mcp-b/web-tools)](https://www.npmjs.com/package/@mcp-b/web-tools) | MCP tools for web APIs (Prompt API, etc.) | [Docs](./web-tools/README.md) |
 | [@mcp-b/extension-tools](./extension-tools) | [![npm](https://img.shields.io/npm/v/@mcp-b/extension-tools)](https://www.npmjs.com/package/@mcp-b/extension-tools) | MCP tools for Chrome Extension APIs | [Docs](./extension-tools/README.md) |
 | [@mcp-b/mcp-react-hook-form](./mcp-react-hook-form) | [![npm](https://img.shields.io/npm/v/@mcp-b/mcp-react-hook-form)](https://www.npmjs.com/package/@mcp-b/mcp-react-hook-form) | React Hook Form integration for MCP | [Docs](./mcp-react-hook-form/README.md) |
 | [@mcp-b/global](./global) | Internal | Global type definitions | Internal use |
@@ -83,12 +79,19 @@ These packages implement the Model Context Protocol for browser environments:
 
 - **Transports**: Handle communication between MCP servers and clients using browser-specific mechanisms (postMessage, Chrome runtime messaging)
 - **React Hooks**: Provide React-friendly APIs for MCP integration
-- **Web Tools**: Pre-built MCP tools for common web APIs
 - **Extension Tools**: Auto-generated tools for Chrome Extension APIs
+- **React Hook Form**: Integration with React Hook Form for form handling
 
 ## 🔧 Development
 
-This is a pnpm workspace monorepo. To work with these packages locally:
+This is a pnpm workspace monorepo using Turbo for build orchestration.
+
+### Prerequisites
+
+- Node.js >= 22.12 (see `.nvmrc`)
+- pnpm >= 10.0.0
+
+### Getting Started
 
 ```bash
 # Clone the repository
@@ -101,26 +104,54 @@ pnpm install
 # Build all packages
 pnpm build
 
-# Run tests
-pnpm test
-
 # Development mode with watch
 pnpm dev
 ```
 
+### Available Scripts
+
+| Script | Description |
+|--------|-------------|
+| `pnpm build` | Build all packages |
+| `pnpm dev` | Start development mode with watch |
+| `pnpm typecheck` | Run TypeScript type checking |
+| `pnpm check` | Run Biome linting and formatting (with fixes) |
+| `pnpm check:ci` | Run Biome checks (CI mode) |
+| `pnpm changeset` | Create a new changeset |
+| `pnpm changeset:version` | Update versions based on changesets |
+| `pnpm changeset:publish` | Build and publish packages to npm |
+
+### Code Quality
+
+- **Linting & Formatting**: We use [Biome](https://biomejs.dev/) for fast, unified linting and formatting
+- **Pre-commit Hooks**: Automatic formatting via Husky and lint-staged
+- **Type Safety**: Full TypeScript with strict mode enabled
+- **CI/CD**: GitHub Actions for automated testing and publishing
+
+### Testing Locally
+
+- **GitHub Actions**: Test workflows locally with [act](./TESTING-WITH-ACT.md)
+- **Unit Tests**: Run tests with `pnpm test` (when implemented)
+
 ### Publishing
 
-We use changesets for version management:
+We use [changesets](https://github.com/changesets/changesets) for version management:
 
 ```bash
-# Create a changeset for your changes
+# 1. Create a changeset for your changes
 pnpm changeset
 
-# Version packages
-pnpm changeset:version
+# 2. Commit the changeset file
+git add .changeset/*.md
+git commit -m "Add changeset"
 
-# Build and publish to npm
-pnpm changeset:publish
+# 3. Push to main branch
+git push origin main
+
+# GitHub Actions will automatically:
+# - Create a Version PR
+# - Update versions when merged
+# - Publish to npm
 ```
 
 ## 📚 Documentation
@@ -132,11 +163,11 @@ pnpm changeset:publish
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please see our [Contributing Guide](../CONTRIBUTING.md) for details.
+Contributions are welcome! Please see our [Contributing Guide](./CONTRIBUTING.md) for details.
 
 ## 📄 License
 
-MIT - see [LICENSE](../LICENSE) for details.
+MIT - see [LICENSE](./LICENSE) for details.
 
 ## 🔗 Links
 

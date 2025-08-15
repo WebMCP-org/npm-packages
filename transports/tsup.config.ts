@@ -2,8 +2,8 @@ import { defineConfig } from 'tsup';
 
 export default defineConfig({
   entry: ['src/index.ts'],
-  format: ['esm'],
   dts: true,
+  format: ['esm'],
   splitting: false,
   sourcemap: true,
   clean: true,
@@ -11,5 +11,6 @@ export default defineConfig({
   minify: true,
   target: 'esnext',
   platform: 'browser',
-  external: [''],
+  external: [],
+  tsconfig: './tsconfig.json',
 });

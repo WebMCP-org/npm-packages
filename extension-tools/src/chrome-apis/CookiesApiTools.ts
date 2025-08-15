@@ -293,17 +293,17 @@ export class CookiesApiTools extends BaseApiTools {
           if (frameId !== undefined) details.frameId = frameId;
           if (documentId !== undefined) details.documentId = documentId;
 
-          const result = await new Promise<{ partitionKey: chrome.cookies.CookiePartitionKey }>(
-            (resolve, reject) => {
-              chrome.cookies.getPartitionKey(details, (result) => {
-                if (chrome.runtime.lastError) {
-                  reject(new Error(chrome.runtime.lastError.message));
-                } else {
-                  resolve(result);
-                }
-              });
-            }
-          );
+          const result = await new Promise<{
+            partitionKey: chrome.cookies.CookiePartitionKey;
+          }>((resolve, reject) => {
+            chrome.cookies.getPartitionKey(details, (result) => {
+              if (chrome.runtime.lastError) {
+                reject(new Error(chrome.runtime.lastError.message));
+              } else {
+                resolve(result);
+              }
+            });
+          });
 
           return this.formatJson({
             partitionKey: result.partitionKey,
@@ -478,7 +478,10 @@ export class CookiesApiTools extends BaseApiTools {
           });
 
           if (!result) {
-            return this.formatSuccess('No cookie found to remove', { name, url });
+            return this.formatSuccess('No cookie found to remove', {
+              name,
+              url,
+            });
           }
 
           return this.formatSuccess('Cookie removed successfully', {

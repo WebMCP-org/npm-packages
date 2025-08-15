@@ -338,7 +338,9 @@ export class ManagementApiTools extends BaseApiTools {
             });
           });
 
-          return this.formatSuccess('Extension uninstalled successfully', { id });
+          return this.formatSuccess('Extension uninstalled successfully', {
+            id,
+          });
         } catch (error) {
           return this.formatError(error);
         }
@@ -404,7 +406,9 @@ export class ManagementApiTools extends BaseApiTools {
             });
           });
 
-          return this.formatSuccess('Application launched successfully', { id });
+          return this.formatSuccess('Application launched successfully', {
+            id,
+          });
         } catch (error) {
           return this.formatError(error);
         }
@@ -433,7 +437,9 @@ export class ManagementApiTools extends BaseApiTools {
             });
           });
 
-          return this.formatSuccess('App shortcut created successfully', { id });
+          return this.formatSuccess('App shortcut created successfully', {
+            id,
+          });
         } catch (error) {
           return this.formatError(error);
         }
@@ -512,7 +518,10 @@ export class ManagementApiTools extends BaseApiTools {
             });
           });
 
-          return this.formatSuccess('App launch type set successfully', { id, launchType });
+          return this.formatSuccess('App launch type set successfully', {
+            id,
+            launchType,
+          });
         } catch (error) {
           return this.formatError(error);
         }
