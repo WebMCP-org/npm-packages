@@ -4,9 +4,9 @@ import monkey from 'vite-plugin-monkey';
 export default defineConfig({
   plugins: [
     monkey({
-      entry: 'src/index.ts',
+      entry: 'src/inject.ts',
       userscript: {
-        name: 'MCP-B Global',
+        name: 'Smart DOM Reader',
         match: ['*'],
       },
       build: {
@@ -14,6 +14,7 @@ export default defineConfig({
         metaFileName: false,
         autoGrant: false,
         externalGlobals: {},
+        externalResource: {},
       },
     }),
   ],
@@ -22,7 +23,9 @@ export default defineConfig({
     rollupOptions: {
       output: {
         format: 'iife',
+        name: 'SmartDOMReader',
         inlineDynamicImports: true,
+        extend: true,
       },
     },
     target: 'esnext',

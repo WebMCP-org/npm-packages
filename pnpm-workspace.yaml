@@ -3,6 +3,7 @@ packages:
   - "global"
   - "mcp-react-hook-form"
   - "mcp-react-hooks"
+  - "smart-dom-reader"
   - "transports"
 
 catalog:

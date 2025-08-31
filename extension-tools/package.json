@@ -55,6 +55,7 @@
     "version:patch": "pnpm version patch --no-git-tag-version"
   },
   "dependencies": {
+    "@mcp-b/smart-dom-reader": "workspace:*",
     "@modelcontextprotocol/sdk": "catalog:",
     "zod": "catalog:",
     "zod-to-json-schema": "^3.24.5"

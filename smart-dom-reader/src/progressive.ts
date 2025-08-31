@@ -1,0 +1,387 @@
+import { ContentDetection } from './content-detection';
+import { SelectorGenerator } from './selectors';
+import { DOMTraversal } from './traversal';
+import {
+  ContentExtractionOptions,
+  ExtractedContent,
+  ExtractionOptions,
+  RegionInfo,
+  SmartDOMResult,
+  StructuralOverview,
+} from './types';
+
+export class ProgressiveExtractor {
+  /**
+   * Step 1: Extract high-level structural overview
+   * This provides a "map" of the page for the AI to understand structure
+   */
+  static extractStructure(doc: Document = document): StructuralOverview {
+    const regions: StructuralOverview['regions'] = {};
+
+    // Find header
+    const header = doc.querySelector('header, [role="banner"], .header, #header');
+    if (header) {
+      regions.header = this.analyzeRegion(header);
+    }
+
+    // Find navigation areas
+    const navs = doc.querySelectorAll('nav, [role="navigation"], .nav, .navigation');
+    if (navs.length > 0) {
+      regions.navigation = Array.from(navs).map((nav) => this.analyzeRegion(nav));
+    }
+
+    // Find main content
+    const main = ContentDetection.findMainContent(doc);
+    if (main) {
+      regions.main = this.analyzeRegion(main);
+
+      // Find sections within main
+      const sections = main.querySelectorAll('section, article, [role="region"]');
+      if (sections.length > 0) {
+        regions.sections = Array.from(sections)
+          .filter((section) => !section.closest('nav, header, footer'))
+          .map((section) => this.analyzeRegion(section));
+      }
+    }
+
+    // Find sidebars
+    const sidebars = doc.querySelectorAll('aside, [role="complementary"], .sidebar, #sidebar');
+    if (sidebars.length > 0) {
+      regions.sidebar = Array.from(sidebars).map((sidebar) => this.analyzeRegion(sidebar));
+    }
+
+    // Find footer
+    const footer = doc.querySelector('footer, [role="contentinfo"], .footer, #footer');
+    if (footer) {
+      regions.footer = this.analyzeRegion(footer);
+    }
+
+    // Find modals/dialogs
+    const modals = doc.querySelectorAll('[role="dialog"], .modal, .popup, .overlay');
+    const visibleModals = Array.from(modals).filter((modal) => DOMTraversal.isVisible(modal));
+    if (visibleModals.length > 0) {
+      regions.modals = visibleModals.map((modal) => this.analyzeRegion(modal));
+    }
+
+    // Extract form information
+    const forms = this.extractFormOverview(doc);
+
+    // Calculate summary statistics
+    const summary = this.calculateSummary(doc, regions, forms);
+
+    // Generate AI-friendly suggestions
+    const suggestions = this.generateSuggestions(regions, summary);
+
+    return {
+      regions,
+      forms,
+      summary,
+      suggestions,
+    };
+  }
+
+  /**
+   * Step 2: Extract detailed information from a specific region
+   */
+  static extractRegion(
+    selector: string,
+    options: Partial<ExtractionOptions> = {}
+  ): SmartDOMResult | null {
+    const element = document.querySelector(selector);
+    if (!element) return null;
+
+    // Import SmartDOMReader to reuse existing extraction logic
+    const { SmartDOMReader } = require('./index');
+    const reader = new SmartDOMReader(options);
+
+    // Extract from the specific element/region
+    return reader.extract(element, options);
+  }
+
+  /**
+   * Step 3: Extract readable content from a region
+   */
+  static extractContent(
+    selector: string,
+    options: ContentExtractionOptions = {}
+  ): ExtractedContent | null {
+    const element = document.querySelector(selector);
+    if (!element) return null;
+
+    const result: ExtractedContent = {
+      selector,
+      text: {},
+      metadata: {
+        wordCount: 0,
+        hasInteractive: false,
+      },
+    };
+
+    // Extract headings
+    if (options.includeHeadings !== false) {
+      const headings = element.querySelectorAll('h1, h2, h3, h4, h5, h6');
+      result.text.headings = Array.from(headings).map((h) => ({
+        level: parseInt(h.tagName[1]),
+        text: this.getTextContent(h, options.maxTextLength),
+      }));
+    }
+
+    // Extract paragraphs
+    const paragraphs = element.querySelectorAll('p');
+    if (paragraphs.length > 0) {
+      result.text.paragraphs = Array.from(paragraphs)
+        .map((p) => this.getTextContent(p, options.maxTextLength))
+        .filter((text) => text.length > 0);
+    }
+
+    // Extract lists
+    if (options.includeLists !== false) {
+      const lists = element.querySelectorAll('ul, ol');
+      result.text.lists = Array.from(lists).map((list) => ({
+        type: list.tagName.toLowerCase() as 'ul' | 'ol',
+        items: Array.from(list.querySelectorAll('li')).map((li) =>
+          this.getTextContent(li, options.maxTextLength)
+        ),
+      }));
+    }
+
+    // Extract tables
+    if (options.includeTables !== false) {
+      const tables = element.querySelectorAll('table');
+      result.tables = Array.from(tables).map((table) => {
+        const headers = Array.from(table.querySelectorAll('th')).map((th) =>
+          this.getTextContent(th)
+        );
+        const rows = Array.from(table.querySelectorAll('tr'))
+          .filter((tr) => tr.querySelector('td'))
+          .map((tr) => Array.from(tr.querySelectorAll('td')).map((td) => this.getTextContent(td)));
+        return { headers, rows };
+      });
+    }
+
+    // Extract media
+    if (options.includeMedia !== false) {
+      const images = element.querySelectorAll('img');
+      const videos = element.querySelectorAll('video');
+      const audios = element.querySelectorAll('audio');
+
+      result.media = [
+        ...Array.from(images).map((img) => ({
+          type: 'img' as const,
+          alt: img.getAttribute('alt') || undefined,
+          src: img.getAttribute('src') || undefined,
+        })),
+        ...Array.from(videos).map((video) => ({
+          type: 'video' as const,
+          src: video.getAttribute('src') || undefined,
+        })),
+        ...Array.from(audios).map((audio) => ({
+          type: 'audio' as const,
+          src: audio.getAttribute('src') || undefined,
+        })),
+      ];
+    }
+
+    // Calculate metadata
+    const allText = element.textContent || '';
+    result.metadata.wordCount = allText.trim().split(/\s+/).length;
+    result.metadata.hasInteractive =
+      element.querySelectorAll('button, a, input, textarea, select').length > 0;
+
+    return result;
+  }
+
+  /**
+   * Analyze a region and extract summary information
+   */
+  private static analyzeRegion(element: Element): RegionInfo {
+    const selector = SelectorGenerator.generateSelectors(element).css;
+    const buttons = element.querySelectorAll('button, [role="button"]');
+    const links = element.querySelectorAll('a[href]');
+    const inputs = element.querySelectorAll('input, textarea, select');
+    const forms = element.querySelectorAll('form');
+    const lists = element.querySelectorAll('ul, ol');
+    const tables = element.querySelectorAll('table');
+    const media = element.querySelectorAll('img, video, audio');
+
+    const interactiveCount = buttons.length + links.length + inputs.length;
+
+    // Get label from aria-label, aria-labelledby, or heading
+    let label: string | undefined;
+    if (element.getAttribute('aria-label')) {
+      label = element.getAttribute('aria-label')!;
+    } else if (element.getAttribute('aria-labelledby')) {
+      const labelId = element.getAttribute('aria-labelledby')!;
+      const labelElement = document.getElementById(labelId);
+      if (labelElement) {
+        label = labelElement.textContent?.trim();
+      }
+    } else {
+      const heading = element.querySelector('h1, h2, h3');
+      if (heading) {
+        label = heading.textContent?.trim();
+      }
+    }
+
+    // Get text preview
+    const textContent = element.textContent?.trim() || '';
+    const textPreview =
+      textContent.length > 50 ? textContent.substring(0, 50) + '...' : textContent;
+
+    return {
+      selector,
+      label,
+      role: element.getAttribute('role') || undefined,
+      interactiveCount,
+      hasForm: forms.length > 0,
+      hasList: lists.length > 0,
+      hasTable: tables.length > 0,
+      hasMedia: media.length > 0,
+      buttonCount: buttons.length > 0 ? buttons.length : undefined,
+      linkCount: links.length > 0 ? links.length : undefined,
+      inputCount: inputs.length > 0 ? inputs.length : undefined,
+      textPreview: textPreview.length > 0 ? textPreview : undefined,
+    };
+  }
+
+  /**
+   * Extract overview of forms on the page
+   */
+  private static extractFormOverview(doc: Document): StructuralOverview['forms'] {
+    const forms = doc.querySelectorAll('form');
+    return Array.from(forms).map((form) => {
+      const inputs = form.querySelectorAll('input, textarea, select');
+      const selector = SelectorGenerator.generateSelectors(form).css;
+
+      // Determine which region the form is in
+      let location = 'unknown';
+      if (form.closest('header, [role="banner"]')) {
+        location = 'header';
+      } else if (form.closest('nav, [role="navigation"]')) {
+        location = 'navigation';
+      } else if (form.closest('main, [role="main"]')) {
+        location = 'main';
+      } else if (form.closest('aside, [role="complementary"]')) {
+        location = 'sidebar';
+      } else if (form.closest('footer, [role="contentinfo"]')) {
+        location = 'footer';
+      }
+
+      // Infer purpose from form attributes and content
+      let purpose: string | undefined;
+      const formId = form.getAttribute('id')?.toLowerCase();
+      const formClass = form.getAttribute('class')?.toLowerCase();
+      const formAction = form.getAttribute('action')?.toLowerCase();
+      const hasEmail = form.querySelector('input[type="email"]');
+      const hasPassword = form.querySelector('input[type="password"]');
+      const hasSearch = form.querySelector('input[type="search"]');
+
+      if (hasSearch || formId?.includes('search') || formClass?.includes('search')) {
+        purpose = 'search';
+      } else if (hasPassword && hasEmail) {
+        purpose = 'login';
+      } else if (hasPassword) {
+        purpose = 'authentication';
+      } else if (formId?.includes('contact') || formClass?.includes('contact')) {
+        purpose = 'contact';
+      } else if (formId?.includes('subscribe') || formClass?.includes('subscribe')) {
+        purpose = 'subscription';
+      } else if (formAction?.includes('checkout') || formClass?.includes('checkout')) {
+        purpose = 'checkout';
+      }
+
+      return {
+        selector,
+        location,
+        inputCount: inputs.length,
+        purpose,
+      };
+    });
+  }
+
+  /**
+   * Calculate summary statistics
+   */
+  private static calculateSummary(
+    doc: Document,
+    regions: StructuralOverview['regions'],
+    forms: StructuralOverview['forms']
+  ): StructuralOverview['summary'] {
+    const allInteractive = doc.querySelectorAll('button, a[href], input, textarea, select');
+    const allSections = doc.querySelectorAll('section, article, [role="region"]');
+    const hasModals = (regions.modals?.length || 0) > 0;
+
+    // Check for errors
+    const errorSelectors = ['.error', '.alert-danger', '[role="alert"]'];
+    const hasErrors = errorSelectors.some(
+      (sel) => doc.querySelector(sel) && DOMTraversal.isVisible(doc.querySelector(sel)!)
+    );
+
+    // Check for loading
+    const loadingSelectors = ['.loading', '.spinner', '[aria-busy="true"]'];
+    const isLoading = loadingSelectors.some(
+      (sel) => doc.querySelector(sel) && DOMTraversal.isVisible(doc.querySelector(sel)!)
+    );
+
+    const mainContentSelector = regions.main?.selector;
+
+    return {
+      totalInteractive: allInteractive.length,
+      totalForms: forms.length,
+      totalSections: allSections.length,
+      hasModals,
+      hasErrors,
+      isLoading,
+      mainContentSelector,
+    };
+  }
+
+  /**
+   * Generate AI-friendly suggestions
+   */
+  private static generateSuggestions(
+    regions: StructuralOverview['regions'],
+    summary: StructuralOverview['summary']
+  ): string[] {
+    const suggestions: string[] = [];
+
+    if (summary.hasErrors) {
+      suggestions.push('Page has error indicators - check error messages before interacting');
+    }
+
+    if (summary.isLoading) {
+      suggestions.push('Page appears to be loading - wait or check loading state');
+    }
+
+    if (summary.hasModals) {
+      suggestions.push('Modal/dialog is open - may need to interact with or close it first');
+    }
+
+    if (regions.main && regions.main.interactiveCount > 10) {
+      suggestions.push(
+        `Main content has ${regions.main.interactiveCount} interactive elements - consider filtering`
+      );
+    }
+
+    if (summary.totalForms > 0) {
+      suggestions.push(`Found ${summary.totalForms} form(s) on the page`);
+    }
+
+    if (!regions.main) {
+      suggestions.push('No clear main content area detected - may need to explore regions');
+    }
+
+    return suggestions;
+  }
+
+  /**
+   * Get text content with optional truncation
+   */
+  private static getTextContent(element: Element, maxLength?: number): string {
+    const text = element.textContent?.trim() || '';
+    if (maxLength && text.length > maxLength) {
+      return text.substring(0, maxLength) + '...';
+    }
+    return text;
+  }
+}

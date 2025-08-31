@@ -51,6 +51,7 @@ export * from './ScriptingApiTools';
 export * from './SearchApiTools';
 export * from './SessionsApiTools';
 export * from './SidePanelApiTools';
+export * from './SmartDOMReaderTools';
 export * from './StorageApiTools';
 export * from './SystemCpuApiTools';
 export * from './SystemLogApiTools';

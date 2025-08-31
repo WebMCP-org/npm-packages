@@ -1,0 +1,71 @@
+{
+  "name": "@mcp-b/smart-dom-reader",
+  "version": "1.0.0",
+  "description": "Token-efficient DOM extraction library for AI-powered browser automation",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "browser",
+    "dom",
+    "extraction",
+    "ai",
+    "selector",
+    "interactive",
+    "semantic"
+  ],
+  "homepage": "https://github.com/MiguelsPizza/WebMCP#readme",
+  "bugs": {
+    "url": "https://github.com/MiguelsPizza/WebMCP/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MiguelsPizza/WebMCP.git",
+    "directory": "packages/smart-dom-reader"
+  },
+  "license": "MIT",
+  "author": "Alex Nahas",
+  "sideEffects": true,
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "browser": "./dist/index.js",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "check": "biome check --write .",
+    "clean": "rm -rf dist .turbo",
+    "format": "biome format --write .",
+    "lint": "biome lint --write .",
+    "prepublishOnly": "pnpm run build",
+    "preview": "vite preview",
+    "publish:dry": "pnpm publish --access public --dry-run",
+    "publish:npm": "pnpm publish --access public",
+    "typecheck": "tsc --noEmit",
+    "version:major": "pnpm version major --no-git-tag-version",
+    "version:minor": "pnpm version minor --no-git-tag-version",
+    "version:patch": "pnpm version patch --no-git-tag-version"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vite": "^7.1.1",
+    "vite-plugin-monkey": "^6.0.1"
+  },
+  "peerDependencies": {
+    "@modelcontextprotocol/sdk": "^1.15.0"
+  },
+  "peerDependenciesMeta": {
+    "@modelcontextprotocol/sdk": {
+      "optional": true
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}
