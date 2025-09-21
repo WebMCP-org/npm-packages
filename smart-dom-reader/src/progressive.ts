@@ -1,4 +1,5 @@
 import { ContentDetection } from './content-detection';
+import type { SmartDOMReader as SmartDOMReaderClass } from './index';
 import { SelectorGenerator } from './selectors';
 import { DOMTraversal } from './traversal';
 import {
@@ -10,12 +11,52 @@ import {
   StructuralOverview,
 } from './types';
 
+type SmartDomReaderNamespace = typeof import('./index');
+type SmartDomReaderCtor = new (options?: Partial<ExtractionOptions>) => SmartDOMReaderClass;
+
+type SmartDomReaderWindow = Window & {
+  SmartDOMReader?: SmartDomReaderCtor;
+  SmartDOMReaderNamespace?: SmartDomReaderNamespace;
+};
+
+function resolveSmartDomReader(): SmartDomReaderCtor | undefined {
+  if (typeof window !== 'undefined') {
+    const globalWindow = window as Partial<SmartDomReaderWindow>;
+    const direct = globalWindow.SmartDOMReader;
+    if (typeof direct === 'function') {
+      return direct;
+    }
+
+    const namespace = globalWindow.SmartDOMReaderNamespace;
+    if (namespace && typeof namespace.SmartDOMReader === 'function') {
+      return namespace.SmartDOMReader as SmartDomReaderCtor;
+    }
+  }
+
+  try {
+    if (typeof require === 'function') {
+      const moduleExports = require('./index') as SmartDomReaderNamespace;
+      if (moduleExports && typeof moduleExports.SmartDOMReader === 'function') {
+        return moduleExports.SmartDOMReader as SmartDomReaderCtor;
+      }
+
+      if (moduleExports && typeof moduleExports.default === 'function') {
+        return moduleExports.default as SmartDomReaderCtor;
+      }
+    }
+  } catch {
+    // Ignore resolution errors when require is unavailable (e.g. browser bundles)
+  }
+
+  return undefined;
+}
+
 export class ProgressiveExtractor {
   /**
    * Step 1: Extract high-level structural overview
    * This provides a "map" of the page for the AI to understand structure
    */
-  static extractStructure(doc: Document = document): StructuralOverview {
+  static extractStructure(doc: Document): StructuralOverview {
     const regions: StructuralOverview['regions'] = {};
 
     // Find header
@@ -85,14 +126,20 @@ export class ProgressiveExtractor {
    */
   static extractRegion(
     selector: string,
-    options: Partial<ExtractionOptions> = {}
+    doc: Document,
+    options: Partial<ExtractionOptions> = {},
+    smartDomReaderCtor?: SmartDomReaderCtor
   ): SmartDOMResult | null {
-    const element = document.querySelector(selector);
+    const element = doc.querySelector(selector);
     if (!element) return null;
 
-    // Import SmartDOMReader to reuse existing extraction logic
-    const { SmartDOMReader } = require('./index');
-    const reader = new SmartDOMReader(options);
+    const SmartDOMReaderCtor = smartDomReaderCtor ?? resolveSmartDomReader();
+    if (!SmartDOMReaderCtor) {
+      throw new Error(
+        'SmartDOMReader is unavailable. Ensure the Smart DOM Reader module is loaded before calling extractRegion.'
+      );
+    }
+    const reader = new SmartDOMReaderCtor(options);
 
     // Extract from the specific element/region
     return reader.extract(element, options);
@@ -103,9 +150,10 @@ export class ProgressiveExtractor {
    */
   static extractContent(
     selector: string,
+    doc: Document,
     options: ContentExtractionOptions = {}
   ): ExtractedContent | null {
-    const element = document.querySelector(selector);
+    const element = doc.querySelector(selector);
     if (!element) return null;
 
     const result: ExtractedContent = {
@@ -208,13 +256,16 @@ export class ProgressiveExtractor {
 
     // Get label from aria-label, aria-labelledby, or heading
     let label: string | undefined;
-    if (element.getAttribute('aria-label')) {
-      label = element.getAttribute('aria-label')!;
+    const ariaLabel = element.getAttribute('aria-label');
+    if (ariaLabel) {
+      label = ariaLabel;
     } else if (element.getAttribute('aria-labelledby')) {
-      const labelId = element.getAttribute('aria-labelledby')!;
-      const labelElement = document.getElementById(labelId);
-      if (labelElement) {
-        label = labelElement.textContent?.trim();
+      const labelId = element.getAttribute('aria-labelledby');
+      if (labelId) {
+        const labelElement = element.ownerDocument?.getElementById(labelId);
+        if (labelElement) {
+          label = labelElement.textContent?.trim();
+        }
       }
     } else {
       const heading = element.querySelector('h1, h2, h3');
@@ -313,15 +364,17 @@ export class ProgressiveExtractor {
 
     // Check for errors
     const errorSelectors = ['.error', '.alert-danger', '[role="alert"]'];
-    const hasErrors = errorSelectors.some(
-      (sel) => doc.querySelector(sel) && DOMTraversal.isVisible(doc.querySelector(sel)!)
-    );
+    const hasErrors = errorSelectors.some((sel) => {
+      const element = doc.querySelector(sel);
+      return element ? DOMTraversal.isVisible(element) : false;
+    });
 
     // Check for loading
     const loadingSelectors = ['.loading', '.spinner', '[aria-busy="true"]'];
-    const isLoading = loadingSelectors.some(
-      (sel) => doc.querySelector(sel) && DOMTraversal.isVisible(doc.querySelector(sel)!)
-    );
+    const isLoading = loadingSelectors.some((sel) => {
+      const element = doc.querySelector(sel);
+      return element ? DOMTraversal.isVisible(element) : false;
+    });
 
     const mainContentSelector = regions.main?.selector;
 

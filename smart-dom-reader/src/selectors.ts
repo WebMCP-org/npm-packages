@@ -5,9 +5,10 @@ export class SelectorGenerator {
    * Generate multiple selector strategies for an element
    */
   static generateSelectors(element: Element): ElementSelector {
+    const doc = element.ownerDocument || document;
     return {
-      css: this.generateCSSSelector(element),
-      xpath: this.generateXPath(element),
+      css: this.generateCSSSelector(element, doc),
+      xpath: this.generateXPath(element, doc),
       textBased: this.generateTextBasedSelector(element),
       dataTestId: this.getDataTestId(element),
       ariaLabel: element.getAttribute('aria-label') || undefined,
@@ -17,9 +18,9 @@ export class SelectorGenerator {
   /**
    * Generate a unique CSS selector for an element
    */
-  private static generateCSSSelector(element: Element): string {
+  private static generateCSSSelector(element: Element, doc: Document): string {
     // If element has a unique ID, use it
-    if (element.id && this.isUniqueId(element.id)) {
+    if (element.id && this.isUniqueId(element.id, doc)) {
       return `#${CSS.escape(element.id)}`;
     }
 
@@ -36,7 +37,7 @@ export class SelectorGenerator {
     while (current && current.nodeType === Node.ELEMENT_NODE) {
       let selector = current.nodeName.toLowerCase();
 
-      if (current.id && this.isUniqueId(current.id)) {
+      if (current.id && this.isUniqueId(current.id, doc)) {
         selector = `#${CSS.escape(current.id)}`;
         path.unshift(selector);
         break;
@@ -62,14 +63,14 @@ export class SelectorGenerator {
     }
 
     // Optimize the path
-    return this.optimizePath(path, element);
+    return this.optimizePath(path, element, doc);
   }
 
   /**
    * Generate XPath for an element
    */
-  private static generateXPath(element: Element): string {
-    if (element.id && this.isUniqueId(element.id)) {
+  private static generateXPath(element: Element, doc: Document): string {
+    if (element.id && this.isUniqueId(element.id, doc)) {
       return `//*[@id="${element.id}"]`;
     }
 
@@ -79,7 +80,7 @@ export class SelectorGenerator {
     while (current && current.nodeType === Node.ELEMENT_NODE) {
       const tagName = current.nodeName.toLowerCase();
 
-      if (current.id && this.isUniqueId(current.id)) {
+      if (current.id && this.isUniqueId(current.id, doc)) {
         path.unshift(`//*[@id="${current.id}"]`);
         break;
       }
@@ -138,8 +139,8 @@ export class SelectorGenerator {
   /**
    * Check if an ID is unique in the document
    */
-  private static isUniqueId(id: string): boolean {
-    return document.querySelectorAll(`#${CSS.escape(id)}`).length === 1;
+  private static isUniqueId(id: string, doc: Document): boolean {
+    return doc.querySelectorAll(`#${CSS.escape(id)}`).length === 1;
   }
 
   /**
@@ -181,12 +182,12 @@ export class SelectorGenerator {
   /**
    * Optimize the selector path by removing unnecessary parts
    */
-  private static optimizePath(path: string[], element: Element): string {
+  private static optimizePath(path: string[], element: Element, doc: Document): string {
     // Try progressively shorter paths
     for (let i = 0; i < path.length - 1; i++) {
       const shortPath = path.slice(i).join(' > ');
       try {
-        const matches = document.querySelectorAll(shortPath);
+        const matches = doc.querySelectorAll(shortPath);
         if (matches.length === 1 && matches[0] === element) {
           return shortPath;
         }
@@ -207,7 +208,7 @@ export class SelectorGenerator {
     let depth = 0;
     const maxDepth = 5;
 
-    while (current && current !== document.body && depth < maxDepth) {
+    while (current && current !== element.ownerDocument?.body && depth < maxDepth) {
       const tag = current.nodeName.toLowerCase();
       let descriptor = tag;
 

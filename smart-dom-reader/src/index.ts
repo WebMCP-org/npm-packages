@@ -11,11 +11,25 @@ import {
   SmartDOMResult,
 } from './types';
 
+// Re-export modules for external use
 export { ContentDetection } from './content-detection';
 export { ProgressiveExtractor } from './progressive';
 export { SelectorGenerator } from './selectors';
 export * from './types';
 
+/**
+ * Smart DOM Reader - Full Extraction Approach
+ *
+ * This class provides complete DOM extraction in a single pass.
+ * Use this when you need all information upfront and have sufficient
+ * token budget for processing the complete output.
+ *
+ * Features:
+ * - Single-pass extraction of all elements
+ * - Two modes: 'interactive' (UI elements) or 'full' (includes content)
+ * - Efficient for automation and testing scenarios
+ * - Returns complete structured data immediately
+ */
 export class SmartDOMReader {
   private options: ExtractionOptions;
 
@@ -37,7 +51,9 @@ export class SmartDOMReader {
   }
 
   /**
-   * Main extraction method
+   * Main extraction method - extracts all data in one pass
+   * @param rootElement The document or element to extract from
+   * @param runtimeOptions Options to override constructor options
    */
   extract(
     rootElement: Document | Element = document,
@@ -100,61 +116,91 @@ export class SmartDOMReader {
    * Extract page landmarks
    */
   private extractLandmarks(doc: Document): PageLandmarks {
-    const landmarkElements = ContentDetection.detectLandmarks(doc);
-
+    const detected = ContentDetection.detectLandmarks(doc);
     return {
-      navigation: landmarkElements.navigation.map(
-        (el) => SelectorGenerator.generateSelectors(el).css
-      ),
-      main: landmarkElements.main.map((el) => SelectorGenerator.generateSelectors(el).css),
-      forms: Array.from(doc.querySelectorAll('form')).map(
-        (el) => SelectorGenerator.generateSelectors(el).css
-      ),
-      headers: Array.from(doc.querySelectorAll('header, [role="banner"]')).map(
-        (el) => SelectorGenerator.generateSelectors(el).css
-      ),
-      footers: Array.from(doc.querySelectorAll('footer, [role="contentinfo"]')).map(
-        (el) => SelectorGenerator.generateSelectors(el).css
-      ),
-      articles: Array.from(doc.querySelectorAll('article')).map(
-        (el) => SelectorGenerator.generateSelectors(el).css
-      ),
-      sections: Array.from(
-        doc.querySelectorAll('section[aria-label], section[aria-labelledby]')
-      ).map((el) => SelectorGenerator.generateSelectors(el).css),
+      navigation: this.elementsToSelectors(detected.navigation || []),
+      main: this.elementsToSelectors(detected.main || []),
+      forms: this.elementsToSelectors(detected.form || []),
+      headers: this.elementsToSelectors(detected.banner || []),
+      footers: this.elementsToSelectors(detected.contentinfo || []),
+      articles: this.elementsToSelectors(detected.region || []),
+      sections: this.elementsToSelectors(detected.region || []),
     };
+  }
+
+  /**
+   * Convert elements to selector strings
+   */
+  private elementsToSelectors(elements: Element[]): string[] {
+    return elements.map((el) => SelectorGenerator.generateSelectors(el).css);
   }
 
   /**
    * Extract interactive elements
    */
-  private extractInteractiveElements(container: Element | Document, options: ExtractionOptions) {
-    const elements = DOMTraversal.getInteractiveElements(container, options);
-
-    // Categorize elements
+  private extractInteractiveElements(
+    container: Element | Document,
+    options: ExtractionOptions
+  ): SmartDOMResult['interactive'] {
     const buttons: ExtractedElement[] = [];
     const links: ExtractedElement[] = [];
     const inputs: ExtractedElement[] = [];
     const clickable: ExtractedElement[] = [];
 
-    for (const element of elements) {
-      const tag = element.tag;
-
-      if (tag === 'button' || element.attributes.role === 'button') {
-        buttons.push(element);
-      } else if (tag === 'a' && element.attributes.href) {
-        links.push(element);
-      } else if (['input', 'textarea', 'select'].includes(tag)) {
-        inputs.push(element);
-      } else if (element.interaction.click) {
-        clickable.push(element);
+    // Extract buttons
+    const buttonElements = container.querySelectorAll(
+      'button, [role="button"], input[type="button"], input[type="submit"]'
+    );
+    buttonElements.forEach((el) => {
+      if (this.shouldIncludeElement(el, options)) {
+        const extracted = DOMTraversal.extractElement(el, options);
+        if (extracted) buttons.push(extracted);
       }
+    });
+
+    // Extract links
+    const linkElements = container.querySelectorAll('a[href]');
+    linkElements.forEach((el) => {
+      if (this.shouldIncludeElement(el, options)) {
+        const extracted = DOMTraversal.extractElement(el, options);
+        if (extracted) links.push(extracted);
+      }
+    });
+
+    // Extract form inputs
+    const inputElements = container.querySelectorAll(
+      'input:not([type="button"]):not([type="submit"]), textarea, select'
+    );
+    inputElements.forEach((el) => {
+      if (this.shouldIncludeElement(el, options)) {
+        const extracted = DOMTraversal.extractElement(el, options);
+        if (extracted) inputs.push(extracted);
+      }
+    });
+
+    // Extract custom selectors
+    if (options.customSelectors) {
+      options.customSelectors.forEach((selector) => {
+        const elements = container.querySelectorAll(selector);
+        elements.forEach((el) => {
+          if (this.shouldIncludeElement(el, options)) {
+            const extracted = DOMTraversal.extractElement(el, options);
+            if (extracted) clickable.push(extracted);
+          }
+        });
+      });
     }
 
     // Extract forms
     const forms = this.extractForms(container, options);
 
-    return { buttons, links, inputs, forms, clickable };
+    return {
+      buttons,
+      links,
+      inputs,
+      forms,
+      clickable,
+    };
   }
 
   /**
@@ -164,71 +210,100 @@ export class SmartDOMReader {
     const forms: FormInfo[] = [];
     const formElements = container.querySelectorAll('form');
 
-    for (const form of Array.from(formElements)) {
-      const formInputs = form.querySelectorAll('input:not([type="hidden"]), textarea, select');
-      const formButtons = form.querySelectorAll(
-        'button, input[type="submit"], input[type="button"]'
-      );
+    formElements.forEach((form) => {
+      if (!this.shouldIncludeElement(form, options)) return;
 
-      const formInfo: FormInfo = {
+      const formInputs: ExtractedElement[] = [];
+      const formButtons: ExtractedElement[] = [];
+
+      // Extract form inputs
+      const inputs = form.querySelectorAll(
+        'input:not([type="button"]):not([type="submit"]), textarea, select'
+      );
+      inputs.forEach((input) => {
+        const extracted = DOMTraversal.extractElement(input, options);
+        if (extracted) formInputs.push(extracted);
+      });
+
+      // Extract form buttons
+      const buttons = form.querySelectorAll('button, input[type="button"], input[type="submit"]');
+      buttons.forEach((button) => {
+        const extracted = DOMTraversal.extractElement(button, options);
+        if (extracted) formButtons.push(extracted);
+      });
+
+      forms.push({
         selector: SelectorGenerator.generateSelectors(form).css,
         action: form.getAttribute('action') || undefined,
         method: form.getAttribute('method') || undefined,
-        inputs: [],
-        buttons: [],
-      };
-
-      // Extract form inputs
-      for (const input of Array.from(formInputs)) {
-        const extracted = DOMTraversal.extractElement(input, options);
-        if (extracted) {
-          formInfo.inputs.push(extracted);
-        }
-      }
-
-      // Extract form buttons
-      for (const button of Array.from(formButtons)) {
-        const extracted = DOMTraversal.extractElement(button, options);
-        if (extracted) {
-          formInfo.buttons.push(extracted);
-        }
-      }
-
-      forms.push(formInfo);
-    }
+        inputs: formInputs,
+        buttons: formButtons,
+      });
+    });
 
     return forms;
   }
 
   /**
-   * Extract semantic elements (full mode)
+   * Extract semantic elements (full mode only)
    */
-  private extractSemanticElements(container: Element | Document, options: ExtractionOptions) {
-    const elements = DOMTraversal.getSemanticElements(container, options);
-
+  private extractSemanticElements(
+    container: Element | Document,
+    options: ExtractionOptions
+  ): SmartDOMResult['semantic'] {
     const headings: ExtractedElement[] = [];
     const images: ExtractedElement[] = [];
     const tables: ExtractedElement[] = [];
     const lists: ExtractedElement[] = [];
     const articles: ExtractedElement[] = [];
 
-    for (const element of elements) {
-      const tag = element.tag;
-
-      if (/^h[1-6]$/.test(tag)) {
-        headings.push(element);
-      } else if (tag === 'img') {
-        images.push(element);
-      } else if (tag === 'table') {
-        tables.push(element);
-      } else if (['ul', 'ol', 'dl'].includes(tag)) {
-        lists.push(element);
-      } else if (tag === 'article') {
-        articles.push(element);
+    // Extract headings
+    container.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach((el) => {
+      if (this.shouldIncludeElement(el, options)) {
+        const extracted = DOMTraversal.extractElement(el, options);
+        if (extracted) headings.push(extracted);
       }
-    }
+    });
 
-    return { headings, images, tables, lists, articles };
+    // Extract images
+    container.querySelectorAll('img').forEach((el) => {
+      if (this.shouldIncludeElement(el, options)) {
+        const extracted = DOMTraversal.extractElement(el, options);
+        if (extracted) images.push(extracted);
+      }
+    });
+
+    // Extract tables
+    container.querySelectorAll('table').forEach((el) => {
+      if (this.shouldIncludeElement(el, options)) {
+        const extracted = DOMTraversal.extractElement(el, options);
+        if (extracted) tables.push(extracted);
+      }
+    });
+
+    // Extract lists
+    container.querySelectorAll('ul, ol').forEach((el) => {
+      if (this.shouldIncludeElement(el, options)) {
+        const extracted = DOMTraversal.extractElement(el, options);
+        if (extracted) lists.push(extracted);
+      }
+    });
+
+    // Extract articles
+    container.querySelectorAll('article, [role="article"]').forEach((el) => {
+      if (this.shouldIncludeElement(el, options)) {
+        const extracted = DOMTraversal.extractElement(el, options);
+        if (extracted) articles.push(extracted);
+      }
+    });
+
+    return {
+      headings,
+      images,
+      tables,
+      lists,
+      articles,
+    };
   }
 
   /**
@@ -238,94 +313,76 @@ export class SmartDOMReader {
     doc: Document,
     container: Element | Document,
     options: ExtractionOptions
-  ) {
+  ): SmartDOMResult['metadata'] {
     const allElements = container.querySelectorAll('*');
-    const mainContent = options.mainContentOnly ? container : ContentDetection.findMainContent(doc);
+    const extractedElements = container.querySelectorAll(
+      'button, a, input, textarea, select, h1, h2, h3, h4, h5, h6, img, table, ul, ol, article'
+    ).length;
 
     return {
       totalElements: allElements.length,
-      extractedElements: this.countExtractedElements(),
-      mainContent: SelectorGenerator.generateSelectors(mainContent as Element).css,
-      language: doc.documentElement.lang || undefined,
+      extractedElements,
+      mainContent:
+        options.mainContentOnly && container instanceof Element
+          ? SelectorGenerator.generateSelectors(container).css
+          : undefined,
+      language: doc.documentElement.getAttribute('lang') || undefined,
     };
   }
 
   /**
-   * Detect if page has errors
+   * Check if element should be included based on options
    */
-  private detectErrors(doc: Document): boolean {
-    // Check for common error indicators
-    const errorSelectors = [
-      '.error',
-      '.alert-danger',
-      '.alert-error',
-      '[role="alert"]',
-      '.validation-error',
-      '.form-error',
-      '.field-error',
-    ];
-
-    for (const selector of errorSelectors) {
-      const errorElement = doc.querySelector(selector);
-      if (errorElement && DOMTraversal.isVisible(errorElement)) {
-        return true;
-      }
+  private shouldIncludeElement(element: Element, options: ExtractionOptions): boolean {
+    // Check visibility
+    if (!options.includeHidden && !DOMTraversal.isVisible(element)) {
+      return false;
     }
 
-    // Check for error text patterns
-    const bodyText = doc.body?.textContent?.toLowerCase() || '';
-    const errorPatterns = ['error occurred', 'something went wrong', 'unable to process'];
+    // Check viewport
+    if (options.viewportOnly && !DOMTraversal.isInViewport(element)) {
+      return false;
+    }
 
-    return errorPatterns.some((pattern) => bodyText.includes(pattern));
+    // Check custom filter
+    if (options.filter && !DOMTraversal.passesFilter(element, options.filter)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Detect errors on the page
+   */
+  private detectErrors(doc: Document): boolean {
+    const errorSelectors = ['.error', '.alert-danger', '[role="alert"]', '.error-message'];
+    return errorSelectors.some((sel) => {
+      const element = doc.querySelector(sel);
+      return element ? DOMTraversal.isVisible(element) : false;
+    });
   }
 
   /**
    * Detect if page is loading
    */
   private detectLoading(doc: Document): boolean {
-    // Check for loading indicators
-    const loadingSelectors = [
-      '.loading',
-      '.spinner',
-      '.loader',
-      '[aria-busy="true"]',
-      '.skeleton',
-      '.placeholder-loading',
-    ];
-
-    for (const selector of loadingSelectors) {
-      const loadingElement = doc.querySelector(selector);
-      if (loadingElement && DOMTraversal.isVisible(loadingElement)) {
-        return true;
-      }
-    }
-
-    return false;
+    const loadingSelectors = ['.loading', '.spinner', '[aria-busy="true"]', '.loader'];
+    return loadingSelectors.some((sel) => {
+      const element = doc.querySelector(sel);
+      return element ? DOMTraversal.isVisible(element) : false;
+    });
   }
 
   /**
-   * Detect if page has modals
+   * Detect modal dialogs
    */
   private detectModals(doc: Document): boolean {
-    // Check for modal indicators
-    const modalSelectors = [
-      '.modal.show',
-      '.modal.open',
-      '.modal.active',
-      '[role="dialog"][aria-hidden="false"]',
-      '.overlay:not([hidden])',
-      '.popup:not([hidden])',
-    ];
-
-    for (const selector of modalSelectors) {
-      const modalElement = doc.querySelector(selector);
-      if (modalElement && DOMTraversal.isVisible(modalElement)) {
-        return true;
-      }
-    }
-
-    // Check if body has modal-open class
-    return doc.body?.classList.contains('modal-open') || false;
+    const modalSelectors = ['[role="dialog"]', '.modal', '.popup', '.overlay'];
+    return modalSelectors.some((sel) => {
+      const element = doc.querySelector(sel);
+      return element ? DOMTraversal.isVisible(element) : false;
+    });
   }
 
   /**
@@ -333,84 +390,63 @@ export class SmartDOMReader {
    */
   private getFocusedElement(doc: Document): string | undefined {
     const focused = doc.activeElement;
-    if (focused && focused !== doc.body && focused !== doc.documentElement) {
+    if (focused && focused !== doc.body) {
       return SelectorGenerator.generateSelectors(focused).css;
     }
     return undefined;
   }
 
-  /**
-   * Count extracted elements (for metadata)
-   */
-  private countExtractedElements(): number {
-    // This would be tracked during extraction
-    // For now, return 0 as placeholder
-    return 0;
-  }
+  // ===== Static convenience methods =====
 
   /**
-   * Quick extraction method for interactive elements only
+   * Quick extraction for interactive elements only
+   * @param doc The document to extract from
+   * @param options Extraction options
    */
-  static extractInteractive(options: Partial<ExtractionOptions> = {}): SmartDOMResult {
+  static extractInteractive(
+    doc: Document,
+    options: Partial<ExtractionOptions> = {}
+  ): SmartDOMResult {
     const reader = new SmartDOMReader({
       ...options,
       mode: 'interactive',
     });
-    return reader.extract();
+    return reader.extract(doc);
   }
 
   /**
-   * Full extraction method
+   * Quick extraction for full content
+   * @param doc The document to extract from
+   * @param options Extraction options
    */
-  static extractFull(options: Partial<ExtractionOptions> = {}): SmartDOMResult {
+  static extractFull(doc: Document, options: Partial<ExtractionOptions> = {}): SmartDOMResult {
     const reader = new SmartDOMReader({
       ...options,
       mode: 'full',
     });
-    return reader.extract();
+    return reader.extract(doc);
   }
 
   /**
    * Extract from a specific element
+   * @param element The element to extract from
+   * @param mode The extraction mode
+   * @param options Additional options
    */
   static extractFromElement(
     element: Element,
-    mode: ExtractionMode = 'interactive'
-  ): ExtractedElement | null {
-    const options: ExtractionOptions = {
+    mode: ExtractionMode = 'interactive',
+    options: Partial<ExtractionOptions> = {}
+  ): SmartDOMResult {
+    const reader = new SmartDOMReader({
+      ...options,
       mode,
-      maxDepth: 3,
-      includeHidden: false,
-      includeShadowDOM: true,
-      includeIframes: false,
-      viewportOnly: false,
-      mainContentOnly: false,
-    };
-
-    return DOMTraversal.extractElement(element, options);
-  }
-
-  /**
-   * Progressive extraction: Step 1 - Get structural overview
-   */
-  static getStructure() {
-    const { ProgressiveExtractor } = require('./progressive');
-    return ProgressiveExtractor.extractStructure();
-  }
-
-  /**
-   * Progressive extraction: Step 2 - Extract specific region
-   */
-  static getRegion(selector: string, options: Partial<ExtractionOptions> = {}) {
-    const { ProgressiveExtractor } = require('./progressive');
-    return ProgressiveExtractor.extractRegion(selector, options);
-  }
-
-  /**
-   * Progressive extraction: Step 3 - Read content from region
-   */
-  static readContent(selector: string, options: any = {}) {
-    const { ProgressiveExtractor } = require('./progressive');
-    return ProgressiveExtractor.extractContent(selector, options);
+    });
+    return reader.extract(element);
   }
 }
+
+/**
+ * Default export for convenience - full extraction approach
+ */
+export default SmartDOMReader;

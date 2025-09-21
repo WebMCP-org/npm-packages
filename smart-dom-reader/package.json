@@ -27,22 +27,25 @@
   "sideEffects": true,
   "type": "module",
   "exports": {
-    ".": "./dist/index.js"
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
   },
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "browser": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "vite build",
+    "build": "tsup",
     "check": "biome check --write .",
     "clean": "rm -rf dist .turbo",
     "format": "biome format --write .",
     "lint": "biome lint --write .",
     "prepublishOnly": "pnpm run build",
-    "preview": "vite preview",
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
     "typecheck": "tsc --noEmit",
@@ -52,9 +55,8 @@
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "typescript": "catalog:",
-    "vite": "^7.1.1",
-    "vite-plugin-monkey": "^6.0.1"
+    "tsup": "catalog:",
+    "typescript": "catalog:"
   },
   "peerDependencies": {
     "@modelcontextprotocol/sdk": "^1.15.0"

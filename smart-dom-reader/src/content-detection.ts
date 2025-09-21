@@ -3,19 +3,19 @@ export class ContentDetection {
    * Find the main content area of a page
    * Inspired by dom-to-semantic-markdown's approach
    */
-  static findMainContent(document: Document): Element {
+  static findMainContent(doc: Document): Element {
     // First, check for explicit main element
-    const mainElement = document.querySelector('main, [role="main"]');
+    const mainElement = doc.querySelector('main, [role="main"]');
     if (mainElement) {
       return mainElement;
     }
 
     // If no explicit main, detect it
-    if (!document.body) {
-      return document.documentElement;
+    if (!doc.body) {
+      return doc.documentElement;
     }
 
-    return this.detectMainContent(document.body);
+    return this.detectMainContent(doc.body);
   }
 
   /**
@@ -220,7 +220,7 @@ export class ContentDetection {
   /**
    * Detect page landmarks
    */
-  static detectLandmarks(document: Document): Record<string, Element[]> {
+  static detectLandmarks(doc: Document): Record<string, Element[]> {
     const landmarks: Record<string, Element[]> = {
       navigation: [],
       main: [],
@@ -245,7 +245,7 @@ export class ContentDetection {
     };
 
     for (const [landmark, selector] of Object.entries(landmarkSelectors)) {
-      const elements = document.querySelectorAll(selector);
+      const elements = doc.querySelectorAll(selector);
       landmarks[landmark] = Array.from(elements);
     }
 

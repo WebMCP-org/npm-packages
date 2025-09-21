@@ -1,10 +1,11 @@
 # Smart DOM Reader
 
-A token-efficient TypeScript library for extracting DOM information optimized for AI-powered userscript generation. Combines wisdom from multiple DOM extraction approaches to provide intelligent, context-aware element extraction.
+A stateless, token-efficient TypeScript library for extracting DOM information optimized for AI-powered userscript generation. Combines wisdom from multiple DOM extraction approaches to provide intelligent, context-aware element extraction.
 
-## Features
+## Key Features
 
-- **Two extraction modes**: Interactive-only and Full
+- **Two extraction approaches**: Progressive (step-by-step) and Full (single-pass)
+- **Stateless architecture**: All functions accept document/element parameters
 - **Multiple selector strategies**: CSS, XPath, text-based, data-testid
 - **Smart content detection**: Automatically identifies main content areas
 - **Context preservation**: Maintains element relationships and semantic context
@@ -14,55 +15,61 @@ A token-efficient TypeScript library for extracting DOM information optimized fo
 ## Installation
 
 ```bash
-npm install smart-dom-reader
+npm install @mcp-b/smart-dom-reader
 ```
 
-## Usage
+## Two Extraction Approaches
 
-### Quick Start
+### 1. Full Extraction (SmartDOMReader)
+
+**When to use:** You need all information upfront and have sufficient token budget for processing the complete output. Best for automation, testing, and scenarios where you know exactly what you need.
 
 ```typescript
-import { SmartDOMReader } from 'smart-dom-reader';
+import { SmartDOMReader } from '@mcp-b/smart-dom-reader';
+
+// Pass document explicitly - no window dependency
+const doc = document; // or any Document object
 
 // Interactive mode - extract only interactive elements
-const interactiveData = SmartDOMReader.extractInteractive();
+const interactiveData = SmartDOMReader.extractInteractive(doc);
 
 // Full mode - extract interactive + semantic elements
-const fullData = SmartDOMReader.extractFull();
-```
+const fullData = SmartDOMReader.extractFull(doc);
 
-### Advanced Usage
-
-```typescript
-import { SmartDOMReader, ExtractionOptions } from 'smart-dom-reader';
-
-const options: Partial<ExtractionOptions> = {
-  mode: 'interactive',
-  maxDepth: 3,
-  includeHidden: false,
-  includeShadowDOM: true,
-  includeIframes: false,
-  viewportOnly: true,
+// Custom options
+const customData = SmartDOMReader.extractInteractive(doc, {
   mainContentOnly: true,
-  customSelectors: ['[data-action]', '.custom-interactive']
-};
-
-const reader = new SmartDOMReader(options);
-const result = reader.extract();
-
-// Access extracted data
-console.log(result.interactive.buttons);
-console.log(result.interactive.forms);
-console.log(result.landmarks);
+  viewportOnly: true,
+  includeHidden: false
+});
 ```
 
-### Extract from Specific Element
+### 2. Progressive Extraction (ProgressiveExtractor)
+
+**When to use:** Working with AI/LLMs where token efficiency is critical. Allows making intelligent decisions at each step rather than extracting everything upfront.
 
 ```typescript
-import { SmartDOMReader } from 'smart-dom-reader';
+import { ProgressiveExtractor } from '@mcp-b/smart-dom-reader';
 
-const element = document.querySelector('#my-form');
-const extracted = SmartDOMReader.extractFromElement(element!, 'interactive');
+// Step 1: Get high-level page structure (minimal tokens)
+const structure = ProgressiveExtractor.extractStructure(document);
+console.log(structure.summary); // Quick stats about the page
+console.log(structure.regions); // Map of page regions
+console.log(structure.suggestions); // AI-friendly hints
+
+// Step 2: Extract details from specific region based on structure
+const mainContent = ProgressiveExtractor.extractRegion(
+  structure.summary.mainContentSelector,
+  document,
+  { mode: 'interactive' }
+);
+
+// Step 3: Extract readable content from a region
+const articleText = ProgressiveExtractor.extractContent(
+  'article.main-article',
+  document,
+  { includeHeadings: true, includeLists: true }
+);
 ```
 
 ## Extraction Modes
@@ -83,7 +90,52 @@ Includes everything from interactive mode plus:
 - Tables and lists
 - Content structure and relationships
 
+## API Comparison
+
+### Full Extraction API
+
+```typescript
+// Class-based with options
+const reader = new SmartDOMReader({
+  mode: 'interactive',
+  mainContentOnly: true,
+  viewportOnly: false
+});
+const result = reader.extract(document);
+
+// Static methods for convenience
+SmartDOMReader.extractInteractive(document);
+SmartDOMReader.extractFull(document);
+SmartDOMReader.extractFromElement(element, 'interactive');
+```
+
+### Progressive Extraction API
+
+```typescript
+// Step 1: Structure overview
+const overview = ProgressiveExtractor.extractStructure(document);
+// Returns: regions, forms, summary, suggestions
+
+// Step 2: Region extraction
+const region = ProgressiveExtractor.extractRegion(
+  selector,
+  document,
+  options
+);
+// Returns: Full SmartDOMResult for that region
+
+// Step 3: Content extraction
+const content = ProgressiveExtractor.extractContent(
+  selector,
+  document,
+  { includeMedia: true }
+);
+// Returns: Text content, headings, lists, tables, media
+```
+
 ## Output Structure
+
+Both approaches return structured data optimized for AI processing:
 
 ```typescript
 interface SmartDOMResult {
@@ -136,7 +188,7 @@ interface SmartDOMResult {
 
 ## Element Information
 
-Each extracted element includes:
+Each extracted element includes comprehensive selector strategies:
 
 ```typescript
 interface ExtractedElement {
@@ -151,14 +203,14 @@ interface ExtractedElement {
     ariaLabel?: string;  // ARIA label if available
   };
   
-  attributes: Record<string, string>;  // Relevant attributes
+  attributes: Record<string, string>;
   
   context: {
     nearestForm?: string;
     nearestSection?: string;
     nearestMain?: string;
     nearestNav?: string;
-    parentChain: string[];  // Path from element to root
+    parentChain: string[];
   };
   
   interaction: {
@@ -197,42 +249,39 @@ interface ExtractedElement {
 
 ## Use Cases
 
-### AI Userscript Generation
+### AI Userscript Generation (Progressive Approach)
 ```typescript
-const data = SmartDOMReader.extractInteractive({
-  mainContentOnly: true,
-  viewportOnly: true
-});
+// First, understand the page structure
+const structure = ProgressiveExtractor.extractStructure(document);
 
-// Send to AI with context about interactive elements
+// AI decides which region to focus on based on structure
+const targetRegion = structure.regions.main?.selector || 'body';
+
+// Extract detailed information from chosen region
+const details = ProgressiveExtractor.extractRegion(
+  targetRegion,
+  document,
+  { mode: 'interactive', viewportOnly: true }
+);
+
+// Generate userscript prompt with focused context
 const prompt = `
-  Page: ${data.page.title}
-  Available buttons: ${data.interactive.buttons.map(b => b.text)}
-  Forms: ${data.interactive.forms.map(f => f.selector)}
+  Page: ${details.page.title}
+  Main form: ${details.interactive.forms[0]?.selector}
+  Submit button: ${details.interactive.buttons.find(b => b.text.includes('Submit'))?.selector.css}
   
-  Write a userscript to auto-fill the form and submit it.
+  Write a userscript to auto-fill and submit this form.
 `;
 ```
 
-### Page Analysis
+### Test Automation (Full Extraction)
 ```typescript
-const analysis = SmartDOMReader.extractFull({
-  includeHidden: true,
-  includeShadowDOM: true
-});
-
-console.log('Page structure:', analysis.landmarks);
-console.log('Content sections:', analysis.semantic?.articles);
-console.log('Interactive elements:', analysis.interactive);
-```
-
-### Testing Automation
-```typescript
-const testData = SmartDOMReader.extractInteractive({
+// Get all interactive elements at once
+const testData = SmartDOMReader.extractInteractive(document, {
   customSelectors: ['[data-test]', '[data-cy]']
 });
 
-// Use selectors for test automation
+// Use multiple selector strategies for robust testing
 testData.interactive.buttons.forEach(button => {
   console.log(`Button: ${button.text}`);
   console.log(`  CSS: ${button.selector.css}`);
@@ -241,16 +290,57 @@ testData.interactive.buttons.forEach(button => {
 });
 ```
 
+### Content Analysis (Progressive Approach)
+```typescript
+// Get structure first
+const structure = ProgressiveExtractor.extractStructure(document);
+
+// Extract readable content from main area
+const content = ProgressiveExtractor.extractContent(
+  structure.summary.mainContentSelector || 'main',
+  document,
+  { includeHeadings: true, includeTables: true }
+);
+
+console.log(`Word count: ${content.metadata.wordCount}`);
+console.log(`Headings: ${content.text.headings?.length}`);
+console.log(`Has interactive elements: ${content.metadata.hasInteractive}`);
+```
+
+## Stateless Architecture
+
+All methods are stateless and accept document/element parameters explicitly:
+
+```typescript
+// No window or document globals required
+function extractFromIframe(iframe: HTMLIFrameElement) {
+  const iframeDoc = iframe.contentDocument;
+  if (iframeDoc) {
+    return SmartDOMReader.extractInteractive(iframeDoc);
+  }
+}
+
+// Works with any document context
+function extractFromShadowRoot(shadowRoot: ShadowRoot) {
+  const container = shadowRoot.querySelector('.container');
+  if (container) {
+    return SmartDOMReader.extractFromElement(container);
+  }
+}
+```
+
 ## Design Philosophy
 
 This library is designed to provide:
 
-1. **Token Efficiency**: Extract only what's needed for AI context
-2. **Multiple Selector Strategies**: Robust element targeting
-3. **Semantic Understanding**: Preserve meaning and relationships
-4. **Interactive Focus**: Prioritize elements users interact with
-5. **Context Preservation**: Maintain element relationships
-6. **Framework Agnostic**: Works with any web application
+1. **Token Efficiency**: Progressive extraction minimizes token usage for AI applications
+2. **Flexibility**: Choose between complete extraction or step-by-step approach
+3. **Statelessness**: No global dependencies, works in any JavaScript environment
+4. **Multiple Selector Strategies**: Robust element targeting with fallbacks
+5. **Semantic Understanding**: Preserves meaning and relationships
+6. **Interactive Focus**: Prioritizes elements users interact with
+7. **Context Preservation**: Maintains element relationships
+8. **Framework Agnostic**: Works with any web application
 
 ## Credits
 

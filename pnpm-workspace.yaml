@@ -4,6 +4,7 @@ packages:
   - "mcp-react-hook-form"
   - "mcp-react-hooks"
   - "smart-dom-reader"
+  - "smart-dom-reader/mcp-server"
   - "transports"
 
 catalog:

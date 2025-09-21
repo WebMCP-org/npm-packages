@@ -52,9 +52,11 @@ export class DOMTraversal {
   /**
    * Check if element is visible
    */
-  static isVisible(element: Element): boolean {
+  static isVisible(element: Element, computedStyle?: CSSStyleDeclaration): boolean {
     const rect = element.getBoundingClientRect();
-    const style = window.getComputedStyle(element);
+    const style = computedStyle || element.ownerDocument?.defaultView?.getComputedStyle(element);
+
+    if (!style) return false;
 
     return !!(
       rect.width > 0 &&
@@ -69,20 +71,20 @@ export class DOMTraversal {
   /**
    * Check if element is in viewport
    */
-  static isInViewport(element: Element): boolean {
+  static isInViewport(element: Element, viewport?: { width: number; height: number }): boolean {
     const rect = element.getBoundingClientRect();
-    return (
-      rect.top < window.innerHeight &&
-      rect.bottom > 0 &&
-      rect.left < window.innerWidth &&
-      rect.right > 0
-    );
+    const view = viewport || {
+      width: element.ownerDocument?.defaultView?.innerWidth || 0,
+      height: element.ownerDocument?.defaultView?.innerHeight || 0,
+    };
+
+    return rect.top < view.height && rect.bottom > 0 && rect.left < view.width && rect.right > 0;
   }
 
   /**
    * Check if element passes filter criteria
    */
-  private static passesFilter(element: Element, filter: FilterOptions | undefined): boolean {
+  static passesFilter(element: Element, filter: FilterOptions | undefined): boolean {
     if (!filter) return true;
 
     const htmlElement = element as HTMLElement;
