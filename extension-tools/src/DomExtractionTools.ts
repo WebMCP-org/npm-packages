@@ -1,27 +1,16 @@
-import type {
-  ContentExtractionOptions,
-  ExtractedContent,
-  ExtractionOptions,
-  SmartDOMResult,
-  StructuralOverview,
-} from '@mcp-b/smart-dom-reader';
+import type { ExtractionArgs, ExtractionMethod } from '@mcp-b/smart-dom-reader';
+import { SMART_DOM_READER_BUNDLE } from '@mcp-b/smart-dom-reader/bundle-string';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { type ApiAvailability, BaseApiTools } from './BaseApiTools';
 
 type ExtractionError = { error: string };
-type StructureExtractionResult = StructuralOverview;
-type RegionExtractionResult = SmartDOMResult;
-type ContentExtractionResult = ExtractedContent;
+type ExtractionResult = string | ExtractionError;
 
 export interface DomExtractionToolsOptions {
   extractStructure?: boolean;
   extractRegion?: boolean;
   extractContent?: boolean;
-  // Legacy single-pass extractors are currently disabled while we finalize
-  // the stateless injection workflow.
-  // extractInteractive?: boolean;
-  // extractFull?: boolean;
 }
 
 /**
@@ -41,19 +30,16 @@ export interface DomExtractionToolsOptions {
  */
 export class DomExtractionTools extends BaseApiTools {
   protected apiName = 'DomExtraction';
-  private moduleUrl: string | undefined;
+  private bundleScript: string = SMART_DOM_READER_BUNDLE;
   private userScriptsSupport: boolean | null = null;
 
   constructor(server: McpServer, options: DomExtractionToolsOptions = {}) {
     super(server, options);
   }
 
-  private getModuleUrl(): string {
-    if (!this.moduleUrl) {
-      this.moduleUrl = chrome.runtime.getURL('smart-dom-reader.js');
-    }
-
-    return this.moduleUrl;
+  private getBundleScript(): string {
+    // Return the pre-bundled script string
+    return this.bundleScript;
   }
 
   private async resolveTabId(tabId?: number): Promise<number> {
@@ -104,47 +90,29 @@ export class DomExtractionTools extends BaseApiTools {
     }
   }
 
-  private serializeForInjection(value: unknown): string {
-    if (value === undefined) {
-      return 'undefined';
-    }
-
-    if (value === null) {
-      return 'null';
-    }
-
-    if (typeof value === 'number' || typeof value === 'boolean') {
-      return JSON.stringify(value);
-    }
-
-    if (typeof value === 'string') {
-      return JSON.stringify(value);
-    }
-
-    if (value instanceof RegExp) {
-      return `new RegExp(${JSON.stringify(value.source)}, ${JSON.stringify(value.flags)})`;
-    }
-
-    if (Array.isArray(value)) {
-      return `[${value.map((item) => this.serializeForInjection(item)).join(', ')}]`;
-    }
-
-    if (typeof value === 'object') {
-      const entries = Object.entries(value as Record<string, unknown>)
-        .filter(([, entryValue]) => entryValue !== undefined)
-        .map(
-          ([key, entryValue]) => `${JSON.stringify(key)}: ${this.serializeForInjection(entryValue)}`
-        );
-      return `{${entries.join(', ')}}`;
-    }
-
-    throw new Error(`Unsupported value type for injection: ${String(value)}`);
+  private serializeArgs(args: any): string {
+    // Safely serialize the args object for injection
+    return JSON.stringify(args);
   }
 
-  private async executeWithUserScripts<Result>(
+  private async executeExtraction<M extends ExtractionMethod>(
     tabId: number,
-    code: string
-  ): Promise<Result | ExtractionError> {
+    method: M,
+    args: ExtractionArgs[M]
+  ): Promise<ExtractionResult> {
+    const code = `
+      (() => {
+        // Inject the bundle
+        ${this.getBundleScript()}
+
+        // Execute extraction and return result immediately
+        const method = ${JSON.stringify(method)};
+        const args = ${this.serializeArgs(args)};
+
+        return SmartDOMReaderBundle.executeExtraction(method, args);
+      })()
+    `;
+
     try {
       const executions = await chrome.userScripts.execute({
         target: { tabId },
@@ -162,155 +130,10 @@ export class DomExtractionTools extends BaseApiTools {
         return { error: execution.error };
       }
 
-      return execution.result as Result;
+      return execution.result as ExtractionResult;
     } catch (error) {
       return { error: error instanceof Error ? error.message : String(error) };
     }
-  }
-
-  private buildStructureScript(moduleUrl: string, frameSelector?: string): string {
-    const frameSelectorLiteral = this.serializeForInjection(frameSelector);
-
-    return `(
-      async () => {
-        const moduleUrl = ${JSON.stringify(moduleUrl)};
-        const frameSelector = ${frameSelectorLiteral};
-        try {
-          const { ProgressiveExtractor } = await import(moduleUrl);
-
-          let doc = document;
-          if (frameSelector) {
-            const iframe = document.querySelector(frameSelector);
-            if (!iframe || !(iframe instanceof HTMLIFrameElement) || !iframe.contentDocument) {
-              return { error: 'Cannot access iframe: ' + frameSelector };
-            }
-            doc = iframe.contentDocument;
-          }
-
-          return ProgressiveExtractor.extractStructure(doc);
-        } catch (error) {
-          return { error: error instanceof Error ? error.message : String(error) };
-        }
-      }
-    )();`;
-  }
-
-  private buildRegionScript(
-    moduleUrl: string,
-    selector: string,
-    mode: ExtractionOptions['mode'],
-    frameSelector?: string,
-    options?: Partial<ExtractionOptions>
-  ): string {
-    const selectorLiteral = JSON.stringify(selector);
-    const modeLiteral = JSON.stringify(mode);
-    const frameSelectorLiteral = this.serializeForInjection(frameSelector);
-    const optionsLiteral = this.serializeForInjection(options);
-
-    return `(
-      async () => {
-        const moduleUrl = ${JSON.stringify(moduleUrl)};
-        const selector = ${selectorLiteral};
-        const mode = ${modeLiteral};
-        const frameSelector = ${frameSelectorLiteral};
-        const options = ${optionsLiteral};
-        try {
-          const { ProgressiveExtractor } = await import(moduleUrl);
-
-          let doc = document;
-          if (frameSelector) {
-            const iframe = document.querySelector(frameSelector);
-            if (!iframe || !(iframe instanceof HTMLIFrameElement) || !iframe.contentDocument) {
-              return { error: 'Cannot access iframe: ' + frameSelector };
-            }
-            doc = iframe.contentDocument;
-          }
-
-          const extractOptions = { ...(options || {}), mode };
-          const extractResult = ProgressiveExtractor.extractRegion(selector, doc, extractOptions);
-          if (!extractResult) {
-            return { error: 'No element found matching selector: ' + selector };
-          }
-
-          return extractResult;
-        } catch (error) {
-          return { error: error instanceof Error ? error.message : String(error) };
-        }
-      }
-    )();`;
-  }
-
-  private buildContentScript(
-    moduleUrl: string,
-    selector: string,
-    frameSelector?: string,
-    options?: Partial<ContentExtractionOptions>
-  ): string {
-    const selectorLiteral = JSON.stringify(selector);
-    const frameSelectorLiteral = this.serializeForInjection(frameSelector);
-    const optionsLiteral = this.serializeForInjection(options);
-
-    return `(
-      async () => {
-        const moduleUrl = ${JSON.stringify(moduleUrl)};
-        const selector = ${selectorLiteral};
-        const frameSelector = ${frameSelectorLiteral};
-        const options = ${optionsLiteral};
-        try {
-          const { ProgressiveExtractor } = await import(moduleUrl);
-
-          let doc = document;
-          if (frameSelector) {
-            const iframe = document.querySelector(frameSelector);
-            if (!iframe || !(iframe instanceof HTMLIFrameElement) || !iframe.contentDocument) {
-              return { error: 'Cannot access iframe: ' + frameSelector };
-            }
-            doc = iframe.contentDocument;
-          }
-
-          const extractResult = ProgressiveExtractor.extractContent(selector, doc, options || {});
-          if (!extractResult) {
-            return { error: 'No element found matching selector: ' + selector };
-          }
-
-          return extractResult;
-        } catch (error) {
-          return { error: error instanceof Error ? error.message : String(error) };
-        }
-      }
-    )();`;
-  }
-
-  private async executeStructureWithUserScripts(
-    tabId: number,
-    frameSelector?: string
-  ): Promise<StructureExtractionResult | ExtractionError> {
-    const moduleUrl = this.getModuleUrl();
-    const code = this.buildStructureScript(moduleUrl, frameSelector);
-    return this.executeWithUserScripts<StructureExtractionResult>(tabId, code);
-  }
-
-  private async executeRegionWithUserScripts(
-    tabId: number,
-    selector: string,
-    mode: ExtractionOptions['mode'],
-    frameSelector?: string,
-    options?: Partial<ExtractionOptions>
-  ): Promise<RegionExtractionResult | ExtractionError> {
-    const moduleUrl = this.getModuleUrl();
-    const code = this.buildRegionScript(moduleUrl, selector, mode, frameSelector, options);
-    return this.executeWithUserScripts<RegionExtractionResult>(tabId, code);
-  }
-
-  private async executeContentWithUserScripts(
-    tabId: number,
-    selector: string,
-    frameSelector?: string,
-    options?: Partial<ContentExtractionOptions>
-  ): Promise<ContentExtractionResult | ExtractionError> {
-    const moduleUrl = this.getModuleUrl();
-    const code = this.buildContentScript(moduleUrl, selector, frameSelector, options);
-    return this.executeWithUserScripts<ContentExtractionResult>(tabId, code);
   }
 
   checkAvailability(): ApiAvailability {
@@ -385,13 +208,20 @@ export class DomExtractionTools extends BaseApiTools {
           await this.ensureUserScriptsEnabled();
 
           const resolvedTabId = await this.resolveTabId(tabId);
-          const result = await this.executeStructureWithUserScripts(resolvedTabId, frameSelector);
+          const result = await this.executeExtraction(resolvedTabId, 'extractStructure', {
+            selector: frameSelector,
+            frameSelector: undefined,
+            formatOptions: { detail: 'summary' },
+          });
 
           if (this.isExtractionError(result)) {
             return this.formatError(new Error(result.error));
           }
 
-          return this.formatJson(result);
+          // Result is already markdown string
+          return {
+            content: [{ type: 'text', text: result as string }],
+          };
         } catch (error) {
           return this.formatError(error);
         }
@@ -456,20 +286,22 @@ export class DomExtractionTools extends BaseApiTools {
           await this.ensureUserScriptsEnabled();
 
           const resolvedTabId = await this.resolveTabId(tabId);
-          const modeValue = mode;
-          const result = await this.executeRegionWithUserScripts(
-            resolvedTabId,
+          const result = await this.executeExtraction(resolvedTabId, 'extractRegion', {
             selector,
-            modeValue,
+            mode: mode || 'interactive',
             frameSelector,
-            options ?? undefined
-          );
+            options: options ?? undefined,
+            formatOptions: { detail: 'region' },
+          });
 
           if (this.isExtractionError(result)) {
             return this.formatError(new Error(result.error));
           }
 
-          return this.formatJson(result);
+          // Result is already markdown string
+          return {
+            content: [{ type: 'text', text: result as string }],
+          };
         } catch (error) {
           return this.formatError(error);
         }
@@ -511,18 +343,21 @@ export class DomExtractionTools extends BaseApiTools {
           await this.ensureUserScriptsEnabled();
 
           const resolvedTabId = await this.resolveTabId(tabId);
-          const result = await this.executeContentWithUserScripts(
-            resolvedTabId,
+          const result = await this.executeExtraction(resolvedTabId, 'extractContent', {
             selector,
             frameSelector,
-            options ?? undefined
-          );
+            options: options ?? undefined,
+            formatOptions: { detail: 'region' },
+          });
 
           if (this.isExtractionError(result)) {
             return this.formatError(new Error(result.error));
           }
 
-          return this.formatJson(result);
+          // Result is already markdown string
+          return {
+            content: [{ type: 'text', text: result as string }],
+          };
         } catch (error) {
           return this.formatError(error);
         }

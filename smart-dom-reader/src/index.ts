@@ -11,6 +11,16 @@ import {
   SmartDOMResult,
 } from './types';
 
+export type {
+  ExtractContentArgs,
+  ExtractFullArgs,
+  ExtractInteractiveArgs,
+  ExtractionArgs,
+  ExtractionMethod,
+  ExtractionResult,
+  ExtractRegionArgs,
+  ExtractStructureArgs,
+} from './bundle-types';
 // Re-export modules for external use
 export { ContentDetection } from './content-detection';
 export { type MarkdownFormatOptions, MarkdownFormatter } from './markdown-formatter';
@@ -67,8 +77,13 @@ export class SmartDOMReader {
     const options: ExtractionOptions = { ...this.options, ...runtimeOptions };
 
     // Determine the container to search
-    let container: Element | Document = doc;
-    if (options.mainContentOnly) {
+    // IMPORTANT: Respect the provided rootElement when it's an Element.
+    // Previous behavior incorrectly defaulted to the whole document, causing
+    // region-scoped extractions to include page-wide data.
+    let container: Element | Document =
+      rootElement instanceof Document ? doc : (rootElement as Element);
+    // Only override container with detected main content when starting from the document.
+    if (options.mainContentOnly && rootElement instanceof Document) {
       container = ContentDetection.findMainContent(doc);
     }
 

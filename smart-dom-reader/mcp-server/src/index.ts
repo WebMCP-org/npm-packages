@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 
 import { constants as fsConstants } from 'node:fs';
-import { access, readFile } from 'node:fs/promises';
+import { access, readFile, stat } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -131,6 +131,7 @@ interface FormatOptions {
 type LibraryCache = {
   path: string;
   code: string;
+  mtimeMs: number;
 };
 
 async function pathExists(candidate: string | undefined): Promise<boolean> {
@@ -773,10 +774,6 @@ class SmartDomReaderServer {
   }
 
   private async readLibraryFile(resolvedPath: string): Promise<string> {
-    if (this.cachedLibrary?.path === resolvedPath) {
-      return this.cachedLibrary.code;
-    }
-
     if (!(await pathExists(resolvedPath))) {
       throw new McpError(
         ErrorCode.InvalidParams,
@@ -784,8 +781,14 @@ class SmartDomReaderServer {
       );
     }
 
+    // If cached, validate mtime to support hot updates without restart
+    const { mtimeMs } = await stat(resolvedPath);
+    if (this.cachedLibrary?.path === resolvedPath && this.cachedLibrary.mtimeMs === mtimeMs) {
+      return this.cachedLibrary.code;
+    }
+
     const code = await readFile(resolvedPath, 'utf8');
-    this.cachedLibrary = { path: resolvedPath, code };
+    this.cachedLibrary = { path: resolvedPath, code, mtimeMs };
     return code;
   }
 

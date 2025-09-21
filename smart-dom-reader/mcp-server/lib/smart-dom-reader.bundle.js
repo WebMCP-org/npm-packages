@@ -1248,48 +1248,53 @@ var init_progressive = __esm({
        * Step 1: Extract high-level structural overview
        * This provides a "map" of the page for the AI to understand structure
        */
-      static extractStructure(doc) {
+      static extractStructure(root) {
         const regions = {};
-        const header = doc.querySelector('header, [role="banner"], .header, #header');
+        const header = root.querySelector('header, [role="banner"], .header, #header');
         if (header) {
           regions.header = this.analyzeRegion(header);
         }
-        const navs = doc.querySelectorAll('nav, [role="navigation"], .nav, .navigation');
+        const navs = root.querySelectorAll('nav, [role="navigation"], .nav, .navigation');
         if (navs.length > 0) {
           regions.navigation = Array.from(navs).map((nav) => this.analyzeRegion(nav));
         }
-        const main = ContentDetection.findMainContent(doc);
-        if (main) {
-          regions.main = this.analyzeRegion(main);
-          const sections = main.querySelectorAll('section, article, [role="region"]');
+        if (root instanceof Document) {
+          const main = ContentDetection.findMainContent(root);
+          if (main) {
+            regions.main = this.analyzeRegion(main);
+            const sections = main.querySelectorAll('section, article, [role="region"]');
+            if (sections.length > 0) {
+              regions.sections = Array.from(sections)
+                .filter((section) => !section.closest('nav, header, footer'))
+                .map((section) => this.analyzeRegion(section));
+            }
+          }
+        } else {
+          regions.main = this.analyzeRegion(root);
+          const sections = root.querySelectorAll('section, article, [role="region"]');
           if (sections.length > 0) {
             regions.sections = Array.from(sections)
               .filter((section) => !section.closest('nav, header, footer'))
               .map((section) => this.analyzeRegion(section));
           }
         }
-        const sidebars = doc.querySelectorAll('aside, [role="complementary"], .sidebar, #sidebar');
+        const sidebars = root.querySelectorAll('aside, [role="complementary"], .sidebar, #sidebar');
         if (sidebars.length > 0) {
           regions.sidebar = Array.from(sidebars).map((sidebar) => this.analyzeRegion(sidebar));
         }
-        const footer = doc.querySelector('footer, [role="contentinfo"], .footer, #footer');
+        const footer = root.querySelector('footer, [role="contentinfo"], .footer, #footer');
         if (footer) {
           regions.footer = this.analyzeRegion(footer);
         }
-        const modals = doc.querySelectorAll('[role="dialog"], .modal, .popup, .overlay');
+        const modals = root.querySelectorAll('[role="dialog"], .modal, .popup, .overlay');
         const visibleModals = Array.from(modals).filter((modal) => DOMTraversal.isVisible(modal));
         if (visibleModals.length > 0) {
           regions.modals = visibleModals.map((modal) => this.analyzeRegion(modal));
         }
-        const forms = this.extractFormOverview(doc);
-        const summary = this.calculateSummary(doc, regions, forms);
+        const forms = this.extractFormOverview(root);
+        const summary = this.calculateSummary(root, regions, forms);
         const suggestions = this.generateSuggestions(regions, summary);
-        return {
-          regions,
-          forms,
-          summary,
-          suggestions,
-        };
+        return { regions, forms, summary, suggestions };
       }
       /**
        * Step 2: Extract detailed information from a specific region
@@ -1434,8 +1439,8 @@ var init_progressive = __esm({
       /**
        * Extract overview of forms on the page
        */
-      static extractFormOverview(doc) {
-        const forms = doc.querySelectorAll('form');
+      static extractFormOverview(root) {
+        const forms = root.querySelectorAll('form');
         return Array.from(forms).map((form) => {
           const inputs = form.querySelectorAll('input, textarea, select');
           const selector = SelectorGenerator.generateSelectors(form).css;
@@ -1482,18 +1487,18 @@ var init_progressive = __esm({
       /**
        * Calculate summary statistics
        */
-      static calculateSummary(doc, regions, forms) {
-        const allInteractive = doc.querySelectorAll('button, a[href], input, textarea, select');
-        const allSections = doc.querySelectorAll('section, article, [role="region"]');
+      static calculateSummary(root, regions, forms) {
+        const allInteractive = root.querySelectorAll('button, a[href], input, textarea, select');
+        const allSections = root.querySelectorAll('section, article, [role="region"]');
         const hasModals = (regions.modals?.length || 0) > 0;
         const errorSelectors = ['.error', '.alert-danger', '[role="alert"]'];
         const hasErrors = errorSelectors.some((sel) => {
-          const element = doc.querySelector(sel);
+          const element = root.querySelector(sel);
           return element ? DOMTraversal.isVisible(element) : false;
         });
         const loadingSelectors = ['.loading', '.spinner', '[aria-busy="true"]'];
         const isLoading = loadingSelectors.some((sel) => {
-          const element = doc.querySelector(sel);
+          const element = root.querySelector(sel);
           return element ? DOMTraversal.isVisible(element) : false;
         });
         const mainContentSelector = regions.main?.selector;
@@ -1603,8 +1608,8 @@ var init_index = __esm({
         const startTime = Date.now();
         const doc = rootElement instanceof Document ? rootElement : rootElement.ownerDocument;
         const options = { ...this.options, ...runtimeOptions };
-        let container = doc;
-        if (options.mainContentOnly) {
+        let container = rootElement instanceof Document ? doc : rootElement;
+        if (options.mainContentOnly && rootElement instanceof Document) {
           container = ContentDetection.findMainContent(doc);
         }
         const pageState = this.extractPageState(doc);

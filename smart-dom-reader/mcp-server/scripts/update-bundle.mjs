@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Copies the built smart-dom-reader library into the MCP server bundle location.
-// Source: ../../dist/index.js
+// Copies the built Smart DOM Reader library into the MCP server location.
+// Source: ../../dist/index.js (ESM, single file, no chunks)
 // Dest:   ../lib/smart-dom-reader.bundle.js
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';

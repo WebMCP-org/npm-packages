@@ -1,28 +1,30 @@
 packages:
-  - "extension-tools"
-  - "global"
-  - "mcp-react-hook-form"
-  - "mcp-react-hooks"
-  - "smart-dom-reader"
-  - "smart-dom-reader/mcp-server"
-  - "transports"
+  - extension-tools
+  - global
+  - mcp-react-hook-form
+  - mcp-react-hooks
+  - smart-dom-reader
+  - smart-dom-reader/mcp-server
+  - transports
 
 catalog:
-  typescript: ^5.8.3
-  "@types/node": ^22.15.21
-  "@types/react": ^19.1.2
-  "@types/react-dom": ^19.1.2
-  "@types/chrome": ^0.0.326
-  tsup: ^8.4.0
-  tsx: ^4.20.0
-  "@modelcontextprotocol/sdk": 1.15.0
-  zod: 3.24.1
+  '@modelcontextprotocol/sdk': 1.15.0
+  '@types/chrome': ^0.0.326
+  '@types/node': ^22.15.21
+  '@types/react': ^19.1.2
+  '@types/react-dom': ^19.1.2
   react: ^19.1.0
   react-dom: ^19.1.0
+  tsup: ^8.4.0
+  tsx: ^4.20.0
+  typescript: ^5.8.3
+  vite: ^7.1.2
+  vite-plugin-monkey: ^6.0.1
+  zod: 3.24.1
 
 onlyBuiltDependencies:
-  - "@axodotdev/oranda"
-  - "@tailwindcss/oxide"
+  - '@axodotdev/oranda'
+  - '@tailwindcss/oxide'
   - dtrace-provider
   - esbuild
   - sharp

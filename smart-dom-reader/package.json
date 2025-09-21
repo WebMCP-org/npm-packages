@@ -30,6 +30,10 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./bundle-string": {
+      "import": "./dist/bundle-string.js",
+      "types": "./dist/bundle-string.d.ts"
     }
   },
   "main": "./dist/index.js",
@@ -40,7 +44,9 @@
     "dist"
   ],
   "scripts": {
+    "prebuild": "pnpm build:bundle && node generate-bundle-module.mjs",
     "build": "tsup",
+    "build:bundle": "vite build --config vite.config.bundle.ts",
     "bundle:mcp": "pnpm --filter @mcp-b/smart-dom-reader build && pnpm --filter @mcp-b/smart-dom-reader-server bundle",
     "check": "biome check --write .",
     "clean": "rm -rf dist .turbo",
@@ -58,7 +64,9 @@
   "devDependencies": {
     "@types/node": "catalog:",
     "tsup": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plugin-monkey": "catalog:"
   },
   "peerDependencies": {
     "@modelcontextprotocol/sdk": "^1.15.0"

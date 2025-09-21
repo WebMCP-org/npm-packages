@@ -56,28 +56,38 @@ export class ProgressiveExtractor {
    * Step 1: Extract high-level structural overview
    * This provides a "map" of the page for the AI to understand structure
    */
-  static extractStructure(doc: Document): StructuralOverview {
+  static extractStructure(root: Document | Element): StructuralOverview {
     const regions: StructuralOverview['regions'] = {};
 
-    // Find header
-    const header = doc.querySelector('header, [role="banner"], .header, #header');
+    // Find header (scoped to root)
+    const header = root.querySelector('header, [role="banner"], .header, #header');
     if (header) {
       regions.header = this.analyzeRegion(header);
     }
 
-    // Find navigation areas
-    const navs = doc.querySelectorAll('nav, [role="navigation"], .nav, .navigation');
+    // Find navigation areas (scoped to root)
+    const navs = root.querySelectorAll('nav, [role="navigation"], .nav, .navigation');
     if (navs.length > 0) {
       regions.navigation = Array.from(navs).map((nav) => this.analyzeRegion(nav));
     }
 
     // Find main content
-    const main = ContentDetection.findMainContent(doc);
-    if (main) {
-      regions.main = this.analyzeRegion(main);
-
-      // Find sections within main
-      const sections = main.querySelectorAll('section, article, [role="region"]');
+    if (root instanceof Document) {
+      const main = ContentDetection.findMainContent(root);
+      if (main) {
+        regions.main = this.analyzeRegion(main);
+        // Find sections within main
+        const sections = main.querySelectorAll('section, article, [role="region"]');
+        if (sections.length > 0) {
+          regions.sections = Array.from(sections)
+            .filter((section) => !section.closest('nav, header, footer'))
+            .map((section) => this.analyzeRegion(section));
+        }
+      }
+    } else {
+      // When scoped to an Element, treat the element itself as the main region
+      regions.main = this.analyzeRegion(root);
+      const sections = root.querySelectorAll('section, article, [role="region"]');
       if (sections.length > 0) {
         regions.sections = Array.from(sections)
           .filter((section) => !section.closest('nav, header, footer'))
@@ -85,40 +95,35 @@ export class ProgressiveExtractor {
       }
     }
 
-    // Find sidebars
-    const sidebars = doc.querySelectorAll('aside, [role="complementary"], .sidebar, #sidebar');
+    // Find sidebars (scoped)
+    const sidebars = root.querySelectorAll('aside, [role="complementary"], .sidebar, #sidebar');
     if (sidebars.length > 0) {
       regions.sidebar = Array.from(sidebars).map((sidebar) => this.analyzeRegion(sidebar));
     }
 
-    // Find footer
-    const footer = doc.querySelector('footer, [role="contentinfo"], .footer, #footer');
+    // Find footer (scoped)
+    const footer = root.querySelector('footer, [role="contentinfo"], .footer, #footer');
     if (footer) {
       regions.footer = this.analyzeRegion(footer);
     }
 
-    // Find modals/dialogs
-    const modals = doc.querySelectorAll('[role="dialog"], .modal, .popup, .overlay');
+    // Find modals/dialogs (scoped)
+    const modals = root.querySelectorAll('[role="dialog"], .modal, .popup, .overlay');
     const visibleModals = Array.from(modals).filter((modal) => DOMTraversal.isVisible(modal));
     if (visibleModals.length > 0) {
       regions.modals = visibleModals.map((modal) => this.analyzeRegion(modal));
     }
 
-    // Extract form information
-    const forms = this.extractFormOverview(doc);
+    // Extract form information (scoped)
+    const forms = this.extractFormOverview(root);
 
-    // Calculate summary statistics
-    const summary = this.calculateSummary(doc, regions, forms);
+    // Calculate summary statistics (scoped)
+    const summary = this.calculateSummary(root, regions, forms);
 
     // Generate AI-friendly suggestions
     const suggestions = this.generateSuggestions(regions, summary);
 
-    return {
-      regions,
-      forms,
-      summary,
-      suggestions,
-    };
+    return { regions, forms, summary, suggestions };
   }
 
   /**
@@ -298,8 +303,8 @@ export class ProgressiveExtractor {
   /**
    * Extract overview of forms on the page
    */
-  private static extractFormOverview(doc: Document): StructuralOverview['forms'] {
-    const forms = doc.querySelectorAll('form');
+  private static extractFormOverview(root: Document | Element): StructuralOverview['forms'] {
+    const forms = root.querySelectorAll('form');
     return Array.from(forms).map((form) => {
       const inputs = form.querySelectorAll('input, textarea, select');
       const selector = SelectorGenerator.generateSelectors(form).css;
@@ -354,25 +359,25 @@ export class ProgressiveExtractor {
    * Calculate summary statistics
    */
   private static calculateSummary(
-    doc: Document,
+    root: Document | Element,
     regions: StructuralOverview['regions'],
     forms: StructuralOverview['forms']
   ): StructuralOverview['summary'] {
-    const allInteractive = doc.querySelectorAll('button, a[href], input, textarea, select');
-    const allSections = doc.querySelectorAll('section, article, [role="region"]');
+    const allInteractive = root.querySelectorAll('button, a[href], input, textarea, select');
+    const allSections = root.querySelectorAll('section, article, [role="region"]');
     const hasModals = (regions.modals?.length || 0) > 0;
 
     // Check for errors
     const errorSelectors = ['.error', '.alert-danger', '[role="alert"]'];
     const hasErrors = errorSelectors.some((sel) => {
-      const element = doc.querySelector(sel);
+      const element = root.querySelector(sel);
       return element ? DOMTraversal.isVisible(element) : false;
     });
 
     // Check for loading
     const loadingSelectors = ['.loading', '.spinner', '[aria-busy="true"]'];
     const isLoading = loadingSelectors.some((sel) => {
-      const element = doc.querySelector(sel);
+      const element = root.querySelector(sel);
       return element ? DOMTraversal.isVisible(element) : false;
     });
 
