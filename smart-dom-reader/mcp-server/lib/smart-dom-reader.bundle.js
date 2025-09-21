@@ -1209,10 +1209,258 @@ var init_types = __esm({
   },
 });
 
+// src/markdown-formatter.ts
+function truncate(text, len) {
+  const t = (text ?? '').trim();
+  if (!len || t.length <= len) return t;
+  return t.slice(0, len) + '...';
+}
+function bestSelector(el) {
+  return el.selector?.css || '';
+}
+function hashId(input) {
+  let h = 5381;
+  for (let i = 0; i < input.length; i++) h = (h * 33) ^ input.charCodeAt(i);
+  return 'sec-' + (h >>> 0).toString(36);
+}
+function iconForRegion(key) {
+  switch (key) {
+    case 'header':
+      return '\u{1F9ED}';
+    case 'navigation':
+      return '\u{1F4D1}';
+    case 'main':
+      return '\u{1F4C4}';
+    case 'sections':
+      return '\u{1F5C2}\uFE0F';
+    case 'sidebar':
+      return '\u{1F4DA}';
+    case 'footer':
+      return '\u{1F53B}';
+    case 'modals':
+      return '\u{1F4AC}';
+    default:
+      return '\u{1F539}';
+  }
+}
+function elementLine(el, opts) {
+  const txt = truncate(el.text || el.attributes?.ariaLabel, opts?.maxTextLength ?? 80);
+  const sel = bestSelector(el);
+  const tag = el.tag.toLowerCase();
+  const action = el.interaction?.submit
+    ? 'submit'
+    : el.interaction?.click
+      ? 'click'
+      : el.interaction?.change
+        ? 'change'
+        : void 0;
+  const actionText = action ? ` (${action})` : '';
+  return `- ${tag.toUpperCase()}: ${txt || '(no text)'} \u2192 \`${sel}\`${actionText}`;
+}
+function renderInteractive(inter, opts) {
+  const parts = [];
+  const limit = (arr) =>
+    typeof opts?.maxElements === 'number' ? arr.slice(0, opts.maxElements) : arr;
+  if (inter.buttons.length) {
+    parts.push('Buttons:');
+    for (const el of limit(inter.buttons)) parts.push(elementLine(el, opts));
+  }
+  if (inter.links.length) {
+    parts.push('Links:');
+    for (const el of limit(inter.links)) parts.push(elementLine(el, opts));
+  }
+  if (inter.inputs.length) {
+    parts.push('Inputs:');
+    for (const el of limit(inter.inputs)) parts.push(elementLine(el, opts));
+  }
+  if (inter.clickable.length) {
+    parts.push('Other Clickable:');
+    for (const el of limit(inter.clickable)) parts.push(elementLine(el, opts));
+  }
+  if (inter.forms.length) {
+    parts.push('Forms:');
+    for (const f of limit(inter.forms)) {
+      parts.push(
+        `- FORM: action=${f.action ?? '-'} method=${f.method ?? '-'} \u2192 \`${f.selector}\``
+      );
+    }
+  }
+  return parts.join('\n');
+}
+function renderRegionInfo(region) {
+  const icon = iconForRegion('region');
+  const id = hashId(`${region.selector}|${region.label ?? ''}|${region.role ?? ''}`);
+  const label = region.label ? ` ${region.label}` : '';
+  const stats = [];
+  if (region.buttonCount) stats.push(`${region.buttonCount} buttons`);
+  if (region.linkCount) stats.push(`${region.linkCount} links`);
+  if (region.inputCount) stats.push(`${region.inputCount} inputs`);
+  if (region.textPreview) stats.push(`\u201C${truncate(region.textPreview, 80)}\u201D`);
+  const statsLine = stats.length ? ` \u2014 ${stats.join(', ')}` : '';
+  return `${icon} ${label} \u2192 \`${region.selector}\` [${id}]${statsLine}`;
+}
+function wrapXml(body, meta, type = 'section') {
+  const attrs = [
+    meta?.title ? `title="${escapeXml(meta.title)}"` : null,
+    meta?.url ? `url="${escapeXml(meta.url)}"` : null,
+  ]
+    .filter(Boolean)
+    .join(' ');
+  return `<page ${attrs}>
+  <${type}><![CDATA[
+${body}
+]]></${type}>
+</page>`;
+}
+function escapeXml(s) {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+function capitalize(s) {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+var MarkdownFormatter;
+var init_markdown_formatter = __esm({
+  'src/markdown-formatter.ts'() {
+    'use strict';
+    MarkdownFormatter = class {
+      static structure(overview, _opts = {}, meta) {
+        const lines = [];
+        lines.push(`# Page Outline`);
+        if (meta?.title || meta?.url) {
+          lines.push(`Title: ${meta?.title ?? ''}`.trim());
+          lines.push(`URL: ${meta?.url ?? ''}`.trim());
+        }
+        lines.push('');
+        const regions = overview.regions;
+        const entries = [
+          ['header', regions.header],
+          ['navigation', regions.navigation],
+          ['main', regions.main],
+          ['sections', regions.sections],
+          ['sidebar', regions.sidebar],
+          ['footer', regions.footer],
+          ['modals', regions.modals],
+        ];
+        for (const [key, value] of entries) {
+          if (!value) continue;
+          const icon = iconForRegion(key);
+          if (Array.isArray(value)) {
+            if (!value.length) continue;
+            lines.push(`## ${icon} ${capitalize(key)}`);
+            for (const region of value) lines.push(renderRegionInfo(region));
+          } else {
+            lines.push(`## ${icon} ${capitalize(key)}`);
+            lines.push(renderRegionInfo(value));
+          }
+          lines.push('');
+        }
+        if (overview.suggestions?.length) {
+          lines.push('## Suggestions');
+          for (const s of overview.suggestions) lines.push(`- ${s}`);
+          lines.push('');
+        }
+        lines.push(
+          'Next: choose a region (by selector or [sectionId]) and call dom_extract_region for actionable details.'
+        );
+        const body = lines.join('\n');
+        return wrapXml(body, meta, 'outline');
+      }
+      static region(result, opts = {}, meta) {
+        const lines = [];
+        lines.push(`# Region Details`);
+        if (meta?.title || meta?.url) {
+          lines.push(`Title: ${meta?.title ?? ''}`.trim());
+          lines.push(`URL: ${meta?.url ?? ''}`.trim());
+        }
+        lines.push('');
+        const inter = result.interactive;
+        const summary = [];
+        const count = (arr) => (arr ? arr.length : 0);
+        summary.push(`${count(inter.buttons)} buttons`);
+        summary.push(`${count(inter.links)} links`);
+        summary.push(`${count(inter.inputs)} inputs`);
+        if (inter.forms?.length) summary.push(`${count(inter.forms)} forms`);
+        lines.push(`Summary: ${summary.join(', ')}`);
+        lines.push('');
+        lines.push(renderInteractive(inter, opts));
+        lines.push('');
+        lines.push(
+          'Next: write a script using the most stable selectors above. If selectors look unstable, rerun dom_extract_region with higher detail or call dom_extract_content for text context.'
+        );
+        const body = lines.join('\n');
+        return wrapXml(body, meta, 'section');
+      }
+      static content(content, opts = {}, meta) {
+        const lines = [];
+        lines.push(`# Content`);
+        lines.push(`Selector: \`${content.selector}\``);
+        lines.push('');
+        if (content.text.headings?.length) {
+          lines.push('Headings:');
+          for (const h of content.text.headings)
+            lines.push(`- H${h.level}: ${truncate(h.text, opts.maxTextLength ?? 120)}`);
+          lines.push('');
+        }
+        if (content.text.paragraphs?.length) {
+          const limit =
+            typeof opts.maxElements === 'number'
+              ? opts.maxElements
+              : content.text.paragraphs.length;
+          lines.push('Paragraphs:');
+          for (const p of content.text.paragraphs.slice(0, limit))
+            lines.push(`- ${truncate(p, opts.maxTextLength ?? 200)}`);
+          lines.push('');
+        }
+        if (content.text.lists?.length) {
+          lines.push('Lists:');
+          for (const list of content.text.lists) {
+            lines.push(`- ${list.type.toUpperCase()}:`);
+            const limit =
+              typeof opts.maxElements === 'number' ? opts.maxElements : list.items.length;
+            for (const item of list.items.slice(0, limit))
+              lines.push(`  - ${truncate(item, opts.maxTextLength ?? 120)}`);
+          }
+          lines.push('');
+        }
+        if (content.tables?.length) {
+          lines.push('Tables:');
+          for (const t of content.tables) {
+            lines.push(`- Headers: ${t.headers.join(' | ')}`);
+            const limit = typeof opts.maxElements === 'number' ? opts.maxElements : t.rows.length;
+            for (const row of t.rows.slice(0, limit)) lines.push(`  - ${row.join(' | ')}`);
+          }
+          lines.push('');
+        }
+        if (content.media?.length) {
+          lines.push('Media:');
+          const limit =
+            typeof opts.maxElements === 'number' ? opts.maxElements : content.media.length;
+          for (const m of content.media.slice(0, limit)) {
+            lines.push(
+              `- ${m.type.toUpperCase()}: ${m.alt ?? ''} ${m.src ? `\u2192 ${m.src}` : ''}`.trim()
+            );
+          }
+          lines.push('');
+        }
+        lines.push(
+          'Next: if text is insufficient for targeting, call dom_extract_region for interactive selectors.'
+        );
+        const body = lines.join('\n');
+        return wrapXml(body, meta, 'content');
+      }
+    };
+  },
+});
+
 // src/index.ts
 var index_exports = {};
 __export(index_exports, {
   ContentDetection: () => ContentDetection,
+  MarkdownFormatter: () => MarkdownFormatter,
   ProgressiveExtractor: () => ProgressiveExtractor,
   SelectorGenerator: () => SelectorGenerator,
   SmartDOMReader: () => SmartDOMReader,
@@ -1228,6 +1476,7 @@ var init_index = __esm({
     init_progressive();
     init_selectors();
     init_types();
+    init_markdown_formatter();
     SmartDOMReader = class _SmartDOMReader {
       options;
       constructor(options = {}) {
@@ -1561,6 +1810,7 @@ var init_index = __esm({
 init_index();
 export {
   ContentDetection,
+  MarkdownFormatter,
   ProgressiveExtractor,
   SelectorGenerator,
   SmartDOMReader,

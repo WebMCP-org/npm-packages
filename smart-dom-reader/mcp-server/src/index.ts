@@ -29,21 +29,24 @@ type NavigateArgs = {
 
 type OptionalSelectorArgs = {
   selector?: string;
+  detail?: 'summary' | 'region' | 'deep';
+  maxTextLength?: number;
+  maxElements?: number;
 };
 
 type RegionArgs = {
   selector: string;
-  options?: ProgressiveExtractorRegionConfig;
+  options?: ProgressiveExtractorRegionConfig & FormatOptions;
 };
 
 type ContentArgs = {
   selector: string;
-  options?: ProgressiveExtractorContentConfig;
+  options?: ProgressiveExtractorContentConfig & FormatOptions;
 };
 
 type InteractiveArgs = {
   selector?: string;
-  options?: SmartDomReaderOptions;
+  options?: SmartDomReaderOptions & FormatOptions;
 };
 
 type ScreenshotArgs = {
@@ -119,6 +122,12 @@ interface SmartDomReaderOptions {
   maxDepth?: number;
 }
 
+interface FormatOptions {
+  detail?: 'summary' | 'region' | 'deep';
+  maxTextLength?: number;
+  maxElements?: number;
+}
+
 type LibraryCache = {
   path: string;
   code: string;
@@ -137,18 +146,6 @@ async function pathExists(candidate: string | undefined): Promise<boolean> {
   }
 }
 
-function asJsonText(value: unknown): string {
-  if (typeof value === 'string') {
-    return value;
-  }
-
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
-}
-
 function createTextResult(text: string): CallToolResult {
   return {
     content: [
@@ -158,10 +155,6 @@ function createTextResult(text: string): CallToolResult {
       },
     ],
   };
-}
-
-function createJsonResult(payload: unknown): CallToolResult {
-  return createTextResult(asJsonText(payload));
 }
 
 class SmartDomReaderServer {
@@ -190,14 +183,23 @@ class SmartDomReaderServer {
       'browser_connect',
       {
         title: 'Connect with Playwright',
-        description: 'Launch a Chromium instance using Playwright automation',
+        description:
+          'Launch Chromium for subsequent tools. Use this first. Returns a brief status message. Run headless=false for visual debugging.',
         inputSchema: {
           executablePath: z
             .string()
             .trim()
             .min(1, { message: 'Provide a non-empty executablePath' })
+            .describe(
+              'Optional path to a Chrome/Chromium binary. If omitted, Playwright resolves a system or bundled build.'
+            )
             .optional(),
-          headless: z.boolean().default(false),
+          headless: z
+            .boolean()
+            .default(false)
+            .describe(
+              'Run without a visible window. Set false to watch interactions. Default: false.'
+            ),
         },
       },
       async (args) => this.connectBrowser(args)
@@ -207,9 +209,13 @@ class SmartDomReaderServer {
       'browser_navigate',
       {
         title: 'Navigate to URL',
-        description: 'Load a URL in the active tab',
+        description:
+          'Load an absolute URL in the active tab and wait for network idle. Use after browser_connect.',
         inputSchema: {
-          url: z.string().url('url must be a valid absolute URL'),
+          url: z
+            .string()
+            .url('url must be a valid absolute URL')
+            .describe('Absolute URL to navigate to (e.g., https://example.com).'),
         },
       },
       async (args) => this.navigate(args)
@@ -219,9 +225,34 @@ class SmartDomReaderServer {
       'dom_extract_structure',
       {
         title: 'Extract DOM Structure',
-        description: 'Capture the structural outline of the DOM',
+        description:
+          'Start here. Returns an XML-wrapped Markdown outline (<outline>) describing page regions. Next: pick a selector/section and call dom_extract_region.',
         inputSchema: {
-          selector: z.string().trim().min(1).optional(),
+          selector: z
+            .string()
+            .trim()
+            .min(1)
+            .describe(
+              'Optional container CSS selector to scope the outline. Omit to analyze the whole document.'
+            )
+            .optional(),
+          detail: z
+            .enum(['summary', 'region', 'deep'])
+            .default('summary')
+            .describe("Output depth. 'summary' is concise, 'deep' expands more structure.")
+            .optional(),
+          maxTextLength: z
+            .number()
+            .int()
+            .min(0)
+            .describe('Truncate text snippets to this many characters to save tokens.')
+            .optional(),
+          maxElements: z
+            .number()
+            .int()
+            .min(0)
+            .describe('Limit number of listed items per group (buttons, links, etc.).')
+            .optional(),
         },
       },
       async (args) => this.extractStructure(args)
@@ -231,14 +262,51 @@ class SmartDomReaderServer {
       'dom_extract_region',
       {
         title: 'Extract DOM Region',
-        description: 'Capture details for a targeted DOM region',
+        description:
+          'Use after the outline. Returns XML-wrapped Markdown (<section>) with actionable selectors for a specific region. Next: write a script or rerun with higher detail.',
         inputSchema: {
-          selector: z.string().trim().min(1),
+          selector: z
+            .string()
+            .trim()
+            .min(1)
+            .describe('CSS selector for the region to analyze (e.g., from the outline).'),
           options: z
             .object({
-              mode: z.enum(['interactive', 'full']).optional(),
-              includeHidden: z.boolean().optional(),
-              maxDepth: z.number().int().min(0).optional(),
+              mode: z
+                .enum(['interactive', 'full'])
+                .describe(
+                  "Extraction mode. 'interactive' lists controls; 'full' also inspects content structure."
+                )
+                .optional(),
+              includeHidden: z
+                .boolean()
+                .describe('Include elements that are hidden/offscreen. Default: false.')
+                .optional(),
+              maxDepth: z
+                .number()
+                .int()
+                .min(0)
+                .describe(
+                  'Traversal depth for nested elements. Larger values inspect deeper trees.'
+                )
+                .optional(),
+              detail: z
+                .enum(['summary', 'region', 'deep'])
+                .default('region')
+                .describe("Output depth. 'region' is actionable; 'deep' expands more details.")
+                .optional(),
+              maxTextLength: z
+                .number()
+                .int()
+                .min(0)
+                .describe('Truncate text snippets to this many characters to save tokens.')
+                .optional(),
+              maxElements: z
+                .number()
+                .int()
+                .min(0)
+                .describe('Limit number of listed items per group (buttons, links, inputs).')
+                .optional(),
             })
             .optional(),
         },
@@ -250,15 +318,45 @@ class SmartDomReaderServer {
       'dom_extract_content',
       {
         title: 'Extract DOM Content',
-        description: 'Capture textual and media content for a DOM region',
+        description:
+          'Readable text for a region as XML-wrapped Markdown (<content>). Use for comprehension; for selectors use dom_extract_region.',
         inputSchema: {
-          selector: z.string().trim().min(1),
+          selector: z
+            .string()
+            .trim()
+            .min(1)
+            .describe('CSS selector for the content region (e.g., main article or section).'),
           options: z
             .object({
-              includeHeadings: z.boolean().optional(),
-              includeLists: z.boolean().optional(),
-              includeMedia: z.boolean().optional(),
-              maxTextLength: z.number().int().min(0).optional(),
+              includeHeadings: z
+                .boolean()
+                .describe('Include H1–H6 headings in the output.')
+                .optional(),
+              includeLists: z
+                .boolean()
+                .describe('Include unordered/ordered lists in the output.')
+                .optional(),
+              includeMedia: z
+                .boolean()
+                .describe('Include media references (images, video, audio).')
+                .optional(),
+              maxTextLength: z
+                .number()
+                .int()
+                .min(0)
+                .describe('Truncate text snippets to this many characters to save tokens.')
+                .optional(),
+              detail: z
+                .enum(['summary', 'region', 'deep'])
+                .default('region')
+                .describe("Output depth. 'summary' is brief; 'deep' expands more content examples.")
+                .optional(),
+              maxElements: z
+                .number()
+                .int()
+                .min(0)
+                .describe('Limit number of listed items (paragraphs, list items, rows).')
+                .optional(),
             })
             .optional(),
         },
@@ -270,13 +368,46 @@ class SmartDomReaderServer {
       'dom_extract_interactive',
       {
         title: 'Extract Interactive Elements',
-        description: 'Enumerate interactive elements within the target scope',
+        description:
+          'Quick list of controls within a scope as XML-wrapped Markdown (<section>). Alternative to region when you only need controls.',
         inputSchema: {
-          selector: z.string().trim().min(1).optional(),
+          selector: z
+            .string()
+            .trim()
+            .min(1)
+            .describe('Optional container CSS selector. Omit to scan the whole document.')
+            .optional(),
           options: z
             .object({
-              viewportOnly: z.boolean().default(false),
-              maxDepth: z.number().int().min(0).optional(),
+              viewportOnly: z
+                .boolean()
+                .default(false)
+                .describe('Only include elements currently within the viewport. Default: false.'),
+              maxDepth: z
+                .number()
+                .int()
+                .min(0)
+                .describe(
+                  'Traversal depth for nested elements. Larger values inspect deeper trees.'
+                )
+                .optional(),
+              detail: z
+                .enum(['summary', 'region', 'deep'])
+                .default('region')
+                .describe("Output depth. 'region' is actionable; 'deep' expands more details.")
+                .optional(),
+              maxTextLength: z
+                .number()
+                .int()
+                .min(0)
+                .describe('Truncate text snippets to this many characters to save tokens.')
+                .optional(),
+              maxElements: z
+                .number()
+                .int()
+                .min(0)
+                .describe('Limit number of listed items per group (buttons, links, inputs).')
+                .optional(),
             })
             .optional(),
         },
@@ -288,10 +419,21 @@ class SmartDomReaderServer {
       'browser_screenshot',
       {
         title: 'Capture Screenshot',
-        description: 'Take a PNG screenshot of the current page',
+        description:
+          'Capture a PNG screenshot of the current page. Returns a short Markdown summary (path and fullPage flag).',
         inputSchema: {
-          path: z.string().trim().min(1).optional(),
-          fullPage: z.boolean().default(false),
+          path: z
+            .string()
+            .trim()
+            .min(1)
+            .describe(
+              'Optional output path (absolute or workspace-relative). Default: screenshot-<timestamp>.png'
+            )
+            .optional(),
+          fullPage: z
+            .boolean()
+            .default(false)
+            .describe('Capture the full scrollable page. Default: false.'),
         },
       },
       async (args) => this.captureScreenshot(args)
@@ -301,7 +443,8 @@ class SmartDomReaderServer {
       'browser_close',
       {
         title: 'Close Browser',
-        description: 'Shut down the launched browser instance',
+        description:
+          'Shut down the launched browser instance and release resources. Safe to call multiple times.',
         inputSchema: {},
       },
       async () => this.closeBrowser()
@@ -384,10 +527,18 @@ class SmartDomReaderServer {
 
   private async extractStructure(args: OptionalSelectorArgs): Promise<CallToolResult> {
     try {
-      const result = await this.runLibraryOperation<unknown, StructureOperationArgs>('structure', {
+      const text = await this.runLibraryOperation<
+        string,
+        StructureOperationArgs & { format: FormatOptions }
+      >('structure', {
         selector: args.selector ?? null,
+        format: {
+          detail: args.detail ?? 'summary',
+          maxTextLength: args.maxTextLength,
+          maxElements: args.maxElements,
+        },
       });
-      return createJsonResult(result);
+      return createTextResult(text);
     } catch (error) {
       this.handleToolError(error, 'Failed to extract structure');
     }
@@ -395,11 +546,19 @@ class SmartDomReaderServer {
 
   private async extractRegion(args: RegionArgs): Promise<CallToolResult> {
     try {
-      const result = await this.runLibraryOperation<unknown, RegionOperationArgs>('region', {
+      const text = await this.runLibraryOperation<
+        string,
+        RegionOperationArgs & { format: FormatOptions }
+      >('region', {
         selector: args.selector,
         options: args.options ?? {},
+        format: {
+          detail: args.options?.detail ?? 'region',
+          maxTextLength: args.options?.maxTextLength,
+          maxElements: args.options?.maxElements,
+        },
       });
-      return createJsonResult(result);
+      return createTextResult(text);
     } catch (error) {
       this.handleToolError(error, `Failed to extract region for selector ${args.selector}`);
     }
@@ -407,11 +566,19 @@ class SmartDomReaderServer {
 
   private async extractContent(args: ContentArgs): Promise<CallToolResult> {
     try {
-      const result = await this.runLibraryOperation<unknown, ContentOperationArgs>('content', {
+      const text = await this.runLibraryOperation<
+        string,
+        ContentOperationArgs & { format: FormatOptions }
+      >('content', {
         selector: args.selector,
         options: args.options ?? {},
+        format: {
+          detail: args.options?.detail ?? 'region',
+          maxTextLength: args.options?.maxTextLength,
+          maxElements: args.options?.maxElements,
+        },
       });
-      return createJsonResult(result);
+      return createTextResult(text);
     } catch (error) {
       this.handleToolError(error, `Failed to extract content for selector ${args.selector}`);
     }
@@ -419,14 +586,19 @@ class SmartDomReaderServer {
 
   private async extractInteractive(args: InteractiveArgs): Promise<CallToolResult> {
     try {
-      const result = await this.runLibraryOperation<unknown, InteractiveOperationArgs>(
-        'interactive',
-        {
-          selector: args.selector ?? null,
-          options: args.options ?? {},
-        }
-      );
-      return createJsonResult(result);
+      const text = await this.runLibraryOperation<
+        string,
+        InteractiveOperationArgs & { format: FormatOptions }
+      >('interactive', {
+        selector: args.selector ?? null,
+        options: args.options ?? {},
+        format: {
+          detail: args.options?.detail ?? 'region',
+          maxTextLength: args.options?.maxTextLength,
+          maxElements: args.options?.maxElements,
+        },
+      });
+      return createTextResult(text);
     } catch (error) {
       this.handleToolError(error, 'Failed to extract interactive elements');
     }
@@ -442,11 +614,9 @@ class SmartDomReaderServer {
       this.handleToolError(error, `Failed to capture screenshot to ${outputPath}`);
     }
 
-    return createJsonResult({
-      message: 'Screenshot captured',
-      path: outputPath,
-      fullPage: args.fullPage,
-    });
+    return createTextResult(
+      `Screenshot captured\n- Path: \`${outputPath}\`\n- Full page: ${args.fullPage ? 'yes' : 'no'}`
+    );
   }
 
   private async closeBrowser(): Promise<CallToolResult> {
@@ -486,7 +656,7 @@ class SmartDomReaderServer {
 
         try {
           const moduleExports = await import(/* webpackIgnore: true */ url);
-          const { ProgressiveExtractor } = moduleExports;
+          const { ProgressiveExtractor, MarkdownFormatter } = moduleExports;
           const SmartDOMReader = moduleExports.SmartDOMReader ?? moduleExports.default;
 
           switch (operation) {
@@ -497,7 +667,11 @@ class SmartDomReaderServer {
 
               const { selector } = args as StructureOperationArgs;
               const target = selector ? (document.querySelector(selector) ?? document) : document;
-              return ProgressiveExtractor.extractStructure(target) as TResult;
+              const overview = ProgressiveExtractor.extractStructure(target);
+              if (!MarkdownFormatter) throw new Error('MarkdownFormatter export is unavailable.');
+              const fmt = (args as any).format ?? {};
+              const meta = { title: document.title, url: location.href };
+              return MarkdownFormatter.structure(overview, fmt, meta) as TResult;
             }
 
             case 'region': {
@@ -506,12 +680,18 @@ class SmartDomReaderServer {
               }
 
               const { selector, options } = args as RegionOperationArgs;
-              return ProgressiveExtractor.extractRegion(
+              const result = ProgressiveExtractor.extractRegion(
                 selector,
                 document,
                 options ?? {},
                 SmartDOMReader
-              ) as TResult;
+              );
+              if (!result)
+                return ('No matching region for selector ' + selector) as unknown as TResult;
+              if (!MarkdownFormatter) throw new Error('MarkdownFormatter export is unavailable.');
+              const fmt = (args as any).format ?? {};
+              const meta = { title: document.title, url: location.href };
+              return MarkdownFormatter.region(result, fmt, meta) as TResult;
             }
 
             case 'content': {
@@ -520,11 +700,16 @@ class SmartDomReaderServer {
               }
 
               const { selector, options } = args as ContentOperationArgs;
-              return ProgressiveExtractor.extractContent(
+              const content = ProgressiveExtractor.extractContent(
                 selector,
                 document,
                 options ?? {}
-              ) as TResult;
+              );
+              if (!content) return ('No content for selector ' + selector) as unknown as TResult;
+              if (!MarkdownFormatter) throw new Error('MarkdownFormatter export is unavailable.');
+              const fmt = (args as any).format ?? {};
+              const meta = { title: document.title, url: location.href };
+              return MarkdownFormatter.content(content, fmt, meta) as TResult;
             }
 
             case 'interactive': {
@@ -536,11 +721,19 @@ class SmartDomReaderServer {
               const target = selector ? (document.querySelector(selector) ?? document) : document;
 
               if (typeof SmartDOMReader.extractInteractive === 'function') {
-                return SmartDOMReader.extractInteractive(target, options ?? {}) as TResult;
+                const result = SmartDOMReader.extractInteractive(target, options ?? {});
+                if (!MarkdownFormatter) throw new Error('MarkdownFormatter export is unavailable.');
+                const fmt = (args as any).format ?? {};
+                const meta = { title: document.title, url: location.href };
+                return MarkdownFormatter.region(result, fmt, meta) as TResult;
               }
 
               const reader = new SmartDOMReader({ ...options, mode: 'interactive' });
-              return reader.extract(target, options ?? {}) as TResult;
+              const result = reader.extract(target, options ?? {});
+              if (!MarkdownFormatter) throw new Error('MarkdownFormatter export is unavailable.');
+              const fmt = (args as any).format ?? {};
+              const meta = { title: document.title, url: location.href };
+              return MarkdownFormatter.region(result, fmt, meta) as TResult;
             }
 
             default: {
@@ -565,6 +758,8 @@ class SmartDomReaderServer {
 
     return this.page;
   }
+
+  // All formatting happens in-page via the bundled library; no server-side dynamic imports.
 
   private async loadLibraryCode(): Promise<string> {
     const embeddedPath = resolve(__dirname, EMBEDDED_LIBRARY_RELATIVE_PATH);

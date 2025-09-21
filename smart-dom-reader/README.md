@@ -352,3 +352,50 @@ Inspired by:
 ## License
 
 MIT
+
+## MCP Server (Golden Path)
+
+For AI agents, use the bundled MCP server which returns XML-wrapped Markdown instead of JSON. This keeps responses concise and readable for LLMs while providing clear structural boundaries.
+
+- Output format: always XML envelope with a single section tag containing Markdown in CDATA
+  - Structure: `<page title="..." url="...">\n  <outline><![CDATA[ ...markdown... ]]></outline>\n</page>`
+  - Region: `<page ...>\n  <section><![CDATA[ ...markdown... ]]></section>\n</page>`
+  - Content: `<page ...>\n  <content><![CDATA[ ...markdown... ]]></content>\n</page>`
+- Golden path sequence:
+  1) `dom_extract_structure` → get page outline and pick a target
+  2) `dom_extract_region` → get actionable selectors for that area
+  3) Write a script; if unstable, re-run with higher detail or limits
+  4) Optional: `dom_extract_content` for readable text context
+
+### Running the server
+
+Ensure the library is built so the formatter is available:
+
+```
+pnpm -w --filter @mcp-b/smart-dom-reader run build
+```
+
+Start the MCP server (stdio):
+
+```
+pnpm --filter @mcp-b/smart-dom-reader-server run start
+```
+
+Or directly with tsx:
+
+```
+tsx smart-dom-reader/mcp-server/src/index.ts
+```
+
+### Tool overview (inputs only)
+
+- `browser_connect` → `{ headless?: boolean, executablePath?: string }`
+- `browser_navigate` → `{ url: string }`
+- `dom_extract_structure` → `{ selector?: string, detail?: 'summary'|'region'|'deep', maxTextLength?: number, maxElements?: number }`
+- `dom_extract_region` → `{ selector: string, options?: { mode?: 'interactive'|'full', includeHidden?: boolean, maxDepth?: number, detail?: 'summary'|'region'|'deep', maxTextLength?: number, maxElements?: number } }`
+- `dom_extract_content` → `{ selector: string, options?: { includeHeadings?: boolean, includeLists?: boolean, includeMedia?: boolean, maxTextLength?: number, detail?: 'summary'|'region'|'deep', maxElements?: number } }`
+- `dom_extract_interactive` → `{ selector?: string, options?: { viewportOnly?: boolean, maxDepth?: number, detail?: 'summary'|'region'|'deep', maxTextLength?: number, maxElements?: number } }`
+- `browser_screenshot` → `{ path?: string, fullPage?: boolean }`
+- `browser_close` → `{}`
+
+All extraction tools return XML-wrapped Markdown with a short “Next:” instruction at the bottom to guide the following step.

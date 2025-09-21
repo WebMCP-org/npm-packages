@@ -13,6 +13,7 @@ import {
 
 // Re-export modules for external use
 export { ContentDetection } from './content-detection';
+export { type MarkdownFormatOptions, MarkdownFormatter } from './markdown-formatter';
 export { ProgressiveExtractor } from './progressive';
 export { SelectorGenerator } from './selectors';
 export * from './types';
