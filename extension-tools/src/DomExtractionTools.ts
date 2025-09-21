@@ -195,6 +195,12 @@ export class DomExtractionTools extends BaseApiTools {
         Token-efficient: provides minimal data for intelligent decision-making.`,
         inputSchema: {
           tabId: z.number().optional().describe('Tab ID to extract from (defaults to active tab)'),
+          selector: z
+            .string()
+            .optional()
+            .describe(
+              'Optional container CSS selector to scope the outline. If omitted, analyzes the whole document (or targeted iframe).'
+            ),
           frameSelector: z
             .string()
             .optional()
@@ -203,14 +209,14 @@ export class DomExtractionTools extends BaseApiTools {
             ),
         },
       },
-      async ({ tabId, frameSelector }) => {
+      async ({ tabId, selector, frameSelector }) => {
         try {
           await this.ensureUserScriptsEnabled();
 
           const resolvedTabId = await this.resolveTabId(tabId);
           const result = await this.executeExtraction(resolvedTabId, 'extractStructure', {
-            selector: frameSelector,
-            frameSelector: undefined,
+            selector,
+            frameSelector,
             formatOptions: { detail: 'summary' },
           });
 

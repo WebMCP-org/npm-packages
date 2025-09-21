@@ -52,6 +52,7 @@ const customData = SmartDOMReader.extractInteractive(doc, {
 import { ProgressiveExtractor } from '@mcp-b/smart-dom-reader';
 
 // Step 1: Get high-level page structure (minimal tokens)
+// Structure can be extracted from the whole document or a specific container element
 const structure = ProgressiveExtractor.extractStructure(document);
 console.log(structure.summary); // Quick stats about the page
 console.log(structure.regions); // Map of page regions
@@ -70,6 +71,13 @@ const articleText = ProgressiveExtractor.extractContent(
   document,
   { includeHeadings: true, includeLists: true }
 );
+
+// Structure scoped to a container (e.g., navigation only)
+const nav = document.querySelector('nav');
+if (nav) {
+  const navOutline = ProgressiveExtractor.extractStructure(nav);
+  // navOutline.regions will only include elements within <nav>
+}
 ```
 
 ## Extraction Modes
@@ -112,7 +120,7 @@ SmartDOMReader.extractFromElement(element, 'interactive');
 ### Progressive Extraction API
 
 ```typescript
-// Step 1: Structure overview
+// Step 1: Structure overview (Document or Element)
 const overview = ProgressiveExtractor.extractStructure(document);
 // Returns: regions, forms, summary, suggestions
 
@@ -326,6 +334,24 @@ function extractFromShadowRoot(shadowRoot: ShadowRoot) {
     return SmartDOMReader.extractFromElement(container);
   }
 }
+
+/**
+ * Stateless bundle string (for extensions / userScripts)
+ *
+ * The library also provides a self-contained IIFE bundle as a string
+ * export that can be injected and executed without touching window scope.
+ */
+import { SMART_DOM_READER_BUNDLE } from '@mcp-b/smart-dom-reader/bundle-string';
+
+function execute(method, args) {
+  const code = `(() => {\n${SMART_DOM_READER_BUNDLE}\nreturn SmartDOMReaderBundle.executeExtraction(${JSON.stringify(
+    'extractStructure'
+  )}, ${JSON.stringify({ selector: undefined, formatOptions: { detail: 'summary' } })});\n})()`;
+  // inject `code` into the page (e.g., chrome.userScripts.execute)
+}
+
+// Note: The bundle contains guarded fallbacks (e.g., typeof require === 'function')
+// that are no-ops in the browser; there are no runtime imports.
 ```
 
 ## Design Philosophy
