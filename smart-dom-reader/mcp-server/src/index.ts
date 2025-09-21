@@ -16,7 +16,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const EMBEDDED_LIBRARY_RELATIVE_PATH = join('..', 'lib', 'smart-dom-reader.bundle.js');
-const FALLBACK_LIBRARY_RELATIVE_PATH = join('..', '..', 'dist', 'index.js');
 const DEFAULT_LAUNCH_ARGS = ['--no-sandbox', '--disable-setuid-sandbox'] as const;
 
 type ConnectBrowserArgs = {
@@ -26,10 +25,6 @@ type ConnectBrowserArgs = {
 
 type NavigateArgs = {
   url: string;
-};
-
-type InjectLibraryArgs = {
-  libraryPath?: string;
 };
 
 type OptionalSelectorArgs = {
@@ -174,7 +169,6 @@ class SmartDomReaderServer {
   private browser: Browser | null = null;
   private page: Page | null = null;
   private cachedLibrary: LibraryCache | null = null;
-  private preferredLibraryPath: string | null = null;
 
   constructor() {
     this.server = new McpServer({
@@ -219,18 +213,6 @@ class SmartDomReaderServer {
         },
       },
       async (args) => this.navigate(args)
-    );
-
-    this.server.registerTool(
-      'browser_inject_library',
-      {
-        title: 'Inject Smart DOM Reader',
-        description: 'Injects the Smart DOM Reader bundle into the active page',
-        inputSchema: {
-          libraryPath: z.string().trim().min(1).optional(),
-        },
-      },
-      async (args: InjectLibraryArgs) => this.injectLibrary(args)
     );
 
     this.server.registerTool(
@@ -398,16 +380,6 @@ class SmartDomReaderServer {
     }
 
     return createTextResult(`Navigated to ${args.url}`);
-  }
-
-  private async injectLibrary(args: InjectLibraryArgs): Promise<CallToolResult> {
-    await this.loadLibraryCode(args.libraryPath);
-
-    return createJsonResult({
-      message: 'Library ready for on-demand usage',
-      source: this.cachedLibrary?.path,
-      bytes: this.cachedLibrary?.code.length ?? null,
-    });
   }
 
   private async extractStructure(args: OptionalSelectorArgs): Promise<CallToolResult> {
@@ -594,30 +566,9 @@ class SmartDomReaderServer {
     return this.page;
   }
 
-  private async loadLibraryCode(customPath?: string): Promise<string> {
-    if (customPath) {
-      const resolvedCustomPath = resolve(__dirname, customPath);
-      const code = await this.readLibraryFile(resolvedCustomPath);
-      this.preferredLibraryPath = resolvedCustomPath;
-      return code;
-    }
-
-    if (this.preferredLibraryPath) {
-      try {
-        return await this.readLibraryFile(this.preferredLibraryPath);
-      } catch {
-        // If the preferred file has disappeared, fall through to defaults.
-        this.preferredLibraryPath = null;
-      }
-    }
-
-    try {
-      const embeddedPath = resolve(__dirname, EMBEDDED_LIBRARY_RELATIVE_PATH);
-      return await this.readLibraryFile(embeddedPath);
-    } catch {}
-
-    const fallbackPath = resolve(__dirname, FALLBACK_LIBRARY_RELATIVE_PATH);
-    return this.readLibraryFile(fallbackPath);
+  private async loadLibraryCode(): Promise<string> {
+    const embeddedPath = resolve(__dirname, EMBEDDED_LIBRARY_RELATIVE_PATH);
+    return this.readLibraryFile(embeddedPath);
   }
 
   private async readLibraryFile(resolvedPath: string): Promise<string> {
@@ -628,7 +579,7 @@ class SmartDomReaderServer {
     if (!(await pathExists(resolvedPath))) {
       throw new McpError(
         ErrorCode.InvalidParams,
-        `Library file not found at ${resolvedPath}. Provide a valid libraryPath.`
+        `Embedded library file not found at ${resolvedPath}. Ensure the bundled file exists.`
       );
     }
 
