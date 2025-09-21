@@ -1,4 +1,4 @@
-import { ElementSelector } from './types';
+import { ElementSelector, type ElementSelectorCandidate } from './types';
 
 export class SelectorGenerator {
   /**
@@ -6,12 +6,75 @@ export class SelectorGenerator {
    */
   static generateSelectors(element: Element): ElementSelector {
     const doc = element.ownerDocument || document;
+    const candidates: ElementSelectorCandidate[] = [];
+
+    // 1) Unique ID
+    if (element.id && this.isUniqueId(element.id, doc)) {
+      candidates.push({ type: 'id', value: `#${CSS.escape(element.id)}`, score: 100 });
+    }
+
+    // 2) data-testid variants
+    const testId = this.getDataTestId(element);
+    if (testId) {
+      const v = `[data-testid="${CSS.escape(testId)}"]`;
+      candidates.push({
+        type: 'data-testid',
+        value: v,
+        score: 90 + (this.isUniqueSelectorSafe(v, doc) ? 5 : 0),
+      });
+    }
+
+    // 3) role + aria-label
+    const role = element.getAttribute('role');
+    const aria = element.getAttribute('aria-label');
+    if (role && aria) {
+      const v = `[role="${CSS.escape(role)}"][aria-label="${CSS.escape(aria)}"]`;
+      candidates.push({
+        type: 'role-aria',
+        value: v,
+        score: 85 + (this.isUniqueSelectorSafe(v, doc) ? 5 : 0),
+      });
+    }
+
+    // 4) name attribute (useful for inputs)
+    const nameAttr = element.getAttribute('name');
+    if (nameAttr) {
+      const v = `[name="${CSS.escape(nameAttr)}"]`;
+      candidates.push({
+        type: 'name',
+        value: v,
+        score: 78 + (this.isUniqueSelectorSafe(v, doc) ? 5 : 0),
+      });
+    }
+
+    // 5) Class-based CSS path (try to avoid structural :nth-child when possible)
+    const pathCss = this.generateCSSSelector(element, doc);
+    const structuralPenalty = (pathCss.match(/:nth-child\(/g) || []).length * 10;
+    const classBonus = pathCss.includes('.') ? 8 : 0;
+    const pathScore = Math.max(0, 70 + classBonus - structuralPenalty);
+    candidates.push({ type: 'class-path', value: pathCss, score: pathScore });
+
+    // 6) XPath (fallback)
+    const xpath = this.generateXPath(element, doc);
+    candidates.push({ type: 'xpath', value: xpath, score: 40 });
+
+    // 7) Text-based (only for hints)
+    const textBased = this.generateTextBasedSelector(element);
+    if (textBased) candidates.push({ type: 'text', value: textBased, score: 30 });
+
+    // Rank candidates by score (desc)
+    candidates.sort((a, b) => b.score - a.score);
+
+    const bestCss =
+      candidates.find((c) => c.type !== 'xpath' && c.type !== 'text')?.value || pathCss;
+
     return {
-      css: this.generateCSSSelector(element, doc),
-      xpath: this.generateXPath(element, doc),
-      textBased: this.generateTextBasedSelector(element),
-      dataTestId: this.getDataTestId(element),
-      ariaLabel: element.getAttribute('aria-label') || undefined,
+      css: bestCss,
+      xpath,
+      textBased,
+      dataTestId: testId || undefined,
+      ariaLabel: aria || undefined,
+      candidates,
     };
   }
 
@@ -149,6 +212,14 @@ export class SelectorGenerator {
   private static isUniqueSelector(selector: string, container: Element): boolean {
     try {
       return container.querySelectorAll(selector).length === 1;
+    } catch {
+      return false;
+    }
+  }
+
+  private static isUniqueSelectorSafe(selector: string, doc: Document): boolean {
+    try {
+      return doc.querySelectorAll(selector).length === 1;
     } catch {
       return false;
     }

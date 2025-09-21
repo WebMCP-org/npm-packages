@@ -19,7 +19,33 @@ type PageMeta = { title?: string; url?: string };
 function truncate(text: string | undefined, len?: number): string {
   const t = (text ?? '').trim();
   if (!len || t.length <= len) return t;
-  return t.slice(0, len) + '...';
+
+  // Smart truncation: keep start and preserve key action words if present
+  const keywords = [
+    'login',
+    'log in',
+    'sign in',
+    'sign up',
+    'submit',
+    'search',
+    'filter',
+    'add to cart',
+    'next',
+    'continue',
+  ];
+  const lower = t.toLowerCase();
+  const hit = keywords.map((k) => ({ k, i: lower.indexOf(k) })).find((x) => x.i > -1);
+  const head = Math.max(0, Math.floor(len * 0.66));
+  if (hit && hit.i > head) {
+    const tailWindow = Math.max(12, len - head - 5);
+    const start = Math.max(0, hit.i - Math.floor(tailWindow / 2));
+    const end = Math.min(t.length, start + tailWindow);
+    return t.slice(0, head).trimEnd() + ' … ' + t.slice(start, end).trim() + '…';
+  }
+  // Default: simple head truncation on word boundary
+  const slice = t.slice(0, len);
+  const lastSpace = slice.lastIndexOf(' ');
+  return (lastSpace > 32 ? slice.slice(0, lastSpace) : slice) + '…';
 }
 
 function bestSelector(el: Pick<ExtractedElement, 'selector' | 'tag' | 'text'>): string {
@@ -67,6 +93,22 @@ function elementLine(el: ExtractedElement, opts?: MarkdownFormatOptions): string
         : undefined;
   const actionText = action ? ` (${action})` : '';
   return `- ${tag.toUpperCase()}: ${txt || '(no text)'} → \`${sel}\`${actionText}`;
+}
+
+function selectorQualitySummary(inter: SmartDOMResult['interactive']): string {
+  const all: string[] = [];
+  all.push(...inter.buttons.map((e) => e.selector?.css || ''));
+  all.push(...inter.links.map((e) => e.selector?.css || ''));
+  all.push(...inter.inputs.map((e) => e.selector?.css || ''));
+  all.push(...inter.clickable.map((e) => e.selector?.css || ''));
+  const total = all.length || 1;
+  const idCount = all.filter((s) => s.startsWith('#')).length;
+  const testIdCount = all.filter((s) => /\[data-testid=/.test(s)).length;
+  const nthCount = all.filter((s) => /:nth-child\(/.test(s)).length;
+  const stable = idCount + testIdCount;
+  const stablePct = Math.round((stable / total) * 100);
+  const nthPct = Math.round((nthCount / total) * 100);
+  return `Selector quality: ${stablePct}% stable (ID/data-testid), ${nthPct}% structural (:nth-child)`;
 }
 
 function renderInteractive(
@@ -201,6 +243,16 @@ export class MarkdownFormatter {
     lines.push('');
 
     const inter = result.interactive;
+    // Page state diagnostics if available
+    if (result.page) {
+      const ps = [
+        result.page.hasErrors ? 'errors: yes' : 'errors: no',
+        result.page.isLoading ? 'loading: yes' : 'loading: no',
+        result.page.hasModals ? 'modals: yes' : 'modals: no',
+      ];
+      lines.push(`Page state: ${ps.join(', ')}`);
+    }
+
     const summary: string[] = [];
     const count = (arr: unknown[]) => (arr ? arr.length : 0);
     summary.push(`${count(inter.buttons)} buttons`);
@@ -208,6 +260,7 @@ export class MarkdownFormatter {
     summary.push(`${count(inter.inputs)} inputs`);
     if (inter.forms?.length) summary.push(`${count(inter.forms)} forms`);
     lines.push(`Summary: ${summary.join(', ')}`);
+    lines.push(selectorQualitySummary(inter));
     lines.push('');
 
     lines.push(renderInteractive(inter, opts));

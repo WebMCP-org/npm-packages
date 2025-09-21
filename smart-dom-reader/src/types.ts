@@ -6,6 +6,14 @@ export interface ElementSelector {
   textBased?: string;
   dataTestId?: string;
   ariaLabel?: string;
+  // Ranked selector candidates by stability/robustness (highest score first)
+  candidates?: ElementSelectorCandidate[];
+}
+
+export interface ElementSelectorCandidate {
+  type: 'id' | 'data-testid' | 'role-aria' | 'name' | 'class-path' | 'css-path' | 'xpath' | 'text';
+  value: string;
+  score: number; // Higher is better
 }
 
 export interface ElementContext {

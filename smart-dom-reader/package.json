@@ -41,6 +41,7 @@
   ],
   "scripts": {
     "build": "tsup",
+    "bundle:mcp": "pnpm --filter @mcp-b/smart-dom-reader build && pnpm --filter @mcp-b/smart-dom-reader-server bundle",
     "check": "biome check --write .",
     "clean": "rm -rf dist .turbo",
     "format": "biome format --write .",
@@ -48,6 +49,7 @@
     "prepublishOnly": "pnpm run build",
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
+    "test:local": "node test/local-playwright-runner.mjs",
     "typecheck": "tsc --noEmit",
     "version:major": "pnpm version major --no-git-tag-version",
     "version:minor": "pnpm version minor --no-git-tag-version",

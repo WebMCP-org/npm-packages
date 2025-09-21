@@ -229,11 +229,9 @@ class SmartDomReaderServer {
           'Start here. Returns an XML-wrapped Markdown outline (<outline>) describing page regions. Next: pick a selector/section and call dom_extract_region.',
         inputSchema: {
           selector: z
-            .string()
-            .trim()
-            .min(1)
+            .union([z.string().trim().min(1), z.literal('')])
             .describe(
-              'Optional container CSS selector to scope the outline. Omit to analyze the whole document.'
+              'Optional container CSS selector to scope the outline. Omit or pass empty string to analyze the whole document.'
             )
             .optional(),
           detail: z
@@ -372,10 +370,10 @@ class SmartDomReaderServer {
           'Quick list of controls within a scope as XML-wrapped Markdown (<section>). Alternative to region when you only need controls.',
         inputSchema: {
           selector: z
-            .string()
-            .trim()
-            .min(1)
-            .describe('Optional container CSS selector. Omit to scan the whole document.')
+            .union([z.string().trim().min(1), z.literal('')])
+            .describe(
+              'Optional container CSS selector. Omit or pass empty string to scan the whole document.'
+            )
             .optional(),
           options: z
             .object({
@@ -526,25 +524,28 @@ class SmartDomReaderServer {
   }
 
   private async extractStructure(args: OptionalSelectorArgs): Promise<CallToolResult> {
+    const started = Date.now();
     try {
       const text = await this.runLibraryOperation<
         string,
         StructureOperationArgs & { format: FormatOptions }
       >('structure', {
-        selector: args.selector ?? null,
+        selector: args.selector && args.selector.trim().length > 0 ? args.selector : null,
         format: {
           detail: args.detail ?? 'summary',
           maxTextLength: args.maxTextLength,
           maxElements: args.maxElements,
         },
       });
-      return createTextResult(text);
+      const duration = Date.now() - started;
+      return createTextResult(`${text}\n\nDuration: ${duration}ms`);
     } catch (error) {
       this.handleToolError(error, 'Failed to extract structure');
     }
   }
 
   private async extractRegion(args: RegionArgs): Promise<CallToolResult> {
+    const started = Date.now();
     try {
       const text = await this.runLibraryOperation<
         string,
@@ -558,13 +559,15 @@ class SmartDomReaderServer {
           maxElements: args.options?.maxElements,
         },
       });
-      return createTextResult(text);
+      const duration = Date.now() - started;
+      return createTextResult(`${text}\n\nDuration: ${duration}ms`);
     } catch (error) {
       this.handleToolError(error, `Failed to extract region for selector ${args.selector}`);
     }
   }
 
   private async extractContent(args: ContentArgs): Promise<CallToolResult> {
+    const started = Date.now();
     try {
       const text = await this.runLibraryOperation<
         string,
@@ -578,19 +581,21 @@ class SmartDomReaderServer {
           maxElements: args.options?.maxElements,
         },
       });
-      return createTextResult(text);
+      const duration = Date.now() - started;
+      return createTextResult(`${text}\n\nDuration: ${duration}ms`);
     } catch (error) {
       this.handleToolError(error, `Failed to extract content for selector ${args.selector}`);
     }
   }
 
   private async extractInteractive(args: InteractiveArgs): Promise<CallToolResult> {
+    const started = Date.now();
     try {
       const text = await this.runLibraryOperation<
         string,
         InteractiveOperationArgs & { format: FormatOptions }
       >('interactive', {
-        selector: args.selector ?? null,
+        selector: args.selector && args.selector.trim().length > 0 ? args.selector : null,
         options: args.options ?? {},
         format: {
           detail: args.options?.detail ?? 'region',
@@ -598,7 +603,8 @@ class SmartDomReaderServer {
           maxElements: args.options?.maxElements,
         },
       });
-      return createTextResult(text);
+      const duration = Date.now() - started;
+      return createTextResult(`${text}\n\nDuration: ${duration}ms`);
     } catch (error) {
       this.handleToolError(error, 'Failed to extract interactive elements');
     }

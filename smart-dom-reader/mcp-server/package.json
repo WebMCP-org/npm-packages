@@ -12,6 +12,7 @@
     "lib"
   ],
   "scripts": {
+    "bundle": "node ./scripts/update-bundle.mjs",
     "dev": "tsx watch --clear-screen=false src/index.ts",
     "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit"

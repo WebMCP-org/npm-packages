@@ -188,23 +188,28 @@ interface SmartDOMResult {
 
 ## Element Information
 
-Each extracted element includes comprehensive selector strategies:
+Each extracted element includes comprehensive selector strategies with ranking (stable-first):
 
 ```typescript
 interface ExtractedElement {
   tag: string;
   text: string;
-  
+
   selector: {
-    css: string;         // Optimized CSS selector
+    css: string;         // Best CSS selector (ranked stable-first)
     xpath: string;       // XPath selector
-    textBased?: string;  // Text-content based selector
+    textBased?: string;  // Text-content based hint
     dataTestId?: string; // data-testid if available
     ariaLabel?: string;  // ARIA label if available
+    candidates?: Array<{
+      type: 'id' | 'data-testid' | 'role-aria' | 'name' | 'class-path' | 'css-path' | 'xpath' | 'text';
+      value: string;
+      score: number;     // Higher = more stable/robust
+    }>;
   };
-  
+
   attributes: Record<string, string>;
-  
+
   context: {
     nearestForm?: string;
     nearestSection?: string;
@@ -212,24 +217,17 @@ interface ExtractedElement {
     nearestNav?: string;
     parentChain: string[];
   };
-  
+
+  // Compact flags: only present when true to save tokens
   interaction: {
-    hasClickHandler: boolean;
-    hasChangeHandler: boolean;
-    hasSubmitHandler: boolean;
-    triggersNavigation: boolean;
-    formAssociation?: string;
-    ariaRole?: string;
-    isDisabled: boolean;
-    isHidden: boolean;
-  };
-  
-  bounds?: {
-    top: number;
-    left: number;
-    width: number;
-    height: number;
-    isVisible: boolean;
+    click?: boolean;
+    change?: boolean;
+    submit?: boolean;
+    nav?: boolean;
+    disabled?: boolean;
+    hidden?: boolean;
+    role?: string; // aria role when present
+    form?: string; // associated form selector
   };
 }
 ```
@@ -287,6 +285,7 @@ testData.interactive.buttons.forEach(button => {
   console.log(`  CSS: ${button.selector.css}`);
   console.log(`  XPath: ${button.selector.xpath}`);
   console.log(`  TestID: ${button.selector.dataTestId}`);
+  console.log(`  Ranked candidates:`, button.selector.candidates?.slice(0, 3));
 });
 ```
 
@@ -375,9 +374,10 @@ Ensure the library is built so the formatter is available:
 pnpm -w --filter @mcp-b/smart-dom-reader run build
 ```
 
-Start the MCP server (stdio):
+Build and update the embedded bundle, then start the MCP server (stdio):
 
 ```
+pnpm --filter @mcp-b/smart-dom-reader bundle:mcp
 pnpm --filter @mcp-b/smart-dom-reader-server run start
 ```
 
@@ -399,3 +399,17 @@ tsx smart-dom-reader/mcp-server/src/index.ts
 - `browser_close` → `{}`
 
 All extraction tools return XML-wrapped Markdown with a short “Next:” instruction at the bottom to guide the following step.
+
+## Local Testing (Playwright)
+
+Run the library in a real browser against local HTML (no network):
+
+```
+pnpm --filter @mcp-b/smart-dom-reader bundle:mcp
+pnpm --filter @mcp-b/smart-dom-reader test:local
+```
+
+What it validates:
+- Stable selectors (ID, data-testid, role+aria, name/id)
+- Semantic extraction (headings/images/tables/lists)
+- Shadow DOM detection
