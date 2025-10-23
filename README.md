@@ -128,10 +128,11 @@ pnpm dev
 - **Type Safety**: Full TypeScript with strict mode enabled
 - **CI/CD**: GitHub Actions for automated testing and publishing
 
-### Testing Locally
+### Testing
 
+- **E2E Tests**: Run end-to-end tests with Playwright - `pnpm test` (see [TESTING.md](./TESTING.md))
+- **Test App**: Manual testing with `pnpm --filter mcp-tab-transport-test-app dev`
 - **GitHub Actions**: Test workflows locally with [act](./TESTING-WITH-ACT.md)
-- **Unit Tests**: Run tests with `pnpm test` (when implemented)
 
 ### Publishing
 

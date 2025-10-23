@@ -18,6 +18,11 @@
     "lint": "biome lint --write .",
     "lint:check": "biome lint .",
     "prepare": "husky",
+    "test": "pnpm --filter mcp-e2e-tests test",
+    "test:e2e": "pnpm --filter mcp-e2e-tests test",
+    "test:e2e:debug": "pnpm --filter mcp-e2e-tests test:debug",
+    "test:e2e:headed": "pnpm --filter mcp-e2e-tests test:headed",
+    "test:e2e:ui": "pnpm --filter mcp-e2e-tests test:ui",
     "typecheck": "turbo run typecheck"
   },
   "dependencies": {
