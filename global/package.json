@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/global",
-  "version": "1.0.13",
+  "version": "1.1.0",
   "description": "Web Model Context API polyfill - implements window.agent bridging to Model Context Protocol",
   "keywords": [
     "mcp",
