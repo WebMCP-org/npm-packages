@@ -98,7 +98,7 @@ export interface ToolCallEvent extends Event {
 /**
  * Agent interface on window
  */
-export interface Agent extends EventTarget {
+export interface Agent {
   /**
    * Provide context (tools) to agents
    */
@@ -121,6 +121,11 @@ export interface Agent extends EventTarget {
     listener: (event: ToolCallEvent) => void | Promise<void>,
     options?: boolean | EventListenerOptions
   ): void;
+
+  /**
+   * Dispatch an event
+   */
+  dispatchEvent(event: Event): boolean;
 }
 
 /**

@@ -48,12 +48,42 @@ class WebToolCallEvent extends Event implements ToolCallEvent {
 /**
  * Agent implementation that bridges to MCP SDK
  */
-class WebModelContextAgent extends EventTarget implements Agent {
+class WebModelContextAgent implements Agent {
   private bridge: MCPBridge;
+  private eventTarget: EventTarget;
 
   constructor(bridge: MCPBridge) {
-    super();
     this.bridge = bridge;
+    this.eventTarget = new EventTarget();
+  }
+
+  /**
+   * Add event listener (compatible with Agent interface)
+   */
+  addEventListener(
+    type: 'toolcall',
+    listener: (event: ToolCallEvent) => void | Promise<void>,
+    options?: boolean | AddEventListenerOptions
+  ): void {
+    this.eventTarget.addEventListener(type, listener as EventListener, options);
+  }
+
+  /**
+   * Remove event listener
+   */
+  removeEventListener(
+    type: 'toolcall',
+    listener: (event: ToolCallEvent) => void | Promise<void>,
+    options?: boolean | EventListenerOptions
+  ): void {
+    this.eventTarget.removeEventListener(type, listener as EventListener, options);
+  }
+
+  /**
+   * Dispatch event
+   */
+  dispatchEvent(event: Event): boolean {
+    return this.eventTarget.dispatchEvent(event);
   }
 
   /**
@@ -199,7 +229,11 @@ function initializeMCPBridge(): MCPBridge {
 
     try {
       const response = await agent.executeTool(toolName, args);
-      return response;
+      // Return in MCP SDK format
+      return {
+        content: response.content,
+        isError: response.isError,
+      };
     } catch (error) {
       console.error(`[MCP Bridge] Error calling tool ${toolName}:`, error);
       throw error;
