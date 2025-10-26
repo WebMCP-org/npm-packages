@@ -1,429 +1,451 @@
 # @mcp-b/global
 
+> Web Model Context API polyfill - Implement `window.agent` for AI-powered web applications
+
 [![npm version](https://img.shields.io/npm/v/@mcp-b/global?style=flat-square)](https://www.npmjs.com/package/@mcp-b/global)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 
-**Empower your website with AI capabilities using a single script tag!**
-
-The `@mcp-b/global` package offers the easiest way to integrate MCP-B (Model Context Protocol for Browsers) into any website. It requires no build tools or complex configuration—just add a script tag to expose AI tools that leverage your site's existing functionality.
-
-## ✨ Features
-
-- 🚀 **Zero-Config Setup**: Works instantly in any modern browser.
-- 🏷️ **Script Tag Integration**: Ideal for CDN deployment via unpkg or similar services.
-- 🔧 **Global API Exposure**: Automatically creates `window.mcp` upon loading.
-- 📦 **Multi-Format Support**: Compatible with ESM, CommonJS, and UMD.
-- 🎯 **TypeScript-Ready**: Includes comprehensive type definitions.
-- 🌐 **Framework-Agnostic**: Seamlessly integrates with vanilla JS, React, Vue, Angular, or any other framework.
+This package implements the [Web Model Context API](https://github.com/webmachinelearning/webmcp) (`window.agent`) specification, bridging it to the Model Context Protocol (MCP) SDK. It allows web developers to expose JavaScript functions as "tools" that AI agents can discover and invoke.
 
 ## 🚀 Quick Start
 
-### Option 1: Script Tag (Easiest)
+### Via Script Tag (Recommended)
 
-Add this to your HTML for instant integration:
+Add the script to your HTML `<head>`:
 
 ```html
 <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <title>My AI-Enabled Site</title>
-  </head>
-  <body>
-    <h1>Welcome</h1>
+<html>
+<head>
+  <script src="https://unpkg.com/@mcp-b/global@latest/dist/index.js"></script>
+</head>
+<body>
+  <h1>My AI-Powered App</h1>
 
-    <!-- Load MCP-B via CDN -->
-    <script src="https://unpkg.com/@mcp-b/global@latest"></script>
-
-    <!-- Your custom script -->
-    <script>
-      // Wait for MCP to initialize
-      function initMCP() {
-        if (!window.mcp?.registerTool) {
-          return setTimeout(initMCP, 100);
-        }
-
-        // Register a simple tool
-        window.mcp.registerTool(
-          "getPageDetails",
-          {
-            title: "Retrieve Page Details",
-            description: "Fetches information about the current webpage",
+  <script>
+    // Register tools with AI agents
+    window.agent.provideContext({
+      tools: [
+        {
+          name: "get-page-title",
+          description: "Get the current page title",
+          inputSchema: {
+            type: "object",
+            properties: {}
           },
-          async () => {
+          async execute() {
             return {
-              content: [
-                {
-                  type: "text",
-                  text: JSON.stringify({
-                    title: document.title,
-                    url: window.location.href,
-                    timestamp: new Date().toISOString(),
-                  }),
-                },
-              ],
+              content: [{
+                type: "text",
+                text: document.title
+              }]
             };
           }
-        );
-
-        console.log("AI tools initialized!");
-      }
-
-      // Run on page load
-      document.addEventListener("DOMContentLoaded", initMCP);
-    </script>
-  </body>
+        }
+      ]
+    });
+  </script>
+</body>
 </html>
 ```
 
-### Option 2: NPM Installation (For Advanced Control)
-
-For projects using module bundlers or TypeScript:
+### Via NPM
 
 ```bash
-npm install @mcp-b/global zod
+npm install @mcp-b/global
 ```
 
-```typescript
-import { initializeGlobalMCP } from "@mcp-b/global";
-import { z } from "zod";
+```javascript
+import '@mcp-b/global';
 
-// Initialize the global MCP instance
-initializeGlobalMCP();
+// window.agent is now available
+window.agent.provideContext({
+  tools: [/* your tools */]
+});
+```
 
-// Wait for readiness and register tools
-function initMCP() {
-  if (!window.mcp?.registerTool) {
-    return setTimeout(initMCP, 100);
-  }
+## 📖 API Reference
 
-  window.mcp.registerTool(
-    "processMessage",
+### `window.agent.provideContext(context)`
+
+Register tools that AI agents can invoke.
+
+**Parameters:**
+- `context.tools` - Array of tool descriptors
+
+**Example:**
+
+```javascript
+window.agent.provideContext({
+  tools: [
     {
-      title: "Process User Message",
-      description: "Handles and responds to a message",
+      name: "add-todo",
+      description: "Add a new todo item to the list",
       inputSchema: {
-        message: z.string().describe("The message to process"),
+        type: "object",
+        properties: {
+          text: {
+            type: "string",
+            description: "The todo item text"
+          },
+          priority: {
+            type: "string",
+            enum: ["low", "medium", "high"],
+            description: "Priority level"
+          }
+        },
+        required: ["text"]
       },
+      async execute({ text, priority = "medium" }) {
+        // Add todo to your app
+        const todo = addTodoItem(text, priority);
+
+        return {
+          content: [{
+            type: "text",
+            text: `Added todo: "${text}" with ${priority} priority`
+          }]
+        };
+      }
+    }
+  ]
+});
+```
+
+### Tool Descriptor
+
+Each tool must have:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `name` | `string` | Unique identifier for the tool |
+| `description` | `string` | Natural language description of what the tool does |
+| `inputSchema` | `object` | JSON Schema defining input parameters |
+| `execute` | `function` | Async function that implements the tool logic |
+
+### Tool Response Format
+
+Tools must return an object with:
+
+```typescript
+{
+  content: [
+    {
+      type: "text",      // or "image", "resource"
+      text: "Result..."  // the response content
+    }
+  ],
+  isError?: boolean     // optional error flag
+}
+```
+
+## 🎯 Complete Examples
+
+### Todo List Application
+
+```javascript
+let todos = [];
+
+window.agent.provideContext({
+  tools: [
+    {
+      name: "add-todo",
+      description: "Add a new todo item",
+      inputSchema: {
+        type: "object",
+        properties: {
+          text: { type: "string", description: "Todo text" }
+        },
+        required: ["text"]
+      },
+      async execute({ text }) {
+        const todo = { id: Date.now(), text, done: false };
+        todos.push(todo);
+        updateUI();
+        return {
+          content: [{ type: "text", text: `Added: "${text}"` }]
+        };
+      }
     },
-    async ({ message }) => {
-      return {
-        content: [{ type: "text", text: `Processed: ${message}` }],
-      };
-    }
-  );
-}
-
-initMCP();
-```
-
-## 🛠️ API Reference
-
-### Global Interface
-
-Loading the package attaches `mcp` to the window object:
-
-```typescript
-interface Window {
-  mcp: McpServer; // MCP server instance for tool registration
-}
-```
-
-### Key Methods
-
-#### `window.mcp.registerTool(name, config, handler)`
-
-Registers an AI-callable tool.
-
-- **name**: Unique tool identifier (string).
-- **config**: Object with `title` (string), `description` (string), and optional `inputSchema` (Zod schema for inputs).
-- **handler**: Async function that executes the tool logic and returns `{ content: [{ type: 'text', text: string }] }`.
-
-Example:
-
-```typescript
-import { z } from "zod";
-
-window.mcp.registerTool(
-  "echoInput",
-  {
-    title: "Echo Tool",
-    description: "Echoes the provided input",
-    inputSchema: { input: z.string() },
-  },
-  async ({ input }) => {
-    return { content: [{ type: "text", text: `Echo: ${input}` }] };
-  }
-);
-```
-
-#### `initializeGlobalMCP()` (Optional)
-
-Manually initializes the global MCP instance (automatic in script tag mode).
-
-#### `cleanupGlobalMCP()` (Optional)
-
-Cleans up the global instance, useful for testing or single-page apps.
-
-### TypeScript Integration
-
-Import types for full autocompletion:
-
-```typescript
-import "@mcp-b/global"; // Augments Window interface
-
-window.mcp.registerTool(
-  "mathOperation",
-  {
-    title: "Perform Math",
-    description: "Basic arithmetic",
-    inputSchema: { num1: z.number(), num2: z.number() },
-  },
-  async ({ num1, num2 }) => {
-    return { content: [{ type: "text", text: `${num1 + num2}` }] };
-  }
-);
-```
-
-## 📖 Full Example: AI-Powered Todo App
-
-This complete HTML file creates a todo list with AI tools for adding, viewing, and deleting items:
-
-```html
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>AI Todo List</title>
-    <style>
-      body {
-        font-family: sans-serif;
-        max-width: 600px;
-        margin: 2rem auto;
-        padding: 1rem;
+    {
+      name: "list-todos",
+      description: "Get all todo items",
+      inputSchema: { type: "object", properties: {} },
+      async execute() {
+        const list = todos.map(t =>
+          `${t.done ? '✓' : '○'} ${t.text}`
+        ).join('\n');
+        return {
+          content: [{ type: "text", text: list || "No todos" }]
+        };
       }
-      .todo {
-        padding: 0.5rem;
-        margin: 0.25rem 0;
-        background: #f8f9fa;
-        border-radius: 0.25rem;
-      }
-      .ai-feedback {
-        background: #d4edda;
-        color: #155724;
-        padding: 0.75rem;
-        border-radius: 0.5rem;
-        margin: 0.5rem 0;
-      }
-    </style>
-  </head>
-  <body>
-    <h1>AI-Enabled Todo List</h1>
-    <div id="status">Initializing AI...</div>
-    <div id="todos"></div>
-
-    <!-- MCP-B Script -->
-    <script src="https://unpkg.com/@mcp-b/global@latest"></script>
-    <!-- Zod for Schemas -->
-    <script src="https://unpkg.com/zod@latest/lib/index.umd.js"></script>
-
-    <script>
-      const { z } = window.Zod;
-      const todos = ["Demo Todo 1", "Demo Todo 2"];
-
-      function showFeedback(message) {
-        const feedback = document.createElement("div");
-        feedback.className = "ai-feedback";
-        feedback.textContent = `AI Action: ${message}`;
-        document.body.insertBefore(feedback, document.getElementById("todos"));
-        setTimeout(() => feedback.remove(), 3000);
-      }
-
-      function updateTodos() {
-        document.getElementById("todos").innerHTML = todos
-          .map((todo, index) => `<div class="todo">${index + 1}. ${todo}</div>`)
-          .join("");
-      }
-
-      function initMCP() {
-        if (!window.mcp?.registerTool) {
-          return setTimeout(initMCP, 100);
-        }
-
-        window.mcp.registerTool(
-          "addTodoItem",
-          {
-            title: "Add Todo",
-            description: "Adds a new todo item",
-            inputSchema: { text: z.string().describe("Todo text") },
-          },
-          async ({ text }) => {
-            todos.push(text);
-            showFeedback(`Added "${text}"`);
-            updateTodos();
-            return { content: [{ type: "text", text: `Added: ${text}` }] };
-          }
-        );
-
-        window.mcp.registerTool(
-          "listTodos",
-          {
-            title: "List Todos",
-            description: "Retrieves all todos",
-          },
-          async () => {
-            showFeedback("Listing todos");
-            return { content: [{ type: "text", text: JSON.stringify(todos) }] };
-          }
-        );
-
-        window.mcp.registerTool(
-          "removeTodo",
-          {
-            title: "Remove Todo",
-            description: "Deletes a todo by index (1-based)",
-            inputSchema: { index: z.number().describe("Todo index") },
-          },
-          async ({ index }) => {
-            const i = index - 1;
-            if (i >= 0 && i < todos.length) {
-              const removed = todos.splice(i, 1)[0];
-              showFeedback(`Removed "${removed}"`);
-              updateTodos();
-              return {
-                content: [{ type: "text", text: `Removed: ${removed}` }],
-              };
-            }
-            return {
-              content: [{ type: "text", text: `Invalid index: ${index}` }],
-            };
-          }
-        );
-
-        document.getElementById("status").textContent =
-          "AI Ready! Tools available.";
-        document.getElementById("status").style.background = "#d4edda";
-        document.getElementById("status").style.color = "#155724";
-        document.getElementById("status").style.padding = "0.5rem";
-        document.getElementById("status").style.borderRadius = "0.25rem";
-      }
-
-      document.addEventListener("DOMContentLoaded", () => {
-        updateTodos();
-        initMCP();
-      });
-    </script>
-  </body>
-</html>
-```
-
-Save as `index.html` and open in a browser with the MCP-B extension installed.
-
-## 🎯 Getting Started with the Extension
-
-1. Install the [MCP-B Extension](https://chromewebstore.google.com/detail/mcp-b/daohopfhkdelnpemnhlekblhnikhdhfa) from the Chrome Web Store.
-2. Open your HTML file or site.
-3. Use the extension's chat: Try "Add a todo: Buy milk" or "List all todos".
-
-The AI interacts directly with your site's tools!
-
-## 🌟 Use Cases
-
-- **Quick Prototypes**: Add AI to static sites or landing pages.
-- **Legacy Upgrades**: Enhance old HTML with AI without refactoring.
-- **MVPs**: Rapidly build AI features for demos.
-- **Learning MCP-B**: Experiment with concepts in a simple environment.
-
-For production apps, consider [@mcp-b/transports](https://www.npmjs.com/package/@mcp-b/transports) for deeper integration.
-
-## 📦 Distribution Formats
-
-- **UMD**: `dist/index.umd.js` – For script tags/AMDs.
-- **ESM**: `dist/index.js` – Modern modules.
-- **CommonJS**: `dist/index.cjs` – Node.js compatibility.
-- **Types**: `dist/index.d.ts` – TypeScript support.
-
-Examples:
-
-```html
-<!-- UMD CDN -->
-<script src="https://unpkg.com/@mcp-b/global@latest"></script>
-```
-
-```javascript
-// ESM
-import { initializeGlobalMCP } from "@mcp-b/global";
-```
-
-## 🔧 Advanced Features
-
-### Error Management
-
-Handle failures gracefully:
-
-```javascript
-window.mcp.registerTool(
-  "riskyTask",
-  {
-    title: "Risky Task",
-    description: "May fail",
-  },
-  async () => {
-    try {
-      // Logic here
-      return { content: [{ type: "text", text: "Success!" }] };
-    } catch (err) {
-      return {
-        content: [{ type: "text", text: `Failed: ${err.message}` }],
-        isError: true,
-      };
-    }
-  }
-);
-```
-
-### User-Specific Tools
-
-Register tools dynamically:
-
-```javascript
-function addUserTools(user) {
-  if (user.isAdmin) {
-    window.mcp.registerTool(
-      "adminTool",
-      {
-        title: "Admin Tool",
-        description: "Admin-only",
+    },
+    {
+      name: "complete-todo",
+      description: "Mark a todo as complete",
+      inputSchema: {
+        type: "object",
+        properties: {
+          id: { type: "number", description: "Todo ID" }
+        },
+        required: ["id"]
       },
-      async () => {
-        /* ... */
+      async execute({ id }) {
+        const todo = todos.find(t => t.id === id);
+        if (!todo) {
+          return {
+            content: [{ type: "text", text: "Todo not found" }],
+            isError: true
+          };
+        }
+        todo.done = true;
+        updateUI();
+        return {
+          content: [{ type: "text", text: `Completed: "${todo.text}"` }]
+        };
       }
-    );
+    }
+  ]
+});
+
+function updateUI() {
+  // Update your UI
+  document.getElementById('todo-list').innerHTML =
+    todos.map(t => `<li>${t.done ? '✓' : ''} ${t.text}</li>`).join('');
+}
+```
+
+### E-commerce Product Search
+
+```javascript
+window.agent.provideContext({
+  tools: [
+    {
+      name: "search-products",
+      description: "Search for products in the catalog",
+      inputSchema: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description: "Search query"
+          },
+          category: {
+            type: "string",
+            description: "Filter by category",
+            enum: ["electronics", "clothing", "books", "all"]
+          },
+          maxPrice: {
+            type: "number",
+            description: "Maximum price filter"
+          }
+        },
+        required: ["query"]
+      },
+      async execute({ query, category = "all", maxPrice }) {
+        const results = await searchProducts({
+          query,
+          category: category !== "all" ? category : undefined,
+          maxPrice
+        });
+
+        const summary = results.map(p =>
+          `${p.name} - $${p.price} (${p.category})`
+        ).join('\n');
+
+        return {
+          content: [{
+            type: "text",
+            text: `Found ${results.length} products:\n${summary}`
+          }]
+        };
+      }
+    },
+    {
+      name: "add-to-cart",
+      description: "Add a product to the shopping cart",
+      inputSchema: {
+        type: "object",
+        properties: {
+          productId: { type: "string" },
+          quantity: { type: "number", default: 1 }
+        },
+        required: ["productId"]
+      },
+      async execute({ productId, quantity = 1 }) {
+        await addToCart(productId, quantity);
+        return {
+          content: [{
+            type: "text",
+            text: `Added ${quantity}x product ${productId} to cart`
+          }]
+        };
+      }
+    }
+  ]
+});
+```
+
+## 🔧 Event-Based Tool Calls (Advanced)
+
+For manifest-based or advanced scenarios, you can handle tool calls as events:
+
+```javascript
+window.agent.addEventListener('toolcall', async (event) => {
+  console.log(`Tool called: ${event.name}`, event.arguments);
+
+  if (event.name === "custom-tool") {
+    // Prevent default execution
+    event.preventDefault();
+
+    // Provide custom response
+    event.respondWith({
+      content: [{
+        type: "text",
+        text: "Custom response from event handler"
+      }]
+    });
+  }
+
+  // If not prevented, the tool's execute function will run normally
+});
+```
+
+### Hybrid Approach
+
+The API supports both approaches simultaneously:
+
+1. **Event dispatched first** - `toolcall` event is fired
+2. **Event can override** - Call `event.preventDefault()` and `event.respondWith()`
+3. **Default execution** - If not prevented, the tool's `execute()` function runs
+
+This allows flexibility for different use cases.
+
+## 🏗️ Architecture
+
+```
+┌─────────────────┐
+│   AI Agent      │
+│  (MCP Client)   │
+└────────┬────────┘
+         │ MCP Protocol
+         │ (JSON-RPC)
+┌────────▼────────┐
+│   MCP Server    │
+│   (Internal)    │
+└────────┬────────┘
+         │
+┌────────▼────────┐
+│ window.agent    │ ◄── Your app registers tools here
+│   (This pkg)    │
+└─────────────────┘
+```
+
+This package:
+1. Exposes `window.agent` API (Web Model Context standard)
+2. Internally creates an MCP Server
+3. Bridges tool calls between the two protocols
+4. Uses TabServerTransport for browser communication
+
+## 🔍 Feature Detection
+
+Check if the API is available:
+
+```javascript
+if ("agent" in window) {
+  // API is available
+  window.agent.provideContext({ tools: [...] });
+} else {
+  console.warn("Web Model Context API not available");
+}
+```
+
+## 🐛 Debugging
+
+In development mode, access the internal bridge:
+
+```javascript
+if (window.__mcpBridge) {
+  console.log("MCP Server:", window.__mcpBridge.server);
+  console.log("Registered tools:", window.__mcpBridge.tools);
+}
+```
+
+## 📦 What's Included
+
+- **Web Model Context API** - Standard `window.agent` interface
+- **MCP Bridge** - Automatic bridging to Model Context Protocol
+- **Tab Transport** - Communication layer for browser contexts
+- **Event System** - Hybrid tool call handling
+- **TypeScript Types** - Full type definitions included
+
+## 🔒 Security Considerations
+
+### Origin Restrictions
+
+By default, the MCP transport allows connections from any origin (`*`). For production, you should configure allowed origins:
+
+```javascript
+// Future configuration API
+window.agent.configure({
+  allowedOrigins: [
+    'https://your-app.com',
+    'https://trusted-agent.com'
+  ]
+});
+```
+
+### Tool Validation
+
+Always validate inputs in your tool implementations:
+
+```javascript
+{
+  name: "delete-item",
+  description: "Delete an item",
+  inputSchema: {
+    type: "object",
+    properties: {
+      id: { type: "string", pattern: "^[a-zA-Z0-9]+$" }
+    },
+    required: ["id"]
+  },
+  async execute({ id }) {
+    // Additional validation
+    if (!isValidId(id)) {
+      return {
+        content: [{ type: "text", text: "Invalid ID" }],
+        isError: true
+      };
+    }
+
+    // Proceed with deletion
+    await deleteItem(id);
+    return {
+      content: [{ type: "text", text: "Item deleted" }]
+    };
   }
 }
 ```
 
-## 🚨 Key Considerations
+## 🤝 Related Packages
 
-- **Browser-Only**: Designed exclusively for web environments.
-- **Extension Needed**: Users require the MCP-B extension for AI interactions.
-- **Security**: Tools inherit your site's permissions—expose only safe operations.
-- **Readiness Check**: Always verify `window.mcp` before use.
+- [`@mcp-b/transports`](../transports) - MCP transport implementations
+- [`@mcp-b/mcp-react-hooks`](../mcp-react-hooks) - React hooks for MCP
+- [`@modelcontextprotocol/sdk`](https://www.npmjs.com/package/@modelcontextprotocol/sdk) - Official MCP SDK
 
-## 🔗 Related Resources
+## 📚 Resources
 
-- [@mcp-b/transports](https://www.npmjs.com/package/@mcp-b/transports): Advanced transport layer.
-- [@modelcontextprotocol/sdk](https://www.npmjs.com/package/@modelcontextprotocol/sdk): Core MCP SDK.
-- [MCP-B Extension](https://chromewebstore.google.com/detail/mcp-b/daohopfhkdelnpemnhlekblhnikhdhfa): Browser extension for tool interaction.
-- [Documentation](https://mcp-b.ai): Full guides and specs.
+- [Web Model Context API Explainer](https://github.com/webmachinelearning/webmcp)
+- [Model Context Protocol Spec](https://modelcontextprotocol.io/)
+- [Microsoft Edge Explainer](https://github.com/MicrosoftEdge/MSEdgeExplainers/blob/main/WebModelContext/explainer.md)
 
-## 📄 License
+## 📝 License
 
-MIT – See [LICENSE](https://github.com/MiguelsPizza/WebMCP/blob/main/LICENSE).
+MIT - see [LICENSE](../../LICENSE) for details
 
-## 🤝 Contributing
+## 🙋 Support
 
-Welcome! Check the [main repo](https://github.com/MiguelsPizza/WebMCP) for guidelines.
-
----
-
-**Unlock AI for your site today—start with a script tag!** 🚀
+- [GitHub Issues](https://github.com/WebMCP-org/npm-packages/issues)
+- [Documentation](https://docs.mcp-b.ai)
+- [Discord Community](https://discord.gg/a9fBR6Bw)

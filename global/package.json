@@ -1,15 +1,17 @@
 {
   "name": "@mcp-b/global",
   "version": "1.0.13",
-  "description": "ESM bundle for MCP-B browser injection via Chrome MV3 scripting",
+  "description": "Web Model Context API polyfill - implements window.agent bridging to Model Context Protocol",
   "keywords": [
     "mcp",
     "model-context-protocol",
+    "web-model-context",
+    "window.agent",
     "browser",
-    "chrome-extension",
-    "mv3",
-    "injection",
-    "esm"
+    "polyfill",
+    "web-standard",
+    "ai-agents",
+    "tools"
   ],
   "homepage": "https://github.com/MiguelsPizza/WebMCP#readme",
   "bugs": {
