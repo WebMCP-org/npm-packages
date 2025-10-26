@@ -1,0 +1,19 @@
+{
+  "name": "mcp-e2e-tests",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "test:codegen": "playwright codegen http://localhost:5173",
+    "test:debug": "playwright test --debug",
+    "test:headed": "playwright test --headed",
+    "test:report": "playwright show-report",
+    "test:ui": "playwright test --ui"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.2",
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
+  }
+}

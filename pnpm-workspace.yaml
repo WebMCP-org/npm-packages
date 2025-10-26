@@ -1,11 +1,13 @@
 packages:
-  - extension-tools
-  - global
-  - mcp-react-hook-form
-  - mcp-react-hooks
-  - smart-dom-reader
-  - smart-dom-reader/mcp-server
-  - transports
+  - "extension-tools"
+  - "global"
+  - "mcp-react-hook-form"
+  - "mcp-react-hooks"
+  - "smart-dom-reader"
+  - "smart-dom-reader/mcp-server"
+  - "transports"
+  - "e2e"
+  - "e2e/test-app"
 
 catalog:
   '@modelcontextprotocol/sdk': 1.15.0
