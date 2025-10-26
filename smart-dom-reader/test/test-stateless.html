@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stateless Smart DOM Reader Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .test-section {
+            border: 1px solid #ddd;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        .interactive-section {
+            background: #f5f5f5;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            background: #007bff;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        input {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        #results {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Stateless Smart DOM Reader Test Page</h1>
+        <nav>
+            <a href="#home">Home</a>
+            <a href="#about">About</a>
+            <a href="#contact">Contact</a>
+        </nav>
+    </header>
+
+    <main>
+        <section class="test-section">
+            <h2>Test Controls</h2>
+            <div>
+                <button id="test-structure">Test Extract Structure</button>
+                <button id="test-region">Test Extract Region</button>
+                <button id="test-content">Test Extract Content</button>
+                <button id="clear-results">Clear Results</button>
+            </div>
+        </section>
+
+        <section class="test-section interactive-section">
+            <h2>Interactive Elements</h2>
+            <form id="test-form">
+                <div>
+                    <label for="username">Username:</label>
+                    <input type="text" id="username" name="username" placeholder="Enter username">
+                </div>
+                <div>
+                    <label for="email">Email:</label>
+                    <input type="email" id="email" name="email" placeholder="Enter email">
+                </div>
+                <div>
+                    <button type="submit">Submit Form</button>
+                    <button type="reset">Reset Form</button>
+                </div>
+            </form>
+
+            <div style="margin-top: 20px;">
+                <button data-testid="action-primary">Primary Action</button>
+                <button data-testid="action-secondary">Secondary Action</button>
+                <div role="button" aria-label="Delete Item">Delete</div>
+            </div>
+        </section>
+
+        <section class="test-section">
+            <h2>Content Area</h2>
+            <article>
+                <h3>Article Title</h3>
+                <p>This is a paragraph with some content that can be extracted. It contains <strong>bold text</strong> and <em>italic text</em>.</p>
+                <ul>
+                    <li>List item 1</li>
+                    <li>List item 2</li>
+                    <li>List item 3</li>
+                </ul>
+            </article>
+        </section>
+
+        <section class="test-section">
+            <h2>Extraction Results</h2>
+            <div id="results">Results will appear here...</div>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2024 Smart DOM Reader Test</p>
+    </footer>
+
+    <script type="module">
+        // Load the bundle
+        import { SmartDOMReaderBundle } from '../dist-bundle/smart-dom-reader-bundle.js';
+
+        // Make it available for testing
+        window.SmartDOMReaderBundle = SmartDOMReaderBundle;
+
+        function displayResult(method, result) {
+            const resultsDiv = document.getElementById('results');
+            const timestamp = new Date().toISOString();
+            // If result is a string (markdown), display it directly
+            if (typeof result === 'string') {
+                resultsDiv.textContent = `[${timestamp}] ${method} (Markdown):\n${result}`;
+            } else {
+                resultsDiv.textContent = `[${timestamp}] ${method}:\n${JSON.stringify(result, null, 2)}`;
+            }
+        }
+
+        // Test structure extraction
+        document.getElementById('test-structure').addEventListener('click', () => {
+            try {
+                if (window.SmartDOMReaderBundle && window.SmartDOMReaderBundle.executeExtraction) {
+                    const result = window.SmartDOMReaderBundle.executeExtraction('extractStructure', {
+                        frameSelector: undefined,
+                        formatOptions: { detail: 'summary' }
+                    });
+                    displayResult('extractStructure', result);
+                } else {
+                    displayResult('extractStructure', { error: 'Bundle not loaded' });
+                }
+            } catch (error) {
+                displayResult('extractStructure', { error: error.message });
+            }
+        });
+
+        // Test region extraction
+        document.getElementById('test-region').addEventListener('click', () => {
+            try {
+                if (window.SmartDOMReaderBundle && window.SmartDOMReaderBundle.executeExtraction) {
+                    const result = window.SmartDOMReaderBundle.executeExtraction('extractRegion', {
+                        selector: '.interactive-section',
+                        mode: 'interactive',
+                        frameSelector: undefined,
+                        options: { includeHidden: false },
+                        formatOptions: { detail: 'region' }
+                    });
+                    displayResult('extractRegion', result);
+                } else {
+                    displayResult('extractRegion', { error: 'Bundle not loaded' });
+                }
+            } catch (error) {
+                displayResult('extractRegion', { error: error.message });
+            }
+        });
+
+        // Test content extraction
+        document.getElementById('test-content').addEventListener('click', () => {
+            try {
+                if (window.SmartDOMReaderBundle && window.SmartDOMReaderBundle.executeExtraction) {
+                    const result = window.SmartDOMReaderBundle.executeExtraction('extractContent', {
+                        selector: 'article',
+                        frameSelector: undefined,
+                        options: { includeHeadings: true, includeLists: true },
+                        formatOptions: { detail: 'region' }
+                    });
+                    displayResult('extractContent', result);
+                } else {
+                    displayResult('extractContent', { error: 'Bundle not loaded' });
+                }
+            } catch (error) {
+                displayResult('extractContent', { error: error.message });
+            }
+        });
+
+        // Clear results
+        document.getElementById('clear-results').addEventListener('click', () => {
+            document.getElementById('results').textContent = 'Results will appear here...';
+        });
+    </script>
+</body>
+</html>

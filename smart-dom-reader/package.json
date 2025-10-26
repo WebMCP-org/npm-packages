@@ -1,74 +1,80 @@
 {
-  "name": "@mcp-b/extension-tools",
-  "version": "0.2.2",
-  "description": "Chrome Extension API tools for Model Context Protocol (MCP) - provides MCP-compatible wrappers for browser extension APIs",
+  "name": "@mcp-b/smart-dom-reader",
+  "version": "1.0.1",
+  "description": "Token-efficient DOM extraction library for AI-powered browser automation",
   "keywords": [
     "mcp",
     "model-context-protocol",
-    "chrome-extension",
-    "browser-extension",
-    "chrome-api",
-    "extension-api",
-    "tabs-api",
-    "bookmarks-api",
-    "storage-api",
-    "browser-automation"
+    "browser",
+    "dom",
+    "extraction",
+    "ai",
+    "selector",
+    "interactive",
+    "semantic"
   ],
-  "homepage": "https://github.com/MiguelsPizza/WebMCP/tree/main/packages/extension-tools#readme",
+  "homepage": "https://github.com/MiguelsPizza/WebMCP#readme",
   "bugs": {
     "url": "https://github.com/MiguelsPizza/WebMCP/issues"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/MiguelsPizza/WebMCP.git",
-    "directory": "packages/extension-tools"
+    "directory": "packages/smart-dom-reader"
   },
   "license": "MIT",
   "author": "Alex Nahas",
+  "sideEffects": true,
   "type": "module",
   "exports": {
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./bundle-string": {
+      "import": "./dist/bundle-string.js",
+      "types": "./dist/bundle-string.d.ts"
     }
   },
   "main": "./dist/index.js",
   "module": "./dist/index.js",
+  "browser": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
-    "dist",
-    "README.md"
+    "dist"
   ],
   "scripts": {
+    "prebuild": "pnpm build:bundle && node generate-bundle-module.mjs",
     "build": "tsup",
+    "build:bundle": "vite build --config vite.config.bundle.ts",
+    "bundle:mcp": "pnpm --filter @mcp-b/smart-dom-reader build && pnpm --filter @mcp-b/smart-dom-reader-server bundle",
     "check": "biome check --write .",
     "clean": "rm -rf dist .turbo",
     "format": "biome format --write .",
-    "generate-chrome-api-tools": "pnpx tsx src/aiScripts/generate-chrome-api-tools.ts",
     "lint": "biome lint --write .",
     "prepublishOnly": "pnpm run build",
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
+    "test:local": "node test/local-playwright-runner.mjs",
     "typecheck": "tsc --noEmit",
     "version:major": "pnpm version major --no-git-tag-version",
     "version:minor": "pnpm version minor --no-git-tag-version",
     "version:patch": "pnpm version patch --no-git-tag-version"
   },
-  "dependencies": {
-    "@mcp-b/smart-dom-reader": "workspace:*",
-    "@modelcontextprotocol/sdk": "catalog:",
-    "zod": "catalog:",
-    "zod-to-json-schema": "^3.24.5"
-  },
   "devDependencies": {
-    "@anthropic-ai/sdk": "^0.60.0",
-    "@types/chrome": "catalog:",
     "@types/node": "catalog:",
-    "cheerio": "^1.1.2",
-    "dotenv": "^17.2.1",
-    "playwright": "^1.54.2",
     "tsup": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plugin-monkey": "catalog:"
+  },
+  "peerDependencies": {
+    "@modelcontextprotocol/sdk": "^1.15.0"
+  },
+  "peerDependenciesMeta": {
+    "@modelcontextprotocol/sdk": {
+      "optional": true
+    }
   },
   "publishConfig": {
     "access": "public",

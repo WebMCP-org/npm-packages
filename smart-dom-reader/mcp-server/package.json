@@ -1,0 +1,30 @@
+{
+  "name": "@mcp-b/smart-dom-reader-server",
+  "version": "0.1.0",
+  "description": "MCP server for smart-dom-reader backed by Playwright",
+  "type": "module",
+  "main": "src/index.ts",
+  "bin": {
+    "smart-dom-reader-server": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "lib"
+  ],
+  "scripts": {
+    "bundle": "node ./scripts/update-bundle.mjs",
+    "dev": "tsx watch --clear-screen=false src/index.ts",
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.3",
+    "playwright": "^1.54.2",
+    "tsx": "^4.20.4",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "typescript": "^5.8.0"
+  }
+}
