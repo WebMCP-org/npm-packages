@@ -213,12 +213,24 @@ export interface ModelContext {
 }
 
 /**
+ * Internal ModelContext interface with additional methods for MCP bridge
+ * Not exposed as part of the public Web Model Context API
+ */
+export interface InternalModelContext extends ModelContext {
+  /**
+   * Execute a tool (internal use only by MCP bridge)
+   * @internal
+   */
+  executeTool(toolName: string, args: Record<string, unknown>): Promise<ToolResponse>;
+}
+
+/**
  * Internal MCP Bridge state
  */
 export interface MCPBridge {
   server: McpServer;
   tools: Map<string, ValidatedToolDescriptor>;
-  modelContext: ModelContext;
+  modelContext: InternalModelContext;
   isInitialized: boolean;
 }
 

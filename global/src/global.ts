@@ -8,8 +8,8 @@ import {
   Server as McpServer,
 } from '@mcp-b/webmcp-ts-sdk';
 import type {
+  InternalModelContext,
   MCPBridge,
-  ModelContext,
   ModelContextInput,
   ToolCallEvent,
   ToolDescriptor,
@@ -69,7 +69,7 @@ const RAPID_DUPLICATE_WINDOW_MS = 50;
  * - Components can manage their own tool lifecycle independently
  * - Final tool list = Bucket A + Bucket B (merged, with collision detection)
  */
-class WebModelContext implements ModelContext {
+class WebModelContext implements InternalModelContext {
   private bridge: MCPBridge;
   private eventTarget: EventTarget;
 
@@ -445,7 +445,7 @@ function initializeMCPBridge(): MCPBridge {
   const bridge: MCPBridge = {
     server,
     tools: new Map(),
-    modelContext: undefined as unknown as ModelContext,
+    modelContext: undefined as unknown as InternalModelContext,
     isInitialized: true,
   };
 
