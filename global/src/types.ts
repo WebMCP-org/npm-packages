@@ -218,6 +218,7 @@ export interface ModelContext {
 export interface MCPBridge {
   server: McpServer;
   tools: Map<string, ValidatedToolDescriptor>;
+  modelContext: ModelContext;
   isInitialized: boolean;
 }
 

@@ -441,21 +441,23 @@ function initializeMCPBridge(): MCPBridge {
     }
   );
 
-  // Create bridge object
+  // Create bridge object (modelContext is assigned after instantiation)
   const bridge: MCPBridge = {
     server,
     tools: new Map(),
+    modelContext: undefined as unknown as ModelContext,
     isInitialized: true,
   };
 
-  // Create modelContext
+  // Create modelContext and attach to bridge
   const modelContext = new WebModelContext(bridge);
+  bridge.modelContext = modelContext;
 
   // Set up MCP server handlers
   server.setRequestHandler(ListToolsRequestSchema, async () => {
     console.log('[MCP Bridge] Handling list_tools request');
     return {
-      tools: modelContext.listTools(),
+      tools: bridge.modelContext.listTools(),
     };
   });
 
@@ -466,7 +468,7 @@ function initializeMCPBridge(): MCPBridge {
     const args = (request.params.arguments || {}) as Record<string, unknown>;
 
     try {
-      const response = await modelContext.executeTool(toolName, args);
+      const response = await bridge.modelContext.executeTool(toolName, args);
       // Return in MCP SDK format
       return {
         content: response.content,
@@ -510,10 +512,9 @@ export function initializeWebModelContext(): void {
     // Initialize MCP bridge
     const bridge = initializeMCPBridge();
 
-    // Create and expose modelContext
-    const modelContext = new WebModelContext(bridge);
+    // Expose shared modelContext instance
     Object.defineProperty(window.navigator, 'modelContext', {
-      value: modelContext,
+      value: bridge.modelContext,
       writable: false,
       configurable: false,
     });

@@ -1,8 +1,8 @@
-# @mcp-b/webmcp-polyfill
+# @mcp-b/webmcp-ts-sdk
 
 > Browser-adapted Model Context Protocol TypeScript SDK
 
-[![npm version](https://img.shields.io/npm/v/@mcp-b/webmcp-polyfill?style=flat-square)](https://www.npmjs.com/package/@mcp-b/webmcp-polyfill)
+[![npm version](https://img.shields.io/npm/v/@mcp-b/webmcp-ts-sdk?style=flat-square)](https://www.npmjs.com/package/@mcp-b/webmcp-ts-sdk)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 
 ## Overview
@@ -81,9 +81,9 @@ This package re-exports almost everything from the official SDK:
 ## Installation
 
 ```bash
-npm install @mcp-b/webmcp-polyfill
+npm install @mcp-b/webmcp-ts-sdk
 # or
-pnpm add @mcp-b/webmcp-polyfill
+pnpm add @mcp-b/webmcp-ts-sdk
 ```
 
 ## Usage
@@ -91,7 +91,7 @@ pnpm add @mcp-b/webmcp-polyfill
 Use it exactly like the official SDK:
 
 ```typescript
-import { McpServer } from '@mcp-b/webmcp-polyfill';
+import { McpServer } from '@mcp-b/webmcp-ts-sdk';
 import { TabServerTransport } from '@mcp-b/transports';
 
 const server = new McpServer({
@@ -120,7 +120,7 @@ server.registerTool('my-tool', {
 
 ```
 ┌─────────────────────────────────┐
-│  @mcp-b/webmcp-polyfill         │
+│  @mcp-b/webmcp-ts-sdk           │
 │                                 │
 │  ┌───────────────────────────┐  │
 │  │ BrowserMcpServer          │  │
