@@ -9,7 +9,9 @@ This package implements the [W3C Web Model Context API](https://github.com/webma
 
 ## 🚀 Quick Start
 
-### Via Script Tag (Recommended)
+### Via IIFE Script Tag (Easiest - No Build Required)
+
+The **IIFE (Immediately Invoked Function Expression)** version bundles everything into a single file and auto-initializes when loaded. Perfect for simple HTML pages or prototyping.
 
 Add the script to your HTML `<head>`:
 
@@ -17,12 +19,14 @@ Add the script to your HTML `<head>`:
 <!DOCTYPE html>
 <html>
 <head>
-  <script src="https://unpkg.com/@mcp-b/global@latest/dist/index.js"></script>
+  <!-- IIFE version - bundles all dependencies, auto-initializes -->
+  <script src="https://unpkg.com/@mcp-b/global@latest/dist/index.iife.js"></script>
 </head>
 <body>
   <h1>My AI-Powered App</h1>
 
   <script>
+    // window.navigator.modelContext is already available!
     // Register tools with AI agents
     window.navigator.modelContext.provideContext({
       tools: [
@@ -49,7 +53,42 @@ Add the script to your HTML `<head>`:
 </html>
 ```
 
+**What you get:**
+- ✅ **Self-contained** - All dependencies bundled (285KB minified)
+- ✅ **Auto-initializes** - `window.navigator.modelContext` ready immediately
+- ✅ **No build step** - Just drop it in your HTML
+- ✅ **Works everywhere** - Compatible with all modern browsers
+- ✅ **Global access** - Also exposes `window.WebMCP` for advanced usage
+
+### Via ES Module Script Tag
+
+If you prefer ES modules and have a build system, use the ESM version:
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <!-- ESM version - smaller but requires module support -->
+  <script type="module">
+    import '@mcp-b/global';
+
+    // window.navigator.modelContext is now available
+    window.navigator.modelContext.provideContext({
+      tools: [/* your tools */]
+    });
+  </script>
+</head>
+<body>
+  <h1>My AI-Powered App</h1>
+</body>
+</html>
+```
+
+**Note:** The ESM version is smaller (~16KB) but doesn't bundle dependencies - it expects them to be available via your module system or CDN.
+
 ### Via NPM
+
+For applications using a bundler (Vite, Webpack, etc.):
 
 ```bash
 npm install @mcp-b/global
