@@ -1,5 +1,11 @@
 # @mcp-b/global
 
+## 1.0.15
+
+### Patch Changes
+
+- Fix IIFE build bundling issue - ensure all dependencies are properly bundled
+
 ## 1.0.14
 
 ### Patch Changes

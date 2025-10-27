@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test IIFE Script Tag (Local) - @mcp-b/global</title>
+  <!-- IIFE version from local build -->
+  <script src="./dist/index.iife.js"></script>
+</head>
+<body>
+  <h1>Test IIFE Script Tag Version (Local Build)</h1>
+  <div id="status">Initializing...</div>
+  <button id="test-btn">Test Tool Registration</button>
+  <div id="results"></div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const resultsEl = document.getElementById('results');
+    const testBtn = document.getElementById('test-btn');
+
+    // Check if API is available
+    if ("modelContext" in navigator) {
+      statusEl.innerHTML = '✅ <strong>Success!</strong> window.navigator.modelContext is available';
+      statusEl.style.color = 'green';
+
+      // Register a test tool
+      window.navigator.modelContext.provideContext({
+        tools: [
+          {
+            name: "get-page-info",
+            description: "Get information about the current page",
+            inputSchema: {
+              type: "object",
+              properties: {}
+            },
+            async execute() {
+              return {
+                content: [{
+                  type: "text",
+                  text: `Title: ${document.title}\nURL: ${window.location.href}\nTimestamp: ${new Date().toISOString()}`
+                }]
+              };
+            }
+          }
+        ]
+      });
+
+      // Test button click
+      testBtn.addEventListener('click', async () => {
+        try {
+          const tools = window.navigator.modelContext.listTools();
+          resultsEl.innerHTML = `
+            <h3>Registered Tools:</h3>
+            <pre>${JSON.stringify(tools, null, 2)}</pre>
+            <p style="color: green;">✅ Tool registration successful!</p>
+          `;
+        } catch (error) {
+          resultsEl.innerHTML = `<p style="color: red;">❌ Error: ${error.message}</p>`;
+        }
+      });
+
+      // Auto-click for testing
+      setTimeout(() => testBtn.click(), 100);
+
+    } else {
+      statusEl.innerHTML = '❌ <strong>Failed!</strong> window.navigator.modelContext is NOT available';
+      statusEl.style.color = 'red';
+    }
+
+    // Check for WebMCP global
+    if (window.WebMCP) {
+      const globalCheck = document.createElement('div');
+      globalCheck.style.color = 'blue';
+      globalCheck.innerHTML = '✅ window.WebMCP global is also available';
+      statusEl.appendChild(document.createElement('br'));
+      statusEl.appendChild(globalCheck);
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+    }
+    button {
+      background: #0066cc;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      margin: 20px 0;
+    }
+    button:hover {
+      background: #0052a3;
+    }
+    pre {
+      background: #f5f5f5;
+      padding: 15px;
+      border-radius: 5px;
+      overflow-x: auto;
+    }
+  </style>
+</body>
+</html>
