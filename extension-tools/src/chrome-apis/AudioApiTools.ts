@@ -10,7 +10,7 @@ export interface AudioApiToolsOptions {
   setProperties?: boolean;
 }
 
-export class AudioApiTools extends BaseApiTools {
+export class AudioApiTools extends BaseApiTools<AudioApiToolsOptions> {
   protected apiName = 'Audio';
 
   constructor(server: McpServer, options: AudioApiToolsOptions = {}) {

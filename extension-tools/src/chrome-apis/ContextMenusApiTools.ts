@@ -9,7 +9,7 @@ export interface ContextMenusApiToolsOptions {
   removeAllContextMenus?: boolean;
 }
 
-export class ContextMenusApiTools extends BaseApiTools {
+export class ContextMenusApiTools extends BaseApiTools<ContextMenusApiToolsOptions> {
   protected apiName = 'ContextMenus';
 
   constructor(server: McpServer, options: ContextMenusApiToolsOptions = {}) {
@@ -44,7 +44,7 @@ export class ContextMenusApiTools extends BaseApiTools {
             throw new Error(chrome.runtime.lastError.message);
           }
         });
-      } catch (error) {
+      } catch (_error) {
         // This is expected in some contexts, but we can still use the API
       }
 
@@ -260,7 +260,7 @@ export class ContextMenusApiTools extends BaseApiTools {
       }) => {
         try {
           // Build update properties
-          const updateProperties: any = {};
+          const updateProperties: Record<string, unknown> = {};
 
           if (title !== undefined) updateProperties.title = title;
           if (type !== undefined) updateProperties.type = type;
@@ -276,13 +276,17 @@ export class ContextMenusApiTools extends BaseApiTools {
 
           // Update the context menu item
           await new Promise<void>((resolve, reject) => {
-            chrome.contextMenus.update(id, updateProperties, () => {
-              if (chrome.runtime.lastError) {
-                reject(new Error(chrome.runtime.lastError.message));
-              } else {
-                resolve();
+            chrome.contextMenus.update(
+              id,
+              updateProperties as Parameters<typeof chrome.contextMenus.update>[1],
+              () => {
+                if (chrome.runtime.lastError) {
+                  reject(new Error(chrome.runtime.lastError.message));
+                } else {
+                  resolve();
+                }
               }
-            });
+            );
           });
 
           return this.formatSuccess('Context menu item updated successfully', {

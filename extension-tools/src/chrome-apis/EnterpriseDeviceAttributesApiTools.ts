@@ -9,7 +9,7 @@ export interface EnterpriseDeviceAttributesApiToolsOptions {
   getDeviceHostname?: boolean;
 }
 
-export class EnterpriseDeviceAttributesApiTools extends BaseApiTools {
+export class EnterpriseDeviceAttributesApiTools extends BaseApiTools<EnterpriseDeviceAttributesApiToolsOptions> {
   protected apiName = 'Enterprise.deviceAttributes';
 
   constructor(server: McpServer, options: EnterpriseDeviceAttributesApiToolsOptions = {}) {

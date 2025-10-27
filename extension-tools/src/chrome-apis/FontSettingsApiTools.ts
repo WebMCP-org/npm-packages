@@ -18,7 +18,7 @@ export interface FontSettingsApiToolsOptions {
   clearMinimumFontSize?: boolean;
 }
 
-export class FontSettingsApiTools extends BaseApiTools {
+export class FontSettingsApiTools extends BaseApiTools<FontSettingsApiToolsOptions> {
   protected apiName = 'FontSettings';
 
   constructor(server: McpServer, options: FontSettingsApiToolsOptions = {}) {

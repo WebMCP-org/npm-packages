@@ -17,7 +17,7 @@ export interface ManagementApiToolsOptions {
   getPermissionWarningsByManifest?: boolean;
 }
 
-export class ManagementApiTools extends BaseApiTools {
+export class ManagementApiTools extends BaseApiTools<ManagementApiToolsOptions> {
   protected apiName = 'Management';
 
   constructor(server: McpServer, options: ManagementApiToolsOptions = {}) {

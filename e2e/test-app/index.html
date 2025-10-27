@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MCP Tab Transport Test App</title>
+    <title>Web Model Context API Test App</title>
     <style>
       body {
         font-family: system-ui, -apple-system, sans-serif;
@@ -76,35 +76,58 @@
       .log-entry.success {
         color: #2e7d32;
       }
+      .subtitle {
+        color: #666;
+        font-size: 14px;
+        margin-top: -10px;
+      }
+      code {
+        background: #f5f5f5;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-family: monospace;
+      }
     </style>
   </head>
   <body>
-    <h1>MCP Tab Transport E2E Test</h1>
+    <h1>Web Model Context API E2E Test</h1>
+    <p class="subtitle">Testing <code>window.navigator.modelContext</code> with two-bucket tool management</p>
 
     <div class="section">
-      <h2>MCP Server Status</h2>
-      <div id="server-status" class="status disconnected">Server: Not Started</div>
-      <button id="start-server">Start Server</button>
-      <button id="stop-server" disabled>Stop Server</button>
+      <h2>API Status</h2>
+      <div id="api-status" class="status disconnected">API: Not Initialized</div>
     </div>
 
     <div class="section">
-      <h2>MCP Client Status</h2>
-      <div id="client-status" class="status disconnected">Client: Not Connected</div>
-      <button id="connect-client" disabled>Connect Client</button>
-      <button id="disconnect-client" disabled>Disconnect Client</button>
-      <button id="list-tools" disabled>List Tools</button>
-    </div>
-
-    <div class="section">
-      <h2>Counter (MCP Tool Testing)</h2>
+      <h2>Base Tools (Bucket A - provideContext)</h2>
+      <p>These tools are registered via <code>provideContext()</code> and cleared when called again.</p>
       <div class="counter" id="counter-display">0</div>
       <div style="text-align: center;">
-        <button id="increment" disabled>Increment Counter</button>
-        <button id="decrement" disabled>Decrement Counter</button>
-        <button id="reset" disabled>Reset Counter</button>
-        <button id="get-counter" disabled>Get Counter Value</button>
+        <button id="increment">Increment Counter</button>
+        <button id="decrement">Decrement Counter</button>
+        <button id="reset">Reset Counter</button>
+        <button id="get-counter">Get Counter Value</button>
       </div>
+    </div>
+
+    <div class="section">
+      <h2>Dynamic Tools (Bucket B - registerTool)</h2>
+      <p>These tools are registered via <code>registerTool()</code> and persist across <code>provideContext()</code> calls.</p>
+      <div style="text-align: center;">
+        <button id="register-dynamic">Register Dynamic Tool</button>
+        <button id="unregister-dynamic" disabled>Unregister Dynamic Tool</button>
+        <button id="call-dynamic" disabled>Call Dynamic Tool</button>
+      </div>
+      <div id="dynamic-status" style="margin-top: 10px; padding: 10px; background: #f5f5f5; border-radius: 4px;">
+        Dynamic tool status: Not registered
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Test Two-Bucket System</h2>
+      <p>Test that Bucket B (dynamic tools) persist when Bucket A is replaced.</p>
+      <button id="replace-base-tools">Replace Base Tools (provideContext)</button>
+      <button id="list-all-tools">List All Tools</button>
     </div>
 
     <div class="section">

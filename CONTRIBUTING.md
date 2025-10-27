@@ -120,11 +120,12 @@ We follow the [Conventional Commits](https://www.conventionalcommits.org/) speci
 
 #### Scopes (Required)
 Package scopes:
-- `transports` - Changes to @mcp-b/transports
-- `extension-tools` - Changes to @mcp-b/extension-tools
-- `mcp-react-hooks` - Changes to @mcp-b/mcp-react-hooks
-- `mcp-react-hook-form` - Changes to @mcp-b/mcp-react-hook-form
 - `global` - Changes to @mcp-b/global
+- `webmcp-ts-sdk` - Changes to @mcp-b/webmcp-ts-sdk
+- `transports` - Changes to @mcp-b/transports
+- `react-webmcp` - Changes to @mcp-b/react-webmcp
+- `extension-tools` - Changes to @mcp-b/extension-tools
+- `smart-dom-reader` - Changes to @mcp-b/smart-dom-reader
 
 Repository-wide scopes:
 - `root` - Changes to root config files
@@ -139,7 +140,8 @@ Repository-wide scopes:
 # Package-specific changes
 git commit -m "feat(transports): add postMessage timeout option to TabServerTransport"
 git commit -m "fix(extension-tools): handle chrome.runtime errors gracefully"
-git commit -m "docs(mcp-react-hooks): update usage examples"
+git commit -m "docs(react-webmcp): update usage examples"
+git commit -m "feat(global): add new tool registration API"
 
 # Repository-wide changes
 git commit -m "chore(deps): upgrade @modelcontextprotocol/sdk to v2.0"
@@ -178,11 +180,13 @@ git commit -m "refactor(*): update to new MCP SDK types"
 
 ```
 npm-packages/
+├── global/               # Navigator.modelContext polyfill
+├── webmcp-ts-sdk/        # TypeScript SDK adapter
 ├── transports/           # Core transport implementations
-├── mcp-react-hooks/      # React hooks for MCP
+├── react-webmcp/         # React hooks for MCP (provider & client)
 ├── extension-tools/      # Chrome Extension API tools
-├── mcp-react-hook-form/  # React Hook Form integration
-├── global/               # Shared types (internal)
+├── smart-dom-reader/     # DOM extraction for AI
+├── e2e/                  # E2E tests and test apps
 └── .changeset/           # Changeset files
 ```
 
@@ -190,20 +194,41 @@ npm-packages/
 
 When contributing to a specific package:
 
+### @mcp-b/global
+- Ensure compatibility with W3C Web Model Context API spec
+- Test in multiple browser environments
+- Validate tool registration and unregistration
+- Handle edge cases in two-bucket system
+
+### @mcp-b/webmcp-ts-sdk
+- Minimal modifications to official SDK
+- Maintain compatibility with upstream SDK updates
+- Focus on dynamic tool registration support
+
 ### @mcp-b/transports
 - Ensure browser compatibility
 - Test in multiple browser environments
 - Handle connection lifecycle properly
+- Support both Tab and Extension transports
 
-### @mcp-b/mcp-react-hooks
+### @mcp-b/react-webmcp
 - Follow React best practices
 - Ensure proper cleanup in useEffect
 - Add proper TypeScript types for hooks
+- Support both provider and client use cases
+- Test with React StrictMode
 
 ### @mcp-b/extension-tools
 - Test in Chrome extension context
 - Document required permissions
 - Handle chrome.runtime errors gracefully
+- Auto-generate tools from Chrome API types
+
+### @mcp-b/smart-dom-reader
+- Optimize for token efficiency
+- Test in various DOM structures
+- Handle shadow DOM and iframes
+- Maintain stateless architecture
 
 ## Testing
 

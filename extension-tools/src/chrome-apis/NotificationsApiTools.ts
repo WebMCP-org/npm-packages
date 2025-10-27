@@ -10,7 +10,7 @@ export interface NotificationsApiToolsOptions {
   getPermissionLevel?: boolean;
 }
 
-export class NotificationsApiTools extends BaseApiTools {
+export class NotificationsApiTools extends BaseApiTools<NotificationsApiToolsOptions> {
   protected apiName = 'Notifications';
 
   constructor(server: McpServer, options: NotificationsApiToolsOptions = {}) {
@@ -180,7 +180,13 @@ export class NotificationsApiTools extends BaseApiTools {
           if (contextMessage !== undefined) options.contextMessage = contextMessage;
           if (priority !== undefined) options.priority = priority;
           if (eventTime !== undefined) options.eventTime = eventTime;
-          if (buttons !== undefined) options.buttons = buttons;
+          if (buttons !== undefined) {
+            options.buttons = buttons.map((btn) => {
+              const button: { title: string; iconUrl?: string } = { title: btn.title };
+              if (btn.iconUrl !== undefined) button.iconUrl = btn.iconUrl;
+              return button;
+            });
+          }
           if (imageUrl !== undefined) options.imageUrl = imageUrl;
           if (items !== undefined) options.items = items;
           if (progress !== undefined) options.progress = progress;
@@ -300,7 +306,13 @@ export class NotificationsApiTools extends BaseApiTools {
           if (contextMessage !== undefined) options.contextMessage = contextMessage;
           if (priority !== undefined) options.priority = priority;
           if (eventTime !== undefined) options.eventTime = eventTime;
-          if (buttons !== undefined) options.buttons = buttons;
+          if (buttons !== undefined) {
+            options.buttons = buttons.map((btn) => {
+              const button: { title: string; iconUrl?: string } = { title: btn.title };
+              if (btn.iconUrl !== undefined) button.iconUrl = btn.iconUrl;
+              return button;
+            });
+          }
           if (imageUrl !== undefined) options.imageUrl = imageUrl;
           if (items !== undefined) options.items = items;
           if (progress !== undefined) options.progress = progress;

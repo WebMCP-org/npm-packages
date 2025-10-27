@@ -10,7 +10,7 @@ export interface FileSystemProviderApiToolsOptions {
   notify?: boolean;
 }
 
-export class FileSystemProviderApiTools extends BaseApiTools {
+export class FileSystemProviderApiTools extends BaseApiTools<FileSystemProviderApiToolsOptions> {
   protected apiName = 'FileSystemProvider';
 
   constructor(server: McpServer, options: FileSystemProviderApiToolsOptions = {}) {

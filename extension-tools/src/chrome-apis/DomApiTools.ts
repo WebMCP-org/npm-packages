@@ -6,7 +6,7 @@ export interface DomApiToolsOptions {
   openOrClosedShadowRoot?: boolean;
 }
 
-export class DomApiTools extends BaseApiTools {
+export class DomApiTools extends BaseApiTools<DomApiToolsOptions> {
   protected apiName = 'Dom';
 
   constructor(server: McpServer, options: DomApiToolsOptions = {}) {

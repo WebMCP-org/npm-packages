@@ -45,7 +45,7 @@
 //   setTopicsEnabled?: boolean;
 // }
 
-// export class PrivacyApiTools extends BaseApiTools {
+// export class PrivacyApiTools extends BaseApiTools<PrivacyApiToolsOptions> {
 //   protected apiName = 'Privacy';
 
 //   constructor(

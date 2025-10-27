@@ -5,7 +5,7 @@ export interface PrintingMetricsApiToolsOptions {
   getPrintJobs?: boolean;
 }
 
-export class PrintingMetricsApiTools extends BaseApiTools {
+export class PrintingMetricsApiTools extends BaseApiTools<PrintingMetricsApiToolsOptions> {
   protected apiName = 'PrintingMetrics';
 
   constructor(server: McpServer, options: PrintingMetricsApiToolsOptions = {}) {

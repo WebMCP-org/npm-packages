@@ -87,7 +87,7 @@ export class NativeServerTransport implements Transport {
     if (this._port) {
       try {
         this._port.disconnect();
-      } catch (error) {
+      } catch (_error) {
         // Port might already be disconnected
       }
     }

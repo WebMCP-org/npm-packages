@@ -23,7 +23,7 @@ type StorageAction = (typeof STORAGE_ACTIONS)[number];
 
 const storageActionSchema = z.enum(STORAGE_ACTIONS);
 
-export class StorageApiTools extends BaseApiTools {
+export class StorageApiTools extends BaseApiTools<StorageApiToolsOptions> {
   protected apiName = 'Storage';
 
   constructor(server: McpServer, options: StorageApiToolsOptions = {}) {
@@ -306,7 +306,7 @@ export class StorageApiTools extends BaseApiTools {
       humanReadable: this.formatBytes(bytesInUse),
       quota: quotaInfo,
       percentageUsed: quotaInfo?.quotaBytes
-        ? ((bytesInUse / quotaInfo.quotaBytes) * 100).toFixed(2) + '%'
+        ? `${((bytesInUse / quotaInfo.quotaBytes) * 100).toFixed(2)}%`
         : null,
     });
   }
@@ -364,6 +364,6 @@ export class StorageApiTools extends BaseApiTools {
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Number.parseFloat((bytes / k ** i).toFixed(2)) + ' ' + sizes[i];
+    return `${Number.parseFloat((bytes / k ** i).toFixed(2))} ${sizes[i]}`;
   }
 }

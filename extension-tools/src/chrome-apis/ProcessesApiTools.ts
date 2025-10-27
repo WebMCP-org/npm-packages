@@ -13,7 +13,7 @@
 //   onUpdatedWithMemory?: boolean;
 // }
 
-// export class ProcessesApiTools extends BaseApiTools {
+// export class ProcessesApiTools extends BaseApiTools<ProcessesApiToolsOptions> {
 //   protected apiName = 'Processes';
 
 //   constructor(

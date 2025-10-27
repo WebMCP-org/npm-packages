@@ -4,11 +4,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "playwright test",
+    "test": "playwright test tests/tab-transport.spec.ts && playwright test --config=playwright-react-webmcp.config.ts",
     "test:codegen": "playwright codegen http://localhost:5173",
     "test:debug": "playwright test --debug",
     "test:headed": "playwright test --headed",
+    "test:react-webmcp": "playwright test --config=playwright-react-webmcp.config.ts",
+    "test:react-webmcp:debug": "playwright test --config=playwright-react-webmcp.config.ts --debug",
+    "test:react-webmcp:headed": "playwright test --config=playwright-react-webmcp.config.ts --headed",
+    "test:react-webmcp:ui": "playwright test --config=playwright-react-webmcp.config.ts --ui",
     "test:report": "playwright show-report",
+    "test:tab-transport": "playwright test tests/tab-transport.spec.ts",
     "test:ui": "playwright test --ui"
   },
   "devDependencies": {

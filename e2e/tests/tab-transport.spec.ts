@@ -1,336 +1,198 @@
 import { expect, test } from '@playwright/test';
 
-test.describe('MCP Tab Transport E2E Tests', () => {
+test.describe('Web Model Context API E2E Tests', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('h1')).toContainText('MCP Tab Transport E2E Test');
+    await expect(page.locator('h1')).toContainText('Web Model Context API E2E Test');
   });
 
   test('should load the test application', async ({ page }) => {
     // Verify page loaded correctly
-    await expect(page.locator('#server-status')).toHaveText('Server: Not Started');
-    await expect(page.locator('#client-status')).toHaveText('Client: Not Connected');
+    await expect(page.locator('#api-status')).toContainText('API: Ready');
     await expect(page.locator('#counter-display')).toHaveText('0');
 
-    // Verify initial button states
-    await expect(page.locator('#start-server')).toBeEnabled();
-    await expect(page.locator('#stop-server')).toBeDisabled();
-    await expect(page.locator('#connect-client')).toBeDisabled();
-    await expect(page.locator('#disconnect-client')).toBeDisabled();
+    // Verify base tool buttons are visible
+    await expect(page.locator('#increment')).toBeVisible();
+    await expect(page.locator('#decrement')).toBeVisible();
+    await expect(page.locator('#reset')).toBeVisible();
+    await expect(page.locator('#get-counter')).toBeVisible();
+
+    // Verify dynamic tool buttons
+    await expect(page.locator('#register-dynamic')).toBeEnabled();
+    await expect(page.locator('#unregister-dynamic')).toBeDisabled();
   });
 
-  test('should start MCP server successfully', async ({ page }) => {
-    // Start the server
-    await page.click('#start-server');
+  test('should have navigator.modelContext API available', async ({ page }) => {
+    // Check that the API is available
+    const hasAPI = await page.evaluate(() => 'modelContext' in navigator);
+    expect(hasAPI).toBe(true);
 
-    // Wait for server to start
-    await expect(page.locator('#server-status')).toHaveText('Server: Running', {
-      timeout: 5000,
-    });
-    await expect(page.locator('#server-status')).toHaveAttribute('data-status', 'running');
-
-    // Verify button states changed
-    await expect(page.locator('#start-server')).toBeDisabled();
-    await expect(page.locator('#stop-server')).toBeEnabled();
-    await expect(page.locator('#connect-client')).toBeEnabled();
-
-    // Verify log entry
-    const logEntries = await page.locator('#log .log-entry').allTextContents();
-    expect(logEntries.some((entry) => entry.includes('MCP Server started successfully'))).toBe(
-      true
-    );
+    // Verify status shows API is ready
+    await expect(page.locator('#api-status')).toContainText('API: Ready');
+    await expect(page.locator('#api-status')).toHaveAttribute('data-status', 'ready');
   });
 
-  test('should connect MCP client to server', async ({ page }) => {
-    // Start server
-    await page.click('#start-server');
-    await expect(page.locator('#server-status')).toHaveText('Server: Running', {
-      timeout: 5000,
-    });
-
-    // Connect client
-    await page.click('#connect-client');
-
-    // Wait for client to connect
-    await expect(page.locator('#client-status')).toHaveText('Client: Connected', {
-      timeout: 5000,
-    });
-    await expect(page.locator('#client-status')).toHaveAttribute('data-status', 'connected');
-
-    // Verify button states
-    await expect(page.locator('#connect-client')).toBeDisabled();
-    await expect(page.locator('#disconnect-client')).toBeEnabled();
-    await expect(page.locator('#list-tools')).toBeEnabled();
-    await expect(page.locator('#increment')).toBeEnabled();
-
-    // Verify log entry
+  test('should register base tools via provideContext', async ({ page }) => {
+    // Check the log for base tools registration
     const logEntries = await page.locator('#log .log-entry').allTextContents();
-    expect(logEntries.some((entry) => entry.includes('MCP Client connected successfully'))).toBe(
-      true
-    );
+    expect(
+      logEntries.some((entry) => entry.includes('Registering base tools via provideContext'))
+    ).toBe(true);
+    expect(
+      logEntries.some((entry) => entry.includes('Base tools registered successfully (Bucket A)'))
+    ).toBe(true);
   });
 
-  test('should list available tools', async ({ page }) => {
-    // Setup: Start server and connect client
-    await page.click('#start-server');
-    await expect(page.locator('#server-status')).toHaveText('Server: Running', {
-      timeout: 5000,
-    });
-    await page.click('#connect-client');
-    await expect(page.locator('#client-status')).toHaveText('Client: Connected', {
-      timeout: 5000,
-    });
+  test('should list all registered tools', async ({ page }) => {
+    // Click list all tools button
+    await page.click('#list-all-tools');
 
-    // List tools
-    await page.click('#list-tools');
+    // Wait for tools to be listed
+    await page.waitForTimeout(500);
 
-    // Wait for tools to be listed in log
-    await page.waitForTimeout(1000); // Give time for async operation
-
-    // Verify all tools are listed
+    // Check that the tools are listed in the log
     const logEntries = await page.locator('#log .log-entry').allTextContents();
-    expect(logEntries.some((entry) => entry.includes('Found 4 tools'))).toBe(true);
+    expect(logEntries.some((entry) => entry.includes('Total tools registered: 4'))).toBe(true);
     expect(logEntries.some((entry) => entry.includes('incrementCounter'))).toBe(true);
     expect(logEntries.some((entry) => entry.includes('decrementCounter'))).toBe(true);
     expect(logEntries.some((entry) => entry.includes('resetCounter'))).toBe(true);
     expect(logEntries.some((entry) => entry.includes('getCounter'))).toBe(true);
   });
 
-  test('should increment counter via MCP tool call', async ({ page }) => {
-    // Setup: Start server and connect client
-    await page.click('#start-server');
-    await expect(page.locator('#server-status')).toHaveText('Server: Running', {
-      timeout: 5000,
-    });
-    await page.click('#connect-client');
-    await expect(page.locator('#client-status')).toHaveText('Client: Connected', {
-      timeout: 5000,
-    });
+  test('should register dynamic tool (Bucket B)', async ({ page }) => {
+    // Register dynamic tool
+    await page.click('#register-dynamic');
 
-    // Verify initial counter value
-    await expect(page.locator('#counter-display')).toHaveText('0');
+    // Wait for registration
+    await page.waitForTimeout(500);
 
-    // Increment counter
-    await page.click('#increment');
+    // Verify status updated
+    await expect(page.locator('#dynamic-status')).toContainText('Registered');
 
-    // Wait for counter to update
-    await expect(page.locator('#counter-display')).toHaveText('1', { timeout: 3000 });
-    await expect(page.locator('#counter-display')).toHaveAttribute('data-counter', '1');
+    // Verify buttons updated
+    await expect(page.locator('#register-dynamic')).toBeDisabled();
+    await expect(page.locator('#unregister-dynamic')).toBeEnabled();
+    await expect(page.locator('#call-dynamic')).toBeEnabled();
 
-    // Verify log entry
+    // Check log
     const logEntries = await page.locator('#log .log-entry').allTextContents();
-    expect(logEntries.some((entry) => entry.includes('Counter incremented to 1'))).toBe(true);
+    expect(
+      logEntries.some((entry) => entry.includes('Dynamic tool registered successfully (Bucket B)'))
+    ).toBe(true);
   });
 
-  test('should decrement counter via MCP tool call', async ({ page }) => {
-    // Setup: Start server and connect client
-    await page.click('#start-server');
-    await expect(page.locator('#server-status')).toHaveText('Server: Running', {
-      timeout: 5000,
-    });
-    await page.click('#connect-client');
-    await expect(page.locator('#client-status')).toHaveText('Client: Connected', {
-      timeout: 5000,
-    });
+  test('should unregister dynamic tool', async ({ page }) => {
+    // First register
+    await page.click('#register-dynamic');
+    await page.waitForTimeout(500);
 
-    // First increment to 2
-    await page.click('#increment');
-    await expect(page.locator('#counter-display')).toHaveText('1', { timeout: 3000 });
-    await page.click('#increment');
-    await expect(page.locator('#counter-display')).toHaveText('2', { timeout: 3000 });
+    // Then unregister
+    await page.click('#unregister-dynamic');
+    await page.waitForTimeout(500);
 
-    // Then decrement
-    await page.click('#decrement');
-    await expect(page.locator('#counter-display')).toHaveText('1', { timeout: 3000 });
+    // Verify status updated
+    await expect(page.locator('#dynamic-status')).toContainText('Not registered');
 
-    // Verify log entry
+    // Verify buttons updated
+    await expect(page.locator('#register-dynamic')).toBeEnabled();
+    await expect(page.locator('#unregister-dynamic')).toBeDisabled();
+    await expect(page.locator('#call-dynamic')).toBeDisabled();
+
+    // Check log
     const logEntries = await page.locator('#log .log-entry').allTextContents();
-    expect(logEntries.some((entry) => entry.includes('Counter decremented to 1'))).toBe(true);
+    expect(
+      logEntries.some((entry) => entry.includes('Dynamic tool unregistered successfully'))
+    ).toBe(true);
   });
 
-  test('should reset counter via MCP tool call', async ({ page }) => {
-    // Setup: Start server and connect client
-    await page.click('#start-server');
-    await expect(page.locator('#server-status')).toHaveText('Server: Running', {
-      timeout: 5000,
-    });
-    await page.click('#connect-client');
-    await expect(page.locator('#client-status')).toHaveText('Client: Connected', {
-      timeout: 5000,
-    });
+  test('should persist dynamic tool across provideContext calls (two-bucket system)', async ({
+    page,
+  }) => {
+    // Register dynamic tool
+    await page.click('#register-dynamic');
+    await page.waitForTimeout(500);
 
-    // Increment counter multiple times
-    await page.click('#increment');
-    await page.click('#increment');
-    await page.click('#increment');
-    await expect(page.locator('#counter-display')).toHaveText('3', { timeout: 3000 });
+    // Verify 5 tools total (4 base + 1 dynamic)
+    await page.click('#list-all-tools');
+    await page.waitForTimeout(500);
+    let logEntries = await page.locator('#log .log-entry').allTextContents();
+    expect(logEntries.some((entry) => entry.includes('Total tools registered: 5'))).toBe(true);
 
-    // Reset counter
-    await page.click('#reset');
-    await expect(page.locator('#counter-display')).toHaveText('0', { timeout: 3000 });
+    // Replace base tools (Bucket A)
+    await page.click('#replace-base-tools');
+    await page.waitForTimeout(500);
 
-    // Verify log entry
-    const logEntries = await page.locator('#log .log-entry').allTextContents();
-    expect(logEntries.some((entry) => entry.includes('Counter reset to 0'))).toBe(true);
+    // Verify dynamic tool persisted
+    logEntries = await page.locator('#log .log-entry').allTextContents();
+    expect(
+      logEntries.some((entry) =>
+        entry.includes('Dynamic tool still registered! (Bucket B persists)')
+      )
+    ).toBe(true);
+
+    // List tools again - should now have 3 tools (2 new base + 1 dynamic)
+    await page.click('#list-all-tools');
+    await page.waitForTimeout(500);
+    logEntries = await page.locator('#log .log-entry').allTextContents();
+    expect(logEntries.some((entry) => entry.includes('Total tools registered: 3'))).toBe(true);
+    expect(logEntries.some((entry) => entry.includes('dynamicTool'))).toBe(true);
+    expect(logEntries.some((entry) => entry.includes('doubleCounter'))).toBe(true);
+    expect(logEntries.some((entry) => entry.includes('halveCounter'))).toBe(true);
   });
 
-  test('should get counter value via MCP tool call', async ({ page }) => {
-    // Setup: Start server and connect client
-    await page.click('#start-server');
-    await expect(page.locator('#server-status')).toHaveText('Server: Running', {
-      timeout: 5000,
-    });
-    await page.click('#connect-client');
-    await expect(page.locator('#client-status')).toHaveText('Client: Connected', {
-      timeout: 5000,
+  test('should access tools via __mcpBridge for debugging', async ({ page }) => {
+    const toolCount = await page.evaluate(() => {
+      const w = window as unknown as { __mcpBridge?: { tools: Map<string, unknown> } };
+      if (w.__mcpBridge) {
+        return w.__mcpBridge.tools.size;
+      }
+      return 0;
     });
 
-    // Set counter to a specific value
-    await page.click('#increment');
-    await page.click('#increment');
-    await expect(page.locator('#counter-display')).toHaveText('2', { timeout: 3000 });
-
-    // Get counter value
-    await page.click('#get-counter');
-
-    // Verify log entry
-    await page.waitForTimeout(1000);
-    const logEntries = await page.locator('#log .log-entry').allTextContents();
-    expect(logEntries.some((entry) => entry.includes('Current counter value: 2'))).toBe(true);
-  });
-
-  test('should handle multiple rapid tool calls', async ({ page }) => {
-    // Setup: Start server and connect client
-    await page.click('#start-server');
-    await expect(page.locator('#server-status')).toHaveText('Server: Running', {
-      timeout: 5000,
-    });
-    await page.click('#connect-client');
-    await expect(page.locator('#client-status')).toHaveText('Client: Connected', {
-      timeout: 5000,
-    });
-
-    // Rapidly increment multiple times
-    for (let i = 0; i < 5; i++) {
-      await page.click('#increment');
-    }
-
-    // Wait for all operations to complete
-    await expect(page.locator('#counter-display')).toHaveText('5', { timeout: 5000 });
-  });
-
-  test('should disconnect and reconnect client', async ({ page }) => {
-    // Setup: Start server and connect client
-    await page.click('#start-server');
-    await expect(page.locator('#server-status')).toHaveText('Server: Running', {
-      timeout: 5000,
-    });
-    await page.click('#connect-client');
-    await expect(page.locator('#client-status')).toHaveText('Client: Connected', {
-      timeout: 5000,
-    });
-
-    // Increment counter
-    await page.click('#increment');
-    await expect(page.locator('#counter-display')).toHaveText('1', { timeout: 3000 });
-
-    // Disconnect client
-    await page.click('#disconnect-client');
-    await expect(page.locator('#client-status')).toHaveText('Client: Not Connected', {
-      timeout: 5000,
-    });
-    await expect(page.locator('#increment')).toBeDisabled();
-
-    // Reconnect client
-    await page.click('#connect-client');
-    await expect(page.locator('#client-status')).toHaveText('Client: Connected', {
-      timeout: 5000,
-    });
-
-    // Counter should still be at 1 (state persisted on server)
-    await expect(page.locator('#counter-display')).toHaveText('1');
-
-    // Should be able to use tools again
-    await page.click('#increment');
-    await expect(page.locator('#counter-display')).toHaveText('2', { timeout: 3000 });
-  });
-
-  test('should stop and restart server', async ({ page }) => {
-    // Setup: Start server and connect client
-    await page.click('#start-server');
-    await expect(page.locator('#server-status')).toHaveText('Server: Running', {
-      timeout: 5000,
-    });
-    await page.click('#connect-client');
-    await expect(page.locator('#client-status')).toHaveText('Client: Connected', {
-      timeout: 5000,
-    });
-
-    // Set counter value
-    await page.click('#increment');
-    await page.click('#increment');
-    await expect(page.locator('#counter-display')).toHaveText('2', { timeout: 3000 });
-
-    // Stop server (should also disconnect client)
-    await page.click('#stop-server');
-    await expect(page.locator('#server-status')).toHaveText('Server: Not Started', {
-      timeout: 5000,
-    });
-    await expect(page.locator('#client-status')).toHaveText('Client: Not Connected', {
-      timeout: 5000,
-    });
-
-    // Restart server
-    await page.click('#start-server');
-    await expect(page.locator('#server-status')).toHaveText('Server: Running', {
-      timeout: 5000,
-    });
-
-    // Reconnect client
-    await page.click('#connect-client');
-    await expect(page.locator('#client-status')).toHaveText('Client: Connected', {
-      timeout: 5000,
-    });
-
-    // Counter should still show 2 (UI state persisted, but server state is new)
-    // Note: In this implementation, counter state is global, not per-server instance
-    await expect(page.locator('#counter-display')).toHaveText('2');
+    // Should have 4 base tools initially
+    expect(toolCount).toBe(4);
   });
 
   test('should use testApp API for programmatic testing', async ({ page }) => {
-    // Use the exposed testApp API
-    const serverStarted = await page.evaluate(async () => {
-      const testApp = (window as any).testApp;
-      await testApp.startServer();
-      return testApp.getServerStatus();
+    // Test that the testApp API is exposed
+    const hasTestApp = await page.evaluate(() => 'testApp' in window);
+    expect(hasTestApp).toBe(true);
+
+    // Test counter function
+    const counter = await page.evaluate(() => {
+      const w = window as unknown as {
+        testApp: { counter: () => number; getAPIStatus: () => boolean };
+      };
+      return w.testApp.counter();
     });
+    expect(counter).toBe(0);
 
-    expect(serverStarted).toBe(true);
-    await expect(page.locator('#server-status')).toHaveText('Server: Running');
-
-    const clientConnected = await page.evaluate(async () => {
-      const testApp = (window as any).testApp;
-      await testApp.connectClient();
-      return testApp.getClientStatus();
+    // Test getAPIStatus function
+    const apiStatus = await page.evaluate(() => {
+      const w = window as unknown as {
+        testApp: { counter: () => number; getAPIStatus: () => boolean };
+      };
+      return w.testApp.getAPIStatus();
     });
+    expect(apiStatus).toBe(true);
+  });
 
-    expect(clientConnected).toBe(true);
-    await expect(page.locator('#client-status')).toHaveText('Client: Connected');
+  test('should clear event log', async ({ page }) => {
+    // Add some log entries first
+    await page.click('#list-all-tools');
+    await page.waitForTimeout(500);
 
-    // Call tools programmatically
-    await page.evaluate(async () => {
-      const testApp = (window as any).testApp;
-      await testApp.callTool('incrementCounter');
-      await testApp.callTool('incrementCounter');
-      await testApp.callTool('incrementCounter');
-    });
+    // Verify log has entries
+    let logEntries = await page.locator('#log .log-entry').allTextContents();
+    expect(logEntries.length).toBeGreaterThan(0);
 
-    const counterValue = await page.evaluate(() => {
-      const testApp = (window as any).testApp;
-      return testApp.getCounter();
-    });
+    // Clear log
+    await page.click('#clear-log');
+    await page.waitForTimeout(500);
 
-    expect(counterValue).toBe(3);
-    await expect(page.locator('#counter-display')).toHaveText('3');
+    // Verify log only has "Log cleared" entry
+    logEntries = await page.locator('#log .log-entry').allTextContents();
+    expect(logEntries.length).toBe(1);
+    expect(logEntries[0]).toContain('Log cleared');
   });
 });

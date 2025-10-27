@@ -7,7 +7,7 @@ export interface DesktopCaptureApiToolsOptions {
   cancelChooseDesktopMedia?: boolean;
 }
 
-export class DesktopCaptureApiTools extends BaseApiTools {
+export class DesktopCaptureApiTools extends BaseApiTools<DesktopCaptureApiToolsOptions> {
   protected apiName = 'DesktopCapture';
 
   constructor(server: McpServer, options: DesktopCaptureApiToolsOptions = {}) {

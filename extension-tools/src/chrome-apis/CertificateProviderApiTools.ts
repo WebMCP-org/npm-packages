@@ -11,7 +11,7 @@ export interface CertificateProviderApiToolsOptions {
   onSignatureRequested?: boolean;
 }
 
-export class CertificateProviderApiTools extends BaseApiTools {
+export class CertificateProviderApiTools extends BaseApiTools<CertificateProviderApiToolsOptions> {
   protected apiName = 'CertificateProvider';
 
   constructor(server: McpServer, options: CertificateProviderApiToolsOptions = {}) {

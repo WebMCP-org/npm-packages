@@ -53,7 +53,7 @@ type TabAction = (typeof TAB_ACTIONS)[number];
 
 const tabActionSchema = z.enum(TAB_ACTIONS);
 
-export class TabsApiTools extends BaseApiTools {
+export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
   protected apiName = 'Tabs';
 
   constructor(server: McpServer, options: TabsApiToolsOptions = {}) {
@@ -667,14 +667,14 @@ export class TabsApiTools extends BaseApiTools {
 
   private async handleUngroupTabs(raw: unknown) {
     const { tabIds } = this.ungroupTabsSchema.parse(raw);
-    await chrome.tabs.ungroup(tabIds.length === 1 ? tabIds[0] : tabIds);
+    await chrome.tabs.ungroup(tabIds.length === 1 ? tabIds[0]! : tabIds);
     return this.formatSuccess(`Ungrouped ${tabIds.length} tab(s)`);
   }
 
   private async handleHighlightTabs(raw: unknown) {
     const { tabs, windowId } = this.highlightTabsSchema.parse(raw);
     const highlightInfo: chrome.tabs.HighlightInfo = {
-      tabs: tabs.length === 1 ? tabs[0] : tabs,
+      tabs: tabs.length === 1 ? tabs[0]! : tabs,
     };
     if (windowId !== undefined) {
       highlightInfo.windowId = windowId;

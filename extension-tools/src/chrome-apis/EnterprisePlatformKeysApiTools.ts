@@ -11,7 +11,7 @@ export interface EnterprisePlatformKeysApiToolsOptions {
   challengeUserKey?: boolean;
 }
 
-export class EnterprisePlatformKeysApiTools extends BaseApiTools {
+export class EnterprisePlatformKeysApiTools extends BaseApiTools<EnterprisePlatformKeysApiToolsOptions> {
   protected apiName = 'Enterprise.platformKeys';
 
   constructor(server: McpServer, options: EnterprisePlatformKeysApiToolsOptions = {}) {

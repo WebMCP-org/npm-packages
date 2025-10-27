@@ -1,7 +1,7 @@
 import { ContentDetection } from './content-detection';
 import { SelectorGenerator } from './selectors';
 import { DOMTraversal } from './traversal';
-import {
+import type {
   ExtractedElement,
   ExtractionMode,
   ExtractionOptions,
@@ -49,15 +49,21 @@ export class SmartDOMReader {
       mode: options.mode || 'interactive',
       maxDepth: options.maxDepth || 5,
       includeHidden: options.includeHidden || false,
-      includeShadowDOM: options.includeShadowDOM || true,
+      includeShadowDOM: options.includeShadowDOM ?? true,
       includeIframes: options.includeIframes || false,
       viewportOnly: options.viewportOnly || false,
       mainContentOnly: options.mainContentOnly || false,
       customSelectors: options.customSelectors || [],
-      attributeTruncateLength: options.attributeTruncateLength,
-      dataAttributeTruncateLength: options.dataAttributeTruncateLength,
-      textTruncateLength: options.textTruncateLength,
-      filter: options.filter,
+      ...(options.attributeTruncateLength !== undefined && {
+        attributeTruncateLength: options.attributeTruncateLength,
+      }),
+      ...(options.dataAttributeTruncateLength !== undefined && {
+        dataAttributeTruncateLength: options.dataAttributeTruncateLength,
+      }),
+      ...(options.textTruncateLength !== undefined && {
+        textTruncateLength: options.textTruncateLength,
+      }),
+      ...(options.filter !== undefined && { filter: options.filter }),
     };
   }
 
@@ -107,8 +113,13 @@ export class SmartDOMReader {
 
     // Add semantic elements in full mode
     if (options.mode === 'full') {
-      result.semantic = this.extractSemanticElements(container, options);
-      result.metadata = this.extractMetadata(doc, container, options);
+      const semantic = this.extractSemanticElements(container, options);
+      const metadata = this.extractMetadata(doc, container, options);
+      return {
+        ...result,
+        semantic,
+        metadata,
+      } as SmartDOMResult;
     }
 
     return result;
@@ -118,13 +129,14 @@ export class SmartDOMReader {
    * Extract page state information
    */
   private extractPageState(doc: Document): PageState {
+    const hasFocus = this.getFocusedElement(doc);
     return {
       url: doc.location?.href || '',
       title: doc.title || '',
       hasErrors: this.detectErrors(doc),
       isLoading: this.detectLoading(doc),
       hasModals: this.detectModals(doc),
-      hasFocus: this.getFocusedElement(doc),
+      ...(hasFocus !== undefined && { hasFocus }),
     };
   }
 
@@ -248,13 +260,16 @@ export class SmartDOMReader {
         if (extracted) formButtons.push(extracted);
       });
 
-      forms.push({
+      const action = form.getAttribute('action');
+      const method = form.getAttribute('method');
+      const formInfo: FormInfo = {
         selector: SelectorGenerator.generateSelectors(form).css,
-        action: form.getAttribute('action') || undefined,
-        method: form.getAttribute('method') || undefined,
         inputs: formInputs,
         buttons: formButtons,
-      });
+      };
+      if (action) formInfo.action = action;
+      if (method) formInfo.method = method;
+      forms.push(formInfo);
     });
 
     return forms;
@@ -335,15 +350,21 @@ export class SmartDOMReader {
       'button, a, input, textarea, select, h1, h2, h3, h4, h5, h6, img, table, ul, ol, article'
     ).length;
 
-    return {
+    const metadata: SmartDOMResult['metadata'] = {
       totalElements: allElements.length,
       extractedElements,
-      mainContent:
-        options.mainContentOnly && container instanceof Element
-          ? SelectorGenerator.generateSelectors(container).css
-          : undefined,
-      language: doc.documentElement.getAttribute('lang') || undefined,
     };
+
+    if (options.mainContentOnly && container instanceof Element) {
+      metadata.mainContent = SelectorGenerator.generateSelectors(container).css;
+    }
+
+    const language = doc.documentElement.getAttribute('lang');
+    if (language) {
+      metadata.language = language;
+    }
+
+    return metadata;
   }
 
   /**

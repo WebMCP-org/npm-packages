@@ -16,7 +16,7 @@ export interface InputImeApiToolsOptions {
   deleteSurroundingText?: boolean;
 }
 
-export class InputImeApiTools extends BaseApiTools {
+export class InputImeApiTools extends BaseApiTools<InputImeApiToolsOptions> {
   protected apiName = 'Input.ime';
 
   constructor(server: McpServer, options: InputImeApiToolsOptions = {}) {

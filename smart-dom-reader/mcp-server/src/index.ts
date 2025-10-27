@@ -451,7 +451,7 @@ class SmartDomReaderServer {
   }
 
   private async connectBrowser(args: ConnectBrowserArgs): Promise<CallToolResult> {
-    if (this.browser && this.browser.isConnected()) {
+    if (this.browser?.isConnected()) {
       return createTextResult('Browser already connected');
     }
 
@@ -476,12 +476,12 @@ class SmartDomReaderServer {
       this.handleToolError(error, locationDescription);
     }
 
-    this.browser!.on('disconnected', () => {
+    this.browser?.on('disconnected', () => {
       this.browser = null;
       this.page = null;
     });
 
-    this.page = await this.browser!.newPage();
+    this.page = await this.browser?.newPage();
     const descriptor = args.headless ? ' (headless)' : '';
     const sourceDetails = resolution
       ? ` using ${resolution.path} (${resolution.source}).`
@@ -676,7 +676,10 @@ class SmartDomReaderServer {
               const target = selector ? (document.querySelector(selector) ?? document) : document;
               const overview = ProgressiveExtractor.extractStructure(target);
               if (!MarkdownFormatter) throw new Error('MarkdownFormatter export is unavailable.');
-              const fmt = (args as any).format ?? {};
+              const argsWithFormat = args as Record<string, unknown> & {
+                format?: Record<string, unknown>;
+              };
+              const fmt = argsWithFormat.format ?? {};
               const meta = { title: document.title, url: location.href };
               return MarkdownFormatter.structure(overview, fmt, meta) as TResult;
             }
@@ -694,9 +697,12 @@ class SmartDomReaderServer {
                 SmartDOMReader
               );
               if (!result)
-                return ('No matching region for selector ' + selector) as unknown as TResult;
+                return `No matching region for selector ${selector}` as unknown as TResult;
               if (!MarkdownFormatter) throw new Error('MarkdownFormatter export is unavailable.');
-              const fmt = (args as any).format ?? {};
+              const argsWithFormat = args as Record<string, unknown> & {
+                format?: Record<string, unknown>;
+              };
+              const fmt = argsWithFormat.format ?? {};
               const meta = { title: document.title, url: location.href };
               return MarkdownFormatter.region(result, fmt, meta) as TResult;
             }
@@ -712,9 +718,12 @@ class SmartDomReaderServer {
                 document,
                 options ?? {}
               );
-              if (!content) return ('No content for selector ' + selector) as unknown as TResult;
+              if (!content) return `No content for selector ${selector}` as unknown as TResult;
               if (!MarkdownFormatter) throw new Error('MarkdownFormatter export is unavailable.');
-              const fmt = (args as any).format ?? {};
+              const argsWithFormat = args as Record<string, unknown> & {
+                format?: Record<string, unknown>;
+              };
+              const fmt = argsWithFormat.format ?? {};
               const meta = { title: document.title, url: location.href };
               return MarkdownFormatter.content(content, fmt, meta) as TResult;
             }
@@ -730,7 +739,10 @@ class SmartDomReaderServer {
               if (typeof SmartDOMReader.extractInteractive === 'function') {
                 const result = SmartDOMReader.extractInteractive(target, options ?? {});
                 if (!MarkdownFormatter) throw new Error('MarkdownFormatter export is unavailable.');
-                const fmt = (args as any).format ?? {};
+                const argsWithFormat = args as Record<string, unknown> & {
+                  format?: Record<string, unknown>;
+                };
+                const fmt = argsWithFormat.format ?? {};
                 const meta = { title: document.title, url: location.href };
                 return MarkdownFormatter.region(result, fmt, meta) as TResult;
               }
@@ -738,7 +750,10 @@ class SmartDomReaderServer {
               const reader = new SmartDOMReader({ ...options, mode: 'interactive' });
               const result = reader.extract(target, options ?? {});
               if (!MarkdownFormatter) throw new Error('MarkdownFormatter export is unavailable.');
-              const fmt = (args as any).format ?? {};
+              const argsWithFormat = args as Record<string, unknown> & {
+                format?: Record<string, unknown>;
+              };
+              const fmt = argsWithFormat.format ?? {};
               const meta = { title: document.title, url: location.href };
               return MarkdownFormatter.region(result, fmt, meta) as TResult;
             }

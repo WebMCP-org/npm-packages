@@ -4,83 +4,154 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue?style=flat-square)](https://www.typescriptlang.org/)
 
-This monorepo contains the official NPM packages for MCP-B (Model Context Protocol for Browsers). These packages provide the core functionality for implementing MCP in browser environments.
+This monorepo contains the official NPM packages for MCP-B (Model Context Protocol for Browsers). These packages provide the core functionality for implementing MCP in browser environments, including a polyfill for the emerging Web Model Context API standard.
 
 ## 📥 Installation
 
 Install the packages you need via npm, yarn, or pnpm:
 
 ```bash
-# Core transport layer (required)
-npm install @mcp-b/transports
+# Navigator.modelContext polyfill (recommended starting point)
+pnpm add @mcp-b/global
 
-# React integration
-npm install @mcp-b/mcp-react-hooks
+# React integration (provider & client hooks)
+pnpm add @mcp-b/react-webmcp zod
+
+# Transport layer (if building custom integrations)
+pnpm add @mcp-b/transports
 
 # Chrome Extension API tools
-npm install @mcp-b/extension-tools
+pnpm add @mcp-b/extension-tools
+
+# DOM extraction for AI
+pnpm add @mcp-b/smart-dom-reader
 ```
 
 ## 📦 Available Packages
 
-| Package | NPM | Description | Documentation |
-|---------|-----|-------------|---------------|
-| [@mcp-b/transports](./transports) | [![npm](https://img.shields.io/npm/v/@mcp-b/transports)](https://www.npmjs.com/package/@mcp-b/transports) | Browser-specific MCP transport implementations | [Docs](./transports/README.md) |
-| [@mcp-b/mcp-react-hooks](./mcp-react-hooks) | [![npm](https://img.shields.io/npm/v/@mcp-b/mcp-react-hooks)](https://www.npmjs.com/package/@mcp-b/mcp-react-hooks) | React hooks for MCP integration | [Docs](./mcp-react-hooks/README.md) |
-| [@mcp-b/extension-tools](./extension-tools) | [![npm](https://img.shields.io/npm/v/@mcp-b/extension-tools)](https://www.npmjs.com/package/@mcp-b/extension-tools) | MCP tools for Chrome Extension APIs | [Docs](./extension-tools/README.md) |
-| [@mcp-b/mcp-react-hook-form](./mcp-react-hook-form) | [![npm](https://img.shields.io/npm/v/@mcp-b/mcp-react-hook-form)](https://www.npmjs.com/package/@mcp-b/mcp-react-hook-form) | React Hook Form integration for MCP | [Docs](./mcp-react-hook-form/README.md) |
-| [@mcp-b/global](./global) | Internal | Global type definitions | Internal use |
+| Package | Version | Description |
+|---------|---------|-------------|
+| [@mcp-b/global](./global) | [![npm](https://img.shields.io/npm/v/@mcp-b/global)](https://www.npmjs.com/package/@mcp-b/global) | Navigator.modelContext polyfill - implements the Web Model Context API |
+| [@mcp-b/webmcp-ts-sdk](./webmcp-ts-sdk) | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-ts-sdk)](https://www.npmjs.com/package/@mcp-b/webmcp-ts-sdk) | TypeScript SDK adapter for MCP with browser-specific features |
+| [@mcp-b/transports](./transports) | [![npm](https://img.shields.io/npm/v/@mcp-b/transports)](https://www.npmjs.com/package/@mcp-b/transports) | Browser transport implementations (Tab, Chrome Extension) |
+| [@mcp-b/react-webmcp](./react-webmcp) | [![npm](https://img.shields.io/npm/v/@mcp-b/react-webmcp)](https://www.npmjs.com/package/@mcp-b/react-webmcp) | React hooks for registering and consuming MCP tools |
+| [@mcp-b/extension-tools](./extension-tools) | [![npm](https://img.shields.io/npm/v/@mcp-b/extension-tools)](https://www.npmjs.com/package/@mcp-b/extension-tools) | Auto-generated MCP tools for Chrome Extension APIs |
+| [@mcp-b/smart-dom-reader](./smart-dom-reader) | [![npm](https://img.shields.io/npm/v/@mcp-b/smart-dom-reader)](https://www.npmjs.com/package/@mcp-b/smart-dom-reader) | Token-efficient DOM extraction for AI agents |
+
+### Deprecated Packages
+
+| Package | Status | Migration |
+|---------|--------|-----------|
+| ~~@mcp-b/mcp-react-hooks~~ | ⚠️ Deprecated | Use [@mcp-b/react-webmcp](./react-webmcp) instead |
+| ~~@mcp-b/mcp-react-hook-form~~ | ⚠️ Removed | Use custom `useWebMCP` wrappers |
 
 ## 🚀 Quick Start
 
-### Basic Usage with Vanilla JavaScript
+### Using the Web Model Context API
 
-```typescript
-import { TabServerTransport } from "@mcp-b/transports";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-
-// Create MCP server
-const server = new McpServer({
-  name: "my-website",
-  version: "1.0.0",
-});
-
-// Add tools
-server.tool("getTodos", "Get all todos", {}, async () => {
-  // Your tool implementation
-  return { content: [{ type: "text", text: "Todo items..." }] };
-});
-
-// Connect transport
-await server.connect(new TabServerTransport({ allowedOrigins: ["*"] }));
-```
-
-### React Integration
+The easiest way to get started is with the `@mcp-b/global` polyfill and `@mcp-b/react-webmcp` hooks:
 
 ```tsx
-import { useMcpClient } from "@mcp-b/mcp-react-hooks";
+// App entry point - initialize the polyfill
+import '@mcp-b/global';
+import { useWebMCP } from '@mcp-b/react-webmcp';
+import { z } from 'zod';
 
-function MyComponent() {
-  const { client, connected, tools } = useMcpClient();
-  
-  // Use MCP tools in your React app
-  const handleClick = async () => {
-    const result = await client.callTool("getTodos", {});
+function TodoApp() {
+  const [todos, setTodos] = useState([]);
+
+  // Register a tool that AI agents can call
+  useWebMCP({
+    name: 'get_todos',
+    description: 'Get all todo items',
+    annotations: {
+      readOnlyHint: true,
+      idempotentHint: true,
+    },
+    handler: async () => {
+      return { todos };
+    },
+  });
+
+  useWebMCP({
+    name: 'add_todo',
+    description: 'Add a new todo item',
+    inputSchema: {
+      title: z.string().describe('Todo title'),
+      description: z.string().optional().describe('Optional description'),
+    },
+    annotations: {
+      readOnlyHint: false,
+    },
+    handler: async (input) => {
+      const newTodo = { id: Date.now(), ...input };
+      setTodos([...todos, newTodo]);
+      return { success: true, todo: newTodo };
+    },
+  });
+
+  return <div>{/* Your UI */}</div>;
+}
+```
+
+### Consuming Tools as a Client
+
+```tsx
+import { McpClientProvider, useMcpClient } from '@mcp-b/react-webmcp';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { TabClientTransport } from '@mcp-b/transports';
+
+const client = new Client({ name: 'MyApp', version: '1.0.0' });
+const transport = new TabClientTransport('mcp', { clientInstanceId: 'my-app' });
+
+function App() {
+  return (
+    <McpClientProvider client={client} transport={transport}>
+      <ToolConsumer />
+    </McpClientProvider>
+  );
+}
+
+function ToolConsumer() {
+  const { client, tools, isConnected } = useMcpClient();
+
+  const callTool = async () => {
+    const result = await client.callTool({
+      name: 'get_todos',
+      arguments: {}
+    });
     console.log(result);
   };
-  
-  return <button onClick={handleClick}>Get Todos</button>;
+
+  return (
+    <div>
+      <p>Connected: {isConnected ? 'Yes' : 'No'}</p>
+      <p>Available tools: {tools.length}</p>
+      <button onClick={callTool}>Call get_todos</button>
+    </div>
+  );
 }
 ```
 
 ## 🏗️ Architecture
 
-These packages implement the Model Context Protocol for browser environments:
+The MCP-B packages are organized into layers:
 
-- **Transports**: Handle communication between MCP servers and clients using browser-specific mechanisms (postMessage, Chrome runtime messaging)
-- **React Hooks**: Provide React-friendly APIs for MCP integration
-- **Extension Tools**: Auto-generated tools for Chrome Extension APIs
-- **React Hook Form**: Integration with React Hook Form for form handling
+### Core Layer
+- **@mcp-b/global** - Polyfill for `navigator.modelContext` (Web Model Context API)
+- **@mcp-b/webmcp-ts-sdk** - TypeScript SDK adapter with browser-specific features
+
+### Transport Layer
+- **@mcp-b/transports** - Communication between MCP servers and clients
+  - `TabClientTransport` / `TabServerTransport` - Same-page communication
+  - `ExtensionClientTransport` / `ExtensionServerTransport` - Chrome extension messaging
+
+### Integration Layer
+- **@mcp-b/react-webmcp** - React hooks for tool registration and consumption
+
+### Tools & Utilities
+- **@mcp-b/extension-tools** - Pre-built tools for Chrome Extension APIs
+- **@mcp-b/smart-dom-reader** - AI-friendly DOM extraction
 
 ## 🔧 Development
 
@@ -95,8 +166,8 @@ This is a pnpm workspace monorepo using Turbo for build orchestration.
 
 ```bash
 # Clone the repository
-git clone https://github.com/WebMCP-org/npm-packages.git
-cd npm-packages
+git clone https://github.com/WebMCP-org/WebMCP.git
+cd WebMCP/npm-packages
 
 # Install dependencies
 pnpm install
@@ -104,74 +175,53 @@ pnpm install
 # Build all packages
 pnpm build
 
-# Development mode with watch
-pnpm dev
+# Run type checking
+pnpm typecheck
+
+# Run linting and formatting
+pnpm check
+
+# Run tests
+pnpm test
 ```
 
-### Available Scripts
-
-| Script | Description |
-|--------|-------------|
-| `pnpm build` | Build all packages |
-| `pnpm dev` | Start development mode with watch |
-| `pnpm typecheck` | Run TypeScript type checking |
-| `pnpm check` | Run Biome linting and formatting (with fixes) |
-| `pnpm check:ci` | Run Biome checks (CI mode) |
-| `pnpm changeset` | Create a new changeset |
-| `pnpm changeset:version` | Update versions based on changesets |
-| `pnpm changeset:publish` | Build and publish packages to npm |
-
-### Code Quality
-
-- **Linting & Formatting**: We use [Biome](https://biomejs.dev/) for fast, unified linting and formatting
-- **Pre-commit Hooks**: Automatic formatting via Husky and lint-staged
-- **Type Safety**: Full TypeScript with strict mode enabled
-- **CI/CD**: GitHub Actions for automated testing and publishing
-
-### Testing
-
-- **E2E Tests**: Run end-to-end tests with Playwright - `pnpm test` (see [TESTING.md](./TESTING.md))
-- **Test App**: Manual testing with `pnpm --filter mcp-tab-transport-test-app dev`
-- **GitHub Actions**: Test workflows locally with [act](./TESTING-WITH-ACT.md)
-
-### Publishing
-
-We use [changesets](https://github.com/changesets/changesets) for version management:
+### Workspace Commands
 
 ```bash
-# 1. Create a changeset for your changes
-pnpm changeset
+# Build specific package
+pnpm --filter @mcp-b/transports build
 
-# 2. Commit the changeset file
-git add .changeset/*.md
-git commit -m "Add changeset"
+# Run tests for specific package
+pnpm --filter mcp-e2e-tests test
 
-# 3. Push to main branch
-git push origin main
-
-# GitHub Actions will automatically:
-# - Create a Version PR
-# - Update versions when merged
-# - Publish to npm
+# Add dependency to a package
+pnpm --filter @mcp-b/react-webmcp add zod
 ```
 
 ## 📚 Documentation
 
-- [Main MCP-B Documentation](https://mcp-b.ai)
-- [Examples Repository](https://github.com/WebMCP-org/examples)
-- [Main WebMCP Repository](https://github.com/WebMCP-org/WebMCP)
-- [Model Context Protocol Spec](https://modelcontextprotocol.io/)
+- [CONTRIBUTING.md](./CONTRIBUTING.md) - Contribution guidelines
+- [CLAUDE.md](./CLAUDE.md) - Developer guidance for Claude Code
+- [TESTING.md](./TESTING.md) - Testing documentation
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please see our [Contributing Guide](./CONTRIBUTING.md) for details.
+We welcome contributions! Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
+
+### Development Workflow
+
+1. Create a feature branch
+2. Make your changes
+3. Run `pnpm check-all` to verify code quality
+4. Create a changeset: `pnpm changeset`
+5. Submit a pull request
 
 ## 📄 License
 
-MIT - see [LICENSE](./LICENSE) for details.
+MIT © WebMCP Team
 
 ## 🔗 Links
 
-- [NPM Organization](https://www.npmjs.com/org/mcp-b)
-- [GitHub Organization](https://github.com/WebMCP-org)
-- [Discord Community](https://discord.gg/a9fBR6Bw)
+- [GitHub Repository](https://github.com/WebMCP-org/WebMCP)
+- [npm Organization](https://www.npmjs.com/org/mcp-b)
+- [Issue Tracker](https://github.com/WebMCP-org/WebMCP/issues)

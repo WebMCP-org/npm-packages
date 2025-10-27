@@ -10,7 +10,7 @@ export interface PrintingApiToolsOptions {
   getJobStatus?: boolean;
 }
 
-export class PrintingApiTools extends BaseApiTools {
+export class PrintingApiTools extends BaseApiTools<PrintingApiToolsOptions> {
   protected apiName = 'Printing';
 
   constructor(server: McpServer, options: PrintingApiToolsOptions = {}) {

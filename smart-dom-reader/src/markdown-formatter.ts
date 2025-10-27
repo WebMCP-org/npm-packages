@@ -40,12 +40,12 @@ function truncate(text: string | undefined, len?: number): string {
     const tailWindow = Math.max(12, len - head - 5);
     const start = Math.max(0, hit.i - Math.floor(tailWindow / 2));
     const end = Math.min(t.length, start + tailWindow);
-    return t.slice(0, head).trimEnd() + ' … ' + t.slice(start, end).trim() + '…';
+    return `${t.slice(0, head).trimEnd()} … ${t.slice(start, end).trim()}…`;
   }
   // Default: simple head truncation on word boundary
   const slice = t.slice(0, len);
   const lastSpace = slice.lastIndexOf(' ');
-  return (lastSpace > 32 ? slice.slice(0, lastSpace) : slice) + '…';
+  return `${lastSpace > 32 ? slice.slice(0, lastSpace) : slice}…`;
 }
 
 function bestSelector(el: Pick<ExtractedElement, 'selector' | 'tag' | 'text'>): string {
@@ -56,7 +56,7 @@ function hashId(input: string): string {
   let h = 5381;
   for (let i = 0; i < input.length; i++) h = (h * 33) ^ input.charCodeAt(i);
   // Convert to unsigned and base36 for compactness
-  return 'sec-' + (h >>> 0).toString(36);
+  return `sec-${(h >>> 0).toString(36)}`;
 }
 
 function iconForRegion(key: string): string {
@@ -161,10 +161,10 @@ function renderRegionInfo(region: RegionInfo): string {
   return `${icon} ${label} → \`${region.selector}\` [${id}]${statsLine}`;
 }
 
-function wrapXml(body: string, meta?: PageMeta, type: string = 'section'): string {
+function wrapXml(body: string, meta?: PageMeta, type = 'section'): string {
   const attrs = [
-    meta?.title ? `title="${escapeXml(meta!.title!)}"` : null,
-    meta?.url ? `url="${escapeXml(meta!.url!)}"` : null,
+    meta?.title ? `title="${escapeXml(meta?.title!)}"` : null,
+    meta?.url ? `url="${escapeXml(meta?.url!)}"` : null,
   ]
     .filter(Boolean)
     .join(' ');
@@ -186,7 +186,7 @@ export class MarkdownFormatter {
     meta?: PageMeta
   ): string {
     const lines: string[] = [];
-    lines.push(`# Page Outline`);
+    lines.push('# Page Outline');
     if (meta?.title || meta?.url) {
       lines.push(`Title: ${meta?.title ?? ''}`.trim());
       lines.push(`URL: ${meta?.url ?? ''}`.trim());
@@ -235,7 +235,7 @@ export class MarkdownFormatter {
 
   static region(result: SmartDOMResult, opts: MarkdownFormatOptions = {}, meta?: PageMeta): string {
     const lines: string[] = [];
-    lines.push(`# Region Details`);
+    lines.push('# Region Details');
     if (meta?.title || meta?.url) {
       lines.push(`Title: ${meta?.title ?? ''}`.trim());
       lines.push(`URL: ${meta?.url ?? ''}`.trim());
@@ -279,7 +279,7 @@ export class MarkdownFormatter {
     meta?: PageMeta
   ): string {
     const lines: string[] = [];
-    lines.push(`# Content`);
+    lines.push('# Content');
     lines.push(`Selector: \`${content.selector}\``);
     lines.push('');
 

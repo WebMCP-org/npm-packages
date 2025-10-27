@@ -10,7 +10,7 @@
 //   getLevelOfControl?: boolean;
 // }
 
-// export class TypesApiTools extends BaseApiTools {
+// export class TypesApiTools extends BaseApiTools<TypesApiToolsOptions> {
 //   protected apiName = 'Types';
 
 //   constructor(

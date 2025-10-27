@@ -6,7 +6,7 @@
 //   resolve?: boolean;
 // }
 
-// export class DnsApiTools extends BaseApiTools {
+// export class DnsApiTools extends BaseApiTools<DnsApiToolsOptions> {
 //   protected apiName = 'Dns';
 
 //   constructor(

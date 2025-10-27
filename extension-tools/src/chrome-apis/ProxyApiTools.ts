@@ -8,7 +8,7 @@ export interface ProxyApiToolsOptions {
   clearProxySettings?: boolean;
 }
 
-export class ProxyApiTools extends BaseApiTools {
+export class ProxyApiTools extends BaseApiTools<ProxyApiToolsOptions> {
   protected apiName = 'Proxy';
 
   constructor(server: McpServer, options: ProxyApiToolsOptions = {}) {

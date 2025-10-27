@@ -10,7 +10,7 @@ export interface SidePanelApiToolsOptions {
   open?: boolean;
 }
 
-export class SidePanelApiTools extends BaseApiTools {
+export class SidePanelApiTools extends BaseApiTools<SidePanelApiToolsOptions> {
   protected apiName = 'SidePanel';
 
   constructor(server: McpServer, options: SidePanelApiToolsOptions = {}) {

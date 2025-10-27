@@ -6,7 +6,7 @@ export interface SystemLogApiToolsOptions {
   addLog?: boolean;
 }
 
-export class SystemLogApiTools extends BaseApiTools {
+export class SystemLogApiTools extends BaseApiTools<SystemLogApiToolsOptions> {
   protected apiName = 'SystemLog';
 
   constructor(server: McpServer, options: SystemLogApiToolsOptions = {}) {

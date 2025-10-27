@@ -15,7 +15,7 @@
 //   resumeRecording?: boolean;
 // }
 
-// export class DevtoolsRecorderApiTools extends BaseApiTools {
+// export class DevtoolsRecorderApiTools extends BaseApiTools<DevtoolsRecorderApiToolsOptions> {
 //   protected apiName = 'Devtools.recorder';
 
 //   constructor(

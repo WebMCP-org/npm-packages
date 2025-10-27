@@ -5,7 +5,7 @@ export interface EnterpriseNetworkingAttributesApiToolsOptions {
   getNetworkDetails?: boolean;
 }
 
-export class EnterpriseNetworkingAttributesApiTools extends BaseApiTools {
+export class EnterpriseNetworkingAttributesApiTools extends BaseApiTools<EnterpriseNetworkingAttributesApiToolsOptions> {
   protected apiName = 'Enterprise.networkingAttributes';
 
   constructor(server: McpServer, options: EnterpriseNetworkingAttributesApiToolsOptions = {}) {

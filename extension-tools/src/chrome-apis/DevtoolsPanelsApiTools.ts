@@ -10,7 +10,7 @@ export interface DevtoolsPanelsApiToolsOptions {
   setOpenResourceHandler?: boolean;
 }
 
-export class DevtoolsPanelsApiTools extends BaseApiTools {
+export class DevtoolsPanelsApiTools extends BaseApiTools<DevtoolsPanelsApiToolsOptions> {
   protected apiName = 'Devtools.panels';
 
   constructor(server: McpServer, options: DevtoolsPanelsApiToolsOptions = {}) {

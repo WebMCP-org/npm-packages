@@ -8,7 +8,7 @@ export interface DevtoolsNetworkApiToolsOptions {
   onRequestFinished?: boolean;
 }
 
-export class DevtoolsNetworkApiTools extends BaseApiTools {
+export class DevtoolsNetworkApiTools extends BaseApiTools<DevtoolsNetworkApiToolsOptions> {
   protected apiName = 'Devtools.network';
 
   constructor(server: McpServer, options: DevtoolsNetworkApiToolsOptions = {}) {

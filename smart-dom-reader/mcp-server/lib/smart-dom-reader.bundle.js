@@ -11,7 +11,7 @@ var __require = /* @__PURE__ */ ((x) =>
         })
       : x)(function (x) {
   if (typeof require !== 'undefined') return require.apply(this, arguments);
-  throw Error('Dynamic require of "' + x + '" is not supported');
+  throw Error(`Dynamic require of "${x}" is not supported`);
 });
 var __esm = (fn, res) =>
   function __init() {
@@ -22,7 +22,7 @@ var __export = (target, all) => {
 };
 var __copyProps = (to, from, except, desc) => {
   if ((from && typeof from === 'object') || typeof from === 'function') {
-    for (let key of __getOwnPropNames(from))
+    for (const key of __getOwnPropNames(from))
       if (!__hasOwnProp.call(to, key) && key !== except)
         __defProp(to, key, {
           get: () => from[key],
@@ -37,7 +37,6 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, '__esModule', { value: tru
 var ContentDetection;
 var init_content_detection = __esm({
   'src/content-detection.ts'() {
-    'use strict';
     ContentDetection = class {
       /**
        * Find the main content area of a page
@@ -111,7 +110,7 @@ var init_content_detection = __esm({
           }
         });
         semanticIds.forEach((id) => {
-          if (element.id && element.id.toLowerCase().includes(id)) {
+          if (element.id?.toLowerCase().includes(id)) {
             score += 10;
           }
         });
@@ -179,7 +178,7 @@ var init_content_detection = __esm({
           return true;
         }
         const navPatterns = [/nav/i, /menu/i, /sidebar/i, /toolbar/i];
-        const classesAndId = (element.className + ' ' + element.id).toLowerCase();
+        const classesAndId = `${element.className} ${element.id}`.toLowerCase();
         return navPatterns.some((pattern) => pattern.test(classesAndId));
       }
       /**
@@ -197,7 +196,7 @@ var init_content_detection = __esm({
           /advertisement/i,
           /social/i,
         ];
-        const classesAndId = (element.className + ' ' + element.id).toLowerCase();
+        const classesAndId = `${element.className} ${element.id}`.toLowerCase();
         return supplementaryPatterns.some((pattern) => pattern.test(classesAndId));
       }
       /**
@@ -238,7 +237,6 @@ var init_content_detection = __esm({
 var SelectorGenerator;
 var init_selectors = __esm({
   'src/selectors.ts'() {
-    'use strict';
     SelectorGenerator = class {
       /**
        * Generate multiple selector strategies for an element
@@ -320,7 +318,7 @@ var init_selectors = __esm({
           }
           const classes = this.getMeaningfulClasses(current);
           if (classes.length > 0) {
-            selector += '.' + classes.map((c) => CSS.escape(c)).join('.');
+            selector += `.${classes.map((c) => CSS.escape(c)).join('.')}`;
           }
           const siblings = current.parentElement?.children;
           if (siblings && siblings.length > 1) {
@@ -363,7 +361,7 @@ var init_selectors = __esm({
           path.unshift(xpath);
           current = current.parentElement;
         }
-        return '//' + path.join('/');
+        return `//${path.join('/')}`;
       }
       /**
        * Generate a text-based selector for buttons and links
@@ -485,7 +483,6 @@ var init_selectors = __esm({
 var DOMTraversal;
 var init_traversal = __esm({
   'src/traversal.ts'() {
-    'use strict';
     init_selectors();
     DOMTraversal = class {
       static INTERACTIVE_SELECTORS = [
@@ -761,14 +758,14 @@ var init_traversal = __esm({
           const value = element.getAttribute(attr);
           if (value) {
             attributes[attr] =
-              value.length > attrTruncate ? value.substring(0, attrTruncate) + '...' : value;
+              value.length > attrTruncate ? `${value.substring(0, attrTruncate)}...` : value;
           }
         }
         for (const attr of element.attributes) {
           if (attr.name.startsWith('data-') && !relevant.includes(attr.name)) {
             attributes[attr.name] =
               attr.value.length > dataAttrTruncate
-                ? attr.value.substring(0, dataAttrTruncate) + '...'
+                ? `${attr.value.substring(0, dataAttrTruncate)}...`
                 : attr.value;
           }
         }
@@ -855,7 +852,7 @@ var init_traversal = __esm({
         const text = element.textContent?.trim() || '';
         const maxLength = options?.textTruncateLength;
         if (maxLength && text.length > maxLength) {
-          return text.substring(0, maxLength) + '...';
+          return `${text.substring(0, maxLength)}...`;
         }
         return text;
       }
@@ -870,7 +867,7 @@ var init_traversal = __esm({
       /**
        * Get interactive elements
        */
-      static getInteractiveElements(container = document, options) {
+      static getInteractiveElements(container, options) {
         const elements = [];
         const selector = this.INTERACTIVE_SELECTORS.join(', ');
         const found = container.querySelectorAll(selector);
@@ -890,7 +887,7 @@ var init_traversal = __esm({
                   elements.push(extracted);
                 }
               }
-            } catch (e) {
+            } catch (_e) {
               console.warn(`Invalid custom selector: ${customSelector}`);
             }
           }
@@ -900,7 +897,7 @@ var init_traversal = __esm({
       /**
        * Get semantic elements (for full mode)
        */
-      static getSemanticElements(container = document, options) {
+      static getSemanticElements(container, options) {
         const elements = [];
         const selector = this.SEMANTIC_SELECTORS.join(', ');
         const found = container.querySelectorAll(selector);
@@ -939,11 +936,11 @@ function truncate(text, len) {
     const tailWindow = Math.max(12, len - head - 5);
     const start = Math.max(0, hit.i - Math.floor(tailWindow / 2));
     const end = Math.min(t.length, start + tailWindow);
-    return t.slice(0, head).trimEnd() + ' \u2026 ' + t.slice(start, end).trim() + '\u2026';
+    return `${t.slice(0, head).trimEnd()} \u2026 ${t.slice(start, end).trim()}\u2026`;
   }
   const slice = t.slice(0, len);
   const lastSpace = slice.lastIndexOf(' ');
-  return (lastSpace > 32 ? slice.slice(0, lastSpace) : slice) + '\u2026';
+  return `${lastSpace > 32 ? slice.slice(0, lastSpace) : slice}\u2026`;
 }
 function bestSelector(el) {
   return el.selector?.css || '';
@@ -951,7 +948,7 @@ function bestSelector(el) {
 function hashId(input) {
   let h = 5381;
   for (let i = 0; i < input.length; i++) h = (h * 33) ^ input.charCodeAt(i);
-  return 'sec-' + (h >>> 0).toString(36);
+  return `sec-${(h >>> 0).toString(36)}`;
 }
 function iconForRegion(key) {
   switch (key) {
@@ -1070,11 +1067,10 @@ function capitalize(s) {
 var MarkdownFormatter;
 var init_markdown_formatter = __esm({
   'src/markdown-formatter.ts'() {
-    'use strict';
     MarkdownFormatter = class {
-      static structure(overview, _opts = {}, meta) {
+      static structure(overview, _opts, meta) {
         const lines = [];
-        lines.push(`# Page Outline`);
+        lines.push('# Page Outline');
         if (meta?.title || meta?.url) {
           lines.push(`Title: ${meta?.title ?? ''}`.trim());
           lines.push(`URL: ${meta?.url ?? ''}`.trim());
@@ -1114,9 +1110,9 @@ var init_markdown_formatter = __esm({
         const body = lines.join('\n');
         return wrapXml(body, meta, 'outline');
       }
-      static region(result, opts = {}, meta) {
+      static region(result, opts, meta) {
         const lines = [];
-        lines.push(`# Region Details`);
+        lines.push('# Region Details');
         if (meta?.title || meta?.url) {
           lines.push(`Title: ${meta?.title ?? ''}`.trim());
           lines.push(`URL: ${meta?.url ?? ''}`.trim());
@@ -1148,9 +1144,9 @@ var init_markdown_formatter = __esm({
         const body = lines.join('\n');
         return wrapXml(body, meta, 'section');
       }
-      static content(content, opts = {}, meta) {
+      static content(content, opts, meta) {
         const lines = [];
-        lines.push(`# Content`);
+        lines.push('# Content');
         lines.push(`Selector: \`${content.selector}\``);
         lines.push('');
         if (content.text.headings?.length) {
@@ -1239,7 +1235,6 @@ function resolveSmartDomReader() {
 var ProgressiveExtractor;
 var init_progressive = __esm({
   'src/progressive.ts'() {
-    'use strict';
     init_content_detection();
     init_selectors();
     init_traversal();
@@ -1299,7 +1294,7 @@ var init_progressive = __esm({
       /**
        * Step 2: Extract detailed information from a specific region
        */
-      static extractRegion(selector, doc, options = {}, smartDomReaderCtor) {
+      static extractRegion(selector, doc, options, smartDomReaderCtor) {
         const element = doc.querySelector(selector);
         if (!element) return null;
         const SmartDOMReaderCtor = smartDomReaderCtor ?? resolveSmartDomReader();
@@ -1328,7 +1323,7 @@ var init_progressive = __esm({
         if (options.includeHeadings !== false) {
           const headings = element.querySelectorAll('h1, h2, h3, h4, h5, h6');
           result.text.headings = Array.from(headings).map((h) => ({
-            level: parseInt(h.tagName[1]),
+            level: Number.parseInt(h.tagName[1], 10),
             text: this.getTextContent(h, options.maxTextLength),
           }));
         }
@@ -1420,7 +1415,7 @@ var init_progressive = __esm({
         }
         const textContent = element.textContent?.trim() || '';
         const textPreview =
-          textContent.length > 50 ? textContent.substring(0, 50) + '...' : textContent;
+          textContent.length > 50 ? `${textContent.substring(0, 50)}...` : textContent;
         return {
           selector,
           label,
@@ -1545,7 +1540,7 @@ var init_progressive = __esm({
       static getTextContent(element, maxLength) {
         const text = element.textContent?.trim() || '';
         if (maxLength && text.length > maxLength) {
-          return text.substring(0, maxLength) + '...';
+          return `${text.substring(0, maxLength)}...`;
         }
         return text;
       }
@@ -1555,9 +1550,7 @@ var init_progressive = __esm({
 
 // src/types.ts
 var init_types = __esm({
-  'src/types.ts'() {
-    'use strict';
-  },
+  'src/types.ts'() {},
 });
 
 // src/index.ts
@@ -1570,7 +1563,8 @@ __export(index_exports, {
   SmartDOMReader: () => SmartDOMReader,
   default: () => index_default,
 });
-var SmartDOMReader, index_default;
+var SmartDOMReader;
+var index_default;
 var init_index = __esm({
   'src/index.ts'() {
     init_content_detection();
@@ -1604,7 +1598,7 @@ var init_index = __esm({
        * @param rootElement The document or element to extract from
        * @param runtimeOptions Options to override constructor options
        */
-      extract(rootElement = document, runtimeOptions) {
+      extract(rootElement, runtimeOptions) {
         const startTime = Date.now();
         const doc = rootElement instanceof Document ? rootElement : rootElement.ownerDocument;
         const options = { ...this.options, ...runtimeOptions };

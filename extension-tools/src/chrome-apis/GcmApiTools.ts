@@ -8,7 +8,7 @@ export interface GcmApiToolsOptions {
   unregister?: boolean;
 }
 
-export class GcmApiTools extends BaseApiTools {
+export class GcmApiTools extends BaseApiTools<GcmApiToolsOptions> {
   protected apiName = 'Gcm';
 
   constructor(server: McpServer, options: GcmApiToolsOptions = {}) {

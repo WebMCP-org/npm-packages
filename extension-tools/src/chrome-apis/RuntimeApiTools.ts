@@ -20,7 +20,7 @@ export interface RuntimeApiToolsOptions {
   setUninstallURL?: boolean;
 }
 
-export class RuntimeApiTools extends BaseApiTools {
+export class RuntimeApiTools extends BaseApiTools<RuntimeApiToolsOptions> {
   protected apiName = 'Runtime';
 
   constructor(server: McpServer, options: RuntimeApiToolsOptions = {}) {

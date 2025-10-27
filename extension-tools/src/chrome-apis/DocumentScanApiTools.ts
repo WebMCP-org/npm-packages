@@ -14,7 +14,7 @@ export interface DocumentScanApiToolsOptions {
   cancelScan?: boolean;
 }
 
-export class DocumentScanApiTools extends BaseApiTools {
+export class DocumentScanApiTools extends BaseApiTools<DocumentScanApiToolsOptions> {
   protected apiName = 'DocumentScan';
 
   constructor(server: McpServer, options: DocumentScanApiToolsOptions = {}) {

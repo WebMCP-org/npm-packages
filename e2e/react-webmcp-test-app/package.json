@@ -1,0 +1,27 @@
+{
+  "name": "react-webmcp-test-app",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@mcp-b/global": "workspace:*",
+    "@mcp-b/react-webmcp": "workspace:*",
+    "@mcp-b/transports": "workspace:*",
+    "@modelcontextprotocol/sdk": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  }
+}

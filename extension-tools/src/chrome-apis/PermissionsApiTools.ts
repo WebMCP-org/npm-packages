@@ -11,7 +11,7 @@ export interface PermissionsApiToolsOptions {
   removeHostAccessRequest?: boolean;
 }
 
-export class PermissionsApiTools extends BaseApiTools {
+export class PermissionsApiTools extends BaseApiTools<PermissionsApiToolsOptions> {
   protected apiName = 'Permissions';
 
   constructor(server: McpServer, options: PermissionsApiToolsOptions = {}) {

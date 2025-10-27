@@ -8,7 +8,7 @@ export interface PowerApiToolsOptions {
   reportActivity?: boolean;
 }
 
-export class PowerApiTools extends BaseApiTools {
+export class PowerApiTools extends BaseApiTools<PowerApiToolsOptions> {
   protected apiName = 'Power';
 
   constructor(server: McpServer, options: PowerApiToolsOptions = {}) {

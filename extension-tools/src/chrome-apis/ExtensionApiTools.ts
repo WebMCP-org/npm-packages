@@ -10,7 +10,7 @@ export interface ExtensionApiToolsOptions {
   setUpdateUrlData?: boolean;
 }
 
-export class ExtensionApiTools extends BaseApiTools {
+export class ExtensionApiTools extends BaseApiTools<ExtensionApiToolsOptions> {
   protected apiName = 'Extension';
 
   constructor(server: McpServer, options: ExtensionApiToolsOptions = {}) {

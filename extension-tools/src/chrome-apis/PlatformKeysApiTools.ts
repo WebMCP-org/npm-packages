@@ -10,7 +10,7 @@ export interface PlatformKeysApiToolsOptions {
   getSubtleCrypto?: boolean;
 }
 
-export class PlatformKeysApiTools extends BaseApiTools {
+export class PlatformKeysApiTools extends BaseApiTools<PlatformKeysApiToolsOptions> {
   protected apiName = 'PlatformKeys';
 
   constructor(server: McpServer, options: PlatformKeysApiToolsOptions = {}) {

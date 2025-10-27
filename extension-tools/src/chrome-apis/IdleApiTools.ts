@@ -8,7 +8,7 @@ export interface IdleApiToolsOptions {
   getAutoLockDelay?: boolean;
 }
 
-export class IdleApiTools extends BaseApiTools {
+export class IdleApiTools extends BaseApiTools<IdleApiToolsOptions> {
   protected apiName = 'Idle';
 
   constructor(server: McpServer, options: IdleApiToolsOptions = {}) {

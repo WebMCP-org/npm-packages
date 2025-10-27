@@ -1,33 +1,36 @@
-import { TabClientTransport, TabServerTransport } from '@mcp-b/transports';
-import { Client as McpClient } from '@modelcontextprotocol/sdk/client/index.js';
-import { Server as McpServer } from '@modelcontextprotocol/sdk/server/index.js';
-import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { z } from 'zod';
+// Web Model Context API Test App
+// Tests window.navigator.modelContext with two-bucket tool management
+
+// Import the global package to initialize navigator.modelContext
+import '@mcp-b/global';
 
 // Counter state
 let counter = 0;
 
-// MCP instances
-let server: McpServer | null = null;
-let client: McpClient | null = null;
-let serverTransport: TabServerTransport | null = null;
-let clientTransport: TabClientTransport | null = null;
+// Dynamic tool registration
+let dynamicToolRegistration: { unregister: () => void } | null = null;
 
 // DOM Elements
-const serverStatusEl = document.getElementById('server-status')!;
-const clientStatusEl = document.getElementById('client-status')!;
-const counterDisplayEl = document.getElementById('counter-display')!;
-const logEl = document.getElementById('log')!;
+const apiStatusEl = document.getElementById('api-status');
+const counterDisplayEl = document.getElementById('counter-display');
+const logEl = document.getElementById('log');
+const dynamicStatusEl = document.getElementById('dynamic-status');
 
-const startServerBtn = document.getElementById('start-server') as HTMLButtonElement;
-const stopServerBtn = document.getElementById('stop-server') as HTMLButtonElement;
-const connectClientBtn = document.getElementById('connect-client') as HTMLButtonElement;
-const disconnectClientBtn = document.getElementById('disconnect-client') as HTMLButtonElement;
-const listToolsBtn = document.getElementById('list-tools') as HTMLButtonElement;
+if (!apiStatusEl || !counterDisplayEl || !logEl || !dynamicStatusEl) {
+  throw new Error('Required DOM elements not found');
+}
+
 const incrementBtn = document.getElementById('increment') as HTMLButtonElement;
 const decrementBtn = document.getElementById('decrement') as HTMLButtonElement;
 const resetBtn = document.getElementById('reset') as HTMLButtonElement;
 const getCounterBtn = document.getElementById('get-counter') as HTMLButtonElement;
+
+const registerDynamicBtn = document.getElementById('register-dynamic') as HTMLButtonElement;
+const unregisterDynamicBtn = document.getElementById('unregister-dynamic') as HTMLButtonElement;
+const callDynamicBtn = document.getElementById('call-dynamic') as HTMLButtonElement;
+
+const replaceBaseToolsBtn = document.getElementById('replace-base-tools') as HTMLButtonElement;
+const listAllToolsBtn = document.getElementById('list-all-tools') as HTMLButtonElement;
 const clearLogBtn = document.getElementById('clear-log') as HTMLButtonElement;
 
 // Logging utility
@@ -47,328 +50,342 @@ function updateCounterDisplay() {
   counterDisplayEl.setAttribute('data-counter', counter.toString());
 }
 
-// Update UI state
-function updateUI() {
-  const serverRunning = server !== null;
-  const clientConnected = client !== null;
-
-  startServerBtn.disabled = serverRunning;
-  stopServerBtn.disabled = !serverRunning;
-  connectClientBtn.disabled = !serverRunning || clientConnected;
-  disconnectClientBtn.disabled = !clientConnected;
-  listToolsBtn.disabled = !clientConnected;
-  incrementBtn.disabled = !clientConnected;
-  decrementBtn.disabled = !clientConnected;
-  resetBtn.disabled = !clientConnected;
-  getCounterBtn.disabled = !clientConnected;
-
-  if (serverRunning) {
-    serverStatusEl.textContent = 'Server: Running';
-    serverStatusEl.className = 'status connected';
-    serverStatusEl.setAttribute('data-status', 'running');
-  } else {
-    serverStatusEl.textContent = 'Server: Not Started';
-    serverStatusEl.className = 'status disconnected';
-    serverStatusEl.setAttribute('data-status', 'stopped');
+// Check if API is available
+function checkAPIAvailability() {
+  if ('modelContext' in navigator) {
+    apiStatusEl.textContent = 'API: Ready ✅';
+    apiStatusEl.className = 'status connected';
+    apiStatusEl.setAttribute('data-status', 'ready');
+    log('navigator.modelContext API is available', 'success');
+    return true;
   }
-
-  if (clientConnected) {
-    clientStatusEl.textContent = 'Client: Connected';
-    clientStatusEl.className = 'status connected';
-    clientStatusEl.setAttribute('data-status', 'connected');
-  } else {
-    clientStatusEl.textContent = 'Client: Not Connected';
-    clientStatusEl.className = 'status disconnected';
-    clientStatusEl.setAttribute('data-status', 'disconnected');
-  }
+  apiStatusEl.textContent = 'API: Not Available ❌';
+  apiStatusEl.className = 'status disconnected';
+  apiStatusEl.setAttribute('data-status', 'unavailable');
+  log('navigator.modelContext API is NOT available', 'error');
+  return false;
 }
 
-// Start MCP Server
-async function startServer() {
+// Register base tools (Bucket A) using provideContext
+function registerBaseTools() {
   try {
-    log('Starting MCP Server...');
+    log('Registering base tools via provideContext()...');
 
-    server = new McpServer(
-      {
-        name: 'test-counter-server',
-        version: '1.0.0',
-      },
-      {
-        capabilities: {
-          tools: {},
+    navigator.modelContext.provideContext({
+      tools: [
+        {
+          name: 'incrementCounter',
+          description: 'Increment the counter by 1',
+          inputSchema: {
+            type: 'object',
+            properties: {},
+          },
+          async execute() {
+            counter++;
+            updateCounterDisplay();
+            log(`Counter incremented to ${counter}`, 'success');
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: `Counter incremented to ${counter}`,
+                },
+              ],
+            };
+          },
         },
-      }
-    );
-
-    // Register tools
-    server.setRequestHandler(ListToolsRequestSchema, async () => {
-      log('Server: Received list_tools request');
-      return {
-        tools: [
-          {
-            name: 'incrementCounter',
-            description: 'Increment the counter by 1',
-            inputSchema: {
-              type: 'object',
-              properties: {},
-            },
+        {
+          name: 'decrementCounter',
+          description: 'Decrement the counter by 1',
+          inputSchema: {
+            type: 'object',
+            properties: {},
           },
-          {
-            name: 'decrementCounter',
-            description: 'Decrement the counter by 1',
-            inputSchema: {
-              type: 'object',
-              properties: {},
-            },
+          async execute() {
+            counter--;
+            updateCounterDisplay();
+            log(`Counter decremented to ${counter}`, 'success');
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: `Counter decremented to ${counter}`,
+                },
+              ],
+            };
           },
-          {
-            name: 'resetCounter',
-            description: 'Reset the counter to 0',
-            inputSchema: {
-              type: 'object',
-              properties: {},
-            },
+        },
+        {
+          name: 'resetCounter',
+          description: 'Reset the counter to 0',
+          inputSchema: {
+            type: 'object',
+            properties: {},
           },
-          {
-            name: 'getCounter',
-            description: 'Get the current counter value',
-            inputSchema: {
-              type: 'object',
-              properties: {},
-            },
+          async execute() {
+            const oldValue = counter;
+            counter = 0;
+            updateCounterDisplay();
+            log(`Counter reset from ${oldValue} to 0`, 'success');
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: 'Counter reset to 0',
+                },
+              ],
+            };
           },
-        ],
-      };
+        },
+        {
+          name: 'getCounter',
+          description: 'Get the current counter value',
+          inputSchema: {
+            type: 'object',
+            properties: {},
+          },
+          async execute() {
+            log(`Counter value retrieved: ${counter}`, 'info');
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: `Current counter value: ${counter}`,
+                },
+              ],
+            };
+          },
+        },
+      ],
     });
 
-    server.setRequestHandler(CallToolRequestSchema, async (request) => {
-      log(`Server: Received call_tool request for ${request.params.name}`);
-
-      switch (request.params.name) {
-        case 'incrementCounter':
-          counter++;
-          updateCounterDisplay();
-          log(`Counter incremented to ${counter}`, 'success');
-          return {
-            content: [
-              {
-                type: 'text',
-                text: `Counter incremented to ${counter}`,
-              },
-            ],
-          };
-
-        case 'decrementCounter':
-          counter--;
-          updateCounterDisplay();
-          log(`Counter decremented to ${counter}`, 'success');
-          return {
-            content: [
-              {
-                type: 'text',
-                text: `Counter decremented to ${counter}`,
-              },
-            ],
-          };
-
-        case 'resetCounter':
-          counter = 0;
-          updateCounterDisplay();
-          log('Counter reset to 0', 'success');
-          return {
-            content: [
-              {
-                type: 'text',
-                text: 'Counter reset to 0',
-              },
-            ],
-          };
-
-        case 'getCounter':
-          log(`Counter value retrieved: ${counter}`, 'success');
-          return {
-            content: [
-              {
-                type: 'text',
-                text: `Current counter value: ${counter}`,
-              },
-            ],
-          };
-
-        default:
-          throw new Error(`Unknown tool: ${request.params.name}`);
-      }
-    });
-
-    // Create and connect transport
-    serverTransport = new TabServerTransport({
-      allowedOrigins: ['*'],
-    });
-
-    await server.connect(serverTransport);
-
-    log('MCP Server started successfully', 'success');
-    updateUI();
+    log('Base tools registered successfully (Bucket A)', 'success');
   } catch (error) {
-    log(`Failed to start server: ${error}`, 'error');
+    log(`Failed to register base tools: ${error}`, 'error');
     console.error(error);
   }
 }
 
-// Stop MCP Server
-async function stopServer() {
+// Register a dynamic tool (Bucket B) using registerTool
+function registerDynamicTool() {
   try {
-    log('Stopping MCP Server...');
-
-    if (client) {
-      await disconnectClient();
+    if (dynamicToolRegistration) {
+      log('Dynamic tool already registered', 'error');
+      return;
     }
 
-    if (server) {
-      await server.close();
-      server = null;
-    }
+    log('Registering dynamic tool via registerTool()...');
 
-    if (serverTransport) {
-      await serverTransport.close();
-      serverTransport = null;
-    }
-
-    log('MCP Server stopped', 'success');
-    updateUI();
-  } catch (error) {
-    log(`Failed to stop server: ${error}`, 'error');
-    console.error(error);
-  }
-}
-
-// Connect MCP Client
-async function connectClient() {
-  try {
-    log('Connecting MCP Client...');
-
-    client = new McpClient(
-      {
-        name: 'test-client',
-        version: '1.0.0',
+    dynamicToolRegistration = navigator.modelContext.registerTool({
+      name: 'dynamicTool',
+      description: 'A dynamically registered tool that persists across provideContext calls',
+      inputSchema: {
+        type: 'object',
+        properties: {},
       },
-      {
-        capabilities: {},
-      }
-    );
-
-    clientTransport = new TabClientTransport({
-      targetOrigin: window.location.origin,
+      async execute() {
+        log('Dynamic tool executed!', 'success');
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Dynamic tool executed successfully! (Bucket B)',
+            },
+          ],
+        };
+      },
     });
 
-    await client.connect(clientTransport);
-
-    log('MCP Client connected successfully', 'success');
-    updateUI();
+    log('Dynamic tool registered successfully (Bucket B)', 'success');
+    dynamicStatusEl.textContent = 'Dynamic tool status: Registered ✅';
+    dynamicStatusEl.style.background = '#d4edda';
+    registerDynamicBtn.disabled = true;
+    unregisterDynamicBtn.disabled = false;
+    callDynamicBtn.disabled = false;
   } catch (error) {
-    log(`Failed to connect client: ${error}`, 'error');
+    log(`Failed to register dynamic tool: ${error}`, 'error');
     console.error(error);
   }
 }
 
-// Disconnect MCP Client
-async function disconnectClient() {
+// Unregister the dynamic tool
+function unregisterDynamicTool() {
   try {
-    log('Disconnecting MCP Client...');
-
-    if (client) {
-      await client.close();
-      client = null;
+    if (!dynamicToolRegistration) {
+      log('No dynamic tool to unregister', 'error');
+      return;
     }
 
-    if (clientTransport) {
-      await clientTransport.close();
-      clientTransport = null;
-    }
+    log('Unregistering dynamic tool...');
+    dynamicToolRegistration.unregister();
+    dynamicToolRegistration = null;
 
-    log('MCP Client disconnected', 'success');
-    updateUI();
+    log('Dynamic tool unregistered successfully', 'success');
+    dynamicStatusEl.textContent = 'Dynamic tool status: Not registered';
+    dynamicStatusEl.style.background = '#f5f5f5';
+    registerDynamicBtn.disabled = false;
+    unregisterDynamicBtn.disabled = true;
+    callDynamicBtn.disabled = true;
   } catch (error) {
-    log(`Failed to disconnect client: ${error}`, 'error');
+    log(`Failed to unregister dynamic tool: ${error}`, 'error');
     console.error(error);
   }
 }
 
-// List available tools
-async function listTools() {
-  try {
-    if (!client) {
-      throw new Error('Client not connected');
-    }
-
-    log('Listing available tools...');
-    const result = await client.listTools();
-
-    log(`Found ${result.tools.length} tools:`, 'success');
-    for (const tool of result.tools) {
-      log(`  - ${tool.name}: ${tool.description}`);
-    }
-  } catch (error) {
-    log(`Failed to list tools: ${error}`, 'error');
-    console.error(error);
+// Test calling the dynamic tool (simulated)
+function callDynamicTool() {
+  if (!dynamicToolRegistration) {
+    log('Dynamic tool is not registered', 'error');
+    return;
   }
+
+  log('Dynamic tool would be called by MCP client', 'info');
+  log('In a real scenario, an MCP client would call this tool', 'info');
 }
 
-// Call a tool
-async function callTool(toolName: string, args: Record<string, unknown> = {}) {
+// Replace base tools to test two-bucket system
+function replaceBaseTools() {
   try {
-    if (!client) {
-      throw new Error('Client not connected');
-    }
+    log('Replacing base tools with new set (Bucket A should be replaced)...');
 
-    log(`Calling tool: ${toolName}...`);
-    const result = await client.callTool({
-      name: toolName,
-      arguments: args,
+    navigator.modelContext.provideContext({
+      tools: [
+        {
+          name: 'doubleCounter',
+          description: 'Double the counter value',
+          inputSchema: {
+            type: 'object',
+            properties: {},
+          },
+          async execute() {
+            counter *= 2;
+            updateCounterDisplay();
+            log(`Counter doubled to ${counter}`, 'success');
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: `Counter doubled to ${counter}`,
+                },
+              ],
+            };
+          },
+        },
+        {
+          name: 'halveCounter',
+          description: 'Halve the counter value',
+          inputSchema: {
+            type: 'object',
+            properties: {},
+          },
+          async execute() {
+            counter = Math.floor(counter / 2);
+            updateCounterDisplay();
+            log(`Counter halved to ${counter}`, 'success');
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: `Counter halved to ${counter}`,
+                },
+              ],
+            };
+          },
+        },
+      ],
     });
 
-    const textContent = result.content.find((c) => c.type === 'text');
-    if (textContent && 'text' in textContent) {
-      log(`Tool result: ${textContent.text}`, 'success');
+    log('Base tools replaced! Old tools (increment, decrement, etc.) are gone.', 'success');
+    if (dynamicToolRegistration) {
+      log('✅ Dynamic tool still registered! (Bucket B persists)', 'success');
     }
-
-    return result;
   } catch (error) {
-    log(`Failed to call tool ${toolName}: ${error}`, 'error');
+    log(`Failed to replace base tools: ${error}`, 'error');
     console.error(error);
-    throw error;
+  }
+}
+
+// List all registered tools (simulated)
+function listAllTools() {
+  log('Listing all registered tools...', 'info');
+  log('In a real scenario, an MCP client would call listTools()', 'info');
+  log('Check browser console for __mcpBridge.tools to see registered tools', 'info');
+
+  // Access the internal bridge for debugging
+  const w = window as unknown as {
+    __mcpBridge?: {
+      tools: Map<string, { description: string; [key: string]: unknown }>;
+    };
+  };
+  if (w.__mcpBridge) {
+    const tools = w.__mcpBridge.tools;
+    log(`Total tools registered: ${tools.size}`, 'info');
+    tools.forEach((tool, name: string) => {
+      log(`  - ${name}: ${tool.description}`, 'info');
+    });
   }
 }
 
 // Event listeners
-startServerBtn.addEventListener('click', startServer);
-stopServerBtn.addEventListener('click', stopServer);
-connectClientBtn.addEventListener('click', connectClient);
-disconnectClientBtn.addEventListener('click', disconnectClient);
-listToolsBtn.addEventListener('click', listTools);
-incrementBtn.addEventListener('click', () => callTool('incrementCounter'));
-decrementBtn.addEventListener('click', () => callTool('decrementCounter'));
-resetBtn.addEventListener('click', () => callTool('resetCounter'));
-getCounterBtn.addEventListener('click', () => callTool('getCounter'));
+incrementBtn.addEventListener('click', () => {
+  log('Increment button clicked (would call incrementCounter tool)', 'info');
+});
+
+decrementBtn.addEventListener('click', () => {
+  log('Decrement button clicked (would call decrementCounter tool)', 'info');
+});
+
+resetBtn.addEventListener('click', () => {
+  log('Reset button clicked (would call resetCounter tool)', 'info');
+});
+
+getCounterBtn.addEventListener('click', () => {
+  log('Get Counter button clicked (would call getCounter tool)', 'info');
+});
+
+registerDynamicBtn.addEventListener('click', registerDynamicTool);
+unregisterDynamicBtn.addEventListener('click', unregisterDynamicTool);
+callDynamicBtn.addEventListener('click', callDynamicTool);
+
+replaceBaseToolsBtn.addEventListener('click', replaceBaseTools);
+listAllToolsBtn.addEventListener('click', listAllTools);
+
 clearLogBtn.addEventListener('click', () => {
   logEl.innerHTML = '';
   log('Log cleared');
 });
 
 // Initialize
-updateUI();
 updateCounterDisplay();
 log('Application initialized');
 
+if (checkAPIAvailability()) {
+  registerBaseTools();
+  log('✅ Test app ready! Use buttons to test two-bucket system.', 'success');
+}
+
+// Type for test API
+declare global {
+  interface Window {
+    testApp: {
+      counter: () => number;
+      registerBaseTools: () => void;
+      registerDynamicTool: () => void;
+      unregisterDynamicTool: () => void;
+      replaceBaseTools: () => void;
+      listAllTools: () => void;
+      getAPIStatus: () => boolean;
+    };
+  }
+}
+
 // Expose functions for testing
-(window as any).testApp = {
-  startServer,
-  stopServer,
-  connectClient,
-  disconnectClient,
-  listTools,
-  callTool,
-  getCounter: () => counter,
-  getServerStatus: () => server !== null,
-  getClientStatus: () => client !== null,
+window.testApp = {
+  counter: () => counter,
+  registerBaseTools,
+  registerDynamicTool,
+  unregisterDynamicTool,
+  replaceBaseTools,
+  listAllTools,
+  getAPIStatus: () => 'modelContext' in navigator,
 };

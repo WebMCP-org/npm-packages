@@ -7,19 +7,19 @@ export interface ApiAvailability {
   details?: string;
 }
 
-export abstract class BaseApiTools {
+export abstract class BaseApiTools<TOptions = Record<string, unknown>> {
   protected abstract apiName: string;
 
   constructor(
     protected server: McpServer,
-    protected options: any = {}
+    protected options: TOptions = {} as TOptions
   ) {}
 
   abstract checkAvailability(): ApiAvailability;
   abstract registerTools(): void;
 
   protected shouldRegisterTool(toolName: string): boolean {
-    if (this.options[toolName] === false) {
+    if ((this.options as Record<string, unknown>)[toolName] === false) {
       return false;
     }
     return true;
@@ -38,7 +38,7 @@ export abstract class BaseApiTools {
     };
   }
 
-  protected formatSuccess(message: string, data?: any): CallToolResult {
+  protected formatSuccess(message: string, data?: unknown): CallToolResult {
     return {
       content: [
         {
@@ -49,7 +49,7 @@ export abstract class BaseApiTools {
     };
   }
 
-  protected formatJson(data: any): CallToolResult {
+  protected formatJson(data: unknown): CallToolResult {
     return {
       content: [
         {

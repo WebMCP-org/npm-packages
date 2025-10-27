@@ -36,7 +36,7 @@ type BookmarkAction = (typeof BOOKMARK_ACTIONS)[number];
 
 const bookmarkActionSchema = z.enum(BOOKMARK_ACTIONS);
 
-export class BookmarksApiTools extends BaseApiTools {
+export class BookmarksApiTools extends BaseApiTools<BookmarksApiToolsOptions> {
   protected apiName = 'Bookmarks';
 
   constructor(server: McpServer, options: BookmarksApiToolsOptions = {}) {

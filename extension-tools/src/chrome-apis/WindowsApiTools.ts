@@ -27,7 +27,7 @@ type WindowAction = (typeof WINDOW_ACTIONS)[number];
 
 const windowActionSchema = z.enum(WINDOW_ACTIONS);
 
-export class WindowsApiTools extends BaseApiTools {
+export class WindowsApiTools extends BaseApiTools<WindowsApiToolsOptions> {
   protected apiName = 'Windows';
 
   constructor(server: McpServer, options: WindowsApiToolsOptions = {}) {

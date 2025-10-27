@@ -35,9 +35,9 @@ export type UserScriptServerTransportOptions = {
 export class UserScriptServerTransport implements Transport {
   private _port: chrome.runtime.Port;
   private _started = false;
-  private _messageHandler?: (message: any, port: chrome.runtime.Port) => void;
-  private _disconnectHandler?: (port: chrome.runtime.Port) => void;
-  private _keepAliveTimer?: number;
+  private _messageHandler: ((message: unknown, port: chrome.runtime.Port) => void) | undefined;
+  private _disconnectHandler: ((port: chrome.runtime.Port) => void) | undefined;
+  private _keepAliveTimer: number | undefined;
   private _options: UserScriptServerTransportOptions;
   private _connectionInfo: {
     connectedAt: number;
@@ -79,14 +79,15 @@ export class UserScriptServerTransport implements Transport {
     this._started = true;
 
     // Set up message handler
-    this._messageHandler = (message: any) => {
+    this._messageHandler = (message: unknown) => {
       try {
         // Update connection info
         this._connectionInfo.lastMessageAt = Date.now();
         this._connectionInfo.messageCount++;
 
         // Handle ping messages for keep-alive
-        if ((message as any).type === 'ping') {
+        const msg = message as { type?: string };
+        if (msg.type === 'ping') {
           this._port.postMessage({ type: 'pong' });
           return;
         }
@@ -154,7 +155,7 @@ export class UserScriptServerTransport implements Transport {
     if (this._port) {
       try {
         this._port.disconnect();
-      } catch (error) {
+      } catch (_error) {
         // Port might already be disconnected
       }
     }
@@ -168,7 +169,7 @@ export class UserScriptServerTransport implements Transport {
    */
   private _cleanup(): void {
     // Stop keep-alive timer
-    if (this._keepAliveTimer) {
+    if (this._keepAliveTimer !== undefined) {
       clearInterval(this._keepAliveTimer);
       this._keepAliveTimer = undefined;
     }
@@ -215,7 +216,7 @@ export class UserScriptServerTransport implements Transport {
    * Stops the keep-alive mechanism
    */
   private _stopKeepAlive(): void {
-    if (this._keepAliveTimer) {
+    if (this._keepAliveTimer !== undefined) {
       clearInterval(this._keepAliveTimer);
       this._keepAliveTimer = undefined;
     }

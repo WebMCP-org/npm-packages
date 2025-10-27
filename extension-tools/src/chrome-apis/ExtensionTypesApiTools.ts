@@ -14,7 +14,7 @@
 //   getFrameTypes?: boolean;
 // }
 
-// export class ExtensionTypesApiTools extends BaseApiTools {
+// export class ExtensionTypesApiTools extends BaseApiTools<ExtensionTypesApiToolsOptions> {
 //   protected apiName = 'ExtensionTypes';
 
 //   constructor(

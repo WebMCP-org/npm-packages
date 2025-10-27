@@ -20,7 +20,7 @@ export interface BrowsingDataApiToolsOptions {
   settings?: boolean;
 }
 
-export class BrowsingDataApiTools extends BaseApiTools {
+export class BrowsingDataApiTools extends BaseApiTools<BrowsingDataApiToolsOptions> {
   protected apiName = 'BrowsingData';
 
   constructor(server: McpServer, options: BrowsingDataApiToolsOptions = {}) {

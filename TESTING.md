@@ -17,13 +17,14 @@ We use **Playwright** for end-to-end testing of browser-based transports, which 
 
 Located in `/e2e/`, the test infrastructure includes:
 
-- **Test App** (`e2e/test-app/`): A Vite + TypeScript application that demonstrates Tab Transport usage
-- **Test Suites** (`e2e/tests/`): Playwright tests that validate transport behavior
-- **Configuration**: Playwright config with Chromium browser support
+- **Tab Transport Test App** (`e2e/test-app/`): A Vite + TypeScript application that demonstrates Tab Transport usage
+- **React WebMCP Test App** (`e2e/react-webmcp-test-app/`): React application testing `useWebMCP` hooks and tool registration
+- **Test Suites** (`e2e/tests/`): Playwright tests that validate transport behavior and React integration
+- **Configuration**: Multiple Playwright configs for different test scenarios
 
 ### Test App Features
 
-The test application provides:
+#### Tab Transport Test App (`e2e/test-app/`)
 
 1. **MCP Server**: Implements a counter service with 4 tools:
    - `incrementCounter` - Increment counter by 1
@@ -41,6 +42,24 @@ The test application provides:
    - Counter display
 
 4. **Programmatic API**: Exposed `testApp` object for Playwright to control
+
+#### React WebMCP Test App (`e2e/react-webmcp-test-app/`)
+
+1. **Provider Component**: Demonstrates `useWebMCP` hook for tool registration
+   - Registers tools via `navigator.modelContext`
+   - State-aware tool execution
+   - Component-scoped tool lifecycle
+
+2. **Client Component**: Demonstrates MCP client consuming tools
+   - Lists available tools
+   - Calls tools via MCP protocol
+   - Connection management
+
+3. **Test Scenarios**: Validates React integration
+   - Tool registration on component mount
+   - Tool unregistration on component unmount
+   - StrictMode compatibility
+   - State management during tool execution
 
 ## Running Tests
 
@@ -67,6 +86,10 @@ pnpm test
 pnpm test
 pnpm test:e2e
 
+# Run specific test suites
+pnpm --filter mcp-e2e-tests test                    # Tab transport tests
+pnpm --filter mcp-e2e-tests test:react-webmcp       # React WebMCP tests
+
 # Run with Playwright UI (recommended for development)
 pnpm test:e2e:ui
 
@@ -82,7 +105,9 @@ pnpm --filter mcp-e2e-tests test:report
 
 ### Manual Testing
 
-Run the test app manually to experiment with transports:
+Run the test apps manually to experiment:
+
+#### Tab Transport Test App
 
 ```bash
 # Start test app dev server
@@ -98,34 +123,77 @@ Then use the UI to:
 4. Execute counter operations
 5. Monitor the event log
 
+#### React WebMCP Test App
+
+```bash
+# Start React test app
+pnpm --filter react-webmcp-test-app dev
+
+# Open http://localhost:5174 in browser
+```
+
+Test React integration:
+1. See tools registered via `useWebMCP`
+2. Connect client to consume tools
+3. Call tools through MCP protocol
+4. Observe tool state management
+
 ## Test Coverage
 
 The Playwright test suite validates:
 
-### Basic Functionality
+### Tab Transport Tests (`e2e/tests/tab-transport.spec.ts`)
+
+**Basic Functionality**
 - ✅ Application loads correctly
 - ✅ MCP server starts successfully
 - ✅ MCP client connects to server
 - ✅ Tools can be listed via MCP protocol
 
-### Tool Execution
+**Tool Execution**
 - ✅ Increment counter via MCP tool call
 - ✅ Decrement counter via MCP tool call
 - ✅ Reset counter via MCP tool call
 - ✅ Get counter value via MCP tool call
 
-### Advanced Scenarios
+**Advanced Scenarios**
 - ✅ Multiple rapid tool calls (concurrency)
 - ✅ Client disconnect and reconnect
 - ✅ Server stop and restart
 - ✅ Programmatic API usage
 
-### Transport Validation
+**Transport Validation**
 - ✅ TabServerTransport accepts connections
 - ✅ TabClientTransport establishes connections
 - ✅ postMessage communication works
 - ✅ JSON-RPC messages flow correctly
 - ✅ State persistence across reconnections
+
+### React WebMCP Tests (`e2e/tests/react-webmcp.spec.ts`)
+
+**Hook Integration**
+- ✅ `useWebMCP` registers tools on mount
+- ✅ Tools appear in `navigator.modelContext`
+- ✅ Tools unregister on component unmount
+- ✅ React StrictMode compatibility (double mounting)
+
+**Tool Registration**
+- ✅ Multiple tools registered successfully
+- ✅ Input schema validation with Zod
+- ✅ Tool execution state tracking
+- ✅ Error handling in tool handlers
+
+**Client Consumption**
+- ✅ `McpClientProvider` connects to server
+- ✅ `useMcpClient` lists available tools
+- ✅ Tools can be called from client
+- ✅ Tool responses propagate correctly
+
+**State Management**
+- ✅ Tool execution state (isExecuting, lastResult, error)
+- ✅ State updates during tool execution
+- ✅ Error state management
+- ✅ Execution count tracking
 
 ## CI/CD Integration
 
@@ -319,6 +387,8 @@ pnpm --filter mcp-e2e-tests exec playwright install chromium
 ```
 
 ### Port Conflicts
+
+
 
 If port 5173 is in use:
 

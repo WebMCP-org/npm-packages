@@ -15,7 +15,7 @@ export class ContentDetection {
       return doc.documentElement;
     }
 
-    return this.detectMainContent(doc.body);
+    return ContentDetection.detectMainContent(doc.body);
   }
 
   /**
@@ -25,28 +25,31 @@ export class ContentDetection {
     const candidates: Element[] = [];
     const minScore = 15;
 
-    this.collectCandidates(rootElement, candidates, minScore);
+    ContentDetection.collectCandidates(rootElement, candidates, minScore);
 
     if (candidates.length === 0) {
       return rootElement;
     }
 
     // Sort by score
-    candidates.sort((a, b) => this.calculateContentScore(b) - this.calculateContentScore(a));
+    candidates.sort(
+      (a, b) =>
+        ContentDetection.calculateContentScore(b) - ContentDetection.calculateContentScore(a)
+    );
 
     // Find best independent candidate
-    let bestCandidate = candidates[0];
+    let bestCandidate = candidates[0]!;
     for (let i = 1; i < candidates.length; i++) {
+      const candidate = candidates[i]!;
       // Check if this candidate is not contained in any other
-      const isIndependent = !candidates.some(
-        (other, j) => j !== i && other.contains(candidates[i])
-      );
+      const isIndependent = !candidates.some((other, j) => j !== i && other.contains(candidate));
 
       if (
         isIndependent &&
-        this.calculateContentScore(candidates[i]) > this.calculateContentScore(bestCandidate)
+        ContentDetection.calculateContentScore(candidate) >
+          ContentDetection.calculateContentScore(bestCandidate)
       ) {
-        bestCandidate = candidates[i];
+        bestCandidate = candidate;
       }
     }
 
@@ -61,14 +64,14 @@ export class ContentDetection {
     candidates: Element[],
     minScore: number
   ): void {
-    const score = this.calculateContentScore(element);
+    const score = ContentDetection.calculateContentScore(element);
     if (score >= minScore) {
       candidates.push(element);
     }
 
     // Recursively check children
     Array.from(element.children).forEach((child) => {
-      this.collectCandidates(child, candidates, minScore);
+      ContentDetection.collectCandidates(child, candidates, minScore);
     });
   }
 
@@ -99,7 +102,7 @@ export class ContentDetection {
 
     // Check ID
     semanticIds.forEach((id) => {
-      if (element.id && element.id.toLowerCase().includes(id)) {
+      if (element.id?.toLowerCase().includes(id)) {
         score += 10;
       }
     });
@@ -126,7 +129,7 @@ export class ContentDetection {
     }
 
     // Link density (lower is better for content)
-    const linkDensity = this.calculateLinkDensity(element);
+    const linkDensity = ContentDetection.calculateLinkDensity(element);
     if (linkDensity < 0.3) {
       score += 5;
     } else if (linkDensity > 0.5) {
@@ -195,7 +198,7 @@ export class ContentDetection {
     // Check for navigation patterns
     const navPatterns = [/nav/i, /menu/i, /sidebar/i, /toolbar/i];
 
-    const classesAndId = (element.className + ' ' + element.id).toLowerCase();
+    const classesAndId = `${element.className} ${element.id}`.toLowerCase();
     return navPatterns.some((pattern) => pattern.test(classesAndId));
   }
 
@@ -213,7 +216,7 @@ export class ContentDetection {
     // Check for supplementary patterns
     const supplementaryPatterns = [/sidebar/i, /widget/i, /related/i, /advertisement/i, /social/i];
 
-    const classesAndId = (element.className + ' ' + element.id).toLowerCase();
+    const classesAndId = `${element.className} ${element.id}`.toLowerCase();
     return supplementaryPatterns.some((pattern) => pattern.test(classesAndId));
   }
 

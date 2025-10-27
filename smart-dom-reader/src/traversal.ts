@@ -1,5 +1,5 @@
 import { SelectorGenerator } from './selectors';
-import {
+import type {
   ElementContext,
   ElementInteraction,
   ExtractedElement,
@@ -173,7 +173,7 @@ export class DOMTraversal {
 
     // Check interaction types
     if (filter.interactionTypes?.length) {
-      const interaction = this.getInteractionInfo(element);
+      const interaction = DOMTraversal.getInteractionInfo(element);
       let hasInteraction = false;
       for (const type of filter.interactionTypes) {
         if (interaction[type]) {
@@ -201,7 +201,7 @@ export class DOMTraversal {
   static extractElement(
     element: Element,
     options: ExtractionOptions,
-    depth: number = 0
+    depth = 0
   ): ExtractedElement | null {
     // Check depth limit
     if (options.maxDepth && depth > options.maxDepth) {
@@ -209,17 +209,17 @@ export class DOMTraversal {
     }
 
     // Check visibility
-    if (!options.includeHidden && !this.isVisible(element)) {
+    if (!options.includeHidden && !DOMTraversal.isVisible(element)) {
       return null;
     }
 
     // Check viewport
-    if (options.viewportOnly && !this.isInViewport(element)) {
+    if (options.viewportOnly && !DOMTraversal.isInViewport(element)) {
       return null;
     }
 
     // Apply filters
-    if (!this.passesFilter(element, options.filter)) {
+    if (!DOMTraversal.passesFilter(element, options.filter)) {
       return null;
     }
 
@@ -227,26 +227,30 @@ export class DOMTraversal {
 
     const extracted: ExtractedElement = {
       tag: element.tagName.toLowerCase(),
-      text: this.getElementText(element, options),
+      text: DOMTraversal.getElementText(element, options),
       selector: SelectorGenerator.generateSelectors(element),
-      attributes: this.getRelevantAttributes(element, options),
-      context: this.getElementContext(element),
-      interaction: this.getInteractionInfo(element),
+      attributes: DOMTraversal.getRelevantAttributes(element, options),
+      context: DOMTraversal.getElementContext(element),
+      interaction: DOMTraversal.getInteractionInfo(element),
       // bounds removed to save tokens
     };
 
     // Extract children for semantic elements in full mode
-    if (options.mode === 'full' && this.isSemanticContainer(element)) {
+    if (options.mode === 'full' && DOMTraversal.isSemanticContainer(element)) {
       const children: ExtractedElement[] = [];
 
       // Handle shadow DOM
       if (options.includeShadowDOM && htmlElement.shadowRoot) {
-        const shadowChildren = this.extractChildren(htmlElement.shadowRoot, options, depth + 1);
+        const shadowChildren = DOMTraversal.extractChildren(
+          htmlElement.shadowRoot,
+          options,
+          depth + 1
+        );
         children.push(...shadowChildren);
       }
 
       // Handle regular children
-      const regularChildren = this.extractChildren(element, options, depth + 1);
+      const regularChildren = DOMTraversal.extractChildren(element, options, depth + 1);
       children.push(...regularChildren);
 
       if (children.length > 0) {
@@ -270,11 +274,11 @@ export class DOMTraversal {
 
     for (const child of Array.from(elements)) {
       // Skip if element is nested inside another extracted element
-      if (this.hasExtractedAncestor(child, elements)) {
+      if (DOMTraversal.hasExtractedAncestor(child, elements)) {
         continue;
       }
 
-      const extracted = this.extractElement(child, options, depth);
+      const extracted = DOMTraversal.extractElement(child, options, depth);
       if (extracted) {
         children.push(extracted);
       }
@@ -347,7 +351,7 @@ export class DOMTraversal {
       if (value) {
         // Truncate long values based on options
         attributes[attr] =
-          value.length > attrTruncate ? value.substring(0, attrTruncate) + '...' : value;
+          value.length > attrTruncate ? `${value.substring(0, attrTruncate)}...` : value;
       }
     }
 
@@ -356,7 +360,7 @@ export class DOMTraversal {
       if (attr.name.startsWith('data-') && !relevant.includes(attr.name)) {
         attributes[attr.name] =
           attr.value.length > dataAttrTruncate
-            ? attr.value.substring(0, dataAttrTruncate) + '...'
+            ? `${attr.value.substring(0, dataAttrTruncate)}...`
             : attr.value;
       }
     }
@@ -432,7 +436,7 @@ export class DOMTraversal {
       htmlElement.hasAttribute('disabled') || htmlElement.getAttribute('aria-disabled') === 'true';
     if (isDisabled) interaction.disabled = true;
 
-    const isHidden = !this.isVisible(element);
+    const isHidden = !DOMTraversal.isVisible(element);
     if (isHidden) interaction.hidden = true;
 
     const ariaRole = element.getAttribute('role');
@@ -469,7 +473,7 @@ export class DOMTraversal {
     const maxLength = options?.textTruncateLength;
 
     if (maxLength && text.length > maxLength) {
-      return text.substring(0, maxLength) + '...';
+      return `${text.substring(0, maxLength)}...`;
     }
 
     return text;
@@ -490,15 +494,15 @@ export class DOMTraversal {
    * Get interactive elements
    */
   static getInteractiveElements(
-    container: Element | Document = document,
+    container: Element | Document,
     options: ExtractionOptions
   ): ExtractedElement[] {
     const elements: ExtractedElement[] = [];
-    const selector = this.INTERACTIVE_SELECTORS.join(', ');
+    const selector = DOMTraversal.INTERACTIVE_SELECTORS.join(', ');
     const found = container.querySelectorAll(selector);
 
     for (const element of Array.from(found)) {
-      const extracted = this.extractElement(element, options);
+      const extracted = DOMTraversal.extractElement(element, options);
       if (extracted) {
         elements.push(extracted);
       }
@@ -510,12 +514,12 @@ export class DOMTraversal {
         try {
           const customFound = container.querySelectorAll(customSelector);
           for (const element of Array.from(customFound)) {
-            const extracted = this.extractElement(element, options);
+            const extracted = DOMTraversal.extractElement(element, options);
             if (extracted) {
               elements.push(extracted);
             }
           }
-        } catch (e) {
+        } catch (_e) {
           console.warn(`Invalid custom selector: ${customSelector}`);
         }
       }
@@ -528,15 +532,15 @@ export class DOMTraversal {
    * Get semantic elements (for full mode)
    */
   static getSemanticElements(
-    container: Element | Document = document,
+    container: Element | Document,
     options: ExtractionOptions
   ): ExtractedElement[] {
     const elements: ExtractedElement[] = [];
-    const selector = this.SEMANTIC_SELECTORS.join(', ');
+    const selector = DOMTraversal.SEMANTIC_SELECTORS.join(', ');
     const found = container.querySelectorAll(selector);
 
     for (const element of Array.from(found)) {
-      const extracted = this.extractElement(element, options);
+      const extracted = DOMTraversal.extractElement(element, options);
       if (extracted) {
         elements.push(extracted);
       }

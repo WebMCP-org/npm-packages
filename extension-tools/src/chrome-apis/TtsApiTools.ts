@@ -11,7 +11,7 @@ export interface TtsApiToolsOptions {
   getVoices?: boolean;
 }
 
-export class TtsApiTools extends BaseApiTools {
+export class TtsApiTools extends BaseApiTools<TtsApiToolsOptions> {
   protected apiName = 'Tts';
 
   constructor(server: McpServer, options: TtsApiToolsOptions = {}) {

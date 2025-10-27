@@ -9,7 +9,7 @@ export interface I18nApiToolsOptions {
   detectLanguage?: boolean;
 }
 
-export class I18nApiTools extends BaseApiTools {
+export class I18nApiTools extends BaseApiTools<I18nApiToolsOptions> {
   protected apiName = 'I18n';
 
   constructor(server: McpServer, options: I18nApiToolsOptions = {}) {

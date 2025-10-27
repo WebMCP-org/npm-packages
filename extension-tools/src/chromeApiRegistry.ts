@@ -959,14 +959,15 @@ export function isApiAvailable(
 /**
  * Get the Chrome API object reference by API enum
  */
-export function getChromeApiReference(api: ChromeApi): any {
+export function getChromeApiReference(api: ChromeApi): unknown {
   const metadata = CHROME_API_REGISTRY[api];
   const parts = metadata.namespace.split('.');
 
-  let ref: any = chrome;
+  let ref: Record<string, unknown> = chrome as unknown as Record<string, unknown>;
   for (const part of parts) {
-    ref = ref?.[part];
-    if (!ref) return undefined;
+    const next = ref?.[part];
+    if (!next) return undefined;
+    ref = next as Record<string, unknown>;
   }
 
   return ref;

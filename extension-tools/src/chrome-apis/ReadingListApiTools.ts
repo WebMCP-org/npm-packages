@@ -9,7 +9,7 @@ export interface ReadingListApiToolsOptions {
   updateEntry?: boolean;
 }
 
-export class ReadingListApiTools extends BaseApiTools {
+export class ReadingListApiTools extends BaseApiTools<ReadingListApiToolsOptions> {
   protected apiName = 'ReadingList';
 
   constructor(server: McpServer, options: ReadingListApiToolsOptions = {}) {

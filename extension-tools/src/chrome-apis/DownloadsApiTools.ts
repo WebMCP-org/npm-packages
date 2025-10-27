@@ -18,7 +18,7 @@ export interface DownloadsApiToolsOptions {
   setUiOptions?: boolean;
 }
 
-export class DownloadsApiTools extends BaseApiTools {
+export class DownloadsApiTools extends BaseApiTools<DownloadsApiToolsOptions> {
   protected apiName = 'Downloads';
 
   constructor(server: McpServer, options: DownloadsApiToolsOptions = {}) {

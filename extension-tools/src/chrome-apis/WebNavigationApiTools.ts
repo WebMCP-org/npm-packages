@@ -16,7 +16,7 @@ export interface WebNavigationApiToolsOptions {
   onTabReplaced?: boolean;
 }
 
-export class WebNavigationApiTools extends BaseApiTools {
+export class WebNavigationApiTools extends BaseApiTools<WebNavigationApiToolsOptions> {
   protected apiName = 'WebNavigation';
 
   constructor(server: McpServer, options: WebNavigationApiToolsOptions = {}) {
