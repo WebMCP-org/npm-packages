@@ -5,7 +5,7 @@ export interface TopSitesApiToolsOptions {
   getTopSites?: boolean;
 }
 
-export class TopSitesApiTools extends BaseApiTools {
+export class TopSitesApiTools extends BaseApiTools<TopSitesApiToolsOptions> {
   protected apiName = 'TopSites';
 
   constructor(server: McpServer, options: TopSitesApiToolsOptions = {}) {

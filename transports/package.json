@@ -36,7 +36,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup",
+    "build": "tsdown",
     "check": "biome check --write .",
     "clean": "rm -rf dist .turbo",
     "format": "biome format --write .",
@@ -55,7 +55,7 @@
   "devDependencies": {
     "@types/chrome": "catalog:",
     "@types/node": "catalog:",
-    "tsup": "catalog:",
+    "tsdown": "catalog:",
     "typescript": "catalog:"
   },
   "peerDependencies": {

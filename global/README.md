@@ -1,11 +1,11 @@
 # @mcp-b/global
 
-> Web Model Context API polyfill - Implement `window.agent` for AI-powered web applications
+> Web Model Context API polyfill - Implement `window.navigator.modelContext` for AI-powered web applications
 
 [![npm version](https://img.shields.io/npm/v/@mcp-b/global?style=flat-square)](https://www.npmjs.com/package/@mcp-b/global)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 
-This package implements the [Web Model Context API](https://github.com/webmachinelearning/webmcp) (`window.agent`) specification, bridging it to the Model Context Protocol (MCP) SDK. It allows web developers to expose JavaScript functions as "tools" that AI agents can discover and invoke.
+This package implements the [W3C Web Model Context API](https://github.com/webmachinelearning/webmcp) (`window.navigator.modelContext`) specification, bridging it to the Model Context Protocol (MCP) SDK. It allows web developers to expose JavaScript functions as "tools" that AI agents can discover and invoke.
 
 ## 🚀 Quick Start
 
@@ -24,7 +24,7 @@ Add the script to your HTML `<head>`:
 
   <script>
     // Register tools with AI agents
-    window.agent.provideContext({
+    window.navigator.modelContext.provideContext({
       tools: [
         {
           name: "get-page-title",
@@ -58,17 +58,32 @@ npm install @mcp-b/global
 ```javascript
 import '@mcp-b/global';
 
-// window.agent is now available
-window.agent.provideContext({
+// window.navigator.modelContext is now available
+window.navigator.modelContext.provideContext({
   tools: [/* your tools */]
 });
 ```
 
 ## 📖 API Reference
 
-### `window.agent.provideContext(context)`
+### Two-Bucket Tool Management System
 
-Register tools that AI agents can invoke.
+This package uses a **two-bucket system** for tool management to support both app-level and component-level tools:
+
+- **Bucket A (Base Tools)**: Registered via `provideContext()` - represents your app's core functionality
+- **Bucket B (Dynamic Tools)**: Registered via `registerTool()` - component-scoped tools that persist across `provideContext()` calls
+
+**Key behaviors:**
+- ✅ `provideContext()` only clears Bucket A, leaving Bucket B intact
+- ✅ `registerTool()` adds to Bucket B and persists across `provideContext()` calls
+- ✅ Tool name collisions between buckets throw an error
+- ✅ Cannot `unregister()` a tool that was registered via `provideContext()`
+
+**Use case:** React components can use `registerTool()` in `useEffect()` to manage tool lifecycle independently of the app's base tools.
+
+### `window.navigator.modelContext.provideContext(context)`
+
+Register base/app-level tools (Bucket A). **This clears Bucket A only** and replaces with the provided array. Dynamic tools (Bucket B) registered via `registerTool()` are NOT affected.
 
 **Parameters:**
 - `context.tools` - Array of tool descriptors
@@ -76,7 +91,7 @@ Register tools that AI agents can invoke.
 **Example:**
 
 ```javascript
-window.agent.provideContext({
+window.navigator.modelContext.provideContext({
   tools: [
     {
       name: "add-todo",
@@ -110,6 +125,51 @@ window.agent.provideContext({
     }
   ]
 });
+```
+
+### `window.navigator.modelContext.registerTool(tool)`
+
+Register a single tool dynamically (Bucket B). Tools registered this way:
+- ✅ Persist across `provideContext()` calls
+- ✅ Perfect for component lifecycle management
+- ✅ Can be unregistered via the returned `unregister()` function
+- ❌ Cannot have the same name as a tool in Bucket A (provideContext)
+
+**Parameters:**
+- `tool` - A single tool descriptor
+
+**Returns:**
+- Object with `unregister()` function to remove the tool
+
+**Example:**
+
+```javascript
+// Register a tool dynamically (Bucket B)
+const registration = window.navigator.modelContext.registerTool({
+  name: "get-timestamp",
+  description: "Get the current timestamp",
+  inputSchema: {
+    type: "object",
+    properties: {}
+  },
+  async execute() {
+    return {
+      content: [{
+        type: "text",
+        text: new Date().toISOString()
+      }]
+    };
+  }
+});
+
+// Later, unregister the tool
+registration.unregister();
+
+// Note: You can call provideContext() and this tool will still be registered!
+window.navigator.modelContext.provideContext({
+  tools: [/* other tools */]
+});
+// "get-timestamp" is still available because it's in Bucket B
 ```
 
 ### Tool Descriptor
@@ -146,7 +206,7 @@ Tools must return an object with:
 ```javascript
 let todos = [];
 
-window.agent.provideContext({
+window.navigator.modelContext.provideContext({
   tools: [
     {
       name: "add-todo",
@@ -218,7 +278,7 @@ function updateUI() {
 ### E-commerce Product Search
 
 ```javascript
-window.agent.provideContext({
+window.navigator.modelContext.provideContext({
   tools: [
     {
       name: "search-products",
@@ -286,12 +346,119 @@ window.agent.provideContext({
 });
 ```
 
+## 🔧 Dynamic Tool Registration (Component Lifecycle)
+
+### React Component Example
+
+Perfect for managing tools tied to component lifecycle:
+
+```javascript
+import { useEffect } from 'react';
+
+function MyComponent() {
+  useEffect(() => {
+    // Register component-specific tool when component mounts (Bucket B)
+    const registration = window.navigator.modelContext.registerTool({
+      name: "component-action",
+      description: "Action specific to this component",
+      inputSchema: { type: "object", properties: {} },
+      async execute() {
+        // Access component state/methods here
+        return {
+          content: [{ type: "text", text: "Component action executed!" }]
+        };
+      }
+    });
+
+    // Cleanup: unregister when component unmounts
+    return () => {
+      registration.unregister();
+    };
+  }, []);
+
+  return <div>My Component</div>;
+}
+```
+
+### Persistence Across provideContext() Calls
+
+```javascript
+// Step 1: Register base tools (Bucket A)
+window.navigator.modelContext.provideContext({
+  tools: [
+    { name: "base-tool-1", description: "Base tool", inputSchema: {}, async execute() {} }
+  ]
+});
+// Tools: ["base-tool-1"]
+
+// Step 2: Register dynamic tool (Bucket B)
+const reg = window.navigator.modelContext.registerTool({
+  name: "dynamic-tool",
+  description: "Dynamic tool",
+  inputSchema: { type: "object", properties: {} },
+  async execute() {
+    return { content: [{ type: "text", text: "Dynamic!" }] };
+  }
+});
+// Tools: ["base-tool-1", "dynamic-tool"]
+
+// Step 3: Update base tools via provideContext
+window.navigator.modelContext.provideContext({
+  tools: [
+    { name: "base-tool-2", description: "New base tool", inputSchema: {}, async execute() {} }
+  ]
+});
+// Tools: ["base-tool-2", "dynamic-tool"]
+// ✅ "dynamic-tool" persists! Only "base-tool-1" was cleared
+
+// Step 4: Clean up dynamic tool
+reg.unregister();
+// Tools: ["base-tool-2"]
+```
+
+### Name Collision Protection
+
+```javascript
+// Register a base tool
+window.navigator.modelContext.provideContext({
+  tools: [
+    { name: "my-tool", description: "Base", inputSchema: {}, async execute() {} }
+  ]
+});
+
+// This will throw an error!
+try {
+  window.navigator.modelContext.registerTool({
+    name: "my-tool", // ❌ Name collision with Bucket A
+    description: "Dynamic",
+    inputSchema: {},
+    async execute() {}
+  });
+} catch (error) {
+  console.error(error.message);
+  // Error: Tool name collision: "my-tool" is already registered via provideContext()
+}
+
+// Similarly, can't unregister a base tool
+const baseToolList = window.navigator.modelContext.provideContext({
+  tools: [{ name: "base", description: "Base", inputSchema: {}, async execute() {} }]
+});
+
+// This will also throw an error!
+try {
+  // Assuming we got a reference somehow
+  // registration.unregister(); would fail for a base tool
+} catch (error) {
+  // Error: Cannot unregister tool "base": This tool was registered via provideContext()
+}
+```
+
 ## 🔧 Event-Based Tool Calls (Advanced)
 
 For manifest-based or advanced scenarios, you can handle tool calls as events:
 
 ```javascript
-window.agent.addEventListener('toolcall', async (event) => {
+window.navigator.modelContext.addEventListener('toolcall', async (event) => {
   console.log(`Tool called: ${event.name}`, event.arguments);
 
   if (event.name === "custom-tool") {
@@ -335,14 +502,14 @@ This allows flexibility for different use cases.
 │   (Internal)    │
 └────────┬────────┘
          │
-┌────────▼────────┐
-│ window.agent    │ ◄── Your app registers tools here
-│   (This pkg)    │
-└─────────────────┘
+┌────────▼───────────────────┐
+│ navigator.modelContext     │ ◄── Your app registers tools here
+│        (This pkg)          │
+└────────────────────────────┘
 ```
 
 This package:
-1. Exposes `window.agent` API (Web Model Context standard)
+1. Exposes `window.navigator.modelContext` API (W3C Web Model Context standard)
 2. Internally creates an MCP Server
 3. Bridges tool calls between the two protocols
 4. Uses TabServerTransport for browser communication
@@ -352,9 +519,9 @@ This package:
 Check if the API is available:
 
 ```javascript
-if ("agent" in window) {
+if ("modelContext" in navigator) {
   // API is available
-  window.agent.provideContext({ tools: [...] });
+  navigator.modelContext.provideContext({ tools: [...] });
 } else {
   console.warn("Web Model Context API not available");
 }
@@ -373,7 +540,8 @@ if (window.__mcpBridge) {
 
 ## 📦 What's Included
 
-- **Web Model Context API** - Standard `window.agent` interface
+- **Web Model Context API** - Standard `window.navigator.modelContext` interface
+- **Dynamic Tool Registration** - `registerTool()` with `unregister()` function
 - **MCP Bridge** - Automatic bridging to Model Context Protocol
 - **Tab Transport** - Communication layer for browser contexts
 - **Event System** - Hybrid tool call handling
@@ -387,7 +555,7 @@ By default, the MCP transport allows connections from any origin (`*`). For prod
 
 ```javascript
 // Future configuration API
-window.agent.configure({
+window.navigator.modelContext.configure({
   allowedOrigins: [
     'https://your-app.com',
     'https://trusted-agent.com'

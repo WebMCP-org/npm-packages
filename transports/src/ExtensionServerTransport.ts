@@ -33,9 +33,9 @@ export type ExtensionServerTransportOptions = {
 export class ExtensionServerTransport implements Transport {
   private _port: chrome.runtime.Port;
   private _started = false;
-  private _messageHandler?: (message: any, port: chrome.runtime.Port) => void;
-  private _disconnectHandler?: (port: chrome.runtime.Port) => void;
-  private _keepAliveTimer?: number;
+  private _messageHandler: ((message: any, port: chrome.runtime.Port) => void) | undefined;
+  private _disconnectHandler: ((port: chrome.runtime.Port) => void) | undefined;
+  private _keepAliveTimer: number | undefined;
   private _options: ExtensionServerTransportOptions;
   private _connectionInfo: {
     connectedAt: number;
@@ -152,7 +152,7 @@ export class ExtensionServerTransport implements Transport {
     if (this._port) {
       try {
         this._port.disconnect();
-      } catch (error) {
+      } catch (_error) {
         // Port might already be disconnected
       }
     }
@@ -166,7 +166,7 @@ export class ExtensionServerTransport implements Transport {
    */
   private _cleanup(): void {
     // Stop keep-alive timer
-    if (this._keepAliveTimer) {
+    if (this._keepAliveTimer !== undefined) {
       clearInterval(this._keepAliveTimer);
       this._keepAliveTimer = undefined;
     }
@@ -213,7 +213,7 @@ export class ExtensionServerTransport implements Transport {
    * Stops the keep-alive mechanism
    */
   private _stopKeepAlive(): void {
-    if (this._keepAliveTimer) {
+    if (this._keepAliveTimer !== undefined) {
       clearInterval(this._keepAliveTimer);
       this._keepAliveTimer = undefined;
     }

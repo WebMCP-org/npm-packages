@@ -5,7 +5,7 @@ export interface SystemCpuApiToolsOptions {
   getInfo?: boolean;
 }
 
-export class SystemCpuApiTools extends BaseApiTools {
+export class SystemCpuApiTools extends BaseApiTools<SystemCpuApiToolsOptions> {
   protected apiName = 'System.cpu';
 
   constructor(server: McpServer, options: SystemCpuApiToolsOptions = {}) {

@@ -17,7 +17,7 @@ export interface DeclarativeNetRequestApiToolsOptions {
   setExtensionActionOptions?: boolean;
 }
 
-export class DeclarativeNetRequestApiTools extends BaseApiTools {
+export class DeclarativeNetRequestApiTools extends BaseApiTools<DeclarativeNetRequestApiToolsOptions> {
   protected apiName = 'DeclarativeNetRequest';
 
   constructor(server: McpServer, options: DeclarativeNetRequestApiToolsOptions = {}) {

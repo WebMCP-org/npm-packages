@@ -40,7 +40,7 @@
     "lineEnding": "lf"
   },
   "linter": {
-    "enabled": false,
+    "enabled": true,
     "rules": {
       "recommended": true,
       "style": {
@@ -75,5 +75,65 @@
         "organizeImports": "on"
       }
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": [
+        "extension-tools/src/chrome-apis/**",
+        "extension-tools/src/DomExtractionTools.ts",
+        "extension-tools/src/aiScripts/**"
+      ],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "off",
+            "noImplicitAnyLet": "off"
+          },
+          "style": {
+            "noNonNullAssertion": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "smart-dom-reader/**/*.bundle.js",
+        "smart-dom-reader/**/lib/**",
+        "smart-dom-reader/src/**",
+        "smart-dom-reader/mcp-server/**",
+        "smart-dom-reader/dist-bundle/**"
+      ],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noThisInStatic": "off",
+            "noCommaOperator": "off",
+            "noStaticOnlyClass": "off"
+          },
+          "suspicious": {
+            "noTemplateCurlyInString": "off",
+            "noAssignInExpressions": "off"
+          },
+          "style": {
+            "noNonNullAssertion": "off",
+            "noParameterAssign": "off",
+            "useDefaultParameterLast": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["transports/src/**"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "off"
+          },
+          "style": {
+            "noNonNullAssertion": "off"
+          }
+        }
+      }
+    }
+  ]
 }

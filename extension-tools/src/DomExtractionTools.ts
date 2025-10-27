@@ -28,7 +28,7 @@ export interface DomExtractionToolsOptions {
  * module inside the page context and immediately return structured data without
  * mutating window scope.
  */
-export class DomExtractionTools extends BaseApiTools {
+export class DomExtractionTools extends BaseApiTools<DomExtractionToolsOptions> {
   protected apiName = 'DomExtraction';
   private bundleScript: string = SMART_DOM_READER_BUNDLE;
   private userScriptsSupport: boolean | null = null;
@@ -90,7 +90,7 @@ export class DomExtractionTools extends BaseApiTools {
     }
   }
 
-  private serializeArgs(args: any): string {
+  private serializeArgs(args: unknown): string {
     // Safely serialize the args object for injection
     return JSON.stringify(args);
   }
@@ -214,11 +214,12 @@ export class DomExtractionTools extends BaseApiTools {
           await this.ensureUserScriptsEnabled();
 
           const resolvedTabId = await this.resolveTabId(tabId);
-          const result = await this.executeExtraction(resolvedTabId, 'extractStructure', {
-            selector,
-            frameSelector,
+          const args: any = {
             formatOptions: { detail: 'summary' },
-          });
+          };
+          if (selector !== undefined) args.selector = selector;
+          if (frameSelector !== undefined) args.frameSelector = frameSelector;
+          const result = await this.executeExtraction(resolvedTabId, 'extractStructure', args);
 
           if (this.isExtractionError(result)) {
             return this.formatError(new Error(result.error));
@@ -292,13 +293,14 @@ export class DomExtractionTools extends BaseApiTools {
           await this.ensureUserScriptsEnabled();
 
           const resolvedTabId = await this.resolveTabId(tabId);
-          const result = await this.executeExtraction(resolvedTabId, 'extractRegion', {
+          const args: any = {
             selector,
             mode: mode || 'interactive',
-            frameSelector,
-            options: options ?? undefined,
             formatOptions: { detail: 'region' },
-          });
+          };
+          if (frameSelector !== undefined) args.frameSelector = frameSelector;
+          if (options !== undefined) args.options = options;
+          const result = await this.executeExtraction(resolvedTabId, 'extractRegion', args);
 
           if (this.isExtractionError(result)) {
             return this.formatError(new Error(result.error));
@@ -349,12 +351,13 @@ export class DomExtractionTools extends BaseApiTools {
           await this.ensureUserScriptsEnabled();
 
           const resolvedTabId = await this.resolveTabId(tabId);
-          const result = await this.executeExtraction(resolvedTabId, 'extractContent', {
+          const args: any = {
             selector,
-            frameSelector,
-            options: options ?? undefined,
             formatOptions: { detail: 'region' },
-          });
+          };
+          if (frameSelector !== undefined) args.frameSelector = frameSelector;
+          if (options !== undefined) args.options = options;
+          const result = await this.executeExtraction(resolvedTabId, 'extractContent', args);
 
           if (this.isExtractionError(result)) {
             return this.formatError(new Error(result.error));

@@ -6,7 +6,7 @@ export interface SearchApiToolsOptions {
   query?: boolean;
 }
 
-export class SearchApiTools extends BaseApiTools {
+export class SearchApiTools extends BaseApiTools<SearchApiToolsOptions> {
   protected apiName = 'Search';
 
   constructor(server: McpServer, options: SearchApiToolsOptions = {}) {

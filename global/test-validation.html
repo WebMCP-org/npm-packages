@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Global Package Validation Test</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      max-width: 1000px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .test-section {
+      background: white;
+      padding: 20px;
+      margin: 20px 0;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .test-section h2 {
+      margin-top: 0;
+      color: #333;
+    }
+    button {
+      background: #0066cc;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      margin: 5px;
+    }
+    button:hover {
+      background: #0052a3;
+    }
+    .result {
+      margin-top: 15px;
+      padding: 15px;
+      background: #f8f8f8;
+      border-left: 4px solid #0066cc;
+      font-family: monospace;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .error {
+      border-left-color: #cc0000;
+      background: #fff0f0;
+    }
+    .success {
+      border-left-color: #00cc00;
+      background: #f0fff0;
+    }
+  </style>
+</head>
+<body>
+  <h1>Global Package - Dual Schema Validation Test</h1>
+  <p>This page tests both JSON Schema and Zod schema support with runtime validation.</p>
+
+  <!-- JSON Schema Test -->
+  <div class="test-section">
+    <h2>Test 1: JSON Schema (Web Standard)</h2>
+    <p>Register a tool using JSON Schema format</p>
+    <button onclick="testJsonSchema()">Register JSON Schema Tool</button>
+    <button onclick="testJsonSchemaValid()">Call with Valid Input</button>
+    <button onclick="testJsonSchemaInvalid()">Call with Invalid Input (should fail)</button>
+    <div id="jsonSchemaResult" class="result"></div>
+  </div>
+
+  <!-- Zod Schema Test -->
+  <div class="test-section">
+    <h2>Test 2: Zod Schema (Type-Safe)</h2>
+    <p>Register a tool using Zod schema format (requires importing zod)</p>
+    <button onclick="testZodSchema()">Register Zod Tool</button>
+    <button onclick="testZodSchemaValid()">Call with Valid Input</button>
+    <button onclick="testZodSchemaInvalid()">Call with Invalid Input (should fail)</button>
+    <div id="zodSchemaResult" class="result"></div>
+  </div>
+
+  <!-- List Tools Test -->
+  <div class="test-section">
+    <h2>Test 3: List Tools</h2>
+    <p>View all registered tools (should show JSON Schema format)</p>
+    <button onclick="testListTools()">List All Tools</button>
+    <div id="listToolsResult" class="result"></div>
+  </div>
+
+  <!-- Load the global package IIFE -->
+  <script src="./dist/index.iife.js"></script>
+
+  <!-- Load Zod from CDN -->
+  <script type="module">
+    import { z } from 'https://cdn.jsdelivr.net/npm/zod@3.25.76/+esm';
+    window.z = z;
+  </script>
+
+  <script>
+    function log(elementId, message, type = 'info') {
+      const el = document.getElementById(elementId);
+      el.className = 'result ' + type;
+      el.textContent = message;
+    }
+
+    // Test 1: JSON Schema
+    function testJsonSchema() {
+      try {
+        window.navigator.modelContext.provideContext({
+          tools: [{
+            name: "add-todo-json",
+            description: "Add a todo item using JSON Schema",
+            inputSchema: {
+              type: "object",
+              properties: {
+                text: {
+                  type: "string",
+                  description: "The todo item text"
+                },
+                priority: {
+                  type: "string",
+                  description: "Priority level"
+                }
+              },
+              required: ["text"]
+            },
+            async execute({ text, priority = "medium" }) {
+              return {
+                content: [{
+                  type: "text",
+                  text: `TODO added via JSON Schema: "${text}" (priority: ${priority})`
+                }]
+              };
+            }
+          }]
+        });
+        log('jsonSchemaResult', 'SUCCESS: JSON Schema tool registered\n\nTool: add-todo-json', 'success');
+      } catch (error) {
+        log('jsonSchemaResult', 'ERROR: ' + error.message, 'error');
+      }
+    }
+
+    async function testJsonSchemaValid() {
+      try {
+        const result = await window.navigator.modelContext.__mcpBridge?.server._toolHandlers?.get('add-todo-json')?.handler({ text: "Buy milk", priority: "high" });
+        log('jsonSchemaResult', 'SUCCESS: Valid input accepted\n\n' + JSON.stringify(result, null, 2), 'success');
+      } catch (error) {
+        log('jsonSchemaResult', 'ERROR: ' + error.message, 'error');
+      }
+    }
+
+    async function testJsonSchemaInvalid() {
+      try {
+        // Missing required 'text' field
+        const result = await window.navigator.modelContext.__mcpBridge?.server._toolHandlers?.get('add-todo-json')?.handler({ priority: "high" });
+        log('jsonSchemaResult', 'UNEXPECTED: Should have failed validation\n\n' + JSON.stringify(result, null, 2), 'error');
+      } catch (error) {
+        log('jsonSchemaResult', 'SUCCESS: Invalid input rejected (as expected)\n\nError: ' + error.message, 'success');
+      }
+    }
+
+    // Test 2: Zod Schema
+    async function testZodSchema() {
+      // Wait for zod to load
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      if (!window.z) {
+        log('zodSchemaResult', 'ERROR: Zod not loaded from CDN yet. Please wait and try again.', 'error');
+        return;
+      }
+
+      try {
+        window.navigator.modelContext.registerTool({
+          name: "create-user-zod",
+          description: "Create a user using Zod schema",
+          inputSchema: {
+            email: window.z.string().email().describe("User email address"),
+            age: window.z.number().min(18).describe("User age (must be 18+)"),
+            role: window.z.enum(["admin", "user", "guest"]).describe("User role")
+          },
+          async execute({ email, age, role }) {
+            return {
+              content: [{
+                type: "text",
+                text: `User created via Zod: ${email}, age ${age}, role ${role}`
+              }]
+            };
+          }
+        });
+        log('zodSchemaResult', 'SUCCESS: Zod schema tool registered\n\nTool: create-user-zod', 'success');
+      } catch (error) {
+        log('zodSchemaResult', 'ERROR: ' + error.message + '\n\n' + error.stack, 'error');
+      }
+    }
+
+    async function testZodSchemaValid() {
+      try {
+        const bridge = window.navigator.modelContext.__mcpBridge;
+        const tool = bridge.tools.get('create-user-zod');
+        if (!tool) {
+          log('zodSchemaResult', 'ERROR: Tool not registered. Click "Register Zod Tool" first.', 'error');
+          return;
+        }
+
+        const modelContext = window.navigator.modelContext;
+        const result = await modelContext.executeTool('create-user-zod', {
+          email: "test@example.com",
+          age: 25,
+          role: "user"
+        });
+
+        log('zodSchemaResult', 'SUCCESS: Valid input accepted\n\n' + JSON.stringify(result, null, 2), 'success');
+      } catch (error) {
+        log('zodSchemaResult', 'ERROR: ' + error.message + '\n\n' + error.stack, 'error');
+      }
+    }
+
+    async function testZodSchemaInvalid() {
+      try {
+        const modelContext = window.navigator.modelContext;
+        const result = await modelContext.executeTool('create-user-zod', {
+          email: "invalid-email", // Invalid email format
+          age: 16, // Below minimum age
+          role: "user"
+        });
+
+        if (result.isError) {
+          log('zodSchemaResult', 'SUCCESS: Invalid input rejected (as expected)\n\n' + JSON.stringify(result, null, 2), 'success');
+        } else {
+          log('zodSchemaResult', 'UNEXPECTED: Should have failed validation\n\n' + JSON.stringify(result, null, 2), 'error');
+        }
+      } catch (error) {
+        log('zodSchemaResult', 'ERROR: ' + error.message, 'error');
+      }
+    }
+
+    // Test 3: List Tools
+    function testListTools() {
+      try {
+        const modelContext = window.navigator.modelContext;
+        const tools = modelContext.listTools();
+        log('listToolsResult', 'SUCCESS: Retrieved ' + tools.length + ' tools\n\n' + JSON.stringify(tools, null, 2), 'success');
+      } catch (error) {
+        log('listToolsResult', 'ERROR: ' + error.message, 'error');
+      }
+    }
+
+    // Auto-run basic test on load
+    window.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => {
+        console.log('Global package loaded. Testing basic functionality...');
+        if (window.navigator.modelContext) {
+          console.log('✅ window.navigator.modelContext is available');
+        } else {
+          console.error('❌ window.navigator.modelContext is NOT available');
+        }
+      }, 100);
+    });
+  </script>
+</body>
+</html>

@@ -8,7 +8,7 @@ export interface DeclarativeContentApiToolsOptions {
   getRules?: boolean;
 }
 
-export class DeclarativeContentApiTools extends BaseApiTools {
+export class DeclarativeContentApiTools extends BaseApiTools<DeclarativeContentApiToolsOptions> {
   protected apiName = 'DeclarativeContent';
 
   constructor(server: McpServer, options: DeclarativeContentApiToolsOptions = {}) {

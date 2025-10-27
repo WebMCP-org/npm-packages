@@ -12,7 +12,7 @@ export interface IdentityApiToolsOptions {
   clearAllCachedAuthTokens?: boolean;
 }
 
-export class IdentityApiTools extends BaseApiTools {
+export class IdentityApiTools extends BaseApiTools<IdentityApiToolsOptions> {
   protected apiName = 'Identity';
 
   constructor(server: McpServer, options: IdentityApiToolsOptions = {}) {

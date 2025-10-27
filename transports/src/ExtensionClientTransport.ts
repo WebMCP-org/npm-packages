@@ -58,14 +58,14 @@ export interface ExtensionClientTransportOptions {
  * Features automatic reconnection to handle background service worker lifecycle.
  */
 export class ExtensionClientTransport implements Transport {
-  private _port?: chrome.runtime.Port;
-  private _extensionId?: string;
+  private _port: chrome.runtime.Port | undefined;
+  private _extensionId: string | undefined;
   private _portName: string;
-  private _messageHandler?: (message: any) => void;
-  private _disconnectHandler?: () => void;
+  private _messageHandler: ((message: any) => void) | undefined;
+  private _disconnectHandler: (() => void) | undefined;
   private _isReconnecting = false;
   private _reconnectAttempts = 0;
-  private _reconnectTimer?: number;
+  private _reconnectTimer: number | undefined;
   private _currentReconnectDelay: number;
   private _isStarted = false;
   private _isClosed = false;
@@ -222,7 +222,7 @@ export class ExtensionClientTransport implements Transport {
     this._isStarted = false;
 
     // Cancel any pending reconnection
-    if (this._reconnectTimer) {
+    if (this._reconnectTimer !== undefined) {
       clearTimeout(this._reconnectTimer);
       this._reconnectTimer = undefined;
     }
@@ -230,7 +230,7 @@ export class ExtensionClientTransport implements Transport {
     if (this._port) {
       try {
         this._port.disconnect();
-      } catch (error) {
+      } catch (_error) {
         // Port might already be disconnected
       }
     }
@@ -303,7 +303,7 @@ export class ExtensionClientTransport implements Transport {
       if (chrome?.runtime?.sendMessage) {
         try {
           await chrome.runtime.sendMessage({ type: 'ping' });
-        } catch (error) {
+        } catch (_error) {
           // Service worker might not be ready yet
         }
       }

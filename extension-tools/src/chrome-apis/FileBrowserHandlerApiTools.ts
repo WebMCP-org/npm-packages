@@ -8,7 +8,7 @@ export interface FileBrowserHandlerApiToolsOptions {
   removeExecuteListener?: boolean;
 }
 
-export class FileBrowserHandlerApiTools extends BaseApiTools {
+export class FileBrowserHandlerApiTools extends BaseApiTools<FileBrowserHandlerApiToolsOptions> {
   protected apiName = 'FileBrowserHandler';
 
   constructor(server: McpServer, options: FileBrowserHandlerApiToolsOptions = {}) {

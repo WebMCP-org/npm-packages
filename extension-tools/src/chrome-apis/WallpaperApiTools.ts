@@ -6,7 +6,7 @@ export interface WallpaperApiToolsOptions {
   setWallpaper?: boolean;
 }
 
-export class WallpaperApiTools extends BaseApiTools {
+export class WallpaperApiTools extends BaseApiTools<WallpaperApiToolsOptions> {
   protected apiName = 'Wallpaper';
 
   constructor(server: McpServer, options: WallpaperApiToolsOptions = {}) {
@@ -105,7 +105,7 @@ export class WallpaperApiTools extends BaseApiTools {
                 bytes[i] = binaryString.charCodeAt(i);
               }
               details.data = bytes.buffer;
-            } catch (error) {
+            } catch (_error) {
               return this.formatError('Invalid base64 data provided');
             }
           }
@@ -140,7 +140,7 @@ export class WallpaperApiTools extends BaseApiTools {
             const bytes = new Uint8Array(thumbnailResult);
             let binary = '';
             for (let i = 0; i < bytes.byteLength; i++) {
-              binary += String.fromCharCode(bytes[i]);
+              binary += String.fromCharCode(bytes[i]!);
             }
             result.thumbnail = btoa(binary);
             result.thumbnailSize = thumbnailResult.byteLength;

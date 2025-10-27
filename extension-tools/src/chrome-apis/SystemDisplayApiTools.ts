@@ -19,7 +19,7 @@
 //   enableUnifiedDesktop?: boolean;
 // }
 
-// export class SystemDisplayApiTools extends BaseApiTools {
+// export class SystemDisplayApiTools extends BaseApiTools<SystemDisplayApiToolsOptions> {
 //   protected apiName = 'System.display';
 
 //   constructor(server: McpServer, options: SystemDisplayApiToolsOptions = {}) {

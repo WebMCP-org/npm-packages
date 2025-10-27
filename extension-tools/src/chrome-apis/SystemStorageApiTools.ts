@@ -8,7 +8,7 @@ export interface SystemStorageApiToolsOptions {
   getAvailableCapacity?: boolean;
 }
 
-export class SystemStorageApiTools extends BaseApiTools {
+export class SystemStorageApiTools extends BaseApiTools<SystemStorageApiToolsOptions> {
   protected apiName = 'System.storage';
 
   constructor(server: McpServer, options: SystemStorageApiToolsOptions = {}) {
@@ -204,6 +204,6 @@ export class SystemStorageApiTools extends BaseApiTools {
     const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
 
-    return Number.parseFloat((bytes / k ** i).toFixed(2)) + ' ' + sizes[i];
+    return `${Number.parseFloat((bytes / k ** i).toFixed(2))} ${sizes[i]}`;
   }
 }

@@ -11,7 +11,7 @@ export interface OmniboxApiToolsOptions {
   onDeleteSuggestion?: boolean;
 }
 
-export class OmniboxApiTools extends BaseApiTools {
+export class OmniboxApiTools extends BaseApiTools<OmniboxApiToolsOptions> {
   protected apiName = 'Omnibox';
 
   constructor(server: McpServer, options: OmniboxApiToolsOptions = {}) {

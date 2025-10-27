@@ -6,7 +6,7 @@ export interface PageCaptureApiToolsOptions {
   saveAsMHTML?: boolean;
 }
 
-export class PageCaptureApiTools extends BaseApiTools {
+export class PageCaptureApiTools extends BaseApiTools<PageCaptureApiToolsOptions> {
   protected apiName = 'PageCapture';
 
   constructor(server: McpServer, options: PageCaptureApiToolsOptions = {}) {

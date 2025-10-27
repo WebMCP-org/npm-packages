@@ -9,7 +9,7 @@ export interface DebuggerApiToolsOptions {
   getTargets?: boolean;
 }
 
-export class DebuggerApiTools extends BaseApiTools {
+export class DebuggerApiTools extends BaseApiTools<DebuggerApiToolsOptions> {
   protected apiName = 'Debugger';
 
   constructor(server: McpServer, options: DebuggerApiToolsOptions = {}) {

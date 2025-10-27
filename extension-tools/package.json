@@ -40,7 +40,7 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsup",
+    "build": "tsdown",
     "check": "biome check --write .",
     "clean": "rm -rf dist .turbo",
     "format": "biome format --write .",
@@ -67,7 +67,7 @@
     "cheerio": "^1.1.2",
     "dotenv": "^17.2.1",
     "playwright": "^1.54.2",
-    "tsup": "catalog:",
+    "tsdown": "catalog:",
     "typescript": "catalog:"
   },
   "publishConfig": {

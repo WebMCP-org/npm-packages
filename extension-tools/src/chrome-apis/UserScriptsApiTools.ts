@@ -13,7 +13,7 @@ export interface UserScriptsApiToolsOptions {
   execute?: boolean;
 }
 
-export class UserScriptsApiTools extends BaseApiTools {
+export class UserScriptsApiTools extends BaseApiTools<UserScriptsApiToolsOptions> {
   protected apiName = 'UserScripts';
 
   constructor(server: McpServer, options: UserScriptsApiToolsOptions = {}) {
@@ -158,7 +158,7 @@ export class UserScriptsApiTools extends BaseApiTools {
           // Validate script objects
           for (const script of scripts) {
             if (script.id.startsWith('_')) {
-              return this.formatError('Script ID cannot start with underscore: ' + script.id);
+              return this.formatError(`Script ID cannot start with underscore: ${script.id}`);
             }
 
             if (script.js) {

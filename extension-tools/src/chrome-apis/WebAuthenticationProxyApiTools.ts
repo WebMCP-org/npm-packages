@@ -15,7 +15,7 @@ export interface WebAuthenticationProxyApiToolsOptions {
   onRequestCanceled?: boolean;
 }
 
-export class WebAuthenticationProxyApiTools extends BaseApiTools {
+export class WebAuthenticationProxyApiTools extends BaseApiTools<WebAuthenticationProxyApiToolsOptions> {
   protected apiName = 'WebAuthenticationProxy';
 
   constructor(server: McpServer, options: WebAuthenticationProxyApiToolsOptions = {}) {

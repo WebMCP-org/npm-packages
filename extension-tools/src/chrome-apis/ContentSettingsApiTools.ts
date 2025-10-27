@@ -39,7 +39,7 @@ export interface ContentSettingsApiToolsOptions {
   getPluginsResourceIdentifiers?: boolean;
 }
 
-export class ContentSettingsApiTools extends BaseApiTools {
+export class ContentSettingsApiTools extends BaseApiTools<ContentSettingsApiToolsOptions> {
   protected apiName = 'ContentSettings';
 
   constructor(server: McpServer, options: ContentSettingsApiToolsOptions = {}) {

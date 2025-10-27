@@ -5,7 +5,7 @@ export interface EnterpriseHardwarePlatformApiToolsOptions {
   getHardwarePlatformInfo?: boolean;
 }
 
-export class EnterpriseHardwarePlatformApiTools extends BaseApiTools {
+export class EnterpriseHardwarePlatformApiTools extends BaseApiTools<EnterpriseHardwarePlatformApiToolsOptions> {
   protected apiName = 'Enterprise.hardwarePlatform';
 
   constructor(server: McpServer, options: EnterpriseHardwarePlatformApiToolsOptions = {}) {

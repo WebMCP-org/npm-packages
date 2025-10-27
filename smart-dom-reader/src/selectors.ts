@@ -1,4 +1,4 @@
-import { ElementSelector, type ElementSelectorCandidate } from './types';
+import type { ElementSelector, ElementSelectorCandidate } from './types';
 
 export class SelectorGenerator {
   /**
@@ -9,18 +9,18 @@ export class SelectorGenerator {
     const candidates: ElementSelectorCandidate[] = [];
 
     // 1) Unique ID
-    if (element.id && this.isUniqueId(element.id, doc)) {
+    if (element.id && SelectorGenerator.isUniqueId(element.id, doc)) {
       candidates.push({ type: 'id', value: `#${CSS.escape(element.id)}`, score: 100 });
     }
 
     // 2) data-testid variants
-    const testId = this.getDataTestId(element);
+    const testId = SelectorGenerator.getDataTestId(element);
     if (testId) {
       const v = `[data-testid="${CSS.escape(testId)}"]`;
       candidates.push({
         type: 'data-testid',
         value: v,
-        score: 90 + (this.isUniqueSelectorSafe(v, doc) ? 5 : 0),
+        score: 90 + (SelectorGenerator.isUniqueSelectorSafe(v, doc) ? 5 : 0),
       });
     }
 
@@ -32,7 +32,7 @@ export class SelectorGenerator {
       candidates.push({
         type: 'role-aria',
         value: v,
-        score: 85 + (this.isUniqueSelectorSafe(v, doc) ? 5 : 0),
+        score: 85 + (SelectorGenerator.isUniqueSelectorSafe(v, doc) ? 5 : 0),
       });
     }
 
@@ -43,23 +43,23 @@ export class SelectorGenerator {
       candidates.push({
         type: 'name',
         value: v,
-        score: 78 + (this.isUniqueSelectorSafe(v, doc) ? 5 : 0),
+        score: 78 + (SelectorGenerator.isUniqueSelectorSafe(v, doc) ? 5 : 0),
       });
     }
 
     // 5) Class-based CSS path (try to avoid structural :nth-child when possible)
-    const pathCss = this.generateCSSSelector(element, doc);
+    const pathCss = SelectorGenerator.generateCSSSelector(element, doc);
     const structuralPenalty = (pathCss.match(/:nth-child\(/g) || []).length * 10;
     const classBonus = pathCss.includes('.') ? 8 : 0;
     const pathScore = Math.max(0, 70 + classBonus - structuralPenalty);
     candidates.push({ type: 'class-path', value: pathCss, score: pathScore });
 
     // 6) XPath (fallback)
-    const xpath = this.generateXPath(element, doc);
+    const xpath = SelectorGenerator.generateXPath(element, doc);
     candidates.push({ type: 'xpath', value: xpath, score: 40 });
 
     // 7) Text-based (only for hints)
-    const textBased = this.generateTextBasedSelector(element);
+    const textBased = SelectorGenerator.generateTextBasedSelector(element);
     if (textBased) candidates.push({ type: 'text', value: textBased, score: 30 });
 
     // Rank candidates by score (desc)
@@ -68,14 +68,17 @@ export class SelectorGenerator {
     const bestCss =
       candidates.find((c) => c.type !== 'xpath' && c.type !== 'text')?.value || pathCss;
 
-    return {
+    const selector: ElementSelector = {
       css: bestCss,
       xpath,
-      textBased,
-      dataTestId: testId || undefined,
-      ariaLabel: aria || undefined,
       candidates,
     };
+
+    if (textBased) selector.textBased = textBased;
+    if (testId) selector.dataTestId = testId;
+    if (aria) selector.ariaLabel = aria;
+
+    return selector;
   }
 
   /**
@@ -83,12 +86,12 @@ export class SelectorGenerator {
    */
   private static generateCSSSelector(element: Element, doc: Document): string {
     // If element has a unique ID, use it
-    if (element.id && this.isUniqueId(element.id, doc)) {
+    if (element.id && SelectorGenerator.isUniqueId(element.id, doc)) {
       return `#${CSS.escape(element.id)}`;
     }
 
     // Try data-testid or data-test-id
-    const testId = this.getDataTestId(element);
+    const testId = SelectorGenerator.getDataTestId(element);
     if (testId) {
       return `[data-testid="${CSS.escape(testId)}"]`;
     }
@@ -100,23 +103,23 @@ export class SelectorGenerator {
     while (current && current.nodeType === Node.ELEMENT_NODE) {
       let selector = current.nodeName.toLowerCase();
 
-      if (current.id && this.isUniqueId(current.id, doc)) {
+      if (current.id && SelectorGenerator.isUniqueId(current.id, doc)) {
         selector = `#${CSS.escape(current.id)}`;
         path.unshift(selector);
         break;
       }
 
       // Add classes if they exist and are meaningful
-      const classes = this.getMeaningfulClasses(current);
+      const classes = SelectorGenerator.getMeaningfulClasses(current);
       if (classes.length > 0) {
-        selector += '.' + classes.map((c) => CSS.escape(c)).join('.');
+        selector += `.${classes.map((c) => CSS.escape(c)).join('.')}`;
       }
 
       // Add position if needed for uniqueness
       const siblings = current.parentElement?.children;
       if (siblings && siblings.length > 1) {
         const index = Array.from(siblings).indexOf(current);
-        if (index > 0 || !this.isUniqueSelector(selector, current.parentElement!)) {
+        if (index > 0 || !SelectorGenerator.isUniqueSelector(selector, current.parentElement!)) {
           selector += `:nth-child(${index + 1})`;
         }
       }
@@ -126,14 +129,14 @@ export class SelectorGenerator {
     }
 
     // Optimize the path
-    return this.optimizePath(path, element, doc);
+    return SelectorGenerator.optimizePath(path, element, doc);
   }
 
   /**
    * Generate XPath for an element
    */
   private static generateXPath(element: Element, doc: Document): string {
-    if (element.id && this.isUniqueId(element.id, doc)) {
+    if (element.id && SelectorGenerator.isUniqueId(element.id, doc)) {
       return `//*[@id="${element.id}"]`;
     }
 
@@ -143,7 +146,7 @@ export class SelectorGenerator {
     while (current && current.nodeType === Node.ELEMENT_NODE) {
       const tagName = current.nodeName.toLowerCase();
 
-      if (current.id && this.isUniqueId(current.id, doc)) {
+      if (current.id && SelectorGenerator.isUniqueId(current.id, doc)) {
         path.unshift(`//*[@id="${current.id}"]`);
         break;
       }
@@ -166,7 +169,7 @@ export class SelectorGenerator {
       current = current.parentElement;
     }
 
-    return '//' + path.join('/');
+    return `//${path.join('/')}`;
   }
 
   /**

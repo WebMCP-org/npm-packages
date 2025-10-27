@@ -17,7 +17,7 @@
 //   node test/local-playwright-runner.mjs --url=https://example.com --mode=interactive --screenshot=example.png
 
 import { readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 let chromium;
@@ -48,7 +48,7 @@ async function loadPlaywright() {
     }
     const entry = new URL(pathResolve(target, 'index.js'), 'file:').href;
     const mod = await import(entry);
-    chromium = mod.chromium || (mod.default && mod.default.chromium);
+    chromium = mod.chromium || mod.default?.chromium;
   }
 }
 
@@ -172,13 +172,13 @@ async function injectLibrary(page) {
         const SmartDOMReader = mod.SmartDOMReader ?? mod.default;
         const { ProgressiveExtractor, MarkdownFormatter, SelectorGenerator } = mod;
         // Attach to window for subsequent evaluations
-        // @ts-ignore
+        // @ts-expect-error
         window.SmartDOMReader = SmartDOMReader;
-        // @ts-ignore
+        // @ts-expect-error
         window.ProgressiveExtractor = ProgressiveExtractor;
-        // @ts-ignore
+        // @ts-expect-error
         window.MarkdownFormatter = MarkdownFormatter;
-        // @ts-ignore
+        // @ts-expect-error
         window.SelectorGenerator = SelectorGenerator;
       } finally {
         URL.revokeObjectURL(url);
@@ -309,13 +309,12 @@ async function main() {
             }
             const reader = new Smart({ mode: 'interactive' });
             return reader.extract(target);
-          } else {
-            if (typeof Smart.extractFull === 'function') {
-              return Smart.extractFull(document, {});
-            }
-            const reader = new Smart({ mode: 'full' });
-            return reader.extract(document);
           }
+          if (typeof Smart.extractFull === 'function') {
+            return Smart.extractFull(document, {});
+          }
+          const reader = new Smart({ mode: 'full' });
+          return reader.extract(document);
         }
 
         const res = runExtract(mode, target);
@@ -413,7 +412,7 @@ async function main() {
   // Print concise report
   console.log('Smart DOM Reader — Local Playwright Runner');
   for (const c of report.checks)
-    console.log(`- ${c.ok ? '✅' : '❌'} ${c.name}: ${c.ok ? 'ok' : 'got ' + c.got}`);
+    console.log(`- ${c.ok ? '✅' : '❌'} ${c.name}: ${c.ok ? 'ok' : `got ${c.got}`}`);
   console.log(`Summary: ${report.passed} passed, ${report.failed} failed`);
 
   if (report.failed > 0) process.exitCode = 1;

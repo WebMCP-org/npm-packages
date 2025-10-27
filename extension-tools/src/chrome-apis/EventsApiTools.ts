@@ -13,7 +13,7 @@
 //   createUrlFilter?: boolean;
 // }
 
-// export class EventsApiTools extends BaseApiTools {
+// export class EventsApiTools extends BaseApiTools<EventsApiToolsOptions> {
 //   protected apiName = 'Events';
 
 //   constructor(server: McpServer, options: EventsApiToolsOptions = {}) {

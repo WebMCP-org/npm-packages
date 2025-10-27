@@ -10,7 +10,7 @@ export interface VpnProviderApiToolsOptions {
   sendPacket?: boolean;
 }
 
-export class VpnProviderApiTools extends BaseApiTools {
+export class VpnProviderApiTools extends BaseApiTools<VpnProviderApiToolsOptions> {
   protected apiName = 'VpnProvider';
 
   constructor(server: McpServer, options: VpnProviderApiToolsOptions = {}) {

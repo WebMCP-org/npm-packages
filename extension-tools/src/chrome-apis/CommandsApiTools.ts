@@ -5,7 +5,7 @@ export interface CommandsApiToolsOptions {
   getAll?: boolean;
 }
 
-export class CommandsApiTools extends BaseApiTools {
+export class CommandsApiTools extends BaseApiTools<CommandsApiToolsOptions> {
   protected apiName = 'Commands';
 
   constructor(server: McpServer, options: CommandsApiToolsOptions = {}) {

@@ -1,15 +1,17 @@
 packages:
   - "extension-tools"
   - "global"
-  - "mcp-react-hook-form"
-  - "mcp-react-hooks"
+  - "react-webmcp"
   - "smart-dom-reader"
   - "smart-dom-reader/mcp-server"
   - "transports"
+  - "webmcp-ts-sdk"
   - "e2e"
   - "e2e/test-app"
+  - "e2e/react-webmcp-test-app"
 
 catalog:
+  '@composio/json-schema-to-zod': ^0.1.17
   '@modelcontextprotocol/sdk': 1.15.0
   '@types/chrome': ^0.0.326
   '@types/node': ^22.15.21
@@ -17,12 +19,12 @@ catalog:
   '@types/react-dom': ^19.1.2
   react: ^19.1.0
   react-dom: ^19.1.0
-  tsup: ^8.4.0
+  tsdown: ^0.15.10
   tsx: ^4.20.0
   typescript: ^5.8.3
   vite: ^7.1.2
   vite-plugin-monkey: ^6.0.1
-  zod: 3.24.1
+  zod: ^3.25.76
 
 onlyBuiltDependencies:
   - '@axodotdev/oranda'

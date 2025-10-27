@@ -2,7 +2,7 @@ import { ContentDetection } from './content-detection';
 import type { SmartDOMReader as SmartDOMReaderClass } from './index';
 import { SelectorGenerator } from './selectors';
 import { DOMTraversal } from './traversal';
-import {
+import type {
   ContentExtractionOptions,
   ExtractedContent,
   ExtractionOptions,
@@ -62,66 +62,68 @@ export class ProgressiveExtractor {
     // Find header (scoped to root)
     const header = root.querySelector('header, [role="banner"], .header, #header');
     if (header) {
-      regions.header = this.analyzeRegion(header);
+      regions.header = ProgressiveExtractor.analyzeRegion(header);
     }
 
     // Find navigation areas (scoped to root)
     const navs = root.querySelectorAll('nav, [role="navigation"], .nav, .navigation');
     if (navs.length > 0) {
-      regions.navigation = Array.from(navs).map((nav) => this.analyzeRegion(nav));
+      regions.navigation = Array.from(navs).map((nav) => ProgressiveExtractor.analyzeRegion(nav));
     }
 
     // Find main content
     if (root instanceof Document) {
       const main = ContentDetection.findMainContent(root);
       if (main) {
-        regions.main = this.analyzeRegion(main);
+        regions.main = ProgressiveExtractor.analyzeRegion(main);
         // Find sections within main
         const sections = main.querySelectorAll('section, article, [role="region"]');
         if (sections.length > 0) {
           regions.sections = Array.from(sections)
             .filter((section) => !section.closest('nav, header, footer'))
-            .map((section) => this.analyzeRegion(section));
+            .map((section) => ProgressiveExtractor.analyzeRegion(section));
         }
       }
     } else {
       // When scoped to an Element, treat the element itself as the main region
-      regions.main = this.analyzeRegion(root);
+      regions.main = ProgressiveExtractor.analyzeRegion(root);
       const sections = root.querySelectorAll('section, article, [role="region"]');
       if (sections.length > 0) {
         regions.sections = Array.from(sections)
           .filter((section) => !section.closest('nav, header, footer'))
-          .map((section) => this.analyzeRegion(section));
+          .map((section) => ProgressiveExtractor.analyzeRegion(section));
       }
     }
 
     // Find sidebars (scoped)
     const sidebars = root.querySelectorAll('aside, [role="complementary"], .sidebar, #sidebar');
     if (sidebars.length > 0) {
-      regions.sidebar = Array.from(sidebars).map((sidebar) => this.analyzeRegion(sidebar));
+      regions.sidebar = Array.from(sidebars).map((sidebar) =>
+        ProgressiveExtractor.analyzeRegion(sidebar)
+      );
     }
 
     // Find footer (scoped)
     const footer = root.querySelector('footer, [role="contentinfo"], .footer, #footer');
     if (footer) {
-      regions.footer = this.analyzeRegion(footer);
+      regions.footer = ProgressiveExtractor.analyzeRegion(footer);
     }
 
     // Find modals/dialogs (scoped)
     const modals = root.querySelectorAll('[role="dialog"], .modal, .popup, .overlay');
     const visibleModals = Array.from(modals).filter((modal) => DOMTraversal.isVisible(modal));
     if (visibleModals.length > 0) {
-      regions.modals = visibleModals.map((modal) => this.analyzeRegion(modal));
+      regions.modals = visibleModals.map((modal) => ProgressiveExtractor.analyzeRegion(modal));
     }
 
     // Extract form information (scoped)
-    const forms = this.extractFormOverview(root);
+    const forms = ProgressiveExtractor.extractFormOverview(root);
 
     // Calculate summary statistics (scoped)
-    const summary = this.calculateSummary(root, regions, forms);
+    const summary = ProgressiveExtractor.calculateSummary(root, regions, forms);
 
     // Generate AI-friendly suggestions
-    const suggestions = this.generateSuggestions(regions, summary);
+    const suggestions = ProgressiveExtractor.generateSuggestions(regions, summary);
 
     return { regions, forms, summary, suggestions };
   }
@@ -174,8 +176,8 @@ export class ProgressiveExtractor {
     if (options.includeHeadings !== false) {
       const headings = element.querySelectorAll('h1, h2, h3, h4, h5, h6');
       result.text.headings = Array.from(headings).map((h) => ({
-        level: parseInt(h.tagName[1]),
-        text: this.getTextContent(h, options.maxTextLength),
+        level: Number.parseInt(h.tagName[1]!, 10),
+        text: ProgressiveExtractor.getTextContent(h, options.maxTextLength),
       }));
     }
 
@@ -183,7 +185,7 @@ export class ProgressiveExtractor {
     const paragraphs = element.querySelectorAll('p');
     if (paragraphs.length > 0) {
       result.text.paragraphs = Array.from(paragraphs)
-        .map((p) => this.getTextContent(p, options.maxTextLength))
+        .map((p) => ProgressiveExtractor.getTextContent(p, options.maxTextLength))
         .filter((text) => text.length > 0);
     }
 
@@ -193,7 +195,7 @@ export class ProgressiveExtractor {
       result.text.lists = Array.from(lists).map((list) => ({
         type: list.tagName.toLowerCase() as 'ul' | 'ol',
         items: Array.from(list.querySelectorAll('li')).map((li) =>
-          this.getTextContent(li, options.maxTextLength)
+          ProgressiveExtractor.getTextContent(li, options.maxTextLength)
         ),
       }));
     }
@@ -203,11 +205,15 @@ export class ProgressiveExtractor {
       const tables = element.querySelectorAll('table');
       result.tables = Array.from(tables).map((table) => {
         const headers = Array.from(table.querySelectorAll('th')).map((th) =>
-          this.getTextContent(th)
+          ProgressiveExtractor.getTextContent(th)
         );
         const rows = Array.from(table.querySelectorAll('tr'))
           .filter((tr) => tr.querySelector('td'))
-          .map((tr) => Array.from(tr.querySelectorAll('td')).map((td) => this.getTextContent(td)));
+          .map((tr) =>
+            Array.from(tr.querySelectorAll('td')).map((td) =>
+              ProgressiveExtractor.getTextContent(td)
+            )
+          );
         return { headers, rows };
       });
     }
@@ -219,19 +225,26 @@ export class ProgressiveExtractor {
       const audios = element.querySelectorAll('audio');
 
       result.media = [
-        ...Array.from(images).map((img) => ({
-          type: 'img' as const,
-          alt: img.getAttribute('alt') || undefined,
-          src: img.getAttribute('src') || undefined,
-        })),
-        ...Array.from(videos).map((video) => ({
-          type: 'video' as const,
-          src: video.getAttribute('src') || undefined,
-        })),
-        ...Array.from(audios).map((audio) => ({
-          type: 'audio' as const,
-          src: audio.getAttribute('src') || undefined,
-        })),
+        ...Array.from(images).map((img) => {
+          const item: { type: 'img'; alt?: string; src?: string } = { type: 'img' };
+          const alt = img.getAttribute('alt');
+          const src = img.getAttribute('src');
+          if (alt) item.alt = alt;
+          if (src) item.src = src;
+          return item;
+        }),
+        ...Array.from(videos).map((video) => {
+          const item: { type: 'video'; src?: string } = { type: 'video' };
+          const src = video.getAttribute('src');
+          if (src) item.src = src;
+          return item;
+        }),
+        ...Array.from(audios).map((audio) => {
+          const item: { type: 'audio'; src?: string } = { type: 'audio' };
+          const src = audio.getAttribute('src');
+          if (src) item.src = src;
+          return item;
+        }),
       ];
     }
 
@@ -282,22 +295,28 @@ export class ProgressiveExtractor {
     // Get text preview
     const textContent = element.textContent?.trim() || '';
     const textPreview =
-      textContent.length > 50 ? textContent.substring(0, 50) + '...' : textContent;
+      textContent.length > 50 ? `${textContent.substring(0, 50)}...` : textContent;
 
-    return {
+    const regionInfo: RegionInfo = {
       selector,
-      label,
-      role: element.getAttribute('role') || undefined,
       interactiveCount,
       hasForm: forms.length > 0,
       hasList: lists.length > 0,
       hasTable: tables.length > 0,
       hasMedia: media.length > 0,
-      buttonCount: buttons.length > 0 ? buttons.length : undefined,
-      linkCount: links.length > 0 ? links.length : undefined,
-      inputCount: inputs.length > 0 ? inputs.length : undefined,
-      textPreview: textPreview.length > 0 ? textPreview : undefined,
     };
+
+    if (label) regionInfo.label = label;
+
+    const role = element.getAttribute('role');
+    if (role) regionInfo.role = role;
+
+    if (buttons.length > 0) regionInfo.buttonCount = buttons.length;
+    if (links.length > 0) regionInfo.linkCount = links.length;
+    if (inputs.length > 0) regionInfo.inputCount = inputs.length;
+    if (textPreview.length > 0) regionInfo.textPreview = textPreview;
+
+    return regionInfo;
   }
 
   /**
@@ -346,12 +365,20 @@ export class ProgressiveExtractor {
         purpose = 'checkout';
       }
 
-      return {
+      const formOverview: {
+        selector: string;
+        location: string;
+        inputCount: number;
+        purpose?: string;
+      } = {
         selector,
         location,
         inputCount: inputs.length,
-        purpose,
       };
+
+      if (purpose) formOverview.purpose = purpose;
+
+      return formOverview;
     });
   }
 
@@ -381,17 +408,21 @@ export class ProgressiveExtractor {
       return element ? DOMTraversal.isVisible(element) : false;
     });
 
-    const mainContentSelector = regions.main?.selector;
-
-    return {
+    const summary: StructuralOverview['summary'] = {
       totalInteractive: allInteractive.length,
       totalForms: forms.length,
       totalSections: allSections.length,
       hasModals,
       hasErrors,
       isLoading,
-      mainContentSelector,
     };
+
+    const mainContentSelector = regions.main?.selector;
+    if (mainContentSelector) {
+      summary.mainContentSelector = mainContentSelector;
+    }
+
+    return summary;
   }
 
   /**
@@ -438,7 +469,7 @@ export class ProgressiveExtractor {
   private static getTextContent(element: Element, maxLength?: number): string {
     const text = element.textContent?.trim() || '';
     if (maxLength && text.length > maxLength) {
-      return text.substring(0, maxLength) + '...';
+      return `${text.substring(0, maxLength)}...`;
     }
     return text;
   }

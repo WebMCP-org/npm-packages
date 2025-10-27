@@ -8,7 +8,7 @@ export interface SessionsApiToolsOptions {
   restore?: boolean;
 }
 
-export class SessionsApiTools extends BaseApiTools {
+export class SessionsApiTools extends BaseApiTools<SessionsApiToolsOptions> {
   protected apiName = 'Sessions';
 
   constructor(server: McpServer, options: SessionsApiToolsOptions = {}) {

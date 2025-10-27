@@ -9,7 +9,7 @@ export interface ScriptingApiToolsOptions {
   removeCSS?: boolean;
 }
 
-export class ScriptingApiTools extends BaseApiTools {
+export class ScriptingApiTools extends BaseApiTools<ScriptingApiToolsOptions> {
   protected apiName = 'Scripting';
 
   constructor(server: McpServer, options: ScriptingApiToolsOptions = {}) {
@@ -91,7 +91,7 @@ export class ScriptingApiTools extends BaseApiTools {
         console.log('UserScripts API available (legacy mode)');
         this.registerUserScriptLegacy();
       }
-    } catch (error) {
+    } catch (_error) {
       console.warn(
         'UserScripts API not enabled. Users need to enable developer mode and "User Scripts" toggle in chrome://extensions'
       );
@@ -299,7 +299,7 @@ export class ScriptingApiTools extends BaseApiTools {
           await chrome.userScripts.register([
             {
               id: scriptId,
-              matches: [new URL(tab.url).origin + '/*'],
+              matches: [`${new URL(tab.url).origin}/*`],
               js: [
                 {
                   code: `

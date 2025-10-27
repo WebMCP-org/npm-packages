@@ -6,7 +6,7 @@ export interface LoginStateApiToolsOptions {
   getSessionState?: boolean;
 }
 
-export class LoginStateApiTools extends BaseApiTools {
+export class LoginStateApiTools extends BaseApiTools<LoginStateApiToolsOptions> {
   protected apiName = 'LoginState';
 
   constructor(server: McpServer, options: LoginStateApiToolsOptions = {}) {

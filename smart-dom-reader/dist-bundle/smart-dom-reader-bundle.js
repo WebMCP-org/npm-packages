@@ -1,4 +1,4 @@
-var SmartDOMReaderBundle = (function (exports) {
+var SmartDOMReaderBundle = ((exports) => {
   class ContentDetection {
     /**
      * Find the main content area of a page
@@ -12,7 +12,7 @@ var SmartDOMReaderBundle = (function (exports) {
       if (!doc.body) {
         return doc.documentElement;
       }
-      return this.detectMainContent(doc.body);
+      return ContentDetection.detectMainContent(doc.body);
     }
     /**
      * Detect main content using scoring algorithm
@@ -20,21 +20,24 @@ var SmartDOMReaderBundle = (function (exports) {
     static detectMainContent(rootElement) {
       const candidates = [];
       const minScore = 15;
-      this.collectCandidates(rootElement, candidates, minScore);
+      ContentDetection.collectCandidates(rootElement, candidates, minScore);
       if (candidates.length === 0) {
         return rootElement;
       }
-      candidates.sort((a, b) => this.calculateContentScore(b) - this.calculateContentScore(a));
+      candidates.sort(
+        (a, b) =>
+          ContentDetection.calculateContentScore(b) - ContentDetection.calculateContentScore(a)
+      );
       let bestCandidate = candidates[0];
       for (let i = 1; i < candidates.length; i++) {
-        const isIndependent = !candidates.some(
-          (other, j) => j !== i && other.contains(candidates[i])
-        );
+        const candidate = candidates[i];
+        const isIndependent = !candidates.some((other, j) => j !== i && other.contains(candidate));
         if (
           isIndependent &&
-          this.calculateContentScore(candidates[i]) > this.calculateContentScore(bestCandidate)
+          ContentDetection.calculateContentScore(candidate) >
+            ContentDetection.calculateContentScore(bestCandidate)
         ) {
-          bestCandidate = candidates[i];
+          bestCandidate = candidate;
         }
       }
       return bestCandidate;
@@ -43,12 +46,12 @@ var SmartDOMReaderBundle = (function (exports) {
      * Collect content candidates
      */
     static collectCandidates(element, candidates, minScore) {
-      const score = this.calculateContentScore(element);
+      const score = ContentDetection.calculateContentScore(element);
       if (score >= minScore) {
         candidates.push(element);
       }
       Array.from(element.children).forEach((child) => {
-        this.collectCandidates(child, candidates, minScore);
+        ContentDetection.collectCandidates(child, candidates, minScore);
       });
     }
     /**
@@ -72,7 +75,7 @@ var SmartDOMReaderBundle = (function (exports) {
         }
       });
       semanticIds.forEach((id) => {
-        if (element.id && element.id.toLowerCase().includes(id)) {
+        if (element.id?.toLowerCase().includes(id)) {
           score += 10;
         }
       });
@@ -89,7 +92,7 @@ var SmartDOMReaderBundle = (function (exports) {
       if (textLength > 300) {
         score += Math.min(Math.floor(textLength / 300) * 2, 10);
       }
-      const linkDensity = this.calculateLinkDensity(element);
+      const linkDensity = ContentDetection.calculateLinkDensity(element);
       if (linkDensity < 0.3) {
         score += 5;
       } else if (linkDensity > 0.5) {
@@ -140,7 +143,7 @@ var SmartDOMReaderBundle = (function (exports) {
         return true;
       }
       const navPatterns = [/nav/i, /menu/i, /sidebar/i, /toolbar/i];
-      const classesAndId = (element.className + ' ' + element.id).toLowerCase();
+      const classesAndId = `${element.className} ${element.id}`.toLowerCase();
       return navPatterns.some((pattern) => pattern.test(classesAndId));
     }
     /**
@@ -158,7 +161,7 @@ var SmartDOMReaderBundle = (function (exports) {
         /advertisement/i,
         /social/i,
       ];
-      const classesAndId = (element.className + ' ' + element.id).toLowerCase();
+      const classesAndId = `${element.className} ${element.id}`.toLowerCase();
       return supplementaryPatterns.some((pattern) => pattern.test(classesAndId));
     }
     /**
@@ -199,16 +202,16 @@ var SmartDOMReaderBundle = (function (exports) {
     static generateSelectors(element) {
       const doc = element.ownerDocument || document;
       const candidates = [];
-      if (element.id && this.isUniqueId(element.id, doc)) {
+      if (element.id && SelectorGenerator.isUniqueId(element.id, doc)) {
         candidates.push({ type: 'id', value: `#${CSS.escape(element.id)}`, score: 100 });
       }
-      const testId = this.getDataTestId(element);
+      const testId = SelectorGenerator.getDataTestId(element);
       if (testId) {
         const v = `[data-testid="${CSS.escape(testId)}"]`;
         candidates.push({
           type: 'data-testid',
           value: v,
-          score: 90 + (this.isUniqueSelectorSafe(v, doc) ? 5 : 0),
+          score: 90 + (SelectorGenerator.isUniqueSelectorSafe(v, doc) ? 5 : 0),
         });
       }
       const role = element.getAttribute('role');
@@ -218,7 +221,7 @@ var SmartDOMReaderBundle = (function (exports) {
         candidates.push({
           type: 'role-aria',
           value: v,
-          score: 85 + (this.isUniqueSelectorSafe(v, doc) ? 5 : 0),
+          score: 85 + (SelectorGenerator.isUniqueSelectorSafe(v, doc) ? 5 : 0),
         });
       }
       const nameAttr = element.getAttribute('name');
@@ -227,38 +230,39 @@ var SmartDOMReaderBundle = (function (exports) {
         candidates.push({
           type: 'name',
           value: v,
-          score: 78 + (this.isUniqueSelectorSafe(v, doc) ? 5 : 0),
+          score: 78 + (SelectorGenerator.isUniqueSelectorSafe(v, doc) ? 5 : 0),
         });
       }
-      const pathCss = this.generateCSSSelector(element, doc);
+      const pathCss = SelectorGenerator.generateCSSSelector(element, doc);
       const structuralPenalty = (pathCss.match(/:nth-child\(/g) || []).length * 10;
       const classBonus = pathCss.includes('.') ? 8 : 0;
       const pathScore = Math.max(0, 70 + classBonus - structuralPenalty);
       candidates.push({ type: 'class-path', value: pathCss, score: pathScore });
-      const xpath = this.generateXPath(element, doc);
+      const xpath = SelectorGenerator.generateXPath(element, doc);
       candidates.push({ type: 'xpath', value: xpath, score: 40 });
-      const textBased = this.generateTextBasedSelector(element);
+      const textBased = SelectorGenerator.generateTextBasedSelector(element);
       if (textBased) candidates.push({ type: 'text', value: textBased, score: 30 });
       candidates.sort((a, b) => b.score - a.score);
       const bestCss =
         candidates.find((c) => c.type !== 'xpath' && c.type !== 'text')?.value || pathCss;
-      return {
+      const selector = {
         css: bestCss,
         xpath,
-        textBased,
-        dataTestId: testId || void 0,
-        ariaLabel: aria || void 0,
         candidates,
       };
+      if (textBased) selector.textBased = textBased;
+      if (testId) selector.dataTestId = testId;
+      if (aria) selector.ariaLabel = aria;
+      return selector;
     }
     /**
      * Generate a unique CSS selector for an element
      */
     static generateCSSSelector(element, doc) {
-      if (element.id && this.isUniqueId(element.id, doc)) {
+      if (element.id && SelectorGenerator.isUniqueId(element.id, doc)) {
         return `#${CSS.escape(element.id)}`;
       }
-      const testId = this.getDataTestId(element);
+      const testId = SelectorGenerator.getDataTestId(element);
       if (testId) {
         return `[data-testid="${CSS.escape(testId)}"]`;
       }
@@ -266,39 +270,39 @@ var SmartDOMReaderBundle = (function (exports) {
       let current = element;
       while (current && current.nodeType === Node.ELEMENT_NODE) {
         let selector = current.nodeName.toLowerCase();
-        if (current.id && this.isUniqueId(current.id, doc)) {
+        if (current.id && SelectorGenerator.isUniqueId(current.id, doc)) {
           selector = `#${CSS.escape(current.id)}`;
           path.unshift(selector);
           break;
         }
-        const classes = this.getMeaningfulClasses(current);
+        const classes = SelectorGenerator.getMeaningfulClasses(current);
         if (classes.length > 0) {
-          selector += '.' + classes.map((c) => CSS.escape(c)).join('.');
+          selector += `.${classes.map((c) => CSS.escape(c)).join('.')}`;
         }
         const siblings = current.parentElement?.children;
         if (siblings && siblings.length > 1) {
           const index = Array.from(siblings).indexOf(current);
-          if (index > 0 || !this.isUniqueSelector(selector, current.parentElement)) {
+          if (index > 0 || !SelectorGenerator.isUniqueSelector(selector, current.parentElement)) {
             selector += `:nth-child(${index + 1})`;
           }
         }
         path.unshift(selector);
         current = current.parentElement;
       }
-      return this.optimizePath(path, element, doc);
+      return SelectorGenerator.optimizePath(path, element, doc);
     }
     /**
      * Generate XPath for an element
      */
     static generateXPath(element, doc) {
-      if (element.id && this.isUniqueId(element.id, doc)) {
+      if (element.id && SelectorGenerator.isUniqueId(element.id, doc)) {
         return `//*[@id="${element.id}"]`;
       }
       const path = [];
       let current = element;
       while (current && current.nodeType === Node.ELEMENT_NODE) {
         const tagName = current.nodeName.toLowerCase();
-        if (current.id && this.isUniqueId(current.id, doc)) {
+        if (current.id && SelectorGenerator.isUniqueId(current.id, doc)) {
           path.unshift(`//*[@id="${current.id}"]`);
           break;
         }
@@ -316,7 +320,7 @@ var SmartDOMReaderBundle = (function (exports) {
         path.unshift(xpath);
         current = current.parentElement;
       }
-      return '//' + path.join('/');
+      return `//${path.join('/')}`;
     }
     /**
      * Generate a text-based selector for buttons and links
@@ -570,7 +574,7 @@ var SmartDOMReaderBundle = (function (exports) {
         if (!isWithin) return false;
       }
       if (filter.interactionTypes?.length) {
-        const interaction = this.getInteractionInfo(element);
+        const interaction = DOMTraversal.getInteractionInfo(element);
         let hasInteraction = false;
         for (const type of filter.interactionTypes) {
           if (interaction[type]) {
@@ -595,32 +599,36 @@ var SmartDOMReaderBundle = (function (exports) {
       if (options.maxDepth && depth > options.maxDepth) {
         return null;
       }
-      if (!options.includeHidden && !this.isVisible(element)) {
+      if (!options.includeHidden && !DOMTraversal.isVisible(element)) {
         return null;
       }
-      if (options.viewportOnly && !this.isInViewport(element)) {
+      if (options.viewportOnly && !DOMTraversal.isInViewport(element)) {
         return null;
       }
-      if (!this.passesFilter(element, options.filter)) {
+      if (!DOMTraversal.passesFilter(element, options.filter)) {
         return null;
       }
       const htmlElement = element;
       const extracted = {
         tag: element.tagName.toLowerCase(),
-        text: this.getElementText(element, options),
+        text: DOMTraversal.getElementText(element, options),
         selector: SelectorGenerator.generateSelectors(element),
-        attributes: this.getRelevantAttributes(element, options),
-        context: this.getElementContext(element),
-        interaction: this.getInteractionInfo(element),
+        attributes: DOMTraversal.getRelevantAttributes(element, options),
+        context: DOMTraversal.getElementContext(element),
+        interaction: DOMTraversal.getInteractionInfo(element),
         // bounds removed to save tokens
       };
-      if (options.mode === 'full' && this.isSemanticContainer(element)) {
+      if (options.mode === 'full' && DOMTraversal.isSemanticContainer(element)) {
         const children = [];
         if (options.includeShadowDOM && htmlElement.shadowRoot) {
-          const shadowChildren = this.extractChildren(htmlElement.shadowRoot, options, depth + 1);
+          const shadowChildren = DOMTraversal.extractChildren(
+            htmlElement.shadowRoot,
+            options,
+            depth + 1
+          );
           children.push(...shadowChildren);
         }
-        const regularChildren = this.extractChildren(element, options, depth + 1);
+        const regularChildren = DOMTraversal.extractChildren(element, options, depth + 1);
         children.push(...regularChildren);
         if (children.length > 0) {
           extracted.children = children;
@@ -635,10 +643,10 @@ var SmartDOMReaderBundle = (function (exports) {
       const children = [];
       const elements = container.querySelectorAll('*');
       for (const child of Array.from(elements)) {
-        if (this.hasExtractedAncestor(child, elements)) {
+        if (DOMTraversal.hasExtractedAncestor(child, elements)) {
           continue;
         }
-        const extracted = this.extractElement(child, options, depth);
+        const extracted = DOMTraversal.extractElement(child, options, depth);
         if (extracted) {
           children.push(extracted);
         }
@@ -699,14 +707,14 @@ var SmartDOMReaderBundle = (function (exports) {
         const value = element.getAttribute(attr);
         if (value) {
           attributes[attr] =
-            value.length > attrTruncate ? value.substring(0, attrTruncate) + '...' : value;
+            value.length > attrTruncate ? `${value.substring(0, attrTruncate)}...` : value;
         }
       }
       for (const attr of element.attributes) {
         if (attr.name.startsWith('data-') && !relevant.includes(attr.name)) {
           attributes[attr.name] =
             attr.value.length > dataAttrTruncate
-              ? attr.value.substring(0, dataAttrTruncate) + '...'
+              ? `${attr.value.substring(0, dataAttrTruncate)}...`
               : attr.value;
         }
       }
@@ -767,7 +775,7 @@ var SmartDOMReaderBundle = (function (exports) {
         htmlElement.hasAttribute('disabled') ||
         htmlElement.getAttribute('aria-disabled') === 'true';
       if (isDisabled) interaction.disabled = true;
-      const isHidden = !this.isVisible(element);
+      const isHidden = !DOMTraversal.isVisible(element);
       if (isHidden) interaction.hidden = true;
       const ariaRole = element.getAttribute('role');
       if (ariaRole) interaction.role = ariaRole;
@@ -793,7 +801,7 @@ var SmartDOMReaderBundle = (function (exports) {
       const text = element.textContent?.trim() || '';
       const maxLength = options?.textTruncateLength;
       if (maxLength && text.length > maxLength) {
-        return text.substring(0, maxLength) + '...';
+        return `${text.substring(0, maxLength)}...`;
       }
       return text;
     }
@@ -808,12 +816,12 @@ var SmartDOMReaderBundle = (function (exports) {
     /**
      * Get interactive elements
      */
-    static getInteractiveElements(container = document, options) {
+    static getInteractiveElements(container, options) {
       const elements = [];
-      const selector = this.INTERACTIVE_SELECTORS.join(', ');
+      const selector = DOMTraversal.INTERACTIVE_SELECTORS.join(', ');
       const found = container.querySelectorAll(selector);
       for (const element of Array.from(found)) {
-        const extracted = this.extractElement(element, options);
+        const extracted = DOMTraversal.extractElement(element, options);
         if (extracted) {
           elements.push(extracted);
         }
@@ -823,12 +831,12 @@ var SmartDOMReaderBundle = (function (exports) {
           try {
             const customFound = container.querySelectorAll(customSelector);
             for (const element of Array.from(customFound)) {
-              const extracted = this.extractElement(element, options);
+              const extracted = DOMTraversal.extractElement(element, options);
               if (extracted) {
                 elements.push(extracted);
               }
             }
-          } catch (e) {
+          } catch (_e) {
             console.warn(`Invalid custom selector: ${customSelector}`);
           }
         }
@@ -838,12 +846,12 @@ var SmartDOMReaderBundle = (function (exports) {
     /**
      * Get semantic elements (for full mode)
      */
-    static getSemanticElements(container = document, options) {
+    static getSemanticElements(container, options) {
       const elements = [];
-      const selector = this.SEMANTIC_SELECTORS.join(', ');
+      const selector = DOMTraversal.SEMANTIC_SELECTORS.join(', ');
       const found = container.querySelectorAll(selector);
       for (const element of Array.from(found)) {
-        const extracted = this.extractElement(element, options);
+        const extracted = DOMTraversal.extractElement(element, options);
         if (extracted) {
           elements.push(extracted);
         }
@@ -873,11 +881,11 @@ var SmartDOMReaderBundle = (function (exports) {
       const tailWindow = Math.max(12, len - head - 5);
       const start = Math.max(0, hit.i - Math.floor(tailWindow / 2));
       const end = Math.min(t.length, start + tailWindow);
-      return t.slice(0, head).trimEnd() + ' … ' + t.slice(start, end).trim() + '…';
+      return `${t.slice(0, head).trimEnd()} … ${t.slice(start, end).trim()}…`;
     }
     const slice = t.slice(0, len);
     const lastSpace = slice.lastIndexOf(' ');
-    return (lastSpace > 32 ? slice.slice(0, lastSpace) : slice) + '…';
+    return `${lastSpace > 32 ? slice.slice(0, lastSpace) : slice}…`;
   }
   function bestSelector(el) {
     return el.selector?.css || '';
@@ -885,7 +893,7 @@ var SmartDOMReaderBundle = (function (exports) {
   function hashId(input) {
     let h = 5381;
     for (let i = 0; i < input.length; i++) h = (h * 33) ^ input.charCodeAt(i);
-    return 'sec-' + (h >>> 0).toString(36);
+    return `sec-${(h >>> 0).toString(36)}`;
   }
   function iconForRegion(key) {
     switch (key) {
@@ -980,8 +988,8 @@ var SmartDOMReaderBundle = (function (exports) {
   }
   function wrapXml(body, meta, type = 'section') {
     const attrs = [
-      meta?.title ? `title="${escapeXml(meta.title)}"` : null,
-      meta?.url ? `url="${escapeXml(meta.url)}"` : null,
+      meta?.title ? `title="${escapeXml(meta?.title)}"` : null,
+      meta?.url ? `url="${escapeXml(meta?.url)}"` : null,
     ]
       .filter(Boolean)
       .join(' ');
@@ -1001,7 +1009,7 @@ ${body}
   class MarkdownFormatter {
     static structure(overview, _opts = {}, meta) {
       const lines = [];
-      lines.push(`# Page Outline`);
+      lines.push('# Page Outline');
       if (meta?.title || meta?.url) {
         lines.push(`Title: ${meta?.title ?? ''}`.trim());
         lines.push(`URL: ${meta?.url ?? ''}`.trim());
@@ -1043,7 +1051,7 @@ ${body}
     }
     static region(result, opts = {}, meta) {
       const lines = [];
-      lines.push(`# Region Details`);
+      lines.push('# Region Details');
       if (meta?.title || meta?.url) {
         lines.push(`Title: ${meta?.title ?? ''}`.trim());
         lines.push(`URL: ${meta?.url ?? ''}`.trim());
@@ -1077,7 +1085,7 @@ ${body}
     }
     static content(content, opts = {}, meta) {
       const lines = [];
-      lines.push(`# Content`);
+      lines.push('# Content');
       lines.push(`Selector: \`${content.selector}\``);
       lines.push('');
       if (content.text.headings?.length) {
@@ -1168,48 +1176,50 @@ ${body}
       const regions = {};
       const header = root.querySelector('header, [role="banner"], .header, #header');
       if (header) {
-        regions.header = this.analyzeRegion(header);
+        regions.header = ProgressiveExtractor.analyzeRegion(header);
       }
       const navs = root.querySelectorAll('nav, [role="navigation"], .nav, .navigation');
       if (navs.length > 0) {
-        regions.navigation = Array.from(navs).map((nav) => this.analyzeRegion(nav));
+        regions.navigation = Array.from(navs).map((nav) => ProgressiveExtractor.analyzeRegion(nav));
       }
       if (root instanceof Document) {
         const main = ContentDetection.findMainContent(root);
         if (main) {
-          regions.main = this.analyzeRegion(main);
+          regions.main = ProgressiveExtractor.analyzeRegion(main);
           const sections = main.querySelectorAll('section, article, [role="region"]');
           if (sections.length > 0) {
             regions.sections = Array.from(sections)
               .filter((section) => !section.closest('nav, header, footer'))
-              .map((section) => this.analyzeRegion(section));
+              .map((section) => ProgressiveExtractor.analyzeRegion(section));
           }
         }
       } else {
-        regions.main = this.analyzeRegion(root);
+        regions.main = ProgressiveExtractor.analyzeRegion(root);
         const sections = root.querySelectorAll('section, article, [role="region"]');
         if (sections.length > 0) {
           regions.sections = Array.from(sections)
             .filter((section) => !section.closest('nav, header, footer'))
-            .map((section) => this.analyzeRegion(section));
+            .map((section) => ProgressiveExtractor.analyzeRegion(section));
         }
       }
       const sidebars = root.querySelectorAll('aside, [role="complementary"], .sidebar, #sidebar');
       if (sidebars.length > 0) {
-        regions.sidebar = Array.from(sidebars).map((sidebar) => this.analyzeRegion(sidebar));
+        regions.sidebar = Array.from(sidebars).map((sidebar) =>
+          ProgressiveExtractor.analyzeRegion(sidebar)
+        );
       }
       const footer = root.querySelector('footer, [role="contentinfo"], .footer, #footer');
       if (footer) {
-        regions.footer = this.analyzeRegion(footer);
+        regions.footer = ProgressiveExtractor.analyzeRegion(footer);
       }
       const modals = root.querySelectorAll('[role="dialog"], .modal, .popup, .overlay');
       const visibleModals = Array.from(modals).filter((modal) => DOMTraversal.isVisible(modal));
       if (visibleModals.length > 0) {
-        regions.modals = visibleModals.map((modal) => this.analyzeRegion(modal));
+        regions.modals = visibleModals.map((modal) => ProgressiveExtractor.analyzeRegion(modal));
       }
-      const forms = this.extractFormOverview(root);
-      const summary = this.calculateSummary(root, regions, forms);
-      const suggestions = this.generateSuggestions(regions, summary);
+      const forms = ProgressiveExtractor.extractFormOverview(root);
+      const summary = ProgressiveExtractor.calculateSummary(root, regions, forms);
+      const suggestions = ProgressiveExtractor.generateSuggestions(regions, summary);
       return { regions, forms, summary, suggestions };
     }
     /**
@@ -1244,14 +1254,14 @@ ${body}
       if (options.includeHeadings !== false) {
         const headings = element.querySelectorAll('h1, h2, h3, h4, h5, h6');
         result.text.headings = Array.from(headings).map((h) => ({
-          level: parseInt(h.tagName[1]),
-          text: this.getTextContent(h, options.maxTextLength),
+          level: Number.parseInt(h.tagName[1], 10),
+          text: ProgressiveExtractor.getTextContent(h, options.maxTextLength),
         }));
       }
       const paragraphs = element.querySelectorAll('p');
       if (paragraphs.length > 0) {
         result.text.paragraphs = Array.from(paragraphs)
-          .map((p) => this.getTextContent(p, options.maxTextLength))
+          .map((p) => ProgressiveExtractor.getTextContent(p, options.maxTextLength))
           .filter((text) => text.length > 0);
       }
       if (options.includeLists !== false) {
@@ -1259,7 +1269,7 @@ ${body}
         result.text.lists = Array.from(lists).map((list) => ({
           type: list.tagName.toLowerCase(),
           items: Array.from(list.querySelectorAll('li')).map((li) =>
-            this.getTextContent(li, options.maxTextLength)
+            ProgressiveExtractor.getTextContent(li, options.maxTextLength)
           ),
         }));
       }
@@ -1267,12 +1277,14 @@ ${body}
         const tables = element.querySelectorAll('table');
         result.tables = Array.from(tables).map((table) => {
           const headers = Array.from(table.querySelectorAll('th')).map((th) =>
-            this.getTextContent(th)
+            ProgressiveExtractor.getTextContent(th)
           );
           const rows = Array.from(table.querySelectorAll('tr'))
             .filter((tr) => tr.querySelector('td'))
             .map((tr) =>
-              Array.from(tr.querySelectorAll('td')).map((td) => this.getTextContent(td))
+              Array.from(tr.querySelectorAll('td')).map((td) =>
+                ProgressiveExtractor.getTextContent(td)
+              )
             );
           return { headers, rows };
         });
@@ -1282,19 +1294,26 @@ ${body}
         const videos = element.querySelectorAll('video');
         const audios = element.querySelectorAll('audio');
         result.media = [
-          ...Array.from(images).map((img) => ({
-            type: 'img',
-            alt: img.getAttribute('alt') || void 0,
-            src: img.getAttribute('src') || void 0,
-          })),
-          ...Array.from(videos).map((video) => ({
-            type: 'video',
-            src: video.getAttribute('src') || void 0,
-          })),
-          ...Array.from(audios).map((audio) => ({
-            type: 'audio',
-            src: audio.getAttribute('src') || void 0,
-          })),
+          ...Array.from(images).map((img) => {
+            const item = { type: 'img' };
+            const alt = img.getAttribute('alt');
+            const src = img.getAttribute('src');
+            if (alt) item.alt = alt;
+            if (src) item.src = src;
+            return item;
+          }),
+          ...Array.from(videos).map((video) => {
+            const item = { type: 'video' };
+            const src = video.getAttribute('src');
+            if (src) item.src = src;
+            return item;
+          }),
+          ...Array.from(audios).map((audio) => {
+            const item = { type: 'audio' };
+            const src = audio.getAttribute('src');
+            if (src) item.src = src;
+            return item;
+          }),
         ];
       }
       const allText = element.textContent || '';
@@ -1336,21 +1355,23 @@ ${body}
       }
       const textContent = element.textContent?.trim() || '';
       const textPreview =
-        textContent.length > 50 ? textContent.substring(0, 50) + '...' : textContent;
-      return {
+        textContent.length > 50 ? `${textContent.substring(0, 50)}...` : textContent;
+      const regionInfo = {
         selector,
-        label,
-        role: element.getAttribute('role') || void 0,
         interactiveCount,
         hasForm: forms.length > 0,
         hasList: lists.length > 0,
         hasTable: tables.length > 0,
         hasMedia: media.length > 0,
-        buttonCount: buttons.length > 0 ? buttons.length : void 0,
-        linkCount: links.length > 0 ? links.length : void 0,
-        inputCount: inputs.length > 0 ? inputs.length : void 0,
-        textPreview: textPreview.length > 0 ? textPreview : void 0,
       };
+      if (label) regionInfo.label = label;
+      const role = element.getAttribute('role');
+      if (role) regionInfo.role = role;
+      if (buttons.length > 0) regionInfo.buttonCount = buttons.length;
+      if (links.length > 0) regionInfo.linkCount = links.length;
+      if (inputs.length > 0) regionInfo.inputCount = inputs.length;
+      if (textPreview.length > 0) regionInfo.textPreview = textPreview;
+      return regionInfo;
     }
     /**
      * Extract overview of forms on the page
@@ -1392,12 +1413,13 @@ ${body}
         } else if (formAction?.includes('checkout') || formClass?.includes('checkout')) {
           purpose = 'checkout';
         }
-        return {
+        const formOverview = {
           selector,
           location: location2,
           inputCount: inputs.length,
-          purpose,
         };
+        if (purpose) formOverview.purpose = purpose;
+        return formOverview;
       });
     }
     /**
@@ -1417,16 +1439,19 @@ ${body}
         const element = root.querySelector(sel);
         return element ? DOMTraversal.isVisible(element) : false;
       });
-      const mainContentSelector = regions.main?.selector;
-      return {
+      const summary = {
         totalInteractive: allInteractive.length,
         totalForms: forms.length,
         totalSections: allSections.length,
         hasModals,
         hasErrors,
         isLoading,
-        mainContentSelector,
       };
+      const mainContentSelector = regions.main?.selector;
+      if (mainContentSelector) {
+        summary.mainContentSelector = mainContentSelector;
+      }
+      return summary;
     }
     /**
      * Generate AI-friendly suggestions
@@ -1461,7 +1486,7 @@ ${body}
     static getTextContent(element, maxLength) {
       const text = element.textContent?.trim() || '';
       if (maxLength && text.length > maxLength) {
-        return text.substring(0, maxLength) + '...';
+        return `${text.substring(0, maxLength)}...`;
       }
       return text;
     }
@@ -1473,15 +1498,21 @@ ${body}
         mode: options.mode || 'interactive',
         maxDepth: options.maxDepth || 5,
         includeHidden: options.includeHidden || false,
-        includeShadowDOM: options.includeShadowDOM || true,
+        includeShadowDOM: options.includeShadowDOM ?? true,
         includeIframes: options.includeIframes || false,
         viewportOnly: options.viewportOnly || false,
         mainContentOnly: options.mainContentOnly || false,
         customSelectors: options.customSelectors || [],
-        attributeTruncateLength: options.attributeTruncateLength,
-        dataAttributeTruncateLength: options.dataAttributeTruncateLength,
-        textTruncateLength: options.textTruncateLength,
-        filter: options.filter,
+        ...(options.attributeTruncateLength !== void 0 && {
+          attributeTruncateLength: options.attributeTruncateLength,
+        }),
+        ...(options.dataAttributeTruncateLength !== void 0 && {
+          dataAttributeTruncateLength: options.dataAttributeTruncateLength,
+        }),
+        ...(options.textTruncateLength !== void 0 && {
+          textTruncateLength: options.textTruncateLength,
+        }),
+        ...(options.filter !== void 0 && { filter: options.filter }),
       };
     }
     /**
@@ -1508,8 +1539,13 @@ ${body}
         interactive,
       };
       if (options.mode === 'full') {
-        result.semantic = this.extractSemanticElements(container, options);
-        result.metadata = this.extractMetadata(doc, container, options);
+        const semantic = this.extractSemanticElements(container, options);
+        const metadata = this.extractMetadata(doc, container, options);
+        return {
+          ...result,
+          semantic,
+          metadata,
+        };
       }
       return result;
     }
@@ -1517,13 +1553,14 @@ ${body}
      * Extract page state information
      */
     extractPageState(doc) {
+      const hasFocus = this.getFocusedElement(doc);
       return {
         url: doc.location?.href || '',
         title: doc.title || '',
         hasErrors: this.detectErrors(doc),
         isLoading: this.detectLoading(doc),
         hasModals: this.detectModals(doc),
-        hasFocus: this.getFocusedElement(doc),
+        ...(hasFocus !== void 0 && { hasFocus }),
       };
     }
     /**
@@ -1622,13 +1659,16 @@ ${body}
           const extracted = DOMTraversal.extractElement(button, options);
           if (extracted) formButtons.push(extracted);
         });
-        forms.push({
+        const action = form.getAttribute('action');
+        const method = form.getAttribute('method');
+        const formInfo = {
           selector: SelectorGenerator.generateSelectors(form).css,
-          action: form.getAttribute('action') || void 0,
-          method: form.getAttribute('method') || void 0,
           inputs: formInputs,
           buttons: formButtons,
-        });
+        };
+        if (action) formInfo.action = action;
+        if (method) formInfo.method = method;
+        forms.push(formInfo);
       });
       return forms;
     }
@@ -1687,15 +1727,18 @@ ${body}
       const extractedElements = container.querySelectorAll(
         'button, a, input, textarea, select, h1, h2, h3, h4, h5, h6, img, table, ul, ol, article'
       ).length;
-      return {
+      const metadata = {
         totalElements: allElements.length,
         extractedElements,
-        mainContent:
-          options.mainContentOnly && container instanceof Element
-            ? SelectorGenerator.generateSelectors(container).css
-            : void 0,
-        language: doc.documentElement.getAttribute('lang') || void 0,
       };
+      if (options.mainContentOnly && container instanceof Element) {
+        metadata.mainContent = SelectorGenerator.generateSelectors(container).css;
+      }
+      const language = doc.documentElement.getAttribute('lang');
+      if (language) {
+        metadata.language = language;
+      }
+      return metadata;
     }
     /**
      * Check if element should be included based on options

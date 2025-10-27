@@ -2,24 +2,12 @@
 
 import { initializeWebModelContext } from './global.js';
 
-// Auto-initialize when script loads in browser environments
+// Auto-initialize immediately when script loads in browser environments
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-  // Wait for DOM to be ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-      try {
-        initializeWebModelContext();
-      } catch (error) {
-        console.error('[Web Model Context] Auto-initialization failed:', error);
-      }
-    });
-  } else {
-    // DOM is already ready
-    try {
-      initializeWebModelContext();
-    } catch (error) {
-      console.error('[Web Model Context] Auto-initialization failed:', error);
-    }
+  try {
+    initializeWebModelContext();
+  } catch (error) {
+    console.error('[Web Model Context] Auto-initialization failed:', error);
   }
 }
 

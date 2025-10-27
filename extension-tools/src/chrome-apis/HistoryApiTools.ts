@@ -25,7 +25,7 @@ type HistoryAction = (typeof HISTORY_ACTIONS)[number];
 
 const historyActionSchema = z.enum(HISTORY_ACTIONS);
 
-export class HistoryApiTools extends BaseApiTools {
+export class HistoryApiTools extends BaseApiTools<HistoryApiToolsOptions> {
   protected apiName = 'History';
 
   constructor(server: McpServer, options: HistoryApiToolsOptions = {}) {

@@ -5,7 +5,7 @@ export interface SystemMemoryApiToolsOptions {
   getInfo?: boolean;
 }
 
-export class SystemMemoryApiTools extends BaseApiTools {
+export class SystemMemoryApiTools extends BaseApiTools<SystemMemoryApiToolsOptions> {
   protected apiName = 'System.memory';
 
   constructor(server: McpServer, options: SystemMemoryApiToolsOptions = {}) {

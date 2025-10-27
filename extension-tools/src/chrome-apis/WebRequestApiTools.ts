@@ -10,7 +10,7 @@ export interface WebRequestApiToolsOptions {
   getActiveListeners?: boolean;
 }
 
-export class WebRequestApiTools extends BaseApiTools {
+export class WebRequestApiTools extends BaseApiTools<WebRequestApiToolsOptions> {
   protected apiName = 'WebRequest';
 
   constructor(server: McpServer, options: WebRequestApiToolsOptions = {}) {

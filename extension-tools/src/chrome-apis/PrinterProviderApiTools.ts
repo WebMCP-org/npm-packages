@@ -9,7 +9,7 @@
 //   print?: boolean;
 // }
 
-// export class PrinterProviderApiTools extends BaseApiTools {
+// export class PrinterProviderApiTools extends BaseApiTools<PrinterProviderApiToolsOptions> {
 //   protected apiName = 'PrinterProvider';
 
 //   constructor(server: McpServer, options: PrinterProviderApiToolsOptions = {}) {

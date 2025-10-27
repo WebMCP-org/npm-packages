@@ -8,7 +8,7 @@ export interface TabCaptureApiToolsOptions {
   getMediaStreamId?: boolean;
 }
 
-export class TabCaptureApiTools extends BaseApiTools {
+export class TabCaptureApiTools extends BaseApiTools<TabCaptureApiToolsOptions> {
   protected apiName = 'TabCapture';
 
   constructor(server: McpServer, options: TabCaptureApiToolsOptions = {}) {

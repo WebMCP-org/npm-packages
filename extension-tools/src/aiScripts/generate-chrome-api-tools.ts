@@ -1,7 +1,7 @@
+import fs from 'node:fs/promises';
+import path, { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import Anthropic from '@anthropic-ai/sdk';
-import fs from 'fs/promises';
-import path, { dirname } from 'path';
-import { fileURLToPath } from 'url';
 import 'dotenv/config';
 import { chromium } from 'playwright'; // <-- Add this import at the top of your file
 import { CHROME_API_REGISTRY, ChromeApi } from '../chromeApiRegistry';
@@ -17,8 +17,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Initialize Anthropic client
+const apiKey = process.env.ANTHROPIC_API_KEY;
+if (!apiKey) {
+  throw new Error('ANTHROPIC_API_KEY environment variable is required');
+}
 const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY!,
+  apiKey,
 });
 
 // Output directory for generated API classes
@@ -379,14 +383,14 @@ async function processBatchResults(batchId: string) {
       const message = result.result.message;
       const content = message.content[0];
 
-      if (content.type === 'text') {
+      if (content && content.type === 'text') {
         // Extract the TypeScript code from the response
-        let code = content.text;
+        let code = 'text' in content ? content.text : '';
 
         // Strip markdown code block markers
         const codeBlockRegex = /```(?:typescript|ts)?\n([\s\S]*?)```/;
         const match = code.match(codeBlockRegex);
-        if (match) {
+        if (match?.[1]) {
           code = match[1].trim();
         }
 

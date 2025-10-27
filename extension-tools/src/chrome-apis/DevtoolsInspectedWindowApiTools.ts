@@ -8,7 +8,7 @@ export interface DevtoolsInspectedWindowApiToolsOptions {
   getResources?: boolean;
 }
 
-export class DevtoolsInspectedWindowApiTools extends BaseApiTools {
+export class DevtoolsInspectedWindowApiTools extends BaseApiTools<DevtoolsInspectedWindowApiToolsOptions> {
   protected apiName = 'Devtools.inspectedWindow';
 
   constructor(server: McpServer, options: DevtoolsInspectedWindowApiToolsOptions = {}) {

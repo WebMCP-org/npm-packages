@@ -15,7 +15,7 @@ export interface TtsEngineApiToolsOptions {
   onUninstallLanguageRequest?: boolean;
 }
 
-export class TtsEngineApiTools extends BaseApiTools {
+export class TtsEngineApiTools extends BaseApiTools<TtsEngineApiToolsOptions> {
   protected apiName = 'TtsEngine';
 
   constructor(server: McpServer, options: TtsEngineApiToolsOptions = {}) {

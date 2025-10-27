@@ -11,7 +11,7 @@ export interface CookiesApiToolsOptions {
   removeCookie?: boolean;
 }
 
-export class CookiesApiTools extends BaseApiTools {
+export class CookiesApiTools extends BaseApiTools<CookiesApiToolsOptions> {
   protected apiName = 'Cookies';
 
   constructor(server: McpServer, options: CookiesApiToolsOptions = {}) {

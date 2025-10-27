@@ -10,7 +10,7 @@ export interface InstanceIDApiToolsOptions {
   deleteID?: boolean;
 }
 
-export class InstanceIDApiTools extends BaseApiTools {
+export class InstanceIDApiTools extends BaseApiTools<InstanceIDApiToolsOptions> {
   protected apiName = 'InstanceID';
 
   constructor(server: McpServer, options: InstanceIDApiToolsOptions = {}) {

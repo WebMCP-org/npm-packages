@@ -10,7 +10,7 @@ export interface AlarmsApiToolsOptions {
   clearAllAlarms?: boolean;
 }
 
-export class AlarmsApiTools extends BaseApiTools {
+export class AlarmsApiTools extends BaseApiTools<AlarmsApiToolsOptions> {
   protected apiName = 'Alarms';
 
   constructor(server: McpServer, options: AlarmsApiToolsOptions = {}) {

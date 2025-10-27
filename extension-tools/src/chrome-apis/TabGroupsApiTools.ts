@@ -16,7 +16,7 @@ type TabGroupAction = (typeof TAB_GROUP_ACTIONS)[number];
 
 const tabGroupSchema = z.enum(TAB_GROUP_ACTIONS);
 
-export class TabGroupsApiTools extends BaseApiTools {
+export class TabGroupsApiTools extends BaseApiTools<TabGroupsApiToolsOptions> {
   protected apiName = 'TabGroups';
 
   constructor(server: McpServer, options: TabGroupsApiToolsOptions = {}) {

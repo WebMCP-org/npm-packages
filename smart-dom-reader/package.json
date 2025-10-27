@@ -45,7 +45,7 @@
   ],
   "scripts": {
     "prebuild": "pnpm build:bundle && node generate-bundle-module.mjs",
-    "build": "tsup",
+    "build": "tsdown",
     "build:bundle": "vite build --config vite.config.bundle.ts",
     "bundle:mcp": "pnpm --filter @mcp-b/smart-dom-reader build && pnpm --filter @mcp-b/smart-dom-reader-server bundle",
     "check": "biome check --write .",
@@ -63,7 +63,7 @@
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "tsup": "catalog:",
+    "tsdown": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plugin-monkey": "catalog:"

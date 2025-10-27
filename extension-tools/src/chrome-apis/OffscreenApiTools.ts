@@ -8,7 +8,7 @@ export interface OffscreenApiToolsOptions {
   hasOffscreenDocument?: boolean;
 }
 
-export class OffscreenApiTools extends BaseApiTools {
+export class OffscreenApiTools extends BaseApiTools<OffscreenApiToolsOptions> {
   protected apiName = 'Offscreen';
 
   constructor(server: McpServer, options: OffscreenApiToolsOptions = {}) {
@@ -224,7 +224,7 @@ export class OffscreenApiTools extends BaseApiTools {
                   note: 'Limited information available in Chrome versions before 116',
                 };
               }
-            } catch (clientsError) {
+            } catch (_clientsError) {
               // If clients API is not available, we can't determine the status
               return this.formatSuccess(
                 'Cannot determine offscreen document status - clients API not available'

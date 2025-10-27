@@ -8,7 +8,7 @@
 //   stopProfiling?: boolean;
 // }
 
-// export class DevtoolsPerformanceApiTools extends BaseApiTools {
+// export class DevtoolsPerformanceApiTools extends BaseApiTools<DevtoolsPerformanceApiToolsOptions> {
 //   protected apiName = 'Devtools.performance';
 
 //   constructor(
