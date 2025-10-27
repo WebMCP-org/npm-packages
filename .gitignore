@@ -41,3 +41,4 @@ coverage
 .temp
 .tmp
 .secrets
+e2e/playwright-report
