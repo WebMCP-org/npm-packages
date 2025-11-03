@@ -1,7 +1,13 @@
 // Web Model Context API Types
 // Based on: https://github.com/MicrosoftEdge/MSEdgeExplainers/blob/main/WebModelContext/explainer.md
 
-import type { CallToolResult, Server as McpServer, ToolAnnotations } from '@mcp-b/webmcp-ts-sdk';
+import type { IframeChildTransportOptions, TabServerTransportOptions } from '@mcp-b/transports';
+import type {
+  CallToolResult,
+  Server as McpServer,
+  ToolAnnotations,
+  Transport,
+} from '@mcp-b/webmcp-ts-sdk';
 import type { z } from 'zod';
 
 /**
@@ -42,6 +48,45 @@ export type { CallToolResult };
  * This is compatible with MCP SDK's CallToolResult
  */
 export type ToolResponse = CallToolResult;
+
+/**
+ * Transport configuration for initializing the Web Model Context polyfill.
+ */
+export interface TransportConfiguration {
+  /**
+   * Provide a custom transport factory. When set, tabServer and iframeServer options are ignored.
+   */
+  create?: () => Transport;
+
+  /**
+   * Options passed to the built-in TabServerTransport when no custom factory is provided.
+   * Set to false to disable the tab server.
+   * Default: enabled with allowedOrigins: ['*']
+   */
+  tabServer?: Partial<TabServerTransportOptions> | false;
+
+  /**
+   * Options passed to the built-in IframeChildTransport when no custom factory is provided.
+   * Set to false to disable the iframe server.
+   * Default: auto-enabled when running in an iframe (window.parent !== window)
+   */
+  iframeServer?: Partial<IframeChildTransportOptions> | false;
+}
+
+/**
+ * Initialization options for the Web Model Context polyfill.
+ */
+export interface WebModelContextInitOptions {
+  /**
+   * Configure the transport used to expose the MCP server in the browser.
+   */
+  transport?: TransportConfiguration;
+
+  /**
+   * When set to false, automatic initialization on module load is skipped.
+   */
+  autoInitialize?: boolean;
+}
 
 /**
  * Tool descriptor for Web Model Context API
@@ -228,7 +273,8 @@ export interface InternalModelContext extends ModelContext {
  * Internal MCP Bridge state
  */
 export interface MCPBridge {
-  server: McpServer;
+  tabServer: McpServer;
+  iframeServer?: McpServer;
   tools: Map<string, ValidatedToolDescriptor>;
   modelContext: InternalModelContext;
   isInitialized: boolean;
