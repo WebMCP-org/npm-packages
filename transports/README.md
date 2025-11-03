@@ -106,6 +106,135 @@ const result = await client.callTool({
 });
 ```
 
+### Tab Transport Configuration
+
+#### TabClientTransport Options
+
+- `targetOrigin` (required): Origin expected from the server window (for security).
+- `channelId`: Override the default channel identifier (default: `mcp-default`).
+
+#### TabServerTransport Options
+
+- `allowedOrigins` (required): Whitelist of origins allowed to connect (for security).
+- `channelId`: Override the default channel identifier (default: `mcp-default`).
+
+## Iframe Transports (Parent-Child Communication)
+
+Use `IframeParentTransport` and `IframeChildTransport` for cross-origin communication between a parent page and an iframe. These transports are specifically designed for iframe scenarios and support cross-origin messaging.
+
+### Iframe Server Setup (Inside Iframe)
+
+Create an MCP server inside an iframe that can be accessed by the parent page:
+
+```typescript
+import { IframeChildTransport } from "@mcp-b/transports";
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { z } from "zod";
+
+// Create MCP server
+const server = new Server(
+  {
+    name: "IframeApp",
+    version: "1.0.0",
+  },
+  {
+    capabilities: {
+      tools: {},
+    },
+  }
+);
+
+// Register tools
+server.tool(
+  "getIframeData",
+  "Get data from the iframe application",
+  {
+    key: z.string().describe("Data key to retrieve"),
+  },
+  async (args) => {
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Retrieved: ${args.key}`,
+        },
+      ],
+    };
+  }
+);
+
+// Connect to iframe transport
+const transport = new IframeChildTransport({
+  allowedOrigins: ["https://parent-app.com"], // Parent page origin
+  // or use ['*'] to allow any origin (less secure)
+});
+
+await server.connect(transport);
+```
+
+### Iframe Client Setup (Parent Page)
+
+Connect from the parent page to the iframe's MCP server:
+
+```typescript
+import { IframeParentTransport } from "@mcp-b/transports";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+
+// Get reference to iframe element
+const iframe = document.querySelector('iframe');
+
+// Wait for iframe to load
+iframe.addEventListener('load', async () => {
+  // Create transport targeting the iframe
+  const transport = new IframeParentTransport({
+    iframe: iframe,
+    targetOrigin: 'https://iframe-app.com', // Iframe page origin
+  });
+
+  // Create MCP client
+  const client = new Client({
+    name: "ParentPage",
+    version: "1.0.0",
+  });
+
+  // Connect and use
+  await client.connect(transport);
+
+  // List available tools from iframe
+  const tools = await client.listTools();
+  console.log("Tools from iframe:", tools.tools);
+
+  // Call a tool from the iframe
+  const result = await client.callTool({
+    name: "getIframeData",
+    arguments: { key: "user-preferences" },
+  });
+});
+```
+
+### Iframe Transport Configuration
+
+#### IframeParentTransport Options
+
+- `iframe` (required): Reference to the HTMLIFrameElement
+- `targetOrigin` (required): Expected origin of the iframe (for security)
+- `channelId`: Override the default channel identifier (default: `mcp-iframe`)
+- `checkReadyRetryMs`: Interval to retry the ready handshake if iframe isn't ready yet (default: 250ms)
+
+#### IframeChildTransport Options
+
+- `allowedOrigins` (required): Whitelist of parent origins allowed to connect (for security)
+- `channelId`: Override the default channel identifier (default: `mcp-iframe`)
+- `serverReadyRetryMs`: Interval to retry broadcasting ready signal to parent (default: 250ms)
+
+### Cross-Origin Support
+
+Iframe transports are designed for cross-origin communication:
+- Parent and iframe can be on different domains
+- Origin validation is performed on both sides
+- Uses secure `postMessage` API
+- Retry mechanisms handle iframe loading timing issues
+
 ## Extension Transport Examples
 
 ### Background Script Setup
