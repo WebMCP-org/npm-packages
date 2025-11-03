@@ -1,30 +1,37 @@
 packages:
-  - "extension-tools"
-  - "global"
-  - "react-webmcp"
-  - "smart-dom-reader"
-  - "smart-dom-reader/mcp-server"
-  - "transports"
-  - "webmcp-ts-sdk"
-  - "e2e"
-  - "e2e/test-app"
-  - "e2e/react-webmcp-test-app"
+  - extension-tools
+  - global
+  - react-webmcp
+  - smart-dom-reader
+  - smart-dom-reader/mcp-server
+  - transports
+  - webmcp-ts-sdk
+  - e2e
+  - e2e/test-app
+  - e2e/react-webmcp-test-app
+  - e2e/mcp-ui-with-webmcp/**
 
 catalog:
+  '@cloudflare/vite-plugin': ^1.13.18
   '@composio/json-schema-to-zod': ^0.1.17
+  '@hookform/resolvers': ^5.2.2
   '@modelcontextprotocol/sdk': 1.15.0
+  '@radix-ui/react-collapsible': ^1.1.12
   '@types/chrome': ^0.0.326
-  '@types/node': ^22.15.21
+  '@types/node': 22.17.2
   '@types/react': ^19.1.2
   '@types/react-dom': ^19.1.2
+  ai: ^5.0.83
   react: ^19.1.0
   react-dom: ^19.1.0
+  react-markdown: ^10.1.0
   tsdown: ^0.15.10
   tsx: ^4.20.0
   typescript: ^5.8.3
   vite: ^7.1.2
   vite-plugin-monkey: ^6.0.1
-  zod: ^3.25.76
+  wrangler: ^4.45.3
+  zod: 3.25.76
 
 onlyBuiltDependencies:
   - '@axodotdev/oranda'
