@@ -1,0 +1,42 @@
+{
+  "name": "@mcp-b/mcp-ui-webmcp-starter",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -b && vite build",
+    "postbuild": "mkdir -p public/embedded-apps && cp -r dist/client public/embedded-apps",
+    "cf-typegen": "wrangler types",
+    "deploy": "pnpm run build && wrangler deploy",
+    "dev": "vite",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@mcp-b/global": "workspace:*",
+    "@mcp-b/react-webmcp": "workspace:*",
+    "@mcp-ui/server": "^5.2.0",
+    "@modelcontextprotocol/sdk": "^1.20.2",
+    "agents": "^0.2.20",
+    "fetch-to-node": "^2.0.0",
+    "hono": "^4.10.4",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "catalog:",
+    "@eslint/js": "^9.33.0",
+    "@types/react": "^19.1.10",
+    "@types/react-dom": "^19.1.7",
+    "@vitejs/plugin-react": "^5.0.0",
+    "eslint": "^9.33.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.20",
+    "globals": "^16.3.0",
+    "typescript": "~5.8.3",
+    "typescript-eslint": "^8.39.1",
+    "vite": "^7.1.2",
+    "wrangler": "catalog:"
+  }
+}
