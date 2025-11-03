@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { AlertCircle } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useId } from 'react';
 import { FormProvider, useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import {
@@ -33,6 +33,8 @@ export function ApiKeyInput({
   onDisconnectServer,
   connectionState,
 }: ApiKeyInputProps) {
+  const apiKeyId = useId();
+
   // Initialize form with values from localStorage
   const form = useForm<SettingsFormData>({
     resolver: zodResolver(settingsFormSchema),
@@ -105,7 +107,7 @@ export function ApiKeyInput({
               {/* API Key Section */}
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <label htmlFor="apiKey" className="text-sm font-medium">
+                  <label htmlFor={apiKeyId} className="text-sm font-medium">
                     Anthropic API Key
                   </label>
                   <TooltipProvider>
@@ -131,7 +133,7 @@ export function ApiKeyInput({
                   </TooltipProvider>
                 </div>
                 <input
-                  id="apiKey"
+                  id={apiKeyId}
                   type="password"
                   placeholder="sk-ant-..."
                   {...form.register('apiKey')}

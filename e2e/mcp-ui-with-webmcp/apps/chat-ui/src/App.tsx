@@ -45,7 +45,7 @@ function McpToolBridge({
   useAssistantTool({
     toolName,
     description: toolDescription,
-    parameters: inputSchema as any,
+    parameters: inputSchema as Record<string, unknown>,
     execute: async (args) => {
       try {
         const result: CallToolResult = (await callTool(toolName, args)) as CallToolResult;
@@ -467,9 +467,8 @@ function App() {
                   {mcpState === 'ready' ? (
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <div
+                        <output
                           className="flex items-center gap-1.5 rounded-lg border border-green-500/50 bg-green-500/10 px-2 py-1.5 sm:gap-2 sm:px-3 cursor-pointer"
-                          role="status"
                           aria-live="polite"
                         >
                           <div className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-green-500" />
@@ -485,7 +484,7 @@ function App() {
                           <span className="text-xs font-medium text-green-700 dark:text-green-400 sm:hidden">
                             {mcpTools.length}
                           </span>
-                        </div>
+                        </output>
                       </TooltipTrigger>
                       <TooltipContent>
                         <p className="text-xs">
@@ -496,16 +495,15 @@ function App() {
                   ) : mcpState === 'connecting' || mcpState === 'loading' ? (
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <div
+                        <output
                           className="flex items-center gap-1.5 rounded-lg border border-blue-500/50 bg-blue-500/10 px-2 py-1.5 sm:gap-2 sm:px-3 cursor-pointer"
-                          role="status"
                           aria-live="polite"
                         >
                           <Loader2 className="h-3 w-3 shrink-0 animate-spin text-blue-500 sm:h-4 sm:w-4" />
                           <span className="text-xs font-medium text-blue-700 dark:text-blue-400 sm:text-sm">
                             {mcpState === 'connecting' ? 'Connecting...' : 'Loading...'}
                           </span>
-                        </div>
+                        </output>
                       </TooltipTrigger>
                       <TooltipContent>
                         <p className="text-xs">Establishing connection to MCP server...</p>
@@ -514,16 +512,15 @@ function App() {
                   ) : mcpState === 'failed' ? (
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <div
+                        <output
                           className="flex items-center gap-1.5 rounded-lg border border-red-500/50 bg-red-500/10 px-2 py-1.5 sm:gap-2 sm:px-3 cursor-pointer"
-                          role="status"
                           aria-live="polite"
                         >
                           <AlertCircle className="h-3 w-3 shrink-0 text-red-500 sm:h-4 sm:w-4" />
                           <span className="text-xs font-medium text-red-700 dark:text-red-400 sm:text-sm">
                             Failed
                           </span>
-                        </div>
+                        </output>
                       </TooltipTrigger>
                       <TooltipContent>
                         <p className="text-xs">Connection failed. Click Settings to try again.</p>
@@ -532,16 +529,15 @@ function App() {
                   ) : (
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <div
+                        <output
                           className="flex items-center gap-1.5 rounded-lg border border-muted bg-muted/20 px-2 py-1.5 sm:gap-2 sm:px-3 cursor-pointer"
-                          role="status"
                           aria-live="polite"
                         >
                           <Plug className="h-3 w-3 shrink-0 text-muted-foreground sm:h-4 sm:w-4" />
                           <span className="text-xs font-medium text-muted-foreground sm:text-sm">
                             Not Connected
                           </span>
-                        </div>
+                        </output>
                       </TooltipTrigger>
                       <TooltipContent>
                         <p className="text-xs">No server configured. Click Settings to connect.</p>

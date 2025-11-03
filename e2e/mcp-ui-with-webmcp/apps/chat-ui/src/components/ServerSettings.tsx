@@ -1,4 +1,5 @@
 import { AlertCircle, XCircle } from 'lucide-react';
+import { useId } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,8 @@ interface ServerSettingsProps {
 }
 
 export function ServerSettings({ onDisconnect, connectionState }: ServerSettingsProps) {
+  const serverUrlId = useId();
+
   // Access form context from parent FormProvider
   const {
     register,
@@ -34,7 +37,7 @@ export function ServerSettings({ onDisconnect, connectionState }: ServerSettings
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <label htmlFor="serverUrl" className="text-sm font-medium">
+            <label htmlFor={serverUrlId} className="text-sm font-medium">
               MCP Server URL
             </label>
             <TooltipProvider>
@@ -82,7 +85,7 @@ export function ServerSettings({ onDisconnect, connectionState }: ServerSettings
 
         <div className="flex gap-2">
           <input
-            id="serverUrl"
+            id={serverUrlId}
             type="text"
             placeholder="http://localhost:8888"
             {...register('serverUrl')}

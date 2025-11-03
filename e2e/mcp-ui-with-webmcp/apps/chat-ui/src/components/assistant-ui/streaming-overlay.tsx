@@ -61,7 +61,7 @@ export function StreamingOverlay() {
     }, 1500);
 
     return () => clearTimeout(timer);
-  }, [displayText, toolNames, visible]);
+  }, [visible]);
 
   if (!visible) return null;
 
