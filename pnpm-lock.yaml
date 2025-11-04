@@ -6,9 +6,6 @@ settings:
 
 catalogs:
   default:
-    '@cloudflare/vite-plugin':
-      specifier: ^1.13.18
-      version: 1.13.18
     '@composio/json-schema-to-zod':
       specifier: ^0.1.17
       version: 0.1.17
@@ -57,9 +54,6 @@ catalogs:
     vite-plugin-monkey:
       specifier: ^6.0.1
       version: 6.0.1
-    wrangler:
-      specifier: ^4.45.3
-      version: 4.45.3
     zod:
       specifier: 3.25.76
       version: 3.25.76
@@ -304,9 +298,6 @@ importers:
       agents:
         specifier: ^0.2.20
         version: 0.2.20(@cloudflare/workers-types@4.20251014.0)(react@19.1.1)(typescript@5.8.3)
-      fetch-to-node:
-        specifier: ^2.0.0
-        version: 2.1.0
       hono:
         specifier: ^4.10.4
         version: 4.10.4
@@ -321,7 +312,7 @@ importers:
         version: 3.25.76
     devDependencies:
       '@cloudflare/vite-plugin':
-        specifier: 'catalog:'
+        specifier: ^1.13.18
         version: 1.13.18(vite@7.1.12(@types/node@24.9.2)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.4)(yaml@2.8.1))(workerd@1.20251011.0)(wrangler@4.45.3(@cloudflare/workers-types@4.20251014.0))
       '@eslint/js':
         specifier: ^9.33.0
@@ -333,8 +324,11 @@ importers:
         specifier: ^19.1.7
         version: 19.2.2(@types/react@19.2.2)
       '@vitejs/plugin-react':
-        specifier: ^5.0.0
+        specifier: ^5.1.0
         version: 5.1.0(vite@7.1.12(@types/node@24.9.2)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.4)(yaml@2.8.1))
+      babel-plugin-react-compiler:
+        specifier: ^1.0.0
+        version: 1.0.0
       eslint:
         specifier: ^9.33.0
         version: 9.38.0(jiti@2.6.1)
@@ -342,7 +336,7 @@ importers:
         specifier: ^5.2.0
         version: 5.2.0(eslint@9.38.0(jiti@2.6.1))
       eslint-plugin-react-refresh:
-        specifier: ^0.4.20
+        specifier: ^0.4.24
         version: 0.4.24(eslint@9.38.0(jiti@2.6.1))
       globals:
         specifier: ^16.3.0
@@ -354,10 +348,10 @@ importers:
         specifier: ^8.39.1
         version: 8.46.2(eslint@9.38.0(jiti@2.6.1))(typescript@5.8.3)
       vite:
-        specifier: ^7.1.2
+        specifier: ^7.1.12
         version: 7.1.12(@types/node@24.9.2)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.4)(yaml@2.8.1)
       wrangler:
-        specifier: 'catalog:'
+        specifier: ^4.45.3
         version: 4.45.3(@cloudflare/workers-types@4.20251014.0)
 
   e2e/react-webmcp-test-app:
@@ -2753,6 +2747,9 @@ packages:
     resolution: {integrity: sha512-TH+b3Lv6pUjy/Nu0m6A2JULtdzLpmqF9x1Dhj00ZoEiML8qvVA9j1flkzTKNYgdEhWrjDwtWNpyyCUbfQe514g==}
     engines: {node: '>=20.19.0'}
 
+  babel-plugin-react-compiler@1.0.0:
+    resolution: {integrity: sha512-Ixm8tFfoKKIPYdCCKYTsqv+Fd4IJ0DQqMyEimo+pxUOMUR9cVPlwTrFt9Avu+3cb6Zp3mAzl+t1MrG2fxxKsxw==}
+
   bail@2.0.2:
     resolution: {integrity: sha512-0xO6mYd7JB2YesxDKplafRpsiOzPt9V02ddPCLbY1xYGPOX24NTyN50qnUxgCPcSoYMhKpAuBTjQoRZCAkUDRw==}
 
@@ -3351,9 +3348,6 @@ packages:
     peerDependenciesMeta:
       picomatch:
         optional: true
-
-  fetch-to-node@2.1.0:
-    resolution: {integrity: sha512-Wq05j6LE1GrWpT2t1YbCkyFY6xKRJq3hx/oRJdWEJpZlik3g25MmdJS6RFm49iiMJw6zpZuBOrgihOgy2jGyAA==}
 
   file-entry-cache@8.0.0:
     resolution: {integrity: sha512-XXTUwCvisa5oacNGRP9SfNtYBNAMi+RPwBFmblZEF7N7swHYQS6/Zfk7SRwx4D5j3CH211YNRco1DEMNVfZCnQ==}
@@ -7543,6 +7537,10 @@ snapshots:
       '@babel/parser': 7.28.5
       pathe: 2.0.3
 
+  babel-plugin-react-compiler@1.0.0:
+    dependencies:
+      '@babel/types': 7.28.5
+
   bail@2.0.2: {}
 
   balanced-match@1.0.2: {}
@@ -8181,8 +8179,6 @@ snapshots:
   fdir@6.5.0(picomatch@4.0.3):
     optionalDependencies:
       picomatch: 4.0.3
-
-  fetch-to-node@2.1.0: {}
 
   file-entry-cache@8.0.0:
     dependencies:
