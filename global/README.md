@@ -103,6 +103,117 @@ window.navigator.modelContext.provideContext({
 });
 ```
 
+## ⚙️ Configuration
+
+The polyfill exposes `initializeWebModelContext(options?: WebModelContextInitOptions)` to let you control transport behaviour. When you import `@mcp-b/global` as a module it auto-initializes by default, but you can customise or defer initialization:
+
+- **Disable auto init**: Set `window.__webModelContextOptions = { autoInitialize: false }` before importing, then call `initializeWebModelContext()` manually.
+- **Configure via script tag**: When using the IIFE build, pass options through data attributes:
+  ```html
+  <script
+    src="https://unpkg.com/@mcp-b/global@latest/dist/index.iife.js"
+    data-webmcp-auto-initialize="false"
+    data-webmcp-allowed-origins="https://example.com,https://docs.example.com"
+  ></script>
+  <!-- Later in the page -->
+  <script>
+    window.navigator.modelContext.provideContext({ tools: [] });
+  </script>
+  ```
+  Use `data-webmcp-options='{"transport":{"tabServer":{"allowedOrigins":["https://example.com"]}}}'` for advanced JSON configuration.
+- **Supported data attributes**
+  - `data-webmcp-auto-initialize="false"`: Skip automatic setup.
+  - `data-webmcp-allowed-origins="https://a.com,https://b.com"`: Override `tabServer.allowedOrigins`.
+  - `data-webmcp-channel-id="custom-channel"`: Set the Tab transport channel.
+
+### Dual-Server Mode (Tab + Iframe)
+
+By default, the global package runs **two MCP servers** that share the same tool registry:
+
+1. **Tab Server** (`TabServerTransport`) - For same-window communication
+2. **Iframe Server** (`IframeChildTransport`) - Auto-enabled when running in an iframe (when `window.parent !== window`)
+
+Both servers expose the same tools (Bucket A + Bucket B), allowing your tools to be accessed from:
+- Same-window clients (e.g., browser extension content scripts)
+- Parent page (when running in an iframe)
+
+**Example: Running in an Iframe**
+
+When your app runs in an iframe, both servers are automatically enabled:
+
+```ts
+// In iframe: Auto-initializes with both servers
+import '@mcp-b/global';
+
+// Register tools - they're automatically available to:
+// 1. Same-window clients (via TabServerTransport)
+// 2. Parent page (via IframeChildTransport)
+window.navigator.modelContext.provideContext({
+  tools: [
+    {
+      name: "iframe-action",
+      description: "Action from iframe",
+      inputSchema: { type: "object", properties: {} },
+      async execute() {
+        return {
+          content: [{ type: "text", text: "Hello from iframe!" }]
+        };
+      }
+    }
+  ]
+});
+```
+
+**Configure Iframe Server**
+
+You can customize or disable the iframe server:
+
+```ts
+import { initializeWebModelContext } from '@mcp-b/global';
+
+// Customize iframe server
+initializeWebModelContext({
+  transport: {
+    iframeServer: {
+      allowedOrigins: ['https://parent-app.com'], // Only allow specific parent
+      channelId: 'custom-iframe-channel',
+    },
+  },
+});
+
+// Disable iframe server (only Tab server runs)
+initializeWebModelContext({
+  transport: {
+    iframeServer: false, // Disable iframe server
+  },
+});
+
+// Disable tab server (only Iframe server runs)
+initializeWebModelContext({
+  transport: {
+    tabServer: false, // Disable tab server
+    iframeServer: {
+      allowedOrigins: ['https://parent-app.com'],
+    },
+  },
+});
+```
+
+**Custom Transport Factory**
+
+Provide `transport.create` to supply any MCP `Transport` implementation instead of the built-in dual-server mode:
+
+```ts
+import { initializeWebModelContext } from '@mcp-b/global';
+import { CustomTransport } from './my-transport';
+
+initializeWebModelContext({
+  transport: {
+    create: () => new CustomTransport(),
+  },
+});
+```
+
 ## 📖 API Reference
 
 ### Two-Bucket Tool Management System

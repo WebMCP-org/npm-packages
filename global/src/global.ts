@@ -1,7 +1,10 @@
-// global.ts - Web Model Context API Implementation
-// Bridges the Web Model Context API (window.navigator.modelContext) to MCP SDK
-
-import { TabServerTransport } from '@mcp-b/transports';
+import {
+  IframeChildTransport,
+  type IframeChildTransportOptions,
+  TabServerTransport,
+  type TabServerTransportOptions,
+} from '@mcp-b/transports';
+import type { Transport } from '@mcp-b/webmcp-ts-sdk';
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
@@ -15,8 +18,15 @@ import type {
   ToolDescriptor,
   ToolResponse,
   ValidatedToolDescriptor,
+  WebModelContextInitOptions,
 } from './types.js';
 import { normalizeSchema, validateWithZod } from './validation.js';
+
+declare global {
+  interface Window {
+    __webModelContextOptions?: WebModelContextInitOptions;
+  }
+}
 
 /**
  * Custom ToolCallEvent implementation
@@ -72,17 +82,9 @@ const RAPID_DUPLICATE_WINDOW_MS = 50;
 class WebModelContext implements InternalModelContext {
   private bridge: MCPBridge;
   private eventTarget: EventTarget;
-
-  // Bucket A: Tools from provideContext() - cleared when provideContext is called again
   private provideContextTools: Map<string, ValidatedToolDescriptor>;
-
-  // Bucket B: Tools from registerTool() - persist across provideContext calls
   private dynamicTools: Map<string, ValidatedToolDescriptor>;
-
-  // Track registration timestamps for rapid duplicate detection (React Strict Mode)
   private registrationTimestamps: Map<string, number>;
-
-  // Store unregister functions for returning on rapid duplicates
   private unregisterFunctions: Map<string, () => void>;
 
   constructor(bridge: MCPBridge) {
@@ -130,12 +132,9 @@ class WebModelContext implements InternalModelContext {
   provideContext(context: ModelContextInput): void {
     console.log(`[Web Model Context] Registering ${context.tools.length} tools via provideContext`);
 
-    // Clear only Bucket A (provideContext tools)
     this.provideContextTools.clear();
 
-    // Process each tool: normalize schemas and create validated descriptors
     for (const tool of context.tools) {
-      // Check for name collisions with Bucket B (dynamic tools)
       if (this.dynamicTools.has(tool.name)) {
         throw new Error(
           `[Web Model Context] Tool name collision: "${tool.name}" is already registered via registerTool(). ` +
@@ -143,13 +142,10 @@ class WebModelContext implements InternalModelContext {
         );
       }
 
-      // Normalize input schema (convert to both JSON Schema and Zod)
       const { jsonSchema: inputJson, zodValidator: inputZod } = normalizeSchema(tool.inputSchema);
 
-      // Normalize output schema if provided
       const normalizedOutput = tool.outputSchema ? normalizeSchema(tool.outputSchema) : null;
 
-      // Create validated tool descriptor
       const validatedTool: ValidatedToolDescriptor = {
         name: tool.name,
         description: tool.description,
@@ -161,20 +157,12 @@ class WebModelContext implements InternalModelContext {
         ...(normalizedOutput && { outputValidator: normalizedOutput.zodValidator }),
       };
 
-      // Add to Bucket A
       this.provideContextTools.set(tool.name, validatedTool);
     }
 
-    // Update the merged tool list in bridge
     this.updateBridgeTools();
 
-    // Notify that tools list changed
-    if (this.bridge.server.notification) {
-      this.bridge.server.notification({
-        method: 'notifications/tools/list_changed',
-        params: {},
-      });
-    }
+    this.notifyToolsListChanged();
   }
 
   /**
@@ -185,7 +173,6 @@ class WebModelContext implements InternalModelContext {
   registerTool(tool: ToolDescriptor<any, any>): { unregister: () => void } {
     console.log(`[Web Model Context] Registering tool dynamically: ${tool.name}`);
 
-    // Check for rapid duplicate registration (React Strict Mode detection)
     const now = Date.now();
     const lastRegistration = this.registrationTimestamps.get(tool.name);
 
@@ -195,14 +182,12 @@ class WebModelContext implements InternalModelContext {
           'This is likely due to React Strict Mode double-mounting. Ignoring duplicate registration.'
       );
 
-      // Return the existing unregister function
       const existingUnregister = this.unregisterFunctions.get(tool.name);
       if (existingUnregister) {
         return { unregister: existingUnregister };
       }
     }
 
-    // Check for name collision with Bucket A (provideContext tools)
     if (this.provideContextTools.has(tool.name)) {
       throw new Error(
         `[Web Model Context] Tool name collision: "${tool.name}" is already registered via provideContext(). ` +
@@ -210,7 +195,6 @@ class WebModelContext implements InternalModelContext {
       );
     }
 
-    // Check for name collision within Bucket B (genuine duplicate, not rapid)
     if (this.dynamicTools.has(tool.name)) {
       throw new Error(
         `[Web Model Context] Tool name collision: "${tool.name}" is already registered via registerTool(). ` +
@@ -218,13 +202,10 @@ class WebModelContext implements InternalModelContext {
       );
     }
 
-    // Normalize input schema (convert to both JSON Schema and Zod)
     const { jsonSchema: inputJson, zodValidator: inputZod } = normalizeSchema(tool.inputSchema);
 
-    // Normalize output schema if provided
     const normalizedOutput = tool.outputSchema ? normalizeSchema(tool.outputSchema) : null;
 
-    // Create validated tool descriptor
     const validatedTool: ValidatedToolDescriptor = {
       name: tool.name,
       description: tool.description,
@@ -236,28 +217,17 @@ class WebModelContext implements InternalModelContext {
       ...(normalizedOutput && { outputValidator: normalizedOutput.zodValidator }),
     };
 
-    // Add to Bucket B (dynamic tools)
     this.dynamicTools.set(tool.name, validatedTool);
 
-    // Store registration timestamp for rapid duplicate detection
     this.registrationTimestamps.set(tool.name, now);
 
-    // Update the merged tool list in bridge
     this.updateBridgeTools();
 
-    // Notify that tools list changed
-    if (this.bridge.server.notification) {
-      this.bridge.server.notification({
-        method: 'notifications/tools/list_changed',
-        params: {},
-      });
-    }
+    this.notifyToolsListChanged();
 
-    // Create unregister function
     const unregisterFn = () => {
       console.log(`[Web Model Context] Unregistering tool: ${tool.name}`);
 
-      // Check if this tool was registered via provideContext
       if (this.provideContextTools.has(tool.name)) {
         throw new Error(
           `[Web Model Context] Cannot unregister tool "${tool.name}": ` +
@@ -265,7 +235,6 @@ class WebModelContext implements InternalModelContext {
         );
       }
 
-      // Remove from Bucket B
       if (!this.dynamicTools.has(tool.name)) {
         console.warn(
           `[Web Model Context] Tool "${tool.name}" is not registered, ignoring unregister call`
@@ -275,26 +244,16 @@ class WebModelContext implements InternalModelContext {
 
       this.dynamicTools.delete(tool.name);
 
-      // Clean up tracking data
       this.registrationTimestamps.delete(tool.name);
       this.unregisterFunctions.delete(tool.name);
 
-      // Update the merged tool list in bridge
       this.updateBridgeTools();
 
-      // Notify that tools list changed
-      if (this.bridge.server.notification) {
-        this.bridge.server.notification({
-          method: 'notifications/tools/list_changed',
-          params: {},
-        });
-      }
+      this.notifyToolsListChanged();
     };
 
-    // Store unregister function for rapid duplicate detection
     this.unregisterFunctions.set(tool.name, unregisterFn);
 
-    // Return unregister function
     return { unregister: unregisterFn };
   }
 
@@ -303,15 +262,12 @@ class WebModelContext implements InternalModelContext {
    * Final tool list = Bucket A (provideContext) + Bucket B (dynamic)
    */
   private updateBridgeTools(): void {
-    // Clear the bridge tools map
     this.bridge.tools.clear();
 
-    // Add tools from Bucket A (provideContext tools)
     for (const [name, tool] of this.provideContextTools) {
       this.bridge.tools.set(name, tool);
     }
 
-    // Add tools from Bucket B (dynamic tools)
     for (const [name, tool] of this.dynamicTools) {
       this.bridge.tools.set(name, tool);
     }
@@ -319,6 +275,25 @@ class WebModelContext implements InternalModelContext {
     console.log(
       `[Web Model Context] Updated bridge with ${this.provideContextTools.size} base tools + ${this.dynamicTools.size} dynamic tools = ${this.bridge.tools.size} total`
     );
+  }
+
+  /**
+   * Notify all servers that the tools list has changed
+   */
+  private notifyToolsListChanged(): void {
+    if (this.bridge.tabServer.notification) {
+      this.bridge.tabServer.notification({
+        method: 'notifications/tools/list_changed',
+        params: {},
+      });
+    }
+
+    if (this.bridge.iframeServer?.notification) {
+      this.bridge.iframeServer.notification({
+        method: 'notifications/tools/list_changed',
+        params: {},
+      });
+    }
   }
 
   /**
@@ -334,7 +309,6 @@ class WebModelContext implements InternalModelContext {
       throw new Error(`Tool not found: ${toolName}`);
     }
 
-    // 1. VALIDATE INPUT ARGUMENTS
     console.log(`[Web Model Context] Validating input for tool: ${toolName}`);
     const validation = validateWithZod(args, tool.inputValidator);
     if (!validation.success) {
@@ -353,16 +327,12 @@ class WebModelContext implements InternalModelContext {
       };
     }
 
-    // Use validated data for execution
     const validatedArgs = validation.data as Record<string, unknown>;
 
-    // 2. Create toolcall event
     const event = new WebToolCallEvent(toolName, validatedArgs);
 
-    // Dispatch event to listeners
     this.dispatchEvent(event);
 
-    // If event was prevented and response provided, use that
     if (event.defaultPrevented && event.hasResponse()) {
       const response = event.getResponse();
       if (response) {
@@ -371,12 +341,10 @@ class WebModelContext implements InternalModelContext {
       }
     }
 
-    // 3. Execute the tool's execute function
     console.log(`[Web Model Context] Executing tool: ${toolName}`);
     try {
       const response = await tool.execute(validatedArgs);
 
-      // 4. VALIDATE OUTPUT (permissive mode - warn only, don't block)
       if (tool.outputValidator && response.structuredContent) {
         const outputValidation = validateWithZod(response.structuredContent, tool.outputValidator);
         if (!outputValidation.success) {
@@ -384,7 +352,6 @@ class WebModelContext implements InternalModelContext {
             `[Web Model Context] Output validation failed for ${toolName}:`,
             outputValidation.error
           );
-          // Continue anyway - permissive mode
         }
       }
 
@@ -419,17 +386,85 @@ class WebModelContext implements InternalModelContext {
 }
 
 /**
- * Initialize the MCP bridge
+ * Initialize the MCP bridge with dual-server support
+ * Creates both TabServer (same-window) and IframeChildServer (parent-child) by default
  */
-function initializeMCPBridge(): MCPBridge {
+function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
   console.log('[Web Model Context] Initializing MCP bridge');
 
   const hostname = window.location.hostname || 'localhost';
+  const transportOptions = options?.transport;
 
-  // Create MCP server
-  const server = new McpServer(
+  const setupServerHandlers = (server: McpServer, bridge: MCPBridge) => {
+    server.setRequestHandler(ListToolsRequestSchema, async () => {
+      console.log('[MCP Bridge] Handling list_tools request');
+      return {
+        tools: bridge.modelContext.listTools(),
+      };
+    });
+
+    server.setRequestHandler(CallToolRequestSchema, async (request) => {
+      console.log(`[MCP Bridge] Handling call_tool request: ${request.params.name}`);
+
+      const toolName = request.params.name;
+      const args = (request.params.arguments || {}) as Record<string, unknown>;
+
+      try {
+        const response = await bridge.modelContext.executeTool(toolName, args);
+        // Return in MCP SDK format
+        return {
+          content: response.content,
+          isError: response.isError,
+        };
+      } catch (error) {
+        console.error(`[MCP Bridge] Error calling tool ${toolName}:`, error);
+        throw error;
+      }
+    });
+  };
+
+  const customTransport: Transport | undefined = transportOptions?.create?.();
+
+  if (customTransport) {
+    console.log('[Web Model Context] Using custom transport');
+
+    const server = new McpServer(
+      {
+        name: hostname,
+        version: '1.0.0',
+      },
+      {
+        capabilities: {
+          tools: {
+            listChanged: true,
+          },
+        },
+      }
+    );
+
+    const bridge: MCPBridge = {
+      tabServer: server,
+      tools: new Map(),
+      modelContext: undefined as unknown as InternalModelContext,
+      isInitialized: true,
+    };
+
+    const modelContext = new WebModelContext(bridge);
+    bridge.modelContext = modelContext;
+
+    setupServerHandlers(server, bridge);
+    server.connect(customTransport);
+
+    console.log('[Web Model Context] MCP server connected with custom transport');
+    return bridge;
+  }
+
+  console.log('[Web Model Context] Using dual-server mode');
+
+  const tabServerEnabled = transportOptions?.tabServer !== false;
+  const tabServer = new McpServer(
     {
-      name: hostname,
+      name: `${hostname}-tab`,
       version: '1.0.0',
     },
     {
@@ -443,7 +478,7 @@ function initializeMCPBridge(): MCPBridge {
 
   // Create bridge object (modelContext is assigned after instantiation)
   const bridge: MCPBridge = {
-    server,
+    tabServer,
     tools: new Map(),
     modelContext: undefined as unknown as InternalModelContext,
     isInitialized: true,
@@ -453,41 +488,62 @@ function initializeMCPBridge(): MCPBridge {
   const modelContext = new WebModelContext(bridge);
   bridge.modelContext = modelContext;
 
-  // Set up MCP server handlers
-  server.setRequestHandler(ListToolsRequestSchema, async () => {
-    console.log('[MCP Bridge] Handling list_tools request');
-    return {
-      tools: bridge.modelContext.listTools(),
-    };
-  });
+  // Set up handlers for tab server
+  setupServerHandlers(tabServer, bridge);
 
-  server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    console.log(`[MCP Bridge] Handling call_tool request: ${request.params.name}`);
+  // Connect tab server transport
+  if (tabServerEnabled) {
+    const tabServerOptions: Partial<TabServerTransportOptions> =
+      typeof transportOptions?.tabServer === 'object' ? transportOptions.tabServer : {};
+    const { allowedOrigins, ...restTabServerOptions } = tabServerOptions;
 
-    const toolName = request.params.name;
-    const args = (request.params.arguments || {}) as Record<string, unknown>;
+    const tabTransport = new TabServerTransport({
+      allowedOrigins: allowedOrigins ?? ['*'],
+      ...(restTabServerOptions as Omit<TabServerTransportOptions, 'allowedOrigins'>),
+    });
 
-    try {
-      const response = await bridge.modelContext.executeTool(toolName, args);
-      // Return in MCP SDK format
-      return {
-        content: response.content,
-        isError: response.isError,
-      };
-    } catch (error) {
-      console.error(`[MCP Bridge] Error calling tool ${toolName}:`, error);
-      throw error;
-    }
-  });
+    tabServer.connect(tabTransport);
+    console.log('[Web Model Context] Tab server connected');
+  }
 
-  // Connect transport
-  const transport = new TabServerTransport({
-    allowedOrigins: ['*'], // TODO: Make this configurable
-  });
+  const isInIframe = typeof window !== 'undefined' && window.parent !== window;
+  const iframeServerConfig = transportOptions?.iframeServer;
+  const iframeServerEnabled =
+    iframeServerConfig !== false && (iframeServerConfig !== undefined || isInIframe);
 
-  server.connect(transport);
+  if (iframeServerEnabled) {
+    console.log('[Web Model Context] Enabling iframe server');
 
-  console.log('[Web Model Context] MCP server connected');
+    const iframeServer = new McpServer(
+      {
+        name: `${hostname}-iframe`,
+        version: '1.0.0',
+      },
+      {
+        capabilities: {
+          tools: {
+            listChanged: true,
+          },
+        },
+      }
+    );
+
+    setupServerHandlers(iframeServer, bridge);
+
+    const iframeServerOptions: Partial<IframeChildTransportOptions> =
+      typeof iframeServerConfig === 'object' ? iframeServerConfig : {};
+    const { allowedOrigins, ...restIframeServerOptions } = iframeServerOptions;
+
+    const iframeTransport = new IframeChildTransport({
+      allowedOrigins: allowedOrigins ?? ['*'],
+      ...(restIframeServerOptions as Omit<IframeChildTransportOptions, 'allowedOrigins'>),
+    });
+
+    iframeServer.connect(iframeTransport);
+    bridge.iframeServer = iframeServer;
+
+    console.log('[Web Model Context] Iframe server connected');
+  }
 
   return bridge;
 }
@@ -495,11 +551,13 @@ function initializeMCPBridge(): MCPBridge {
 /**
  * Initialize the Web Model Context API (window.navigator.modelContext)
  */
-export function initializeWebModelContext(): void {
+export function initializeWebModelContext(options?: WebModelContextInitOptions): void {
   if (typeof window === 'undefined') {
     console.warn('[Web Model Context] Not in browser environment, skipping initialization');
     return;
   }
+
+  const effectiveOptions = options ?? window.__webModelContextOptions;
 
   if (window.navigator.modelContext) {
     console.warn(
@@ -509,17 +567,14 @@ export function initializeWebModelContext(): void {
   }
 
   try {
-    // Initialize MCP bridge
-    const bridge = initializeMCPBridge();
+    const bridge = initializeMCPBridge(effectiveOptions);
 
-    // Expose shared modelContext instance
     Object.defineProperty(window.navigator, 'modelContext', {
       value: bridge.modelContext,
       writable: false,
       configurable: false,
     });
 
-    // Expose bridge for debugging
     Object.defineProperty(window, '__mcpBridge', {
       value: bridge,
       writable: false,
@@ -541,9 +596,13 @@ export function cleanupWebModelContext(): void {
 
   if (window.__mcpBridge) {
     try {
-      window.__mcpBridge.server.close();
+      window.__mcpBridge.tabServer.close();
+
+      if (window.__mcpBridge.iframeServer) {
+        window.__mcpBridge.iframeServer.close();
+      }
     } catch (error) {
-      console.warn('[Web Model Context] Error closing MCP server:', error);
+      console.warn('[Web Model Context] Error closing MCP servers:', error);
     }
   }
 

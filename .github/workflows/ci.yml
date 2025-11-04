@@ -39,6 +39,8 @@ jobs:
   typecheck:
     name: Typecheck
     runs-on: ubuntu-latest
+    env:
+      NODE_OPTIONS: --max-old-space-size=16384
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -63,6 +65,8 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
+    env:
+      NODE_OPTIONS: --max-old-space-size=16384
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

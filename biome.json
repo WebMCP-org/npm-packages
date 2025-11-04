@@ -11,6 +11,7 @@
       "node_modules/",
       "pnpm-lock.yaml",
       "dist/",
+      "dist-bundle/",
       "build/",
       ".next/",
       ".turbo/",
@@ -21,6 +22,7 @@
       "web/src/routeTree.gen.ts",
       "extension/entrypoints/sidepanel/routeTree.gen.ts",
       "**/*.d.ts",
+      "**/bundle-string.ts",
       "extension/.wxt/",
       "extension/.output/",
       "extension/chrome/",
@@ -131,6 +133,36 @@
           },
           "style": {
             "noNonNullAssertion": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["global/src/**"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "warn"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["e2e/**"],
+      "linter": {
+        "rules": {
+          "a11y": {
+            "useButtonType": "off"
+          },
+          "suspicious": {
+            "noUnknownAtRules": "off",
+            "noExplicitAny": "warn"
+          },
+          "complexity": {
+            "noArguments": "off"
+          },
+          "correctness": {
+            "noUnusedVariables": "error"
           }
         }
       }

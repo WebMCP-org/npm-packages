@@ -1,0 +1,11 @@
+# robots.txt for mcp-ui.mcp-b.ai
+# Allow all search engines to crawl the site
+
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://mcp-ui.mcp-b.ai/sitemap.xml
+
+# Crawl-delay (optional, be nice to the server)
+Crawl-delay: 1

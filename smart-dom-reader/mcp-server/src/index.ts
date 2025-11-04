@@ -203,7 +203,8 @@ class SmartDomReaderServer {
             ),
         },
       },
-      async (args) => this.connectBrowser(args)
+      // @ts-expect-error - Complex Zod schema causes TypeScript recursion depth error (TS2589)
+      async (args: ConnectBrowserArgs) => this.connectBrowser(args)
     );
 
     this.server.registerTool(
@@ -219,7 +220,8 @@ class SmartDomReaderServer {
             .describe('Absolute URL to navigate to (e.g., https://example.com).'),
         },
       },
-      async (args) => this.navigate(args)
+      // @ts-expect-error - Complex Zod schema causes TypeScript recursion depth error (TS2589)
+      async (args: NavigateArgs) => this.navigate(args)
     );
 
     this.server.registerTool(
@@ -254,7 +256,8 @@ class SmartDomReaderServer {
             .optional(),
         },
       },
-      async (args) => this.extractStructure(args)
+      // @ts-expect-error - Complex Zod schema causes TypeScript recursion depth error (TS2589)
+      async (args: OptionalSelectorArgs) => this.extractStructure(args)
     );
 
     this.server.registerTool(
@@ -310,7 +313,8 @@ class SmartDomReaderServer {
             .optional(),
         },
       },
-      async (args) => this.extractRegion(args)
+      // @ts-expect-error - Complex Zod schema causes TypeScript recursion depth error (TS2589)
+      async (args: RegionArgs) => this.extractRegion(args)
     );
 
     this.server.registerTool(
@@ -360,7 +364,8 @@ class SmartDomReaderServer {
             .optional(),
         },
       },
-      async (args) => this.extractContent(args)
+      // @ts-expect-error - Complex Zod schema causes TypeScript recursion depth error (TS2589)
+      async (args: ContentArgs) => this.extractContent(args)
     );
 
     this.server.registerTool(
@@ -411,7 +416,8 @@ class SmartDomReaderServer {
             .optional(),
         },
       },
-      async (args) => this.extractInteractive(args)
+      // @ts-expect-error - Complex Zod schema causes TypeScript recursion depth error (TS2589)
+      async (args: InteractiveArgs) => this.extractInteractive(args)
     );
 
     this.server.registerTool(
@@ -435,7 +441,7 @@ class SmartDomReaderServer {
             .describe('Capture the full scrollable page. Default: false.'),
         },
       },
-      async (args) => this.captureScreenshot(args)
+      async (args: ScreenshotArgs) => this.captureScreenshot(args)
     );
 
     this.server.registerTool(

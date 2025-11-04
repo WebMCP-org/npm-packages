@@ -1,11 +1,11 @@
-// TabClientTransport.ts
-
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { type JSONRPCMessage, JSONRPCMessageSchema } from '@modelcontextprotocol/sdk/types.js';
 
 export interface TabClientTransportOptions {
-  targetOrigin: string; // Required for security
-  channelId?: string; // Optional channel name
+  /** Origin expected from the server window (for security) */
+  targetOrigin: string;
+  /** Optional channel name (default: 'mcp-default') */
+  channelId?: string;
 }
 
 export class TabClientTransport implements Transport {
@@ -16,7 +16,6 @@ export class TabClientTransport implements Transport {
   public readonly serverReadyPromise: Promise<void>;
   private _serverReadyResolve: () => void;
   private _serverReadyReject: (reason: any) => void;
-  // private _retryInterval?: NodeJS.Timeout;
 
   onclose?: () => void;
   onerror?: (error: Error) => void;
@@ -46,17 +45,14 @@ export class TabClientTransport implements Transport {
     }
 
     this._messageHandler = (event: MessageEvent) => {
-      // Security: validate origin
       if (event.origin !== this._targetOrigin) {
         return;
       }
 
-      // Validate message structure
       if (event.data?.channel !== this._channelId || event.data?.type !== 'mcp') {
         return;
       }
 
-      // Only process server-to-client messages to avoid processing own messages
       if (event.data?.direction !== 'server-to-client') {
         return;
       }
@@ -118,7 +114,7 @@ export class TabClientTransport implements Transport {
       {
         channel: this._channelId,
         type: 'mcp',
-        direction: 'client-to-server', // Mark as client-to-server message
+        direction: 'client-to-server',
         payload: message,
       },
       this._targetOrigin

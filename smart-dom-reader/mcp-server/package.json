@@ -15,7 +15,7 @@
     "bundle": "node ./scripts/update-bundle.mjs",
     "dev": "tsx watch --clear-screen=false src/index.ts",
     "start": "tsx src/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "NODE_OPTIONS='--max-old-space-size=16384' tsc --noEmit"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.3",

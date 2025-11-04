@@ -1,0 +1,45 @@
+{
+  "name": "@mcp-b/mcp-ui-webmcp-starter",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -b && vite build",
+    "cf-typegen": "wrangler types",
+    "deploy": "bash deploy.sh",
+    "dev": "wrangler dev --port 8888",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@mcp-b/global": "workspace:*",
+    "@mcp-b/react-webmcp": "workspace:*",
+    "@mcp-ui/server": "^5.2.0",
+    "@modelcontextprotocol/sdk": "^1.20.2",
+    "@tailwindcss/vite": "^4.1.10",
+    "agents": "^0.2.20",
+    "clsx": "^2.1.1",
+    "hono": "^4.10.4",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "tailwind-merge": "^3.3.1",
+    "tailwindcss": "^4.1.10",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.13.18",
+    "@eslint/js": "^9.33.0",
+    "@types/react": "^19.1.10",
+    "@types/react-dom": "^19.1.7",
+    "@vitejs/plugin-react": "^5.1.0",
+    "babel-plugin-react-compiler": "^1.0.0",
+    "eslint": "^9.33.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "globals": "^16.3.0",
+    "typescript": "~5.8.3",
+    "typescript-eslint": "^8.39.1",
+    "vite": "^7.1.12",
+    "wrangler": "^4.45.3"
+  }
+}

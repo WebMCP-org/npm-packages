@@ -1,11 +1,11 @@
-// TabServerTransport.ts
-
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { type JSONRPCMessage, JSONRPCMessageSchema } from '@modelcontextprotocol/sdk/types.js';
 
 export interface TabServerTransportOptions {
-  allowedOrigins: string[]; // Required for security
-  channelId?: string; // Optional channel name
+  /** Whitelist of origins allowed to connect (for security) */
+  allowedOrigins: string[];
+  /** Optional channel name (default: 'mcp-default') */
+  channelId?: string;
 }
 
 export class TabServerTransport implements Transport {
@@ -23,6 +23,7 @@ export class TabServerTransport implements Transport {
     if (!options.allowedOrigins || options.allowedOrigins.length === 0) {
       throw new Error('At least one allowed origin must be specified');
     }
+
     this._allowedOrigins = options.allowedOrigins;
     this._channelId = options.channelId || 'mcp-default';
   }
@@ -33,22 +34,18 @@ export class TabServerTransport implements Transport {
     }
 
     this._messageHandler = (event: MessageEvent) => {
-      // Security: validate origin
       if (!this._allowedOrigins.includes(event.origin) && !this._allowedOrigins.includes('*')) {
         return;
       }
 
-      // Validate message structure
       if (event.data?.channel !== this._channelId || event.data?.type !== 'mcp') {
         return;
       }
 
-      // Only process client-to-server messages to avoid processing own messages
       if (event.data?.direction !== 'client-to-server') {
         return;
       }
 
-      // Store client origin for responses
       this._clientOrigin = event.origin;
 
       const payload = event.data.payload;
@@ -98,14 +95,15 @@ export class TabServerTransport implements Transport {
     }
 
     if (!this._clientOrigin) {
-      throw new Error('No client connected');
+      console.warn('[TabServerTransport] No client connected, message not sent');
+      return;
     }
 
     window.postMessage(
       {
         channel: this._channelId,
         type: 'mcp',
-        direction: 'server-to-client', // Mark as server-to-client message
+        direction: 'server-to-client',
         payload: message,
       },
       this._clientOrigin
