@@ -17,6 +17,9 @@ catalog:
   '@hookform/resolvers': ^5.2.2
   '@modelcontextprotocol/sdk': 1.15.0
   '@radix-ui/react-collapsible': ^1.1.12
+  '@sentry/cloudflare': ^10.22.0
+  '@sentry/react': ^10.22.0
+  '@sentry/vite-plugin': ^4.6.0
   '@types/chrome': ^0.0.326
   '@types/node': 22.17.2
   '@types/react': ^19.1.2
