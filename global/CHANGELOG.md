@@ -1,5 +1,21 @@
 # @mcp-b/global
 
+## 1.1.0
+
+### Minor Changes
+
+- Add dual-server mode with iframe support
+
+  - Implemented dual-server mode allowing multiple MCP server instances
+  - Added iframe-based server communication support
+  - Enhanced navigator.modelContext polyfill with multi-server capabilities
+  - Improved tool registration and management for complex multi-server scenarios
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-b/transports@1.1.0
+
 ## 1.0.15
 
 ### Patch Changes

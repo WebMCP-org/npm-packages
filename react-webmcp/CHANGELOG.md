@@ -1,5 +1,14 @@
 # @mcp-b/react-webmcp
 
+## 0.1.3
+
+### Patch Changes
+
+- Updated dependencies
+- Updated dependencies
+  - @mcp-b/global@1.1.0
+  - @mcp-b/transports@1.1.0
+
 ## 0.1.2
 
 ### Patch Changes
