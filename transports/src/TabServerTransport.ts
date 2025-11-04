@@ -50,6 +50,20 @@ export class TabServerTransport implements Transport {
 
       const payload = event.data.payload;
 
+      if (typeof payload === 'string' && payload === 'mcp-check-ready') {
+        // Respond with server ready
+        window.postMessage(
+          {
+            channel: this._channelId,
+            type: 'mcp',
+            direction: 'server-to-client',
+            payload: 'mcp-server-ready',
+          },
+          this._clientOrigin
+        );
+        return;
+      }
+
       try {
         const message = JSONRPCMessageSchema.parse(payload);
         this.onmessage?.(message);
@@ -62,6 +76,17 @@ export class TabServerTransport implements Transport {
 
     window.addEventListener('message', this._messageHandler);
     this._started = true;
+
+    // Broadcast server ready to all allowed origins
+    window.postMessage(
+      {
+        channel: this._channelId,
+        type: 'mcp',
+        direction: 'server-to-client',
+        payload: 'mcp-server-ready',
+      },
+      '*'
+    );
   }
 
   async send(message: JSONRPCMessage): Promise<void> {
@@ -91,17 +116,16 @@ export class TabServerTransport implements Transport {
     }
     this._started = false;
 
-    if (this._clientOrigin) {
-      window.postMessage(
-        {
-          channel: this._channelId,
-          type: 'mcp',
-          direction: 'server-to-client',
-          payload: 'mcp-server-stopped',
-        },
-        '*'
-      );
-    }
+    // Post message to notify content scripts that the MCP server has stopped
+    window.postMessage(
+      {
+        channel: this._channelId,
+        type: 'mcp',
+        direction: 'server-to-client',
+        payload: 'mcp-server-stopped',
+      },
+      '*'
+    );
 
     this.onclose?.();
   }
