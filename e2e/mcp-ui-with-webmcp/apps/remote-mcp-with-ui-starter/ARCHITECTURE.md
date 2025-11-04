@@ -190,7 +190,7 @@ this.server.tool(
 ```typescript
 private getBaseUrl(): string {
   const env = (this as Record<string, any>).env as Env | undefined;
-  return env?.APP_URL || "http://localhost:8787";
+  return env?.APP_URL || "http://localhost:8888";
 }
 ```
 
@@ -506,18 +506,19 @@ tsconfig.json              # Root (references only)
 
 ### Deployment Scenarios
 
-**Development (localhost:8787):**
-1. Vite dev server runs
-2. Worker serves from http://localhost:8787
-3. Auto-detection sets `APP_URL = http://localhost:8787`
-4. Iframe URL: `http://localhost:8787/mini-apps/tictactoe/`
+**Development (localhost:8888):**
+1. Wrangler dev server runs on port 8888
+2. Worker serves from http://localhost:8888
+3. `APP_URL` loaded from `.dev.vars` (automatically by wrangler dev)
+4. Iframe URL: `http://localhost:8888/mini-apps/tictactoe/`
 
 **Production (Cloudflare Workers):**
-1. `pnpm build` creates dist/
-2. `wrangler deploy` uploads to Cloudflare
-3. Worker serves from https://my-worker.workers.dev
-4. Auto-detection sets `APP_URL = https://my-worker.workers.dev`
-5. Iframe URL: `https://my-worker.workers.dev/mini-apps/tictactoe/`
+1. `pnpm deploy` runs `deploy.sh` script
+2. Script loads `APP_URL` from `.prod.vars`
+3. `pnpm build` creates dist/
+4. `wrangler deploy` uploads to Cloudflare with vars
+5. Worker serves from https://my-worker.workers.dev
+6. Iframe URL: `https://my-worker.workers.dev/mini-apps/tictactoe/`
 
 **Custom Domain:**
 1. Configure domain in Cloudflare
@@ -613,19 +614,20 @@ Request 2 → Worker → Same DO Instance (ID: session-123)
 
 **Trade-off:** Slight increase in code complexity
 
-### Why auto-detect URLs?
+### Why use .dev.vars and .prod.vars?
 
-**Alternative:** Hardcode URLs or require configuration
+**Alternative:** Hardcode URLs or use wrangler environments
 
-**Chosen:** Auto-detect from request origin
+**Chosen:** Separate `.dev.vars` and `.prod.vars` files
 
 **Rationale:**
-- **Zero config**: Works everywhere without setup
-- **Developer friendly**: No environment-specific config files
-- **Deployment agnostic**: Same code works in dev/prod/custom domains
-- **Fewer bugs**: No outdated hardcoded URLs
+- **Simple**: Easy to understand and modify
+- **Explicit**: Clear separation between dev and prod
+- **No secrets**: Both files can be committed to git (no sensitive data)
+- **Wrangler native**: `.dev.vars` is automatically loaded in dev mode
+- **Flexible**: Can create `.local` overrides for personal settings
 
-**Trade-off:** Can be overridden if needed via `APP_URL` env var
+**Trade-off:** Requires custom deploy script to load `.prod.vars`
 
 ## Performance Considerations
 

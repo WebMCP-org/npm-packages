@@ -48,10 +48,10 @@ pnpm dev
 ```
 
 This starts:
-- **Main app**: http://localhost:8787
-- **MCP endpoint**: http://localhost:8787/mcp
-- **SSE endpoint**: http://localhost:8787/sse
-- **TicTacToe mini-app**: http://localhost:8787/mini-apps/tictactoe/
+- **Main app**: http://localhost:8888
+- **MCP endpoint**: http://localhost:8888/mcp
+- **SSE endpoint**: http://localhost:8888/sse
+- **TicTacToe mini-app**: http://localhost:8888/mini-apps/tictactoe/
 
 ### Building
 
@@ -68,11 +68,18 @@ This builds:
 ### Deployment
 
 ```bash
-# Deploy to Cloudflare Workers
+# Deploy to Cloudflare Workers (production environment)
 pnpm deploy
 ```
 
+The deploy script automatically:
+1. Builds the project
+2. Loads variables from `.prod.vars`
+3. Deploys to Cloudflare Workers
+
 Your MCP server will be live at: `https://your-worker.workers.dev/mcp`
+
+**⚠️ Remember**: Update the `APP_URL` in `.prod.vars` before your first deployment!
 
 ## 📦 What's Included
 
@@ -145,16 +152,14 @@ The TicTacToe game demonstrates:
 **src/** - Main React app (if you want a landing page)
 **mini-apps/tictactoe/** - Self-contained mini-app with WebMCP integration
 
-### How URL Auto-Detection Works
+### How URL Configuration Works
 
-The worker automatically detects its own URL:
-- In development: `http://localhost:8787`
-- In production: `https://your-worker.workers.dev`
-- Custom domains: `https://your-domain.com`
+The worker uses the `APP_URL` environment variable to construct iframe URLs:
+- In development: `http://localhost:8888` (from `.dev.vars`)
+- In production: `https://your-worker.workers.dev` (from `.prod.vars`)
+- Custom domains: `https://your-domain.com` (configured in `.prod.vars`)
 
-This means **zero configuration** - the iframe URLs are constructed dynamically based on where the worker is running.
-
-You can override this with the `APP_URL` environment variable if needed.
+The deployment script (`deploy.sh`) automatically loads variables from `.prod.vars` and passes them to wrangler.
 
 ## 🛠️ Project Structure
 
@@ -183,6 +188,9 @@ remote-mcp-with-ui-starter/
 │       ├── index.html                # Main app
 │       └── mini-apps/tictactoe/      # TicTacToe build
 │
+├── .dev.vars                         # Development environment variables
+├── .prod.vars                        # Production environment variables
+├── deploy.sh                         # Deployment script
 ├── vite.config.ts                    # Multi-entry Vite config
 ├── wrangler.jsonc                    # Cloudflare Workers config
 ├── tsconfig.json                     # TypeScript project references
@@ -320,20 +328,25 @@ async init() {
 
 ### Environment Configuration
 
-Create a `.env` file for local development:
+This template uses `.dev.vars` and `.prod.vars` files for environment-specific configuration:
+
+- **`.dev.vars`**: Development environment (loaded automatically by `wrangler dev`)
+- **`.prod.vars`**: Production environment (loaded by deploy script)
+
+Both files are committed to git since they don't contain secrets - just public URLs.
+
+**⚠️ IMPORTANT: If you fork this template**, update the production URL in `.prod.vars`:
 
 ```env
-APP_URL=http://localhost:8787
+# .prod.vars
+APP_URL=https://your-worker-name.your-username.workers.dev
 ```
 
-For production, set environment variables in `wrangler.jsonc`:
+Replace with your actual Cloudflare Workers URL.
 
-```jsonc
-{
-  "vars": {
-    "APP_URL": "https://your-custom-domain.com"
-  }
-}
+**Local Overrides**: You can create `.dev.vars.local` or `.prod.vars.local` for personal overrides (gitignored):
+```env
+APP_URL=http://localhost:3000
 ```
 
 ## 🔍 How It Works
