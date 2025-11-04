@@ -53,9 +53,11 @@ The result is a **bidirectional integration** where:
 │                                                                   │
 │  ┌───────────────────────────────────────────────────────┐     │
 │  │  Worker Entry Point (worker/index.ts)                 │     │
+│  │  - Hono router for multi-app routing                  │     │
 │  │  - Routes /mcp → MCP Durable Object                   │     │
 │  │  - Routes /sse → SSE handler                          │     │
-│  │  - Extracts origin for URL auto-detection            │     │
+│  │  - Routes / → Landing page (static)                   │     │
+│  │  - Routes /apps/* → Mini-apps (static)                │     │
 │  │  - Error handling and logging                         │     │
 │  └───────────────────────────────────────────────────────┘     │
 │                              ↓                                   │
@@ -68,9 +70,10 @@ The result is a **bidirectional integration** where:
 │  └───────────────────────────────────────────────────────┘     │
 │                                                                   │
 │  ┌───────────────────────────────────────────────────────┐     │
-│  │  Static Assets (dist/client/)                         │     │
-│  │  - Main app (optional landing page)                   │     │
-│  │  - Mini-apps (TicTacToe, etc.)                        │     │
+│  │  Static Assets (dist/client/) - Multi-App Platform    │     │
+│  │  - Landing page (apps/landing/)                       │     │
+│  │  - TicTacToe mini-app (apps/tictactoe/)               │     │
+│  │  - Shared components library (apps/shared/)           │     │
 │  └───────────────────────────────────────────────────────┘     │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
@@ -110,31 +113,54 @@ The result is a **bidirectional integration** where:
 ### 1. Worker Entry Point (worker/index.ts)
 
 **Responsibilities:**
-- Route incoming HTTP requests to appropriate handlers
-- Extract the request origin for URL auto-detection
-- Set `env.APP_URL` if not already configured
+- Route incoming HTTP requests using Hono framework
+- Serve MCP protocol endpoints (/mcp, /sse)
+- Serve static assets for multiple apps
+- Handle fallback routing for SPAs
 - Error handling and logging
 
 **Key Code:**
 ```typescript
-export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext) {
-    const url = new URL(request.url);
-    const origin = url.origin; // e.g., "https://my-worker.workers.dev"
+import { Hono } from 'hono/tiny';
+import { serveStatic } from 'hono/cloudflare-workers';
 
-    // Auto-detect deployment URL
-    if (!env.APP_URL) {
-      env.APP_URL = origin;
-    }
+const app = new Hono<{ Bindings: Env }>();
 
-    // Route to MCP server or SSE handler
-    if (url.pathname === "/mcp") {
-      return await MyMCP.serve("/mcp").fetch(request, env, ctx);
-    }
-    // ... other routes
+// MCP Protocol Endpoint
+app.post('/mcp', async (c) => {
+  return await MyMCP.serve('/mcp').fetch(c.req.raw, c.env, c.executionCtx);
+});
+
+// Server-Sent Events Endpoint
+app.all('/sse/*', async (c) => {
+  return await MyMCP.serveSSE('/sse').fetch(c.req.raw, c.env, c.executionCtx);
+});
+
+// Static File Serving (multi-app platform)
+app.use('/*', serveStatic({ root: './' }));
+
+// SPA Fallback Handler
+app.get('*', async (c) => {
+  const path = new URL(c.req.url).pathname;
+
+  // Route to specific app index.html
+  if (path.startsWith('/apps/tictactoe')) {
+    return serveStatic({ path: '/apps/tictactoe/index.html' })(c);
   }
-}
+
+  // Default to landing page
+  return serveStatic({ path: '/index.html' })(c);
+});
+
+export default app;
 ```
+
+**Why Hono?**
+- Lightweight (~12KB) and fast
+- Built for edge runtimes (Cloudflare Workers optimized)
+- Clean routing API
+- Static file serving middleware included
+- Type-safe with TypeScript
 
 **Why Cloudflare Workers?**
 - Edge deployment (low latency worldwide)
@@ -242,24 +268,45 @@ This method retrieves the auto-detected or configured base URL, ensuring iframe 
 - **rawHtml**: For simple static content
 - **remoteDom**: For dynamic content that doesn't need a full framework
 
-### 4. TicTacToe Mini-App
+### 4. Multi-App Platform Structure
 
-**Structure:**
+**Directory Structure:**
 
 ```
-mini-apps/tictactoe/
-├── index.html         # Entry point
-└── main.tsx           # React entry with WebMCP init
+apps/
+├── landing/                # Main landing page
+│   ├── index.html         # Entry point
+│   ├── main.tsx           # React entry
+│   └── App.tsx            # Landing page component
+├── tictactoe/             # TicTacToe mini-app
+│   ├── index.html         # Entry point
+│   ├── main.tsx           # React entry with WebMCP
+│   └── TicTacToeWithWebMCP.tsx  # Game + WebMCP integration
+├── shared/                # Shared component library
+│   ├── components/
+│   │   ├── ErrorBoundary.tsx    # Reusable error boundary
+│   │   └── TicTacToe.tsx        # Pure game component
+│   └── styles/
+│       └── index.css      # Base styles
+└── _template/             # Boilerplate for new apps
 ```
 
-**Entry Point (main.tsx):**
+**Benefits of Multi-App Structure:**
+- **Landing Page**: Central hub listing all available apps
+- **Shared Components**: DRY principle, reuse across apps
+- **Independent Apps**: Each app is self-contained
+- **Easy to Extend**: Add new apps by copying template
+
+**TicTacToe Entry Point (apps/tictactoe/main.tsx):**
 ```typescript
+import '@shared/styles/index.css';  // Import shared styles
+import { ErrorBoundary } from '@shared/components/ErrorBoundary';
+
 // 1. Initialize WebMCP BEFORE React renders
 initializeWebModelContext({
   transport: {
     tabServer: {
       allowedOrigins: ['*'],
-      postMessageTarget: window.parent,
     },
   },
 });
@@ -454,13 +501,33 @@ This prevents race conditions where the child tries to send messages before the 
 
 ```typescript
 // vite.config.ts
+import { resolve } from 'node:path';
+
 export default defineConfig({
   build: {
     rollupOptions: {
       input: {
-        main: resolve(__dirname, 'index.html'),
-        tictactoe: resolve(__dirname, 'mini-apps/tictactoe/index.html'),
+        // Main landing page (served at /)
+        main: resolve(__dirname, 'apps/landing/index.html'),
+
+        // Mini-apps (served at /apps/{name}/)
+        tictactoe: resolve(__dirname, 'apps/tictactoe/index.html'),
+
+        // Add more apps here:
+        // calculator: resolve(__dirname, 'apps/calculator/index.html'),
       },
+    },
+
+    // Optimize for smaller bundles
+    target: 'es2022',
+    minify: 'terser' as const,
+    sourcemap: true,
+  },
+
+  // Resolve paths for shared components
+  resolve: {
+    alias: {
+      '@shared': resolve(__dirname, 'apps/shared'),
     },
   },
 })
@@ -470,23 +537,32 @@ export default defineConfig({
 ```
 dist/
 └── client/
-    ├── index.html                      # Main app
+    ├── index.html                      # Landing page (root)
     ├── assets/
-    │   ├── index-xyz.js                # Main app bundle
-    │   └── index-xyz.css               # Main app styles
-    └── mini-apps/
+    │   ├── main-xyz.js                 # Landing page bundle
+    │   ├── main-xyz.css                # Landing page styles
+    │   └── chunks/
+    │       └── vendor-react-abc.js     # Shared React bundle
+    └── apps/
         └── tictactoe/
-            ├── index.html              # TicTacToe app
+            ├── index.html              # TicTacToe entry point
             └── assets/
-                ├── index-abc.js        # TicTacToe bundle
-                └── index-abc.css       # TicTacToe styles
+                ├── tictactoe-def.js    # TicTacToe bundle
+                └── tictactoe-def.css   # TicTacToe styles
 ```
+
+**Key Features:**
+- **Shared Components**: `@shared` alias for imports across apps
+- **Code Splitting**: Vite automatically extracts shared vendor code
+- **Multiple Entries**: Each app has its own entry point
+- **Route-Based Structure**: URLs match file structure (`/apps/tictactoe/` → `apps/tictactoe/`)
 
 **Why separate builds?**
 - Each mini-app is self-contained
 - Can be developed/tested independently
 - No shared state between apps
-- Smaller bundle sizes
+- Optimized bundle sizes with automatic code splitting
+- Easy to add new apps (just add entry to config)
 
 ### TypeScript Project References
 
