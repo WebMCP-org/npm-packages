@@ -72,8 +72,11 @@ interface ToolExecutionPanelProps {
  * Features:
  * - Auto-generated forms using React JSON Schema Form
  * - Loading/success/error states for each tool
- * - Automatic UI resource extraction and display
+ * - Automatic UI resource extraction and display (for manual tool calls)
  * - Auto-clearing success state after 3 seconds
+ *
+ * Note: This handles manual tool execution. AI-initiated calls use McpToolBridge.
+ * Both paths extract resources, with deduplication handled by UIResourceContext.
  */
 export const ToolExecutionPanel: FC<ToolExecutionPanelProps> = ({
   tools,
@@ -108,6 +111,7 @@ export const ToolExecutionPanel: FC<ToolExecutionPanelProps> = ({
         }));
 
         // Extract and add UI resources to side panel
+        // Note: Deduplication is handled by UIResourceContext to prevent duplicates
         if (result && typeof result === 'object') {
           const resultObj = result as ToolResultContent;
           if (resultObj.content && Array.isArray(resultObj.content)) {

@@ -49,7 +49,7 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useUIResources } from '@/contexts/UIResourceContext';
 import { useMCP } from '@/hooks/useMCP';
-import { useIsMobile } from '@/hooks/useMediaQuery';
+import { useIsMobile, usePrefersReducedMotion } from '@/hooks/useMediaQuery';
 import { cn } from '@/lib/utils';
 import { getStoredServerUrl } from '../../lib/storage';
 import { NotifyMessage } from './notify-message';
@@ -112,7 +112,7 @@ const TabSelector: FC<TabSelectorProps> = ({ openToolsPanelId, setOpenToolsPanel
           <div
             key={resource.id}
             className={cn(
-              'group flex items-center gap-1 px-2 py-1 rounded-t-lg border-t border-x transition-colors whitespace-nowrap text-[10px] sm:gap-1.5 sm:px-3 sm:py-1.5 sm:text-xs',
+              'group flex items-center gap-1 px-2 py-1 rounded-t-lg border-t border-x transition-colors whitespace-nowrap text-xs sm:gap-1.5 sm:px-3 sm:py-1.5',
               isSelected
                 ? 'bg-background border-border text-foreground'
                 : 'bg-muted/50 border-transparent text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -135,7 +135,7 @@ const TabSelector: FC<TabSelectorProps> = ({ openToolsPanelId, setOpenToolsPanel
                       setOpenToolsPanelId(isToolsPanelOpen ? null : resource.id);
                     }}
                     className={cn(
-                      'flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors',
+                      'flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-medium transition-colors',
                       isToolsPanelOpen
                         ? 'bg-primary/20 text-primary'
                         : 'bg-muted text-muted-foreground hover:bg-muted-foreground/20 hover:text-foreground'
@@ -160,10 +160,10 @@ const TabSelector: FC<TabSelectorProps> = ({ openToolsPanelId, setOpenToolsPanel
                 e.stopPropagation();
                 await removeResource(resource.id);
               }}
-              className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-destructive"
+              className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-destructive p-2 -m-2"
               aria-label={`Close ${resource.toolName}`}
             >
-              <XIcon className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+              <XIcon className="h-3 w-3" />
             </button>
           </div>
         );
@@ -187,6 +187,7 @@ const ThreadContent: FC = () => {
   // Detect screen size for responsive animations
   const isMobile = useIsMobile();
   const isLargeScreen = !isMobile;
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   // Auto-switch to UI view on mobile when tool surface first appears
   useEffect(() => {
@@ -195,9 +196,29 @@ const ThreadContent: FC = () => {
     }
   }, [isMobile, hasToolSurface]);
 
-  // Refs for gesture targets
+  // Refs for gesture targets and scroll preservation
   const chatPanelRef = useRef<HTMLDivElement>(null);
   const uiPanelRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
+
+  // Store scroll position when switching views on mobile
+  const [savedScrollPosition, setSavedScrollPosition] = useState(0);
+
+  // Save scroll position when leaving chat view, restore when returning
+  useEffect(() => {
+    if (!isMobile || !hasToolSurface) return;
+
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+
+    if (mobileView === 'ui') {
+      // Switching away from chat - save scroll position
+      setSavedScrollPosition(viewport.scrollTop);
+    } else if (mobileView === 'chat') {
+      // Switching back to chat - restore scroll position
+      viewport.scrollTop = savedScrollPosition;
+    }
+  }, [mobileView, isMobile, hasToolSurface, savedScrollPosition]);
 
   // Pan gesture handlers for swipe navigation
   const handlePanEnd = useCallback(
@@ -249,7 +270,7 @@ const ThreadContent: FC = () => {
               initial={{ x: isLargeScreen ? '-100%' : mobileView === 'ui' ? '0%' : '100%' }}
               animate={{ x: isLargeScreen ? 0 : mobileView === 'ui' ? '0%' : '100%' }}
               exit={{ x: isLargeScreen ? '-100%' : '100%' }}
-              transition={{ duration: 0.4, ease: [0.42, 0, 0.58, 1] }}
+              transition={{ duration: prefersReducedMotion ? 0 : 0.4, ease: [0.42, 0, 0.58, 1] }}
               style={{
                 willChange: 'transform',
                 backfaceVisibility: 'hidden',
@@ -281,7 +302,7 @@ const ThreadContent: FC = () => {
                   x: hasToolSurface ? (mobileView === 'chat' ? '0%' : '-100%') : '0%',
                 }
           }
-          transition={{ duration: 0.4, ease: [0.42, 0, 0.58, 1] }}
+          transition={{ duration: prefersReducedMotion ? 0 : 0.4, ease: [0.42, 0, 0.58, 1] }}
           style={{
             willChange: isLargeScreen ? 'left' : 'transform',
             backfaceVisibility: 'hidden',
@@ -294,12 +315,18 @@ const ThreadContent: FC = () => {
           className="flex h-full min-h-0 flex-col"
         >
           <ThreadPrimitive.Viewport
+            ref={viewportRef}
             className={cn(
-              'flex h-full flex-1 flex-col overflow-y-auto scroll-smooth px-3 pt-6 sm:px-6 sm:pt-8 md:px-8 md:pt-10 transition-[align-items,padding] duration-400 ease-[cubic-bezier(0.42,0,0.58,1)]',
+              'flex h-full flex-1 flex-col overflow-y-auto scroll-smooth px-3 pt-6 sm:px-6 sm:pt-8 md:px-8 md:pt-10 max-[500px]:pt-3 transition-[align-items,padding] duration-400 ease-[cubic-bezier(0.42,0,0.58,1)]',
               hasToolSurface ? 'items-stretch lg:items-end lg:px-10' : 'items-center',
               // Dynamic bottom padding based on screen size and tool surface presence
               // Minimal padding to bring thread content very close to composer
-              isMobile && hasToolSurface ? 'pb-44' : isMobile ? 'pb-36' : 'pb-44'
+              // Reduced in landscape (max-height 500px) for better space usage
+              isMobile && hasToolSurface
+                ? 'pb-44 max-[500px]:pb-32'
+                : isMobile
+                  ? 'pb-36 max-[500px]:pb-28'
+                  : 'pb-44'
             )}
           >
             <ThreadWelcome />
@@ -325,11 +352,21 @@ const ThreadContent: FC = () => {
             className={cn(
               'pointer-events-none absolute bottom-0 left-0 right-0 flex justify-center px-3 sm:px-6 md:px-8',
               isMobile && hasToolSurface
-                ? 'pb-16 pt-2'
+                ? 'pb-16 pt-2 max-[500px]:pb-12 max-[500px]:pt-1'
                 : isMobile
-                  ? 'pb-4 pt-2'
+                  ? 'pb-4 pt-2 max-[500px]:pb-3 max-[500px]:pt-1'
                   : 'pb-4 pt-6 sm:pt-8'
             )}
+            style={{
+              paddingBottom:
+                isMobile && hasToolSurface
+                  ? 'max(4rem, env(safe-area-inset-bottom))'
+                  : isMobile
+                    ? 'max(1rem, env(safe-area-inset-bottom))'
+                    : 'max(1rem, env(safe-area-inset-bottom))',
+              paddingLeft: 'max(0.75rem, env(safe-area-inset-left))',
+              paddingRight: 'max(0.75rem, env(safe-area-inset-right))',
+            }}
           >
             <div className="pointer-events-auto flex w-full max-w-[var(--thread-max-width)] flex-col gap-3 transition-[max-width] duration-400 ease-[cubic-bezier(0.42,0,0.58,1)]">
               <ThreadScrollToBottom />
@@ -344,33 +381,38 @@ const ThreadContent: FC = () => {
             initial={{ y: 100 }}
             animate={{ y: 0 }}
             exit={{ y: 100 }}
-            transition={{ duration: 0.3, ease: [0.42, 0, 0.58, 1] }}
+            transition={{ duration: prefersReducedMotion ? 0 : 0.3, ease: [0.42, 0, 0.58, 1] }}
             className="pointer-events-auto absolute bottom-0 left-0 right-0 z-50 border-t bg-background/95 backdrop-blur-sm shadow-lg"
+            style={{
+              paddingBottom: 'env(safe-area-inset-bottom)',
+              paddingLeft: 'env(safe-area-inset-left)',
+              paddingRight: 'env(safe-area-inset-right)',
+            }}
           >
-            <div className="flex items-center justify-around p-1.5 gap-1.5">
+            <div className="flex items-center justify-around p-1 gap-1 max-[500px]:p-0.5 max-[500px]:gap-0.5">
               <button
                 onClick={() => setMobileView('chat')}
                 className={cn(
-                  'flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg transition-all',
+                  'flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg transition-all max-[500px]:py-1.5 max-[500px]:px-2',
                   mobileView === 'chat'
                     ? 'bg-primary text-primary-foreground shadow-sm'
                     : 'text-muted-foreground hover:bg-muted'
                 )}
               >
-                <MessageSquare className="h-4 w-4" />
-                <span className="text-sm font-medium">Chat</span>
+                <MessageSquare className="h-4 w-4 max-[500px]:h-3.5 max-[500px]:w-3.5" />
+                <span className="text-sm font-medium max-[500px]:text-xs">Chat</span>
               </button>
               <button
                 onClick={() => setMobileView('ui')}
                 className={cn(
-                  'flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg transition-all',
+                  'flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg transition-all max-[500px]:py-1.5 max-[500px]:px-2',
                   mobileView === 'ui'
                     ? 'bg-primary text-primary-foreground shadow-sm'
                     : 'text-muted-foreground hover:bg-muted'
                 )}
               >
-                <Wrench className="h-4 w-4" />
-                <span className="text-sm font-medium">Embedded UI</span>
+                <Wrench className="h-4 w-4 max-[500px]:h-3.5 max-[500px]:w-3.5" />
+                <span className="text-sm font-medium max-[500px]:text-xs">Embedded UI</span>
               </button>
             </div>
           </motion.div>
@@ -389,7 +431,7 @@ const ThreadScrollToBottom: FC = () => {
       <TooltipIconButton
         tooltip="Scroll to bottom"
         variant="secondary"
-        className="self-end size-9 rounded-full border border-border/60 bg-background/80 shadow-sm backdrop-blur transition-transform disabled:invisible"
+        className="self-end size-11 rounded-full border border-border/60 bg-background/80 shadow-sm backdrop-blur transition-transform disabled:invisible"
       >
         <ArrowDownIcon className="size-4" />
       </TooltipIconButton>
@@ -416,28 +458,18 @@ const ThreadWelcome: FC = () => {
 };
 
 const ThreadWelcomeSuggestions: FC = () => {
-  const { prompts, state } = useMCP();
+  const { prompts } = useMCP();
 
-  // Only show prompts when MCP is ready
-  if (state !== 'ready' || prompts.length === 0) {
+  // Show placeholder if no prompts are available
+  if (prompts.length === 0) {
     return (
       <div className="flex w-full flex-wrap justify-center gap-2 sm:gap-3">
-        <ThreadPrimitive.Suggestion
-          className="group flex min-w-[160px] max-w-xs cursor-pointer flex-col items-start gap-1.5 rounded-lg border border-border/60 bg-background p-3 shadow-sm transition-all hover:border-primary/40 hover:shadow-md sm:min-w-[200px] sm:gap-2 sm:rounded-xl sm:p-4"
-          prompt="Let's play Tic-Tac-Toe!"
-        >
-          <span className="text-xs font-medium tracking-tight group-hover:text-primary sm:text-sm">
-            Let's play Tic-Tac-Toe!
+        <div className="flex min-w-[160px] max-w-md flex-col items-center gap-1.5 rounded-lg border border-border/60 bg-muted/20 p-3 text-center sm:min-w-[200px] sm:gap-2 sm:rounded-xl sm:p-4">
+          <span className="text-xs text-muted-foreground sm:text-sm">
+            Connect any tool or embedded iframe that exposes WebMCP prompts and they will appear
+            here as suggestions
           </span>
-        </ThreadPrimitive.Suggestion>
-        <ThreadPrimitive.Suggestion
-          className="group flex min-w-[160px] max-w-xs cursor-pointer flex-col items-start gap-1.5 rounded-lg border border-border/60 bg-background p-3 shadow-sm transition-all hover:border-primary/40 hover:shadow-md sm:min-w-[200px] sm:gap-2 sm:rounded-xl sm:p-4"
-          prompt="What tools do you have available?"
-        >
-          <span className="text-xs font-medium tracking-tight group-hover:text-primary sm:text-sm">
-            What tools do you have available?
-          </span>
-        </ThreadPrimitive.Suggestion>
+        </div>
       </div>
     );
   }
@@ -485,6 +517,7 @@ const ToolResponsePanel: FC = () => {
   const handleUIAction = useCallback(
     async (action: UIActionResult) => {
       setLastUIAction(action);
+
       if (action.type === 'notify') {
         if (runtime.thread.getState().isRunning) {
           runtime.thread.cancelRun();
@@ -493,10 +526,67 @@ const ToolResponsePanel: FC = () => {
         // Prefix message with marker so we can identify it as a notify message
         runtime.thread.append(`${NOTIFY_MESSAGE_PREFIX}${action.payload.message}`);
       }
+
       return { status: 'UI action handled in panel' };
     },
     [runtime]
   );
+
+  /**
+   * Handle iframe resize events
+   *
+   * Listens for ui-size-change messages from iframes and updates their dimensions.
+   * This is part of the embeddable UI protocol but handled separately from user actions
+   * since it's not included in the @mcp-ui/client UIActionResult type yet.
+   */
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'ui-size-change') {
+        const payload = event.data.payload as { height?: number; width?: number };
+
+        if (selectedResource?.iframeRef?.current) {
+          const iframe = selectedResource.iframeRef.current;
+          const container = iframe.parentElement;
+
+          if (payload.width !== undefined && payload.height !== undefined && container) {
+            const containerWidth = container.clientWidth;
+
+            // Scale based on width only - mobile users expect vertical scrolling
+            // Leave a bit of padding (95% of container width)
+            const targetWidth = containerWidth * 0.95;
+            const scale = Math.min(targetWidth / payload.width, 1); // Don't scale up, only down
+
+            // Set natural dimensions
+            iframe.style.width = `${payload.width}px`;
+            iframe.style.height = `${payload.height}px`;
+
+            // Apply scaling if needed (on mobile/small screens)
+            if (scale < 1) {
+              iframe.style.transform = `scale(${scale})`;
+              iframe.style.transformOrigin = 'top center';
+              // Adjust container to account for scaled size
+              iframe.style.marginBottom = `${payload.height * (scale - 1)}px`;
+            } else {
+              iframe.style.transform = 'none';
+              iframe.style.marginBottom = '0';
+            }
+
+            console.log(
+              `📏 Iframe resized: ${payload.width}x${payload.height} (scale: ${scale.toFixed(2)})`
+            );
+          } else if (payload.width !== undefined) {
+            iframe.style.width = `${payload.width}px`;
+            iframe.style.maxWidth = '100%';
+          } else if (payload.height !== undefined) {
+            iframe.style.height = `${payload.height}px`;
+          }
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [selectedResource]);
 
   const handleToolCall = useCallback(
     async (toolName: string, args: Record<string, unknown>, sourceId?: string) => {
@@ -564,6 +654,26 @@ const ToolResponsePanel: FC = () => {
                     const iframe = e.currentTarget;
                     const sourceId = selectedResource.id;
 
+                    // UI Lifecycle Protocol Handler
+                    // Listen for iframe ready signal and respond to enable UI interaction
+                    const handleIframeLifecycleMessage = (event: MessageEvent) => {
+                      // Basic origin check - accept messages from the iframe
+                      if (event.source !== iframe.contentWindow) {
+                        return;
+                      }
+
+                      // Respond to iframe ready signal
+                      if (event.data?.type === 'ui-lifecycle-iframe-ready') {
+                        console.log('[UI Lifecycle] Iframe ready, sending parent-ready signal');
+                        iframe.contentWindow?.postMessage(
+                          { type: 'parent-ready', payload: {} },
+                          '*'
+                        );
+                      }
+                    };
+
+                    window.addEventListener('message', handleIframeLifecycleMessage);
+
                     // Create Client + Transport pair (1-to-1 relationship)
                     const client = new Client({
                       name: 'WebMCP Client',
@@ -593,6 +703,9 @@ const ToolResponsePanel: FC = () => {
                       // Store cleanup function in the resource (properly via context method)
                       setResourceCleanup(sourceId, async () => {
                         try {
+                          // Clean up UI lifecycle listener
+                          window.removeEventListener('message', handleIframeLifecycleMessage);
+
                           await client.close();
                           await transport.close();
                         } catch (error) {
@@ -620,8 +733,8 @@ const ToolResponsePanel: FC = () => {
           {/* Resource Info Icon */}
           <Tooltip>
             <TooltipTrigger asChild>
-              <button className="h-7 w-7 rounded-full bg-background/95 backdrop-blur-sm border border-border/60 shadow-lg hover:bg-background transition-colors flex items-center justify-center sm:h-9 sm:w-9">
-                <Info className="h-3 w-3 text-muted-foreground sm:h-4 sm:w-4" />
+              <button className="h-11 w-11 rounded-full bg-background/95 backdrop-blur-sm border border-border/60 shadow-lg hover:bg-background transition-colors flex items-center justify-center">
+                <Info className="h-4 w-4 text-muted-foreground" />
               </button>
             </TooltipTrigger>
             <TooltipContent side="left" className="max-w-xs">
@@ -647,8 +760,8 @@ const ToolResponsePanel: FC = () => {
           {/* Raw JSON Icon */}
           <Tooltip>
             <TooltipTrigger asChild>
-              <button className="h-7 w-7 rounded-full bg-background/95 backdrop-blur-sm border border-border/60 shadow-lg hover:bg-background transition-colors flex items-center justify-center sm:h-9 sm:w-9">
-                <Code className="h-3 w-3 text-muted-foreground sm:h-4 sm:w-4" />
+              <button className="h-11 w-11 rounded-full bg-background/95 backdrop-blur-sm border border-border/60 shadow-lg hover:bg-background transition-colors flex items-center justify-center">
+                <Code className="h-4 w-4 text-muted-foreground" />
               </button>
             </TooltipTrigger>
             <TooltipContent side="left" className="max-w-md max-h-96 overflow-auto">
@@ -663,8 +776,8 @@ const ToolResponsePanel: FC = () => {
           {lastUIAction && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <button className="h-7 w-7 rounded-full bg-primary/10 backdrop-blur-sm border border-primary/40 shadow-lg hover:bg-primary/20 transition-colors flex items-center justify-center sm:h-9 sm:w-9">
-                  <Activity className="h-3 w-3 text-primary sm:h-4 sm:w-4" />
+                <button className="h-11 w-11 rounded-full bg-primary/10 backdrop-blur-sm border border-primary/40 shadow-lg hover:bg-primary/20 transition-colors flex items-center justify-center">
+                  <Activity className="h-4 w-4 text-primary" />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="left" className="max-w-md">
@@ -679,7 +792,7 @@ const ToolResponsePanel: FC = () => {
 
         {/* Tool Name Badge - Bottom Left Corner */}
         <div className="absolute bottom-2 left-2 z-10 sm:bottom-4 sm:left-4">
-          <div className="px-2 py-1 rounded-full bg-background/95 backdrop-blur-sm border border-border/60 shadow-lg text-[10px] sm:px-3 sm:py-1.5 sm:text-xs">
+          <div className="px-2 py-1 rounded-full bg-background/95 backdrop-blur-sm border border-border/60 shadow-lg text-xs sm:px-3 sm:py-1.5">
             <p className="font-semibold text-foreground truncate max-w-[120px] sm:max-w-none">
               {selectedResource.toolName}
             </p>
@@ -729,13 +842,13 @@ const ResourcesList: FC<{
             <div className="flex flex-col items-start">
               <span className="font-medium">{resource.name}</span>
               {resource.description && (
-                <span className="text-[10px] text-muted-foreground line-clamp-1">
+                <span className="text-xs text-muted-foreground line-clamp-1">
                   {resource.description}
                 </span>
               )}
             </div>
             {resource.mimeType && (
-              <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+              <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
                 {resource.mimeType.split('/')[1] || resource.mimeType}
               </span>
             )}
@@ -793,9 +906,9 @@ const Composer: FC = () => {
         />
       )}
 
-      <ComposerPrimitive.Root className="focus-within:border-primary/50 focus-within:ring-4 focus-within:ring-primary/10 flex w-full flex-col gap-1.5 rounded-xl border border-border/60 bg-background shadow-xl backdrop-blur-sm transition-all ease-in-out sm:gap-2 sm:rounded-2xl">
+      <ComposerPrimitive.Root className="focus-within:border-primary/50 focus-within:ring-4 focus-within:ring-primary/10 flex w-full flex-col gap-1.5 rounded-xl border border-border/60 bg-background shadow-xl backdrop-blur-sm transition-all ease-in-out sm:gap-2 sm:rounded-2xl max-[500px]:gap-1">
         {/* Main Input Row */}
-        <div className="flex items-end gap-1.5 px-3 pt-3 pb-2 sm:gap-2 sm:px-4 sm:pt-4 sm:pb-3">
+        <div className="flex items-end gap-1.5 px-3 pt-3 pb-2 sm:gap-2 sm:px-4 sm:pt-4 sm:pb-3 max-[500px]:px-2 max-[500px]:pt-2 max-[500px]:pb-1.5">
           {/* Tools button */}
           {tools.length > 0 && (
             <Tooltip>
@@ -826,14 +939,15 @@ const Composer: FC = () => {
             rows={1}
             autoFocus
             placeholder="Type your message..."
-            className="placeholder:text-muted-foreground max-h-48 min-h-9 flex-1 resize-none border-none bg-transparent py-2 text-sm leading-relaxed outline-none disabled:cursor-not-allowed sm:min-h-10 sm:py-2.5"
+            className="placeholder:text-muted-foreground max-h-48 min-h-9 flex-1 resize-none border-none bg-transparent py-2 text-base leading-relaxed outline-none disabled:cursor-not-allowed sm:min-h-10 sm:py-2.5"
+            enterKeyHint="send"
           />
           <ComposerAction />
         </div>
 
         {/* Toolbar Row */}
         <ThreadPrimitive.If empty={false}>
-          <div className="flex items-center justify-between border-t border-border/40 bg-muted/5 px-3 py-1.5 sm:px-4 sm:py-2">
+          <div className="flex items-center justify-between border-t border-border/40 bg-muted/5 px-3 py-1.5 sm:px-4 sm:py-2 max-[500px]:px-2 max-[500px]:py-1">
             <div className="flex items-center gap-1.5 sm:gap-2">
               {/* Reset Thread Button */}
               <Tooltip>
@@ -853,9 +967,9 @@ const Composer: FC = () => {
               </Tooltip>
             </div>
 
-            <div className="flex items-center gap-1 text-[10px] text-muted-foreground sm:text-xs">
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
               <span className="hidden sm:inline">Press</span>
-              <kbd className="rounded border border-border/60 bg-muted px-1 py-0.5 font-mono text-[9px] sm:px-1.5 sm:text-[10px]">
+              <kbd className="rounded border border-border/60 bg-muted px-1 py-0.5 font-mono text-xs sm:px-1.5">
                 Enter
               </kbd>
               <span className="hidden sm:inline">to send</span>
@@ -878,7 +992,7 @@ const ComposerAction: FC = () => {
           <TooltipIconButton
             tooltip="Send"
             variant="default"
-            className="my-2 size-7 p-1.5 transition-opacity ease-in sm:my-2.5 sm:size-8 sm:p-2"
+            className="my-2 size-11 p-2.5 transition-opacity ease-in"
           >
             <SendHorizontalIcon />
           </TooltipIconButton>
@@ -889,7 +1003,7 @@ const ComposerAction: FC = () => {
           <TooltipIconButton
             tooltip="Cancel"
             variant="default"
-            className="my-2 size-7 p-1.5 transition-opacity ease-in sm:my-2.5 sm:size-8 sm:p-2"
+            className="my-2 size-11 p-2.5 transition-opacity ease-in"
           >
             <CircleStopIcon />
           </TooltipIconButton>
@@ -987,7 +1101,10 @@ const UserActionBar: FC = () => {
 const EditComposer: FC = () => {
   return (
     <ComposerPrimitive.Root className="bg-muted my-4 flex w-full max-w-[var(--thread-max-width)] flex-col gap-2 rounded-xl transition-[max-width] duration-400 ease-[cubic-bezier(0.42,0,0.58,1)]">
-      <ComposerPrimitive.Input className="text-foreground flex h-8 w-full resize-none bg-transparent p-4 pb-0 outline-none" />
+      <ComposerPrimitive.Input
+        className="text-foreground flex h-8 w-full resize-none bg-transparent p-4 pb-0 outline-none"
+        enterKeyHint="send"
+      />
 
       <div className="mx-3 mb-3 flex items-center justify-center gap-2 self-end">
         <ComposerPrimitive.Cancel asChild>

@@ -119,6 +119,7 @@
   body,
   #root {
     height: 100%;
+    overscroll-behavior: none;
   }
   body {
     margin: 0;
@@ -126,5 +127,22 @@
   }
   #root {
     @apply flex min-h-screen flex-col;
+  }
+
+  /* Ensure embedded iframes are responsive on mobile */
+  iframe {
+    max-width: 100%;
+  }
+
+  /* Respect user's motion preferences for accessibility */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }

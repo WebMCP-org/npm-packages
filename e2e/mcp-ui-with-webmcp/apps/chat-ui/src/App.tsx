@@ -389,8 +389,8 @@ function App() {
 
         <div className="flex min-h-dvh w-full flex-col bg-gradient-to-br from-background via-background to-muted/20">
           {/* Header */}
-          <header className="z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <div className="flex h-12 items-center justify-between gap-1.5 px-2 sm:h-14 sm:gap-3 sm:px-4 md:h-16 md:gap-4 md:px-6">
+          <header className="z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pt-[env(safe-area-inset-top)]">
+            <div className="flex h-12 items-center justify-between gap-1.5 px-2 sm:h-14 sm:gap-3 sm:px-4 md:h-16 md:gap-4 md:px-6 pl-[max(0.5rem,env(safe-area-inset-left))] pr-[max(0.5rem,env(safe-area-inset-right))] sm:pl-[max(1rem,env(safe-area-inset-left))] sm:pr-[max(1rem,env(safe-area-inset-right))] md:pl-[max(1.5rem,env(safe-area-inset-left))] md:pr-[max(1.5rem,env(safe-area-inset-right))]">
               {/* Logo and Title */}
               <div className="flex min-w-0 items-center gap-1.5 sm:gap-2 md:gap-3">
                 <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 sm:h-8 sm:w-8 md:h-10 md:w-10">
@@ -409,9 +409,9 @@ function App() {
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-7 w-7 shrink-0 rounded-full shadow-sm md:hidden sm:h-8 sm:w-8"
+                      className="shrink-0 rounded-full shadow-sm md:hidden"
                     >
-                      <Menu className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                      <Menu className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
                       <span className="sr-only">Open menu</span>
                     </Button>
                   </SheetTrigger>
@@ -521,8 +521,8 @@ function App() {
                         <span className="text-xs font-medium text-muted-foreground">
                           Tool Sources:
                         </span>
-                        <ToolSourceBadge sourceId={undefined} className="text-[10px] px-1.5 py-0" />
-                        <ToolSourceBadge sourceId="webmcp" className="text-[10px] px-1.5 py-0" />
+                        <ToolSourceBadge sourceId={undefined} className="text-xs px-1.5 py-0" />
+                        <ToolSourceBadge sourceId="webmcp" className="text-xs px-1.5 py-0" />
                       </div>
                     </TooltipTrigger>
                     <TooltipContent>
@@ -634,9 +634,9 @@ function App() {
                         variant="outline"
                         size="icon"
                         onClick={() => setShowApiKeyDialog(true)}
-                        className="h-7 w-7 shrink-0 rounded-full shadow-sm sm:h-8 sm:w-8 md:h-9 md:w-9"
+                        className="shrink-0 rounded-full shadow-sm"
                       >
-                        <Settings className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4" />
+                        <Settings className="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>

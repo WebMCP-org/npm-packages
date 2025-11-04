@@ -89,14 +89,26 @@ export const UIResourceProvider: React.FC<UIResourceProviderProps> = ({ children
 
   const addResource = useCallback(
     (item: Omit<UIResourceItem, 'id' | 'timestamp' | 'iframeRef'>) => {
-      const newResource: UIResourceItem = {
-        ...item,
-        id: `${item.toolName}-${Date.now()}-${Math.random()}`,
-        timestamp: new Date(),
-        iframeRef: createRef<HTMLIFrameElement>(),
-      };
-      setResources((prev) => [...prev, newResource]);
-      setSelectedResourceId(newResource.id);
+      // Check if a resource with the same URI already exists
+      setResources((prev) => {
+        const existingResource = prev.find((r) => r.resource.uri === item.resource.uri);
+
+        if (existingResource) {
+          // Resource with same URI exists, just select it instead of creating duplicate
+          setSelectedResourceId(existingResource.id);
+          return prev; // No state change needed
+        }
+
+        // Create new resource since no duplicate found
+        const newResource: UIResourceItem = {
+          ...item,
+          id: `${item.toolName}-${Date.now()}-${Math.random()}`,
+          timestamp: new Date(),
+          iframeRef: createRef<HTMLIFrameElement>(),
+        };
+        setSelectedResourceId(newResource.id);
+        return [...prev, newResource];
+      });
     },
     []
   );
