@@ -199,7 +199,8 @@ export const TicTacToe: React.FC<TicTacToeProps> = ({
       <div className="tic-tac-toe-board">
         {board.map((cell, index) => (
           <button
-            key={index}
+            // biome-ignore lint/suspicious/noArrayIndexKey: TicTacToe board positions are stable and never reorder
+            key={`cell-${index}`}
             className={`tic-tac-toe-cell ${cell ? 'filled' : ''} ${
               isWinningCell(index) ? 'winning-cell' : ''
             } ${cell === 'X' ? 'player-x' : cell === 'O' ? 'player-o' : ''}`}
@@ -238,6 +239,21 @@ export const TicTacToe: React.FC<TicTacToeProps> = ({
           box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
 
+        /* Responsive padding for mobile */
+        @media (max-width: 768px) {
+          .tic-tac-toe-board {
+            gap: 0.5rem;
+            padding: 1rem;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .tic-tac-toe-board {
+            gap: 0.4rem;
+            padding: 0.75rem;
+          }
+        }
+
         @media (prefers-color-scheme: dark) {
           .tic-tac-toe-board {
             background: #2a2a2a;
@@ -259,6 +275,23 @@ export const TicTacToe: React.FC<TicTacToeProps> = ({
           align-items: center;
           justify-content: center;
           position: relative;
+        }
+
+        /* Responsive sizing for mobile */
+        @media (max-width: 768px) {
+          .tic-tac-toe-cell {
+            width: 90px;
+            height: 90px;
+            font-size: 2.25rem;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .tic-tac-toe-cell {
+            width: 75px;
+            height: 75px;
+            font-size: 2rem;
+          }
         }
 
         @media (prefers-color-scheme: dark) {
@@ -351,6 +384,12 @@ export const TicTacToe: React.FC<TicTacToeProps> = ({
           pointer-events: none;
         }
 
+        @media (max-width: 480px) {
+          .tic-tac-toe-game-over-message {
+            font-size: 1.125rem;
+          }
+        }
+
         .tic-tac-toe-reset-overlay {
           padding: 0.75rem 1.5rem;
           font-size: 1rem;
@@ -362,6 +401,13 @@ export const TicTacToe: React.FC<TicTacToeProps> = ({
           color: #fff;
           text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
           pointer-events: auto;
+        }
+
+        @media (max-width: 480px) {
+          .tic-tac-toe-reset-overlay {
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+          }
         }
 
         .tic-tac-toe-reset-overlay:hover {

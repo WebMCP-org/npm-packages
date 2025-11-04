@@ -3,6 +3,16 @@ import { useCallback, useEffect, useState } from 'react';
 import { z } from 'zod';
 import { type Board, type Player, TicTacToe } from './TicTacToe';
 
+// Game statistics interface
+interface GameStats {
+  totalGames: number;
+  liveGames: number;
+  clankersWins: number;
+  carbonUnitsWins: number;
+  draws: number;
+  lastUpdated: string;
+}
+
 type GameStatus = {
   winner: Player | 'Draw' | null;
   winningLine: number[] | null;
@@ -103,8 +113,8 @@ const formatGameStateMarkdown = (
     '# Tic-Tac-Toe Game State',
     '',
     '**Player Roles:**',
-    `- Player ${humanPlayer} = Human`,
-    `- Player ${agentPlayer} = AI/Assistant`,
+    `- Player ${humanPlayer} = Carbon Units 👤`,
+    `- Player ${agentPlayer} = Clankers 🤖`,
     '',
     formatBoardMarkdown(board),
     '',
@@ -113,16 +123,16 @@ const formatGameStateMarkdown = (
   if (winner === 'Draw') {
     lines.push("**Status:** Game Over - It's a draw!");
   } else if (winner) {
-    const winnerLabel = winner === humanPlayer ? 'Human' : 'AI/Assistant';
+    const winnerLabel = winner === humanPlayer ? 'Carbon Units 👤' : 'Clankers 🤖';
     lines.push(`**Status:** Game Over - Player ${winner} (${winnerLabel}) wins!`);
   } else {
-    const currentRole = currentPlayer === humanPlayer ? 'Human' : 'AI/Assistant';
+    const currentRole = currentPlayer === humanPlayer ? 'Carbon Units 👤' : 'Clankers 🤖';
     lines.push('**Status:** Game in progress');
     lines.push(`**Current Turn:** Player ${currentPlayer} (${currentRole})`);
     if (currentPlayer === humanPlayer) {
-      lines.push('**Action:** Waiting for the human to move via the UI.');
+      lines.push('**Action:** Waiting for Carbon Units to move via the UI.');
     } else {
-      lines.push('**Action:** Awaiting AI/Assistant move.');
+      lines.push('**Action:** Awaiting Clankers move.');
     }
     if (availableMoves.length > 0) {
       lines.push(`**Available Moves:** ${availableMoves.join(', ')}`);
@@ -144,7 +154,7 @@ const formatMoveMarkdown = (
   const lines: string[] = [
     '# Move Successful',
     '',
-    `Player ${player} (${player === humanPlayer ? 'Human' : 'AI/Assistant'}) placed at position ${index}.`,
+    `Player ${player} (${player === humanPlayer ? 'Carbon Units 👤' : 'Clankers 🤖'}) placed at position ${index}.`,
     '',
     formatBoardMarkdown(board),
     '',
@@ -153,13 +163,13 @@ const formatMoveMarkdown = (
   if (status.winner === 'Draw') {
     lines.push("**Game Over:** It's a draw!");
   } else if (status.winner) {
-    const winnerLabel = status.winner === humanPlayer ? 'Human' : 'AI/Assistant';
+    const winnerLabel = status.winner === humanPlayer ? 'Carbon Units 👤' : 'Clankers 🤖';
     lines.push(`**Game Over:** Player ${status.winner} (${winnerLabel}) wins!`);
   } else if (nextPlayer) {
-    const nextLabel = nextPlayer === humanPlayer ? 'Human' : 'AI/Assistant';
+    const nextLabel = nextPlayer === humanPlayer ? 'Carbon Units 👤' : 'Clankers 🤖';
     lines.push(`**Next Turn:** Player ${nextPlayer} (${nextLabel})`);
     if (nextPlayer === agentPlayer) {
-      lines.push('**Reminder:** You are the AI/Assistant—make your move using this tool.');
+      lines.push('**Reminder:** You are Clankers 🤖—make your move using this tool.');
     }
 
     const remainingMoves = getAvailableMoves(board);
@@ -177,8 +187,8 @@ const formatResetMarkdown = (board: Board, humanPlayer: Player, agentPlayer: Pla
   const lines: string[] = [
     '# Game Reset',
     '',
-    `Human plays as Player ${humanPlayer}.`,
-    `AI/Assistant plays as Player ${agentPlayer}.`,
+    `Carbon Units 👤 plays as Player ${humanPlayer}.`,
+    `Clankers 🤖 plays as Player ${agentPlayer}.`,
     '',
     formatBoardMarkdown(board),
     '',
@@ -186,9 +196,9 @@ const formatResetMarkdown = (board: Board, humanPlayer: Player, agentPlayer: Pla
   ];
 
   if (agentPlayer === 'X') {
-    lines.push('**Action:** AI/Assistant opens the game.');
+    lines.push('**Action:** Clankers 🤖 opens the game.');
   } else {
-    lines.push('**Action:** Human opens the game via the UI.');
+    lines.push('**Action:** Carbon Units 👤 opens the game via the UI.');
   }
 
   if (availableMoves.length > 0) {
@@ -210,22 +220,22 @@ const formatMoveNotification = ({
   const lines: string[] = [
     '# Tic-Tac-Toe Update',
     '',
-    `- Move: Player ${actor} (${actor === humanPlayer ? 'Human' : 'AI/Assistant'}) placed at position ${index}.`,
-    `- Human plays as Player ${humanPlayer}`,
-    `- AI/Assistant plays as Player ${agentPlayer}`,
+    `- Move: Player ${actor} (${actor === humanPlayer ? 'Carbon Units 👤' : 'Clankers 🤖'}) placed at position ${index}.`,
+    `- Carbon Units 👤 plays as Player ${humanPlayer}`,
+    `- Clankers 🤖 plays as Player ${agentPlayer}`,
     '',
   ];
 
   if (status.winner === 'Draw') {
     lines.push("**Status:** Game over – it's a draw.");
   } else if (status.winner) {
-    const winnerLabel = status.winner === humanPlayer ? 'Human' : 'AI/Assistant';
+    const winnerLabel = status.winner === humanPlayer ? 'Carbon Units 👤' : 'Clankers 🤖';
     lines.push(`**Status:** Game over – Player ${status.winner} (${winnerLabel}) wins!`);
   } else if (nextPlayer) {
-    const nextLabel = nextPlayer === humanPlayer ? 'Human' : 'AI/Assistant';
+    const nextLabel = nextPlayer === humanPlayer ? 'Carbon Units 👤' : 'Clankers 🤖';
     lines.push(`**Next Turn:** Player ${nextPlayer} (${nextLabel})`);
     if (nextPlayer === agentPlayer) {
-      lines.push('**Action:** Awaiting AI/Assistant move.');
+      lines.push('**Action:** Awaiting Clankers 🤖 move.');
     }
   }
 
@@ -250,16 +260,16 @@ const formatNewGameNotification = ({
   const lines: string[] = [
     '# Tic-Tac-Toe New Game',
     '',
-    `- Human plays as Player ${humanPlayer}`,
-    `- AI/Assistant plays as Player ${agentPlayer}`,
+    `- Carbon Units 👤 plays as Player ${humanPlayer}`,
+    `- Clankers 🤖 plays as Player ${agentPlayer}`,
     '',
   ];
 
   if (currentPlayer === agentPlayer) {
-    lines.push('**Next Turn:** AI/Assistant opens the game.');
-    lines.push('**Action:** Awaiting AI/Assistant move.');
+    lines.push('**Next Turn:** Clankers 🤖 opens the game.');
+    lines.push('**Action:** Awaiting Clankers 🤖 move.');
   } else {
-    lines.push('**Next Turn:** Human opens the game via the UI.');
+    lines.push('**Next Turn:** Carbon Units 👤 opens the game via the UI.');
   }
 
   if (availableMoves.length > 0) {
@@ -313,6 +323,9 @@ export const TicTacToeWithWebMCP: React.FC<TicTacToeWithWebMCPProps> = ({ animat
   // UI state
   const [isRoleModalOpen, setIsRoleModalOpen] = useState<boolean>(true);
   const [isWaitingForAIMove, setIsWaitingForAIMove] = useState<boolean>(false);
+
+  // Stats state
+  const [stats, setStats] = useState<GameStats | null>(null);
 
   // Derived state: AI plays the opposite of human
   const agentPlayer: Player = humanPlayer === 'X' ? 'O' : 'X';
@@ -407,6 +420,132 @@ export const TicTacToeWithWebMCP: React.FC<TicTacToeWithWebMCPProps> = ({ animat
     };
   }, []);
 
+  /**
+   * Stats WebSocket Connection
+   *
+   * Establishes a WebSocket connection for real-time stats updates.
+   * Automatically reconnects with exponential backoff on disconnection.
+   * Falls back to REST API if WebSocket fails repeatedly.
+   */
+  useEffect(() => {
+    // Construct WebSocket URL based on current location
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/api/stats/ws`;
+
+    let ws: WebSocket | null = null;
+    let reconnectTimeout: NodeJS.Timeout | null = null;
+    let reconnectAttempts = 0;
+    const MAX_RECONNECT_ATTEMPTS = 5;
+    const BASE_RECONNECT_DELAY = 1000; // 1 second
+    const MAX_RECONNECT_DELAY = 30000; // 30 seconds
+
+    const connect = () => {
+      try {
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+          console.log('Stats WebSocket connected');
+          reconnectAttempts = 0; // Reset on successful connection
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const data: GameStats = JSON.parse(event.data);
+            setStats(data);
+          } catch (error) {
+            console.error('Failed to parse stats message:', error);
+          }
+        };
+
+        ws.onerror = (error) => {
+          console.error('Stats WebSocket error:', error);
+        };
+
+        ws.onclose = (event) => {
+          console.log(`Stats WebSocket closed: code=${event.code}, reason=${event.reason}`);
+
+          // Attempt to reconnect with exponential backoff
+          if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+            const delay = Math.min(
+              BASE_RECONNECT_DELAY * 2 ** reconnectAttempts,
+              MAX_RECONNECT_DELAY
+            );
+
+            console.log(
+              `Reconnecting in ${delay}ms (attempt ${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS})...`
+            );
+
+            reconnectTimeout = setTimeout(() => {
+              reconnectAttempts++;
+              connect();
+            }, delay);
+          } else {
+            console.warn(
+              'Max WebSocket reconnection attempts reached. Stats will not update automatically.'
+            );
+            // Could optionally fall back to polling here if needed
+          }
+        };
+      } catch (error) {
+        console.error('Failed to create WebSocket connection:', error);
+      }
+    };
+
+    // Establish initial connection
+    connect();
+
+    // Cleanup function
+    return () => {
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+      }
+      if (ws) {
+        // Set a flag to prevent reconnection during intentional close
+        reconnectAttempts = MAX_RECONNECT_ATTEMPTS;
+        ws.close(1000, 'Component unmounting');
+      }
+    };
+  }, []);
+
+  /**
+   * Game Completion Tracking
+   *
+   * Notifies the server when a game completes with the result.
+   * Maps X/O winners to Clankers/Carbon Units based on role assignments.
+   * Note: liveGames counter is now managed by WebSocket connections automatically.
+   */
+  useEffect(() => {
+    const notifyGameComplete = async () => {
+      if (!winner) return;
+
+      try {
+        let result: 'clankers' | 'carbonUnits' | 'draw';
+        if (winner === 'Draw') {
+          result = 'draw';
+        } else if (winner === agentPlayer) {
+          result = 'clankers';
+        } else {
+          result = 'carbonUnits';
+        }
+
+        const response = await fetch('/api/stats/game-complete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ result }),
+        });
+
+        if (response.ok) {
+          const data: GameStats = await response.json();
+          setStats(data);
+        }
+      } catch (error) {
+        console.error('Failed to notify game completion:', error);
+      }
+    };
+
+    notifyGameComplete();
+  }, [winner, agentPlayer]);
+
   const performReset = useCallback(
     (nextHumanPlayer: Player = humanPlayer) => {
       const chosenHuman = nextHumanPlayer;
@@ -469,6 +608,50 @@ export const TicTacToeWithWebMCP: React.FC<TicTacToeWithWebMCPProps> = ({ animat
     },
     [board, currentPlayer, winner]
   );
+
+  /**
+   * Notify Parent of Current Document Size
+   *
+   * Sends the current document dimensions to the parent window via postMessage.
+   * This allows the parent to resize the iframe to fit the content properly.
+   *
+   * Based on Kent C. Dodds' pattern from:
+   * https://github.com/idosal/mcp-ui/issues/100
+   */
+  const notifyParentOfCurrentDocumentSize = useCallback(() => {
+    if (typeof window === 'undefined' || window.parent === window) {
+      return;
+    }
+
+    const height = document.documentElement.scrollHeight;
+    const width = document.documentElement.scrollWidth;
+
+    window.parent.postMessage(
+      {
+        type: 'ui-size-change',
+        payload: { height, width },
+      },
+      '*'
+    );
+
+    console.log(`📏 Size notification sent: ${width}x${height}`);
+  }, []);
+
+  /**
+   * Notify parent of initial size after readiness
+   *
+   * Once the parent is ready, send the initial document size.
+   * Uses requestAnimationFrame to ensure accurate measurements after layout.
+   */
+  useEffect(() => {
+    if (!isParentReady) {
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      notifyParentOfCurrentDocumentSize();
+    });
+  }, [isParentReady, notifyParentOfCurrentDocumentSize]);
 
   const postNotifyMarkdown = useCallback(
     (content: string, logLabel: string) => {
@@ -613,10 +796,10 @@ export const TicTacToeWithWebMCP: React.FC<TicTacToeWithWebMCPProps> = ({ animat
   /**
    * WebMCP Tool 2: tictactoe_ai_move
    *
-   * This tool allows the AI to make a move on the board.
+   * This tool allows Clankers (AI) to make a move on the board.
    * It accepts a position parameter (0-8) and validates:
    * - Position is in valid range
-   * - It's the AI's turn
+   * - It's Clankers' turn
    * - The cell is empty
    * - The game is not over
    *
@@ -629,18 +812,18 @@ export const TicTacToeWithWebMCP: React.FC<TicTacToeWithWebMCPProps> = ({ animat
    * - Auto-generated documentation
    *
    * After a successful move, this unblocks the UI (setIsWaitingForAIMove)
-   * so the human can continue playing.
+   * so Carbon Units can continue playing.
    */
   useWebMCP({
     name: 'tictactoe_ai_move',
-    description: `Play as Player ${agentPlayer} (AI/Assistant). Provide a board position (0-8) to place your ${agentPlayer}.`,
+    description: `Play as Player ${agentPlayer} (Clankers 🤖). Provide a board position (0-8) to place your ${agentPlayer}.`,
     inputSchema: {
       position: z
         .number()
         .int()
         .min(0)
         .max(8)
-        .describe('Cell position (0-8) in row-major order where the AI/Assistant should move.'),
+        .describe('Cell position (0-8) in row-major order where Clankers 🤖 should move.'),
     },
     annotations: {
       idempotentHint: false,
@@ -711,10 +894,38 @@ export const TicTacToeWithWebMCP: React.FC<TicTacToeWithWebMCPProps> = ({ animat
       : `${currentPlayer}'s turn`;
 
   return (
-    <div className="tic-tac-toe-with-webmcp">
-      <div className="tic-tac-toe-game-area">
+    <div className="flex flex-col gap-1.5 font-sans">
+      {/* Header */}
+      <div className="text-center">
+        <h1 className="text-sm font-bold text-black mb-0.5">Beat The Clankers 🤖</h1>
+
+        {/* Tier 2: Game Outcomes (Primary Stats) */}
+        {stats && (
+          <div className="flex items-center justify-center gap-3 text-xs text-black mb-0.5">
+            <span className="font-semibold">👤 {stats.carbonUnitsWins} Humans</span>
+            <span className="text-black">•</span>
+            <span className="font-semibold">🤖 {stats.clankersWins} Clankers</span>
+            <span className="text-black">•</span>
+            <span className="font-semibold">🤝 {stats.draws} Draws</span>
+          </div>
+        )}
+
+        {/* Tier 3: Meta Stats (Secondary) */}
+        {stats && (
+          <div className="flex items-center justify-center gap-2 text-[0.625rem] text-black">
+            <span title="Total games played">📊 {stats.totalGames} total</span>
+            <span className="text-black">•</span>
+            <span title="Active games">🎮 {stats.liveGames} active</span>
+          </div>
+        )}
+      </div>
+
+      <div className="relative">
         {statusText && (
-          <div className="tic-tac-toe-status-overlay" aria-live="polite">
+          <div
+            className="absolute top-0 left-0 right-0 text-xs text-center p-1.5 text-black [text-shadow:0_1px_2px_rgba(0,0,0,0.5)] z-10 pointer-events-none"
+            aria-live="polite"
+          >
             {statusText}
           </div>
         )}
@@ -730,102 +941,42 @@ export const TicTacToeWithWebMCP: React.FC<TicTacToeWithWebMCPProps> = ({ animat
         />
 
         {showRoleSelection && (
-          <div className="tic-tac-toe-role-overlay">
-            <fieldset className="tic-tac-toe-role-selection">
-              <legend className="tic-tac-toe-role-prompt">Pick your side:</legend>
-              <button
-                type="button"
-                className="tic-tac-toe-role-button"
-                onClick={() => confirmRoleSelection('X')}
-              >
-                X
-              </button>
-              <button
-                type="button"
-                className="tic-tac-toe-role-button"
-                onClick={() => confirmRoleSelection('O')}
-              >
-                O
-              </button>
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 pointer-events-none">
+            <fieldset className="flex flex-col gap-3 pointer-events-auto border-none p-0 m-0 min-w-0">
+              <legend className="text-sm font-semibold text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.5)] mb-2">
+                Pick your side:
+              </legend>
+              <div className="flex items-center justify-center gap-2 mb-1">
+                <span className="text-xs font-semibold text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.3)]">
+                  👤 Carbon Units
+                </span>
+                <span className="text-[0.625rem] font-bold text-white/70 uppercase">vs</span>
+                <span className="text-xs font-semibold text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.3)]">
+                  🤖 Clankers
+                </span>
+              </div>
+              <div className="flex gap-3 justify-center">
+                <button
+                  type="button"
+                  className="py-2.5 px-5 border-2 border-white rounded-md text-xl font-bold cursor-pointer transition-all duration-150 text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.3)] min-w-14 hover:scale-105 hover:border-[3px] active:scale-95"
+                  onClick={() => confirmRoleSelection('X')}
+                  title="Play as X (Carbon Units go first)"
+                >
+                  X
+                </button>
+                <button
+                  type="button"
+                  className="py-2.5 px-5 border-2 border-white rounded-md text-xl font-bold cursor-pointer transition-all duration-150 text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.3)] min-w-14 hover:scale-105 hover:border-[3px] active:scale-95"
+                  onClick={() => confirmRoleSelection('O')}
+                  title="Play as O (Clankers go first)"
+                >
+                  O
+                </button>
+              </div>
             </fieldset>
           </div>
         )}
       </div>
-
-      <style>{`
-        .tic-tac-toe-with-webmcp {
-          display: inline-block;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-        }
-
-        .tic-tac-toe-game-area {
-          position: relative;
-        }
-
-        .tic-tac-toe-status-overlay {
-          position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          font-size: 0.75rem;
-          text-align: center;
-          padding: 0.375rem;
-          color: #fff;
-          text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-          z-index: 10;
-          pointer-events: none;
-        }
-
-        .tic-tac-toe-role-overlay {
-          position: absolute;
-          inset: 0;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          gap: 0.75rem;
-          pointer-events: none;
-        }
-
-        .tic-tac-toe-role-prompt {
-          font-size: 0.875rem;
-          font-weight: 600;
-          color: #fff;
-          text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
-        }
-
-        .tic-tac-toe-role-selection {
-          display: flex;
-          gap: 0.75rem;
-          pointer-events: auto;
-          border: none;
-          padding: 0;
-          margin: 0;
-          min-width: 0;
-        }
-
-        .tic-tac-toe-role-button {
-          padding: 0.625rem 1.25rem;
-          border: 2px solid #fff;
-          border-radius: 6px;
-          font-size: 1.25rem;
-          font-weight: 700;
-          cursor: pointer;
-          transition: all 0.15s ease;
-          color: #fff;
-          text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-          min-width: 3.5rem;
-        }
-
-        .tic-tac-toe-role-button:hover {
-          transform: scale(1.05);
-          border-width: 3px;
-        }
-
-        .tic-tac-toe-role-button:active {
-          transform: scale(0.95);
-        }
-      `}</style>
     </div>
   );
 };
