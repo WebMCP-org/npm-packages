@@ -731,8 +731,8 @@ export const TicTacToeWithWebMCP: React.FC<TicTacToeWithWebMCPProps> = ({ animat
 
         {showRoleSelection && (
           <div className="tic-tac-toe-role-overlay">
-            <div className="tic-tac-toe-role-prompt">Pick your side:</div>
-            <div className="tic-tac-toe-role-selection" role="group" aria-label="Choose your side">
+            <fieldset className="tic-tac-toe-role-selection">
+              <legend className="tic-tac-toe-role-prompt">Pick your side:</legend>
               <button
                 type="button"
                 className="tic-tac-toe-role-button"
@@ -747,7 +747,7 @@ export const TicTacToeWithWebMCP: React.FC<TicTacToeWithWebMCPProps> = ({ animat
               >
                 O
               </button>
-            </div>
+            </fieldset>
           </div>
         )}
       </div>
@@ -798,6 +798,10 @@ export const TicTacToeWithWebMCP: React.FC<TicTacToeWithWebMCPProps> = ({ animat
           display: flex;
           gap: 0.75rem;
           pointer-events: auto;
+          border: none;
+          padding: 0;
+          margin: 0;
+          min-width: 0;
         }
 
         .tic-tac-toe-role-button {
