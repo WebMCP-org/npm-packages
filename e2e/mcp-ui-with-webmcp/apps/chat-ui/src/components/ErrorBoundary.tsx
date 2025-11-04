@@ -1,4 +1,9 @@
+import { AlertTriangle, ChevronDown, RefreshCw } from 'lucide-react';
 import { Component, type ReactNode } from 'react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -9,6 +14,7 @@ interface ErrorBoundaryState {
   hasError: boolean;
   error: Error | null;
   errorInfo: React.ErrorInfo | null;
+  isDetailsOpen: boolean;
 }
 
 /**
@@ -21,6 +27,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       hasError: false,
       error: null,
       errorInfo: null,
+      isDetailsOpen: false,
     };
   }
 
@@ -41,7 +48,14 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       hasError: false,
       error: null,
       errorInfo: null,
+      isDetailsOpen: false,
     });
+  };
+
+  toggleDetails = (): void => {
+    this.setState((prev) => ({
+      isDetailsOpen: !prev.isDetailsOpen,
+    }));
   };
 
   render(): ReactNode {
@@ -51,37 +65,78 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       }
 
       return (
-        <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-purple-600 to-indigo-700">
-          <div className="max-w-2xl w-full bg-white dark:bg-gray-900 rounded-lg shadow-xl p-8">
-            <h1 className="text-3xl font-bold text-red-600 dark:text-red-400 mb-4">
-              Oops! Something went wrong
-            </h1>
+        <div className="min-h-screen flex items-center justify-center p-4 bg-background sm:p-6">
+          <Card className="w-full max-w-2xl">
+            <CardHeader>
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-destructive/10">
+                  <AlertTriangle className="h-5 w-5 text-destructive" />
+                </div>
+                <div className="flex-1 space-y-1">
+                  <CardTitle className="text-xl">Something went wrong</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    We encountered an unexpected error. You can try refreshing the page or resetting
+                    the application.
+                  </p>
+                </div>
+              </div>
+            </CardHeader>
 
-            <p className="text-gray-700 dark:text-gray-300 mb-6 text-lg">
-              {this.state.error?.message || 'An unexpected error occurred'}
-            </p>
+            <CardContent className="space-y-4">
+              <Alert variant="destructive">
+                <AlertTitle>Error Message</AlertTitle>
+                <AlertDescription>
+                  {this.state.error?.message || 'An unexpected error occurred'}
+                </AlertDescription>
+              </Alert>
 
-            {this.state.errorInfo && (
-              <details className="mb-6 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-                <summary className="cursor-pointer font-semibold text-gray-900 dark:text-gray-100 hover:text-purple-600 dark:hover:text-purple-400 select-none">
-                  Error Details
-                </summary>
-                <pre className="mt-4 p-4 bg-white dark:bg-gray-900 rounded overflow-x-auto text-xs text-red-600 dark:text-red-400 border border-gray-200 dark:border-gray-700">
-                  {this.state.error?.stack}
-                  {'\n\nComponent Stack:'}
-                  {this.state.errorInfo.componentStack}
-                </pre>
-              </details>
-            )}
+              {this.state.errorInfo && (
+                <Collapsible open={this.state.isDetailsOpen} onOpenChange={this.toggleDetails}>
+                  <CollapsibleTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-between"
+                      aria-label="Toggle error details"
+                    >
+                      <span className="text-sm font-medium">Technical Details</span>
+                      <ChevronDown
+                        className={`h-4 w-4 transition-transform duration-200 ${
+                          this.state.isDetailsOpen ? 'rotate-180' : ''
+                        }`}
+                      />
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-2">
+                    <div className="rounded-lg border bg-muted/50 p-4">
+                      <pre className="overflow-x-auto text-xs leading-relaxed text-foreground">
+                        <code>
+                          {this.state.error?.stack}
+                          {'\n\n'}
+                          {'Component Stack:'}
+                          {this.state.errorInfo.componentStack}
+                        </code>
+                      </pre>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
+            </CardContent>
 
-            <button
-              type="button"
-              onClick={this.handleReset}
-              className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200"
-            >
-              Try Again
-            </button>
-          </div>
+            <CardFooter className="flex flex-col gap-2 sm:flex-row sm:justify-between">
+              <Button onClick={this.handleReset} className="w-full sm:w-auto">
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Try Again
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => window.location.reload()}
+                className="w-full sm:w-auto"
+              >
+                Reload Page
+              </Button>
+            </CardFooter>
+          </Card>
         </div>
       );
     }

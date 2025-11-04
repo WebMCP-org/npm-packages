@@ -9,7 +9,7 @@ import type {
   Resource as MCPResource,
   Tool as MCPTool,
 } from '@modelcontextprotocol/sdk/types.js';
-import { AlertCircle, ExternalLink, Loader2, Plug, PlugZap, Settings } from 'lucide-react';
+import { AlertCircle, ExternalLink, Loader2, Menu, Plug, PlugZap, Settings } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiKeyInput } from '@/components/ApiKeyInput';
 import { Thread } from '@/components/assistant-ui/thread';
@@ -17,6 +17,7 @@ import { ToolSourceBadge } from '@/components/assistant-ui/tool-source-badge';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { MCPContext, type MCPContextValue } from '@/contexts/MCPContext';
 import { useUIResources } from '@/contexts/UIResourceContext';
@@ -76,6 +77,7 @@ function App() {
   const [showApiKeyDialog, setShowApiKeyDialog] = useState(
     !getStoredApiKey() || mcpState !== 'ready'
   );
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [mcpTools, setMcpTools] = useState<MCPTool[]>([]);
   const [mcpPrompts, setMcpPrompts] = useState<MCPPrompt[]>([]);
   const [mcpResources, setMcpResources] = useState<MCPResource[]>([]);
@@ -388,21 +390,99 @@ function App() {
         <div className="flex min-h-dvh w-full flex-col bg-gradient-to-br from-background via-background to-muted/20">
           {/* Header */}
           <header className="z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <div className="flex h-14 items-center justify-between gap-2 px-3 sm:h-16 sm:gap-4 sm:px-6">
+            <div className="flex h-12 items-center justify-between gap-1.5 px-2 sm:h-14 sm:gap-3 sm:px-4 md:h-16 md:gap-4 md:px-6">
               {/* Logo and Title */}
-              <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 sm:h-10 sm:w-10">
-                  <PlugZap className="h-4 w-4 text-primary sm:h-5 sm:w-5" />
+              <div className="flex min-w-0 items-center gap-1.5 sm:gap-2 md:gap-3">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 sm:h-8 sm:w-8 md:h-10 md:w-10">
+                  <PlugZap className="h-3.5 w-3.5 text-primary sm:h-4 sm:w-4 md:h-5 md:w-5" />
                 </div>
-                <h1 className="truncate text-sm font-semibold tracking-tight sm:text-base lg:text-lg">
-                  <span className="sm:hidden">MCP-UI</span>
-                  <span className="hidden sm:inline">MCP-UI + WebMCP</span>
+                <h1 className="truncate text-xs font-semibold tracking-tight sm:text-sm md:text-base lg:text-lg">
+                  webMCP + mcp-ui
                 </h1>
               </div>
 
               {/* Right side - Navigation, Connection status and settings */}
               <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-                {/* Navigation Links */}
+                {/* Mobile Menu - Hamburger */}
+                <Sheet open={showMobileMenu} onOpenChange={setShowMobileMenu}>
+                  <SheetTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-7 w-7 shrink-0 rounded-full shadow-sm md:hidden sm:h-8 sm:w-8"
+                    >
+                      <Menu className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                      <span className="sr-only">Open menu</span>
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="right" className="w-[280px] sm:w-[320px]">
+                    <SheetHeader className="mb-6">
+                      <SheetTitle>Navigation</SheetTitle>
+                    </SheetHeader>
+
+                    {/* Navigation Links in Mobile Menu */}
+                    <div className="flex flex-col gap-4 mb-6">
+                      <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        Links
+                      </h3>
+                      <nav className="flex flex-col gap-3">
+                        <a
+                          href="https://mcp-b.ai"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 text-sm font-medium text-foreground transition-colors hover:text-primary"
+                          onClick={() => setShowMobileMenu(false)}
+                        >
+                          MCP-B
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                        <a
+                          href="https://docs.mcp-b.ai/mcpui-webmcp-integration"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 text-sm font-medium text-foreground transition-colors hover:text-primary"
+                          onClick={() => setShowMobileMenu(false)}
+                        >
+                          View Docs
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                        <a
+                          href="https://www.linkedin.com/in/alex-nahas/"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 text-sm font-medium text-foreground transition-colors hover:text-primary"
+                          onClick={() => setShowMobileMenu(false)}
+                        >
+                          Contact me
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      </nav>
+                    </div>
+
+                    {/* Tool Source Legend in Mobile Menu */}
+                    <div className="flex flex-col gap-4 pt-4 border-t">
+                      <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        Tool Sources
+                      </h3>
+                      <div className="flex flex-col gap-3">
+                        <div className="flex items-center gap-2">
+                          <ToolSourceBadge sourceId={undefined} />
+                          <span className="text-xs text-muted-foreground">Remote MCP Server</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <ToolSourceBadge sourceId="webmcp" />
+                          <span className="text-xs text-muted-foreground">Client JavaScript</span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Tools can come from the remote MCP server (HTTP) or run directly in your
+                        browser via WebMCP.
+                      </p>
+                    </div>
+                  </SheetContent>
+                </Sheet>
+
+                {/* Desktop Navigation Links */}
                 <div className="hidden items-center gap-2 border-r pr-3 md:flex">
                   <a
                     href="https://mcp-b.ai"
@@ -554,9 +634,9 @@ function App() {
                         variant="outline"
                         size="icon"
                         onClick={() => setShowApiKeyDialog(true)}
-                        className="h-8 w-8 shrink-0 rounded-full shadow-sm sm:h-9 sm:w-9"
+                        className="h-7 w-7 shrink-0 rounded-full shadow-sm sm:h-8 sm:w-8 md:h-9 md:w-9"
                       >
-                        <Settings className="h-3 w-3 sm:h-4 sm:w-4" />
+                        <Settings className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4" />
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>

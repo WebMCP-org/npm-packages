@@ -21,7 +21,7 @@ const CalendarChevron = ({
   ...props
 }: {
   className?: string;
-  orientation?: 'left' | 'right' | 'down';
+  orientation?: 'left' | 'right' | 'down' | 'up';
 }) => {
   if (orientation === 'left') {
     return <ChevronLeftIcon className={cn('size-4', className)} {...props} />;

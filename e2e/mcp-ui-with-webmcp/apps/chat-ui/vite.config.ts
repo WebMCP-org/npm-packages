@@ -6,7 +6,15 @@ import { defineConfig } from 'vite';
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), tailwindcss(), cloudflare()],
+  plugins: [
+    react({
+      babel: {
+        plugins: ['babel-plugin-react-compiler'],
+      },
+    }),
+    tailwindcss(),
+    cloudflare(),
+  ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

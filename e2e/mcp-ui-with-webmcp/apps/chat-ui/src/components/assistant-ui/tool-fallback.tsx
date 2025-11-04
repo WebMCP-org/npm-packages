@@ -82,44 +82,44 @@ export const ToolFallback: ToolCallMessagePartComponent = ({
   return (
     <div
       className={cn(
-        'aui-tool-fallback-root mb-4 flex w-full flex-col gap-3 rounded-lg border py-3 transition-colors',
+        'aui-tool-fallback-root mb-4 flex w-full max-w-full flex-col gap-3 rounded-lg border py-3 transition-colors',
         borderColor
       )}
     >
-      <div className="aui-tool-fallback-header flex items-center gap-2 px-4">
-        <p className="aui-tool-fallback-title flex-grow flex items-center gap-2">
-          <span className="text-muted-foreground">Used tool:</span>{' '}
-          <b className="font-semibold">{toolName}</b>
+      <div className="aui-tool-fallback-header flex items-center gap-2 px-3 sm:px-4">
+        <p className="aui-tool-fallback-title flex-grow flex items-center gap-1.5 text-xs sm:gap-2 sm:text-sm min-w-0">
+          <span className="text-muted-foreground shrink-0">Used tool:</span>{' '}
+          <b className="font-semibold truncate">{toolName}</b>
           <ToolSourceBadge sourceId={sourceId} iconOnly />
         </p>
         <ToolStatusBadge status={toolStatus} isError={resultIsError} className="shrink-0" />
         <Button
           variant="ghost"
           size="icon"
-          className="size-8 shrink-0"
+          className="size-7 shrink-0 sm:size-8"
           onClick={() => setIsCollapsed(!isCollapsed)}
           disabled={isRunning}
           aria-label={isCollapsed ? 'Expand tool details' : 'Collapse tool details'}
         >
           {isCollapsed ? (
-            <ChevronDownIcon className="size-4" />
+            <ChevronDownIcon className="size-3.5 sm:size-4" />
           ) : (
-            <ChevronUpIcon className="size-4" />
+            <ChevronUpIcon className="size-3.5 sm:size-4" />
           )}
         </Button>
       </div>
 
       {!isCollapsed && (
-        <div className="aui-tool-fallback-content flex flex-col gap-3 border-t pt-3">
-          <div className="aui-tool-fallback-args-root px-4">
+        <div className="aui-tool-fallback-content flex flex-col gap-3 border-t pt-3 min-w-0">
+          <div className="aui-tool-fallback-args-root px-3 sm:px-4 min-w-0">
             <p className="mb-2 text-xs font-semibold text-muted-foreground">Parameters:</p>
-            <pre className="aui-tool-fallback-args-value rounded-md bg-muted p-3 text-xs overflow-x-auto">
+            <pre className="aui-tool-fallback-args-value rounded-md bg-muted p-2 text-[10px] sm:p-3 sm:text-xs overflow-x-auto max-w-full">
               {argsText}
             </pre>
           </div>
 
           {result !== undefined && formattedResult && (
-            <div className="aui-tool-fallback-result-root border-t px-4 pt-3 space-y-2">
+            <div className="aui-tool-fallback-result-root border-t px-3 sm:px-4 pt-3 space-y-2 min-w-0">
               <p
                 className={cn(
                   'text-xs font-semibold',
@@ -132,7 +132,7 @@ export const ToolFallback: ToolCallMessagePartComponent = ({
               {/* Display formatted text prominently */}
               <div
                 className={cn(
-                  'aui-tool-fallback-result-content rounded-md p-3 text-xs whitespace-pre-wrap',
+                  'aui-tool-fallback-result-content rounded-md p-2 text-[10px] sm:p-3 sm:text-xs whitespace-pre-wrap break-words max-w-full',
                   resultIsError
                     ? 'bg-destructive/10 text-destructive border border-destructive/20'
                     : 'bg-muted'
@@ -148,7 +148,7 @@ export const ToolFallback: ToolCallMessagePartComponent = ({
                   <span>View Full Response</span>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
-                  <pre className="mt-2 text-xs bg-muted/30 p-2 rounded border border-border/30 overflow-x-auto">
+                  <pre className="mt-2 text-[10px] sm:text-xs bg-muted/30 p-2 rounded border border-border/30 overflow-x-auto max-w-full">
                     {JSON.stringify(formattedResult.rawResult, null, 2)}
                   </pre>
                 </CollapsibleContent>
@@ -158,9 +158,9 @@ export const ToolFallback: ToolCallMessagePartComponent = ({
 
           {/* Show error details for incomplete status */}
           {status.type === 'incomplete' && status.error !== undefined && (
-            <div className="aui-tool-fallback-error-root border-t border-destructive/20 px-4 pt-3">
+            <div className="aui-tool-fallback-error-root border-t border-destructive/20 px-3 sm:px-4 pt-3 min-w-0">
               <p className="mb-2 text-xs font-semibold text-destructive">Error Details:</p>
-              <pre className="rounded-md bg-destructive/10 p-3 text-xs text-destructive overflow-x-auto border border-destructive/20">
+              <pre className="rounded-md bg-destructive/10 p-2 text-[10px] sm:p-3 sm:text-xs text-destructive overflow-x-auto border border-destructive/20 max-w-full">
                 {status.error instanceof Error
                   ? status.error.message
                   : typeof status.error === 'string'

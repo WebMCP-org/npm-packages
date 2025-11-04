@@ -18,7 +18,8 @@ export const settingsFormSchema = z.object({
     .url('Invalid URL format')
     .refine((url) => url.startsWith('http://') || url.startsWith('https://'), {
       message: 'URL must start with http:// or https://',
-    }),
+    })
+    .default(import.meta.env.VITE_MCP_SERVER_URL ?? 'http://localhost:8888/mcp'),
 });
 
 /**

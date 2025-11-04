@@ -37,6 +37,7 @@ export function ApiKeyInput({
 
   // Initialize form with values from localStorage
   const form = useForm<SettingsFormData>({
+    // @ts-expect-error zodResolver type issue
     resolver: zodResolver(settingsFormSchema),
     defaultValues: {
       apiKey: getStoredApiKey(),
@@ -81,6 +82,7 @@ export function ApiKeyInput({
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && handleClose()}>
       <DialogContent showCloseButton={false} className="max-w-2xl">
         <FormProvider {...form}>
+          {/* @ts-expect-error close enough */}
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <DialogHeader>
               <DialogTitle>Settings</DialogTitle>

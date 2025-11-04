@@ -27,5 +27,10 @@ dist-ssr
 .wrangler
 .dev.vars*
 !.dev.vars.example
+
+# Environment files
+# Note: .env.development and .env.production are tracked because they don't contain secrets
 .env*
 !.env.example
+!.env.development
+!.env.production

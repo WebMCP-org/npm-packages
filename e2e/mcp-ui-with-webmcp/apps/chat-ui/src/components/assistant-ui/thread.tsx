@@ -35,12 +35,13 @@ import {
   PencilIcon,
   RefreshCwIcon,
   SendHorizontalIcon,
+  Trash2,
   Wrench,
   X as XIcon,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import type { FC } from 'react';
-import { createContext, useCallback, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MarkdownText } from '@/components/assistant-ui/markdown-text';
 import { TooltipIconButton } from '@/components/assistant-ui/tooltip-icon-button';
 
@@ -96,7 +97,7 @@ const TabSelector: FC<TabSelectorProps> = ({ openToolsPanelId, setOpenToolsPanel
   if (resources.length === 0) return null;
 
   return (
-    <div className="flex items-center gap-1 px-3 py-2 border-b border-border/40 bg-muted/10 overflow-x-auto">
+    <div className="flex items-center gap-1 px-2 py-1.5 border-b border-border/40 bg-muted/10 overflow-x-auto sm:px-3 sm:py-2">
       {resources.map((resource) => {
         const isSelected = resource.id === selectedResourceId;
         // Filter tools for this specific iframe
@@ -111,7 +112,7 @@ const TabSelector: FC<TabSelectorProps> = ({ openToolsPanelId, setOpenToolsPanel
           <div
             key={resource.id}
             className={cn(
-              'group flex items-center gap-1.5 px-3 py-1.5 rounded-t-lg border-t border-x transition-colors whitespace-nowrap',
+              'group flex items-center gap-1 px-2 py-1 rounded-t-lg border-t border-x transition-colors whitespace-nowrap text-[10px] sm:gap-1.5 sm:px-3 sm:py-1.5 sm:text-xs',
               isSelected
                 ? 'bg-background border-border text-foreground'
                 : 'bg-muted/50 border-transparent text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -119,7 +120,7 @@ const TabSelector: FC<TabSelectorProps> = ({ openToolsPanelId, setOpenToolsPanel
           >
             <button
               onClick={() => selectResource(resource.id)}
-              className="text-xs font-medium hover:opacity-80 transition-opacity"
+              className="font-medium hover:opacity-80 transition-opacity"
             >
               {resource.toolName}
             </button>
@@ -162,7 +163,7 @@ const TabSelector: FC<TabSelectorProps> = ({ openToolsPanelId, setOpenToolsPanel
               className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-destructive"
               aria-label={`Close ${resource.toolName}`}
             >
-              <XIcon className="h-3 w-3" />
+              <XIcon className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
             </button>
           </div>
         );
@@ -194,6 +195,34 @@ const ThreadContent: FC = () => {
     }
   }, [isMobile, hasToolSurface]);
 
+  // Refs for gesture targets
+  const chatPanelRef = useRef<HTMLDivElement>(null);
+  const uiPanelRef = useRef<HTMLDivElement>(null);
+
+  // Pan gesture handlers for swipe navigation
+  const handlePanEnd = useCallback(
+    (
+      _event: PointerEvent | MouseEvent | TouchEvent,
+      info: { offset: { x: number; y: number } }
+    ) => {
+      // Only handle swipe on mobile when tool surface is visible
+      if (!isMobile || !hasToolSurface) return;
+
+      const swipeThreshold = 50; // Minimum distance for swipe detection
+      const { x } = info.offset;
+
+      // Swipe left (negative x): Chat → UI
+      if (x < -swipeThreshold && mobileView === 'chat') {
+        setMobileView('ui');
+      }
+      // Swipe right (positive x): UI → Chat
+      else if (x > swipeThreshold && mobileView === 'ui') {
+        setMobileView('chat');
+      }
+    },
+    [isMobile, hasToolSurface, mobileView]
+  );
+
   const toolSurfaceValue = useMemo(
     () => ({
       hasToolSurface,
@@ -215,6 +244,8 @@ const ThreadContent: FC = () => {
           {hasToolSurface && (
             <motion.aside
               key="tool-surface"
+              ref={uiPanelRef}
+              onPanEnd={isMobile && hasToolSurface ? handlePanEnd : undefined}
               initial={{ x: isLargeScreen ? '-100%' : mobileView === 'ui' ? '0%' : '100%' }}
               animate={{ x: isLargeScreen ? 0 : mobileView === 'ui' ? '0%' : '100%' }}
               exit={{ x: isLargeScreen ? '-100%' : '100%' }}
@@ -223,9 +254,10 @@ const ThreadContent: FC = () => {
                 willChange: 'transform',
                 backfaceVisibility: 'hidden',
                 contain: 'layout style paint',
+                touchAction: isMobile && hasToolSurface ? 'pan-y' : 'auto',
               }}
               className={cn(
-                'absolute inset-y-0 left-0 z-10 flex w-full flex-col overflow-hidden border-b border-border/40 bg-background lg:w-[55%] lg:max-w-[800px] lg:border-b-0 lg:border-r',
+                'absolute inset-y-0 left-0 z-10 flex w-full max-w-full flex-col overflow-hidden border-b border-border/40 bg-background lg:w-[55%] lg:max-w-[800px] lg:border-b-0 lg:border-r',
                 isMobile && 'pb-16'
               )}
             >
@@ -236,6 +268,8 @@ const ThreadContent: FC = () => {
 
         {/* Main Chat Content - Uses absolute positioning for layout */}
         <motion.div
+          ref={chatPanelRef}
+          onPanEnd={isMobile && hasToolSurface ? handlePanEnd : undefined}
           animate={
             isLargeScreen
               ? {
@@ -255,13 +289,17 @@ const ThreadContent: FC = () => {
             top: 0,
             right: 0,
             bottom: 0,
+            touchAction: isMobile && hasToolSurface ? 'pan-y' : 'auto',
           }}
           className="flex h-full min-h-0 flex-col"
         >
           <ThreadPrimitive.Viewport
             className={cn(
-              'flex h-full flex-1 flex-col overflow-y-auto scroll-smooth px-4 pb-32 pt-10 sm:px-8 transition-[align-items,padding] duration-400 ease-[cubic-bezier(0.42,0,0.58,1)]',
-              hasToolSurface ? 'items-stretch lg:items-end lg:px-10' : 'items-center'
+              'flex h-full flex-1 flex-col overflow-y-auto scroll-smooth px-3 pt-6 sm:px-6 sm:pt-8 md:px-8 md:pt-10 transition-[align-items,padding] duration-400 ease-[cubic-bezier(0.42,0,0.58,1)]',
+              hasToolSurface ? 'items-stretch lg:items-end lg:px-10' : 'items-center',
+              // Dynamic bottom padding based on screen size and tool surface presence
+              // Minimal padding to bring thread content very close to composer
+              isMobile && hasToolSurface ? 'pb-44' : isMobile ? 'pb-36' : 'pb-44'
             )}
           >
             <ThreadWelcome />
@@ -279,11 +317,18 @@ const ThreadContent: FC = () => {
             </ThreadPrimitive.If>
           </ThreadPrimitive.Viewport>
 
+          {/* Gradient overlay above composer */}
+          <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-background via-background/60 to-transparent" />
+
           {/* Fixed position composer at bottom - floats above content */}
           <div
             className={cn(
-              'pointer-events-none absolute bottom-0 left-0 right-0 flex justify-center px-4 pt-8 sm:px-8',
-              isMobile && hasToolSurface ? 'pb-20' : 'pb-4'
+              'pointer-events-none absolute bottom-0 left-0 right-0 flex justify-center px-3 sm:px-6 md:px-8',
+              isMobile && hasToolSurface
+                ? 'pb-16 pt-2'
+                : isMobile
+                  ? 'pb-4 pt-2'
+                  : 'pb-4 pt-6 sm:pt-8'
             )}
           >
             <div className="pointer-events-auto flex w-full max-w-[var(--thread-max-width)] flex-col gap-3 transition-[max-width] duration-400 ease-[cubic-bezier(0.42,0,0.58,1)]">
@@ -302,11 +347,11 @@ const ThreadContent: FC = () => {
             transition={{ duration: 0.3, ease: [0.42, 0, 0.58, 1] }}
             className="pointer-events-auto absolute bottom-0 left-0 right-0 z-50 border-t bg-background/95 backdrop-blur-sm shadow-lg"
           >
-            <div className="flex items-center justify-around p-2 gap-2">
+            <div className="flex items-center justify-around p-1.5 gap-1.5">
               <button
                 onClick={() => setMobileView('chat')}
                 className={cn(
-                  'flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg transition-all',
+                  'flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg transition-all',
                   mobileView === 'chat'
                     ? 'bg-primary text-primary-foreground shadow-sm'
                     : 'text-muted-foreground hover:bg-muted'
@@ -318,7 +363,7 @@ const ThreadContent: FC = () => {
               <button
                 onClick={() => setMobileView('ui')}
                 className={cn(
-                  'flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg transition-all',
+                  'flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg transition-all',
                   mobileView === 'ui'
                     ? 'bg-primary text-primary-foreground shadow-sm'
                     : 'text-muted-foreground hover:bg-muted'
@@ -331,8 +376,8 @@ const ThreadContent: FC = () => {
           </motion.div>
         )}
 
-        {/* Streaming Overlay - shows assistant response on mobile UI view */}
-        {isMobile && mobileView === 'ui' && <StreamingOverlay />}
+        {/* Streaming Overlay - shows assistant response on mobile chat view */}
+        {isMobile && mobileView !== 'chat' && hasToolSurface && <StreamingOverlay />}
       </ThreadPrimitive.Root>
     </ToolSurfaceContext.Provider>
   );
@@ -355,10 +400,14 @@ const ThreadScrollToBottom: FC = () => {
 const ThreadWelcome: FC = () => {
   return (
     <ThreadPrimitive.Empty>
-      <div className="flex w-full max-w-[var(--thread-max-width)] flex-col items-center gap-8 pb-8 pt-16 text-center transition-[max-width] duration-400 ease-[cubic-bezier(0.42,0,0.58,1)]">
-        <div className="space-y-2">
-          <h1 className="text-3xl font-semibold tracking-tight">How can I help you today?</h1>
-          <p className="text-sm text-muted-foreground">Choose a suggestion below to get started</p>
+      <div className="flex w-full max-w-[var(--thread-max-width)] flex-col items-center gap-4 pb-6 pt-8 text-center transition-[max-width] duration-400 ease-[cubic-bezier(0.42,0,0.58,1)] sm:gap-6 sm:pb-8 sm:pt-12 md:gap-8 md:pt-16">
+        <div className="space-y-1 sm:space-y-2">
+          <h1 className="text-xl font-semibold tracking-tight sm:text-2xl md:text-3xl">
+            How can I help you today?
+          </h1>
+          <p className="text-xs text-muted-foreground sm:text-sm">
+            Choose a suggestion below to get started
+          </p>
         </div>
         <ThreadWelcomeSuggestions />
       </div>
@@ -372,20 +421,20 @@ const ThreadWelcomeSuggestions: FC = () => {
   // Only show prompts when MCP is ready
   if (state !== 'ready' || prompts.length === 0) {
     return (
-      <div className="flex w-full flex-wrap justify-center gap-3">
+      <div className="flex w-full flex-wrap justify-center gap-2 sm:gap-3">
         <ThreadPrimitive.Suggestion
-          className="group flex min-w-[200px] max-w-xs cursor-pointer flex-col items-start gap-2 rounded-xl border border-border/60 bg-background p-4 shadow-sm transition-all hover:border-primary/40 hover:shadow-md"
+          className="group flex min-w-[160px] max-w-xs cursor-pointer flex-col items-start gap-1.5 rounded-lg border border-border/60 bg-background p-3 shadow-sm transition-all hover:border-primary/40 hover:shadow-md sm:min-w-[200px] sm:gap-2 sm:rounded-xl sm:p-4"
           prompt="Let's play Tic-Tac-Toe!"
         >
-          <span className="text-sm font-medium tracking-tight group-hover:text-primary">
+          <span className="text-xs font-medium tracking-tight group-hover:text-primary sm:text-sm">
             Let's play Tic-Tac-Toe!
           </span>
         </ThreadPrimitive.Suggestion>
         <ThreadPrimitive.Suggestion
-          className="group flex min-w-[200px] max-w-xs cursor-pointer flex-col items-start gap-2 rounded-xl border border-border/60 bg-background p-4 shadow-sm transition-all hover:border-primary/40 hover:shadow-md"
+          className="group flex min-w-[160px] max-w-xs cursor-pointer flex-col items-start gap-1.5 rounded-lg border border-border/60 bg-background p-3 shadow-sm transition-all hover:border-primary/40 hover:shadow-md sm:min-w-[200px] sm:gap-2 sm:rounded-xl sm:p-4"
           prompt="What tools do you have available?"
         >
-          <span className="text-sm font-medium tracking-tight group-hover:text-primary">
+          <span className="text-xs font-medium tracking-tight group-hover:text-primary sm:text-sm">
             What tools do you have available?
           </span>
         </ThreadPrimitive.Suggestion>
@@ -394,14 +443,14 @@ const ThreadWelcomeSuggestions: FC = () => {
   }
 
   return (
-    <div className="flex w-full flex-wrap justify-center gap-3">
+    <div className="flex w-full flex-wrap justify-center gap-2 sm:gap-3">
       {prompts.slice(0, 3).map((prompt) => (
         <ThreadPrimitive.Suggestion
           key={prompt.name}
-          className="group flex min-w-[200px] max-w-xs cursor-pointer flex-col items-start gap-2 rounded-xl border border-border/60 bg-background p-4 shadow-sm transition-all hover:border-primary/40 hover:shadow-md"
+          className="group flex min-w-[160px] max-w-xs cursor-pointer flex-col items-start gap-1.5 rounded-lg border border-border/60 bg-background p-3 shadow-sm transition-all hover:border-primary/40 hover:shadow-md sm:min-w-[200px] sm:gap-2 sm:rounded-xl sm:p-4"
           prompt={prompt.description || prompt.title || prompt.name}
         >
-          <span className="text-sm font-medium tracking-tight group-hover:text-primary">
+          <span className="text-xs font-medium tracking-tight group-hover:text-primary sm:text-sm">
             {prompt.description || prompt.title || prompt.name}
           </span>
         </ThreadPrimitive.Suggestion>
@@ -473,13 +522,13 @@ const ToolResponsePanel: FC = () => {
   }
 
   return (
-    <div className="relative w-full h-full flex flex-col">
+    <div className="relative w-full max-w-full h-full flex flex-col overflow-hidden">
       {/* Tab Selector */}
       <TabSelector openToolsPanelId={openToolsPanelId} setOpenToolsPanelId={setOpenToolsPanelId} />
 
       {/* Iframe-specific Tool Execution Panel */}
       {openToolsPanelId && iframeTools.length > 0 && (
-        <div className="p-3 bg-muted/5 border-b border-border/40">
+        <div className="p-2 sm:p-3 bg-muted/5 border-b border-border/40">
           <ToolExecutionPanel
             tools={iframeTools}
             onToolCall={handleToolCall}
@@ -491,7 +540,7 @@ const ToolResponsePanel: FC = () => {
       )}
 
       {/* Full-Screen UI Resource Renderer */}
-      <div className="relative flex-1 overflow-hidden">
+      <div className="relative flex-1 overflow-hidden max-w-full">
         <AnimatePresence initial={false} mode="popLayout">
           <motion.div
             key={selectedResource.id}
@@ -503,7 +552,7 @@ const ToolResponsePanel: FC = () => {
               willChange: 'opacity',
               backfaceVisibility: 'hidden',
             }}
-            className="absolute inset-0 w-full h-full"
+            className="absolute inset-0 w-full max-w-full h-full"
           >
             <UIResourceRenderer
               resource={selectedResource.resource}
@@ -567,12 +616,12 @@ const ToolResponsePanel: FC = () => {
         </AnimatePresence>
 
         {/* Overlay Icons - Bottom Right Corner */}
-        <div className="absolute bottom-4 right-4 flex gap-2 z-10">
+        <div className="absolute bottom-2 right-2 flex gap-1.5 z-10 sm:bottom-4 sm:right-4 sm:gap-2">
           {/* Resource Info Icon */}
           <Tooltip>
             <TooltipTrigger asChild>
-              <button className="h-9 w-9 rounded-full bg-background/95 backdrop-blur-sm border border-border/60 shadow-lg hover:bg-background transition-colors flex items-center justify-center">
-                <Info className="h-4 w-4 text-muted-foreground" />
+              <button className="h-7 w-7 rounded-full bg-background/95 backdrop-blur-sm border border-border/60 shadow-lg hover:bg-background transition-colors flex items-center justify-center sm:h-9 sm:w-9">
+                <Info className="h-3 w-3 text-muted-foreground sm:h-4 sm:w-4" />
               </button>
             </TooltipTrigger>
             <TooltipContent side="left" className="max-w-xs">
@@ -598,8 +647,8 @@ const ToolResponsePanel: FC = () => {
           {/* Raw JSON Icon */}
           <Tooltip>
             <TooltipTrigger asChild>
-              <button className="h-9 w-9 rounded-full bg-background/95 backdrop-blur-sm border border-border/60 shadow-lg hover:bg-background transition-colors flex items-center justify-center">
-                <Code className="h-4 w-4 text-muted-foreground" />
+              <button className="h-7 w-7 rounded-full bg-background/95 backdrop-blur-sm border border-border/60 shadow-lg hover:bg-background transition-colors flex items-center justify-center sm:h-9 sm:w-9">
+                <Code className="h-3 w-3 text-muted-foreground sm:h-4 sm:w-4" />
               </button>
             </TooltipTrigger>
             <TooltipContent side="left" className="max-w-md max-h-96 overflow-auto">
@@ -614,8 +663,8 @@ const ToolResponsePanel: FC = () => {
           {lastUIAction && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <button className="h-9 w-9 rounded-full bg-primary/10 backdrop-blur-sm border border-primary/40 shadow-lg hover:bg-primary/20 transition-colors flex items-center justify-center">
-                  <Activity className="h-4 w-4 text-primary" />
+                <button className="h-7 w-7 rounded-full bg-primary/10 backdrop-blur-sm border border-primary/40 shadow-lg hover:bg-primary/20 transition-colors flex items-center justify-center sm:h-9 sm:w-9">
+                  <Activity className="h-3 w-3 text-primary sm:h-4 sm:w-4" />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="left" className="max-w-md">
@@ -629,9 +678,11 @@ const ToolResponsePanel: FC = () => {
         </div>
 
         {/* Tool Name Badge - Bottom Left Corner */}
-        <div className="absolute bottom-4 left-4 z-10">
-          <div className="px-3 py-1.5 rounded-full bg-background/95 backdrop-blur-sm border border-border/60 shadow-lg">
-            <p className="text-xs font-semibold text-foreground">{selectedResource.toolName}</p>
+        <div className="absolute bottom-2 left-2 z-10 sm:bottom-4 sm:left-4">
+          <div className="px-2 py-1 rounded-full bg-background/95 backdrop-blur-sm border border-border/60 shadow-lg text-[10px] sm:px-3 sm:py-1.5 sm:text-xs">
+            <p className="font-semibold text-foreground truncate max-w-[120px] sm:max-w-none">
+              {selectedResource.toolName}
+            </p>
           </div>
         </div>
       </div>
@@ -699,7 +750,9 @@ const ResourcesList: FC<{
 
 const Composer: FC = () => {
   const { tools, resources, callTool } = useMCP();
+  const { resources: uiResources, removeResource } = useUIResources();
   const [showTools, setShowTools] = useState(false);
+  const assistantRuntime = useAssistantRuntime();
 
   const handleToolCall = useCallback(
     async (toolName: string, args: Record<string, unknown>, sourceId?: string) => {
@@ -708,8 +761,27 @@ const Composer: FC = () => {
     [callTool]
   );
 
+  const handleResetThread = useCallback(async () => {
+    // Clear the conversation by creating a new thread
+    const currentState = assistantRuntime.thread.getState();
+    if (currentState.isRunning) {
+      assistantRuntime.thread.cancelRun();
+    }
+
+    // Close all UI resources (iframes)
+    for (const resource of uiResources) {
+      await removeResource(resource.id);
+    }
+
+    // Start a new thread by switching to a new thread ID
+    // This will clear all messages and start fresh
+    assistantRuntime.thread.import({
+      messages: [],
+    });
+  }, [assistantRuntime, uiResources, removeResource]);
+
   return (
-    <div className="flex w-full flex-col gap-2">
+    <div className="flex w-full flex-col gap-2 sm:gap-3">
       {/* Expanded Tools List */}
       {showTools && tools.length > 0 && (
         <ToolExecutionPanel
@@ -721,31 +793,75 @@ const Composer: FC = () => {
         />
       )}
 
-      <ComposerPrimitive.Root className="focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/15 flex w-full items-end gap-3 rounded-2xl border border-border/60 bg-background/95 px-4 py-3 shadow-lg backdrop-blur-sm transition-all ease-in">
-        {/* Tools button */}
-        {tools.length > 0 && (
-          <button
-            onClick={() => setShowTools(!showTools)}
-            className={cn(
-              'flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs transition-colors',
-              showTools
-                ? 'bg-primary/10 text-primary'
-                : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-            )}
-            title="View available tools"
-          >
-            <Wrench className="h-3.5 w-3.5" />
-            <span>{tools.length}</span>
-          </button>
-        )}
+      <ComposerPrimitive.Root className="focus-within:border-primary/50 focus-within:ring-4 focus-within:ring-primary/10 flex w-full flex-col gap-1.5 rounded-xl border border-border/60 bg-background shadow-xl backdrop-blur-sm transition-all ease-in-out sm:gap-2 sm:rounded-2xl">
+        {/* Main Input Row */}
+        <div className="flex items-end gap-1.5 px-3 pt-3 pb-2 sm:gap-2 sm:px-4 sm:pt-4 sm:pb-3">
+          {/* Tools button */}
+          {tools.length > 0 && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setShowTools(!showTools)}
+                  className={cn(
+                    'flex shrink-0 items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-all sm:gap-1.5 sm:rounded-xl sm:px-2.5 sm:py-2',
+                    showTools
+                      ? 'bg-primary/15 text-primary shadow-sm ring-1 ring-primary/20'
+                      : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground hover:shadow-sm'
+                  )}
+                  aria-label="View available tools"
+                >
+                  <Wrench className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span className="tabular-nums">{tools.length}</span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p className="text-xs">
+                  View {tools.length} available tool{tools.length !== 1 ? 's' : ''}
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          )}
 
-        <ComposerPrimitive.Input
-          rows={1}
-          autoFocus
-          placeholder="Type your message..."
-          className="placeholder:text-muted-foreground max-h-48 flex-1 resize-none border-none bg-transparent py-2 text-sm leading-relaxed outline-none disabled:cursor-not-allowed"
-        />
-        <ComposerAction />
+          <ComposerPrimitive.Input
+            rows={1}
+            autoFocus
+            placeholder="Type your message..."
+            className="placeholder:text-muted-foreground max-h-48 min-h-9 flex-1 resize-none border-none bg-transparent py-2 text-sm leading-relaxed outline-none disabled:cursor-not-allowed sm:min-h-10 sm:py-2.5"
+          />
+          <ComposerAction />
+        </div>
+
+        {/* Toolbar Row */}
+        <ThreadPrimitive.If empty={false}>
+          <div className="flex items-center justify-between border-t border-border/40 bg-muted/5 px-3 py-1.5 sm:px-4 sm:py-2">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              {/* Reset Thread Button */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={handleResetThread}
+                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive sm:gap-1.5 sm:px-2.5 sm:py-1.5"
+                    aria-label="Reset conversation"
+                  >
+                    <Trash2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                    <span className="hidden sm:inline">Reset</span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <p className="text-xs">Clear all messages and start a new conversation</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+
+            <div className="flex items-center gap-1 text-[10px] text-muted-foreground sm:text-xs">
+              <span className="hidden sm:inline">Press</span>
+              <kbd className="rounded border border-border/60 bg-muted px-1 py-0.5 font-mono text-[9px] sm:px-1.5 sm:text-[10px]">
+                Enter
+              </kbd>
+              <span className="hidden sm:inline">to send</span>
+            </div>
+          </div>
+        </ThreadPrimitive.If>
       </ComposerPrimitive.Root>
 
       {/* Resources as Attachments */}
@@ -762,7 +878,7 @@ const ComposerAction: FC = () => {
           <TooltipIconButton
             tooltip="Send"
             variant="default"
-            className="my-2.5 size-8 p-2 transition-opacity ease-in"
+            className="my-2 size-7 p-1.5 transition-opacity ease-in sm:my-2.5 sm:size-8 sm:p-2"
           >
             <SendHorizontalIcon />
           </TooltipIconButton>
@@ -773,7 +889,7 @@ const ComposerAction: FC = () => {
           <TooltipIconButton
             tooltip="Cancel"
             variant="default"
-            className="my-2.5 size-8 p-2 transition-opacity ease-in"
+            className="my-2 size-7 p-1.5 transition-opacity ease-in sm:my-2.5 sm:size-8 sm:p-2"
           >
             <CircleStopIcon />
           </TooltipIconButton>
@@ -826,7 +942,7 @@ const UserMessage: FC = () => {
 
   // Regular user message
   return (
-    <MessagePrimitive.Root className="grid w-full max-w-[var(--thread-max-width)] auto-rows-auto grid-cols-[minmax(72px,1fr)_auto] gap-y-2 py-4 transition-[max-width] duration-400 ease-[cubic-bezier(0.42,0,0.58,1)] [&:where(>*)]:col-start-2">
+    <MessagePrimitive.Root className="grid w-full max-w-[var(--thread-max-width)] auto-rows-auto grid-cols-[minmax(72px,1fr)_auto] gap-y-1.5 py-2.5 transition-[max-width] duration-400 ease-[cubic-bezier(0.42,0,0.58,1)] sm:gap-y-2 sm:py-4 [&:where(>*)]:col-start-2">
       <UserActionBar />
 
       <motion.div
@@ -842,7 +958,7 @@ const UserMessage: FC = () => {
           backfaceVisibility: 'hidden',
         }}
       >
-        <div className="bg-muted text-foreground max-w-[calc(var(--thread-max-width)*0.8)] rounded-3xl px-5 py-2.5 wrap-break-word transition-[max-width] duration-400 ease-[cubic-bezier(0.42,0,0.58,1)]">
+        <div className="bg-muted text-foreground max-w-[calc(var(--thread-max-width)*0.8)] rounded-2xl px-3 py-2 text-sm wrap-break-word transition-[max-width] duration-400 ease-[cubic-bezier(0.42,0,0.58,1)] sm:rounded-3xl sm:px-5 sm:py-2.5 sm:text-base">
           <MessagePrimitive.Parts />
         </div>
       </motion.div>
@@ -887,8 +1003,8 @@ const EditComposer: FC = () => {
 
 const AssistantMessage: FC = () => {
   return (
-    <MessagePrimitive.Root className="relative grid w-full max-w-[var(--thread-max-width)] grid-cols-[auto_auto_1fr] grid-rows-[auto_1fr] py-4 transition-[max-width,grid-template-columns] duration-400 ease-[cubic-bezier(0.42,0,0.58,1)]">
-      <div className="text-foreground col-span-2 col-start-2 row-start-1 my-1.5 max-w-[calc(var(--thread-max-width)*0.8)] leading-7 break-words transition-[max-width,width] duration-400 ease-[cubic-bezier(0.42,0,0.58,1)]">
+    <MessagePrimitive.Root className="relative grid w-full max-w-[var(--thread-max-width)] grid-cols-[auto_auto_1fr] grid-rows-[auto_1fr] py-2.5 transition-[max-width,grid-template-columns] duration-400 ease-[cubic-bezier(0.42,0,0.58,1)] sm:py-4">
+      <div className="text-foreground col-span-2 col-start-2 row-start-1 my-1 max-w-[calc(var(--thread-max-width)*0.8)] text-sm leading-6 wrap-break-word transition-[max-width,width] duration-400 ease-[cubic-bezier(0.42,0,0.58,1)] sm:my-1.5 sm:text-base sm:leading-7">
         <MessagePrimitive.Parts
           components={{ Text: MarkdownText, tools: { Fallback: ToolFallback } }}
         />

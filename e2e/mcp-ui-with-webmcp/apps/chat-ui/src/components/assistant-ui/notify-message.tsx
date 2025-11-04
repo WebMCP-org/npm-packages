@@ -74,9 +74,9 @@ export const NotifyMessage: React.FC<NotifyMessageProps> = ({ message, timestamp
       {/* Preview when collapsed */}
       {isCollapsed && (
         <div className="notify-message-preview px-4">
-          <p className="text-sm text-foreground/90">
+          <div className="text-sm text-foreground/90">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{previewText}</ReactMarkdown>
-          </p>
+          </div>
         </div>
       )}
 
