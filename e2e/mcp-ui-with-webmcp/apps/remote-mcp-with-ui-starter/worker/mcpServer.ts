@@ -184,6 +184,75 @@ Wait for the human player to make the first move, then check the state and respo
     );
 
     /**
+     * Tool 5: Get TicTacToe Statistics
+     *
+     * Fetches global statistics for all TicTacToe games played.
+     * Tracks wins for Clankers (AI) and Carbon Units (humans), plus draws and live games.
+     */
+    this.server.tool(
+      'tictactoe_get_stats',
+      'Get global statistics for all TicTacToe games. Shows wins for Clankers (AI) vs Carbon Units (humans), draws, live games, and total games played.',
+      {},
+      async () => {
+        try {
+          const id = this.env.GAME_STATS.idFromName('global-stats');
+          const stub = this.env.GAME_STATS.get(id);
+          const response = await stub.fetch(new Request('http://internal/stats'));
+          const stats = await response.json<{
+            totalGames: number;
+            liveGames: number;
+            clankersWins: number;
+            carbonUnitsWins: number;
+            draws: number;
+            lastUpdated: string;
+          }>();
+
+          // Calculate win percentages
+          const totalCompleted = stats.totalGames;
+          const clankersWinRate =
+            totalCompleted > 0 ? ((stats.clankersWins / totalCompleted) * 100).toFixed(1) : '0.0';
+          const carbonUnitsWinRate =
+            totalCompleted > 0
+              ? ((stats.carbonUnitsWins / totalCompleted) * 100).toFixed(1)
+              : '0.0';
+          const drawRate =
+            totalCompleted > 0 ? ((stats.draws / totalCompleted) * 100).toFixed(1) : '0.0';
+
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `# TicTacToe Global Statistics 🤖 vs 🧬
+
+**Current Status:**
+- 🎮 Live games in progress: ${stats.liveGames}
+- 📊 Total games completed: ${totalCompleted}
+
+**Scoreboard:**
+- 🤖 Clankers (AI) wins: ${stats.clankersWins} (${clankersWinRate}%)
+- 🧬 Carbon Units (Humans) wins: ${stats.carbonUnitsWins} (${carbonUnitsWinRate}%)
+- 🤝 Draws: ${stats.draws} (${drawRate}%)
+
+**Last updated:** ${new Date(stats.lastUpdated).toLocaleString()}
+
+${
+  stats.clankersWins > stats.carbonUnitsWins
+    ? '🏆 Clankers are currently dominating!'
+    : stats.carbonUnitsWins > stats.clankersWins
+      ? '🏆 Carbon Units are holding strong!'
+      : "⚖️ It's a tie! The battle continues..."
+}`,
+              },
+            ],
+          };
+        } catch (error) {
+          console.error('Error fetching TicTacToe stats:', error);
+          throw error;
+        }
+      }
+    );
+
+    /**
      * Prompt: Play Tic Tac Toe
      *
      * A convenience prompt that users can trigger to start a game.

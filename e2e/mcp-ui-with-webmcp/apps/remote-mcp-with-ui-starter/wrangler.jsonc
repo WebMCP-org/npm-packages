@@ -12,6 +12,10 @@
     {
       "new_sqlite_classes": ["MyMCP"],
       "tag": "v1"
+    },
+    {
+      "new_classes": ["GameStatsStorage"],
+      "tag": "v2"
     }
   ],
   "durable_objects": {
@@ -19,9 +23,20 @@
       {
         "class_name": "MyMCP",
         "name": "MCP_OBJECT"
+      },
+      {
+        "class_name": "GameStatsStorage",
+        "name": "GAME_STATS"
       }
     ]
   },
+  // Uncomment routes for production deployment
+  // "routes": [
+  //   {
+  //     "pattern": "beattheclankers.com",
+  //     "custom_domain": true
+  //   }
+  // ],
   "observability": {
     "enabled": true
   }
