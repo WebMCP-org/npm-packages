@@ -327,14 +327,14 @@ test.describe('Model Context Testing API Tests', () => {
   });
 
   test('should getRegisteredTools match listTools', async ({ page }) => {
-    const toolsMatch = await page.evaluate(async () => {
+    const toolsMatch = await page.evaluate(() => {
       const testingAPI = navigator.modelContextTesting;
       if (!testingAPI) return false;
 
-      const testingTools = await testingAPI.getRegisteredTools();
-      const contextTools = await navigator.modelContext.listTools();
+      const testingTools = testingAPI.getRegisteredTools();
+      const contextTools = navigator.modelContext.listTools();
 
-      return testingTools.tools.length === contextTools.tools.length;
+      return testingTools.length === contextTools.length;
     });
 
     expect(toolsMatch).toBe(true);
@@ -345,10 +345,10 @@ test.describe('Model Context Testing API Tests', () => {
       const testingAPI = navigator.modelContextTesting;
       if (!testingAPI) return false;
 
-      const tools = await navigator.modelContext.listTools();
-      if (tools.tools.length === 0) return false;
+      const tools = navigator.modelContext.listTools();
+      if (tools.length === 0) return false;
 
-      const toolName = tools.tools[0].name;
+      const toolName = tools[0].name;
       const mockResponse = {
         content: [{ type: 'text' as const, text: 'Mock' }],
       };
@@ -376,20 +376,20 @@ test.describe('Model Context Testing API Tests', () => {
       const testingAPI = navigator.modelContextTesting;
       if (!testingAPI) return false;
 
-      const tools = await navigator.modelContext.listTools();
-      if (tools.tools.length < 2) return false;
+      const tools = navigator.modelContext.listTools();
+      if (tools.length < 2) return false;
 
       const mockResponse = {
         content: [{ type: 'text' as const, text: 'Mock' }],
       };
 
-      testingAPI.setMockToolResponse(tools.tools[0].name, mockResponse);
-      testingAPI.setMockToolResponse(tools.tools[1].name, mockResponse);
+      testingAPI.setMockToolResponse(tools[0].name, mockResponse);
+      testingAPI.setMockToolResponse(tools[1].name, mockResponse);
 
       testingAPI.clearAllMockToolResponses();
 
-      const result1 = await navigator.modelContext.executeTool(tools.tools[0].name, {});
-      const result2 = await navigator.modelContext.executeTool(tools.tools[1].name, {});
+      const result1 = await navigator.modelContext.executeTool(tools[0].name, {});
+      const result2 = await navigator.modelContext.executeTool(tools[1].name, {});
 
       const bothCleared =
         !(result1.content[0].type === 'text' && result1.content[0].text === 'Mock') &&

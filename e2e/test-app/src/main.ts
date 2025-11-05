@@ -375,13 +375,13 @@ async function testToolCallTracking() {
   testingAPI.clearToolCalls();
   log('Cleared tool call history', 'info');
 
-  const tools = await navigator.modelContext.listTools();
-  if (tools.tools.length === 0) {
+  const tools = navigator.modelContext.listTools();
+  if (tools.length === 0) {
     log('No tools registered. Register tools first.', 'error');
     return;
   }
 
-  const firstTool = tools.tools[0];
+  const firstTool = tools[0];
   log(`Executing tool: ${firstTool.name}`, 'info');
 
   try {
@@ -415,13 +415,13 @@ async function testMockResponse() {
 
   log('Testing mock response...', 'info');
 
-  const tools = await navigator.modelContext.listTools();
-  if (tools.tools.length === 0) {
+  const tools = navigator.modelContext.listTools();
+  if (tools.length === 0) {
     log('No tools registered. Register tools first.', 'error');
     return;
   }
 
-  const firstTool = tools.tools[0];
+  const firstTool = tools[0];
   const mockResponse = {
     content: [
       {
