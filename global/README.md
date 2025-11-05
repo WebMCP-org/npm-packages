@@ -688,9 +688,238 @@ if (window.__mcpBridge) {
 }
 ```
 
+## 🧪 Testing API (`navigator.modelContextTesting`)
+
+This package provides a **Model Context Testing API** at `window.navigator.modelContextTesting` for debugging and testing your tools during development.
+
+### Native Support in Chromium
+
+**IMPORTANT**: The `modelContextTesting` API is available natively in Chromium-based browsers when the experimental feature flag is enabled. This polyfill will detect and use the native implementation when available.
+
+#### How to Enable Native API in Chromium:
+
+**Option 1: Chrome Flags**
+1. Navigate to `chrome://flags`
+2. Search for "Experimental Web Platform Features"
+3. Enable the flag
+4. Restart your browser
+
+**Option 2: Command Line**
+```bash
+# Launch Chrome/Edge with experimental features
+chrome --enable-experimental-web-platform-features
+```
+
+**Detection**: When the native API is detected, you'll see this console message:
+```
+✅ [Model Context Testing] Native implementation detected (Chromium experimental feature)
+   Using native window.navigator.modelContextTesting from browser
+```
+
+### Polyfill Fallback
+
+If the native API is not available, this package automatically provides a polyfill implementation with the same interface:
+
+```
+[Model Context Testing] Native implementation not found, installing polyfill
+   💡 To use the native implementation in Chromium:
+      - Navigate to chrome://flags
+      - Enable "Experimental Web Platform Features"
+      - Or launch with: --enable-experimental-web-platform-features
+✅ [Model Context Testing] Polyfill installed at window.navigator.modelContextTesting
+```
+
+### API Reference
+
+#### `getToolCalls(): Array<ToolCall>`
+
+Get a history of all tool calls made during the session.
+
+```javascript
+// Register and call some tools
+window.navigator.modelContext.provideContext({
+  tools: [{
+    name: "greet",
+    description: "Greet a user",
+    inputSchema: {
+      type: "object",
+      properties: { name: { type: "string" } },
+      required: ["name"]
+    },
+    async execute({ name }) {
+      return { content: [{ type: "text", text: `Hello, ${name}!` }] };
+    }
+  }]
+});
+
+// Simulate a tool call
+// (In practice, this would come from an AI agent)
+
+// Later, inspect the tool call history
+const calls = window.navigator.modelContextTesting.getToolCalls();
+console.log(calls);
+// [
+//   {
+//     toolName: "greet",
+//     arguments: { name: "Alice" },
+//     timestamp: 1699123456789
+//   }
+// ]
+```
+
+#### `clearToolCalls(): void`
+
+Clear the tool call history.
+
+```javascript
+window.navigator.modelContextTesting.clearToolCalls();
+console.log(window.navigator.modelContextTesting.getToolCalls()); // []
+```
+
+#### `setMockToolResponse(toolName: string, response: ToolResponse): void`
+
+Set a mock response for a specific tool. When set, the tool's `execute()` function will be bypassed and the mock response will be returned instead.
+
+```javascript
+// Mock the "greet" tool to always return a specific response
+window.navigator.modelContextTesting.setMockToolResponse("greet", {
+  content: [{
+    type: "text",
+    text: "Mocked greeting!"
+  }]
+});
+
+// Now when the tool is called, it returns the mock response
+// (The execute function is never called)
+```
+
+#### `clearMockToolResponse(toolName: string): void`
+
+Remove the mock response for a specific tool.
+
+```javascript
+window.navigator.modelContextTesting.clearMockToolResponse("greet");
+// Tool will now use its actual execute function
+```
+
+#### `clearAllMockToolResponses(): void`
+
+Remove all mock tool responses.
+
+```javascript
+window.navigator.modelContextTesting.clearAllMockToolResponses();
+```
+
+#### `getRegisteredTools(): Array<ToolDescriptor>`
+
+Get the list of all currently registered tools (same as `modelContext.listTools()`).
+
+```javascript
+const tools = window.navigator.modelContextTesting.getRegisteredTools();
+console.log(tools.map(t => t.name)); // ["greet", "add-todo", ...]
+```
+
+#### `reset(): void`
+
+Reset the entire testing state (clears tool call history and all mock responses).
+
+```javascript
+window.navigator.modelContextTesting.reset();
+```
+
+### Testing Workflow Example
+
+Here's a complete example of using the testing API:
+
+```javascript
+// 1. Register your tools
+window.navigator.modelContext.provideContext({
+  tools: [
+    {
+      name: "add-todo",
+      description: "Add a todo item",
+      inputSchema: {
+        type: "object",
+        properties: { text: { type: "string" } },
+        required: ["text"]
+      },
+      async execute({ text }) {
+        // This would normally add to your app state
+        return { content: [{ type: "text", text: `Added: ${text}` }] };
+      }
+    }
+  ]
+});
+
+// 2. Set up mocks for testing
+window.navigator.modelContextTesting.setMockToolResponse("add-todo", {
+  content: [{ type: "text", text: "Mock: Todo added successfully" }]
+});
+
+// 3. Simulate tool calls (or let AI agent call them)
+// The tool will return the mock response instead of executing
+
+// 4. Inspect tool call history
+const calls = window.navigator.modelContextTesting.getToolCalls();
+console.log(`${calls.length} tool calls made`);
+calls.forEach(call => {
+  console.log(`- ${call.toolName}`, call.arguments);
+});
+
+// 5. Clean up after testing
+window.navigator.modelContextTesting.reset();
+```
+
+### Integration Testing Example
+
+Perfect for automated testing with frameworks like Jest, Vitest, or Playwright:
+
+```javascript
+// test/model-context.test.js
+import { test, expect } from 'vitest';
+
+test('todo tool creates correct response', async () => {
+  // Arrange
+  const mockResponse = {
+    content: [{ type: "text", text: "Test todo added" }]
+  };
+
+  window.navigator.modelContextTesting.setMockToolResponse(
+    "add-todo",
+    mockResponse
+  );
+
+  // Act
+  // Trigger your AI agent or directly call the tool via MCP
+  // ...
+
+  // Assert
+  const calls = window.navigator.modelContextTesting.getToolCalls();
+  expect(calls).toHaveLength(1);
+  expect(calls[0].toolName).toBe("add-todo");
+  expect(calls[0].arguments).toEqual({ text: "Test item" });
+
+  // Cleanup
+  window.navigator.modelContextTesting.reset();
+});
+```
+
+### Browser Compatibility
+
+| Browser | Native Support | Polyfill |
+|---------|---------------|----------|
+| Chrome/Edge (with flag) | ✅ Yes | N/A |
+| Chrome/Edge (default) | ❌ No | ✅ Yes |
+| Firefox | ❌ No | ✅ Yes |
+| Safari | ❌ No | ✅ Yes |
+| Other browsers | ❌ No | ✅ Yes |
+
+The polyfill automatically detects and defers to the native implementation when available, ensuring forward compatibility as browsers adopt this standard.
+
 ## 📦 What's Included
 
 - **Web Model Context API** - Standard `window.navigator.modelContext` interface
+- **Model Context Testing API** - `window.navigator.modelContextTesting` for debugging and testing (with native Chromium support detection)
 - **Dynamic Tool Registration** - `registerTool()` with `unregister()` function
 - **MCP Bridge** - Automatic bridging to Model Context Protocol
 - **Tab Transport** - Communication layer for browser contexts

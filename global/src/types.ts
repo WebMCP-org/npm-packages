@@ -277,7 +277,66 @@ export interface MCPBridge {
   iframeServer?: McpServer;
   tools: Map<string, ValidatedToolDescriptor>;
   modelContext: InternalModelContext;
+  modelContextTesting?: ModelContextTesting;
   isInitialized: boolean;
+}
+
+/**
+ * Testing API for Model Context
+ *
+ * **Native Support**: This API is available natively in Chromium-based browsers
+ * when the experimental "Model Context Testing" feature flag is enabled.
+ *
+ * **How to enable in Chromium**:
+ * - Navigate to `chrome://flags`
+ * - Search for "experimental web platform features" or "model context"
+ * - Enable the feature and restart the browser
+ * - Or launch with: `--enable-experimental-web-platform-features`
+ *
+ * **Polyfill**: If the native API is not available, this polyfill provides
+ * a compatible implementation for testing purposes.
+ */
+export interface ModelContextTesting {
+  /**
+   * Get all tool calls that have been made (for testing/debugging)
+   */
+  getToolCalls(): Array<{
+    toolName: string;
+    arguments: Record<string, unknown>;
+    timestamp: number;
+  }>;
+
+  /**
+   * Clear the history of tool calls
+   */
+  clearToolCalls(): void;
+
+  /**
+   * Set a mock response for a specific tool (for testing)
+   * When set, the tool's execute function will be bypassed and the mock response returned
+   */
+  setMockToolResponse(toolName: string, response: ToolResponse): void;
+
+  /**
+   * Clear mock response for a specific tool
+   */
+  clearMockToolResponse(toolName: string): void;
+
+  /**
+   * Clear all mock tool responses
+   */
+  clearAllMockToolResponses(): void;
+
+  /**
+   * Get the current tools registered in the system
+   * (same as modelContext.listTools but explicitly for testing)
+   */
+  getRegisteredTools(): ReturnType<ModelContext['listTools']>;
+
+  /**
+   * Reset the entire testing state (clears tool calls and mock responses)
+   */
+  reset(): void;
 }
 
 declare global {
@@ -287,6 +346,19 @@ declare global {
      * Provides tools and context to AI agents
      */
     modelContext: ModelContext;
+
+    /**
+     * Model Context Testing API
+     *
+     * **IMPORTANT**: This API is only available in Chromium-based browsers
+     * with the experimental feature flag enabled:
+     * - `chrome://flags` → "Experimental Web Platform Features"
+     * - Or launch with: `--enable-experimental-web-platform-features`
+     *
+     * If not available natively, the @mcp-b/global polyfill provides
+     * a compatible implementation.
+     */
+    modelContextTesting?: ModelContextTesting;
   }
 
   interface Window {

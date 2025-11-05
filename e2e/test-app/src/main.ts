@@ -33,6 +33,12 @@ const replaceBaseToolsBtn = document.getElementById('replace-base-tools') as HTM
 const listAllToolsBtn = document.getElementById('list-all-tools') as HTMLButtonElement;
 const clearLogBtn = document.getElementById('clear-log') as HTMLButtonElement;
 
+const testingApiStatusEl = document.getElementById('testing-api-status');
+const checkTestingApiBtn = document.getElementById('check-testing-api') as HTMLButtonElement;
+const testToolTrackingBtn = document.getElementById('test-tool-tracking') as HTMLButtonElement;
+const testMockResponseBtn = document.getElementById('test-mock-response') as HTMLButtonElement;
+const testResetBtn = document.getElementById('test-reset') as HTMLButtonElement;
+
 // Logging utility
 function log(message: string, type: 'info' | 'success' | 'error' = 'info') {
   const entry = document.createElement('div');
@@ -326,6 +332,178 @@ function listAllTools() {
   }
 }
 
+// Check if modelContextTesting API is available
+function checkTestingAPI() {
+  if (testingApiStatusEl) {
+    if ('modelContextTesting' in navigator) {
+      const testingAPI = navigator.modelContextTesting;
+      const isNative =
+        testingAPI && !testingAPI.constructor.name.includes('WebModelContextTesting');
+
+      testingApiStatusEl.textContent = `Testing API: Available ✅ (${isNative ? 'Native' : 'Polyfill'})`;
+      testingApiStatusEl.style.background = '#d4edda';
+      testingApiStatusEl.setAttribute('data-testing-api', 'available');
+      testingApiStatusEl.setAttribute('data-testing-api-type', isNative ? 'native' : 'polyfill');
+
+      log(
+        `navigator.modelContextTesting is available (${isNative ? 'Native' : 'Polyfill'})`,
+        'success'
+      );
+
+      const methods = [
+        'getToolCalls',
+        'clearToolCalls',
+        'setMockToolResponse',
+        'clearMockToolResponse',
+        'clearAllMockToolResponses',
+        'getRegisteredTools',
+        'reset',
+      ];
+      log(`Available methods: ${methods.join(', ')}`, 'info');
+    } else {
+      testingApiStatusEl.textContent = 'Testing API: Not Available ❌';
+      testingApiStatusEl.style.background = '#f8d7da';
+      testingApiStatusEl.setAttribute('data-testing-api', 'unavailable');
+      log('navigator.modelContextTesting is NOT available', 'error');
+    }
+  }
+}
+
+// Test tool call tracking
+async function testToolCallTracking() {
+  if (!('modelContextTesting' in navigator)) {
+    log('modelContextTesting API not available', 'error');
+    return;
+  }
+
+  const testingAPI = navigator.modelContextTesting;
+  if (!testingAPI) {
+    log('modelContextTesting API not available', 'error');
+    return;
+  }
+
+  log('Testing tool call tracking...', 'info');
+
+  testingAPI.clearToolCalls();
+  log('Cleared tool call history', 'info');
+
+  const tools = navigator.modelContext.listTools();
+  if (tools.length === 0) {
+    log('No tools registered. Register tools first.', 'error');
+    return;
+  }
+
+  const firstTool = tools[0];
+  log(`Executing tool: ${firstTool.name}`, 'info');
+
+  try {
+    await navigator.modelContext.executeTool(firstTool.name, {});
+
+    const calls = testingAPI.getToolCalls();
+    log(`Tool calls tracked: ${calls.length}`, 'success');
+
+    if (calls.length > 0) {
+      const lastCall = calls[calls.length - 1];
+      log(
+        `Last call: ${lastCall.toolName} at ${new Date(lastCall.timestamp).toLocaleTimeString()}`,
+        'info'
+      );
+      testingApiStatusEl?.setAttribute('data-tool-calls', calls.length.toString());
+    }
+  } catch (error) {
+    log(`Tool execution failed: ${error}`, 'error');
+  }
+}
+
+// Test mock response functionality
+async function testMockResponse() {
+  if (!('modelContextTesting' in navigator)) {
+    log('modelContextTesting API not available', 'error');
+    return;
+  }
+
+  const testingAPI = navigator.modelContextTesting;
+  if (!testingAPI) {
+    log('modelContextTesting API not available', 'error');
+    return;
+  }
+
+  log('Testing mock response...', 'info');
+
+  const tools = navigator.modelContext.listTools();
+  if (tools.length === 0) {
+    log('No tools registered. Register tools first.', 'error');
+    return;
+  }
+
+  const firstTool = tools[0];
+  const mockResponse = {
+    content: [
+      {
+        type: 'text' as const,
+        text: 'This is a MOCK response!',
+      },
+    ],
+  };
+
+  testingAPI.setMockToolResponse(firstTool.name, mockResponse);
+  log(`Set mock response for ${firstTool.name}`, 'info');
+
+  try {
+    const result = await navigator.modelContext.executeTool(firstTool.name, {});
+    log(`Tool returned: ${JSON.stringify(result)}`, 'info');
+
+    if (
+      result.content[0].type === 'text' &&
+      result.content[0].text === 'This is a MOCK response!'
+    ) {
+      log('Mock response verified! ✅', 'success');
+      testingApiStatusEl?.setAttribute('data-mock-response', 'working');
+    } else {
+      log('Mock response NOT used', 'error');
+    }
+
+    testingAPI.clearMockToolResponse(firstTool.name);
+    log(`Cleared mock response for ${firstTool.name}`, 'info');
+  } catch (error) {
+    log(`Tool execution failed: ${error}`, 'error');
+  }
+}
+
+// Test reset functionality
+function testReset() {
+  if (!('modelContextTesting' in navigator)) {
+    log('modelContextTesting API not available', 'error');
+    return;
+  }
+
+  const testingAPI = navigator.modelContextTesting;
+  if (!testingAPI) {
+    log('modelContextTesting API not available', 'error');
+    return;
+  }
+
+  log('Testing reset functionality...', 'info');
+
+  const callsBefore = testingAPI.getToolCalls().length;
+  log(`Tool calls before reset: ${callsBefore}`, 'info');
+
+  testingAPI.reset();
+  log('Called reset()', 'info');
+
+  const callsAfter = testingAPI.getToolCalls().length;
+  log(`Tool calls after reset: ${callsAfter}`, 'info');
+
+  if (callsAfter === 0) {
+    log('Reset successful! ✅', 'success');
+    testingApiStatusEl?.setAttribute('data-reset', 'working');
+    testingApiStatusEl?.removeAttribute('data-tool-calls');
+    testingApiStatusEl?.removeAttribute('data-mock-response');
+  } else {
+    log('Reset failed', 'error');
+  }
+}
+
 // Event listeners
 incrementBtn.addEventListener('click', () => {
   log('Increment button clicked (would call incrementCounter tool)', 'info');
@@ -355,6 +533,11 @@ clearLogBtn.addEventListener('click', () => {
   log('Log cleared');
 });
 
+checkTestingApiBtn.addEventListener('click', checkTestingAPI);
+testToolTrackingBtn.addEventListener('click', testToolCallTracking);
+testMockResponseBtn.addEventListener('click', testMockResponse);
+testResetBtn.addEventListener('click', testReset);
+
 // Initialize
 updateCounterDisplay();
 log('Application initialized');
@@ -375,6 +558,11 @@ declare global {
       replaceBaseTools: () => void;
       listAllTools: () => void;
       getAPIStatus: () => boolean;
+      checkTestingAPI: () => void;
+      testToolCallTracking: () => Promise<void>;
+      testMockResponse: () => Promise<void>;
+      testReset: () => void;
+      hasTestingAPI: () => boolean;
     };
   }
 }
@@ -388,4 +576,9 @@ window.testApp = {
   replaceBaseTools,
   listAllTools,
   getAPIStatus: () => 'modelContext' in navigator,
+  checkTestingAPI,
+  testToolCallTracking,
+  testMockResponse,
+  testReset,
+  hasTestingAPI: () => 'modelContextTesting' in navigator,
 };
