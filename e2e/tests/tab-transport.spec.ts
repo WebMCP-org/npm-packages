@@ -220,9 +220,7 @@ test.describe('Model Context Testing API Tests', () => {
 
     const logEntries = await page.locator('#log .log-entry').allTextContents();
     expect(
-      logEntries.some((entry) =>
-        entry.includes('navigator.modelContextTesting is available')
-      )
+      logEntries.some((entry) => entry.includes('navigator.modelContextTesting is available'))
     ).toBe(true);
   });
 
@@ -232,7 +230,7 @@ test.describe('Model Context Testing API Tests', () => {
 
     const status = page.locator('#testing-api-status');
     const toolCalls = await status.getAttribute('data-tool-calls');
-    expect(Number.parseInt(toolCalls || '0')).toBeGreaterThan(0);
+    expect(Number.parseInt(toolCalls || '0', 10)).toBeGreaterThan(0);
 
     const logEntries = await page.locator('#log .log-entry').allTextContents();
     expect(logEntries.some((entry) => entry.includes('Tool calls tracked:'))).toBe(true);
@@ -246,12 +244,8 @@ test.describe('Model Context Testing API Tests', () => {
     await expect(status).toHaveAttribute('data-mock-response', 'working');
 
     const logEntries = await page.locator('#log .log-entry').allTextContents();
-    expect(logEntries.some((entry) => entry.includes('Mock response verified!'))).toBe(
-      true
-    );
-    expect(
-      logEntries.some((entry) => entry.includes('This is a MOCK response!'))
-    ).toBe(true);
+    expect(logEntries.some((entry) => entry.includes('Mock response verified!'))).toBe(true);
+    expect(logEntries.some((entry) => entry.includes('This is a MOCK response!'))).toBe(true);
   });
 
   test('should reset testing state', async ({ page }) => {
@@ -259,8 +253,8 @@ test.describe('Model Context Testing API Tests', () => {
     await page.waitForTimeout(1000);
 
     let status = page.locator('#testing-api-status');
-    let toolCallsBefore = await status.getAttribute('data-tool-calls');
-    expect(Number.parseInt(toolCallsBefore || '0')).toBeGreaterThan(0);
+    const toolCallsBefore = await status.getAttribute('data-tool-calls');
+    expect(Number.parseInt(toolCallsBefore || '0', 10)).toBeGreaterThan(0);
 
     await page.click('#test-reset');
     await page.waitForTimeout(500);
@@ -273,9 +267,7 @@ test.describe('Model Context Testing API Tests', () => {
 
     const logEntries = await page.locator('#log .log-entry').allTextContents();
     expect(logEntries.some((entry) => entry.includes('Reset successful!'))).toBe(true);
-    expect(logEntries.some((entry) => entry.includes('Tool calls after reset: 0'))).toBe(
-      true
-    );
+    expect(logEntries.some((entry) => entry.includes('Tool calls after reset: 0'))).toBe(true);
   });
 
   test('should expose all testing API methods', async ({ page }) => {
@@ -356,14 +348,15 @@ test.describe('Model Context Testing API Tests', () => {
       testingAPI.setMockToolResponse(toolName, mockResponse);
 
       const resultWithMock = await navigator.modelContext.executeTool(toolName, {});
-      const hasMock = resultWithMock.content[0].type === 'text' &&
-                      resultWithMock.content[0].text === 'Mock';
+      const hasMock =
+        resultWithMock.content[0].type === 'text' && resultWithMock.content[0].text === 'Mock';
 
       testingAPI.clearMockToolResponse(toolName);
 
       const resultWithoutMock = await navigator.modelContext.executeTool(toolName, {});
-      const noMock = !(resultWithoutMock.content[0].type === 'text' &&
-                       resultWithoutMock.content[0].text === 'Mock');
+      const noMock = !(
+        resultWithoutMock.content[0].type === 'text' && resultWithoutMock.content[0].text === 'Mock'
+      );
 
       return hasMock && noMock;
     });

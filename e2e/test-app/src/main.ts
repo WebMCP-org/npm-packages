@@ -337,16 +337,28 @@ function checkTestingAPI() {
   if (testingApiStatusEl) {
     if ('modelContextTesting' in navigator) {
       const testingAPI = navigator.modelContextTesting;
-      const isNative = testingAPI && !testingAPI.constructor.name.includes('WebModelContextTesting');
+      const isNative =
+        testingAPI && !testingAPI.constructor.name.includes('WebModelContextTesting');
 
       testingApiStatusEl.textContent = `Testing API: Available ✅ (${isNative ? 'Native' : 'Polyfill'})`;
       testingApiStatusEl.style.background = '#d4edda';
       testingApiStatusEl.setAttribute('data-testing-api', 'available');
       testingApiStatusEl.setAttribute('data-testing-api-type', isNative ? 'native' : 'polyfill');
 
-      log(`navigator.modelContextTesting is available (${isNative ? 'Native' : 'Polyfill'})`, 'success');
+      log(
+        `navigator.modelContextTesting is available (${isNative ? 'Native' : 'Polyfill'})`,
+        'success'
+      );
 
-      const methods = ['getToolCalls', 'clearToolCalls', 'setMockToolResponse', 'clearMockToolResponse', 'clearAllMockToolResponses', 'getRegisteredTools', 'reset'];
+      const methods = [
+        'getToolCalls',
+        'clearToolCalls',
+        'setMockToolResponse',
+        'clearMockToolResponse',
+        'clearAllMockToolResponses',
+        'getRegisteredTools',
+        'reset',
+      ];
       log(`Available methods: ${methods.join(', ')}`, 'info');
     } else {
       testingApiStatusEl.textContent = 'Testing API: Not Available ❌';
@@ -392,7 +404,10 @@ async function testToolCallTracking() {
 
     if (calls.length > 0) {
       const lastCall = calls[calls.length - 1];
-      log(`Last call: ${lastCall.toolName} at ${new Date(lastCall.timestamp).toLocaleTimeString()}`, 'info');
+      log(
+        `Last call: ${lastCall.toolName} at ${new Date(lastCall.timestamp).toLocaleTimeString()}`,
+        'info'
+      );
       testingApiStatusEl?.setAttribute('data-tool-calls', calls.length.toString());
     }
   } catch (error) {
@@ -438,7 +453,10 @@ async function testMockResponse() {
     const result = await navigator.modelContext.executeTool(firstTool.name, {});
     log(`Tool returned: ${JSON.stringify(result)}`, 'info');
 
-    if (result.content[0].type === 'text' && result.content[0].text === 'This is a MOCK response!') {
+    if (
+      result.content[0].type === 'text' &&
+      result.content[0].text === 'This is a MOCK response!'
+    ) {
       log('Mock response verified! ✅', 'success');
       testingApiStatusEl?.setAttribute('data-mock-response', 'working');
     } else {
