@@ -426,7 +426,7 @@ class WebModelContext implements InternalModelContext {
       this.testingAPI.recordToolCall(toolName, validatedArgs);
     }
 
-    if (this.testingAPI && this.testingAPI.hasMockResponse(toolName)) {
+    if (this.testingAPI?.hasMockResponse(toolName)) {
       const mockResponse = this.testingAPI.getMockResponse(toolName);
       if (mockResponse) {
         console.log(`[Web Model Context] Returning mock response for tool: ${toolName}`);
@@ -687,26 +687,14 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
       console.log(
         '✅ [Model Context Testing] Native implementation detected (Chromium experimental feature)'
       );
-      console.log(
-        '   Using native window.navigator.modelContextTesting from browser'
-      );
+      console.log('   Using native window.navigator.modelContextTesting from browser');
       bridge.modelContextTesting = window.navigator.modelContextTesting;
     } else {
-      console.log(
-        '[Model Context Testing] Native implementation not found, installing polyfill'
-      );
-      console.log(
-        '   💡 To use the native implementation in Chromium:'
-      );
-      console.log(
-        '      - Navigate to chrome://flags'
-      );
-      console.log(
-        '      - Enable "Experimental Web Platform Features"'
-      );
-      console.log(
-        '      - Or launch with: --enable-experimental-web-platform-features'
-      );
+      console.log('[Model Context Testing] Native implementation not found, installing polyfill');
+      console.log('   💡 To use the native implementation in Chromium:');
+      console.log('      - Navigate to chrome://flags');
+      console.log('      - Enable "Experimental Web Platform Features"');
+      console.log('      - Or launch with: --enable-experimental-web-platform-features');
 
       const testingAPI = new WebModelContextTesting(bridge);
       bridge.modelContextTesting = testingAPI;
