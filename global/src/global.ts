@@ -14,6 +14,7 @@ import type {
   InternalModelContext,
   MCPBridge,
   ModelContextInput,
+  ModelContextTesting,
   ToolCallEvent,
   ToolDescriptor,
   ToolResponse,
@@ -67,6 +68,87 @@ class WebToolCallEvent extends Event implements ToolCallEvent {
 const RAPID_DUPLICATE_WINDOW_MS = 50;
 
 /**
+ * Testing API implementation for Model Context
+ * Provides debugging and mocking capabilities for testing
+ */
+class WebModelContextTesting implements ModelContextTesting {
+  private toolCallHistory: Array<{
+    toolName: string;
+    arguments: Record<string, unknown>;
+    timestamp: number;
+  }> = [];
+  private mockResponses: Map<string, ToolResponse> = new Map();
+  private bridge: MCPBridge;
+
+  constructor(bridge: MCPBridge) {
+    this.bridge = bridge;
+  }
+
+  /**
+   * Record a tool call (called internally by WebModelContext)
+   */
+  recordToolCall(toolName: string, args: Record<string, unknown>): void {
+    this.toolCallHistory.push({
+      toolName,
+      arguments: args,
+      timestamp: Date.now(),
+    });
+  }
+
+  /**
+   * Check if a mock response exists for a tool
+   */
+  hasMockResponse(toolName: string): boolean {
+    return this.mockResponses.has(toolName);
+  }
+
+  /**
+   * Get mock response for a tool (if set)
+   */
+  getMockResponse(toolName: string): ToolResponse | undefined {
+    return this.mockResponses.get(toolName);
+  }
+
+  getToolCalls(): Array<{
+    toolName: string;
+    arguments: Record<string, unknown>;
+    timestamp: number;
+  }> {
+    return [...this.toolCallHistory];
+  }
+
+  clearToolCalls(): void {
+    this.toolCallHistory = [];
+    console.log('[Model Context Testing] Tool call history cleared');
+  }
+
+  setMockToolResponse(toolName: string, response: ToolResponse): void {
+    this.mockResponses.set(toolName, response);
+    console.log(`[Model Context Testing] Mock response set for tool: ${toolName}`);
+  }
+
+  clearMockToolResponse(toolName: string): void {
+    this.mockResponses.delete(toolName);
+    console.log(`[Model Context Testing] Mock response cleared for tool: ${toolName}`);
+  }
+
+  clearAllMockToolResponses(): void {
+    this.mockResponses.clear();
+    console.log('[Model Context Testing] All mock responses cleared');
+  }
+
+  getRegisteredTools(): ReturnType<InternalModelContext['listTools']> {
+    return this.bridge.modelContext.listTools();
+  }
+
+  reset(): void {
+    this.clearToolCalls();
+    this.clearAllMockToolResponses();
+    console.log('[Model Context Testing] Testing state reset');
+  }
+}
+
+/**
  * ModelContext implementation that bridges to MCP SDK
  * Implements the W3C Web Model Context API proposal with two-bucket tool management
  *
@@ -86,6 +168,7 @@ class WebModelContext implements InternalModelContext {
   private dynamicTools: Map<string, ValidatedToolDescriptor>;
   private registrationTimestamps: Map<string, number>;
   private unregisterFunctions: Map<string, () => void>;
+  private testingAPI?: WebModelContextTesting;
 
   constructor(bridge: MCPBridge) {
     this.bridge = bridge;
@@ -94,6 +177,14 @@ class WebModelContext implements InternalModelContext {
     this.dynamicTools = new Map();
     this.registrationTimestamps = new Map();
     this.unregisterFunctions = new Map();
+  }
+
+  /**
+   * Set the testing API (called during initialization)
+   * @internal
+   */
+  setTestingAPI(testingAPI: WebModelContextTesting): void {
+    this.testingAPI = testingAPI;
   }
 
   /**
@@ -299,9 +390,11 @@ class WebModelContext implements InternalModelContext {
   /**
    * Execute a tool with hybrid approach:
    * 1. Validate input arguments
-   * 2. Dispatch toolcall event first
-   * 3. If not prevented, call tool's execute function
-   * 4. Validate output (permissive mode - warn only)
+   * 2. Record tool call in testing API (if available)
+   * 3. Check for mock response (if testing API is active)
+   * 4. Dispatch toolcall event first
+   * 5. If not prevented, call tool's execute function
+   * 6. Validate output (permissive mode - warn only)
    */
   async executeTool(toolName: string, args: Record<string, unknown>): Promise<ToolResponse> {
     const tool = this.bridge.tools.get(toolName);
@@ -328,6 +421,18 @@ class WebModelContext implements InternalModelContext {
     }
 
     const validatedArgs = validation.data as Record<string, unknown>;
+
+    if (this.testingAPI) {
+      this.testingAPI.recordToolCall(toolName, validatedArgs);
+    }
+
+    if (this.testingAPI && this.testingAPI.hasMockResponse(toolName)) {
+      const mockResponse = this.testingAPI.getMockResponse(toolName);
+      if (mockResponse) {
+        console.log(`[Web Model Context] Returning mock response for tool: ${toolName}`);
+        return mockResponse;
+      }
+    }
 
     const event = new WebToolCallEvent(toolName, validatedArgs);
 
@@ -411,7 +516,6 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
 
       try {
         const response = await bridge.modelContext.executeTool(toolName, args);
-        // Return in MCP SDK format
         return {
           content: response.content,
           isError: response.isError,
@@ -476,7 +580,6 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
     }
   );
 
-  // Create bridge object (modelContext is assigned after instantiation)
   const bridge: MCPBridge = {
     tabServer,
     tools: new Map(),
@@ -484,14 +587,11 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
     isInitialized: true,
   };
 
-  // Create modelContext and attach to bridge
   const modelContext = new WebModelContext(bridge);
   bridge.modelContext = modelContext;
 
-  // Set up handlers for tab server
   setupServerHandlers(tabServer, bridge);
 
-  // Connect tab server transport
   if (tabServerEnabled) {
     const tabServerOptions: Partial<TabServerTransportOptions> =
       typeof transportOptions?.tabServer === 'object' ? transportOptions.tabServer : {};
@@ -582,6 +682,47 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
     });
 
     console.log('✅ [Web Model Context] window.navigator.modelContext initialized successfully');
+
+    if (window.navigator.modelContextTesting) {
+      console.log(
+        '✅ [Model Context Testing] Native implementation detected (Chromium experimental feature)'
+      );
+      console.log(
+        '   Using native window.navigator.modelContextTesting from browser'
+      );
+      bridge.modelContextTesting = window.navigator.modelContextTesting;
+    } else {
+      console.log(
+        '[Model Context Testing] Native implementation not found, installing polyfill'
+      );
+      console.log(
+        '   💡 To use the native implementation in Chromium:'
+      );
+      console.log(
+        '      - Navigate to chrome://flags'
+      );
+      console.log(
+        '      - Enable "Experimental Web Platform Features"'
+      );
+      console.log(
+        '      - Or launch with: --enable-experimental-web-platform-features'
+      );
+
+      const testingAPI = new WebModelContextTesting(bridge);
+      bridge.modelContextTesting = testingAPI;
+
+      (bridge.modelContext as WebModelContext).setTestingAPI(testingAPI);
+
+      Object.defineProperty(window.navigator, 'modelContextTesting', {
+        value: testingAPI,
+        writable: false,
+        configurable: true,
+      });
+
+      console.log(
+        '✅ [Model Context Testing] Polyfill installed at window.navigator.modelContextTesting'
+      );
+    }
   } catch (error) {
     console.error('[Web Model Context] Failed to initialize:', error);
     throw error;
@@ -607,6 +748,7 @@ export function cleanupWebModelContext(): void {
   }
 
   delete (window.navigator as unknown as { modelContext?: unknown }).modelContext;
+  delete (window.navigator as unknown as { modelContextTesting?: unknown }).modelContextTesting;
   delete (window as unknown as { __mcpBridge?: unknown }).__mcpBridge;
 
   console.log('[Web Model Context] Cleaned up');
