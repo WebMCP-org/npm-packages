@@ -87,6 +87,18 @@
     <div id="listToolsResult" class="result"></div>
   </div>
 
+  <!-- Testing API Tests -->
+  <div class="test-section">
+    <h2>Test 4: Model Context Testing API</h2>
+    <p>Test navigator.modelContextTesting API (native in Chromium with flags, polyfill elsewhere)</p>
+    <button onclick="checkTestingAPI()">Check API Availability</button>
+    <button onclick="testToolCallTracking()">Test Tool Call Tracking</button>
+    <button onclick="testMockResponse()">Test Mock Response</button>
+    <button onclick="testGetRegisteredTools()">Test Get Registered Tools</button>
+    <button onclick="testResetState()">Test Reset State</button>
+    <div id="testingAPIResult" class="result"></div>
+  </div>
+
   <!-- Load the global package IIFE -->
   <script src="./dist/index.iife.js"></script>
 
@@ -245,6 +257,201 @@
       }
     }
 
+    // Test 4: Model Context Testing API
+    function checkTestingAPI() {
+      try {
+        const testingAPI = window.navigator.modelContextTesting;
+        if (!testingAPI) {
+          log('testingAPIResult', 'ERROR: modelContextTesting API not available', 'error');
+          return;
+        }
+
+        const isNative = !testingAPI.constructor.name.includes('WebModelContextTesting');
+        const info = {
+          available: true,
+          implementation: isNative ? 'native (Chromium)' : 'polyfill',
+          methods: Object.getOwnPropertyNames(Object.getPrototypeOf(testingAPI)).filter(m => m !== 'constructor')
+        };
+
+        log('testingAPIResult',
+          'SUCCESS: modelContextTesting API available\n\n' +
+          'Implementation: ' + info.implementation + '\n' +
+          'Methods: ' + info.methods.join(', '),
+          'success');
+      } catch (error) {
+        log('testingAPIResult', 'ERROR: ' + error.message, 'error');
+      }
+    }
+
+    async function testToolCallTracking() {
+      try {
+        const testingAPI = window.navigator.modelContextTesting;
+        const modelContext = window.navigator.modelContext;
+
+        testingAPI.reset();
+
+        modelContext.provideContext({
+          tools: [{
+            name: "test-tracking",
+            description: "Test tool for tracking",
+            inputSchema: { type: "object", properties: { msg: { type: "string" } } },
+            async execute({ msg }) {
+              return { content: [{ type: "text", text: "Received: " + msg }] };
+            }
+          }]
+        });
+
+        await modelContext.executeTool('test-tracking', { msg: "first call" });
+        await modelContext.executeTool('test-tracking', { msg: "second call" });
+
+        const calls = testingAPI.getToolCalls();
+
+        if (calls.length === 2) {
+          log('testingAPIResult',
+            'SUCCESS: Tool calls tracked correctly\n\n' +
+            'Call 1: ' + JSON.stringify(calls[0].arguments, null, 2) + '\n' +
+            'Call 2: ' + JSON.stringify(calls[1].arguments, null, 2),
+            'success');
+        } else {
+          log('testingAPIResult',
+            'ERROR: Expected 2 calls, got ' + calls.length + '\n\n' + JSON.stringify(calls, null, 2),
+            'error');
+        }
+      } catch (error) {
+        log('testingAPIResult', 'ERROR: ' + error.message + '\n\n' + error.stack, 'error');
+      }
+    }
+
+    async function testMockResponse() {
+      try {
+        const testingAPI = window.navigator.modelContextTesting;
+        const modelContext = window.navigator.modelContext;
+
+        modelContext.provideContext({
+          tools: [{
+            name: "test-mock",
+            description: "Test tool for mocking",
+            inputSchema: { type: "object", properties: { value: { type: "number" } } },
+            async execute({ value }) {
+              return { content: [{ type: "text", text: "Real result: " + value }] };
+            }
+          }]
+        });
+
+        const mockResponse = {
+          content: [{ type: "text", text: "Mocked result: 999" }]
+        };
+        testingAPI.setMockToolResponse('test-mock', mockResponse);
+
+        const result = await modelContext.executeTool('test-mock', { value: 42 });
+
+        if (result.content[0].text.includes('Mocked')) {
+          log('testingAPIResult',
+            'SUCCESS: Mock response returned\n\n' +
+            'Input: { value: 42 }\n' +
+            'Output: ' + result.content[0].text + '\n\n' +
+            '(Tool execute function was bypassed)',
+            'success');
+        } else {
+          log('testingAPIResult',
+            'ERROR: Expected mocked response, got real response\n\n' + JSON.stringify(result, null, 2),
+            'error');
+        }
+
+        testingAPI.clearMockToolResponse('test-mock');
+        const result2 = await modelContext.executeTool('test-mock', { value: 42 });
+
+        if (result2.content[0].text.includes('Real')) {
+          log('testingAPIResult',
+            'SUCCESS: Mock cleared, real response returned\n\n' +
+            'First call (mocked): ' + result.content[0].text + '\n' +
+            'Second call (real): ' + result2.content[0].text,
+            'success');
+        }
+      } catch (error) {
+        log('testingAPIResult', 'ERROR: ' + error.message + '\n\n' + error.stack, 'error');
+      }
+    }
+
+    function testGetRegisteredTools() {
+      try {
+        const testingAPI = window.navigator.modelContextTesting;
+        const modelContext = window.navigator.modelContext;
+
+        modelContext.provideContext({
+          tools: [
+            { name: "tool-1", description: "First tool", inputSchema: {}, async execute() {} },
+            { name: "tool-2", description: "Second tool", inputSchema: {}, async execute() {} }
+          ]
+        });
+
+        const toolsFromContext = modelContext.listTools();
+        const toolsFromTesting = testingAPI.getRegisteredTools();
+
+        if (JSON.stringify(toolsFromContext) === JSON.stringify(toolsFromTesting)) {
+          log('testingAPIResult',
+            'SUCCESS: getRegisteredTools() matches listTools()\n\n' +
+            'Tools: ' + toolsFromTesting.map(t => t.name).join(', '),
+            'success');
+        } else {
+          log('testingAPIResult',
+            'ERROR: Tool lists do not match\n\n' +
+            'modelContext.listTools(): ' + JSON.stringify(toolsFromContext, null, 2) + '\n' +
+            'modelContextTesting.getRegisteredTools(): ' + JSON.stringify(toolsFromTesting, null, 2),
+            'error');
+        }
+      } catch (error) {
+        log('testingAPIResult', 'ERROR: ' + error.message, 'error');
+      }
+    }
+
+    async function testResetState() {
+      try {
+        const testingAPI = window.navigator.modelContextTesting;
+        const modelContext = window.navigator.modelContext;
+
+        modelContext.provideContext({
+          tools: [{
+            name: "test-reset",
+            description: "Test reset",
+            inputSchema: {},
+            async execute() {
+              return { content: [{ type: "text", text: "Executed" }] };
+            }
+          }]
+        });
+
+        await modelContext.executeTool('test-reset', {});
+        await modelContext.executeTool('test-reset', {});
+
+        testingAPI.setMockToolResponse('test-reset', { content: [{ type: "text", text: "Mock" }] });
+
+        let callsBefore = testingAPI.getToolCalls().length;
+
+        testingAPI.reset();
+
+        let callsAfter = testingAPI.getToolCalls().length;
+        const result = await modelContext.executeTool('test-reset', {});
+
+        if (callsAfter === 0 && !result.content[0].text.includes('Mock')) {
+          log('testingAPIResult',
+            'SUCCESS: State reset correctly\n\n' +
+            'Calls before reset: ' + callsBefore + '\n' +
+            'Calls after reset: ' + callsAfter + '\n' +
+            'Mock cleared: ' + (result.content[0].text.includes('Executed') ? 'Yes' : 'No'),
+            'success');
+        } else {
+          log('testingAPIResult',
+            'ERROR: State not fully reset\n\n' +
+            'Calls after reset: ' + callsAfter + ' (expected 0)\n' +
+            'Result: ' + JSON.stringify(result, null, 2),
+            'error');
+        }
+      } catch (error) {
+        log('testingAPIResult', 'ERROR: ' + error.message + '\n\n' + error.stack, 'error');
+      }
+    }
+
     // Auto-run basic test on load
     window.addEventListener('DOMContentLoaded', () => {
       setTimeout(() => {
@@ -253,6 +460,14 @@
           console.log('✅ window.navigator.modelContext is available');
         } else {
           console.error('❌ window.navigator.modelContext is NOT available');
+        }
+
+        if (window.navigator.modelContextTesting) {
+          const isNative = !window.navigator.modelContextTesting.constructor.name.includes('WebModelContextTesting');
+          console.log('✅ window.navigator.modelContextTesting is available (' +
+            (isNative ? 'native Chromium' : 'polyfill') + ')');
+        } else {
+          console.error('❌ window.navigator.modelContextTesting is NOT available');
         }
       }, 100);
     });
