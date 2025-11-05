@@ -1,23 +1,57 @@
-# MCP-B NPM Packages 📦
+<div align="center">
+
+# MCP-B NPM Packages
+
+**Official Model Context Protocol implementation for browsers**
 
 [![npm version](https://img.shields.io/npm/v/@mcp-b/transports?style=flat-square)](https://www.npmjs.com/org/mcp-b)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue?style=flat-square)](https://www.typescriptlang.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.8+-blue?style=flat-square)](https://www.typescriptlang.org/)
+[![pnpm](https://img.shields.io/badge/maintained%20with-pnpm-cc00ff.svg?style=flat-square)](https://pnpm.io/)
 
-This monorepo contains the official NPM packages for MCP-B (Model Context Protocol for Browsers). These packages provide the core functionality for implementing MCP in browser environments, including a polyfill for the emerging Web Model Context API standard.
+</div>
 
-## 📥 Installation
+---
 
-Install the packages you need via npm, yarn, or pnpm:
+## Table of Contents
+
+- [Overview](#overview)
+- [Installation](#installation)
+- [Available Packages](#available-packages)
+- [Quick Start](#quick-start)
+- [Architecture](#architecture)
+- [Development](#development)
+- [Documentation](#documentation)
+- [Contributing](#contributing)
+- [License](#license)
+- [Links](#links)
+
+## Overview
+
+This monorepo contains the official NPM packages for MCP-B (Model Context Protocol for Browsers). These packages provide browser-native implementations of the Model Context Protocol, including transports, React integrations, and a polyfill for the emerging Web Model Context API standard.
+
+### Core Capabilities
+
+MCP-B enables bidirectional communication between AI assistants and web applications running in browsers, allowing:
+
+- **Tool Registration**: Web applications can expose tools that AI assistants can discover and invoke
+- **Dynamic Integration**: Embedded applications (iframes) can register tools at runtime
+- **Browser Transports**: Native browser communication patterns (postMessage, Chrome extension messaging)
+- **React Integration**: First-class React hooks for seamless MCP integration
+- **Chrome Extension APIs**: Auto-generated tools for browser automation
+
+## Installation
+
+Install packages via npm, pnpm, or yarn:
 
 ```bash
-# Navigator.modelContext polyfill (recommended starting point)
+# Web Model Context API polyfill (recommended starting point)
 pnpm add @mcp-b/global
 
-# React integration (provider & client hooks)
+# React integration (provider and client hooks)
 pnpm add @mcp-b/react-webmcp zod
 
-# Transport layer (if building custom integrations)
+# Transport layer (for custom integrations)
 pnpm add @mcp-b/transports
 
 # Chrome Extension API tools
@@ -27,7 +61,7 @@ pnpm add @mcp-b/extension-tools
 pnpm add @mcp-b/smart-dom-reader
 ```
 
-## 📦 Available Packages
+## Available Packages
 
 | Package | Version | Description |
 |---------|---------|-------------|
@@ -45,7 +79,7 @@ pnpm add @mcp-b/smart-dom-reader
 | ~~@mcp-b/mcp-react-hooks~~ | ⚠️ Deprecated | Use [@mcp-b/react-webmcp](./react-webmcp) instead |
 | ~~@mcp-b/mcp-react-hook-form~~ | ⚠️ Removed | Use custom `useWebMCP` wrappers |
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Using the Web Model Context API
 
@@ -133,9 +167,9 @@ function ToolConsumer() {
 }
 ```
 
-## 🏗️ Architecture
+## Architecture
 
-The MCP-B packages are organized into layers:
+The MCP-B packages are organized into functional layers:
 
 ### Core Layer
 - **@mcp-b/global** - Polyfill for `navigator.modelContext` (Web Model Context API)
@@ -153,9 +187,9 @@ The MCP-B packages are organized into layers:
 - **@mcp-b/extension-tools** - Pre-built tools for Chrome Extension APIs
 - **@mcp-b/smart-dom-reader** - AI-friendly DOM extraction
 
-## 🔧 Development
+## Development
 
-This is a pnpm workspace monorepo using Turbo for build orchestration.
+This monorepo uses pnpm workspaces with Turbo for build orchestration and Changesets for version management.
 
 ### Prerequisites
 
@@ -198,13 +232,13 @@ pnpm --filter mcp-e2e-tests test
 pnpm --filter @mcp-b/react-webmcp add zod
 ```
 
-## 📚 Documentation
+## Documentation
 
 - [CONTRIBUTING.md](./CONTRIBUTING.md) - Contribution guidelines
 - [CLAUDE.md](./CLAUDE.md) - Developer guidance for Claude Code
 - [TESTING.md](./TESTING.md) - Testing documentation
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
 
@@ -216,11 +250,11 @@ We welcome contributions! Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for gu
 4. Create a changeset: `pnpm changeset`
 5. Submit a pull request
 
-## 📄 License
+## License
 
-MIT © WebMCP Team
+[MIT License](./LICENSE) - See LICENSE file for details.
 
-## 🔗 Links
+## Links
 
 - [GitHub Repository](https://github.com/WebMCP-org/WebMCP)
 - [npm Organization](https://www.npmjs.com/org/mcp-b)
