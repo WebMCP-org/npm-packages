@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Web Model Context API - Native Chromium Showcase</title>
+  <link rel="stylesheet" href="/src/styles/main.css">
+</head>
+<body>
+  <!-- Detection Banner -->
+  <div id="detection-banner" class="banner">
+    <div class="container">
+      <div id="detection-status" class="status-content">
+        <div class="spinner"></div>
+        <span>Detecting native API...</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="container">
+      <h1>⚡ Web Model Context API Showcase</h1>
+      <p class="subtitle">Native Chromium Implementation - No Polyfill</p>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <div class="container">
+
+      <!-- CodePen-style Editor Section -->
+      <section class="editor-section">
+        <div class="section-header">
+          <h2>🎨 Live Tool Editor</h2>
+          <div class="editor-controls">
+            <select id="template-select" class="template-select">
+              <option value="">Load Template...</option>
+              <option value="counter">Counter Tools</option>
+              <option value="calculator">Calculator</option>
+              <option value="todo">Todo List</option>
+              <option value="timer">Timer</option>
+              <option value="state-machine">State Machine</option>
+            </select>
+            <button id="clear-editor" class="btn btn-secondary">Clear</button>
+            <button id="register-code" class="btn btn-primary">▶ Register Tool</button>
+          </div>
+        </div>
+
+        <div class="editor-layout">
+          <!-- Code Editor -->
+          <div class="editor-panel">
+            <div class="panel-header">
+              <span class="panel-title">📝 Tool Definition</span>
+              <span class="panel-hint">Write your tool code here (JavaScript)</span>
+            </div>
+            <textarea
+              id="code-editor"
+              class="code-editor"
+              spellcheck="false"
+              placeholder="// Define your tool here&#10;// Example:&#10;const tool = {&#10;  name: 'my_tool',&#10;  description: 'My custom tool',&#10;  inputSchema: {&#10;    type: 'object',&#10;    properties: {}&#10;  },&#10;  async execute(input) {&#10;    return {&#10;      content: [{&#10;        type: 'text',&#10;        text: 'Hello from my tool!'&#10;      }]&#10;    };&#10;  }&#10;};"></textarea>
+          </div>
+
+          <!-- Live Output -->
+          <div class="output-panel">
+            <div class="panel-header">
+              <span class="panel-title">📊 Registered Tools</span>
+              <span class="panel-hint" id="tool-count">0 tools</span>
+            </div>
+            <div id="tools-output" class="tools-output">
+              <div class="empty-state">
+                <div class="empty-icon">🔧</div>
+                <p>No tools registered yet</p>
+                <p class="hint">Use the editor to define and register tools</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Error Display -->
+        <div id="editor-error" class="error-display" style="display: none;"></div>
+      </section>
+
+      <!-- API Demonstrations -->
+      <section class="api-section">
+        <h2>🔬 API Demonstrations</h2>
+
+        <!-- Two-Bucket System -->
+        <div class="demo-card">
+          <h3>Two-Bucket Tool Management</h3>
+          <p class="description">
+            Demonstrates the two-bucket architecture:
+            <strong class="bucket-a">Bucket A (provideContext)</strong> for dynamic replacement and
+            <strong class="bucket-b">Bucket B (registerTool)</strong> for persistent tools.
+          </p>
+
+          <div class="demo-controls">
+            <div class="control-group">
+              <h4 class="bucket-a">Bucket A - provideContext()</h4>
+              <button class="btn btn-small" id="provide-counter-tools">Add Counter Tools (A)</button>
+              <button class="btn btn-small" id="replace-bucket-a">Replace Bucket A</button>
+              <div class="bucket-indicator bucket-a-indicator" id="bucket-a-tools">Empty</div>
+            </div>
+
+            <div class="control-group">
+              <h4 class="bucket-b">Bucket B - registerTool()</h4>
+              <button class="btn btn-small" id="register-timer-tool">Add Timer Tool (B)</button>
+              <button class="btn btn-small" id="unregister-timer">Unregister Timer</button>
+              <div class="bucket-indicator bucket-b-indicator" id="bucket-b-tools">Empty</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Native Methods -->
+        <div class="demo-card">
+          <h3>Native Chromium Methods</h3>
+          <p class="description">
+            Methods specific to the native Chromium implementation (not available in polyfill).
+          </p>
+
+          <div class="demo-controls">
+            <button class="btn btn-small" id="list-tools">📋 listTools()</button>
+            <button class="btn btn-small" id="execute-tool">▶ executeTool()</button>
+            <button class="btn btn-small" id="unregister-tool">❌ unregisterTool()</button>
+            <button class="btn btn-small" id="clear-context">🗑️ clearContext()</button>
+          </div>
+          <div class="result-display" id="native-result"></div>
+        </div>
+
+        <!-- Testing API -->
+        <div class="demo-card">
+          <h3>Testing API (navigator.modelContextTesting)</h3>
+          <p class="description">
+            Advanced testing features for debugging and development.
+          </p>
+
+          <div class="demo-controls">
+            <button class="btn btn-small" id="testing-list-tools">📋 listTools()</button>
+            <button class="btn btn-small" id="testing-execute">▶ executeTool()</button>
+            <button class="btn btn-small" id="get-tool-calls">📞 getToolCalls()</button>
+            <button class="btn btn-small" id="clear-tool-calls">Clear Calls</button>
+            <button class="btn btn-small" id="set-mock">🎭 setMock()</button>
+            <button class="btn btn-small" id="reset-testing">🔄 reset()</button>
+          </div>
+          <div class="result-display" id="testing-result"></div>
+        </div>
+
+        <!-- Tool Executor -->
+        <div class="demo-card">
+          <h3>🎮 Interactive Tool Executor</h3>
+          <div class="executor-controls">
+            <select id="exec-tool-select" class="form-select">
+              <option value="">Select a tool...</option>
+            </select>
+            <textarea
+              id="exec-input"
+              class="form-input"
+              placeholder='{"key": "value"}'
+              rows="3"></textarea>
+            <button class="btn btn-primary" id="exec-button">Execute</button>
+          </div>
+          <div class="result-display" id="exec-result"></div>
+        </div>
+      </section>
+
+      <!-- Event Log -->
+      <section class="log-section">
+        <div class="section-header">
+          <h2>📝 Event Log</h2>
+          <button id="clear-log" class="btn btn-secondary btn-small">Clear Log</button>
+        </div>
+        <div id="event-log" class="event-log"></div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <p>
+        Native Chromium Web Model Context API Showcase |
+        <a href="https://github.com/WebMCP-org/WebMCP" target="_blank">GitHub</a> |
+        Launch with: <code>chromium --enable-experimental-web-platform-features</code>
+      </p>
+    </div>
+  </footer>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
