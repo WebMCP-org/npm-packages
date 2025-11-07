@@ -1,6 +1,3 @@
-// Web Model Context API Types
-// Based on: https://github.com/MicrosoftEdge/MSEdgeExplainers/blob/main/WebModelContext/explainer.md
-
 import type { IframeChildTransportOptions, TabServerTransportOptions } from '@mcp-b/transports';
 import type {
   CallToolResult,
@@ -172,7 +169,7 @@ export interface ModelContextInput {
    * Array of tool descriptors
    * Supports both JSON Schema and Zod schema formats
    */
-  tools: ToolDescriptor<any, any>[];
+  tools: ToolDescriptor[];
 }
 
 /**
@@ -220,6 +217,18 @@ export interface ModelContext {
   ): {
     unregister: () => void;
   };
+
+  /**
+   * Unregister a tool by name
+   * Available in Chromium's native implementation
+   */
+  unregisterTool(name: string): void;
+
+  /**
+   * Clear all registered tools (both buckets)
+   * Available in Chromium's native implementation
+   */
+  clearContext(): void;
 
   /**
    * Add event listener for tool calls
@@ -282,6 +291,16 @@ export interface MCPBridge {
 }
 
 /**
+ * Tool info returned by listTools() in testing API
+ * Note: inputSchema is a JSON string, not an object (matches Chromium implementation)
+ */
+export interface ToolInfo {
+  name: string;
+  description: string;
+  inputSchema: string;
+}
+
+/**
  * Testing API for Model Context
  *
  * **Native Support**: This API is available natively in Chromium-based browsers
@@ -298,7 +317,28 @@ export interface MCPBridge {
  */
 export interface ModelContextTesting {
   /**
+   * Execute a tool directly with JSON string input (Chromium native API)
+   * @param toolName - Name of the tool to execute
+   * @param inputArgsJson - JSON string of input arguments
+   * @returns Promise resolving to the tool's result
+   */
+  executeTool(toolName: string, inputArgsJson: string): Promise<unknown>;
+
+  /**
+   * List all registered tools (Chromium native API)
+   * Returns tools with inputSchema as JSON string
+   */
+  listTools(): ToolInfo[];
+
+  /**
+   * Register a callback that fires when the tools list changes (Chromium native API)
+   * Callback will fire on: registerTool, unregisterTool, provideContext, clearContext
+   */
+  registerToolsChangedCallback(callback: () => void): void;
+
+  /**
    * Get all tool calls that have been made (for testing/debugging)
+   * Polyfill-specific extension
    */
   getToolCalls(): Array<{
     toolName: string;
@@ -308,33 +348,39 @@ export interface ModelContextTesting {
 
   /**
    * Clear the history of tool calls
+   * Polyfill-specific extension
    */
   clearToolCalls(): void;
 
   /**
    * Set a mock response for a specific tool (for testing)
    * When set, the tool's execute function will be bypassed and the mock response returned
+   * Polyfill-specific extension
    */
   setMockToolResponse(toolName: string, response: ToolResponse): void;
 
   /**
    * Clear mock response for a specific tool
+   * Polyfill-specific extension
    */
   clearMockToolResponse(toolName: string): void;
 
   /**
    * Clear all mock tool responses
+   * Polyfill-specific extension
    */
   clearAllMockToolResponses(): void;
 
   /**
    * Get the current tools registered in the system
    * (same as modelContext.listTools but explicitly for testing)
+   * Polyfill-specific extension
    */
   getRegisteredTools(): ReturnType<ModelContext['listTools']>;
 
   /**
    * Reset the entire testing state (clears tool calls and mock responses)
+   * Polyfill-specific extension
    */
   reset(): void;
 }

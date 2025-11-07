@@ -1,5 +1,3 @@
-// index.ts - Entry point for Web Model Context API polyfill
-
 import { initializeWebModelContext } from './global.js';
 import type { TransportConfiguration, WebModelContextInitOptions } from './types.js';
 
@@ -105,7 +103,6 @@ function parseScriptTagOptions(
   return hasOptions ? options : undefined;
 }
 
-// Auto-initialize immediately when script loads in browser environments
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   const globalOptions = window.__webModelContextOptions;
   const scriptElement = document.currentScript as HTMLScriptElement | null;
@@ -128,6 +125,5 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   }
 }
 
-// For manual initialization (when using as ES module)
 export { cleanupWebModelContext, initializeWebModelContext } from './global.js';
 export type * from './types.js';

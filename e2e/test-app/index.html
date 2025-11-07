@@ -145,6 +145,32 @@
     </div>
 
     <div class="section">
+      <h2>Chromium Native API Tests</h2>
+      <p>Test Chromium-compatible APIs: <code>unregisterTool()</code>, <code>clearContext()</code>, <code>executeTool()</code>, <code>listTools()</code>, and <code>registerToolsChangedCallback()</code>.</p>
+      <div id="chromium-callback-status" style="display: none;"></div>
+
+      <h3>ModelContext APIs</h3>
+      <div style="text-align: center;">
+        <button id="chromium-unregister-tool">Test unregisterTool()</button>
+        <button id="chromium-clear-context">Test clearContext()</button>
+      </div>
+
+      <h3>ModelContextTesting APIs</h3>
+      <div style="text-align: center;">
+        <button id="chromium-execute-tool">Test executeTool()</button>
+        <button id="chromium-list-tools">Test listTools()</button>
+      </div>
+
+      <h3>Tools Changed Callbacks</h3>
+      <div style="text-align: center;">
+        <button id="chromium-test-callback-register">Test Callback: registerTool()</button>
+        <button id="chromium-test-callback-unregister">Test Callback: unregisterTool()</button>
+        <button id="chromium-test-callback-provide">Test Callback: provideContext()</button>
+        <button id="chromium-test-callback-clear">Test Callback: clearContext()</button>
+      </div>
+    </div>
+
+    <div class="section">
       <h2>Event Log</h2>
       <button id="clear-log">Clear Log</button>
       <div id="log"></div>

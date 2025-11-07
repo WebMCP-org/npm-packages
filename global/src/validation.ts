@@ -1,5 +1,3 @@
-// validation.ts - JSON Schema <-> Zod conversion and validation utilities
-
 import { jsonSchemaToZod as convertJsonSchemaToZod } from '@composio/json-schema-to-zod';
 import { z } from 'zod';
 import type { InputSchema } from './types.js';
@@ -13,18 +11,15 @@ export function isZodSchema(schema: unknown): boolean {
     return false;
   }
 
-  // JSON Schema always has a 'type' property at the root
   if ('type' in schema && typeof (schema as { type: unknown }).type === 'string') {
-    return false; // This is JSON Schema
+    return false;
   }
 
-  // Check if any property value is a Zod type instance
   const values = Object.values(schema);
   if (values.length === 0) {
-    return false; // Empty object, treat as JSON Schema
+    return false;
   }
 
-  // If any value is a ZodType, it's a Zod schema
   return values.some((val) => val instanceof z.ZodType);
 }
 
@@ -34,12 +29,10 @@ export function isZodSchema(schema: unknown): boolean {
  */
 export function jsonSchemaToZod(jsonSchema: InputSchema): z.ZodType {
   try {
-    // convertJsonSchemaToZod returns a Zod schema from JSON Schema
     const zodSchema = convertJsonSchemaToZod(jsonSchema as unknown as object);
     return zodSchema;
   } catch (error) {
     console.warn('[Web Model Context] Failed to convert JSON Schema to Zod:', error);
-    // Fallback: accept anything with passthrough
     return z.object({}).passthrough();
   }
 }
@@ -54,10 +47,8 @@ export function zodToJsonSchema(schema: Record<string, z.ZodTypeAny>): InputSche
   const required: string[] = [];
 
   for (const [key, zodType] of Object.entries(schema)) {
-    // Extract description if available
     const description = (zodType as { description?: string }).description || undefined;
 
-    // Infer JSON Schema type from Zod type
     let type = 'string';
     let enumValues: unknown[] | undefined;
     let items: unknown | undefined;
@@ -70,7 +61,6 @@ export function zodToJsonSchema(schema: Record<string, z.ZodTypeAny>): InputSche
       type = 'boolean';
     } else if (zodType instanceof z.ZodArray) {
       type = 'array';
-      // Try to get array item type
       const elementType = (zodType as { element?: z.ZodTypeAny }).element;
       if (elementType instanceof z.ZodString) {
         items = { type: 'string' };
@@ -85,7 +75,6 @@ export function zodToJsonSchema(schema: Record<string, z.ZodTypeAny>): InputSche
       type = 'object';
     } else if (zodType instanceof z.ZodEnum) {
       type = 'string';
-      // Extract enum values
       const enumDef = (zodType as { _def?: { values?: unknown[] } })._def;
       if (enumDef?.values) {
         enumValues = enumDef.values;
@@ -105,7 +94,6 @@ export function zodToJsonSchema(schema: Record<string, z.ZodTypeAny>): InputSche
 
     properties[key] = propertySchema;
 
-    // Check if field is required (not optional)
     if (!zodType.isOptional()) {
       required.push(key);
     }
@@ -129,13 +117,11 @@ export function normalizeSchema(schema: InputSchema | Record<string, z.ZodTypeAn
   const isZod = isZodSchema(schema);
 
   if (isZod) {
-    // Input is Zod schema object → convert to JSON Schema and wrap in z.object()
     const jsonSchema = zodToJsonSchema(schema as Record<string, z.ZodTypeAny>);
     const zodValidator = z.object(schema as Record<string, z.ZodTypeAny>);
     return { jsonSchema, zodValidator };
   }
 
-  // Input is JSON Schema → convert to Zod
   const jsonSchema = schema as InputSchema;
   const zodValidator = jsonSchemaToZod(jsonSchema);
   return { jsonSchema, zodValidator };
@@ -151,7 +137,6 @@ export function validateWithZod(
   const result = validator.safeParse(data);
 
   if (!result.success) {
-    // Format Zod errors into readable message
     const errors = result.error.errors
       .map((err) => `  - ${err.path.join('.') || 'root'}: ${err.message}`)
       .join('\n');

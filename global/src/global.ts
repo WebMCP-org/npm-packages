@@ -20,6 +20,7 @@ import type {
   ToolResponse,
   ValidatedToolDescriptor,
   WebModelContextInitOptions,
+  ZodSchemaObject,
 } from './types.js';
 import { normalizeSchema, validateWithZod } from './validation.js';
 
@@ -30,7 +31,13 @@ declare global {
 }
 
 /**
- * Custom ToolCallEvent implementation
+ * ToolCallEvent implementation for the Web Model Context API.
+ * Represents an event fired when a tool is called, allowing event listeners
+ * to intercept and provide custom responses.
+ *
+ * @class WebToolCallEvent
+ * @extends {Event}
+ * @implements {ToolCallEvent}
  */
 class WebToolCallEvent extends Event implements ToolCallEvent {
   public name: string;
@@ -38,12 +45,24 @@ class WebToolCallEvent extends Event implements ToolCallEvent {
   private _response: ToolResponse | null = null;
   private _responded = false;
 
+  /**
+   * Creates a new ToolCallEvent.
+   *
+   * @param {string} toolName - Name of the tool being called
+   * @param {Record<string, unknown>} args - Validated arguments for the tool
+   */
   constructor(toolName: string, args: Record<string, unknown>) {
     super('toolcall', { cancelable: true });
     this.name = toolName;
     this.arguments = args;
   }
 
+  /**
+   * Provides a response for this tool call, preventing the default tool execution.
+   *
+   * @param {ToolResponse} response - The response to use instead of executing the tool
+   * @throws {Error} If a response has already been provided
+   */
   respondWith(response: ToolResponse): void {
     if (this._responded) {
       throw new Error('Response already provided for this tool call');
@@ -52,24 +71,38 @@ class WebToolCallEvent extends Event implements ToolCallEvent {
     this._responded = true;
   }
 
+  /**
+   * Gets the response provided via respondWith().
+   *
+   * @returns {ToolResponse | null} The response, or null if none provided
+   */
   getResponse(): ToolResponse | null {
     return this._response;
   }
 
+  /**
+   * Checks whether a response has been provided for this tool call.
+   *
+   * @returns {boolean} True if respondWith() was called
+   */
   hasResponse(): boolean {
     return this._responded;
   }
 }
 
 /**
- * Time window (in ms) to detect rapid duplicate registrations
- * Registrations within this window are likely due to React Strict Mode
+ * Time window in milliseconds to detect rapid duplicate tool registrations.
+ * Used to filter out double-registrations caused by React Strict Mode.
  */
 const RAPID_DUPLICATE_WINDOW_MS = 50;
 
 /**
- * Testing API implementation for Model Context
- * Provides debugging and mocking capabilities for testing
+ * Testing API implementation for the Model Context Protocol.
+ * Provides debugging, mocking, and testing capabilities for tool execution.
+ * Implements both Chromium native methods and polyfill-specific extensions.
+ *
+ * @class WebModelContextTesting
+ * @implements {ModelContextTesting}
  */
 class WebModelContextTesting implements ModelContextTesting {
   private toolCallHistory: Array<{
@@ -78,14 +111,25 @@ class WebModelContextTesting implements ModelContextTesting {
     timestamp: number;
   }> = [];
   private mockResponses: Map<string, ToolResponse> = new Map();
+  private toolsChangedCallbacks: Set<() => void> = new Set();
   private bridge: MCPBridge;
 
+  /**
+   * Creates a new WebModelContextTesting instance.
+   *
+   * @param {MCPBridge} bridge - The MCP bridge instance to test
+   */
   constructor(bridge: MCPBridge) {
     this.bridge = bridge;
   }
 
   /**
-   * Record a tool call (called internally by WebModelContext)
+   * Records a tool call in the history.
+   * Called internally by WebModelContext when tools are executed.
+   *
+   * @param {string} toolName - Name of the tool that was called
+   * @param {Record<string, unknown>} args - Arguments passed to the tool
+   * @internal
    */
   recordToolCall(toolName: string, args: Record<string, unknown>): void {
     this.toolCallHistory.push({
@@ -96,19 +140,121 @@ class WebModelContextTesting implements ModelContextTesting {
   }
 
   /**
-   * Check if a mock response exists for a tool
+   * Checks if a mock response is registered for a specific tool.
+   *
+   * @param {string} toolName - Name of the tool to check
+   * @returns {boolean} True if a mock response exists
+   * @internal
    */
   hasMockResponse(toolName: string): boolean {
     return this.mockResponses.has(toolName);
   }
 
   /**
-   * Get mock response for a tool (if set)
+   * Retrieves the mock response for a specific tool.
+   *
+   * @param {string} toolName - Name of the tool
+   * @returns {ToolResponse | undefined} The mock response, or undefined if none exists
+   * @internal
    */
   getMockResponse(toolName: string): ToolResponse | undefined {
     return this.mockResponses.get(toolName);
   }
 
+  /**
+   * Notifies all registered callbacks that the tools list has changed.
+   * Called internally when tools are registered, unregistered, or cleared.
+   *
+   * @internal
+   */
+  notifyToolsChanged(): void {
+    for (const callback of this.toolsChangedCallbacks) {
+      try {
+        callback();
+      } catch (error) {
+        console.error('[Model Context Testing] Error in tools changed callback:', error);
+      }
+    }
+  }
+
+  /**
+   * Executes a tool directly with JSON string input (Chromium native API).
+   * Parses the JSON input, validates it, and executes the tool.
+   *
+   * @param {string} toolName - Name of the tool to execute
+   * @param {string} inputArgsJson - JSON string of input arguments
+   * @returns {Promise<unknown>} The tool's result, or undefined on error
+   * @throws {SyntaxError} If the input JSON is invalid
+   * @throws {Error} If the tool does not exist
+   */
+  async executeTool(toolName: string, inputArgsJson: string): Promise<unknown> {
+    console.log(`[Model Context Testing] Executing tool: ${toolName}`);
+
+    let args: Record<string, unknown>;
+    try {
+      args = JSON.parse(inputArgsJson);
+    } catch (error) {
+      throw new SyntaxError(
+        `Invalid JSON input: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+
+    const tool = this.bridge.tools.get(toolName);
+    if (!tool) {
+      throw new Error(`Tool not found: ${toolName}`);
+    }
+
+    const result = await this.bridge.modelContext.executeTool(toolName, args);
+
+    if (result.isError) {
+      return undefined;
+    }
+
+    if (result.structuredContent) {
+      return result.structuredContent;
+    }
+
+    if (result.content && result.content.length > 0) {
+      const firstContent = result.content[0];
+      if (firstContent && firstContent.type === 'text') {
+        return firstContent.text;
+      }
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Lists all registered tools with inputSchema as JSON string (Chromium native API).
+   * Returns an array of ToolInfo objects where inputSchema is stringified.
+   *
+   * @returns {Array<{name: string, description: string, inputSchema: string}>} Array of tool information
+   */
+  listTools(): Array<{ name: string; description: string; inputSchema: string }> {
+    const tools = this.bridge.modelContext.listTools();
+    return tools.map((tool) => ({
+      name: tool.name,
+      description: tool.description,
+      inputSchema: JSON.stringify(tool.inputSchema),
+    }));
+  }
+
+  /**
+   * Registers a callback that fires when the tools list changes (Chromium native API).
+   * The callback will be invoked on registerTool, unregisterTool, provideContext, and clearContext.
+   *
+   * @param {() => void} callback - Function to call when tools change
+   */
+  registerToolsChangedCallback(callback: () => void): void {
+    this.toolsChangedCallbacks.add(callback);
+    console.log('[Model Context Testing] Tools changed callback registered');
+  }
+
+  /**
+   * Gets all tool calls that have been recorded (polyfill extension).
+   *
+   * @returns {Array<{toolName: string, arguments: Record<string, unknown>, timestamp: number}>} Tool call history
+   */
   getToolCalls(): Array<{
     toolName: string;
     arguments: Record<string, unknown>;
@@ -117,30 +263,57 @@ class WebModelContextTesting implements ModelContextTesting {
     return [...this.toolCallHistory];
   }
 
+  /**
+   * Clears the tool call history (polyfill extension).
+   */
   clearToolCalls(): void {
     this.toolCallHistory = [];
     console.log('[Model Context Testing] Tool call history cleared');
   }
 
+  /**
+   * Sets a mock response for a specific tool (polyfill extension).
+   * When set, the tool's execute function will be bypassed.
+   *
+   * @param {string} toolName - Name of the tool to mock
+   * @param {ToolResponse} response - The mock response to return
+   */
   setMockToolResponse(toolName: string, response: ToolResponse): void {
     this.mockResponses.set(toolName, response);
     console.log(`[Model Context Testing] Mock response set for tool: ${toolName}`);
   }
 
+  /**
+   * Clears the mock response for a specific tool (polyfill extension).
+   *
+   * @param {string} toolName - Name of the tool
+   */
   clearMockToolResponse(toolName: string): void {
     this.mockResponses.delete(toolName);
     console.log(`[Model Context Testing] Mock response cleared for tool: ${toolName}`);
   }
 
+  /**
+   * Clears all mock tool responses (polyfill extension).
+   */
   clearAllMockToolResponses(): void {
     this.mockResponses.clear();
     console.log('[Model Context Testing] All mock responses cleared');
   }
 
+  /**
+   * Gets the current tools registered in the system (polyfill extension).
+   *
+   * @returns {ReturnType<InternalModelContext['listTools']>} Array of registered tools
+   */
   getRegisteredTools(): ReturnType<InternalModelContext['listTools']> {
     return this.bridge.modelContext.listTools();
   }
 
+  /**
+   * Resets the entire testing state (polyfill extension).
+   * Clears both tool call history and all mock responses.
+   */
   reset(): void {
     this.clearToolCalls();
     this.clearAllMockToolResponses();
@@ -149,17 +322,16 @@ class WebModelContextTesting implements ModelContextTesting {
 }
 
 /**
- * ModelContext implementation that bridges to MCP SDK
- * Implements the W3C Web Model Context API proposal with two-bucket tool management
+ * ModelContext implementation that bridges to the Model Context Protocol SDK.
+ * Implements the W3C Web Model Context API proposal with two-bucket tool management:
+ * - Bucket A (provideContextTools): Tools registered via provideContext()
+ * - Bucket B (dynamicTools): Tools registered via registerTool()
  *
- * Two-Bucket System:
- * - Bucket A (provideContextTools): Tools registered via provideContext() - base/app-level tools
- * - Bucket B (dynamicTools): Tools registered via registerTool() - component-scoped tools
+ * This separation ensures that component-scoped dynamic tools persist across
+ * app-level provideContext() calls.
  *
- * Benefits:
- * - provideContext() only clears Bucket A, leaving Bucket B intact
- * - Components can manage their own tool lifecycle independently
- * - Final tool list = Bucket A + Bucket B (merged, with collision detection)
+ * @class WebModelContext
+ * @implements {InternalModelContext}
  */
 class WebModelContext implements InternalModelContext {
   private bridge: MCPBridge;
@@ -170,6 +342,11 @@ class WebModelContext implements InternalModelContext {
   private unregisterFunctions: Map<string, () => void>;
   private testingAPI?: WebModelContextTesting;
 
+  /**
+   * Creates a new WebModelContext instance.
+   *
+   * @param {MCPBridge} bridge - The MCP bridge to use for communication
+   */
   constructor(bridge: MCPBridge) {
     this.bridge = bridge;
     this.eventTarget = new EventTarget();
@@ -180,7 +357,10 @@ class WebModelContext implements InternalModelContext {
   }
 
   /**
-   * Set the testing API (called during initialization)
+   * Sets the testing API instance.
+   * Called during initialization to enable testing features.
+   *
+   * @param {WebModelContextTesting} testingAPI - The testing API instance
    * @internal
    */
   setTestingAPI(testingAPI: WebModelContextTesting): void {
@@ -188,7 +368,11 @@ class WebModelContext implements InternalModelContext {
   }
 
   /**
-   * Add event listener (compatible with ModelContext interface)
+   * Adds an event listener for tool call events.
+   *
+   * @param {'toolcall'} type - Event type (only 'toolcall' is supported)
+   * @param {(event: ToolCallEvent) => void | Promise<void>} listener - Event handler function
+   * @param {boolean | AddEventListenerOptions} [options] - Event listener options
    */
   addEventListener(
     type: 'toolcall',
@@ -199,7 +383,11 @@ class WebModelContext implements InternalModelContext {
   }
 
   /**
-   * Remove event listener
+   * Removes an event listener for tool call events.
+   *
+   * @param {'toolcall'} type - Event type (only 'toolcall' is supported)
+   * @param {(event: ToolCallEvent) => void | Promise<void>} listener - Event handler function
+   * @param {boolean | EventListenerOptions} [options] - Event listener options
    */
   removeEventListener(
     type: 'toolcall',
@@ -210,15 +398,22 @@ class WebModelContext implements InternalModelContext {
   }
 
   /**
-   * Dispatch event
+   * Dispatches a tool call event to all registered listeners.
+   *
+   * @param {Event} event - The event to dispatch
+   * @returns {boolean} False if event was cancelled, true otherwise
    */
   dispatchEvent(event: Event): boolean {
     return this.eventTarget.dispatchEvent(event);
   }
 
   /**
-   * Provide context (tools) to AI models
-   * Clears and replaces Bucket A (provideContext tools), leaving Bucket B (dynamic tools) intact
+   * Provides context (tools) to AI models by registering base tools (Bucket A).
+   * Clears and replaces all previously registered base tools while preserving
+   * dynamic tools registered via registerTool().
+   *
+   * @param {ModelContextInput} context - Context containing tools to register
+   * @throws {Error} If a tool name collides with an existing dynamic tool
    */
   provideContext(context: ModelContextInput): void {
     console.log(`[Web Model Context] Registering ${context.tools.length} tools via provideContext`);
@@ -257,11 +452,17 @@ class WebModelContext implements InternalModelContext {
   }
 
   /**
-   * Register a single tool dynamically (Bucket B)
-   * Returns an object with an unregister function to remove the tool
-   * Tools registered via this method persist across provideContext() calls
+   * Registers a single tool dynamically (Bucket B).
+   * Dynamic tools persist across provideContext() calls and can be independently managed.
+   *
+   * @param {ToolDescriptor} tool - The tool descriptor to register
+   * @returns {{unregister: () => void}} Object with unregister function
+   * @throws {Error} If tool name collides with existing tools
    */
-  registerTool(tool: ToolDescriptor<any, any>): { unregister: () => void } {
+  registerTool<
+    TInputSchema extends ZodSchemaObject = Record<string, never>,
+    TOutputSchema extends ZodSchemaObject = Record<string, never>,
+  >(tool: ToolDescriptor<TInputSchema, TOutputSchema>): { unregister: () => void } {
     console.log(`[Web Model Context] Registering tool dynamically: ${tool.name}`);
 
     const now = Date.now();
@@ -303,7 +504,7 @@ class WebModelContext implements InternalModelContext {
       inputSchema: inputJson,
       ...(normalizedOutput && { outputSchema: normalizedOutput.jsonSchema }),
       ...(tool.annotations && { annotations: tool.annotations }),
-      execute: tool.execute,
+      execute: tool.execute as (args: Record<string, unknown>) => Promise<ToolResponse>,
       inputValidator: inputZod,
       ...(normalizedOutput && { outputValidator: normalizedOutput.zodValidator }),
     };
@@ -349,8 +550,59 @@ class WebModelContext implements InternalModelContext {
   }
 
   /**
-   * Update the bridge tools map with merged tools from both buckets
-   * Final tool list = Bucket A (provideContext) + Bucket B (dynamic)
+   * Unregisters a tool by name (Chromium native API).
+   * Can unregister tools from either Bucket A (provideContext) or Bucket B (registerTool).
+   *
+   * @param {string} name - Name of the tool to unregister
+   */
+  unregisterTool(name: string): void {
+    console.log(`[Web Model Context] Unregistering tool: ${name}`);
+
+    const inProvideContext = this.provideContextTools.has(name);
+    const inDynamic = this.dynamicTools.has(name);
+
+    if (!inProvideContext && !inDynamic) {
+      console.warn(
+        `[Web Model Context] Tool "${name}" is not registered, ignoring unregister call`
+      );
+      return;
+    }
+
+    if (inProvideContext) {
+      this.provideContextTools.delete(name);
+    }
+
+    if (inDynamic) {
+      this.dynamicTools.delete(name);
+      this.registrationTimestamps.delete(name);
+      this.unregisterFunctions.delete(name);
+    }
+
+    this.updateBridgeTools();
+    this.notifyToolsListChanged();
+  }
+
+  /**
+   * Clears all registered tools from both buckets (Chromium native API).
+   * Removes all tools registered via provideContext() and registerTool().
+   */
+  clearContext(): void {
+    console.log('[Web Model Context] Clearing all tools');
+
+    this.provideContextTools.clear();
+    this.dynamicTools.clear();
+    this.registrationTimestamps.clear();
+    this.unregisterFunctions.clear();
+
+    this.updateBridgeTools();
+    this.notifyToolsListChanged();
+  }
+
+  /**
+   * Updates the bridge tools map with merged tools from both buckets.
+   * The final tool list is the union of Bucket A (provideContext) and Bucket B (dynamic).
+   *
+   * @private
    */
   private updateBridgeTools(): void {
     this.bridge.tools.clear();
@@ -369,7 +621,10 @@ class WebModelContext implements InternalModelContext {
   }
 
   /**
-   * Notify all servers that the tools list has changed
+   * Notifies all servers and testing callbacks that the tools list has changed.
+   * Sends MCP notifications to connected servers and invokes registered testing callbacks.
+   *
+   * @private
    */
   private notifyToolsListChanged(): void {
     if (this.bridge.tabServer.notification) {
@@ -385,16 +640,27 @@ class WebModelContext implements InternalModelContext {
         params: {},
       });
     }
+
+    if (this.testingAPI && 'notifyToolsChanged' in this.testingAPI) {
+      (this.testingAPI as WebModelContextTesting).notifyToolsChanged();
+    }
   }
 
   /**
-   * Execute a tool with hybrid approach:
-   * 1. Validate input arguments
-   * 2. Record tool call in testing API (if available)
-   * 3. Check for mock response (if testing API is active)
-   * 4. Dispatch toolcall event first
-   * 5. If not prevented, call tool's execute function
-   * 6. Validate output (permissive mode - warn only)
+   * Executes a tool with validation and event dispatch.
+   * Follows this sequence:
+   * 1. Validates input arguments against schema
+   * 2. Records tool call in testing API (if available)
+   * 3. Checks for mock response (if testing)
+   * 4. Dispatches 'toolcall' event to listeners
+   * 5. Executes tool function if not prevented
+   * 6. Validates output (permissive mode - warns only)
+   *
+   * @param {string} toolName - Name of the tool to execute
+   * @param {Record<string, unknown>} args - Arguments to pass to the tool
+   * @returns {Promise<ToolResponse>} The tool's response
+   * @throws {Error} If tool is not found
+   * @internal
    */
   async executeTool(toolName: string, args: Record<string, unknown>): Promise<ToolResponse> {
     const tool = this.bridge.tools.get(toolName);
@@ -476,8 +742,11 @@ class WebModelContext implements InternalModelContext {
   }
 
   /**
-   * Get list of registered tools in MCP format
-   * Includes full MCP spec: annotations, outputSchema, etc.
+   * Lists all registered tools in MCP format.
+   * Returns tools from both buckets with full MCP specification including
+   * annotations and output schemas.
+   *
+   * @returns {Array<{name: string, description: string, inputSchema: InputSchema, outputSchema?: InputSchema, annotations?: ToolAnnotations}>} Array of tool descriptors
    */
   listTools() {
     return Array.from(this.bridge.tools.values()).map((tool) => ({
@@ -491,8 +760,12 @@ class WebModelContext implements InternalModelContext {
 }
 
 /**
- * Initialize the MCP bridge with dual-server support
- * Creates both TabServer (same-window) and IframeChildServer (parent-child) by default
+ * Initializes the MCP bridge with dual-server support.
+ * Creates TabServer for same-window communication and optionally IframeChildServer
+ * for parent-child iframe communication.
+ *
+ * @param {WebModelContextInitOptions} [options] - Configuration options
+ * @returns {MCPBridge} The initialized MCP bridge
  */
 function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
   console.log('[Web Model Context] Initializing MCP bridge');
@@ -649,7 +922,24 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
 }
 
 /**
- * Initialize the Web Model Context API (window.navigator.modelContext)
+ * Initializes the Web Model Context API on window.navigator.
+ * Creates and exposes navigator.modelContext and navigator.modelContextTesting.
+ * Automatically detects and uses native Chromium implementation if available.
+ *
+ * @param {WebModelContextInitOptions} [options] - Configuration options
+ * @throws {Error} If initialization fails
+ * @example
+ * ```typescript
+ * import { initializeWebModelContext } from '@mcp-b/global';
+ *
+ * initializeWebModelContext({
+ *   transport: {
+ *     tabServer: {
+ *       allowedOrigins: ['https://example.com']
+ *     }
+ *   }
+ * });
+ * ```
  */
 export function initializeWebModelContext(options?: WebModelContextInitOptions): void {
   if (typeof window === 'undefined') {
@@ -718,7 +1008,16 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
 }
 
 /**
- * Cleanup function (for testing/development)
+ * Cleans up the Web Model Context API.
+ * Closes all MCP servers and removes API from window.navigator.
+ * Useful for testing and hot module replacement.
+ *
+ * @example
+ * ```typescript
+ * import { cleanupWebModelContext } from '@mcp-b/global';
+ *
+ * cleanupWebModelContext();
+ * ```
  */
 export function cleanupWebModelContext(): void {
   if (typeof window === 'undefined') return;
