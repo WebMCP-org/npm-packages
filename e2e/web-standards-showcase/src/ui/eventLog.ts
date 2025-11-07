@@ -16,15 +16,15 @@ export class EventLog {
 
   log(event: string, details?: string): void {
     const entry = document.createElement('div');
-    entry.className = 'log-entry';
+    entry.className = 'border-b border-white/10 py-1';
 
     const timestamp = new Date().toLocaleTimeString();
     const timestampSpan = document.createElement('span');
-    timestampSpan.className = 'log-timestamp';
+    timestampSpan.className = 'mr-4 text-gray-400';
     timestampSpan.textContent = timestamp;
 
     const eventSpan = document.createElement('span');
-    eventSpan.className = 'log-event';
+    eventSpan.className = 'mr-2 font-semibold text-blue-400';
     eventSpan.textContent = event;
 
     entry.appendChild(timestampSpan);
@@ -32,7 +32,7 @@ export class EventLog {
 
     if (details) {
       const detailsSpan = document.createElement('span');
-      detailsSpan.className = 'log-details';
+      detailsSpan.className = 'text-gray-300';
       detailsSpan.textContent = details;
       entry.appendChild(detailsSpan);
     }
@@ -50,18 +50,18 @@ export class EventLog {
   }
 
   success(event: string, details?: string): void {
-    this.log(`✅ ${event}`, details);
+    this.log(`[SUCCESS] ${event}`, details);
   }
 
   error(event: string, details?: string): void {
-    this.log(`❌ ${event}`, details);
+    this.log(`[ERROR] ${event}`, details);
   }
 
   info(event: string, details?: string): void {
-    this.log(`ℹ️ ${event}`, details);
+    this.log(`[INFO] ${event}`, details);
   }
 
   warning(event: string, details?: string): void {
-    this.log(`⚠️ ${event}`, details);
+    this.log(`[WARNING] ${event}`, details);
   }
 }

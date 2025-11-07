@@ -60,17 +60,16 @@ function updateDetectionBanner(detection: ReturnType<typeof detectNativeAPI>): v
   if (!banner || !status) return;
 
   if (detection.isNative) {
-    banner.className = 'banner success';
+    banner.className = 'sticky top-0 z-50 bg-green-600 text-white shadow-lg';
     status.innerHTML = `
-      <span style="font-size: 1.5rem; margin-right: 0.5rem;">✅</span>
-      <span>${detection.message}</span>
+      <span class="flex items-center gap-4 py-3 text-sm">${detection.message}</span>
     `;
   } else if (detection.available && detection.isPolyfill) {
-    banner.className = 'banner warning';
-    status.innerHTML = `<span>${detection.message}</span>`;
+    banner.className = 'sticky top-0 z-50 bg-yellow-600 text-white shadow-lg';
+    status.innerHTML = `<span class="flex items-center gap-4 py-3 text-sm">${detection.message}</span>`;
   } else {
-    banner.className = 'banner error';
-    status.innerHTML = `<span>${detection.message}</span>`;
+    banner.className = 'sticky top-0 z-50 bg-red-600 text-white shadow-lg';
+    status.innerHTML = `<span class="flex items-center gap-4 py-3 text-sm">${detection.message}</span>`;
   }
 }
 
@@ -200,7 +199,7 @@ function showError(message: string): void {
   const errorDiv = document.getElementById('editor-error');
   if (errorDiv) {
     errorDiv.textContent = `Error: ${message}`;
-    errorDiv.style.display = 'block';
+    errorDiv.classList.remove('hidden');
   }
 }
 
@@ -210,7 +209,7 @@ function showError(message: string): void {
 function hideError(): void {
   const errorDiv = document.getElementById('editor-error');
   if (errorDiv) {
-    errorDiv.style.display = 'none';
+    errorDiv.classList.add('hidden');
   }
 }
 
@@ -392,6 +391,7 @@ function listToolsDemo(): void {
       null,
       2
     );
+    result.classList.remove('hidden');
   }
 
   eventLog.info('listTools() called', `Found ${tools.length} tools`);
@@ -412,6 +412,7 @@ async function executeToolDemo(): Promise<void> {
 
     if (result) {
       result.textContent = JSON.stringify(toolResult, null, 2);
+      result.classList.remove('hidden');
     }
 
     eventLog.success(`executeTool("${firstTool.name}")`, 'Tool executed successfully');
@@ -421,6 +422,7 @@ async function executeToolDemo(): Promise<void> {
 
     if (result) {
       result.textContent = `Error: ${message}`;
+      result.classList.remove('hidden');
     }
   }
 }
@@ -463,6 +465,7 @@ function testingListTools(): void {
       null,
       2
     );
+    result.classList.remove('hidden');
   }
 
   eventLog.info('Testing.listTools() called', `Found ${tools.length} tools`);
@@ -484,6 +487,7 @@ async function testingExecute(): Promise<void> {
 
     if (result) {
       result.textContent = `Result (string):\n${toolResult}`;
+      result.classList.remove('hidden');
     }
 
     eventLog.success(`Testing.executeTool("${firstTool.name}")`, 'Tool executed successfully');
@@ -493,6 +497,7 @@ async function testingExecute(): Promise<void> {
 
     if (result) {
       result.textContent = `Error: ${message}`;
+      result.classList.remove('hidden');
     }
   }
 }
@@ -503,6 +508,7 @@ function getToolCalls(): void {
 
   if (result) {
     result.textContent = JSON.stringify(calls, null, 2);
+    result.classList.remove('hidden');
   }
 
   eventLog.info('getToolCalls() called', `Found ${calls.length} calls`);
@@ -514,6 +520,7 @@ function clearToolCalls(): void {
 
   if (result) {
     result.textContent = 'Tool call history cleared';
+    result.classList.remove('hidden');
   }
 
   eventLog.success('clearToolCalls() called', 'History cleared');
@@ -535,6 +542,7 @@ function setMockResponse(): void {
   const result = document.getElementById('testing-result');
   if (result) {
     result.textContent = `Mock set for "${toolName}"\nResponse: ${mockResponse}`;
+    result.classList.remove('hidden');
   }
 
   eventLog.success('setMockToolResponse() called', `Mocked "${toolName}"`);
@@ -546,6 +554,7 @@ function resetTesting(): void {
   const result = document.getElementById('testing-result');
   if (result) {
     result.textContent = 'Testing API reset';
+    result.classList.remove('hidden');
   }
 
   eventLog.success('reset() called', 'Testing state cleared');
@@ -569,6 +578,7 @@ async function executeSelectedTool(): Promise<void> {
 
     if (result) {
       result.textContent = JSON.stringify(toolResult, null, 2);
+      result.classList.remove('hidden');
     }
 
     eventLog.success(`Executed "${select.value}"`, 'Tool executed successfully');
@@ -577,6 +587,7 @@ async function executeSelectedTool(): Promise<void> {
 
     if (result) {
       result.textContent = `Error: ${message}`;
+      result.classList.remove('hidden');
     }
 
     eventLog.error('Execution failed', message);

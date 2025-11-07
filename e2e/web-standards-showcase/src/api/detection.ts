@@ -16,7 +16,7 @@ export function detectNativeAPI(): DetectionResult {
 
   // Check if modelContext exists
   if (!navigator.modelContext) {
-    result.message = '❌ navigator.modelContext not found. Please launch Chromium with --enable-experimental-web-platform-features';
+    result.message = 'navigator.modelContext not found. Please launch Chromium with --enable-experimental-web-platform-features';
     return result;
   }
 
@@ -34,7 +34,7 @@ export function detectNativeAPI(): DetectionResult {
     result.isNative = !result.isPolyfill;
 
     if (result.isPolyfill) {
-      result.message = `⚠️  Polyfill detected (${constructorName}). This app requires the NATIVE Chromium implementation. Please ensure you've launched with --enable-experimental-web-platform-features and no polyfill is loaded.`;
+      result.message = `Polyfill detected (${constructorName}). This app requires the NATIVE Chromium implementation. Please ensure you've launched with --enable-experimental-web-platform-features and no polyfill is loaded.`;
       return result;
     }
   }
@@ -47,12 +47,12 @@ export function detectNativeAPI(): DetectionResult {
   if (!hasNativeMethods) {
     result.isPolyfill = true;
     result.isNative = false;
-    result.message = '⚠️  Missing native methods (unregisterTool, clearContext). Polyfill detected.';
+    result.message = 'Missing native methods (unregisterTool, clearContext). Polyfill detected.';
     return result;
   }
 
   result.isNative = true;
-  result.message = '✅ Native Chromium Web Model Context API detected!';
+  result.message = 'Native Chromium Web Model Context API detected!';
   return result;
 }
 

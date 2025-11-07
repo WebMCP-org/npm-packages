@@ -80,10 +80,10 @@ export class ToolDisplay {
 
     if (tools.length === 0) {
       this.container.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-icon">🔧</div>
-          <p>No tools registered yet</p>
-          <p class="hint">Use the editor to define and register tools</p>
+        <div class="flex h-full flex-col items-center justify-center text-center text-muted-foreground">
+          <div class="mb-4 text-5xl opacity-50">⚙</div>
+          <p class="text-base">No tools registered yet</p>
+          <p class="mt-1 text-sm">Use the editor to define and register tools</p>
         </div>
       `;
       return;
@@ -100,28 +100,31 @@ export class ToolDisplay {
 
     for (const tool of sortedTools) {
       const item = document.createElement('div');
-      item.className = 'tool-item';
+      item.className = 'mb-4 rounded-lg border border-border bg-muted p-4 last:mb-0';
 
       const header = document.createElement('div');
-      header.className = 'tool-header';
+      header.className = 'mb-2 flex items-start justify-between';
 
       const name = document.createElement('div');
-      name.className = 'tool-name';
+      name.className = 'font-mono text-sm font-semibold text-primary';
       name.textContent = tool.name;
 
       const badge = document.createElement('span');
-      badge.className = `tool-badge ${tool.bucket ? `bucket-${tool.bucket.toLowerCase()}` : ''}`;
+      const bucketClass = tool.bucket === 'A' ? 'bg-[var(--color-bucket-a-light)] text-[var(--color-bucket-a)]' :
+                          tool.bucket === 'B' ? 'bg-[var(--color-bucket-b-light)] text-[var(--color-bucket-b)]' :
+                          'bg-secondary text-secondary-foreground';
+      badge.className = `rounded px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${bucketClass}`;
       badge.textContent = tool.bucket ? `Bucket ${tool.bucket}` : 'Tool';
 
       header.appendChild(name);
       header.appendChild(badge);
 
       const description = document.createElement('div');
-      description.className = 'tool-description';
+      description.className = 'mb-2 text-sm text-muted-foreground';
       description.textContent = tool.description;
 
       const schema = document.createElement('div');
-      schema.className = 'tool-schema';
+      schema.className = 'overflow-x-auto whitespace-pre-wrap break-all rounded-md border border-border bg-card p-2 font-mono text-xs text-foreground';
       schema.textContent = JSON.stringify(tool.inputSchema, null, 2);
 
       item.appendChild(header);

@@ -6,35 +6,35 @@
   <title>Web Model Context API - Native Chromium Showcase</title>
   <link rel="stylesheet" href="/src/styles/main.css">
 </head>
-<body>
+<body class="flex min-h-screen flex-col">
   <!-- Detection Banner -->
-  <div id="detection-banner" class="banner">
-    <div class="container">
-      <div id="detection-status" class="status-content">
-        <div class="spinner"></div>
+  <div id="detection-banner" class="sticky top-0 z-50 bg-gray-900 text-white shadow-lg">
+    <div class="container mx-auto max-w-7xl px-6">
+      <div id="detection-status" class="flex items-center gap-4 py-3 text-sm">
+        <div class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"></div>
         <span>Detecting native API...</span>
       </div>
     </div>
   </div>
 
   <!-- Header -->
-  <header class="header">
-    <div class="container">
-      <h1>⚡ Web Model Context API Showcase</h1>
-      <p class="subtitle">Native Chromium Implementation - No Polyfill</p>
+  <header class="border-b-2 border-border bg-card px-6 py-8">
+    <div class="container mx-auto max-w-7xl">
+      <h1 class="text-3xl font-bold text-foreground">Web Model Context API Showcase</h1>
+      <p class="mt-2 text-lg text-muted-foreground">Native Chromium Implementation - No Polyfill</p>
     </div>
   </header>
 
   <!-- Main Content -->
-  <main class="main-content">
-    <div class="container">
+  <main class="flex-1 px-6 py-8">
+    <div class="container mx-auto max-w-7xl">
 
       <!-- CodePen-style Editor Section -->
-      <section class="editor-section">
-        <div class="section-header">
-          <h2>🎨 Live Tool Editor</h2>
-          <div class="editor-controls">
-            <select id="template-select" class="template-select">
+      <section class="mb-8 rounded-xl border border-border bg-card p-6 shadow-sm">
+        <div class="mb-6 flex items-center justify-between border-b-2 border-border pb-4">
+          <h2 class="text-2xl font-semibold text-foreground">Live Tool Editor</h2>
+          <div class="flex items-center gap-2">
+            <select id="template-select" class="min-w-[180px] rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
               <option value="">Load Template...</option>
               <option value="counter">Counter Tools</option>
               <option value="calculator">Calculator</option>
@@ -42,146 +42,146 @@
               <option value="timer">Timer</option>
               <option value="state-machine">State Machine</option>
             </select>
-            <button id="clear-editor" class="btn btn-secondary">Clear</button>
-            <button id="register-code" class="btn btn-primary">▶ Register Tool</button>
+            <button id="clear-editor" class="rounded-md bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground transition-transform hover:-translate-y-0.5 hover:shadow-md">Clear</button>
+            <button id="register-code" class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-transform hover:-translate-y-0.5 hover:shadow-md">Register Tool</button>
           </div>
         </div>
 
-        <div class="editor-layout">
+        <div class="mb-6 grid gap-6 lg:grid-cols-2">
           <!-- Code Editor -->
-          <div class="editor-panel">
-            <div class="panel-header">
-              <span class="panel-title">📝 Tool Definition</span>
-              <span class="panel-hint">Write your tool code here (JavaScript)</span>
+          <div class="flex flex-col overflow-hidden rounded-lg border border-border bg-muted">
+            <div class="flex items-center justify-between bg-gray-900 px-4 py-3 text-sm text-white">
+              <span class="font-semibold">Tool Definition</span>
+              <span class="text-white/70">Write your tool code here (JavaScript)</span>
             </div>
             <textarea
               id="code-editor"
-              class="code-editor"
+              class="scrollbar-thin min-h-[400px] flex-1 resize-y bg-gray-900 p-6 font-mono text-sm leading-relaxed text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary"
               spellcheck="false"
               placeholder="// Define your tool here&#10;// Example:&#10;const tool = {&#10;  name: 'my_tool',&#10;  description: 'My custom tool',&#10;  inputSchema: {&#10;    type: 'object',&#10;    properties: {}&#10;  },&#10;  async execute(input) {&#10;    return {&#10;      content: [{&#10;        type: 'text',&#10;        text: 'Hello from my tool!'&#10;      }]&#10;    };&#10;  }&#10;};"></textarea>
           </div>
 
           <!-- Live Output -->
-          <div class="output-panel">
-            <div class="panel-header">
-              <span class="panel-title">📊 Registered Tools</span>
-              <span class="panel-hint" id="tool-count">0 tools</span>
+          <div class="flex flex-col overflow-hidden rounded-lg border border-border bg-card">
+            <div class="flex items-center justify-between bg-gray-900 px-4 py-3 text-sm text-white">
+              <span class="font-semibold">Registered Tools</span>
+              <span class="text-white/70" id="tool-count">0 tools</span>
             </div>
-            <div id="tools-output" class="tools-output">
-              <div class="empty-state">
-                <div class="empty-icon">🔧</div>
-                <p>No tools registered yet</p>
-                <p class="hint">Use the editor to define and register tools</p>
+            <div id="tools-output" class="scrollbar-thin min-h-[400px] flex-1 overflow-y-auto p-6">
+              <div class="flex h-full flex-col items-center justify-center text-center text-muted-foreground">
+                <div class="mb-4 text-5xl opacity-50">⚙</div>
+                <p class="text-base">No tools registered yet</p>
+                <p class="mt-1 text-sm">Use the editor to define and register tools</p>
               </div>
             </div>
           </div>
         </div>
 
         <!-- Error Display -->
-        <div id="editor-error" class="error-display" style="display: none;"></div>
+        <div id="editor-error" class="mt-4 hidden rounded-lg border border-red-200 bg-red-50 p-4 font-mono text-sm text-red-600"></div>
       </section>
 
       <!-- API Demonstrations -->
-      <section class="api-section">
-        <h2>🔬 API Demonstrations</h2>
+      <section class="mb-8">
+        <h2 class="mb-6 text-2xl font-semibold text-foreground">API Demonstrations</h2>
 
         <!-- Two-Bucket System -->
-        <div class="demo-card">
-          <h3>Two-Bucket Tool Management</h3>
-          <p class="description">
+        <div class="mb-6 rounded-lg border border-border bg-muted p-6">
+          <h3 class="mb-2 text-xl font-semibold text-foreground">Two-Bucket Tool Management</h3>
+          <p class="mb-6 leading-relaxed text-muted-foreground">
             Demonstrates the two-bucket architecture:
-            <strong class="bucket-a">Bucket A (provideContext)</strong> for dynamic replacement and
-            <strong class="bucket-b">Bucket B (registerTool)</strong> for persistent tools.
+            <strong class="text-[var(--color-bucket-a)]">Bucket A (provideContext)</strong> for dynamic replacement and
+            <strong class="text-[var(--color-bucket-b)]">Bucket B (registerTool)</strong> for persistent tools.
           </p>
 
-          <div class="demo-controls">
-            <div class="control-group">
-              <h4 class="bucket-a">Bucket A - provideContext()</h4>
-              <button class="btn btn-small" id="provide-counter-tools">Add Counter Tools (A)</button>
-              <button class="btn btn-small" id="replace-bucket-a">Replace Bucket A</button>
-              <div class="bucket-indicator bucket-a-indicator" id="bucket-a-tools">Empty</div>
+          <div class="flex flex-wrap gap-4">
+            <div class="min-w-[300px] flex-1 rounded-lg border border-border bg-card p-4">
+              <h4 class="mb-4 text-base font-semibold text-[var(--color-bucket-a)]">Bucket A - provideContext()</h4>
+              <button class="mb-2 mr-2 rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80" id="provide-counter-tools">Add Counter Tools (A)</button>
+              <button class="mb-2 mr-2 rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80" id="replace-bucket-a">Replace Bucket A</button>
+              <div class="mt-4 rounded-md border-l-4 border-[var(--color-bucket-a)] bg-[var(--color-bucket-a-light)] px-4 py-3 font-mono text-sm text-[var(--color-bucket-a)]" id="bucket-a-tools">Empty</div>
             </div>
 
-            <div class="control-group">
-              <h4 class="bucket-b">Bucket B - registerTool()</h4>
-              <button class="btn btn-small" id="register-timer-tool">Add Timer Tool (B)</button>
-              <button class="btn btn-small" id="unregister-timer">Unregister Timer</button>
-              <div class="bucket-indicator bucket-b-indicator" id="bucket-b-tools">Empty</div>
+            <div class="min-w-[300px] flex-1 rounded-lg border border-border bg-card p-4">
+              <h4 class="mb-4 text-base font-semibold text-[var(--color-bucket-b)]">Bucket B - registerTool()</h4>
+              <button class="mb-2 mr-2 rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80" id="register-timer-tool">Add Timer Tool (B)</button>
+              <button class="mb-2 mr-2 rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80" id="unregister-timer">Unregister Timer</button>
+              <div class="mt-4 rounded-md border-l-4 border-[var(--color-bucket-b)] bg-[var(--color-bucket-b-light)] px-4 py-3 font-mono text-sm text-[var(--color-bucket-b)]" id="bucket-b-tools">Empty</div>
             </div>
           </div>
         </div>
 
         <!-- Native Methods -->
-        <div class="demo-card">
-          <h3>Native Chromium Methods</h3>
-          <p class="description">
+        <div class="mb-6 rounded-lg border border-border bg-muted p-6">
+          <h3 class="mb-2 text-xl font-semibold text-foreground">Native Chromium Methods</h3>
+          <p class="mb-6 leading-relaxed text-muted-foreground">
             Methods specific to the native Chromium implementation (not available in polyfill).
           </p>
 
-          <div class="demo-controls">
-            <button class="btn btn-small" id="list-tools">📋 listTools()</button>
-            <button class="btn btn-small" id="execute-tool">▶ executeTool()</button>
-            <button class="btn btn-small" id="unregister-tool">❌ unregisterTool()</button>
-            <button class="btn btn-small" id="clear-context">🗑️ clearContext()</button>
+          <div class="flex flex-wrap gap-2">
+            <button class="rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80" id="list-tools">listTools()</button>
+            <button class="rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80" id="execute-tool">executeTool()</button>
+            <button class="rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80" id="unregister-tool">unregisterTool()</button>
+            <button class="rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80" id="clear-context">clearContext()</button>
           </div>
-          <div class="result-display" id="native-result"></div>
+          <div id="native-result" class="scrollbar-thin mt-4 hidden max-h-[300px] overflow-y-auto rounded-lg border border-border bg-card p-4 font-mono text-sm text-foreground"></div>
         </div>
 
         <!-- Testing API -->
-        <div class="demo-card">
-          <h3>Testing API (navigator.modelContextTesting)</h3>
-          <p class="description">
+        <div class="mb-6 rounded-lg border border-border bg-muted p-6">
+          <h3 class="mb-2 text-xl font-semibold text-foreground">Testing API (navigator.modelContextTesting)</h3>
+          <p class="mb-6 leading-relaxed text-muted-foreground">
             Advanced testing features for debugging and development.
           </p>
 
-          <div class="demo-controls">
-            <button class="btn btn-small" id="testing-list-tools">📋 listTools()</button>
-            <button class="btn btn-small" id="testing-execute">▶ executeTool()</button>
-            <button class="btn btn-small" id="get-tool-calls">📞 getToolCalls()</button>
-            <button class="btn btn-small" id="clear-tool-calls">Clear Calls</button>
-            <button class="btn btn-small" id="set-mock">🎭 setMock()</button>
-            <button class="btn btn-small" id="reset-testing">🔄 reset()</button>
+          <div class="flex flex-wrap gap-2">
+            <button class="rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80" id="testing-list-tools">listTools()</button>
+            <button class="rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80" id="testing-execute">executeTool()</button>
+            <button class="rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80" id="get-tool-calls">getToolCalls()</button>
+            <button class="rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80" id="clear-tool-calls">Clear Calls</button>
+            <button class="rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80" id="set-mock">setMock()</button>
+            <button class="rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80" id="reset-testing">reset()</button>
           </div>
-          <div class="result-display" id="testing-result"></div>
+          <div id="testing-result" class="scrollbar-thin mt-4 hidden max-h-[300px] overflow-y-auto rounded-lg border border-border bg-card p-4 font-mono text-sm text-foreground"></div>
         </div>
 
         <!-- Tool Executor -->
-        <div class="demo-card">
-          <h3>🎮 Interactive Tool Executor</h3>
-          <div class="executor-controls">
-            <select id="exec-tool-select" class="form-select">
+        <div class="mb-6 rounded-lg border border-border bg-muted p-6">
+          <h3 class="mb-4 text-xl font-semibold text-foreground">Interactive Tool Executor</h3>
+          <div class="grid gap-4">
+            <select id="exec-tool-select" class="w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-ring">
               <option value="">Select a tool...</option>
             </select>
             <textarea
               id="exec-input"
-              class="form-input"
+              class="w-full resize-y rounded-md border border-input bg-muted px-3 py-2 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               placeholder='{"key": "value"}'
               rows="3"></textarea>
-            <button class="btn btn-primary" id="exec-button">Execute</button>
+            <button class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90" id="exec-button">Execute</button>
           </div>
-          <div class="result-display" id="exec-result"></div>
+          <div id="exec-result" class="scrollbar-thin mt-4 hidden max-h-[300px] overflow-y-auto rounded-lg border border-border bg-card p-4 font-mono text-sm text-foreground"></div>
         </div>
       </section>
 
       <!-- Event Log -->
-      <section class="log-section">
-        <div class="section-header">
-          <h2>📝 Event Log</h2>
-          <button id="clear-log" class="btn btn-secondary btn-small">Clear Log</button>
+      <section class="mb-8">
+        <div class="mb-4 flex items-center justify-between border-b-2 border-border pb-4">
+          <h2 class="text-2xl font-semibold text-foreground">Event Log</h2>
+          <button id="clear-log" class="rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80">Clear Log</button>
         </div>
-        <div id="event-log" class="event-log"></div>
+        <div id="event-log" class="scrollbar-thin max-h-96 overflow-y-auto rounded-lg bg-gray-900 p-6 font-mono text-sm leading-loose text-gray-100"></div>
       </section>
 
     </div>
   </main>
 
   <!-- Footer -->
-  <footer class="footer">
-    <div class="container">
+  <footer class="mt-auto bg-gray-900 px-6 py-6 text-center text-sm text-white">
+    <div class="container mx-auto max-w-7xl">
       <p>
         Native Chromium Web Model Context API Showcase |
-        <a href="https://github.com/WebMCP-org/WebMCP" target="_blank">GitHub</a> |
-        Launch with: <code>chromium --enable-experimental-web-platform-features</code>
+        <a href="https://github.com/WebMCP-org/WebMCP" target="_blank" class="text-primary hover:underline">GitHub</a> |
+        Launch with: <code class="rounded bg-white/10 px-2 py-1 font-mono text-xs">chromium --enable-experimental-web-platform-features</code>
       </p>
     </div>
   </footer>
