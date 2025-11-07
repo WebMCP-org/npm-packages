@@ -1,6 +1,3 @@
-// Web Model Context API Types
-// Based on: https://github.com/MicrosoftEdge/MSEdgeExplainers/blob/main/WebModelContext/explainer.md
-
 import type { IframeChildTransportOptions, TabServerTransportOptions } from '@mcp-b/transports';
 import type {
   CallToolResult,
@@ -172,7 +169,7 @@ export interface ModelContextInput {
    * Array of tool descriptors
    * Supports both JSON Schema and Zod schema formats
    */
-  tools: ToolDescriptor<any, any>[];
+  tools: ToolDescriptor[];
 }
 
 /**
@@ -325,7 +322,7 @@ export interface ModelContextTesting {
    * @param inputArgsJson - JSON string of input arguments
    * @returns Promise resolving to the tool's result
    */
-  executeTool(toolName: string, inputArgsJson: string): Promise<any>;
+  executeTool(toolName: string, inputArgsJson: string): Promise<unknown>;
 
   /**
    * List all registered tools (Chromium native API)

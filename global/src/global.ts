@@ -20,6 +20,7 @@ import type {
   ToolResponse,
   ValidatedToolDescriptor,
   WebModelContextInitOptions,
+  ZodSchemaObject,
 } from './types.js';
 import { normalizeSchema, validateWithZod } from './validation.js';
 
@@ -182,11 +183,11 @@ class WebModelContextTesting implements ModelContextTesting {
    *
    * @param {string} toolName - Name of the tool to execute
    * @param {string} inputArgsJson - JSON string of input arguments
-   * @returns {Promise<any>} The tool's result, or undefined on error
+   * @returns {Promise<unknown>} The tool's result, or undefined on error
    * @throws {SyntaxError} If the input JSON is invalid
    * @throws {Error} If the tool does not exist
    */
-  async executeTool(toolName: string, inputArgsJson: string): Promise<any> {
+  async executeTool(toolName: string, inputArgsJson: string): Promise<unknown> {
     console.log(`[Model Context Testing] Executing tool: ${toolName}`);
 
     let args: Record<string, unknown>;
@@ -454,11 +455,14 @@ class WebModelContext implements InternalModelContext {
    * Registers a single tool dynamically (Bucket B).
    * Dynamic tools persist across provideContext() calls and can be independently managed.
    *
-   * @param {ToolDescriptor<any, any>} tool - The tool descriptor to register
+   * @param {ToolDescriptor} tool - The tool descriptor to register
    * @returns {{unregister: () => void}} Object with unregister function
    * @throws {Error} If tool name collides with existing tools
    */
-  registerTool(tool: ToolDescriptor<any, any>): { unregister: () => void } {
+  registerTool<
+    TInputSchema extends ZodSchemaObject = Record<string, never>,
+    TOutputSchema extends ZodSchemaObject = Record<string, never>,
+  >(tool: ToolDescriptor<TInputSchema, TOutputSchema>): { unregister: () => void } {
     console.log(`[Web Model Context] Registering tool dynamically: ${tool.name}`);
 
     const now = Date.now();
@@ -500,7 +504,7 @@ class WebModelContext implements InternalModelContext {
       inputSchema: inputJson,
       ...(normalizedOutput && { outputSchema: normalizedOutput.jsonSchema }),
       ...(tool.annotations && { annotations: tool.annotations }),
-      execute: tool.execute,
+      execute: tool.execute as (args: Record<string, unknown>) => Promise<ToolResponse>,
       inputValidator: inputZod,
       ...(normalizedOutput && { outputValidator: normalizedOutput.zodValidator }),
     };
