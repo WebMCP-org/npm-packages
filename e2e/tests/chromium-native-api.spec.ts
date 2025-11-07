@@ -56,9 +56,9 @@ test.describe('Chromium Native API - ModelContext', () => {
     expect(toolCount).toBe(4); // back to 4 base tools
 
     const logEntries = await page.locator('#log .log-entry').allTextContents();
-    expect(logEntries.some((entry) => entry.includes('Tool unregistered via unregisterTool()'))).toBe(
-      true
-    );
+    expect(
+      logEntries.some((entry) => entry.includes('Tool unregistered via unregisterTool()'))
+    ).toBe(true);
   });
 
   test('should unregisterTool by name - base tool', async ({ page }) => {
@@ -188,9 +188,9 @@ test.describe('Chromium Native API - ModelContextTesting', () => {
     await page.waitForTimeout(500);
 
     const logEntries = await page.locator('#log .log-entry').allTextContents();
-    expect(
-      logEntries.some((entry) => entry.includes('executeTool() succeeded with result'))
-    ).toBe(true);
+    expect(logEntries.some((entry) => entry.includes('executeTool() succeeded with result'))).toBe(
+      true
+    );
   });
 
   test('should executeTool return correct value', async ({ page }) => {
