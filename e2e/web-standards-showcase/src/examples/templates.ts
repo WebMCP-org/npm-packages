@@ -21,12 +21,7 @@ const tool = {
   },
   async execute(input) {
     counter += input.amount || 1;
-    return {
-      content: [{
-        type: 'text',
-        text: \`Counter incremented to: \${counter}\`
-      }]
-    };
+    return \`Counter incremented to: \${counter}\`;
   }
 };
 
@@ -48,12 +43,7 @@ const calculatorTools = [
     },
     async execute(input) {
       const result = input.a + input.b;
-      return {
-        content: [{
-          type: 'text',
-          text: \`\${input.a} + \${input.b} = \${result}\`
-        }]
-      };
+      return \`\${input.a} + \${input.b} = \${result}\`;
     }
   },
   {
@@ -69,12 +59,7 @@ const calculatorTools = [
     },
     async execute(input) {
       const result = input.a * input.b;
-      return {
-        content: [{
-          type: 'text',
-          text: \`\${input.a} × \${input.b} = \${result}\`
-        }]
-      };
+      return \`\${input.a} × \${input.b} = \${result}\`;
     }
   }
 ];
@@ -106,12 +91,7 @@ const todoTools = [
         createdAt: new Date().toISOString()
       };
       todos.push(todo);
-      return {
-        content: [{
-          type: 'text',
-          text: \`Added todo: \${todo.title} (ID: \${todo.id})\`
-        }]
-      };
+      return \`Added todo: \${todo.title} (ID: \${todo.id})\`;
     }
   },
   {
@@ -123,16 +103,12 @@ const todoTools = [
     },
     async execute() {
       if (todos.length === 0) {
-        return {
-          content: [{ type: 'text', text: 'No todos yet!' }]
-        };
+        return 'No todos yet!';
       }
       const list = todos.map(t =>
         \`[\${t.completed ? '✓' : ' '}] \${t.id}. \${t.title}\`
       ).join('\\n');
-      return {
-        content: [{ type: 'text', text: list }]
-      };
+      return list;
     }
   },
   {
@@ -148,18 +124,10 @@ const todoTools = [
     async execute(input) {
       const todo = todos.find(t => t.id === input.id);
       if (!todo) {
-        return {
-          content: [{ type: 'text', text: \`Todo \${input.id} not found\` }],
-          isError: true
-        };
+        throw new Error(\`Todo \${input.id} not found\`);
       }
       todo.completed = true;
-      return {
-        content: [{
-          type: 'text',
-          text: \`Marked '\${todo.title}' as complete\`
-        }]
-      };
+      return \`Marked '\${todo.title}' as complete\`;
     }
   }
 ];
@@ -188,50 +156,29 @@ const timerTool = {
     switch (input.action) {
       case 'start':
         if (timerRunning) {
-          return {
-            content: [{ type: 'text', text: 'Timer already running!' }]
-          };
+          throw new Error('Timer already running!');
         }
         startTime = Date.now();
         timerRunning = true;
-        return {
-          content: [{ type: 'text', text: 'Timer started!' }]
-        };
+        return 'Timer started!';
 
       case 'stop':
         if (!timerRunning) {
-          return {
-            content: [{ type: 'text', text: 'Timer not running!' }]
-          };
+          throw new Error('Timer not running!');
         }
         const elapsed = Date.now() - startTime;
         timerRunning = false;
-        return {
-          content: [{
-            type: 'text',
-            text: \`Timer stopped. Elapsed: \${(elapsed / 1000).toFixed(2)}s\`
-          }]
-        };
+        return \`Timer stopped. Elapsed: \${(elapsed / 1000).toFixed(2)}s\`;
 
       case 'check':
         if (!timerRunning) {
-          return {
-            content: [{ type: 'text', text: 'Timer not running!' }]
-          };
+          throw new Error('Timer not running!');
         }
         const current = Date.now() - startTime;
-        return {
-          content: [{
-            type: 'text',
-            text: \`Timer running: \${(current / 1000).toFixed(2)}s\`
-          }]
-        };
+        return \`Timer running: \${(current / 1000).toFixed(2)}s\`;
 
       default:
-        return {
-          content: [{ type: 'text', text: 'Invalid action!' }],
-          isError: true
-        };
+        throw new Error('Invalid action!');
     }
   }
 };
@@ -267,59 +214,33 @@ const stateMachineTool = {
     switch (input.action) {
       case 'transition':
         if (!input.targetState) {
-          return {
-            content: [{ type: 'text', text: 'Target state required!' }],
-            isError: true
-          };
+          throw new Error('Target state required!');
         }
         if (!states.includes(input.targetState)) {
-          return {
-            content: [{ type: 'text', text: 'Invalid state!' }],
-            isError: true
-          };
+          throw new Error('Invalid state!');
         }
         const oldState = currentState;
         currentState = input.targetState;
         stateHistory.push({ state: currentState, timestamp: Date.now() });
-        return {
-          content: [{
-            type: 'text',
-            text: \`Transitioned: \${oldState} → \${currentState}\`
-          }]
-        };
+        return \`Transitioned: \${oldState} → \${currentState}\`;
 
       case 'get':
-        return {
-          content: [{
-            type: 'text',
-            text: \`Current state: \${currentState}\`
-          }]
-        };
+        return \`Current state: \${currentState}\`;
 
       case 'history':
         const historyText = stateHistory
           .map((h, i) => \`\${i + 1}. \${h.state} (\${new Date(h.timestamp).toLocaleTimeString()})\`)
           .join('\\n');
-        return {
-          content: [{
-            type: 'text',
-            text: \`State History:\\n\${historyText}\`
-          }]
-        };
+        return \`State History:\\n\${historyText}\`;
 
       case 'reset':
         currentState = 'idle';
         stateHistory.length = 0;
         stateHistory.push({ state: 'idle', timestamp: Date.now() });
-        return {
-          content: [{ type: 'text', text: 'State machine reset to idle' }]
-        };
+        return 'State machine reset to idle';
 
       default:
-        return {
-          content: [{ type: 'text', text: 'Invalid action!' }],
-          isError: true
-        };
+        throw new Error('Invalid action!');
     }
   }
 };

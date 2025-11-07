@@ -5,13 +5,12 @@
 
 import { detectNativeAPI, getAPIInfo } from './api/detection';
 import { templates } from './examples/templates';
-import type { ModelContext, ModelContextTesting, Tool } from './types';
+import { mountReactToolExecutor } from './mountReactToolExecutor';
+import type { ModelContext, ModelContextTesting, Tool, ToolInfo } from './types';
 import { EventLog } from './ui/eventLog';
-import { ToolDisplay } from './ui/toolDisplay';
 
 // Global instances
 let eventLog: EventLog;
-let toolDisplay: ToolDisplay;
 let modelContext: ModelContext;
 let modelContextTesting: ModelContextTesting;
 
@@ -36,12 +35,13 @@ function init(): void {
   }
 
   // Get API references
+  // biome-ignore lint/style/noNonNullAssertion: Checked in detection step above
   modelContext = navigator.modelContext!;
+  // biome-ignore lint/style/noNonNullAssertion: Checked in detection step above
   modelContextTesting = navigator.modelContextTesting!;
 
   // Initialize UI managers
   eventLog = new EventLog('event-log');
-  toolDisplay = new ToolDisplay('tools-output', 'tool-count');
 
   // Setup event listeners
   setupEventListeners();
@@ -217,10 +217,36 @@ function hideError(): void {
  * Refresh tool display
  */
 function refreshToolDisplay(): void {
-  const tools = modelContext.listTools();
-  toolDisplay.setTools(tools);
+  const tools = modelContextTesting.listTools();
+  updateToolCount(tools.length);
   updateToolExecutorSelect(tools);
+  updateReactToolExecutor(tools);
   updateBucketIndicators();
+}
+
+/**
+ * Update tool count display
+ */
+function updateToolCount(count: number): void {
+  const countElement = document.getElementById('tool-count');
+  if (countElement) {
+    countElement.textContent = count === 0 ? '0 tools' : count === 1 ? '1 tool' : `${count} tools`;
+  }
+}
+
+/**
+ * Mount/update React tool executor
+ */
+function updateReactToolExecutor(tools: ToolInfo[]): void {
+  const container = document.getElementById('react-tool-executor');
+  if (!container) return;
+
+  mountReactToolExecutor(container, tools, async (toolName: string, argsJson: string) => {
+    eventLog.info(`Executing "${toolName}"`, argsJson);
+    const result = await modelContextTesting.executeTool(toolName, argsJson);
+    eventLog.success(`Executed "${toolName}"`, 'Tool executed successfully');
+    return result;
+  });
 }
 
 /**
@@ -243,7 +269,7 @@ function updateBucketIndicators(): void {
 /**
  * Update tool executor select dropdown
  */
-function updateToolExecutorSelect(tools: Tool[]): void {
+function updateToolExecutorSelect(tools: ToolInfo[]): void {
   const select = document.getElementById('exec-tool-select') as HTMLSelectElement;
   if (!select) return;
 
@@ -269,7 +295,7 @@ function provideCounterTools(): void {
       inputSchema: { type: 'object', properties: {} },
       async execute() {
         counter++;
-        return { content: [{ type: 'text', text: `Counter: ${counter}` }] };
+        return `Counter: ${counter}`;
       },
     },
     {
@@ -278,7 +304,7 @@ function provideCounterTools(): void {
       inputSchema: { type: 'object', properties: {} },
       async execute() {
         counter--;
-        return { content: [{ type: 'text', text: `Counter: ${counter}` }] };
+        return `Counter: ${counter}`;
       },
     },
     {
@@ -286,7 +312,7 @@ function provideCounterTools(): void {
       description: 'Get counter value',
       inputSchema: { type: 'object', properties: {} },
       async execute() {
-        return { content: [{ type: 'text', text: `Counter: ${counter}` }] };
+        return `Counter: ${counter}`;
       },
     },
   ];
@@ -310,7 +336,7 @@ function replaceBucketA(): void {
       required: ['name'],
     },
     async execute(input) {
-      return { content: [{ type: 'text', text: `Hello, ${input.name}!` }] };
+      return `Hello, ${input.name}!`;
     },
   };
 
@@ -338,24 +364,24 @@ function registerTimerTool(): void {
       switch (input.action) {
         case 'start':
           startTime = Date.now();
-          return { content: [{ type: 'text', text: 'Timer started' }] };
+          return 'Timer started';
         case 'stop': {
           if (!startTime) {
-            return { content: [{ type: 'text', text: 'Timer not running' }], isError: true };
+            throw new Error('Timer not running');
           }
           const elapsed = Date.now() - startTime;
           startTime = null;
-          return { content: [{ type: 'text', text: `Elapsed: ${(elapsed / 1000).toFixed(2)}s` }] };
+          return `Elapsed: ${(elapsed / 1000).toFixed(2)}s`;
         }
         case 'check': {
           if (!startTime) {
-            return { content: [{ type: 'text', text: 'Timer not running' }], isError: true };
+            throw new Error('Timer not running');
           }
           const elapsed = Date.now() - startTime;
-          return { content: [{ type: 'text', text: `Running: ${(elapsed / 1000).toFixed(2)}s` }] };
+          return `Running: ${(elapsed / 1000).toFixed(2)}s`;
         }
         default:
-          return { content: [{ type: 'text', text: 'Invalid action' }], isError: true };
+          throw new Error('Invalid action');
       }
     },
   };
@@ -382,7 +408,7 @@ function unregisterTimerTool(): void {
 // ==================== Native Method Demos ====================
 
 function listToolsDemo(): void {
-  const tools = modelContext.listTools();
+  const tools = modelContextTesting.listTools();
   const result = document.getElementById('native-result');
 
   if (result) {
@@ -398,7 +424,7 @@ function listToolsDemo(): void {
 }
 
 async function executeToolDemo(): Promise<void> {
-  const tools = modelContext.listTools();
+  const tools = modelContextTesting.listTools();
   const result = document.getElementById('native-result');
 
   if (tools.length === 0) {
@@ -408,7 +434,7 @@ async function executeToolDemo(): Promise<void> {
 
   try {
     const firstTool = tools[0];
-    const toolResult = await modelContext.executeTool(firstTool.name, {});
+    const toolResult = await modelContextTesting.executeTool(firstTool.name, JSON.stringify({}));
 
     if (result) {
       result.textContent = JSON.stringify(toolResult, null, 2);
@@ -574,8 +600,8 @@ async function executeSelectedTool(): Promise<void> {
 
   try {
     const args = input.value.trim() ? JSON.parse(input.value) : {};
-    const toolResult = await modelContext.executeTool(select.value, args);
-
+    const toolResult = await modelContextTesting.executeTool(select.value, JSON.stringify(args));
+    console.log('Tool result:', toolResult);
     if (result) {
       result.textContent = JSON.stringify(toolResult, null, 2);
       result.classList.remove('hidden');

@@ -9,16 +9,15 @@ export interface ToolInputSchema {
   required?: string[];
 }
 
-export interface ToolResult {
-  content: Array<{ type: 'text'; text: string }>;
-  isError?: boolean;
-}
-
+/**
+ * The Web Model Context API expects execute functions to return any value.
+ * The native API will handle serialization to string for the testing API.
+ */
 export interface Tool {
   name: string;
   description: string;
   inputSchema: ToolInputSchema;
-  execute: (input: Record<string, unknown>) => Promise<ToolResult>;
+  execute: (input: Record<string, unknown>) => Promise<unknown> | unknown;
 }
 
 export interface ToolRegistration {
@@ -33,7 +32,7 @@ export interface ModelContext extends EventTarget {
   provideContext(options: ProvideContextOptions): void;
   registerTool(tool: Tool): ToolRegistration;
   listTools(): Tool[];
-  executeTool(name: string, input: Record<string, unknown>): Promise<ToolResult>;
+  executeTool(name: string, input: Record<string, unknown>): Promise<unknown>;
   unregisterTool(name: string): void;
   clearContext(): void;
 }

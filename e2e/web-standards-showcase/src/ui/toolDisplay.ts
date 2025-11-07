@@ -1,10 +1,10 @@
-import type { Tool } from '../types';
+import type { ToolInfo } from '../types';
 
 /**
  * Tool Display UI Manager
  */
 
-interface ToolWithBucket extends Tool {
+interface ToolWithBucket extends ToolInfo {
   bucket?: 'A' | 'B';
 }
 
@@ -28,7 +28,7 @@ export class ToolDisplay {
     this.countElement = countElement;
   }
 
-  setTools(tools: Tool[], bucket?: 'A' | 'B'): void {
+  setTools(tools: ToolInfo[], bucket?: 'A' | 'B'): void {
     // If bucket is specified, only update that bucket's tools
     if (bucket) {
       // Remove existing tools from this bucket
@@ -53,7 +53,7 @@ export class ToolDisplay {
     this.render();
   }
 
-  addTool(tool: Tool, bucket?: 'A' | 'B'): void {
+  addTool(tool: ToolInfo, bucket?: 'A' | 'B'): void {
     this.toolsMap.set(tool.name, { ...tool, bucket });
     this.render();
   }

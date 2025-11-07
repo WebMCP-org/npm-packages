@@ -61,106 +61,20 @@
               placeholder="// Define your tool here&#10;// Example:&#10;const tool = {&#10;  name: 'my_tool',&#10;  description: 'My custom tool',&#10;  inputSchema: {&#10;    type: 'object',&#10;    properties: {}&#10;  },&#10;  async execute(input) {&#10;    return {&#10;      content: [{&#10;        type: 'text',&#10;        text: 'Hello from my tool!'&#10;      }]&#10;    };&#10;  }&#10;};"></textarea>
           </div>
 
-          <!-- Live Output -->
+          <!-- Interactive Tool Executor -->
           <div class="flex flex-col overflow-hidden rounded-lg border border-border bg-card">
             <div class="flex items-center justify-between bg-gray-900 px-4 py-3 text-sm text-white">
-              <span class="font-semibold">Registered Tools</span>
+              <span class="font-semibold">Interactive Tool Executor</span>
               <span class="text-white/70" id="tool-count">0 tools</span>
             </div>
-            <div id="tools-output" class="scrollbar-thin min-h-[400px] flex-1 overflow-y-auto p-6">
-              <div class="flex h-full flex-col items-center justify-center text-center text-muted-foreground">
-                <div class="mb-4 text-5xl opacity-50">⚙</div>
-                <p class="text-base">No tools registered yet</p>
-                <p class="mt-1 text-sm">Use the editor to define and register tools</p>
-              </div>
+            <div class="scrollbar-thin min-h-[400px] flex-1 overflow-y-auto p-6">
+              <div id="react-tool-executor"></div>
             </div>
           </div>
         </div>
 
         <!-- Error Display -->
         <div id="editor-error" class="mt-4 hidden rounded-lg border border-red-200 bg-red-50 p-4 font-mono text-sm text-red-600"></div>
-      </section>
-
-      <!-- API Demonstrations -->
-      <section class="mb-8">
-        <h2 class="mb-6 text-2xl font-semibold text-foreground">API Demonstrations</h2>
-
-        <!-- Two-Bucket System -->
-        <div class="mb-6 rounded-lg border border-border bg-muted p-6">
-          <h3 class="mb-2 text-xl font-semibold text-foreground">Two-Bucket Tool Management</h3>
-          <p class="mb-6 leading-relaxed text-muted-foreground">
-            Demonstrates the two-bucket architecture:
-            <strong class="text-[var(--color-bucket-a)]">Bucket A (provideContext)</strong> for dynamic replacement and
-            <strong class="text-[var(--color-bucket-b)]">Bucket B (registerTool)</strong> for persistent tools.
-          </p>
-
-          <div class="flex flex-wrap gap-4">
-            <div class="min-w-[300px] flex-1 rounded-lg border border-border bg-card p-4">
-              <h4 class="mb-4 text-base font-semibold text-[var(--color-bucket-a)]">Bucket A - provideContext()</h4>
-              <button class="mb-2 mr-2 rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80" id="provide-counter-tools">Add Counter Tools (A)</button>
-              <button class="mb-2 mr-2 rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80" id="replace-bucket-a">Replace Bucket A</button>
-              <div class="mt-4 rounded-md border-l-4 border-[var(--color-bucket-a)] bg-[var(--color-bucket-a-light)] px-4 py-3 font-mono text-sm text-[var(--color-bucket-a)]" id="bucket-a-tools">Empty</div>
-            </div>
-
-            <div class="min-w-[300px] flex-1 rounded-lg border border-border bg-card p-4">
-              <h4 class="mb-4 text-base font-semibold text-[var(--color-bucket-b)]">Bucket B - registerTool()</h4>
-              <button class="mb-2 mr-2 rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80" id="register-timer-tool">Add Timer Tool (B)</button>
-              <button class="mb-2 mr-2 rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80" id="unregister-timer">Unregister Timer</button>
-              <div class="mt-4 rounded-md border-l-4 border-[var(--color-bucket-b)] bg-[var(--color-bucket-b-light)] px-4 py-3 font-mono text-sm text-[var(--color-bucket-b)]" id="bucket-b-tools">Empty</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Native Methods -->
-        <div class="mb-6 rounded-lg border border-border bg-muted p-6">
-          <h3 class="mb-2 text-xl font-semibold text-foreground">Native Chromium Methods</h3>
-          <p class="mb-6 leading-relaxed text-muted-foreground">
-            Methods specific to the native Chromium implementation (not available in polyfill).
-          </p>
-
-          <div class="flex flex-wrap gap-2">
-            <button class="rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80" id="list-tools">listTools()</button>
-            <button class="rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80" id="execute-tool">executeTool()</button>
-            <button class="rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80" id="unregister-tool">unregisterTool()</button>
-            <button class="rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80" id="clear-context">clearContext()</button>
-          </div>
-          <div id="native-result" class="scrollbar-thin mt-4 hidden max-h-[300px] overflow-y-auto rounded-lg border border-border bg-card p-4 font-mono text-sm text-foreground"></div>
-        </div>
-
-        <!-- Testing API -->
-        <div class="mb-6 rounded-lg border border-border bg-muted p-6">
-          <h3 class="mb-2 text-xl font-semibold text-foreground">Testing API (navigator.modelContextTesting)</h3>
-          <p class="mb-6 leading-relaxed text-muted-foreground">
-            Advanced testing features for debugging and development.
-          </p>
-
-          <div class="flex flex-wrap gap-2">
-            <button class="rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80" id="testing-list-tools">listTools()</button>
-            <button class="rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80" id="testing-execute">executeTool()</button>
-            <button class="rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80" id="get-tool-calls">getToolCalls()</button>
-            <button class="rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80" id="clear-tool-calls">Clear Calls</button>
-            <button class="rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80" id="set-mock">setMock()</button>
-            <button class="rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80" id="reset-testing">reset()</button>
-          </div>
-          <div id="testing-result" class="scrollbar-thin mt-4 hidden max-h-[300px] overflow-y-auto rounded-lg border border-border bg-card p-4 font-mono text-sm text-foreground"></div>
-        </div>
-
-        <!-- Tool Executor -->
-        <div class="mb-6 rounded-lg border border-border bg-muted p-6">
-          <h3 class="mb-4 text-xl font-semibold text-foreground">Interactive Tool Executor</h3>
-          <div class="grid gap-4">
-            <select id="exec-tool-select" class="w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-              <option value="">Select a tool...</option>
-            </select>
-            <textarea
-              id="exec-input"
-              class="w-full resize-y rounded-md border border-input bg-muted px-3 py-2 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              placeholder='{"key": "value"}'
-              rows="3"></textarea>
-            <button class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90" id="exec-button">Execute</button>
-          </div>
-          <div id="exec-result" class="scrollbar-thin mt-4 hidden max-h-[300px] overflow-y-auto rounded-lg border border-border bg-card p-4 font-mono text-sm text-foreground"></div>
-        </div>
       </section>
 
       <!-- Event Log -->
