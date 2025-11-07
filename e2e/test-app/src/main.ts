@@ -538,6 +538,43 @@ testToolTrackingBtn.addEventListener('click', testToolCallTracking);
 testMockResponseBtn.addEventListener('click', testMockResponse);
 testResetBtn.addEventListener('click', testReset);
 
+// Chromium native API event listeners
+const chromiumButtons = {
+  unregisterTool: document.getElementById('chromium-unregister-tool'),
+  clearContext: document.getElementById('chromium-clear-context'),
+  executeTool: document.getElementById('chromium-execute-tool'),
+  listTools: document.getElementById('chromium-list-tools'),
+  callbackRegister: document.getElementById('chromium-test-callback-register'),
+  callbackUnregister: document.getElementById('chromium-test-callback-unregister'),
+  callbackProvide: document.getElementById('chromium-test-callback-provide'),
+  callbackClear: document.getElementById('chromium-test-callback-clear'),
+};
+
+if (chromiumButtons.unregisterTool) {
+  chromiumButtons.unregisterTool.addEventListener('click', testChromiumUnregisterTool);
+}
+if (chromiumButtons.clearContext) {
+  chromiumButtons.clearContext.addEventListener('click', testChromiumClearContext);
+}
+if (chromiumButtons.executeTool) {
+  chromiumButtons.executeTool.addEventListener('click', testChromiumExecuteTool);
+}
+if (chromiumButtons.listTools) {
+  chromiumButtons.listTools.addEventListener('click', testChromiumListTools);
+}
+if (chromiumButtons.callbackRegister) {
+  chromiumButtons.callbackRegister.addEventListener('click', testChromiumCallbackRegister);
+}
+if (chromiumButtons.callbackUnregister) {
+  chromiumButtons.callbackUnregister.addEventListener('click', testChromiumCallbackUnregister);
+}
+if (chromiumButtons.callbackProvide) {
+  chromiumButtons.callbackProvide.addEventListener('click', testChromiumCallbackProvide);
+}
+if (chromiumButtons.callbackClear) {
+  chromiumButtons.callbackClear.addEventListener('click', testChromiumCallbackClear);
+}
+
 // Initialize
 updateCounterDisplay();
 log('Application initialized');
@@ -545,6 +582,304 @@ log('Application initialized');
 if (checkAPIAvailability()) {
   registerBaseTools();
   log('✅ Test app ready! Use buttons to test two-bucket system.', 'success');
+}
+
+// Chromium Native API Test Functions
+
+// Test unregisterTool (Chromium native API)
+function testChromiumUnregisterTool() {
+  try {
+    log('Testing unregisterTool() (Chromium native API)...', 'info');
+
+    if (!dynamicToolRegistration) {
+      log('No dynamic tool registered. Register one first.', 'error');
+      return;
+    }
+
+    const toolName = 'dynamicTool';
+    navigator.modelContext.unregisterTool(toolName);
+
+    dynamicToolRegistration = null;
+    dynamicStatusEl.textContent = 'Dynamic tool status: Not registered';
+    dynamicStatusEl.style.background = '#f5f5f5';
+    registerDynamicBtn.disabled = false;
+    unregisterDynamicBtn.disabled = true;
+    callDynamicBtn.disabled = true;
+
+    log(`Tool unregistered via unregisterTool(): ${toolName}`, 'success');
+  } catch (error) {
+    log(`unregisterTool() failed: ${error}`, 'error');
+  }
+}
+
+// Test clearContext (Chromium native API)
+function testChromiumClearContext() {
+  try {
+    log('Testing clearContext() (Chromium native API)...', 'info');
+
+    navigator.modelContext.clearContext();
+
+    dynamicToolRegistration = null;
+    dynamicStatusEl.textContent = 'Dynamic tool status: Not registered';
+    dynamicStatusEl.style.background = '#f5f5f5';
+    registerDynamicBtn.disabled = false;
+    unregisterDynamicBtn.disabled = true;
+    callDynamicBtn.disabled = true;
+
+    log('All tools cleared via clearContext()', 'success');
+  } catch (error) {
+    log(`clearContext() failed: ${error}`, 'error');
+  }
+}
+
+// Test executeTool (Chromium native API)
+async function testChromiumExecuteTool() {
+  if (!('modelContextTesting' in navigator)) {
+    log('modelContextTesting API not available', 'error');
+    return;
+  }
+
+  const testingAPI = navigator.modelContextTesting;
+  if (!testingAPI) {
+    log('modelContextTesting API not available', 'error');
+    return;
+  }
+
+  try {
+    log('Testing executeTool() (Chromium native API)...', 'info');
+
+    const tools = navigator.modelContext.listTools();
+    if (tools.length === 0) {
+      log('No tools registered. Register tools first.', 'error');
+      return;
+    }
+
+    const firstTool = tools[0];
+    const inputJson = JSON.stringify({});
+
+    log(`Calling executeTool("${firstTool.name}", "${inputJson}")`, 'info');
+    const result = await testingAPI.executeTool(firstTool.name, inputJson);
+
+    log(`executeTool() succeeded with result: ${JSON.stringify(result)}`, 'success');
+  } catch (error) {
+    log(`executeTool() failed: ${error}`, 'error');
+  }
+}
+
+// Test listTools (Chromium native API)
+function testChromiumListTools() {
+  if (!('modelContextTesting' in navigator)) {
+    log('modelContextTesting API not available', 'error');
+    return;
+  }
+
+  const testingAPI = navigator.modelContextTesting;
+  if (!testingAPI) {
+    log('modelContextTesting API not available', 'error');
+    return;
+  }
+
+  try {
+    log('Testing listTools() (Chromium native API)...', 'info');
+
+    const tools = testingAPI.listTools();
+    log(`listTools() returned ${tools.length} tools`, 'success');
+
+    if (tools.length > 0) {
+      const firstTool = tools[0];
+      log(`First tool: ${firstTool.name}`, 'info');
+      log(`inputSchema is string: ${typeof firstTool.inputSchema === 'string'}`, 'info');
+
+      // Verify it's valid JSON
+      try {
+        JSON.parse(firstTool.inputSchema);
+        log('inputSchema is valid JSON ✅', 'success');
+      } catch {
+        log('inputSchema is NOT valid JSON ❌', 'error');
+      }
+    }
+  } catch (error) {
+    log(`listTools() failed: ${error}`, 'error');
+  }
+}
+
+// Test registerToolsChangedCallback on registerTool
+function testChromiumCallbackRegister() {
+  if (!('modelContextTesting' in navigator)) {
+    log('modelContextTesting API not available', 'error');
+    return;
+  }
+
+  const testingAPI = navigator.modelContextTesting;
+  if (!testingAPI) {
+    log('modelContextTesting API not available', 'error');
+    return;
+  }
+
+  try {
+    log('Testing registerToolsChangedCallback() on registerTool...', 'info');
+
+    let callbackFired = false;
+    testingAPI.registerToolsChangedCallback(() => {
+      callbackFired = true;
+      log('Callback fired on registerTool!', 'success');
+    });
+
+    // Register a tool to trigger callback
+    navigator.modelContext.registerTool({
+      name: 'callbackTest1',
+      description: 'Test callback',
+      inputSchema: { type: 'object', properties: {} },
+      async execute() {
+        return { content: [{ type: 'text', text: 'test' }] };
+      },
+    });
+
+    setTimeout(() => {
+      if (callbackFired) {
+        const statusEl = document.getElementById('chromium-callback-status');
+        if (statusEl) statusEl.setAttribute('data-register-fired', 'true');
+        log('Callback test passed ✅', 'success');
+      } else {
+        log('Callback did NOT fire ❌', 'error');
+      }
+    }, 100);
+  } catch (error) {
+    log(`Callback test failed: ${error}`, 'error');
+  }
+}
+
+// Test registerToolsChangedCallback on unregisterTool
+function testChromiumCallbackUnregister() {
+  if (!('modelContextTesting' in navigator)) {
+    log('modelContextTesting API not available', 'error');
+    return;
+  }
+
+  const testingAPI = navigator.modelContextTesting;
+  if (!testingAPI) {
+    log('modelContextTesting API not available', 'error');
+    return;
+  }
+
+  try {
+    log('Testing registerToolsChangedCallback() on unregisterTool...', 'info');
+
+    let callbackFired = false;
+    testingAPI.registerToolsChangedCallback(() => {
+      callbackFired = true;
+      log('Callback fired on unregisterTool!', 'success');
+    });
+
+    // Unregister the dynamic tool to trigger callback
+    if (dynamicToolRegistration) {
+      navigator.modelContext.unregisterTool('dynamicTool');
+      dynamicToolRegistration = null;
+
+      setTimeout(() => {
+        if (callbackFired) {
+          const statusEl = document.getElementById('chromium-callback-status');
+          if (statusEl) statusEl.setAttribute('data-unregister-fired', 'true');
+          log('Callback test passed ✅', 'success');
+        } else {
+          log('Callback did NOT fire ❌', 'error');
+        }
+      }, 100);
+    } else {
+      log('No dynamic tool to unregister', 'error');
+    }
+  } catch (error) {
+    log(`Callback test failed: ${error}`, 'error');
+  }
+}
+
+// Test registerToolsChangedCallback on provideContext
+function testChromiumCallbackProvide() {
+  if (!('modelContextTesting' in navigator)) {
+    log('modelContextTesting API not available', 'error');
+    return;
+  }
+
+  const testingAPI = navigator.modelContextTesting;
+  if (!testingAPI) {
+    log('modelContextTesting API not available', 'error');
+    return;
+  }
+
+  try {
+    log('Testing registerToolsChangedCallback() on provideContext...', 'info');
+
+    let callbackFired = false;
+    testingAPI.registerToolsChangedCallback(() => {
+      callbackFired = true;
+      log('Callback fired on provideContext!', 'success');
+    });
+
+    // Call provideContext to trigger callback
+    navigator.modelContext.provideContext({
+      tools: [
+        {
+          name: 'callbackTest2',
+          description: 'Test callback',
+          inputSchema: { type: 'object', properties: {} },
+          async execute() {
+            return { content: [{ type: 'text', text: 'test' }] };
+          },
+        },
+      ],
+    });
+
+    setTimeout(() => {
+      if (callbackFired) {
+        const statusEl = document.getElementById('chromium-callback-status');
+        if (statusEl) statusEl.setAttribute('data-provide-fired', 'true');
+        log('Callback test passed ✅', 'success');
+      } else {
+        log('Callback did NOT fire ❌', 'error');
+      }
+    }, 100);
+  } catch (error) {
+    log(`Callback test failed: ${error}`, 'error');
+  }
+}
+
+// Test registerToolsChangedCallback on clearContext
+function testChromiumCallbackClear() {
+  if (!('modelContextTesting' in navigator)) {
+    log('modelContextTesting API not available', 'error');
+    return;
+  }
+
+  const testingAPI = navigator.modelContextTesting;
+  if (!testingAPI) {
+    log('modelContextTesting API not available', 'error');
+    return;
+  }
+
+  try {
+    log('Testing registerToolsChangedCallback() on clearContext...', 'info');
+
+    let callbackFired = false;
+    testingAPI.registerToolsChangedCallback(() => {
+      callbackFired = true;
+      log('Callback fired on clearContext!', 'success');
+    });
+
+    // Call clearContext to trigger callback
+    navigator.modelContext.clearContext();
+
+    setTimeout(() => {
+      if (callbackFired) {
+        const statusEl = document.getElementById('chromium-callback-status');
+        if (statusEl) statusEl.setAttribute('data-clear-fired', 'true');
+        log('Callback test passed ✅', 'success');
+      } else {
+        log('Callback did NOT fire ❌', 'error');
+      }
+    }, 100);
+  } catch (error) {
+    log(`Callback test failed: ${error}`, 'error');
+  }
 }
 
 // Type for test API
@@ -563,6 +898,15 @@ declare global {
       testMockResponse: () => Promise<void>;
       testReset: () => void;
       hasTestingAPI: () => boolean;
+      // Chromium native API tests
+      testChromiumUnregisterTool: () => void;
+      testChromiumClearContext: () => void;
+      testChromiumExecuteTool: () => Promise<void>;
+      testChromiumListTools: () => void;
+      testChromiumCallbackRegister: () => void;
+      testChromiumCallbackUnregister: () => void;
+      testChromiumCallbackProvide: () => void;
+      testChromiumCallbackClear: () => void;
     };
   }
 }
@@ -581,4 +925,13 @@ window.testApp = {
   testMockResponse,
   testReset,
   hasTestingAPI: () => 'modelContextTesting' in navigator,
+  // Chromium native API tests
+  testChromiumUnregisterTool,
+  testChromiumClearContext,
+  testChromiumExecuteTool,
+  testChromiumListTools,
+  testChromiumCallbackRegister,
+  testChromiumCallbackUnregister,
+  testChromiumCallbackProvide,
+  testChromiumCallbackClear,
 };
