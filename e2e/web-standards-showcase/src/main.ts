@@ -4,10 +4,10 @@
  */
 
 import { detectNativeAPI, getAPIInfo } from './api/detection';
+import { templates } from './examples/templates';
+import type { ModelContext, ModelContextTesting, Tool } from './types';
 import { EventLog } from './ui/eventLog';
 import { ToolDisplay } from './ui/toolDisplay';
-import { templates } from './examples/templates';
-import type { Tool, ModelContext, ModelContextTesting } from './types';
 
 // Global instances
 let eventLog: EventLog;
@@ -17,7 +17,7 @@ let modelContextTesting: ModelContextTesting;
 
 // Bucket tracking
 let bucketATools: string[] = [];
-let bucketBRegistrations = new Map<string, { unregister: () => void }>();
+const bucketBRegistrations = new Map<string, { unregister: () => void }>();
 
 /**
  * Initialize the application

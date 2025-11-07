@@ -110,9 +110,12 @@ export class ToolDisplay {
       name.textContent = tool.name;
 
       const badge = document.createElement('span');
-      const bucketClass = tool.bucket === 'A' ? 'bg-[var(--color-bucket-a-light)] text-[var(--color-bucket-a)]' :
-                          tool.bucket === 'B' ? 'bg-[var(--color-bucket-b-light)] text-[var(--color-bucket-b)]' :
-                          'bg-secondary text-secondary-foreground';
+      const bucketClass =
+        tool.bucket === 'A'
+          ? 'bg-[var(--color-bucket-a-light)] text-[var(--color-bucket-a)]'
+          : tool.bucket === 'B'
+            ? 'bg-[var(--color-bucket-b-light)] text-[var(--color-bucket-b)]'
+            : 'bg-secondary text-secondary-foreground';
       badge.className = `rounded px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${bucketClass}`;
       badge.textContent = tool.bucket ? `Bucket ${tool.bucket}` : 'Tool';
 
@@ -124,7 +127,8 @@ export class ToolDisplay {
       description.textContent = tool.description;
 
       const schema = document.createElement('div');
-      schema.className = 'overflow-x-auto whitespace-pre-wrap break-all rounded-md border border-border bg-card p-2 font-mono text-xs text-foreground';
+      schema.className =
+        'overflow-x-auto whitespace-pre-wrap break-all rounded-md border border-border bg-card p-2 font-mono text-xs text-foreground';
       schema.textContent = JSON.stringify(tool.inputSchema, null, 2);
 
       item.appendChild(header);

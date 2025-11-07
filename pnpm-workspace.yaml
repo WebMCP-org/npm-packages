@@ -9,6 +9,7 @@ packages:
   - e2e
   - e2e/test-app
   - e2e/react-webmcp-test-app
+  - e2e/web-standards-showcase
   - e2e/mcp-ui-with-webmcp/**
 
 catalog:

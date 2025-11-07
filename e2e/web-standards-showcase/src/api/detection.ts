@@ -16,7 +16,8 @@ export function detectNativeAPI(): DetectionResult {
 
   // Check if modelContext exists
   if (!navigator.modelContext) {
-    result.message = 'navigator.modelContext not found. Please launch Chromium with --enable-experimental-web-platform-features';
+    result.message =
+      'navigator.modelContext not found. Please launch Chromium with --enable-experimental-web-platform-features';
     return result;
   }
 

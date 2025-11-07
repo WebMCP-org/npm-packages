@@ -41,7 +41,10 @@ export class EventLog {
 
     // Limit entries
     while (this.container.children.length > this.maxEntries) {
-      this.container.removeChild(this.container.lastChild!);
+      const lastChild = this.container.lastChild;
+      if (lastChild) {
+        this.container.removeChild(lastChild);
+      }
     }
   }
 

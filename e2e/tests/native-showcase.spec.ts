@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 /**
  * Native Web Standards Showcase E2E Tests
@@ -56,9 +56,7 @@ test.describe('Native API Detection', () => {
       const ctx = navigator.modelContext;
       if (!ctx) return false;
 
-      return (
-        typeof ctx.unregisterTool === 'function' && typeof ctx.clearContext === 'function'
-      );
+      return typeof ctx.unregisterTool === 'function' && typeof ctx.clearContext === 'function';
     });
 
     expect(hasNativeMethods).toBe(true);

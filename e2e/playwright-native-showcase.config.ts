@@ -21,10 +21,7 @@ export default defineConfig({
 
     // CRITICAL: Launch with experimental web platform features enabled
     launchOptions: {
-      args: [
-        '--enable-experimental-web-platform-features',
-        '--enable-features=WebModelContext',
-      ],
+      args: ['--enable-experimental-web-platform-features', '--enable-features=WebModelContext'],
     },
   },
 
