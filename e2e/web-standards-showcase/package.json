@@ -1,0 +1,25 @@
+{
+  "name": "web-standards-showcase",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Native Chromium Web Model Context API Showcase - No Polyfill",
+  "scripts": {
+    "build": "tsc && vite build",
+    "cf-typegen": "wrangler types",
+    "deploy": "pnpm run build && wrangler deploy",
+    "dev": "vite",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.13.17",
+    "@tailwindcss/vite": "^4.1.10",
+    "@types/node": "catalog:",
+    "tailwindcss": "^4.1.10",
+    "tw-animate-css": "^1.4.0",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "wrangler": "^4.45.2"
+  }
+}

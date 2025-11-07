@@ -1,4 +1,4 @@
-var SmartDOMReaderBundle = ((exports) => {
+var _SmartDOMReaderBundle = ((exports) => {
   class ContentDetection {
     /**
      * Find the main content area of a page

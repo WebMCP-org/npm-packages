@@ -1,0 +1,72 @@
+/**
+ * Type definitions for the native Chromium Web Model Context API
+ * This file provides TypeScript types without importing any polyfills
+ */
+
+export interface ToolInputSchema {
+  type: 'object';
+  properties?: Record<string, unknown>;
+  required?: string[];
+}
+
+export interface ToolResult {
+  content: Array<{ type: 'text'; text: string }>;
+  isError?: boolean;
+}
+
+export interface Tool {
+  name: string;
+  description: string;
+  inputSchema: ToolInputSchema;
+  execute: (input: Record<string, unknown>) => Promise<ToolResult>;
+}
+
+export interface ToolRegistration {
+  unregister: () => void;
+}
+
+export interface ProvideContextOptions {
+  tools: Tool[];
+}
+
+export interface ModelContext extends EventTarget {
+  provideContext(options: ProvideContextOptions): void;
+  registerTool(tool: Tool): ToolRegistration;
+  listTools(): Tool[];
+  executeTool(name: string, input: Record<string, unknown>): Promise<ToolResult>;
+  unregisterTool(name: string): void;
+  clearContext(): void;
+}
+
+export interface ToolInfo {
+  name: string;
+  description: string;
+  inputSchema: string; // JSON string, not object!
+}
+
+export interface ModelContextTesting {
+  executeTool(toolName: string, inputArgsJson: string): Promise<string>;
+  listTools(): ToolInfo[];
+  registerToolsChangedCallback(callback: () => void): void;
+  getToolCalls(): Array<{ toolName: string; inputArgs: string; result: string }>;
+  clearToolCalls(): void;
+  setMockToolResponse(toolName: string, response: string): void;
+  clearMockToolResponse(toolName: string): void;
+  getRegisteredTools(): ToolInfo[];
+  reset(): void;
+}
+
+declare global {
+  interface Navigator {
+    modelContext?: ModelContext;
+    modelContextTesting?: ModelContextTesting;
+  }
+}
+
+export interface DetectionResult {
+  available: boolean;
+  isNative: boolean;
+  isPolyfill: boolean;
+  testingAvailable: boolean;
+  message: string;
+}

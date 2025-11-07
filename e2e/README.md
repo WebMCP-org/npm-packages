@@ -1,15 +1,51 @@
-# E2E Tests for MCP Tab Transports
+# E2E Tests & Demos for MCP-B
 
-This directory contains end-to-end tests for the `@mcp-b/transports` package using Playwright.
+This directory contains end-to-end tests and demonstration applications for the MCP-B packages using Playwright.
 
 ## Overview
 
-The E2E test suite validates that the Tab Transport implementation works correctly in a real browser environment. It tests:
+The E2E suite includes:
 
-- **TabServerTransport**: Server-side transport for accepting MCP connections
-- **TabClientTransport**: Client-side transport for connecting to MCP servers
-- **Full MCP protocol**: Tool registration, listing, and execution
-- **Connection lifecycle**: Connect, disconnect, reconnect scenarios
+- **Tab Transport Tests**: Validates `@mcp-b/transports` package functionality
+- **React WebMCP Tests**: Tests React hooks integration
+- **Web Standards Showcase**: Interactive demo of native Chromium Web Model Context API (NEW!)
+- **Full MCP Protocol**: Tool registration, listing, execution, and lifecycle management
+
+## 🎨 Web Standards Showcase (NEW!)
+
+**Location:** `web-standards-showcase/`
+
+Interactive CodePen-style playground demonstrating the **native Chromium Web Model Context API** without any polyfills.
+
+**Features:**
+- 📝 Live code editor with syntax highlighting
+- 🔧 Pre-built tool templates (Counter, Calculator, Todo, Timer, State Machine)
+- 📊 Two-bucket system demonstration (provideContext vs registerTool)
+- 🧪 Testing API explorer (navigator.modelContextTesting)
+- 📝 Real-time event logging
+- 🚫 **No polyfill** - Validates native implementation only
+
+**Quick Start:**
+```bash
+cd web-standards-showcase
+pnpm install
+pnpm dev
+
+# Launch Chromium with experimental features enabled:
+chromium --enable-experimental-web-platform-features http://localhost:5174
+```
+
+**Testing:**
+```bash
+# From e2e directory
+pnpm test:native-showcase        # Run tests
+pnpm test:native-showcase:ui     # Playwright UI mode
+pnpm test:native-showcase:headed # Watch tests run
+```
+
+**Documentation:**
+- [web-standards-showcase/README.md](./web-standards-showcase/README.md) - Detailed user guide
+- [web-standards-showcase/CHROMIUM_FLAGS.md](./web-standards-showcase/CHROMIUM_FLAGS.md) - Flag reference
 
 ## Structure
 
@@ -58,17 +94,25 @@ pnpm test:e2e:debug
 ```bash
 cd e2e
 
-# Run tests
+# Run all tests
 pnpm test
+
+# Run specific test suites
+pnpm test:tab-transport
+pnpm test:react-webmcp
+pnpm test:native-showcase        # NEW! Native API tests
 
 # Open Playwright UI
 pnpm test:ui
+pnpm test:native-showcase:ui     # NEW! Native showcase UI
 
 # Run in headed mode
 pnpm test:headed
+pnpm test:native-showcase:headed # NEW! Watch native tests
 
 # Debug tests
 pnpm test:debug
+pnpm test:native-showcase:debug  # NEW! Debug native tests
 
 # View test report
 pnpm test:report
