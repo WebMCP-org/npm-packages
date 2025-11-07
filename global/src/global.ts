@@ -78,6 +78,7 @@ class WebModelContextTesting implements ModelContextTesting {
     timestamp: number;
   }> = [];
   private mockResponses: Map<string, ToolResponse> = new Map();
+  private toolsChangedCallbacks: Set<() => void> = new Set();
   private bridge: MCPBridge;
 
   constructor(bridge: MCPBridge) {
@@ -107,6 +108,85 @@ class WebModelContextTesting implements ModelContextTesting {
    */
   getMockResponse(toolName: string): ToolResponse | undefined {
     return this.mockResponses.get(toolName);
+  }
+
+  /**
+   * Notify all registered callbacks that tools have changed
+   * @internal
+   */
+  notifyToolsChanged(): void {
+    for (const callback of this.toolsChangedCallbacks) {
+      try {
+        callback();
+      } catch (error) {
+        console.error('[Model Context Testing] Error in tools changed callback:', error);
+      }
+    }
+  }
+
+  /**
+   * Execute a tool directly with JSON string input (Chromium native API)
+   */
+  async executeTool(toolName: string, inputArgsJson: string): Promise<any> {
+    console.log(`[Model Context Testing] Executing tool: ${toolName}`);
+
+    let args: Record<string, unknown>;
+    try {
+      args = JSON.parse(inputArgsJson);
+    } catch (error) {
+      throw new SyntaxError(
+        `Invalid JSON input: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+
+    const tool = this.bridge.tools.get(toolName);
+    if (!tool) {
+      throw new Error(`Tool not found: ${toolName}`);
+    }
+
+    const result = await this.bridge.modelContext.executeTool(toolName, args);
+
+    // Return the actual result based on response structure
+    if (result.isError) {
+      // For errors, return undefined (matches Chromium behavior)
+      return undefined;
+    }
+
+    // If there's structured content, return it
+    if (result.structuredContent) {
+      return result.structuredContent;
+    }
+
+    // Otherwise, extract text from content array
+    if (result.content && result.content.length > 0) {
+      const firstContent = result.content[0];
+      if (firstContent && firstContent.type === 'text') {
+        return firstContent.text;
+      }
+    }
+
+    return undefined;
+  }
+
+  /**
+   * List all registered tools (Chromium native API)
+   * Returns tools with inputSchema as JSON string
+   */
+  listTools(): Array<{ name: string; description: string; inputSchema: string }> {
+    const tools = this.bridge.modelContext.listTools();
+    return tools.map((tool) => ({
+      name: tool.name,
+      description: tool.description,
+      inputSchema: JSON.stringify(tool.inputSchema),
+    }));
+  }
+
+  /**
+   * Register a callback that fires when the tools list changes (Chromium native API)
+   */
+  registerToolsChangedCallback(callback: () => void): void {
+    this.toolsChangedCallbacks.add(callback);
+    console.log('[Model Context Testing] Tools changed callback registered');
   }
 
   getToolCalls(): Array<{
@@ -349,6 +429,55 @@ class WebModelContext implements InternalModelContext {
   }
 
   /**
+   * Unregister a tool by name (Chromium native API)
+   * Can unregister tools from either bucket
+   */
+  unregisterTool(name: string): void {
+    console.log(`[Web Model Context] Unregistering tool: ${name}`);
+
+    // Check if tool exists in either bucket
+    const inProvideContext = this.provideContextTools.has(name);
+    const inDynamic = this.dynamicTools.has(name);
+
+    if (!inProvideContext && !inDynamic) {
+      console.warn(
+        `[Web Model Context] Tool "${name}" is not registered, ignoring unregister call`
+      );
+      return;
+    }
+
+    // Remove from appropriate bucket
+    if (inProvideContext) {
+      this.provideContextTools.delete(name);
+    }
+
+    if (inDynamic) {
+      this.dynamicTools.delete(name);
+      this.registrationTimestamps.delete(name);
+      this.unregisterFunctions.delete(name);
+    }
+
+    this.updateBridgeTools();
+    this.notifyToolsListChanged();
+  }
+
+  /**
+   * Clear all registered tools (Chromium native API)
+   * Clears both buckets (provideContext and dynamic)
+   */
+  clearContext(): void {
+    console.log('[Web Model Context] Clearing all tools');
+
+    this.provideContextTools.clear();
+    this.dynamicTools.clear();
+    this.registrationTimestamps.clear();
+    this.unregisterFunctions.clear();
+
+    this.updateBridgeTools();
+    this.notifyToolsListChanged();
+  }
+
+  /**
    * Update the bridge tools map with merged tools from both buckets
    * Final tool list = Bucket A (provideContext) + Bucket B (dynamic)
    */
@@ -384,6 +513,11 @@ class WebModelContext implements InternalModelContext {
         method: 'notifications/tools/list_changed',
         params: {},
       });
+    }
+
+    // Notify testing API callbacks
+    if (this.testingAPI && 'notifyToolsChanged' in this.testingAPI) {
+      (this.testingAPI as WebModelContextTesting).notifyToolsChanged();
     }
   }
 

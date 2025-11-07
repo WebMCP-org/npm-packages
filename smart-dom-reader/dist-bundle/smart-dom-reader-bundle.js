@@ -1,4 +1,4 @@
-var SmartDOMReaderBundle = ((exports) => {
+var SmartDOMReaderBundle = (function(exports) {
   class ContentDetection {
     /**
      * Find the main content area of a page
@@ -25,18 +25,13 @@ var SmartDOMReaderBundle = ((exports) => {
         return rootElement;
       }
       candidates.sort(
-        (a, b) =>
-          ContentDetection.calculateContentScore(b) - ContentDetection.calculateContentScore(a)
+        (a, b) => ContentDetection.calculateContentScore(b) - ContentDetection.calculateContentScore(a)
       );
       let bestCandidate = candidates[0];
       for (let i = 1; i < candidates.length; i++) {
         const candidate = candidates[i];
         const isIndependent = !candidates.some((other, j) => j !== i && other.contains(candidate));
-        if (
-          isIndependent &&
-          ContentDetection.calculateContentScore(candidate) >
-            ContentDetection.calculateContentScore(bestCandidate)
-        ) {
+        if (isIndependent && ContentDetection.calculateContentScore(candidate) > ContentDetection.calculateContentScore(bestCandidate)) {
           bestCandidate = candidate;
         }
       }
@@ -60,15 +55,15 @@ var SmartDOMReaderBundle = ((exports) => {
     static calculateContentScore(element) {
       let score = 0;
       const semanticClasses = [
-        'article',
-        'content',
-        'main-container',
-        'main',
-        'main-content',
-        'post',
-        'entry',
+        "article",
+        "content",
+        "main-container",
+        "main",
+        "main-content",
+        "post",
+        "entry"
       ];
-      const semanticIds = ['content', 'main', 'article', 'post', 'entry'];
+      const semanticIds = ["content", "main", "article", "post", "entry"];
       semanticClasses.forEach((cls) => {
         if (element.classList.contains(cls)) {
           score += 10;
@@ -80,13 +75,13 @@ var SmartDOMReaderBundle = ((exports) => {
         }
       });
       const tag = element.tagName.toLowerCase();
-      const highValueTags = ['article', 'main', 'section'];
+      const highValueTags = ["article", "main", "section"];
       if (highValueTags.includes(tag)) {
         score += 8;
       }
-      const paragraphs = element.getElementsByTagName('p').length;
+      const paragraphs = element.getElementsByTagName("p").length;
       score += Math.min(paragraphs * 2, 10);
-      const headings = element.querySelectorAll('h1, h2, h3').length;
+      const headings = element.querySelectorAll("h1, h2, h3").length;
       score += Math.min(headings * 3, 9);
       const textLength = element.textContent?.trim().length || 0;
       if (textLength > 300) {
@@ -98,25 +93,19 @@ var SmartDOMReaderBundle = ((exports) => {
       } else if (linkDensity > 0.5) {
         score -= 5;
       }
-      if (
-        element.hasAttribute('data-main') ||
-        element.hasAttribute('data-content') ||
-        element.hasAttribute('itemprop')
-      ) {
+      if (element.hasAttribute("data-main") || element.hasAttribute("data-content") || element.hasAttribute("itemprop")) {
         score += 8;
       }
-      const role = element.getAttribute('role');
-      if (role === 'main' || role === 'article') {
+      const role = element.getAttribute("role");
+      if (role === "main" || role === "article") {
         score += 10;
       }
-      if (
-        element.matches(
-          'aside, nav, header, footer, .sidebar, .navigation, .menu, .ad, .advertisement'
-        )
-      ) {
+      if (element.matches(
+        "aside, nav, header, footer, .sidebar, .navigation, .menu, .ad, .advertisement"
+      )) {
         score -= 10;
       }
-      const forms = element.getElementsByTagName('form').length;
+      const forms = element.getElementsByTagName("form").length;
       if (forms > 2) {
         score -= 5;
       }
@@ -126,7 +115,7 @@ var SmartDOMReaderBundle = ((exports) => {
      * Calculate link density in an element
      */
     static calculateLinkDensity(element) {
-      const links = element.getElementsByTagName('a');
+      const links = element.getElementsByTagName("a");
       let linkTextLength = 0;
       for (const link of Array.from(links)) {
         linkTextLength += link.textContent?.length || 0;
@@ -139,7 +128,7 @@ var SmartDOMReaderBundle = ((exports) => {
      */
     static isNavigation(element) {
       const tag = element.tagName.toLowerCase();
-      if (tag === 'nav' || element.getAttribute('role') === 'navigation') {
+      if (tag === "nav" || element.getAttribute("role") === "navigation") {
         return true;
       }
       const navPatterns = [/nav/i, /menu/i, /sidebar/i, /toolbar/i];
@@ -151,16 +140,10 @@ var SmartDOMReaderBundle = ((exports) => {
      */
     static isSupplementary(element) {
       const tag = element.tagName.toLowerCase();
-      if (tag === 'aside' || element.getAttribute('role') === 'complementary') {
+      if (tag === "aside" || element.getAttribute("role") === "complementary") {
         return true;
       }
-      const supplementaryPatterns = [
-        /sidebar/i,
-        /widget/i,
-        /related/i,
-        /advertisement/i,
-        /social/i,
-      ];
+      const supplementaryPatterns = [/sidebar/i, /widget/i, /related/i, /advertisement/i, /social/i];
       const classesAndId = `${element.className} ${element.id}`.toLowerCase();
       return supplementaryPatterns.some((pattern) => pattern.test(classesAndId));
     }
@@ -176,7 +159,7 @@ var SmartDOMReaderBundle = ((exports) => {
         banner: [],
         search: [],
         form: [],
-        region: [],
+        region: []
       };
       const landmarkSelectors = {
         navigation: 'nav, [role="navigation"]',
@@ -186,7 +169,7 @@ var SmartDOMReaderBundle = ((exports) => {
         banner: 'header, [role="banner"]',
         search: '[role="search"]',
         form: 'form[aria-label], form[aria-labelledby], [role="form"]',
-        region: 'section[aria-label], section[aria-labelledby], [role="region"]',
+        region: 'section[aria-label], section[aria-labelledby], [role="region"]'
       };
       for (const [landmark, selector] of Object.entries(landmarkSelectors)) {
         const elements = doc.querySelectorAll(selector);
@@ -203,52 +186,51 @@ var SmartDOMReaderBundle = ((exports) => {
       const doc = element.ownerDocument || document;
       const candidates = [];
       if (element.id && SelectorGenerator.isUniqueId(element.id, doc)) {
-        candidates.push({ type: 'id', value: `#${CSS.escape(element.id)}`, score: 100 });
+        candidates.push({ type: "id", value: `#${CSS.escape(element.id)}`, score: 100 });
       }
       const testId = SelectorGenerator.getDataTestId(element);
       if (testId) {
         const v = `[data-testid="${CSS.escape(testId)}"]`;
         candidates.push({
-          type: 'data-testid',
+          type: "data-testid",
           value: v,
-          score: 90 + (SelectorGenerator.isUniqueSelectorSafe(v, doc) ? 5 : 0),
+          score: 90 + (SelectorGenerator.isUniqueSelectorSafe(v, doc) ? 5 : 0)
         });
       }
-      const role = element.getAttribute('role');
-      const aria = element.getAttribute('aria-label');
+      const role = element.getAttribute("role");
+      const aria = element.getAttribute("aria-label");
       if (role && aria) {
         const v = `[role="${CSS.escape(role)}"][aria-label="${CSS.escape(aria)}"]`;
         candidates.push({
-          type: 'role-aria',
+          type: "role-aria",
           value: v,
-          score: 85 + (SelectorGenerator.isUniqueSelectorSafe(v, doc) ? 5 : 0),
+          score: 85 + (SelectorGenerator.isUniqueSelectorSafe(v, doc) ? 5 : 0)
         });
       }
-      const nameAttr = element.getAttribute('name');
+      const nameAttr = element.getAttribute("name");
       if (nameAttr) {
         const v = `[name="${CSS.escape(nameAttr)}"]`;
         candidates.push({
-          type: 'name',
+          type: "name",
           value: v,
-          score: 78 + (SelectorGenerator.isUniqueSelectorSafe(v, doc) ? 5 : 0),
+          score: 78 + (SelectorGenerator.isUniqueSelectorSafe(v, doc) ? 5 : 0)
         });
       }
       const pathCss = SelectorGenerator.generateCSSSelector(element, doc);
       const structuralPenalty = (pathCss.match(/:nth-child\(/g) || []).length * 10;
-      const classBonus = pathCss.includes('.') ? 8 : 0;
+      const classBonus = pathCss.includes(".") ? 8 : 0;
       const pathScore = Math.max(0, 70 + classBonus - structuralPenalty);
-      candidates.push({ type: 'class-path', value: pathCss, score: pathScore });
+      candidates.push({ type: "class-path", value: pathCss, score: pathScore });
       const xpath = SelectorGenerator.generateXPath(element, doc);
-      candidates.push({ type: 'xpath', value: xpath, score: 40 });
+      candidates.push({ type: "xpath", value: xpath, score: 40 });
       const textBased = SelectorGenerator.generateTextBasedSelector(element);
-      if (textBased) candidates.push({ type: 'text', value: textBased, score: 30 });
+      if (textBased) candidates.push({ type: "text", value: textBased, score: 30 });
       candidates.sort((a, b) => b.score - a.score);
-      const bestCss =
-        candidates.find((c) => c.type !== 'xpath' && c.type !== 'text')?.value || pathCss;
+      const bestCss = candidates.find((c) => c.type !== "xpath" && c.type !== "text")?.value || pathCss;
       const selector = {
         css: bestCss,
         xpath,
-        candidates,
+        candidates
       };
       if (textBased) selector.textBased = textBased;
       if (testId) selector.dataTestId = testId;
@@ -277,7 +259,7 @@ var SmartDOMReaderBundle = ((exports) => {
         }
         const classes = SelectorGenerator.getMeaningfulClasses(current);
         if (classes.length > 0) {
-          selector += `.${classes.map((c) => CSS.escape(c)).join('.')}`;
+          selector += `.${classes.map((c) => CSS.escape(c)).join(".")}`;
         }
         const siblings = current.parentElement?.children;
         if (siblings && siblings.length > 1) {
@@ -320,7 +302,7 @@ var SmartDOMReaderBundle = ((exports) => {
         path.unshift(xpath);
         current = current.parentElement;
       }
-      return `//${path.join('/')}`;
+      return `//${path.join("/")}`;
     }
     /**
      * Generate a text-based selector for buttons and links
@@ -329,8 +311,8 @@ var SmartDOMReaderBundle = ((exports) => {
       const text = element.textContent?.trim();
       if (!text || text.length > 50) return void 0;
       const tag = element.nodeName.toLowerCase();
-      if (['button', 'a', 'label'].includes(tag)) {
-        const escapedText = text.replace(/['"\\]/g, '\\$&');
+      if (["button", "a", "label"].includes(tag)) {
+        const escapedText = text.replace(/['"\\]/g, "\\$&");
         return `${tag}:contains("${escapedText}")`;
       }
       return void 0;
@@ -339,13 +321,7 @@ var SmartDOMReaderBundle = ((exports) => {
      * Get data-testid or similar attributes
      */
     static getDataTestId(element) {
-      return (
-        element.getAttribute('data-testid') ||
-        element.getAttribute('data-test-id') ||
-        element.getAttribute('data-test') ||
-        element.getAttribute('data-cy') ||
-        void 0
-      );
+      return element.getAttribute("data-testid") || element.getAttribute("data-test-id") || element.getAttribute("data-test") || element.getAttribute("data-cy") || void 0;
     }
     /**
      * Check if an ID is unique in the document
@@ -381,29 +357,28 @@ var SmartDOMReaderBundle = ((exports) => {
         /^(hover|focus|active|disabled|checked):/,
         /^js-/,
         /^is-/,
-        /^has-/,
+        /^has-/
       ];
-      return classes
-        .filter((cls) => {
-          if (cls.length < 3) return false;
-          return !utilityPatterns.some((pattern) => pattern.test(cls));
-        })
-        .slice(0, 2);
+      return classes.filter((cls) => {
+        if (cls.length < 3) return false;
+        return !utilityPatterns.some((pattern) => pattern.test(cls));
+      }).slice(0, 2);
     }
     /**
      * Optimize the selector path by removing unnecessary parts
      */
     static optimizePath(path, element, doc) {
       for (let i = 0; i < path.length - 1; i++) {
-        const shortPath = path.slice(i).join(' > ');
+        const shortPath = path.slice(i).join(" > ");
         try {
           const matches = doc.querySelectorAll(shortPath);
           if (matches.length === 1 && matches[0] === element) {
             return shortPath;
           }
-        } catch {}
+        } catch {
+        }
       }
-      return path.join(' > ');
+      return path.join(" > ");
     }
     /**
      * Get a human-readable path description
@@ -418,13 +393,13 @@ var SmartDOMReaderBundle = ((exports) => {
         let descriptor = tag;
         if (current.id) {
           descriptor = `${tag}#${current.id}`;
-        } else if (current.className && typeof current.className === 'string') {
-          const firstClass = current.className.split(' ')[0];
+        } else if (current.className && typeof current.className === "string") {
+          const firstClass = current.className.split(" ")[0];
           if (firstClass) {
             descriptor = `${tag}.${firstClass}`;
           }
         }
-        const role = current.getAttribute('role');
+        const role = current.getAttribute("role");
         if (role) {
           descriptor += `[role="${role}"]`;
         }
@@ -437,43 +412,43 @@ var SmartDOMReaderBundle = ((exports) => {
   }
   class DOMTraversal {
     static INTERACTIVE_SELECTORS = [
-      'button',
-      'a[href]',
+      "button",
+      "a[href]",
       'input:not([type="hidden"])',
-      'textarea',
-      'select',
+      "textarea",
+      "select",
       '[role="button"]',
-      '[onclick]',
+      "[onclick]",
       '[contenteditable="true"]',
-      'summary',
-      '[tabindex]:not([tabindex="-1"])',
+      "summary",
+      '[tabindex]:not([tabindex="-1"])'
     ];
     static SEMANTIC_SELECTORS = [
-      'h1',
-      'h2',
-      'h3',
-      'h4',
-      'h5',
-      'h6',
-      'article',
-      'section',
-      'nav',
-      'aside',
-      'main',
-      'header',
-      'footer',
-      'form',
-      'table',
-      'ul',
-      'ol',
-      'img[alt]',
-      'figure',
-      'video',
-      'audio',
+      "h1",
+      "h2",
+      "h3",
+      "h4",
+      "h5",
+      "h6",
+      "article",
+      "section",
+      "nav",
+      "aside",
+      "main",
+      "header",
+      "footer",
+      "form",
+      "table",
+      "ul",
+      "ol",
+      "img[alt]",
+      "figure",
+      "video",
+      "audio",
       '[role="navigation"]',
       '[role="main"]',
       '[role="complementary"]',
-      '[role="contentinfo"]',
+      '[role="contentinfo"]'
     ];
     /**
      * Check if element is visible
@@ -482,14 +457,7 @@ var SmartDOMReaderBundle = ((exports) => {
       const rect = element.getBoundingClientRect();
       const style = computedStyle || element.ownerDocument?.defaultView?.getComputedStyle(element);
       if (!style) return false;
-      return !!(
-        rect.width > 0 &&
-        rect.height > 0 &&
-        style.display !== 'none' &&
-        style.visibility !== 'hidden' &&
-        style.opacity !== '0' &&
-        element.offsetParent !== null
-      );
+      return !!(rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden" && style.opacity !== "0" && element.offsetParent !== null);
     }
     /**
      * Check if element is in viewport
@@ -498,7 +466,7 @@ var SmartDOMReaderBundle = ((exports) => {
       const rect = element.getBoundingClientRect();
       const view = viewport || {
         width: element.ownerDocument?.defaultView?.innerWidth || 0,
-        height: element.ownerDocument?.defaultView?.innerHeight || 0,
+        height: element.ownerDocument?.defaultView?.innerHeight || 0
       };
       return rect.top < view.height && rect.bottom > 0 && rect.left < view.width && rect.right > 0;
     }
@@ -526,7 +494,7 @@ var SmartDOMReaderBundle = ((exports) => {
       if (filter.tags?.length && !filter.tags.includes(element.tagName.toLowerCase())) {
         return false;
       }
-      const textContent = htmlElement.textContent?.toLowerCase() || '';
+      const textContent = htmlElement.textContent?.toLowerCase() || "";
       if (filter.textContains?.length) {
         let hasText = false;
         for (const text of filter.textContains) {
@@ -556,7 +524,7 @@ var SmartDOMReaderBundle = ((exports) => {
         for (const [attr, value] of Object.entries(filter.attributeValues)) {
           const attrValue = element.getAttribute(attr);
           if (!attrValue) return false;
-          if (typeof value === 'string') {
+          if (typeof value === "string") {
             if (attrValue !== value) return false;
           } else if (value instanceof RegExp) {
             if (!value.test(attrValue)) return false;
@@ -615,10 +583,10 @@ var SmartDOMReaderBundle = ((exports) => {
         selector: SelectorGenerator.generateSelectors(element),
         attributes: DOMTraversal.getRelevantAttributes(element, options),
         context: DOMTraversal.getElementContext(element),
-        interaction: DOMTraversal.getInteractionInfo(element),
+        interaction: DOMTraversal.getInteractionInfo(element)
         // bounds removed to save tokens
       };
-      if (options.mode === 'full' && DOMTraversal.isSemanticContainer(element)) {
+      if (options.mode === "full" && DOMTraversal.isSemanticContainer(element)) {
         const children = [];
         if (options.includeShadowDOM && htmlElement.shadowRoot) {
           const shadowChildren = DOMTraversal.extractChildren(
@@ -641,7 +609,7 @@ var SmartDOMReaderBundle = ((exports) => {
      */
     static extractChildren(container, options, depth) {
       const children = [];
-      const elements = container.querySelectorAll('*');
+      const elements = container.querySelectorAll("*");
       for (const child of Array.from(elements)) {
         if (DOMTraversal.hasExtractedAncestor(child, elements)) {
           continue;
@@ -671,34 +639,34 @@ var SmartDOMReaderBundle = ((exports) => {
      */
     static getRelevantAttributes(element, options) {
       const relevant = [
-        'id',
-        'class',
-        'name',
-        'type',
-        'value',
-        'placeholder',
-        'href',
-        'src',
-        'alt',
-        'title',
-        'action',
-        'method',
-        'aria-label',
-        'aria-describedby',
-        'aria-controls',
-        'role',
-        'disabled',
-        'readonly',
-        'required',
-        'checked',
-        'min',
-        'max',
-        'pattern',
-        'step',
-        'autocomplete',
-        'data-testid',
-        'data-test',
-        'data-cy',
+        "id",
+        "class",
+        "name",
+        "type",
+        "value",
+        "placeholder",
+        "href",
+        "src",
+        "alt",
+        "title",
+        "action",
+        "method",
+        "aria-label",
+        "aria-describedby",
+        "aria-controls",
+        "role",
+        "disabled",
+        "readonly",
+        "required",
+        "checked",
+        "min",
+        "max",
+        "pattern",
+        "step",
+        "autocomplete",
+        "data-testid",
+        "data-test",
+        "data-cy"
       ];
       const attributes = {};
       const attrTruncate = options.attributeTruncateLength ?? 100;
@@ -706,16 +674,12 @@ var SmartDOMReaderBundle = ((exports) => {
       for (const attr of relevant) {
         const value = element.getAttribute(attr);
         if (value) {
-          attributes[attr] =
-            value.length > attrTruncate ? `${value.substring(0, attrTruncate)}...` : value;
+          attributes[attr] = value.length > attrTruncate ? `${value.substring(0, attrTruncate)}...` : value;
         }
       }
       for (const attr of element.attributes) {
-        if (attr.name.startsWith('data-') && !relevant.includes(attr.name)) {
-          attributes[attr.name] =
-            attr.value.length > dataAttrTruncate
-              ? `${attr.value.substring(0, dataAttrTruncate)}...`
-              : attr.value;
+        if (attr.name.startsWith("data-") && !relevant.includes(attr.name)) {
+          attributes[attr.name] = attr.value.length > dataAttrTruncate ? `${attr.value.substring(0, dataAttrTruncate)}...` : attr.value;
         }
       }
       return attributes;
@@ -725,9 +689,9 @@ var SmartDOMReaderBundle = ((exports) => {
      */
     static getElementContext(element) {
       const context = {
-        parentChain: SelectorGenerator.getContextPath(element),
+        parentChain: SelectorGenerator.getContextPath(element)
       };
-      const form = element.closest('form');
+      const form = element.closest("form");
       if (form) {
         context.nearestForm = SelectorGenerator.generateSelectors(form).css;
       }
@@ -751,36 +715,22 @@ var SmartDOMReaderBundle = ((exports) => {
     static getInteractionInfo(element) {
       const htmlElement = element;
       const interaction = {};
-      const hasClickHandler = !!(
-        htmlElement.onclick ||
-        element.getAttribute('onclick') ||
-        element.matches('button, a[href], [role="button"], [tabindex]:not([tabindex="-1"])')
-      );
+      const hasClickHandler = !!(htmlElement.onclick || element.getAttribute("onclick") || element.matches('button, a[href], [role="button"], [tabindex]:not([tabindex="-1"])'));
       if (hasClickHandler) interaction.click = true;
-      const hasChangeHandler = !!(
-        htmlElement.onchange ||
-        element.getAttribute('onchange') ||
-        element.matches('input, select, textarea')
-      );
+      const hasChangeHandler = !!(htmlElement.onchange || element.getAttribute("onchange") || element.matches("input, select, textarea"));
       if (hasChangeHandler) interaction.change = true;
-      const hasSubmitHandler = !!(
-        htmlElement.onsubmit ||
-        element.getAttribute('onsubmit') ||
-        element.matches('form')
-      );
+      const hasSubmitHandler = !!(htmlElement.onsubmit || element.getAttribute("onsubmit") || element.matches("form"));
       if (hasSubmitHandler) interaction.submit = true;
       const triggersNavigation = element.matches('a[href], button[type="submit"]');
       if (triggersNavigation) interaction.nav = true;
-      const isDisabled =
-        htmlElement.hasAttribute('disabled') ||
-        htmlElement.getAttribute('aria-disabled') === 'true';
+      const isDisabled = htmlElement.hasAttribute("disabled") || htmlElement.getAttribute("aria-disabled") === "true";
       if (isDisabled) interaction.disabled = true;
       const isHidden = !DOMTraversal.isVisible(element);
       if (isHidden) interaction.hidden = true;
-      const ariaRole = element.getAttribute('role');
+      const ariaRole = element.getAttribute("role");
       if (ariaRole) interaction.role = ariaRole;
-      if (element.matches('input, textarea, select, button')) {
-        const form = element.form || element.closest('form');
+      if (element.matches("input, textarea, select, button")) {
+        const form = element.form || element.closest("form");
         if (form) {
           interaction.form = SelectorGenerator.generateSelectors(form).css;
         }
@@ -791,14 +741,14 @@ var SmartDOMReaderBundle = ((exports) => {
      * Get text content of an element (limited length)
      */
     static getElementText(element, options) {
-      if (element.matches('input, textarea')) {
+      if (element.matches("input, textarea")) {
         const input = element;
-        return input.value || input.placeholder || '';
+        return input.value || input.placeholder || "";
       }
-      if (element.matches('img')) {
-        return element.alt || '';
+      if (element.matches("img")) {
+        return element.alt || "";
       }
-      const text = element.textContent?.trim() || '';
+      const text = element.textContent?.trim() || "";
       const maxLength = options?.textTruncateLength;
       if (maxLength && text.length > maxLength) {
         return `${text.substring(0, maxLength)}...`;
@@ -818,7 +768,7 @@ var SmartDOMReaderBundle = ((exports) => {
      */
     static getInteractiveElements(container, options) {
       const elements = [];
-      const selector = DOMTraversal.INTERACTIVE_SELECTORS.join(', ');
+      const selector = DOMTraversal.INTERACTIVE_SELECTORS.join(", ");
       const found = container.querySelectorAll(selector);
       for (const element of Array.from(found)) {
         const extracted = DOMTraversal.extractElement(element, options);
@@ -848,7 +798,7 @@ var SmartDOMReaderBundle = ((exports) => {
      */
     static getSemanticElements(container, options) {
       const elements = [];
-      const selector = DOMTraversal.SEMANTIC_SELECTORS.join(', ');
+      const selector = DOMTraversal.SEMANTIC_SELECTORS.join(", ");
       const found = container.querySelectorAll(selector);
       for (const element of Array.from(found)) {
         const extracted = DOMTraversal.extractElement(element, options);
@@ -860,19 +810,19 @@ var SmartDOMReaderBundle = ((exports) => {
     }
   }
   function truncate(text, len) {
-    const t = (text ?? '').trim();
+    const t = (text ?? "").trim();
     if (!len || t.length <= len) return t;
     const keywords = [
-      'login',
-      'log in',
-      'sign in',
-      'sign up',
-      'submit',
-      'search',
-      'filter',
-      'add to cart',
-      'next',
-      'continue',
+      "login",
+      "log in",
+      "sign in",
+      "sign up",
+      "submit",
+      "search",
+      "filter",
+      "add to cart",
+      "next",
+      "continue"
     ];
     const lower = t.toLowerCase();
     const hit = keywords.map((k) => ({ k, i: lower.indexOf(k) })).find((x) => x.i > -1);
@@ -884,115 +834,104 @@ var SmartDOMReaderBundle = ((exports) => {
       return `${t.slice(0, head).trimEnd()} … ${t.slice(start, end).trim()}…`;
     }
     const slice = t.slice(0, len);
-    const lastSpace = slice.lastIndexOf(' ');
+    const lastSpace = slice.lastIndexOf(" ");
     return `${lastSpace > 32 ? slice.slice(0, lastSpace) : slice}…`;
   }
   function bestSelector(el) {
-    return el.selector?.css || '';
+    return el.selector?.css || "";
   }
   function hashId(input) {
     let h = 5381;
-    for (let i = 0; i < input.length; i++) h = (h * 33) ^ input.charCodeAt(i);
+    for (let i = 0; i < input.length; i++) h = h * 33 ^ input.charCodeAt(i);
     return `sec-${(h >>> 0).toString(36)}`;
   }
   function iconForRegion(key) {
     switch (key) {
-      case 'header':
-        return '🧭';
-      case 'navigation':
-        return '📑';
-      case 'main':
-        return '📄';
-      case 'sections':
-        return '🗂️';
-      case 'sidebar':
-        return '📚';
-      case 'footer':
-        return '🔻';
-      case 'modals':
-        return '💬';
+      case "header":
+        return "🧭";
+      case "navigation":
+        return "📑";
+      case "main":
+        return "📄";
+      case "sections":
+        return "🗂️";
+      case "sidebar":
+        return "📚";
+      case "footer":
+        return "🔻";
+      case "modals":
+        return "💬";
       default:
-        return '🔹';
+        return "🔹";
     }
   }
   function elementLine(el, opts) {
     const txt = truncate(el.text || el.attributes?.ariaLabel, opts?.maxTextLength ?? 80);
     const sel = bestSelector(el);
     const tag = el.tag.toLowerCase();
-    const action = el.interaction?.submit
-      ? 'submit'
-      : el.interaction?.click
-        ? 'click'
-        : el.interaction?.change
-          ? 'change'
-          : void 0;
-    const actionText = action ? ` (${action})` : '';
-    return `- ${tag.toUpperCase()}: ${txt || '(no text)'} → \`${sel}\`${actionText}`;
+    const action = el.interaction?.submit ? "submit" : el.interaction?.click ? "click" : el.interaction?.change ? "change" : void 0;
+    const actionText = action ? ` (${action})` : "";
+    return `- ${tag.toUpperCase()}: ${txt || "(no text)"} → \`${sel}\`${actionText}`;
   }
   function selectorQualitySummary(inter) {
     const all = [];
-    all.push(...inter.buttons.map((e) => e.selector?.css || ''));
-    all.push(...inter.links.map((e) => e.selector?.css || ''));
-    all.push(...inter.inputs.map((e) => e.selector?.css || ''));
-    all.push(...inter.clickable.map((e) => e.selector?.css || ''));
+    all.push(...inter.buttons.map((e) => e.selector?.css || ""));
+    all.push(...inter.links.map((e) => e.selector?.css || ""));
+    all.push(...inter.inputs.map((e) => e.selector?.css || ""));
+    all.push(...inter.clickable.map((e) => e.selector?.css || ""));
     const total = all.length || 1;
-    const idCount = all.filter((s) => s.startsWith('#')).length;
+    const idCount = all.filter((s) => s.startsWith("#")).length;
     const testIdCount = all.filter((s) => /\[data-testid=/.test(s)).length;
     const nthCount = all.filter((s) => /:nth-child\(/.test(s)).length;
     const stable = idCount + testIdCount;
-    const stablePct = Math.round((stable / total) * 100);
-    const nthPct = Math.round((nthCount / total) * 100);
+    const stablePct = Math.round(stable / total * 100);
+    const nthPct = Math.round(nthCount / total * 100);
     return `Selector quality: ${stablePct}% stable (ID/data-testid), ${nthPct}% structural (:nth-child)`;
   }
   function renderInteractive(inter, opts) {
     const parts = [];
-    const limit = (arr) =>
-      typeof opts?.maxElements === 'number' ? arr.slice(0, opts.maxElements) : arr;
+    const limit = (arr) => typeof opts?.maxElements === "number" ? arr.slice(0, opts.maxElements) : arr;
     if (inter.buttons.length) {
-      parts.push('Buttons:');
+      parts.push("Buttons:");
       for (const el of limit(inter.buttons)) parts.push(elementLine(el, opts));
     }
     if (inter.links.length) {
-      parts.push('Links:');
+      parts.push("Links:");
       for (const el of limit(inter.links)) parts.push(elementLine(el, opts));
     }
     if (inter.inputs.length) {
-      parts.push('Inputs:');
+      parts.push("Inputs:");
       for (const el of limit(inter.inputs)) parts.push(elementLine(el, opts));
     }
     if (inter.clickable.length) {
-      parts.push('Other Clickable:');
+      parts.push("Other Clickable:");
       for (const el of limit(inter.clickable)) parts.push(elementLine(el, opts));
     }
     if (inter.forms.length) {
-      parts.push('Forms:');
+      parts.push("Forms:");
       for (const f of limit(inter.forms)) {
-        parts.push(
-          `- FORM: action=${f.action ?? '-'} method=${f.method ?? '-'} → \`${f.selector}\``
-        );
+        parts.push(`- FORM: action=${f.action ?? "-"} method=${f.method ?? "-"} → \`${f.selector}\``);
       }
     }
-    return parts.join('\n');
+    return parts.join("\n");
   }
   function renderRegionInfo(region) {
-    const icon = iconForRegion('region');
-    const id = hashId(`${region.selector}|${region.label ?? ''}|${region.role ?? ''}`);
-    const label = region.label ? ` ${region.label}` : '';
+    const icon = iconForRegion("region");
+    const id = hashId(`${region.selector}|${region.label ?? ""}|${region.role ?? ""}`);
+    const label = region.label ? ` ${region.label}` : "";
     const stats = [];
     if (region.buttonCount) stats.push(`${region.buttonCount} buttons`);
     if (region.linkCount) stats.push(`${region.linkCount} links`);
     if (region.inputCount) stats.push(`${region.inputCount} inputs`);
     if (region.textPreview) stats.push(`“${truncate(region.textPreview, 80)}”`);
-    const statsLine = stats.length ? ` — ${stats.join(', ')}` : '';
+    const statsLine = stats.length ? ` — ${stats.join(", ")}` : "";
     return `${icon} ${label} → \`${region.selector}\` [${id}]${statsLine}`;
   }
-  function wrapXml(body, meta, type = 'section') {
+  function wrapXml(body, meta, type = "section") {
     const attrs = [
       meta?.title ? `title="${escapeXml(meta?.title)}"` : null,
-      meta?.url ? `url="${escapeXml(meta?.url)}"` : null,
-    ]
-      .filter(Boolean)
-      .join(' ');
+      meta?.url ? `url="${escapeXml(meta?.url)}"` : null
+    ].filter(Boolean).join(" ");
     return `<page ${attrs}>
   <${type}><![CDATA[
 ${body}
@@ -1000,30 +939,26 @@ ${body}
 </page>`;
   }
   function escapeXml(s) {
-    return s
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
   class MarkdownFormatter {
     static structure(overview, _opts = {}, meta) {
       const lines = [];
-      lines.push('# Page Outline');
+      lines.push("# Page Outline");
       if (meta?.title || meta?.url) {
-        lines.push(`Title: ${meta?.title ?? ''}`.trim());
-        lines.push(`URL: ${meta?.url ?? ''}`.trim());
+        lines.push(`Title: ${meta?.title ?? ""}`.trim());
+        lines.push(`URL: ${meta?.url ?? ""}`.trim());
       }
-      lines.push('');
+      lines.push("");
       const regions = overview.regions;
       const entries = [
-        ['header', regions.header],
-        ['navigation', regions.navigation],
-        ['main', regions.main],
-        ['sections', regions.sections],
-        ['sidebar', regions.sidebar],
-        ['footer', regions.footer],
-        ['modals', regions.modals],
+        ["header", regions.header],
+        ["navigation", regions.navigation],
+        ["main", regions.main],
+        ["sections", regions.sections],
+        ["sidebar", regions.sidebar],
+        ["footer", regions.footer],
+        ["modals", regions.modals]
       ];
       for (const [key, value] of entries) {
         if (!value) continue;
@@ -1036,135 +971,132 @@ ${body}
           lines.push(`## ${icon} ${capitalize(key)}`);
           lines.push(renderRegionInfo(value));
         }
-        lines.push('');
+        lines.push("");
       }
       if (overview.suggestions?.length) {
-        lines.push('## Suggestions');
+        lines.push("## Suggestions");
         for (const s of overview.suggestions) lines.push(`- ${s}`);
-        lines.push('');
+        lines.push("");
       }
       lines.push(
-        'Next: choose a region (by selector or [sectionId]) and call dom_extract_region for actionable details.'
+        "Next: choose a region (by selector or [sectionId]) and call dom_extract_region for actionable details."
       );
-      const body = lines.join('\n');
-      return wrapXml(body, meta, 'outline');
+      const body = lines.join("\n");
+      return wrapXml(body, meta, "outline");
     }
     static region(result, opts = {}, meta) {
       const lines = [];
-      lines.push('# Region Details');
+      lines.push("# Region Details");
       if (meta?.title || meta?.url) {
-        lines.push(`Title: ${meta?.title ?? ''}`.trim());
-        lines.push(`URL: ${meta?.url ?? ''}`.trim());
+        lines.push(`Title: ${meta?.title ?? ""}`.trim());
+        lines.push(`URL: ${meta?.url ?? ""}`.trim());
       }
-      lines.push('');
+      lines.push("");
       const inter = result.interactive;
       if (result.page) {
         const ps = [
-          result.page.hasErrors ? 'errors: yes' : 'errors: no',
-          result.page.isLoading ? 'loading: yes' : 'loading: no',
-          result.page.hasModals ? 'modals: yes' : 'modals: no',
+          result.page.hasErrors ? "errors: yes" : "errors: no",
+          result.page.isLoading ? "loading: yes" : "loading: no",
+          result.page.hasModals ? "modals: yes" : "modals: no"
         ];
-        lines.push(`Page state: ${ps.join(', ')}`);
+        lines.push(`Page state: ${ps.join(", ")}`);
       }
       const summary = [];
-      const count = (arr) => (arr ? arr.length : 0);
+      const count = (arr) => arr ? arr.length : 0;
       summary.push(`${count(inter.buttons)} buttons`);
       summary.push(`${count(inter.links)} links`);
       summary.push(`${count(inter.inputs)} inputs`);
       if (inter.forms?.length) summary.push(`${count(inter.forms)} forms`);
-      lines.push(`Summary: ${summary.join(', ')}`);
+      lines.push(`Summary: ${summary.join(", ")}`);
       lines.push(selectorQualitySummary(inter));
-      lines.push('');
+      lines.push("");
       lines.push(renderInteractive(inter, opts));
-      lines.push('');
+      lines.push("");
       lines.push(
-        'Next: write a script using the most stable selectors above. If selectors look unstable, rerun dom_extract_region with higher detail or call dom_extract_content for text context.'
+        "Next: write a script using the most stable selectors above. If selectors look unstable, rerun dom_extract_region with higher detail or call dom_extract_content for text context."
       );
-      const body = lines.join('\n');
-      return wrapXml(body, meta, 'section');
+      const body = lines.join("\n");
+      return wrapXml(body, meta, "section");
     }
     static content(content, opts = {}, meta) {
       const lines = [];
-      lines.push('# Content');
+      lines.push("# Content");
       lines.push(`Selector: \`${content.selector}\``);
-      lines.push('');
+      lines.push("");
       if (content.text.headings?.length) {
-        lines.push('Headings:');
+        lines.push("Headings:");
         for (const h of content.text.headings)
           lines.push(`- H${h.level}: ${truncate(h.text, opts.maxTextLength ?? 120)}`);
-        lines.push('');
+        lines.push("");
       }
       if (content.text.paragraphs?.length) {
-        const limit =
-          typeof opts.maxElements === 'number' ? opts.maxElements : content.text.paragraphs.length;
-        lines.push('Paragraphs:');
+        const limit = typeof opts.maxElements === "number" ? opts.maxElements : content.text.paragraphs.length;
+        lines.push("Paragraphs:");
         for (const p of content.text.paragraphs.slice(0, limit))
           lines.push(`- ${truncate(p, opts.maxTextLength ?? 200)}`);
-        lines.push('');
+        lines.push("");
       }
       if (content.text.lists?.length) {
-        lines.push('Lists:');
+        lines.push("Lists:");
         for (const list of content.text.lists) {
           lines.push(`- ${list.type.toUpperCase()}:`);
-          const limit = typeof opts.maxElements === 'number' ? opts.maxElements : list.items.length;
+          const limit = typeof opts.maxElements === "number" ? opts.maxElements : list.items.length;
           for (const item of list.items.slice(0, limit))
             lines.push(`  - ${truncate(item, opts.maxTextLength ?? 120)}`);
         }
-        lines.push('');
+        lines.push("");
       }
       if (content.tables?.length) {
-        lines.push('Tables:');
+        lines.push("Tables:");
         for (const t of content.tables) {
-          lines.push(`- Headers: ${t.headers.join(' | ')}`);
-          const limit = typeof opts.maxElements === 'number' ? opts.maxElements : t.rows.length;
-          for (const row of t.rows.slice(0, limit)) lines.push(`  - ${row.join(' | ')}`);
+          lines.push(`- Headers: ${t.headers.join(" | ")}`);
+          const limit = typeof opts.maxElements === "number" ? opts.maxElements : t.rows.length;
+          for (const row of t.rows.slice(0, limit)) lines.push(`  - ${row.join(" | ")}`);
         }
-        lines.push('');
+        lines.push("");
       }
       if (content.media?.length) {
-        lines.push('Media:');
-        const limit =
-          typeof opts.maxElements === 'number' ? opts.maxElements : content.media.length;
+        lines.push("Media:");
+        const limit = typeof opts.maxElements === "number" ? opts.maxElements : content.media.length;
         for (const m of content.media.slice(0, limit)) {
-          lines.push(
-            `- ${m.type.toUpperCase()}: ${m.alt ?? ''} ${m.src ? `→ ${m.src}` : ''}`.trim()
-          );
+          lines.push(`- ${m.type.toUpperCase()}: ${m.alt ?? ""} ${m.src ? `→ ${m.src}` : ""}`.trim());
         }
-        lines.push('');
+        lines.push("");
       }
       lines.push(
-        'Next: if text is insufficient for targeting, call dom_extract_region for interactive selectors.'
+        "Next: if text is insufficient for targeting, call dom_extract_region for interactive selectors."
       );
-      const body = lines.join('\n');
-      return wrapXml(body, meta, 'content');
+      const body = lines.join("\n");
+      return wrapXml(body, meta, "content");
     }
   }
   function capitalize(s) {
     return s.charAt(0).toUpperCase() + s.slice(1);
   }
   function resolveSmartDomReader() {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       const globalWindow = window;
       const direct = globalWindow.SmartDOMReader;
-      if (typeof direct === 'function') {
+      if (typeof direct === "function") {
         return direct;
       }
       const namespace = globalWindow.SmartDOMReaderNamespace;
-      if (namespace && typeof namespace.SmartDOMReader === 'function') {
+      if (namespace && typeof namespace.SmartDOMReader === "function") {
         return namespace.SmartDOMReader;
       }
     }
     try {
-      if (typeof require === 'function') {
-        const moduleExports = require('./index');
-        if (moduleExports && typeof moduleExports.SmartDOMReader === 'function') {
+      if (typeof require === "function") {
+        const moduleExports = require("./index");
+        if (moduleExports && typeof moduleExports.SmartDOMReader === "function") {
           return moduleExports.SmartDOMReader;
         }
-        if (moduleExports && typeof moduleExports.default === 'function') {
+        if (moduleExports && typeof moduleExports.default === "function") {
           return moduleExports.default;
         }
       }
-    } catch {}
+    } catch {
+    }
     return void 0;
   }
   class ProgressiveExtractor {
@@ -1188,24 +1120,20 @@ ${body}
           regions.main = ProgressiveExtractor.analyzeRegion(main);
           const sections = main.querySelectorAll('section, article, [role="region"]');
           if (sections.length > 0) {
-            regions.sections = Array.from(sections)
-              .filter((section) => !section.closest('nav, header, footer'))
-              .map((section) => ProgressiveExtractor.analyzeRegion(section));
+            regions.sections = Array.from(sections).filter((section) => !section.closest("nav, header, footer")).map((section) => ProgressiveExtractor.analyzeRegion(section));
           }
         }
       } else {
         regions.main = ProgressiveExtractor.analyzeRegion(root);
         const sections = root.querySelectorAll('section, article, [role="region"]');
         if (sections.length > 0) {
-          regions.sections = Array.from(sections)
-            .filter((section) => !section.closest('nav, header, footer'))
-            .map((section) => ProgressiveExtractor.analyzeRegion(section));
+          regions.sections = Array.from(sections).filter((section) => !section.closest("nav, header, footer")).map((section) => ProgressiveExtractor.analyzeRegion(section));
         }
       }
       const sidebars = root.querySelectorAll('aside, [role="complementary"], .sidebar, #sidebar');
       if (sidebars.length > 0) {
-        regions.sidebar = Array.from(sidebars).map((sidebar) =>
-          ProgressiveExtractor.analyzeRegion(sidebar)
+        regions.sidebar = Array.from(sidebars).map(
+          (sidebar) => ProgressiveExtractor.analyzeRegion(sidebar)
         );
       }
       const footer = root.querySelector('footer, [role="contentinfo"], .footer, #footer');
@@ -1231,7 +1159,7 @@ ${body}
       const SmartDOMReaderCtor = smartDomReaderCtor ?? resolveSmartDomReader();
       if (!SmartDOMReaderCtor) {
         throw new Error(
-          'SmartDOMReader is unavailable. Ensure the Smart DOM Reader module is loaded before calling extractRegion.'
+          "SmartDOMReader is unavailable. Ensure the Smart DOM Reader module is loaded before calling extractRegion."
         );
       }
       const reader = new SmartDOMReaderCtor(options);
@@ -1248,78 +1176,73 @@ ${body}
         text: {},
         metadata: {
           wordCount: 0,
-          hasInteractive: false,
-        },
+          hasInteractive: false
+        }
       };
       if (options.includeHeadings !== false) {
-        const headings = element.querySelectorAll('h1, h2, h3, h4, h5, h6');
+        const headings = element.querySelectorAll("h1, h2, h3, h4, h5, h6");
         result.text.headings = Array.from(headings).map((h) => ({
           level: Number.parseInt(h.tagName[1], 10),
-          text: ProgressiveExtractor.getTextContent(h, options.maxTextLength),
+          text: ProgressiveExtractor.getTextContent(h, options.maxTextLength)
         }));
       }
-      const paragraphs = element.querySelectorAll('p');
+      const paragraphs = element.querySelectorAll("p");
       if (paragraphs.length > 0) {
-        result.text.paragraphs = Array.from(paragraphs)
-          .map((p) => ProgressiveExtractor.getTextContent(p, options.maxTextLength))
-          .filter((text) => text.length > 0);
+        result.text.paragraphs = Array.from(paragraphs).map((p) => ProgressiveExtractor.getTextContent(p, options.maxTextLength)).filter((text) => text.length > 0);
       }
       if (options.includeLists !== false) {
-        const lists = element.querySelectorAll('ul, ol');
+        const lists = element.querySelectorAll("ul, ol");
         result.text.lists = Array.from(lists).map((list) => ({
           type: list.tagName.toLowerCase(),
-          items: Array.from(list.querySelectorAll('li')).map((li) =>
-            ProgressiveExtractor.getTextContent(li, options.maxTextLength)
-          ),
+          items: Array.from(list.querySelectorAll("li")).map(
+            (li) => ProgressiveExtractor.getTextContent(li, options.maxTextLength)
+          )
         }));
       }
       if (options.includeTables !== false) {
-        const tables = element.querySelectorAll('table');
+        const tables = element.querySelectorAll("table");
         result.tables = Array.from(tables).map((table) => {
-          const headers = Array.from(table.querySelectorAll('th')).map((th) =>
-            ProgressiveExtractor.getTextContent(th)
+          const headers = Array.from(table.querySelectorAll("th")).map(
+            (th) => ProgressiveExtractor.getTextContent(th)
           );
-          const rows = Array.from(table.querySelectorAll('tr'))
-            .filter((tr) => tr.querySelector('td'))
-            .map((tr) =>
-              Array.from(tr.querySelectorAll('td')).map((td) =>
-                ProgressiveExtractor.getTextContent(td)
-              )
-            );
+          const rows = Array.from(table.querySelectorAll("tr")).filter((tr) => tr.querySelector("td")).map(
+            (tr) => Array.from(tr.querySelectorAll("td")).map(
+              (td) => ProgressiveExtractor.getTextContent(td)
+            )
+          );
           return { headers, rows };
         });
       }
       if (options.includeMedia !== false) {
-        const images = element.querySelectorAll('img');
-        const videos = element.querySelectorAll('video');
-        const audios = element.querySelectorAll('audio');
+        const images = element.querySelectorAll("img");
+        const videos = element.querySelectorAll("video");
+        const audios = element.querySelectorAll("audio");
         result.media = [
           ...Array.from(images).map((img) => {
-            const item = { type: 'img' };
-            const alt = img.getAttribute('alt');
-            const src = img.getAttribute('src');
+            const item = { type: "img" };
+            const alt = img.getAttribute("alt");
+            const src = img.getAttribute("src");
             if (alt) item.alt = alt;
             if (src) item.src = src;
             return item;
           }),
           ...Array.from(videos).map((video) => {
-            const item = { type: 'video' };
-            const src = video.getAttribute('src');
+            const item = { type: "video" };
+            const src = video.getAttribute("src");
             if (src) item.src = src;
             return item;
           }),
           ...Array.from(audios).map((audio) => {
-            const item = { type: 'audio' };
-            const src = audio.getAttribute('src');
+            const item = { type: "audio" };
+            const src = audio.getAttribute("src");
             if (src) item.src = src;
             return item;
-          }),
+          })
         ];
       }
-      const allText = element.textContent || '';
+      const allText = element.textContent || "";
       result.metadata.wordCount = allText.trim().split(/\s+/).length;
-      result.metadata.hasInteractive =
-        element.querySelectorAll('button, a, input, textarea, select').length > 0;
+      result.metadata.hasInteractive = element.querySelectorAll("button, a, input, textarea, select").length > 0;
       return result;
     }
     /**
@@ -1328,19 +1251,19 @@ ${body}
     static analyzeRegion(element) {
       const selector = SelectorGenerator.generateSelectors(element).css;
       const buttons = element.querySelectorAll('button, [role="button"]');
-      const links = element.querySelectorAll('a[href]');
-      const inputs = element.querySelectorAll('input, textarea, select');
-      const forms = element.querySelectorAll('form');
-      const lists = element.querySelectorAll('ul, ol');
-      const tables = element.querySelectorAll('table');
-      const media = element.querySelectorAll('img, video, audio');
+      const links = element.querySelectorAll("a[href]");
+      const inputs = element.querySelectorAll("input, textarea, select");
+      const forms = element.querySelectorAll("form");
+      const lists = element.querySelectorAll("ul, ol");
+      const tables = element.querySelectorAll("table");
+      const media = element.querySelectorAll("img, video, audio");
       const interactiveCount = buttons.length + links.length + inputs.length;
       let label;
-      const ariaLabel = element.getAttribute('aria-label');
+      const ariaLabel = element.getAttribute("aria-label");
       if (ariaLabel) {
         label = ariaLabel;
-      } else if (element.getAttribute('aria-labelledby')) {
-        const labelId = element.getAttribute('aria-labelledby');
+      } else if (element.getAttribute("aria-labelledby")) {
+        const labelId = element.getAttribute("aria-labelledby");
         if (labelId) {
           const labelElement = element.ownerDocument?.getElementById(labelId);
           if (labelElement) {
@@ -1348,24 +1271,23 @@ ${body}
           }
         }
       } else {
-        const heading = element.querySelector('h1, h2, h3');
+        const heading = element.querySelector("h1, h2, h3");
         if (heading) {
           label = heading.textContent?.trim();
         }
       }
-      const textContent = element.textContent?.trim() || '';
-      const textPreview =
-        textContent.length > 50 ? `${textContent.substring(0, 50)}...` : textContent;
+      const textContent = element.textContent?.trim() || "";
+      const textPreview = textContent.length > 50 ? `${textContent.substring(0, 50)}...` : textContent;
       const regionInfo = {
         selector,
         interactiveCount,
         hasForm: forms.length > 0,
         hasList: lists.length > 0,
         hasTable: tables.length > 0,
-        hasMedia: media.length > 0,
+        hasMedia: media.length > 0
       };
       if (label) regionInfo.label = label;
-      const role = element.getAttribute('role');
+      const role = element.getAttribute("role");
       if (role) regionInfo.role = role;
       if (buttons.length > 0) regionInfo.buttonCount = buttons.length;
       if (links.length > 0) regionInfo.linkCount = links.length;
@@ -1377,46 +1299,46 @@ ${body}
      * Extract overview of forms on the page
      */
     static extractFormOverview(root) {
-      const forms = root.querySelectorAll('form');
+      const forms = root.querySelectorAll("form");
       return Array.from(forms).map((form) => {
-        const inputs = form.querySelectorAll('input, textarea, select');
+        const inputs = form.querySelectorAll("input, textarea, select");
         const selector = SelectorGenerator.generateSelectors(form).css;
-        let location2 = 'unknown';
+        let location2 = "unknown";
         if (form.closest('header, [role="banner"]')) {
-          location2 = 'header';
+          location2 = "header";
         } else if (form.closest('nav, [role="navigation"]')) {
-          location2 = 'navigation';
+          location2 = "navigation";
         } else if (form.closest('main, [role="main"]')) {
-          location2 = 'main';
+          location2 = "main";
         } else if (form.closest('aside, [role="complementary"]')) {
-          location2 = 'sidebar';
+          location2 = "sidebar";
         } else if (form.closest('footer, [role="contentinfo"]')) {
-          location2 = 'footer';
+          location2 = "footer";
         }
         let purpose;
-        const formId = form.getAttribute('id')?.toLowerCase();
-        const formClass = form.getAttribute('class')?.toLowerCase();
-        const formAction = form.getAttribute('action')?.toLowerCase();
+        const formId = form.getAttribute("id")?.toLowerCase();
+        const formClass = form.getAttribute("class")?.toLowerCase();
+        const formAction = form.getAttribute("action")?.toLowerCase();
         const hasEmail = form.querySelector('input[type="email"]');
         const hasPassword = form.querySelector('input[type="password"]');
         const hasSearch = form.querySelector('input[type="search"]');
-        if (hasSearch || formId?.includes('search') || formClass?.includes('search')) {
-          purpose = 'search';
+        if (hasSearch || formId?.includes("search") || formClass?.includes("search")) {
+          purpose = "search";
         } else if (hasPassword && hasEmail) {
-          purpose = 'login';
+          purpose = "login";
         } else if (hasPassword) {
-          purpose = 'authentication';
-        } else if (formId?.includes('contact') || formClass?.includes('contact')) {
-          purpose = 'contact';
-        } else if (formId?.includes('subscribe') || formClass?.includes('subscribe')) {
-          purpose = 'subscription';
-        } else if (formAction?.includes('checkout') || formClass?.includes('checkout')) {
-          purpose = 'checkout';
+          purpose = "authentication";
+        } else if (formId?.includes("contact") || formClass?.includes("contact")) {
+          purpose = "contact";
+        } else if (formId?.includes("subscribe") || formClass?.includes("subscribe")) {
+          purpose = "subscription";
+        } else if (formAction?.includes("checkout") || formClass?.includes("checkout")) {
+          purpose = "checkout";
         }
         const formOverview = {
           selector,
           location: location2,
-          inputCount: inputs.length,
+          inputCount: inputs.length
         };
         if (purpose) formOverview.purpose = purpose;
         return formOverview;
@@ -1426,15 +1348,15 @@ ${body}
      * Calculate summary statistics
      */
     static calculateSummary(root, regions, forms) {
-      const allInteractive = root.querySelectorAll('button, a[href], input, textarea, select');
+      const allInteractive = root.querySelectorAll("button, a[href], input, textarea, select");
       const allSections = root.querySelectorAll('section, article, [role="region"]');
       const hasModals = (regions.modals?.length || 0) > 0;
-      const errorSelectors = ['.error', '.alert-danger', '[role="alert"]'];
+      const errorSelectors = [".error", ".alert-danger", '[role="alert"]'];
       const hasErrors = errorSelectors.some((sel) => {
         const element = root.querySelector(sel);
         return element ? DOMTraversal.isVisible(element) : false;
       });
-      const loadingSelectors = ['.loading', '.spinner', '[aria-busy="true"]'];
+      const loadingSelectors = [".loading", ".spinner", '[aria-busy="true"]'];
       const isLoading = loadingSelectors.some((sel) => {
         const element = root.querySelector(sel);
         return element ? DOMTraversal.isVisible(element) : false;
@@ -1445,7 +1367,7 @@ ${body}
         totalSections: allSections.length,
         hasModals,
         hasErrors,
-        isLoading,
+        isLoading
       };
       const mainContentSelector = regions.main?.selector;
       if (mainContentSelector) {
@@ -1459,13 +1381,13 @@ ${body}
     static generateSuggestions(regions, summary) {
       const suggestions = [];
       if (summary.hasErrors) {
-        suggestions.push('Page has error indicators - check error messages before interacting');
+        suggestions.push("Page has error indicators - check error messages before interacting");
       }
       if (summary.isLoading) {
-        suggestions.push('Page appears to be loading - wait or check loading state');
+        suggestions.push("Page appears to be loading - wait or check loading state");
       }
       if (summary.hasModals) {
-        suggestions.push('Modal/dialog is open - may need to interact with or close it first');
+        suggestions.push("Modal/dialog is open - may need to interact with or close it first");
       }
       if (regions.main && regions.main.interactiveCount > 10) {
         suggestions.push(
@@ -1476,7 +1398,7 @@ ${body}
         suggestions.push(`Found ${summary.totalForms} form(s) on the page`);
       }
       if (!regions.main) {
-        suggestions.push('No clear main content area detected - may need to explore regions');
+        suggestions.push("No clear main content area detected - may need to explore regions");
       }
       return suggestions;
     }
@@ -1484,7 +1406,7 @@ ${body}
      * Get text content with optional truncation
      */
     static getTextContent(element, maxLength) {
-      const text = element.textContent?.trim() || '';
+      const text = element.textContent?.trim() || "";
       if (maxLength && text.length > maxLength) {
         return `${text.substring(0, maxLength)}...`;
       }
@@ -1495,7 +1417,7 @@ ${body}
     options;
     constructor(options = {}) {
       this.options = {
-        mode: options.mode || 'interactive',
+        mode: options.mode || "interactive",
         maxDepth: options.maxDepth || 5,
         includeHidden: options.includeHidden || false,
         includeShadowDOM: options.includeShadowDOM ?? true,
@@ -1503,16 +1425,16 @@ ${body}
         viewportOnly: options.viewportOnly || false,
         mainContentOnly: options.mainContentOnly || false,
         customSelectors: options.customSelectors || [],
-        ...(options.attributeTruncateLength !== void 0 && {
-          attributeTruncateLength: options.attributeTruncateLength,
-        }),
-        ...(options.dataAttributeTruncateLength !== void 0 && {
-          dataAttributeTruncateLength: options.dataAttributeTruncateLength,
-        }),
-        ...(options.textTruncateLength !== void 0 && {
-          textTruncateLength: options.textTruncateLength,
-        }),
-        ...(options.filter !== void 0 && { filter: options.filter }),
+        ...options.attributeTruncateLength !== void 0 && {
+          attributeTruncateLength: options.attributeTruncateLength
+        },
+        ...options.dataAttributeTruncateLength !== void 0 && {
+          dataAttributeTruncateLength: options.dataAttributeTruncateLength
+        },
+        ...options.textTruncateLength !== void 0 && {
+          textTruncateLength: options.textTruncateLength
+        },
+        ...options.filter !== void 0 && { filter: options.filter }
       };
     }
     /**
@@ -1536,15 +1458,15 @@ ${body}
         timestamp: startTime,
         page: pageState,
         landmarks,
-        interactive,
+        interactive
       };
-      if (options.mode === 'full') {
+      if (options.mode === "full") {
         const semantic = this.extractSemanticElements(container, options);
         const metadata = this.extractMetadata(doc, container, options);
         return {
           ...result,
           semantic,
-          metadata,
+          metadata
         };
       }
       return result;
@@ -1555,12 +1477,12 @@ ${body}
     extractPageState(doc) {
       const hasFocus = this.getFocusedElement(doc);
       return {
-        url: doc.location?.href || '',
-        title: doc.title || '',
+        url: doc.location?.href || "",
+        title: doc.title || "",
         hasErrors: this.detectErrors(doc),
         isLoading: this.detectLoading(doc),
         hasModals: this.detectModals(doc),
-        ...(hasFocus !== void 0 && { hasFocus }),
+        ...hasFocus !== void 0 && { hasFocus }
       };
     }
     /**
@@ -1575,7 +1497,7 @@ ${body}
         headers: this.elementsToSelectors(detected.banner || []),
         footers: this.elementsToSelectors(detected.contentinfo || []),
         articles: this.elementsToSelectors(detected.region || []),
-        sections: this.elementsToSelectors(detected.region || []),
+        sections: this.elementsToSelectors(detected.region || [])
       };
     }
     /**
@@ -1601,7 +1523,7 @@ ${body}
           if (extracted) buttons.push(extracted);
         }
       });
-      const linkElements = container.querySelectorAll('a[href]');
+      const linkElements = container.querySelectorAll("a[href]");
       linkElements.forEach((el) => {
         if (this.shouldIncludeElement(el, options)) {
           const extracted = DOMTraversal.extractElement(el, options);
@@ -1634,7 +1556,7 @@ ${body}
         links,
         inputs,
         forms,
-        clickable,
+        clickable
       };
     }
     /**
@@ -1642,7 +1564,7 @@ ${body}
      */
     extractForms(container, options) {
       const forms = [];
-      const formElements = container.querySelectorAll('form');
+      const formElements = container.querySelectorAll("form");
       formElements.forEach((form) => {
         if (!this.shouldIncludeElement(form, options)) return;
         const formInputs = [];
@@ -1659,12 +1581,12 @@ ${body}
           const extracted = DOMTraversal.extractElement(button, options);
           if (extracted) formButtons.push(extracted);
         });
-        const action = form.getAttribute('action');
-        const method = form.getAttribute('method');
+        const action = form.getAttribute("action");
+        const method = form.getAttribute("method");
         const formInfo = {
           selector: SelectorGenerator.generateSelectors(form).css,
           inputs: formInputs,
-          buttons: formButtons,
+          buttons: formButtons
         };
         if (action) formInfo.action = action;
         if (method) formInfo.method = method;
@@ -1681,25 +1603,25 @@ ${body}
       const tables = [];
       const lists = [];
       const articles = [];
-      container.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach((el) => {
+      container.querySelectorAll("h1, h2, h3, h4, h5, h6").forEach((el) => {
         if (this.shouldIncludeElement(el, options)) {
           const extracted = DOMTraversal.extractElement(el, options);
           if (extracted) headings.push(extracted);
         }
       });
-      container.querySelectorAll('img').forEach((el) => {
+      container.querySelectorAll("img").forEach((el) => {
         if (this.shouldIncludeElement(el, options)) {
           const extracted = DOMTraversal.extractElement(el, options);
           if (extracted) images.push(extracted);
         }
       });
-      container.querySelectorAll('table').forEach((el) => {
+      container.querySelectorAll("table").forEach((el) => {
         if (this.shouldIncludeElement(el, options)) {
           const extracted = DOMTraversal.extractElement(el, options);
           if (extracted) tables.push(extracted);
         }
       });
-      container.querySelectorAll('ul, ol').forEach((el) => {
+      container.querySelectorAll("ul, ol").forEach((el) => {
         if (this.shouldIncludeElement(el, options)) {
           const extracted = DOMTraversal.extractElement(el, options);
           if (extracted) lists.push(extracted);
@@ -1716,25 +1638,25 @@ ${body}
         images,
         tables,
         lists,
-        articles,
+        articles
       };
     }
     /**
      * Extract metadata
      */
     extractMetadata(doc, container, options) {
-      const allElements = container.querySelectorAll('*');
+      const allElements = container.querySelectorAll("*");
       const extractedElements = container.querySelectorAll(
-        'button, a, input, textarea, select, h1, h2, h3, h4, h5, h6, img, table, ul, ol, article'
+        "button, a, input, textarea, select, h1, h2, h3, h4, h5, h6, img, table, ul, ol, article"
       ).length;
       const metadata = {
         totalElements: allElements.length,
-        extractedElements,
+        extractedElements
       };
       if (options.mainContentOnly && container instanceof Element) {
         metadata.mainContent = SelectorGenerator.generateSelectors(container).css;
       }
-      const language = doc.documentElement.getAttribute('lang');
+      const language = doc.documentElement.getAttribute("lang");
       if (language) {
         metadata.language = language;
       }
@@ -1759,7 +1681,7 @@ ${body}
      * Detect errors on the page
      */
     detectErrors(doc) {
-      const errorSelectors = ['.error', '.alert-danger', '[role="alert"]', '.error-message'];
+      const errorSelectors = [".error", ".alert-danger", '[role="alert"]', ".error-message"];
       return errorSelectors.some((sel) => {
         const element = doc.querySelector(sel);
         return element ? DOMTraversal.isVisible(element) : false;
@@ -1769,7 +1691,7 @@ ${body}
      * Detect if page is loading
      */
     detectLoading(doc) {
-      const loadingSelectors = ['.loading', '.spinner', '[aria-busy="true"]', '.loader'];
+      const loadingSelectors = [".loading", ".spinner", '[aria-busy="true"]', ".loader"];
       return loadingSelectors.some((sel) => {
         const element = doc.querySelector(sel);
         return element ? DOMTraversal.isVisible(element) : false;
@@ -1779,7 +1701,7 @@ ${body}
      * Detect modal dialogs
      */
     detectModals(doc) {
-      const modalSelectors = ['[role="dialog"]', '.modal', '.popup', '.overlay'];
+      const modalSelectors = ['[role="dialog"]', ".modal", ".popup", ".overlay"];
       return modalSelectors.some((sel) => {
         const element = doc.querySelector(sel);
         return element ? DOMTraversal.isVisible(element) : false;
@@ -1804,7 +1726,7 @@ ${body}
     static extractInteractive(doc, options = {}) {
       const reader = new SmartDOMReader({
         ...options,
-        mode: 'interactive',
+        mode: "interactive"
       });
       return reader.extract(doc);
     }
@@ -1816,7 +1738,7 @@ ${body}
     static extractFull(doc, options = {}) {
       const reader = new SmartDOMReader({
         ...options,
-        mode: 'full',
+        mode: "full"
       });
       return reader.extract(doc);
     }
@@ -1826,10 +1748,10 @@ ${body}
      * @param mode The extraction mode
      * @param options Additional options
      */
-    static extractFromElement(element, mode = 'interactive', options = {}) {
+    static extractFromElement(element, mode = "interactive", options = {}) {
       const reader = new SmartDOMReader({
         ...options,
-        mode,
+        mode
       });
       return reader.extract(element);
     }
@@ -1838,7 +1760,7 @@ ${body}
     try {
       let result;
       switch (method) {
-        case 'extractStructure': {
+        case "extractStructure": {
           const structureArgs = args;
           const { selector, frameSelector, formatOptions } = structureArgs;
           let doc = document;
@@ -1849,17 +1771,17 @@ ${body}
             }
             doc = iframe.contentDocument;
           }
-          const target = selector ? (doc.querySelector(selector) ?? doc) : doc;
+          const target = selector ? doc.querySelector(selector) ?? doc : doc;
           const overview = ProgressiveExtractor.extractStructure(target);
           const meta = { title: document.title, url: location.href };
           result = MarkdownFormatter.structure(
             overview,
-            formatOptions ?? { detail: 'summary' },
+            formatOptions ?? { detail: "summary" },
             meta
           );
           break;
         }
-        case 'extractRegion': {
+        case "extractRegion": {
           const regionArgs = args;
           const { selector, mode, frameSelector, options, formatOptions } = regionArgs;
           let doc = document;
@@ -1871,8 +1793,8 @@ ${body}
             doc = iframe.contentDocument;
           }
           const extractOptions = {
-            ...(options || {}),
-            mode: mode || 'interactive',
+            ...options || {},
+            mode: mode || "interactive"
           };
           const extractResult = ProgressiveExtractor.extractRegion(
             selector,
@@ -1886,12 +1808,12 @@ ${body}
           const meta = { title: document.title, url: location.href };
           result = MarkdownFormatter.region(
             extractResult,
-            formatOptions ?? { detail: 'region' },
+            formatOptions ?? { detail: "region" },
             meta
           );
           break;
         }
-        case 'extractContent': {
+        case "extractContent": {
           const contentArgs = args;
           const { selector, frameSelector, options, formatOptions } = contentArgs;
           let doc = document;
@@ -1910,12 +1832,12 @@ ${body}
           const meta = { title: document.title, url: location.href };
           result = MarkdownFormatter.content(
             extractResult,
-            formatOptions ?? { detail: 'region' },
+            formatOptions ?? { detail: "region" },
             meta
           );
           break;
         }
-        case 'extractInteractive': {
+        case "extractInteractive": {
           const interactiveArgs = args;
           const { selector, frameSelector, options, formatOptions } = interactiveArgs;
           let doc = document;
@@ -1926,22 +1848,20 @@ ${body}
             }
             doc = iframe.contentDocument;
           }
-          const extractResult = selector
-            ? SmartDOMReader.extractFromElement(
-                doc.querySelector(selector),
-                'interactive',
-                options || {}
-              )
-            : SmartDOMReader.extractInteractive(doc, options || {});
+          const extractResult = selector ? SmartDOMReader.extractFromElement(
+            doc.querySelector(selector),
+            "interactive",
+            options || {}
+          ) : SmartDOMReader.extractInteractive(doc, options || {});
           const meta = { title: document.title, url: location.href };
           result = MarkdownFormatter.region(
             extractResult,
-            formatOptions ?? { detail: 'region' },
+            formatOptions ?? { detail: "region" },
             meta
           );
           break;
         }
-        case 'extractFull': {
+        case "extractFull": {
           const fullArgs = args;
           const { selector, frameSelector, options, formatOptions } = fullArgs;
           let doc = document;
@@ -1952,15 +1872,9 @@ ${body}
             }
             doc = iframe.contentDocument;
           }
-          const extractResult = selector
-            ? SmartDOMReader.extractFromElement(doc.querySelector(selector), 'full', options || {})
-            : SmartDOMReader.extractFull(doc, options || {});
+          const extractResult = selector ? SmartDOMReader.extractFromElement(doc.querySelector(selector), "full", options || {}) : SmartDOMReader.extractFull(doc, options || {});
           const meta = { title: document.title, url: location.href };
-          result = MarkdownFormatter.region(
-            extractResult,
-            formatOptions ?? { detail: 'deep' },
-            meta
-          );
+          result = MarkdownFormatter.region(extractResult, formatOptions ?? { detail: "deep" }, meta);
           break;
         }
         default:
@@ -1969,13 +1883,13 @@ ${body}
       return result;
     } catch (error) {
       return {
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : String(error)
       };
     }
   }
   const SmartDOMReaderBundle2 = { executeExtraction };
   exports.SmartDOMReaderBundle = SmartDOMReaderBundle2;
   exports.executeExtraction = executeExtraction;
-  Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
+  Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
   return exports;
 })({});
