@@ -33,7 +33,9 @@ declare global {
 
 /**
  * Detect if the native Chromium Web Model Context API is available.
- * Checks for both navigator.modelContext and navigator.modelContextTesting.
+ * Checks for both navigator.modelContext and navigator.modelContextTesting,
+ * and verifies they are native implementations (not polyfills) by examining
+ * the constructor name.
  *
  * @returns Detection result with flags for native context and testing API availability
  */
@@ -45,17 +47,21 @@ function detectNativeAPI(): {
     return { hasNativeContext: false, hasNativeTesting: false };
   }
 
-  const hasNativeContext =
-    'modelContext' in navigator &&
-    navigator.modelContext !== undefined &&
-    navigator.modelContext !== null;
+  const modelContext = navigator.modelContext;
+  const modelContextTesting = navigator.modelContextTesting;
 
-  const hasNativeTesting =
-    'modelContextTesting' in navigator &&
-    navigator.modelContextTesting !== undefined &&
-    navigator.modelContextTesting !== null;
+  if (!modelContext || !modelContextTesting) {
+    return { hasNativeContext: false, hasNativeTesting: false };
+  }
 
-  return { hasNativeContext, hasNativeTesting };
+  const testingConstructorName = modelContextTesting.constructor?.name || '';
+  const isPolyfill = testingConstructorName.includes('WebModelContext');
+
+  if (isPolyfill) {
+    return { hasNativeContext: false, hasNativeTesting: false };
+  }
+
+  return { hasNativeContext: true, hasNativeTesting: true };
 }
 
 /**
