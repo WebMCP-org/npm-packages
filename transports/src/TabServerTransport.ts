@@ -94,9 +94,14 @@ export class TabServerTransport implements Transport {
       throw new Error('Transport not started');
     }
 
+    // If we have a known client origin, use it (for security)
+    // Otherwise, use '*' for backwards compatibility with clients that don't do the handshake
+    const targetOrigin = this._clientOrigin || '*';
+
     if (!this._clientOrigin) {
-      console.warn('[TabServerTransport] No client connected, message not sent');
-      return;
+      console.debug(
+        '[TabServerTransport] Sending to unknown client origin (backwards compatibility mode)'
+      );
     }
 
     window.postMessage(
@@ -106,7 +111,7 @@ export class TabServerTransport implements Transport {
         direction: 'server-to-client',
         payload: message,
       },
-      this._clientOrigin
+      targetOrigin
     );
   }
 
