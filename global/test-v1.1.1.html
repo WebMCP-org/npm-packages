@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test IIFE v1.1.1 - With Cache Busting</title>
+  <!-- Use specific version with cache busting parameter -->
+  <script src="https://unpkg.com/@mcp-b/global@1.1.1/dist/index.iife.js?v=1"></script>
+</head>
+<body>
+  <h1>My AI-Powered App (v1.1.1 Test)</h1>
+  <div id="status" style="font-family: monospace; padding: 20px;"></div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+
+    function log(message, isError = false) {
+      const p = document.createElement('p');
+      p.style.color = isError ? 'red' : 'green';
+      p.textContent = message;
+      statusEl.appendChild(p);
+    }
+
+    // Check loaded version
+    log('Script loaded successfully!');
+    log(`WebMCP global available: ${typeof WebMCP !== 'undefined'}`);
+
+    // Check if navigator.modelContext is available
+    if (window.navigator.modelContext) {
+      log('✅ navigator.modelContext is available!');
+
+      try {
+        // Register tools with AI agents
+        window.navigator.modelContext.provideContext({
+          tools: [
+            {
+              name: "get-page-title",
+              description: "Get the current page title",
+              inputSchema: {
+                type: "object",
+                properties: {}
+              },
+              async execute() {
+                return {
+                  content: [{
+                    type: "text",
+                    text: document.title
+                  }]
+                };
+              }
+            }
+          ]
+        });
+
+        log('✅ Tool registered successfully!');
+
+        // List registered tools
+        const tools = window.navigator.modelContextTesting?.listTools();
+        if (tools) {
+          log(`✅ Registered ${tools.length} tool(s)`);
+          log('Tools: ' + JSON.stringify(tools, null, 2));
+        }
+      } catch (error) {
+        log(`❌ Error: ${error.message}`, true);
+        log(`Stack: ${error.stack}`, true);
+        console.error(error);
+      }
+    } else {
+      log('❌ navigator.modelContext is NOT available', true);
+      log('Available globals: ' + Object.keys(window).filter(k => k.includes('MCP') || k.includes('WebMCP')).join(', '), true);
+      console.error('navigator.modelContext not found');
+    }
+  </script>
+</body>
+</html>

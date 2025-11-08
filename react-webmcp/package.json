@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/react-webmcp",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "React hooks for Model Context Protocol - register tools via navigator.modelContext and consume tools from MCP servers",
   "keywords": [
     "mcp",
