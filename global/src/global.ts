@@ -90,13 +90,11 @@ class NativeModelContextAdapter implements InternalModelContext {
     this.nativeContext = nativeContext;
     this.nativeTesting = nativeTesting;
 
-    // Register callback to sync tool changes from native API
     this.nativeTesting.registerToolsChangedCallback(() => {
       console.log('[Native Adapter] Tool change detected from native API');
       this.syncToolsFromNative();
     });
 
-    // Perform initial sync
     this.syncToolsFromNative();
   }
 
@@ -122,7 +120,6 @@ class NativeModelContextAdapter implements InternalModelContext {
 
       for (const toolInfo of nativeTools) {
         try {
-          // Parse inputSchema from JSON string to object
           const inputSchema = JSON.parse(toolInfo.inputSchema);
 
           const validatedTool: ValidatedToolDescriptor = {
@@ -130,15 +127,12 @@ class NativeModelContextAdapter implements InternalModelContext {
             description: toolInfo.description,
             inputSchema: inputSchema,
             execute: async (args: Record<string, unknown>) => {
-              // Delegate execution to native API
               const result = await this.nativeTesting.executeTool(
                 toolInfo.name,
                 JSON.stringify(args)
               );
-              // Convert native result to MCP ToolResponse format
               return this.convertToToolResponse(result);
             },
-            // Native API handles validation internally
             inputValidator: jsonSchemaToZod(inputSchema),
           };
 
@@ -148,7 +142,6 @@ class NativeModelContextAdapter implements InternalModelContext {
         }
       }
 
-      // Notify MCP servers that tools have changed
       this.notifyMCPServers();
     } finally {
       this.syncInProgress = false;
@@ -165,17 +158,14 @@ class NativeModelContextAdapter implements InternalModelContext {
    * @private
    */
   private convertToToolResponse(result: unknown): ToolResponse {
-    // Handle string results
     if (typeof result === 'string') {
       return { content: [{ type: 'text', text: result }] };
     }
 
-    // Handle null/undefined
     if (result === undefined || result === null) {
       return { content: [{ type: 'text', text: '' }] };
     }
 
-    // Handle objects/arrays - provide both text and structured content
     if (typeof result === 'object') {
       return {
         content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
@@ -183,7 +173,6 @@ class NativeModelContextAdapter implements InternalModelContext {
       };
     }
 
-    // Handle primitives (numbers, booleans)
     return {
       content: [{ type: 'text', text: String(result) }],
     };
@@ -220,7 +209,6 @@ class NativeModelContextAdapter implements InternalModelContext {
   provideContext(context: ModelContextInput): void {
     console.log('[Native Adapter] Delegating provideContext to native API');
     this.nativeContext.provideContext(context);
-    // registerToolsChangedCallback will fire and sync automatically
   }
 
   /**
@@ -237,7 +225,6 @@ class NativeModelContextAdapter implements InternalModelContext {
   >(tool: ToolDescriptor<TInputSchema, TOutputSchema>): { unregister: () => void } {
     console.log(`[Native Adapter] Delegating registerTool("${tool.name}") to native API`);
     const result = this.nativeContext.registerTool(tool);
-    // registerToolsChangedCallback will fire and sync automatically
     return result;
   }
 
@@ -1269,12 +1256,10 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
   const effectiveOptions = options ?? window.__webModelContextOptions;
   const native = detectNativeAPI();
 
-  // Case 1: Native API is fully available (both modelContext and modelContextTesting)
   if (native.hasNativeContext && native.hasNativeTesting) {
     const nativeContext = window.navigator.modelContext;
     const nativeTesting = window.navigator.modelContextTesting;
 
-    // Type guard: we checked these exist via detectNativeAPI()
     if (!nativeContext || !nativeTesting) {
       console.error('[Web Model Context] Native API detection mismatch');
       return;
@@ -1285,16 +1270,13 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
     console.log('   Native API will automatically collect tools from embedded iframes');
 
     try {
-      // Create MCP bridge for tab/iframe transports
       const bridge = initializeMCPBridge(effectiveOptions);
 
-      // Create adapter that syncs native tools to MCP bridge
       const adapter = new NativeModelContextAdapter(bridge, nativeContext, nativeTesting);
 
       bridge.modelContext = adapter;
       bridge.modelContextTesting = nativeTesting;
 
-      // Expose bridge for advanced use cases
       Object.defineProperty(window, '__mcpBridge', {
         value: bridge,
         writable: false,
@@ -1311,7 +1293,6 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
     return;
   }
 
-  // Case 2: Partial native API (modelContext exists but no testing API)
   if (native.hasNativeContext && !native.hasNativeTesting) {
     console.warn('[Web Model Context] Partial native API detected');
     console.warn('   navigator.modelContext exists but navigator.modelContextTesting is missing');
@@ -1323,7 +1304,6 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
     return;
   }
 
-  // Case 3: No native API - install full polyfill
   if (window.navigator.modelContext) {
     console.warn(
       '[Web Model Context] window.navigator.modelContext already exists, skipping initialization'
@@ -1350,7 +1330,6 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
 
     console.log('✅ [Web Model Context] window.navigator.modelContext initialized successfully');
 
-    // Install testing API polyfill
     console.log('[Model Context Testing] Installing polyfill');
     console.log('   💡 To use the native implementation in Chromium:');
     console.log('      - Navigate to chrome://flags');
