@@ -214,6 +214,152 @@ initializeWebModelContext({
 });
 ```
 
+## 🔄 Native Chromium API Support
+
+This package **automatically detects and integrates** with Chromium's native Web Model Context API when available. No configuration needed - it just works!
+
+### Automatic Detection & Integration
+
+When you call `initializeWebModelContext()` (or when auto-initialization runs):
+
+1. **Native API detected** (both `navigator.modelContext` and `navigator.modelContextTesting` present):
+   - Uses native Chromium implementation
+   - Creates MCP bridge and syncs tools automatically
+   - Registers callback to listen for native tool changes
+   - MCP clients stay synchronized with native tool registry
+
+2. **No native API detected**:
+   - Installs full polyfill implementation
+   - Provides identical API surface
+
+**Zero configuration required** - the package automatically adapts to your environment!
+
+### Native API Features
+
+When the native Chromium API is available, you get:
+
+- ✅ **Automatic tool synchronization** - Tools registered in native API are synced to MCP bridge via `registerToolsChangedCallback()`
+- ✅ **Iframe tool collection** - Native API automatically collects tools from embedded iframes (no manual transport setup needed)
+- ✅ **MCP compatibility** - Your MCP clients (extensions, apps) continue to work seamlessly
+- ✅ **Tool change notifications** - MCP servers receive `tools/list_changed` notifications automatically
+- ✅ **Consistent API** - Same code works with both native and polyfill implementations
+
+### How Tool Synchronization Works
+
+The polyfill automatically registers a callback with the native API:
+
+```typescript
+// Happens automatically when native API is detected
+navigator.modelContextTesting.registerToolsChangedCallback(() => {
+  // Syncs native tools → MCP bridge
+  // MCP clients receive tools/list_changed notification
+});
+```
+
+This callback fires when:
+- `navigator.modelContext.registerTool()` is called
+- `navigator.modelContext.unregisterTool()` is called
+- `navigator.modelContext.provideContext()` is called
+- `navigator.modelContext.clearContext()` is called
+- Tools are added from embedded iframes (native feature)
+
+### Enabling Native API in Chromium
+
+```bash
+# Method 1: Launch with flag
+chromium --enable-experimental-web-platform-features
+
+# Method 2: Enable in chrome://flags
+# Search for: "Experimental Web Platform Features"
+# Set to: Enabled
+# Restart browser
+```
+
+### Example: Using Native API
+
+```typescript
+import '@mcp-b/global';
+
+// If native API is present, this delegates to navigator.modelContext:
+window.navigator.modelContext.registerTool({
+  name: 'myTool',
+  description: 'My tool',
+  inputSchema: { type: 'object', properties: {} },
+  async execute() {
+    return { content: [{ type: 'text', text: 'Hello!' }] };
+  }
+});
+
+// Behind the scenes:
+// 1. Tool registered in native Chromium registry
+// 2. Callback fires (registerToolsChangedCallback)
+// 3. Tool synced to MCP bridge
+// 4. MCP clients notified (tools/list_changed)
+```
+
+### Iframe Tool Collection (Native Only)
+
+When the native API is active, tools from embedded iframes are **automatically collected**:
+
+```html
+<!-- parent.html -->
+<script type="module">
+  import '@mcp-b/global';
+
+  // Native API will collect tools from this page AND all iframes
+  navigator.modelContext.registerTool({
+    name: 'parent-tool',
+    description: 'Tool from parent page',
+    inputSchema: { type: 'object', properties: {} },
+    async execute() {
+      return { content: [{ type: 'text', text: 'Parent tool' }] };
+    }
+  });
+</script>
+
+<iframe src="child.html"></iframe>
+```
+
+```html
+<!-- child.html -->
+<script type="module">
+  import '@mcp-b/global';
+
+  // This tool is automatically visible in parent's registry (native feature)
+  navigator.modelContext.registerTool({
+    name: 'child-tool',
+    description: 'Tool from iframe',
+    inputSchema: { type: 'object', properties: {} },
+    async execute() {
+      return { content: [{ type: 'text', text: 'Child tool' }] };
+    }
+  });
+</script>
+```
+
+With native API, `navigator.modelContextTesting.listTools()` in the parent will show **both** tools! The MCP bridge stays in sync automatically.
+
+### Detection in Console
+
+When you initialize the package, check the console logs:
+
+```
+✅ [Web Model Context] Native Chromium API detected
+   Using native implementation with MCP bridge synchronization
+   Native API will automatically collect tools from embedded iframes
+✅ [Web Model Context] MCP bridge synced with native API
+   MCP clients will receive automatic tool updates from native registry
+```
+
+Or if polyfill is used:
+
+```
+[Web Model Context] Native API not detected, installing polyfill
+✅ [Web Model Context] window.navigator.modelContext initialized successfully
+[Model Context Testing] Installing polyfill
+✅ [Model Context Testing] Polyfill installed at window.navigator.modelContextTesting
+```
+
 ## 📖 API Reference
 
 ### Two-Bucket Tool Management System

@@ -13,6 +13,7 @@ import {
 import type {
   InternalModelContext,
   MCPBridge,
+  ModelContext,
   ModelContextInput,
   ModelContextTesting,
   ToolCallEvent,
@@ -22,11 +23,329 @@ import type {
   WebModelContextInitOptions,
   ZodSchemaObject,
 } from './types.js';
-import { normalizeSchema, validateWithZod } from './validation.js';
+import { jsonSchemaToZod, normalizeSchema, validateWithZod } from './validation.js';
 
 declare global {
   interface Window {
     __webModelContextOptions?: WebModelContextInitOptions;
+  }
+}
+
+/**
+ * Detect if the native Chromium Web Model Context API is available.
+ * Checks for both navigator.modelContext and navigator.modelContextTesting.
+ *
+ * @returns Detection result with flags for native context and testing API availability
+ */
+function detectNativeAPI(): {
+  hasNativeContext: boolean;
+  hasNativeTesting: boolean;
+} {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+    return { hasNativeContext: false, hasNativeTesting: false };
+  }
+
+  const hasNativeContext =
+    'modelContext' in navigator &&
+    navigator.modelContext !== undefined &&
+    navigator.modelContext !== null;
+
+  const hasNativeTesting =
+    'modelContextTesting' in navigator &&
+    navigator.modelContextTesting !== undefined &&
+    navigator.modelContextTesting !== null;
+
+  return { hasNativeContext, hasNativeTesting };
+}
+
+/**
+ * Adapter that wraps the native Chromium Web Model Context API.
+ * Synchronizes tool changes from the native API to the MCP bridge,
+ * enabling MCP clients to stay in sync with the native tool registry.
+ *
+ * Key features:
+ * - Listens to native tool changes via registerToolsChangedCallback()
+ * - Syncs native tools to MCP bridge automatically
+ * - Delegates tool execution to native API
+ * - Converts native results to MCP ToolResponse format
+ *
+ * @class NativeModelContextAdapter
+ * @implements {InternalModelContext}
+ */
+class NativeModelContextAdapter implements InternalModelContext {
+  private nativeContext: ModelContext;
+  private nativeTesting: ModelContextTesting;
+  private bridge: MCPBridge;
+  private syncInProgress = false;
+
+  /**
+   * Creates a new NativeModelContextAdapter.
+   *
+   * @param {MCPBridge} bridge - The MCP bridge instance
+   * @param {ModelContext} nativeContext - The native navigator.modelContext
+   * @param {ModelContextTesting} nativeTesting - The native navigator.modelContextTesting
+   */
+  constructor(bridge: MCPBridge, nativeContext: ModelContext, nativeTesting: ModelContextTesting) {
+    this.bridge = bridge;
+    this.nativeContext = nativeContext;
+    this.nativeTesting = nativeTesting;
+
+    // Register callback to sync tool changes from native API
+    this.nativeTesting.registerToolsChangedCallback(() => {
+      console.log('[Native Adapter] Tool change detected from native API');
+      this.syncToolsFromNative();
+    });
+
+    // Perform initial sync
+    this.syncToolsFromNative();
+  }
+
+  /**
+   * Synchronizes tools from the native API to the MCP bridge.
+   * Fetches all tools from navigator.modelContextTesting.listTools()
+   * and updates the bridge's tool registry.
+   *
+   * @private
+   */
+  private syncToolsFromNative(): void {
+    if (this.syncInProgress) {
+      return;
+    }
+
+    this.syncInProgress = true;
+
+    try {
+      const nativeTools = this.nativeTesting.listTools();
+      console.log(`[Native Adapter] Syncing ${nativeTools.length} tools from native API`);
+
+      this.bridge.tools.clear();
+
+      for (const toolInfo of nativeTools) {
+        try {
+          // Parse inputSchema from JSON string to object
+          const inputSchema = JSON.parse(toolInfo.inputSchema);
+
+          const validatedTool: ValidatedToolDescriptor = {
+            name: toolInfo.name,
+            description: toolInfo.description,
+            inputSchema: inputSchema,
+            execute: async (args: Record<string, unknown>) => {
+              // Delegate execution to native API
+              const result = await this.nativeTesting.executeTool(
+                toolInfo.name,
+                JSON.stringify(args)
+              );
+              // Convert native result to MCP ToolResponse format
+              return this.convertToToolResponse(result);
+            },
+            // Native API handles validation internally
+            inputValidator: jsonSchemaToZod(inputSchema),
+          };
+
+          this.bridge.tools.set(toolInfo.name, validatedTool);
+        } catch (error) {
+          console.error(`[Native Adapter] Failed to sync tool "${toolInfo.name}":`, error);
+        }
+      }
+
+      // Notify MCP servers that tools have changed
+      this.notifyMCPServers();
+    } finally {
+      this.syncInProgress = false;
+    }
+  }
+
+  /**
+   * Converts native API result to MCP ToolResponse format.
+   * Native API returns simplified values (string, number, object, etc.)
+   * which need to be wrapped in the MCP CallToolResult format.
+   *
+   * @param {unknown} result - The result from native executeTool()
+   * @returns {ToolResponse} Formatted MCP ToolResponse
+   * @private
+   */
+  private convertToToolResponse(result: unknown): ToolResponse {
+    // Handle string results
+    if (typeof result === 'string') {
+      return { content: [{ type: 'text', text: result }] };
+    }
+
+    // Handle null/undefined
+    if (result === undefined || result === null) {
+      return { content: [{ type: 'text', text: '' }] };
+    }
+
+    // Handle objects/arrays - provide both text and structured content
+    if (typeof result === 'object') {
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        structuredContent: result as Record<string, unknown>,
+      };
+    }
+
+    // Handle primitives (numbers, booleans)
+    return {
+      content: [{ type: 'text', text: String(result) }],
+    };
+  }
+
+  /**
+   * Notifies all connected MCP servers that the tools list has changed.
+   *
+   * @private
+   */
+  private notifyMCPServers(): void {
+    if (this.bridge.tabServer?.notification) {
+      this.bridge.tabServer.notification({
+        method: 'notifications/tools/list_changed',
+        params: {},
+      });
+    }
+
+    if (this.bridge.iframeServer?.notification) {
+      this.bridge.iframeServer.notification({
+        method: 'notifications/tools/list_changed',
+        params: {},
+      });
+    }
+  }
+
+  /**
+   * Provides context (tools) to AI models via the native API.
+   * Delegates to navigator.modelContext.provideContext().
+   * Tool change callback will fire and trigger sync automatically.
+   *
+   * @param {ModelContextInput} context - Context containing tools to register
+   */
+  provideContext(context: ModelContextInput): void {
+    console.log('[Native Adapter] Delegating provideContext to native API');
+    this.nativeContext.provideContext(context);
+    // registerToolsChangedCallback will fire and sync automatically
+  }
+
+  /**
+   * Registers a single tool dynamically via the native API.
+   * Delegates to navigator.modelContext.registerTool().
+   * Tool change callback will fire and trigger sync automatically.
+   *
+   * @param {ToolDescriptor} tool - The tool descriptor to register
+   * @returns {{unregister: () => void}} Object with unregister function
+   */
+  registerTool<
+    TInputSchema extends ZodSchemaObject = Record<string, never>,
+    TOutputSchema extends ZodSchemaObject = Record<string, never>,
+  >(tool: ToolDescriptor<TInputSchema, TOutputSchema>): { unregister: () => void } {
+    console.log(`[Native Adapter] Delegating registerTool("${tool.name}") to native API`);
+    const result = this.nativeContext.registerTool(tool);
+    // registerToolsChangedCallback will fire and sync automatically
+    return result;
+  }
+
+  /**
+   * Unregisters a tool by name via the native API.
+   * Delegates to navigator.modelContext.unregisterTool().
+   *
+   * @param {string} name - Name of the tool to unregister
+   */
+  unregisterTool(name: string): void {
+    console.log(`[Native Adapter] Delegating unregisterTool("${name}") to native API`);
+    this.nativeContext.unregisterTool(name);
+  }
+
+  /**
+   * Clears all registered tools via the native API.
+   * Delegates to navigator.modelContext.clearContext().
+   */
+  clearContext(): void {
+    console.log('[Native Adapter] Delegating clearContext to native API');
+    this.nativeContext.clearContext();
+  }
+
+  /**
+   * Executes a tool via the native API.
+   * Delegates to navigator.modelContextTesting.executeTool() with JSON string args.
+   *
+   * @param {string} toolName - Name of the tool to execute
+   * @param {Record<string, unknown>} args - Arguments to pass to the tool
+   * @returns {Promise<ToolResponse>} The tool's response in MCP format
+   * @internal
+   */
+  async executeTool(toolName: string, args: Record<string, unknown>): Promise<ToolResponse> {
+    console.log(`[Native Adapter] Executing tool "${toolName}" via native API`);
+    try {
+      const result = await this.nativeTesting.executeTool(toolName, JSON.stringify(args));
+      return this.convertToToolResponse(result);
+    } catch (error) {
+      console.error(`[Native Adapter] Error executing tool "${toolName}":`, error);
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+
+  /**
+   * Lists all registered tools from the MCP bridge.
+   * Returns tools synced from the native API.
+   *
+   * @returns {Array<{name: string, description: string, inputSchema: InputSchema}>} Array of tool descriptors
+   */
+  listTools() {
+    return Array.from(this.bridge.tools.values()).map((tool) => ({
+      name: tool.name,
+      description: tool.description,
+      inputSchema: tool.inputSchema,
+      ...(tool.outputSchema && { outputSchema: tool.outputSchema }),
+      ...(tool.annotations && { annotations: tool.annotations }),
+    }));
+  }
+
+  /**
+   * Adds an event listener for tool call events.
+   * Delegates to the native API's addEventListener.
+   *
+   * @param {'toolcall'} type - Event type
+   * @param {(event: ToolCallEvent) => void | Promise<void>} listener - Event handler
+   * @param {boolean | AddEventListenerOptions} [options] - Event listener options
+   */
+  addEventListener(
+    type: 'toolcall',
+    listener: (event: ToolCallEvent) => void | Promise<void>,
+    options?: boolean | AddEventListenerOptions
+  ): void {
+    this.nativeContext.addEventListener(type, listener, options);
+  }
+
+  /**
+   * Removes an event listener for tool call events.
+   * Delegates to the native API's removeEventListener.
+   *
+   * @param {'toolcall'} type - Event type
+   * @param {(event: ToolCallEvent) => void | Promise<void>} listener - Event handler
+   * @param {boolean | EventListenerOptions} [options] - Event listener options
+   */
+  removeEventListener(
+    type: 'toolcall',
+    listener: (event: ToolCallEvent) => void | Promise<void>,
+    options?: boolean | EventListenerOptions
+  ): void {
+    this.nativeContext.removeEventListener(type, listener, options);
+  }
+
+  /**
+   * Dispatches a tool call event.
+   * Delegates to the native API's dispatchEvent.
+   *
+   * @param {Event} event - The event to dispatch
+   * @returns {boolean} False if event was cancelled, true otherwise
+   */
+  dispatchEvent(event: Event): boolean {
+    return this.nativeContext.dispatchEvent(event);
   }
 }
 
@@ -948,13 +1267,71 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
   }
 
   const effectiveOptions = options ?? window.__webModelContextOptions;
+  const native = detectNativeAPI();
 
+  // Case 1: Native API is fully available (both modelContext and modelContextTesting)
+  if (native.hasNativeContext && native.hasNativeTesting) {
+    const nativeContext = window.navigator.modelContext;
+    const nativeTesting = window.navigator.modelContextTesting;
+
+    // Type guard: we checked these exist via detectNativeAPI()
+    if (!nativeContext || !nativeTesting) {
+      console.error('[Web Model Context] Native API detection mismatch');
+      return;
+    }
+
+    console.log('✅ [Web Model Context] Native Chromium API detected');
+    console.log('   Using native implementation with MCP bridge synchronization');
+    console.log('   Native API will automatically collect tools from embedded iframes');
+
+    try {
+      // Create MCP bridge for tab/iframe transports
+      const bridge = initializeMCPBridge(effectiveOptions);
+
+      // Create adapter that syncs native tools to MCP bridge
+      const adapter = new NativeModelContextAdapter(bridge, nativeContext, nativeTesting);
+
+      bridge.modelContext = adapter;
+      bridge.modelContextTesting = nativeTesting;
+
+      // Expose bridge for advanced use cases
+      Object.defineProperty(window, '__mcpBridge', {
+        value: bridge,
+        writable: false,
+        configurable: true,
+      });
+
+      console.log('✅ [Web Model Context] MCP bridge synced with native API');
+      console.log('   MCP clients will receive automatic tool updates from native registry');
+    } catch (error) {
+      console.error('[Web Model Context] Failed to initialize native adapter:', error);
+      throw error;
+    }
+
+    return;
+  }
+
+  // Case 2: Partial native API (modelContext exists but no testing API)
+  if (native.hasNativeContext && !native.hasNativeTesting) {
+    console.warn('[Web Model Context] Partial native API detected');
+    console.warn('   navigator.modelContext exists but navigator.modelContextTesting is missing');
+    console.warn('   Cannot sync with native API. Please enable experimental features:');
+    console.warn('      - Navigate to chrome://flags');
+    console.warn('      - Enable "Experimental Web Platform Features"');
+    console.warn('      - Or launch with: --enable-experimental-web-platform-features');
+    console.warn('   Skipping initialization to avoid conflicts');
+    return;
+  }
+
+  // Case 3: No native API - install full polyfill
   if (window.navigator.modelContext) {
     console.warn(
       '[Web Model Context] window.navigator.modelContext already exists, skipping initialization'
     );
     return;
   }
+
+  console.log('[Web Model Context] Native API not detected, installing polyfill');
 
   try {
     const bridge = initializeMCPBridge(effectiveOptions);
@@ -973,34 +1350,27 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
 
     console.log('✅ [Web Model Context] window.navigator.modelContext initialized successfully');
 
-    if (window.navigator.modelContextTesting) {
-      console.log(
-        '✅ [Model Context Testing] Native implementation detected (Chromium experimental feature)'
-      );
-      console.log('   Using native window.navigator.modelContextTesting from browser');
-      bridge.modelContextTesting = window.navigator.modelContextTesting;
-    } else {
-      console.log('[Model Context Testing] Native implementation not found, installing polyfill');
-      console.log('   💡 To use the native implementation in Chromium:');
-      console.log('      - Navigate to chrome://flags');
-      console.log('      - Enable "Experimental Web Platform Features"');
-      console.log('      - Or launch with: --enable-experimental-web-platform-features');
+    // Install testing API polyfill
+    console.log('[Model Context Testing] Installing polyfill');
+    console.log('   💡 To use the native implementation in Chromium:');
+    console.log('      - Navigate to chrome://flags');
+    console.log('      - Enable "Experimental Web Platform Features"');
+    console.log('      - Or launch with: --enable-experimental-web-platform-features');
 
-      const testingAPI = new WebModelContextTesting(bridge);
-      bridge.modelContextTesting = testingAPI;
+    const testingAPI = new WebModelContextTesting(bridge);
+    bridge.modelContextTesting = testingAPI;
 
-      (bridge.modelContext as WebModelContext).setTestingAPI(testingAPI);
+    (bridge.modelContext as WebModelContext).setTestingAPI(testingAPI);
 
-      Object.defineProperty(window.navigator, 'modelContextTesting', {
-        value: testingAPI,
-        writable: false,
-        configurable: true,
-      });
+    Object.defineProperty(window.navigator, 'modelContextTesting', {
+      value: testingAPI,
+      writable: false,
+      configurable: true,
+    });
 
-      console.log(
-        '✅ [Model Context Testing] Polyfill installed at window.navigator.modelContextTesting'
-      );
-    }
+    console.log(
+      '✅ [Model Context Testing] Polyfill installed at window.navigator.modelContextTesting'
+    );
   } catch (error) {
     console.error('[Web Model Context] Failed to initialize:', error);
     throw error;
