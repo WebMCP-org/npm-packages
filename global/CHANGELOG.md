@@ -1,5 +1,16 @@
 # @mcp-b/global
 
+## 1.1.1
+
+### Patch Changes
+
+- 450e2fa: fix: rebuild IIFE bundle with properly bundled dependencies
+
+  Republish the IIFE build with all dependencies properly bundled. The previous published version had external dependency references that caused "ReferenceError: \_\_mcp_b_transports is not defined" when loaded via script tag.
+
+- Updated dependencies [450e2fa]
+  - @mcp-b/transports@1.1.1
+
 ## 1.1.0
 
 ### Minor Changes
