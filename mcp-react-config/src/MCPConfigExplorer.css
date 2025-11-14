@@ -1,0 +1,596 @@
+/**
+ * MCPConfigExplorer Styles
+ *
+ * Comprehensive styling for the MCP Configuration Explorer component
+ */
+
+/* ===========================
+   Main Container
+   =========================== */
+
+.mcp-config-explorer {
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell",
+    "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.mcp-config-explorer__header {
+  margin-bottom: 24px;
+}
+
+.mcp-config-explorer__header h2 {
+  margin: 0 0 8px 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.mcp-config-explorer__header p {
+  margin: 0;
+  font-size: 14px;
+  color: #666666;
+  line-height: 1.5;
+}
+
+.mcp-config-explorer__actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.mcp-config-explorer__stats {
+  font-size: 14px;
+  color: #666666;
+  font-weight: 500;
+}
+
+.mcp-config-explorer__empty {
+  padding: 48px;
+  text-align: center;
+  color: #666666;
+  background-color: #f5f5f5;
+  border-radius: 8px;
+  border: 2px dashed #d0d0d0;
+}
+
+.mcp-config-explorer__empty p {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* ===========================
+   Buttons
+   =========================== */
+
+.mcp-config-explorer__button {
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.mcp-config-explorer__button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mcp-config-explorer__button--primary {
+  background-color: #0070f3;
+  color: #ffffff;
+}
+
+.mcp-config-explorer__button--primary:hover:not(:disabled) {
+  background-color: #0051cc;
+}
+
+.mcp-config-explorer__button--secondary {
+  background-color: #f5f5f5;
+  color: #1a1a1a;
+}
+
+.mcp-config-explorer__button--secondary:hover:not(:disabled) {
+  background-color: #e0e0e0;
+}
+
+/* ===========================
+   Config File List
+   =========================== */
+
+.config-file-list {
+  margin-bottom: 24px;
+}
+
+.config-file-list__header {
+  margin-bottom: 16px;
+}
+
+.config-file-list__header h3 {
+  margin: 0 0 4px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.config-file-list__header p {
+  margin: 0;
+  font-size: 14px;
+  color: #666666;
+}
+
+.config-file-list__groups {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.config-file-list__group {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.config-file-list__group-header {
+  padding: 12px 16px;
+  background-color: #f5f5f5;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.config-file-list__platform-name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.config-file-list__platform-description {
+  font-size: 13px;
+  color: #666666;
+  flex-grow: 1;
+}
+
+.config-file-list__count {
+  font-size: 12px;
+  font-weight: 500;
+  color: #666666;
+  background-color: #e0e0e0;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.config-file-list__items {
+  display: flex;
+  flex-direction: column;
+}
+
+.config-file-list__item {
+  padding: 16px;
+  background-color: #ffffff;
+  border: none;
+  border-bottom: 1px solid #e0e0e0;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  font-family: inherit;
+}
+
+.config-file-list__item:last-child {
+  border-bottom: none;
+}
+
+.config-file-list__item:hover {
+  background-color: #f9f9f9;
+}
+
+.config-file-list__item--updated {
+  background-color: #f0fdf4;
+}
+
+.config-file-list__item--updated:hover {
+  background-color: #dcfce7;
+}
+
+.config-file-list__item-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.config-file-list__file-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a1a;
+  font-family: "Monaco", "Menlo", "Consolas", monospace;
+}
+
+.config-file-list__format {
+  font-size: 11px;
+  font-weight: 500;
+  color: #666666;
+  background-color: #e0e0e0;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.config-file-list__badge {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.config-file-list__badge--success {
+  background-color: #22c55e;
+  color: #ffffff;
+}
+
+.config-file-list__item-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.config-file-list__path {
+  font-size: 12px;
+  color: #666666;
+  font-family: "Monaco", "Menlo", "Consolas", monospace;
+}
+
+.config-file-list__modified {
+  font-size: 11px;
+  color: #999999;
+}
+
+.config-file-list__empty {
+  padding: 24px;
+  text-align: center;
+  color: #666666;
+}
+
+.config-file-list__empty p {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* ===========================
+   Config Diff Viewer
+   =========================== */
+
+.mcp-config-explorer__preview {
+  margin-top: 24px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.mcp-config-explorer__preview-header {
+  padding: 16px;
+  background-color: #f5f5f5;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.mcp-config-explorer__preview-header h3 {
+  margin: 0 0 4px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.mcp-config-explorer__preview-header p {
+  margin: 0;
+  font-size: 13px;
+  color: #666666;
+}
+
+.mcp-config-explorer__preview-header code {
+  background-color: #e0e0e0;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: "Monaco", "Menlo", "Consolas", monospace;
+  font-size: 12px;
+}
+
+.mcp-config-explorer__preview-actions {
+  padding: 16px;
+  background-color: #f5f5f5;
+  border-top: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.config-diff-viewer {
+  background-color: #ffffff;
+}
+
+.config-diff-viewer__header {
+  padding: 12px 16px;
+  background-color: #fafafa;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.config-diff-viewer__file-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.config-diff-viewer__file-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1a1a;
+  font-family: "Monaco", "Menlo", "Consolas", monospace;
+}
+
+.config-diff-viewer__platform {
+  font-size: 11px;
+  font-weight: 500;
+  color: #666666;
+  background-color: #e0e0e0;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.config-diff-viewer__stats {
+  display: flex;
+  gap: 8px;
+}
+
+.config-diff-viewer__stat {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-family: "Monaco", "Menlo", "Consolas", monospace;
+}
+
+.config-diff-viewer__stat--added {
+  background-color: #dcfce7;
+  color: #15803d;
+}
+
+.config-diff-viewer__stat--removed {
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+.config-diff-viewer__content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  max-height: 600px;
+  overflow: auto;
+}
+
+.config-diff-viewer__side {
+  min-width: 0;
+}
+
+.config-diff-viewer__side--original {
+  border-right: 1px solid #e0e0e0;
+}
+
+.config-diff-viewer__side-header {
+  padding: 8px 12px;
+  background-color: #fafafa;
+  border-bottom: 1px solid #e0e0e0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #666666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.config-diff-viewer__lines {
+  font-family: "Monaco", "Menlo", "Consolas", monospace;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.diff-line {
+  display: grid;
+  grid-template-columns: 40px 20px 1fr;
+  gap: 8px;
+  padding: 2px 0;
+  min-height: 20px;
+}
+
+.diff-line--added {
+  background-color: #f0fdf4;
+}
+
+.diff-line--removed {
+  background-color: #fef2f2;
+}
+
+.diff-line--modified {
+  background-color: #fef3c7;
+}
+
+.diff-line--unchanged {
+  background-color: #ffffff;
+}
+
+.diff-line__number {
+  text-align: right;
+  padding-right: 8px;
+  color: #999999;
+  user-select: none;
+  font-size: 11px;
+}
+
+.diff-line__indicator {
+  color: #666666;
+  font-weight: 600;
+  user-select: none;
+}
+
+.diff-line--added .diff-line__indicator {
+  color: #15803d;
+}
+
+.diff-line--removed .diff-line__indicator {
+  color: #991b1b;
+}
+
+.diff-line--modified .diff-line__indicator {
+  color: #ca8a04;
+}
+
+.diff-line__content {
+  overflow-x: auto;
+  white-space: pre;
+  padding-right: 12px;
+}
+
+/* ===========================
+   Responsive Design
+   =========================== */
+
+@media (max-width: 768px) {
+  .mcp-config-explorer {
+    padding: 16px;
+  }
+
+  .config-diff-viewer__content {
+    grid-template-columns: 1fr;
+    max-height: none;
+  }
+
+  .config-diff-viewer__side--original {
+    border-right: none;
+    border-bottom: 1px solid #e0e0e0;
+  }
+
+  .config-file-list__group-header {
+    flex-wrap: wrap;
+  }
+}
+
+/* ===========================
+   Dark Mode Support
+   =========================== */
+
+@media (prefers-color-scheme: dark) {
+  .mcp-config-explorer {
+    background-color: #1a1a1a;
+    color: #e0e0e0;
+  }
+
+  .mcp-config-explorer__header h2,
+  .config-file-list__header h3,
+  .config-file-list__platform-name,
+  .config-file-list__file-name,
+  .config-diff-viewer__file-name,
+  .mcp-config-explorer__preview-header h3 {
+    color: #e0e0e0;
+  }
+
+  .mcp-config-explorer__header p,
+  .config-file-list__header p,
+  .config-file-list__platform-description,
+  .config-file-list__path,
+  .mcp-config-explorer__preview-header p,
+  .mcp-config-explorer__stats,
+  .config-file-list__count {
+    color: #999999;
+  }
+
+  .mcp-config-explorer__empty,
+  .config-file-list__empty {
+    background-color: #2a2a2a;
+    border-color: #404040;
+    color: #999999;
+  }
+
+  .config-file-list__group,
+  .mcp-config-explorer__preview {
+    border-color: #404040;
+  }
+
+  .config-file-list__group-header,
+  .mcp-config-explorer__preview-header,
+  .mcp-config-explorer__preview-actions,
+  .config-diff-viewer__header,
+  .config-diff-viewer__side-header {
+    background-color: #2a2a2a;
+    border-color: #404040;
+  }
+
+  .config-file-list__item {
+    background-color: #1a1a1a;
+    border-color: #404040;
+  }
+
+  .config-file-list__item:hover {
+    background-color: #2a2a2a;
+  }
+
+  .config-file-list__item--updated {
+    background-color: #1a2e1a;
+  }
+
+  .config-file-list__item--updated:hover {
+    background-color: #234023;
+  }
+
+  .mcp-config-explorer__button--secondary {
+    background-color: #2a2a2a;
+    color: #e0e0e0;
+  }
+
+  .mcp-config-explorer__button--secondary:hover:not(:disabled) {
+    background-color: #404040;
+  }
+
+  .diff-line--unchanged {
+    background-color: #1a1a1a;
+  }
+
+  .diff-line--added {
+    background-color: #1a2e1a;
+  }
+
+  .diff-line--removed {
+    background-color: #2e1a1a;
+  }
+
+  .diff-line--modified {
+    background-color: #2e2a1a;
+  }
+
+  .config-file-list__format,
+  .config-file-list__count,
+  .config-diff-viewer__platform {
+    background-color: #404040;
+    color: #e0e0e0;
+  }
+
+  .mcp-config-explorer__preview-header code {
+    background-color: #404040;
+  }
+}
