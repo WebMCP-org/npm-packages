@@ -72,36 +72,3 @@ export type { McpClientProviderProps } from './client/McpClientProvider.js';
  * Manages connection state, fetches tools/resources, and handles server notifications.
  */
 export { McpClientProvider, useMcpClient } from './client/McpClientProvider.js';
-
-// ============================================
-// MCP Config Explorer Components
-// ============================================
-
-export type {
-  ConfigDiffViewerProps,
-  ConfigFileListProps,
-  ConfigFormat,
-  ConfigPlatform,
-  DetectedConfig,
-  FileSystemEntry,
-  MCPConfigExplorerProps,
-  MCPServerConfig,
-  PlatformConfig,
-} from './components/index.js';
-/**
- * Components for exploring, detecting, and updating MCP configuration files
- * across multiple platforms (Claude Desktop, Cursor, VSCode, etc.)
- */
-export {
-  ConfigDiffViewer,
-  ConfigFileList,
-  detectConfigFiles,
-  detectConfigFilesWithParents,
-  exploreFileSystem,
-  exploreFileSystemWithParents,
-  formatConfig,
-  generateConfigForPlatform,
-  MCPConfigExplorer,
-  mergeConfig,
-  PLATFORM_CONFIGS,
-} from './components/index.js';

@@ -1,0 +1,70 @@
+{
+  "name": "@mcp-b/mcp-react-config",
+  "version": "0.1.0",
+  "description": "React components for exploring and managing MCP configuration files across multiple platforms",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "react",
+    "configuration",
+    "config-explorer",
+    "claude-desktop",
+    "cursor",
+    "vscode",
+    "file-system-api"
+  ],
+  "homepage": "https://github.com/WebMCP-org/WebMCP#readme",
+  "bugs": {
+    "url": "https://github.com/WebMCP-org/WebMCP/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WebMCP-org/WebMCP.git",
+    "directory": "packages/mcp-react-config"
+  },
+  "license": "MIT",
+  "author": "WebMCP Team",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./style.css": "./dist/index.css"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "build:prod": "NODE_ENV=prod tsdown",
+    "check": "biome check --write .",
+    "clean": "rm -rf dist .turbo",
+    "format": "biome format --write .",
+    "lint": "biome lint --write .",
+    "prepublishOnly": "pnpm run build:prod",
+    "publish:dry": "pnpm publish --access public --dry-run",
+    "publish:npm": "pnpm publish --access public",
+    "typecheck": "tsc --noEmit",
+    "version:major": "pnpm version major --no-git-tag-version",
+    "version:minor": "pnpm version minor --no-git-tag-version",
+    "version:patch": "pnpm version patch --no-git-tag-version"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "react": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}

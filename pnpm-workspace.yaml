@@ -1,6 +1,7 @@
 packages:
   - extension-tools
   - global
+  - mcp-react-config
   - react-webmcp
   - smart-dom-reader
   - smart-dom-reader/mcp-server
