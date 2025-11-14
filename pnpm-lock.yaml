@@ -115,6 +115,34 @@ importers:
         specifier: 'catalog:'
         version: 5.9.2
 
+  e2e/mcp-react-config-test-app:
+    dependencies:
+      '@mcp-b/mcp-react-config':
+        specifier: workspace:*
+        version: link:../../mcp-react-config
+      react:
+        specifier: 'catalog:'
+        version: 19.1.1
+      react-dom:
+        specifier: 'catalog:'
+        version: 19.1.1(react@19.1.1)
+    devDependencies:
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.1.10
+      '@types/react-dom':
+        specifier: 'catalog:'
+        version: 19.2.2(@types/react@19.1.10)
+      '@vitejs/plugin-react':
+        specifier: ^4.3.4
+        version: 4.7.0(vite@7.1.2(@types/node@24.9.2)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.4)(yaml@2.8.1))
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.2
+      vite:
+        specifier: 'catalog:'
+        version: 7.1.2(@types/node@24.9.2)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.4)(yaml@2.8.1)
+
   e2e/mcp-ui-with-webmcp/apps/chat-ui:
     dependencies:
       '@ai-sdk/anthropic':
@@ -595,6 +623,9 @@ importers:
 
   mcp-react-config:
     devDependencies:
+      '@playwright/test':
+        specifier: ^1.48.2
+        version: 1.56.1
       '@types/node':
         specifier: 'catalog:'
         version: 22.17.2

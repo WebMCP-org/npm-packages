@@ -48,12 +48,17 @@
     "prepublishOnly": "pnpm run build:prod",
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:debug": "playwright test --debug",
+    "test:headed": "playwright test --headed",
     "typecheck": "tsc --noEmit",
     "version:major": "pnpm version major --no-git-tag-version",
     "version:minor": "pnpm version minor --no-git-tag-version",
     "version:patch": "pnpm version patch --no-git-tag-version"
   },
   "devDependencies": {
+    "@playwright/test": "^1.48.2",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "react": "catalog:",

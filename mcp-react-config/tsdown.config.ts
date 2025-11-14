@@ -10,6 +10,9 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   treeshake: true,
+  // Target modern browsers that support File System Access API
+  // File System Access API requires Chrome 86+, Edge 86+, Opera 72+
+  target: ['chrome86', 'edge86', 'opera72'],
   // We don't want to bundle these with the library,
   // as the consuming project will provide them.
   external: ['react', 'react/jsx-runtime', 'react-dom'],
