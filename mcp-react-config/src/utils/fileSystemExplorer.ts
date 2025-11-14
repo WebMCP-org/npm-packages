@@ -131,61 +131,15 @@ function matchesPlatformConfig(entry: FileSystemEntry, platformConfig: PlatformC
 
 /**
  * Detect MCP configuration files from the explored entries
+ * @deprecated Use detectConfigFilesWithParents instead for proper parent directory tracking
  */
-export async function detectConfigFiles(entries: FileSystemEntry[]): Promise<DetectedConfig[]> {
-  const detectedConfigs: DetectedConfig[] = [];
+export async function detectConfigFiles(_entries: FileSystemEntry[]): Promise<DetectedConfig[]> {
+  console.warn(
+    'detectConfigFiles is deprecated. Use exploreFileSystemWithParents + detectConfigFilesWithParents instead.'
+  );
 
-  for (const entry of entries) {
-    if (entry.isDirectory || !entry.fileHandle) {
-      continue;
-    }
-
-    // Check against all known platform configurations
-    for (const platformConfig of PLATFORM_CONFIGS) {
-      if (matchesPlatformConfig(entry, platformConfig)) {
-        try {
-          const file = await entry.fileHandle.getFile();
-
-          detectedConfigs.push({
-            path: entry.path,
-            fileName: entry.name,
-            fileHandle: entry.fileHandle,
-            // Get the directory handle by going up one level
-            directoryHandle: await getParentDirectory(entry.fileHandle),
-            platform: platformConfig.platform,
-            format: platformConfig.format,
-            lastModified: file.lastModified,
-            isUpdated: false,
-          });
-        } catch (error) {
-          console.warn(`Failed to read file ${entry.path}:`, error);
-        }
-      }
-    }
-  }
-
-  // Sort by platform and path
-  detectedConfigs.sort((a, b) => {
-    if (a.platform !== b.platform) {
-      return a.platform.localeCompare(b.platform);
-    }
-    return a.path.localeCompare(b.path);
-  });
-
-  return detectedConfigs;
-}
-
-/**
- * Get the parent directory handle for a file
- * Note: This is a workaround since the File System Access API doesn't provide direct parent access
- */
-async function getParentDirectory(
-  _fileHandle: FileSystemFileHandle
-): Promise<FileSystemDirectoryHandle> {
-  // This is a simplified version - in practice, you'd need to store the parent
-  // directory handle during exploration
-  // For now, we'll return a placeholder (this would need to be enhanced)
-  throw new Error('Parent directory access not yet implemented');
+  // Return empty array since this function cannot work without parent map
+  return [];
 }
 
 /**
