@@ -1,19 +1,5 @@
-/**
- * MCPConfigExplorer Component
- *
- * A comprehensive React component for exploring the file system to find MCP config files,
- * displaying diffs, and allowing users to add their MCP server configuration to detected configs.
- *
- * Features:
- * - Recursive file system exploration to find MCP config files
- * - Support for multiple platforms (Claude Desktop, Cursor, VSCode, Continue, Cline, Windsurf, Codex)
- * - Diff preview showing what will be added
- * - In-place editing and saving of configuration files
- */
-
 /// <reference lib="dom" />
 
-// Type augmentation for File System Access API
 declare global {
   interface Window {
     showDirectoryPicker(options?: {
@@ -24,15 +10,11 @@ declare global {
 }
 
 import type React from 'react';
-import { useCallback, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { ConfigDiffViewer } from './ConfigDiffViewer';
 import { ConfigFileList } from './ConfigFileList';
+import { useConfigPreview, useFileSystemExplorer } from './hooks';
 import type { DetectedConfig, MCPServerConfig } from './types';
-import { formatConfig, generateConfigForPlatform, mergeConfig } from './utils/configGenerator';
-import {
-  detectConfigFilesWithParents,
-  exploreFileSystemWithParents,
-} from './utils/fileSystemExplorer';
 import './MCPConfigExplorer.css';
 
 export interface MCPConfigExplorerProps {
@@ -76,17 +58,6 @@ export const MCPConfigExplorer: React.FC<MCPConfigExplorerProps> = ({
   onError,
   className,
 }) => {
-  const [isExploring, setIsExploring] = useState(false);
-  const [detectedConfigs, setDetectedConfigs] = useState<DetectedConfig[]>([]);
-  const [selectedConfig, setSelectedConfig] = useState<DetectedConfig | null>(null);
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [diffContent, setDiffContent] = useState<{ original: string; updated: string } | null>(
-    null
-  );
-
-  /**
-   * Generate the MCP server configuration based on the platform
-   */
   const mcpServerConfig: MCPServerConfig = useMemo(
     () => ({
       name: serverName,
@@ -96,117 +67,17 @@ export const MCPConfigExplorer: React.FC<MCPConfigExplorerProps> = ({
     [serverName, mcpUrl, serverConfig]
   );
 
-  /**
-   * Start exploring the file system for MCP config files
-   */
-  const handleExploreFileSystem = useCallback(async () => {
-    setIsExploring(true);
-    setDetectedConfigs([]);
-    setSelectedConfig(null);
-    setDiffContent(null);
-
-    try {
-      // Request directory access
-      const directoryHandle = await window.showDirectoryPicker({
-        mode: 'readwrite',
-        startIn: 'documents',
-      });
-
-      // Explore the file system recursively
-      const { entries, parentMap } = await exploreFileSystemWithParents(directoryHandle);
-
-      // Detect and classify config files
-      const detectedConfigFiles = await detectConfigFilesWithParents(entries, parentMap);
-
-      setDetectedConfigs(detectedConfigFiles);
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error('Failed to explore file system');
-      console.error('File system exploration error:', err);
-      onError?.(err);
-    } finally {
-      setIsExploring(false);
-    }
-  }, [onError]);
-
-  /**
-   * Preview what will be added to a config file (show diff)
-   */
-  const handlePreviewConfig = useCallback(
-    async (config: DetectedConfig) => {
-      try {
-        setSelectedConfig(config);
-
-        // Read the current file content
-        const file = await config.fileHandle.getFile();
-        const originalContent = await file.text();
-
-        // Generate the new config to add
-        const newConfig = generateConfigForPlatform(config.platform, mcpServerConfig);
-
-        // Merge with existing config
-        const updatedContent = await mergeConfig(
-          originalContent,
-          newConfig,
-          config.platform,
-          serverName
-        );
-
-        setDiffContent({
-          original: formatConfig(originalContent, config.platform),
-          updated: formatConfig(updatedContent, config.platform),
-        });
-      } catch (error) {
-        const err = error instanceof Error ? error : new Error('Failed to preview config');
-        console.error('Config preview error:', err);
-        onError?.(err);
-      }
-    },
-    [mcpServerConfig, serverName, onError]
+  const { detectedConfigs, isExploring, exploreFileSystem } = useFileSystemExplorer(
+    onError ? { onError } : {}
   );
 
-  /**
-   * Apply the configuration changes to the file
-   */
-  const handleApplyConfig = useCallback(async () => {
-    if (!selectedConfig || !diffContent) return;
-
-    setIsUpdating(true);
-
-    try {
-      // Request write permission
-      const writable = await selectedConfig.fileHandle.createWritable();
-
-      // Write the updated content
-      await writable.write(diffContent.updated);
-      await writable.close();
-
-      // Notify success
-      onConfigUpdated?.(selectedConfig);
-
-      // Update the detected config to mark as updated
-      setDetectedConfigs((prev) =>
-        prev.map((c) => (c.path === selectedConfig.path ? { ...c, isUpdated: true } : c))
-      );
-
-      // Clear selection
-      setSelectedConfig(null);
-      setDiffContent(null);
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error('Failed to update config');
-      console.error('Config update error:', err);
-      onError?.(err);
-    } finally {
-      setIsUpdating(false);
-    }
-  }, [selectedConfig, diffContent, onConfigUpdated, onError]);
-
-  /**
-   * Cancel the current preview
-   */
-  const handleCancelPreview = useCallback(() => {
-    setSelectedConfig(null);
-    setDiffContent(null);
-  }, []);
+  const { selectedConfig, diffContent, isUpdating, previewConfig, applyConfig, cancelPreview } =
+    useConfigPreview({
+      serverName,
+      mcpServerConfig,
+      ...(onError && { onError }),
+      ...(onConfigUpdated && { onConfigUpdated }),
+    });
 
   return (
     <div className={`mcp-config-explorer ${className || ''}`}>
@@ -221,7 +92,7 @@ export const MCPConfigExplorer: React.FC<MCPConfigExplorerProps> = ({
       <div className="mcp-config-explorer__actions">
         <button
           type="button"
-          onClick={handleExploreFileSystem}
+          onClick={exploreFileSystem}
           disabled={isExploring}
           className="mcp-config-explorer__button mcp-config-explorer__button--primary"
         >
@@ -237,7 +108,7 @@ export const MCPConfigExplorer: React.FC<MCPConfigExplorerProps> = ({
       </div>
 
       {detectedConfigs.length > 0 && !selectedConfig && (
-        <ConfigFileList configs={detectedConfigs} onSelectConfig={handlePreviewConfig} />
+        <ConfigFileList configs={detectedConfigs} onSelectConfig={previewConfig} />
       )}
 
       {selectedConfig && diffContent && (
@@ -259,7 +130,7 @@ export const MCPConfigExplorer: React.FC<MCPConfigExplorerProps> = ({
           <div className="mcp-config-explorer__preview-actions">
             <button
               type="button"
-              onClick={handleCancelPreview}
+              onClick={cancelPreview}
               disabled={isUpdating}
               className="mcp-config-explorer__button mcp-config-explorer__button--secondary"
             >
@@ -267,7 +138,7 @@ export const MCPConfigExplorer: React.FC<MCPConfigExplorerProps> = ({
             </button>
             <button
               type="button"
-              onClick={handleApplyConfig}
+              onClick={applyConfig}
               disabled={isUpdating}
               className="mcp-config-explorer__button mcp-config-explorer__button--primary"
             >

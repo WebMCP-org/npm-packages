@@ -22,11 +22,11 @@ A comprehensive React TypeScript component library for exploring, detecting, and
 ## Installation
 
 ```bash
-npm install @mcp-b/react-webmcp
+npm install @mcp-b/mcp-react-config
 # or
-pnpm add @mcp-b/react-webmcp
+pnpm add @mcp-b/mcp-react-config
 # or
-yarn add @mcp-b/react-webmcp
+yarn add @mcp-b/mcp-react-config
 ```
 
 ## Quick Start
@@ -35,7 +35,8 @@ yarn add @mcp-b/react-webmcp
 
 ```tsx
 import React from 'react';
-import { MCPConfigExplorer } from '@mcp-b/react-webmcp/components';
+import { MCPConfigExplorer } from '@mcp-b/mcp-react-config';
+import '@mcp-b/mcp-react-config/style.css';
 
 function App() {
   const handleConfigUpdated = (config) => {
@@ -63,7 +64,7 @@ export default App;
 
 ```tsx
 import React from 'react';
-import { MCPConfigExplorer } from '@mcp-b/react-webmcp/components';
+import { MCPConfigExplorer } from '@mcp-b/mcp-react-config';
 
 function App() {
   const serverConfig = {
@@ -182,6 +183,94 @@ type ConfigPlatform =
 type ConfigFormat = 'json' | 'yaml' | 'toml';
 ```
 
+## React Hooks
+
+The package exports reusable React hooks for building custom MCP configuration experiences.
+
+### useFileSystemExplorer
+
+Hook for exploring the file system and detecting MCP configuration files.
+
+```typescript
+import { useFileSystemExplorer } from '@mcp-b/mcp-react-config';
+
+function MyComponent() {
+  const { detectedConfigs, isExploring, exploreFileSystem, clearConfigs } = useFileSystemExplorer({
+    onError: (error) => console.error(error),
+  });
+
+  return (
+    <div>
+      <button onClick={exploreFileSystem} disabled={isExploring}>
+        {isExploring ? 'Exploring...' : 'Explore File System'}
+      </button>
+
+      {detectedConfigs.map((config) => (
+        <div key={config.path}>{config.fileName}</div>
+      ))}
+    </div>
+  );
+}
+```
+
+**Returns:**
+- `detectedConfigs: DetectedConfig[]` - List of detected configuration files
+- `isExploring: boolean` - Whether the file system is being explored
+- `exploreFileSystem: () => Promise<void>` - Function to start exploring
+- `clearConfigs: () => void` - Function to clear detected configs
+
+### useConfigPreview
+
+Hook for previewing and applying configuration changes.
+
+```typescript
+import { useConfigPreview } from '@mcp-b/mcp-react-config';
+
+function MyComponent() {
+  const mcpServerConfig = {
+    name: 'my-server',
+    url: 'https://example.com/mcp',
+  };
+
+  const {
+    selectedConfig,
+    diffContent,
+    isUpdating,
+    previewConfig,
+    applyConfig,
+    cancelPreview,
+  } = useConfigPreview({
+    serverName: 'my-server',
+    mcpServerConfig,
+    onError: (error) => console.error(error),
+    onConfigUpdated: (config) => console.log('Updated:', config),
+  });
+
+  return (
+    <div>
+      {selectedConfig && diffContent && (
+        <div>
+          <pre>{diffContent.original}</pre>
+          <pre>{diffContent.updated}</pre>
+          <button onClick={applyConfig} disabled={isUpdating}>
+            Apply
+          </button>
+          <button onClick={cancelPreview}>Cancel</button>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+**Returns:**
+- `selectedConfig: DetectedConfig | null` - Currently selected configuration
+- `diffContent: { original: string; updated: string } | null` - Diff content
+- `isUpdating: boolean` - Whether the config is being updated
+- `previewConfig: (config: DetectedConfig) => Promise<void>` - Function to preview changes
+- `applyConfig: () => Promise<void>` - Function to apply changes
+- `cancelPreview: () => void` - Function to cancel preview
+
 ## Utility Functions
 
 ### File System Exploration
@@ -190,7 +279,7 @@ type ConfigFormat = 'json' | 'yaml' | 'toml';
 import {
   exploreFileSystemWithParents,
   detectConfigFilesWithParents,
-} from '@mcp-b/react-webmcp/components';
+} from '@mcp-b/mcp-react-config';
 
 // Explore file system
 const directoryHandle = await window.showDirectoryPicker();
@@ -207,7 +296,7 @@ import {
   generateConfigForPlatform,
   mergeConfig,
   formatConfig,
-} from '@mcp-b/react-webmcp/components';
+} from '@mcp-b/mcp-react-config';
 
 // Generate platform-specific config
 const config = generateConfigForPlatform('claude-desktop', {
@@ -234,7 +323,7 @@ The component includes comprehensive CSS with dark mode support. You can customi
 1. **Importing the default styles:**
 
 ```tsx
-import '@mcp-b/react-webmcp/components/MCPConfigExplorer.css';
+import '@mcp-b/mcp-react-config/MCPConfigExplorer.css';
 ```
 
 2. **Overriding with custom CSS:**
@@ -318,7 +407,7 @@ For unsupported browsers, the component will display an appropriate error messag
 
 ```tsx
 import React, { useState } from 'react';
-import { MCPConfigExplorer } from '@mcp-b/react-webmcp/components';
+import { MCPConfigExplorer } from '@mcp-b/mcp-react-config';
 import { useAuth } from './hooks/useAuth';
 import { getMcpUrl } from './services/mcpService';
 
@@ -360,7 +449,7 @@ function MCPSetup() {
 
 ```tsx
 import React, { useState } from 'react';
-import { MCPConfigExplorer } from '@mcp-b/react-webmcp/components';
+import { MCPConfigExplorer } from '@mcp-b/mcp-react-config';
 import { Toast } from './components/Toast';
 
 function App() {
@@ -393,6 +482,42 @@ function App() {
       )}
     </>
   );
+}
+```
+
+## Testing
+
+This package includes comprehensive Playwright E2E tests covering all component functionality.
+
+### Running Tests
+
+```bash
+# Run all tests
+pnpm test
+
+# Run tests in UI mode
+pnpm test:ui
+
+# Run tests in debug mode
+pnpm test:debug
+
+# Run tests with visible browser
+pnpm test:headed
+```
+
+### Known Limitations
+
+**Playwright Tests in Docker/Containerized Environments**: The E2E tests may fail in containerized environments (Docker, CI containers) with a "Target crashed" error. This is a known infrastructure limitation where Chrome crashes due to resource constraints in sandboxed environments. The tests are fully functional in standard development environments.
+
+**Workaround**: If running tests in CI, ensure proper Chrome flags are set:
+```typescript
+// playwright.config.ts
+launchOptions: {
+  args: [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage',
+  ],
 }
 ```
 

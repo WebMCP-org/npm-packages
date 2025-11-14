@@ -37,6 +37,9 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         // Grant permissions needed for File System Access API
         permissions: ['clipboard-read', 'clipboard-write'],
+        launchOptions: {
+          args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+        },
       },
     },
   ],
