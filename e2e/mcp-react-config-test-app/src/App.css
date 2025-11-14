@@ -5,8 +5,9 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu',
-    'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell",
+    "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -100,10 +101,10 @@ body {
 
 .control-group textarea {
   resize: vertical;
-  font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+  font-family: "Monaco", "Menlo", "Consolas", monospace;
 }
 
-button[type='button'] {
+button[type="button"] {
   padding: 10px 20px;
   font-size: 14px;
   font-weight: 500;
@@ -115,11 +116,11 @@ button[type='button'] {
   color: #ffffff;
 }
 
-button[type='button']:hover:not(:disabled) {
+button[type="button"]:hover:not(:disabled) {
   background-color: #0051cc;
 }
 
-button[type='button']:disabled {
+button[type="button"]:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -207,7 +208,7 @@ button[type='button']:disabled {
   padding: 16px;
   border-radius: 6px;
   overflow-x: auto;
-  font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+  font-family: "Monaco", "Menlo", "Consolas", monospace;
   font-size: 12px;
   line-height: 1.5;
 }

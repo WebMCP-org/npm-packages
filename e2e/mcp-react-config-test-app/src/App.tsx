@@ -1,9 +1,9 @@
-import { useState } from 'react';
 import {
-  MCPConfigExplorer,
-  type DetectedConfig,
   type ConfigPlatform,
+  type DetectedConfig,
+  MCPConfigExplorer,
 } from '@mcp-b/mcp-react-config';
+import { useState } from 'react';
 import '@mcp-b/mcp-react-config/style.css';
 import './App.css';
 
@@ -36,9 +36,7 @@ function App() {
     <div className="app">
       <header className="app-header">
         <h1 data-testid="app-title">MCP Config Explorer Test App</h1>
-        <p data-testid="app-description">
-          Test app for @mcp-b/mcp-react-config package
-        </p>
+        <p data-testid="app-description">Test app for @mcp-b/mcp-react-config package</p>
       </header>
 
       <div className="test-mode-selector">
@@ -194,7 +192,7 @@ function App() {
 
             <div className="output" data-testid="utility-output">
               <h3>Output:</h3>
-              <pre id="utility-output-content"></pre>
+              <pre id="utility-output-content" />
             </div>
           </div>
         </section>
