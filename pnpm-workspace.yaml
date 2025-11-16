@@ -25,8 +25,8 @@ catalog:
   '@sentry/vite-plugin': ^4.6.0
   '@types/chrome': ^0.0.326
   '@types/node': 22.17.2
-  '@types/react': ^19.1.2
-  '@types/react-dom': ^19.1.2
+  '@types/react': ^19.2.0
+  '@types/react-dom': ^19.2.0
   '@use-gesture/react': ^10.3.1
   ai: ^5.0.83
   babel-plugin-react-compiler: ^1.0.0
@@ -36,7 +36,7 @@ catalog:
   tsdown: ^0.15.10
   tsx: ^4.20.0
   typescript: ^5.8.3
-  vite: ^7.1.2
+  vite: ^7.1.12
   vite-plugin-monkey: ^6.0.1
   wrangler: ^4.45.3
   zod: 3.25.76
