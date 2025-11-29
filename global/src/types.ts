@@ -1,11 +1,11 @@
 import type { IframeChildTransportOptions, TabServerTransportOptions } from '@mcp-b/transports';
 import type {
   CallToolResult,
+  Server as McpServer,
   Prompt,
   PromptMessage,
   Resource,
   ResourceContents,
-  Server as McpServer,
   ToolAnnotations,
   Transport,
 } from '@mcp-b/webmcp-ts-sdk';
@@ -227,10 +227,7 @@ export interface ResourceDescriptor {
    * @param params - Parameters extracted from URI template (if applicable)
    * @returns Resource contents with the data
    */
-  read: (
-    uri: URL,
-    params?: Record<string, string>
-  ) => Promise<{ contents: ResourceContents[] }>;
+  read: (uri: URL, params?: Record<string, string>) => Promise<{ contents: ResourceContents[] }>;
 }
 
 /**
@@ -241,10 +238,7 @@ export interface ValidatedResourceDescriptor {
   name: string;
   description: string | undefined;
   mimeType: string | undefined;
-  read: (
-    uri: URL,
-    params?: Record<string, string>
-  ) => Promise<{ contents: ResourceContents[] }>;
+  read: (uri: URL, params?: Record<string, string>) => Promise<{ contents: ResourceContents[] }>;
 
   /**
    * Whether this is a URI template (contains {param} placeholders)
@@ -296,9 +290,7 @@ export interface ValidatedResourceDescriptor {
  * };
  * ```
  */
-export interface PromptDescriptor<
-  TArgsSchema extends ZodSchemaObject = Record<string, never>,
-> {
+export interface PromptDescriptor<TArgsSchema extends ZodSchemaObject = Record<string, never>> {
   /**
    * Unique identifier for the prompt
    */
@@ -542,10 +534,7 @@ export interface InternalModelContext extends ModelContext {
    * Get a prompt with arguments (internal use only by MCP bridge)
    * @internal
    */
-  getPrompt(
-    name: string,
-    args?: Record<string, unknown>
-  ): Promise<{ messages: PromptMessage[] }>;
+  getPrompt(name: string, args?: Record<string, unknown>): Promise<{ messages: PromptMessage[] }>;
 }
 
 /**

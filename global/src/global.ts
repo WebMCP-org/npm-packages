@@ -4,17 +4,23 @@ import {
   TabServerTransport,
   type TabServerTransportOptions,
 } from '@mcp-b/transports';
-import type { Prompt, PromptMessage, Resource, ResourceContents, Transport } from '@mcp-b/webmcp-ts-sdk';
-import type { z } from 'zod';
+import type {
+  Prompt,
+  PromptMessage,
+  Resource,
+  ResourceContents,
+  Transport,
+} from '@mcp-b/webmcp-ts-sdk';
 import {
   CallToolRequestSchema,
   GetPromptRequestSchema,
   ListPromptsRequestSchema,
   ListResourcesRequestSchema,
   ListToolsRequestSchema,
-  ReadResourceRequestSchema,
   Server as McpServer,
+  ReadResourceRequestSchema,
 } from '@mcp-b/webmcp-ts-sdk';
+import type { z } from 'zod';
 import type {
   InputSchema,
   InternalModelContext,
@@ -945,8 +951,7 @@ class WebModelContext implements InternalModelContext {
     // Extract template parameters from URI (e.g., "file://{path}" -> ["path"])
     const templateParamRegex = /\{([^}]+)\}/g;
     const templateParams: string[] = [];
-    let match: RegExpExecArray | null;
-    while ((match = templateParamRegex.exec(resource.uri)) !== null) {
+    for (const match of resource.uri.matchAll(templateParamRegex)) {
       const paramName = match[1];
       if (paramName) {
         templateParams.push(paramName);
@@ -1621,7 +1626,7 @@ class WebModelContext implements InternalModelContext {
     let regexPattern = template.replace(/[.*+?^${}()|[\]\\]/g, (char) => {
       // Don't escape { and } - we'll handle them specially
       if (char === '{' || char === '}') return char;
-      return '\\' + char;
+      return `\\${char}`;
     });
 
     // Replace {param} with capture groups
