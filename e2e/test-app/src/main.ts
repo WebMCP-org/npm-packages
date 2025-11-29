@@ -10,6 +10,19 @@ let counter = 0;
 // Dynamic tool registration
 let dynamicToolRegistration: { unregister: () => void } | null = null;
 
+// Dynamic resource registration
+let dynamicResourceRegistration: { unregister: () => void } | null = null;
+
+// Dynamic prompt registration
+let dynamicPromptRegistration: { unregister: () => void } | null = null;
+
+// App state for resources
+const appConfig = {
+  theme: 'dark',
+  language: 'en',
+  version: '1.0.0',
+};
+
 // DOM Elements
 const apiStatusEl = document.getElementById('api-status');
 const counterDisplayEl = document.getElementById('counter-display');
@@ -38,6 +51,43 @@ const checkTestingApiBtn = document.getElementById('check-testing-api') as HTMLB
 const testToolTrackingBtn = document.getElementById('test-tool-tracking') as HTMLButtonElement;
 const testMockResponseBtn = document.getElementById('test-mock-response') as HTMLButtonElement;
 const testResetBtn = document.getElementById('test-reset') as HTMLButtonElement;
+
+// Resource DOM elements
+const resourcesStatusEl = document.getElementById('resources-status');
+const registerBaseResourcesBtn = document.getElementById(
+  'register-base-resources'
+) as HTMLButtonElement;
+const registerDynamicResourceBtn = document.getElementById(
+  'register-dynamic-resource'
+) as HTMLButtonElement;
+const unregisterDynamicResourceBtn = document.getElementById(
+  'unregister-dynamic-resource'
+) as HTMLButtonElement;
+const listResourcesBtn = document.getElementById('list-resources') as HTMLButtonElement;
+const listResourceTemplatesBtn = document.getElementById(
+  'list-resource-templates'
+) as HTMLButtonElement;
+const readStaticResourceBtn = document.getElementById('read-static-resource') as HTMLButtonElement;
+const readTemplateResourceBtn = document.getElementById(
+  'read-template-resource'
+) as HTMLButtonElement;
+
+// Prompt DOM elements
+const promptsStatusEl = document.getElementById('prompts-status');
+const registerBasePromptsBtn = document.getElementById(
+  'register-base-prompts'
+) as HTMLButtonElement;
+const registerDynamicPromptBtn = document.getElementById(
+  'register-dynamic-prompt'
+) as HTMLButtonElement;
+const unregisterDynamicPromptBtn = document.getElementById(
+  'unregister-dynamic-prompt'
+) as HTMLButtonElement;
+const listPromptsBtn = document.getElementById('list-prompts') as HTMLButtonElement;
+const getPromptWithoutArgsBtn = document.getElementById(
+  'get-prompt-without-args'
+) as HTMLButtonElement;
+const getPromptWithArgsBtn = document.getElementById('get-prompt-with-args') as HTMLButtonElement;
 
 // Logging utility
 function log(message: string, type: 'info' | 'success' | 'error' = 'info') {
@@ -332,6 +382,505 @@ function listAllTools() {
   }
 }
 
+// ==================== RESOURCES ====================
+
+// Register base resources (Bucket A)
+function registerBaseResources() {
+  try {
+    log('Registering base resources via provideContext()...', 'info');
+
+    navigator.modelContext.provideContext({
+      resources: [
+        {
+          uri: 'config://app-settings',
+          name: 'App Settings',
+          description: 'Application configuration settings',
+          mimeType: 'application/json',
+          async read() {
+            log('Reading app settings resource', 'info');
+            return {
+              contents: [
+                {
+                  uri: 'config://app-settings',
+                  text: JSON.stringify(appConfig, null, 2),
+                  mimeType: 'application/json',
+                },
+              ],
+            };
+          },
+        },
+        {
+          uri: 'counter://value',
+          name: 'Counter Value',
+          description: 'Current counter value',
+          mimeType: 'text/plain',
+          async read() {
+            log('Reading counter value resource', 'info');
+            return {
+              contents: [
+                {
+                  uri: 'counter://value',
+                  text: `Counter: ${counter}`,
+                  mimeType: 'text/plain',
+                },
+              ],
+            };
+          },
+        },
+        {
+          uri: 'file://{path}',
+          name: 'File Reader',
+          description: 'Read files from the virtual filesystem',
+          mimeType: 'text/plain',
+          async read(uri: URL, params?: Record<string, string>) {
+            const path = params?.path ?? 'unknown';
+            log(`Reading file resource: ${path}`, 'info');
+            return {
+              contents: [
+                {
+                  uri: uri.href,
+                  text: `Contents of file: ${path}\nThis is mock file content for testing.`,
+                  mimeType: 'text/plain',
+                },
+              ],
+            };
+          },
+        },
+      ],
+    });
+
+    log('Base resources registered successfully (Bucket A)', 'success');
+    if (resourcesStatusEl) {
+      resourcesStatusEl.textContent = 'Resources: Base registered (Bucket A) ✅';
+      resourcesStatusEl.style.background = '#d4edda';
+      resourcesStatusEl.setAttribute('data-resources', 'base-registered');
+    }
+  } catch (error) {
+    log(`Failed to register base resources: ${error}`, 'error');
+    console.error(error);
+  }
+}
+
+// Register dynamic resource (Bucket B)
+function registerDynamicResource() {
+  try {
+    if (dynamicResourceRegistration) {
+      log('Dynamic resource already registered', 'error');
+      return;
+    }
+
+    log('Registering dynamic resource via registerResource()...', 'info');
+
+    dynamicResourceRegistration = navigator.modelContext.registerResource({
+      uri: 'dynamic://status',
+      name: 'Dynamic Status',
+      description: 'A dynamically registered resource that persists across provideContext calls',
+      mimeType: 'application/json',
+      async read() {
+        log('Reading dynamic status resource', 'info');
+        return {
+          contents: [
+            {
+              uri: 'dynamic://status',
+              text: JSON.stringify({
+                status: 'active',
+                timestamp: new Date().toISOString(),
+                counter,
+              }),
+              mimeType: 'application/json',
+            },
+          ],
+        };
+      },
+    });
+
+    log('Dynamic resource registered successfully (Bucket B)', 'success');
+    if (resourcesStatusEl) {
+      resourcesStatusEl.textContent = 'Resources: Dynamic registered (Bucket B) ✅';
+      resourcesStatusEl.style.background = '#d4edda';
+      resourcesStatusEl.setAttribute('data-resources', 'dynamic-registered');
+    }
+    registerDynamicResourceBtn.disabled = true;
+    unregisterDynamicResourceBtn.disabled = false;
+  } catch (error) {
+    log(`Failed to register dynamic resource: ${error}`, 'error');
+    console.error(error);
+  }
+}
+
+// Unregister dynamic resource
+function unregisterDynamicResource() {
+  try {
+    if (!dynamicResourceRegistration) {
+      log('No dynamic resource to unregister', 'error');
+      return;
+    }
+
+    log('Unregistering dynamic resource...', 'info');
+    dynamicResourceRegistration.unregister();
+    dynamicResourceRegistration = null;
+
+    log('Dynamic resource unregistered successfully', 'success');
+    if (resourcesStatusEl) {
+      resourcesStatusEl.textContent = 'Resources: Dynamic unregistered';
+      resourcesStatusEl.style.background = '#f5f5f5';
+      resourcesStatusEl.setAttribute('data-resources', 'dynamic-unregistered');
+    }
+    registerDynamicResourceBtn.disabled = false;
+    unregisterDynamicResourceBtn.disabled = true;
+  } catch (error) {
+    log(`Failed to unregister dynamic resource: ${error}`, 'error');
+    console.error(error);
+  }
+}
+
+// List all resources
+function listResources() {
+  try {
+    log('Listing all registered resources...', 'info');
+    const resources = navigator.modelContext.listResources();
+    log(`Total resources: ${resources.length}`, 'success');
+
+    if (resourcesStatusEl) {
+      resourcesStatusEl.setAttribute('data-resource-count', resources.length.toString());
+    }
+
+    resources.forEach((resource) => {
+      log(`  - ${resource.uri}: ${resource.name}`, 'info');
+    });
+  } catch (error) {
+    log(`Failed to list resources: ${error}`, 'error');
+    console.error(error);
+  }
+}
+
+// List resource templates
+function listResourceTemplates() {
+  try {
+    log('Listing all resource templates...', 'info');
+    const templates = navigator.modelContext.listResourceTemplates();
+    log(`Total templates: ${templates.length}`, 'success');
+
+    if (resourcesStatusEl) {
+      resourcesStatusEl.setAttribute('data-template-count', templates.length.toString());
+    }
+
+    templates.forEach((template) => {
+      log(`  - ${template.uriTemplate}: ${template.name}`, 'info');
+    });
+  } catch (error) {
+    log(`Failed to list resource templates: ${error}`, 'error');
+    console.error(error);
+  }
+}
+
+// Read static resource
+async function readStaticResource() {
+  try {
+    log('Reading static resource config://app-settings...', 'info');
+
+    const w = window as unknown as {
+      __mcpBridge?: {
+        modelContext: {
+          readResource: (
+            uri: string
+          ) => Promise<{ contents: Array<{ uri: string; text?: string }> }>;
+        };
+      };
+    };
+
+    if (w.__mcpBridge) {
+      const result = await w.__mcpBridge.modelContext.readResource('config://app-settings');
+      log('Resource read successfully:', 'success');
+      if (result.contents[0]?.text) {
+        log(`  Content: ${result.contents[0].text}`, 'info');
+      }
+      if (resourcesStatusEl) {
+        resourcesStatusEl.setAttribute('data-read-static', 'success');
+      }
+    } else {
+      log('__mcpBridge not available', 'error');
+    }
+  } catch (error) {
+    log(`Failed to read resource: ${error}`, 'error');
+    console.error(error);
+  }
+}
+
+// Read template resource
+async function readTemplateResource() {
+  try {
+    log('Reading template resource file://test.txt...', 'info');
+
+    const w = window as unknown as {
+      __mcpBridge?: {
+        modelContext: {
+          readResource: (
+            uri: string
+          ) => Promise<{ contents: Array<{ uri: string; text?: string }> }>;
+        };
+      };
+    };
+
+    if (w.__mcpBridge) {
+      const result = await w.__mcpBridge.modelContext.readResource('file://test.txt');
+      log('Template resource read successfully:', 'success');
+      if (result.contents[0]?.text) {
+        log(`  Content: ${result.contents[0].text}`, 'info');
+      }
+      if (resourcesStatusEl) {
+        resourcesStatusEl.setAttribute('data-read-template', 'success');
+      }
+    } else {
+      log('__mcpBridge not available', 'error');
+    }
+  } catch (error) {
+    log(`Failed to read template resource: ${error}`, 'error');
+    console.error(error);
+  }
+}
+
+// ==================== PROMPTS ====================
+
+// Register base prompts (Bucket A)
+function registerBasePrompts() {
+  try {
+    log('Registering base prompts via provideContext()...', 'info');
+
+    navigator.modelContext.provideContext({
+      prompts: [
+        {
+          name: 'greeting',
+          description: 'A simple greeting prompt',
+          async get() {
+            log('Getting greeting prompt', 'info');
+            return {
+              messages: [
+                {
+                  role: 'user',
+                  content: { type: 'text', text: 'Hello! How can you help me today?' },
+                },
+              ],
+            };
+          },
+        },
+        {
+          name: 'code-review',
+          description: 'Review code for best practices',
+          argsSchema: {
+            type: 'object',
+            properties: {
+              code: { type: 'string', description: 'The code to review' },
+              language: { type: 'string', description: 'Programming language' },
+            },
+            required: ['code'],
+          },
+          async get(args: Record<string, unknown>) {
+            log(`Getting code-review prompt with args: ${JSON.stringify(args)}`, 'info');
+            const code = args.code as string;
+            const language = (args.language as string) || 'unknown';
+            return {
+              messages: [
+                {
+                  role: 'user',
+                  content: {
+                    type: 'text',
+                    text: `Please review this ${language} code for best practices:\n\n\`\`\`${language}\n${code}\n\`\`\``,
+                  },
+                },
+              ],
+            };
+          },
+        },
+      ],
+    });
+
+    log('Base prompts registered successfully (Bucket A)', 'success');
+    if (promptsStatusEl) {
+      promptsStatusEl.textContent = 'Prompts: Base registered (Bucket A) ✅';
+      promptsStatusEl.style.background = '#d4edda';
+      promptsStatusEl.setAttribute('data-prompts', 'base-registered');
+    }
+  } catch (error) {
+    log(`Failed to register base prompts: ${error}`, 'error');
+    console.error(error);
+  }
+}
+
+// Register dynamic prompt (Bucket B)
+function registerDynamicPrompt() {
+  try {
+    if (dynamicPromptRegistration) {
+      log('Dynamic prompt already registered', 'error');
+      return;
+    }
+
+    log('Registering dynamic prompt via registerPrompt()...', 'info');
+
+    dynamicPromptRegistration = navigator.modelContext.registerPrompt({
+      name: 'dynamic-summary',
+      description: 'A dynamically registered prompt for summarization',
+      argsSchema: {
+        type: 'object',
+        properties: {
+          text: { type: 'string', description: 'Text to summarize' },
+        },
+        required: ['text'],
+      },
+      async get(args: Record<string, unknown>) {
+        log(`Getting dynamic-summary prompt with args: ${JSON.stringify(args)}`, 'info');
+        const text = args.text as string;
+        return {
+          messages: [
+            {
+              role: 'user',
+              content: {
+                type: 'text',
+                text: `Please summarize the following text:\n\n${text}`,
+              },
+            },
+          ],
+        };
+      },
+    });
+
+    log('Dynamic prompt registered successfully (Bucket B)', 'success');
+    if (promptsStatusEl) {
+      promptsStatusEl.textContent = 'Prompts: Dynamic registered (Bucket B) ✅';
+      promptsStatusEl.style.background = '#d4edda';
+      promptsStatusEl.setAttribute('data-prompts', 'dynamic-registered');
+    }
+    registerDynamicPromptBtn.disabled = true;
+    unregisterDynamicPromptBtn.disabled = false;
+  } catch (error) {
+    log(`Failed to register dynamic prompt: ${error}`, 'error');
+    console.error(error);
+  }
+}
+
+// Unregister dynamic prompt
+function unregisterDynamicPrompt() {
+  try {
+    if (!dynamicPromptRegistration) {
+      log('No dynamic prompt to unregister', 'error');
+      return;
+    }
+
+    log('Unregistering dynamic prompt...', 'info');
+    dynamicPromptRegistration.unregister();
+    dynamicPromptRegistration = null;
+
+    log('Dynamic prompt unregistered successfully', 'success');
+    if (promptsStatusEl) {
+      promptsStatusEl.textContent = 'Prompts: Dynamic unregistered';
+      promptsStatusEl.style.background = '#f5f5f5';
+      promptsStatusEl.setAttribute('data-prompts', 'dynamic-unregistered');
+    }
+    registerDynamicPromptBtn.disabled = false;
+    unregisterDynamicPromptBtn.disabled = true;
+  } catch (error) {
+    log(`Failed to unregister dynamic prompt: ${error}`, 'error');
+    console.error(error);
+  }
+}
+
+// List all prompts
+function listPrompts() {
+  try {
+    log('Listing all registered prompts...', 'info');
+    const prompts = navigator.modelContext.listPrompts();
+    log(`Total prompts: ${prompts.length}`, 'success');
+
+    if (promptsStatusEl) {
+      promptsStatusEl.setAttribute('data-prompt-count', prompts.length.toString());
+    }
+
+    prompts.forEach((prompt) => {
+      log(`  - ${prompt.name}: ${prompt.description}`, 'info');
+    });
+  } catch (error) {
+    log(`Failed to list prompts: ${error}`, 'error');
+    console.error(error);
+  }
+}
+
+// Get prompt without arguments
+async function getPromptWithoutArgs() {
+  try {
+    log('Getting prompt without args (greeting)...', 'info');
+
+    const w = window as unknown as {
+      __mcpBridge?: {
+        modelContext: {
+          getPrompt: (
+            name: string,
+            args?: Record<string, unknown>
+          ) => Promise<{
+            messages: Array<{ role: string; content: { type: string; text: string } }>;
+          }>;
+        };
+      };
+    };
+
+    if (w.__mcpBridge) {
+      const result = await w.__mcpBridge.modelContext.getPrompt('greeting');
+      log('Prompt retrieved successfully:', 'success');
+      if (result.messages[0]?.content) {
+        const content = result.messages[0].content;
+        log(`  Message: ${content.text}`, 'info');
+      }
+      if (promptsStatusEl) {
+        promptsStatusEl.setAttribute('data-get-prompt-no-args', 'success');
+      }
+    } else {
+      log('__mcpBridge not available', 'error');
+    }
+  } catch (error) {
+    log(`Failed to get prompt: ${error}`, 'error');
+    console.error(error);
+  }
+}
+
+// Get prompt with arguments
+async function getPromptWithArgs() {
+  try {
+    log('Getting prompt with args (code-review)...', 'info');
+
+    const w = window as unknown as {
+      __mcpBridge?: {
+        modelContext: {
+          getPrompt: (
+            name: string,
+            args?: Record<string, unknown>
+          ) => Promise<{
+            messages: Array<{ role: string; content: { type: string; text: string } }>;
+          }>;
+        };
+      };
+    };
+
+    if (w.__mcpBridge) {
+      const result = await w.__mcpBridge.modelContext.getPrompt('code-review', {
+        code: 'console.log("Hello World");',
+        language: 'javascript',
+      });
+      log('Prompt with args retrieved successfully:', 'success');
+      if (result.messages[0]?.content) {
+        const content = result.messages[0].content;
+        log(`  Message: ${content.text.substring(0, 100)}...`, 'info');
+      }
+      if (promptsStatusEl) {
+        promptsStatusEl.setAttribute('data-get-prompt-with-args', 'success');
+      }
+    } else {
+      log('__mcpBridge not available', 'error');
+    }
+  } catch (error) {
+    log(`Failed to get prompt with args: ${error}`, 'error');
+    console.error(error);
+  }
+}
+
 // Check if modelContextTesting API is available
 function checkTestingAPI() {
   if (testingApiStatusEl) {
@@ -537,6 +1086,23 @@ checkTestingApiBtn.addEventListener('click', checkTestingAPI);
 testToolTrackingBtn.addEventListener('click', testToolCallTracking);
 testMockResponseBtn.addEventListener('click', testMockResponse);
 testResetBtn.addEventListener('click', testReset);
+
+// Resource event listeners
+registerBaseResourcesBtn.addEventListener('click', registerBaseResources);
+registerDynamicResourceBtn.addEventListener('click', registerDynamicResource);
+unregisterDynamicResourceBtn.addEventListener('click', unregisterDynamicResource);
+listResourcesBtn.addEventListener('click', listResources);
+listResourceTemplatesBtn.addEventListener('click', listResourceTemplates);
+readStaticResourceBtn.addEventListener('click', readStaticResource);
+readTemplateResourceBtn.addEventListener('click', readTemplateResource);
+
+// Prompt event listeners
+registerBasePromptsBtn.addEventListener('click', registerBasePrompts);
+registerDynamicPromptBtn.addEventListener('click', registerDynamicPrompt);
+unregisterDynamicPromptBtn.addEventListener('click', unregisterDynamicPrompt);
+listPromptsBtn.addEventListener('click', listPrompts);
+getPromptWithoutArgsBtn.addEventListener('click', getPromptWithoutArgs);
+getPromptWithArgsBtn.addEventListener('click', getPromptWithArgs);
 
 // Chromium native API event listeners
 const chromiumButtons = {
@@ -907,6 +1473,21 @@ declare global {
       testChromiumCallbackUnregister: () => void;
       testChromiumCallbackProvide: () => void;
       testChromiumCallbackClear: () => void;
+      // Resource tests
+      registerBaseResources: () => void;
+      registerDynamicResource: () => void;
+      unregisterDynamicResource: () => void;
+      listResources: () => void;
+      listResourceTemplates: () => void;
+      readStaticResource: () => Promise<void>;
+      readTemplateResource: () => Promise<void>;
+      // Prompt tests
+      registerBasePrompts: () => void;
+      registerDynamicPrompt: () => void;
+      unregisterDynamicPrompt: () => void;
+      listPrompts: () => void;
+      getPromptWithoutArgs: () => Promise<void>;
+      getPromptWithArgs: () => Promise<void>;
     };
   }
 }
@@ -934,4 +1515,19 @@ window.testApp = {
   testChromiumCallbackUnregister,
   testChromiumCallbackProvide,
   testChromiumCallbackClear,
+  // Resource tests
+  registerBaseResources,
+  registerDynamicResource,
+  unregisterDynamicResource,
+  listResources,
+  listResourceTemplates,
+  readStaticResource,
+  readTemplateResource,
+  // Prompt tests
+  registerBasePrompts,
+  registerDynamicPrompt,
+  unregisterDynamicPrompt,
+  listPrompts,
+  getPromptWithoutArgs,
+  getPromptWithArgs,
 };

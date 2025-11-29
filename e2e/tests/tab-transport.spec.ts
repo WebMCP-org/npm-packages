@@ -197,6 +197,308 @@ test.describe('Web Model Context API E2E Tests', () => {
   });
 });
 
+test.describe('Resources API Tests', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('h1')).toContainText('Web Model Context API E2E Test');
+  });
+
+  test('should register base resources via provideContext (Bucket A)', async ({ page }) => {
+    await page.click('#register-base-resources');
+    await page.waitForTimeout(500);
+
+    const logEntries = await page.locator('#log .log-entry').allTextContents();
+    expect(
+      logEntries.some((entry) =>
+        entry.includes('Base resources registered successfully (Bucket A)')
+      )
+    ).toBe(true);
+
+    const status = page.locator('#resources-status');
+    await expect(status).toHaveAttribute('data-resources', 'base-registered');
+  });
+
+  test('should register dynamic resource via registerResource (Bucket B)', async ({ page }) => {
+    await page.click('#register-dynamic-resource');
+    await page.waitForTimeout(500);
+
+    const logEntries = await page.locator('#log .log-entry').allTextContents();
+    expect(
+      logEntries.some((entry) =>
+        entry.includes('Dynamic resource registered successfully (Bucket B)')
+      )
+    ).toBe(true);
+
+    const status = page.locator('#resources-status');
+    await expect(status).toHaveAttribute('data-resources', 'dynamic-registered');
+
+    await expect(page.locator('#register-dynamic-resource')).toBeDisabled();
+    await expect(page.locator('#unregister-dynamic-resource')).toBeEnabled();
+  });
+
+  test('should unregister dynamic resource', async ({ page }) => {
+    await page.click('#register-dynamic-resource');
+    await page.waitForTimeout(500);
+
+    await page.click('#unregister-dynamic-resource');
+    await page.waitForTimeout(500);
+
+    const logEntries = await page.locator('#log .log-entry').allTextContents();
+    expect(
+      logEntries.some((entry) => entry.includes('Dynamic resource unregistered successfully'))
+    ).toBe(true);
+
+    const status = page.locator('#resources-status');
+    await expect(status).toHaveAttribute('data-resources', 'dynamic-unregistered');
+
+    await expect(page.locator('#register-dynamic-resource')).toBeEnabled();
+    await expect(page.locator('#unregister-dynamic-resource')).toBeDisabled();
+  });
+
+  test('should list all resources', async ({ page }) => {
+    await page.click('#register-base-resources');
+    await page.waitForTimeout(500);
+
+    await page.click('#list-resources');
+    await page.waitForTimeout(500);
+
+    const logEntries = await page.locator('#log .log-entry').allTextContents();
+    expect(logEntries.some((entry) => entry.includes('Total resources:'))).toBe(true);
+    expect(logEntries.some((entry) => entry.includes('config://app-settings'))).toBe(true);
+    expect(logEntries.some((entry) => entry.includes('counter://value'))).toBe(true);
+  });
+
+  test('should list resource templates', async ({ page }) => {
+    await page.click('#register-base-resources');
+    await page.waitForTimeout(500);
+
+    await page.click('#list-resource-templates');
+    await page.waitForTimeout(500);
+
+    const logEntries = await page.locator('#log .log-entry').allTextContents();
+    expect(logEntries.some((entry) => entry.includes('Total templates:'))).toBe(true);
+    expect(logEntries.some((entry) => entry.includes('file://{path}'))).toBe(true);
+  });
+
+  test('should read static resource', async ({ page }) => {
+    await page.click('#register-base-resources');
+    await page.waitForTimeout(500);
+
+    await page.click('#read-static-resource');
+    await page.waitForTimeout(500);
+
+    const logEntries = await page.locator('#log .log-entry').allTextContents();
+    expect(logEntries.some((entry) => entry.includes('Resource read successfully'))).toBe(true);
+
+    const status = page.locator('#resources-status');
+    await expect(status).toHaveAttribute('data-read-static', 'success');
+  });
+
+  test('should read template resource', async ({ page }) => {
+    await page.click('#register-base-resources');
+    await page.waitForTimeout(500);
+
+    await page.click('#read-template-resource');
+    await page.waitForTimeout(500);
+
+    const logEntries = await page.locator('#log .log-entry').allTextContents();
+    expect(logEntries.some((entry) => entry.includes('Template resource read successfully'))).toBe(
+      true
+    );
+
+    const status = page.locator('#resources-status');
+    await expect(status).toHaveAttribute('data-read-template', 'success');
+  });
+
+  test('should persist dynamic resource across provideContext calls (two-bucket system)', async ({
+    page,
+  }) => {
+    // Register dynamic resource
+    await page.click('#register-dynamic-resource');
+    await page.waitForTimeout(500);
+
+    // List resources - should have 1 dynamic resource
+    await page.click('#list-resources');
+    await page.waitForTimeout(500);
+    let logEntries = await page.locator('#log .log-entry').allTextContents();
+    expect(logEntries.some((entry) => entry.includes('dynamic://status'))).toBe(true);
+
+    // Register base resources (replaces Bucket A)
+    await page.click('#register-base-resources');
+    await page.waitForTimeout(500);
+
+    // List resources again - dynamic resource should persist
+    await page.click('#list-resources');
+    await page.waitForTimeout(500);
+    logEntries = await page.locator('#log .log-entry').allTextContents();
+    expect(logEntries.some((entry) => entry.includes('dynamic://status'))).toBe(true);
+    expect(logEntries.some((entry) => entry.includes('config://app-settings'))).toBe(true);
+  });
+
+  test('should access resources via __mcpBridge', async ({ page }) => {
+    await page.click('#register-base-resources');
+    await page.waitForTimeout(500);
+
+    const resourceCount = await page.evaluate(() => {
+      const w = window as unknown as { __mcpBridge?: { resources: Map<string, unknown> } };
+      if (w.__mcpBridge) {
+        return w.__mcpBridge.resources.size;
+      }
+      return 0;
+    });
+
+    // Should have 3 base resources (app-settings, counter, file template)
+    expect(resourceCount).toBe(3);
+  });
+});
+
+test.describe('Prompts API Tests', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('h1')).toContainText('Web Model Context API E2E Test');
+  });
+
+  test('should register base prompts via provideContext (Bucket A)', async ({ page }) => {
+    await page.click('#register-base-prompts');
+    await page.waitForTimeout(500);
+
+    const logEntries = await page.locator('#log .log-entry').allTextContents();
+    expect(
+      logEntries.some((entry) => entry.includes('Base prompts registered successfully (Bucket A)'))
+    ).toBe(true);
+
+    const status = page.locator('#prompts-status');
+    await expect(status).toHaveAttribute('data-prompts', 'base-registered');
+  });
+
+  test('should register dynamic prompt via registerPrompt (Bucket B)', async ({ page }) => {
+    await page.click('#register-dynamic-prompt');
+    await page.waitForTimeout(500);
+
+    const logEntries = await page.locator('#log .log-entry').allTextContents();
+    expect(
+      logEntries.some((entry) =>
+        entry.includes('Dynamic prompt registered successfully (Bucket B)')
+      )
+    ).toBe(true);
+
+    const status = page.locator('#prompts-status');
+    await expect(status).toHaveAttribute('data-prompts', 'dynamic-registered');
+
+    await expect(page.locator('#register-dynamic-prompt')).toBeDisabled();
+    await expect(page.locator('#unregister-dynamic-prompt')).toBeEnabled();
+  });
+
+  test('should unregister dynamic prompt', async ({ page }) => {
+    await page.click('#register-dynamic-prompt');
+    await page.waitForTimeout(500);
+
+    await page.click('#unregister-dynamic-prompt');
+    await page.waitForTimeout(500);
+
+    const logEntries = await page.locator('#log .log-entry').allTextContents();
+    expect(
+      logEntries.some((entry) => entry.includes('Dynamic prompt unregistered successfully'))
+    ).toBe(true);
+
+    const status = page.locator('#prompts-status');
+    await expect(status).toHaveAttribute('data-prompts', 'dynamic-unregistered');
+
+    await expect(page.locator('#register-dynamic-prompt')).toBeEnabled();
+    await expect(page.locator('#unregister-dynamic-prompt')).toBeDisabled();
+  });
+
+  test('should list all prompts', async ({ page }) => {
+    await page.click('#register-base-prompts');
+    await page.waitForTimeout(500);
+
+    await page.click('#list-prompts');
+    await page.waitForTimeout(500);
+
+    const logEntries = await page.locator('#log .log-entry').allTextContents();
+    expect(logEntries.some((entry) => entry.includes('Total prompts:'))).toBe(true);
+    expect(logEntries.some((entry) => entry.includes('greeting'))).toBe(true);
+    expect(logEntries.some((entry) => entry.includes('code-review'))).toBe(true);
+  });
+
+  test('should get prompt without arguments', async ({ page }) => {
+    await page.click('#register-base-prompts');
+    await page.waitForTimeout(500);
+
+    await page.click('#get-prompt-without-args');
+    await page.waitForTimeout(500);
+
+    const logEntries = await page.locator('#log .log-entry').allTextContents();
+    expect(logEntries.some((entry) => entry.includes('Prompt retrieved successfully'))).toBe(true);
+    expect(logEntries.some((entry) => entry.includes('Hello! How can you help me today?'))).toBe(
+      true
+    );
+
+    const status = page.locator('#prompts-status');
+    await expect(status).toHaveAttribute('data-get-prompt-no-args', 'success');
+  });
+
+  test('should get prompt with arguments', async ({ page }) => {
+    await page.click('#register-base-prompts');
+    await page.waitForTimeout(500);
+
+    await page.click('#get-prompt-with-args');
+    await page.waitForTimeout(500);
+
+    const logEntries = await page.locator('#log .log-entry').allTextContents();
+    expect(
+      logEntries.some((entry) => entry.includes('Prompt with args retrieved successfully'))
+    ).toBe(true);
+    expect(logEntries.some((entry) => entry.includes('Please review this javascript code'))).toBe(
+      true
+    );
+
+    const status = page.locator('#prompts-status');
+    await expect(status).toHaveAttribute('data-get-prompt-with-args', 'success');
+  });
+
+  test('should persist dynamic prompt across provideContext calls (two-bucket system)', async ({
+    page,
+  }) => {
+    // Register dynamic prompt
+    await page.click('#register-dynamic-prompt');
+    await page.waitForTimeout(500);
+
+    // List prompts - should have 1 dynamic prompt
+    await page.click('#list-prompts');
+    await page.waitForTimeout(500);
+    let logEntries = await page.locator('#log .log-entry').allTextContents();
+    expect(logEntries.some((entry) => entry.includes('dynamic-summary'))).toBe(true);
+
+    // Register base prompts (replaces Bucket A)
+    await page.click('#register-base-prompts');
+    await page.waitForTimeout(500);
+
+    // List prompts again - dynamic prompt should persist
+    await page.click('#list-prompts');
+    await page.waitForTimeout(500);
+    logEntries = await page.locator('#log .log-entry').allTextContents();
+    expect(logEntries.some((entry) => entry.includes('dynamic-summary'))).toBe(true);
+    expect(logEntries.some((entry) => entry.includes('greeting'))).toBe(true);
+  });
+
+  test('should access prompts via __mcpBridge', async ({ page }) => {
+    await page.click('#register-base-prompts');
+    await page.waitForTimeout(500);
+
+    const promptCount = await page.evaluate(() => {
+      const w = window as unknown as { __mcpBridge?: { prompts: Map<string, unknown> } };
+      if (w.__mcpBridge) {
+        return w.__mcpBridge.prompts.size;
+      }
+      return 0;
+    });
+
+    // Should have 2 base prompts (greeting, code-review)
+    expect(promptCount).toBe(2);
+  });
+});
+
 test.describe('Model Context Testing API Tests', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
