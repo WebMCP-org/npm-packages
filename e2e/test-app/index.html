@@ -131,6 +131,43 @@
     </div>
 
     <div class="section">
+      <h2>Resources (Bucket A & B)</h2>
+      <p>Test <code>provideContext({ resources })</code> and <code>registerResource()</code> for exposing data to AI models.</p>
+      <div id="resources-status" style="margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 4px;">
+        Resources: Not registered
+      </div>
+      <div style="text-align: center;">
+        <button id="register-base-resources">Register Base Resources (Bucket A)</button>
+        <button id="register-dynamic-resource">Register Dynamic Resource (Bucket B)</button>
+        <button id="unregister-dynamic-resource" disabled>Unregister Dynamic Resource</button>
+      </div>
+      <div style="text-align: center; margin-top: 10px;">
+        <button id="list-resources">List Resources</button>
+        <button id="list-resource-templates">List Resource Templates</button>
+        <button id="read-static-resource">Read Static Resource</button>
+        <button id="read-template-resource">Read Template Resource</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Prompts (Bucket A & B)</h2>
+      <p>Test <code>provideContext({ prompts })</code> and <code>registerPrompt()</code> for reusable prompt templates.</p>
+      <div id="prompts-status" style="margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 4px;">
+        Prompts: Not registered
+      </div>
+      <div style="text-align: center;">
+        <button id="register-base-prompts">Register Base Prompts (Bucket A)</button>
+        <button id="register-dynamic-prompt">Register Dynamic Prompt (Bucket B)</button>
+        <button id="unregister-dynamic-prompt" disabled>Unregister Dynamic Prompt</button>
+      </div>
+      <div style="text-align: center; margin-top: 10px;">
+        <button id="list-prompts">List Prompts</button>
+        <button id="get-prompt-without-args">Get Prompt (no args)</button>
+        <button id="get-prompt-with-args">Get Prompt (with args)</button>
+      </div>
+    </div>
+
+    <div class="section">
       <h2>Model Context Testing API</h2>
       <p>Test <code>navigator.modelContextTesting</code> for debugging and testing tool execution.</p>
       <div id="testing-api-status" style="margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 4px;">

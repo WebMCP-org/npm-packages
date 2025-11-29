@@ -4,21 +4,37 @@ import {
   TabServerTransport,
   type TabServerTransportOptions,
 } from '@mcp-b/transports';
-import type { Transport } from '@mcp-b/webmcp-ts-sdk';
+import type {
+  Prompt,
+  PromptMessage,
+  Resource,
+  ResourceContents,
+  Transport,
+} from '@mcp-b/webmcp-ts-sdk';
 import {
   CallToolRequestSchema,
+  GetPromptRequestSchema,
+  ListPromptsRequestSchema,
+  ListResourcesRequestSchema,
   ListToolsRequestSchema,
   Server as McpServer,
+  ReadResourceRequestSchema,
 } from '@mcp-b/webmcp-ts-sdk';
+import type { z } from 'zod';
 import type {
+  InputSchema,
   InternalModelContext,
   MCPBridge,
   ModelContext,
   ModelContextInput,
   ModelContextTesting,
+  PromptDescriptor,
+  ResourceDescriptor,
   ToolCallEvent,
   ToolDescriptor,
   ToolResponse,
+  ValidatedPromptDescriptor,
+  ValidatedResourceDescriptor,
   ValidatedToolDescriptor,
   WebModelContextInitOptions,
   ZodSchemaObject,
@@ -296,6 +312,98 @@ class NativeModelContextAdapter implements InternalModelContext {
       ...(tool.outputSchema && { outputSchema: tool.outputSchema }),
       ...(tool.annotations && { annotations: tool.annotations }),
     }));
+  }
+
+  // ==================== RESOURCE METHODS (not yet supported by native API) ====================
+
+  /**
+   * Registers a resource dynamically.
+   * Note: Native Chromium API does not yet support resources.
+   * This is a polyfill-only feature.
+   */
+  registerResource(_resource: ResourceDescriptor): { unregister: () => void } {
+    console.warn('[Native Adapter] registerResource is not supported by native API');
+    return { unregister: () => {} };
+  }
+
+  /**
+   * Unregisters a resource by URI.
+   * Note: Native Chromium API does not yet support resources.
+   */
+  unregisterResource(_uri: string): void {
+    console.warn('[Native Adapter] unregisterResource is not supported by native API');
+  }
+
+  /**
+   * Lists all registered resources.
+   * Note: Native Chromium API does not yet support resources.
+   */
+  listResources(): Resource[] {
+    return [];
+  }
+
+  /**
+   * Lists all resource templates.
+   * Note: Native Chromium API does not yet support resources.
+   */
+  listResourceTemplates(): Array<{
+    uriTemplate: string;
+    name: string;
+    description?: string;
+    mimeType?: string;
+  }> {
+    return [];
+  }
+
+  /**
+   * Reads a resource by URI.
+   * Note: Native Chromium API does not yet support resources.
+   * @internal
+   */
+  async readResource(_uri: string): Promise<{ contents: ResourceContents[] }> {
+    throw new Error('[Native Adapter] readResource is not supported by native API');
+  }
+
+  // ==================== PROMPT METHODS (not yet supported by native API) ====================
+
+  /**
+   * Registers a prompt dynamically.
+   * Note: Native Chromium API does not yet support prompts.
+   * This is a polyfill-only feature.
+   */
+  registerPrompt<TArgsSchema extends ZodSchemaObject = Record<string, never>>(
+    _prompt: PromptDescriptor<TArgsSchema>
+  ): { unregister: () => void } {
+    console.warn('[Native Adapter] registerPrompt is not supported by native API');
+    return { unregister: () => {} };
+  }
+
+  /**
+   * Unregisters a prompt by name.
+   * Note: Native Chromium API does not yet support prompts.
+   */
+  unregisterPrompt(_name: string): void {
+    console.warn('[Native Adapter] unregisterPrompt is not supported by native API');
+  }
+
+  /**
+   * Lists all registered prompts.
+   * Note: Native Chromium API does not yet support prompts.
+   */
+  listPrompts(): Prompt[] {
+    return [];
+  }
+
+  /**
+   * Gets a prompt with arguments.
+   * Note: Native Chromium API does not yet support prompts.
+   * @internal
+   */
+  async getPrompt(
+    _name: string,
+    _args?: Record<string, unknown>
+  ): Promise<{ messages: PromptMessage[] }> {
+    throw new Error('[Native Adapter] getPrompt is not supported by native API');
   }
 
   /**
@@ -648,10 +756,29 @@ class WebModelContextTesting implements ModelContextTesting {
 class WebModelContext implements InternalModelContext {
   private bridge: MCPBridge;
   private eventTarget: EventTarget;
+
+  // Tool storage (Bucket A = provideContext, Bucket B = dynamic)
   private provideContextTools: Map<string, ValidatedToolDescriptor>;
   private dynamicTools: Map<string, ValidatedToolDescriptor>;
-  private registrationTimestamps: Map<string, number>;
-  private unregisterFunctions: Map<string, () => void>;
+
+  // Resource storage (Bucket A = provideContext, Bucket B = dynamic)
+  private provideContextResources: Map<string, ValidatedResourceDescriptor>;
+  private dynamicResources: Map<string, ValidatedResourceDescriptor>;
+
+  // Prompt storage (Bucket A = provideContext, Bucket B = dynamic)
+  private provideContextPrompts: Map<string, ValidatedPromptDescriptor>;
+  private dynamicPrompts: Map<string, ValidatedPromptDescriptor>;
+
+  // Registration tracking for duplicate detection
+  private toolRegistrationTimestamps: Map<string, number>;
+  private resourceRegistrationTimestamps: Map<string, number>;
+  private promptRegistrationTimestamps: Map<string, number>;
+
+  // Unregister functions for dynamic registrations
+  private toolUnregisterFunctions: Map<string, () => void>;
+  private resourceUnregisterFunctions: Map<string, () => void>;
+  private promptUnregisterFunctions: Map<string, () => void>;
+
   private testingAPI?: WebModelContextTesting;
 
   /**
@@ -662,10 +789,24 @@ class WebModelContext implements InternalModelContext {
   constructor(bridge: MCPBridge) {
     this.bridge = bridge;
     this.eventTarget = new EventTarget();
+
+    // Initialize tool storage
     this.provideContextTools = new Map();
     this.dynamicTools = new Map();
-    this.registrationTimestamps = new Map();
-    this.unregisterFunctions = new Map();
+    this.toolRegistrationTimestamps = new Map();
+    this.toolUnregisterFunctions = new Map();
+
+    // Initialize resource storage
+    this.provideContextResources = new Map();
+    this.dynamicResources = new Map();
+    this.resourceRegistrationTimestamps = new Map();
+    this.resourceUnregisterFunctions = new Map();
+
+    // Initialize prompt storage
+    this.provideContextPrompts = new Map();
+    this.dynamicPrompts = new Map();
+    this.promptRegistrationTimestamps = new Map();
+    this.promptUnregisterFunctions = new Map();
   }
 
   /**
@@ -720,19 +861,28 @@ class WebModelContext implements InternalModelContext {
   }
 
   /**
-   * Provides context (tools) to AI models by registering base tools (Bucket A).
-   * Clears and replaces all previously registered base tools while preserving
-   * dynamic tools registered via registerTool().
+   * Provides context (tools, resources, prompts) to AI models by registering base items (Bucket A).
+   * Clears and replaces all previously registered base items while preserving
+   * dynamic items registered via register* methods.
    *
-   * @param {ModelContextInput} context - Context containing tools to register
-   * @throws {Error} If a tool name collides with an existing dynamic tool
+   * @param {ModelContextInput} context - Context containing tools, resources, and prompts to register
+   * @throws {Error} If a name/uri collides with existing dynamic items
    */
   provideContext(context: ModelContextInput): void {
-    console.log(`[Web Model Context] Registering ${context.tools.length} tools via provideContext`);
+    const toolCount = context.tools?.length ?? 0;
+    const resourceCount = context.resources?.length ?? 0;
+    const promptCount = context.prompts?.length ?? 0;
+    console.log(
+      `[Web Model Context] provideContext: ${toolCount} tools, ${resourceCount} resources, ${promptCount} prompts`
+    );
 
+    // Clear base items (Bucket A)
     this.provideContextTools.clear();
+    this.provideContextResources.clear();
+    this.provideContextPrompts.clear();
 
-    for (const tool of context.tools) {
+    // Register tools
+    for (const tool of context.tools ?? []) {
       if (this.dynamicTools.has(tool.name)) {
         throw new Error(
           `[Web Model Context] Tool name collision: "${tool.name}" is already registered via registerTool(). ` +
@@ -741,7 +891,6 @@ class WebModelContext implements InternalModelContext {
       }
 
       const { jsonSchema: inputJson, zodValidator: inputZod } = normalizeSchema(tool.inputSchema);
-
       const normalizedOutput = tool.outputSchema ? normalizeSchema(tool.outputSchema) : null;
 
       const validatedTool: ValidatedToolDescriptor = {
@@ -758,9 +907,91 @@ class WebModelContext implements InternalModelContext {
       this.provideContextTools.set(tool.name, validatedTool);
     }
 
+    // Register resources
+    for (const resource of context.resources ?? []) {
+      if (this.dynamicResources.has(resource.uri)) {
+        throw new Error(
+          `[Web Model Context] Resource URI collision: "${resource.uri}" is already registered via registerResource(). ` +
+            'Please use a different URI or unregister the dynamic resource first.'
+        );
+      }
+
+      const validatedResource = this.validateResource(resource);
+      this.provideContextResources.set(resource.uri, validatedResource);
+    }
+
+    // Register prompts
+    for (const prompt of context.prompts ?? []) {
+      if (this.dynamicPrompts.has(prompt.name)) {
+        throw new Error(
+          `[Web Model Context] Prompt name collision: "${prompt.name}" is already registered via registerPrompt(). ` +
+            'Please use a different name or unregister the dynamic prompt first.'
+        );
+      }
+
+      const validatedPrompt = this.validatePrompt(prompt);
+      this.provideContextPrompts.set(prompt.name, validatedPrompt);
+    }
+
+    // Update bridge and notify
     this.updateBridgeTools();
+    this.updateBridgeResources();
+    this.updateBridgePrompts();
 
     this.notifyToolsListChanged();
+    this.notifyResourcesListChanged();
+    this.notifyPromptsListChanged();
+  }
+
+  /**
+   * Validates and normalizes a resource descriptor.
+   * @private
+   */
+  private validateResource(resource: ResourceDescriptor): ValidatedResourceDescriptor {
+    // Extract template parameters from URI (e.g., "file://{path}" -> ["path"])
+    const templateParamRegex = /\{([^}]+)\}/g;
+    const templateParams: string[] = [];
+    for (const match of resource.uri.matchAll(templateParamRegex)) {
+      const paramName = match[1];
+      if (paramName) {
+        templateParams.push(paramName);
+      }
+    }
+
+    return {
+      uri: resource.uri,
+      name: resource.name,
+      description: resource.description,
+      mimeType: resource.mimeType,
+      read: resource.read,
+      isTemplate: templateParams.length > 0,
+      templateParams,
+    };
+  }
+
+  /**
+   * Validates and normalizes a prompt descriptor.
+   * @private
+   */
+  private validatePrompt<TArgsSchema extends ZodSchemaObject>(
+    prompt: PromptDescriptor<TArgsSchema>
+  ): ValidatedPromptDescriptor {
+    let argsSchema: InputSchema | undefined;
+    let argsValidator: z.ZodType | undefined;
+
+    if (prompt.argsSchema) {
+      const normalized = normalizeSchema(prompt.argsSchema);
+      argsSchema = normalized.jsonSchema;
+      argsValidator = normalized.zodValidator;
+    }
+
+    return {
+      name: prompt.name,
+      description: prompt.description,
+      argsSchema,
+      get: prompt.get as (args: Record<string, unknown>) => Promise<{ messages: PromptMessage[] }>,
+      argsValidator,
+    };
   }
 
   /**
@@ -778,7 +1009,7 @@ class WebModelContext implements InternalModelContext {
     console.log(`[Web Model Context] Registering tool dynamically: ${tool.name}`);
 
     const now = Date.now();
-    const lastRegistration = this.registrationTimestamps.get(tool.name);
+    const lastRegistration = this.toolRegistrationTimestamps.get(tool.name);
 
     if (lastRegistration && now - lastRegistration < RAPID_DUPLICATE_WINDOW_MS) {
       console.warn(
@@ -786,7 +1017,7 @@ class WebModelContext implements InternalModelContext {
           'This is likely due to React Strict Mode double-mounting. Ignoring duplicate registration.'
       );
 
-      const existingUnregister = this.unregisterFunctions.get(tool.name);
+      const existingUnregister = this.toolUnregisterFunctions.get(tool.name);
       if (existingUnregister) {
         return { unregister: existingUnregister };
       }
@@ -822,11 +1053,8 @@ class WebModelContext implements InternalModelContext {
     };
 
     this.dynamicTools.set(tool.name, validatedTool);
-
-    this.registrationTimestamps.set(tool.name, now);
-
+    this.toolRegistrationTimestamps.set(tool.name, now);
     this.updateBridgeTools();
-
     this.notifyToolsListChanged();
 
     const unregisterFn = () => {
@@ -847,18 +1075,296 @@ class WebModelContext implements InternalModelContext {
       }
 
       this.dynamicTools.delete(tool.name);
-
-      this.registrationTimestamps.delete(tool.name);
-      this.unregisterFunctions.delete(tool.name);
-
+      this.toolRegistrationTimestamps.delete(tool.name);
+      this.toolUnregisterFunctions.delete(tool.name);
       this.updateBridgeTools();
-
       this.notifyToolsListChanged();
     };
 
-    this.unregisterFunctions.set(tool.name, unregisterFn);
+    this.toolUnregisterFunctions.set(tool.name, unregisterFn);
 
     return { unregister: unregisterFn };
+  }
+
+  // ==================== RESOURCE METHODS ====================
+
+  /**
+   * Registers a single resource dynamically (Bucket B).
+   * Dynamic resources persist across provideContext() calls and can be independently managed.
+   *
+   * @param {ResourceDescriptor} resource - The resource descriptor to register
+   * @returns {{unregister: () => void}} Object with unregister function
+   * @throws {Error} If resource URI collides with existing resources
+   */
+  registerResource(resource: ResourceDescriptor): { unregister: () => void } {
+    console.log(`[Web Model Context] Registering resource dynamically: ${resource.uri}`);
+
+    const now = Date.now();
+    const lastRegistration = this.resourceRegistrationTimestamps.get(resource.uri);
+
+    if (lastRegistration && now - lastRegistration < RAPID_DUPLICATE_WINDOW_MS) {
+      console.warn(
+        `[Web Model Context] Resource "${resource.uri}" registered multiple times within ${RAPID_DUPLICATE_WINDOW_MS}ms. ` +
+          'This is likely due to React Strict Mode double-mounting. Ignoring duplicate registration.'
+      );
+
+      const existingUnregister = this.resourceUnregisterFunctions.get(resource.uri);
+      if (existingUnregister) {
+        return { unregister: existingUnregister };
+      }
+    }
+
+    if (this.provideContextResources.has(resource.uri)) {
+      throw new Error(
+        `[Web Model Context] Resource URI collision: "${resource.uri}" is already registered via provideContext(). ` +
+          'Please use a different URI or update your provideContext() call.'
+      );
+    }
+
+    if (this.dynamicResources.has(resource.uri)) {
+      throw new Error(
+        `[Web Model Context] Resource URI collision: "${resource.uri}" is already registered via registerResource(). ` +
+          'Please unregister it first or use a different URI.'
+      );
+    }
+
+    const validatedResource = this.validateResource(resource);
+    this.dynamicResources.set(resource.uri, validatedResource);
+    this.resourceRegistrationTimestamps.set(resource.uri, now);
+    this.updateBridgeResources();
+    this.notifyResourcesListChanged();
+
+    const unregisterFn = () => {
+      console.log(`[Web Model Context] Unregistering resource: ${resource.uri}`);
+
+      if (this.provideContextResources.has(resource.uri)) {
+        throw new Error(
+          `[Web Model Context] Cannot unregister resource "${resource.uri}": ` +
+            'This resource was registered via provideContext(). Use provideContext() to update the base resource set.'
+        );
+      }
+
+      if (!this.dynamicResources.has(resource.uri)) {
+        console.warn(
+          `[Web Model Context] Resource "${resource.uri}" is not registered, ignoring unregister call`
+        );
+        return;
+      }
+
+      this.dynamicResources.delete(resource.uri);
+      this.resourceRegistrationTimestamps.delete(resource.uri);
+      this.resourceUnregisterFunctions.delete(resource.uri);
+      this.updateBridgeResources();
+      this.notifyResourcesListChanged();
+    };
+
+    this.resourceUnregisterFunctions.set(resource.uri, unregisterFn);
+
+    return { unregister: unregisterFn };
+  }
+
+  /**
+   * Unregisters a resource by URI.
+   * Can unregister resources from either Bucket A (provideContext) or Bucket B (registerResource).
+   *
+   * @param {string} uri - URI of the resource to unregister
+   */
+  unregisterResource(uri: string): void {
+    console.log(`[Web Model Context] Unregistering resource: ${uri}`);
+
+    const inProvideContext = this.provideContextResources.has(uri);
+    const inDynamic = this.dynamicResources.has(uri);
+
+    if (!inProvideContext && !inDynamic) {
+      console.warn(
+        `[Web Model Context] Resource "${uri}" is not registered, ignoring unregister call`
+      );
+      return;
+    }
+
+    if (inProvideContext) {
+      this.provideContextResources.delete(uri);
+    }
+
+    if (inDynamic) {
+      this.dynamicResources.delete(uri);
+      this.resourceRegistrationTimestamps.delete(uri);
+      this.resourceUnregisterFunctions.delete(uri);
+    }
+
+    this.updateBridgeResources();
+    this.notifyResourcesListChanged();
+  }
+
+  /**
+   * Lists all registered resources in MCP format.
+   * Returns static resources from both buckets (not templates).
+   *
+   * @returns {Resource[]} Array of resource descriptors
+   */
+  listResources(): Resource[] {
+    return Array.from(this.bridge.resources.values())
+      .filter((r) => !r.isTemplate)
+      .map((resource) => ({
+        uri: resource.uri,
+        name: resource.name,
+        description: resource.description,
+        mimeType: resource.mimeType,
+      }));
+  }
+
+  /**
+   * Lists all registered resource templates.
+   * Returns only resources with URI templates (dynamic resources).
+   *
+   * @returns {Array<{uriTemplate: string, name: string, description?: string, mimeType?: string}>}
+   */
+  listResourceTemplates(): Array<{
+    uriTemplate: string;
+    name: string;
+    description?: string;
+    mimeType?: string;
+  }> {
+    return Array.from(this.bridge.resources.values())
+      .filter((r) => r.isTemplate)
+      .map((resource) => ({
+        uriTemplate: resource.uri,
+        name: resource.name,
+        ...(resource.description !== undefined && { description: resource.description }),
+        ...(resource.mimeType !== undefined && { mimeType: resource.mimeType }),
+      }));
+  }
+
+  // ==================== PROMPT METHODS ====================
+
+  /**
+   * Registers a single prompt dynamically (Bucket B).
+   * Dynamic prompts persist across provideContext() calls and can be independently managed.
+   *
+   * @param {PromptDescriptor} prompt - The prompt descriptor to register
+   * @returns {{unregister: () => void}} Object with unregister function
+   * @throws {Error} If prompt name collides with existing prompts
+   */
+  registerPrompt<TArgsSchema extends ZodSchemaObject = Record<string, never>>(
+    prompt: PromptDescriptor<TArgsSchema>
+  ): { unregister: () => void } {
+    console.log(`[Web Model Context] Registering prompt dynamically: ${prompt.name}`);
+
+    const now = Date.now();
+    const lastRegistration = this.promptRegistrationTimestamps.get(prompt.name);
+
+    if (lastRegistration && now - lastRegistration < RAPID_DUPLICATE_WINDOW_MS) {
+      console.warn(
+        `[Web Model Context] Prompt "${prompt.name}" registered multiple times within ${RAPID_DUPLICATE_WINDOW_MS}ms. ` +
+          'This is likely due to React Strict Mode double-mounting. Ignoring duplicate registration.'
+      );
+
+      const existingUnregister = this.promptUnregisterFunctions.get(prompt.name);
+      if (existingUnregister) {
+        return { unregister: existingUnregister };
+      }
+    }
+
+    if (this.provideContextPrompts.has(prompt.name)) {
+      throw new Error(
+        `[Web Model Context] Prompt name collision: "${prompt.name}" is already registered via provideContext(). ` +
+          'Please use a different name or update your provideContext() call.'
+      );
+    }
+
+    if (this.dynamicPrompts.has(prompt.name)) {
+      throw new Error(
+        `[Web Model Context] Prompt name collision: "${prompt.name}" is already registered via registerPrompt(). ` +
+          'Please unregister it first or use a different name.'
+      );
+    }
+
+    const validatedPrompt = this.validatePrompt(prompt);
+    this.dynamicPrompts.set(prompt.name, validatedPrompt);
+    this.promptRegistrationTimestamps.set(prompt.name, now);
+    this.updateBridgePrompts();
+    this.notifyPromptsListChanged();
+
+    const unregisterFn = () => {
+      console.log(`[Web Model Context] Unregistering prompt: ${prompt.name}`);
+
+      if (this.provideContextPrompts.has(prompt.name)) {
+        throw new Error(
+          `[Web Model Context] Cannot unregister prompt "${prompt.name}": ` +
+            'This prompt was registered via provideContext(). Use provideContext() to update the base prompt set.'
+        );
+      }
+
+      if (!this.dynamicPrompts.has(prompt.name)) {
+        console.warn(
+          `[Web Model Context] Prompt "${prompt.name}" is not registered, ignoring unregister call`
+        );
+        return;
+      }
+
+      this.dynamicPrompts.delete(prompt.name);
+      this.promptRegistrationTimestamps.delete(prompt.name);
+      this.promptUnregisterFunctions.delete(prompt.name);
+      this.updateBridgePrompts();
+      this.notifyPromptsListChanged();
+    };
+
+    this.promptUnregisterFunctions.set(prompt.name, unregisterFn);
+
+    return { unregister: unregisterFn };
+  }
+
+  /**
+   * Unregisters a prompt by name.
+   * Can unregister prompts from either Bucket A (provideContext) or Bucket B (registerPrompt).
+   *
+   * @param {string} name - Name of the prompt to unregister
+   */
+  unregisterPrompt(name: string): void {
+    console.log(`[Web Model Context] Unregistering prompt: ${name}`);
+
+    const inProvideContext = this.provideContextPrompts.has(name);
+    const inDynamic = this.dynamicPrompts.has(name);
+
+    if (!inProvideContext && !inDynamic) {
+      console.warn(
+        `[Web Model Context] Prompt "${name}" is not registered, ignoring unregister call`
+      );
+      return;
+    }
+
+    if (inProvideContext) {
+      this.provideContextPrompts.delete(name);
+    }
+
+    if (inDynamic) {
+      this.dynamicPrompts.delete(name);
+      this.promptRegistrationTimestamps.delete(name);
+      this.promptUnregisterFunctions.delete(name);
+    }
+
+    this.updateBridgePrompts();
+    this.notifyPromptsListChanged();
+  }
+
+  /**
+   * Lists all registered prompts in MCP format.
+   * Returns prompts from both buckets.
+   *
+   * @returns {Prompt[]} Array of prompt descriptors
+   */
+  listPrompts(): Prompt[] {
+    return Array.from(this.bridge.prompts.values()).map((prompt) => ({
+      name: prompt.name,
+      description: prompt.description,
+      arguments: prompt.argsSchema?.properties
+        ? Object.entries(prompt.argsSchema.properties).map(([name, schema]) => ({
+            name,
+            description: (schema as { description?: string }).description,
+            required: prompt.argsSchema?.required?.includes(name) ?? false,
+          }))
+        : undefined,
+    }));
   }
 
   /**
@@ -886,8 +1392,8 @@ class WebModelContext implements InternalModelContext {
 
     if (inDynamic) {
       this.dynamicTools.delete(name);
-      this.registrationTimestamps.delete(name);
-      this.unregisterFunctions.delete(name);
+      this.toolRegistrationTimestamps.delete(name);
+      this.toolUnregisterFunctions.delete(name);
     }
 
     this.updateBridgeTools();
@@ -895,19 +1401,39 @@ class WebModelContext implements InternalModelContext {
   }
 
   /**
-   * Clears all registered tools from both buckets (Chromium native API).
-   * Removes all tools registered via provideContext() and registerTool().
+   * Clears all registered context from both buckets (Chromium native API).
+   * Removes all tools, resources, and prompts registered via provideContext() and register* methods.
    */
   clearContext(): void {
-    console.log('[Web Model Context] Clearing all tools');
+    console.log('[Web Model Context] Clearing all context (tools, resources, prompts)');
 
+    // Clear tools
     this.provideContextTools.clear();
     this.dynamicTools.clear();
-    this.registrationTimestamps.clear();
-    this.unregisterFunctions.clear();
+    this.toolRegistrationTimestamps.clear();
+    this.toolUnregisterFunctions.clear();
 
+    // Clear resources
+    this.provideContextResources.clear();
+    this.dynamicResources.clear();
+    this.resourceRegistrationTimestamps.clear();
+    this.resourceUnregisterFunctions.clear();
+
+    // Clear prompts
+    this.provideContextPrompts.clear();
+    this.dynamicPrompts.clear();
+    this.promptRegistrationTimestamps.clear();
+    this.promptUnregisterFunctions.clear();
+
+    // Update bridge
     this.updateBridgeTools();
+    this.updateBridgeResources();
+    this.updateBridgePrompts();
+
+    // Notify changes
     this.notifyToolsListChanged();
+    this.notifyResourcesListChanged();
+    this.notifyPromptsListChanged();
   }
 
   /**
@@ -955,6 +1481,214 @@ class WebModelContext implements InternalModelContext {
 
     if (this.testingAPI && 'notifyToolsChanged' in this.testingAPI) {
       (this.testingAPI as WebModelContextTesting).notifyToolsChanged();
+    }
+  }
+
+  /**
+   * Updates the bridge resources map with merged resources from both buckets.
+   *
+   * @private
+   */
+  private updateBridgeResources(): void {
+    this.bridge.resources.clear();
+
+    for (const [uri, resource] of this.provideContextResources) {
+      this.bridge.resources.set(uri, resource);
+    }
+
+    for (const [uri, resource] of this.dynamicResources) {
+      this.bridge.resources.set(uri, resource);
+    }
+
+    console.log(
+      `[Web Model Context] Updated bridge with ${this.provideContextResources.size} base resources + ${this.dynamicResources.size} dynamic resources = ${this.bridge.resources.size} total`
+    );
+  }
+
+  /**
+   * Notifies all servers that the resources list has changed.
+   *
+   * @private
+   */
+  private notifyResourcesListChanged(): void {
+    if (this.bridge.tabServer.notification) {
+      this.bridge.tabServer.notification({
+        method: 'notifications/resources/list_changed',
+        params: {},
+      });
+    }
+
+    if (this.bridge.iframeServer?.notification) {
+      this.bridge.iframeServer.notification({
+        method: 'notifications/resources/list_changed',
+        params: {},
+      });
+    }
+  }
+
+  /**
+   * Updates the bridge prompts map with merged prompts from both buckets.
+   *
+   * @private
+   */
+  private updateBridgePrompts(): void {
+    this.bridge.prompts.clear();
+
+    for (const [name, prompt] of this.provideContextPrompts) {
+      this.bridge.prompts.set(name, prompt);
+    }
+
+    for (const [name, prompt] of this.dynamicPrompts) {
+      this.bridge.prompts.set(name, prompt);
+    }
+
+    console.log(
+      `[Web Model Context] Updated bridge with ${this.provideContextPrompts.size} base prompts + ${this.dynamicPrompts.size} dynamic prompts = ${this.bridge.prompts.size} total`
+    );
+  }
+
+  /**
+   * Notifies all servers that the prompts list has changed.
+   *
+   * @private
+   */
+  private notifyPromptsListChanged(): void {
+    if (this.bridge.tabServer.notification) {
+      this.bridge.tabServer.notification({
+        method: 'notifications/prompts/list_changed',
+        params: {},
+      });
+    }
+
+    if (this.bridge.iframeServer?.notification) {
+      this.bridge.iframeServer.notification({
+        method: 'notifications/prompts/list_changed',
+        params: {},
+      });
+    }
+  }
+
+  /**
+   * Reads a resource by URI (internal use only by MCP bridge).
+   * Handles both static resources and URI templates.
+   *
+   * @param {string} uri - The URI of the resource to read
+   * @returns {Promise<{contents: ResourceContents[]}>} The resource contents
+   * @throws {Error} If resource is not found
+   * @internal
+   */
+  async readResource(uri: string): Promise<{ contents: ResourceContents[] }> {
+    console.log(`[Web Model Context] Reading resource: ${uri}`);
+
+    // First, try to find an exact match (static resource)
+    const staticResource = this.bridge.resources.get(uri);
+    if (staticResource && !staticResource.isTemplate) {
+      try {
+        const parsedUri = new URL(uri);
+        return await staticResource.read(parsedUri);
+      } catch (error) {
+        console.error(`[Web Model Context] Error reading resource ${uri}:`, error);
+        throw error;
+      }
+    }
+
+    // Try to match against URI templates
+    for (const resource of this.bridge.resources.values()) {
+      if (!resource.isTemplate) continue;
+
+      const params = this.matchUriTemplate(resource.uri, uri);
+      if (params) {
+        try {
+          const parsedUri = new URL(uri);
+          return await resource.read(parsedUri, params);
+        } catch (error) {
+          console.error(`[Web Model Context] Error reading resource ${uri}:`, error);
+          throw error;
+        }
+      }
+    }
+
+    throw new Error(`Resource not found: ${uri}`);
+  }
+
+  /**
+   * Matches a URI against a URI template and extracts parameters.
+   *
+   * @param {string} template - The URI template (e.g., "file://{path}")
+   * @param {string} uri - The actual URI to match
+   * @returns {Record<string, string> | null} Extracted parameters or null if no match
+   * @private
+   */
+  private matchUriTemplate(template: string, uri: string): Record<string, string> | null {
+    // Convert template to regex pattern
+    // e.g., "file://{path}" -> "^file://(.+)$" with capture group for "path"
+    const paramNames: string[] = [];
+    let regexPattern = template.replace(/[.*+?^${}()|[\]\\]/g, (char) => {
+      // Don't escape { and } - we'll handle them specially
+      if (char === '{' || char === '}') return char;
+      return `\\${char}`;
+    });
+
+    // Replace {param} with capture groups
+    regexPattern = regexPattern.replace(/\{([^}]+)\}/g, (_, paramName) => {
+      paramNames.push(paramName);
+      return '(.+)';
+    });
+
+    const regex = new RegExp(`^${regexPattern}$`);
+    const match = uri.match(regex);
+
+    if (!match) return null;
+
+    const params: Record<string, string> = {};
+    for (let i = 0; i < paramNames.length; i++) {
+      const paramName = paramNames[i];
+      const paramValue = match[i + 1];
+      if (paramName !== undefined && paramValue !== undefined) {
+        params[paramName] = paramValue;
+      }
+    }
+
+    return params;
+  }
+
+  /**
+   * Gets a prompt with arguments (internal use only by MCP bridge).
+   *
+   * @param {string} name - Name of the prompt
+   * @param {Record<string, unknown>} args - Arguments to pass to the prompt
+   * @returns {Promise<{messages: PromptMessage[]}>} The prompt messages
+   * @throws {Error} If prompt is not found
+   * @internal
+   */
+  async getPrompt(
+    name: string,
+    args?: Record<string, unknown>
+  ): Promise<{ messages: PromptMessage[] }> {
+    console.log(`[Web Model Context] Getting prompt: ${name}`);
+
+    const prompt = this.bridge.prompts.get(name);
+    if (!prompt) {
+      throw new Error(`Prompt not found: ${name}`);
+    }
+
+    // Validate arguments if schema is defined
+    if (prompt.argsValidator && args) {
+      const validation = validateWithZod(args, prompt.argsValidator);
+      if (!validation.success) {
+        console.error(
+          `[Web Model Context] Argument validation failed for prompt ${name}:`,
+          validation.error
+        );
+        throw new Error(`Argument validation error for prompt "${name}":\n${validation.error}`);
+      }
+    }
+
+    try {
+      return await prompt.get(args ?? {});
+    } catch (error) {
+      console.error(`[Web Model Context] Error getting prompt ${name}:`, error);
+      throw error;
     }
   }
 
@@ -1086,6 +1820,7 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
   const transportOptions = options?.transport;
 
   const setupServerHandlers = (server: McpServer, bridge: MCPBridge) => {
+    // ==================== TOOL HANDLERS ====================
     server.setRequestHandler(ListToolsRequestSchema, async () => {
       console.log('[MCP Bridge] Handling list_tools request');
       return {
@@ -1110,6 +1845,50 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
         throw error;
       }
     });
+
+    // ==================== RESOURCE HANDLERS ====================
+    server.setRequestHandler(ListResourcesRequestSchema, async () => {
+      console.log('[MCP Bridge] Handling list_resources request');
+      return {
+        resources: bridge.modelContext.listResources(),
+        // Note: Resource templates are included in the resources list as the MCP SDK
+        // doesn't export ListResourceTemplatesRequestSchema separately.
+        // Clients can identify templates by checking for URI patterns containing {param}.
+      };
+    });
+
+    server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+      console.log(`[MCP Bridge] Handling read_resource request: ${request.params.uri}`);
+
+      try {
+        return await bridge.modelContext.readResource(request.params.uri);
+      } catch (error) {
+        console.error(`[MCP Bridge] Error reading resource ${request.params.uri}:`, error);
+        throw error;
+      }
+    });
+
+    // ==================== PROMPT HANDLERS ====================
+    server.setRequestHandler(ListPromptsRequestSchema, async () => {
+      console.log('[MCP Bridge] Handling list_prompts request');
+      return {
+        prompts: bridge.modelContext.listPrompts(),
+      };
+    });
+
+    server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+      console.log(`[MCP Bridge] Handling get_prompt request: ${request.params.name}`);
+
+      try {
+        return await bridge.modelContext.getPrompt(
+          request.params.name,
+          request.params.arguments as Record<string, unknown> | undefined
+        );
+      } catch (error) {
+        console.error(`[MCP Bridge] Error getting prompt ${request.params.name}:`, error);
+        throw error;
+      }
+    });
   };
 
   const customTransport: Transport | undefined = transportOptions?.create?.();
@@ -1124,9 +1903,9 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
       },
       {
         capabilities: {
-          tools: {
-            listChanged: true,
-          },
+          tools: { listChanged: true },
+          resources: { listChanged: true },
+          prompts: { listChanged: true },
         },
       }
     );
@@ -1134,6 +1913,8 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
     const bridge: MCPBridge = {
       tabServer: server,
       tools: new Map(),
+      resources: new Map(),
+      prompts: new Map(),
       modelContext: undefined as unknown as InternalModelContext,
       isInitialized: true,
     };
@@ -1158,9 +1939,9 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
     },
     {
       capabilities: {
-        tools: {
-          listChanged: true,
-        },
+        tools: { listChanged: true },
+        resources: { listChanged: true },
+        prompts: { listChanged: true },
       },
     }
   );
@@ -1168,6 +1949,8 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
   const bridge: MCPBridge = {
     tabServer,
     tools: new Map(),
+    resources: new Map(),
+    prompts: new Map(),
     modelContext: undefined as unknown as InternalModelContext,
     isInitialized: true,
   };
@@ -1206,9 +1989,9 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
       },
       {
         capabilities: {
-          tools: {
-            listChanged: true,
-          },
+          tools: { listChanged: true },
+          resources: { listChanged: true },
+          prompts: { listChanged: true },
         },
       }
     );

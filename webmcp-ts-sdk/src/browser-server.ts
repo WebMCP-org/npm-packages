@@ -5,26 +5,26 @@ import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type { Implementation } from '@modelcontextprotocol/sdk/types.js';
 
 /**
- * Browser-optimized MCP Server for Web Model Context API (window.agent).
+ * Browser-optimized MCP Server for Web Model Context API (navigator.modelContext).
  *
- * This class extends McpServer to support dynamic tool registration after
- * transport connection, which is required for the Web Model Context API
- * where tools are registered via window.agent.provideContext() at any time.
+ * This class extends McpServer to support dynamic registration of tools, resources,
+ * and prompts after transport connection, which is required for the Web Model Context API
+ * where items are registered via navigator.modelContext.provideContext() at any time.
  *
  * Key differences from base McpServer:
- * - Pre-registers tool capabilities before connection
- * - Allows tools to be registered after transport is connected
- * - Designed for browser environments where tools arrive asynchronously
+ * - Pre-registers tool, resource, and prompt capabilities before connection
+ * - Allows items to be registered after transport is connected
+ * - Designed for browser environments where items arrive asynchronously
  */
 export class BrowserMcpServer extends BaseMcpServer {
   constructor(serverInfo: Implementation, options?: ServerOptions) {
-    // Ensure tools capability is registered from the start
+    // Ensure tools, resources, and prompts capabilities are registered from the start
     const enhancedOptions: ServerOptions = {
       ...options,
       capabilities: mergeCapabilities(options?.capabilities || {}, {
-        tools: {
-          listChanged: true,
-        },
+        tools: { listChanged: true },
+        resources: { listChanged: true },
+        prompts: { listChanged: true },
       }),
     };
 
@@ -32,11 +32,11 @@ export class BrowserMcpServer extends BaseMcpServer {
   }
 
   /**
-   * Override connect to ensure tool request handlers are initialized
+   * Override connect to ensure request handlers are initialized
    * BEFORE the transport connection is established.
    *
    * This prevents the "Cannot register capabilities after connecting to transport"
-   * error when tools are registered dynamically after connection.
+   * error when items are registered dynamically after connection.
    */
   override async connect(transport: Transport): Promise<void> {
     // Call setToolRequestHandlers() BEFORE connecting the transport

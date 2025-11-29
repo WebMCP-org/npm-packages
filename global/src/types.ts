@@ -2,76 +2,203 @@ import type { IframeChildTransportOptions, TabServerTransportOptions } from '@mc
 import type {
   CallToolResult,
   Server as McpServer,
+  Prompt,
+  PromptMessage,
+  Resource,
+  ResourceContents,
+  ResourceTemplate,
   ToolAnnotations,
   Transport,
 } from '@mcp-b/webmcp-ts-sdk';
 import type { z } from 'zod';
 
+// ============================================================================
+// MCP SDK Type Re-exports
+// ============================================================================
+// Re-export MCP SDK types for consumer convenience. These are the canonical
+// types from the Model Context Protocol specification.
+
 /**
- * JSON Schema definition for tool input parameters
+ * Re-export Resource type from MCP SDK.
+ * Represents a resource that can be read by AI models.
+ * @see {@link https://spec.modelcontextprotocol.io/specification/server/resources/}
+ */
+export type { Resource };
+
+/**
+ * Re-export ResourceContents type from MCP SDK.
+ * Represents the contents returned when reading a resource.
+ * @see {@link https://spec.modelcontextprotocol.io/specification/server/resources/}
+ */
+export type { ResourceContents };
+
+/**
+ * Re-export ResourceTemplate type from MCP SDK.
+ * Represents a URI template for dynamic resources.
+ * @see {@link https://spec.modelcontextprotocol.io/specification/server/resources/}
+ */
+export type { ResourceTemplate };
+
+/**
+ * Re-export Prompt type from MCP SDK.
+ * Represents a reusable prompt template.
+ * @see {@link https://spec.modelcontextprotocol.io/specification/server/prompts/}
+ */
+export type { Prompt };
+
+/**
+ * Re-export PromptMessage type from MCP SDK.
+ * Represents a message within a prompt.
+ * @see {@link https://spec.modelcontextprotocol.io/specification/server/prompts/}
+ */
+export type { PromptMessage };
+
+// ============================================================================
+// Schema Types
+// ============================================================================
+
+/**
+ * JSON Schema definition for tool/prompt input parameters.
+ *
+ * This interface represents a JSON Schema object as defined by the JSON Schema
+ * specification. It's used for defining tool input schemas and prompt argument
+ * schemas when not using Zod.
+ *
+ * @see {@link https://json-schema.org/}
+ *
+ * @example
+ * ```typescript
+ * const schema: InputSchema = {
+ *   type: 'object',
+ *   properties: {
+ *     query: { type: 'string', description: 'Search query' },
+ *     limit: { type: 'number', description: 'Max results' }
+ *   },
+ *   required: ['query']
+ * };
+ * ```
  */
 export interface InputSchema {
+  /** The JSON Schema type (typically "object" for tool inputs) */
   type: string;
+  /** Property definitions for object schemas */
   properties?: Record<
     string,
     {
+      /** The property type */
       type: string;
+      /** Human-readable description of the property */
       description?: string;
+      /** Additional JSON Schema keywords */
       [key: string]: unknown;
     }
   >;
+  /** Array of required property names */
   required?: string[];
+  /** Additional JSON Schema keywords */
   [key: string]: unknown;
 }
 
 /**
- * Zod schema object type (Record<string, ZodType>)
- * Used for type-safe tool definitions
+ * Zod schema object type for type-safe tool and prompt definitions.
+ *
+ * When using Zod schemas instead of JSON Schema, define your schema as an object
+ * where keys are parameter names and values are Zod type definitions.
+ *
+ * @example
+ * ```typescript
+ * import { z } from 'zod';
+ *
+ * const mySchema: ZodSchemaObject = {
+ *   query: z.string().describe('Search query'),
+ *   limit: z.number().optional().describe('Max results')
+ * };
+ * ```
  */
 export type ZodSchemaObject = Record<string, z.ZodTypeAny>;
 
 /**
- * Re-export ToolAnnotations from MCP SDK for convenience
+ * Re-export ToolAnnotations from MCP SDK.
+ * Provides hints about tool behavior (e.g., destructive, idempotent).
+ * @see {@link https://spec.modelcontextprotocol.io/specification/server/tools/}
  */
 export type { ToolAnnotations };
 
 /**
- * Re-export CallToolResult from MCP SDK for convenience
+ * Re-export CallToolResult from MCP SDK.
+ * The result returned from tool execution.
+ * @see {@link https://spec.modelcontextprotocol.io/specification/server/tools/}
  */
 export type { CallToolResult };
 
 /**
- * Tool response format (Web API version)
- * This is compatible with MCP SDK's CallToolResult
+ * Tool response format for the Web Model Context API.
+ * This is an alias for MCP SDK's CallToolResult for API consistency.
+ * @see {@link CallToolResult}
  */
 export type ToolResponse = CallToolResult;
 
+// ============================================================================
+// Configuration Types
+// ============================================================================
+
 /**
  * Transport configuration for initializing the Web Model Context polyfill.
+ *
+ * The polyfill supports multiple transport modes:
+ * - **Custom transport**: Provide your own MCP transport implementation
+ * - **Tab server**: Same-window communication via postMessage
+ * - **Iframe server**: Parent-child iframe communication
+ *
+ * @example Custom transport
+ * ```typescript
+ * const config: TransportConfiguration = {
+ *   create: () => new MyCustomTransport()
+ * };
+ * ```
+ *
+ * @example Configure allowed origins
+ * ```typescript
+ * const config: TransportConfiguration = {
+ *   tabServer: { allowedOrigins: ['https://example.com'] },
+ *   iframeServer: false // disable iframe server
+ * };
+ * ```
  */
 export interface TransportConfiguration {
   /**
-   * Provide a custom transport factory. When set, tabServer and iframeServer options are ignored.
+   * Provide a custom transport factory.
+   * When set, tabServer and iframeServer options are ignored.
    */
   create?: () => Transport;
 
   /**
    * Options passed to the built-in TabServerTransport when no custom factory is provided.
-   * Set to false to disable the tab server.
-   * Default: enabled with allowedOrigins: ['*']
+   * Set to `false` to disable the tab server.
+   * @default { allowedOrigins: ['*'] }
    */
   tabServer?: Partial<TabServerTransportOptions> | false;
 
   /**
    * Options passed to the built-in IframeChildTransport when no custom factory is provided.
-   * Set to false to disable the iframe server.
-   * Default: auto-enabled when running in an iframe (window.parent !== window)
+   * Set to `false` to disable the iframe server.
+   * @default Auto-enabled when `window.parent !== window`
    */
   iframeServer?: Partial<IframeChildTransportOptions> | false;
 }
 
 /**
  * Initialization options for the Web Model Context polyfill.
+ *
+ * @example
+ * ```typescript
+ * initializeWebModelContext({
+ *   autoInitialize: true,
+ *   transport: {
+ *     tabServer: { allowedOrigins: ['https://trusted.com'] }
+ *   }
+ * });
+ * ```
  */
 export interface WebModelContextInitOptions {
   /**
@@ -80,19 +207,56 @@ export interface WebModelContextInitOptions {
   transport?: TransportConfiguration;
 
   /**
-   * When set to false, automatic initialization on module load is skipped.
+   * When set to `false`, automatic initialization on module load is skipped.
+   * Useful when you need to configure options before initialization.
+   * @default true
    */
   autoInitialize?: boolean;
 }
 
+// ============================================================================
+// Tool Types
+// ============================================================================
+
 /**
- * Tool descriptor for Web Model Context API
- * Extended with full MCP protocol support
+ * Tool descriptor for the Web Model Context API.
  *
- * Supports both JSON Schema (Web standard) and Zod schemas (type-safe)
+ * Tools are functions that AI models can call to perform actions or retrieve
+ * information. This interface supports both JSON Schema (Web standard) and
+ * Zod schemas (type-safe) for input/output validation.
  *
- * @template TInputSchema - If using Zod, the schema object type for type inference
- * @template TOutputSchema - If using Zod, the output schema object type
+ * @template TInputSchema - Zod schema object type for input type inference
+ * @template TOutputSchema - Zod schema object type for output type inference
+ *
+ * @see {@link https://spec.modelcontextprotocol.io/specification/server/tools/}
+ *
+ * @example JSON Schema
+ * ```typescript
+ * const tool: ToolDescriptor = {
+ *   name: 'search',
+ *   description: 'Search the web',
+ *   inputSchema: {
+ *     type: 'object',
+ *     properties: { query: { type: 'string' } },
+ *     required: ['query']
+ *   },
+ *   execute: async ({ query }) => ({
+ *     content: [{ type: 'text', text: `Results for: ${query}` }]
+ *   })
+ * };
+ * ```
+ *
+ * @example Zod Schema (type-safe)
+ * ```typescript
+ * const tool: ToolDescriptor<{ query: z.ZodString }> = {
+ *   name: 'search',
+ *   description: 'Search the web',
+ *   inputSchema: { query: z.string() },
+ *   execute: async ({ query }) => ({ // query is typed as string
+ *     content: [{ type: 'text', text: `Results for: ${query}` }]
+ *   })
+ * };
+ * ```
  */
 export interface ToolDescriptor<
   TInputSchema extends ZodSchemaObject = Record<string, never>,
@@ -143,9 +307,10 @@ export interface ToolDescriptor<
 }
 
 /**
- * Internal validated tool descriptor (used internally by the bridge)
- * Always stores JSON Schema format for MCP protocol
- * Plus Zod validators for runtime validation
+ * Internal validated tool descriptor (used internally by the bridge).
+ * Always stores JSON Schema format for MCP protocol compatibility,
+ * plus Zod validators for runtime validation.
+ * @internal
  */
 export interface ValidatedToolDescriptor {
   name: string;
@@ -155,21 +320,260 @@ export interface ValidatedToolDescriptor {
   annotations?: ToolAnnotations;
   execute: (args: Record<string, unknown>) => Promise<ToolResponse>;
 
-  // Internal validators (not exposed via MCP)
+  /** Zod validator for input arguments (not exposed via MCP) */
   inputValidator: z.ZodType;
+  /** Zod validator for output (not exposed via MCP) */
   outputValidator?: z.ZodType;
 }
 
+// ============================================================================
+// Resource Types
+// ============================================================================
+
 /**
- * Context provided to models via provideContext()
- * Contains the base set of tools (Bucket A)
+ * Resource descriptor for Web Model Context API
+ * Defines a resource that can be read by AI models
+ *
+ * Resources can be:
+ * - Static: Fixed URI like "config://app-settings"
+ * - Dynamic: URI template like "file://{path}" where {path} is a parameter
+ *
+ * @example Static resource
+ * ```typescript
+ * const configResource: ResourceDescriptor = {
+ *   uri: 'config://app-settings',
+ *   name: 'App Settings',
+ *   description: 'Application configuration',
+ *   mimeType: 'application/json',
+ *   read: async (uri) => ({
+ *     contents: [{ uri: uri.href, text: JSON.stringify(config) }]
+ *   })
+ * };
+ * ```
+ *
+ * @example Dynamic resource with URI template
+ * ```typescript
+ * const fileResource: ResourceDescriptor = {
+ *   uri: 'file://{path}',
+ *   name: 'File Reader',
+ *   description: 'Read files from the virtual filesystem',
+ *   read: async (uri, params) => ({
+ *     contents: [{ uri: uri.href, text: await readFile(params?.path ?? '') }]
+ *   })
+ * };
+ * ```
+ */
+export interface ResourceDescriptor {
+  /**
+   * The resource URI or URI template
+   * - Static: "config://app-settings"
+   * - Template: "file://{path}" where {path} becomes a parameter
+   */
+  uri: string;
+
+  /**
+   * Human-readable name for the resource
+   */
+  name: string;
+
+  /**
+   * Optional description of what the resource provides
+   */
+  description?: string;
+
+  /**
+   * Optional MIME type of the resource content
+   */
+  mimeType?: string;
+
+  /**
+   * Function that reads and returns the resource content
+   *
+   * @param uri - The resolved URI being requested
+   * @param params - Parameters extracted from URI template (if applicable)
+   * @returns Resource contents with the data
+   */
+  read: (uri: URL, params?: Record<string, string>) => Promise<{ contents: ResourceContents[] }>;
+}
+
+/**
+ * Internal validated resource descriptor (used internally by the bridge).
+ * @internal
+ */
+export interface ValidatedResourceDescriptor {
+  uri: string;
+  name: string;
+  description: string | undefined;
+  mimeType: string | undefined;
+  read: (uri: URL, params?: Record<string, string>) => Promise<{ contents: ResourceContents[] }>;
+
+  /** Whether this is a URI template (contains {param} placeholders) */
+  isTemplate: boolean;
+
+  /** Parameter names extracted from URI template (e.g., ['path'] for 'file://{path}') */
+  templateParams: string[];
+}
+
+// ============================================================================
+// Prompt Types
+// ============================================================================
+
+/**
+ * Prompt descriptor for Web Model Context API
+ * Defines a reusable prompt template for AI interactions
+ *
+ * Prompts help users interact with AI models by providing
+ * pre-defined message templates. They can accept arguments
+ * to customize the prompt dynamically.
+ *
+ * @template TArgsSchema - If using Zod, the schema object type for argument inference
+ *
+ * @example Simple prompt without arguments
+ * ```typescript
+ * const helpPrompt: PromptDescriptor = {
+ *   name: 'help',
+ *   description: 'Get help with using the application',
+ *   get: async () => ({
+ *     messages: [{
+ *       role: 'user',
+ *       content: { type: 'text', text: 'How do I use this application?' }
+ *     }]
+ *   })
+ * };
+ * ```
+ *
+ * @example Prompt with typed arguments
+ * ```typescript
+ * const reviewPrompt: PromptDescriptor<{ code: z.ZodString }> = {
+ *   name: 'review-code',
+ *   description: 'Review code for best practices',
+ *   argsSchema: { code: z.string() },
+ *   get: async ({ code }) => ({
+ *     messages: [{
+ *       role: 'user',
+ *       content: { type: 'text', text: `Please review this code:\n\n${code}` }
+ *     }]
+ *   })
+ * };
+ * ```
+ */
+export interface PromptDescriptor<TArgsSchema extends ZodSchemaObject = Record<string, never>> {
+  /**
+   * Unique identifier for the prompt
+   */
+  name: string;
+
+  /**
+   * Optional description of what the prompt does
+   */
+  description?: string;
+
+  /**
+   * Optional schema for prompt arguments
+   * Accepts EITHER:
+   * - JSON Schema object: { type: "object", properties: {...} }
+   * - Zod schema object: { code: z.string(), language: z.enum([...]) }
+   */
+  argsSchema?: InputSchema | TArgsSchema;
+
+  /**
+   * Function that generates prompt messages
+   *
+   * @param args - Arguments matching the argsSchema (if defined)
+   * @returns Object containing the prompt messages
+   */
+  get: (
+    args: TArgsSchema extends Record<string, never>
+      ? Record<string, unknown>
+      : z.infer<z.ZodObject<TArgsSchema>>
+  ) => Promise<{ messages: PromptMessage[] }>;
+}
+
+/**
+ * Internal validated prompt descriptor (used internally by the bridge).
+ * @internal
+ */
+export interface ValidatedPromptDescriptor {
+  name: string;
+  description: string | undefined;
+  argsSchema: InputSchema | undefined;
+  get: (args: Record<string, unknown>) => Promise<{ messages: PromptMessage[] }>;
+
+  /** Zod validator for arguments (not exposed via MCP) */
+  argsValidator: z.ZodType | undefined;
+}
+
+// ============================================================================
+// Return Types (for API cleanliness)
+// ============================================================================
+
+/**
+ * Tool information returned by listTools().
+ * Provides metadata about a registered tool without exposing the execute function.
+ */
+export interface ToolListItem {
+  /** Unique identifier for the tool */
+  name: string;
+  /** Natural language description of what the tool does */
+  description: string;
+  /** JSON Schema for tool input parameters */
+  inputSchema: InputSchema;
+  /** Optional JSON Schema for tool output */
+  outputSchema?: InputSchema;
+  /** Optional annotations providing hints about tool behavior */
+  annotations?: ToolAnnotations;
+}
+
+/**
+ * Resource template information returned by listResourceTemplates().
+ * Describes a dynamic resource with URI template parameters.
+ */
+export interface ResourceTemplateInfo {
+  /** The URI template (e.g., 'file://{path}') */
+  uriTemplate: string;
+  /** Human-readable name for the resource */
+  name: string;
+  /** Optional description of what the resource provides */
+  description?: string;
+  /** Optional MIME type of the resource content */
+  mimeType?: string;
+}
+
+/**
+ * Registration handle returned by registerTool, registerResource, registerPrompt.
+ * Provides a method to unregister the item.
+ */
+export interface RegistrationHandle {
+  /** Unregister the item, removing it from the context */
+  unregister: () => void;
+}
+
+// ============================================================================
+// Model Context Types
+// ============================================================================
+
+/**
+ * Context provided to models via provideContext().
+ * Contains the base set of tools, resources, and prompts (Bucket A).
  */
 export interface ModelContextInput {
   /**
    * Array of tool descriptors
    * Supports both JSON Schema and Zod schema formats
    */
-  tools: ToolDescriptor[];
+  tools?: ToolDescriptor[];
+
+  /**
+   * Array of resource descriptors
+   * Resources expose data that AI models can read
+   */
+  resources?: ResourceDescriptor[];
+
+  /**
+   * Array of prompt descriptors
+   * Prompts provide reusable message templates
+   */
+  prompts?: PromptDescriptor[];
 }
 
 /**
@@ -198,25 +602,23 @@ export interface ToolCallEvent extends Event {
  */
 export interface ModelContext {
   /**
-   * Provide context (tools) to AI models
-   * Clears base tools (Bucket A) and replaces with the provided array.
-   * Dynamic tools (Bucket B) registered via registerTool() persist.
+   * Provide context (tools, resources, prompts) to AI models
+   * Clears base items (Bucket A) and replaces with the provided arrays.
+   * Dynamic items (Bucket B) registered via register* methods persist.
    */
   provideContext(context: ModelContextInput): void;
 
+  // ==================== TOOLS ====================
+
   /**
-   * Register a single tool dynamically
-   * Returns an object with an unregister function to remove the tool
-   * Supports both JSON Schema and Zod schema formats
+   * Register a single tool dynamically.
+   * Returns a handle to unregister the tool.
+   * Supports both JSON Schema and Zod schema formats.
    */
   registerTool<
     TInputSchema extends ZodSchemaObject = Record<string, never>,
     TOutputSchema extends ZodSchemaObject = Record<string, never>,
-  >(
-    tool: ToolDescriptor<TInputSchema, TOutputSchema>
-  ): {
-    unregister: () => void;
-  };
+  >(tool: ToolDescriptor<TInputSchema, TOutputSchema>): RegistrationHandle;
 
   /**
    * Unregister a tool by name
@@ -225,7 +627,62 @@ export interface ModelContext {
   unregisterTool(name: string): void;
 
   /**
-   * Clear all registered tools (both buckets)
+   * Get the list of all registered tools.
+   * Returns tools from both buckets (provideContext and registerTool).
+   */
+  listTools(): ToolListItem[];
+
+  // ==================== RESOURCES ====================
+
+  /**
+   * Register a single resource dynamically.
+   * Returns a handle to unregister the resource.
+   */
+  registerResource(resource: ResourceDescriptor): RegistrationHandle;
+
+  /**
+   * Unregister a resource by URI
+   */
+  unregisterResource(uri: string): void;
+
+  /**
+   * Get the list of all registered resources
+   * Returns resources from both buckets (provideContext and registerResource)
+   */
+  listResources(): Resource[];
+
+  /**
+   * Get the list of all resource templates.
+   * Returns only resources with URI templates (dynamic resources).
+   */
+  listResourceTemplates(): ResourceTemplateInfo[];
+
+  // ==================== PROMPTS ====================
+
+  /**
+   * Register a single prompt dynamically.
+   * Returns a handle to unregister the prompt.
+   * Supports both JSON Schema and Zod schema formats for argsSchema.
+   */
+  registerPrompt<TArgsSchema extends ZodSchemaObject = Record<string, never>>(
+    prompt: PromptDescriptor<TArgsSchema>
+  ): RegistrationHandle;
+
+  /**
+   * Unregister a prompt by name
+   */
+  unregisterPrompt(name: string): void;
+
+  /**
+   * Get the list of all registered prompts
+   * Returns prompts from both buckets (provideContext and registerPrompt)
+   */
+  listPrompts(): Prompt[];
+
+  // ==================== GENERAL ====================
+
+  /**
+   * Clear all registered context (tools, resources, prompts from both buckets)
    * Available in Chromium's native implementation
    */
   clearContext(): void;
@@ -252,23 +709,16 @@ export interface ModelContext {
    * Dispatch an event
    */
   dispatchEvent(event: Event): boolean;
-
-  /**
-   * Get the list of all registered tools
-   * Returns tools from both buckets (provideContext and registerTool)
-   */
-  listTools(): Array<{
-    name: string;
-    description: string;
-    inputSchema: InputSchema;
-    outputSchema?: InputSchema;
-    annotations?: ToolAnnotations;
-  }>;
 }
 
+// ============================================================================
+// Internal/Bridge Types
+// ============================================================================
+
 /**
- * Internal ModelContext interface with additional methods for MCP bridge
- * Not exposed as part of the public Web Model Context API
+ * Internal ModelContext interface with additional methods for MCP bridge.
+ * Not exposed as part of the public Web Model Context API.
+ * @internal
  */
 export interface InternalModelContext extends ModelContext {
   /**
@@ -276,23 +726,51 @@ export interface InternalModelContext extends ModelContext {
    * @internal
    */
   executeTool(toolName: string, args: Record<string, unknown>): Promise<ToolResponse>;
+
+  /**
+   * Read a resource by URI (internal use only by MCP bridge)
+   * @internal
+   */
+  readResource(uri: string): Promise<{ contents: ResourceContents[] }>;
+
+  /**
+   * Get a prompt with arguments (internal use only by MCP bridge)
+   * @internal
+   */
+  getPrompt(name: string, args?: Record<string, unknown>): Promise<{ messages: PromptMessage[] }>;
 }
 
 /**
- * Internal MCP Bridge state
+ * Internal MCP Bridge state.
+ * Contains the MCP servers and registered context items.
+ * @internal
  */
 export interface MCPBridge {
+  /** The main tab server transport */
   tabServer: McpServer;
+  /** Optional iframe server transport */
   iframeServer?: McpServer;
+  /** Map of tool name -> validated tool descriptor */
   tools: Map<string, ValidatedToolDescriptor>;
+  /** Map of resource URI -> validated resource descriptor */
+  resources: Map<string, ValidatedResourceDescriptor>;
+  /** Map of prompt name -> validated prompt descriptor */
+  prompts: Map<string, ValidatedPromptDescriptor>;
+  /** The internal model context instance */
   modelContext: InternalModelContext;
+  /** Optional testing API instance */
   modelContextTesting?: ModelContextTesting;
+  /** Whether the bridge has been initialized */
   isInitialized: boolean;
 }
 
+// ============================================================================
+// Testing Types
+// ============================================================================
+
 /**
- * Tool info returned by listTools() in testing API
- * Note: inputSchema is a JSON string, not an object (matches Chromium implementation)
+ * Tool info returned by listTools() in the testing API.
+ * Note: inputSchema is a JSON string, not an object (matches Chromium implementation).
  */
 export interface ToolInfo {
   name: string;
