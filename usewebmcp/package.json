@@ -1,0 +1,69 @@
+{
+  "name": "usewebmcp",
+  "version": "0.1.5",
+  "description": "React hooks for Model Context Protocol - alias for @mcp-b/react-webmcp",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "react",
+    "hooks",
+    "react-hooks",
+    "browser",
+    "ai",
+    "assistant",
+    "tools",
+    "zod",
+    "usewebmcp"
+  ],
+  "homepage": "https://github.com/WebMCP-org/WebMCP#readme",
+  "bugs": {
+    "url": "https://github.com/WebMCP-org/WebMCP/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WebMCP-org/WebMCP.git",
+    "directory": "packages/usewebmcp"
+  },
+  "license": "MIT",
+  "author": "WebMCP Team",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "main": "./dist/index.js",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "build:prod": "NODE_ENV=prod tsdown",
+    "check": "biome check --write .",
+    "clean": "rm -rf dist .turbo",
+    "format": "biome format --write .",
+    "lint": "biome lint --write .",
+    "prepublishOnly": "pnpm run build:prod",
+    "publish:dry": "pnpm publish --access public --dry-run",
+    "publish:npm": "pnpm publish --access public",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mcp-b/react-webmcp": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:"
+  },
+  "peerDependencies": {
+    "react": "catalog:",
+    "zod": "catalog:"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}
