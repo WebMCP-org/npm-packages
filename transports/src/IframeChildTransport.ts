@@ -1,5 +1,6 @@
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { type JSONRPCMessage, JSONRPCMessageSchema } from '@modelcontextprotocol/sdk/types.js';
+import { iframeChildLog as log } from './logger.js';
 
 export interface IframeChildTransportOptions {
   /** Whitelist of parent origins allowed to connect (for security) */
@@ -136,7 +137,7 @@ export class IframeChildTransport implements Transport {
     }
 
     if (!this._clientOrigin) {
-      console.warn('[IframeChildTransport] No client connected, message not sent');
+      log.warn('No client connected, message not sent');
       return;
     }
 
@@ -151,7 +152,7 @@ export class IframeChildTransport implements Transport {
         this._clientOrigin
       );
     } else {
-      console.warn('[IframeChildTransport] Not running in an iframe, message not sent');
+      log.warn('Not running in an iframe, message not sent');
     }
   }
 

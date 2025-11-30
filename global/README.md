@@ -825,7 +825,62 @@ if ("modelContext" in navigator) {
 
 ## 🐛 Debugging
 
-In development mode, access the internal bridge:
+### Enable Debug Logs
+
+This package uses the [`debug`](https://www.npmjs.com/package/debug) library for logging. Logs are **silent by default** and can be enabled when needed.
+
+**In the browser (localStorage):**
+
+```javascript
+// Enable all MCP-B logs
+localStorage.debug = 'mcp-b:*';
+
+// Enable only specific module logs
+localStorage.debug = 'mcp-b:global:*';           // Global/context logs
+localStorage.debug = 'mcp-b:global:bridge';      // MCP bridge logs
+localStorage.debug = 'mcp-b:transports:*';       // All transport logs
+
+// Enable only error/warning logs
+localStorage.debug = 'mcp-b:*:error,mcp-b:*:warn';
+
+// Disable all logs
+localStorage.debug = '';
+```
+
+**In Node.js (environment variable):**
+
+```bash
+DEBUG=mcp-b:* node your-app.js
+```
+
+### Available Namespaces
+
+| Namespace | Description |
+|-----------|-------------|
+| `mcp-b:global:context` | Model context initialization & operations |
+| `mcp-b:global:bridge` | MCP bridge request handling |
+| `mcp-b:global:native-adapter` | Native Chromium API adapter |
+| `mcp-b:global:testing` | Testing API operations |
+| `mcp-b:global:validation` | Schema validation |
+| `mcp-b:transports:*` | All transport operations |
+| `mcp-b:react:*` | React hooks logging |
+| `mcp-b:extension-tools` | Extension tools API |
+
+### Programmatic Control
+
+```javascript
+import { enableLogging, disableLogging } from '@mcp-b/global/logger';
+
+// Enable logging programmatically
+enableLogging('mcp-b:*');
+
+// Disable all logging
+disableLogging();
+```
+
+### Access Internal Bridge
+
+In development mode, you can also access the internal bridge:
 
 ```javascript
 if (window.__mcpBridge) {

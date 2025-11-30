@@ -1,5 +1,6 @@
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { type JSONRPCMessage, JSONRPCMessageSchema } from '@modelcontextprotocol/sdk/types.js';
+import { iframeParentLog as log } from './logger.js';
 
 export interface IframeParentTransportOptions {
   /** Reference to the iframe element */
@@ -92,7 +93,7 @@ export class IframeParentTransport implements Transport {
       }
 
       if (typeof payload === 'string' && payload === 'mcp-server-stopped') {
-        console.log('[IframeParentTransport] Received mcp-server-stopped event, closing transport');
+        log('Received mcp-server-stopped event, closing transport');
         this.close();
         return;
       }
@@ -118,7 +119,7 @@ export class IframeParentTransport implements Transport {
     const contentWindow = this._iframe.contentWindow;
 
     if (!contentWindow) {
-      console.warn('[IframeParentTransport] iframe.contentWindow not available, will retry');
+      log.warn('iframe.contentWindow not available, will retry');
       this.scheduleCheckReadyRetry();
       return;
     }

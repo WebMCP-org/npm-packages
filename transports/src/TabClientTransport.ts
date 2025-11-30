@@ -1,5 +1,6 @@
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { type JSONRPCMessage, JSONRPCMessageSchema } from '@modelcontextprotocol/sdk/types.js';
+import { tabClientLog as log } from './logger.js';
 
 export interface TabClientTransportOptions {
   /** Origin expected from the server window (for security) */
@@ -67,7 +68,7 @@ export class TabClientTransport implements Transport {
 
       // Handle server stopped signal
       if (typeof payload === 'string' && payload === 'mcp-server-stopped') {
-        console.log('[TabClientTransport] Received mcp-server-stopped event, closing transport');
+        log('Received mcp-server-stopped event, closing transport');
         this.close();
         return;
       }

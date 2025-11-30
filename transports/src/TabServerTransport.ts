@@ -1,5 +1,6 @@
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { type JSONRPCMessage, JSONRPCMessageSchema } from '@modelcontextprotocol/sdk/types.js';
+import { tabServerLog as log } from './logger.js';
 
 export interface TabServerTransportOptions {
   /** Whitelist of origins allowed to connect (for security) */
@@ -99,9 +100,7 @@ export class TabServerTransport implements Transport {
     const targetOrigin = this._clientOrigin || '*';
 
     if (!this._clientOrigin) {
-      console.debug(
-        '[TabServerTransport] Sending to unknown client origin (backwards compatibility mode)'
-      );
+      log('Sending to unknown client origin (backwards compatibility mode)');
     }
 
     window.postMessage(
