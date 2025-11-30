@@ -2,6 +2,7 @@ packages:
   - extension-tools
   - global
   - react-webmcp
+  - usewebmcp
   - smart-dom-reader
   - smart-dom-reader/mcp-server
   - transports
