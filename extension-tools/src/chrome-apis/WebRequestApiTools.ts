@@ -1,6 +1,9 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import debug from 'debug';
 import { z } from 'zod';
 import { type ApiAvailability, BaseApiTools } from '../BaseApiTools';
+
+const log = debug('mcp-b:extension-tools:webrequest');
 
 export interface WebRequestApiToolsOptions {
   addListener?: boolean;
@@ -164,7 +167,7 @@ export class WebRequestApiTools extends BaseApiTools<WebRequestApiToolsOptions> 
 
           // Create a callback function that logs the request details
           const callback = (details: any) => {
-            console.log(`WebRequest ${event}:`, {
+            log('WebRequest %s: %O', event, {
               requestId: details.requestId,
               url: details.url,
               method: details.method,
