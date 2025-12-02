@@ -22,6 +22,8 @@ import {
 } from '@mcp-b/webmcp-ts-sdk';
 import type { z } from 'zod';
 import type {
+  ElicitationParams,
+  ElicitationResult,
   InputSchema,
   InternalModelContext,
   MCPBridge,
@@ -30,6 +32,8 @@ import type {
   ModelContextTesting,
   PromptDescriptor,
   ResourceDescriptor,
+  SamplingRequestParams,
+  SamplingResult,
   ToolCallEvent,
   ToolDescriptor,
   ToolResponse,
@@ -447,6 +451,58 @@ class NativeModelContextAdapter implements InternalModelContext {
    */
   dispatchEvent(event: Event): boolean {
     return this.nativeContext.dispatchEvent(event);
+  }
+
+  // ==================== SAMPLING METHODS ====================
+
+  /**
+   * Request an LLM completion from the connected client.
+   * Note: Native Chromium API does not yet support sampling.
+   * This is handled by the polyfill.
+   */
+  async createMessage(params: SamplingRequestParams): Promise<SamplingResult> {
+    console.log('[Native Adapter] Requesting sampling from client');
+    const server = this.bridge.tabServer;
+
+    // Access the underlying Server instance to call createMessage
+    const underlyingServer = (
+      server as unknown as {
+        server: { createMessage: (params: unknown) => Promise<SamplingResult> };
+      }
+    ).server;
+
+    if (!underlyingServer?.createMessage) {
+      throw new Error('Sampling is not supported: no connected client with sampling capability');
+    }
+
+    return underlyingServer.createMessage(params);
+  }
+
+  // ==================== ELICITATION METHODS ====================
+
+  /**
+   * Request user input from the connected client.
+   * Note: Native Chromium API does not yet support elicitation.
+   * This is handled by the polyfill.
+   */
+  async elicitInput(params: ElicitationParams): Promise<ElicitationResult> {
+    console.log('[Native Adapter] Requesting elicitation from client');
+    const server = this.bridge.tabServer;
+
+    // Access the underlying Server instance to call elicitInput
+    const underlyingServer = (
+      server as unknown as {
+        server: { elicitInput: (params: unknown) => Promise<ElicitationResult> };
+      }
+    ).server;
+
+    if (!underlyingServer?.elicitInput) {
+      throw new Error(
+        'Elicitation is not supported: no connected client with elicitation capability'
+      );
+    }
+
+    return underlyingServer.elicitInput(params);
   }
 }
 
@@ -1803,6 +1859,62 @@ class WebModelContext implements InternalModelContext {
       ...(tool.annotations && { annotations: tool.annotations }),
     }));
   }
+
+  // ==================== SAMPLING METHODS ====================
+
+  /**
+   * Request an LLM completion from the connected client.
+   * This sends a sampling request to the connected MCP client.
+   *
+   * @param {SamplingRequestParams} params - Parameters for the sampling request
+   * @returns {Promise<SamplingResult>} The LLM completion result
+   */
+  async createMessage(params: SamplingRequestParams): Promise<SamplingResult> {
+    console.log('[Web Model Context] Requesting sampling from client');
+    const server = this.bridge.tabServer;
+
+    // Access the underlying Server instance to call createMessage
+    const underlyingServer = (
+      server as unknown as {
+        server: { createMessage: (params: unknown) => Promise<SamplingResult> };
+      }
+    ).server;
+
+    if (!underlyingServer?.createMessage) {
+      throw new Error('Sampling is not supported: no connected client with sampling capability');
+    }
+
+    return underlyingServer.createMessage(params);
+  }
+
+  // ==================== ELICITATION METHODS ====================
+
+  /**
+   * Request user input from the connected client.
+   * This sends an elicitation request to the connected MCP client.
+   *
+   * @param {ElicitationParams} params - Parameters for the elicitation request
+   * @returns {Promise<ElicitationResult>} The user's response
+   */
+  async elicitInput(params: ElicitationParams): Promise<ElicitationResult> {
+    console.log('[Web Model Context] Requesting elicitation from client');
+    const server = this.bridge.tabServer;
+
+    // Access the underlying Server instance to call elicitInput
+    const underlyingServer = (
+      server as unknown as {
+        server: { elicitInput: (params: unknown) => Promise<ElicitationResult> };
+      }
+    ).server;
+
+    if (!underlyingServer?.elicitInput) {
+      throw new Error(
+        'Elicitation is not supported: no connected client with elicitation capability'
+      );
+    }
+
+    return underlyingServer.elicitInput(params);
+  }
 }
 
 /**
@@ -1889,6 +2001,10 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
         throw error;
       }
     });
+
+    // Note: Sampling and elicitation are server-to-client requests.
+    // The server calls createMessage() and elicitInput() methods on the Server instance.
+    // These are NOT request handlers - the client handles these requests.
   };
 
   const customTransport: Transport | undefined = transportOptions?.create?.();

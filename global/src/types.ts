@@ -1,6 +1,10 @@
 import type { IframeChildTransportOptions, TabServerTransportOptions } from '@mcp-b/transports';
 import type {
   CallToolResult,
+  CreateMessageRequest,
+  CreateMessageResult,
+  ElicitRequest,
+  ElicitResult,
   Server as McpServer,
   Prompt,
   PromptMessage,
@@ -52,6 +56,34 @@ export type { Prompt };
  * @see {@link https://spec.modelcontextprotocol.io/specification/server/prompts/}
  */
 export type { PromptMessage };
+
+/**
+ * Re-export CreateMessageRequest type from MCP SDK.
+ * Represents a request for LLM sampling from server to client.
+ * @see {@link https://spec.modelcontextprotocol.io/specification/client/sampling/}
+ */
+export type { CreateMessageRequest };
+
+/**
+ * Re-export CreateMessageResult type from MCP SDK.
+ * Represents the result of an LLM sampling request.
+ * @see {@link https://spec.modelcontextprotocol.io/specification/client/sampling/}
+ */
+export type { CreateMessageResult };
+
+/**
+ * Re-export ElicitRequest type from MCP SDK.
+ * Represents a request for user input from server to client.
+ * @see {@link https://spec.modelcontextprotocol.io/specification/client/elicitation/}
+ */
+export type { ElicitRequest };
+
+/**
+ * Re-export ElicitResult type from MCP SDK.
+ * Represents the result of an elicitation request.
+ * @see {@link https://spec.modelcontextprotocol.io/specification/client/elicitation/}
+ */
+export type { ElicitResult };
 
 // ============================================================================
 // Schema Types
@@ -549,6 +581,122 @@ export interface RegistrationHandle {
 }
 
 // ============================================================================
+// Sampling and Elicitation Types
+// ============================================================================
+
+/**
+ * Parameters for a sampling request from the server.
+ * Extracted from CreateMessageRequest for handler convenience.
+ */
+export interface SamplingRequestParams {
+  /** Messages to send to the LLM */
+  messages: Array<{
+    role: 'user' | 'assistant';
+    content:
+      | { type: 'text'; text: string }
+      | { type: 'image'; data: string; mimeType: string }
+      | Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }>;
+  }>;
+  /** Optional system prompt */
+  systemPrompt?: string | undefined;
+  /** Maximum tokens to generate */
+  maxTokens: number;
+  /** Optional temperature for sampling */
+  temperature?: number | undefined;
+  /** Optional stop sequences */
+  stopSequences?: string[] | undefined;
+  /** Optional model preferences */
+  modelPreferences?:
+    | {
+        hints?: Array<{ name?: string }>;
+        costPriority?: number;
+        speedPriority?: number;
+        intelligencePriority?: number;
+      }
+    | undefined;
+  /** Optional context inclusion setting */
+  includeContext?: 'none' | 'thisServer' | 'allServers' | undefined;
+  /** Optional metadata */
+  metadata?: Record<string, unknown> | undefined;
+}
+
+/**
+ * Result of a sampling request.
+ * Returned by the sampling handler.
+ */
+export interface SamplingResult {
+  /** The model that generated the response */
+  model: string;
+  /** The generated content */
+  content: { type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string };
+  /** Role of the responder */
+  role: 'user' | 'assistant';
+  /** Reason for stopping generation */
+  stopReason?: 'endTurn' | 'stopSequence' | 'maxTokens' | string;
+}
+
+/**
+ * Parameters for a form elicitation request.
+ */
+export interface ElicitationFormParams {
+  /** Mode of elicitation */
+  mode?: 'form';
+  /** Message to show to the user */
+  message: string;
+  /** Schema for the form fields */
+  requestedSchema: {
+    type: 'object';
+    properties: Record<
+      string,
+      {
+        type: 'string' | 'number' | 'integer' | 'boolean';
+        title?: string;
+        description?: string;
+        default?: string | number | boolean;
+        minLength?: number;
+        maxLength?: number;
+        minimum?: number;
+        maximum?: number;
+        enum?: Array<string | number>;
+        enumNames?: string[];
+        format?: string;
+      }
+    >;
+    required?: string[];
+  };
+}
+
+/**
+ * Parameters for a URL elicitation request.
+ */
+export interface ElicitationUrlParams {
+  /** Mode of elicitation */
+  mode: 'url';
+  /** Message explaining why the URL needs to be opened */
+  message: string;
+  /** Unique identifier for this elicitation */
+  elicitationId: string;
+  /** URL to open */
+  url: string;
+}
+
+/**
+ * Parameters for an elicitation request.
+ * Can be either form-based or URL-based.
+ */
+export type ElicitationParams = ElicitationFormParams | ElicitationUrlParams;
+
+/**
+ * Result of an elicitation request.
+ */
+export interface ElicitationResult {
+  /** User action */
+  action: 'accept' | 'decline' | 'cancel';
+  /** Content returned when action is 'accept' */
+  content?: Record<string, string | number | boolean | string[]>;
+}
+
+// ============================================================================
 // Model Context Types
 // ============================================================================
 
@@ -686,6 +834,56 @@ export interface ModelContext {
    * Available in Chromium's native implementation
    */
   clearContext(): void;
+
+  // ==================== SAMPLING ====================
+
+  /**
+   * Request an LLM completion from the connected client.
+   * This allows the server (webpage) to request sampling from the client (AI agent).
+   *
+   * @param params - Parameters for the sampling request
+   * @returns Promise resolving to the LLM completion result
+   *
+   * @example
+   * ```typescript
+   * const result = await navigator.modelContext.createMessage({
+   *   messages: [
+   *     { role: 'user', content: { type: 'text', text: 'What is 2+2?' } }
+   *   ],
+   *   maxTokens: 100,
+   * });
+   * console.log(result.content); // { type: 'text', text: '4' }
+   * ```
+   */
+  createMessage(params: SamplingRequestParams): Promise<SamplingResult>;
+
+  // ==================== ELICITATION ====================
+
+  /**
+   * Request user input from the connected client.
+   * This allows the server (webpage) to request form data or URL navigation from the client.
+   *
+   * @param params - Parameters for the elicitation request
+   * @returns Promise resolving to the user's response
+   *
+   * @example Form elicitation:
+   * ```typescript
+   * const result = await navigator.modelContext.elicitInput({
+   *   message: 'Please provide your API key',
+   *   requestedSchema: {
+   *     type: 'object',
+   *     properties: {
+   *       apiKey: { type: 'string', title: 'API Key', description: 'Your API key' }
+   *     },
+   *     required: ['apiKey']
+   *   }
+   * });
+   * if (result.action === 'accept') {
+   *   console.log(result.content?.apiKey);
+   * }
+   * ```
+   */
+  elicitInput(params: ElicitationParams): Promise<ElicitationResult>;
 
   /**
    * Add event listener for tool calls

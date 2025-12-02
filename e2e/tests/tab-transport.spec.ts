@@ -696,3 +696,66 @@ test.describe('Model Context Testing API Tests', () => {
     expect(allCleared).toBe(true);
   });
 });
+
+test.describe('Sampling & Elicitation API Tests', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('h1')).toContainText('Web Model Context API E2E Test');
+  });
+
+  test('should have createMessage and elicitInput methods available', async ({ page }) => {
+    await page.click('#check-sampling-api');
+    await page.waitForTimeout(500);
+
+    const status = page.locator('#sampling-status');
+    await expect(status).toHaveAttribute('data-sampling-api', 'available');
+
+    const logEntries = await page.locator('#log .log-entry').allTextContents();
+    expect(logEntries.some((entry) => entry.includes('createMessage available: true'))).toBe(true);
+    expect(logEntries.some((entry) => entry.includes('elicitInput available: true'))).toBe(true);
+  });
+
+  test('should have createMessage method on navigator.modelContext', async ({ page }) => {
+    const hasMethod = await page.evaluate(() => {
+      return typeof navigator.modelContext.createMessage === 'function';
+    });
+    expect(hasMethod).toBe(true);
+  });
+
+  test('should have elicitInput method on navigator.modelContext', async ({ page }) => {
+    const hasMethod = await page.evaluate(() => {
+      return typeof navigator.modelContext.elicitInput === 'function';
+    });
+    expect(hasMethod).toBe(true);
+  });
+
+  test('should throw error when calling createMessage without connected client', async ({
+    page,
+  }) => {
+    await page.click('#test-sampling-call');
+    await page.waitForTimeout(500);
+
+    const status = page.locator('#sampling-status');
+    await expect(status).toHaveAttribute('data-sampling-call', 'error-no-client');
+
+    const logEntries = await page.locator('#log .log-entry').allTextContents();
+    expect(logEntries.some((entry) => entry.includes('createMessage() threw error'))).toBe(true);
+    expect(
+      logEntries.some((entry) => entry.includes('Correct error thrown for missing client'))
+    ).toBe(true);
+  });
+
+  test('should throw error when calling elicitInput without connected client', async ({ page }) => {
+    await page.click('#test-elicitation-call');
+    await page.waitForTimeout(500);
+
+    const status = page.locator('#sampling-status');
+    await expect(status).toHaveAttribute('data-elicitation-call', 'error-no-client');
+
+    const logEntries = await page.locator('#log .log-entry').allTextContents();
+    expect(logEntries.some((entry) => entry.includes('elicitInput() threw error'))).toBe(true);
+    expect(
+      logEntries.some((entry) => entry.includes('Correct error thrown for missing client'))
+    ).toBe(true);
+  });
+});
