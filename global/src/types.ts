@@ -1,6 +1,10 @@
 import type { IframeChildTransportOptions, TabServerTransportOptions } from '@mcp-b/transports';
 import type {
   CallToolResult,
+  CreateMessageRequest,
+  CreateMessageResult,
+  ElicitRequest,
+  ElicitResult,
   Server as McpServer,
   Prompt,
   PromptMessage,
@@ -52,6 +56,34 @@ export type { Prompt };
  * @see {@link https://spec.modelcontextprotocol.io/specification/server/prompts/}
  */
 export type { PromptMessage };
+
+/**
+ * Re-export CreateMessageRequest type from MCP SDK.
+ * Represents a request for LLM sampling from server to client.
+ * @see {@link https://spec.modelcontextprotocol.io/specification/client/sampling/}
+ */
+export type { CreateMessageRequest };
+
+/**
+ * Re-export CreateMessageResult type from MCP SDK.
+ * Represents the result of an LLM sampling request.
+ * @see {@link https://spec.modelcontextprotocol.io/specification/client/sampling/}
+ */
+export type { CreateMessageResult };
+
+/**
+ * Re-export ElicitRequest type from MCP SDK.
+ * Represents a request for user input from server to client.
+ * @see {@link https://spec.modelcontextprotocol.io/specification/client/elicitation/}
+ */
+export type { ElicitRequest };
+
+/**
+ * Re-export ElicitResult type from MCP SDK.
+ * Represents the result of an elicitation request.
+ * @see {@link https://spec.modelcontextprotocol.io/specification/client/elicitation/}
+ */
+export type { ElicitResult };
 
 // ============================================================================
 // Schema Types
@@ -549,6 +581,150 @@ export interface RegistrationHandle {
 }
 
 // ============================================================================
+// Sampling and Elicitation Types
+// ============================================================================
+
+/**
+ * Parameters for a sampling request from the server.
+ * Extracted from CreateMessageRequest for handler convenience.
+ */
+export interface SamplingRequestParams {
+  /** Messages to send to the LLM */
+  messages: Array<{
+    role: 'user' | 'assistant';
+    content:
+      | { type: 'text'; text: string }
+      | { type: 'image'; data: string; mimeType: string }
+      | Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }>;
+  }>;
+  /** Optional system prompt */
+  systemPrompt?: string | undefined;
+  /** Maximum tokens to generate */
+  maxTokens: number;
+  /** Optional temperature for sampling */
+  temperature?: number | undefined;
+  /** Optional stop sequences */
+  stopSequences?: string[] | undefined;
+  /** Optional model preferences */
+  modelPreferences?:
+    | {
+        hints?: Array<{ name?: string }>;
+        costPriority?: number;
+        speedPriority?: number;
+        intelligencePriority?: number;
+      }
+    | undefined;
+  /** Optional context inclusion setting */
+  includeContext?: 'none' | 'thisServer' | 'allServers' | undefined;
+  /** Optional metadata */
+  metadata?: Record<string, unknown> | undefined;
+}
+
+/**
+ * Result of a sampling request.
+ * Returned by the sampling handler.
+ */
+export interface SamplingResult {
+  /** The model that generated the response */
+  model: string;
+  /** The generated content */
+  content: { type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string };
+  /** Role of the responder */
+  role: 'user' | 'assistant';
+  /** Reason for stopping generation */
+  stopReason?: 'endTurn' | 'stopSequence' | 'maxTokens' | string;
+}
+
+/**
+ * Handler function for sampling requests from the server.
+ * This is called when a tool execution needs LLM completion.
+ */
+export type SamplingHandler = (params: SamplingRequestParams) => Promise<SamplingResult>;
+
+/**
+ * Parameters for a form elicitation request.
+ */
+export interface ElicitationFormParams {
+  /** Mode of elicitation */
+  mode?: 'form';
+  /** Message to show to the user */
+  message: string;
+  /** Schema for the form fields */
+  requestedSchema: {
+    type: 'object';
+    properties: Record<
+      string,
+      {
+        type: 'string' | 'number' | 'integer' | 'boolean';
+        title?: string;
+        description?: string;
+        default?: string | number | boolean;
+        minLength?: number;
+        maxLength?: number;
+        minimum?: number;
+        maximum?: number;
+        enum?: Array<string | number>;
+        enumNames?: string[];
+        format?: string;
+      }
+    >;
+    required?: string[];
+  };
+}
+
+/**
+ * Parameters for a URL elicitation request.
+ */
+export interface ElicitationUrlParams {
+  /** Mode of elicitation */
+  mode: 'url';
+  /** Message explaining why the URL needs to be opened */
+  message: string;
+  /** Unique identifier for this elicitation */
+  elicitationId: string;
+  /** URL to open */
+  url: string;
+}
+
+/**
+ * Parameters for an elicitation request.
+ * Can be either form-based or URL-based.
+ */
+export type ElicitationParams = ElicitationFormParams | ElicitationUrlParams;
+
+/**
+ * Result of an elicitation request.
+ */
+export interface ElicitationResult {
+  /** User action */
+  action: 'accept' | 'decline' | 'cancel';
+  /** Content returned when action is 'accept' */
+  content?: Record<string, string | number | boolean | string[]>;
+}
+
+/**
+ * Handler function for elicitation requests from the server.
+ * This is called when a tool needs additional user input.
+ */
+export type ElicitationHandler = (params: ElicitationParams) => Promise<ElicitationResult>;
+
+/**
+ * Options for registering a sampling handler.
+ */
+export interface SamplingHandlerOptions {
+  /** The handler function to process sampling requests */
+  handler: SamplingHandler;
+}
+
+/**
+ * Options for registering an elicitation handler.
+ */
+export interface ElicitationHandlerOptions {
+  /** The handler function to process elicitation requests */
+  handler: ElicitationHandler;
+}
+
+// ============================================================================
 // Model Context Types
 // ============================================================================
 
@@ -687,6 +863,77 @@ export interface ModelContext {
    */
   clearContext(): void;
 
+  // ==================== SAMPLING ====================
+
+  /**
+   * Register a handler for LLM sampling requests.
+   * When a tool needs an LLM completion, this handler will be called.
+   *
+   * @param options - Options containing the sampling handler function
+   * @returns A handle to unregister the handler
+   *
+   * @example
+   * ```typescript
+   * const handle = navigator.modelContext.setSamplingHandler({
+   *   handler: async (params) => {
+   *     const response = await openai.chat.completions.create({
+   *       model: 'gpt-4',
+   *       messages: params.messages.map(m => ({
+   *         role: m.role,
+   *         content: typeof m.content === 'string' ? m.content : m.content.text
+   *       })),
+   *       max_tokens: params.maxTokens,
+   *       temperature: params.temperature,
+   *     });
+   *     return {
+   *       model: 'gpt-4',
+   *       role: 'assistant',
+   *       content: { type: 'text', text: response.choices[0].message.content },
+   *       stopReason: 'endTurn',
+   *     };
+   *   }
+   * });
+   * ```
+   */
+  setSamplingHandler(options: SamplingHandlerOptions): RegistrationHandle;
+
+  /**
+   * Clear the current sampling handler.
+   */
+  clearSamplingHandler(): void;
+
+  // ==================== ELICITATION ====================
+
+  /**
+   * Register a handler for user elicitation requests.
+   * When a tool needs additional user input, this handler will be called.
+   *
+   * @param options - Options containing the elicitation handler function
+   * @returns A handle to unregister the handler
+   *
+   * @example Form elicitation:
+   * ```typescript
+   * const handle = navigator.modelContext.setElicitationHandler({
+   *   handler: async (params) => {
+   *     if (params.mode === 'url') {
+   *       // Open URL for sensitive data collection
+   *       window.open(params.url, '_blank');
+   *       return { action: 'accept' };
+   *     }
+   *     // Show form dialog and collect user input
+   *     const result = await showFormDialog(params.message, params.requestedSchema);
+   *     return result;
+   *   }
+   * });
+   * ```
+   */
+  setElicitationHandler(options: ElicitationHandlerOptions): RegistrationHandle;
+
+  /**
+   * Clear the current elicitation handler.
+   */
+  clearElicitationHandler(): void;
+
   /**
    * Add event listener for tool calls
    */
@@ -762,6 +1009,10 @@ export interface MCPBridge {
   modelContextTesting?: ModelContextTesting;
   /** Whether the bridge has been initialized */
   isInitialized: boolean;
+  /** Optional sampling handler for LLM completions */
+  samplingHandler?: SamplingHandler;
+  /** Optional elicitation handler for user input */
+  elicitationHandler?: ElicitationHandler;
 }
 
 // ============================================================================

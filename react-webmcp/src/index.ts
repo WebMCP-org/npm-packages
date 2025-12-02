@@ -4,14 +4,30 @@
  * React hooks for registering and managing Model Context Protocol (MCP) tools
  * with type-safe schemas, async state management, and built-in error handling.
  *
- * This package provides two main use cases:
+ * This package provides three main use cases:
  *
  * 1. **Provider hooks**: Register and expose tools to AI assistants via `window.navigator.modelContext`
  * 2. **Client hooks**: Connect to and consume tools from MCP servers
+ * 3. **Capability hooks**: Handle sampling and elicitation requests from MCP servers
  *
  * @packageDocumentation
  */
 
+/**
+ * Re-export sampling and elicitation types from @mcp-b/global.
+ */
+export type {
+  ElicitationFormParams,
+  ElicitationHandler,
+  ElicitationHandlerOptions,
+  ElicitationParams,
+  ElicitationResult,
+  ElicitationUrlParams,
+  SamplingHandler,
+  SamplingHandlerOptions,
+  SamplingRequestParams,
+  SamplingResult,
+} from '@mcp-b/global';
 /**
  * Re-export MCP SDK types for convenience.
  * These types come from the official @modelcontextprotocol/sdk.
@@ -22,7 +38,6 @@ export type {
   ServerCapabilities,
   Tool,
 } from '@modelcontextprotocol/sdk/types.js';
-
 /**
  * Re-export shared types from @mcp-b packages.
  * These maintain the type hierarchy:
@@ -58,6 +73,37 @@ export { useWebMCP } from './useWebMCP.js';
  * Convenience wrapper around `useWebMCP` for context tools.
  */
 export { useWebMCPContext } from './useWebMCPContext.js';
+
+// ============================================
+// Capability Hooks (Sampling & Elicitation)
+// ============================================
+
+/**
+ * Type definitions for elicitation handler hook.
+ */
+export type {
+  ElicitationHandlerState,
+  UseElicitationHandlerConfig,
+  UseElicitationHandlerReturn,
+} from './useElicitationHandler.js';
+/**
+ * Hook for registering an elicitation handler that processes user input requests.
+ * Use this when MCP servers need to collect additional information from users.
+ */
+export { useElicitationHandler } from './useElicitationHandler.js';
+/**
+ * Type definitions for sampling handler hook.
+ */
+export type {
+  SamplingHandlerState,
+  UseSamplingHandlerConfig,
+  UseSamplingHandlerReturn,
+} from './useSamplingHandler.js';
+/**
+ * Hook for registering a sampling handler that processes LLM completion requests.
+ * Use this when MCP servers need to request AI model responses.
+ */
+export { useSamplingHandler } from './useSamplingHandler.js';
 
 // ============================================
 // Client Hooks (Consume Tools)

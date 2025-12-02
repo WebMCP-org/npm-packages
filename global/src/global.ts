@@ -13,6 +13,8 @@ import type {
 } from '@mcp-b/webmcp-ts-sdk';
 import {
   CallToolRequestSchema,
+  CreateMessageRequestSchema,
+  ElicitRequestSchema,
   GetPromptRequestSchema,
   ListPromptsRequestSchema,
   ListResourcesRequestSchema,
@@ -22,6 +24,8 @@ import {
 } from '@mcp-b/webmcp-ts-sdk';
 import type { z } from 'zod';
 import type {
+  ElicitationHandlerOptions,
+  ElicitationParams,
   InputSchema,
   InternalModelContext,
   MCPBridge,
@@ -29,7 +33,9 @@ import type {
   ModelContextInput,
   ModelContextTesting,
   PromptDescriptor,
+  RegistrationHandle,
   ResourceDescriptor,
+  SamplingHandlerOptions,
   ToolCallEvent,
   ToolDescriptor,
   ToolResponse,
@@ -447,6 +453,58 @@ class NativeModelContextAdapter implements InternalModelContext {
    */
   dispatchEvent(event: Event): boolean {
     return this.nativeContext.dispatchEvent(event);
+  }
+
+  // ==================== SAMPLING METHODS (polyfill implementation) ====================
+
+  /**
+   * Sets the sampling handler for LLM requests.
+   * Note: Native Chromium API does not yet support sampling.
+   * This is handled by the polyfill.
+   */
+  setSamplingHandler(options: SamplingHandlerOptions): RegistrationHandle {
+    console.log('[Native Adapter] Setting sampling handler');
+    this.bridge.samplingHandler = options.handler;
+    return {
+      unregister: () => {
+        console.log('[Native Adapter] Clearing sampling handler');
+        delete this.bridge.samplingHandler;
+      },
+    };
+  }
+
+  /**
+   * Clears the sampling handler.
+   */
+  clearSamplingHandler(): void {
+    console.log('[Native Adapter] Clearing sampling handler');
+    delete this.bridge.samplingHandler;
+  }
+
+  // ==================== ELICITATION METHODS (polyfill implementation) ====================
+
+  /**
+   * Sets the elicitation handler for user input requests.
+   * Note: Native Chromium API does not yet support elicitation.
+   * This is handled by the polyfill.
+   */
+  setElicitationHandler(options: ElicitationHandlerOptions): RegistrationHandle {
+    console.log('[Native Adapter] Setting elicitation handler');
+    this.bridge.elicitationHandler = options.handler;
+    return {
+      unregister: () => {
+        console.log('[Native Adapter] Clearing elicitation handler');
+        delete this.bridge.elicitationHandler;
+      },
+    };
+  }
+
+  /**
+   * Clears the elicitation handler.
+   */
+  clearElicitationHandler(): void {
+    console.log('[Native Adapter] Clearing elicitation handler');
+    delete this.bridge.elicitationHandler;
   }
 }
 
@@ -1803,6 +1861,62 @@ class WebModelContext implements InternalModelContext {
       ...(tool.annotations && { annotations: tool.annotations }),
     }));
   }
+
+  // ==================== SAMPLING METHODS ====================
+
+  /**
+   * Sets the sampling handler for LLM requests.
+   * When a tool needs an LLM completion, this handler will be called.
+   *
+   * @param {SamplingHandlerOptions} options - Options containing the sampling handler function
+   * @returns {{unregister: () => void}} Object with unregister function
+   */
+  setSamplingHandler(options: SamplingHandlerOptions): RegistrationHandle {
+    console.log('[Web Model Context] Setting sampling handler');
+    this.bridge.samplingHandler = options.handler;
+    return {
+      unregister: () => {
+        console.log('[Web Model Context] Clearing sampling handler via unregister');
+        delete this.bridge.samplingHandler;
+      },
+    };
+  }
+
+  /**
+   * Clears the current sampling handler.
+   */
+  clearSamplingHandler(): void {
+    console.log('[Web Model Context] Clearing sampling handler');
+    delete this.bridge.samplingHandler;
+  }
+
+  // ==================== ELICITATION METHODS ====================
+
+  /**
+   * Sets the elicitation handler for user input requests.
+   * When a tool needs additional user input, this handler will be called.
+   *
+   * @param {ElicitationHandlerOptions} options - Options containing the elicitation handler function
+   * @returns {{unregister: () => void}} Object with unregister function
+   */
+  setElicitationHandler(options: ElicitationHandlerOptions): RegistrationHandle {
+    console.log('[Web Model Context] Setting elicitation handler');
+    this.bridge.elicitationHandler = options.handler;
+    return {
+      unregister: () => {
+        console.log('[Web Model Context] Clearing elicitation handler via unregister');
+        delete this.bridge.elicitationHandler;
+      },
+    };
+  }
+
+  /**
+   * Clears the current elicitation handler.
+   */
+  clearElicitationHandler(): void {
+    console.log('[Web Model Context] Clearing elicitation handler');
+    delete this.bridge.elicitationHandler;
+  }
 }
 
 /**
@@ -1886,6 +2000,88 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
         );
       } catch (error) {
         console.error(`[MCP Bridge] Error getting prompt ${request.params.name}:`, error);
+        throw error;
+      }
+    });
+
+    // ==================== SAMPLING HANDLERS ====================
+    server.setRequestHandler(CreateMessageRequestSchema, async (request) => {
+      console.log('[MCP Bridge] Handling sampling/createMessage request');
+
+      if (!bridge.samplingHandler) {
+        throw new Error(
+          'No sampling handler registered. Use navigator.modelContext.setSamplingHandler() to register one.'
+        );
+      }
+
+      const params = request.params as {
+        messages: Array<{
+          role: 'user' | 'assistant';
+          content:
+            | { type: 'text'; text: string }
+            | { type: 'image'; data: string; mimeType: string }
+            | Array<
+                { type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }
+              >;
+        }>;
+        systemPrompt?: string;
+        maxTokens: number;
+        temperature?: number;
+        stopSequences?: string[];
+        modelPreferences?: {
+          hints?: Array<{ name?: string }>;
+          costPriority?: number;
+          speedPriority?: number;
+          intelligencePriority?: number;
+        };
+        includeContext?: 'none' | 'thisServer' | 'allServers';
+        metadata?: Record<string, unknown>;
+      };
+
+      try {
+        const result = await bridge.samplingHandler({
+          messages: params.messages,
+          systemPrompt: params.systemPrompt,
+          maxTokens: params.maxTokens,
+          temperature: params.temperature,
+          stopSequences: params.stopSequences,
+          modelPreferences: params.modelPreferences,
+          includeContext: params.includeContext,
+          metadata: params.metadata,
+        });
+
+        return {
+          model: result.model,
+          role: result.role,
+          content: result.content,
+          stopReason: result.stopReason,
+        };
+      } catch (error) {
+        console.error('[MCP Bridge] Error in sampling handler:', error);
+        throw error;
+      }
+    });
+
+    // ==================== ELICITATION HANDLERS ====================
+    server.setRequestHandler(ElicitRequestSchema, async (request) => {
+      console.log('[MCP Bridge] Handling elicitation/create request');
+
+      if (!bridge.elicitationHandler) {
+        throw new Error(
+          'No elicitation handler registered. Use navigator.modelContext.setElicitationHandler() to register one.'
+        );
+      }
+
+      const params = request.params as ElicitationParams;
+
+      try {
+        const result = await bridge.elicitationHandler(params);
+        return {
+          action: result.action,
+          content: result.content,
+        };
+      } catch (error) {
+        console.error('[MCP Bridge] Error in elicitation handler:', error);
         throw error;
       }
     });
