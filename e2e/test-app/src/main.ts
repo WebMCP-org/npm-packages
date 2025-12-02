@@ -1104,6 +1104,23 @@ listPromptsBtn.addEventListener('click', listPrompts);
 getPromptWithoutArgsBtn.addEventListener('click', getPromptWithoutArgs);
 getPromptWithArgsBtn.addEventListener('click', getPromptWithArgs);
 
+// Sampling & Elicitation event listeners
+const samplingButtons = {
+  checkSamplingApi: document.getElementById('check-sampling-api'),
+  testSamplingCall: document.getElementById('test-sampling-call'),
+  testElicitationCall: document.getElementById('test-elicitation-call'),
+};
+
+if (samplingButtons.checkSamplingApi) {
+  samplingButtons.checkSamplingApi.addEventListener('click', checkSamplingApi);
+}
+if (samplingButtons.testSamplingCall) {
+  samplingButtons.testSamplingCall.addEventListener('click', testSamplingCall);
+}
+if (samplingButtons.testElicitationCall) {
+  samplingButtons.testElicitationCall.addEventListener('click', testElicitationCall);
+}
+
 // Chromium native API event listeners
 const chromiumButtons = {
   unregisterTool: document.getElementById('chromium-unregister-tool'),
@@ -1148,6 +1165,110 @@ log('Application initialized');
 if (checkAPIAvailability()) {
   registerBaseTools();
   log('✅ Test app ready! Use buttons to test two-bucket system.', 'success');
+}
+
+// ==================== SAMPLING & ELICITATION ====================
+
+const samplingStatusEl = document.getElementById('sampling-status');
+
+// Check if sampling/elicitation API is available
+function checkSamplingApi() {
+  try {
+    log('Checking sampling/elicitation API availability...', 'info');
+
+    const hasCreateMessage = 'createMessage' in navigator.modelContext;
+    const hasElicitInput = 'elicitInput' in navigator.modelContext;
+
+    if (samplingStatusEl) {
+      if (hasCreateMessage && hasElicitInput) {
+        samplingStatusEl.textContent =
+          'Sampling/Elicitation: Available ✅ (createMessage, elicitInput)';
+        samplingStatusEl.style.background = '#d4edda';
+        samplingStatusEl.setAttribute('data-sampling-api', 'available');
+      } else {
+        samplingStatusEl.textContent = `Sampling/Elicitation: Partial ⚠️ (createMessage: ${hasCreateMessage}, elicitInput: ${hasElicitInput})`;
+        samplingStatusEl.style.background = '#fff3cd';
+        samplingStatusEl.setAttribute('data-sampling-api', 'partial');
+      }
+    }
+
+    log(`createMessage available: ${hasCreateMessage}`, hasCreateMessage ? 'success' : 'error');
+    log(`elicitInput available: ${hasElicitInput}`, hasElicitInput ? 'success' : 'error');
+  } catch (error) {
+    log(`Failed to check sampling API: ${error}`, 'error');
+  }
+}
+
+// Test createMessage call (should fail without connected client)
+async function testSamplingCall() {
+  try {
+    log('Testing createMessage() - this should fail without a connected client...', 'info');
+
+    const result = await navigator.modelContext.createMessage({
+      messages: [{ role: 'user', content: { type: 'text', text: 'Hello, this is a test!' } }],
+      maxTokens: 100,
+    });
+
+    // If we got here, a client responded (unexpected in this test environment)
+    log(`createMessage() succeeded unexpectedly: ${JSON.stringify(result)}`, 'success');
+    if (samplingStatusEl) {
+      samplingStatusEl.setAttribute('data-sampling-call', 'success');
+    }
+  } catch (error) {
+    // Expected behavior - no connected client with sampling capability
+    log(`createMessage() threw error (expected): ${error}`, 'info');
+    if (samplingStatusEl) {
+      samplingStatusEl.setAttribute('data-sampling-call', 'error-no-client');
+    }
+
+    // Check if it's the expected error message
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (
+      errorMessage.includes('Sampling is not supported') ||
+      errorMessage.includes('no connected client')
+    ) {
+      log('✅ Correct error thrown for missing client capability', 'success');
+    }
+  }
+}
+
+// Test elicitInput call (should fail without connected client)
+async function testElicitationCall() {
+  try {
+    log('Testing elicitInput() - this should fail without a connected client...', 'info');
+
+    const result = await navigator.modelContext.elicitInput({
+      message: 'Please provide your name',
+      requestedSchema: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', title: 'Name', description: 'Your name' },
+        },
+        required: ['name'],
+      },
+    });
+
+    // If we got here, a client responded (unexpected in this test environment)
+    log(`elicitInput() succeeded unexpectedly: ${JSON.stringify(result)}`, 'success');
+    if (samplingStatusEl) {
+      samplingStatusEl.setAttribute('data-elicitation-call', 'success');
+    }
+  } catch (error) {
+    // Expected behavior - no connected client with elicitation capability
+    log(`elicitInput() threw error (expected): ${error}`, 'info');
+    if (samplingStatusEl) {
+      samplingStatusEl.setAttribute('data-elicitation-call', 'error-no-client');
+    }
+
+    // Check if it's the expected error message
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (
+      errorMessage.includes('Elicitation is not supported') ||
+      errorMessage.includes('no connected client')
+    ) {
+      log('✅ Correct error thrown for missing client capability', 'success');
+    }
+  }
 }
 
 // Chromium Native API Test Functions
@@ -1488,6 +1609,10 @@ declare global {
       listPrompts: () => void;
       getPromptWithoutArgs: () => Promise<void>;
       getPromptWithArgs: () => Promise<void>;
+      // Sampling & Elicitation tests
+      checkSamplingApi: () => void;
+      testSamplingCall: () => Promise<void>;
+      testElicitationCall: () => Promise<void>;
     };
   }
 }
@@ -1530,4 +1655,8 @@ window.testApp = {
   listPrompts,
   getPromptWithoutArgs,
   getPromptWithArgs,
+  // Sampling & Elicitation tests
+  checkSamplingApi,
+  testSamplingCall,
+  testElicitationCall,
 };
