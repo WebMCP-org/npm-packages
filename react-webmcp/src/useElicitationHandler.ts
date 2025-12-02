@@ -1,301 +1,181 @@
-import type { ElicitationHandler, ElicitationParams, ElicitationResult } from '@mcp-b/global';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import type { ElicitationParams, ElicitationResult } from '@mcp-b/global';
+import { useCallback, useState } from 'react';
 
 /**
- * State for the elicitation handler, tracking requests and errors.
+ * State for elicitation requests, tracking the current request and results.
  */
-export interface ElicitationHandlerState {
-  /** Whether an elicitation request is currently being processed */
-  isProcessing: boolean;
-  /** The last elicitation request that was processed */
-  lastRequest: ElicitationParams | null;
-  /** The last result returned from the handler */
-  lastResult: ElicitationResult | null;
+export interface ElicitationState {
+  /** Whether an elicitation request is currently in progress */
+  isLoading: boolean;
+  /** The last elicitation result received */
+  result: ElicitationResult | null;
   /** Any error that occurred during the last request */
   error: Error | null;
-  /** Total number of requests processed */
+  /** Total number of requests made */
   requestCount: number;
 }
 
 /**
- * Configuration options for the useElicitationHandler hook.
+ * Configuration options for the useElicitation hook.
  */
-export interface UseElicitationHandlerConfig {
-  /**
-   * The handler function to process elicitation requests.
-   * Called when a tool needs additional user input.
-   *
-   * @param params - The elicitation request parameters
-   * @returns Promise resolving to the user's response
-   *
-   * @example Form elicitation:
-   * ```typescript
-   * handler: async (params) => {
-   *   if (params.mode === 'url') {
-   *     // URL mode - for sensitive data collection
-   *     const confirmed = await showConfirmDialog(
-   *       `Open URL: ${params.url}?\nReason: ${params.message}`
-   *     );
-   *     if (confirmed) {
-   *       window.open(params.url, '_blank');
-   *       return { action: 'accept' };
-   *     }
-   *     return { action: 'decline' };
-   *   }
-   *
-   *   // Form mode - collect non-sensitive data
-   *   const result = await showFormDialog(params.message, params.requestedSchema);
-   *   return result;
-   * }
-   * ```
-   */
-  handler: ElicitationHandler;
-
+export interface UseElicitationConfig {
   /**
    * Optional callback invoked when an elicitation request completes successfully.
    */
-  onSuccess?: (result: ElicitationResult, request: ElicitationParams) => void;
+  onSuccess?: (result: ElicitationResult) => void;
 
   /**
    * Optional callback invoked when an elicitation request fails.
    */
-  onError?: (error: Error, request: ElicitationParams) => void;
+  onError?: (error: Error) => void;
 }
 
 /**
- * Return value from the useElicitationHandler hook.
+ * Return value from the useElicitation hook.
  */
-export interface UseElicitationHandlerReturn {
-  /** Current state of the elicitation handler */
-  state: ElicitationHandlerState;
-  /** Reset the handler state */
+export interface UseElicitationReturn {
+  /** Current state of elicitation */
+  state: ElicitationState;
+  /** Function to request user input from the connected client */
+  elicitInput: (params: ElicitationParams) => Promise<ElicitationResult>;
+  /** Reset the state */
   reset: () => void;
-  /** Whether the handler is currently registered */
-  isRegistered: boolean;
 }
 
 /**
- * React hook for registering an elicitation handler with the Model Context API.
+ * React hook for requesting user input from the connected MCP client.
  *
- * Elicitation allows MCP servers to request additional user input when a tool
- * needs more information. There are two modes:
+ * Elicitation allows the server (webpage) to request user input from the
+ * connected client. This is useful when the page needs additional information
+ * from the user, such as API keys, configuration options, or confirmations.
  *
- * 1. **Form mode** (`mode: 'form'` or undefined): For non-sensitive data collection
- *    using a schema-driven form.
- * 2. **URL mode** (`mode: 'url'`): For sensitive data collection via a web URL,
- *    such as API keys, payments, or OAuth flows.
+ * There are two modes:
+ * 1. **Form mode**: For non-sensitive data collection using a schema-driven form.
+ * 2. **URL mode**: For sensitive data collection via a web URL (API keys, OAuth, etc.).
  *
- * The hook:
- * - Registers the handler with `navigator.modelContext.setElicitationHandler()`
- * - Tracks request/response state
- * - Automatically unregisters on component unmount
+ * @param config - Optional configuration including callbacks
+ * @returns Object containing state and the elicitInput function
  *
- * @param config - Configuration including the handler function and callbacks
- * @returns Object containing state and control methods
- *
- * @example Basic form elicitation:
+ * @example Form elicitation:
  * ```tsx
- * function ElicitationProvider() {
- *   const { state, isRegistered } = useElicitationHandler({
- *     handler: async (params) => {
- *       if (params.mode === 'url') {
- *         // Handle URL mode for sensitive data
- *         const confirmed = window.confirm(
- *           `A tool wants to open: ${params.url}\n\nReason: ${params.message}`
- *         );
- *         if (confirmed) {
- *           window.open(params.url, '_blank');
- *           return { action: 'accept' };
- *         }
- *         return { action: 'decline' };
- *       }
- *
- *       // Handle form mode
- *       const formData = await showFormModal(params.message, params.requestedSchema);
- *       if (formData) {
- *         return { action: 'accept', content: formData };
- *       }
- *       return { action: 'cancel' };
- *     },
+ * function ConfigForm() {
+ *   const { state, elicitInput } = useElicitation({
+ *     onSuccess: (result) => console.log('Got input:', result),
+ *     onError: (error) => console.error('Elicitation failed:', error),
  *   });
  *
+ *   const handleConfigure = async () => {
+ *     const result = await elicitInput({
+ *       message: 'Please provide your configuration',
+ *       requestedSchema: {
+ *         type: 'object',
+ *         properties: {
+ *           apiKey: { type: 'string', title: 'API Key', description: 'Your API key' },
+ *           model: { type: 'string', enum: ['gpt-4', 'gpt-3.5'], title: 'Model' }
+ *         },
+ *         required: ['apiKey']
+ *       }
+ *     });
+ *
+ *     if (result.action === 'accept') {
+ *       console.log('Config:', result.content);
+ *     }
+ *   };
+ *
  *   return (
- *     <div>
- *       <p>Elicitation handler: {isRegistered ? 'active' : 'inactive'}</p>
- *       <p>Requests handled: {state.requestCount}</p>
- *     </div>
+ *     <button onClick={handleConfigure} disabled={state.isLoading}>
+ *       Configure
+ *     </button>
  *   );
  * }
  * ```
  *
- * @example With a form library (React Hook Form):
+ * @example URL elicitation (for sensitive data):
  * ```tsx
- * const { state, isRegistered } = useElicitationHandler({
- *   handler: async (params) => {
- *     if (params.mode === 'url') {
- *       window.open(params.url, '_blank');
- *       return { action: 'accept' };
- *     }
+ * const { elicitInput } = useElicitation();
  *
- *     // Show a modal form and wait for submission
- *     return new Promise((resolve) => {
- *       setFormConfig({
- *         message: params.message,
- *         schema: params.requestedSchema,
- *         onSubmit: (data) => resolve({ action: 'accept', content: data }),
- *         onCancel: () => resolve({ action: 'cancel' }),
- *       });
- *       setShowForm(true);
- *     });
- *   },
- * });
- * ```
+ * const handleOAuth = async () => {
+ *   const result = await elicitInput({
+ *     mode: 'url',
+ *     message: 'Please authenticate with GitHub',
+ *     elicitationId: 'github-oauth-123',
+ *     url: 'https://github.com/login/oauth/authorize?client_id=...'
+ *   });
  *
- * @example Handling different field types:
- * ```tsx
- * useElicitationHandler({
- *   handler: async (params) => {
- *     if (params.mode === 'url') {
- *       return { action: 'decline' }; // Don't support URL mode
- *     }
- *
- *     const schema = params.requestedSchema;
- *     const formData: Record<string, string | number | boolean | string[]> = {};
- *
- *     for (const [key, prop] of Object.entries(schema.properties)) {
- *       let value: string | number | boolean | string[];
- *
- *       if (prop.enum) {
- *         // Show dropdown for enum types
- *         value = await showDropdown(prop.title || key, prop.enum);
- *       } else if (prop.type === 'boolean') {
- *         // Show checkbox for boolean
- *         value = await showCheckbox(prop.title || key);
- *       } else if (prop.type === 'number' || prop.type === 'integer') {
- *         // Show number input
- *         value = await showNumberInput(prop.title || key, prop.minimum, prop.maximum);
- *       } else {
- *         // Show text input
- *         value = await showTextInput(prop.title || key, prop.minLength, prop.maxLength);
- *       }
- *
- *       formData[key] = value;
- *     }
- *
- *     return { action: 'accept', content: formData };
- *   },
- * });
+ *   if (result.action === 'accept') {
+ *     console.log('OAuth completed');
+ *   }
+ * };
  * ```
  */
-export function useElicitationHandler(
-  config: UseElicitationHandlerConfig
-): UseElicitationHandlerReturn {
-  const { handler, onSuccess, onError } = config;
+export function useElicitation(config: UseElicitationConfig = {}): UseElicitationReturn {
+  const { onSuccess, onError } = config;
 
-  const [state, setState] = useState<ElicitationHandlerState>({
-    isProcessing: false,
-    lastRequest: null,
-    lastResult: null,
+  const [state, setState] = useState<ElicitationState>({
+    isLoading: false,
+    result: null,
     error: null,
     requestCount: 0,
   });
 
-  const [isRegistered, setIsRegistered] = useState(false);
-
-  // Use refs to avoid stale closures
-  const handlerRef = useRef(handler);
-  const onSuccessRef = useRef(onSuccess);
-  const onErrorRef = useRef(onError);
-
-  useEffect(() => {
-    handlerRef.current = handler;
-  }, [handler]);
-
-  useEffect(() => {
-    onSuccessRef.current = onSuccess;
-  }, [onSuccess]);
-
-  useEffect(() => {
-    onErrorRef.current = onError;
-  }, [onError]);
-
   const reset = useCallback(() => {
     setState({
-      isProcessing: false,
-      lastRequest: null,
-      lastResult: null,
+      isLoading: false,
+      result: null,
       error: null,
       requestCount: 0,
     });
   }, []);
 
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.navigator?.modelContext) {
-      console.warn(
-        '[useElicitationHandler] navigator.modelContext not available. Handler will not be registered.'
-      );
-      return;
-    }
+  const elicitInput = useCallback(
+    async (params: ElicitationParams): Promise<ElicitationResult> => {
+      if (typeof window === 'undefined' || !window.navigator?.modelContext) {
+        throw new Error('navigator.modelContext is not available');
+      }
 
-    // Create a wrapped handler that tracks state
-    const wrappedHandler: ElicitationHandler = async (params) => {
       setState((prev) => ({
         ...prev,
-        isProcessing: true,
-        lastRequest: params,
+        isLoading: true,
         error: null,
       }));
 
       try {
-        const result = await handlerRef.current(params);
+        const result = await window.navigator.modelContext.elicitInput(params);
 
         setState((prev) => ({
-          isProcessing: false,
-          lastRequest: params,
-          lastResult: result,
+          isLoading: false,
+          result,
           error: null,
           requestCount: prev.requestCount + 1,
         }));
 
-        if (onSuccessRef.current) {
-          onSuccessRef.current(result, params);
-        }
-
+        onSuccess?.(result);
         return result;
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
 
         setState((prev) => ({
           ...prev,
-          isProcessing: false,
+          isLoading: false,
           error,
         }));
 
-        if (onErrorRef.current) {
-          onErrorRef.current(error, params);
-        }
-
+        onError?.(error);
         throw error;
       }
-    };
-
-    const registration = window.navigator.modelContext.setElicitationHandler({
-      handler: wrappedHandler,
-    });
-
-    setIsRegistered(true);
-    console.log('[useElicitationHandler] Elicitation handler registered');
-
-    return () => {
-      registration.unregister();
-      setIsRegistered(false);
-      console.log('[useElicitationHandler] Elicitation handler unregistered');
-    };
-  }, []); // Empty deps - we use refs for the handler
+    },
+    [onSuccess, onError]
+  );
 
   return {
     state,
+    elicitInput,
     reset,
-    isRegistered,
   };
 }
+
+// Also export with the old name for backwards compatibility during migration
+export { useElicitation as useElicitationHandler };
+export type { ElicitationState as ElicitationHandlerState };
+export type { UseElicitationConfig as UseElicitationHandlerConfig };
+export type { UseElicitationReturn as UseElicitationHandlerReturn };

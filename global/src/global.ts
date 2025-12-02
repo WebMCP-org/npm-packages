@@ -13,8 +13,6 @@ import type {
 } from '@mcp-b/webmcp-ts-sdk';
 import {
   CallToolRequestSchema,
-  CreateMessageRequestSchema,
-  ElicitRequestSchema,
   GetPromptRequestSchema,
   ListPromptsRequestSchema,
   ListResourcesRequestSchema,
@@ -24,8 +22,8 @@ import {
 } from '@mcp-b/webmcp-ts-sdk';
 import type { z } from 'zod';
 import type {
-  ElicitationHandlerOptions,
   ElicitationParams,
+  ElicitationResult,
   InputSchema,
   InternalModelContext,
   MCPBridge,
@@ -33,9 +31,9 @@ import type {
   ModelContextInput,
   ModelContextTesting,
   PromptDescriptor,
-  RegistrationHandle,
   ResourceDescriptor,
-  SamplingHandlerOptions,
+  SamplingRequestParams,
+  SamplingResult,
   ToolCallEvent,
   ToolDescriptor,
   ToolResponse,
@@ -455,56 +453,56 @@ class NativeModelContextAdapter implements InternalModelContext {
     return this.nativeContext.dispatchEvent(event);
   }
 
-  // ==================== SAMPLING METHODS (polyfill implementation) ====================
+  // ==================== SAMPLING METHODS ====================
 
   /**
-   * Sets the sampling handler for LLM requests.
+   * Request an LLM completion from the connected client.
    * Note: Native Chromium API does not yet support sampling.
    * This is handled by the polyfill.
    */
-  setSamplingHandler(options: SamplingHandlerOptions): RegistrationHandle {
-    console.log('[Native Adapter] Setting sampling handler');
-    this.bridge.samplingHandler = options.handler;
-    return {
-      unregister: () => {
-        console.log('[Native Adapter] Clearing sampling handler');
-        delete this.bridge.samplingHandler;
-      },
-    };
+  async createMessage(params: SamplingRequestParams): Promise<SamplingResult> {
+    console.log('[Native Adapter] Requesting sampling from client');
+    const server = this.bridge.tabServer;
+
+    // Access the underlying Server instance to call createMessage
+    const underlyingServer = (
+      server as unknown as {
+        server: { createMessage: (params: unknown) => Promise<SamplingResult> };
+      }
+    ).server;
+
+    if (!underlyingServer?.createMessage) {
+      throw new Error('Sampling is not supported: no connected client with sampling capability');
+    }
+
+    return underlyingServer.createMessage(params);
   }
 
-  /**
-   * Clears the sampling handler.
-   */
-  clearSamplingHandler(): void {
-    console.log('[Native Adapter] Clearing sampling handler');
-    delete this.bridge.samplingHandler;
-  }
-
-  // ==================== ELICITATION METHODS (polyfill implementation) ====================
+  // ==================== ELICITATION METHODS ====================
 
   /**
-   * Sets the elicitation handler for user input requests.
+   * Request user input from the connected client.
    * Note: Native Chromium API does not yet support elicitation.
    * This is handled by the polyfill.
    */
-  setElicitationHandler(options: ElicitationHandlerOptions): RegistrationHandle {
-    console.log('[Native Adapter] Setting elicitation handler');
-    this.bridge.elicitationHandler = options.handler;
-    return {
-      unregister: () => {
-        console.log('[Native Adapter] Clearing elicitation handler');
-        delete this.bridge.elicitationHandler;
-      },
-    };
-  }
+  async elicitInput(params: ElicitationParams): Promise<ElicitationResult> {
+    console.log('[Native Adapter] Requesting elicitation from client');
+    const server = this.bridge.tabServer;
 
-  /**
-   * Clears the elicitation handler.
-   */
-  clearElicitationHandler(): void {
-    console.log('[Native Adapter] Clearing elicitation handler');
-    delete this.bridge.elicitationHandler;
+    // Access the underlying Server instance to call elicitInput
+    const underlyingServer = (
+      server as unknown as {
+        server: { elicitInput: (params: unknown) => Promise<ElicitationResult> };
+      }
+    ).server;
+
+    if (!underlyingServer?.elicitInput) {
+      throw new Error(
+        'Elicitation is not supported: no connected client with elicitation capability'
+      );
+    }
+
+    return underlyingServer.elicitInput(params);
   }
 }
 
@@ -1865,57 +1863,57 @@ class WebModelContext implements InternalModelContext {
   // ==================== SAMPLING METHODS ====================
 
   /**
-   * Sets the sampling handler for LLM requests.
-   * When a tool needs an LLM completion, this handler will be called.
+   * Request an LLM completion from the connected client.
+   * This sends a sampling request to the connected MCP client.
    *
-   * @param {SamplingHandlerOptions} options - Options containing the sampling handler function
-   * @returns {{unregister: () => void}} Object with unregister function
+   * @param {SamplingRequestParams} params - Parameters for the sampling request
+   * @returns {Promise<SamplingResult>} The LLM completion result
    */
-  setSamplingHandler(options: SamplingHandlerOptions): RegistrationHandle {
-    console.log('[Web Model Context] Setting sampling handler');
-    this.bridge.samplingHandler = options.handler;
-    return {
-      unregister: () => {
-        console.log('[Web Model Context] Clearing sampling handler via unregister');
-        delete this.bridge.samplingHandler;
-      },
-    };
-  }
+  async createMessage(params: SamplingRequestParams): Promise<SamplingResult> {
+    console.log('[Web Model Context] Requesting sampling from client');
+    const server = this.bridge.tabServer;
 
-  /**
-   * Clears the current sampling handler.
-   */
-  clearSamplingHandler(): void {
-    console.log('[Web Model Context] Clearing sampling handler');
-    delete this.bridge.samplingHandler;
+    // Access the underlying Server instance to call createMessage
+    const underlyingServer = (
+      server as unknown as {
+        server: { createMessage: (params: unknown) => Promise<SamplingResult> };
+      }
+    ).server;
+
+    if (!underlyingServer?.createMessage) {
+      throw new Error('Sampling is not supported: no connected client with sampling capability');
+    }
+
+    return underlyingServer.createMessage(params);
   }
 
   // ==================== ELICITATION METHODS ====================
 
   /**
-   * Sets the elicitation handler for user input requests.
-   * When a tool needs additional user input, this handler will be called.
+   * Request user input from the connected client.
+   * This sends an elicitation request to the connected MCP client.
    *
-   * @param {ElicitationHandlerOptions} options - Options containing the elicitation handler function
-   * @returns {{unregister: () => void}} Object with unregister function
+   * @param {ElicitationParams} params - Parameters for the elicitation request
+   * @returns {Promise<ElicitationResult>} The user's response
    */
-  setElicitationHandler(options: ElicitationHandlerOptions): RegistrationHandle {
-    console.log('[Web Model Context] Setting elicitation handler');
-    this.bridge.elicitationHandler = options.handler;
-    return {
-      unregister: () => {
-        console.log('[Web Model Context] Clearing elicitation handler via unregister');
-        delete this.bridge.elicitationHandler;
-      },
-    };
-  }
+  async elicitInput(params: ElicitationParams): Promise<ElicitationResult> {
+    console.log('[Web Model Context] Requesting elicitation from client');
+    const server = this.bridge.tabServer;
 
-  /**
-   * Clears the current elicitation handler.
-   */
-  clearElicitationHandler(): void {
-    console.log('[Web Model Context] Clearing elicitation handler');
-    delete this.bridge.elicitationHandler;
+    // Access the underlying Server instance to call elicitInput
+    const underlyingServer = (
+      server as unknown as {
+        server: { elicitInput: (params: unknown) => Promise<ElicitationResult> };
+      }
+    ).server;
+
+    if (!underlyingServer?.elicitInput) {
+      throw new Error(
+        'Elicitation is not supported: no connected client with elicitation capability'
+      );
+    }
+
+    return underlyingServer.elicitInput(params);
   }
 }
 
@@ -2004,87 +2002,9 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
       }
     });
 
-    // ==================== SAMPLING HANDLERS ====================
-    server.setRequestHandler(CreateMessageRequestSchema, async (request) => {
-      console.log('[MCP Bridge] Handling sampling/createMessage request');
-
-      if (!bridge.samplingHandler) {
-        throw new Error(
-          'No sampling handler registered. Use navigator.modelContext.setSamplingHandler() to register one.'
-        );
-      }
-
-      const params = request.params as {
-        messages: Array<{
-          role: 'user' | 'assistant';
-          content:
-            | { type: 'text'; text: string }
-            | { type: 'image'; data: string; mimeType: string }
-            | Array<
-                { type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }
-              >;
-        }>;
-        systemPrompt?: string;
-        maxTokens: number;
-        temperature?: number;
-        stopSequences?: string[];
-        modelPreferences?: {
-          hints?: Array<{ name?: string }>;
-          costPriority?: number;
-          speedPriority?: number;
-          intelligencePriority?: number;
-        };
-        includeContext?: 'none' | 'thisServer' | 'allServers';
-        metadata?: Record<string, unknown>;
-      };
-
-      try {
-        const result = await bridge.samplingHandler({
-          messages: params.messages,
-          systemPrompt: params.systemPrompt,
-          maxTokens: params.maxTokens,
-          temperature: params.temperature,
-          stopSequences: params.stopSequences,
-          modelPreferences: params.modelPreferences,
-          includeContext: params.includeContext,
-          metadata: params.metadata,
-        });
-
-        return {
-          model: result.model,
-          role: result.role,
-          content: result.content,
-          stopReason: result.stopReason,
-        };
-      } catch (error) {
-        console.error('[MCP Bridge] Error in sampling handler:', error);
-        throw error;
-      }
-    });
-
-    // ==================== ELICITATION HANDLERS ====================
-    server.setRequestHandler(ElicitRequestSchema, async (request) => {
-      console.log('[MCP Bridge] Handling elicitation/create request');
-
-      if (!bridge.elicitationHandler) {
-        throw new Error(
-          'No elicitation handler registered. Use navigator.modelContext.setElicitationHandler() to register one.'
-        );
-      }
-
-      const params = request.params as ElicitationParams;
-
-      try {
-        const result = await bridge.elicitationHandler(params);
-        return {
-          action: result.action,
-          content: result.content,
-        };
-      } catch (error) {
-        console.error('[MCP Bridge] Error in elicitation handler:', error);
-        throw error;
-      }
-    });
+    // Note: Sampling and elicitation are server-to-client requests.
+    // The server calls createMessage() and elicitInput() methods on the Server instance.
+    // These are NOT request handlers - the client handles these requests.
   };
 
   const customTransport: Transport | undefined = transportOptions?.create?.();

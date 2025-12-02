@@ -636,12 +636,6 @@ export interface SamplingResult {
 }
 
 /**
- * Handler function for sampling requests from the server.
- * This is called when a tool execution needs LLM completion.
- */
-export type SamplingHandler = (params: SamplingRequestParams) => Promise<SamplingResult>;
-
-/**
  * Parameters for a form elicitation request.
  */
 export interface ElicitationFormParams {
@@ -700,28 +694,6 @@ export interface ElicitationResult {
   action: 'accept' | 'decline' | 'cancel';
   /** Content returned when action is 'accept' */
   content?: Record<string, string | number | boolean | string[]>;
-}
-
-/**
- * Handler function for elicitation requests from the server.
- * This is called when a tool needs additional user input.
- */
-export type ElicitationHandler = (params: ElicitationParams) => Promise<ElicitationResult>;
-
-/**
- * Options for registering a sampling handler.
- */
-export interface SamplingHandlerOptions {
-  /** The handler function to process sampling requests */
-  handler: SamplingHandler;
-}
-
-/**
- * Options for registering an elicitation handler.
- */
-export interface ElicitationHandlerOptions {
-  /** The handler function to process elicitation requests */
-  handler: ElicitationHandler;
 }
 
 // ============================================================================
@@ -866,73 +838,52 @@ export interface ModelContext {
   // ==================== SAMPLING ====================
 
   /**
-   * Register a handler for LLM sampling requests.
-   * When a tool needs an LLM completion, this handler will be called.
+   * Request an LLM completion from the connected client.
+   * This allows the server (webpage) to request sampling from the client (AI agent).
    *
-   * @param options - Options containing the sampling handler function
-   * @returns A handle to unregister the handler
+   * @param params - Parameters for the sampling request
+   * @returns Promise resolving to the LLM completion result
    *
    * @example
    * ```typescript
-   * const handle = navigator.modelContext.setSamplingHandler({
-   *   handler: async (params) => {
-   *     const response = await openai.chat.completions.create({
-   *       model: 'gpt-4',
-   *       messages: params.messages.map(m => ({
-   *         role: m.role,
-   *         content: typeof m.content === 'string' ? m.content : m.content.text
-   *       })),
-   *       max_tokens: params.maxTokens,
-   *       temperature: params.temperature,
-   *     });
-   *     return {
-   *       model: 'gpt-4',
-   *       role: 'assistant',
-   *       content: { type: 'text', text: response.choices[0].message.content },
-   *       stopReason: 'endTurn',
-   *     };
-   *   }
+   * const result = await navigator.modelContext.createMessage({
+   *   messages: [
+   *     { role: 'user', content: { type: 'text', text: 'What is 2+2?' } }
+   *   ],
+   *   maxTokens: 100,
    * });
+   * console.log(result.content); // { type: 'text', text: '4' }
    * ```
    */
-  setSamplingHandler(options: SamplingHandlerOptions): RegistrationHandle;
-
-  /**
-   * Clear the current sampling handler.
-   */
-  clearSamplingHandler(): void;
+  createMessage(params: SamplingRequestParams): Promise<SamplingResult>;
 
   // ==================== ELICITATION ====================
 
   /**
-   * Register a handler for user elicitation requests.
-   * When a tool needs additional user input, this handler will be called.
+   * Request user input from the connected client.
+   * This allows the server (webpage) to request form data or URL navigation from the client.
    *
-   * @param options - Options containing the elicitation handler function
-   * @returns A handle to unregister the handler
+   * @param params - Parameters for the elicitation request
+   * @returns Promise resolving to the user's response
    *
    * @example Form elicitation:
    * ```typescript
-   * const handle = navigator.modelContext.setElicitationHandler({
-   *   handler: async (params) => {
-   *     if (params.mode === 'url') {
-   *       // Open URL for sensitive data collection
-   *       window.open(params.url, '_blank');
-   *       return { action: 'accept' };
-   *     }
-   *     // Show form dialog and collect user input
-   *     const result = await showFormDialog(params.message, params.requestedSchema);
-   *     return result;
+   * const result = await navigator.modelContext.elicitInput({
+   *   message: 'Please provide your API key',
+   *   requestedSchema: {
+   *     type: 'object',
+   *     properties: {
+   *       apiKey: { type: 'string', title: 'API Key', description: 'Your API key' }
+   *     },
+   *     required: ['apiKey']
    *   }
    * });
+   * if (result.action === 'accept') {
+   *   console.log(result.content?.apiKey);
+   * }
    * ```
    */
-  setElicitationHandler(options: ElicitationHandlerOptions): RegistrationHandle;
-
-  /**
-   * Clear the current elicitation handler.
-   */
-  clearElicitationHandler(): void;
+  elicitInput(params: ElicitationParams): Promise<ElicitationResult>;
 
   /**
    * Add event listener for tool calls
@@ -1009,10 +960,6 @@ export interface MCPBridge {
   modelContextTesting?: ModelContextTesting;
   /** Whether the bridge has been initialized */
   isInitialized: boolean;
-  /** Optional sampling handler for LLM completions */
-  samplingHandler?: SamplingHandler;
-  /** Optional elicitation handler for user input */
-  elicitationHandler?: ElicitationHandler;
 }
 
 // ============================================================================
