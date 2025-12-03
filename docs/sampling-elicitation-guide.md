@@ -200,6 +200,106 @@ Elicitation allows your webpage to request user input from the connected client.
 1. **Form mode**: For non-sensitive data using a schema-driven form
 2. **URL mode**: For sensitive data collection via a web URL (OAuth, API keys, etc.)
 
+### Tool Call Context (Human-in-the-Loop)
+
+Elicitation requests can be tied to specific tool calls using `toolCallId` and `toolName`. This enables human-in-the-loop patterns where tools pause execution to request user input.
+
+```typescript
+// Inside a tool's execute function
+const confirmTool = {
+  name: 'sendEmail',
+  description: 'Send an email with user confirmation',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      to: { type: 'string' },
+      subject: { type: 'string' },
+      body: { type: 'string' },
+    },
+    required: ['to', 'subject', 'body'],
+  },
+  execute: async ({ to, subject, body }, { toolCallId }) => {
+    // Request confirmation from user, tied to this tool call
+    const result = await navigator.modelContext.elicitInput({
+      message: `Confirm sending email to ${to}?`,
+      requestedSchema: {
+        type: 'object',
+        properties: {
+          confirmed: {
+            type: 'boolean',
+            title: 'Send this email?',
+            default: false,
+          },
+        },
+      },
+      // Tie to the current tool call for client-side matching
+      toolCallId,
+      toolName: 'sendEmail',
+      metadata: {
+        to,
+        subject,
+        preview: body.substring(0, 100),
+      },
+    });
+
+    if (result.action !== 'accept' || !result.content?.confirmed) {
+      return {
+        content: [{ type: 'text', text: 'Email cancelled by user' }],
+      };
+    }
+
+    await sendEmail({ to, subject, body });
+    return {
+      content: [{ type: 'text', text: `Email sent to ${to}` }],
+    };
+  },
+};
+```
+
+### Client-Side Handling (assistant-ui pattern)
+
+On the client side (e.g., with assistant-ui), you can use the `toolCallId` to render the elicitation UI in the context of the tool call:
+
+```tsx
+import { makeAssistantTool, tool } from "@assistant-ui/react";
+import { z } from "zod";
+
+// Client receives elicitation request with toolCallId
+// and can match it to the corresponding tool execution
+
+const EmailTool = makeAssistantTool({
+  toolName: "sendEmail",
+  render: ({ args, result, interrupt, resume }) => {
+    // The elicitation request comes through as an interrupt
+    // with toolCallId matching this tool call
+    if (interrupt?.payload.toolName === 'sendEmail') {
+      return (
+        <div className="confirmation-dialog">
+          <h3>Confirm Email</h3>
+          <p>To: {interrupt.payload.metadata.to}</p>
+          <p>Subject: {interrupt.payload.metadata.subject}</p>
+          <p>Preview: {interrupt.payload.metadata.preview}</p>
+          <div className="actions">
+            <button onClick={() => resume({ confirmed: true })}>
+              Send Email
+            </button>
+            <button onClick={() => resume({ confirmed: false })}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    if (result) {
+      return <div className="result">{result.message}</div>;
+    }
+
+    return <div>Preparing email...</div>;
+  },
+});
+```
+
 ### Form Elicitation
 
 ```typescript
@@ -623,7 +723,17 @@ interface SamplingResult {
 ### Elicitation Types
 
 ```typescript
-interface ElicitationFormParams {
+// Context fields for tying elicitation to tool calls (human-in-the-loop)
+interface ElicitationContext {
+  // ID of the tool call this elicitation is associated with
+  toolCallId?: string;
+  // Name of the tool that triggered this elicitation
+  toolName?: string;
+  // Custom metadata to pass through to the client
+  metadata?: Record<string, unknown>;
+}
+
+interface ElicitationFormParams extends ElicitationContext {
   mode?: 'form';
   message: string;
   requestedSchema: {
@@ -645,10 +755,10 @@ interface ElicitationFormParams {
   };
 }
 
-interface ElicitationUrlParams {
+interface ElicitationUrlParams extends ElicitationContext {
   mode: 'url';
   message: string;
-  elicitationId: string;
+  elicitationId: string;  // For tracking OAuth/callback flows
   url: string;
 }
 

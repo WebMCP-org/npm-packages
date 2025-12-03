@@ -636,9 +636,34 @@ export interface SamplingResult {
 }
 
 /**
+ * Common context fields for elicitation requests.
+ * These allow tying elicitation to a specific tool call for human-in-the-loop patterns.
+ */
+export interface ElicitationContext {
+  /**
+   * Optional ID of the tool call this elicitation is associated with.
+   * Use this to match elicitation requests to tool calls on the client side.
+   * This enables human-in-the-loop patterns where tools pause for user input.
+   */
+  toolCallId?: string;
+
+  /**
+   * Optional name of the tool that triggered this elicitation.
+   * Useful for rendering tool-specific UI on the client.
+   */
+  toolName?: string;
+
+  /**
+   * Optional custom metadata to pass through to the client.
+   * Can include any additional context needed for rendering or processing.
+   */
+  metadata?: Record<string, unknown>;
+}
+
+/**
  * Parameters for a form elicitation request.
  */
-export interface ElicitationFormParams {
+export interface ElicitationFormParams extends ElicitationContext {
   /** Mode of elicitation */
   mode?: 'form';
   /** Message to show to the user */
@@ -669,12 +694,12 @@ export interface ElicitationFormParams {
 /**
  * Parameters for a URL elicitation request.
  */
-export interface ElicitationUrlParams {
+export interface ElicitationUrlParams extends ElicitationContext {
   /** Mode of elicitation */
   mode: 'url';
   /** Message explaining why the URL needs to be opened */
   message: string;
-  /** Unique identifier for this elicitation */
+  /** Unique identifier for this elicitation (for tracking OAuth/callback flows) */
   elicitationId: string;
   /** URL to open */
   url: string;

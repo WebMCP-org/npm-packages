@@ -17,6 +17,7 @@
  * Re-export sampling and elicitation types from @mcp-b/global.
  */
 export type {
+  ElicitationContext,
   ElicitationFormParams,
   ElicitationParams,
   ElicitationResult,
