@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/react-webmcp",
-  "version": "0.1.5",
+  "version": "0.1.6-beta.1",
   "description": "React hooks for Model Context Protocol - register tools via navigator.modelContext and consume tools from MCP servers",
   "keywords": [
     "mcp",
@@ -28,8 +28,8 @@
   "type": "module",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     }
   },
   "main": "./dist/index.js",

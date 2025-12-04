@@ -1,5 +1,23 @@
 # @mcp-b/react-webmcp
 
+## 0.1.6-beta.1
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-b/transports@1.1.2-beta.1
+  - @mcp-b/global@1.1.3-beta.1
+
+## 0.1.6-beta.0
+
+### Patch Changes
+
+- Beta release for testing
+- Updated dependencies
+  - @mcp-b/transports@1.1.2-beta.0
+  - @mcp-b/global@1.1.3-beta.0
+  - @mcp-b/webmcp-ts-sdk@1.0.2-beta.0
+
 ## 0.1.5
 
 ### Patch Changes

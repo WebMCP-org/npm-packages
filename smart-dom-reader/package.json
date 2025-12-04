@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/smart-dom-reader",
-  "version": "1.0.2",
+  "version": "1.0.3-beta.0",
   "description": "Token-efficient DOM extraction library for AI-powered browser automation",
   "keywords": [
     "mcp",
@@ -28,12 +28,12 @@
   "type": "module",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     },
     "./bundle-string": {
-      "import": "./dist/bundle-string.js",
-      "types": "./dist/bundle-string.d.ts"
+      "types": "./dist/bundle-string.d.ts",
+      "import": "./dist/bundle-string.js"
     }
   },
   "main": "./dist/index.js",

@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/webmcp-ts-sdk",
-  "version": "1.0.1",
+  "version": "1.0.2-beta.0",
   "description": "TypeScript SDK adapter for Model Context Protocol with dynamic tool registration support for browsers",
   "keywords": [
     "mcp",
@@ -27,8 +27,8 @@
   "type": "module",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     }
   },
   "main": "./dist/index.js",

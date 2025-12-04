@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/extension-tools",
-  "version": "0.2.3",
+  "version": "0.2.4-beta.0",
   "description": "Chrome Extension API tools for Model Context Protocol (MCP) - provides MCP-compatible wrappers for browser extension APIs",
   "keywords": [
     "mcp",
@@ -28,8 +28,8 @@
   "type": "module",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     }
   },
   "main": "./dist/index.js",

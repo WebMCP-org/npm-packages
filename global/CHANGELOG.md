@@ -1,5 +1,21 @@
 # @mcp-b/global
 
+## 1.1.3-beta.1
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-b/transports@1.1.2-beta.1
+
+## 1.1.3-beta.0
+
+### Patch Changes
+
+- Beta release for testing
+- Updated dependencies
+  - @mcp-b/transports@1.1.2-beta.0
+  - @mcp-b/webmcp-ts-sdk@1.0.2-beta.0
+
 ## 1.1.2
 
 ### Patch Changes

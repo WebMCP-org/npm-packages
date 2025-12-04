@@ -1,5 +1,17 @@
 # @mcp-b/transports
 
+## 1.1.2-beta.1
+
+### Patch Changes
+
+- Add dedicated @mcp-b/mcp-iframe package for MCPIframeElement custom element
+
+## 1.1.2-beta.0
+
+### Patch Changes
+
+- Beta release for testing
+
 ## 1.1.1
 
 ### Patch Changes
