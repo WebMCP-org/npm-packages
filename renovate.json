@@ -10,17 +10,17 @@
   "packageRules": [
     {
       "description": "Group code quality tools",
-      "matchPackageNames": ["/^@biomejs\\/.*/", "husky", "lint-staged", "/^@commitlint\\/.*/"],
+      "matchPackageNames": ["@biomejs/*", "husky", "lint-staged", "@commitlint/*"],
       "groupName": "code-quality"
     },
     {
       "description": "Group build tools",
-      "matchPackageNames": ["turbo", "tsdown", "tsup", "/^vite$/", "/^@vitejs\\/.*/"],
+      "matchPackageNames": ["turbo", "tsdown", "tsup", "vite", "@vitejs/*"],
       "groupName": "build-tools"
     },
     {
       "description": "Group TypeScript and types",
-      "matchPackageNames": ["typescript", "/^@types\\/.*/"],
+      "matchPackageNames": ["typescript", "@types/*"],
       "groupName": "typescript"
     },
     {
