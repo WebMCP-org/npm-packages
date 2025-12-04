@@ -25,75 +25,102 @@
  */
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import type { CallToolResult, Tool } from '@modelcontextprotocol/sdk/types.js';
 import { IframeParentTransport } from './IframeParentTransport.js';
 
-/** Tool info from MCP server */
-export interface MCPTool {
-  name: string;
-  description?: string;
-  inputSchema?: {
-    type: string;
-    properties?: Record<string, unknown>;
-    required?: string[];
-  };
-}
-
-/** Options for MCPIframe element */
-export interface MCPIframeElementOptions {
-  /** Timeout for tool calls in ms (default: 30000) */
-  callTimeout?: number;
-  /** Prefix separator for tool names (default: ':') */
-  prefixSeparator?: string;
-  /** MCP channel ID (default: 'mcp-iframe') */
-  channelId?: string;
-}
+// ============================================================================
+// Configuration
+// ============================================================================
 
 const DEFAULT_CALL_TIMEOUT = 30000;
 const DEFAULT_PREFIX_SEPARATOR = ':';
 const DEFAULT_CHANNEL_ID = 'mcp-iframe';
 
+/** Standard iframe attributes that are mirrored to the internal iframe */
+const IFRAME_ATTRIBUTES = [
+  'src',
+  'srcdoc',
+  'name',
+  'sandbox',
+  'allow',
+  'allowfullscreen',
+  'width',
+  'height',
+  'loading',
+  'referrerpolicy',
+  'credentialless',
+] as const;
+
+// ============================================================================
+// Types
+// ============================================================================
+
+/** Registration handle returned by navigator.modelContext.registerTool() */
+interface RegistrationHandle {
+  unregister: () => void;
+}
+
+/** Minimal ModelContext interface for tool registration */
+interface ModelContext {
+  registerTool(tool: {
+    name: string;
+    description: string;
+    inputSchema: Tool['inputSchema'];
+    execute: (args: Record<string, unknown>) => Promise<CallToolResult>;
+  }): RegistrationHandle;
+}
+
+/** Navigator with optional modelContext */
+interface NavigatorWithModelContext extends Navigator {
+  modelContext?: ModelContext;
+}
+
+/** Custom event detail for mcp-iframe-ready */
+export interface MCPIframeReadyEventDetail {
+  tools: string[];
+}
+
+/** Custom event detail for mcp-iframe-error */
+export interface MCPIframeErrorEventDetail {
+  error: unknown;
+}
+
+/** Custom event detail for mcp-iframe-tools-changed */
+export interface MCPIframeToolsChangedEventDetail {
+  tools: string[];
+}
+
+// ============================================================================
+// MCPIframeElement
+// ============================================================================
+
 /**
  * MCPIframe Custom Element
  *
  * Wraps an iframe and exposes its MCP tools to the parent's Model Context API.
+ *
+ * @fires mcp-iframe-ready - When connected to iframe's MCP server
+ * @fires mcp-iframe-error - When connection fails
+ * @fires mcp-iframe-tools-changed - When tools are refreshed
  */
 export class MCPIframeElement extends HTMLElement {
-  private _iframe: HTMLIFrameElement | null = null;
-  private _client: Client | null = null;
-  private _transport: IframeParentTransport | null = null;
-  private _callTimeout: number = DEFAULT_CALL_TIMEOUT;
-  private _prefixSeparator: string = DEFAULT_PREFIX_SEPARATOR;
-  private _channelId: string = DEFAULT_CHANNEL_ID;
-  private _ready = false;
-  private _mcpTools: MCPTool[] = [];
-  private _registeredTools: Map<string, { unregister: () => void }> = new Map();
-  private _connecting = false;
-  private _targetOrigin: string | null = null;
+  // Internal state
+  #iframe: HTMLIFrameElement | null = null;
+  #client: Client | null = null;
+  #transport: IframeParentTransport | null = null;
+  #ready = false;
+  #connecting = false;
+  #mcpTools: Tool[] = [];
+  #registeredTools = new Map<string, RegistrationHandle>();
 
-  /** List of standard iframe attributes to mirror */
-  static readonly IFRAME_ATTRIBUTES = [
-    'src',
-    'srcdoc',
-    'name',
-    'sandbox',
-    'allow',
-    'allowfullscreen',
-    'width',
-    'height',
-    'loading',
-    'referrerpolicy',
-    'credentialless',
-  ];
+  // Configuration
+  #callTimeout = DEFAULT_CALL_TIMEOUT;
+  #prefixSeparator = DEFAULT_PREFIX_SEPARATOR;
+  #channelId = DEFAULT_CHANNEL_ID;
+  #targetOrigin: string | null = null;
 
-  /** Observed attributes for the custom element */
   static get observedAttributes(): string[] {
-    return [
-      ...MCPIframeElement.IFRAME_ATTRIBUTES,
-      'target-origin',
-      'channel',
-      'call-timeout',
-      'prefix-separator',
-    ];
+    return [...IFRAME_ATTRIBUTES, 'target-origin', 'channel', 'call-timeout', 'prefix-separator'];
   }
 
   constructor() {
@@ -101,215 +128,203 @@ export class MCPIframeElement extends HTMLElement {
     this.attachShadow({ mode: 'open' });
   }
 
+  // ==================== Lifecycle ====================
+
   connectedCallback(): void {
-    this._createIframe();
+    this.#createIframe();
   }
 
   disconnectedCallback(): void {
-    this._cleanup();
+    void this.#cleanup();
   }
 
   attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null): void {
     if (oldValue === newValue) return;
 
-    // Handle custom attributes
     switch (name) {
       case 'target-origin':
-        this._targetOrigin = newValue;
-        if (this._ready) {
-          this._reconnect();
-        }
-        return;
+        this.#targetOrigin = newValue;
+        if (this.#ready) void this.#reconnect();
+        break;
+
       case 'channel':
-        this._channelId = newValue || DEFAULT_CHANNEL_ID;
-        if (this._ready) {
-          this._reconnect();
-        }
-        return;
+        this.#channelId = newValue ?? DEFAULT_CHANNEL_ID;
+        if (this.#ready) void this.#reconnect();
+        break;
+
       case 'call-timeout':
-        this._callTimeout = newValue ? Number.parseInt(newValue, 10) : DEFAULT_CALL_TIMEOUT;
-        return;
+        this.#callTimeout = newValue ? Number.parseInt(newValue, 10) : DEFAULT_CALL_TIMEOUT;
+        break;
+
       case 'prefix-separator':
-        this._prefixSeparator = newValue || DEFAULT_PREFIX_SEPARATOR;
-        // Re-register tools with new prefix if already connected
-        if (this._ready) {
-          this._unregisterAllTools();
-          this._registerToolsOnModelContext(this._mcpTools);
+        this.#prefixSeparator = newValue ?? DEFAULT_PREFIX_SEPARATOR;
+        if (this.#ready) {
+          this.#unregisterAllTools();
+          this.#registerToolsOnModelContext(this.#mcpTools);
         }
-        return;
-    }
+        break;
 
-    // Mirror iframe attributes
-    if (this._iframe && MCPIframeElement.IFRAME_ATTRIBUTES.includes(name)) {
-      if (newValue === null) {
-        this._iframe.removeAttribute(name);
-      } else {
-        this._iframe.setAttribute(name, newValue);
-      }
-
-      // Reconnect when src changes
-      if (name === 'src' || name === 'srcdoc') {
-        this._reconnect();
-      }
+      default:
+        // Mirror standard iframe attributes
+        if (this.#iframe && (IFRAME_ATTRIBUTES as readonly string[]).includes(name)) {
+          if (newValue === null) {
+            this.#iframe.removeAttribute(name);
+          } else {
+            this.#iframe.setAttribute(name, newValue);
+          }
+          // Reconnect when source changes
+          if (name === 'src' || name === 'srcdoc') {
+            void this.#reconnect();
+          }
+        }
     }
   }
 
-  /** Get the wrapped iframe element */
+  // ==================== Public API ====================
+
+  /** The wrapped iframe element */
   get iframe(): HTMLIFrameElement | null {
-    return this._iframe;
+    return this.#iframe;
   }
 
-  /** Get the MCP client (if connected) */
+  /** The MCP client (if connected) */
   get client(): Client | null {
-    return this._client;
+    return this.#client;
   }
 
-  /** Check if connected to the iframe's MCP server */
+  /** Whether the element is connected to the iframe's MCP server */
   get ready(): boolean {
-    return this._ready;
+    return this.#ready;
   }
 
-  /** Get list of exposed tool names (with prefix) */
+  /** List of exposed tool names (with prefix) */
   get exposedTools(): string[] {
-    return Array.from(this._registeredTools.keys());
+    return Array.from(this.#registeredTools.keys());
   }
 
-  /** Get the raw tools from the iframe's MCP server (without prefix) */
-  get mcpTools(): MCPTool[] {
-    return [...this._mcpTools];
+  /** Raw tools from the iframe's MCP server (without prefix) */
+  get mcpTools(): Tool[] {
+    return [...this.#mcpTools];
   }
 
-  /** Get the tool name prefix */
+  /** The tool name prefix (id + separator) */
   get toolPrefix(): string {
     const id = this.id || this.getAttribute('name') || 'iframe';
-    return `${id}${this._prefixSeparator}`;
+    return `${id}${this.#prefixSeparator}`;
   }
 
   /** Manually refresh tools from the iframe */
   async refreshTools(): Promise<void> {
-    if (!this._client || !this._ready) {
+    if (!this.#client || !this.#ready) {
       throw new Error('Not connected to iframe MCP server');
     }
 
-    const response = await this._client.listTools();
-    this._mcpTools = response.tools as MCPTool[];
-    this._unregisterAllTools();
-    this._registerToolsOnModelContext(this._mcpTools);
+    const response = await this.#client.listTools();
+    this.#mcpTools = response.tools;
+    this.#unregisterAllTools();
+    this.#registerToolsOnModelContext(this.#mcpTools);
 
     this.dispatchEvent(
-      new CustomEvent('mcp-iframe-tools-changed', {
+      new CustomEvent<MCPIframeToolsChangedEventDetail>('mcp-iframe-tools-changed', {
         detail: { tools: this.exposedTools },
       })
     );
   }
 
-  /** Create the internal iframe element */
-  private _createIframe(): void {
-    this._iframe = document.createElement('iframe');
+  // ==================== Private Methods ====================
 
-    // Copy all iframe attributes
-    for (const attr of MCPIframeElement.IFRAME_ATTRIBUTES) {
+  #createIframe(): void {
+    this.#iframe = document.createElement('iframe');
+
+    // Mirror all iframe attributes
+    for (const attr of IFRAME_ATTRIBUTES) {
       const value = this.getAttribute(attr);
       if (value !== null) {
-        this._iframe.setAttribute(attr, value);
+        this.#iframe.setAttribute(attr, value);
       }
     }
 
-    // Default styling to fill container
-    this._iframe.style.border = 'none';
-    this._iframe.style.width = this.getAttribute('width') || '100%';
-    this._iframe.style.height = this.getAttribute('height') || '100%';
+    // Default styling
+    this.#iframe.style.border = 'none';
+    this.#iframe.style.width = this.getAttribute('width') ?? '100%';
+    this.#iframe.style.height = this.getAttribute('height') ?? '100%';
 
     // Connect when iframe loads
-    this._iframe.addEventListener('load', () => {
-      this._connect();
-    });
+    this.#iframe.addEventListener('load', () => void this.#connect());
 
-    // Add to shadow DOM
-    if (this.shadowRoot) {
-      this.shadowRoot.appendChild(this._iframe);
-    }
+    this.shadowRoot?.appendChild(this.#iframe);
   }
 
-  /** Connect to the iframe's MCP server */
-  private async _connect(): Promise<void> {
-    if (this._connecting || !this._iframe) return;
-    this._connecting = true;
+  async #connect(): Promise<void> {
+    if (this.#connecting || !this.#iframe) return;
+    this.#connecting = true;
 
     try {
-      // Determine target origin
-      const targetOrigin = this._getTargetOrigin();
+      const targetOrigin = this.#getTargetOrigin();
       if (!targetOrigin) {
         console.warn('[MCPIframe] Cannot determine target origin. Set target-origin attribute.');
         return;
       }
 
-      // Create transport
-      this._transport = new IframeParentTransport({
-        iframe: this._iframe,
+      // Create transport and client
+      this.#transport = new IframeParentTransport({
+        iframe: this.#iframe,
         targetOrigin,
-        channelId: this._channelId,
+        channelId: this.#channelId,
       });
 
-      // Create MCP client
-      this._client = new Client({
+      this.#client = new Client({
         name: `MCPIframe:${this.id || 'anonymous'}`,
         version: '1.0.0',
       });
 
-      // Connect
-      await this._client.connect(this._transport);
-      this._ready = true;
+      // Connect to iframe's MCP server
+      await this.#client.connect(this.#transport);
+      this.#ready = true;
 
-      // Get tools from iframe
-      const response = await this._client.listTools();
-      this._mcpTools = response.tools as MCPTool[];
-
-      // Register tools on parent's Model Context
-      this._registerToolsOnModelContext(this._mcpTools);
+      // Fetch and register tools
+      const response = await this.#client.listTools();
+      this.#mcpTools = response.tools;
+      this.#registerToolsOnModelContext(this.#mcpTools);
 
       this.dispatchEvent(
-        new CustomEvent('mcp-iframe-ready', {
+        new CustomEvent<MCPIframeReadyEventDetail>('mcp-iframe-ready', {
           detail: { tools: this.exposedTools },
         })
       );
     } catch (error) {
       console.error('[MCPIframe] Failed to connect:', error);
       this.dispatchEvent(
-        new CustomEvent('mcp-iframe-error', {
+        new CustomEvent<MCPIframeErrorEventDetail>('mcp-iframe-error', {
           detail: { error },
         })
       );
     } finally {
-      this._connecting = false;
+      this.#connecting = false;
     }
   }
 
-  /** Get the target origin for the iframe */
-  private _getTargetOrigin(): string | null {
+  #getTargetOrigin(): string | null {
     // Use explicit attribute if set
-    if (this._targetOrigin) {
-      return this._targetOrigin;
+    if (this.#targetOrigin) {
+      return this.#targetOrigin;
     }
 
-    // Try to infer from src attribute
+    // Infer from src attribute
     const src = this.getAttribute('src');
     if (src) {
       try {
-        const url = new URL(src, window.location.href);
-        return url.origin;
+        return new URL(src, window.location.href).origin;
       } catch {
-        // Invalid URL, fall through
+        // Invalid URL
       }
     }
 
-    // For same-origin iframes
+    // Default to same origin
     return window.location.origin;
   }
 
-  /** Register tools from iframe on parent's Model Context */
-  private _registerToolsOnModelContext(tools: MCPTool[]): void {
-    // Check if Model Context API is available
+  #registerToolsOnModelContext(tools: Tool[]): void {
     const modelContext = (navigator as NavigatorWithModelContext).modelContext;
     if (!modelContext) {
       console.warn('[MCPIframe] Model Context API not available on parent');
@@ -319,125 +334,91 @@ export class MCPIframeElement extends HTMLElement {
     for (const tool of tools) {
       const prefixedName = `${this.toolPrefix}${tool.name}`;
 
-      // Create a wrapper tool that routes calls to the iframe via MCP
       const registration = modelContext.registerTool({
         name: prefixedName,
-        description: tool.description || `Tool from iframe: ${tool.name}`,
-        inputSchema: tool.inputSchema || { type: 'object', properties: {} },
-        execute: async (args: Record<string, unknown>) => {
-          return this._callIframeTool(tool.name, args);
-        },
+        description: tool.description ?? `Tool from iframe: ${tool.name}`,
+        inputSchema: tool.inputSchema,
+        execute: (args) => this.#callIframeTool(tool.name, args),
       });
 
-      this._registeredTools.set(prefixedName, registration);
+      this.#registeredTools.set(prefixedName, registration);
     }
   }
 
-  /** Unregister all tools from the parent's Model Context */
-  private _unregisterAllTools(): void {
-    for (const registration of this._registeredTools.values()) {
+  #unregisterAllTools(): void {
+    for (const registration of this.#registeredTools.values()) {
       registration.unregister();
     }
-    this._registeredTools.clear();
+    this.#registeredTools.clear();
   }
 
-  /** Call a tool in the iframe via MCP */
-  private async _callIframeTool(toolName: string, args: Record<string, unknown>): Promise<unknown> {
-    if (!this._client || !this._ready) {
+  async #callIframeTool(toolName: string, args: Record<string, unknown>): Promise<CallToolResult> {
+    if (!this.#client || !this.#ready) {
       throw new Error('Not connected to iframe MCP server');
     }
 
-    // Create a timeout promise
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => {
-        reject(new Error(`Tool call timed out: ${toolName}`));
-      }, this._callTimeout);
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.#callTimeout);
 
-    // Race the tool call against the timeout
-    const result = await Promise.race([
-      this._client.callTool({
-        name: toolName,
-        arguments: args,
-      }),
-      timeoutPromise,
-    ]);
-
-    // Extract the result from MCP response
-    const mcpResult = result as { content?: Array<{ type: string; text?: string }> };
-    const firstContent = mcpResult.content?.[0];
-    if (firstContent && firstContent.type === 'text' && firstContent.text) {
-      // Try to parse as JSON, otherwise return as string
-      try {
-        return JSON.parse(firstContent.text);
-      } catch {
-        return firstContent.text;
-      }
-    }
-
-    return result;
-  }
-
-  /** Reconnect to the iframe's MCP server */
-  private async _reconnect(): Promise<void> {
-    await this._disconnect();
-    // Small delay to ensure iframe is ready
-    setTimeout(() => {
-      this._connect();
-    }, 100);
-  }
-
-  /** Disconnect from the iframe's MCP server */
-  private async _disconnect(): Promise<void> {
-    this._ready = false;
-    this._mcpTools = [];
-    this._unregisterAllTools();
-
-    if (this._client) {
-      try {
-        await this._client.close();
-      } catch {
-        // Ignore close errors
-      }
-      this._client = null;
-    }
-
-    if (this._transport) {
-      try {
-        await this._transport.close();
-      } catch {
-        // Ignore close errors
-      }
-      this._transport = null;
+    try {
+      const result = await this.#client.callTool({ name: toolName, arguments: args }, undefined, {
+        signal: controller.signal,
+      });
+      // The SDK returns a union type; MCP protocol guarantees content field
+      return result as CallToolResult;
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 
-  /** Clean up all resources */
-  private async _cleanup(): Promise<void> {
-    await this._disconnect();
+  async #reconnect(): Promise<void> {
+    await this.#disconnect();
+    // Brief delay for iframe to be ready
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    await this.#connect();
+  }
+
+  async #disconnect(): Promise<void> {
+    this.#ready = false;
+    this.#mcpTools = [];
+    this.#unregisterAllTools();
+
+    if (this.#client) {
+      try {
+        await this.#client.close();
+      } catch {
+        // Ignore
+      }
+      this.#client = null;
+    }
+
+    if (this.#transport) {
+      try {
+        await this.#transport.close();
+      } catch {
+        // Ignore
+      }
+      this.#transport = null;
+    }
+  }
+
+  async #cleanup(): Promise<void> {
+    await this.#disconnect();
   }
 }
 
-/** Navigator with Model Context API */
-interface NavigatorWithModelContext extends Navigator {
-  modelContext?: {
-    registerTool(tool: {
-      name: string;
-      description: string;
-      inputSchema: Record<string, unknown>;
-      execute: (args: Record<string, unknown>) => Promise<unknown>;
-    }): { unregister: () => void };
-  };
-}
+// ============================================================================
+// Registration
+// ============================================================================
 
-/** Register the custom element */
+/** Register the custom element with a custom tag name */
 export function registerMCPIframeElement(tagName = 'mcp-iframe'): void {
-  if (!customElements.get(tagName)) {
+  if (typeof customElements !== 'undefined' && !customElements.get(tagName)) {
     customElements.define(tagName, MCPIframeElement);
   }
 }
 
-// Auto-register if in browser environment
+// Auto-register in browser environments
 if (typeof window !== 'undefined' && typeof customElements !== 'undefined') {
   registerMCPIframeElement();
 }
