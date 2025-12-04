@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/smart-dom-reader",
-  "version": "1.0.3-beta.0",
+  "version": "1.0.3-beta.1",
   "description": "Token-efficient DOM extraction library for AI-powered browser automation",
   "keywords": [
     "mcp",

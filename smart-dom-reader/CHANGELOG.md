@@ -1,5 +1,11 @@
 # @mcp-b/smart-dom-reader
 
+## 1.0.3-beta.1
+
+### Patch Changes
+
+- Beta release bump
+
 ## 1.0.3-beta.0
 
 ### Patch Changes

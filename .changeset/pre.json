@@ -18,5 +18,5 @@
     "usewebmcp": "0.1.5",
     "@mcp-b/webmcp-ts-sdk": "1.0.1"
   },
-  "changesets": ["beta-release", "mcp-iframe-release"]
+  "changesets": ["beta-release", "mcp-iframe-release", "new-beta-bump"]
 }

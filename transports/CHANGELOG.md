@@ -1,5 +1,11 @@
 # @mcp-b/transports
 
+## 1.1.2-beta.2
+
+### Patch Changes
+
+- Beta release bump
+
 ## 1.1.2-beta.1
 
 ### Patch Changes
