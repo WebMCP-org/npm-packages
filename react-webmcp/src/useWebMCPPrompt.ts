@@ -1,15 +1,15 @@
-import type { InputSchema, PromptMessage } from '@mcp-b/global';
+import type { InputSchema } from '@mcp-b/global';
 import { zodToJsonSchema } from '@mcp-b/global';
 import { useEffect, useRef, useState } from 'react';
 import type { z } from 'zod';
-import type { WebMCPPromptConfig, WebMCPPromptReturn } from './types.js';
+import type { PromptMessage, WebMCPPromptConfig, WebMCPPromptReturn } from './types.js';
 
 /**
  * React hook for registering Model Context Protocol (MCP) prompts.
  *
  * This hook handles the complete lifecycle of an MCP prompt:
  * - Registers the prompt with `window.navigator.modelContext`
- * - Validates arguments using Zod schemas (if provided)
+ * - Converts Zod schemas to JSON Schema for argument validation
  * - Automatically unregisters on component unmount
  *
  * @template TArgsSchema - Zod schema object defining argument types

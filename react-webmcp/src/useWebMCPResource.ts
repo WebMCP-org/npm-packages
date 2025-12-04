@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { WebMCPResourceConfig, WebMCPResourceReturn } from './types.js';
+import type { ResourceContents, WebMCPResourceConfig, WebMCPResourceReturn } from './types.js';
 
 /**
  * React hook for registering Model Context Protocol (MCP) resources.
@@ -82,7 +82,7 @@ export function useWebMCPResource(config: WebMCPResourceConfig): WebMCPResourceR
     const resourceHandler = async (
       resolvedUri: URL,
       params?: Record<string, string>
-    ): Promise<{ contents: import('@mcp-b/global').ResourceContents[] }> => {
+    ): Promise<{ contents: ResourceContents[] }> => {
       return readRef.current(resolvedUri, params);
     };
 
