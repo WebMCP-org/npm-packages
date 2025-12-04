@@ -429,6 +429,9 @@ importers:
       '@mcp-b/global':
         specifier: workspace:*
         version: link:../../global
+      '@mcp-b/mcp-iframe':
+        specifier: workspace:*
+        version: link:../../mcp-iframe
       '@mcp-b/transports':
         specifier: workspace:*
         version: link:../../transports
@@ -582,6 +585,25 @@ importers:
       zod:
         specifier: 'catalog:'
         version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.17.2
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.15.10(typescript@5.9.2)
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.2
+
+  mcp-iframe:
+    dependencies:
+      '@mcp-b/transports':
+        specifier: workspace:*
+        version: link:../transports
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.15.0
+        version: 1.20.2
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -6232,7 +6254,7 @@ snapshots:
   '@commitlint/is-ignored@19.8.1':
     dependencies:
       '@commitlint/types': 19.8.1
-      semver: 7.7.2
+      semver: 7.7.3
 
   '@commitlint/lint@19.8.1':
     dependencies:
@@ -8613,7 +8635,7 @@ snapshots:
 
   eventsource@3.0.7:
     dependencies:
-      eventsource-parser: 3.0.3
+      eventsource-parser: 3.0.6
 
   exit-hook@2.2.1: {}
 

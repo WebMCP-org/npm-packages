@@ -9,9 +9,9 @@
 import '@mcp-b/global';
 
 // Import the MCPIframeElement (auto-registers as <mcp-iframe>)
-import '@mcp-b/transports';
+import '@mcp-b/mcp-iframe';
 
-import type { MCPIframeElement } from '@mcp-b/transports';
+import type { MCPIframeElement } from '@mcp-b/mcp-iframe';
 
 // DOM elements
 const connectionStatus = document.getElementById('connection-status')!;

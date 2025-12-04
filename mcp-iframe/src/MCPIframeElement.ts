@@ -29,6 +29,7 @@
  * ```
  */
 
+import { IframeParentTransport } from '@mcp-b/transports';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type {
   CallToolResult,
@@ -38,7 +39,6 @@ import type {
   Resource,
   Tool,
 } from '@modelcontextprotocol/sdk/types.js';
-import { IframeParentTransport } from './IframeParentTransport.js';
 
 // ============================================================================
 // Configuration

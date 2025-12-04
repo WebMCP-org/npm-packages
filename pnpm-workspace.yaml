@@ -1,6 +1,7 @@
 packages:
   - extension-tools
   - global
+  - mcp-iframe
   - react-webmcp
   - usewebmcp
   - smart-dom-reader

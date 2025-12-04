@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@mcp-b/global": "workspace:*",
+    "@mcp-b/mcp-iframe": "workspace:*",
     "@mcp-b/transports": "workspace:*",
     "@modelcontextprotocol/sdk": "catalog:",
     "zod": "catalog:"

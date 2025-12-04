@@ -13,6 +13,3 @@ export * from './UserScriptServerTransport.js';
 
 // export * from './WebsocketClientTransport.js';
 // export * from './WebsocketServerTransport.js';
-
-// Model Context API iframe tool exposure
-export * from './MCPIframeElement.js';
