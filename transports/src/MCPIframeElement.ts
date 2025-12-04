@@ -1,31 +1,43 @@
 /**
  * MCPIframe Custom Element
  *
- * A custom element that wraps an iframe and automatically exposes tools
- * registered in the iframe's MCP server to the parent page's Model Context API.
+ * A custom element that wraps an iframe and automatically exposes tools,
+ * resources, and prompts registered in the iframe's MCP server to the
+ * parent page's Model Context API.
  *
  * The iframe should have the MCP polyfill installed, which creates an MCP server
- * that exposes tools registered via `navigator.modelContext.registerTool()`.
+ * that exposes items registered via `navigator.modelContext`.
  *
  * @example
  * ```html
  * <mcp-iframe src="./child-app.html" id="my-app"></mcp-iframe>
  * ```
  *
- * Tools from the iframe will be exposed with the element's ID as prefix:
- * - Child registers "calculate" -> Parent sees "my-app:calculate"
+ * Items from the iframe will be exposed with the element's ID as prefix:
+ * - Child registers tool "calculate" -> Parent sees "my-app:calculate"
+ * - Child registers resource "config://settings" -> Parent sees "my-app:config://settings"
+ * - Child registers prompt "help" -> Parent sees "my-app:help"
  *
  * @example
  * ```typescript
  * const mcpIframe = document.querySelector('mcp-iframe');
  * mcpIframe.addEventListener('mcp-iframe-ready', (e) => {
  *   console.log('Tools:', e.detail.tools);
+ *   console.log('Resources:', e.detail.resources);
+ *   console.log('Prompts:', e.detail.prompts);
  * });
  * ```
  */
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import type { CallToolResult, Tool } from '@modelcontextprotocol/sdk/types.js';
+import type {
+  CallToolResult,
+  GetPromptResult,
+  Prompt,
+  ReadResourceResult,
+  Resource,
+  Tool,
+} from '@modelcontextprotocol/sdk/types.js';
 import { IframeParentTransport } from './IframeParentTransport.js';
 
 // ============================================================================
@@ -55,18 +67,33 @@ const IFRAME_ATTRIBUTES = [
 // Types
 // ============================================================================
 
-/** Registration handle returned by navigator.modelContext.registerTool() */
+/** Registration handle returned by navigator.modelContext register methods */
 interface RegistrationHandle {
   unregister: () => void;
 }
 
-/** Minimal ModelContext interface for tool registration */
+/** Minimal ModelContext interface for registering tools, resources, and prompts */
 interface ModelContext {
   registerTool(tool: {
     name: string;
     description: string;
     inputSchema: Tool['inputSchema'];
     execute: (args: Record<string, unknown>) => Promise<CallToolResult>;
+  }): RegistrationHandle;
+
+  registerResource(resource: {
+    uri: string;
+    name: string;
+    description?: string;
+    mimeType?: string;
+    read: (uri: URL, params?: Record<string, string>) => Promise<ReadResourceResult>;
+  }): RegistrationHandle;
+
+  registerPrompt(prompt: {
+    name: string;
+    description?: string;
+    argsSchema?: Record<string, unknown>;
+    get: (args: Record<string, unknown>) => Promise<GetPromptResult>;
   }): RegistrationHandle;
 }
 
@@ -78,6 +105,8 @@ interface NavigatorWithModelContext extends Navigator {
 /** Custom event detail for mcp-iframe-ready */
 export interface MCPIframeReadyEventDetail {
   tools: string[];
+  resources: string[];
+  prompts: string[];
 }
 
 /** Custom event detail for mcp-iframe-error */
@@ -88,6 +117,8 @@ export interface MCPIframeErrorEventDetail {
 /** Custom event detail for mcp-iframe-tools-changed */
 export interface MCPIframeToolsChangedEventDetail {
   tools: string[];
+  resources: string[];
+  prompts: string[];
 }
 
 // ============================================================================
@@ -97,11 +128,12 @@ export interface MCPIframeToolsChangedEventDetail {
 /**
  * MCPIframe Custom Element
  *
- * Wraps an iframe and exposes its MCP tools to the parent's Model Context API.
+ * Wraps an iframe and exposes its MCP tools, resources, and prompts
+ * to the parent's Model Context API.
  *
  * @fires mcp-iframe-ready - When connected to iframe's MCP server
  * @fires mcp-iframe-error - When connection fails
- * @fires mcp-iframe-tools-changed - When tools are refreshed
+ * @fires mcp-iframe-tools-changed - When items are refreshed
  */
 export class MCPIframeElement extends HTMLElement {
   // Internal state
@@ -110,8 +142,16 @@ export class MCPIframeElement extends HTMLElement {
   #transport: IframeParentTransport | null = null;
   #ready = false;
   #connecting = false;
+
+  // MCP items from iframe
   #mcpTools: Tool[] = [];
+  #mcpResources: Resource[] = [];
+  #mcpPrompts: Prompt[] = [];
+
+  // Registered items on parent
   #registeredTools = new Map<string, RegistrationHandle>();
+  #registeredResources = new Map<string, RegistrationHandle>();
+  #registeredPrompts = new Map<string, RegistrationHandle>();
 
   // Configuration
   #callTimeout = DEFAULT_CALL_TIMEOUT;
@@ -159,8 +199,8 @@ export class MCPIframeElement extends HTMLElement {
       case 'prefix-separator':
         this.#prefixSeparator = newValue ?? DEFAULT_PREFIX_SEPARATOR;
         if (this.#ready) {
-          this.#unregisterAllTools();
-          this.#registerToolsOnModelContext(this.#mcpTools);
+          this.#unregisterAll();
+          this.#registerAllOnModelContext();
         }
         break;
 
@@ -202,33 +242,66 @@ export class MCPIframeElement extends HTMLElement {
     return Array.from(this.#registeredTools.keys());
   }
 
+  /** List of exposed resource URIs (with prefix) */
+  get exposedResources(): string[] {
+    return Array.from(this.#registeredResources.keys());
+  }
+
+  /** List of exposed prompt names (with prefix) */
+  get exposedPrompts(): string[] {
+    return Array.from(this.#registeredPrompts.keys());
+  }
+
   /** Raw tools from the iframe's MCP server (without prefix) */
   get mcpTools(): Tool[] {
     return [...this.#mcpTools];
   }
 
-  /** The tool name prefix (id + separator) */
-  get toolPrefix(): string {
+  /** Raw resources from the iframe's MCP server (without prefix) */
+  get mcpResources(): Resource[] {
+    return [...this.#mcpResources];
+  }
+
+  /** Raw prompts from the iframe's MCP server (without prefix) */
+  get mcpPrompts(): Prompt[] {
+    return [...this.#mcpPrompts];
+  }
+
+  /** The item name prefix (id + separator) */
+  get itemPrefix(): string {
     const id = this.id || this.getAttribute('name') || 'iframe';
     return `${id}${this.#prefixSeparator}`;
   }
 
-  /** Manually refresh tools from the iframe */
-  async refreshTools(): Promise<void> {
+  /** @deprecated Use itemPrefix instead */
+  get toolPrefix(): string {
+    return this.itemPrefix;
+  }
+
+  /** Manually refresh all items from the iframe */
+  async refresh(): Promise<void> {
     if (!this.#client || !this.#ready) {
       throw new Error('Not connected to iframe MCP server');
     }
 
-    const response = await this.#client.listTools();
-    this.#mcpTools = response.tools;
-    this.#unregisterAllTools();
-    this.#registerToolsOnModelContext(this.#mcpTools);
+    await this.#fetchAllFromIframe();
+    this.#unregisterAll();
+    this.#registerAllOnModelContext();
 
     this.dispatchEvent(
       new CustomEvent<MCPIframeToolsChangedEventDetail>('mcp-iframe-tools-changed', {
-        detail: { tools: this.exposedTools },
+        detail: {
+          tools: this.exposedTools,
+          resources: this.exposedResources,
+          prompts: this.exposedPrompts,
+        },
       })
     );
+  }
+
+  /** @deprecated Use refresh() instead */
+  async refreshTools(): Promise<void> {
+    return this.refresh();
   }
 
   // ==================== Private Methods ====================
@@ -282,14 +355,19 @@ export class MCPIframeElement extends HTMLElement {
       await this.#client.connect(this.#transport);
       this.#ready = true;
 
-      // Fetch and register tools
-      const response = await this.#client.listTools();
-      this.#mcpTools = response.tools;
-      this.#registerToolsOnModelContext(this.#mcpTools);
+      // Fetch all items from iframe
+      await this.#fetchAllFromIframe();
+
+      // Register on parent's Model Context
+      this.#registerAllOnModelContext();
 
       this.dispatchEvent(
         new CustomEvent<MCPIframeReadyEventDetail>('mcp-iframe-ready', {
-          detail: { tools: this.exposedTools },
+          detail: {
+            tools: this.exposedTools,
+            resources: this.exposedResources,
+            prompts: this.exposedPrompts,
+          },
         })
       );
     } catch (error) {
@@ -302,6 +380,21 @@ export class MCPIframeElement extends HTMLElement {
     } finally {
       this.#connecting = false;
     }
+  }
+
+  async #fetchAllFromIframe(): Promise<void> {
+    if (!this.#client) return;
+
+    // Fetch tools, resources, and prompts in parallel
+    const [toolsResult, resourcesResult, promptsResult] = await Promise.all([
+      this.#client.listTools(),
+      this.#client.listResources().catch(() => ({ resources: [] })),
+      this.#client.listPrompts().catch(() => ({ prompts: [] })),
+    ]);
+
+    this.#mcpTools = toolsResult.tools;
+    this.#mcpResources = resourcesResult.resources;
+    this.#mcpPrompts = promptsResult.prompts;
   }
 
   #getTargetOrigin(): string | null {
@@ -324,15 +417,21 @@ export class MCPIframeElement extends HTMLElement {
     return window.location.origin;
   }
 
-  #registerToolsOnModelContext(tools: Tool[]): void {
+  #registerAllOnModelContext(): void {
     const modelContext = (navigator as NavigatorWithModelContext).modelContext;
     if (!modelContext) {
       console.warn('[MCPIframe] Model Context API not available on parent');
       return;
     }
 
-    for (const tool of tools) {
-      const prefixedName = `${this.toolPrefix}${tool.name}`;
+    this.#registerToolsOnModelContext(modelContext);
+    this.#registerResourcesOnModelContext(modelContext);
+    this.#registerPromptsOnModelContext(modelContext);
+  }
+
+  #registerToolsOnModelContext(modelContext: ModelContext): void {
+    for (const tool of this.#mcpTools) {
+      const prefixedName = `${this.itemPrefix}${tool.name}`;
 
       const registration = modelContext.registerTool({
         name: prefixedName,
@@ -345,11 +444,71 @@ export class MCPIframeElement extends HTMLElement {
     }
   }
 
-  #unregisterAllTools(): void {
+  #registerResourcesOnModelContext(modelContext: ModelContext): void {
+    for (const resource of this.#mcpResources) {
+      const prefixedUri = `${this.itemPrefix}${resource.uri}`;
+
+      const resourceDescriptor: Parameters<ModelContext['registerResource']>[0] = {
+        uri: prefixedUri,
+        name: resource.name,
+        read: (_uri, _params) => this.#readIframeResource(resource.uri),
+      };
+      if (resource.description !== undefined) {
+        resourceDescriptor.description = resource.description;
+      }
+      if (resource.mimeType !== undefined) {
+        resourceDescriptor.mimeType = resource.mimeType;
+      }
+
+      const registration = modelContext.registerResource(resourceDescriptor);
+      this.#registeredResources.set(prefixedUri, registration);
+    }
+  }
+
+  #registerPromptsOnModelContext(modelContext: ModelContext): void {
+    for (const prompt of this.#mcpPrompts) {
+      const prefixedName = `${this.itemPrefix}${prompt.name}`;
+
+      const promptDescriptor: Parameters<ModelContext['registerPrompt']>[0] = {
+        name: prefixedName,
+        get: (args) => this.#getIframePrompt(prompt.name, args),
+      };
+      if (prompt.description !== undefined) {
+        promptDescriptor.description = prompt.description;
+      }
+      if (prompt.arguments && prompt.arguments.length > 0) {
+        promptDescriptor.argsSchema = {
+          type: 'object',
+          properties: Object.fromEntries(
+            prompt.arguments.map((arg) => [
+              arg.name,
+              { type: 'string', description: arg.description },
+            ])
+          ),
+          required: prompt.arguments.filter((a) => a.required).map((a) => a.name),
+        };
+      }
+
+      const registration = modelContext.registerPrompt(promptDescriptor);
+      this.#registeredPrompts.set(prefixedName, registration);
+    }
+  }
+
+  #unregisterAll(): void {
     for (const registration of this.#registeredTools.values()) {
       registration.unregister();
     }
     this.#registeredTools.clear();
+
+    for (const registration of this.#registeredResources.values()) {
+      registration.unregister();
+    }
+    this.#registeredResources.clear();
+
+    for (const registration of this.#registeredPrompts.values()) {
+      registration.unregister();
+    }
+    this.#registeredPrompts.clear();
   }
 
   async #callIframeTool(toolName: string, args: Record<string, unknown>): Promise<CallToolResult> {
@@ -364,8 +523,42 @@ export class MCPIframeElement extends HTMLElement {
       const result = await this.#client.callTool({ name: toolName, arguments: args }, undefined, {
         signal: controller.signal,
       });
-      // The SDK returns a union type; MCP protocol guarantees content field
       return result as CallToolResult;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  async #readIframeResource(uri: string): Promise<ReadResourceResult> {
+    if (!this.#client || !this.#ready) {
+      throw new Error('Not connected to iframe MCP server');
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.#callTimeout);
+
+    try {
+      const result = await this.#client.readResource({ uri }, { signal: controller.signal });
+      return result as ReadResourceResult;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  async #getIframePrompt(name: string, args: Record<string, unknown>): Promise<GetPromptResult> {
+    if (!this.#client || !this.#ready) {
+      throw new Error('Not connected to iframe MCP server');
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.#callTimeout);
+
+    try {
+      const result = await this.#client.getPrompt(
+        { name, arguments: args as Record<string, string> },
+        { signal: controller.signal }
+      );
+      return result as GetPromptResult;
     } finally {
       clearTimeout(timeoutId);
     }
@@ -381,7 +574,9 @@ export class MCPIframeElement extends HTMLElement {
   async #disconnect(): Promise<void> {
     this.#ready = false;
     this.#mcpTools = [];
-    this.#unregisterAllTools();
+    this.#mcpResources = [];
+    this.#mcpPrompts = [];
+    this.#unregisterAll();
 
     if (this.#client) {
       try {
