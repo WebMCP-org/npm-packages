@@ -87,3 +87,33 @@ jobs:
 
       - name: Build packages
         run: pnpm build
+
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.14.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Run security audit
+        run: pnpm audit --audit-level=high
+        continue-on-error: true
+
+      - name: Check for critical vulnerabilities
+        run: |
+          # Fail the build only on critical vulnerabilities
+          pnpm audit --audit-level=critical
