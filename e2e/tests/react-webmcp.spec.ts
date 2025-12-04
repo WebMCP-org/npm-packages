@@ -394,3 +394,209 @@ test.describe('React WebMCP Hook Tests', () => {
     await expect(executions).toContainText('2');
   });
 });
+
+// ============================================================================
+// useWebMCPPrompt Tests
+// ============================================================================
+
+test.describe('React WebMCP Prompt Hook Tests', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('http://localhost:5174');
+    await page.waitForSelector('[data-testid="app-status"]');
+  });
+
+  test('should register all prompts on mount', async ({ page }) => {
+    // Check that all prompts show as registered
+    const helpStatus = page.locator('[data-testid="prompt-help-status"]');
+    const reviewStatus = page.locator('[data-testid="prompt-review-status"]');
+    const summarizeStatus = page.locator('[data-testid="prompt-summarize-status"]');
+
+    await expect(helpStatus).toContainText('Registered', { timeout: 3000 });
+    await expect(reviewStatus).toContainText('Registered', { timeout: 3000 });
+    await expect(summarizeStatus).toContainText('Registered', { timeout: 3000 });
+  });
+
+  test('should display prompt information', async ({ page }) => {
+    // Check prompts info box is visible and contains correct info
+    const promptsInfo = page.locator('[data-testid="prompts-info"]');
+    await expect(promptsInfo).toBeVisible();
+
+    // Verify each prompt is listed
+    const helpInfo = page.locator('[data-testid="prompt-help-info"]');
+    const reviewInfo = page.locator('[data-testid="prompt-review-info"]');
+    const summarizeInfo = page.locator('[data-testid="prompt-summarize-info"]');
+
+    await expect(helpInfo).toContainText('help');
+    await expect(helpInfo).toContainText('Get help with using the application');
+
+    await expect(reviewInfo).toContainText('review_code');
+    await expect(reviewInfo).toContainText('Review code for best practices');
+
+    await expect(summarizeInfo).toContainText('summarize');
+    await expect(summarizeInfo).toContainText('Summarize text');
+  });
+
+  test('should register prompts with correct status indicators', async ({ page }) => {
+    // Wait for prompts to register
+    await page.waitForTimeout(500);
+
+    // All status indicators should be green (registered)
+    const helpStatus = page.locator('[data-testid="prompt-help-status"]');
+    const reviewStatus = page.locator('[data-testid="prompt-review-status"]');
+    const summarizeStatus = page.locator('[data-testid="prompt-summarize-status"]');
+
+    // Check that status text indicates registration
+    await expect(helpStatus).toHaveText('Registered');
+    await expect(reviewStatus).toHaveText('Registered');
+    await expect(summarizeStatus).toHaveText('Registered');
+  });
+
+  test('should show prompt section with all three prompts', async ({ page }) => {
+    // Find the prompts section
+    const promptsSection = page.locator('h2:has-text("Registered Prompts")').locator('..');
+    await expect(promptsSection).toBeVisible();
+
+    // Verify all three stat cards are present
+    const statCards = promptsSection.locator('.stat-card');
+    await expect(statCards).toHaveCount(3);
+  });
+});
+
+// ============================================================================
+// useWebMCPResource Tests
+// ============================================================================
+
+test.describe('React WebMCP Resource Hook Tests', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('http://localhost:5174');
+    await page.waitForSelector('[data-testid="app-status"]');
+  });
+
+  test('should register all resources on mount', async ({ page }) => {
+    // Check that all resources show as registered
+    const configStatus = page.locator('[data-testid="resource-config-status"]');
+    const userStatus = page.locator('[data-testid="resource-user-status"]');
+    const postsStatus = page.locator('[data-testid="resource-posts-status"]');
+
+    await expect(configStatus).toContainText('Registered', { timeout: 3000 });
+    await expect(userStatus).toContainText('Registered', { timeout: 3000 });
+    await expect(postsStatus).toContainText('Registered', { timeout: 3000 });
+  });
+
+  test('should display resource information', async ({ page }) => {
+    // Check resources info box is visible and contains correct info
+    const resourcesInfo = page.locator('[data-testid="resources-info"]');
+    await expect(resourcesInfo).toBeVisible();
+
+    // Verify each resource is listed
+    const configInfo = page.locator('[data-testid="resource-config-info"]');
+    const userInfo = page.locator('[data-testid="resource-user-info"]');
+    const postsInfo = page.locator('[data-testid="resource-posts-info"]');
+
+    await expect(configInfo).toContainText('config://app-settings');
+    await expect(configInfo).toContainText('Static app configuration');
+
+    await expect(userInfo).toContainText('user://');
+    await expect(userInfo).toContainText('Dynamic user profile');
+
+    await expect(postsInfo).toContainText('data://posts');
+    await expect(postsInfo).toContainText('Current posts data');
+  });
+
+  test('should register resources with correct status indicators', async ({ page }) => {
+    // Wait for resources to register
+    await page.waitForTimeout(500);
+
+    // All status indicators should show registered
+    const configStatus = page.locator('[data-testid="resource-config-status"]');
+    const userStatus = page.locator('[data-testid="resource-user-status"]');
+    const postsStatus = page.locator('[data-testid="resource-posts-status"]');
+
+    // Check that status text indicates registration
+    await expect(configStatus).toHaveText('Registered');
+    await expect(userStatus).toHaveText('Registered');
+    await expect(postsStatus).toHaveText('Registered');
+  });
+
+  test('should show resource section with all three resources', async ({ page }) => {
+    // Find the resources section
+    const resourcesSection = page.locator('h2:has-text("Registered Resources")').locator('..');
+    await expect(resourcesSection).toBeVisible();
+
+    // Verify all three stat cards are present
+    const statCards = resourcesSection.locator('.stat-card');
+    await expect(statCards).toHaveCount(3);
+  });
+
+  test('should show both static and dynamic (URI template) resources', async ({ page }) => {
+    // Verify static resource is shown
+    const configInfo = page.locator('[data-testid="resource-config-info"]');
+    await expect(configInfo).toContainText('Static');
+
+    // Verify dynamic resource (URI template) is shown
+    const userInfo = page.locator('[data-testid="resource-user-info"]');
+    await expect(userInfo).toContainText('URI template');
+  });
+});
+
+// ============================================================================
+// Combined Hook Registration Tests
+// ============================================================================
+
+test.describe('React WebMCP Combined Hook Tests', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('http://localhost:5174');
+    await page.waitForSelector('[data-testid="app-status"]');
+  });
+
+  test('should register tools, prompts, and resources together', async ({ page }) => {
+    // Check tools are registered (via client tools list) - tools take longer to load
+    const toolsList = page.locator('[data-testid="client-tools-list"]');
+    await expect(toolsList).toContainText('counter_increment', { timeout: 10000 });
+
+    // Check prompts are registered
+    const helpStatus = page.locator('[data-testid="prompt-help-status"]');
+    await expect(helpStatus).toHaveText('Registered');
+
+    // Check resources are registered
+    const configStatus = page.locator('[data-testid="resource-config-status"]');
+    await expect(configStatus).toHaveText('Registered');
+  });
+
+  test('should maintain all registrations during tool execution', async ({ page }) => {
+    // First verify everything is registered
+    const helpStatus = page.locator('[data-testid="prompt-help-status"]');
+    const configStatus = page.locator('[data-testid="resource-config-status"]');
+    const status = page.locator('[data-testid="app-status"]');
+
+    await expect(helpStatus).toHaveText('Registered', { timeout: 3000 });
+    await expect(configStatus).toHaveText('Registered', { timeout: 3000 });
+
+    // Execute a tool
+    const incrementBtn = page.locator('[data-testid="increment-btn"]');
+    await incrementBtn.click();
+    await expect(status).toContainText('Ready', { timeout: 2000 });
+
+    // Verify prompts and resources are still registered
+    await expect(helpStatus).toHaveText('Registered');
+    await expect(configStatus).toHaveText('Registered');
+  });
+
+  test('should display all MCP primitives in the app', async ({ page }) => {
+    // Tools section should exist
+    const toolsSection = page.locator('h2:has-text("Counter Tools")');
+    await expect(toolsSection).toBeVisible();
+
+    // Prompts section should exist
+    const promptsSection = page.locator('h2:has-text("Registered Prompts")');
+    await expect(promptsSection).toBeVisible();
+
+    // Resources section should exist
+    const resourcesSection = page.locator('h2:has-text("Registered Resources")');
+    await expect(resourcesSection).toBeVisible();
+
+    // MCP Tools list should exist
+    const mcpToolsSection = page.locator('h2:has-text("Registered MCP Tools")');
+    await expect(mcpToolsSection).toBeVisible();
+  });
+});

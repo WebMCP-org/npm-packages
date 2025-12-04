@@ -43,6 +43,10 @@ export type {
  */
 export type {
   ModelContextProtocol,
+  PromptDescriptor,
+  PromptMessage,
+  ResourceContents,
+  ResourceDescriptor,
   ToolAnnotations,
   ToolDescriptor,
 } from './types.js';
@@ -69,6 +73,34 @@ export { useWebMCP } from './useWebMCP.js';
  * Convenience wrapper around `useWebMCP` for context tools.
  */
 export { useWebMCPContext } from './useWebMCPContext.js';
+
+// ============================================
+// Provider Hooks (Register/Expose Prompts)
+// ============================================
+
+/**
+ * Type definitions for prompt registration and configuration.
+ */
+export type { WebMCPPromptConfig, WebMCPPromptReturn } from './types.js';
+/**
+ * Hook for registering MCP prompts with the Model Context API.
+ * Prompts provide reusable message templates for AI interactions.
+ */
+export { useWebMCPPrompt } from './useWebMCPPrompt.js';
+
+// ============================================
+// Provider Hooks (Register/Expose Resources)
+// ============================================
+
+/**
+ * Type definitions for resource registration and configuration.
+ */
+export type { WebMCPResourceConfig, WebMCPResourceReturn } from './types.js';
+/**
+ * Hook for registering MCP resources with the Model Context API.
+ * Resources expose data that AI models can read.
+ */
+export { useWebMCPResource } from './useWebMCPResource.js';
 
 // ============================================
 // Request Hooks (Sampling & Elicitation)

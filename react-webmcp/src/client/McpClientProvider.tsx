@@ -251,6 +251,10 @@ export function McpClientProvider({
       client.setNotificationHandler(ToolListChangedNotificationSchema, handleToolsChanged);
     }
 
+    // Re-fetch after setting up handlers to catch any changes that occurred
+    // during the gap between initial fetch and handler setup
+    Promise.all([fetchResourcesInternal(), fetchToolsInternal()]).catch(console.error);
+
     return () => {
       if (serverCapabilities?.resources?.listChanged) {
         client.removeNotificationHandler('notifications/resources/list_changed');

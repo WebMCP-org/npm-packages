@@ -1,4 +1,10 @@
-import { useMcpClient, useWebMCP, useWebMCPContext } from '@mcp-b/react-webmcp';
+import {
+  useMcpClient,
+  useWebMCP,
+  useWebMCPContext,
+  useWebMCPPrompt,
+  useWebMCPResource,
+} from '@mcp-b/react-webmcp';
 import { useState } from 'react';
 import { z } from 'zod';
 
@@ -169,6 +175,155 @@ function App() {
     totalLikes: posts.reduce((sum, post) => sum + post.likes, 0),
     searchResultsCount: searchResults.length,
   }));
+
+  // ==================== PROMPTS ====================
+
+  // Prompt 1: Simple help prompt (no arguments)
+  const helpPrompt = useWebMCPPrompt({
+    name: 'help',
+    description: 'Get help with using the application',
+    get: async () => ({
+      messages: [
+        {
+          role: 'user',
+          content: {
+            type: 'text',
+            text: 'How do I use this application? Please provide a brief overview of the available features.',
+          },
+        },
+      ],
+    }),
+  });
+
+  // Prompt 2: Code review prompt (with typed arguments)
+  const codeReviewPrompt = useWebMCPPrompt({
+    name: 'review_code',
+    description: 'Review code for best practices and potential issues',
+    argsSchema: {
+      code: z.string().describe('The code to review'),
+      language: z.string().optional().describe('Programming language (optional)'),
+    },
+    get: async ({ code, language }) => ({
+      messages: [
+        {
+          role: 'user',
+          content: {
+            type: 'text',
+            text: `Please review the following ${language ?? 'code'} for best practices, potential bugs, and improvements:\n\n\`\`\`${language ?? ''}\n${code}\n\`\`\``,
+          },
+        },
+      ],
+    }),
+  });
+
+  // Prompt 3: Summarize prompt
+  const summarizePrompt = useWebMCPPrompt({
+    name: 'summarize',
+    description: 'Summarize a piece of text',
+    argsSchema: {
+      text: z.string().min(1).describe('The text to summarize'),
+      maxLength: z.number().optional().describe('Maximum summary length'),
+    },
+    get: async ({ text, maxLength }) => ({
+      messages: [
+        {
+          role: 'user',
+          content: {
+            type: 'text',
+            text: maxLength
+              ? `Please summarize the following text in at most ${maxLength} characters:\n\n${text}`
+              : `Please summarize the following text:\n\n${text}`,
+          },
+        },
+      ],
+    }),
+  });
+
+  // ==================== RESOURCES ====================
+
+  // Resource 1: Static app configuration
+  const appConfigResource = useWebMCPResource({
+    uri: 'config://app-settings',
+    name: 'App Settings',
+    description: 'Application configuration and settings',
+    mimeType: 'application/json',
+    read: async (uri) => ({
+      contents: [
+        {
+          uri: uri.href,
+          text: JSON.stringify(
+            {
+              appName: 'React WebMCP Test App',
+              version: '1.0.0',
+              theme: 'light',
+              features: {
+                counter: true,
+                posts: true,
+                prompts: true,
+                resources: true,
+              },
+              currentState: {
+                counter: globalCounter,
+                totalPosts: posts.length,
+              },
+            },
+            null,
+            2
+          ),
+        },
+      ],
+    }),
+  });
+
+  // Resource 2: Dynamic user profile resource (URI template)
+  const userProfileResource = useWebMCPResource({
+    uri: 'user://{userId}/profile',
+    name: 'User Profile',
+    description: 'Get user profile data by user ID',
+    mimeType: 'application/json',
+    read: async (uri, params) => {
+      const userId = params?.userId ?? 'unknown';
+      // Simulated user data
+      const users: Record<string, { name: string; email: string; role: string }> = {
+        '1': { name: 'Alice Johnson', email: 'alice@example.com', role: 'admin' },
+        '2': { name: 'Bob Smith', email: 'bob@example.com', role: 'user' },
+        '3': { name: 'Charlie Brown', email: 'charlie@example.com', role: 'moderator' },
+      };
+      const user = users[userId] ?? {
+        name: 'Unknown',
+        email: 'unknown@example.com',
+        role: 'guest',
+      };
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            text: JSON.stringify({ userId, ...user }, null, 2),
+          },
+        ],
+      };
+    },
+  });
+
+  // Resource 3: Posts list resource
+  const postsResource = useWebMCPResource({
+    uri: 'data://posts',
+    name: 'Posts Data',
+    description: 'Current posts data in the application',
+    mimeType: 'application/json',
+    read: async (uri) => ({
+      contents: [
+        {
+          uri: uri.href,
+          text: JSON.stringify(
+            { posts, totalLikes: posts.reduce((sum, p) => sum + p.likes, 0) },
+            null,
+            2
+          ),
+        },
+      ],
+    }),
+  });
 
   // Manual test buttons
   const handleIncrement = async () => {
@@ -379,6 +534,123 @@ function App() {
             {likePostTool.state.error.message}
           </div>
         )}
+      </div>
+
+      {/* Prompts Section */}
+      <div className="section">
+        <h2>Registered Prompts</h2>
+        <p className="subtitle">MCP prompts registered via useWebMCPPrompt hook</p>
+
+        <div className="stats" style={{ marginBottom: '1rem' }}>
+          <div className="stat-card">
+            <div className="label">help</div>
+            <div
+              className="value"
+              data-testid="prompt-help-status"
+              style={{ color: helpPrompt.isRegistered ? '#38a169' : '#e53e3e' }}
+            >
+              {helpPrompt.isRegistered ? 'Registered' : 'Pending'}
+            </div>
+          </div>
+          <div className="stat-card">
+            <div className="label">review_code</div>
+            <div
+              className="value"
+              data-testid="prompt-review-status"
+              style={{ color: codeReviewPrompt.isRegistered ? '#38a169' : '#e53e3e' }}
+            >
+              {codeReviewPrompt.isRegistered ? 'Registered' : 'Pending'}
+            </div>
+          </div>
+          <div className="stat-card">
+            <div className="label">summarize</div>
+            <div
+              className="value"
+              data-testid="prompt-summarize-status"
+              style={{ color: summarizePrompt.isRegistered ? '#38a169' : '#e53e3e' }}
+            >
+              {summarizePrompt.isRegistered ? 'Registered' : 'Pending'}
+            </div>
+          </div>
+        </div>
+
+        <div
+          className="info-box"
+          data-testid="prompts-info"
+          style={{ background: '#e6fffa', borderColor: '#38b2ac' }}
+        >
+          <strong>Prompts Available:</strong>
+          <ul style={{ margin: '0.5rem 0 0 1rem', padding: 0 }}>
+            <li data-testid="prompt-help-info">
+              <code>help</code> - Get help with using the application
+            </li>
+            <li data-testid="prompt-review-info">
+              <code>review_code</code> - Review code for best practices (args: code, language?)
+            </li>
+            <li data-testid="prompt-summarize-info">
+              <code>summarize</code> - Summarize text (args: text, maxLength?)
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      {/* Resources Section */}
+      <div className="section">
+        <h2>Registered Resources</h2>
+        <p className="subtitle">MCP resources registered via useWebMCPResource hook</p>
+
+        <div className="stats" style={{ marginBottom: '1rem' }}>
+          <div className="stat-card">
+            <div className="label">config://app-settings</div>
+            <div
+              className="value"
+              data-testid="resource-config-status"
+              style={{ color: appConfigResource.isRegistered ? '#38a169' : '#e53e3e' }}
+            >
+              {appConfigResource.isRegistered ? 'Registered' : 'Pending'}
+            </div>
+          </div>
+          <div className="stat-card">
+            <div className="label">user://&#123;userId&#125;/profile</div>
+            <div
+              className="value"
+              data-testid="resource-user-status"
+              style={{ color: userProfileResource.isRegistered ? '#38a169' : '#e53e3e' }}
+            >
+              {userProfileResource.isRegistered ? 'Registered' : 'Pending'}
+            </div>
+          </div>
+          <div className="stat-card">
+            <div className="label">data://posts</div>
+            <div
+              className="value"
+              data-testid="resource-posts-status"
+              style={{ color: postsResource.isRegistered ? '#38a169' : '#e53e3e' }}
+            >
+              {postsResource.isRegistered ? 'Registered' : 'Pending'}
+            </div>
+          </div>
+        </div>
+
+        <div
+          className="info-box"
+          data-testid="resources-info"
+          style={{ background: '#ebf8ff', borderColor: '#4299e1' }}
+        >
+          <strong>Resources Available:</strong>
+          <ul style={{ margin: '0.5rem 0 0 1rem', padding: 0 }}>
+            <li data-testid="resource-config-info">
+              <code>config://app-settings</code> - Static app configuration (JSON)
+            </li>
+            <li data-testid="resource-user-info">
+              <code>user://&#123;userId&#125;/profile</code> - Dynamic user profile by ID (URI
+              template)
+            </li>
+            <li data-testid="resource-posts-info">
+              <code>data://posts</code> - Current posts data (JSON)
+            </li>
+          </ul>
+        </div>
       </div>
 
       {/* Statistics */}

@@ -1,6 +1,9 @@
-import type { ToolAnnotations } from '@mcp-b/webmcp-ts-sdk';
+import type { PromptMessage, ResourceContents, ToolAnnotations } from '@mcp-b/webmcp-ts-sdk';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { z } from 'zod';
+
+// Re-export PromptMessage and ResourceContents for use in hook types
+export type { PromptMessage, ResourceContents };
 
 // Re-export types from SDK packages
 export type { ToolAnnotations, CallToolResult };
@@ -172,4 +175,167 @@ export interface WebMCPReturn<TOutput = unknown> {
 }
 
 // Re-export types from @mcp-b/global
-export type { ModelContext as ModelContextProtocol, ToolDescriptor } from '@mcp-b/global';
+export type {
+  ModelContext as ModelContextProtocol,
+  PromptDescriptor,
+  ResourceDescriptor,
+  ToolDescriptor,
+} from '@mcp-b/global';
+
+// ============================================================================
+// Prompt Hook Types
+// ============================================================================
+
+/**
+ * Configuration options for the `useWebMCPPrompt` hook.
+ * Defines a prompt's metadata, argument schema, and message generator.
+ *
+ * @template TArgsSchema - Zod schema object defining prompt arguments
+ * @public
+ *
+ * @example
+ * ```typescript
+ * const config: WebMCPPromptConfig = {
+ *   name: 'review_code',
+ *   description: 'Review code for best practices',
+ *   argsSchema: {
+ *     code: z.string().describe('The code to review'),
+ *     language: z.string().optional().describe('Programming language'),
+ *   },
+ *   get: async ({ code, language }) => ({
+ *     messages: [{
+ *       role: 'user',
+ *       content: { type: 'text', text: `Review this ${language ?? ''} code:\n${code}` }
+ *     }]
+ *   }),
+ * };
+ * ```
+ */
+export interface WebMCPPromptConfig<
+  TArgsSchema extends Record<string, z.ZodTypeAny> = Record<string, never>,
+> {
+  /**
+   * Unique identifier for the prompt (e.g., 'review_code', 'summarize_text').
+   */
+  name: string;
+
+  /**
+   * Optional description explaining what the prompt does.
+   * This helps AI assistants understand when to use the prompt.
+   */
+  description?: string;
+
+  /**
+   * Optional Zod schema object defining the arguments for the prompt.
+   * Each key is an argument name, and the value is a Zod type definition.
+   */
+  argsSchema?: TArgsSchema;
+
+  /**
+   * Function that generates the prompt messages.
+   * Can be synchronous or asynchronous.
+   *
+   * @param args - Validated arguments matching the argsSchema
+   * @returns Object containing the prompt messages
+   */
+  get: (
+    args: z.infer<z.ZodObject<TArgsSchema>>
+  ) => Promise<{ messages: PromptMessage[] }> | { messages: PromptMessage[] };
+}
+
+/**
+ * Return value from the `useWebMCPPrompt` hook.
+ * Indicates whether the prompt is registered.
+ *
+ * @public
+ */
+export interface WebMCPPromptReturn {
+  /**
+   * Whether the prompt is currently registered with the Model Context API.
+   */
+  isRegistered: boolean;
+}
+
+// ============================================================================
+// Resource Hook Types
+// ============================================================================
+
+/**
+ * Configuration options for the `useWebMCPResource` hook.
+ * Defines a resource's metadata and read handler.
+ *
+ * @public
+ *
+ * @example Static resource
+ * ```typescript
+ * const config: WebMCPResourceConfig = {
+ *   uri: 'config://app-settings',
+ *   name: 'App Settings',
+ *   description: 'Application configuration',
+ *   mimeType: 'application/json',
+ *   read: async (uri) => ({
+ *     contents: [{ uri: uri.href, text: JSON.stringify(settings) }]
+ *   }),
+ * };
+ * ```
+ *
+ * @example Dynamic resource with URI template
+ * ```typescript
+ * const config: WebMCPResourceConfig = {
+ *   uri: 'user://{userId}/profile',
+ *   name: 'User Profile',
+ *   description: 'User profile data',
+ *   read: async (uri, params) => ({
+ *     contents: [{
+ *       uri: uri.href,
+ *       text: JSON.stringify(await fetchUser(params?.userId ?? ''))
+ *     }]
+ *   }),
+ * };
+ * ```
+ */
+export interface WebMCPResourceConfig {
+  /**
+   * The resource URI or URI template.
+   * - Static: "config://app-settings"
+   * - Template: "user://{userId}/profile" where {userId} becomes a parameter
+   */
+  uri: string;
+
+  /**
+   * Human-readable name for the resource.
+   */
+  name: string;
+
+  /**
+   * Optional description of what the resource provides.
+   */
+  description?: string;
+
+  /**
+   * Optional MIME type of the resource content.
+   */
+  mimeType?: string;
+
+  /**
+   * Function that reads and returns the resource content.
+   *
+   * @param uri - The resolved URI being requested
+   * @param params - Parameters extracted from URI template (if applicable)
+   * @returns Resource contents with the data
+   */
+  read: (uri: URL, params?: Record<string, string>) => Promise<{ contents: ResourceContents[] }>;
+}
+
+/**
+ * Return value from the `useWebMCPResource` hook.
+ * Indicates whether the resource is registered.
+ *
+ * @public
+ */
+export interface WebMCPResourceReturn {
+  /**
+   * Whether the resource is currently registered with the Model Context API.
+   */
+  isRegistered: boolean;
+}
