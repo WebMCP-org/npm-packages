@@ -66,6 +66,9 @@ catalogs:
     zod:
       specifier: 3.25.76
       version: 3.25.76
+    zod-to-json-schema:
+      specifier: ^3.24.5
+      version: 3.24.6
 
 importers:
 
@@ -582,6 +585,9 @@ importers:
       zod:
         specifier: 'catalog:'
         version: 3.25.76
+      zod-to-json-schema:
+        specifier: 'catalog:'
+        version: 3.24.6(zod@3.25.76)
     devDependencies:
       '@types/node':
         specifier: 'catalog:'

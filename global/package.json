@@ -63,7 +63,8 @@
     "@composio/json-schema-to-zod": "catalog:",
     "@mcp-b/transports": "workspace:*",
     "@mcp-b/webmcp-ts-sdk": "workspace:*",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "zod-to-json-schema": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",

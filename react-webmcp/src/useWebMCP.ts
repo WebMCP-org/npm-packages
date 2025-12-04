@@ -1,55 +1,9 @@
 import type { InputSchema } from '@mcp-b/global';
+import { zodToJsonSchema } from '@mcp-b/global';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { z } from 'zod';
 import type { ToolExecutionState, WebMCPConfig, WebMCPReturn } from './types.js';
-
-/**
- * Converts a Zod schema object to JSON Schema format for MCP.
- * Handles basic type inference for common Zod types.
- *
- * @internal
- * @param schema - Record of Zod type definitions
- * @returns JSON Schema object with type, properties, and required fields
- */
-function zodToJsonSchema(schema: Record<string, z.ZodTypeAny>): {
-  type: string;
-  properties?: Record<string, unknown>;
-  required?: string[];
-} {
-  const properties: Record<string, unknown> = {};
-  const required: string[] = [];
-
-  for (const [key, zodType] of Object.entries(schema)) {
-    const description = (zodType as { description?: string }).description || undefined;
-
-    let type = 'string';
-    if (zodType instanceof z.ZodNumber) {
-      type = 'number';
-    } else if (zodType instanceof z.ZodBoolean) {
-      type = 'boolean';
-    } else if (zodType instanceof z.ZodArray) {
-      type = 'array';
-    } else if (zodType instanceof z.ZodObject) {
-      type = 'object';
-    }
-
-    properties[key] = {
-      type,
-      ...(description && { description }),
-    };
-
-    if (!zodType.isOptional()) {
-      required.push(key);
-    }
-  }
-
-  return {
-    type: 'object',
-    properties,
-    ...(required.length > 0 && { required }),
-  };
-}
 
 /**
  * Default output formatter that converts values to formatted JSON strings.

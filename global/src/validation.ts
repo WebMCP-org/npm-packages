@@ -1,5 +1,6 @@
 import { jsonSchemaToZod as convertJsonSchemaToZod } from '@composio/json-schema-to-zod';
 import { z } from 'zod';
+import { zodToJsonSchema as zodToJsonSchemaLib } from 'zod-to-json-schema';
 import type { InputSchema } from './types.js';
 
 /**
@@ -39,71 +40,21 @@ export function jsonSchemaToZod(jsonSchema: InputSchema): z.ZodType {
 
 /**
  * Convert Zod schema object to JSON Schema
- * Based on react-webmcp implementation
+ * Uses zod-to-json-schema package for comprehensive conversion
+ *
+ * @param schema - Record of Zod type definitions (e.g., { name: z.string(), age: z.number() })
+ * @returns JSON Schema object compatible with MCP InputSchema
  */
 export function zodToJsonSchema(schema: Record<string, z.ZodTypeAny>): InputSchema {
-  const properties: Record<string, { type: string; description?: string; [key: string]: unknown }> =
-    {};
-  const required: string[] = [];
+  const zodObject = z.object(schema);
+  const jsonSchema = zodToJsonSchemaLib(zodObject, {
+    $refStrategy: 'none',
+    target: 'jsonSchema7',
+  });
 
-  for (const [key, zodType] of Object.entries(schema)) {
-    const description = (zodType as { description?: string }).description || undefined;
-
-    let type = 'string';
-    let enumValues: unknown[] | undefined;
-    let items: unknown | undefined;
-
-    if (zodType instanceof z.ZodString) {
-      type = 'string';
-    } else if (zodType instanceof z.ZodNumber) {
-      type = 'number';
-    } else if (zodType instanceof z.ZodBoolean) {
-      type = 'boolean';
-    } else if (zodType instanceof z.ZodArray) {
-      type = 'array';
-      const elementType = (zodType as { element?: z.ZodTypeAny }).element;
-      if (elementType instanceof z.ZodString) {
-        items = { type: 'string' };
-      } else if (elementType instanceof z.ZodNumber) {
-        items = { type: 'number' };
-      } else if (elementType instanceof z.ZodBoolean) {
-        items = { type: 'boolean' };
-      } else {
-        items = { type: 'string' };
-      }
-    } else if (zodType instanceof z.ZodObject) {
-      type = 'object';
-    } else if (zodType instanceof z.ZodEnum) {
-      type = 'string';
-      const enumDef = (zodType as { _def?: { values?: unknown[] } })._def;
-      if (enumDef?.values) {
-        enumValues = enumDef.values;
-      }
-    }
-
-    const propertySchema: { type: string; description?: string; [key: string]: unknown } = { type };
-    if (description) {
-      propertySchema.description = description;
-    }
-    if (enumValues) {
-      propertySchema.enum = enumValues;
-    }
-    if (items) {
-      propertySchema.items = items;
-    }
-
-    properties[key] = propertySchema;
-
-    if (!zodType.isOptional()) {
-      required.push(key);
-    }
-  }
-
-  return {
-    type: 'object',
-    properties,
-    ...(required.length > 0 && { required }),
-  };
+  // Remove $schema field as it's not needed for MCP
+  const { $schema: _, ...rest } = jsonSchema as { $schema?: string } & InputSchema;
+  return rest as InputSchema;
 }
 
 /**
