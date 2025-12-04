@@ -86,6 +86,141 @@
         <div id="event-log" class="scrollbar-thin max-h-96 overflow-y-auto rounded-lg bg-gray-900 p-6 font-mono text-sm leading-loose text-gray-100"></div>
       </section>
 
+      <!-- Iframe Context Propagation Sandbox -->
+      <section class="mb-8 rounded-xl border border-border bg-card p-6 shadow-sm">
+        <div class="mb-6 border-b-2 border-border pb-4">
+          <h2 class="text-2xl font-semibold text-foreground">Iframe Context Propagation</h2>
+          <p class="mt-1 text-sm text-muted-foreground">Test how tools propagate across iframe boundaries with the native Web Model Context API</p>
+        </div>
+
+        <!-- Iframe Controls -->
+        <div class="mb-6 grid gap-6 lg:grid-cols-2">
+          <!-- Parent Context Controls -->
+          <div class="rounded-lg border border-border bg-background p-4">
+            <h3 class="mb-3 text-lg font-medium text-foreground">Parent Context</h3>
+            <div class="space-y-3">
+              <div class="flex flex-wrap items-center gap-2">
+                <button id="iframe-parent-register-a" class="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+                  Register Bucket A Tool
+                </button>
+                <button id="iframe-parent-register-b" class="rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80">
+                  Register Bucket B Tool
+                </button>
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <button id="iframe-parent-unregister-b" class="rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent" disabled>
+                  Unregister Bucket B
+                </button>
+                <button id="iframe-parent-clear" class="rounded-md border border-destructive bg-background px-3 py-1.5 text-sm font-medium text-destructive hover:bg-destructive/10">
+                  Clear Context
+                </button>
+              </div>
+            </div>
+            <!-- Parent Tool List -->
+            <div class="mt-4">
+              <div class="mb-2 text-sm font-medium text-foreground">Parent Tools:</div>
+              <div id="iframe-parent-tools" class="rounded-lg border border-border bg-muted p-3 text-sm">
+                <span class="text-muted-foreground">No tools</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Iframe Controls -->
+          <div class="rounded-lg border border-border bg-background p-4">
+            <h3 class="mb-3 text-lg font-medium text-foreground">Iframe Context</h3>
+            <div class="space-y-3">
+              <div class="flex flex-wrap items-center gap-2">
+                <button id="iframe-child-register-a" class="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+                  Register Bucket A Tool
+                </button>
+                <button id="iframe-child-register-b" class="rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80">
+                  Register Bucket B Tool
+                </button>
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <button id="iframe-child-unregister-b" class="rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent" disabled>
+                  Unregister Bucket B
+                </button>
+                <button id="iframe-child-clear" class="rounded-md border border-destructive bg-background px-3 py-1.5 text-sm font-medium text-destructive hover:bg-destructive/10">
+                  Clear Context
+                </button>
+              </div>
+            </div>
+            <!-- Iframe Tool List -->
+            <div class="mt-4">
+              <div class="mb-2 text-sm font-medium text-foreground">Iframe Tools:</div>
+              <div id="iframe-child-tools" class="rounded-lg border border-border bg-muted p-3 text-sm">
+                <span class="text-muted-foreground">Loading iframe...</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Context Comparison -->
+        <div class="mb-6">
+          <h3 class="mb-3 text-lg font-medium text-foreground">Context Comparison</h3>
+          <div class="grid gap-4 lg:grid-cols-3">
+            <!-- Parent Only -->
+            <div class="rounded-lg border border-border bg-background p-4">
+              <div class="mb-2 flex items-center gap-2">
+                <div class="h-3 w-3 rounded-full bg-blue-500"></div>
+                <span class="text-sm font-medium text-foreground">Parent Only</span>
+              </div>
+              <div id="iframe-compare-parent" class="text-sm text-muted-foreground">-</div>
+            </div>
+            <!-- Iframe Only -->
+            <div class="rounded-lg border border-border bg-background p-4">
+              <div class="mb-2 flex items-center gap-2">
+                <div class="h-3 w-3 rounded-full bg-purple-500"></div>
+                <span class="text-sm font-medium text-foreground">Iframe Only</span>
+              </div>
+              <div id="iframe-compare-child" class="text-sm text-muted-foreground">-</div>
+            </div>
+            <!-- Shared -->
+            <div class="rounded-lg border border-border bg-background p-4">
+              <div class="mb-2 flex items-center gap-2">
+                <div class="h-3 w-3 rounded-full bg-green-500"></div>
+                <span class="text-sm font-medium text-foreground">Shared (Both)</span>
+              </div>
+              <div id="iframe-compare-shared" class="text-sm text-muted-foreground">-</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Iframe Sandbox -->
+        <div class="rounded-lg border border-border bg-muted p-4">
+          <div class="mb-3 flex items-center justify-between">
+            <h3 class="text-lg font-medium text-foreground">Embedded Iframe</h3>
+            <div class="flex items-center gap-2">
+              <span id="iframe-status-indicator" class="flex items-center gap-2 text-sm text-muted-foreground">
+                <div class="h-2 w-2 animate-pulse rounded-full bg-yellow-500"></div>
+                Loading...
+              </span>
+              <button id="iframe-reload" class="rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent">
+                Reload Iframe
+              </button>
+            </div>
+          </div>
+          <div class="overflow-hidden rounded-lg border border-border bg-white">
+            <iframe
+              id="test-iframe"
+              src="/iframe-test.html"
+              class="h-80 w-full"
+              title="Iframe Context Test"
+            ></iframe>
+          </div>
+        </div>
+
+        <!-- Iframe Event Log -->
+        <div class="mt-6">
+          <div class="mb-3 flex items-center justify-between">
+            <h3 class="text-lg font-medium text-foreground">Cross-Frame Events</h3>
+            <button id="clear-iframe-log" class="rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80">Clear</button>
+          </div>
+          <div id="iframe-event-log" class="scrollbar-thin max-h-48 overflow-y-auto rounded-lg bg-gray-900 p-4 font-mono text-sm text-gray-100"></div>
+        </div>
+      </section>
+
     </div>
   </main>
 

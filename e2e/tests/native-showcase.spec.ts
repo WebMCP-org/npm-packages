@@ -455,3 +455,242 @@ test.describe('Event Log', () => {
     expect(logEntries).toBe(0);
   });
 });
+
+test.describe('Iframe Context Propagation', () => {
+  test('should load iframe and show connected status', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('.banner.success');
+
+    // Wait for iframe to be ready
+    const iframe = page.frameLocator('#test-iframe');
+    await iframe.locator('#iframe-status').waitFor({ timeout: 10000 });
+
+    // Check iframe status indicator shows connected
+    await page.waitForSelector('#iframe-status-indicator:has-text("Connected")', {
+      timeout: 10000,
+    });
+  });
+
+  test('should register tools in parent context (Bucket A)', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('.banner.success');
+
+    // Wait for iframe to be ready
+    await page.waitForSelector('#iframe-status-indicator:has-text("Connected")', {
+      timeout: 10000,
+    });
+
+    // Register parent Bucket A tool
+    await page.click('#iframe-parent-register-a');
+
+    // Wait for tool to appear in parent tools display
+    await page.waitForSelector('#iframe-parent-tools:has-text("parent_greet")', { timeout: 5000 });
+
+    // Check context comparison shows parent only
+    const parentOnly = await page.locator('#iframe-compare-parent').textContent();
+    expect(parentOnly).toContain('parent_greet');
+  });
+
+  test('should register tools in parent context (Bucket B)', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('.banner.success');
+
+    // Wait for iframe to be ready
+    await page.waitForSelector('#iframe-status-indicator:has-text("Connected")', {
+      timeout: 10000,
+    });
+
+    // Register parent Bucket B tool
+    await page.click('#iframe-parent-register-b');
+
+    // Wait for tool to appear
+    await page.waitForSelector('#iframe-parent-tools:has-text("parent_time")', { timeout: 5000 });
+
+    // Unregister button should be enabled
+    const unregisterBtn = page.locator('#iframe-parent-unregister-b');
+    await expect(unregisterBtn).not.toBeDisabled();
+  });
+
+  test('should send register command to iframe', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('.banner.success');
+
+    // Wait for iframe to be ready
+    await page.waitForSelector('#iframe-status-indicator:has-text("Connected")', {
+      timeout: 10000,
+    });
+
+    // Send register Bucket A command to iframe
+    await page.click('#iframe-child-register-a');
+
+    // Wait for iframe tools to update
+    await page.waitForSelector('#iframe-child-tools:has-text("iframe_echo")', { timeout: 5000 });
+
+    // Check iframe event log
+    const iframeLog = page.locator('#iframe-event-log');
+    await expect(iframeLog).toContainText('iframe_echo');
+  });
+
+  test('should send register Bucket B command to iframe', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('.banner.success');
+
+    // Wait for iframe to be ready
+    await page.waitForSelector('#iframe-status-indicator:has-text("Connected")', {
+      timeout: 10000,
+    });
+
+    // Send register Bucket B command to iframe
+    await page.click('#iframe-child-register-b');
+
+    // Wait for iframe tools to update
+    await page.waitForSelector('#iframe-child-tools:has-text("iframe_timestamp")', {
+      timeout: 5000,
+    });
+
+    // Unregister button should be enabled after registration
+    const unregisterBtn = page.locator('#iframe-child-unregister-b');
+    await expect(unregisterBtn).not.toBeDisabled();
+  });
+
+  test('should show context comparison between parent and iframe', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('.banner.success');
+
+    // Wait for iframe to be ready
+    await page.waitForSelector('#iframe-status-indicator:has-text("Connected")', {
+      timeout: 10000,
+    });
+
+    // Register tool in parent
+    await page.click('#iframe-parent-register-a');
+    await page.waitForSelector('#iframe-parent-tools:has-text("parent_greet")', { timeout: 5000 });
+
+    // Register tool in iframe
+    await page.click('#iframe-child-register-a');
+    await page.waitForSelector('#iframe-child-tools:has-text("iframe_echo")', { timeout: 5000 });
+
+    // Check context comparison
+    const parentOnly = await page.locator('#iframe-compare-parent').textContent();
+    const childOnly = await page.locator('#iframe-compare-child').textContent();
+
+    expect(parentOnly).toContain('parent_greet');
+    expect(childOnly).toContain('iframe_echo');
+  });
+
+  test('should unregister parent Bucket B tool', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('.banner.success');
+
+    // Wait for iframe to be ready
+    await page.waitForSelector('#iframe-status-indicator:has-text("Connected")', {
+      timeout: 10000,
+    });
+
+    // Register and then unregister
+    await page.click('#iframe-parent-register-b');
+    await page.waitForSelector('#iframe-parent-tools:has-text("parent_time")', { timeout: 5000 });
+
+    await page.click('#iframe-parent-unregister-b');
+
+    // Tool should be removed
+    await expect(page.locator('#iframe-parent-tools:has-text("parent_time")')).not.toBeVisible();
+
+    // Button should be disabled again
+    const unregisterBtn = page.locator('#iframe-parent-unregister-b');
+    await expect(unregisterBtn).toBeDisabled();
+  });
+
+  test('should clear parent context', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('.banner.success');
+
+    // Wait for iframe to be ready
+    await page.waitForSelector('#iframe-status-indicator:has-text("Connected")', {
+      timeout: 10000,
+    });
+
+    // Register parent tool
+    await page.click('#iframe-parent-register-a');
+    await page.waitForSelector('#iframe-parent-tools:has-text("parent_greet")', { timeout: 5000 });
+
+    // Clear context
+    await page.click('#iframe-parent-clear');
+
+    // Tool should be removed
+    await expect(page.locator('#iframe-parent-tools:has-text("parent_greet")')).not.toBeVisible();
+
+    // Iframe event log should show context cleared
+    await expect(page.locator('#iframe-event-log')).toContainText('Context cleared');
+  });
+
+  test('should reload iframe', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('.banner.success');
+
+    // Wait for iframe to be ready
+    await page.waitForSelector('#iframe-status-indicator:has-text("Connected")', {
+      timeout: 10000,
+    });
+
+    // Register tool in iframe
+    await page.click('#iframe-child-register-a');
+    await page.waitForSelector('#iframe-child-tools:has-text("iframe_echo")', { timeout: 5000 });
+
+    // Reload iframe
+    await page.click('#iframe-reload');
+
+    // Should show loading state briefly
+    await page.waitForSelector('#iframe-status-indicator:has-text("Loading")', { timeout: 2000 });
+
+    // Should become connected again
+    await page.waitForSelector('#iframe-status-indicator:has-text("Connected")', {
+      timeout: 10000,
+    });
+
+    // Tools should be cleared after reload
+    await expect(page.locator('#iframe-child-tools:has-text("iframe_echo")')).not.toBeVisible();
+  });
+
+  test('should clear iframe event log', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('.banner.success');
+
+    // Wait for iframe to be ready
+    await page.waitForSelector('#iframe-status-indicator:has-text("Connected")', {
+      timeout: 10000,
+    });
+
+    // Generate some logs
+    await page.click('#iframe-parent-register-a');
+    await page.waitForTimeout(500);
+
+    // Clear log
+    await page.click('#clear-iframe-log');
+
+    // Log should be empty
+    const logContent = await page.locator('#iframe-event-log').textContent();
+    expect(logContent?.trim()).toBe('');
+  });
+
+  test('should log cross-frame events', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('.banner.success');
+
+    // Wait for iframe to be ready
+    await page.waitForSelector('#iframe-status-indicator:has-text("Connected")', {
+      timeout: 10000,
+    });
+
+    // Clear any existing logs
+    await page.click('#clear-iframe-log');
+
+    // Register tool in parent
+    await page.click('#iframe-parent-register-a');
+    await page.waitForTimeout(500);
+
+    // Check iframe event log has entry
+    const iframeLog = page.locator('#iframe-event-log');
+    await expect(iframeLog).toContainText('parent_greet');
+  });
+});

@@ -8,6 +8,8 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'index.html'),
+        'mcp-iframe-host': resolve(__dirname, 'mcp-iframe-host.html'),
+        'iframe-child': resolve(__dirname, 'iframe-child.html'),
       },
     },
   },

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Iframe Context Test</title>
+  <link rel="stylesheet" href="/src/styles/main.css">
+</head>
+<body class="bg-background p-4">
+  <!-- Status Banner -->
+  <div id="iframe-banner" class="mb-4 rounded-lg bg-gray-900 px-4 py-2 text-white">
+    <div id="iframe-status" class="flex items-center gap-2 text-sm">
+      <div class="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white"></div>
+      <span>Detecting native API...</span>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <div class="mb-4">
+    <h2 class="text-lg font-semibold text-foreground">Iframe Context</h2>
+    <p class="text-sm text-muted-foreground">Tools registered in this iframe</p>
+  </div>
+
+  <!-- Tool Registration -->
+  <div class="mb-4 space-y-3">
+    <div class="flex items-center gap-2">
+      <button id="register-iframe-tool-a" class="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+        Register via provideContext (Bucket A)
+      </button>
+      <button id="register-iframe-tool-b" class="rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80">
+        Register via registerTool (Bucket B)
+      </button>
+    </div>
+    <div class="flex items-center gap-2">
+      <button id="unregister-iframe-tool-b" class="rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent" disabled>
+        Unregister Bucket B Tool
+      </button>
+      <button id="clear-iframe-context" class="rounded-md border border-destructive bg-background px-3 py-1.5 text-sm font-medium text-destructive hover:bg-destructive/10">
+        Clear Context
+      </button>
+    </div>
+  </div>
+
+  <!-- Tool List -->
+  <div class="mb-4">
+    <h3 class="mb-2 text-sm font-semibold text-foreground">Registered Tools</h3>
+    <div id="iframe-tool-list" class="rounded-lg border border-border bg-card p-3 text-sm">
+      <span class="text-muted-foreground">No tools registered</span>
+    </div>
+  </div>
+
+  <!-- Bucket Indicators -->
+  <div class="grid grid-cols-2 gap-3">
+    <div class="rounded-lg border border-border bg-card p-3">
+      <div class="mb-1 flex items-center gap-2">
+        <div class="h-2 w-2 rounded-full" style="background: oklch(0.55 0.25 265);"></div>
+        <span class="text-sm font-medium text-foreground">Bucket A</span>
+      </div>
+      <div id="iframe-bucket-a" class="text-xs text-muted-foreground">Empty</div>
+    </div>
+    <div class="rounded-lg border border-border bg-card p-3">
+      <div class="mb-1 flex items-center gap-2">
+        <div class="h-2 w-2 rounded-full" style="background: oklch(0.6 0.15 145);"></div>
+        <span class="text-sm font-medium text-foreground">Bucket B</span>
+      </div>
+      <div id="iframe-bucket-b" class="text-xs text-muted-foreground">Empty</div>
+    </div>
+  </div>
+
+  <!-- Event Log -->
+  <div class="mt-4">
+    <h3 class="mb-2 text-sm font-semibold text-foreground">Events</h3>
+    <div id="iframe-event-log" class="scrollbar-thin max-h-32 overflow-y-auto rounded-lg bg-gray-900 p-3 font-mono text-xs text-gray-100"></div>
+  </div>
+
+  <script type="module" src="/src/iframe-main.ts"></script>
+</body>
+</html>

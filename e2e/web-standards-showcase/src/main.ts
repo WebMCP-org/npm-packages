@@ -18,6 +18,47 @@ let modelContextTesting: ModelContextTesting;
 let bucketATools: string[] = [];
 const bucketBRegistrations = new Map<string, { unregister: () => void }>();
 
+// Iframe context tracking
+let iframeReady = false;
+let iframeTools: string[] = [];
+let iframeBucketBTools: string[] = [];
+const iframeBucketBRegistrations = new Map<string, { unregister: () => void }>();
+
+// Iframe event log
+class IframeEventLog {
+  private container: HTMLElement | null;
+
+  constructor(containerId: string) {
+    this.container = document.getElementById(containerId);
+  }
+
+  log(type: 'info' | 'success' | 'warning' | 'error', message: string): void {
+    if (!this.container) return;
+
+    const colors: Record<string, string> = {
+      info: 'text-blue-400',
+      success: 'text-green-400',
+      warning: 'text-yellow-400',
+      error: 'text-red-400',
+    };
+
+    const timestamp = new Date().toLocaleTimeString();
+    const entry = document.createElement('div');
+    entry.className = `${colors[type]} py-0.5`;
+    entry.textContent = `[${timestamp}] ${message}`;
+
+    this.container.insertBefore(entry, this.container.firstChild);
+  }
+
+  clear(): void {
+    if (this.container) {
+      this.container.innerHTML = '';
+    }
+  }
+}
+
+let iframeEventLog: IframeEventLog;
+
 /**
  * Initialize the application
  */
@@ -42,10 +83,13 @@ function init(): void {
 
   // Initialize UI managers
   eventLog = new EventLog('event-log');
+  iframeEventLog = new IframeEventLog('iframe-event-log');
 
   // Setup event listeners
   setupEventListeners();
   setupToolChangeListener();
+  setupIframeEventListeners();
+  setupIframeMessageListener();
 
   eventLog.success('Application initialized', 'Native API ready');
 }
@@ -618,6 +662,379 @@ async function executeSelectedTool(): Promise<void> {
 
     eventLog.error('Execution failed', message);
   }
+}
+
+// ==================== Iframe Context Propagation ====================
+
+/**
+ * Setup iframe-related event listeners
+ */
+function setupIframeEventListeners(): void {
+  // Parent context controls
+  document
+    .getElementById('iframe-parent-register-a')
+    ?.addEventListener('click', iframeParentRegisterBucketA);
+  document
+    .getElementById('iframe-parent-register-b')
+    ?.addEventListener('click', iframeParentRegisterBucketB);
+  document
+    .getElementById('iframe-parent-unregister-b')
+    ?.addEventListener('click', iframeParentUnregisterBucketB);
+  document
+    .getElementById('iframe-parent-clear')
+    ?.addEventListener('click', iframeParentClearContext);
+
+  // Iframe child controls (send commands to iframe)
+  document
+    .getElementById('iframe-child-register-a')
+    ?.addEventListener('click', () => sendIframeCommand('register-bucket-a'));
+  document
+    .getElementById('iframe-child-register-b')
+    ?.addEventListener('click', () => sendIframeCommand('register-bucket-b'));
+  document
+    .getElementById('iframe-child-unregister-b')
+    ?.addEventListener('click', () => sendIframeCommand('unregister-bucket-b'));
+  document
+    .getElementById('iframe-child-clear')
+    ?.addEventListener('click', () => sendIframeCommand('clear-context'));
+
+  // Iframe management
+  document.getElementById('iframe-reload')?.addEventListener('click', reloadIframe);
+  document.getElementById('clear-iframe-log')?.addEventListener('click', () => {
+    iframeEventLog.clear();
+  });
+}
+
+/**
+ * Setup message listener for iframe communication
+ */
+function setupIframeMessageListener(): void {
+  window.addEventListener('message', (event: MessageEvent) => {
+    // Only accept messages from same origin (for same-origin iframe)
+    if (event.origin !== window.location.origin) return;
+
+    const data = event.data;
+    if (!data?.type?.startsWith('iframe-')) return;
+
+    switch (data.type) {
+      case 'iframe-iframe-ready':
+        handleIframeReady(data.data);
+        break;
+      case 'iframe-tools-changed':
+        handleIframeToolsChanged(data.data);
+        break;
+      case 'iframe-tool-registered':
+        handleIframeToolRegistered(data.data);
+        break;
+      case 'iframe-tool-unregistered':
+        handleIframeToolUnregistered(data.data);
+        break;
+      case 'iframe-context-cleared':
+        handleIframeContextCleared();
+        break;
+      case 'iframe-tools-list':
+        handleIframeToolsList(data.data);
+        break;
+    }
+  });
+}
+
+/**
+ * Send a command to the iframe
+ */
+function sendIframeCommand(command: string): void {
+  const iframe = document.getElementById('test-iframe') as HTMLIFrameElement;
+  if (iframe?.contentWindow) {
+    if (!iframeReady && command !== 'get-tools') {
+      iframeEventLog.log('warning', `Iframe not ready, command may not be processed: ${command}`);
+    }
+    iframe.contentWindow.postMessage({ type: 'iframe-command', command }, '*');
+    iframeEventLog.log('info', `Sent command to iframe: ${command}`);
+  }
+}
+
+/**
+ * Handle iframe ready event
+ */
+function handleIframeReady(data: { origin: string }): void {
+  iframeReady = true;
+  updateIframeStatusIndicator(true);
+  iframeEventLog.log('success', `Iframe ready (origin: ${data.origin})`);
+
+  // Request initial tool list
+  sendIframeCommand('get-tools');
+}
+
+/**
+ * Handle iframe tools changed event
+ */
+function handleIframeToolsChanged(data: { tools: string[] }): void {
+  iframeTools = data.tools;
+  updateIframeToolsDisplay();
+  updateContextComparison();
+  iframeEventLog.log('info', `Iframe tools changed: ${data.tools.length} tools`);
+}
+
+/**
+ * Handle iframe tool registered event
+ */
+function handleIframeToolRegistered(data: { name: string; bucket: string }): void {
+  if (data.bucket === 'B') {
+    iframeBucketBTools.push(data.name);
+    updateIframeUnregisterButton(true);
+  }
+  iframeEventLog.log('success', `Iframe registered: ${data.name} (Bucket ${data.bucket})`);
+  sendIframeCommand('get-tools');
+}
+
+/**
+ * Handle iframe tool unregistered event
+ */
+function handleIframeToolUnregistered(data: { name: string; bucket: string }): void {
+  if (data.bucket === 'B') {
+    iframeBucketBTools = iframeBucketBTools.filter((t) => t !== data.name);
+    updateIframeUnregisterButton(iframeBucketBTools.length > 0);
+  }
+  iframeEventLog.log('info', `Iframe unregistered: ${data.name} (Bucket ${data.bucket})`);
+  sendIframeCommand('get-tools');
+}
+
+/**
+ * Handle iframe context cleared event
+ */
+function handleIframeContextCleared(): void {
+  iframeEventLog.log('info', 'Iframe context cleared (Bucket A removed)');
+  sendIframeCommand('get-tools');
+}
+
+/**
+ * Handle iframe tools list response
+ */
+function handleIframeToolsList(data: { tools: string[] }): void {
+  iframeTools = data.tools;
+  updateIframeToolsDisplay();
+  updateContextComparison();
+}
+
+/**
+ * Update iframe status indicator
+ */
+function updateIframeStatusIndicator(ready: boolean): void {
+  const indicator = document.getElementById('iframe-status-indicator');
+  if (!indicator) return;
+
+  if (ready) {
+    indicator.innerHTML = `
+      <div class="h-2 w-2 rounded-full bg-green-500"></div>
+      <span>Connected</span>
+    `;
+  } else {
+    indicator.innerHTML = `
+      <div class="h-2 w-2 animate-pulse rounded-full bg-yellow-500"></div>
+      <span>Loading...</span>
+    `;
+  }
+}
+
+/**
+ * Update iframe unregister button state
+ */
+function updateIframeUnregisterButton(enabled: boolean): void {
+  const btn = document.getElementById('iframe-child-unregister-b') as HTMLButtonElement;
+  if (btn) {
+    btn.disabled = !enabled;
+  }
+}
+
+/**
+ * Update iframe tools display
+ */
+function updateIframeToolsDisplay(): void {
+  const childToolsDiv = document.getElementById('iframe-child-tools');
+  if (childToolsDiv) {
+    if (iframeTools.length === 0) {
+      childToolsDiv.innerHTML = '<span class="text-muted-foreground">No tools</span>';
+    } else {
+      childToolsDiv.innerHTML = iframeTools
+        .map(
+          (t) =>
+            `<div class="flex items-center gap-2 py-0.5">
+              <div class="h-1.5 w-1.5 rounded-full bg-green-500"></div>
+              <span>${t}</span>
+            </div>`
+        )
+        .join('');
+    }
+  }
+}
+
+/**
+ * Update parent tools display (for iframe section)
+ */
+function updateParentToolsDisplay(): void {
+  const parentToolsDiv = document.getElementById('iframe-parent-tools');
+  const parentTools = modelContext.listTools().map((t) => t.name);
+
+  if (parentToolsDiv) {
+    if (parentTools.length === 0) {
+      parentToolsDiv.innerHTML = '<span class="text-muted-foreground">No tools</span>';
+    } else {
+      parentToolsDiv.innerHTML = parentTools
+        .map(
+          (t) =>
+            `<div class="flex items-center gap-2 py-0.5">
+              <div class="h-1.5 w-1.5 rounded-full bg-green-500"></div>
+              <span>${t}</span>
+            </div>`
+        )
+        .join('');
+    }
+  }
+
+  updateContextComparison();
+}
+
+/**
+ * Update context comparison display
+ */
+function updateContextComparison(): void {
+  const parentTools = new Set(modelContext.listTools().map((t) => t.name));
+  const childTools = new Set(iframeTools);
+
+  // Parent only tools
+  const parentOnly = [...parentTools].filter((t) => !childTools.has(t));
+  // Iframe only tools
+  const childOnly = [...childTools].filter((t) => !parentTools.has(t));
+  // Shared tools
+  const shared = [...parentTools].filter((t) => childTools.has(t));
+
+  const parentOnlyDiv = document.getElementById('iframe-compare-parent');
+  const childOnlyDiv = document.getElementById('iframe-compare-child');
+  const sharedDiv = document.getElementById('iframe-compare-shared');
+
+  if (parentOnlyDiv) {
+    parentOnlyDiv.textContent = parentOnly.length > 0 ? parentOnly.join(', ') : '-';
+  }
+  if (childOnlyDiv) {
+    childOnlyDiv.textContent = childOnly.length > 0 ? childOnly.join(', ') : '-';
+  }
+  if (sharedDiv) {
+    sharedDiv.textContent = shared.length > 0 ? shared.join(', ') : '-';
+  }
+}
+
+/**
+ * Reload the iframe
+ */
+function reloadIframe(): void {
+  const iframe = document.getElementById('test-iframe') as HTMLIFrameElement;
+  if (iframe) {
+    iframeReady = false;
+    iframeTools = [];
+    iframeBucketBTools = [];
+    updateIframeStatusIndicator(false);
+    updateIframeToolsDisplay();
+    updateContextComparison();
+
+    // Store and reassign to trigger reload
+    const currentSrc = iframe.src;
+    iframe.src = '';
+    iframe.src = currentSrc;
+    iframeEventLog.log('info', 'Iframe reloaded');
+  }
+}
+
+// ==================== Parent Context for Iframe Demo ====================
+
+/**
+ * Register a tool in parent context via provideContext (Bucket A)
+ */
+function iframeParentRegisterBucketA(): void {
+  const tool: Tool = {
+    name: 'parent_greet',
+    description: 'Greeting tool registered in parent via provideContext (Bucket A)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Name to greet' },
+      },
+      required: ['name'],
+    },
+    async execute(input) {
+      return `[Parent Greet]: Hello, ${input.name}!`;
+    },
+  };
+
+  modelContext.provideContext({ tools: [tool] });
+
+  iframeEventLog.log('success', 'Parent: Registered parent_greet via provideContext (Bucket A)');
+  eventLog.info('Iframe Demo', 'Registered parent_greet in parent context (Bucket A)');
+  updateParentToolsDisplay();
+}
+
+/**
+ * Register a tool in parent context via registerTool (Bucket B)
+ */
+function iframeParentRegisterBucketB(): void {
+  if (iframeBucketBRegistrations.has('parent_time')) {
+    iframeEventLog.log('warning', 'Parent: parent_time already registered');
+    return;
+  }
+
+  const tool: Tool = {
+    name: 'parent_time',
+    description: 'Time tool registered in parent via registerTool (Bucket B)',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+    async execute() {
+      return `[Parent Time]: ${new Date().toLocaleTimeString()}`;
+    },
+  };
+
+  const registration = modelContext.registerTool(tool);
+  iframeBucketBRegistrations.set('parent_time', registration);
+
+  const btn = document.getElementById('iframe-parent-unregister-b') as HTMLButtonElement;
+  if (btn) {
+    btn.disabled = false;
+  }
+
+  iframeEventLog.log('success', 'Parent: Registered parent_time via registerTool (Bucket B)');
+  eventLog.info('Iframe Demo', 'Registered parent_time in parent context (Bucket B)');
+  updateParentToolsDisplay();
+}
+
+/**
+ * Unregister parent Bucket B tool
+ */
+function iframeParentUnregisterBucketB(): void {
+  const registration = iframeBucketBRegistrations.get('parent_time');
+  if (registration) {
+    registration.unregister();
+    iframeBucketBRegistrations.delete('parent_time');
+
+    const btn = document.getElementById('iframe-parent-unregister-b') as HTMLButtonElement;
+    if (btn) {
+      btn.disabled = true;
+    }
+
+    iframeEventLog.log('info', 'Parent: Unregistered parent_time (Bucket B)');
+    eventLog.info('Iframe Demo', 'Unregistered parent_time from parent context');
+    updateParentToolsDisplay();
+  }
+}
+
+/**
+ * Clear parent context
+ */
+function iframeParentClearContext(): void {
+  modelContext.clearContext();
+
+  iframeEventLog.log('info', 'Parent: Context cleared (Bucket A removed)');
+  eventLog.info('Iframe Demo', 'Parent context cleared');
+  updateParentToolsDisplay();
 }
 
 // Initialize on load
