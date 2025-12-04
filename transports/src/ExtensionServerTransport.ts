@@ -3,6 +3,7 @@ import type {
   TransportSendOptions,
 } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { type JSONRPCMessage, JSONRPCMessageSchema } from '@modelcontextprotocol/sdk/types.js';
+import { extensionServerLog as log } from './logger.js';
 
 /**
  * Configuration options for ExtensionServerTransport
@@ -98,8 +99,10 @@ export class ExtensionServerTransport implements Transport {
 
     // Set up disconnect handler
     this._disconnectHandler = () => {
-      console.log(
-        `[ExtensionServerTransport] Client disconnected after ${Date.now() - this._connectionInfo.connectedAt}ms, processed ${this._connectionInfo.messageCount} messages`
+      log(
+        'Client disconnected after %dms, processed %d messages',
+        Date.now() - this._connectionInfo.connectedAt,
+        this._connectionInfo.messageCount
       );
       this._cleanup();
       this.onclose?.();
@@ -113,9 +116,7 @@ export class ExtensionServerTransport implements Transport {
       this._startKeepAlive();
     }
 
-    console.log(
-      `[ExtensionServerTransport] Started with client: ${this._port.sender?.id || 'unknown'}`
-    );
+    log('Started with client: %s', this._port.sender?.id || 'unknown');
   }
 
   /**
@@ -189,9 +190,7 @@ export class ExtensionServerTransport implements Transport {
       return;
     }
 
-    console.log(
-      `[ExtensionServerTransport] Starting keep-alive with ${this._options.keepAliveInterval}ms interval`
-    );
+    log('Starting keep-alive with %dms interval', this._options.keepAliveInterval);
 
     this._keepAliveTimer = setInterval(() => {
       if (!this._port) {
@@ -203,7 +202,7 @@ export class ExtensionServerTransport implements Transport {
         // Send a keep-alive ping
         this._port.postMessage({ type: 'keep-alive', timestamp: Date.now() });
       } catch (error) {
-        console.error('[ExtensionServerTransport] Keep-alive failed:', error);
+        log.error('Keep-alive failed: %O', error);
         this._stopKeepAlive();
       }
     }, this._options.keepAliveInterval!) as unknown as number;

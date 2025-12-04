@@ -1,5 +1,6 @@
 import { jsonSchemaToZod as convertJsonSchemaToZod } from '@composio/json-schema-to-zod';
 import { z } from 'zod';
+import { validationLog as log } from './logger.js';
 import type { InputSchema } from './types.js';
 
 /**
@@ -32,7 +33,7 @@ export function jsonSchemaToZod(jsonSchema: InputSchema): z.ZodType {
     const zodSchema = convertJsonSchemaToZod(jsonSchema as unknown as object);
     return zodSchema;
   } catch (error) {
-    console.warn('[Web Model Context] Failed to convert JSON Schema to Zod:', error);
+    log.warn('Failed to convert JSON Schema to Zod: %O', error);
     return z.object({}).passthrough();
   }
 }

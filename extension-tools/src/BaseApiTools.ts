@@ -1,5 +1,9 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import debug from 'debug';
+
+const log = debug('mcp-b:extension-tools');
+const logWarn = debug('mcp-b:extension-tools:warn');
 
 export interface ApiAvailability {
   available: boolean;
@@ -63,14 +67,14 @@ export abstract class BaseApiTools<TOptions = Record<string, unknown>> {
   public register(): void {
     const availability = this.checkAvailability();
     if (!availability.available) {
-      console.warn(`✗ ${this.apiName} API not available: ${availability.message}`);
+      logWarn('%s API not available: %s', this.apiName, availability.message);
       if (availability.details) {
-        console.warn(`  Details: ${availability.details}`);
+        logWarn('  Details: %s', availability.details);
       }
       return;
     }
 
-    console.log(`✓ ${this.apiName} API available`);
+    log('%s API available', this.apiName);
     this.registerTools();
   }
 }

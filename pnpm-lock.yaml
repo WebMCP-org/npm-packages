@@ -30,6 +30,9 @@ catalogs:
     '@types/chrome':
       specifier: ^0.0.326
       version: 0.0.326
+    '@types/debug':
+      specifier: ^4.1.12
+      version: 4.1.12
     '@types/node':
       specifier: 22.17.2
       version: 22.17.2
@@ -42,6 +45,9 @@ catalogs:
     ai:
       specifier: ^5.0.83
       version: 5.0.83
+    debug:
+      specifier: ^4.4.1
+      version: 4.4.3
     react:
       specifier: ^19.1.0
       version: 19.1.1
@@ -536,6 +542,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: 'catalog:'
         version: 1.15.0
+      debug:
+        specifier: 'catalog:'
+        version: 4.4.3
       zod:
         specifier: 'catalog:'
         version: 3.25.76
@@ -549,6 +558,9 @@ importers:
       '@types/chrome':
         specifier: 'catalog:'
         version: 0.0.326
+      '@types/debug':
+        specifier: 'catalog:'
+        version: 4.1.12
       '@types/node':
         specifier: 'catalog:'
         version: 22.17.2
@@ -579,10 +591,16 @@ importers:
       '@mcp-b/webmcp-ts-sdk':
         specifier: workspace:*
         version: link:../webmcp-ts-sdk
+      debug:
+        specifier: 'catalog:'
+        version: 4.4.3
       zod:
         specifier: 'catalog:'
         version: 3.25.76
     devDependencies:
+      '@types/debug':
+        specifier: 'catalog:'
+        version: 4.1.12
       '@types/node':
         specifier: 'catalog:'
         version: 22.17.2
@@ -607,10 +625,16 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: 'catalog:'
         version: 1.15.0
+      debug:
+        specifier: 'catalog:'
+        version: 4.4.3
       react:
         specifier: 'catalog:'
         version: 19.1.1
     devDependencies:
+      '@types/debug':
+        specifier: 'catalog:'
+        version: 4.1.12
       '@types/node':
         specifier: 'catalog:'
         version: 22.17.2
@@ -676,6 +700,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.15.0
         version: 1.17.3
+      debug:
+        specifier: 'catalog:'
+        version: 4.4.3
       zod:
         specifier: 'catalog:'
         version: 3.25.76
@@ -683,6 +710,9 @@ importers:
       '@types/chrome':
         specifier: 'catalog:'
         version: 0.0.326
+      '@types/debug':
+        specifier: 'catalog:'
+        version: 4.1.12
       '@types/node':
         specifier: 'catalog:'
         version: 22.17.2
@@ -3271,15 +3301,6 @@ packages:
   date-fns@4.1.0:
     resolution: {integrity: sha512-Ukq0owbQXxa/U3EGtsdVBkR1w7KOQ5gIBqdH2hkvknzZPYvBxb/aa6E8L7tmjFtkwZBu3UXBbjIgPo/Ez4xaNg==}
 
-  debug@4.4.1:
-    resolution: {integrity: sha512-KcKCqiftBJcZr++7ykoDIEwSa3XWowTfNPo92BYxjXiyYEVrUQh2aLyhxBCwww+heortUFxEJYcRzosstTEBYQ==}
-    engines: {node: '>=6.0'}
-    peerDependencies:
-      supports-color: '*'
-    peerDependenciesMeta:
-      supports-color:
-        optional: true
-
   debug@4.4.3:
     resolution: {integrity: sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA==}
     engines: {node: '>=6.0'}
@@ -5853,7 +5874,7 @@ snapshots:
       '@babel/types': 7.28.5
       '@jridgewell/remapping': 2.3.5
       convert-source-map: 2.0.0
-      debug: 4.4.1
+      debug: 4.4.3
       gensync: 1.0.0-beta.2
       json5: 2.2.3
       semver: 6.3.1
@@ -8328,10 +8349,6 @@ snapshots:
 
   date-fns@4.1.0: {}
 
-  debug@4.4.1:
-    dependencies:
-      ms: 2.1.3
-
   debug@4.4.3:
     dependencies:
       ms: 2.1.3
@@ -9141,7 +9158,7 @@ snapshots:
     dependencies:
       chalk: 5.5.0
       commander: 14.0.0
-      debug: 4.4.1
+      debug: 4.4.3
       lilconfig: 3.1.3
       listr2: 9.0.1
       micromatch: 4.0.8

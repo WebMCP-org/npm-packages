@@ -14,7 +14,9 @@ packages:
   - e2e/mcp-ui-with-webmcp/**
 
 catalog:
+  '@types/debug': ^4.1.12
   '@cloudflare/vite-plugin': ^1.13.18
+  debug: ^4.4.1
   '@composio/json-schema-to-zod': ^0.1.17
   '@hookform/resolvers': ^5.2.2
   '@modelcontextprotocol/sdk': 1.15.0

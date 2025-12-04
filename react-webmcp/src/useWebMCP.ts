@@ -2,6 +2,7 @@ import type { InputSchema } from '@mcp-b/global';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { z } from 'zod';
+import { useWebMCPLog as log } from './logger.js';
 import type { ToolExecutionState, WebMCPConfig, WebMCPReturn } from './types.js';
 
 /**
@@ -244,8 +245,9 @@ export function useWebMCP<
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.navigator?.modelContext) {
-      console.warn(
-        `[useWebMCP] window.navigator.modelContext is not available. Tool "${name}" will not be registered.`
+      log.warn(
+        'window.navigator.modelContext is not available. Tool "%s" will not be registered.',
+        name
       );
       return;
     }
@@ -298,7 +300,7 @@ export function useWebMCP<
       },
     });
 
-    console.log(`[useWebMCP] Registered tool: ${name}`);
+    log('Registered tool: %s', name);
 
     // Expose registered tools on window for testing
     if (typeof window !== 'undefined') {
@@ -310,7 +312,7 @@ export function useWebMCP<
     return () => {
       if (registration) {
         registration.unregister();
-        console.log(`[useWebMCP] Unregistered tool: ${name}`);
+        log('Unregistered tool: %s', name);
 
         // Update window.mcpTools after unregistration
         if (typeof window !== 'undefined' && window.navigator?.modelContext) {

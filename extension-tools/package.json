@@ -28,8 +28,8 @@
   "type": "module",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     }
   },
   "main": "./dist/index.js",
@@ -57,12 +57,14 @@
   "dependencies": {
     "@mcp-b/smart-dom-reader": "workspace:*",
     "@modelcontextprotocol/sdk": "catalog:",
+    "debug": "catalog:",
     "zod": "catalog:",
     "zod-to-json-schema": "^3.24.5"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.60.0",
     "@types/chrome": "catalog:",
+    "@types/debug": "catalog:",
     "@types/node": "catalog:",
     "cheerio": "^1.1.2",
     "dotenv": "^17.2.1",

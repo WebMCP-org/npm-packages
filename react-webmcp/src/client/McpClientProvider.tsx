@@ -20,6 +20,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { clientProviderLog as log } from '../logger.js';
 
 /**
  * Context value provided by McpClientProvider.
@@ -166,7 +167,7 @@ export function McpClientProvider({
       const response = await client.listResources();
       setResources(response.resources);
     } catch (e) {
-      console.error('Error fetching resources:', e);
+      log.error('Error fetching resources: %O', e);
       throw e;
     }
   }, [client]);
@@ -188,7 +189,7 @@ export function McpClientProvider({
       const response = await client.listTools();
       setTools(response.tools);
     } catch (e) {
-      console.error('Error fetching tools:', e);
+      log.error('Error fetching tools: %O', e);
       throw e;
     }
   }, [client]);
@@ -236,11 +237,11 @@ export function McpClientProvider({
     const serverCapabilities = client.getServerCapabilities();
 
     const handleResourcesChanged = () => {
-      fetchResourcesInternal().catch(console.error);
+      fetchResourcesInternal().catch((e) => log.error('Error refetching resources: %O', e));
     };
 
     const handleToolsChanged = () => {
-      fetchToolsInternal().catch(console.error);
+      fetchToolsInternal().catch((e) => log.error('Error refetching tools: %O', e));
     };
 
     if (serverCapabilities?.resources?.listChanged) {
@@ -265,7 +266,7 @@ export function McpClientProvider({
   useEffect(() => {
     // Initial connection - reconnect() has its own guard to prevent concurrent connections
     reconnect().catch((err) => {
-      console.error('Failed to connect MCP client:', err);
+      log.error('Failed to connect MCP client: %O', err);
     });
 
     // Cleanup: mark as disconnected so next mount will reconnect

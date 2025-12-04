@@ -1,4 +1,5 @@
 import { initializeWebModelContext } from './global.js';
+import { initLog as log } from './logger.js';
 import type { TransportConfiguration, WebModelContextInitOptions } from './types.js';
 
 type TabServerConfig = NonNullable<TransportConfiguration['tabServer']>;
@@ -55,7 +56,7 @@ function parseScriptTagOptions(
     try {
       return JSON.parse(dataset.webmcpOptions) as WebModelContextInitOptions;
     } catch (error) {
-      console.error('[Web Model Context] Invalid JSON in data-webmcp-options:', error);
+      log.error('Invalid JSON in data-webmcp-options: %O', error);
       return undefined;
     }
   }
@@ -121,7 +122,7 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
       initializeWebModelContext(mergedOptions);
     }
   } catch (error) {
-    console.error('[Web Model Context] Auto-initialization failed:', error);
+    log.error('Auto-initialization failed: %O', error);
   }
 }
 

@@ -33,6 +33,11 @@
       "import": "./dist/index.js",
       "default": "./dist/index.js"
     },
+    "./logger": {
+      "types": "./dist/logger.d.ts",
+      "import": "./dist/logger.js",
+      "default": "./dist/logger.js"
+    },
     "./iife": {
       "script": "./dist/index.iife.js",
       "default": "./dist/index.iife.js"
@@ -63,9 +68,11 @@
     "@composio/json-schema-to-zod": "catalog:",
     "@mcp-b/transports": "workspace:*",
     "@mcp-b/webmcp-ts-sdk": "workspace:*",
+    "debug": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@types/debug": "catalog:",
     "@types/node": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:"

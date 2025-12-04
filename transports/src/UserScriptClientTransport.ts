@@ -3,6 +3,7 @@ import type {
   TransportSendOptions,
 } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { type JSONRPCMessage, JSONRPCMessageSchema } from '@modelcontextprotocol/sdk/types.js';
+import { userScriptClientLog as log } from './logger.js';
 
 /**
  * Configuration options for UserScriptClientTransport
@@ -98,8 +99,8 @@ export class UserScriptClientTransport implements Transport {
    */
   async start(): Promise<void> {
     if (this._isStarted && this._port) {
-      console.warn(
-        'UserScriptClientTransport already started! If using Client class, note that connect() calls start() automatically.'
+      log.warn(
+        'Already started! If using Client class, note that connect() calls start() automatically.'
       );
       return;
     }
@@ -266,7 +267,7 @@ export class UserScriptClientTransport implements Transport {
 
     // Check if we've exceeded max attempts
     if (this._reconnectAttempts >= this._maxReconnectAttempts) {
-      console.error('Maximum reconnection attempts reached');
+      log.error('Maximum reconnection attempts reached');
       this._isReconnecting = false;
       this.onerror?.(new Error('Maximum reconnection attempts reached'));
       this.onclose?.();
@@ -275,8 +276,11 @@ export class UserScriptClientTransport implements Transport {
 
     this._reconnectAttempts++;
 
-    console.log(
-      `Scheduling reconnection attempt ${this._reconnectAttempts}/${this._maxReconnectAttempts} in ${this._currentReconnectDelay}ms`
+    log(
+      'Scheduling reconnection attempt %d/%d in %dms',
+      this._reconnectAttempts,
+      this._maxReconnectAttempts,
+      this._currentReconnectDelay
     );
 
     this._reconnectTimer = setTimeout(() => {
@@ -311,10 +315,10 @@ export class UserScriptClientTransport implements Transport {
       // Attempt to connect
       await this._connect();
 
-      console.log('Reconnection successful');
+      log('Reconnection successful');
       this._isReconnecting = false;
     } catch (error) {
-      console.error('Reconnection failed:', error);
+      log.error('Reconnection failed: %O', error);
 
       // Schedule another attempt
       this._scheduleReconnect();

@@ -21,6 +21,7 @@ import {
   ReadResourceRequestSchema,
 } from '@mcp-b/webmcp-ts-sdk';
 import type { z } from 'zod';
+import { bridgeLog, contextLog, nativeAdapterLog, testingLog } from './logger.js';
 import type {
   ElicitationParams,
   ElicitationResult,
@@ -117,7 +118,7 @@ class NativeModelContextAdapter implements InternalModelContext {
     this.nativeTesting = nativeTesting;
 
     this.nativeTesting.registerToolsChangedCallback(() => {
-      console.log('[Native Adapter] Tool change detected from native API');
+      nativeAdapterLog('Tool change detected from native API');
       this.syncToolsFromNative();
     });
 
@@ -140,7 +141,7 @@ class NativeModelContextAdapter implements InternalModelContext {
 
     try {
       const nativeTools = this.nativeTesting.listTools();
-      console.log(`[Native Adapter] Syncing ${nativeTools.length} tools from native API`);
+      nativeAdapterLog('Syncing %d tools from native API', nativeTools.length);
 
       this.bridge.tools.clear();
 
@@ -164,7 +165,7 @@ class NativeModelContextAdapter implements InternalModelContext {
 
           this.bridge.tools.set(toolInfo.name, validatedTool);
         } catch (error) {
-          console.error(`[Native Adapter] Failed to sync tool "${toolInfo.name}":`, error);
+          nativeAdapterLog.error('Failed to sync tool "%s": %O', toolInfo.name, error);
         }
       }
 
@@ -233,7 +234,7 @@ class NativeModelContextAdapter implements InternalModelContext {
    * @param {ModelContextInput} context - Context containing tools to register
    */
   provideContext(context: ModelContextInput): void {
-    console.log('[Native Adapter] Delegating provideContext to native API');
+    nativeAdapterLog('Delegating provideContext to native API');
     this.nativeContext.provideContext(context);
   }
 
@@ -249,7 +250,7 @@ class NativeModelContextAdapter implements InternalModelContext {
     TInputSchema extends ZodSchemaObject = Record<string, never>,
     TOutputSchema extends ZodSchemaObject = Record<string, never>,
   >(tool: ToolDescriptor<TInputSchema, TOutputSchema>): { unregister: () => void } {
-    console.log(`[Native Adapter] Delegating registerTool("${tool.name}") to native API`);
+    nativeAdapterLog('Delegating registerTool("%s") to native API', tool.name);
     const result = this.nativeContext.registerTool(tool);
     return result;
   }
@@ -261,7 +262,7 @@ class NativeModelContextAdapter implements InternalModelContext {
    * @param {string} name - Name of the tool to unregister
    */
   unregisterTool(name: string): void {
-    console.log(`[Native Adapter] Delegating unregisterTool("${name}") to native API`);
+    nativeAdapterLog('Delegating unregisterTool("%s") to native API', name);
     this.nativeContext.unregisterTool(name);
   }
 
@@ -270,7 +271,7 @@ class NativeModelContextAdapter implements InternalModelContext {
    * Delegates to navigator.modelContext.clearContext().
    */
   clearContext(): void {
-    console.log('[Native Adapter] Delegating clearContext to native API');
+    nativeAdapterLog('Delegating clearContext to native API');
     this.nativeContext.clearContext();
   }
 
@@ -284,12 +285,12 @@ class NativeModelContextAdapter implements InternalModelContext {
    * @internal
    */
   async executeTool(toolName: string, args: Record<string, unknown>): Promise<ToolResponse> {
-    console.log(`[Native Adapter] Executing tool "${toolName}" via native API`);
+    nativeAdapterLog('Executing tool "%s" via native API', toolName);
     try {
       const result = await this.nativeTesting.executeTool(toolName, JSON.stringify(args));
       return this.convertToToolResponse(result);
     } catch (error) {
-      console.error(`[Native Adapter] Error executing tool "${toolName}":`, error);
+      nativeAdapterLog.error('Error executing tool "%s": %O', toolName, error);
       return {
         content: [
           {
@@ -326,7 +327,7 @@ class NativeModelContextAdapter implements InternalModelContext {
    * This is a polyfill-only feature.
    */
   registerResource(_resource: ResourceDescriptor): { unregister: () => void } {
-    console.warn('[Native Adapter] registerResource is not supported by native API');
+    nativeAdapterLog.warn('registerResource is not supported by native API');
     return { unregister: () => {} };
   }
 
@@ -335,7 +336,7 @@ class NativeModelContextAdapter implements InternalModelContext {
    * Note: Native Chromium API does not yet support resources.
    */
   unregisterResource(_uri: string): void {
-    console.warn('[Native Adapter] unregisterResource is not supported by native API');
+    nativeAdapterLog.warn('unregisterResource is not supported by native API');
   }
 
   /**
@@ -378,7 +379,7 @@ class NativeModelContextAdapter implements InternalModelContext {
   registerPrompt<TArgsSchema extends ZodSchemaObject = Record<string, never>>(
     _prompt: PromptDescriptor<TArgsSchema>
   ): { unregister: () => void } {
-    console.warn('[Native Adapter] registerPrompt is not supported by native API');
+    nativeAdapterLog.warn('registerPrompt is not supported by native API');
     return { unregister: () => {} };
   }
 
@@ -387,7 +388,7 @@ class NativeModelContextAdapter implements InternalModelContext {
    * Note: Native Chromium API does not yet support prompts.
    */
   unregisterPrompt(_name: string): void {
-    console.warn('[Native Adapter] unregisterPrompt is not supported by native API');
+    nativeAdapterLog.warn('unregisterPrompt is not supported by native API');
   }
 
   /**
@@ -648,7 +649,7 @@ class WebModelContextTesting implements ModelContextTesting {
       try {
         callback();
       } catch (error) {
-        console.error('[Model Context Testing] Error in tools changed callback:', error);
+        testingLog.error('Error in tools changed callback: %O', error);
       }
     }
   }
@@ -664,7 +665,7 @@ class WebModelContextTesting implements ModelContextTesting {
    * @throws {Error} If the tool does not exist
    */
   async executeTool(toolName: string, inputArgsJson: string): Promise<unknown> {
-    console.log(`[Model Context Testing] Executing tool: ${toolName}`);
+    testingLog('Executing tool: %s', toolName);
 
     let args: Record<string, unknown>;
     try {
@@ -723,7 +724,7 @@ class WebModelContextTesting implements ModelContextTesting {
    */
   registerToolsChangedCallback(callback: () => void): void {
     this.toolsChangedCallbacks.add(callback);
-    console.log('[Model Context Testing] Tools changed callback registered');
+    testingLog('Tools changed callback registered');
   }
 
   /**
@@ -744,7 +745,7 @@ class WebModelContextTesting implements ModelContextTesting {
    */
   clearToolCalls(): void {
     this.toolCallHistory = [];
-    console.log('[Model Context Testing] Tool call history cleared');
+    testingLog('Tool call history cleared');
   }
 
   /**
@@ -756,7 +757,7 @@ class WebModelContextTesting implements ModelContextTesting {
    */
   setMockToolResponse(toolName: string, response: ToolResponse): void {
     this.mockResponses.set(toolName, response);
-    console.log(`[Model Context Testing] Mock response set for tool: ${toolName}`);
+    testingLog('Mock response set for tool: %s', toolName);
   }
 
   /**
@@ -766,7 +767,7 @@ class WebModelContextTesting implements ModelContextTesting {
    */
   clearMockToolResponse(toolName: string): void {
     this.mockResponses.delete(toolName);
-    console.log(`[Model Context Testing] Mock response cleared for tool: ${toolName}`);
+    testingLog('Mock response cleared for tool: %s', toolName);
   }
 
   /**
@@ -774,7 +775,7 @@ class WebModelContextTesting implements ModelContextTesting {
    */
   clearAllMockToolResponses(): void {
     this.mockResponses.clear();
-    console.log('[Model Context Testing] All mock responses cleared');
+    testingLog('All mock responses cleared');
   }
 
   /**
@@ -793,7 +794,7 @@ class WebModelContextTesting implements ModelContextTesting {
   reset(): void {
     this.clearToolCalls();
     this.clearAllMockToolResponses();
-    console.log('[Model Context Testing] Testing state reset');
+    testingLog('Testing state reset');
   }
 }
 
@@ -928,8 +929,11 @@ class WebModelContext implements InternalModelContext {
     const toolCount = context.tools?.length ?? 0;
     const resourceCount = context.resources?.length ?? 0;
     const promptCount = context.prompts?.length ?? 0;
-    console.log(
-      `[Web Model Context] provideContext: ${toolCount} tools, ${resourceCount} resources, ${promptCount} prompts`
+    contextLog(
+      'provideContext: %d tools, %d resources, %d prompts',
+      toolCount,
+      resourceCount,
+      promptCount
     );
 
     // Clear base items (Bucket A)
@@ -1062,15 +1066,17 @@ class WebModelContext implements InternalModelContext {
     TInputSchema extends ZodSchemaObject = Record<string, never>,
     TOutputSchema extends ZodSchemaObject = Record<string, never>,
   >(tool: ToolDescriptor<TInputSchema, TOutputSchema>): { unregister: () => void } {
-    console.log(`[Web Model Context] Registering tool dynamically: ${tool.name}`);
+    contextLog('Registering tool dynamically: %s', tool.name);
 
     const now = Date.now();
     const lastRegistration = this.toolRegistrationTimestamps.get(tool.name);
 
     if (lastRegistration && now - lastRegistration < RAPID_DUPLICATE_WINDOW_MS) {
-      console.warn(
-        `[Web Model Context] Tool "${tool.name}" registered multiple times within ${RAPID_DUPLICATE_WINDOW_MS}ms. ` +
-          'This is likely due to React Strict Mode double-mounting. Ignoring duplicate registration.'
+      contextLog.warn(
+        'Tool "%s" registered multiple times within %dms. ' +
+          'This is likely due to React Strict Mode double-mounting. Ignoring duplicate registration.',
+        tool.name,
+        RAPID_DUPLICATE_WINDOW_MS
       );
 
       const existingUnregister = this.toolUnregisterFunctions.get(tool.name);
@@ -1114,7 +1120,7 @@ class WebModelContext implements InternalModelContext {
     this.notifyToolsListChanged();
 
     const unregisterFn = () => {
-      console.log(`[Web Model Context] Unregistering tool: ${tool.name}`);
+      contextLog('Unregistering tool: %s', tool.name);
 
       if (this.provideContextTools.has(tool.name)) {
         throw new Error(
@@ -1124,9 +1130,7 @@ class WebModelContext implements InternalModelContext {
       }
 
       if (!this.dynamicTools.has(tool.name)) {
-        console.warn(
-          `[Web Model Context] Tool "${tool.name}" is not registered, ignoring unregister call`
-        );
+        contextLog.warn('Tool "%s" is not registered, ignoring unregister call', tool.name);
         return;
       }
 
@@ -1153,15 +1157,17 @@ class WebModelContext implements InternalModelContext {
    * @throws {Error} If resource URI collides with existing resources
    */
   registerResource(resource: ResourceDescriptor): { unregister: () => void } {
-    console.log(`[Web Model Context] Registering resource dynamically: ${resource.uri}`);
+    contextLog('Registering resource dynamically: %s', resource.uri);
 
     const now = Date.now();
     const lastRegistration = this.resourceRegistrationTimestamps.get(resource.uri);
 
     if (lastRegistration && now - lastRegistration < RAPID_DUPLICATE_WINDOW_MS) {
-      console.warn(
-        `[Web Model Context] Resource "${resource.uri}" registered multiple times within ${RAPID_DUPLICATE_WINDOW_MS}ms. ` +
-          'This is likely due to React Strict Mode double-mounting. Ignoring duplicate registration.'
+      contextLog.warn(
+        'Resource "%s" registered multiple times within %dms. ' +
+          'This is likely due to React Strict Mode double-mounting. Ignoring duplicate registration.',
+        resource.uri,
+        RAPID_DUPLICATE_WINDOW_MS
       );
 
       const existingUnregister = this.resourceUnregisterFunctions.get(resource.uri);
@@ -1191,7 +1197,7 @@ class WebModelContext implements InternalModelContext {
     this.notifyResourcesListChanged();
 
     const unregisterFn = () => {
-      console.log(`[Web Model Context] Unregistering resource: ${resource.uri}`);
+      contextLog('Unregistering resource: %s', resource.uri);
 
       if (this.provideContextResources.has(resource.uri)) {
         throw new Error(
@@ -1201,9 +1207,7 @@ class WebModelContext implements InternalModelContext {
       }
 
       if (!this.dynamicResources.has(resource.uri)) {
-        console.warn(
-          `[Web Model Context] Resource "${resource.uri}" is not registered, ignoring unregister call`
-        );
+        contextLog.warn('Resource "%s" is not registered, ignoring unregister call', resource.uri);
         return;
       }
 
@@ -1226,15 +1230,13 @@ class WebModelContext implements InternalModelContext {
    * @param {string} uri - URI of the resource to unregister
    */
   unregisterResource(uri: string): void {
-    console.log(`[Web Model Context] Unregistering resource: ${uri}`);
+    contextLog('Unregistering resource: %s', uri);
 
     const inProvideContext = this.provideContextResources.has(uri);
     const inDynamic = this.dynamicResources.has(uri);
 
     if (!inProvideContext && !inDynamic) {
-      console.warn(
-        `[Web Model Context] Resource "${uri}" is not registered, ignoring unregister call`
-      );
+      contextLog.warn('Resource "%s" is not registered, ignoring unregister call', uri);
       return;
     }
 
@@ -1304,15 +1306,17 @@ class WebModelContext implements InternalModelContext {
   registerPrompt<TArgsSchema extends ZodSchemaObject = Record<string, never>>(
     prompt: PromptDescriptor<TArgsSchema>
   ): { unregister: () => void } {
-    console.log(`[Web Model Context] Registering prompt dynamically: ${prompt.name}`);
+    contextLog('Registering prompt dynamically: %s', prompt.name);
 
     const now = Date.now();
     const lastRegistration = this.promptRegistrationTimestamps.get(prompt.name);
 
     if (lastRegistration && now - lastRegistration < RAPID_DUPLICATE_WINDOW_MS) {
-      console.warn(
-        `[Web Model Context] Prompt "${prompt.name}" registered multiple times within ${RAPID_DUPLICATE_WINDOW_MS}ms. ` +
-          'This is likely due to React Strict Mode double-mounting. Ignoring duplicate registration.'
+      contextLog.warn(
+        'Prompt "%s" registered multiple times within %dms. ' +
+          'This is likely due to React Strict Mode double-mounting. Ignoring duplicate registration.',
+        prompt.name,
+        RAPID_DUPLICATE_WINDOW_MS
       );
 
       const existingUnregister = this.promptUnregisterFunctions.get(prompt.name);
@@ -1342,7 +1346,7 @@ class WebModelContext implements InternalModelContext {
     this.notifyPromptsListChanged();
 
     const unregisterFn = () => {
-      console.log(`[Web Model Context] Unregistering prompt: ${prompt.name}`);
+      contextLog('Unregistering prompt: %s', prompt.name);
 
       if (this.provideContextPrompts.has(prompt.name)) {
         throw new Error(
@@ -1352,9 +1356,7 @@ class WebModelContext implements InternalModelContext {
       }
 
       if (!this.dynamicPrompts.has(prompt.name)) {
-        console.warn(
-          `[Web Model Context] Prompt "${prompt.name}" is not registered, ignoring unregister call`
-        );
+        contextLog.warn('Prompt "%s" is not registered, ignoring unregister call', prompt.name);
         return;
       }
 
@@ -1377,15 +1379,13 @@ class WebModelContext implements InternalModelContext {
    * @param {string} name - Name of the prompt to unregister
    */
   unregisterPrompt(name: string): void {
-    console.log(`[Web Model Context] Unregistering prompt: ${name}`);
+    contextLog('Unregistering prompt: %s', name);
 
     const inProvideContext = this.provideContextPrompts.has(name);
     const inDynamic = this.dynamicPrompts.has(name);
 
     if (!inProvideContext && !inDynamic) {
-      console.warn(
-        `[Web Model Context] Prompt "${name}" is not registered, ignoring unregister call`
-      );
+      contextLog.warn('Prompt "%s" is not registered, ignoring unregister call', name);
       return;
     }
 
@@ -1430,15 +1430,13 @@ class WebModelContext implements InternalModelContext {
    * @param {string} name - Name of the tool to unregister
    */
   unregisterTool(name: string): void {
-    console.log(`[Web Model Context] Unregistering tool: ${name}`);
+    contextLog('Unregistering tool: %s', name);
 
     const inProvideContext = this.provideContextTools.has(name);
     const inDynamic = this.dynamicTools.has(name);
 
     if (!inProvideContext && !inDynamic) {
-      console.warn(
-        `[Web Model Context] Tool "${name}" is not registered, ignoring unregister call`
-      );
+      contextLog.warn('Tool "%s" is not registered, ignoring unregister call', name);
       return;
     }
 
@@ -1461,7 +1459,7 @@ class WebModelContext implements InternalModelContext {
    * Removes all tools, resources, and prompts registered via provideContext() and register* methods.
    */
   clearContext(): void {
-    console.log('[Web Model Context] Clearing all context (tools, resources, prompts)');
+    contextLog('Clearing all context (tools, resources, prompts)');
 
     // Clear tools
     this.provideContextTools.clear();
@@ -1509,8 +1507,11 @@ class WebModelContext implements InternalModelContext {
       this.bridge.tools.set(name, tool);
     }
 
-    console.log(
-      `[Web Model Context] Updated bridge with ${this.provideContextTools.size} base tools + ${this.dynamicTools.size} dynamic tools = ${this.bridge.tools.size} total`
+    contextLog(
+      'Updated bridge with %d base tools + %d dynamic tools = %d total',
+      this.provideContextTools.size,
+      this.dynamicTools.size,
+      this.bridge.tools.size
     );
   }
 
@@ -1556,8 +1557,11 @@ class WebModelContext implements InternalModelContext {
       this.bridge.resources.set(uri, resource);
     }
 
-    console.log(
-      `[Web Model Context] Updated bridge with ${this.provideContextResources.size} base resources + ${this.dynamicResources.size} dynamic resources = ${this.bridge.resources.size} total`
+    contextLog(
+      'Updated bridge with %d base resources + %d dynamic resources = %d total',
+      this.provideContextResources.size,
+      this.dynamicResources.size,
+      this.bridge.resources.size
     );
   }
 
@@ -1598,8 +1602,11 @@ class WebModelContext implements InternalModelContext {
       this.bridge.prompts.set(name, prompt);
     }
 
-    console.log(
-      `[Web Model Context] Updated bridge with ${this.provideContextPrompts.size} base prompts + ${this.dynamicPrompts.size} dynamic prompts = ${this.bridge.prompts.size} total`
+    contextLog(
+      'Updated bridge with %d base prompts + %d dynamic prompts = %d total',
+      this.provideContextPrompts.size,
+      this.dynamicPrompts.size,
+      this.bridge.prompts.size
     );
   }
 
@@ -1634,7 +1641,7 @@ class WebModelContext implements InternalModelContext {
    * @internal
    */
   async readResource(uri: string): Promise<{ contents: ResourceContents[] }> {
-    console.log(`[Web Model Context] Reading resource: ${uri}`);
+    contextLog('Reading resource: %s', uri);
 
     // First, try to find an exact match (static resource)
     const staticResource = this.bridge.resources.get(uri);
@@ -1643,7 +1650,7 @@ class WebModelContext implements InternalModelContext {
         const parsedUri = new URL(uri);
         return await staticResource.read(parsedUri);
       } catch (error) {
-        console.error(`[Web Model Context] Error reading resource ${uri}:`, error);
+        contextLog.error('Error reading resource %s: %O', uri, error);
         throw error;
       }
     }
@@ -1658,7 +1665,7 @@ class WebModelContext implements InternalModelContext {
           const parsedUri = new URL(uri);
           return await resource.read(parsedUri, params);
         } catch (error) {
-          console.error(`[Web Model Context] Error reading resource ${uri}:`, error);
+          contextLog.error('Error reading resource %s: %O', uri, error);
           throw error;
         }
       }
@@ -1721,7 +1728,7 @@ class WebModelContext implements InternalModelContext {
     name: string,
     args?: Record<string, unknown>
   ): Promise<{ messages: PromptMessage[] }> {
-    console.log(`[Web Model Context] Getting prompt: ${name}`);
+    contextLog('Getting prompt: %s', name);
 
     const prompt = this.bridge.prompts.get(name);
     if (!prompt) {
@@ -1732,10 +1739,7 @@ class WebModelContext implements InternalModelContext {
     if (prompt.argsValidator && args) {
       const validation = validateWithZod(args, prompt.argsValidator);
       if (!validation.success) {
-        console.error(
-          `[Web Model Context] Argument validation failed for prompt ${name}:`,
-          validation.error
-        );
+        contextLog.error('Argument validation failed for prompt %s: %s', name, validation.error);
         throw new Error(`Argument validation error for prompt "${name}":\n${validation.error}`);
       }
     }
@@ -1743,7 +1747,7 @@ class WebModelContext implements InternalModelContext {
     try {
       return await prompt.get(args ?? {});
     } catch (error) {
-      console.error(`[Web Model Context] Error getting prompt ${name}:`, error);
+      contextLog.error('Error getting prompt %s: %O', name, error);
       throw error;
     }
   }
@@ -1770,13 +1774,10 @@ class WebModelContext implements InternalModelContext {
       throw new Error(`Tool not found: ${toolName}`);
     }
 
-    console.log(`[Web Model Context] Validating input for tool: ${toolName}`);
+    contextLog('Validating input for tool: %s', toolName);
     const validation = validateWithZod(args, tool.inputValidator);
     if (!validation.success) {
-      console.error(
-        `[Web Model Context] Input validation failed for ${toolName}:`,
-        validation.error
-      );
+      contextLog.error('Input validation failed for %s: %s', toolName, validation.error);
       return {
         content: [
           {
@@ -1797,7 +1798,7 @@ class WebModelContext implements InternalModelContext {
     if (this.testingAPI?.hasMockResponse(toolName)) {
       const mockResponse = this.testingAPI.getMockResponse(toolName);
       if (mockResponse) {
-        console.log(`[Web Model Context] Returning mock response for tool: ${toolName}`);
+        contextLog('Returning mock response for tool: %s', toolName);
         return mockResponse;
       }
     }
@@ -1809,28 +1810,25 @@ class WebModelContext implements InternalModelContext {
     if (event.defaultPrevented && event.hasResponse()) {
       const response = event.getResponse();
       if (response) {
-        console.log(`[Web Model Context] Tool ${toolName} handled by event listener`);
+        contextLog('Tool %s handled by event listener', toolName);
         return response;
       }
     }
 
-    console.log(`[Web Model Context] Executing tool: ${toolName}`);
+    contextLog('Executing tool: %s', toolName);
     try {
       const response = await tool.execute(validatedArgs);
 
       if (tool.outputValidator && response.structuredContent) {
         const outputValidation = validateWithZod(response.structuredContent, tool.outputValidator);
         if (!outputValidation.success) {
-          console.warn(
-            `[Web Model Context] Output validation failed for ${toolName}:`,
-            outputValidation.error
-          );
+          contextLog.warn('Output validation failed for %s: %s', toolName, outputValidation.error);
         }
       }
 
       return response;
     } catch (error) {
-      console.error(`[Web Model Context] Error executing tool ${toolName}:`, error);
+      contextLog.error('Error executing tool %s: %O', toolName, error);
       return {
         content: [
           {
@@ -1926,7 +1924,7 @@ class WebModelContext implements InternalModelContext {
  * @returns {MCPBridge} The initialized MCP bridge
  */
 function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
-  console.log('[Web Model Context] Initializing MCP bridge');
+  contextLog('Initializing MCP bridge');
 
   const hostname = window.location.hostname || 'localhost';
   const transportOptions = options?.transport;
@@ -1934,14 +1932,14 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
   const setupServerHandlers = (server: McpServer, bridge: MCPBridge) => {
     // ==================== TOOL HANDLERS ====================
     server.setRequestHandler(ListToolsRequestSchema, async () => {
-      console.log('[MCP Bridge] Handling list_tools request');
+      bridgeLog('Handling list_tools request');
       return {
         tools: bridge.modelContext.listTools(),
       };
     });
 
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
-      console.log(`[MCP Bridge] Handling call_tool request: ${request.params.name}`);
+      bridgeLog('Handling call_tool request: %s', request.params.name);
 
       const toolName = request.params.name;
       const args = (request.params.arguments || {}) as Record<string, unknown>;
@@ -1953,14 +1951,14 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
           isError: response.isError,
         };
       } catch (error) {
-        console.error(`[MCP Bridge] Error calling tool ${toolName}:`, error);
+        bridgeLog.error('Error calling tool %s: %O', toolName, error);
         throw error;
       }
     });
 
     // ==================== RESOURCE HANDLERS ====================
     server.setRequestHandler(ListResourcesRequestSchema, async () => {
-      console.log('[MCP Bridge] Handling list_resources request');
+      bridgeLog('Handling list_resources request');
       return {
         resources: bridge.modelContext.listResources(),
         // Note: Resource templates are included in the resources list as the MCP SDK
@@ -1970,26 +1968,26 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
     });
 
     server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-      console.log(`[MCP Bridge] Handling read_resource request: ${request.params.uri}`);
+      bridgeLog('Handling read_resource request: %s', request.params.uri);
 
       try {
         return await bridge.modelContext.readResource(request.params.uri);
       } catch (error) {
-        console.error(`[MCP Bridge] Error reading resource ${request.params.uri}:`, error);
+        bridgeLog.error('Error reading resource %s: %O', request.params.uri, error);
         throw error;
       }
     });
 
     // ==================== PROMPT HANDLERS ====================
     server.setRequestHandler(ListPromptsRequestSchema, async () => {
-      console.log('[MCP Bridge] Handling list_prompts request');
+      bridgeLog('Handling list_prompts request');
       return {
         prompts: bridge.modelContext.listPrompts(),
       };
     });
 
     server.setRequestHandler(GetPromptRequestSchema, async (request) => {
-      console.log(`[MCP Bridge] Handling get_prompt request: ${request.params.name}`);
+      bridgeLog('Handling get_prompt request: %s', request.params.name);
 
       try {
         return await bridge.modelContext.getPrompt(
@@ -1997,7 +1995,7 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
           request.params.arguments as Record<string, unknown> | undefined
         );
       } catch (error) {
-        console.error(`[MCP Bridge] Error getting prompt ${request.params.name}:`, error);
+        bridgeLog.error('Error getting prompt %s: %O', request.params.name, error);
         throw error;
       }
     });
@@ -2010,7 +2008,7 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
   const customTransport: Transport | undefined = transportOptions?.create?.();
 
   if (customTransport) {
-    console.log('[Web Model Context] Using custom transport');
+    contextLog('Using custom transport');
 
     const server = new McpServer(
       {
@@ -2041,11 +2039,11 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
     setupServerHandlers(server, bridge);
     server.connect(customTransport);
 
-    console.log('[Web Model Context] MCP server connected with custom transport');
+    contextLog('MCP server connected with custom transport');
     return bridge;
   }
 
-  console.log('[Web Model Context] Using dual-server mode');
+  contextLog('Using dual-server mode');
 
   const tabServerEnabled = transportOptions?.tabServer !== false;
   const tabServer = new McpServer(
@@ -2087,7 +2085,7 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
     });
 
     tabServer.connect(tabTransport);
-    console.log('[Web Model Context] Tab server connected');
+    contextLog('Tab server connected');
   }
 
   const isInIframe = typeof window !== 'undefined' && window.parent !== window;
@@ -2096,7 +2094,7 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
     iframeServerConfig !== false && (iframeServerConfig !== undefined || isInIframe);
 
   if (iframeServerEnabled) {
-    console.log('[Web Model Context] Enabling iframe server');
+    contextLog('Enabling iframe server');
 
     const iframeServer = new McpServer(
       {
@@ -2126,7 +2124,7 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
     iframeServer.connect(iframeTransport);
     bridge.iframeServer = iframeServer;
 
-    console.log('[Web Model Context] Iframe server connected');
+    contextLog('Iframe server connected');
   }
 
   return bridge;
@@ -2154,7 +2152,7 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
  */
 export function initializeWebModelContext(options?: WebModelContextInitOptions): void {
   if (typeof window === 'undefined') {
-    console.warn('[Web Model Context] Not in browser environment, skipping initialization');
+    contextLog.warn('Not in browser environment, skipping initialization');
     return;
   }
 
@@ -2166,13 +2164,13 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
     const nativeTesting = window.navigator.modelContextTesting;
 
     if (!nativeContext || !nativeTesting) {
-      console.error('[Web Model Context] Native API detection mismatch');
+      contextLog.error('Native API detection mismatch');
       return;
     }
 
-    console.log('✅ [Web Model Context] Native Chromium API detected');
-    console.log('   Using native implementation with MCP bridge synchronization');
-    console.log('   Native API will automatically collect tools from embedded iframes');
+    contextLog('Native Chromium API detected');
+    contextLog('Using native implementation with MCP bridge synchronization');
+    contextLog('Native API will automatically collect tools from embedded iframes');
 
     try {
       const bridge = initializeMCPBridge(effectiveOptions);
@@ -2188,10 +2186,10 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
         configurable: true,
       });
 
-      console.log('✅ [Web Model Context] MCP bridge synced with native API');
-      console.log('   MCP clients will receive automatic tool updates from native registry');
+      contextLog('MCP bridge synced with native API');
+      contextLog('MCP clients will receive automatic tool updates from native registry');
     } catch (error) {
-      console.error('[Web Model Context] Failed to initialize native adapter:', error);
+      contextLog.error('Failed to initialize native adapter: %O', error);
       throw error;
     }
 
@@ -2199,24 +2197,22 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
   }
 
   if (native.hasNativeContext && !native.hasNativeTesting) {
-    console.warn('[Web Model Context] Partial native API detected');
-    console.warn('   navigator.modelContext exists but navigator.modelContextTesting is missing');
-    console.warn('   Cannot sync with native API. Please enable experimental features:');
-    console.warn('      - Navigate to chrome://flags');
-    console.warn('      - Enable "Experimental Web Platform Features"');
-    console.warn('      - Or launch with: --enable-experimental-web-platform-features');
-    console.warn('   Skipping initialization to avoid conflicts');
+    contextLog.warn('Partial native API detected');
+    contextLog.warn('navigator.modelContext exists but navigator.modelContextTesting is missing');
+    contextLog.warn('Cannot sync with native API. Please enable experimental features:');
+    contextLog.warn('- Navigate to chrome://flags');
+    contextLog.warn('- Enable "Experimental Web Platform Features"');
+    contextLog.warn('- Or launch with: --enable-experimental-web-platform-features');
+    contextLog.warn('Skipping initialization to avoid conflicts');
     return;
   }
 
   if (window.navigator.modelContext) {
-    console.warn(
-      '[Web Model Context] window.navigator.modelContext already exists, skipping initialization'
-    );
+    contextLog.warn('window.navigator.modelContext already exists, skipping initialization');
     return;
   }
 
-  console.log('[Web Model Context] Native API not detected, installing polyfill');
+  contextLog('Native API not detected, installing polyfill');
 
   try {
     const bridge = initializeMCPBridge(effectiveOptions);
@@ -2233,13 +2229,13 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
       configurable: true,
     });
 
-    console.log('✅ [Web Model Context] window.navigator.modelContext initialized successfully');
+    contextLog('window.navigator.modelContext initialized successfully');
 
-    console.log('[Model Context Testing] Installing polyfill');
-    console.log('   💡 To use the native implementation in Chromium:');
-    console.log('      - Navigate to chrome://flags');
-    console.log('      - Enable "Experimental Web Platform Features"');
-    console.log('      - Or launch with: --enable-experimental-web-platform-features');
+    testingLog('Installing polyfill');
+    testingLog('To use the native implementation in Chromium:');
+    testingLog('- Navigate to chrome://flags');
+    testingLog('- Enable "Experimental Web Platform Features"');
+    testingLog('- Or launch with: --enable-experimental-web-platform-features');
 
     const testingAPI = new WebModelContextTesting(bridge);
     bridge.modelContextTesting = testingAPI;
@@ -2252,11 +2248,9 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
       configurable: true,
     });
 
-    console.log(
-      '✅ [Model Context Testing] Polyfill installed at window.navigator.modelContextTesting'
-    );
+    testingLog('Polyfill installed at window.navigator.modelContextTesting');
   } catch (error) {
-    console.error('[Web Model Context] Failed to initialize:', error);
+    contextLog.error('Failed to initialize: %O', error);
     throw error;
   }
 }
@@ -2284,7 +2278,7 @@ export function cleanupWebModelContext(): void {
         window.__mcpBridge.iframeServer.close();
       }
     } catch (error) {
-      console.warn('[Web Model Context] Error closing MCP servers:', error);
+      contextLog.warn('Error closing MCP servers: %O', error);
     }
   }
 
@@ -2292,5 +2286,5 @@ export function cleanupWebModelContext(): void {
   delete (window.navigator as unknown as { modelContextTesting?: unknown }).modelContextTesting;
   delete (window as unknown as { __mcpBridge?: unknown }).__mcpBridge;
 
-  console.log('[Web Model Context] Cleaned up');
+  contextLog('Cleaned up');
 }
