@@ -2,26 +2,25 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:best-practices",
-    "group:allNonMajor",
-    ":dependencyDashboard"
+    "group:allNonMajor"
   ],
   "labels": ["dependencies"],
-  "schedule": ["before 9am on monday"],
+  "schedule": ["before 9am on Monday"],
   "timezone": "UTC",
   "packageRules": [
     {
       "description": "Group code quality tools",
-      "matchPackagePatterns": ["@biomejs/*", "husky", "lint-staged", "@commitlint/*"],
+      "matchPackageNames": ["/^@biomejs\\/.*/", "husky", "lint-staged", "/^@commitlint\\/.*/"],
       "groupName": "code-quality"
     },
     {
       "description": "Group build tools",
-      "matchPackagePatterns": ["turbo", "tsdown", "tsup", "vite"],
+      "matchPackageNames": ["turbo", "tsdown", "tsup", "/^vite$/", "/^@vitejs\\/.*/"],
       "groupName": "build-tools"
     },
     {
       "description": "Group TypeScript and types",
-      "matchPackagePatterns": ["typescript", "@types/*"],
+      "matchPackageNames": ["typescript", "/^@types\\/.*/"],
       "groupName": "typescript"
     },
     {
@@ -33,8 +32,7 @@
       "description": "Auto-merge patch updates for dev dependencies",
       "matchDepTypes": ["devDependencies"],
       "matchUpdateTypes": ["patch"],
-      "automerge": true,
-      "automergeType": "pr"
+      "automerge": true
     }
   ]
 }
