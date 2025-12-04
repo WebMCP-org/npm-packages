@@ -2,7 +2,10 @@
  * MCPIframe Custom Element
  *
  * A custom element that wraps an iframe and automatically exposes tools
- * registered in the iframe to the parent page's Model Context API.
+ * registered in the iframe's MCP server to the parent page's Model Context API.
+ *
+ * The iframe should have the MCP polyfill installed, which creates an MCP server
+ * that exposes tools registered via `navigator.modelContext.registerTool()`.
  *
  * @example
  * ```html
@@ -14,124 +17,58 @@
  *
  * @example
  * ```typescript
- * // Access the element programmatically
  * const mcpIframe = document.querySelector('mcp-iframe');
- * console.log(mcpIframe.exposedTools); // ['my-app:calculate', ...]
+ * mcpIframe.addEventListener('mcp-iframe-ready', (e) => {
+ *   console.log('Tools:', e.detail.tools);
+ * });
  * ```
  */
 
-/** Tool definition from iframe */
-export interface IframeTool {
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { IframeParentTransport } from './IframeParentTransport.js';
+
+/** Tool info from MCP server */
+export interface MCPTool {
   name: string;
   description?: string;
-  inputSchema?: Record<string, unknown>;
-}
-
-/** Message types for parent-child communication */
-export type MCPIframeMessageType =
-  | 'mcp-iframe-ping'
-  | 'mcp-iframe-ready'
-  | 'mcp-iframe-tools-changed'
-  | 'mcp-iframe-call-tool'
-  | 'mcp-iframe-tool-result'
-  | 'mcp-iframe-tool-error';
-
-/** Base message structure */
-export interface MCPIframeMessage {
-  type: MCPIframeMessageType;
-  channel: string;
-}
-
-/** Ping message from parent to check if child is ready */
-export interface MCPIframePingMessage extends MCPIframeMessage {
-  type: 'mcp-iframe-ping';
-}
-
-/** Ready message from child with initial tools */
-export interface MCPIframeReadyMessage extends MCPIframeMessage {
-  type: 'mcp-iframe-ready';
-  tools: IframeTool[];
-}
-
-/** Tools changed notification from child */
-export interface MCPIframeToolsChangedMessage extends MCPIframeMessage {
-  type: 'mcp-iframe-tools-changed';
-  tools: IframeTool[];
-}
-
-/** Tool call request from parent */
-export interface MCPIframeCallToolMessage extends MCPIframeMessage {
-  type: 'mcp-iframe-call-tool';
-  callId: string;
-  toolName: string;
-  args: Record<string, unknown>;
-}
-
-/** Tool result from child */
-export interface MCPIframeToolResultMessage extends MCPIframeMessage {
-  type: 'mcp-iframe-tool-result';
-  callId: string;
-  result: unknown;
-}
-
-/** Tool error from child */
-export interface MCPIframeToolErrorMessage extends MCPIframeMessage {
-  type: 'mcp-iframe-tool-error';
-  callId: string;
-  error: string;
-}
-
-/** Union of all message types */
-export type MCPIframeMessages =
-  | MCPIframePingMessage
-  | MCPIframeReadyMessage
-  | MCPIframeToolsChangedMessage
-  | MCPIframeCallToolMessage
-  | MCPIframeToolResultMessage
-  | MCPIframeToolErrorMessage;
-
-/** Pending tool call tracker */
-interface PendingCall {
-  resolve: (result: unknown) => void;
-  reject: (error: Error) => void;
-  timeout: ReturnType<typeof setTimeout>;
+  inputSchema?: {
+    type: string;
+    properties?: Record<string, unknown>;
+    required?: string[];
+  };
 }
 
 /** Options for MCPIframe element */
-export interface MCPIframeOptions {
-  /** Channel ID for message filtering (default: 'mcp-iframe-tools') */
-  channelId?: string;
+export interface MCPIframeElementOptions {
   /** Timeout for tool calls in ms (default: 30000) */
   callTimeout?: number;
-  /** Interval for ping retries in ms (default: 250) */
-  pingInterval?: number;
   /** Prefix separator for tool names (default: ':') */
   prefixSeparator?: string;
+  /** MCP channel ID (default: 'mcp-iframe') */
+  channelId?: string;
 }
 
-const DEFAULT_CHANNEL = 'mcp-iframe-tools';
 const DEFAULT_CALL_TIMEOUT = 30000;
-const DEFAULT_PING_INTERVAL = 250;
 const DEFAULT_PREFIX_SEPARATOR = ':';
+const DEFAULT_CHANNEL_ID = 'mcp-iframe';
 
 /**
  * MCPIframe Custom Element
  *
- * Wraps an iframe and exposes its tools to the parent's Model Context API.
+ * Wraps an iframe and exposes its MCP tools to the parent's Model Context API.
  */
 export class MCPIframeElement extends HTMLElement {
   private _iframe: HTMLIFrameElement | null = null;
-  private _channelId: string = DEFAULT_CHANNEL;
+  private _client: Client | null = null;
+  private _transport: IframeParentTransport | null = null;
   private _callTimeout: number = DEFAULT_CALL_TIMEOUT;
-  private _pingInterval: number = DEFAULT_PING_INTERVAL;
   private _prefixSeparator: string = DEFAULT_PREFIX_SEPARATOR;
+  private _channelId: string = DEFAULT_CHANNEL_ID;
   private _ready = false;
-  private _iframeTools: IframeTool[] = [];
+  private _mcpTools: MCPTool[] = [];
   private _registeredTools: Map<string, { unregister: () => void }> = new Map();
-  private _pendingCalls: Map<string, PendingCall> = new Map();
-  private _pingTimeout: ReturnType<typeof setTimeout> | null = null;
-  private _messageHandler: ((event: MessageEvent) => void) | null = null;
-  private _iframeOrigin: string | null = null;
+  private _connecting = false;
+  private _targetOrigin: string | null = null;
 
   /** List of standard iframe attributes to mirror */
   static readonly IFRAME_ATTRIBUTES = [
@@ -150,7 +87,13 @@ export class MCPIframeElement extends HTMLElement {
 
   /** Observed attributes for the custom element */
   static get observedAttributes(): string[] {
-    return [...MCPIframeElement.IFRAME_ATTRIBUTES, 'channel', 'call-timeout', 'prefix-separator'];
+    return [
+      ...MCPIframeElement.IFRAME_ATTRIBUTES,
+      'target-origin',
+      'channel',
+      'call-timeout',
+      'prefix-separator',
+    ];
   }
 
   constructor() {
@@ -160,8 +103,6 @@ export class MCPIframeElement extends HTMLElement {
 
   connectedCallback(): void {
     this._createIframe();
-    this._setupMessageListener();
-    this._startPinging();
   }
 
   disconnectedCallback(): void {
@@ -172,22 +113,30 @@ export class MCPIframeElement extends HTMLElement {
     if (oldValue === newValue) return;
 
     // Handle custom attributes
-    if (name === 'channel') {
-      this._channelId = newValue || DEFAULT_CHANNEL;
-      return;
-    }
-    if (name === 'call-timeout') {
-      this._callTimeout = newValue ? Number.parseInt(newValue, 10) : DEFAULT_CALL_TIMEOUT;
-      return;
-    }
-    if (name === 'prefix-separator') {
-      this._prefixSeparator = newValue || DEFAULT_PREFIX_SEPARATOR;
-      // Re-register tools with new prefix if already connected
-      if (this._ready) {
-        this._unregisterAllTools();
-        this._registerTools(this._iframeTools);
-      }
-      return;
+    switch (name) {
+      case 'target-origin':
+        this._targetOrigin = newValue;
+        if (this._ready) {
+          this._reconnect();
+        }
+        return;
+      case 'channel':
+        this._channelId = newValue || DEFAULT_CHANNEL_ID;
+        if (this._ready) {
+          this._reconnect();
+        }
+        return;
+      case 'call-timeout':
+        this._callTimeout = newValue ? Number.parseInt(newValue, 10) : DEFAULT_CALL_TIMEOUT;
+        return;
+      case 'prefix-separator':
+        this._prefixSeparator = newValue || DEFAULT_PREFIX_SEPARATOR;
+        // Re-register tools with new prefix if already connected
+        if (this._ready) {
+          this._unregisterAllTools();
+          this._registerToolsOnModelContext(this._mcpTools);
+        }
+        return;
     }
 
     // Mirror iframe attributes
@@ -198,9 +147,9 @@ export class MCPIframeElement extends HTMLElement {
         this._iframe.setAttribute(name, newValue);
       }
 
-      // Reset connection when src changes
+      // Reconnect when src changes
       if (name === 'src' || name === 'srcdoc') {
-        this._resetConnection();
+        this._reconnect();
       }
     }
   }
@@ -210,7 +159,12 @@ export class MCPIframeElement extends HTMLElement {
     return this._iframe;
   }
 
-  /** Check if the iframe is connected and ready */
+  /** Get the MCP client (if connected) */
+  get client(): Client | null {
+    return this._client;
+  }
+
+  /** Check if connected to the iframe's MCP server */
   get ready(): boolean {
     return this._ready;
   }
@@ -220,15 +174,33 @@ export class MCPIframeElement extends HTMLElement {
     return Array.from(this._registeredTools.keys());
   }
 
-  /** Get the raw tools from the iframe (without prefix) */
-  get iframeTools(): IframeTool[] {
-    return [...this._iframeTools];
+  /** Get the raw tools from the iframe's MCP server (without prefix) */
+  get mcpTools(): MCPTool[] {
+    return [...this._mcpTools];
   }
 
   /** Get the tool name prefix */
   get toolPrefix(): string {
     const id = this.id || this.getAttribute('name') || 'iframe';
     return `${id}${this._prefixSeparator}`;
+  }
+
+  /** Manually refresh tools from the iframe */
+  async refreshTools(): Promise<void> {
+    if (!this._client || !this._ready) {
+      throw new Error('Not connected to iframe MCP server');
+    }
+
+    const response = await this._client.listTools();
+    this._mcpTools = response.tools as MCPTool[];
+    this._unregisterAllTools();
+    this._registerToolsOnModelContext(this._mcpTools);
+
+    this.dispatchEvent(
+      new CustomEvent('mcp-iframe-tools-changed', {
+        detail: { tools: this.exposedTools },
+      })
+    );
   }
 
   /** Create the internal iframe element */
@@ -248,136 +220,106 @@ export class MCPIframeElement extends HTMLElement {
     this._iframe.style.width = this.getAttribute('width') || '100%';
     this._iframe.style.height = this.getAttribute('height') || '100%';
 
+    // Connect when iframe loads
+    this._iframe.addEventListener('load', () => {
+      this._connect();
+    });
+
     // Add to shadow DOM
     if (this.shadowRoot) {
       this.shadowRoot.appendChild(this._iframe);
     }
   }
 
-  /** Setup the message listener for iframe communication */
-  private _setupMessageListener(): void {
-    this._messageHandler = (event: MessageEvent) => {
-      const data = event.data as MCPIframeMessages;
+  /** Connect to the iframe's MCP server */
+  private async _connect(): Promise<void> {
+    if (this._connecting || !this._iframe) return;
+    this._connecting = true;
 
-      // Validate message
-      if (!data || data.channel !== this._channelId) return;
-
-      // Store origin on first valid message
-      if (!this._iframeOrigin && this._iframe?.contentWindow === event.source) {
-        this._iframeOrigin = event.origin;
+    try {
+      // Determine target origin
+      const targetOrigin = this._getTargetOrigin();
+      if (!targetOrigin) {
+        console.warn('[MCPIframe] Cannot determine target origin. Set target-origin attribute.');
+        return;
       }
 
-      // Verify origin
-      if (event.origin !== this._iframeOrigin) return;
+      // Create transport
+      this._transport = new IframeParentTransport({
+        iframe: this._iframe,
+        targetOrigin,
+        channelId: this._channelId,
+      });
 
-      switch (data.type) {
-        case 'mcp-iframe-ready':
-          this._handleReady(data);
-          break;
-        case 'mcp-iframe-tools-changed':
-          this._handleToolsChanged(data);
-          break;
-        case 'mcp-iframe-tool-result':
-          this._handleToolResult(data);
-          break;
-        case 'mcp-iframe-tool-error':
-          this._handleToolError(data);
-          break;
-      }
-    };
+      // Create MCP client
+      this._client = new Client({
+        name: `MCPIframe:${this.id || 'anonymous'}`,
+        version: '1.0.0',
+      });
 
-    window.addEventListener('message', this._messageHandler);
-  }
+      // Connect
+      await this._client.connect(this._transport);
+      this._ready = true;
 
-  /** Start pinging the iframe to establish connection */
-  private _startPinging(): void {
-    const ping = () => {
-      if (this._ready) return;
+      // Get tools from iframe
+      const response = await this._client.listTools();
+      this._mcpTools = response.tools as MCPTool[];
 
-      if (this._iframe?.contentWindow) {
-        this._iframe.contentWindow.postMessage(
-          {
-            type: 'mcp-iframe-ping',
-            channel: this._channelId,
-          } satisfies MCPIframePingMessage,
-          '*'
-        );
-      }
+      // Register tools on parent's Model Context
+      this._registerToolsOnModelContext(this._mcpTools);
 
-      this._pingTimeout = setTimeout(ping, this._pingInterval);
-    };
-
-    ping();
-  }
-
-  /** Stop pinging */
-  private _stopPinging(): void {
-    if (this._pingTimeout) {
-      clearTimeout(this._pingTimeout);
-      this._pingTimeout = null;
+      this.dispatchEvent(
+        new CustomEvent('mcp-iframe-ready', {
+          detail: { tools: this.exposedTools },
+        })
+      );
+    } catch (error) {
+      console.error('[MCPIframe] Failed to connect:', error);
+      this.dispatchEvent(
+        new CustomEvent('mcp-iframe-error', {
+          detail: { error },
+        })
+      );
+    } finally {
+      this._connecting = false;
     }
   }
 
-  /** Handle ready message from iframe */
-  private _handleReady(message: MCPIframeReadyMessage): void {
-    this._stopPinging();
-    this._ready = true;
-    this._iframeTools = message.tools;
-    this._registerTools(message.tools);
-
-    this.dispatchEvent(
-      new CustomEvent('mcp-iframe-ready', {
-        detail: { tools: this.exposedTools },
-      })
-    );
-  }
-
-  /** Handle tools changed message from iframe */
-  private _handleToolsChanged(message: MCPIframeToolsChangedMessage): void {
-    this._iframeTools = message.tools;
-    this._unregisterAllTools();
-    this._registerTools(message.tools);
-
-    this.dispatchEvent(
-      new CustomEvent('mcp-iframe-tools-changed', {
-        detail: { tools: this.exposedTools },
-      })
-    );
-  }
-
-  /** Handle tool result from iframe */
-  private _handleToolResult(message: MCPIframeToolResultMessage): void {
-    const pending = this._pendingCalls.get(message.callId);
-    if (pending) {
-      clearTimeout(pending.timeout);
-      this._pendingCalls.delete(message.callId);
-      pending.resolve(message.result);
+  /** Get the target origin for the iframe */
+  private _getTargetOrigin(): string | null {
+    // Use explicit attribute if set
+    if (this._targetOrigin) {
+      return this._targetOrigin;
     }
-  }
 
-  /** Handle tool error from iframe */
-  private _handleToolError(message: MCPIframeToolErrorMessage): void {
-    const pending = this._pendingCalls.get(message.callId);
-    if (pending) {
-      clearTimeout(pending.timeout);
-      this._pendingCalls.delete(message.callId);
-      pending.reject(new Error(message.error));
+    // Try to infer from src attribute
+    const src = this.getAttribute('src');
+    if (src) {
+      try {
+        const url = new URL(src, window.location.href);
+        return url.origin;
+      } catch {
+        // Invalid URL, fall through
+      }
     }
+
+    // For same-origin iframes
+    return window.location.origin;
   }
 
-  /** Register tools in the parent's Model Context */
-  private _registerTools(tools: IframeTool[]): void {
+  /** Register tools from iframe on parent's Model Context */
+  private _registerToolsOnModelContext(tools: MCPTool[]): void {
     // Check if Model Context API is available
-    const modelContext = (navigator as { modelContext?: ModelContextAPI }).modelContext;
+    const modelContext = (navigator as NavigatorWithModelContext).modelContext;
     if (!modelContext) {
-      console.warn('[MCPIframe] Model Context API not available');
+      console.warn('[MCPIframe] Model Context API not available on parent');
       return;
     }
 
     for (const tool of tools) {
       const prefixedName = `${this.toolPrefix}${tool.name}`;
 
-      // Create a wrapper tool that routes calls to the iframe
+      // Create a wrapper tool that routes calls to the iframe via MCP
       const registration = modelContext.registerTool({
         name: prefixedName,
         description: tool.description || `Tool from iframe: ${tool.name}`,
@@ -399,82 +341,93 @@ export class MCPIframeElement extends HTMLElement {
     this._registeredTools.clear();
   }
 
-  /** Call a tool in the iframe and wait for result */
-  private _callIframeTool(toolName: string, args: Record<string, unknown>): Promise<unknown> {
-    return new Promise((resolve, reject) => {
-      if (!this._ready || !this._iframe?.contentWindow || !this._iframeOrigin) {
-        reject(new Error('Iframe not ready'));
-        return;
-      }
+  /** Call a tool in the iframe via MCP */
+  private async _callIframeTool(toolName: string, args: Record<string, unknown>): Promise<unknown> {
+    if (!this._client || !this._ready) {
+      throw new Error('Not connected to iframe MCP server');
+    }
 
-      const callId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
-      const timeout = setTimeout(() => {
-        this._pendingCalls.delete(callId);
+    // Create a timeout promise
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => {
         reject(new Error(`Tool call timed out: ${toolName}`));
       }, this._callTimeout);
-
-      this._pendingCalls.set(callId, { resolve, reject, timeout });
-
-      this._iframe.contentWindow.postMessage(
-        {
-          type: 'mcp-iframe-call-tool',
-          channel: this._channelId,
-          callId,
-          toolName,
-          args,
-        } satisfies MCPIframeCallToolMessage,
-        this._iframeOrigin
-      );
     });
+
+    // Race the tool call against the timeout
+    const result = await Promise.race([
+      this._client.callTool({
+        name: toolName,
+        arguments: args,
+      }),
+      timeoutPromise,
+    ]);
+
+    // Extract the result from MCP response
+    const mcpResult = result as { content?: Array<{ type: string; text?: string }> };
+    const firstContent = mcpResult.content?.[0];
+    if (firstContent && firstContent.type === 'text' && firstContent.text) {
+      // Try to parse as JSON, otherwise return as string
+      try {
+        return JSON.parse(firstContent.text);
+      } catch {
+        return firstContent.text;
+      }
+    }
+
+    return result;
   }
 
-  /** Reset connection state when iframe source changes */
-  private _resetConnection(): void {
+  /** Reconnect to the iframe's MCP server */
+  private async _reconnect(): Promise<void> {
+    await this._disconnect();
+    // Small delay to ensure iframe is ready
+    setTimeout(() => {
+      this._connect();
+    }, 100);
+  }
+
+  /** Disconnect from the iframe's MCP server */
+  private async _disconnect(): Promise<void> {
     this._ready = false;
-    this._iframeOrigin = null;
-    this._iframeTools = [];
+    this._mcpTools = [];
     this._unregisterAllTools();
 
-    // Cancel pending calls
-    for (const pending of this._pendingCalls.values()) {
-      clearTimeout(pending.timeout);
-      pending.reject(new Error('Connection reset'));
+    if (this._client) {
+      try {
+        await this._client.close();
+      } catch {
+        // Ignore close errors
+      }
+      this._client = null;
     }
-    this._pendingCalls.clear();
 
-    // Start pinging again
-    this._startPinging();
+    if (this._transport) {
+      try {
+        await this._transport.close();
+      } catch {
+        // Ignore close errors
+      }
+      this._transport = null;
+    }
   }
 
   /** Clean up all resources */
-  private _cleanup(): void {
-    this._stopPinging();
-
-    if (this._messageHandler) {
-      window.removeEventListener('message', this._messageHandler);
-      this._messageHandler = null;
-    }
-
-    this._unregisterAllTools();
-
-    // Cancel pending calls
-    for (const pending of this._pendingCalls.values()) {
-      clearTimeout(pending.timeout);
-      pending.reject(new Error('Element disconnected'));
-    }
-    this._pendingCalls.clear();
+  private async _cleanup(): Promise<void> {
+    await this._disconnect();
   }
 }
 
-/** Model Context API interface (subset) */
-interface ModelContextAPI {
-  registerTool(tool: {
-    name: string;
-    description: string;
-    inputSchema: Record<string, unknown>;
-    execute: (args: Record<string, unknown>) => Promise<unknown>;
-  }): { unregister: () => void };
+/** Navigator with Model Context API */
+interface NavigatorWithModelContext extends Navigator {
+  modelContext?: {
+    registerTool(tool: {
+      name: string;
+      description: string;
+      inputSchema: Record<string, unknown>;
+      execute: (args: Record<string, unknown>) => Promise<unknown>;
+    }): { unregister: () => void };
+  };
 }
 
 /** Register the custom element */
