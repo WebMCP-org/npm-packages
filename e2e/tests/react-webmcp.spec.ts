@@ -550,12 +550,9 @@ test.describe('React WebMCP Combined Hook Tests', () => {
   });
 
   test('should register tools, prompts, and resources together', async ({ page }) => {
-    // Wait for everything to initialize
-    await page.waitForTimeout(1000);
-
-    // Check tools are registered (via client tools list)
+    // Check tools are registered (via client tools list) - tools take longer to load
     const toolsList = page.locator('[data-testid="client-tools-list"]');
-    await expect(toolsList).toContainText('counter_increment');
+    await expect(toolsList).toContainText('counter_increment', { timeout: 10000 });
 
     // Check prompts are registered
     const helpStatus = page.locator('[data-testid="prompt-help-status"]');
