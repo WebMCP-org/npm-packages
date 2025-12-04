@@ -300,24 +300,10 @@ export function useWebMCP<
 
     console.log(`[useWebMCP] Registered tool: ${name}`);
 
-    // Expose registered tools on window for testing
-    if (typeof window !== 'undefined') {
-      const tools = window.navigator.modelContext.listTools();
-      const w = window as unknown as Window & { mcpTools: string[] };
-      w.mcpTools = tools.map((t) => t.name);
-    }
-
     return () => {
       if (registration) {
         registration.unregister();
         console.log(`[useWebMCP] Unregistered tool: ${name}`);
-
-        // Update window.mcpTools after unregistration
-        if (typeof window !== 'undefined' && window.navigator?.modelContext) {
-          const tools = window.navigator.modelContext.listTools();
-          const w = window as unknown as Window & { mcpTools: string[] };
-          w.mcpTools = tools.map((t) => t.name);
-        }
       }
     };
   }, [name, description, inputSchema, outputSchema, annotations, execute]);

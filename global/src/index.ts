@@ -127,3 +127,4 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
 
 export { cleanupWebModelContext, initializeWebModelContext } from './global.js';
 export type * from './types.js';
+export { zodToJsonSchema } from './validation.js';
