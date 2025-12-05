@@ -100,7 +100,8 @@ export const WEB_MCP_BRIDGE_SCRIPT = `
   checkWebMCPAvailable();
 
   // Expose the bridge API for CDP to call
-  window.__mcpBridge = {
+  Object.defineProperty(window, '__mcpBridge', {
+    value: {
     version: BRIDGE_VERSION,
 
     /**
@@ -181,7 +182,10 @@ export const WEB_MCP_BRIDGE_SCRIPT = `
       window.removeEventListener('message', handleServerMessage);
       delete window.__mcpBridge;
     }
-  };
+  },
+  writable: true,
+  configurable: true
+  });
 
   return { success: true, version: BRIDGE_VERSION, webMCPDetected: webMCPDetected };
 })();
