@@ -37,19 +37,16 @@ export const WEB_MCP_BRIDGE_SCRIPT = `
   'use strict';
 
   var CHANNEL_ID = 'mcp-default';
-  var BRIDGE_VERSION = '1.0.0';
+  var BRIDGE_VERSION = '1.1.0';
 
   // Prevent double injection
   if (window.__mcpBridge && window.__mcpBridge.version === BRIDGE_VERSION) {
-    console.log('[WebMCP Bridge] Already injected (v' + BRIDGE_VERSION + '), skipping');
     return { alreadyInjected: true };
   }
 
-  console.log('[WebMCP Bridge] Initializing CDP <-> TabServer bridge v' + BRIDGE_VERSION);
-
   // Track if we've seen the server ready signal
   var serverReady = false;
-  var pendingMessages = [];
+  var webMCPDetected = false;
 
   // Listen for messages FROM TabServerTransport (server-to-client direction)
   // These are responses and notifications from the MCP server
@@ -67,10 +64,8 @@ export const WEB_MCP_BRIDGE_SCRIPT = `
 
     // Track server ready state
     if (payload === 'mcp-server-ready') {
-      console.log('[WebMCP Bridge] Server ready signal received');
       serverReady = true;
     } else if (payload === 'mcp-server-stopped') {
-      console.log('[WebMCP Bridge] Server stopped signal received');
       serverReady = false;
     }
 
@@ -83,12 +78,26 @@ export const WEB_MCP_BRIDGE_SCRIPT = `
       } catch (err) {
         console.error('[WebMCP Bridge] Failed to forward message to CDP:', err);
       }
-    } else {
-      console.warn('[WebMCP Bridge] CDP binding not available, message dropped');
     }
   }
 
   window.addEventListener('message', handleServerMessage);
+
+  // Check if WebMCP (navigator.modelContext) is available
+  function checkWebMCPAvailable() {
+    if (typeof navigator !== 'undefined' && navigator.modelContext) {
+      webMCPDetected = true;
+      return true;
+    }
+    if (window.__MCP_BRIDGE__) {
+      webMCPDetected = true;
+      return true;
+    }
+    return false;
+  }
+
+  // Initial check
+  checkWebMCPAvailable();
 
   // Expose the bridge API for CDP to call
   window.__mcpBridge = {
@@ -128,6 +137,15 @@ export const WEB_MCP_BRIDGE_SCRIPT = `
     },
 
     /**
+     * Check if WebMCP is available on this page
+     * Re-checks each time in case polyfill loaded after bridge injection
+     * @returns {boolean}
+     */
+    hasWebMCP: function() {
+      return checkWebMCPAvailable();
+    },
+
+    /**
      * Check if the MCP server has signaled ready
      * @returns {boolean}
      */
@@ -140,7 +158,6 @@ export const WEB_MCP_BRIDGE_SCRIPT = `
      * This triggers the server to respond with 'mcp-server-ready'
      */
     checkReady: function() {
-      console.log('[WebMCP Bridge] Sending check-ready signal');
       window.postMessage({
         channel: CHANNEL_ID,
         type: 'mcp',
@@ -161,15 +178,12 @@ export const WEB_MCP_BRIDGE_SCRIPT = `
      * Clean up the bridge (remove listeners)
      */
     dispose: function() {
-      console.log('[WebMCP Bridge] Disposing');
       window.removeEventListener('message', handleServerMessage);
       delete window.__mcpBridge;
     }
   };
 
-  console.log('[WebMCP Bridge] Ready - window.__mcpBridge available');
-
-  return { success: true, version: BRIDGE_VERSION };
+  return { success: true, version: BRIDGE_VERSION, webMCPDetected: webMCPDetected };
 })();
 `;
 

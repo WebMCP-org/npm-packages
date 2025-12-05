@@ -13,6 +13,7 @@ import {type AggregatedIssue} from '../node_modules/chrome-devtools-frontend/mcp
 import {extractUrlLikeFromDevToolsTitle, urlsEqual} from './DevtoolsUtils.js';
 import type {ListenerMap} from './PageCollector.js';
 import {NetworkCollector, ConsoleCollector} from './PageCollector.js';
+import {WEB_MCP_BRIDGE_SCRIPT} from './transports/WebMCPBridgeScript.js';
 import {Locator} from './third_party/index.js';
 import type {
   Browser,
@@ -156,6 +157,54 @@ export class McpContext implements Context {
     const pages = await this.createPagesSnapshot();
     await this.#networkCollector.init(pages);
     await this.#consoleCollector.init(pages);
+
+    // Auto-inject WebMCP bridge into all pages
+    await this.#setupWebMCPAutoInject();
+  }
+
+  /**
+   * Set up automatic WebMCP bridge injection for all pages.
+   * This injects the bridge script into existing pages and configures
+   * the browser to inject it into all future pages.
+   */
+  async #setupWebMCPAutoInject(): Promise<void> {
+    try {
+      // Get browser-level CDP session to inject into all new pages
+      const browserTarget = this.browser.target();
+      const cdpSession = await browserTarget.createCDPSession();
+
+      // Inject bridge script into all future pages
+      await cdpSession.send('Page.addScriptToEvaluateOnNewDocument', {
+        source: WEB_MCP_BRIDGE_SCRIPT,
+      });
+
+      this.logger('WebMCP bridge auto-inject configured for new pages');
+
+      // Inject into existing pages (they won't have the auto-inject yet)
+      for (const page of this.#pages) {
+        try {
+          // Skip chrome:// and devtools:// pages
+          const url = page.url();
+          if (
+            url.startsWith('chrome://') ||
+            url.startsWith('chrome-extension://') ||
+            url.startsWith('devtools://') ||
+            url === 'about:blank'
+          ) {
+            continue;
+          }
+
+          await page.evaluate(WEB_MCP_BRIDGE_SCRIPT);
+        } catch {
+          // Page might not be ready or accessible, ignore
+        }
+      }
+
+      this.logger('WebMCP bridge injected into existing pages');
+    } catch (err) {
+      // Non-fatal - auto-inject is a convenience feature
+      this.logger('WebMCP auto-inject setup failed:', err);
+    }
   }
 
   dispose() {
