@@ -1569,6 +1569,300 @@ function testChromiumCallbackClear() {
   }
 }
 
+// ==================== NOTIFICATION BATCHING TESTS ====================
+
+/**
+ * Tests for microtask-based notification batching.
+ * These tests verify that rapid tool/resource/prompt registrations
+ * are coalesced into a single notification.
+ */
+
+// Notification tracking state
+let toolNotificationCount = 0;
+let resourceNotificationCount = 0;
+let promptNotificationCount = 0;
+let notificationTrackingEnabled = false;
+
+// Start tracking notifications
+function startNotificationTracking() {
+  if (!('modelContextTesting' in navigator)) {
+    log('modelContextTesting API not available', 'error');
+    return;
+  }
+
+  const testingAPI = navigator.modelContextTesting;
+  if (!testingAPI) {
+    log('modelContextTesting API not available', 'error');
+    return;
+  }
+
+  // Reset counts
+  toolNotificationCount = 0;
+  resourceNotificationCount = 0;
+  promptNotificationCount = 0;
+  notificationTrackingEnabled = true;
+
+  // Register callback to count tool notifications
+  testingAPI.registerToolsChangedCallback(() => {
+    if (notificationTrackingEnabled) {
+      toolNotificationCount++;
+      log(`[Notification Tracking] Tool notification #${toolNotificationCount}`, 'info');
+    }
+  });
+
+  log('Notification tracking started', 'success');
+}
+
+// Stop tracking and return counts
+function stopNotificationTracking(): {
+  tools: number;
+  resources: number;
+  prompts: number;
+} {
+  notificationTrackingEnabled = false;
+  log(
+    `Notification tracking stopped. Counts: tools=${toolNotificationCount}, resources=${resourceNotificationCount}, prompts=${promptNotificationCount}`,
+    'success'
+  );
+  return {
+    tools: toolNotificationCount,
+    resources: resourceNotificationCount,
+    prompts: promptNotificationCount,
+  };
+}
+
+// Test: Register N tools rapidly (synchronously) and count notifications
+function testRapidToolRegistration(count: number): Promise<{
+  registeredCount: number;
+  notificationCount: number;
+}> {
+  return new Promise((resolve) => {
+    log(`Testing rapid registration of ${count} tools...`, 'info');
+
+    // Reset notification count
+    toolNotificationCount = 0;
+    notificationTrackingEnabled = true;
+
+    // Register callback before registrations
+    if ('modelContextTesting' in navigator && navigator.modelContextTesting) {
+      navigator.modelContextTesting.registerToolsChangedCallback(() => {
+        if (notificationTrackingEnabled) {
+          toolNotificationCount++;
+        }
+      });
+    }
+
+    // Register N tools synchronously (should batch into 1 notification)
+    const registrations: Array<{ unregister: () => void }> = [];
+    for (let i = 0; i < count; i++) {
+      const reg = navigator.modelContext.registerTool({
+        name: `batchTestTool_${i}`,
+        description: `Batch test tool ${i}`,
+        inputSchema: { type: 'object', properties: {} },
+        async execute() {
+          return { content: [{ type: 'text', text: `Tool ${i} executed` }] };
+        },
+      });
+      registrations.push(reg);
+    }
+
+    log(`Registered ${registrations.length} tools synchronously`, 'info');
+
+    // Wait for microtask to complete, then check notification count
+    // Use setTimeout to ensure we're after the microtask queue
+    setTimeout(() => {
+      notificationTrackingEnabled = false;
+
+      const result = {
+        registeredCount: registrations.length,
+        notificationCount: toolNotificationCount,
+      };
+
+      log(
+        `Result: ${result.registeredCount} tools registered, ${result.notificationCount} notification(s) sent`,
+        result.notificationCount <= 1 ? 'success' : 'error'
+      );
+
+      // Cleanup: unregister all test tools
+      for (const reg of registrations) {
+        reg.unregister();
+      }
+
+      resolve(result);
+    }, 50); // Wait for microtask + some buffer
+  });
+}
+
+// Test: Register tools across multiple tasks (should send multiple notifications)
+function testMultiTaskToolRegistration(count: number): Promise<{
+  registeredCount: number;
+  notificationCount: number;
+}> {
+  return new Promise((resolve) => {
+    log(`Testing multi-task registration of ${count} tools...`, 'info');
+
+    // Reset notification count
+    toolNotificationCount = 0;
+    notificationTrackingEnabled = true;
+
+    // Register callback before registrations
+    if ('modelContextTesting' in navigator && navigator.modelContextTesting) {
+      navigator.modelContextTesting.registerToolsChangedCallback(() => {
+        if (notificationTrackingEnabled) {
+          toolNotificationCount++;
+        }
+      });
+    }
+
+    const registrations: Array<{ unregister: () => void }> = [];
+    let registered = 0;
+
+    // Register tools across separate tasks using setTimeout
+    function registerNext() {
+      if (registered >= count) {
+        // All registered, wait and check
+        setTimeout(() => {
+          notificationTrackingEnabled = false;
+
+          const result = {
+            registeredCount: registrations.length,
+            notificationCount: toolNotificationCount,
+          };
+
+          log(
+            `Result: ${result.registeredCount} tools registered across tasks, ${result.notificationCount} notification(s) sent`,
+            result.notificationCount === count ? 'success' : 'info'
+          );
+
+          // Cleanup
+          for (const reg of registrations) {
+            reg.unregister();
+          }
+
+          resolve(result);
+        }, 50);
+        return;
+      }
+
+      const i = registered++;
+      const reg = navigator.modelContext.registerTool({
+        name: `multiTaskTool_${i}`,
+        description: `Multi-task test tool ${i}`,
+        inputSchema: { type: 'object', properties: {} },
+        async execute() {
+          return { content: [{ type: 'text', text: `Tool ${i} executed` }] };
+        },
+      });
+      registrations.push(reg);
+
+      // Schedule next registration in a new task
+      setTimeout(registerNext, 10);
+    }
+
+    registerNext();
+  });
+}
+
+// Test: Mixed rapid and delayed registrations
+function testMixedRegistrationBatching(): Promise<{
+  phase1Notifications: number;
+  phase2Notifications: number;
+  phase3Notifications: number;
+}> {
+  return new Promise((resolve) => {
+    log('Testing mixed registration batching...', 'info');
+
+    let phase1Notifications = 0;
+    let phase2Notifications = 0;
+    let phase3Notifications = 0;
+    let currentPhase = 1;
+
+    // Register callback
+    if ('modelContextTesting' in navigator && navigator.modelContextTesting) {
+      navigator.modelContextTesting.registerToolsChangedCallback(() => {
+        if (currentPhase === 1) phase1Notifications++;
+        else if (currentPhase === 2) phase2Notifications++;
+        else if (currentPhase === 3) phase3Notifications++;
+      });
+    }
+
+    const allRegistrations: Array<{ unregister: () => void }> = [];
+
+    // Phase 1: Register 5 tools synchronously (should batch to 1 notification)
+    for (let i = 0; i < 5; i++) {
+      allRegistrations.push(
+        navigator.modelContext.registerTool({
+          name: `mixedPhase1_${i}`,
+          description: `Mixed phase 1 tool ${i}`,
+          inputSchema: { type: 'object', properties: {} },
+          async execute() {
+            return { content: [{ type: 'text', text: 'test' }] };
+          },
+        })
+      );
+    }
+
+    // After microtask, move to phase 2
+    setTimeout(() => {
+      currentPhase = 2;
+
+      // Phase 2: Register 3 more tools synchronously (should batch to 1 notification)
+      for (let i = 0; i < 3; i++) {
+        allRegistrations.push(
+          navigator.modelContext.registerTool({
+            name: `mixedPhase2_${i}`,
+            description: `Mixed phase 2 tool ${i}`,
+            inputSchema: { type: 'object', properties: {} },
+            async execute() {
+              return { content: [{ type: 'text', text: 'test' }] };
+            },
+          })
+        );
+      }
+
+      setTimeout(() => {
+        currentPhase = 3;
+
+        // Phase 3: Register 2 more tools synchronously (should batch to 1 notification)
+        for (let i = 0; i < 2; i++) {
+          allRegistrations.push(
+            navigator.modelContext.registerTool({
+              name: `mixedPhase3_${i}`,
+              description: `Mixed phase 3 tool ${i}`,
+              inputSchema: { type: 'object', properties: {} },
+              async execute() {
+                return { content: [{ type: 'text', text: 'test' }] };
+              },
+            })
+          );
+        }
+
+        setTimeout(() => {
+          const result = {
+            phase1Notifications,
+            phase2Notifications,
+            phase3Notifications,
+          };
+
+          log(
+            `Result: Phase1=${phase1Notifications}, Phase2=${phase2Notifications}, Phase3=${phase3Notifications}`,
+            phase1Notifications === 1 && phase2Notifications === 1 && phase3Notifications === 1
+              ? 'success'
+              : 'error'
+          );
+
+          // Cleanup
+          for (const reg of allRegistrations) {
+            reg.unregister();
+          }
+
+          resolve(result);
+        }, 50);
+      }, 50);
+    }, 50);
+  });
+}
+
 // Type for test API
 declare global {
   interface Window {
@@ -1613,6 +1907,22 @@ declare global {
       checkSamplingApi: () => void;
       testSamplingCall: () => Promise<void>;
       testElicitationCall: () => Promise<void>;
+      // Notification batching tests
+      startNotificationTracking: () => void;
+      stopNotificationTracking: () => { tools: number; resources: number; prompts: number };
+      testRapidToolRegistration: (count: number) => Promise<{
+        registeredCount: number;
+        notificationCount: number;
+      }>;
+      testMultiTaskToolRegistration: (count: number) => Promise<{
+        registeredCount: number;
+        notificationCount: number;
+      }>;
+      testMixedRegistrationBatching: () => Promise<{
+        phase1Notifications: number;
+        phase2Notifications: number;
+        phase3Notifications: number;
+      }>;
     };
   }
 }
@@ -1659,4 +1969,10 @@ window.testApp = {
   checkSamplingApi,
   testSamplingCall,
   testElicitationCall,
+  // Notification batching tests
+  startNotificationTracking,
+  stopNotificationTracking,
+  testRapidToolRegistration,
+  testMultiTaskToolRegistration,
+  testMixedRegistrationBatching,
 };
