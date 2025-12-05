@@ -573,6 +573,12 @@ class WebToolCallEvent extends Event implements ToolCallEvent {
 const RAPID_DUPLICATE_WINDOW_MS = 50;
 
 /**
+ * Types of lists that can trigger change notifications.
+ * Single source of truth for notification batching logic.
+ */
+type ListChangeType = 'tools' | 'resources' | 'prompts';
+
+/**
  * Testing API implementation for the Model Context Protocol.
  * Provides debugging, mocking, and testing capabilities for tool execution.
  * Implements both Chromium native methods and polyfill-specific extensions.
@@ -835,6 +841,13 @@ class WebModelContext implements InternalModelContext {
   private resourceUnregisterFunctions: Map<string, () => void>;
   private promptUnregisterFunctions: Map<string, () => void>;
 
+  /**
+   * Tracks which list change notifications are pending.
+   * Uses microtask-based batching to coalesce rapid registrations
+   * (e.g., React mount phase) into a single notification per list type.
+   */
+  private pendingNotifications = new Set<ListChangeType>();
+
   private testingAPI?: WebModelContextTesting;
 
   /**
@@ -989,14 +1002,14 @@ class WebModelContext implements InternalModelContext {
       this.provideContextPrompts.set(prompt.name, validatedPrompt);
     }
 
-    // Update bridge and notify
+    // Update bridge and schedule notifications (batched via microtask)
     this.updateBridgeTools();
     this.updateBridgeResources();
     this.updateBridgePrompts();
 
-    this.notifyToolsListChanged();
-    this.notifyResourcesListChanged();
-    this.notifyPromptsListChanged();
+    this.scheduleListChanged('tools');
+    this.scheduleListChanged('resources');
+    this.scheduleListChanged('prompts');
   }
 
   /**
@@ -1111,7 +1124,7 @@ class WebModelContext implements InternalModelContext {
     this.dynamicTools.set(tool.name, validatedTool);
     this.toolRegistrationTimestamps.set(tool.name, now);
     this.updateBridgeTools();
-    this.notifyToolsListChanged();
+    this.scheduleListChanged('tools');
 
     const unregisterFn = () => {
       console.log(`[Web Model Context] Unregistering tool: ${tool.name}`);
@@ -1134,7 +1147,7 @@ class WebModelContext implements InternalModelContext {
       this.toolRegistrationTimestamps.delete(tool.name);
       this.toolUnregisterFunctions.delete(tool.name);
       this.updateBridgeTools();
-      this.notifyToolsListChanged();
+      this.scheduleListChanged('tools');
     };
 
     this.toolUnregisterFunctions.set(tool.name, unregisterFn);
@@ -1188,7 +1201,7 @@ class WebModelContext implements InternalModelContext {
     this.dynamicResources.set(resource.uri, validatedResource);
     this.resourceRegistrationTimestamps.set(resource.uri, now);
     this.updateBridgeResources();
-    this.notifyResourcesListChanged();
+    this.scheduleListChanged('resources');
 
     const unregisterFn = () => {
       console.log(`[Web Model Context] Unregistering resource: ${resource.uri}`);
@@ -1211,7 +1224,7 @@ class WebModelContext implements InternalModelContext {
       this.resourceRegistrationTimestamps.delete(resource.uri);
       this.resourceUnregisterFunctions.delete(resource.uri);
       this.updateBridgeResources();
-      this.notifyResourcesListChanged();
+      this.scheduleListChanged('resources');
     };
 
     this.resourceUnregisterFunctions.set(resource.uri, unregisterFn);
@@ -1249,7 +1262,7 @@ class WebModelContext implements InternalModelContext {
     }
 
     this.updateBridgeResources();
-    this.notifyResourcesListChanged();
+    this.scheduleListChanged('resources');
   }
 
   /**
@@ -1339,7 +1352,7 @@ class WebModelContext implements InternalModelContext {
     this.dynamicPrompts.set(prompt.name, validatedPrompt);
     this.promptRegistrationTimestamps.set(prompt.name, now);
     this.updateBridgePrompts();
-    this.notifyPromptsListChanged();
+    this.scheduleListChanged('prompts');
 
     const unregisterFn = () => {
       console.log(`[Web Model Context] Unregistering prompt: ${prompt.name}`);
@@ -1362,7 +1375,7 @@ class WebModelContext implements InternalModelContext {
       this.promptRegistrationTimestamps.delete(prompt.name);
       this.promptUnregisterFunctions.delete(prompt.name);
       this.updateBridgePrompts();
-      this.notifyPromptsListChanged();
+      this.scheduleListChanged('prompts');
     };
 
     this.promptUnregisterFunctions.set(prompt.name, unregisterFn);
@@ -1400,7 +1413,7 @@ class WebModelContext implements InternalModelContext {
     }
 
     this.updateBridgePrompts();
-    this.notifyPromptsListChanged();
+    this.scheduleListChanged('prompts');
   }
 
   /**
@@ -1453,7 +1466,7 @@ class WebModelContext implements InternalModelContext {
     }
 
     this.updateBridgeTools();
-    this.notifyToolsListChanged();
+    this.scheduleListChanged('tools');
   }
 
   /**
@@ -1486,10 +1499,10 @@ class WebModelContext implements InternalModelContext {
     this.updateBridgeResources();
     this.updateBridgePrompts();
 
-    // Notify changes
-    this.notifyToolsListChanged();
-    this.notifyResourcesListChanged();
-    this.notifyPromptsListChanged();
+    // Schedule notifications (batched via microtask)
+    this.scheduleListChanged('tools');
+    this.scheduleListChanged('resources');
+    this.scheduleListChanged('prompts');
   }
 
   /**
@@ -1622,6 +1635,43 @@ class WebModelContext implements InternalModelContext {
         params: {},
       });
     }
+  }
+
+  /**
+   * Schedules a list changed notification using microtask batching.
+   * Multiple calls for the same list type within the same task are coalesced
+   * into a single notification. This dramatically reduces notification spam
+   * during React mount/unmount cycles.
+   *
+   * @param listType - The type of list that changed ('tools' | 'resources' | 'prompts')
+   * @private
+   */
+  private scheduleListChanged(listType: ListChangeType): void {
+    if (this.pendingNotifications.has(listType)) return;
+
+    this.pendingNotifications.add(listType);
+    queueMicrotask(() => {
+      this.pendingNotifications.delete(listType);
+
+      // Dispatch to the appropriate notification method
+      // Exhaustive switch ensures compile-time safety when adding new list types
+      switch (listType) {
+        case 'tools':
+          this.notifyToolsListChanged();
+          break;
+        case 'resources':
+          this.notifyResourcesListChanged();
+          break;
+        case 'prompts':
+          this.notifyPromptsListChanged();
+          break;
+        default: {
+          // Exhaustiveness check: TypeScript will error if a case is missing
+          const _exhaustive: never = listType;
+          console.error(`[Web Model Context] Unknown list type: ${_exhaustive}`);
+        }
+      }
+    });
   }
 
   /**
