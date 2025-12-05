@@ -105,6 +105,12 @@ class NativeModelContextAdapter implements InternalModelContext {
   private syncInProgress = false;
 
   /**
+   * Stores dynamically registered prompts since native API doesn't support prompts.
+   * Prompts are stored directly in bridge.prompts and managed here.
+   */
+  private promptUnregisterFunctions = new Map<string, () => void>();
+
+  /**
    * Creates a new NativeModelContextAdapter.
    *
    * @param {MCPBridge} bridge - The MCP bridge instance
@@ -223,6 +229,55 @@ class NativeModelContextAdapter implements InternalModelContext {
         params: {},
       });
     }
+  }
+
+  /**
+   * Notifies all connected MCP servers that the prompts list has changed.
+   *
+   * @private
+   */
+  private notifyPromptsListChanged(): void {
+    if (this.bridge.tabServer?.notification) {
+      this.bridge.tabServer.notification({
+        method: 'notifications/prompts/list_changed',
+        params: {},
+      });
+    }
+
+    if (this.bridge.iframeServer?.notification) {
+      this.bridge.iframeServer.notification({
+        method: 'notifications/prompts/list_changed',
+        params: {},
+      });
+    }
+  }
+
+  /**
+   * Validates and normalizes a prompt descriptor.
+   *
+   * @param {PromptDescriptor} prompt - The prompt to validate
+   * @returns {ValidatedPromptDescriptor} The validated prompt
+   * @private
+   */
+  private validatePrompt<TArgsSchema extends ZodSchemaObject>(
+    prompt: PromptDescriptor<TArgsSchema>
+  ): ValidatedPromptDescriptor {
+    let argsSchema: InputSchema | undefined;
+    let argsValidator: z.ZodType | undefined;
+
+    if (prompt.argsSchema) {
+      const normalized = normalizeSchema(prompt.argsSchema);
+      argsSchema = normalized.jsonSchema;
+      argsValidator = normalized.zodValidator;
+    }
+
+    return {
+      name: prompt.name,
+      description: prompt.description,
+      argsSchema,
+      get: prompt.get as (args: Record<string, unknown>) => Promise<{ messages: PromptMessage[] }>,
+      argsValidator,
+    };
   }
 
   /**
@@ -368,46 +423,122 @@ class NativeModelContextAdapter implements InternalModelContext {
     throw new Error('[Native Adapter] readResource is not supported by native API');
   }
 
-  // ==================== PROMPT METHODS (not yet supported by native API) ====================
+  // ==================== PROMPT METHODS (managed via MCP bridge) ====================
 
   /**
    * Registers a prompt dynamically.
-   * Note: Native Chromium API does not yet support prompts.
-   * This is a polyfill-only feature.
+   * Since native Chromium API does not support prompts, this stores prompts
+   * in the MCP bridge and exposes them to MCP clients.
+   *
+   * @param {PromptDescriptor} prompt - The prompt descriptor to register
+   * @returns {{unregister: () => void}} Object with unregister function
    */
   registerPrompt<TArgsSchema extends ZodSchemaObject = Record<string, never>>(
-    _prompt: PromptDescriptor<TArgsSchema>
+    prompt: PromptDescriptor<TArgsSchema>
   ): { unregister: () => void } {
-    console.warn('[Native Adapter] registerPrompt is not supported by native API');
-    return { unregister: () => {} };
+    console.log(`[Native Adapter] Registering prompt: ${prompt.name}`);
+
+    if (this.bridge.prompts.has(prompt.name)) {
+      throw new Error(
+        `[Native Adapter] Prompt name collision: "${prompt.name}" is already registered. ` +
+          'Please unregister it first or use a different name.'
+      );
+    }
+
+    const validatedPrompt = this.validatePrompt(prompt);
+    this.bridge.prompts.set(prompt.name, validatedPrompt);
+    this.notifyPromptsListChanged();
+
+    const unregisterFn = () => {
+      console.log(`[Native Adapter] Unregistering prompt: ${prompt.name}`);
+      this.bridge.prompts.delete(prompt.name);
+      this.promptUnregisterFunctions.delete(prompt.name);
+      this.notifyPromptsListChanged();
+    };
+
+    this.promptUnregisterFunctions.set(prompt.name, unregisterFn);
+
+    return { unregister: unregisterFn };
   }
 
   /**
    * Unregisters a prompt by name.
-   * Note: Native Chromium API does not yet support prompts.
+   * Removes the prompt from the MCP bridge.
+   *
+   * @param {string} name - Name of the prompt to unregister
    */
-  unregisterPrompt(_name: string): void {
-    console.warn('[Native Adapter] unregisterPrompt is not supported by native API');
+  unregisterPrompt(name: string): void {
+    console.log(`[Native Adapter] Unregistering prompt: ${name}`);
+
+    if (!this.bridge.prompts.has(name)) {
+      console.warn(`[Native Adapter] Prompt "${name}" is not registered, ignoring unregister call`);
+      return;
+    }
+
+    this.bridge.prompts.delete(name);
+    this.promptUnregisterFunctions.delete(name);
+    this.notifyPromptsListChanged();
   }
 
   /**
    * Lists all registered prompts.
-   * Note: Native Chromium API does not yet support prompts.
+   * Returns prompts from the MCP bridge in MCP format.
+   *
+   * @returns {Prompt[]} Array of prompt descriptors
    */
   listPrompts(): Prompt[] {
-    return [];
+    return Array.from(this.bridge.prompts.values()).map((prompt) => ({
+      name: prompt.name,
+      description: prompt.description,
+      arguments: prompt.argsSchema?.properties
+        ? Object.entries(prompt.argsSchema.properties).map(([name, schema]) => ({
+            name,
+            description: (schema as { description?: string }).description,
+            required: prompt.argsSchema?.required?.includes(name) ?? false,
+          }))
+        : undefined,
+    }));
   }
 
   /**
    * Gets a prompt with arguments.
-   * Note: Native Chromium API does not yet support prompts.
+   * Retrieves and executes a prompt from the MCP bridge.
+   *
+   * @param {string} name - Name of the prompt
+   * @param {Record<string, unknown>} args - Arguments to pass to the prompt
+   * @returns {Promise<{messages: PromptMessage[]}>} The prompt messages
+   * @throws {Error} If prompt is not found
    * @internal
    */
   async getPrompt(
-    _name: string,
-    _args?: Record<string, unknown>
+    name: string,
+    args?: Record<string, unknown>
   ): Promise<{ messages: PromptMessage[] }> {
-    throw new Error('[Native Adapter] getPrompt is not supported by native API');
+    console.log(`[Native Adapter] Getting prompt: ${name}`);
+
+    const prompt = this.bridge.prompts.get(name);
+    if (!prompt) {
+      throw new Error(`Prompt not found: ${name}`);
+    }
+
+    // Validate arguments if schema is defined
+    if (prompt.argsValidator && args) {
+      const validation = validateWithZod(args, prompt.argsValidator);
+      if (!validation.success) {
+        console.error(
+          `[Native Adapter] Argument validation failed for prompt ${name}:`,
+          validation.error
+        );
+        throw new Error(`Argument validation error for prompt "${name}":\n${validation.error}`);
+      }
+    }
+
+    try {
+      return await prompt.get(args ?? {});
+    } catch (error) {
+      console.error(`[Native Adapter] Error getting prompt ${name}:`, error);
+      throw error;
+    }
   }
 
   /**
