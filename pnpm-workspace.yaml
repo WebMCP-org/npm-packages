@@ -2,6 +2,7 @@ packages:
   - extension-tools
   - global
   - mcp-iframe
+  - packages/chrome-devtools-mcp
   - react-webmcp
   - usewebmcp
   - smart-dom-reader
