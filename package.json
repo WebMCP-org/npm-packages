@@ -9,7 +9,7 @@
     "changeset:publish": "pnpm build && changeset publish",
     "changeset:version": "changeset version",
     "check": "biome check --write .",
-    "check-all": "pnpm run typecheck && biome ci --linter-enabled --formatter-enabled .",
+    "check-all": "pnpm run typecheck && biome ci --linter-enabled=true --formatter-enabled=true .",
     "check:ci": "biome ci .",
     "ci:publish": "pnpm publish -r --access public",
     "clean": "git clean -xdf .cache .turbo node_modules",

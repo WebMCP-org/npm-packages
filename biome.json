@@ -80,6 +80,15 @@
   },
   "overrides": [
     {
+      "includes": ["**/bundle-string.ts"],
+      "formatter": {
+        "enabled": false
+      },
+      "linter": {
+        "enabled": false
+      }
+    },
+    {
       "includes": [
         "extension-tools/src/chrome-apis/**",
         "extension-tools/src/DomExtractionTools.ts",
@@ -105,12 +114,17 @@
         "smart-dom-reader/mcp-server/**",
         "smart-dom-reader/dist-bundle/**"
       ],
+      "formatter": {
+        "enabled": false
+      },
       "linter": {
         "rules": {
           "complexity": {
             "noThisInStatic": "off",
             "noCommaOperator": "off",
-            "noStaticOnlyClass": "off"
+            "noStaticOnlyClass": "off",
+            "noArguments": "off",
+            "useArrowFunction": "off"
           },
           "suspicious": {
             "noTemplateCurlyInString": "off",
@@ -120,6 +134,9 @@
             "noNonNullAssertion": "off",
             "noParameterAssign": "off",
             "useDefaultParameterLast": "off"
+          },
+          "correctness": {
+            "noUnusedVariables": "off"
           }
         }
       }
