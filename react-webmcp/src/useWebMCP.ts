@@ -1,7 +1,7 @@
 import type { InputSchema } from '@mcp-b/global';
 import { zodToJsonSchema } from '@mcp-b/global';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { z } from 'zod';
 import type { ToolExecutionState, WebMCPConfig, WebMCPReturn } from './types.js';
 
@@ -132,7 +132,15 @@ export function useWebMCP<
     formatOutputRef.current = formatOutput;
   }, [formatOutput]);
 
-  const validator = inputSchema ? z.object(inputSchema) : null;
+  // Memoize validator to prevent recreation on every render
+  // This ensures execute callback and registration effect have stable dependencies
+  const validator = useMemo(() => (inputSchema ? z.object(inputSchema) : null), [inputSchema]);
+
+  // Store validator in ref to avoid execute callback dependency
+  const validatorRef = useRef(validator);
+  useEffect(() => {
+    validatorRef.current = validator;
+  }, [validator]);
 
   /**
    * Executes the tool handler with input validation and state management.
@@ -141,48 +149,46 @@ export function useWebMCP<
    * @returns Promise resolving to the handler's output
    * @throws Error if validation fails or the handler throws
    */
-  const execute = useCallback(
-    async (input: unknown): Promise<TOutput> => {
+  const execute = useCallback(async (input: unknown): Promise<TOutput> => {
+    setState((prev) => ({
+      ...prev,
+      isExecuting: true,
+      error: null,
+    }));
+
+    try {
+      const currentValidator = validatorRef.current;
+      const validatedInput = currentValidator ? currentValidator.parse(input) : input;
+      const result = await handlerRef.current(validatedInput as never);
+
       setState((prev) => ({
-        ...prev,
-        isExecuting: true,
+        isExecuting: false,
+        lastResult: result,
         error: null,
+        executionCount: prev.executionCount + 1,
       }));
 
-      try {
-        const validatedInput = validator ? validator.parse(input) : input;
-        const result = await handlerRef.current(validatedInput as never);
-
-        setState((prev) => ({
-          isExecuting: false,
-          lastResult: result,
-          error: null,
-          executionCount: prev.executionCount + 1,
-        }));
-
-        if (onSuccessRef.current) {
-          onSuccessRef.current(result, input);
-        }
-
-        return result;
-      } catch (error) {
-        const err = error instanceof Error ? error : new Error(String(error));
-
-        setState((prev) => ({
-          ...prev,
-          isExecuting: false,
-          error: err,
-        }));
-
-        if (onErrorRef.current) {
-          onErrorRef.current(err, input);
-        }
-
-        throw err;
+      if (onSuccessRef.current) {
+        onSuccessRef.current(result, input);
       }
-    },
-    [validator]
-  );
+
+      return result;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+
+      setState((prev) => ({
+        ...prev,
+        isExecuting: false,
+        error: err,
+      }));
+
+      if (onErrorRef.current) {
+        onErrorRef.current(err, input);
+      }
+
+      throw err;
+    }
+  }, []);
 
   /**
    * Resets the execution state to initial values.
@@ -260,7 +266,9 @@ export function useWebMCP<
         console.log(`[useWebMCP] Unregistered tool: ${name}`);
       }
     };
-  }, [name, description, inputSchema, outputSchema, annotations, execute]);
+    // Note: execute is intentionally omitted - it's stable (empty deps) and uses refs internally
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [name, description, inputSchema, outputSchema, annotations]);
 
   return {
     state,
