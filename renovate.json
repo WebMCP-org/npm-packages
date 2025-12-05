@@ -1,0 +1,35 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:best-practices", "group:allNonMajor"],
+  "labels": ["dependencies"],
+  "schedule": ["before 9am on Monday"],
+  "timezone": "UTC",
+  "packageRules": [
+    {
+      "description": "Group code quality tools",
+      "matchPackageNames": ["@biomejs/*", "husky", "lint-staged", "@commitlint/*"],
+      "groupName": "code-quality"
+    },
+    {
+      "description": "Group build tools",
+      "matchPackageNames": ["turbo", "tsdown", "tsup", "vite", "@vitejs/*"],
+      "groupName": "build-tools"
+    },
+    {
+      "description": "Group TypeScript and types",
+      "matchPackageNames": ["typescript", "@types/*"],
+      "groupName": "typescript"
+    },
+    {
+      "description": "Require manual approval for major updates",
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true
+    },
+    {
+      "description": "Auto-merge patch updates for dev dependencies",
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["patch"],
+      "automerge": true
+    }
+  ]
+}

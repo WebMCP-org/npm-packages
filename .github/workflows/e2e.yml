@@ -8,6 +8,10 @@ on:
     branches:
       - main
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   CI: true
 
@@ -23,8 +27,6 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10.14.0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
