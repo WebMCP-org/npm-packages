@@ -344,11 +344,9 @@ If you run into any issues, checkout our [troubleshooting guide](./docs/troubles
   - [`list_console_messages`](docs/tool-reference.md#list_console_messages)
   - [`take_screenshot`](docs/tool-reference.md#take_screenshot)
   - [`take_snapshot`](docs/tool-reference.md#take_snapshot)
-- **Website MCP Tools** (4 tools)
-  - [`connect_webmcp`](docs/tool-reference.md#connect_webmcp) - Connect to tools on the current webpage
-  - [`list_webmcp_tools`](docs/tool-reference.md#list_webmcp_tools) - List available website tools
-  - [`call_webmcp_tool`](docs/tool-reference.md#call_webmcp_tool) - Call a website tool
-  - [`disconnect_webmcp`](docs/tool-reference.md#disconnect_webmcp) - Disconnect from website tools
+- **Website MCP Tools** (2 tools)
+  - [`list_webmcp_tools`](docs/tool-reference.md#list_webmcp_tools) - List available website tools (auto-connects)
+  - [`call_webmcp_tool`](docs/tool-reference.md#call_webmcp_tool) - Call a website tool (auto-connects)
 
 <!-- END AUTO GENERATED TOOLS -->
 
@@ -612,24 +610,16 @@ Once you're on a webpage with WebMCP tools, you can use the following workflow:
 Navigate to https://example.com/app
 ```
 
-**2. Connect to WebMCP**
-
-```
-Connect to the webpage's MCP tools
-```
-
-This will detect and connect to any MCP tools registered on the page.
-
-**3. List available tools**
+**2. List available tools**
 
 ```
 What tools are available on this website?
 ```
 
 The AI agent will use `list_webmcp_tools` to show you what functionality the
-website exposes.
+website exposes. This automatically connects to the page's WebMCP server.
 
-**4. Use the tools**
+**3. Use the tools**
 
 ```
 Search for "wireless headphones" using the website's search tool
@@ -637,33 +627,31 @@ Search for "wireless headphones" using the website's search tool
 
 The AI agent will use `call_webmcp_tool` to invoke the website's functionality.
 
-**5. Disconnect when done**
-
-```
-Disconnect from the website's tools
-```
+That's it! No explicit connect or disconnect steps needed - WebMCP tools
+auto-connect when called and automatically reconnect when you navigate to
+a different page.
 
 ### Example prompts
 
 Here are some example prompts you can use with WebMCP-enabled websites:
 
 ```
-Connect to this webpage's tools and show me what's available
+What tools does this website have?
 ```
 
 ```
-Use the website's form submission tool to fill out the contact form
+Use the website's search tool to find wireless headphones
 ```
 
 ```
-Call the website's API tool to fetch the latest data
+Call the website's form submission tool to fill out the contact form
 ```
 
 ### Troubleshooting WebMCP
 
-- **"WebMCP not available"**: The current webpage doesn't have `@mcp-b/global`
-  installed or no tools are registered.
-- **"Not connected to WebMCP"**: Run `connect_webmcp` first before trying to
-  list or call tools.
+- **"WebMCP not detected"**: The current webpage doesn't have `@mcp-b/global`
+  installed or no tools are registered. The page needs the WebMCP polyfill loaded.
 - **Tool call fails**: Check the tool's input schema matches your parameters.
   Use `list_webmcp_tools` to see the expected input format.
+- **Tools not appearing after navigation**: WebMCP auto-reconnects when you
+  navigate. If the new page has different tools, call `list_webmcp_tools` again.

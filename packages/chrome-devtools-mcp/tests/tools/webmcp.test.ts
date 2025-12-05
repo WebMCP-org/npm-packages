@@ -7,12 +7,7 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {
-  connectWebMCP,
-  disconnectWebMCP,
-  listWebMCPTools,
-  callWebMCPTool,
-} from '../../src/tools/webmcp.js';
+import {listWebMCPTools, callWebMCPTool} from '../../src/tools/webmcp.js';
 import {serverHooks} from '../server.js';
 import {withMcpContext} from '../utils.js';
 
@@ -190,8 +185,8 @@ const NO_WEBMCP_PAGE = `
 describe('webmcp tools', () => {
   const server = serverHooks();
 
-  describe('connect_webmcp', () => {
-    it('connects to a page with WebMCP and lists tools', async () => {
+  describe('list_webmcp_tools', () => {
+    it('auto-connects and lists tools on WebMCP page', async () => {
       server.addHtmlRoute('/webmcp', MOCK_WEBMCP_PAGE);
 
       await withMcpContext(async (response, context) => {
@@ -203,12 +198,12 @@ describe('webmcp tools', () => {
           return typeof (window as {navigator: {modelContext?: unknown}}).navigator.modelContext !== 'undefined';
         });
 
-        await connectWebMCP.handler({params: {}}, response, context);
+        await listWebMCPTools.handler({params: {}}, response, context);
 
         const output = response.responseLines.join('\\n');
-        assert.ok(output.includes('Connected to WebMCP server'), 'Should show connected message');
-        assert.ok(output.includes('test_add'), 'Should list test_add tool');
-        assert.ok(output.includes('test_greet'), 'Should list test_greet tool');
+        assert.ok(output.includes('3 tool(s) available'), 'Should show 3 tools');
+        assert.ok(output.includes('test_add'), 'Should list test_add');
+        assert.ok(output.includes('Add two numbers'), 'Should show description');
       });
     });
 
@@ -216,49 +211,49 @@ describe('webmcp tools', () => {
       server.addHtmlRoute('/regular', NO_WEBMCP_PAGE);
 
       await withMcpContext(async (response, context) => {
-        // First disconnect any existing connection
-        await disconnectWebMCP.handler({params: {}}, response, context);
-        response.resetResponseLineForTesting();
-
         const page = context.getSelectedPage();
         await page.goto(server.getRoute('/regular'));
 
-        await connectWebMCP.handler({params: {}}, response, context);
+        await listWebMCPTools.handler({params: {}}, response, context);
 
         const output = response.responseLines.join('\\n');
         assert.ok(output.includes('WebMCP not detected'), 'Should show not detected message');
       });
     });
 
-    it('prevents double connection', async () => {
+    it('reconnects when navigating to different WebMCP page', async () => {
+      server.addHtmlRoute('/webmcp1', MOCK_WEBMCP_PAGE);
       server.addHtmlRoute('/webmcp2', MOCK_WEBMCP_PAGE);
 
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPage();
-        await page.goto(server.getRoute('/webmcp2'));
 
+        // First page
+        await page.goto(server.getRoute('/webmcp1'));
         await page.waitForFunction(() => {
           return typeof (window as {navigator: {modelContext?: unknown}}).navigator.modelContext !== 'undefined';
         });
 
-        // First connection
-        await connectWebMCP.handler({params: {}}, response, context);
+        await listWebMCPTools.handler({params: {}}, response, context);
+        assert.ok(response.responseLines.join('\\n').includes('3 tool(s)'), 'Should list tools from first page');
+
         response.resetResponseLineForTesting();
 
-        // Second connection attempt
-        await connectWebMCP.handler({params: {}}, response, context);
+        // Navigate to second page
+        await page.goto(server.getRoute('/webmcp2'));
+        await page.waitForFunction(() => {
+          return typeof (window as {navigator: {modelContext?: unknown}}).navigator.modelContext !== 'undefined';
+        });
 
-        const output = response.responseLines.join('\\n');
-        assert.ok(output.includes('Already connected'), 'Should show already connected message');
-
-        // Cleanup
-        await disconnectWebMCP.handler({params: {}}, response, context);
+        // Should auto-reconnect to new page
+        await listWebMCPTools.handler({params: {}}, response, context);
+        assert.ok(response.responseLines.join('\\n').includes('3 tool(s)'), 'Should list tools from second page');
       });
     });
   });
 
-  describe('list_webmcp_tools', () => {
-    it('lists tools when connected', async () => {
+  describe('call_webmcp_tool', () => {
+    it('auto-connects and calls a tool', async () => {
       server.addHtmlRoute('/webmcp3', MOCK_WEBMCP_PAGE);
 
       await withMcpContext(async (response, context) => {
@@ -269,37 +264,19 @@ describe('webmcp tools', () => {
           return typeof (window as {navigator: {modelContext?: unknown}}).navigator.modelContext !== 'undefined';
         });
 
-        await connectWebMCP.handler({params: {}}, response, context);
-        response.resetResponseLineForTesting();
-
-        await listWebMCPTools.handler({params: {}}, response, context);
+        await callWebMCPTool.handler(
+          {params: {name: 'test_add', arguments: {a: 5, b: 3}}},
+          response,
+          context
+        );
 
         const output = response.responseLines.join('\\n');
-        assert.ok(output.includes('3 tool(s) available'), 'Should show 3 tools');
-        assert.ok(output.includes('test_add'), 'Should list test_add');
-        assert.ok(output.includes('Add two numbers'), 'Should show description');
-
-        // Cleanup
-        await disconnectWebMCP.handler({params: {}}, response, context);
+        assert.ok(output.includes('Calling tool: test_add'), 'Should show tool name');
+        assert.ok(output.includes('8'), 'Should show result (5+3=8)');
       });
     });
 
-    it('shows error when not connected', async () => {
-      await withMcpContext(async (response, context) => {
-        // Ensure disconnected
-        await disconnectWebMCP.handler({params: {}}, response, context);
-        response.resetResponseLineForTesting();
-
-        await listWebMCPTools.handler({params: {}}, response, context);
-
-        const output = response.responseLines.join('\\n');
-        assert.ok(output.includes('Not connected'), 'Should show not connected message');
-      });
-    });
-  });
-
-  describe('call_webmcp_tool', () => {
-    it('calls a tool and returns result', async () => {
+    it('calls a tool with string result', async () => {
       server.addHtmlRoute('/webmcp4', MOCK_WEBMCP_PAGE);
 
       await withMcpContext(async (response, context) => {
@@ -310,25 +287,18 @@ describe('webmcp tools', () => {
           return typeof (window as {navigator: {modelContext?: unknown}}).navigator.modelContext !== 'undefined';
         });
 
-        await connectWebMCP.handler({params: {}}, response, context);
-        response.resetResponseLineForTesting();
-
         await callWebMCPTool.handler(
-          {params: {name: 'test_add', arguments: {a: 5, b: 3}}},
+          {params: {name: 'test_greet', arguments: {name: 'World'}}},
           response,
           context
         );
 
         const output = response.responseLines.join('\\n');
-        assert.ok(output.includes('Calling tool: test_add'), 'Should show tool name');
-        assert.ok(output.includes('8'), 'Should show result (5+3=8)');
-
-        // Cleanup
-        await disconnectWebMCP.handler({params: {}}, response, context);
+        assert.ok(output.includes('Hello, World!'), 'Should show greeting');
       });
     });
 
-    it('calls a tool with string result', async () => {
+    it('shows error for tool that returns isError', async () => {
       server.addHtmlRoute('/webmcp5', MOCK_WEBMCP_PAGE);
 
       await withMcpContext(async (response, context) => {
@@ -339,37 +309,6 @@ describe('webmcp tools', () => {
           return typeof (window as {navigator: {modelContext?: unknown}}).navigator.modelContext !== 'undefined';
         });
 
-        await connectWebMCP.handler({params: {}}, response, context);
-        response.resetResponseLineForTesting();
-
-        await callWebMCPTool.handler(
-          {params: {name: 'test_greet', arguments: {name: 'World'}}},
-          response,
-          context
-        );
-
-        const output = response.responseLines.join('\\n');
-        assert.ok(output.includes('Hello, World!'), 'Should show greeting');
-
-        // Cleanup
-        await disconnectWebMCP.handler({params: {}}, response, context);
-      });
-    });
-
-    it('shows error for tool that returns isError', async () => {
-      server.addHtmlRoute('/webmcp6', MOCK_WEBMCP_PAGE);
-
-      await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPage();
-        await page.goto(server.getRoute('/webmcp6'));
-
-        await page.waitForFunction(() => {
-          return typeof (window as {navigator: {modelContext?: unknown}}).navigator.modelContext !== 'undefined';
-        });
-
-        await connectWebMCP.handler({params: {}}, response, context);
-        response.resetResponseLineForTesting();
-
         await callWebMCPTool.handler(
           {params: {name: 'test_error', arguments: {}}},
           response,
@@ -378,17 +317,15 @@ describe('webmcp tools', () => {
 
         const output = response.responseLines.join('\\n');
         assert.ok(output.includes('Tool returned an error'), 'Should indicate error');
-
-        // Cleanup
-        await disconnectWebMCP.handler({params: {}}, response, context);
       });
     });
 
-    it('shows error when not connected', async () => {
+    it('shows error on page without WebMCP', async () => {
+      server.addHtmlRoute('/regular2', NO_WEBMCP_PAGE);
+
       await withMcpContext(async (response, context) => {
-        // Ensure disconnected
-        await disconnectWebMCP.handler({params: {}}, response, context);
-        response.resetResponseLineForTesting();
+        const page = context.getSelectedPage();
+        await page.goto(server.getRoute('/regular2'));
 
         await callWebMCPTool.handler(
           {params: {name: 'test_add', arguments: {a: 1, b: 2}}},
@@ -397,50 +334,7 @@ describe('webmcp tools', () => {
         );
 
         const output = response.responseLines.join('\\n');
-        assert.ok(output.includes('Not connected'), 'Should show not connected message');
-      });
-    });
-  });
-
-  describe('disconnect_webmcp', () => {
-    it('disconnects from WebMCP', async () => {
-      server.addHtmlRoute('/webmcp7', MOCK_WEBMCP_PAGE);
-
-      await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPage();
-        await page.goto(server.getRoute('/webmcp7'));
-
-        await page.waitForFunction(() => {
-          return typeof (window as {navigator: {modelContext?: unknown}}).navigator.modelContext !== 'undefined';
-        });
-
-        await connectWebMCP.handler({params: {}}, response, context);
-        response.resetResponseLineForTesting();
-
-        await disconnectWebMCP.handler({params: {}}, response, context);
-
-        const output = response.responseLines.join('\\n');
-        assert.ok(output.includes('Disconnected'), 'Should show disconnected message');
-
-        // Verify we can't list tools after disconnect
-        response.resetResponseLineForTesting();
-        await listWebMCPTools.handler({params: {}}, response, context);
-        const output2 = response.responseLines.join('\\n');
-        assert.ok(output2.includes('Not connected'), 'Should be disconnected');
-      });
-    });
-
-    it('handles disconnect when not connected', async () => {
-      await withMcpContext(async (response, context) => {
-        // Ensure disconnected first
-        await disconnectWebMCP.handler({params: {}}, response, context);
-        response.resetResponseLineForTesting();
-
-        // Try to disconnect again
-        await disconnectWebMCP.handler({params: {}}, response, context);
-
-        const output = response.responseLines.join('\\n');
-        assert.ok(output.includes('Not connected'), 'Should show not connected message');
+        assert.ok(output.includes('WebMCP not detected'), 'Should show not detected message');
       });
     });
   });
