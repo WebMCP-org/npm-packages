@@ -835,6 +835,12 @@ class WebModelContext implements InternalModelContext {
   private resourceUnregisterFunctions: Map<string, () => void>;
   private promptUnregisterFunctions: Map<string, () => void>;
 
+  // Pending notification flags for microtask-based batching
+  // This coalesces rapid registrations (e.g., React mount phase) into a single notification
+  private pendingToolNotification = false;
+  private pendingResourceNotification = false;
+  private pendingPromptNotification = false;
+
   private testingAPI?: WebModelContextTesting;
 
   /**
@@ -989,14 +995,14 @@ class WebModelContext implements InternalModelContext {
       this.provideContextPrompts.set(prompt.name, validatedPrompt);
     }
 
-    // Update bridge and notify
+    // Update bridge and schedule notifications (batched via microtask)
     this.updateBridgeTools();
     this.updateBridgeResources();
     this.updateBridgePrompts();
 
-    this.notifyToolsListChanged();
-    this.notifyResourcesListChanged();
-    this.notifyPromptsListChanged();
+    this.scheduleToolsListChanged();
+    this.scheduleResourcesListChanged();
+    this.schedulePromptsListChanged();
   }
 
   /**
@@ -1111,7 +1117,7 @@ class WebModelContext implements InternalModelContext {
     this.dynamicTools.set(tool.name, validatedTool);
     this.toolRegistrationTimestamps.set(tool.name, now);
     this.updateBridgeTools();
-    this.notifyToolsListChanged();
+    this.scheduleToolsListChanged();
 
     const unregisterFn = () => {
       console.log(`[Web Model Context] Unregistering tool: ${tool.name}`);
@@ -1134,7 +1140,7 @@ class WebModelContext implements InternalModelContext {
       this.toolRegistrationTimestamps.delete(tool.name);
       this.toolUnregisterFunctions.delete(tool.name);
       this.updateBridgeTools();
-      this.notifyToolsListChanged();
+      this.scheduleToolsListChanged();
     };
 
     this.toolUnregisterFunctions.set(tool.name, unregisterFn);
@@ -1188,7 +1194,7 @@ class WebModelContext implements InternalModelContext {
     this.dynamicResources.set(resource.uri, validatedResource);
     this.resourceRegistrationTimestamps.set(resource.uri, now);
     this.updateBridgeResources();
-    this.notifyResourcesListChanged();
+    this.scheduleResourcesListChanged();
 
     const unregisterFn = () => {
       console.log(`[Web Model Context] Unregistering resource: ${resource.uri}`);
@@ -1211,7 +1217,7 @@ class WebModelContext implements InternalModelContext {
       this.resourceRegistrationTimestamps.delete(resource.uri);
       this.resourceUnregisterFunctions.delete(resource.uri);
       this.updateBridgeResources();
-      this.notifyResourcesListChanged();
+      this.scheduleResourcesListChanged();
     };
 
     this.resourceUnregisterFunctions.set(resource.uri, unregisterFn);
@@ -1249,7 +1255,7 @@ class WebModelContext implements InternalModelContext {
     }
 
     this.updateBridgeResources();
-    this.notifyResourcesListChanged();
+    this.scheduleResourcesListChanged();
   }
 
   /**
@@ -1339,7 +1345,7 @@ class WebModelContext implements InternalModelContext {
     this.dynamicPrompts.set(prompt.name, validatedPrompt);
     this.promptRegistrationTimestamps.set(prompt.name, now);
     this.updateBridgePrompts();
-    this.notifyPromptsListChanged();
+    this.schedulePromptsListChanged();
 
     const unregisterFn = () => {
       console.log(`[Web Model Context] Unregistering prompt: ${prompt.name}`);
@@ -1362,7 +1368,7 @@ class WebModelContext implements InternalModelContext {
       this.promptRegistrationTimestamps.delete(prompt.name);
       this.promptUnregisterFunctions.delete(prompt.name);
       this.updateBridgePrompts();
-      this.notifyPromptsListChanged();
+      this.schedulePromptsListChanged();
     };
 
     this.promptUnregisterFunctions.set(prompt.name, unregisterFn);
@@ -1400,7 +1406,7 @@ class WebModelContext implements InternalModelContext {
     }
 
     this.updateBridgePrompts();
-    this.notifyPromptsListChanged();
+    this.schedulePromptsListChanged();
   }
 
   /**
@@ -1453,7 +1459,7 @@ class WebModelContext implements InternalModelContext {
     }
 
     this.updateBridgeTools();
-    this.notifyToolsListChanged();
+    this.scheduleToolsListChanged();
   }
 
   /**
@@ -1486,10 +1492,10 @@ class WebModelContext implements InternalModelContext {
     this.updateBridgeResources();
     this.updateBridgePrompts();
 
-    // Notify changes
-    this.notifyToolsListChanged();
-    this.notifyResourcesListChanged();
-    this.notifyPromptsListChanged();
+    // Schedule notifications (batched via microtask)
+    this.scheduleToolsListChanged();
+    this.scheduleResourcesListChanged();
+    this.schedulePromptsListChanged();
   }
 
   /**
@@ -1622,6 +1628,55 @@ class WebModelContext implements InternalModelContext {
         params: {},
       });
     }
+  }
+
+  /**
+   * Schedules a tools list changed notification using microtask batching.
+   * Multiple calls within the same task are coalesced into a single notification.
+   * This dramatically reduces notification spam during React mount/unmount cycles.
+   *
+   * @private
+   */
+  private scheduleToolsListChanged(): void {
+    if (this.pendingToolNotification) return;
+
+    this.pendingToolNotification = true;
+    queueMicrotask(() => {
+      this.pendingToolNotification = false;
+      this.notifyToolsListChanged();
+    });
+  }
+
+  /**
+   * Schedules a resources list changed notification using microtask batching.
+   * Multiple calls within the same task are coalesced into a single notification.
+   *
+   * @private
+   */
+  private scheduleResourcesListChanged(): void {
+    if (this.pendingResourceNotification) return;
+
+    this.pendingResourceNotification = true;
+    queueMicrotask(() => {
+      this.pendingResourceNotification = false;
+      this.notifyResourcesListChanged();
+    });
+  }
+
+  /**
+   * Schedules a prompts list changed notification using microtask batching.
+   * Multiple calls within the same task are coalesced into a single notification.
+   *
+   * @private
+   */
+  private schedulePromptsListChanged(): void {
+    if (this.pendingPromptNotification) return;
+
+    this.pendingPromptNotification = true;
+    queueMicrotask(() => {
+      this.pendingPromptNotification = false;
+      this.notifyPromptsListChanged();
+    });
   }
 
   /**
