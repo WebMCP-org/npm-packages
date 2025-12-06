@@ -31,7 +31,8 @@
       "coverage/",
       ".env*",
       "*.log",
-      ".DS_Store"
+      ".DS_Store",
+      "**/worker-configuration.d.ts"
     ]
   },
   "formatter": {
@@ -173,15 +174,34 @@
           },
           "suspicious": {
             "noUnknownAtRules": "off",
-            "noExplicitAny": "warn"
+            "noExplicitAny": "off",
+            "noImplicitAnyLet": "off"
           },
           "complexity": {
-            "noArguments": "off"
+            "noArguments": "off",
+            "noStaticOnlyClass": "off",
+            "noBannedTypes": "off"
+          },
+          "style": {
+            "noNonNullAssertion": "off",
+            "useTemplate": "off"
           },
           "correctness": {
             "noUnusedVariables": "error"
           }
         }
+      }
+    },
+    {
+      "includes": ["packages/chrome-devtools-mcp/**"],
+      "formatter": {
+        "enabled": false
+      },
+      "linter": {
+        "enabled": false
+      },
+      "assist": {
+        "enabled": false
       }
     }
   ]
