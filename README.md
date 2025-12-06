@@ -201,8 +201,8 @@ This monorepo uses pnpm workspaces with Turbo for build orchestration and Change
 
 ```bash
 # Clone the repository
-git clone https://github.com/WebMCP-org/WebMCP.git
-cd WebMCP/npm-packages
+git clone https://github.com/WebMCP-org/npm-packages.git
+cd npm-packages
 
 # Install dependencies
 pnpm install
@@ -257,6 +257,6 @@ We welcome contributions! Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for gu
 
 ## Links
 
-- [GitHub Repository](https://github.com/WebMCP-org/WebMCP)
+- [GitHub Repository](https://github.com/WebMCP-org/npm-packages)
 - [npm Organization](https://www.npmjs.com/org/mcp-b)
-- [Issue Tracker](https://github.com/WebMCP-org/WebMCP/issues)
+- [Issue Tracker](https://github.com/WebMCP-org/npm-packages/issues)
