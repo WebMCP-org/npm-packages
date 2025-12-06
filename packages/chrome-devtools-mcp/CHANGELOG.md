@@ -1,20 +1,62 @@
 # Changelog
 
+## 1.0.0
+
+### Major Changes
+
+This is the first stable release of `@mcp-b/chrome-devtools-mcp`, a fork of Chrome DevTools MCP with WebMCP integration.
+
+### Features
+
+- **WebMCP Integration**: Connect to MCP tools registered on webpages via [@mcp-b/global](https://www.npmjs.com/package/@mcp-b/global)
+  - `list_webmcp_tools`: List available website tools (auto-connects)
+  - `call_webmcp_tool`: Call a website tool (auto-connects)
+
+- **AI-Driven Development Workflow**: Build and test WebMCP tools in real-time
+  - Write tools in your codebase
+  - Hot-reload sees the changes
+  - AI discovers tools via `list_webmcp_tools`
+  - AI tests tools via `call_webmcp_tool`
+  - Iterate until working - TDD for AI!
+
+- **Built-in MCP Prompts**: Three prompts to help with WebMCP development
+  - `webmcp-dev-workflow`: Guide through the AI-driven development workflow
+  - `test-webmcp-tool`: Systematically test WebMCP tools
+  - `debug-webmcp`: Troubleshoot WebMCP connection issues
+
+### What's Different from Chrome DevTools MCP?
+
+This fork adds the ability to call MCP tools registered directly on webpages. The original Chrome DevTools MCP provides browser automation, performance analysis, network inspection, and debugging. This fork adds:
+
+| Feature | Chrome DevTools MCP | @mcp-b/chrome-devtools-mcp |
+|---------|--------------------|-----------------------------|
+| Browser automation | ✅ | ✅ |
+| Performance analysis | ✅ | ✅ |
+| Network inspection | ✅ | ✅ |
+| **Call website MCP tools** | ❌ | ✅ |
+| **List website MCP tools** | ❌ | ✅ |
+| **AI-driven tool development** | ❌ | ✅ |
+| **Built-in development prompts** | ❌ | ✅ |
+
+### Attribution
+
+This package is a fork of [ChromeDevTools/chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp), developed by Google LLC and the ChromeDevTools team. See [NOTICE](./NOTICE) for full attribution.
+
+---
+
 ## 0.12.0-beta.0
 
 ### Minor Changes
 
 - 79de6d9: Add WebMCP integration to connect to MCP tools registered on webpages
 
-  This adds four new tools for interacting with website-specific MCP functionality:
+  This adds two new tools for interacting with website-specific MCP functionality:
 
-  - `connect_webmcp`: Connect to MCP tools on the current webpage
   - `list_webmcp_tools`: List available website tools
   - `call_webmcp_tool`: Call a website tool
-  - `disconnect_webmcp`: Disconnect from website tools
 
   Websites can register tools using @mcp-b/global, and AI agents can now interact
-  with those tools through chrome-devtools-mcp using the Chrome DevTools Protocol.
+  with those tools through @mcp-b/chrome-devtools-mcp using the Chrome DevTools Protocol.
 
 ## [0.11.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.10.2...chrome-devtools-mcp-v0.11.0) (2025-12-03)
 
