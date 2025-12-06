@@ -1,19 +1,31 @@
 # @mcp-b/chrome-devtools-mcp
 
+> MCP server for Chrome DevTools - Let Claude, Cursor, Copilot, and Gemini control and debug Chrome browser
+
 [![npm @mcp-b/chrome-devtools-mcp package](https://img.shields.io/npm/v/@mcp-b/chrome-devtools-mcp.svg)](https://www.npmjs.com/package/@mcp-b/chrome-devtools-mcp)
+[![npm downloads](https://img.shields.io/npm/dm/@mcp-b/chrome-devtools-mcp?style=flat-square)](https://www.npmjs.com/package/@mcp-b/chrome-devtools-mcp)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=flat-square)](https://opensource.org/licenses/Apache-2.0)
+[![28 Tools](https://img.shields.io/badge/MCP_Tools-28-green?style=flat-square)](./docs/tool-reference.md)
+[![Chrome](https://img.shields.io/badge/Chrome-DevTools-4285F4?style=flat-square&logo=googlechrome)](https://developer.chrome.com/docs/devtools/)
 
 📖 **[WebMCP Documentation](https://docs.mcp-b.ai)** | 🚀 **[Quick Start](https://docs.mcp-b.ai/quickstart)** | 🔌 **[Connecting Agents](https://docs.mcp-b.ai/connecting-agents)**
+
+**@mcp-b/chrome-devtools-mcp** lets AI coding agents like Claude, Gemini, Cursor, and Copilot control and inspect a live Chrome browser via the Model Context Protocol (MCP). Get performance insights, debug network requests, take screenshots, and interact with website-specific MCP tools through WebMCP integration.
 
 > **Note:** This is a fork of [ChromeDevTools/chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp)
 > published under the `@mcp-b` scope. It includes WebMCP integration for connecting to MCP tools
 > registered on webpages. The original project is developed by Google LLC and the ChromeDevTools team.
 > See [NOTICE](./NOTICE) for attribution details.
 
-`@mcp-b/chrome-devtools-mcp` lets your coding agent (such as Gemini, Claude, Cursor or Copilot)
-control and inspect a live Chrome browser. It acts as a Model-Context-Protocol
-(MCP) server, giving your AI coding assistant access to the full power of
-Chrome DevTools for reliable automation, in-depth debugging, and performance analysis.
+## Why Use @mcp-b/chrome-devtools-mcp?
+
+| Feature | Benefit |
+|---------|---------|
+| **28 MCP Tools** | Comprehensive browser control - navigation, input, screenshots, performance, debugging |
+| **WebMCP Integration** | Connect to website-specific AI tools via `@mcp-b/global` |
+| **Performance Analysis** | Chrome DevTools-powered performance insights and trace recording |
+| **Reliable Automation** | Puppeteer-based with automatic waiting for action results |
+| **Works with All MCP Clients** | Claude, Cursor, Copilot, Gemini CLI, VS Code, Windsurf, and more |
 
 ## [Tool reference](./docs/tool-reference.md) | [Changelog](./CHANGELOG.md) | [Contributing](./CONTRIBUTING.md) | [Troubleshooting](./docs/troubleshooting.md) | [Design Principles](./docs/design-principles.md)
 

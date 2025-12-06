@@ -1,24 +1,44 @@
 {
   "name": "@mcp-b/transports",
   "version": "1.1.2-beta.2",
-  "description": "Transports for the in browser transport protocols",
+  "description": "Browser transport implementations for Model Context Protocol (MCP) - postMessage, Chrome extension messaging, and iframe communication for AI agents and LLMs",
   "keywords": [
     "mcp",
     "model-context-protocol",
     "browser",
     "transport",
     "browser-extension",
-    "tab-transport",
-    "chrome-extension"
+    "chrome-extension",
+    "postmessage",
+    "iframe",
+    "ai-agents",
+    "llm",
+    "claude",
+    "chatgpt",
+    "openai",
+    "anthropic",
+    "browser-automation",
+    "web-ai",
+    "ai-tools",
+    "message-passing",
+    "cross-origin",
+    "webmcp",
+    "ai-assistant",
+    "mcp-transport",
+    "mcp-client",
+    "mcp-server",
+    "gemini",
+    "cursor",
+    "copilot"
   ],
-  "homepage": "https://github.com/MiguelsPizza/WebMCP#readme",
+  "homepage": "https://docs.mcp-b.ai/packages/transports",
   "bugs": {
-    "url": "https://github.com/MiguelsPizza/WebMCP/issues"
+    "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/MiguelsPizza/WebMCP.git",
-    "directory": "packages/transports"
+    "url": "git+https://github.com/WebMCP-org/npm-packages.git",
+    "directory": "transports"
   },
   "license": "MIT",
   "author": "Alex Nahas",

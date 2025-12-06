@@ -1,7 +1,7 @@
 {
   "name": "@mcp-b/extension-tools",
   "version": "0.2.4-beta.1",
-  "description": "Chrome Extension API tools for Model Context Protocol (MCP) - provides MCP-compatible wrappers for browser extension APIs",
+  "description": "62+ Chrome Extension API tools for Model Context Protocol (MCP) - Let AI agents control tabs, bookmarks, history, storage, and more",
   "keywords": [
     "mcp",
     "model-context-protocol",
@@ -12,16 +12,34 @@
     "tabs-api",
     "bookmarks-api",
     "storage-api",
-    "browser-automation"
+    "browser-automation",
+    "ai-agents",
+    "llm",
+    "claude",
+    "chatgpt",
+    "openai",
+    "anthropic",
+    "cursor",
+    "copilot",
+    "gemini",
+    "webmcp",
+    "chrome-tabs",
+    "chrome-history",
+    "chrome-cookies",
+    "chrome-scripting",
+    "ai-browser-control",
+    "manifest-v3",
+    "browser-control",
+    "automation"
   ],
-  "homepage": "https://github.com/MiguelsPizza/WebMCP/tree/main/packages/extension-tools#readme",
+  "homepage": "https://docs.mcp-b.ai/packages/extension-tools",
   "bugs": {
-    "url": "https://github.com/MiguelsPizza/WebMCP/issues"
+    "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/MiguelsPizza/WebMCP.git",
-    "directory": "packages/extension-tools"
+    "url": "git+https://github.com/WebMCP-org/npm-packages.git",
+    "directory": "extension-tools"
   },
   "license": "MIT",
   "author": "Alex Nahas",

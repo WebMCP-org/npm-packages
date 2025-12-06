@@ -1,13 +1,35 @@
 # @mcp-b/extension-tools
 
-> MCP wrappers for 62+ Chrome Extension APIs enabling protocol-based browser control
+> 62+ Chrome Extension API tools for Model Context Protocol - Let Claude, ChatGPT, and Gemini control your browser
 
 [![npm version](https://img.shields.io/npm/v/@mcp-b/extension-tools?style=flat-square)](https://www.npmjs.com/package/@mcp-b/extension-tools)
+[![npm downloads](https://img.shields.io/npm/dm/@mcp-b/extension-tools?style=flat-square)](https://www.npmjs.com/package/@mcp-b/extension-tools)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue?style=flat-square)](https://www.typescriptlang.org/)
+[![Chrome APIs](https://img.shields.io/badge/Chrome_APIs-62+-4285F4?style=flat-square&logo=googlechrome)](https://developer.chrome.com/docs/extensions/reference/)
 
 📖 **[Full Documentation](https://docs.mcp-b.ai/packages/extension-tools)** | 🚀 **[Quick Start](https://docs.mcp-b.ai/quickstart)**
 
-Chrome Extension API tools for Model Context Protocol (MCP) - provides MCP-compatible wrappers for browser extension APIs.
+**@mcp-b/extension-tools** exposes Chrome Extension APIs as MCP tools, enabling AI agents like Claude, ChatGPT, Gemini, Cursor, and Copilot to control browser tabs, manage bookmarks, access history, execute scripts, and more.
+
+## Why Use @mcp-b/extension-tools?
+
+| Feature | Benefit |
+|---------|---------|
+| **62+ Chrome APIs** | Comprehensive coverage of Chrome Extension APIs |
+| **AI-Ready** | Built for MCP, the standard for AI tool integration |
+| **Granular Control** | Enable only the APIs your extension needs |
+| **Permission Aware** | Automatic permission checking and clear error messages |
+| **Manifest V3** | Full support for Chrome's latest extension platform |
+| **TypeScript** | Complete type definitions for all 62+ APIs |
+
+## Use Cases
+
+- **AI Browser Assistants**: Let AI agents manage tabs, bookmarks, and browsing history
+- **Automated Testing**: AI-driven browser automation and testing
+- **Research Tools**: AI can search history, manage reading lists, and organize bookmarks
+- **Productivity Extensions**: AI helps with tab management, session saving, and workflow automation
+- **Enterprise Tools**: AI-powered browser management and policy enforcement
 
 ## Overview
 
@@ -520,10 +542,55 @@ This package is written in TypeScript and includes full type definitions for all
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
+## Frequently Asked Questions
+
+### Which AI agents can use these tools?
+
+Any MCP-compatible client, including:
+- **Claude Desktop** and Claude.ai
+- **Cursor** IDE
+- **VS Code Copilot**
+- **Gemini** applications
+- **Windsurf**, **Cline**, and other MCP clients
+
+### Do I need to enable all 62 APIs?
+
+No! Each API tool class accepts configuration options. Enable only what you need:
+
+```typescript
+new TabsApiTools(server, {
+  listActiveTabs: true,  // Only enable tab listing
+  createTab: false,      // Disable tab creation
+});
+```
+
+### Is Manifest V3 supported?
+
+Yes! All tools are compatible with Chrome's Manifest V3 extension platform.
+
+### How do AI agents connect to my extension?
+
+Use `@mcp-b/transports` for in-browser communication, or expose a WebSocket server for desktop AI agents.
+
+### What about Firefox and Edge?
+
+The APIs target Chrome, but many also work in Firefox (via WebExtensions) and Edge (Chromium-based). Check browser compatibility for specific APIs.
+
+## Comparison with Alternatives
+
+| Feature | @mcp-b/extension-tools | Raw Chrome APIs | Puppeteer |
+|---------|------------------------|-----------------|-----------|
+| MCP Protocol Support | Yes | No | No |
+| Type Safety | Full TypeScript | Partial | Full |
+| Permission Handling | Automatic | Manual | N/A |
+| Error Formatting | Structured | Raw | Varies |
+| AI Agent Ready | Yes | Manual | Manual |
+
 ## Related Packages
 
 - [`@mcp-b/transports`](https://docs.mcp-b.ai/packages/transports) - Browser-specific MCP transports
 - [`@mcp-b/global`](https://docs.mcp-b.ai/packages/global) - W3C Web Model Context API polyfill
+- [`@mcp-b/chrome-devtools-mcp`](https://docs.mcp-b.ai/packages/chrome-devtools-mcp) - Connect desktop AI agents to browser
 - [`@modelcontextprotocol/sdk`](https://www.npmjs.com/package/@modelcontextprotocol/sdk) - Official MCP SDK
 
 ## Resources
@@ -531,6 +598,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 - [WebMCP Documentation](https://docs.mcp-b.ai)
 - [Model Context Protocol Spec](https://modelcontextprotocol.io)
 - [Chrome Extension APIs](https://developer.chrome.com/docs/extensions/reference/)
+- [MCP GitHub Repository](https://github.com/modelcontextprotocol)
 
 ## License
 
@@ -540,3 +608,4 @@ MIT - see [LICENSE](../../LICENSE) for details
 
 - [GitHub Issues](https://github.com/WebMCP-org/npm-packages/issues)
 - [Documentation](https://docs.mcp-b.ai)
+- [Discord Community](https://discord.gg/a9fBR6Bw)

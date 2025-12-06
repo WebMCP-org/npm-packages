@@ -1,13 +1,35 @@
 # @mcp-b/smart-dom-reader
 
-> Token-efficient DOM extraction library for AI-powered browser automation
+> Token-efficient DOM extraction for AI agents - Extract interactive elements, semantic structure, and stable CSS selectors for LLM-powered browser automation
 
 [![npm version](https://img.shields.io/npm/v/@mcp-b/smart-dom-reader?style=flat-square)](https://www.npmjs.com/package/@mcp-b/smart-dom-reader)
+[![npm downloads](https://img.shields.io/npm/dm/@mcp-b/smart-dom-reader?style=flat-square)](https://www.npmjs.com/package/@mcp-b/smart-dom-reader)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue?style=flat-square)](https://www.typescriptlang.org/)
+[![Zero Dependencies](https://img.shields.io/badge/Dependencies-0-green?style=flat-square)](https://bundlephobia.com/package/@mcp-b/smart-dom-reader)
 
 📖 **[Full Documentation](https://docs.mcp-b.ai/packages/smart-dom-reader)** | 🚀 **[Quick Start](https://docs.mcp-b.ai/quickstart)**
 
-A stateless, token-efficient TypeScript library for extracting DOM information optimized for AI-powered userscript generation. Combines wisdom from multiple DOM extraction approaches to provide intelligent, context-aware element extraction.
+**@mcp-b/smart-dom-reader** extracts DOM structure optimized for AI/LLM consumption. Get stable CSS selectors, interactive elements, and semantic page structure while minimizing token usage. Perfect for AI-powered browser automation, userscript generation, and web scraping with Claude, ChatGPT, or any LLM.
+
+## Why Use @mcp-b/smart-dom-reader?
+
+| Feature | Benefit |
+|---------|---------|
+| **Token-Efficient** | Progressive extraction minimizes LLM context window usage |
+| **Stable Selectors** | Ranked CSS selectors (ID > data-testid > ARIA > classes) for reliable automation |
+| **AI-Optimized Output** | Structured data designed for LLM understanding |
+| **Zero Dependencies** | Lightweight, runs in any browser environment |
+| **Shadow DOM Support** | Traverses shadow roots and iframes |
+| **Stateless API** | Works with any document context - Puppeteer, Playwright, browser extensions |
+
+## Use Cases
+
+- **AI Browser Automation**: Generate robust selectors for Puppeteer/Playwright scripts
+- **Userscript Generation**: LLMs create browser automation scripts with stable selectors
+- **Web Scraping**: Extract structured data with semantic context for AI processing
+- **Test Automation**: Generate reliable test selectors with multiple fallback strategies
+- **Accessibility Analysis**: Extract ARIA labels, roles, and semantic landmarks
 
 ## Key Features
 
@@ -374,6 +396,56 @@ This library is designed to provide:
 7. **Context Preservation**: Maintains element relationships
 8. **Framework Agnostic**: Works with any web application
 
+## Frequently Asked Questions
+
+### How is this different from Cheerio or jsdom?
+
+This library is **AI-optimized**:
+- Outputs structured data designed for LLM consumption
+- Provides ranked selectors with stability scores
+- Progressive extraction minimizes token usage
+- Preserves semantic context (landmarks, forms, interactivity)
+
+### Can I use this with Puppeteer/Playwright?
+
+Yes! The library is stateless - pass any `document` object:
+
+```typescript
+const page = await browser.newPage();
+await page.goto('https://example.com');
+const result = await page.evaluate(() => {
+  return SmartDOMReader.extractInteractive(document);
+});
+```
+
+### How do selector rankings work?
+
+Selectors are ranked by stability (higher = more reliable):
+1. **ID selectors** (score: 100) - `#unique-id`
+2. **data-testid** (score: 90) - `[data-testid="submit"]`
+3. **ARIA** (score: 80) - `[role="button"][aria-label="Submit"]`
+4. **Name/ID attributes** (score: 70) - `input[name="email"]`
+5. **Class paths** (score: 50) - `.form-container .submit-btn`
+
+### Does it handle Shadow DOM?
+
+Yes! Set `includeShadowDOM: true` to traverse shadow roots.
+
+### What's the token overhead vs raw HTML?
+
+Progressive extraction can reduce token usage by 80-95% compared to raw HTML, depending on the page and what you extract.
+
+## Comparison with Alternatives
+
+| Feature | @mcp-b/smart-dom-reader | Cheerio | jsdom | Raw DOM |
+|---------|-------------------------|---------|-------|---------|
+| AI-Optimized Output | Yes | No | No | No |
+| Ranked Selectors | Yes | No | No | No |
+| Token Efficiency | Progressive | N/A | N/A | N/A |
+| Shadow DOM | Yes | No | Limited | Yes |
+| Browser Environment | Native | Parse only | Simulated | Native |
+| Zero Dependencies | Yes | No | No | Yes |
+
 ## Credits
 
 Inspired by:
@@ -385,12 +457,14 @@ Inspired by:
 
 - [`@mcp-b/global`](https://docs.mcp-b.ai/packages/global) - W3C Web Model Context API polyfill
 - [`@mcp-b/transports`](https://docs.mcp-b.ai/packages/transports) - Browser-specific MCP transports
+- [`@mcp-b/chrome-devtools-mcp`](https://docs.mcp-b.ai/packages/chrome-devtools-mcp) - Connect desktop AI agents to browser
 - [`@modelcontextprotocol/sdk`](https://www.npmjs.com/package/@modelcontextprotocol/sdk) - Official MCP SDK
 
 ## Resources
 
 - [WebMCP Documentation](https://docs.mcp-b.ai)
 - [Model Context Protocol Spec](https://modelcontextprotocol.io)
+- [MCP GitHub Repository](https://github.com/modelcontextprotocol)
 
 ## License
 
@@ -400,6 +474,7 @@ MIT - see [LICENSE](../../LICENSE) for details
 
 - [GitHub Issues](https://github.com/WebMCP-org/npm-packages/issues)
 - [Documentation](https://docs.mcp-b.ai)
+- [Discord Community](https://discord.gg/a9fBR6Bw)
 
 ## MCP Server (Golden Path)
 
