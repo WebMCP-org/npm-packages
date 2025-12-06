@@ -1,7 +1,7 @@
 {
   "name": "@mcp-b/smart-dom-reader",
   "version": "1.0.3-beta.1",
-  "description": "Token-efficient DOM extraction library for AI-powered browser automation",
+  "description": "Token-efficient DOM extraction for AI agents - Extract interactive elements, semantic structure, and stable CSS selectors for LLM-powered browser automation",
   "keywords": [
     "mcp",
     "model-context-protocol",
@@ -11,16 +11,34 @@
     "ai",
     "selector",
     "interactive",
-    "semantic"
+    "semantic",
+    "llm",
+    "claude",
+    "chatgpt",
+    "openai",
+    "anthropic",
+    "web-scraping",
+    "css-selector",
+    "xpath",
+    "browser-automation",
+    "puppeteer",
+    "playwright",
+    "ai-agents",
+    "token-efficient",
+    "dom-parser",
+    "web-ai",
+    "userscript",
+    "shadow-dom",
+    "iframe"
   ],
-  "homepage": "https://github.com/MiguelsPizza/WebMCP#readme",
+  "homepage": "https://docs.mcp-b.ai/packages/smart-dom-reader",
   "bugs": {
-    "url": "https://github.com/MiguelsPizza/WebMCP/issues"
+    "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/MiguelsPizza/WebMCP.git",
-    "directory": "packages/smart-dom-reader"
+    "url": "git+https://github.com/WebMCP-org/npm-packages.git",
+    "directory": "smart-dom-reader"
   },
   "license": "MIT",
   "author": "Alex Nahas",

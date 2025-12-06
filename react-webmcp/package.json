@@ -1,7 +1,7 @@
 {
   "name": "@mcp-b/react-webmcp",
   "version": "0.1.6-beta.2",
-  "description": "React hooks for Model Context Protocol - register tools via navigator.modelContext and consume tools from MCP servers",
+  "description": "React hooks for Model Context Protocol (MCP) - expose React components as AI tools for Claude, ChatGPT, Cursor, and Copilot with Zod validation",
   "keywords": [
     "mcp",
     "model-context-protocol",
@@ -10,18 +10,36 @@
     "react-hooks",
     "browser",
     "ai",
-    "assistant",
-    "tools",
-    "zod"
+    "ai-tools",
+    "ai-agents",
+    "llm",
+    "claude",
+    "chatgpt",
+    "openai",
+    "anthropic",
+    "cursor",
+    "copilot",
+    "gemini",
+    "zod",
+    "typescript",
+    "webmcp",
+    "navigator-modelcontext",
+    "tool-registration",
+    "ai-assistant",
+    "react-ai",
+    "ai-integration",
+    "mcp-client",
+    "mcp-server",
+    "web-ai"
   ],
-  "homepage": "https://github.com/WebMCP-org/WebMCP#readme",
+  "homepage": "https://docs.mcp-b.ai/packages/react-webmcp",
   "bugs": {
-    "url": "https://github.com/WebMCP-org/WebMCP/issues"
+    "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/WebMCP-org/WebMCP.git",
-    "directory": "packages/react-webmcp"
+    "url": "git+https://github.com/WebMCP-org/npm-packages.git",
+    "directory": "react-webmcp"
   },
   "license": "MIT",
   "author": "WebMCP Team",

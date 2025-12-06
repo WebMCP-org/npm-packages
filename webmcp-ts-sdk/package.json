@@ -1,7 +1,7 @@
 {
   "name": "@mcp-b/webmcp-ts-sdk",
   "version": "1.0.2-beta.1",
-  "description": "TypeScript SDK adapter for Model Context Protocol with dynamic tool registration support for browsers",
+  "description": "Browser-adapted MCP TypeScript SDK - Dynamic tool registration for W3C Web Model Context API and AI agent integration",
   "keywords": [
     "mcp",
     "model-context-protocol",
@@ -10,17 +10,32 @@
     "sdk",
     "adapter",
     "web-model-context",
-    "navigator.modelContext",
-    "w3c"
+    "navigator-modelcontext",
+    "w3c",
+    "ai-agents",
+    "llm",
+    "claude",
+    "chatgpt",
+    "openai",
+    "anthropic",
+    "cursor",
+    "copilot",
+    "gemini",
+    "webmcp",
+    "dynamic-tools",
+    "mcp-server",
+    "mcp-client",
+    "tool-registration",
+    "ai-integration"
   ],
-  "homepage": "https://github.com/MiguelsPizza/WebMCP#readme",
+  "homepage": "https://docs.mcp-b.ai/packages/webmcp-ts-sdk",
   "bugs": {
-    "url": "https://github.com/MiguelsPizza/WebMCP/issues"
+    "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/MiguelsPizza/WebMCP.git",
-    "directory": "packages/webmcp-ts-sdk"
+    "url": "git+https://github.com/WebMCP-org/npm-packages.git",
+    "directory": "webmcp-ts-sdk"
   },
   "license": "MIT",
   "author": "Alex Nahas",

@@ -1,11 +1,26 @@
 # @mcp-b/webmcp-ts-sdk
 
-> Browser-adapted Model Context Protocol TypeScript SDK supporting dynamic tool registration
+> Browser-adapted MCP TypeScript SDK - Dynamic tool registration for AI agents like Claude, ChatGPT, and Gemini
 
 [![npm version](https://img.shields.io/npm/v/@mcp-b/webmcp-ts-sdk?style=flat-square)](https://www.npmjs.com/package/@mcp-b/webmcp-ts-sdk)
+[![npm downloads](https://img.shields.io/npm/dm/@mcp-b/webmcp-ts-sdk?style=flat-square)](https://www.npmjs.com/package/@mcp-b/webmcp-ts-sdk)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue?style=flat-square)](https://www.typescriptlang.org/)
+[![Minimal Code](https://img.shields.io/badge/Custom_Code-~50_lines-green?style=flat-square)](https://github.com/WebMCP-org/npm-packages)
 
 📖 **[Full Documentation](https://docs.mcp-b.ai/packages/webmcp-ts-sdk)** | 🚀 **[Quick Start](https://docs.mcp-b.ai/quickstart)**
+
+**@mcp-b/webmcp-ts-sdk** adapts the official MCP TypeScript SDK for browser environments, enabling dynamic tool registration required by the W3C Web Model Context API. This allows AI agents like Claude, ChatGPT, Gemini, Cursor, and Copilot to interact with browser-based applications.
+
+## Why Use @mcp-b/webmcp-ts-sdk?
+
+| Feature | Benefit |
+|---------|---------|
+| **Dynamic Tool Registration** | Register tools after transport connection - required for browser apps |
+| **Minimal Overhead** | Only ~50 lines of custom code on top of official SDK |
+| **Full SDK Compatibility** | Re-exports all types, classes, and utilities from official SDK |
+| **Type-Safe** | No prototype hacks - clean TypeScript extension |
+| **Auto-Updates** | Types and protocol follow official SDK automatically |
 
 ## Overview
 
@@ -160,10 +175,30 @@ When the official SDK updates:
 
 The modification is minimal and unlikely to conflict with upstream changes.
 
+## Frequently Asked Questions
+
+### Why can't I use the official SDK directly?
+
+The official SDK throws an error if you try to register tools after connecting a transport. Browsers need dynamic registration because tools arrive asynchronously as the page loads.
+
+### Is this a fork of the official SDK?
+
+No - it's a thin adapter (~50 lines) that extends the official SDK. All types, protocol handling, and validation come from the upstream package.
+
+### Will this break when the official SDK updates?
+
+Unlikely. The modification is minimal and isolated. When upstream updates, just update your dependencies - the wrapper adapts automatically.
+
+### When should I use this vs `@mcp-b/global`?
+
+Use `@mcp-b/global` for the standard `navigator.modelContext` API. Use this package directly only if you need low-level control over the MCP server.
+
 ## Related Packages
 
-- [`@mcp-b/global`](https://docs.mcp-b.ai/packages/global) - W3C Web Model Context API implementation (uses this package)
+- [`@mcp-b/global`](https://docs.mcp-b.ai/packages/global) - W3C Web Model Context API polyfill (uses this package internally)
 - [`@mcp-b/transports`](https://docs.mcp-b.ai/packages/transports) - Browser-specific MCP transports
+- [`@mcp-b/react-webmcp`](https://docs.mcp-b.ai/packages/react-webmcp) - React hooks for MCP
+- [`@mcp-b/chrome-devtools-mcp`](https://docs.mcp-b.ai/packages/chrome-devtools-mcp) - Connect desktop AI agents to browser tools
 - [`@modelcontextprotocol/sdk`](https://www.npmjs.com/package/@modelcontextprotocol/sdk) - Official MCP SDK
 
 ## Resources
@@ -172,6 +207,7 @@ The modification is minimal and unlikely to conflict with upstream changes.
 - [Web Model Context API Explainer](https://github.com/nicolo-ribaudo/model-context-protocol-api)
 - [Model Context Protocol Spec](https://modelcontextprotocol.io/)
 - [Official MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk)
+- [MCP GitHub Repository](https://github.com/modelcontextprotocol)
 
 ## License
 
@@ -181,3 +217,4 @@ MIT - see [LICENSE](../../LICENSE) for details
 
 - [GitHub Issues](https://github.com/WebMCP-org/npm-packages/issues)
 - [Documentation](https://docs.mcp-b.ai)
+- [Discord Community](https://discord.gg/a9fBR6Bw)

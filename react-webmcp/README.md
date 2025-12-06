@@ -1,13 +1,34 @@
 # @mcp-b/react-webmcp
 
-> React hooks for Model Context Protocol with automatic lifecycle management and Zod validation
+> React hooks for Model Context Protocol (MCP) - Let AI agents like Claude, ChatGPT, Cursor, and Copilot control your React components
 
 [![npm version](https://img.shields.io/npm/v/@mcp-b/react-webmcp?style=flat-square)](https://www.npmjs.com/package/@mcp-b/react-webmcp)
+[![npm downloads](https://img.shields.io/npm/dm/@mcp-b/react-webmcp?style=flat-square)](https://www.npmjs.com/package/@mcp-b/react-webmcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue?style=flat-square)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-18+-61DAFB?style=flat-square&logo=react)](https://reactjs.org/)
 
 📖 **[Full Documentation](https://docs.mcp-b.ai/packages/react-webmcp)** | 🚀 **[Quick Start](https://docs.mcp-b.ai/quickstart)** | ⚛️ **[AI Framework Integration](https://docs.mcp-b.ai/ai-frameworks)**
 
-Complete React hooks for the Model Context Protocol - register tools via `navigator.modelContext` and consume tools from MCP servers.
+**@mcp-b/react-webmcp** provides React hooks that expose your components as AI-callable tools via the Model Context Protocol. Build AI-powered React applications where Claude, ChatGPT, Gemini, Cursor, and Copilot can interact with your app's functionality.
+
+## Why Use @mcp-b/react-webmcp?
+
+| Feature | Benefit |
+|---------|---------|
+| **React-First Design** | Hooks follow React patterns with automatic cleanup and StrictMode support |
+| **Type-Safe with Zod** | Full TypeScript support with Zod schema validation for inputs/outputs |
+| **Two-Way Integration** | Both expose tools TO AI agents AND consume tools FROM MCP servers |
+| **Execution State Tracking** | Built-in loading, success, and error states for UI feedback |
+| **Works with Any AI** | Compatible with Claude, ChatGPT, Gemini, Cursor, Copilot, and any MCP client |
+
+## Use Cases
+
+- **AI-Controllable Dashboards**: Let AI agents filter data, generate reports, and navigate views
+- **Form Automation**: Expose form submission as tools for AI-powered data entry
+- **E-commerce Integration**: AI agents can search products, add to cart, and checkout
+- **Content Management**: Let AI edit, publish, and organize content in your CMS
+- **Data Visualization**: AI can adjust chart parameters, zoom, and export visualizations
 
 ## Features
 
@@ -476,10 +497,60 @@ function MyApp() {
 - Use `useWebMCPContext` for lightweight read-only data exposure
 - Client automatically manages reconnection and tool list updates
 
+## Frequently Asked Questions
+
+### What AI agents can use my React tools?
+
+Any MCP-compatible client can discover and call your tools, including:
+- **Claude Desktop** and Claude.ai
+- **ChatGPT** (via plugins/GPTs)
+- **Cursor** IDE
+- **VS Code Copilot**
+- **Gemini** applications
+- **Windsurf**, **Cline**, and other MCP clients
+
+### How do AI agents connect to my React app?
+
+AI agents connect via browser extensions or the `@mcp-b/chrome-devtools-mcp` server, which bridges desktop AI clients to browser-based MCP tools.
+
+### Is this production-ready?
+
+Yes! The hooks handle React StrictMode, automatic cleanup, and proper lifecycle management. Tools are automatically unregistered when components unmount.
+
+### Can I use this with Next.js / Remix / Gatsby?
+
+Yes! These hooks work with any React framework. Just ensure `@mcp-b/global` is loaded on the client side.
+
+### How do I validate tool inputs?
+
+Use Zod schemas in `inputSchema`. Invalid inputs are automatically rejected with descriptive error messages.
+
+```tsx
+inputSchema: {
+  email: z.string().email().describe('User email address'),
+  age: z.number().min(0).max(120).describe('User age')
+}
+```
+
+### Can tools access React state?
+
+Yes! Tool handlers have access to component state via closures. State updates trigger re-renders as expected.
+
+## Comparison with Alternatives
+
+| Feature | @mcp-b/react-webmcp | Raw MCP SDK | Custom Implementation |
+|---------|---------------------|-------------|----------------------|
+| React Lifecycle Integration | Automatic | Manual | Manual |
+| StrictMode Support | Yes | N/A | Manual |
+| Zod Schema Validation | Built-in | Manual | Manual |
+| Execution State Tracking | Built-in | Manual | Manual |
+| TypeScript Support | Full | Partial | Varies |
+
 ## Related Packages
 
-- [`@mcp-b/global`](https://docs.mcp-b.ai/packages/global) - W3C Web Model Context API polyfill
+- [`@mcp-b/global`](https://docs.mcp-b.ai/packages/global) - W3C Web Model Context API polyfill (required for provider hooks)
 - [`@mcp-b/transports`](https://docs.mcp-b.ai/packages/transports) - Browser-specific MCP transports
+- [`@mcp-b/chrome-devtools-mcp`](https://docs.mcp-b.ai/packages/chrome-devtools-mcp) - Connect desktop AI agents to browser tools
 - [`@modelcontextprotocol/sdk`](https://www.npmjs.com/package/@modelcontextprotocol/sdk) - Official MCP SDK
 
 ## Resources
@@ -488,6 +559,7 @@ function MyApp() {
 - [AI Framework Integration](https://docs.mcp-b.ai/ai-frameworks)
 - [Best Practices](https://docs.mcp-b.ai/best-practices)
 - [Model Context Protocol Spec](https://modelcontextprotocol.io)
+- [MCP GitHub Repository](https://github.com/modelcontextprotocol)
 
 ## License
 
@@ -497,3 +569,4 @@ MIT - see [LICENSE](../../LICENSE) for details
 
 - [GitHub Issues](https://github.com/WebMCP-org/npm-packages/issues)
 - [Documentation](https://docs.mcp-b.ai)
+- [Discord Community](https://discord.gg/a9fBR6Bw)

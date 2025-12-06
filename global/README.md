@@ -1,13 +1,35 @@
 # @mcp-b/global
 
-> W3C Web Model Context API polyfill implementing `navigator.modelContext`
+> W3C Web Model Context API polyfill - Let Claude, ChatGPT, Gemini, and other AI agents interact with your website
 
 [![npm version](https://img.shields.io/npm/v/@mcp-b/global?style=flat-square)](https://www.npmjs.com/package/@mcp-b/global)
+[![npm downloads](https://img.shields.io/npm/dm/@mcp-b/global?style=flat-square)](https://www.npmjs.com/package/@mcp-b/global)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+[![Bundle Size](https://img.shields.io/badge/IIFE-285KB-blue?style=flat-square)](https://bundlephobia.com/package/@mcp-b/global)
+[![W3C](https://img.shields.io/badge/W3C-Web_Model_Context-005A9C?style=flat-square)](https://github.com/nicolo-ribaudo/model-context-protocol-api)
 
 📖 **[Full Documentation](https://docs.mcp-b.ai/packages/global)** | 🚀 **[Quick Start](https://docs.mcp-b.ai/quickstart)** | 🔧 **[Tool Registration](https://docs.mcp-b.ai/concepts/tool-registration)**
 
-This package implements the [W3C Web Model Context API](https://github.com/nicolo-ribaudo/model-context-protocol-api) (`window.navigator.modelContext`) specification, bridging it to the Model Context Protocol (MCP) SDK. It allows web developers to expose JavaScript functions as "tools" that AI agents can discover and invoke.
+**@mcp-b/global** implements the [W3C Web Model Context API](https://github.com/nicolo-ribaudo/model-context-protocol-api) (`navigator.modelContext`) specification, allowing AI agents like Claude, ChatGPT, Gemini, Cursor, and Copilot to discover and call functions on your website.
+
+## Why Use @mcp-b/global?
+
+| Feature | Benefit |
+|---------|---------|
+| **W3C Standard** | Implements the emerging Web Model Context API specification |
+| **Drop-in IIFE** | Add AI capabilities with a single `<script>` tag - no build step |
+| **Native Chromium Support** | Auto-detects and uses native browser implementation when available |
+| **Dual Transport** | Works with both same-window clients AND parent pages (iframe support) |
+| **Two-Bucket System** | Manage app-level and component-level tools separately |
+| **Works with Any AI** | Claude, ChatGPT, Gemini, Cursor, Copilot, and any MCP client |
+
+## Use Cases
+
+- **AI-Powered Websites**: Let AI agents search, filter, and interact with your web app
+- **E-commerce Integration**: AI can search products, add to cart, checkout
+- **SaaS Applications**: Expose your app's functionality to AI assistants
+- **Content Management**: Let AI edit, publish, and organize content
+- **Embedded Widgets**: AI tools accessible from parent pages via iframes
 
 ## 🚀 Quick Start
 
@@ -1123,11 +1145,30 @@ Always validate inputs in your tool implementations:
 }
 ```
 
+## Frequently Asked Questions
+
+### How do AI agents connect to my website?
+
+AI agents connect through browser extensions or the `@mcp-b/chrome-devtools-mcp` server, which bridges desktop AI clients to browser-based tools.
+
+### Do I need a build step?
+
+No! Use the IIFE version with a single `<script>` tag. For bundler users, the ESM version is also available.
+
+### Is this production-ready?
+
+Yes! The polyfill handles tool registration, lifecycle management, and automatically uses native Chromium implementation when available.
+
+### What about browser support?
+
+Works in all modern browsers. Native API support is available in Chromium with experimental flags enabled.
+
 ## 🤝 Related Packages
 
 - [`@mcp-b/transports`](https://docs.mcp-b.ai/packages/transports) - MCP transport implementations
 - [`@mcp-b/react-webmcp`](https://docs.mcp-b.ai/packages/react-webmcp) - React hooks for MCP
 - [`@mcp-b/extension-tools`](https://docs.mcp-b.ai/packages/extension-tools) - Chrome Extension API tools
+- [`@mcp-b/chrome-devtools-mcp`](https://docs.mcp-b.ai/packages/chrome-devtools-mcp) - Connect desktop AI agents to browser tools
 - [`@modelcontextprotocol/sdk`](https://www.npmjs.com/package/@modelcontextprotocol/sdk) - Official MCP SDK
 
 ## 📚 Resources
@@ -1135,7 +1176,7 @@ Always validate inputs in your tool implementations:
 - [WebMCP Documentation](https://docs.mcp-b.ai)
 - [Web Model Context API Explainer](https://github.com/nicolo-ribaudo/model-context-protocol-api)
 - [Model Context Protocol Spec](https://modelcontextprotocol.io/)
-- [Microsoft Edge Explainer](https://github.com/nicolo-ribaudo/model-context-protocol-api)
+- [MCP GitHub Repository](https://github.com/modelcontextprotocol)
 
 ## 📝 License
 
