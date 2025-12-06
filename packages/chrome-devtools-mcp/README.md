@@ -82,9 +82,9 @@ Create a WebMCP tool called "search_products" that searches our product catalog
 **Step 2: The AI writes the code in your app**
 ```typescript
 // Your AI agent writes this code
-import { registerTools } from '@mcp-b/global';
+import '@mcp-b/global';
 
-registerTools([{
+navigator.modelContext.registerTool({
   name: 'search_products',
   description: 'Search for products by name or category',
   inputSchema: {
@@ -95,11 +95,13 @@ registerTools([{
     },
     required: ['query']
   },
-  handler: async ({ query, category }) => {
+  async execute({ query, category }) {
     const results = await searchProducts(query, category);
-    return { results };
+    return {
+      content: [{ type: 'text', text: JSON.stringify(results) }]
+    };
   }
-}]);
+});
 ```
 
 **Step 3: Your dev server hot-reloads**
@@ -764,25 +766,25 @@ The webpage must have WebMCP tools registered. Websites do this by using the
 
 ```javascript
 // Example of how a website registers tools (done by the website developer)
-import { registerTools } from '@mcp-b/global';
+import '@mcp-b/global';
 
-registerTools([
-  {
-    name: 'search_products',
-    description: 'Search for products on this website',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        query: { type: 'string', description: 'Search query' }
-      },
-      required: ['query']
+navigator.modelContext.registerTool({
+  name: 'search_products',
+  description: 'Search for products on this website',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      query: { type: 'string', description: 'Search query' }
     },
-    handler: async ({ query }) => {
-      // Implementation
-      return { results: [...] };
-    }
+    required: ['query']
+  },
+  async execute({ query }) {
+    // Implementation
+    return {
+      content: [{ type: 'text', text: JSON.stringify({ results: [...] }) }]
+    };
   }
-]);
+});
 ```
 
 ### Using WebMCP tools
