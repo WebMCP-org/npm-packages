@@ -1,6 +1,6 @@
 # @mcp-b/webmcp-ts-sdk
 
-> Browser-adapted MCP TypeScript SDK - Dynamic tool registration for AI agents like Claude, ChatGPT, and Gemini
+> Browser-optimized MCP TypeScript SDK - Stripped-down re-exports excluding auth and Node.js transports, with dynamic tool registration for AI agents
 
 [![npm version](https://img.shields.io/npm/v/@mcp-b/webmcp-ts-sdk?style=flat-square)](https://www.npmjs.com/package/@mcp-b/webmcp-ts-sdk)
 [![npm downloads](https://img.shields.io/npm/dm/@mcp-b/webmcp-ts-sdk?style=flat-square)](https://www.npmjs.com/package/@mcp-b/webmcp-ts-sdk)
@@ -17,8 +17,9 @@
 | Feature | Benefit |
 |---------|---------|
 | **Dynamic Tool Registration** | Register tools after transport connection - required for browser apps |
+| **Browser-Optimized** | Excludes Node.js-only code (auth, stdio, Express transports) |
 | **Minimal Overhead** | Only ~50 lines of custom code on top of official SDK |
-| **Full SDK Compatibility** | Re-exports all types, classes, and utilities from official SDK |
+| **Selective Re-exports** | Only browser-relevant types and classes exposed |
 | **Type-Safe** | No prototype hacks - clean TypeScript extension |
 | **Auto-Updates** | Types and protocol follow official SDK automatically |
 
@@ -76,24 +77,40 @@ export class BrowserMcpServer extends BaseMcpServer {
 
 **Key Difference**: Capabilities are registered **before** connecting, allowing tools to be added dynamically afterward.
 
-## What's Re-Exported
+## What's Included
 
-This package re-exports almost everything from the official SDK:
+This package provides a **stripped-down** version of the MCP SDK optimized for browser environments:
 
-### Types
-- All MCP protocol types (`Tool`, `Resource`, `Prompt`, etc.)
-- Request/response schemas
-- Client and server capabilities
-- Error codes and constants
+### ✅ Included
 
-### Classes
-- `Server` - Base server class (unchanged)
-- `McpServer` - Aliased to `BrowserMcpServer` with our modifications
+| Category | Exports |
+|----------|---------|
+| **Core Classes** | `Client`, `Server`, `McpServer` (BrowserMcpServer), `Protocol` |
+| **Transports** | `InMemoryTransport` only (for testing and in-process communication) |
+| **Types** | All MCP protocol types (`Tool`, `Resource`, `Prompt`, etc.) |
+| **Schemas** | All Zod validation schemas for requests/responses |
+| **Utilities** | `Transport` interface, `mergeCapabilities`, error codes, protocol constants |
 
-### Utilities
-- `Transport` interface
-- `mergeCapabilities` helper
-- Protocol version constants
+### ❌ Excluded (for browser optimization)
+
+| Category | Why Excluded |
+|----------|--------------|
+| **OAuth/Auth Modules** | Not needed for browser-to-browser MCP communication |
+| **stdio Transport** | Node.js only - requires `child_process` |
+| **SSE Transports** | Server-side Express integration |
+| **Streamable HTTP Transports** | Server-side Express integration |
+| **WebSocket Transport** | Use `@mcp-b/transports` for browser transports instead |
+| **Server Auth Router** | Express middleware - not applicable to browsers |
+| **CLI** | Command-line interface - not for browsers |
+
+### Browser Transports
+
+For browser-specific transports (postMessage, Chrome extension messaging, iframe communication), use **[@mcp-b/transports](https://docs.mcp-b.ai/packages/transports)** alongside this package:
+
+```typescript
+import { McpServer } from '@mcp-b/webmcp-ts-sdk';
+import { TabServerTransport, ExtensionClientTransport } from '@mcp-b/transports';
+```
 
 ## Installation
 
