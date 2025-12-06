@@ -1,11 +1,13 @@
 # @mcp-b/global
 
-> Web Model Context API polyfill - Implement `window.navigator.modelContext` for AI-powered web applications
+> W3C Web Model Context API polyfill implementing `navigator.modelContext`
 
 [![npm version](https://img.shields.io/npm/v/@mcp-b/global?style=flat-square)](https://www.npmjs.com/package/@mcp-b/global)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 
-This package implements the [W3C Web Model Context API](https://github.com/webmachinelearning/webmcp) (`window.navigator.modelContext`) specification, bridging it to the Model Context Protocol (MCP) SDK. It allows web developers to expose JavaScript functions as "tools" that AI agents can discover and invoke.
+📖 **[Full Documentation](https://docs.mcp-b.ai/packages/global)** | 🚀 **[Quick Start](https://docs.mcp-b.ai/quickstart)** | 🔧 **[Tool Registration](https://docs.mcp-b.ai/concepts/tool-registration)**
+
+This package implements the [W3C Web Model Context API](https://github.com/nicolo-ribaudo/model-context-protocol-api) (`window.navigator.modelContext`) specification, bridging it to the Model Context Protocol (MCP) SDK. It allows web developers to expose JavaScript functions as "tools" that AI agents can discover and invoke.
 
 ## 🚀 Quick Start
 
@@ -1123,15 +1125,17 @@ Always validate inputs in your tool implementations:
 
 ## 🤝 Related Packages
 
-- [`@mcp-b/transports`](../transports) - MCP transport implementations
-- [`@mcp-b/mcp-react-hooks`](../mcp-react-hooks) - React hooks for MCP
+- [`@mcp-b/transports`](https://docs.mcp-b.ai/packages/transports) - MCP transport implementations
+- [`@mcp-b/react-webmcp`](https://docs.mcp-b.ai/packages/react-webmcp) - React hooks for MCP
+- [`@mcp-b/extension-tools`](https://docs.mcp-b.ai/packages/extension-tools) - Chrome Extension API tools
 - [`@modelcontextprotocol/sdk`](https://www.npmjs.com/package/@modelcontextprotocol/sdk) - Official MCP SDK
 
 ## 📚 Resources
 
-- [Web Model Context API Explainer](https://github.com/webmachinelearning/webmcp)
+- [WebMCP Documentation](https://docs.mcp-b.ai)
+- [Web Model Context API Explainer](https://github.com/nicolo-ribaudo/model-context-protocol-api)
 - [Model Context Protocol Spec](https://modelcontextprotocol.io/)
-- [Microsoft Edge Explainer](https://github.com/MicrosoftEdge/MSEdgeExplainers/blob/main/WebModelContext/explainer.md)
+- [Microsoft Edge Explainer](https://github.com/nicolo-ribaudo/model-context-protocol-api)
 
 ## 📝 License
 

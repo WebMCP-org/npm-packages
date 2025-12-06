@@ -1,13 +1,15 @@
 # @mcp-b/webmcp-ts-sdk
 
-> Browser-adapted Model Context Protocol TypeScript SDK
+> Browser-adapted Model Context Protocol TypeScript SDK supporting dynamic tool registration
 
 [![npm version](https://img.shields.io/npm/v/@mcp-b/webmcp-ts-sdk?style=flat-square)](https://www.npmjs.com/package/@mcp-b/webmcp-ts-sdk)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 
+📖 **[Full Documentation](https://docs.mcp-b.ai/packages/webmcp-ts-sdk)** | 🚀 **[Quick Start](https://docs.mcp-b.ai/quickstart)**
+
 ## Overview
 
-This package adapts the official [@modelcontextprotocol/sdk](https://www.npmjs.com/package/@modelcontextprotocol/sdk) for browser environments with modifications to support dynamic tool registration required by the [W3C Web Model Context API](https://github.com/webmachinelearning/webmcp) (`window.navigator.modelContext`).
+This package adapts the official [@modelcontextprotocol/sdk](https://www.npmjs.com/package/@modelcontextprotocol/sdk) for browser environments with modifications to support dynamic tool registration required by the [W3C Web Model Context API](https://github.com/nicolo-ribaudo/model-context-protocol-api) (`window.navigator.modelContext`).
 
 ## Why This Package Exists
 
@@ -160,13 +162,14 @@ The modification is minimal and unlikely to conflict with upstream changes.
 
 ## Related Packages
 
-- [`@mcp-b/global`](../global) - W3C Web Model Context API implementation (uses this package)
-- [`@mcp-b/transports`](../transports) - Browser-specific MCP transports
+- [`@mcp-b/global`](https://docs.mcp-b.ai/packages/global) - W3C Web Model Context API implementation (uses this package)
+- [`@mcp-b/transports`](https://docs.mcp-b.ai/packages/transports) - Browser-specific MCP transports
 - [`@modelcontextprotocol/sdk`](https://www.npmjs.com/package/@modelcontextprotocol/sdk) - Official MCP SDK
 
 ## Resources
 
-- [Web Model Context API Explainer](https://github.com/webmachinelearning/webmcp)
+- [WebMCP Documentation](https://docs.mcp-b.ai)
+- [Web Model Context API Explainer](https://github.com/nicolo-ribaudo/model-context-protocol-api)
 - [Model Context Protocol Spec](https://modelcontextprotocol.io/)
 - [Official MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk)
 

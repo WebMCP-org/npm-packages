@@ -1,4 +1,11 @@
-# Smart DOM Reader
+# @mcp-b/smart-dom-reader
+
+> Token-efficient DOM extraction library for AI-powered browser automation
+
+[![npm version](https://img.shields.io/npm/v/@mcp-b/smart-dom-reader?style=flat-square)](https://www.npmjs.com/package/@mcp-b/smart-dom-reader)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+
+📖 **[Full Documentation](https://docs.mcp-b.ai/packages/smart-dom-reader)** | 🚀 **[Quick Start](https://docs.mcp-b.ai/quickstart)**
 
 A stateless, token-efficient TypeScript library for extracting DOM information optimized for AI-powered userscript generation. Combines wisdom from multiple DOM extraction approaches to provide intelligent, context-aware element extraction.
 
@@ -374,9 +381,25 @@ Inspired by:
 - [dom-to-semantic-markdown](https://github.com/romansky/dom-to-semantic-markdown) - Content scoring algorithms
 - [z-context](https://github.com/gwwar/z-context) - Selector generation approaches
 
+## Related Packages
+
+- [`@mcp-b/global`](https://docs.mcp-b.ai/packages/global) - W3C Web Model Context API polyfill
+- [`@mcp-b/transports`](https://docs.mcp-b.ai/packages/transports) - Browser-specific MCP transports
+- [`@modelcontextprotocol/sdk`](https://www.npmjs.com/package/@modelcontextprotocol/sdk) - Official MCP SDK
+
+## Resources
+
+- [WebMCP Documentation](https://docs.mcp-b.ai)
+- [Model Context Protocol Spec](https://modelcontextprotocol.io)
+
 ## License
 
-MIT
+MIT - see [LICENSE](../../LICENSE) for details
+
+## Support
+
+- [GitHub Issues](https://github.com/WebMCP-org/npm-packages/issues)
+- [Documentation](https://docs.mcp-b.ai)
 
 ## MCP Server (Golden Path)
 

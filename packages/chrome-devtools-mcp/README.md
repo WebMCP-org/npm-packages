@@ -1,6 +1,9 @@
-# Chrome DevTools MCP
+# @mcp-b/chrome-devtools-mcp
 
 [![npm @mcp-b/chrome-devtools-mcp package](https://img.shields.io/npm/v/@mcp-b/chrome-devtools-mcp.svg)](https://www.npmjs.com/package/@mcp-b/chrome-devtools-mcp)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=flat-square)](https://opensource.org/licenses/Apache-2.0)
+
+📖 **[WebMCP Documentation](https://docs.mcp-b.ai)** | 🚀 **[Quick Start](https://docs.mcp-b.ai/quickstart)** | 🔌 **[Connecting Agents](https://docs.mcp-b.ai/connecting-agents)**
 
 > **Note:** This is a fork of [ChromeDevTools/chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp)
 > published under the `@mcp-b` scope. It includes WebMCP integration for connecting to MCP tools
@@ -660,3 +663,22 @@ Call the website's form submission tool to fill out the contact form
   Use `list_webmcp_tools` to see the expected input format.
 - **Tools not appearing after navigation**: WebMCP auto-reconnects when you
   navigate. If the new page has different tools, call `list_webmcp_tools` again.
+
+## Related Packages
+
+- [`@mcp-b/global`](https://docs.mcp-b.ai/packages/global) - W3C Web Model Context API polyfill for websites
+- [`@mcp-b/transports`](https://docs.mcp-b.ai/packages/transports) - Browser-specific MCP transports
+- [`@mcp-b/react-webmcp`](https://docs.mcp-b.ai/packages/react-webmcp) - React hooks for MCP
+- [`@modelcontextprotocol/sdk`](https://www.npmjs.com/package/@modelcontextprotocol/sdk) - Official MCP SDK
+
+## Resources
+
+- [WebMCP Documentation](https://docs.mcp-b.ai)
+- [MCP-B Browser Extension](https://docs.mcp-b.ai/extension)
+- [Connecting Agents to WebMCP](https://docs.mcp-b.ai/connecting-agents)
+- [Model Context Protocol Spec](https://modelcontextprotocol.io)
+
+## Support
+
+- [GitHub Issues](https://github.com/WebMCP-org/npm-packages/issues)
+- [WebMCP Documentation](https://docs.mcp-b.ai)

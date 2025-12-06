@@ -1,4 +1,11 @@
-# MCP Browser Transports
+# @mcp-b/transports
+
+> Browser-specific transport implementations for the Model Context Protocol
+
+[![npm version](https://img.shields.io/npm/v/@mcp-b/transports?style=flat-square)](https://www.npmjs.com/package/@mcp-b/transports)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+
+📖 **[Full Documentation](https://docs.mcp-b.ai/packages/transports)** | 🚀 **[Quick Start](https://docs.mcp-b.ai/quickstart)** | 🔌 **[Transport Concepts](https://docs.mcp-b.ai/concepts/transports)**
 
 This library provides MCP `Transport` implementations for browser environments, enabling communication between MCP clients and servers within web pages and browser extensions.
 
@@ -486,3 +493,25 @@ const result = await client.callTool({
 - Server extensions should validate incoming connections from other extensions
 - Configure `allowedOrigins` appropriately for your use case
 - Tools execute in their original context (web page or extension)
+
+## Related Packages
+
+- [`@mcp-b/global`](https://docs.mcp-b.ai/packages/global) - W3C Web Model Context API polyfill
+- [`@mcp-b/react-webmcp`](https://docs.mcp-b.ai/packages/react-webmcp) - React hooks for MCP
+- [`@mcp-b/extension-tools`](https://docs.mcp-b.ai/packages/extension-tools) - Chrome Extension API tools
+- [`@modelcontextprotocol/sdk`](https://www.npmjs.com/package/@modelcontextprotocol/sdk) - Official MCP SDK
+
+## Resources
+
+- [WebMCP Documentation](https://docs.mcp-b.ai)
+- [Transport Concepts](https://docs.mcp-b.ai/concepts/transports)
+- [Model Context Protocol Spec](https://modelcontextprotocol.io)
+
+## License
+
+MIT - see [LICENSE](../../LICENSE) for details
+
+## Support
+
+- [GitHub Issues](https://github.com/WebMCP-org/npm-packages/issues)
+- [Documentation](https://docs.mcp-b.ai)
