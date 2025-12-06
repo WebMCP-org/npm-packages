@@ -20,6 +20,7 @@ import {
   type CallToolResult,
   SetLevelRequestSchema,
 } from './third_party/index.js';
+import {registerPrompts} from './prompts/index.js';
 import {ToolCategory} from './tools/categories.js';
 import type {ToolDefinition} from './tools/ToolDefinition.js';
 import {tools} from './tools/tools.js';
@@ -40,8 +41,11 @@ const server = new McpServer(
     title: 'Chrome DevTools MCP server',
     version: VERSION,
   },
-  {capabilities: {logging: {}}},
+  {capabilities: {logging: {}, prompts: {}}},
 );
+
+// Register WebMCP development prompts
+registerPrompts(server);
 server.server.setRequestHandler(SetLevelRequestSchema, () => {
   return {};
 });

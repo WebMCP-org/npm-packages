@@ -27,6 +27,113 @@
 | **Reliable Automation** | Puppeteer-based with automatic waiting for action results |
 | **Works with All MCP Clients** | Claude, Cursor, Copilot, Gemini CLI, VS Code, Windsurf, and more |
 
+## What's Different from Chrome DevTools MCP?
+
+This fork adds **WebMCP integration** - the ability to call MCP tools that are registered directly on webpages. This unlocks a powerful new workflow:
+
+| Feature | Chrome DevTools MCP | @mcp-b/chrome-devtools-mcp |
+|---------|--------------------|-----------------------------|
+| Browser automation | ✅ | ✅ |
+| Performance analysis | ✅ | ✅ |
+| Network inspection | ✅ | ✅ |
+| Screenshot/snapshot | ✅ | ✅ |
+| **Call website MCP tools** | ❌ | ✅ |
+| **List website MCP tools** | ❌ | ✅ |
+| **AI-driven tool development** | ❌ | ✅ |
+
+The key addition is the `list_webmcp_tools` and `call_webmcp_tool` tools that let your AI agent interact with MCP tools that websites expose via [@mcp-b/global](https://www.npmjs.com/package/@mcp-b/global).
+
+## AI-Driven Development Workflow
+
+One of the most powerful use cases for this package is **AI-driven tool development** - essentially test-driven development for AI agents. Here's how it works:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    AI Development Feedback Loop                     │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│   1. AI writes WebMCP tool code ──────────────────────────┐        │
+│                                                            │        │
+│   2. Dev server hot-reloads ◄─────────────────────────────┘        │
+│                                                                     │
+│   3. AI opens browser via Chrome DevTools MCP                       │
+│            │                                                        │
+│            ▼                                                        │
+│   4. AI calls list_webmcp_tools to see the new tool                 │
+│            │                                                        │
+│            ▼                                                        │
+│   5. AI calls call_webmcp_tool to test it                           │
+│            │                                                        │
+│            ▼                                                        │
+│   6. AI sees results, iterates if needed ───────► Back to step 1    │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Example: Building a Search Tool
+
+Imagine you're building a web app and want to add a search feature exposed as an MCP tool:
+
+**Step 1: Ask your AI agent to create the tool**
+```
+Create a WebMCP tool called "search_products" that searches our product catalog
+```
+
+**Step 2: The AI writes the code in your app**
+```typescript
+// Your AI agent writes this code
+import '@mcp-b/global';
+
+navigator.modelContext.registerTool({
+  name: 'search_products',
+  description: 'Search for products by name or category',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      query: { type: 'string' },
+      category: { type: 'string' }
+    },
+    required: ['query']
+  },
+  async execute({ query, category }) {
+    const results = await searchProducts(query, category);
+    return {
+      content: [{ type: 'text', text: JSON.stringify(results) }]
+    };
+  }
+});
+```
+
+**Step 3: Your dev server hot-reloads**
+
+**Step 4: The AI tests it via Chrome DevTools MCP**
+```
+Navigate to http://localhost:3000 and list the available tools
+```
+
+The AI sees the new `search_products` tool appear.
+
+**Step 5: The AI calls the tool to verify it works**
+```
+Use the search_products tool to search for "headphones"
+```
+
+**Step 6: If something is wrong, the AI iterates**
+
+The AI can see the actual response, fix any bugs, and repeat until it works perfectly.
+
+### Why This Matters
+
+This creates a tight feedback loop where your AI assistant can:
+- **Write** WebMCP tools in your codebase
+- **Deploy** them automatically via hot-reload
+- **Discover** them through `list_webmcp_tools`
+- **Test** them through `call_webmcp_tool`
+- **Debug** issues using console messages and snapshots
+- **Iterate** until the tool works correctly
+
+This is like **TDD for AI** - the AI can build and verify its own tools in real-time.
+
 ## [Tool reference](./docs/tool-reference.md) | [Changelog](./CHANGELOG.md) | [Contributing](./CONTRIBUTING.md) | [Troubleshooting](./docs/troubleshooting.md) | [Design Principles](./docs/design-principles.md)
 
 ## Key features
@@ -45,7 +152,7 @@
 
 ## Disclaimers
 
-`chrome-devtools-mcp` exposes content of the browser instance to the MCP clients
+`@mcp-b/chrome-devtools-mcp` exposes content of the browser instance to the MCP clients
 allowing them to inspect, debug, and modify any data in the browser or DevTools.
 Avoid sharing sensitive or personal information that you don't want to share with
 MCP clients.
@@ -183,9 +290,9 @@ Configure the following fields and press `CTRL+S` to save the configuration:
 
 **Click the button to install:**
 
-[<img src="https://mcpbadge.dev/badge-install-in-vs-code-stable-dark" alt="Install in VS Code">](https://vscode.dev/redirect/mcp/install?name=io.github.ChromeDevTools%2Fchrome-devtools-mcp&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22chrome-devtools-mcp%22%5D%2C%22env%22%3A%7B%7D%7D)
+[<img src="https://mcpbadge.dev/badge-install-in-vs-code-stable-dark" alt="Install in VS Code">](https://vscode.dev/redirect/mcp/install?name=%40mcp-b%2Fchrome-devtools-mcp&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40mcp-b%2Fchrome-devtools-mcp%40latest%22%5D%2C%22env%22%3A%7B%7D%7D)
 
-[<img src="https://mcpbadge.dev/badge-install-in-vs-code-insiders-dark" alt="Install in VS Code Insiders">](https://insiders.vscode.dev/redirect?url=vscode-insiders%3Amcp%2Finstall%3F%257B%2522name%2522%253A%2522io.github.ChromeDevTools%252Fchrome-devtools-mcp%2522%252C%2522config%2522%253A%257B%2522command%2522%253A%2522npx%2522%252C%2522args%2522%253A%255B%2522-y%2522%252C%2522chrome-devtools-mcp%2522%255D%252C%2522env%2522%253A%257B%257D%257D%257D)
+[<img src="https://mcpbadge.dev/badge-install-in-vs-code-insiders-dark" alt="Install in VS Code Insiders">](https://insiders.vscode.dev/redirect?url=vscode-insiders%3Amcp%2Finstall%3F%257B%2522name%2522%253A%2522%2540mcp-b%252Fchrome-devtools-mcp%2522%252C%2522config%2522%253A%257B%2522command%2522%253A%2522npx%2522%252C%2522args%2522%253A%255B%2522-y%2522%252C%2522%2540mcp-b%252Fchrome-devtools-mcp%2540latest%2522%255D%252C%2522env%2522%253A%257B%257D%257D%257D)
 
 **Or install manually:**
 
@@ -193,7 +300,7 @@ Follow the MCP install <a href="https://code.visualstudio.com/docs/copilot/chat/
 with the standard config from above. You can also install the Chrome DevTools MCP server using the VS Code CLI:
 
 ```bash
-code --add-mcp '{"name":"io.github.ChromeDevTools/chrome-devtools-mcp","command":"npx","args":["-y","chrome-devtools-mcp"],"env":{}}'
+code --add-mcp '{"name":"@mcp-b/chrome-devtools-mcp","command":"npx","args":["-y","@mcp-b/chrome-devtools-mcp@latest"],"env":{}}'
 ```
 
 </details>
@@ -203,7 +310,7 @@ code --add-mcp '{"name":"io.github.ChromeDevTools/chrome-devtools-mcp","command"
 
 **Click the button to install:**
 
-[<img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Install in Cursor">](https://cursor.com/en/install-mcp?name=chrome-devtools&config=eyJjb21tYW5kIjoibnB4IC15IGNocm9tZS1kZXZ0b29scy1tY3BAbGF0ZXN0In0%3D)
+[<img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Install in Cursor">](https://cursor.com/en/install-mcp?name=chrome-devtools&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBtY3AtYi9jaHJvbWUtZGV2dG9vbHMtbWNwQGxhdGVzdCJdfQ%3D%3D)
 
 **Or install manually:**
 
@@ -251,7 +358,7 @@ Alternatively, follow the <a href="https://github.com/google-gemini/gemini-cli/b
   <summary>JetBrains AI Assistant & Junie</summary>
 
 Go to `Settings | Tools | AI Assistant | Model Context Protocol (MCP)` -> `Add`. Use the config provided above.
-The same way chrome-devtools-mcp can be configured for JetBrains Junie in `Settings | Tools | Junie | MCP Settings` -> `Add`. Use the config provided above.
+The same way `@mcp-b/chrome-devtools-mcp` can be configured for JetBrains Junie in `Settings | Tools | Junie | MCP Settings` -> `Add`. Use the config provided above.
 
 </details>
 
@@ -294,10 +401,10 @@ qodercli mcp add -s user chrome-devtools -- npx @mcp-b/chrome-devtools-mcp@lates
 
 <details>
   <summary>Visual Studio</summary>
-  
+
   **Click the button to install:**
-  
-  [<img src="https://img.shields.io/badge/Visual_Studio-Install-C16FDE?logo=visualstudio&logoColor=white" alt="Install in Visual Studio">](https://vs-open.link/mcp-install?%7B%22name%22%3A%22chrome-devtools%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22chrome-devtools-mcp%40latest%22%5D%7D)
+
+  [<img src="https://img.shields.io/badge/Visual_Studio-Install-C16FDE?logo=visualstudio&logoColor=white" alt="Install in Visual Studio">](https://vs-open.link/mcp-install?%7B%22name%22%3A%22%40mcp-b%2Fchrome-devtools-mcp%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40mcp-b%2Fchrome-devtools-mcp%40latest%22%5D%7D)
 </details>
 
 <details>
@@ -370,6 +477,66 @@ If you run into any issues, checkout our [troubleshooting guide](./docs/troubles
 
 <!-- END AUTO GENERATED TOOLS -->
 
+## Prompts
+
+The server includes built-in prompts to help with WebMCP development workflows. Prompts are reusable message templates that guide AI agents through common tasks.
+
+| Prompt | Description |
+|--------|-------------|
+| `webmcp-dev-workflow` | Step-by-step guide for building WebMCP tools with AI |
+| `test-webmcp-tool` | Systematically test tools with edge cases and validation |
+| `debug-webmcp` | Diagnose WebMCP connection and registration issues |
+
+### webmcp-dev-workflow
+
+Guides you through the AI-driven development workflow for building and testing WebMCP tools.
+
+**When to use:** Starting a new WebMCP tool and want step-by-step guidance through the write → hot-reload → discover → test → iterate cycle.
+
+**Arguments:** None
+
+**Example:**
+```
+Use the webmcp-dev-workflow prompt to help me build a search tool
+```
+
+### test-webmcp-tool
+
+Systematically test a WebMCP tool with various inputs including valid data, edge cases, and invalid inputs.
+
+**When to use:** You have a tool ready and want to verify it handles all input scenarios correctly.
+
+**Arguments:**
+
+| Argument | Type | Required | Description |
+|----------|------|----------|-------------|
+| `toolName` | string | No | Focus testing on a specific tool |
+| `devServerUrl` | string | No | Dev server URL (default: `http://localhost:3000`) |
+
+**Examples:**
+```
+Use the test-webmcp-tool prompt
+Use the test-webmcp-tool prompt with toolName=search_products
+Use the test-webmcp-tool prompt with devServerUrl=http://localhost:5173 toolName=add_to_cart
+```
+
+### debug-webmcp
+
+Troubleshoot WebMCP connection issues and diagnose why tools aren't appearing or working.
+
+**When to use:** Tools aren't being discovered, connections are failing, or you see "WebMCP not detected" errors.
+
+**Arguments:**
+
+| Argument | Type | Required | Description |
+|----------|------|----------|-------------|
+| `url` | string | No | Page URL to debug (default: current page) |
+
+**Example:**
+```
+Use the debug-webmcp prompt with url=http://localhost:3000
+```
+
 ## Configuration
 
 The Chrome DevTools MCP server supports the following configuration option:
@@ -427,7 +594,7 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** boolean
 
 - **`--chromeArg`**
-  Additional arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.
+  Additional arguments for Chrome. Only applies when Chrome is launched by `@mcp-b/chrome-devtools-mcp`.
   - **Type:** array
 
 - **`--categoryEmulation`**
@@ -492,14 +659,14 @@ You can also run `npx @mcp-b/chrome-devtools-mcp@latest --help` to see all avail
 
 ### User data directory
 
-`chrome-devtools-mcp` starts a Chrome's stable channel instance using the following user
+`@mcp-b/chrome-devtools-mcp` starts a Chrome's stable channel instance using the following user
 data directory:
 
 - Linux / macOS: `$HOME/.cache/chrome-devtools-mcp/chrome-profile-$CHANNEL`
 - Windows: `%HOMEPATH%/.cache/chrome-devtools-mcp/chrome-profile-$CHANNEL`
 
 The user data directory is not cleared between runs and shared across
-all instances of `chrome-devtools-mcp`. Set the `isolated` option to `true`
+all instances of `@mcp-b/chrome-devtools-mcp`. Set the `isolated` option to `true`
 to use a temporary user data dir instead which will be cleared automatically after
 the browser is closed.
 
@@ -573,9 +740,9 @@ For more details on remote debugging, see the [Chrome DevTools documentation](ht
 ### Operating system sandboxes
 
 Some MCP clients allow sandboxing the MCP server using macOS Seatbelt or Linux
-containers. If sandboxes are enabled, `chrome-devtools-mcp` is not able to start
+containers. If sandboxes are enabled, `@mcp-b/chrome-devtools-mcp` is not able to start
 Chrome that requires permissions to create its own sandboxes. As a workaround,
-either disable sandboxing for `chrome-devtools-mcp` in your MCP client or use
+either disable sandboxing for `@mcp-b/chrome-devtools-mcp` in your MCP client or use
 `--browser-url` to connect to a Chrome instance that you start manually outside
 of the MCP client sandbox.
 
@@ -588,7 +755,7 @@ functionality to AI agents via the Model Context Protocol.
 ### How it works
 
 When a webpage uses [@mcp-b/global](https://www.npmjs.com/package/@mcp-b/global)
-to register MCP tools, `chrome-devtools-mcp` can connect to those tools using
+to register MCP tools, `@mcp-b/chrome-devtools-mcp` can connect to those tools using
 the Chrome DevTools Protocol. This creates a bridge between your MCP client
 (like Claude Desktop, Cursor, or VS Code Copilot) and the website's tools.
 
@@ -599,25 +766,25 @@ The webpage must have WebMCP tools registered. Websites do this by using the
 
 ```javascript
 // Example of how a website registers tools (done by the website developer)
-import { registerTools } from '@mcp-b/global';
+import '@mcp-b/global';
 
-registerTools([
-  {
-    name: 'search_products',
-    description: 'Search for products on this website',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        query: { type: 'string', description: 'Search query' }
-      },
-      required: ['query']
+navigator.modelContext.registerTool({
+  name: 'search_products',
+  description: 'Search for products on this website',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      query: { type: 'string', description: 'Search query' }
     },
-    handler: async ({ query }) => {
-      // Implementation
-      return { results: [...] };
-    }
+    required: ['query']
+  },
+  async execute({ query }) {
+    // Implementation
+    return {
+      content: [{ type: 'text', text: JSON.stringify({ results: [...] }) }]
+    };
   }
-]);
+});
 ```
 
 ### Using WebMCP tools
