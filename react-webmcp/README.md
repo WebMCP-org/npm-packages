@@ -1,5 +1,12 @@
 # @mcp-b/react-webmcp
 
+> React hooks for Model Context Protocol with automatic lifecycle management and Zod validation
+
+[![npm version](https://img.shields.io/npm/v/@mcp-b/react-webmcp?style=flat-square)](https://www.npmjs.com/package/@mcp-b/react-webmcp)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+
+📖 **[Full Documentation](https://docs.mcp-b.ai/packages/react-webmcp)** | 🚀 **[Quick Start](https://docs.mcp-b.ai/quickstart)** | ⚛️ **[AI Framework Integration](https://docs.mcp-b.ai/ai-frameworks)**
+
 Complete React hooks for the Model Context Protocol - register tools via `navigator.modelContext` and consume tools from MCP servers.
 
 ## Features
@@ -469,10 +476,24 @@ function MyApp() {
 - Use `useWebMCPContext` for lightweight read-only data exposure
 - Client automatically manages reconnection and tool list updates
 
+## Related Packages
+
+- [`@mcp-b/global`](https://docs.mcp-b.ai/packages/global) - W3C Web Model Context API polyfill
+- [`@mcp-b/transports`](https://docs.mcp-b.ai/packages/transports) - Browser-specific MCP transports
+- [`@modelcontextprotocol/sdk`](https://www.npmjs.com/package/@modelcontextprotocol/sdk) - Official MCP SDK
+
+## Resources
+
+- [WebMCP Documentation](https://docs.mcp-b.ai)
+- [AI Framework Integration](https://docs.mcp-b.ai/ai-frameworks)
+- [Best Practices](https://docs.mcp-b.ai/best-practices)
+- [Model Context Protocol Spec](https://modelcontextprotocol.io)
+
 ## License
 
-MIT
+MIT - see [LICENSE](../../LICENSE) for details
 
-## Contributing
+## Support
 
-See the [main repository](https://github.com/WebMCP-org/WebMCP) for contribution guidelines.
+- [GitHub Issues](https://github.com/WebMCP-org/npm-packages/issues)
+- [Documentation](https://docs.mcp-b.ai)

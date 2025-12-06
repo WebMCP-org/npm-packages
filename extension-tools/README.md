@@ -1,5 +1,12 @@
 # @mcp-b/extension-tools
 
+> MCP wrappers for 62+ Chrome Extension APIs enabling protocol-based browser control
+
+[![npm version](https://img.shields.io/npm/v/@mcp-b/extension-tools?style=flat-square)](https://www.npmjs.com/package/@mcp-b/extension-tools)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+
+📖 **[Full Documentation](https://docs.mcp-b.ai/packages/extension-tools)** | 🚀 **[Quick Start](https://docs.mcp-b.ai/quickstart)**
+
 Chrome Extension API tools for Model Context Protocol (MCP) - provides MCP-compatible wrappers for browser extension APIs.
 
 ## Overview
@@ -513,12 +520,23 @@ This package is written in TypeScript and includes full type definitions for all
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
+## Related Packages
+
+- [`@mcp-b/transports`](https://docs.mcp-b.ai/packages/transports) - Browser-specific MCP transports
+- [`@mcp-b/global`](https://docs.mcp-b.ai/packages/global) - W3C Web Model Context API polyfill
+- [`@modelcontextprotocol/sdk`](https://www.npmjs.com/package/@modelcontextprotocol/sdk) - Official MCP SDK
+
+## Resources
+
+- [WebMCP Documentation](https://docs.mcp-b.ai)
+- [Model Context Protocol Spec](https://modelcontextprotocol.io)
+- [Chrome Extension APIs](https://developer.chrome.com/docs/extensions/reference/)
+
 ## License
 
-MIT
+MIT - see [LICENSE](../../LICENSE) for details
 
-## See Also
+## Support
 
-- [Model Context Protocol](https://modelcontextprotocol.io)
-- [Chrome Extension APIs](https://developer.chrome.com/docs/extensions/reference/)
-- [MCP-B Project](https://github.com/MiguelsPizza/WebMCP)
+- [GitHub Issues](https://github.com/WebMCP-org/npm-packages/issues)
+- [Documentation](https://docs.mcp-b.ai)
