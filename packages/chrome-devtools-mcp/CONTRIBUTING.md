@@ -42,10 +42,10 @@ for PR and commit titles.
 Check that you are using node version specified in .nvmrc, then run following commands:
 
 ```sh
-git clone https://github.com/ChromeDevTools/chrome-devtools-mcp.git
-cd chrome-devtools-mcp
-npm ci
-npm run build
+git clone https://github.com/WebMCP-org/npm-packages.git
+cd npm-packages
+pnpm install
+pnpm build
 ```
 
 ### Testing with @modelcontextprotocol/inspector
