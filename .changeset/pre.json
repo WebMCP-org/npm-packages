@@ -19,5 +19,11 @@
     "@mcp-b/webmcp-ts-sdk": "1.0.1",
     "@mcp-b/chrome-devtools-mcp": "0.11.0"
   },
-  "changesets": ["beta-release", "chrome-devtools-webmcp", "mcp-iframe-release", "new-beta-bump"]
+  "changesets": [
+    "beta-release",
+    "bump-all-beta",
+    "chrome-devtools-webmcp",
+    "mcp-iframe-release",
+    "new-beta-bump"
+  ]
 }

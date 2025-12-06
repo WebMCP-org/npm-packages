@@ -1,5 +1,13 @@
 # @mcp-b/mcp-iframe
 
+## 0.1.0-beta.2
+
+### Patch Changes
+
+- Bump all packages to new beta release
+- Updated dependencies
+  - @mcp-b/transports@1.1.2-beta.3
+
 ## 0.1.0-beta.1
 
 ### Patch Changes

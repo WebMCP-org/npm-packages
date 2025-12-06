@@ -1,5 +1,13 @@
 # @mcp-b/extension-tools
 
+## 0.2.4-beta.2
+
+### Patch Changes
+
+- Bump all packages to new beta release
+- Updated dependencies
+  - @mcp-b/smart-dom-reader@1.0.3-beta.2
+
 ## 0.2.4-beta.1
 
 ### Patch Changes

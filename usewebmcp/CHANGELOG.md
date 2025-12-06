@@ -1,5 +1,13 @@
 # usewebmcp
 
+## 0.1.6-beta.3
+
+### Patch Changes
+
+- Bump all packages to new beta release
+- Updated dependencies
+  - @mcp-b/react-webmcp@0.1.6-beta.3
+
 ## 0.1.6-beta.2
 
 ### Patch Changes

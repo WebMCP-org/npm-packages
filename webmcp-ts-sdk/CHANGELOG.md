@@ -1,5 +1,11 @@
 # @mcp-b/webmcp-ts-sdk
 
+## 1.0.2-beta.2
+
+### Patch Changes
+
+- Bump all packages to new beta release
+
 ## 1.0.2-beta.1
 
 ### Patch Changes

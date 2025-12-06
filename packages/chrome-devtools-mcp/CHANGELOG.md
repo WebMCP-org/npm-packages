@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.3-beta.0
+
+### Patch Changes
+
+- Bump all packages to new beta release
+
 ## 1.0.0
 
 ### Major Changes
@@ -9,10 +15,12 @@ This is the first stable release of `@mcp-b/chrome-devtools-mcp`, a fork of Chro
 ### Features
 
 - **WebMCP Integration**: Connect to MCP tools registered on webpages via [@mcp-b/global](https://www.npmjs.com/package/@mcp-b/global)
+
   - `list_webmcp_tools`: List available website tools (auto-connects)
   - `call_webmcp_tool`: Call a website tool (auto-connects)
 
 - **AI-Driven Development Workflow**: Build and test WebMCP tools in real-time
+
   - Write tools in your codebase
   - Hot-reload sees the changes
   - AI discovers tools via `list_webmcp_tools`
@@ -28,15 +36,15 @@ This is the first stable release of `@mcp-b/chrome-devtools-mcp`, a fork of Chro
 
 This fork adds the ability to call MCP tools registered directly on webpages. The original Chrome DevTools MCP provides browser automation, performance analysis, network inspection, and debugging. This fork adds:
 
-| Feature | Chrome DevTools MCP | @mcp-b/chrome-devtools-mcp |
-|---------|--------------------|-----------------------------|
-| Browser automation | ✅ | ✅ |
-| Performance analysis | ✅ | ✅ |
-| Network inspection | ✅ | ✅ |
-| **Call website MCP tools** | ❌ | ✅ |
-| **List website MCP tools** | ❌ | ✅ |
-| **AI-driven tool development** | ❌ | ✅ |
-| **Built-in development prompts** | ❌ | ✅ |
+| Feature                          | Chrome DevTools MCP | @mcp-b/chrome-devtools-mcp |
+| -------------------------------- | ------------------- | -------------------------- |
+| Browser automation               | ✅                  | ✅                         |
+| Performance analysis             | ✅                  | ✅                         |
+| Network inspection               | ✅                  | ✅                         |
+| **Call website MCP tools**       | ❌                  | ✅                         |
+| **List website MCP tools**       | ❌                  | ✅                         |
+| **AI-driven tool development**   | ❌                  | ✅                         |
+| **Built-in development prompts** | ❌                  | ✅                         |
 
 ### Attribution
 
