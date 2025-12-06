@@ -124,11 +124,37 @@ await server.connect(transport);
 server.registerTool('my-tool', {
   description: 'A dynamically registered tool',
   inputSchema: { message: z.string() },
+  // Output schemas enable structured, type-safe AI responses
   outputSchema: { result: z.string() }
 }, async ({ message }) => {
   return {
     content: [{ type: 'text', text: `Echo: ${message}` }],
+    // structuredContent must match the outputSchema
     structuredContent: { result: `Echo: ${message}` }
+  };
+});
+
+// Example with complex output schema
+server.registerTool('analyze-data', {
+  description: 'Analyze data and return structured results',
+  inputSchema: {
+    data: z.array(z.number()),
+    operation: z.enum(['sum', 'average', 'stats'])
+  },
+  outputSchema: {
+    result: z.number(),
+    operation: z.string(),
+    metadata: z.object({
+      count: z.number(),
+      min: z.number().optional(),
+      max: z.number().optional()
+    })
+  }
+}, async ({ data, operation }) => {
+  const stats = calculateStats(data, operation);
+  return {
+    content: [{ type: 'text', text: `Result: ${stats.result}` }],
+    structuredContent: stats
   };
 });
 ```

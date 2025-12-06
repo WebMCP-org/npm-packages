@@ -104,6 +104,62 @@ function PostsPage() {
 }
 ```
 
+### Tool with Output Schema (Recommended)
+
+**Output schemas are essential for modern AI integrations** - they enable AI agents to return structured, type-safe responses:
+
+```tsx
+import { useWebMCP } from '@mcp-b/react-webmcp';
+import { z } from 'zod';
+
+function ProductSearch() {
+  const searchTool = useWebMCP({
+    name: 'products_search',
+    description: 'Search for products in the catalog',
+    inputSchema: {
+      query: z.string().describe('Search query'),
+      maxResults: z.number().min(1).max(50).default(10),
+      category: z.enum(['electronics', 'clothing', 'books']).optional(),
+    },
+    // Output schema enables structured responses
+    outputSchema: {
+      products: z.array(z.object({
+        id: z.string(),
+        name: z.string(),
+        price: z.number(),
+        inStock: z.boolean(),
+      })),
+      total: z.number().describe('Total matching products'),
+      hasMore: z.boolean(),
+    },
+    handler: async ({ query, maxResults, category }) => {
+      const results = await api.products.search({ query, maxResults, category });
+      return {
+        products: results.items,
+        total: results.totalCount,
+        hasMore: results.totalCount > maxResults,
+      };
+    },
+    // Format for text display (structuredContent is auto-generated from return value)
+    formatOutput: (result) => `Found ${result.total} products`,
+  });
+
+  return (
+    <div>
+      {searchTool.state.isExecuting && <Spinner />}
+      {searchTool.state.lastResult && (
+        <p>Found {searchTool.state.lastResult.total} products</p>
+      )}
+    </div>
+  );
+}
+```
+
+**Why use output schemas?**
+- AI providers compile schemas to TypeScript, enabling type-safe code generation
+- Responses are validated against the schema
+- Better AI reasoning about expected output format
+
 ### Context Tool
 
 Expose read-only context to AI:
@@ -150,7 +206,7 @@ function useWebMCP<
 | `name` | `string` | ✓ | Unique tool identifier (e.g., 'posts_like') |
 | `description` | `string` | ✓ | Human-readable description for AI |
 | `inputSchema` | `Record<string, ZodType>` | - | Input validation using Zod schemas |
-| `outputSchema` | `Record<string, ZodType>` | - | Output validation (optional) |
+| `outputSchema` | `Record<string, ZodType>` | - | Output schema for structured responses (recommended) |
 | `annotations` | `ToolAnnotations` | - | Metadata hints for the AI |
 | `elicitation` | `ElicitationConfig` | - | User confirmation settings |
 | `handler` | `(input) => Promise<TOutput>` | ✓ | Function that executes the tool |

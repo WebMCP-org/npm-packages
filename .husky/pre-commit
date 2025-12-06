@@ -1,10 +1,10 @@
-# Load nvm if available
+# Load nvm if available (optional - may not be installed in all environments)
 export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" || true
 
 # Use Node version from .nvmrc if nvm is available
-if command -v nvm &> /dev/null && [ -f .nvmrc ]; then
-  nvm use
+if type nvm >/dev/null 2>&1 && [ -f .nvmrc ]; then
+  nvm use || true
 fi
 
 pnpm lint-staged
