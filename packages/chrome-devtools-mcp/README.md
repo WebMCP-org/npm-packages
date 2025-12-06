@@ -1,8 +1,13 @@
 # Chrome DevTools MCP
 
-[![npm chrome-devtools-mcp package](https://img.shields.io/npm/v/chrome-devtools-mcp.svg)](https://npmjs.org/package/chrome-devtools-mcp)
+[![npm @mcp-b/chrome-devtools-mcp package](https://img.shields.io/npm/v/@mcp-b/chrome-devtools-mcp.svg)](https://www.npmjs.com/package/@mcp-b/chrome-devtools-mcp)
 
-`chrome-devtools-mcp` lets your coding agent (such as Gemini, Claude, Cursor or Copilot)
+> **Note:** This is a fork of [ChromeDevTools/chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp)
+> published under the `@mcp-b` scope. It includes WebMCP integration for connecting to MCP tools
+> registered on webpages. The original project is developed by Google LLC and the ChromeDevTools team.
+> See [NOTICE](./NOTICE) for attribution details.
+
+`@mcp-b/chrome-devtools-mcp` lets your coding agent (such as Gemini, Claude, Cursor or Copilot)
 control and inspect a live Chrome browser. It acts as a Model-Context-Protocol
 (MCP) server, giving your AI coding assistant access to the full power of
 Chrome DevTools for reliable automation, in-depth debugging, and performance analysis.
@@ -45,14 +50,14 @@ Add the following config to your MCP client:
   "mcpServers": {
     "chrome-devtools": {
       "command": "npx",
-      "args": ["-y", "chrome-devtools-mcp@latest"]
+      "args": ["-y", "@mcp-b/chrome-devtools-mcp@latest"]
     }
   }
 }
 ```
 
-> [!NOTE]  
-> Using `chrome-devtools-mcp@latest` ensures that your MCP client will always use the latest version of the Chrome DevTools MCP server.
+> [!NOTE]
+> Using `@mcp-b/chrome-devtools-mcp@latest` ensures that your MCP client will always use the latest version of this Chrome DevTools MCP server with WebMCP integration.
 
 ### MCP Client configuration
 
@@ -61,7 +66,7 @@ Add the following config to your MCP client:
   Follow https://ampcode.com/manual#mcp and use the config provided above. You can also install the Chrome DevTools MCP server using the CLI:
 
 ```bash
-amp mcp add chrome-devtools -- npx chrome-devtools-mcp@latest
+amp mcp add chrome-devtools -- npx @mcp-b/chrome-devtools-mcp@latest
 ```
 
 </details>
@@ -77,7 +82,7 @@ To use the Chrome DevTools MCP server follow the instructions from <a href="http
     "chrome-devtools": {
       "command": "npx",
       "args": [
-        "chrome-devtools-mcp@latest",
+        "@mcp-b/chrome-devtools-mcp@latest",
         "--browser-url=http://127.0.0.1:9222",
         "-y"
       ]
@@ -97,7 +102,7 @@ Chrome DevTools MCP will not start the browser instance automatically using this
     Use the Claude Code CLI to add the Chrome DevTools MCP server (<a href="https://docs.anthropic.com/en/docs/claude-code/mcp">guide</a>):
 
 ```bash
-claude mcp add chrome-devtools npx chrome-devtools-mcp@latest
+claude mcp add chrome-devtools npx @mcp-b/chrome-devtools-mcp@latest
 ```
 
 </details>
@@ -113,7 +118,7 @@ claude mcp add chrome-devtools npx chrome-devtools-mcp@latest
   using the standard config from above. You can also install the Chrome DevTools MCP server using the Codex CLI:
 
 ```bash
-codex mcp add chrome-devtools -- npx chrome-devtools-mcp@latest
+codex mcp add chrome-devtools -- npx @mcp-b/chrome-devtools-mcp@latest
 ```
 
 **On Windows 11**
@@ -127,7 +132,7 @@ args = [
     "/c",
     "npx",
     "-y",
-    "chrome-devtools-mcp@latest",
+    "@mcp-b/chrome-devtools-mcp@latest",
 ]
 env = { SystemRoot="C:\\Windows", PROGRAMFILES="C:\\Program Files" }
 startup_timeout_ms = 20_000
@@ -154,7 +159,7 @@ Configure the following fields and press `CTRL+S` to save the configuration:
 
 - **Server name:** `chrome-devtools`
 - **Server Type:** `[1] Local`
-- **Command:** `npx -y chrome-devtools-mcp@latest`
+- **Command:** `npx -y @mcp-b/chrome-devtools-mcp@latest`
 
 </details>
 
@@ -196,7 +201,7 @@ Go to `Cursor Settings` -> `MCP` -> `New MCP Server`. Use the config provided ab
 Use the Factory CLI to add the Chrome DevTools MCP server (<a href="https://docs.factory.ai/cli/configuration/mcp">guide</a>):
 
 ```bash
-droid mcp add chrome-devtools "npx -y chrome-devtools-mcp@latest"
+droid mcp add chrome-devtools "npx -y @mcp-b/chrome-devtools-mcp@latest"
 ```
 
 </details>
@@ -208,13 +213,13 @@ Install the Chrome DevTools MCP server using the Gemini CLI.
 **Project wide:**
 
 ```bash
-gemini mcp add chrome-devtools npx chrome-devtools-mcp@latest
+gemini mcp add chrome-devtools npx @mcp-b/chrome-devtools-mcp@latest
 ```
 
 **Globally:**
 
 ```bash
-gemini mcp add -s user chrome-devtools npx chrome-devtools-mcp@latest
+gemini mcp add -s user chrome-devtools npx @mcp-b/chrome-devtools-mcp@latest
 ```
 
 Alternatively, follow the <a href="https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md#how-to-set-up-your-mcp-server">MCP guide</a> and use the standard config from above.
@@ -261,13 +266,13 @@ Install the Chrome DevTools MCP server using the Qoder CLI (<a href="https://doc
 **Project wide:**
 
 ```bash
-qodercli mcp add chrome-devtools -- npx chrome-devtools-mcp@latest
+qodercli mcp add chrome-devtools -- npx @mcp-b/chrome-devtools-mcp@latest
 ```
 
 **Globally:**
 
 ```bash
-qodercli mcp add -s user chrome-devtools -- npx chrome-devtools-mcp@latest
+qodercli mcp add -s user chrome-devtools -- npx @mcp-b/chrome-devtools-mcp@latest
 ```
 
 </details>
@@ -435,7 +440,7 @@ Pass them via the `args` property in the JSON configuration. For example:
     "chrome-devtools": {
       "command": "npx",
       "args": [
-        "chrome-devtools-mcp@latest",
+        "@mcp-b/chrome-devtools-mcp@latest",
         "--channel=canary",
         "--headless=true",
         "--isolated=true"
@@ -455,7 +460,7 @@ You can connect directly to a Chrome WebSocket endpoint and include custom heade
     "chrome-devtools": {
       "command": "npx",
       "args": [
-        "chrome-devtools-mcp@latest",
+        "@mcp-b/chrome-devtools-mcp@latest",
         "--wsEndpoint=ws://127.0.0.1:9222/devtools/browser/<id>",
         "--wsHeaders={\"Authorization\":\"Bearer YOUR_TOKEN\"}"
       ]
@@ -466,7 +471,7 @@ You can connect directly to a Chrome WebSocket endpoint and include custom heade
 
 To get the WebSocket endpoint from a running Chrome instance, visit `http://127.0.0.1:9222/json/version` and look for the `webSocketDebuggerUrl` field.
 
-You can also run `npx chrome-devtools-mcp@latest --help` to see all available configuration options.
+You can also run `npx @mcp-b/chrome-devtools-mcp@latest --help` to see all available configuration options.
 
 ## Concepts
 
@@ -499,7 +504,7 @@ Add the `--browser-url` option to your MCP client configuration. The value of th
     "chrome-devtools": {
       "command": "npx",
       "args": [
-        "chrome-devtools-mcp@latest",
+        "@mcp-b/chrome-devtools-mcp@latest",
         "--browser-url=http://127.0.0.1:9222"
       ]
     }
