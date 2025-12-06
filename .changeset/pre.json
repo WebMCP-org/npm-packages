@@ -16,7 +16,8 @@
     "@mcp-b/smart-dom-reader-server": "0.1.0",
     "@mcp-b/transports": "1.1.1",
     "usewebmcp": "0.1.5",
-    "@mcp-b/webmcp-ts-sdk": "1.0.1"
+    "@mcp-b/webmcp-ts-sdk": "1.0.1",
+    "@mcp-b/chrome-devtools-mcp": "0.11.0"
   },
-  "changesets": ["beta-release", "mcp-iframe-release", "new-beta-bump"]
+  "changesets": ["beta-release", "chrome-devtools-webmcp", "mcp-iframe-release", "new-beta-bump"]
 }
