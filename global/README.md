@@ -501,7 +501,169 @@ Each tool must have:
 | `name` | `string` | Unique identifier for the tool |
 | `description` | `string` | Natural language description of what the tool does |
 | `inputSchema` | `object` | JSON Schema defining input parameters |
+| `outputSchema` | `object` | Optional JSON Schema defining structured output |
+| `annotations` | `object` | Optional hints about tool behavior |
 | `execute` | `function` | Async function that implements the tool logic |
+
+### Output Schemas (Structured Output)
+
+**Output schemas are essential for modern AI integrations.** Many AI providers compile tool definitions into TypeScript definitions, enabling the AI to generate type-safe responses. Without an output schema, AI agents can only return unstructured text.
+
+**Benefits of output schemas:**
+- **Type-safe responses** - AI generates structured JSON matching your schema
+- **Better AI reasoning** - AI understands the expected output format
+- **Client validation** - Responses are validated against the schema
+- **IDE support** - TypeScript types inferred from schemas
+
+#### Basic Output Schema Example
+
+```javascript
+window.navigator.modelContext.provideContext({
+  tools: [
+    {
+      name: "get-user-profile",
+      description: "Fetch a user's profile information",
+      inputSchema: {
+        type: "object",
+        properties: {
+          userId: { type: "string", description: "The user ID" }
+        },
+        required: ["userId"]
+      },
+      // Define the structured output format
+      outputSchema: {
+        type: "object",
+        properties: {
+          id: { type: "string", description: "User ID" },
+          name: { type: "string", description: "Display name" },
+          email: { type: "string", description: "Email address" },
+          createdAt: { type: "string", description: "ISO date string" }
+        },
+        required: ["id", "name", "email"]
+      },
+      async execute({ userId }) {
+        const user = await fetchUser(userId);
+        return {
+          content: [{ type: "text", text: `Found user: ${user.name}` }],
+          // Structured content matching the outputSchema
+          structuredContent: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            createdAt: user.createdAt.toISOString()
+          }
+        };
+      }
+    }
+  ]
+});
+```
+
+#### Using Zod for Type-Safe Schemas
+
+For TypeScript projects, you can use Zod schemas for both input and output validation. Zod schemas are automatically converted to JSON Schema:
+
+```typescript
+import { z } from 'zod';
+
+window.navigator.modelContext.provideContext({
+  tools: [
+    {
+      name: "search-products",
+      description: "Search the product catalog",
+      inputSchema: {
+        query: z.string().describe("Search query"),
+        limit: z.number().min(1).max(100).default(10).describe("Max results"),
+        category: z.enum(["electronics", "clothing", "books"]).optional()
+      },
+      // Zod schema for output - provides TypeScript types
+      outputSchema: {
+        products: z.array(z.object({
+          id: z.string(),
+          name: z.string(),
+          price: z.number(),
+          inStock: z.boolean()
+        })),
+        total: z.number().describe("Total matching products"),
+        hasMore: z.boolean().describe("Whether more results exist")
+      },
+      async execute({ query, limit, category }) {
+        const results = await searchProducts({ query, limit, category });
+        return {
+          content: [{ type: "text", text: `Found ${results.total} products` }],
+          structuredContent: {
+            products: results.items,
+            total: results.total,
+            hasMore: results.total > limit
+          }
+        };
+      }
+    }
+  ]
+});
+```
+
+#### Complex Output Schema Example
+
+For tools that return rich data structures:
+
+```javascript
+window.navigator.modelContext.provideContext({
+  tools: [
+    {
+      name: "analyze-code",
+      description: "Analyze code for issues and suggestions",
+      inputSchema: {
+        type: "object",
+        properties: {
+          code: { type: "string", description: "Source code to analyze" },
+          language: { type: "string", enum: ["javascript", "typescript", "python"] }
+        },
+        required: ["code", "language"]
+      },
+      outputSchema: {
+        type: "object",
+        properties: {
+          summary: {
+            type: "object",
+            properties: {
+              linesOfCode: { type: "number" },
+              complexity: { type: "string", enum: ["low", "medium", "high"] }
+            }
+          },
+          issues: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                severity: { type: "string", enum: ["error", "warning", "info"] },
+                line: { type: "number" },
+                message: { type: "string" },
+                suggestion: { type: "string" }
+              },
+              required: ["severity", "line", "message"]
+            }
+          },
+          score: {
+            type: "number",
+            minimum: 0,
+            maximum: 100,
+            description: "Code quality score"
+          }
+        },
+        required: ["summary", "issues", "score"]
+      },
+      async execute({ code, language }) {
+        const analysis = await analyzeCode(code, language);
+        return {
+          content: [{ type: "text", text: `Quality score: ${analysis.score}/100` }],
+          structuredContent: analysis
+        };
+      }
+    }
+  ]
+});
+```
 
 ### Tool Response Format
 
