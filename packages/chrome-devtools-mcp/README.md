@@ -477,26 +477,62 @@ If you run into any issues, checkout our [troubleshooting guide](./docs/troubles
 
 ## Prompts
 
-The server includes built-in prompts to help with WebMCP development workflows:
+The server includes built-in prompts to help with WebMCP development workflows. Prompts are reusable message templates that guide AI agents through common tasks.
 
 | Prompt | Description |
 |--------|-------------|
-| `webmcp-dev-workflow` | Guides you through the AI-driven development workflow for building and testing WebMCP tools |
-| `test-webmcp-tool` | Systematically test a WebMCP tool on the current page with various inputs |
-| `debug-webmcp` | Troubleshoot WebMCP connection issues and diagnose why tools aren't appearing |
+| `webmcp-dev-workflow` | Step-by-step guide for building WebMCP tools with AI |
+| `test-webmcp-tool` | Systematically test tools with edge cases and validation |
+| `debug-webmcp` | Diagnose WebMCP connection and registration issues |
 
-### Using Prompts
+### webmcp-dev-workflow
 
-In MCP clients that support prompts, you can invoke these directly. For example, in Claude Desktop or Claude Code:
+Guides you through the AI-driven development workflow for building and testing WebMCP tools.
 
+**When to use:** Starting a new WebMCP tool and want step-by-step guidance through the write → hot-reload → discover → test → iterate cycle.
+
+**Arguments:** None
+
+**Example:**
 ```
-Use the webmcp-dev-workflow prompt to help me build a new tool
+Use the webmcp-dev-workflow prompt to help me build a search tool
 ```
 
-Or with arguments:
+### test-webmcp-tool
 
+Systematically test a WebMCP tool with various inputs including valid data, edge cases, and invalid inputs.
+
+**When to use:** You have a tool ready and want to verify it handles all input scenarios correctly.
+
+**Arguments:**
+
+| Argument | Type | Required | Description |
+|----------|------|----------|-------------|
+| `toolName` | string | No | Focus testing on a specific tool |
+| `devServerUrl` | string | No | Dev server URL (default: `http://localhost:3000`) |
+
+**Examples:**
 ```
-Use the test-webmcp-tool prompt with devServerUrl=http://localhost:5173
+Use the test-webmcp-tool prompt
+Use the test-webmcp-tool prompt with toolName=search_products
+Use the test-webmcp-tool prompt with devServerUrl=http://localhost:5173 toolName=add_to_cart
+```
+
+### debug-webmcp
+
+Troubleshoot WebMCP connection issues and diagnose why tools aren't appearing or working.
+
+**When to use:** Tools aren't being discovered, connections are failing, or you see "WebMCP not detected" errors.
+
+**Arguments:**
+
+| Argument | Type | Required | Description |
+|----------|------|----------|-------------|
+| `url` | string | No | Page URL to debug (default: current page) |
+
+**Example:**
+```
+Use the debug-webmcp prompt with url=http://localhost:3000
 ```
 
 ## Configuration
