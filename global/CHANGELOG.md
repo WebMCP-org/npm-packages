@@ -1,5 +1,17 @@
 # @mcp-b/global
 
+## 1.2.1
+
+### Patch Changes
+
+- b57ebab: fix: return structuredContent when outputSchema is defined
+
+  When a tool is registered with an outputSchema, the MCP specification requires the execute result to include both content and structuredContent. This fix ensures compliance with the MCP spec by:
+
+  - Returning structuredContent in the MCP response when outputSchema is provided
+  - Passing through structuredContent in the @mcp-b/global bridge handler
+  - Adding InferOutput utility type for better Zod schema type inference
+
 ## 1.2.1-beta.0
 
 ### Patch Changes

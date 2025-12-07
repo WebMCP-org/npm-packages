@@ -1,5 +1,24 @@
 # @mcp-b/react-webmcp
 
+## 0.2.1
+
+### Patch Changes
+
+- b57ebab: Broaden React peer dependency to support React 17, 18, and 19
+
+  Changed React peer dependency from `^19.1.0` to `^17.0.0 || ^18.0.0 || ^19.0.0` to allow usage in projects with older React versions. The hooks only use React 16.8+ compatible features (useState, useEffect, useCallback, useMemo, useRef, useContext), so this is a safe expansion of compatibility. Zod peer dependency set to `^3.25.0` to match MCP SDK requirements.
+
+- b57ebab: fix: return structuredContent when outputSchema is defined
+
+  When a tool is registered with an outputSchema, the MCP specification requires the execute result to include both content and structuredContent. This fix ensures compliance with the MCP spec by:
+
+  - Returning structuredContent in the MCP response when outputSchema is provided
+  - Passing through structuredContent in the @mcp-b/global bridge handler
+  - Adding InferOutput utility type for better Zod schema type inference
+
+- Updated dependencies [b57ebab]
+  - @mcp-b/global@1.2.1
+
 ## 0.2.1-beta.1
 
 ### Patch Changes

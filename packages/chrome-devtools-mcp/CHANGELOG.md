@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.2.0
+
+### Minor Changes
+
+- 9b49dce: Add per-page WebMCP connection support and improve CDP lifecycle handling
+
+  - Support per-page WebMCP connections instead of global state
+  - Move WebMCP state from module-level to McpContext for proper isolation
+  - Handle browser close/reopen scenarios for WebMCP transport
+  - Detect and recover from stale CDP connections after page reload
+
+### Patch Changes
+
+- d4e18d9: Fix post-build script to update import paths in tests directory
+
+  The post-build script now correctly updates import paths from `node_modules` to `vendor` in both `src/` and `tests/` directories, fixing test failures after the vendor rename.
+
 ## 1.2.0-beta.1
 
 ### Minor Changes
