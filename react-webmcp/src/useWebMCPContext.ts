@@ -10,6 +10,10 @@ import { useWebMCP } from './useWebMCP.js';
  * configures appropriate annotations (read-only, idempotent) and handles value
  * serialization.
  *
+ * Note: This hook does not use an output schema, so the result will not include
+ * `structuredContent` in the MCP response. Use {@link useWebMCP} directly with
+ * `outputSchema` if you need structured output for MCP compliance.
+ *
  * @template T - The type of context data to expose
  *
  * @param name - Unique identifier for the context tool (e.g., 'context_current_post')
@@ -67,11 +71,14 @@ export function useWebMCPContext<T>(
   name: string,
   description: string,
   getValue: () => T
-): WebMCPReturn<T> {
+): WebMCPReturn {
   const getValueRef = useRef(getValue);
   getValueRef.current = getValue;
 
-  return useWebMCP<Record<string, never>, T>({
+  // Use default generics (no input/output schema) since context tools
+  // don't define structured schemas. The handler returns T but it's
+  // treated as `unknown` in the return type since no outputSchema is defined.
+  return useWebMCP({
     name,
     description,
     annotations: {
@@ -86,7 +93,7 @@ export function useWebMCPContext<T>(
     },
     formatOutput: (output) => {
       if (typeof output === 'string') {
-        return output;
+        return output as string;
       }
       return JSON.stringify(output, null, 2);
     },

@@ -3,7 +3,7 @@ import { zodToJsonSchema } from '@mcp-b/global';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { z } from 'zod';
-import type { ToolExecutionState, WebMCPConfig, WebMCPReturn } from './types.js';
+import type { InferOutput, ToolExecutionState, WebMCPConfig, WebMCPReturn } from './types.js';
 
 /**
  * Default output formatter that converts values to formatted JSON strings.
@@ -28,9 +28,10 @@ function defaultFormatOutput(output: unknown): string {
  * - Validates input using Zod schemas
  * - Handles tool execution and lifecycle callbacks
  * - Automatically unregisters on component unmount
+ * - Properly returns `structuredContent` when `outputSchema` is defined
  *
  * @template TInputSchema - Zod schema object defining input parameter types
- * @template TOutput - Type of data returned by the handler function
+ * @template TOutputSchema - Zod schema object defining output structure (enables structuredContent)
  *
  * @param config - Configuration object for the tool
  * @returns Object containing execution state and control methods
@@ -62,6 +63,25 @@ function defaultFormatOutput(output: unknown): string {
  * ```
  *
  * @example
+ * Tool with outputSchema (enables MCP structuredContent):
+ * ```tsx
+ * const counterTool = useWebMCP({
+ *   name: 'counter_get',
+ *   description: 'Get the current counter value',
+ *   outputSchema: {
+ *     counter: z.number().describe('Current counter value'),
+ *     timestamp: z.string().describe('ISO timestamp'),
+ *   },
+ *   handler: async () => {
+ *     // Return type is inferred from outputSchema
+ *     return { counter: getCounter(), timestamp: new Date().toISOString() };
+ *   },
+ * });
+ *
+ * // counterTool.state.lastResult is typed as { counter: number; timestamp: string } | null
+ * ```
+ *
+ * @example
  * Tool with annotations and callbacks:
  * ```tsx
  * const deleteTool = useWebMCP({
@@ -90,8 +110,10 @@ function defaultFormatOutput(output: unknown): string {
  */
 export function useWebMCP<
   TInputSchema extends Record<string, z.ZodTypeAny> = Record<string, never>,
-  TOutput = string,
->(config: WebMCPConfig<TInputSchema, TOutput>): WebMCPReturn<TOutput> {
+  TOutputSchema extends Record<string, z.ZodTypeAny> = Record<string, never>,
+>(config: WebMCPConfig<TInputSchema, TOutputSchema>): WebMCPReturn<TOutputSchema> {
+  /** Inferred output type from the schema */
+  type TOutput = InferOutput<TOutputSchema>;
   const {
     name,
     description,
@@ -218,7 +240,8 @@ export function useWebMCP<
         const result = await execute(input);
         const formattedOutput = formatOutputRef.current(result);
 
-        return {
+        // Build the MCP response with text content
+        const response: CallToolResult = {
           content: [
             {
               type: 'text',
@@ -226,6 +249,18 @@ export function useWebMCP<
             },
           ],
         };
+
+        // When outputSchema is defined, include structuredContent per MCP specification.
+        // The type assertion is safe because:
+        // 1. outputSchema uses Zod schema, which always produces object types
+        // 2. WebMCPConfig constrains handler return type to match outputSchema via InferOutput
+        // 3. The MCP SDK's structuredContent type is Record<string, unknown>
+        // Therefore, result is always assignable to Record<string, unknown> when outputSchema exists.
+        if (outputJsonSchema) {
+          response.structuredContent = result as Record<string, unknown>;
+        }
+
+        return response;
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
 

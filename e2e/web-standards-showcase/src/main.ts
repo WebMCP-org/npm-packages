@@ -353,10 +353,18 @@ function provideCounterTools(): void {
     },
     {
       name: 'counter_get',
-      description: 'Get counter value',
+      description: 'Get counter value with structured output',
       inputSchema: { type: 'object', properties: {} },
+      outputSchema: {
+        type: 'object',
+        properties: {
+          counter: { type: 'number', description: 'Current counter value' },
+          timestamp: { type: 'string', description: 'ISO timestamp' },
+        },
+        required: ['counter', 'timestamp'],
+      },
       async execute() {
-        return `Counter: ${counter}`;
+        return { counter, timestamp: new Date().toISOString() };
       },
     },
   ];

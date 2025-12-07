@@ -10,12 +10,22 @@ import { testMiddleware } from './testMiddleware';
 console.log('React WebMCP Test App initialized');
 console.log('navigator.modelContext:', navigator.modelContext);
 
+// Extend Window interface for testing
+declare global {
+  interface Window {
+    mcpClient?: Client;
+  }
+}
+
 // Create MCP client that connects to the MCP server exposed by @mcp-b/global
 // The server is automatically started when @mcp-b/global is imported
 const client = new Client({ name: 'ReactWebMCPTestClient', version: '1.0.0' });
 
 // Wrap client with test middleware to observe MCP events
 const wrappedClient = testMiddleware.wrapClient(client);
+
+// Expose the wrapped client globally for e2e testing
+window.mcpClient = wrappedClient;
 
 // Use TabClientTransport to connect to the MCP server
 // The 'mcp' channel matches what TabServerTransport uses in @mcp-b/global

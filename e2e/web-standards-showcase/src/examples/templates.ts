@@ -186,6 +186,58 @@ const timerTool = {
 // Use registerTool for persistent registration
 navigator.modelContext.registerTool(timerTool);`,
 
+  'output-schema': `// Tool with Output Schema (structuredContent demo)
+// This demonstrates how outputSchema enables structuredContent in MCP responses
+
+let counter = 0;
+
+const counterTool = {
+  name: 'structured_counter',
+  description: 'Get counter value with structured output',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      increment: {
+        type: 'number',
+        description: 'Optional amount to increment before returning'
+      }
+    }
+  },
+  // Output schema enables structuredContent in the MCP response
+  outputSchema: {
+    type: 'object',
+    properties: {
+      counter: {
+        type: 'number',
+        description: 'The current counter value'
+      },
+      timestamp: {
+        type: 'string',
+        description: 'ISO timestamp when the value was retrieved'
+      },
+      previousValue: {
+        type: 'number',
+        description: 'The previous counter value before increment'
+      }
+    },
+    required: ['counter', 'timestamp']
+  },
+  async execute(input) {
+    const previousValue = counter;
+    if (input.increment) {
+      counter += input.increment;
+    }
+    // Return structured data matching the outputSchema
+    return {
+      counter,
+      timestamp: new Date().toISOString(),
+      previousValue
+    };
+  }
+};
+
+navigator.modelContext.registerTool(counterTool);`,
+
   'state-machine': `// State Machine Tool
 const states = ['idle', 'processing', 'completed', 'error'];
 let currentState = 'idle';

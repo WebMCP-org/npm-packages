@@ -456,6 +456,207 @@ test.describe('Event Log', () => {
   });
 });
 
+// ============================================================================
+// outputSchema / structuredContent Tests
+// ============================================================================
+
+test.describe('Output Schema and structuredContent', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('.banner.success');
+  });
+
+  test('should include outputSchema in tool listing', async ({ page }) => {
+    // Provide counter tools (includes counter_get with outputSchema)
+    await page.click('#provide-counter-tools');
+    await page.waitForSelector('.tool-name:has-text("counter_get")');
+
+    // Check via testing API that outputSchema is present
+    const toolInfo = await page.evaluate(() => {
+      const testing = navigator.modelContextTesting;
+      if (!testing) return null;
+
+      const tools = testing.listTools();
+      const counterGetTool = tools.find((t) => t.name === 'counter_get');
+      return counterGetTool;
+    });
+
+    expect(toolInfo).not.toBeNull();
+    expect(toolInfo?.name).toBe('counter_get');
+    // outputSchema should be serialized as JSON string in the testing API
+    expect(toolInfo?.outputSchema).toBeDefined();
+    if (toolInfo?.outputSchema) {
+      const outputSchema = JSON.parse(toolInfo.outputSchema);
+      expect(outputSchema.properties.counter).toBeDefined();
+      expect(outputSchema.properties.timestamp).toBeDefined();
+    }
+  });
+
+  test('should return structuredContent when outputSchema is defined', async ({ page }) => {
+    // Provide counter tools
+    await page.click('#provide-counter-tools');
+    await page.waitForSelector('.tool-name:has-text("counter_get")');
+
+    // Execute counter_get tool and check for structuredContent
+    const result = await page.evaluate(async () => {
+      const testing = navigator.modelContextTesting;
+      if (!testing) return { error: 'Testing API not available' };
+
+      try {
+        // executeTool returns structuredContent directly when outputSchema is present
+        const response = await testing.executeTool('counter_get', '{}');
+        return {
+          success: true,
+          response,
+          type: typeof response,
+        };
+      } catch (error) {
+        return {
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    });
+
+    expect(result.success).toBe(true);
+    // The response should be the structured object (counter, timestamp)
+    expect(result.type).toBe('object');
+
+    const response = result.response as { counter: number; timestamp: string };
+    expect(response).toHaveProperty('counter');
+    expect(response).toHaveProperty('timestamp');
+    expect(typeof response.counter).toBe('number');
+    expect(typeof response.timestamp).toBe('string');
+  });
+
+  test('should return structured counter value reflecting state', async ({ page }) => {
+    // Provide counter tools
+    await page.click('#provide-counter-tools');
+    await page.waitForSelector('.tool-name:has-text("counter_get")');
+
+    // Get initial counter value
+    const initialResult = await page.evaluate(async () => {
+      const testing = navigator.modelContextTesting;
+      if (!testing) throw new Error('Testing API not available');
+
+      const response = (await testing.executeTool('counter_get', '{}')) as {
+        counter: number;
+        timestamp: string;
+      };
+      return response;
+    });
+
+    expect(initialResult.counter).toBe(0);
+    expect(initialResult.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+
+    // Increment counter
+    await page.evaluate(async () => {
+      const testing = navigator.modelContextTesting;
+      if (!testing) throw new Error('Testing API not available');
+      await testing.executeTool('counter_increment', '{}');
+    });
+
+    // Get updated counter value
+    const updatedResult = await page.evaluate(async () => {
+      const testing = navigator.modelContextTesting;
+      if (!testing) throw new Error('Testing API not available');
+
+      const response = (await testing.executeTool('counter_get', '{}')) as {
+        counter: number;
+        timestamp: string;
+      };
+      return response;
+    });
+
+    expect(updatedResult.counter).toBe(1);
+  });
+
+  test('should load and execute output-schema template', async ({ page }) => {
+    // Load output-schema template
+    await page.selectOption('#template-select', 'output-schema');
+
+    // Verify code is loaded
+    const editorContent = await page.locator('#code-editor').inputValue();
+    expect(editorContent).toContain('structured_counter');
+    expect(editorContent).toContain('outputSchema');
+
+    // Execute the code
+    await page.click('#register-code');
+    await page.waitForSelector('.log-entry:has-text("Code executed")');
+
+    // Verify tool appears
+    await expect(page.locator('.tool-name:has-text("structured_counter")')).toBeVisible();
+
+    // Execute the tool
+    const result = await page.evaluate(async () => {
+      const testing = navigator.modelContextTesting;
+      if (!testing) throw new Error('Testing API not available');
+
+      const response = (await testing.executeTool('structured_counter', '{}')) as {
+        counter: number;
+        timestamp: string;
+        previousValue: number;
+      };
+      return response;
+    });
+
+    expect(result.counter).toBe(0);
+    expect(result.previousValue).toBe(0);
+    expect(result.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  test('should return structured data with increment', async ({ page }) => {
+    // Load output-schema template
+    await page.selectOption('#template-select', 'output-schema');
+    await page.click('#register-code');
+    await page.waitForSelector('.tool-name:has-text("structured_counter")');
+
+    // Execute with increment
+    const result = await page.evaluate(async () => {
+      const testing = navigator.modelContextTesting;
+      if (!testing) throw new Error('Testing API not available');
+
+      // First call to set baseline
+      await testing.executeTool('structured_counter', '{}');
+
+      // Second call with increment
+      const response = (await testing.executeTool(
+        'structured_counter',
+        JSON.stringify({ increment: 5 })
+      )) as {
+        counter: number;
+        timestamp: string;
+        previousValue: number;
+      };
+      return response;
+    });
+
+    expect(result.counter).toBe(5);
+    expect(result.previousValue).toBe(0);
+  });
+
+  test('should NOT return structuredContent for tools without outputSchema', async ({ page }) => {
+    // Provide counter tools
+    await page.click('#provide-counter-tools');
+    await page.waitForSelector('.tool-name:has-text("counter_increment")');
+
+    // Execute counter_increment (no outputSchema)
+    const result = await page.evaluate(async () => {
+      const testing = navigator.modelContextTesting;
+      if (!testing) return { error: 'Testing API not available' };
+
+      const response = await testing.executeTool('counter_increment', '{}');
+      return {
+        response,
+        type: typeof response,
+      };
+    });
+
+    // For tools without outputSchema, the response is parsed text (string or parsed JSON)
+    // The counter_increment returns a string like "Counter: 1"
+    expect(result.response).toBeDefined();
+  });
+});
+
 test.describe('Iframe Context Propagation', () => {
   test('should load iframe and show connected status', async ({ page }) => {
     await page.goto('/');

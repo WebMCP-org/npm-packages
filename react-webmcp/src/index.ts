@@ -57,8 +57,14 @@ export type {
 
 /**
  * Type definitions for tool registration and configuration.
+ *
+ * - {@link WebMCPConfig} - Configuration for tool registration
+ * - {@link WebMCPReturn} - Return value from useWebMCP hook
+ * - {@link ToolExecutionState} - Current execution state of a tool
+ * - {@link InferOutput} - Utility type for inferring output from Zod schema
  */
 export type {
+  InferOutput,
   ToolExecutionState,
   WebMCPConfig,
   WebMCPReturn,

@@ -82,6 +82,9 @@ class McpTestMiddleware {
           tool: request.name,
           result,
           isError: result.isError ?? false,
+          hasStructuredContent:
+            'structuredContent' in result && result.structuredContent !== undefined,
+          structuredContent: result.structuredContent,
         });
 
         return result;

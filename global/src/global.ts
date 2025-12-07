@@ -2001,6 +2001,7 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
         return {
           content: response.content,
           isError: response.isError,
+          ...(response.structuredContent && { structuredContent: response.structuredContent }),
         };
       } catch (error) {
         console.error(`[MCP Bridge] Error calling tool ${toolName}:`, error);

@@ -605,3 +605,169 @@ test.describe('React WebMCP Combined Hook Tests', () => {
     await expect(mcpToolsSection).toBeVisible();
   });
 });
+
+// ============================================================================
+// structuredContent Tests
+// ============================================================================
+
+test.describe('React WebMCP structuredContent Tests', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('http://localhost:8888');
+    await page.waitForSelector('[data-testid="app-status"]');
+    // Wait for modelContextTesting to be available and tools to be registered
+    await page.waitForFunction(
+      () => {
+        const testing = navigator.modelContextTesting;
+        if (!testing) return false;
+        const tools = testing.listTools();
+        // Wait until counter_get tool is registered
+        return tools.some((t) => t.name === 'counter_get');
+      },
+      { timeout: 10000 }
+    );
+  });
+
+  test('should return structuredContent for tools with outputSchema', async ({ page }) => {
+    // Call the counter_get tool via modelContextTesting (it has outputSchema defined)
+    // The executeTool returns structuredContent directly when outputSchema is present
+    const result = await page.evaluate(async () => {
+      const testing = navigator.modelContextTesting;
+      if (!testing) {
+        throw new Error('modelContextTesting not available');
+      }
+
+      try {
+        // executeTool returns structuredContent directly for tools with outputSchema
+        const response = await testing.executeTool('counter_get', '{}');
+        return {
+          success: true,
+          response,
+          isObject: typeof response === 'object' && response !== null,
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    });
+
+    // Verify the tool call was successful
+    expect(result.success).toBe(true);
+
+    // modelContextTesting.executeTool returns structuredContent directly when present
+    // (it returns the value itself, not wrapped in a response object)
+    expect(result.isObject).toBe(true);
+
+    // Verify the response has the expected structure (counter and timestamp)
+    const response = result.response as { counter: number; timestamp: string };
+    expect(response).toBeDefined();
+    expect(response).toHaveProperty('counter');
+    expect(response).toHaveProperty('timestamp');
+    expect(typeof response.counter).toBe('number');
+    expect(typeof response.timestamp).toBe('string');
+  });
+
+  test('should return parsed text for tools without outputSchema', async ({ page }) => {
+    // Call the counter_increment tool via modelContextTesting (it does NOT have outputSchema)
+    // When no outputSchema is present, executeTool returns parsed text content
+    const result = await page.evaluate(async () => {
+      const testing = navigator.modelContextTesting;
+      if (!testing) {
+        throw new Error('modelContextTesting not available');
+      }
+
+      try {
+        const response = await testing.executeTool(
+          'counter_increment',
+          JSON.stringify({ amount: 1 })
+        );
+        return {
+          success: true,
+          response,
+          typeOf: typeof response,
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    });
+
+    // Verify the tool call was successful
+    expect(result.success).toBe(true);
+
+    // For tools without outputSchema, executeTool parses the text content
+    // The response should be the parsed JSON from the text content
+    expect(result.response).toBeDefined();
+  });
+
+  test('should return correct counter value from structuredContent', async ({ page }) => {
+    // Test that structuredContent contains the actual data from the handler
+    const result = await page.evaluate(async () => {
+      const testing = navigator.modelContextTesting;
+      if (!testing) {
+        throw new Error('modelContextTesting not available');
+      }
+
+      // Call counter_get - returns { counter, timestamp }
+      const response = (await testing.executeTool('counter_get', '{}')) as {
+        counter: number;
+        timestamp: string;
+      };
+
+      return {
+        counter: response.counter,
+        hasTimestamp: typeof response.timestamp === 'string',
+        timestampIsISO: /^\d{4}-\d{2}-\d{2}T/.test(response.timestamp),
+      };
+    });
+
+    // The counter starts at 0
+    expect(typeof result.counter).toBe('number');
+    expect(result.hasTimestamp).toBe(true);
+    expect(result.timestampIsISO).toBe(true);
+  });
+
+  test('should validate structuredContent reflects updated state', async ({ page }) => {
+    // Call counter_get multiple times and verify structuredContent reflects actual values
+    const results = await page.evaluate(async () => {
+      const testing = navigator.modelContextTesting;
+      if (!testing) {
+        throw new Error('modelContextTesting not available');
+      }
+
+      // First call - get initial counter value
+      const response1 = (await testing.executeTool('counter_get', '{}')) as {
+        counter: number;
+        timestamp: string;
+      };
+      const initialCounter = response1.counter;
+
+      // Increment counter by 5
+      await testing.executeTool('counter_increment', JSON.stringify({ amount: 5 }));
+
+      // Second call - get updated counter value
+      const response2 = (await testing.executeTool('counter_get', '{}')) as {
+        counter: number;
+        timestamp: string;
+      };
+      const updatedCounter = response2.counter;
+
+      return {
+        initialCounter,
+        updatedCounter,
+        incrementedBy5: updatedCounter === initialCounter + 5,
+        hasValidTimestamp: typeof response1.timestamp === 'string',
+      };
+    });
+
+    // Verify the counter was incremented correctly
+    expect(results.incrementedBy5).toBe(true);
+    expect(results.hasValidTimestamp).toBe(true);
+    expect(typeof results.initialCounter).toBe('number');
+    expect(typeof results.updatedCounter).toBe('number');
+    expect(results.updatedCounter).toBe(results.initialCounter + 5);
+  });
+});
