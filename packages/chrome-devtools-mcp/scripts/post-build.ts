@@ -36,7 +36,9 @@ function renameNodeModulesToVendor(): void {
   // Update all import paths in the built JS files
   console.log('Updating import paths from node_modules to vendor...');
   const srcDir = path.join(BUILD_DIR, 'src');
+  const testsDir = path.join(BUILD_DIR, 'tests');
   updateImportPathsInDir(srcDir);
+  updateImportPathsInDir(testsDir);
 
   console.log('Successfully renamed node_modules to vendor');
 }
