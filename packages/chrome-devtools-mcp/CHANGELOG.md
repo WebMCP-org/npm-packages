@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.5-beta.0
+
+### Patch Changes
+
+- d4e18d9: Fix post-build script to update import paths in tests directory
+
+  The post-build script now correctly updates import paths from `node_modules` to `vendor` in both `src/` and `tests/` directories, fixing test failures after the vendor rename.
+
 ## 1.1.4
 
 ### Patch Changes
