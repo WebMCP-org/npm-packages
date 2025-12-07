@@ -10,23 +10,41 @@ import {ToolCategory} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
 
 /**
- * List all MCP tools available on the current webpage.
+ * List all MCP tools available on a webpage.
  * Auto-connects to WebMCP if not already connected.
  */
 export const listWebMCPTools = defineTool({
   name: 'list_webmcp_tools',
   description:
-    'List all MCP tools available on the current webpage. ' +
-    'Automatically connects to WebMCP if the page has @mcp-b/global loaded.',
+    'List all MCP tools available on a webpage. ' +
+    'Automatically connects to WebMCP if the page has @mcp-b/global loaded. ' +
+    'Use page_index to target a specific page (see list_pages for indices).',
   annotations: {
     title: 'List Website MCP Tools',
     category: ToolCategory.WEBMCP,
     readOnlyHint: true,
   },
-  schema: {},
-  handler: async (_request, response, context) => {
+  schema: {
+    page_index: zod
+      .number()
+      .int()
+      .optional()
+      .describe(
+        'Index of the page to list tools from. If not specified, uses the currently selected page. ' +
+          'Use list_pages to see available pages and their indices.',
+      ),
+  },
+  handler: async (request, response, context) => {
+    const {page_index} = request.params;
+
+    // Get the target page
+    const page =
+      page_index !== undefined
+        ? context.getPageByIdx(page_index)
+        : context.getSelectedPage();
+
     // Get client from context (handles auto-connect and stale connection detection)
-    const result = await context.getWebMCPClient();
+    const result = await context.getWebMCPClient(page);
     if (!result.connected) {
       response.appendResponseLine(
         result.error || 'No WebMCP tools available on this page.',
@@ -38,6 +56,11 @@ export const listWebMCPTools = defineTool({
 
     try {
       const {tools} = await client.listTools();
+
+      if (page_index !== undefined) {
+        response.appendResponseLine(`Page ${page_index}: ${page.url()}`);
+        response.appendResponseLine('');
+      }
 
       response.appendResponseLine(`${tools.length} tool(s) available:`);
       response.appendResponseLine('');
@@ -69,15 +92,16 @@ export const listWebMCPTools = defineTool({
 });
 
 /**
- * Call a tool registered on the webpage via WebMCP.
+ * Call a tool registered on a webpage via WebMCP.
  * Auto-connects to WebMCP if not already connected.
  */
 export const callWebMCPTool = defineTool({
   name: 'call_webmcp_tool',
   description:
-    'Call a tool registered on the webpage via WebMCP. ' +
+    'Call a tool registered on a webpage via WebMCP. ' +
     'Automatically connects if the page has @mcp-b/global loaded. ' +
-    'Use list_webmcp_tools to see available tools and their schemas.',
+    'Use list_webmcp_tools to see available tools and their schemas. ' +
+    'Use page_index to target a specific page.',
   annotations: {
     title: 'Call Website MCP Tool',
     category: ToolCategory.WEBMCP,
@@ -89,10 +113,26 @@ export const callWebMCPTool = defineTool({
       .record(zod.any())
       .optional()
       .describe('Arguments to pass to the tool as a JSON object'),
+    page_index: zod
+      .number()
+      .int()
+      .optional()
+      .describe(
+        'Index of the page to call the tool on. If not specified, uses the currently selected page. ' +
+          'Use list_pages to see available pages and their indices.',
+      ),
   },
   handler: async (request, response, context) => {
+    const {name, arguments: args, page_index} = request.params;
+
+    // Get the target page
+    const page =
+      page_index !== undefined
+        ? context.getPageByIdx(page_index)
+        : context.getSelectedPage();
+
     // Get client from context (handles auto-connect and stale connection detection)
-    const result = await context.getWebMCPClient();
+    const result = await context.getWebMCPClient(page);
     if (!result.connected) {
       response.appendResponseLine(
         result.error || 'No WebMCP tools available on this page.',
@@ -101,9 +141,11 @@ export const callWebMCPTool = defineTool({
     }
 
     const client = result.client;
-    const {name, arguments: args} = request.params;
 
     try {
+      if (page_index !== undefined) {
+        response.appendResponseLine(`Page ${page_index}: ${page.url()}`);
+      }
       response.appendResponseLine(`Calling tool: ${name}`);
       if (args && Object.keys(args).length > 0) {
         response.appendResponseLine(`Arguments: ${JSON.stringify(args)}`);

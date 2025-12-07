@@ -136,7 +136,7 @@ export class McpContext implements Context {
 
   #locatorClass: typeof Locator;
   #options: McpContextOptions;
-  #webMCPConnection: WebMCPConnection | null = null;
+  #webMCPConnections = new WeakMap<Page, WebMCPConnection>();
 
   private constructor(
     browser: Browser,
@@ -724,29 +724,23 @@ export class McpContext implements Context {
   }
 
   /**
-   * Get a WebMCP client for the current page, auto-connecting if needed.
+   * Get a WebMCP client for a page, auto-connecting if needed.
    *
    * This method handles the full lifecycle of WebMCP connections:
-   * - Detects stale connections (page reload, navigation, browser close/reopen)
+   * - Maintains separate connections per page (one-to-many relationship)
+   * - Detects stale connections (page reload, navigation)
    * - Cleans up old connections before creating new ones
    * - Auto-connects when WebMCP is available on the page
    *
-   * The connection state is managed per-context (not globally), ensuring
-   * proper isolation and cleanup.
+   * @param page - Optional page to get client for. Defaults to selected page.
    */
-  async getWebMCPClient(): Promise<WebMCPClientResult> {
-    const page = this.getSelectedPage();
+  async getWebMCPClient(page?: Page): Promise<WebMCPClientResult> {
+    const targetPage = page ?? this.getSelectedPage();
 
-    // Check if we have a valid, active connection to the same page
-    // We must verify:
-    // 1. isClosed() - to detect page reloads where URL stays the same but frames are invalidated
-    // 2. page identity - to detect browser close/reopen where the page object is different
-    const conn = this.#webMCPConnection;
-    if (
-      conn &&
-      !conn.transport.isClosed() &&
-      conn.page === page
-    ) {
+    // Check if we have a valid, active connection for this page
+    // We must verify isClosed() to detect page reloads where URL stays the same but frames are invalidated
+    const conn = this.#webMCPConnections.get(targetPage);
+    if (conn && !conn.transport.isClosed()) {
       return {connected: true, client: conn.client};
     }
 
@@ -757,11 +751,11 @@ export class McpContext implements Context {
       } catch {
         // Ignore close errors
       }
-      this.#webMCPConnection = null;
+      this.#webMCPConnections.delete(targetPage);
     }
 
     // Check if WebMCP is available
-    const hasWebMCP = await this.#checkWebMCPAvailable(page);
+    const hasWebMCP = await this.#checkWebMCPAvailable(targetPage);
     if (!hasWebMCP) {
       return {connected: false, error: 'WebMCP not detected on this page'};
     }
@@ -769,7 +763,7 @@ export class McpContext implements Context {
     // Connect
     try {
       const transport = new WebMCPClientTransport({
-        page,
+        page: targetPage,
         readyTimeout: 10000,
         requireWebMCP: false, // We already checked
       });
@@ -782,15 +776,16 @@ export class McpContext implements Context {
       // Set up onclose handler to clean up connection state
       // This handles page navigations, reloads, and manual disconnections
       transport.onclose = () => {
-        if (this.#webMCPConnection?.client === client) {
-          this.#webMCPConnection = null;
+        const currentConn = this.#webMCPConnections.get(targetPage);
+        if (currentConn?.client === client) {
+          this.#webMCPConnections.delete(targetPage);
         }
       };
 
       await client.connect(transport);
 
-      // Store connection for later use
-      this.#webMCPConnection = {client, transport, page};
+      // Store connection for this page
+      this.#webMCPConnections.set(targetPage, {client, transport, page: targetPage});
 
       return {connected: true, client};
     } catch (err) {

@@ -119,10 +119,12 @@ export type Context = Readonly<{
    */
   resolveCdpElementId(cdpBackendNodeId: number): string | undefined;
   /**
-   * Get a WebMCP client for the current page, auto-connecting if needed.
-   * Handles stale connection detection (page reload, navigation, browser close/reopen).
+   * Get a WebMCP client for a page, auto-connecting if needed.
+   * Maintains separate connections per page (one-to-many relationship).
+   * Handles stale connection detection (page reload, navigation).
+   * @param page - Optional page to get client for. Defaults to selected page.
    */
-  getWebMCPClient(): Promise<WebMCPClientResult>;
+  getWebMCPClient(page?: Page): Promise<WebMCPClientResult>;
 }>;
 
 export function defineTool<Schema extends zod.ZodRawShape>(
