@@ -266,6 +266,7 @@ export function McpClientProvider({
     };
   }, [client, isConnected, fetchResourcesInternal, fetchToolsInternal]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional - reconnect when client/transport props change
   useEffect(() => {
     // Initial connection - reconnect() has its own guard to prevent concurrent connections
     reconnect().catch((err) => {
@@ -277,7 +278,6 @@ export function McpClientProvider({
       connectionStateRef.current = 'disconnected';
       setIsConnected(false);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client, transport]);
 
   return (

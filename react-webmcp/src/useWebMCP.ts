@@ -224,6 +224,7 @@ export function useWebMCP<
     });
   }, []);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: execute is stable (empty deps array) and uses refs internally
   useEffect(() => {
     if (typeof window === 'undefined' || !window.navigator?.modelContext) {
       console.warn(
@@ -302,7 +303,6 @@ export function useWebMCP<
       }
     };
     // Note: execute is intentionally omitted - it's stable (empty deps) and uses refs internally
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [name, description, inputSchema, outputSchema, annotations]);
 
   return {

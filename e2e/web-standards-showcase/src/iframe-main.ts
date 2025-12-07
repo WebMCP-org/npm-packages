@@ -24,7 +24,6 @@ function init(): void {
     return;
   }
 
-  // biome-ignore lint/style/noNonNullAssertion: Checked in detection step above
   modelContext = navigator.modelContext!;
 
   setupEventListeners();
@@ -292,7 +291,6 @@ function logEvent(type: 'info' | 'success' | 'warning' | 'error', message: strin
 document.addEventListener('DOMContentLoaded', init);
 
 // Expose for parent window testing
-// biome-ignore lint/suspicious/noExplicitAny: Intentional window extension for testing
 (window as any).iframeTestApp = {
   getTools: getToolNames,
   registerBucketA: registerBucketATool,
