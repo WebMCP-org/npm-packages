@@ -54,8 +54,11 @@ declare global {
 /**
  * Detect if the native Chromium Web Model Context API is available.
  * Checks for both navigator.modelContext and navigator.modelContextTesting,
- * and verifies they are native implementations (not polyfills) by examining
- * the constructor name.
+ * and verifies they are native implementations (not polyfills).
+ *
+ * Detection uses a marker property (`__isWebMCPPolyfill`) on the testing API
+ * to reliably distinguish polyfills from native implementations. This approach
+ * works correctly even when class names are minified in production builds.
  *
  * @returns Detection result with flags for native context and testing API availability
  */
@@ -74,8 +77,12 @@ function detectNativeAPI(): {
     return { hasNativeContext: false, hasNativeTesting: false };
   }
 
-  const testingConstructorName = modelContextTesting.constructor?.name || '';
-  const isPolyfill = testingConstructorName.includes('WebModelContext');
+  // Check for polyfill marker property.
+  // This is more reliable than constructor name checking, which fails when
+  // class names are minified in production builds.
+  const isPolyfill =
+    '__isWebMCPPolyfill' in modelContextTesting &&
+    (modelContextTesting as { __isWebMCPPolyfill?: boolean }).__isWebMCPPolyfill === true;
 
   if (isPolyfill) {
     return { hasNativeContext: false, hasNativeTesting: false };
@@ -587,6 +594,13 @@ type ListChangeType = 'tools' | 'resources' | 'prompts';
  * @implements {ModelContextTesting}
  */
 class WebModelContextTesting implements ModelContextTesting {
+  /**
+   * Marker property to identify this as a polyfill implementation.
+   * Used by detectNativeAPI() to distinguish polyfill from native Chromium API.
+   * This approach works reliably even when class names are minified in production builds.
+   */
+  readonly __isWebMCPPolyfill = true as const;
+
   private toolCallHistory: Array<{
     toolName: string;
     arguments: Record<string, unknown>;
