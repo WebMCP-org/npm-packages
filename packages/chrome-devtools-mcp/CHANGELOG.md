@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.1
+
+### Patch Changes
+
+- 51e345d: Fix turbo build output caching - adds package-level turbo.json to correctly specify build/\*\* as output directory. This fixes the issue where published packages were missing build/node_modules containing compiled chrome-devtools-frontend dependencies.
+
 ## 1.1.0
 
 ### Minor Changes
