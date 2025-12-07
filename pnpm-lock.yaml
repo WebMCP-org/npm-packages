@@ -622,13 +622,32 @@ importers:
         version: 5.9.2
 
   packages/chrome-devtools-mcp:
+    dependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: 1.24.1
+        version: 1.24.1(zod@3.25.76)
+      core-js:
+        specifier: 3.47.0
+        version: 3.47.0
+      debug:
+        specifier: 4.4.3
+        version: 4.4.3
+      puppeteer:
+        specifier: 24.32.0
+        version: 24.32.0(typescript@5.9.3)
+      puppeteer-core:
+        specifier: 24.32.0
+        version: 24.32.0
+      yargs:
+        specifier: 18.0.0
+        version: 18.0.0
+      zod:
+        specifier: 3.25.76
+        version: 3.25.76
     devDependencies:
       '@eslint/js':
         specifier: ^9.35.0
         version: 9.38.0
-      '@modelcontextprotocol/sdk':
-        specifier: 1.24.1
-        version: 1.24.1(zod@3.25.76)
       '@rollup/plugin-commonjs':
         specifier: ^29.0.0
         version: 29.0.0(rollup@4.53.3)
@@ -665,12 +684,6 @@ importers:
       chrome-devtools-frontend:
         specifier: 1.0.1550444
         version: 1.0.1550444
-      core-js:
-        specifier: 3.47.0
-        version: 3.47.0
-      debug:
-        specifier: 4.4.3
-        version: 4.4.3
       eslint:
         specifier: ^9.35.0
         version: 9.38.0(jiti@2.6.1)
@@ -686,12 +699,6 @@ importers:
       prettier:
         specifier: ^3.6.2
         version: 3.6.2
-      puppeteer:
-        specifier: 24.32.0
-        version: 24.32.0(typescript@5.9.3)
-      puppeteer-core:
-        specifier: 24.32.0
-        version: 24.32.0
       rollup:
         specifier: 4.53.3
         version: 4.53.3
@@ -710,12 +717,6 @@ importers:
       typescript-eslint:
         specifier: ^8.43.0
         version: 8.46.2(eslint@9.38.0(jiti@2.6.1))(typescript@5.9.3)
-      yargs:
-        specifier: 18.0.0
-        version: 18.0.0
-      zod:
-        specifier: 3.25.76
-        version: 3.25.76
 
   react-webmcp:
     dependencies:
