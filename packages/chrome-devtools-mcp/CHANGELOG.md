@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.1.0
+
+### Minor Changes
+
+- 79de6d9: Add WebMCP integration to connect to MCP tools registered on webpages
+
+  This adds two new tools for interacting with website-specific MCP functionality:
+
+  - `list_webmcp_tools`: List available website tools (auto-connects to WebMCP)
+  - `call_webmcp_tool`: Call a website tool (auto-connects to WebMCP)
+
+  The tools automatically handle connection management - no explicit connect/disconnect
+  calls needed. WebMCP auto-reconnects when navigating between pages.
+
+  Websites can register tools using @mcp-b/global, and AI agents can now interact
+  with those tools through chrome-devtools-mcp using the Chrome DevTools Protocol.
+
+- Stable release of all packages with backwards-compatible improvements.
+
+### Patch Changes
+
+- 02833d3: Bump all packages to new beta release
+- 7239bb5: Bump all packages to new beta release
+
 ## 1.0.3-beta.1
 
 ### Patch Changes

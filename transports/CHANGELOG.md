@@ -1,5 +1,19 @@
 # @mcp-b/transports
 
+## 1.2.0
+
+### Minor Changes
+
+- Stable release of all packages with backwards-compatible improvements.
+
+### Patch Changes
+
+- 02833d3: Bump all packages to new beta release
+- 1f26978: Beta release for testing
+- 7239bb5: Bump all packages to new beta release
+- 1f26978: Add dedicated @mcp-b/mcp-iframe package for MCPIframeElement custom element
+- b8c2ea5: Beta release bump
+
 ## 1.1.2-beta.4
 
 ### Patch Changes
