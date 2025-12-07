@@ -14,13 +14,13 @@ import {logger, saveLogsToFile} from './logger.js';
 import {McpContext} from './McpContext.js';
 import {McpResponse} from './McpResponse.js';
 import {Mutex} from './Mutex.js';
+import {registerPrompts} from './prompts/index.js';
 import {
   McpServer,
   StdioServerTransport,
   type CallToolResult,
   SetLevelRequestSchema,
 } from './third_party/index.js';
-import {registerPrompts} from './prompts/index.js';
 import {ToolCategory} from './tools/categories.js';
 import type {ToolDefinition} from './tools/ToolDefinition.js';
 import {tools} from './tools/tools.js';

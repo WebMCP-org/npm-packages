@@ -6,9 +6,9 @@
 
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 
-import {WebMCPClientTransport} from '../transports/index.js';
 import {zod} from '../third_party/index.js';
 import type {Page} from '../third_party/index.js';
+import {WebMCPClientTransport} from '../transports/index.js';
 
 import {ToolCategory} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
@@ -20,7 +20,7 @@ import type {Context} from './ToolDefinition.js';
  */
 let webMCPClient: Client | null = null;
 let webMCPTransport: WebMCPClientTransport | null = null;
-let connectedPageUrl: string | null = null;
+let connectedPage: Page | null = null;
 
 /**
  * Check if WebMCP is available on a page by checking the bridge's hasWebMCP() method.
@@ -57,31 +57,62 @@ async function checkWebMCPAvailable(page: Page): Promise<boolean> {
 }
 
 /**
- * Auto-connect to WebMCP on the current page if available.
- * Returns true if connected (or already connected to same page), false otherwise.
+ * Check if the current connection is still valid.
+ * A connection is invalid if:
+ * - The page object changed (browser reconnection)
+ * - The page is closed
+ * - The transport is closed
  */
-async function ensureWebMCPConnected(
-  context: Context
-): Promise<{connected: boolean; error?: string}> {
-  const page = context.getSelectedPage();
-  const currentUrl = page.url();
-
-  // If already connected to the same page, we're good
-  if (webMCPClient && connectedPageUrl === currentUrl) {
-    return {connected: true};
+function isConnectionValid(page: Page): boolean {
+  if (!webMCPClient || !webMCPTransport || !connectedPage) {
+    return false;
   }
 
-  // If connected to a different page, disconnect first
-  if (webMCPClient && connectedPageUrl !== currentUrl) {
+  // Check if the page object is the same instance
+  if (connectedPage !== page) {
+    return false;
+  }
+
+  // Check if the page is closed
+  if (page.isClosed()) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Clean up the current WebMCP connection.
+ */
+async function cleanupConnection(): Promise<void> {
+  if (webMCPClient) {
     try {
       await webMCPClient.close();
     } catch {
       // Ignore close errors
     }
-    webMCPClient = null;
-    webMCPTransport = null;
-    connectedPageUrl = null;
   }
+  webMCPClient = null;
+  webMCPTransport = null;
+  connectedPage = null;
+}
+
+/**
+ * Auto-connect to WebMCP on the current page if available.
+ * Returns true if connected (or already connected to same page), false otherwise.
+ */
+async function ensureWebMCPConnected(
+  context: Context,
+): Promise<{connected: boolean; error?: string}> {
+  const page = context.getSelectedPage();
+
+  // If already connected to the same page and connection is valid, we're good
+  if (isConnectionValid(page)) {
+    return {connected: true};
+  }
+
+  // Clean up any existing connection
+  await cleanupConnection();
 
   // Check if WebMCP is available
   const hasWebMCP = await checkWebMCPAvailable(page);
@@ -99,7 +130,7 @@ async function ensureWebMCPConnected(
 
     const client = new Client(
       {name: 'chrome-devtools-mcp', version: '1.0.0'},
-      {capabilities: {}}
+      {capabilities: {}},
     );
 
     // Set up onclose handler to clean up module-level state
@@ -108,7 +139,7 @@ async function ensureWebMCPConnected(
       if (webMCPClient === client) {
         webMCPClient = null;
         webMCPTransport = null;
-        connectedPageUrl = null;
+        connectedPage = null;
       }
     };
 
@@ -117,7 +148,7 @@ async function ensureWebMCPConnected(
     // Store for later use
     webMCPTransport = transport;
     webMCPClient = client;
-    connectedPageUrl = currentUrl;
+    connectedPage = page;
 
     return {connected: true};
   } catch (err) {
@@ -148,7 +179,7 @@ export const listWebMCPTools = defineTool({
     const connectResult = await ensureWebMCPConnected(context);
     if (!connectResult.connected) {
       response.appendResponseLine(
-        connectResult.error || 'No WebMCP tools available on this page.'
+        connectResult.error || 'No WebMCP tools available on this page.',
       );
       return;
     }
@@ -171,7 +202,7 @@ export const listWebMCPTools = defineTool({
             response.appendResponseLine(`  Input Schema: ${schemaStr}`);
           } else {
             response.appendResponseLine(
-              `  Input Schema: (complex schema, ${schemaStr.length} chars)`
+              `  Input Schema: (complex schema, ${schemaStr.length} chars)`,
             );
           }
         }
@@ -179,7 +210,7 @@ export const listWebMCPTools = defineTool({
       }
     } catch (err) {
       response.appendResponseLine(
-        `Failed to list tools: ${err instanceof Error ? err.message : String(err)}`
+        `Failed to list tools: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
   },
@@ -212,7 +243,7 @@ export const callWebMCPTool = defineTool({
     const connectResult = await ensureWebMCPConnected(context);
     if (!connectResult.connected) {
       response.appendResponseLine(
-        connectResult.error || 'No WebMCP tools available on this page.'
+        connectResult.error || 'No WebMCP tools available on this page.',
       );
       return;
     }
@@ -240,11 +271,11 @@ export const callWebMCPTool = defineTool({
             response.appendResponseLine(content.text);
           } else if (content.type === 'image') {
             response.appendResponseLine(
-              `[Image: ${content.mimeType}, ${content.data.length} bytes]`
+              `[Image: ${content.mimeType}, ${content.data.length} bytes]`,
             );
           } else if (content.type === 'resource') {
             response.appendResponseLine(
-              `[Resource: ${JSON.stringify(content.resource)}]`
+              `[Resource: ${JSON.stringify(content.resource)}]`,
             );
           } else {
             response.appendResponseLine(JSON.stringify(content, null, 2));
@@ -260,7 +291,7 @@ export const callWebMCPTool = defineTool({
       }
     } catch (err) {
       response.appendResponseLine(
-        `Failed to call tool: ${err instanceof Error ? err.message : String(err)}`
+        `Failed to call tool: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
   },

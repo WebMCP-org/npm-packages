@@ -69,7 +69,8 @@ function updateImportPathsInFile(filePath: string): void {
   // Handles: '../node_modules/', '../../node_modules/', etc.
   content = content.replace(
     /(['"])(\.\.\/)+(node_modules\/)/g,
-    (match, quote, dots) => `${quote}${dots.repeat(match.split('../').length - 1)}vendor/`,
+    (match, quote, dots) =>
+      `${quote}${dots.repeat(match.split('../').length - 1)}vendor/`,
   );
 
   if (content !== originalContent) {

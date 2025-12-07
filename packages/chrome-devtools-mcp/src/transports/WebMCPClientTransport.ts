@@ -8,7 +8,10 @@ import type {Transport} from '@modelcontextprotocol/sdk/shared/transport.js';
 import type {JSONRPCMessage} from '@modelcontextprotocol/sdk/types.js';
 import type {CDPSession, Page} from 'puppeteer-core';
 
-import {WEB_MCP_BRIDGE_SCRIPT, CHECK_WEBMCP_AVAILABLE_SCRIPT} from './WebMCPBridgeScript.js';
+import {
+  WEB_MCP_BRIDGE_SCRIPT,
+  CHECK_WEBMCP_AVAILABLE_SCRIPT,
+} from './WebMCPBridgeScript.js';
 
 /**
  * Options for creating a WebMCPClientTransport
@@ -121,7 +124,9 @@ export class WebMCPClientTransport implements Transport {
    */
   async checkWebMCPAvailable(): Promise<WebMCPCheckResult> {
     try {
-      const result = await this._page.evaluate(CHECK_WEBMCP_AVAILABLE_SCRIPT) as WebMCPCheckResult;
+      const result = (await this._page.evaluate(
+        CHECK_WEBMCP_AVAILABLE_SCRIPT,
+      )) as WebMCPCheckResult;
       return result;
     } catch {
       return {available: false};
@@ -153,7 +158,7 @@ export class WebMCPClientTransport implements Transport {
       if (!check.available) {
         throw new Error(
           'WebMCP not detected on this page. ' +
-            'Ensure @mcp-b/global is loaded and initialized.'
+            'Ensure @mcp-b/global is loaded and initialized.',
         );
       }
     }
@@ -179,7 +184,7 @@ export class WebMCPClientTransport implements Transport {
         this._handlePayload(payload);
       } catch (err) {
         this.onerror?.(
-          new Error(`Failed to parse message from bridge: ${err}`)
+          new Error(`Failed to parse message from bridge: ${err}`),
         );
       }
     });
@@ -192,8 +197,15 @@ export class WebMCPClientTransport implements Transport {
       }
     });
 
+    // Listen for page close events
+    this._page.on('close', () => {
+      this._handleNavigation();
+    });
+
     // Inject the bridge script
-    const result = await this._page.evaluate(WEB_MCP_BRIDGE_SCRIPT) as BridgeInjectionResult;
+    const result = (await this._page.evaluate(
+      WEB_MCP_BRIDGE_SCRIPT,
+    )) as BridgeInjectionResult;
 
     if (!result.success && !result.alreadyInjected) {
       throw new Error('Failed to inject WebMCP bridge script');
@@ -203,7 +215,9 @@ export class WebMCPClientTransport implements Transport {
 
     // Initiate server-ready handshake
     await this._page.evaluate(() => {
-      (window as unknown as {__mcpBridge: {checkReady: () => void}}).__mcpBridge?.checkReady();
+      (
+        window as unknown as {__mcpBridge: {checkReady: () => void}}
+      ).__mcpBridge?.checkReady();
     });
 
     // Wait for server ready with timeout
@@ -212,13 +226,15 @@ export class WebMCPClientTransport implements Transport {
         reject(
           new Error(
             `WebMCP server did not respond within ${this._readyTimeout}ms. ` +
-              'Ensure TabServerTransport is running on the page.'
-          )
+              'Ensure TabServerTransport is running on the page.',
+          ),
         );
       }, this._readyTimeout);
 
       // Clear timeout if promise resolves
-      this._serverReadyPromise.then(() => clearTimeout(timer)).catch(() => clearTimeout(timer));
+      this._serverReadyPromise
+        .then(() => clearTimeout(timer))
+        .catch(() => clearTimeout(timer));
     });
 
     try {
@@ -297,6 +313,21 @@ export class WebMCPClientTransport implements Transport {
   }
 
   /**
+   * Check if the page and CDP session are still valid
+   */
+  private _isPageValid(): boolean {
+    if (this._closed) {
+      return false;
+    }
+
+    if (this._page.isClosed()) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
    * Send a JSON-RPC message to the WebMCP server
    */
   async send(message: JSONRPCMessage): Promise<void> {
@@ -308,6 +339,15 @@ export class WebMCPClientTransport implements Transport {
       throw new Error('WebMCPClientTransport has been closed');
     }
 
+    // Check if page is still valid before attempting to send
+    if (!this._isPageValid()) {
+      const error = new Error('Page is no longer valid (closed or detached)');
+      this.onerror?.(error);
+      // Trigger cleanup
+      this._handleNavigation();
+      throw error;
+    }
+
     // Wait for server to be ready before sending
     await this._serverReadyPromise;
 
@@ -315,20 +355,31 @@ export class WebMCPClientTransport implements Transport {
     const messageJson = JSON.stringify(message);
 
     try {
-      await this._page.evaluate(
-        (msg: string) => {
-          const bridge = (window as unknown as {__mcpBridge?: {toServer: (msg: string) => boolean}}).__mcpBridge;
-          if (!bridge) {
-            throw new Error('WebMCP bridge not found');
+      await this._page.evaluate((msg: string) => {
+        const bridge = (
+          window as unknown as {
+            __mcpBridge?: {toServer: (msg: string) => boolean};
           }
-          const sent = bridge.toServer(msg);
-          if (!sent) {
-            throw new Error('Bridge failed to send message');
-          }
-        },
-        messageJson
-      );
+        ).__mcpBridge;
+        if (!bridge) {
+          throw new Error('WebMCP bridge not found');
+        }
+        const sent = bridge.toServer(msg);
+        if (!sent) {
+          throw new Error('Bridge failed to send message');
+        }
+      }, messageJson);
     } catch (err) {
+      // Check if this is a detached frame error
+      const errMsg = err instanceof Error ? err.message : String(err);
+      if (
+        errMsg.includes('detached') ||
+        errMsg.includes('Execution context was destroyed')
+      ) {
+        // Page navigation or destruction - trigger cleanup
+        this._handleNavigation();
+      }
+
       const error = new Error(`Failed to send message: ${err}`);
       this.onerror?.(error);
       throw error;
@@ -348,7 +399,9 @@ export class WebMCPClientTransport implements Transport {
     // Dispose the bridge script if possible
     try {
       await this._page.evaluate(() => {
-        (window as unknown as {__mcpBridge?: {dispose: () => void}}).__mcpBridge?.dispose();
+        (
+          window as unknown as {__mcpBridge?: {dispose: () => void}}
+        ).__mcpBridge?.dispose();
       });
     } catch {
       // Ignore errors during cleanup

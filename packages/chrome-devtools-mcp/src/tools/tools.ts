@@ -12,8 +12,8 @@ import * as performanceTools from './performance.js';
 import * as screenshotTools from './screenshot.js';
 import * as scriptTools from './script.js';
 import * as snapshotTools from './snapshot.js';
-import * as webmcpTools from './webmcp.js';
 import type {ToolDefinition} from './ToolDefinition.js';
+import * as webmcpTools from './webmcp.js';
 
 const tools = [
   ...Object.values(consoleTools),

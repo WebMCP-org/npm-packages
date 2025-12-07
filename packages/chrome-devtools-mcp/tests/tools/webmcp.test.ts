@@ -195,15 +195,24 @@ describe('webmcp tools', () => {
 
         // Wait for page to initialize
         await page.waitForFunction(() => {
-          return typeof (window as {navigator: {modelContext?: unknown}}).navigator.modelContext !== 'undefined';
+          return (
+            typeof (window as {navigator: {modelContext?: unknown}}).navigator
+              .modelContext !== 'undefined'
+          );
         });
 
         await listWebMCPTools.handler({params: {}}, response, context);
 
         const output = response.responseLines.join('\\n');
-        assert.ok(output.includes('3 tool(s) available'), 'Should show 3 tools');
+        assert.ok(
+          output.includes('3 tool(s) available'),
+          'Should show 3 tools',
+        );
         assert.ok(output.includes('test_add'), 'Should list test_add');
-        assert.ok(output.includes('Add two numbers'), 'Should show description');
+        assert.ok(
+          output.includes('Add two numbers'),
+          'Should show description',
+        );
       });
     });
 
@@ -217,7 +226,10 @@ describe('webmcp tools', () => {
         await listWebMCPTools.handler({params: {}}, response, context);
 
         const output = response.responseLines.join('\\n');
-        assert.ok(output.includes('WebMCP not detected'), 'Should show not detected message');
+        assert.ok(
+          output.includes('WebMCP not detected'),
+          'Should show not detected message',
+        );
       });
     });
 
@@ -231,23 +243,35 @@ describe('webmcp tools', () => {
         // First page
         await page.goto(server.getRoute('/webmcp1'));
         await page.waitForFunction(() => {
-          return typeof (window as {navigator: {modelContext?: unknown}}).navigator.modelContext !== 'undefined';
+          return (
+            typeof (window as {navigator: {modelContext?: unknown}}).navigator
+              .modelContext !== 'undefined'
+          );
         });
 
         await listWebMCPTools.handler({params: {}}, response, context);
-        assert.ok(response.responseLines.join('\\n').includes('3 tool(s)'), 'Should list tools from first page');
+        assert.ok(
+          response.responseLines.join('\\n').includes('3 tool(s)'),
+          'Should list tools from first page',
+        );
 
         response.resetResponseLineForTesting();
 
         // Navigate to second page
         await page.goto(server.getRoute('/webmcp2'));
         await page.waitForFunction(() => {
-          return typeof (window as {navigator: {modelContext?: unknown}}).navigator.modelContext !== 'undefined';
+          return (
+            typeof (window as {navigator: {modelContext?: unknown}}).navigator
+              .modelContext !== 'undefined'
+          );
         });
 
         // Should auto-reconnect to new page
         await listWebMCPTools.handler({params: {}}, response, context);
-        assert.ok(response.responseLines.join('\\n').includes('3 tool(s)'), 'Should list tools from second page');
+        assert.ok(
+          response.responseLines.join('\\n').includes('3 tool(s)'),
+          'Should list tools from second page',
+        );
       });
     });
   });
@@ -261,17 +285,23 @@ describe('webmcp tools', () => {
         await page.goto(server.getRoute('/webmcp3'));
 
         await page.waitForFunction(() => {
-          return typeof (window as {navigator: {modelContext?: unknown}}).navigator.modelContext !== 'undefined';
+          return (
+            typeof (window as {navigator: {modelContext?: unknown}}).navigator
+              .modelContext !== 'undefined'
+          );
         });
 
         await callWebMCPTool.handler(
           {params: {name: 'test_add', arguments: {a: 5, b: 3}}},
           response,
-          context
+          context,
         );
 
         const output = response.responseLines.join('\\n');
-        assert.ok(output.includes('Calling tool: test_add'), 'Should show tool name');
+        assert.ok(
+          output.includes('Calling tool: test_add'),
+          'Should show tool name',
+        );
         assert.ok(output.includes('8'), 'Should show result (5+3=8)');
       });
     });
@@ -284,13 +314,16 @@ describe('webmcp tools', () => {
         await page.goto(server.getRoute('/webmcp4'));
 
         await page.waitForFunction(() => {
-          return typeof (window as {navigator: {modelContext?: unknown}}).navigator.modelContext !== 'undefined';
+          return (
+            typeof (window as {navigator: {modelContext?: unknown}}).navigator
+              .modelContext !== 'undefined'
+          );
         });
 
         await callWebMCPTool.handler(
           {params: {name: 'test_greet', arguments: {name: 'World'}}},
           response,
-          context
+          context,
         );
 
         const output = response.responseLines.join('\\n');
@@ -306,17 +339,23 @@ describe('webmcp tools', () => {
         await page.goto(server.getRoute('/webmcp5'));
 
         await page.waitForFunction(() => {
-          return typeof (window as {navigator: {modelContext?: unknown}}).navigator.modelContext !== 'undefined';
+          return (
+            typeof (window as {navigator: {modelContext?: unknown}}).navigator
+              .modelContext !== 'undefined'
+          );
         });
 
         await callWebMCPTool.handler(
           {params: {name: 'test_error', arguments: {}}},
           response,
-          context
+          context,
         );
 
         const output = response.responseLines.join('\\n');
-        assert.ok(output.includes('Tool returned an error'), 'Should indicate error');
+        assert.ok(
+          output.includes('Tool returned an error'),
+          'Should indicate error',
+        );
       });
     });
 
@@ -330,11 +369,14 @@ describe('webmcp tools', () => {
         await callWebMCPTool.handler(
           {params: {name: 'test_add', arguments: {a: 1, b: 2}}},
           response,
-          context
+          context,
         );
 
         const output = response.responseLines.join('\\n');
-        assert.ok(output.includes('WebMCP not detected'), 'Should show not detected message');
+        assert.ok(
+          output.includes('WebMCP not detected'),
+          'Should show not detected message',
+        );
       });
     });
   });

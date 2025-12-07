@@ -97,6 +97,7 @@ This package has a unique build architecture due to its dependency on `chrome-de
 **Important**: `pnpm publish` (and `pnpm pack`) automatically strips out any directory named `node_modules`, even if it's nested inside another directory like `build/node_modules`. This is built-in behavior that cannot be overridden via the `files` field in `package.json`.
 
 To work around this, the `post-build.ts` script:
+
 1. Compiles TypeScript to `build/node_modules/` (matching the source structure)
 2. Renames `build/node_modules/` to `build/vendor/`
 3. Updates all import paths in the built JS files from `../node_modules/` to `../vendor/`
@@ -118,5 +119,6 @@ tar -tf /tmp/mcp-b-chrome-devtools-mcp-*.tgz | grep vendor | wc -l
 ```
 
 If the vendor files are missing, check that:
+
 1. The `post-build.ts` script ran successfully (should see "Successfully renamed node_modules to vendor")
 2. The `files` field in `package.json` includes `"build/vendor"`

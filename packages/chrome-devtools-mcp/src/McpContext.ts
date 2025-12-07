@@ -13,7 +13,6 @@ import {type AggregatedIssue} from '../node_modules/chrome-devtools-frontend/mcp
 import {extractUrlLikeFromDevToolsTitle, urlsEqual} from './DevtoolsUtils.js';
 import type {ListenerMap} from './PageCollector.js';
 import {NetworkCollector, ConsoleCollector} from './PageCollector.js';
-import {WEB_MCP_BRIDGE_SCRIPT} from './transports/WebMCPBridgeScript.js';
 import {Locator} from './third_party/index.js';
 import type {
   Browser,
@@ -31,6 +30,7 @@ import {takeSnapshot} from './tools/snapshot.js';
 import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
 import type {Context, DevToolsData} from './tools/ToolDefinition.js';
 import type {TraceResult} from './trace-processing/parse.js';
+import {WEB_MCP_BRIDGE_SCRIPT} from './transports/WebMCPBridgeScript.js';
 import {WaitForHelper} from './WaitForHelper.js';
 
 export interface TextSnapshotNode extends SerializedAXNode {

@@ -19,27 +19,27 @@
 
 ## Why Use @mcp-b/chrome-devtools-mcp?
 
-| Feature | Benefit |
-|---------|---------|
-| **28 MCP Tools** | Comprehensive browser control - navigation, input, screenshots, performance, debugging |
-| **WebMCP Integration** | Connect to website-specific AI tools via `@mcp-b/global` |
-| **Performance Analysis** | Chrome DevTools-powered performance insights and trace recording |
-| **Reliable Automation** | Puppeteer-based with automatic waiting for action results |
-| **Works with All MCP Clients** | Claude, Cursor, Copilot, Gemini CLI, VS Code, Windsurf, and more |
+| Feature                        | Benefit                                                                                |
+| ------------------------------ | -------------------------------------------------------------------------------------- |
+| **28 MCP Tools**               | Comprehensive browser control - navigation, input, screenshots, performance, debugging |
+| **WebMCP Integration**         | Connect to website-specific AI tools via `@mcp-b/global`                               |
+| **Performance Analysis**       | Chrome DevTools-powered performance insights and trace recording                       |
+| **Reliable Automation**        | Puppeteer-based with automatic waiting for action results                              |
+| **Works with All MCP Clients** | Claude, Cursor, Copilot, Gemini CLI, VS Code, Windsurf, and more                       |
 
 ## What's Different from Chrome DevTools MCP?
 
 This fork adds **WebMCP integration** - the ability to call MCP tools that are registered directly on webpages. This unlocks a powerful new workflow:
 
-| Feature | Chrome DevTools MCP | @mcp-b/chrome-devtools-mcp |
-|---------|--------------------|-----------------------------|
-| Browser automation | ✅ | ✅ |
-| Performance analysis | ✅ | ✅ |
-| Network inspection | ✅ | ✅ |
-| Screenshot/snapshot | ✅ | ✅ |
-| **Call website MCP tools** | ❌ | ✅ |
-| **List website MCP tools** | ❌ | ✅ |
-| **AI-driven tool development** | ❌ | ✅ |
+| Feature                        | Chrome DevTools MCP | @mcp-b/chrome-devtools-mcp |
+| ------------------------------ | ------------------- | -------------------------- |
+| Browser automation             | ✅                  | ✅                         |
+| Performance analysis           | ✅                  | ✅                         |
+| Network inspection             | ✅                  | ✅                         |
+| Screenshot/snapshot            | ✅                  | ✅                         |
+| **Call website MCP tools**     | ❌                  | ✅                         |
+| **List website MCP tools**     | ❌                  | ✅                         |
+| **AI-driven tool development** | ❌                  | ✅                         |
 
 The key addition is the `list_webmcp_tools` and `call_webmcp_tool` tools that let your AI agent interact with MCP tools that websites expose via [@mcp-b/global](https://www.npmjs.com/package/@mcp-b/global).
 
@@ -75,11 +75,13 @@ One of the most powerful use cases for this package is **AI-driven tool developm
 Imagine you're building a web app and want to add a search feature exposed as an MCP tool:
 
 **Step 1: Ask your AI agent to create the tool**
+
 ```
 Create a WebMCP tool called "search_products" that searches our product catalog
 ```
 
 **Step 2: The AI writes the code in your app**
+
 ```typescript
 // Your AI agent writes this code
 import '@mcp-b/global';
@@ -90,23 +92,24 @@ navigator.modelContext.registerTool({
   inputSchema: {
     type: 'object',
     properties: {
-      query: { type: 'string' },
-      category: { type: 'string' }
+      query: {type: 'string'},
+      category: {type: 'string'},
     },
-    required: ['query']
+    required: ['query'],
   },
-  async execute({ query, category }) {
+  async execute({query, category}) {
     const results = await searchProducts(query, category);
     return {
-      content: [{ type: 'text', text: JSON.stringify(results) }]
+      content: [{type: 'text', text: JSON.stringify(results)}],
     };
-  }
+  },
 });
 ```
 
 **Step 3: Your dev server hot-reloads**
 
 **Step 4: The AI tests it via Chrome DevTools MCP**
+
 ```
 Navigate to http://localhost:3000 and list the available tools
 ```
@@ -114,6 +117,7 @@ Navigate to http://localhost:3000 and list the available tools
 The AI sees the new `search_products` tool appear.
 
 **Step 5: The AI calls the tool to verify it works**
+
 ```
 Use the search_products tool to search for "headphones"
 ```
@@ -125,6 +129,7 @@ The AI can see the actual response, fix any bugs, and repeat until it works perf
 ### Why This Matters
 
 This creates a tight feedback loop where your AI assistant can:
+
 - **Write** WebMCP tools in your codebase
 - **Deploy** them automatically via hot-reload
 - **Discover** them through `list_webmcp_tools`
@@ -402,9 +407,10 @@ qodercli mcp add -s user chrome-devtools -- npx @mcp-b/chrome-devtools-mcp@lates
 <details>
   <summary>Visual Studio</summary>
 
-  **Click the button to install:**
+**Click the button to install:**
 
-  [<img src="https://img.shields.io/badge/Visual_Studio-Install-C16FDE?logo=visualstudio&logoColor=white" alt="Install in Visual Studio">](https://vs-open.link/mcp-install?%7B%22name%22%3A%22%40mcp-b%2Fchrome-devtools-mcp%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40mcp-b%2Fchrome-devtools-mcp%40latest%22%5D%7D)
+[<img src="https://img.shields.io/badge/Visual_Studio-Install-C16FDE?logo=visualstudio&logoColor=white" alt="Install in Visual Studio">](https://vs-open.link/mcp-install?%7B%22name%22%3A%22%40mcp-b%2Fchrome-devtools-mcp%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40mcp-b%2Fchrome-devtools-mcp%40latest%22%5D%7D)
+
 </details>
 
 <details>
@@ -481,11 +487,11 @@ If you run into any issues, checkout our [troubleshooting guide](./docs/troubles
 
 The server includes built-in prompts to help with WebMCP development workflows. Prompts are reusable message templates that guide AI agents through common tasks.
 
-| Prompt | Description |
-|--------|-------------|
-| `webmcp-dev-workflow` | Step-by-step guide for building WebMCP tools with AI |
-| `test-webmcp-tool` | Systematically test tools with edge cases and validation |
-| `debug-webmcp` | Diagnose WebMCP connection and registration issues |
+| Prompt                | Description                                              |
+| --------------------- | -------------------------------------------------------- |
+| `webmcp-dev-workflow` | Step-by-step guide for building WebMCP tools with AI     |
+| `test-webmcp-tool`    | Systematically test tools with edge cases and validation |
+| `debug-webmcp`        | Diagnose WebMCP connection and registration issues       |
 
 ### webmcp-dev-workflow
 
@@ -496,6 +502,7 @@ Guides you through the AI-driven development workflow for building and testing W
 **Arguments:** None
 
 **Example:**
+
 ```
 Use the webmcp-dev-workflow prompt to help me build a search tool
 ```
@@ -508,12 +515,13 @@ Systematically test a WebMCP tool with various inputs including valid data, edge
 
 **Arguments:**
 
-| Argument | Type | Required | Description |
-|----------|------|----------|-------------|
-| `toolName` | string | No | Focus testing on a specific tool |
-| `devServerUrl` | string | No | Dev server URL (default: `http://localhost:3000`) |
+| Argument       | Type   | Required | Description                                       |
+| -------------- | ------ | -------- | ------------------------------------------------- |
+| `toolName`     | string | No       | Focus testing on a specific tool                  |
+| `devServerUrl` | string | No       | Dev server URL (default: `http://localhost:3000`) |
 
 **Examples:**
+
 ```
 Use the test-webmcp-tool prompt
 Use the test-webmcp-tool prompt with toolName=search_products
@@ -528,11 +536,12 @@ Troubleshoot WebMCP connection issues and diagnose why tools aren't appearing or
 
 **Arguments:**
 
-| Argument | Type | Required | Description |
-|----------|------|----------|-------------|
-| `url` | string | No | Page URL to debug (default: current page) |
+| Argument | Type   | Required | Description                               |
+| -------- | ------ | -------- | ----------------------------------------- |
+| `url`    | string | No       | Page URL to debug (default: current page) |
 
 **Example:**
+
 ```
 Use the debug-webmcp prompt with url=http://localhost:3000
 ```
