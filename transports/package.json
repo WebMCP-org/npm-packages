@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/transports",
-  "version": "1.1.2-beta.3",
+  "version": "1.1.2-beta.4",
   "description": "Browser transport implementations for Model Context Protocol (MCP) - postMessage, Chrome extension messaging, and iframe communication for AI agents and LLMs",
   "keywords": [
     "mcp",

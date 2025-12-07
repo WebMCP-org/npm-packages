@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.3-beta.1
+
+### Patch Changes
+
+- Bump all packages to new beta release
+
 ## 1.0.3-beta.0
 
 ### Patch Changes

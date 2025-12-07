@@ -20,6 +20,7 @@
     "@mcp-b/chrome-devtools-mcp": "0.11.0"
   },
   "changesets": [
+    "beta-bump-dec6",
     "beta-release",
     "bump-all-beta",
     "chrome-devtools-webmcp",
