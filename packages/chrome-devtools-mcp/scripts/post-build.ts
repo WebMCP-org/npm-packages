@@ -14,6 +14,70 @@ import {sed} from './sed.ts';
 const BUILD_DIR = path.join(process.cwd(), 'build');
 
 /**
+ * Renames build/node_modules to build/vendor and updates all import paths.
+ *
+ * This is necessary because pnpm publish automatically strips out any directory
+ * named 'node_modules', even nested ones. By renaming to 'vendor', the compiled
+ * chrome-devtools-frontend dependencies are included in the published package.
+ */
+function renameNodeModulesToVendor(): void {
+  const nodeModulesDir = path.join(BUILD_DIR, 'node_modules');
+  const vendorDir = path.join(BUILD_DIR, 'vendor');
+
+  if (!fs.existsSync(nodeModulesDir)) {
+    console.log('No build/node_modules directory found, skipping rename');
+    return;
+  }
+
+  // Rename the directory
+  console.log('Renaming build/node_modules to build/vendor...');
+  fs.renameSync(nodeModulesDir, vendorDir);
+
+  // Update all import paths in the built JS files
+  console.log('Updating import paths from node_modules to vendor...');
+  const srcDir = path.join(BUILD_DIR, 'src');
+  updateImportPathsInDir(srcDir);
+
+  console.log('Successfully renamed node_modules to vendor');
+}
+
+/**
+ * Recursively updates import paths in all JS files in a directory.
+ */
+function updateImportPathsInDir(dir: string): void {
+  if (!fs.existsSync(dir)) return;
+
+  const entries = fs.readdirSync(dir, {withFileTypes: true});
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      updateImportPathsInDir(fullPath);
+    } else if (entry.name.endsWith('.js')) {
+      updateImportPathsInFile(fullPath);
+    }
+  }
+}
+
+/**
+ * Updates import paths in a single JS file from node_modules to vendor.
+ */
+function updateImportPathsInFile(filePath: string): void {
+  let content = fs.readFileSync(filePath, 'utf-8');
+  const originalContent = content;
+
+  // Replace various forms of node_modules imports with vendor
+  // Handles: '../node_modules/', '../../node_modules/', etc.
+  content = content.replace(
+    /(['"])(\.\.\/)+(node_modules\/)/g,
+    (match, quote, dots) => `${quote}${dots.repeat(match.split('../').length - 1)}vendor/`,
+  );
+
+  if (content !== originalContent) {
+    fs.writeFileSync(filePath, content, 'utf-8');
+  }
+}
+
+/**
  * Writes content to a file.
  * @param filePath The path to the file.
  * @param content The content to write.
@@ -130,6 +194,11 @@ export const experiments = {
 
   copyThirdPartyLicenseFiles();
   copyDevToolsDescriptionFiles();
+
+  // IMPORTANT: This must be called last!
+  // Rename build/node_modules to build/vendor so pnpm publish includes it.
+  // pnpm automatically strips directories named 'node_modules' from packages.
+  renameNodeModulesToVendor();
 }
 
 function copyDevToolsDescriptionFiles() {

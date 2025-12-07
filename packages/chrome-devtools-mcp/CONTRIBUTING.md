@@ -87,3 +87,36 @@ You can use the `DEBUG` environment variable as usual to control categories that
 ### Updating documentation
 
 When adding a new tool or updating a tool name or description, make sure to run `npm run docs` to generate the tool reference documentation.
+
+## Build Architecture: Vendored Dependencies
+
+This package has a unique build architecture due to its dependency on `chrome-devtools-frontend`. The compiled output of `chrome-devtools-frontend` is included in the published package under `build/vendor/`.
+
+### Why `build/vendor/` instead of `build/node_modules/`?
+
+**Important**: `pnpm publish` (and `pnpm pack`) automatically strips out any directory named `node_modules`, even if it's nested inside another directory like `build/node_modules`. This is built-in behavior that cannot be overridden via the `files` field in `package.json`.
+
+To work around this, the `post-build.ts` script:
+1. Compiles TypeScript to `build/node_modules/` (matching the source structure)
+2. Renames `build/node_modules/` to `build/vendor/`
+3. Updates all import paths in the built JS files from `../node_modules/` to `../vendor/`
+
+This ensures the compiled `chrome-devtools-frontend` code is included when publishing via `pnpm publish`.
+
+### Verifying the build
+
+To verify the package includes all necessary files before publishing:
+
+```sh
+# Build the package
+npm run build
+
+# Check what pnpm will package
+pnpm pack --pack-destination /tmp
+tar -tf /tmp/mcp-b-chrome-devtools-mcp-*.tgz | grep vendor | wc -l
+# Should output ~650+ files
+```
+
+If the vendor files are missing, check that:
+1. The `post-build.ts` script ran successfully (should see "Successfully renamed node_modules to vendor")
+2. The `files` field in `package.json` includes `"build/vendor"`

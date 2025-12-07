@@ -43,7 +43,7 @@
   "bin": "./build/src/index.js",
   "files": [
     "build/src",
-    "build/node_modules",
+    "build/vendor",
     "LICENSE",
     "!*.tsbuildinfo"
   ],
