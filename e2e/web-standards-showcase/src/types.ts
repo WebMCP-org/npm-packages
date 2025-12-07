@@ -13,10 +13,22 @@ export interface ToolInputSchema {
  * The Web Model Context API expects execute functions to return any value.
  * The native API will handle serialization to string for the testing API.
  */
+export interface ToolOutputSchema {
+  type: 'object';
+  properties?: Record<string, unknown>;
+  required?: string[];
+}
+
+/**
+ * The Web Model Context API expects execute functions to return any value.
+ * The native API will handle serialization to string for the testing API.
+ * When outputSchema is defined, the response will include structuredContent.
+ */
 export interface Tool {
   name: string;
   description: string;
   inputSchema: ToolInputSchema;
+  outputSchema?: ToolOutputSchema;
   execute: (input: Record<string, unknown>) => Promise<unknown> | unknown;
 }
 
@@ -41,6 +53,7 @@ export interface ToolInfo {
   name: string;
   description: string;
   inputSchema: string; // JSON string, not object!
+  outputSchema?: string; // JSON string when defined
 }
 
 export interface ModelContextTesting {
