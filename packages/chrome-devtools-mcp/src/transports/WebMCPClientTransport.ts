@@ -104,6 +104,15 @@ export class WebMCPClientTransport implements Transport {
   onerror?: (error: Error) => void;
   onmessage?: (message: JSONRPCMessage) => void;
 
+  /**
+   * Check if the transport has been closed.
+   * This is useful for clients to check if they need to reconnect
+   * after a page navigation or reload.
+   */
+  isClosed(): boolean {
+    return this._closed;
+  }
+
   constructor(options: WebMCPClientTransportOptions) {
     this._page = options.page;
     this._readyTimeout = options.readyTimeout ?? 10000;

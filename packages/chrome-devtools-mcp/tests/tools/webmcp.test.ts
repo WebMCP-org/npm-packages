@@ -250,6 +250,35 @@ describe('webmcp tools', () => {
         assert.ok(response.responseLines.join('\\n').includes('3 tool(s)'), 'Should list tools from second page');
       });
     });
+
+    it('reconnects after page reload with same URL', async () => {
+      server.addHtmlRoute('/webmcp-reload', MOCK_WEBMCP_PAGE);
+
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+
+        // Load page and connect
+        await page.goto(server.getRoute('/webmcp-reload'));
+        await page.waitForFunction(() => {
+          return typeof (window as {navigator: {modelContext?: unknown}}).navigator.modelContext !== 'undefined';
+        });
+
+        await listWebMCPTools.handler({params: {}}, response, context);
+        assert.ok(response.responseLines.join('\\n').includes('3 tool(s)'), 'Should list tools before reload');
+
+        response.resetResponseLineForTesting();
+
+        // Reload the page (same URL, but frames are recreated)
+        await page.reload();
+        await page.waitForFunction(() => {
+          return typeof (window as {navigator: {modelContext?: unknown}}).navigator.modelContext !== 'undefined';
+        });
+
+        // Should auto-reconnect after reload (this was previously failing with "detached Frame" error)
+        await listWebMCPTools.handler({params: {}}, response, context);
+        assert.ok(response.responseLines.join('\\n').includes('3 tool(s)'), 'Should list tools after reload');
+      });
+    });
   });
 
   describe('call_webmcp_tool', () => {
