@@ -96,18 +96,23 @@ function App() {
     },
   });
 
-  // Tool 4: Get Counter (Read-only query)
+  // Tool 4: Get Counter (Read-only query with outputSchema for structuredContent testing)
   const getCounterTool = useWebMCP({
     name: 'counter_get',
     description: 'Get the current counter value',
+    outputSchema: {
+      counter: z.number().describe('The current counter value'),
+      timestamp: z.string().describe('ISO timestamp when the value was retrieved'),
+    },
     annotations: {
       title: 'Get Counter',
       readOnlyHint: true,
       idempotentHint: true,
     },
     handler: async () => {
+      const timestamp = new Date().toISOString();
       addLog(`Retrieved counter value: ${globalCounter}`, 'info');
-      return { counter: globalCounter };
+      return { counter: globalCounter, timestamp };
     },
   });
 
