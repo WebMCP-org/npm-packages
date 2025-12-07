@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
 /**
  * Production Build Tests for React WebMCP
@@ -13,25 +13,133 @@ import { expect, test } from '@playwright/test';
  *
  * Fix: Use a marker property `__isWebMCPPolyfill` instead of constructor name checking.
  */
+
+// =============================================================================
+// Constants - Single source of truth for test values
+// =============================================================================
+
+/** Marker property name - must match POLYFILL_MARKER_PROPERTY in @mcp-b/global */
+const POLYFILL_MARKER = '__isWebMCPPolyfill' as const;
+
+/** Tool names used in the test app */
+const TOOLS = {
+  COUNTER_INCREMENT: 'counter_increment',
+  COUNTER_DECREMENT: 'counter_decrement',
+  COUNTER_GET: 'counter_get',
+  POSTS_LIKE: 'posts_like',
+  POSTS_SEARCH: 'posts_search',
+} as const;
+
+/** Test selectors */
+const SELECTORS = {
+  APP_STATUS: '[data-testid="app-status"]',
+  TOTAL_EXECUTIONS: '[data-testid="total-executions"]',
+  COUNTER_DISPLAY: '[data-testid="counter-display"]',
+  COUNTER_EXECUTIONS: '[data-testid="counter-executions"]',
+} as const;
+
+// =============================================================================
+// Helper Functions
+// =============================================================================
+
+/**
+ * Wait for specific tools to be registered in modelContextTesting.
+ * More reliable than waitForTimeout as it waits for the actual condition.
+ */
+async function waitForToolsRegistered(page: Page, toolNames: string[]): Promise<void> {
+  await page.waitForFunction(
+    (names: string[]) => {
+      const testing = navigator.modelContextTesting;
+      if (!testing) return false;
+      const tools = testing.listTools();
+      return names.every((name) => tools.some((t) => t.name === name));
+    },
+    toolNames,
+    { timeout: 10000 }
+  );
+}
+
+/**
+ * Wait for any tools to be registered.
+ */
+async function waitForAnyToolsRegistered(page: Page): Promise<void> {
+  await page.waitForFunction(
+    () => {
+      const testing = navigator.modelContextTesting;
+      return testing && testing.listTools().length > 0;
+    },
+    { timeout: 10000 }
+  );
+}
+
+/**
+ * Get the current execution count from the UI.
+ */
+async function getExecutionCount(page: Page): Promise<number> {
+  const text = await page.locator(SELECTORS.TOTAL_EXECUTIONS).textContent();
+  return Number.parseInt(text || '0', 10);
+}
+
+/**
+ * Wait for execution count to reach a specific value.
+ * More reliable than waitForTimeout.
+ */
+async function waitForExecutionCount(page: Page, expectedCount: number): Promise<void> {
+  await expect(page.locator(SELECTORS.TOTAL_EXECUTIONS)).toHaveText(String(expectedCount), {
+    timeout: 5000,
+  });
+}
+
+/**
+ * Wait for counter display to reach a specific value.
+ */
+async function waitForCounterValue(page: Page, expectedValue: number): Promise<void> {
+  await expect(page.locator(SELECTORS.COUNTER_DISPLAY)).toHaveText(String(expectedValue), {
+    timeout: 5000,
+  });
+}
+
+// =============================================================================
+// Type definitions for page.evaluate
+// =============================================================================
+
+interface PolyfillMarkerCheck {
+  exists: boolean;
+  reason?: string;
+  hasMarker?: boolean;
+  markerValue?: boolean;
+  constructorName?: string;
+}
+
+interface ApiCheck {
+  hasApis: boolean;
+  reason?: string;
+  isPolyfill?: boolean;
+  testingConstructorName?: string;
+  isConstructorMinified?: boolean;
+}
+
+// =============================================================================
+// Tests
+// =============================================================================
+
 test.describe('Production Build - Polyfill Detection Tests', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
-    await page.waitForSelector('[data-testid="app-status"]');
+    await page.waitForSelector(SELECTORS.APP_STATUS);
   });
 
   test('should correctly detect polyfill via marker property in minified build', async ({
     page,
   }) => {
-    // Verify the polyfill marker property exists on modelContextTesting
-    const markerCheck = await page.evaluate(() => {
+    const markerCheck = await page.evaluate((marker): PolyfillMarkerCheck => {
       const testing = navigator.modelContextTesting;
       if (!testing) {
         return { exists: false, reason: 'modelContextTesting not available' };
       }
 
-      // Check for the marker property that identifies this as a polyfill
-      const hasMarker = '__isWebMCPPolyfill' in testing;
-      const markerValue = (testing as { __isWebMCPPolyfill?: boolean }).__isWebMCPPolyfill;
+      const hasMarker = marker in testing;
+      const markerValue = (testing as Record<string, unknown>)[marker] as boolean | undefined;
 
       return {
         exists: true,
@@ -39,7 +147,7 @@ test.describe('Production Build - Polyfill Detection Tests', () => {
         markerValue,
         constructorName: testing.constructor?.name || 'unknown',
       };
-    });
+    }, POLYFILL_MARKER);
 
     expect(markerCheck.exists).toBe(true);
     expect(markerCheck.hasMarker).toBe(true);
@@ -51,75 +159,35 @@ test.describe('Production Build - Polyfill Detection Tests', () => {
   });
 
   test('should execute tool exactly once - no double execution', async ({ page }) => {
-    // Wait for tools to be registered
-    await page.waitForFunction(
-      () => {
-        const testing = navigator.modelContextTesting;
-        if (!testing) return false;
-        const tools = testing.listTools();
-        return tools.some((t) => t.name === 'counter_increment');
-      },
-      { timeout: 10000 }
-    );
+    await waitForToolsRegistered(page, [TOOLS.COUNTER_INCREMENT]);
 
-    // Track how many times the tool handler is actually called
-    // We do this by checking the execution count before and after
-    const initialExecCount = await page.locator('[data-testid="total-executions"]').textContent();
-    const initialCount = Number.parseInt(initialExecCount || '0', 10);
+    const initialCount = await getExecutionCount(page);
 
     // Execute the tool via modelContextTesting
-    const result = await page.evaluate(async () => {
+    await page.evaluate(async (toolName) => {
       const testing = navigator.modelContextTesting;
-      if (!testing) {
-        throw new Error('modelContextTesting not available');
-      }
+      if (!testing) throw new Error('modelContextTesting not available');
+      await testing.executeTool(toolName, JSON.stringify({ amount: 1 }));
+    }, TOOLS.COUNTER_INCREMENT);
 
-      // Execute counter_increment once
-      await testing.executeTool('counter_increment', JSON.stringify({ amount: 1 }));
+    // Wait for execution count to update (not a fixed timeout)
+    await waitForExecutionCount(page, initialCount + 1);
 
-      return { success: true };
-    });
-
-    expect(result.success).toBe(true);
-
-    // Wait for the execution to be reflected in the UI
-    await page.waitForTimeout(500);
-
-    // Check execution count - should have increased by exactly 1, not 2
-    const finalExecCount = await page.locator('[data-testid="total-executions"]').textContent();
-    const finalCount = Number.parseInt(finalExecCount || '0', 10);
-
-    const executionDelta = finalCount - initialCount;
-    expect(executionDelta).toBe(1); // Should be 1, not 2
-
-    // Also verify counter increased by 1, not 2
-    const counterValue = await page.locator('[data-testid="counter-display"]').textContent();
-    expect(counterValue).toBe('1');
+    // Verify counter increased by 1, not 2
+    await waitForCounterValue(page, 1);
   });
 
   test('should not detect polyfill as native API in production build', async ({ page }) => {
-    // In the buggy version, production builds would incorrectly detect the polyfill
-    // as a native API because the constructor name check failed.
-    // This test verifies the fix works correctly.
-
-    const apiCheck = await page.evaluate(() => {
-      // Check if modelContext and modelContextTesting are the polyfill versions
+    const apiCheck = await page.evaluate((marker): ApiCheck => {
       const ctx = navigator.modelContext;
       const testing = navigator.modelContextTesting;
 
       if (!ctx || !testing) {
-        return {
-          hasApis: false,
-          reason: 'APIs not available',
-        };
+        return { hasApis: false, reason: 'APIs not available' };
       }
 
-      // The polyfill marker should be present
-      const isPolyfill =
-        '__isWebMCPPolyfill' in testing &&
-        (testing as { __isWebMCPPolyfill?: boolean }).__isWebMCPPolyfill === true;
+      const isPolyfill = marker in testing && (testing as Record<string, unknown>)[marker] === true;
 
-      // Constructor names may be minified in production
       const testingConstructorName = testing.constructor?.name || '';
       const isConstructorMinified = !testingConstructorName.includes('WebModelContext');
 
@@ -129,124 +197,70 @@ test.describe('Production Build - Polyfill Detection Tests', () => {
         testingConstructorName,
         isConstructorMinified,
       };
-    });
+    }, POLYFILL_MARKER);
 
     expect(apiCheck.hasApis).toBe(true);
     expect(apiCheck.isPolyfill).toBe(true);
 
-    // Log for debugging - in production, constructor name will likely be minified
     console.log(`Testing constructor name: ${apiCheck.testingConstructorName}`);
     console.log(`Is constructor minified: ${apiCheck.isConstructorMinified}`);
   });
 
   test('should execute multiple tools without double execution', async ({ page }) => {
-    // Wait for tools to be registered
-    await page.waitForFunction(
-      () => {
+    await waitForToolsRegistered(page, [TOOLS.COUNTER_INCREMENT, TOOLS.POSTS_LIKE]);
+
+    const initialCount = await getExecutionCount(page);
+
+    // Execute 3 different tool calls
+    await page.evaluate(
+      async (tools) => {
         const testing = navigator.modelContextTesting;
-        if (!testing) return false;
-        const tools = testing.listTools();
-        return (
-          tools.some((t) => t.name === 'counter_increment') &&
-          tools.some((t) => t.name === 'posts_like')
-        );
+        if (!testing) throw new Error('modelContextTesting not available');
+
+        await testing.executeTool(tools.increment, JSON.stringify({ amount: 1 }));
+        await testing.executeTool(tools.increment, JSON.stringify({ amount: 2 }));
+        await testing.executeTool(tools.like, JSON.stringify({ postId: '1' }));
       },
-      { timeout: 10000 }
+      { increment: TOOLS.COUNTER_INCREMENT, like: TOOLS.POSTS_LIKE }
     );
 
-    // Get initial counts
-    const initialExecCount = await page.locator('[data-testid="total-executions"]').textContent();
-    const initialCount = Number.parseInt(initialExecCount || '0', 10);
-
-    // Execute multiple different tools
-    const result = await page.evaluate(async () => {
-      const testing = navigator.modelContextTesting;
-      if (!testing) {
-        throw new Error('modelContextTesting not available');
-      }
-
-      // Execute 3 different tool calls
-      await testing.executeTool('counter_increment', JSON.stringify({ amount: 1 }));
-      await testing.executeTool('counter_increment', JSON.stringify({ amount: 2 }));
-      await testing.executeTool('posts_like', JSON.stringify({ postId: '1' }));
-
-      return { success: true };
-    });
-
-    expect(result.success).toBe(true);
-
-    // Wait for executions to complete
-    await page.waitForTimeout(500);
-
-    // Check execution count - should have increased by exactly 3
-    const finalExecCount = await page.locator('[data-testid="total-executions"]').textContent();
-    const finalCount = Number.parseInt(finalExecCount || '0', 10);
-
-    const executionDelta = finalCount - initialCount;
-    expect(executionDelta).toBe(3); // Should be 3, not 6
+    // Wait for execution count to update - should be 3, not 6
+    await waitForExecutionCount(page, initialCount + 3);
 
     // Counter should be 3 (1 + 2)
-    const counterValue = await page.locator('[data-testid="counter-display"]').textContent();
-    expect(counterValue).toBe('3');
+    await waitForCounterValue(page, 3);
   });
 
   test('should track counter executions correctly without doubling', async ({ page }) => {
-    // Wait for tools to be registered
-    await page.waitForFunction(
-      () => {
-        const testing = navigator.modelContextTesting;
-        if (!testing) return false;
-        const tools = testing.listTools();
-        return tools.some((t) => t.name === 'counter_increment');
-      },
-      { timeout: 10000 }
-    );
+    await waitForToolsRegistered(page, [TOOLS.COUNTER_INCREMENT]);
 
     // Execute counter increment 5 times
     for (let i = 0; i < 5; i++) {
-      await page.evaluate(async () => {
+      await page.evaluate(async (toolName) => {
         const testing = navigator.modelContextTesting;
         if (!testing) throw new Error('modelContextTesting not available');
-        await testing.executeTool('counter_increment', JSON.stringify({ amount: 1 }));
-      });
+        await testing.executeTool(toolName, JSON.stringify({ amount: 1 }));
+      }, TOOLS.COUNTER_INCREMENT);
     }
 
-    // Wait for all executions to complete
-    await page.waitForTimeout(500);
+    // Wait for final values (not fixed timeout)
+    await waitForCounterValue(page, 5);
+    await waitForExecutionCount(page, 5);
 
-    // Counter should be exactly 5
-    const counterValue = await page.locator('[data-testid="counter-display"]').textContent();
-    expect(counterValue).toBe('5');
-
-    // Counter executions should be exactly 5
-    const counterExecCount = await page.locator('[data-testid="counter-executions"]').textContent();
-    expect(counterExecCount).toBe('5');
-
-    // Total executions should also be 5
-    const totalExecCount = await page.locator('[data-testid="total-executions"]').textContent();
-    expect(totalExecCount).toBe('5');
+    // Verify counter-specific executions
+    await expect(page.locator(SELECTORS.COUNTER_EXECUTIONS)).toHaveText('5');
   });
 });
 
 test.describe('Production Build - Tool Registration Tests', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
-    await page.waitForSelector('[data-testid="app-status"]');
+    await page.waitForSelector(SELECTORS.APP_STATUS);
   });
 
   test('should register tools only once in production build', async ({ page }) => {
-    // Wait for tools to be registered
-    await page.waitForFunction(
-      () => {
-        const testing = navigator.modelContextTesting;
-        if (!testing) return false;
-        const tools = testing.listTools();
-        return tools.length > 0;
-      },
-      { timeout: 10000 }
-    );
+    await waitForAnyToolsRegistered(page);
 
-    // Get all registered tools
     const tools = await page.evaluate(() => {
       const testing = navigator.modelContextTesting;
       if (!testing) return [];
@@ -258,26 +272,19 @@ test.describe('Production Build - Tool Registration Tests', () => {
     expect(tools.length).toBe(uniqueTools.length);
 
     // Verify expected tools are registered
-    expect(tools).toContain('counter_increment');
-    expect(tools).toContain('counter_decrement');
-    expect(tools).toContain('counter_get');
-    expect(tools).toContain('posts_like');
-    expect(tools).toContain('posts_search');
+    expect(tools).toContain(TOOLS.COUNTER_INCREMENT);
+    expect(tools).toContain(TOOLS.COUNTER_DECREMENT);
+    expect(tools).toContain(TOOLS.COUNTER_GET);
+    expect(tools).toContain(TOOLS.POSTS_LIKE);
+    expect(tools).toContain(TOOLS.POSTS_SEARCH);
   });
 
   test('should not have any duplicate tool registrations', async ({ page }) => {
-    await page.waitForFunction(
-      () => {
-        const testing = navigator.modelContextTesting;
-        if (!testing) return false;
-        return testing.listTools().length > 0;
-      },
-      { timeout: 10000 }
-    );
+    await waitForAnyToolsRegistered(page);
 
     const toolCheck = await page.evaluate(() => {
       const testing = navigator.modelContextTesting;
-      if (!testing) return { tools: [], hasDuplicates: false };
+      if (!testing) return { tools: [] as string[], hasDuplicates: false };
 
       const tools = testing.listTools().map((t) => t.name);
       const toolCounts = tools.reduce(
