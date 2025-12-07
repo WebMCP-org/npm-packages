@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {TextSnapshotNode, GeolocationOptions} from '../McpContext.js';
+import type {TextSnapshotNode, GeolocationOptions, WebMCPClientResult} from '../McpContext.js';
 import {zod} from '../third_party/index.js';
 import type {Dialog, ElementHandle, Page} from '../third_party/index.js';
 import type {TraceResult} from '../trace-processing/parse.js';
@@ -118,6 +118,11 @@ export type Context = Readonly<{
    * Returns a reqid for a cdpRequestId.
    */
   resolveCdpElementId(cdpBackendNodeId: number): string | undefined;
+  /**
+   * Get a WebMCP client for the current page, auto-connecting if needed.
+   * Handles stale connection detection (page reload, navigation, browser close/reopen).
+   */
+  getWebMCPClient(): Promise<WebMCPClientResult>;
 }>;
 
 export function defineTool<Schema extends zod.ZodRawShape>(

@@ -8,12 +8,14 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
+import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {type AggregatedIssue} from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
 
 import {extractUrlLikeFromDevToolsTitle, urlsEqual} from './DevtoolsUtils.js';
 import type {ListenerMap} from './PageCollector.js';
 import {NetworkCollector, ConsoleCollector} from './PageCollector.js';
-import {WEB_MCP_BRIDGE_SCRIPT} from './transports/WebMCPBridgeScript.js';
+import {WEB_MCP_BRIDGE_SCRIPT, CHECK_WEBMCP_AVAILABLE_SCRIPT} from './transports/WebMCPBridgeScript.js';
+import {WebMCPClientTransport} from './transports/WebMCPClientTransport.js';
 import {Locator} from './third_party/index.js';
 import type {
   Browser,
@@ -61,6 +63,22 @@ interface McpContextOptions {
   // Whether all page-like targets are exposed as pages.
   experimentalIncludeAllPages?: boolean;
 }
+
+/**
+ * Holds an active WebMCP connection (client + transport) for a specific page.
+ */
+interface WebMCPConnection {
+  client: Client;
+  transport: WebMCPClientTransport;
+  page: Page;
+}
+
+/**
+ * Result of attempting to get a WebMCP client.
+ */
+export type WebMCPClientResult =
+  | {connected: true; client: Client}
+  | {connected: false; error: string};
 
 const DEFAULT_TIMEOUT = 5_000;
 const NAVIGATION_TIMEOUT = 10_000;
@@ -118,6 +136,7 @@ export class McpContext implements Context {
 
   #locatorClass: typeof Locator;
   #options: McpContextOptions;
+  #webMCPConnection: WebMCPConnection | null = null;
 
   private constructor(
     browser: Browser,
@@ -702,6 +721,97 @@ export class McpContext implements Context {
     }
 
     return locator.wait();
+  }
+
+  /**
+   * Get a WebMCP client for the current page, auto-connecting if needed.
+   *
+   * This method handles the full lifecycle of WebMCP connections:
+   * - Detects stale connections (page reload, navigation, browser close/reopen)
+   * - Cleans up old connections before creating new ones
+   * - Auto-connects when WebMCP is available on the page
+   *
+   * The connection state is managed per-context (not globally), ensuring
+   * proper isolation and cleanup.
+   */
+  async getWebMCPClient(): Promise<WebMCPClientResult> {
+    const page = this.getSelectedPage();
+
+    // Check if we have a valid, active connection to the same page
+    // We must verify:
+    // 1. isClosed() - to detect page reloads where URL stays the same but frames are invalidated
+    // 2. page identity - to detect browser close/reopen where the page object is different
+    const conn = this.#webMCPConnection;
+    if (
+      conn &&
+      !conn.transport.isClosed() &&
+      conn.page === page
+    ) {
+      return {connected: true, client: conn.client};
+    }
+
+    // If we have a stale connection, clean up first
+    if (conn) {
+      try {
+        await conn.client.close();
+      } catch {
+        // Ignore close errors
+      }
+      this.#webMCPConnection = null;
+    }
+
+    // Check if WebMCP is available
+    const hasWebMCP = await this.#checkWebMCPAvailable(page);
+    if (!hasWebMCP) {
+      return {connected: false, error: 'WebMCP not detected on this page'};
+    }
+
+    // Connect
+    try {
+      const transport = new WebMCPClientTransport({
+        page,
+        readyTimeout: 10000,
+        requireWebMCP: false, // We already checked
+      });
+
+      const client = new Client(
+        {name: 'chrome-devtools-mcp', version: '1.0.0'},
+        {capabilities: {}},
+      );
+
+      // Set up onclose handler to clean up connection state
+      // This handles page navigations, reloads, and manual disconnections
+      transport.onclose = () => {
+        if (this.#webMCPConnection?.client === client) {
+          this.#webMCPConnection = null;
+        }
+      };
+
+      await client.connect(transport);
+
+      // Store connection for later use
+      this.#webMCPConnection = {client, transport, page};
+
+      return {connected: true, client};
+    } catch (err) {
+      return {
+        connected: false,
+        error: `Failed to connect: ${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
+  }
+
+  /**
+   * Check if WebMCP is available on a page by checking the bridge's hasWebMCP() method.
+   * The bridge is auto-injected into all pages, so we just need to check if it detected WebMCP.
+   */
+  async #checkWebMCPAvailable(page: Page): Promise<boolean> {
+    try {
+      const result = await page.evaluate(CHECK_WEBMCP_AVAILABLE_SCRIPT);
+      return (result as {available: boolean}).available;
+    } catch {
+      return false;
+    }
   }
 
   /**
