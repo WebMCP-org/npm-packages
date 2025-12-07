@@ -19,5 +19,10 @@
     "usewebmcp": "0.2.0",
     "@mcp-b/webmcp-ts-sdk": "1.1.0"
   },
-  "changesets": ["broaden-react-peer-deps", "fix-cdp-test-vendor-paths", "fix-structured-content"]
+  "changesets": [
+    "broaden-react-peer-deps",
+    "fix-cdp-lifecycle-integration",
+    "fix-cdp-test-vendor-paths",
+    "fix-structured-content"
+  ]
 }
