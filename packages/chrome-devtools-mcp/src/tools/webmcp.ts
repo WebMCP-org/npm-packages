@@ -67,12 +67,15 @@ async function ensureWebMCPConnected(
   const currentUrl = page.url();
 
   // Check if we have a valid, active connection to the same page
-  // Note: We must check isClosed() to detect page reloads where URL stays the same
-  // but the CDP session/frames have been invalidated
+  // We must verify:
+  // 1. isClosed() - to detect page reloads where URL stays the same but frames are invalidated
+  // 2. getPage() === page - to detect browser close/reopen where the page object is different
+  //    even if URL is the same
   const hasValidConnection =
     webMCPClient &&
     webMCPTransport &&
     !webMCPTransport.isClosed() &&
+    webMCPTransport.getPage() === page &&
     connectedPageUrl === currentUrl;
 
   if (hasValidConnection) {

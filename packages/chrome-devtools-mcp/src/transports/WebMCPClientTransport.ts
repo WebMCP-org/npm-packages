@@ -113,6 +113,15 @@ export class WebMCPClientTransport implements Transport {
     return this._closed;
   }
 
+  /**
+   * Get the page this transport is connected to.
+   * This allows callers to verify the transport is connected to the expected page,
+   * which is important when browsers are closed and reopened.
+   */
+  getPage(): Page {
+    return this._page;
+  }
+
   constructor(options: WebMCPClientTransportOptions) {
     this._page = options.page;
     this._readyTimeout = options.readyTimeout ?? 10000;
