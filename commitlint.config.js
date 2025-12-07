@@ -11,6 +11,7 @@ export default {
         'mcp-react-hooks',
         'mcp-react-hook-form',
         'global',
+        'chrome-devtools-mcp',
 
         // Repository-wide scopes
         'root',
