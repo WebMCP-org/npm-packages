@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.3
+
+### Patch Changes
+
+- Fix server crash when reloading page with ignoreCache after calling WebMCP tools. Page navigation events are now handled gracefully with connection cleanup instead of throwing errors, allowing automatic reconnection on subsequent WebMCP tool calls.
+
 ## 1.1.2
 
 ### Patch Changes

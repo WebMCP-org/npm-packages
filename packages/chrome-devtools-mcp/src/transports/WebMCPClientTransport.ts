@@ -267,20 +267,25 @@ export class WebMCPClientTransport implements Transport {
 
   /**
    * Handle page navigation - bridge is lost
+   *
+   * Navigation is a normal lifecycle event in browsers, not a fatal error.
+   * We close the connection gracefully and allow the client to reconnect if needed.
    */
   private _handleNavigation(): void {
     if (this._closed) return;
 
     this._serverReady = false;
+
+    // Mark as closed to prevent further operations
+    this._closed = true;
+    this._started = false;
+
+    // Reject any pending server ready promise
     this._serverReadyReject(new Error('Page navigated, connection lost'));
 
-    // Reset the promise for potential reconnection
-    this._serverReadyPromise = new Promise((resolve, reject) => {
-      this._serverReadyResolve = resolve;
-      this._serverReadyReject = reject;
-    });
-
-    this.onerror?.(new Error('Page navigated, WebMCP connection lost'));
+    // Signal clean disconnection (not an error)
+    // The client can reconnect by creating a new transport instance
+    this.onclose?.();
   }
 
   /**

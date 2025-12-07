@@ -102,6 +102,16 @@ async function ensureWebMCPConnected(
       {capabilities: {}}
     );
 
+    // Set up onclose handler to clean up module-level state
+    // This handles page navigations, reloads, and manual disconnections
+    transport.onclose = () => {
+      if (webMCPClient === client) {
+        webMCPClient = null;
+        webMCPTransport = null;
+        connectedPageUrl = null;
+      }
+    };
+
     await client.connect(transport);
 
     // Store for later use
