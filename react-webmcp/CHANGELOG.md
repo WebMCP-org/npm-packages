@@ -1,5 +1,11 @@
 # @mcp-b/react-webmcp
 
+## 0.2.2
+
+### Patch Changes
+
+- 14234a8: Fix biome linter issues by replacing eslint-disable comments with biome-ignore comments for React hooks exhaustive-deps rule
+
 ## 0.2.1
 
 ### Patch Changes
