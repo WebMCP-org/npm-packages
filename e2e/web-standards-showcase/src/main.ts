@@ -76,9 +76,7 @@ function init(): void {
   }
 
   // Get API references
-  // biome-ignore lint/style/noNonNullAssertion: Checked in detection step above
   modelContext = navigator.modelContext!;
-  // biome-ignore lint/style/noNonNullAssertion: Checked in detection step above
   modelContextTesting = navigator.modelContextTesting!;
 
   // Initialize UI managers
