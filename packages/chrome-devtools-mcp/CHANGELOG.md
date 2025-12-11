@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.2.1
+
+### Patch Changes
+
+- docs(chrome-devtools-mcp): add benchmark data, demo images, and quickstart links
+
+  - Add Token Efficiency section with benchmark comparison chart showing 77-89% token savings vs screenshot-based workflows
+  - Add demo result image showing successful WebMCP tool execution
+  - Add prominent link to Chrome DevTools Quickstart in the header
+  - Enhance documentation with visual aids from chrome-devtools-quickstart repo
+
 ## 1.2.0
 
 ### Minor Changes

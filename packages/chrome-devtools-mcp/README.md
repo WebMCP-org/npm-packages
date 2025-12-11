@@ -8,7 +8,7 @@
 [![28 Tools](https://img.shields.io/badge/MCP_Tools-28-green?style=flat-square)](./docs/tool-reference.md)
 [![Chrome](https://img.shields.io/badge/Chrome-DevTools-4285F4?style=flat-square&logo=googlechrome)](https://developer.chrome.com/docs/devtools/)
 
-📖 **[WebMCP Documentation](https://docs.mcp-b.ai)** | 🚀 **[Quick Start](https://docs.mcp-b.ai/quickstart)** | 🔌 **[Connecting Agents](https://docs.mcp-b.ai/connecting-agents)**
+📖 **[WebMCP Documentation](https://docs.mcp-b.ai)** | 🚀 **[Quick Start](https://docs.mcp-b.ai/quickstart)** | 🔌 **[Connecting Agents](https://docs.mcp-b.ai/connecting-agents)** | 🎯 **[Chrome DevTools Quickstart](https://github.com/WebMCP-org/chrome-devtools-quickstart)**
 
 **@mcp-b/chrome-devtools-mcp** lets AI coding agents like Claude, Gemini, Cursor, and Copilot control and inspect a live Chrome browser via the Model Context Protocol (MCP). Get performance insights, debug network requests, take screenshots, and interact with website-specific MCP tools through WebMCP integration.
 
@@ -26,6 +26,21 @@
 | **Performance Analysis** | Chrome DevTools-powered performance insights and trace recording |
 | **Reliable Automation** | Puppeteer-based with automatic waiting for action results |
 | **Works with All MCP Clients** | Claude, Cursor, Copilot, Gemini CLI, VS Code, Windsurf, and more |
+
+### Token Efficiency
+
+WebMCP tools are dramatically more efficient than screenshot-based workflows:
+
+![Token usage comparison: WebMCP tools vs screenshots](https://raw.githubusercontent.com/WebMCP-org/chrome-devtools-quickstart/main/assets/benchmark.png)
+
+| Task | Screenshot-Based | WebMCP Tools | Savings |
+|------|-----------------|--------------|---------|
+| Simple task (set counter) | 3,801 tokens | 433 tokens | **89% fewer tokens** |
+| Complex task (calendar event) | 11,390 tokens | 2,583 tokens | **77% fewer tokens** |
+
+Screenshots are expensive (~2,000 tokens each). WebMCP tool responses are compact JSON (20-100 tokens typically).
+
+> **Try it yourself:** Clone the [Chrome DevTools Quickstart](https://github.com/WebMCP-org/chrome-devtools-quickstart) and run the benchmarks.
 
 ## What's Different from Chrome DevTools MCP?
 
@@ -47,28 +62,9 @@ The key addition is the `list_webmcp_tools` and `call_webmcp_tool` tools that le
 
 One of the most powerful use cases for this package is **AI-driven tool development** - essentially test-driven development for AI agents. Here's how it works:
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                    AI Development Feedback Loop                     │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│   1. AI writes WebMCP tool code ──────────────────────────┐        │
-│                                                            │        │
-│   2. Dev server hot-reloads ◄─────────────────────────────┘        │
-│                                                                     │
-│   3. AI opens browser via Chrome DevTools MCP                       │
-│            │                                                        │
-│            ▼                                                        │
-│   4. AI calls list_webmcp_tools to see the new tool                 │
-│            │                                                        │
-│            ▼                                                        │
-│   5. AI calls call_webmcp_tool to test it                           │
-│            │                                                        │
-│            ▼                                                        │
-│   6. AI sees results, iterates if needed ───────► Back to step 1    │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────────┘
-```
+![WebMCP: AI-Driven Development Workflow](https://raw.githubusercontent.com/WebMCP-org/chrome-devtools-quickstart/main/assets/image.png)
+
+> **Want to try it yourself?** Check out the [Chrome DevTools Quickstart](https://github.com/WebMCP-org/chrome-devtools-quickstart) - a minimal example you can clone and run in 3 steps.
 
 ### Example: Building a Search Tool
 
@@ -134,6 +130,12 @@ This creates a tight feedback loop where your AI assistant can:
 
 This is like **TDD for AI** - the AI can build and verify its own tools in real-time.
 
+### Demo: Tool Execution Result
+
+Here's what it looks like when an AI agent successfully discovers and calls WebMCP tools:
+
+![Demo: AI agent executing WebMCP tools](https://raw.githubusercontent.com/WebMCP-org/chrome-devtools-quickstart/main/assets/demo-result.png)
+
 ## [Tool reference](./docs/tool-reference.md) | [Changelog](./CHANGELOG.md) | [Contributing](./CONTRIBUTING.md) | [Troubleshooting](./docs/troubleshooting.md) | [Design Principles](./docs/design-principles.md)
 
 ## Key features
@@ -164,6 +166,8 @@ MCP clients.
 - [npm](https://www.npmjs.com/).
 
 ## Getting started
+
+> **New to WebMCP?** Try the [Chrome DevTools Quickstart](https://github.com/WebMCP-org/chrome-devtools-quickstart) - clone, run, and see AI-driven tool development in action in under 5 minutes.
 
 Add the following config to your MCP client:
 
