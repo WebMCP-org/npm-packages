@@ -187,6 +187,30 @@ export interface WebMCPConfig<
    *
    * @param output - The raw output from the handler
    * @returns Formatted string for the MCP response content
+   *
+   * @deprecated Use `outputSchema` instead for structured tool responses. The MCP specification
+   * recommends using `outputSchema` which enables `structuredContent` in the response. When
+   * `outputSchema` is defined, the text response is automatically generated from JSON.stringify.
+   * Custom text formatting is not part of the MCP standard and may be removed in a future version.
+   *
+   * @example Migration from formatOutput to outputSchema:
+   * ```typescript
+   * // Before (deprecated)
+   * useWebMCP({
+   *   name: 'get_count',
+   *   handler: async () => ({ count: 5 }),
+   *   formatOutput: (result) => `Count is ${result.count}`,
+   * });
+   *
+   * // After (recommended)
+   * useWebMCP({
+   *   name: 'get_count',
+   *   outputSchema: {
+   *     count: z.number().describe('The current count'),
+   *   },
+   *   handler: async () => ({ count: 5 }),
+   * });
+   * ```
    */
   formatOutput?: (output: InferOutput<TOutputSchema>) => string;
 

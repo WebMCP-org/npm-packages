@@ -78,6 +78,7 @@ export function useWebMCPContext<T>(
   // Use default generics (no input/output schema) since context tools
   // don't define structured schemas. The handler returns T but it's
   // treated as `unknown` in the return type since no outputSchema is defined.
+  // Note: Uses default JSON.stringify formatting for text output.
   return useWebMCP({
     name,
     description,
@@ -90,12 +91,6 @@ export function useWebMCPContext<T>(
     },
     handler: async () => {
       return getValueRef.current();
-    },
-    formatOutput: (output) => {
-      if (typeof output === 'string') {
-        return output as string;
-      }
-      return JSON.stringify(output, null, 2);
     },
   });
 }

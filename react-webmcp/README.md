@@ -82,16 +82,21 @@ function PostsPage() {
     inputSchema: {
       postId: z.string().uuid().describe('The post ID to like'),
     },
+    // Output schema enables structured responses (recommended)
+    outputSchema: {
+      success: z.boolean().describe('Whether the like was successful'),
+      postId: z.string().describe('The ID of the liked post'),
+      likes: z.number().describe('Updated like count'),
+    },
     annotations: {
       title: 'Like Post',
       readOnlyHint: false,
       idempotentHint: true,
     },
     handler: async (input) => {
-      await api.posts.like(input.postId);
-      return { success: true, postId: input.postId };
+      const result = await api.posts.like(input.postId);
+      return { success: true, postId: input.postId, likes: result.likes };
     },
-    formatOutput: (result) => `Post ${result.postId} liked successfully!`,
   });
 
   return (
@@ -106,7 +111,7 @@ function PostsPage() {
 
 ### Tool with Output Schema (Recommended)
 
-**Output schemas are essential for modern AI integrations** - they enable AI agents to return structured, type-safe responses:
+**Output schemas are essential for modern AI integrations** - they enable AI agents to return structured, type-safe responses via `structuredContent` per the MCP specification:
 
 ```tsx
 import { useWebMCP } from '@mcp-b/react-webmcp';
@@ -121,27 +126,26 @@ function ProductSearch() {
       maxResults: z.number().min(1).max(50).default(10),
       category: z.enum(['electronics', 'clothing', 'books']).optional(),
     },
-    // Output schema enables structured responses
+    // Output schema enables structuredContent in MCP responses
     outputSchema: {
       products: z.array(z.object({
         id: z.string(),
         name: z.string(),
         price: z.number(),
         inStock: z.boolean(),
-      })),
+      })).describe('List of matching products'),
       total: z.number().describe('Total matching products'),
-      hasMore: z.boolean(),
+      hasMore: z.boolean().describe('Whether more results are available'),
     },
     handler: async ({ query, maxResults, category }) => {
       const results = await api.products.search({ query, maxResults, category });
+      // Return type is inferred from outputSchema
       return {
         products: results.items,
         total: results.totalCount,
         hasMore: results.totalCount > maxResults,
       };
     },
-    // Format for text display (structuredContent is auto-generated from return value)
-    formatOutput: (result) => `Found ${result.total} products`,
   });
 
   return (
@@ -156,9 +160,10 @@ function ProductSearch() {
 ```
 
 **Why use output schemas?**
-- AI providers compile schemas to TypeScript, enabling type-safe code generation
-- Responses are validated against the schema
-- Better AI reasoning about expected output format
+- **MCP Compliance**: Enables `structuredContent` in responses per the [MCP specification](https://spec.modelcontextprotocol.io/specification/server/tools/#output-schemas)
+- **Type Safety**: Handler return type is inferred from the schema
+- **AI Understanding**: Better AI reasoning about expected output format
+- **Validation**: Responses are validated against the schema
 
 ### Context Tool
 
@@ -206,12 +211,13 @@ function useWebMCP<
 | `name` | `string` | ✓ | Unique tool identifier (e.g., 'posts_like') |
 | `description` | `string` | ✓ | Human-readable description for AI |
 | `inputSchema` | `Record<string, ZodType>` | - | Input validation using Zod schemas |
-| `outputSchema` | `Record<string, ZodType>` | - | Output schema for structured responses (recommended) |
+| `outputSchema` | `Record<string, ZodType>` | - | Output schema for structured responses (**recommended**) |
 | `annotations` | `ToolAnnotations` | - | Metadata hints for the AI |
-| `elicitation` | `ElicitationConfig` | - | User confirmation settings |
 | `handler` | `(input) => Promise<TOutput>` | ✓ | Function that executes the tool |
-| `formatOutput` | `(output) => string` | - | Custom output formatter |
+| `onSuccess` | `(result, input) => void` | - | Success callback for side effects |
 | `onError` | `(error, input) => void` | - | Error handler callback |
+
+> **Note**: The `formatOutput` option is deprecated. Use `outputSchema` instead for structured tool responses per the MCP specification.
 
 #### Return Value
 

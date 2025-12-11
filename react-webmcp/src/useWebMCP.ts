@@ -5,6 +5,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { z } from 'zod';
 import type { InferOutput, ToolExecutionState, WebMCPConfig, WebMCPReturn } from './types.js';
 
+/** Track which tools have already shown the deprecation warning */
+const formatOutputWarningShown = new Set<string>();
+
 /**
  * Default output formatter that converts values to formatted JSON strings.
  *
@@ -125,6 +128,17 @@ export function useWebMCP<
     onSuccess,
     onError,
   } = config;
+
+  // Show deprecation warning for formatOutput (only once per tool name)
+  if (config.formatOutput && !formatOutputWarningShown.has(name)) {
+    formatOutputWarningShown.add(name);
+    console.warn(
+      `[useWebMCP] DEPRECATION WARNING: "formatOutput" is deprecated for tool "${name}". ` +
+        'Use "outputSchema" instead for structured tool responses per the MCP specification. ' +
+        'Custom text formatting may be removed in a future version. ' +
+        'See: https://spec.modelcontextprotocol.io/specification/server/tools/#output-schemas'
+    );
+  }
 
   const [state, setState] = useState<ToolExecutionState<TOutput>>({
     isExecuting: false,
