@@ -107,6 +107,30 @@ function defaultFormatOutput(output: unknown): string {
  *   },
  * });
  * ```
+ *
+ * @example
+ * Tool with deps for automatic re-registration:
+ * ```tsx
+ * function SitesManager({ sites }: { sites: Site[] }) {
+ *   // Without deps, you'd need getter functions like: getSiteCount: () => sites.length
+ *   // With deps, values can be used directly in description and handler
+ *   const sitesTool = useWebMCP({
+ *     name: 'sites_query',
+ *     description: `Query available sites.
+ *
+ * Current count: ${sites.length}
+ * Sites: ${sites.map(s => s.name).join(', ')}`,
+ *     handler: async () => ({
+ *       count: sites.length,
+ *       sites: sites.map(s => ({ id: s.id, name: s.name })),
+ *     }),
+ *     // Re-register tool when sites array changes (by reference)
+ *     deps: [sites],
+ *   });
+ *
+ *   return <SitesList sites={sites} />;
+ * }
+ * ```
  */
 export function useWebMCP<
   TInputSchema extends Record<string, z.ZodTypeAny> = Record<string, never>,
@@ -124,6 +148,7 @@ export function useWebMCP<
     formatOutput = defaultFormatOutput,
     onSuccess,
     onError,
+    deps,
   } = config;
 
   const [state, setState] = useState<ToolExecutionState<TOutput>>({
@@ -224,7 +249,7 @@ export function useWebMCP<
     });
   }, []);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: execute is stable (empty deps array) and uses refs internally
+  // biome-ignore lint/correctness/useExhaustiveDependencies: execute is stable (empty deps array) and uses refs internally; deps is user-controlled
   useEffect(() => {
     if (typeof window === 'undefined' || !window.navigator?.modelContext) {
       console.warn(
@@ -303,7 +328,8 @@ export function useWebMCP<
       }
     };
     // Note: execute is intentionally omitted - it's stable (empty deps) and uses refs internally
-  }, [name, description, inputSchema, outputSchema, annotations]);
+    // deps is spread to allow user-controlled re-registration triggers
+  }, [name, description, inputSchema, outputSchema, annotations, ...(deps ?? [])]);
 
   return {
     state,
