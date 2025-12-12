@@ -31,10 +31,13 @@ function stableStringify(value: unknown): string | undefined {
   if (value === undefined) {
     return undefined;
   }
+  if (value === null) {
+    return 'null';
+  }
   try {
     // Sort object keys for consistent serialization
     return JSON.stringify(value, (_, v) => {
-      if (v && typeof v === 'object' && !Array.isArray(v)) {
+      if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
         return Object.keys(v)
           .sort()
           .reduce(
@@ -48,8 +51,11 @@ function stableStringify(value: unknown): string | undefined {
       return v;
     });
   } catch {
-    // Fallback for non-serializable values (functions, circular refs)
-    return String(value);
+    // Non-serializable values (functions, circular refs, symbols) cannot be
+    // reliably compared. Return undefined to force re-registration on every
+    // render when such values are present. This is a safe fallback since
+    // JSON schemas from Zod should always be serializable.
+    return undefined;
   }
 }
 
@@ -440,12 +446,9 @@ export function useWebMCP<
       },
     });
 
-    console.log(`[useWebMCP] Registered tool: ${name}`);
-
     return () => {
       if (registration) {
         registration.unregister();
-        console.log(`[useWebMCP] Unregistered tool: ${name}`);
       }
     };
     // Dependencies use stable string keys for object comparison to prevent
