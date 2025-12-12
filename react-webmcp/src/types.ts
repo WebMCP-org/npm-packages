@@ -1,5 +1,6 @@
 import type { PromptMessage, ResourceContents, ToolAnnotations } from '@mcp-b/webmcp-ts-sdk';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { DependencyList } from 'react';
 import type { z } from 'zod';
 
 // Re-export PromptMessage and ResourceContents for use in hook types
@@ -207,6 +208,34 @@ export interface WebMCPConfig<
    * @param input - The input that was passed to the handler
    */
   onError?: (error: Error, input: unknown) => void;
+
+  /**
+   * Optional dependency array that triggers tool re-registration when values change.
+   *
+   * Similar to React's `useEffect` dependencies, when any value in this array changes
+   * (by reference), the tool will be unregistered and re-registered with the updated
+   * configuration. This is useful when your `description` includes dynamic state that
+   * should trigger re-registration.
+   *
+   * Without `deps`, you would need to use getter functions to access current state.
+   * With `deps`, you can reference values directly in your description and handler,
+   * and the tool will automatically re-register when those values change.
+   *
+   * @example Using deps to avoid getter functions:
+   * ```tsx
+   * // Instead of using getters:
+   * // description: `Sites: ${getSiteCount()}`,
+   *
+   * // You can use values directly with deps:
+   * useWebMCP({
+   *   name: 'sites_query',
+   *   description: `Query sites. Current count: ${sites.length}`,
+   *   handler: async () => ({ sites }),
+   *   deps: [sites], // Re-register when sites changes
+   * });
+   * ```
+   */
+  deps?: DependencyList;
 }
 
 /**
