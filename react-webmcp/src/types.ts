@@ -221,6 +221,10 @@ export interface WebMCPConfig<
    * With `deps`, you can reference values directly in your description and handler,
    * and the tool will automatically re-register when those values change.
    *
+   * **Important:** Since `deps` uses reference comparison, prefer primitive values
+   * (strings, numbers) over objects/arrays when possible to minimize re-registrations.
+   * For example, use `[sites.length, sites.map(s => s.id).join(',')]` instead of `[sites]`.
+   *
    * @example Using deps to avoid getter functions:
    * ```tsx
    * // Instead of using getters:
@@ -232,6 +236,18 @@ export interface WebMCPConfig<
    *   description: `Query sites. Current count: ${sites.length}`,
    *   handler: async () => ({ sites }),
    *   deps: [sites], // Re-register when sites changes
+   * });
+   * ```
+   *
+   * @example Optimizing deps with primitives:
+   * ```tsx
+   * // Better: Use derived primitives to minimize re-registrations
+   * const siteIds = sites.map(s => s.id).join(',');
+   * useWebMCP({
+   *   name: 'sites_query',
+   *   description: `Query sites. Current count: ${sites.length}`,
+   *   handler: async () => ({ sites }),
+   *   deps: [sites.length, siteIds], // Only re-register when content changes
    * });
    * ```
    */
