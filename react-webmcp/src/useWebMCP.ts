@@ -20,6 +20,40 @@ function defaultFormatOutput(output: unknown): string {
 }
 
 /**
+ * Converts a value to a stable JSON string for dependency comparison.
+ * Returns undefined for undefined values to avoid unnecessary re-registrations.
+ *
+ * @internal
+ * @param value - The value to serialize
+ * @returns Stable JSON string or undefined
+ */
+function stableStringify(value: unknown): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  try {
+    // Sort object keys for consistent serialization
+    return JSON.stringify(value, (_, v) => {
+      if (v && typeof v === 'object' && !Array.isArray(v)) {
+        return Object.keys(v)
+          .sort()
+          .reduce(
+            (sorted, key) => {
+              sorted[key] = v[key];
+              return sorted;
+            },
+            {} as Record<string, unknown>
+          );
+      }
+      return v;
+    });
+  } catch {
+    // Fallback for non-serializable values (functions, circular refs)
+    return String(value);
+  }
+}
+
+/**
  * React hook for registering and managing Model Context Protocol (MCP) tools.
  *
  * This hook handles the complete lifecycle of an MCP tool:
@@ -29,6 +63,30 @@ function defaultFormatOutput(output: unknown): string {
  * - Handles tool execution and lifecycle callbacks
  * - Automatically unregisters on component unmount
  * - Properly returns `structuredContent` when `outputSchema` is defined
+ *
+ * ## Re-render Optimization
+ *
+ * This hook is optimized to minimize unnecessary tool re-registrations, which
+ * trigger JSON-RPC updates. Key optimizations include:
+ *
+ * - **Stable schema comparison**: `inputSchema`, `outputSchema`, and `annotations`
+ *   are compared by content (JSON serialization), not reference. This means passing
+ *   a new object with the same content won't trigger re-registration.
+ *
+ * - **Memoized JSON conversion**: Zod-to-JSON schema conversions are memoized to
+ *   avoid recomputation on every render.
+ *
+ * - **Ref-based callbacks**: `handler`, `onSuccess`, `onError`, and `formatOutput`
+ *   are stored in refs, so changing these functions won't trigger re-registration.
+ *
+ * **What triggers re-registration:**
+ * - Changes to `name` or `description` (string comparison)
+ * - Changes to schema/annotation content (deep comparison via JSON serialization)
+ * - Changes to any value in the `deps` array (reference comparison)
+ *
+ * **What does NOT trigger re-registration:**
+ * - New object references with identical content for schemas/annotations
+ * - Changes to `handler`, `onSuccess`, `onError`, or `formatOutput` functions
  *
  * @template TInputSchema - Zod schema object defining input parameter types
  * @template TOutputSchema - Zod schema object defining output structure (enables structuredContent)
@@ -131,6 +189,30 @@ function defaultFormatOutput(output: unknown): string {
  *   return <SitesList sites={sites} />;
  * }
  * ```
+ *
+ * @example
+ * Optimizing deps to minimize re-registrations:
+ * ```tsx
+ * function OptimizedSites({ sites }: { sites: Site[] }) {
+ *   // BAD: Using the whole array causes re-registration on every render
+ *   // if the array reference changes (e.g., from API response)
+ *   // deps: [sites]
+ *
+ *   // GOOD: Use primitive values that only change when content changes
+ *   const siteIds = sites.map(s => s.id).join(',');
+ *   const siteCount = sites.length;
+ *
+ *   const sitesTool = useWebMCP({
+ *     name: 'sites_query',
+ *     description: `Query ${siteCount} available sites`,
+ *     handler: async () => ({ sites }),
+ *     // Only re-register when IDs or count actually change
+ *     deps: [siteIds, siteCount],
+ *   });
+ *
+ *   return <SitesList sites={sites} />;
+ * }
+ * ```
  */
 export function useWebMCP<
   TInputSchema extends Record<string, z.ZodTypeAny> = Record<string, never>,
@@ -178,6 +260,42 @@ export function useWebMCP<
   useEffect(() => {
     formatOutputRef.current = formatOutput;
   }, [formatOutput]);
+
+  // Memoize JSON schemas to avoid recomputation on every render
+  // These are derived from Zod schemas and used for MCP registration
+  const inputJsonSchema = useMemo(
+    () => (inputSchema ? zodToJsonSchema(inputSchema) : undefined),
+    [inputSchema]
+  );
+  const outputJsonSchema = useMemo(
+    () => (outputSchema ? zodToJsonSchema(outputSchema) : undefined),
+    [outputSchema]
+  );
+
+  // Store schemas in refs so the effect can access them without direct dependencies
+  // This allows us to use stable serialized strings for dependency comparison
+  const inputJsonSchemaRef = useRef(inputJsonSchema);
+  const outputJsonSchemaRef = useRef(outputJsonSchema);
+  const annotationsRef = useRef(annotations);
+
+  useEffect(() => {
+    inputJsonSchemaRef.current = inputJsonSchema;
+  }, [inputJsonSchema]);
+
+  useEffect(() => {
+    outputJsonSchemaRef.current = outputJsonSchema;
+  }, [outputJsonSchema]);
+
+  useEffect(() => {
+    annotationsRef.current = annotations;
+  }, [annotations]);
+
+  // Create stable string representations for dependency comparison
+  // This prevents unnecessary re-registrations when object references change
+  // but content remains the same
+  const inputSchemaKey = useMemo(() => stableStringify(inputJsonSchema), [inputJsonSchema]);
+  const outputSchemaKey = useMemo(() => stableStringify(outputJsonSchema), [outputJsonSchema]);
+  const annotationsKey = useMemo(() => stableStringify(annotations), [annotations]);
 
   // Memoize validator to prevent recreation on every render
   // This ensures execute callback and registration effect have stable dependencies
@@ -249,7 +367,7 @@ export function useWebMCP<
     });
   }, []);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: execute is stable (empty deps array) and uses refs internally; deps is user-controlled
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Uses refs for latest values while stable keys trigger re-registration; execute is stable; deps is user-controlled
   useEffect(() => {
     if (typeof window === 'undefined' || !window.navigator?.modelContext) {
       console.warn(
@@ -258,8 +376,11 @@ export function useWebMCP<
       return;
     }
 
-    const inputJsonSchema = inputSchema ? zodToJsonSchema(inputSchema) : undefined;
-    const outputJsonSchema = outputSchema ? zodToJsonSchema(outputSchema) : undefined;
+    // Use refs to get the latest schema values - the stable keys ensure
+    // we only re-register when content actually changes
+    const currentInputSchema = inputJsonSchemaRef.current;
+    const currentOutputSchema = outputJsonSchemaRef.current;
+    const currentAnnotations = annotationsRef.current;
 
     const mcpHandler = async (input: unknown, _extra: unknown): Promise<CallToolResult> => {
       try {
@@ -282,7 +403,7 @@ export function useWebMCP<
         // 2. WebMCPConfig constrains handler return type to match outputSchema via InferOutput
         // 3. The MCP SDK's structuredContent type is Record<string, unknown>
         // Therefore, result is always assignable to Record<string, unknown> when outputSchema exists.
-        if (outputJsonSchema) {
+        if (currentOutputSchema) {
           response.structuredContent = result as Record<string, unknown>;
         }
 
@@ -310,9 +431,9 @@ export function useWebMCP<
     const registration = window.navigator.modelContext.registerTool({
       name,
       description,
-      inputSchema: (inputJsonSchema || fallbackInputSchema) as InputSchema,
-      ...(outputJsonSchema && { outputSchema: outputJsonSchema as InputSchema }),
-      ...(annotations && { annotations }),
+      inputSchema: (currentInputSchema || fallbackInputSchema) as InputSchema,
+      ...(currentOutputSchema && { outputSchema: currentOutputSchema as InputSchema }),
+      ...(currentAnnotations && { annotations: currentAnnotations }),
       execute: async (args: Record<string, unknown>) => {
         const result = await mcpHandler(args, {});
         return result;
@@ -327,9 +448,11 @@ export function useWebMCP<
         console.log(`[useWebMCP] Unregistered tool: ${name}`);
       }
     };
-    // Note: execute is intentionally omitted - it's stable (empty deps) and uses refs internally
-    // deps is spread to allow user-controlled re-registration triggers
-  }, [name, description, inputSchema, outputSchema, annotations, ...(deps ?? [])]);
+    // Dependencies use stable string keys for object comparison to prevent
+    // unnecessary re-registrations when object references change but content is the same.
+    // execute is intentionally omitted - it's stable (empty deps) and uses refs internally.
+    // deps is spread to allow user-controlled re-registration triggers.
+  }, [name, description, inputSchemaKey, outputSchemaKey, annotationsKey, ...(deps ?? [])]);
 
   return {
     state,
