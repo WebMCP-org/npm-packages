@@ -69,7 +69,31 @@ function stableStringify(value: unknown): string | undefined {
  * - Validates input using Zod schemas
  * - Handles tool execution and lifecycle callbacks
  * - Automatically unregisters on component unmount
- * - Properly returns `structuredContent` when `outputSchema` is defined
+ * - Returns `structuredContent` when `outputSchema` is defined
+ *
+ * ## Output Schema (Recommended)
+ *
+ * Always define an `outputSchema` for your tools. This provides:
+ * - **Type Safety**: Handler return type is inferred from the schema
+ * - **MCP structuredContent**: AI models receive structured, typed data
+ * - **Better AI Understanding**: Models can reason about your tool's output format
+ *
+ * ```tsx
+ * useWebMCP({
+ *   name: 'get_user',
+ *   description: 'Get user by ID',
+ *   inputSchema: { userId: z.string() },
+ *   outputSchema: {
+ *     id: z.string(),
+ *     name: z.string(),
+ *     email: z.string().email(),
+ *   },
+ *   handler: async ({ userId }) => {
+ *     const user = await fetchUser(userId);
+ *     return { id: user.id, name: user.name, email: user.email };
+ *   },
+ * });
+ * ```
  *
  * ## Re-render Optimization
  *
@@ -108,7 +132,7 @@ function stableStringify(value: unknown): string | undefined {
  * @public
  *
  * @example
- * Basic tool registration:
+ * Basic tool with outputSchema (recommended):
  * ```tsx
  * function PostActions() {
  *   const likeTool = useWebMCP({
@@ -117,37 +141,23 @@ function stableStringify(value: unknown): string | undefined {
  *     inputSchema: {
  *       postId: z.string().uuid().describe('The ID of the post to like'),
  *     },
+ *     outputSchema: {
+ *       success: z.boolean().describe('Whether the like was successful'),
+ *       likeCount: z.number().describe('Updated like count'),
+ *     },
  *     handler: async ({ postId }) => {
- *       await api.posts.like(postId);
- *       return { success: true, postId };
+ *       const result = await api.posts.like(postId);
+ *       return { success: true, likeCount: result.likes };
  *     },
  *   });
  *
+ *   // likeTool.state.lastResult is typed as { success: boolean; likeCount: number } | null
  *   if (likeTool.state.isExecuting) {
  *     return <Spinner />;
  *   }
  *
- *   return <div>Post actions ready</div>;
+ *   return <div>Likes: {likeTool.state.lastResult?.likeCount ?? 0}</div>;
  * }
- * ```
- *
- * @example
- * Tool with outputSchema (enables MCP structuredContent):
- * ```tsx
- * const counterTool = useWebMCP({
- *   name: 'counter_get',
- *   description: 'Get the current counter value',
- *   outputSchema: {
- *     counter: z.number().describe('Current counter value'),
- *     timestamp: z.string().describe('ISO timestamp'),
- *   },
- *   handler: async () => {
- *     // Return type is inferred from outputSchema
- *     return { counter: getCounter(), timestamp: new Date().toISOString() };
- *   },
- * });
- *
- * // counterTool.state.lastResult is typed as { counter: number; timestamp: string } | null
  * ```
  *
  * @example
@@ -159,13 +169,17 @@ function stableStringify(value: unknown): string | undefined {
  *   inputSchema: {
  *     postId: z.string().uuid(),
  *   },
+ *   outputSchema: {
+ *     deleted: z.boolean(),
+ *     deletedAt: z.string().describe('ISO timestamp of deletion'),
+ *   },
  *   annotations: {
  *     destructiveHint: true,
  *     idempotentHint: false,
  *   },
  *   handler: async ({ postId }) => {
  *     await api.posts.delete(postId);
- *     return { deleted: true };
+ *     return { deleted: true, deletedAt: new Date().toISOString() };
  *   },
  *   onSuccess: () => {
  *     navigate('/posts');
@@ -186,10 +200,11 @@ function stableStringify(value: unknown): string | undefined {
  *   const sitesTool = useWebMCP(
  *     {
  *       name: 'sites_query',
- *       description: `Query available sites.
- *
- * Current count: ${sites.length}
- * Sites: ${sites.map(s => s.name).join(', ')}`,
+ *       description: `Query available sites. Current count: ${sites.length}`,
+ *       outputSchema: {
+ *         count: z.number(),
+ *         sites: z.array(z.object({ id: z.string(), name: z.string() })),
+ *       },
  *       handler: async () => ({
  *         count: sites.length,
  *         sites: sites.map(s => ({ id: s.id, name: s.name })),
@@ -218,7 +233,12 @@ function stableStringify(value: unknown): string | undefined {
  *     {
  *       name: 'sites_query',
  *       description: `Query ${siteCount} available sites`,
- *       handler: async () => ({ sites }),
+ *       outputSchema: {
+ *         sites: z.array(z.object({ id: z.string(), name: z.string() })),
+ *       },
+ *       handler: async () => ({
+ *         sites: sites.map(s => ({ id: s.id, name: s.name })),
+ *       }),
  *     },
  *     [siteIds, siteCount] // Only re-register when IDs or count actually change
  *   );
