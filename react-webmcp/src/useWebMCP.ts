@@ -1,6 +1,7 @@
 import type { InputSchema } from '@mcp-b/global';
 import { zodToJsonSchema } from '@mcp-b/global';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { DependencyList } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { z } from 'zod';
 import type { InferOutput, ToolExecutionState, WebMCPConfig, WebMCPReturn } from './types.js';
@@ -88,7 +89,7 @@ function stableStringify(value: unknown): string | undefined {
  * **What triggers re-registration:**
  * - Changes to `name` or `description` (string comparison)
  * - Changes to schema/annotation content (deep comparison via JSON serialization)
- * - Changes to any value in the `deps` array (reference comparison)
+ * - Changes to any value in the `deps` argument (reference comparison)
  *
  * **What does NOT trigger re-registration:**
  * - New object references with identical content for schemas/annotations
@@ -98,6 +99,10 @@ function stableStringify(value: unknown): string | undefined {
  * @template TOutputSchema - Zod schema object defining output structure (enables structuredContent)
  *
  * @param config - Configuration object for the tool
+ * @param deps - Optional dependency array that triggers tool re-registration when values change.
+ *   Similar to React's `useEffect` dependencies. When any value changes (by reference),
+ *   the tool will be unregistered and re-registered. Prefer primitive values over
+ *   objects/arrays to minimize re-registrations.
  * @returns Object containing execution state and control methods
  *
  * @public
@@ -178,19 +183,20 @@ function stableStringify(value: unknown): string | undefined {
  * function SitesManager({ sites }: { sites: Site[] }) {
  *   // Without deps, you'd need getter functions like: getSiteCount: () => sites.length
  *   // With deps, values can be used directly in description and handler
- *   const sitesTool = useWebMCP({
- *     name: 'sites_query',
- *     description: `Query available sites.
+ *   const sitesTool = useWebMCP(
+ *     {
+ *       name: 'sites_query',
+ *       description: `Query available sites.
  *
  * Current count: ${sites.length}
  * Sites: ${sites.map(s => s.name).join(', ')}`,
- *     handler: async () => ({
- *       count: sites.length,
- *       sites: sites.map(s => ({ id: s.id, name: s.name })),
- *     }),
- *     // Re-register tool when sites array changes (by reference)
- *     deps: [sites],
- *   });
+ *       handler: async () => ({
+ *         count: sites.length,
+ *         sites: sites.map(s => ({ id: s.id, name: s.name })),
+ *       }),
+ *     },
+ *     [sites] // Re-register tool when sites array changes (by reference)
+ *   );
  *
  *   return <SitesList sites={sites} />;
  * }
@@ -202,19 +208,20 @@ function stableStringify(value: unknown): string | undefined {
  * function OptimizedSites({ sites }: { sites: Site[] }) {
  *   // BAD: Using the whole array causes re-registration on every render
  *   // if the array reference changes (e.g., from API response)
- *   // deps: [sites]
+ *   // useWebMCP(config, [sites])
  *
  *   // GOOD: Use primitive values that only change when content changes
  *   const siteIds = sites.map(s => s.id).join(',');
  *   const siteCount = sites.length;
  *
- *   const sitesTool = useWebMCP({
- *     name: 'sites_query',
- *     description: `Query ${siteCount} available sites`,
- *     handler: async () => ({ sites }),
- *     // Only re-register when IDs or count actually change
- *     deps: [siteIds, siteCount],
- *   });
+ *   const sitesTool = useWebMCP(
+ *     {
+ *       name: 'sites_query',
+ *       description: `Query ${siteCount} available sites`,
+ *       handler: async () => ({ sites }),
+ *     },
+ *     [siteIds, siteCount] // Only re-register when IDs or count actually change
+ *   );
  *
  *   return <SitesList sites={sites} />;
  * }
@@ -223,7 +230,10 @@ function stableStringify(value: unknown): string | undefined {
 export function useWebMCP<
   TInputSchema extends Record<string, z.ZodTypeAny> = Record<string, never>,
   TOutputSchema extends Record<string, z.ZodTypeAny> = Record<string, never>,
->(config: WebMCPConfig<TInputSchema, TOutputSchema>): WebMCPReturn<TOutputSchema> {
+>(
+  config: WebMCPConfig<TInputSchema, TOutputSchema>,
+  deps?: DependencyList
+): WebMCPReturn<TOutputSchema> {
   /** Inferred output type from the schema */
   type TOutput = InferOutput<TOutputSchema>;
   const {
@@ -236,7 +246,6 @@ export function useWebMCP<
     formatOutput = defaultFormatOutput,
     onSuccess,
     onError,
-    deps,
   } = config;
 
   const [state, setState] = useState<ToolExecutionState<TOutput>>({

@@ -2,18 +2,20 @@
 "@mcp-b/react-webmcp": minor
 ---
 
-Add `deps` property to useWebMCP hook for automatic tool re-registration
+Add `deps` argument to useWebMCP hook for automatic tool re-registration
 
-The new `deps` option allows you to specify a dependency array that triggers tool re-registration when values change. This eliminates the need for getter functions when using dynamic values in tool descriptions or handlers.
+The new `deps` argument (second parameter) allows you to specify a dependency array that triggers tool re-registration when values change. This follows the idiomatic React pattern used by `useEffect`, `useMemo`, and `useCallback`.
 
 Example usage:
 ```tsx
-useWebMCP({
-  name: 'sites_query',
-  description: `Query sites. Current count: ${sites.length}`,
-  handler: async () => ({ sites }),
-  deps: [sites], // Re-register when sites changes
-});
+useWebMCP(
+  {
+    name: 'sites_query',
+    description: `Query sites. Current count: ${sites.length}`,
+    handler: async () => ({ sites }),
+  },
+  [sites] // Re-register when sites changes
+);
 ```
 
 Previously, you would need getter functions like `getSiteCount: () => sites.length` to access current state. Now you can reference values directly and the tool will automatically re-register when dependencies change.
@@ -30,7 +32,8 @@ The hook is now optimized to minimize unnecessary JSON-RPC tool update calls:
 ```tsx
 // Better: derived primitives minimize re-registrations
 const siteIds = sites.map(s => s.id).join(',');
-useWebMCP({
-  deps: [sites.length, siteIds],
-});
+useWebMCP(
+  { name: 'sites_query', description: '...', handler: async () => ({}) },
+  [sites.length, siteIds]
+);
 ```
