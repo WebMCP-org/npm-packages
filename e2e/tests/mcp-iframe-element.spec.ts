@@ -23,9 +23,9 @@ test.describe('MCPIframeElement E2E Tests', () => {
 
     // Verify tool names are prefixed
     const toolsText = await toolsEl.textContent();
-    expect(toolsText).toContain('child-iframe:add');
-    expect(toolsText).toContain('child-iframe:multiply');
-    expect(toolsText).toContain('child-iframe:greet');
+    expect(toolsText).toContain('child-iframe_add');
+    expect(toolsText).toContain('child-iframe_multiply');
+    expect(toolsText).toContain('child-iframe_greet');
   });
 
   test('should expose resources from iframe', async ({ page }) => {
@@ -35,8 +35,8 @@ test.describe('MCPIframeElement E2E Tests', () => {
 
     // Verify resource URIs are prefixed
     const resourcesText = await resourcesEl.textContent();
-    expect(resourcesText).toContain('child-iframe:iframe://config');
-    expect(resourcesText).toContain('child-iframe:iframe://timestamp');
+    expect(resourcesText).toContain('child-iframe_iframe://config');
+    expect(resourcesText).toContain('child-iframe_iframe://timestamp');
   });
 
   test('should expose prompts from iframe', async ({ page }) => {
@@ -46,8 +46,8 @@ test.describe('MCPIframeElement E2E Tests', () => {
 
     // Verify prompt names are prefixed
     const promptsText = await promptsEl.textContent();
-    expect(promptsText).toContain('child-iframe:summarize');
-    expect(promptsText).toContain('child-iframe:translate');
+    expect(promptsText).toContain('child-iframe_summarize');
+    expect(promptsText).toContain('child-iframe_translate');
   });
 
   test('should call add tool and get result', async ({ page }) => {
@@ -177,6 +177,6 @@ test.describe('MCPIframeElement E2E Tests', () => {
     expect(elementInfo.exposedToolsCount).toBe(3);
     expect(elementInfo.exposedResourcesCount).toBe(2);
     expect(elementInfo.exposedPromptsCount).toBe(2);
-    expect(elementInfo.itemPrefix).toBe('child-iframe:');
+    expect(elementInfo.itemPrefix).toBe('child-iframe_');
   });
 });

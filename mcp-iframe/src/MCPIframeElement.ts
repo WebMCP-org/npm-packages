@@ -14,9 +14,12 @@
  * ```
  *
  * Items from the iframe will be exposed with the element's ID as prefix:
- * - Child registers tool "calculate" -> Parent sees "my-app:calculate"
- * - Child registers resource "config://settings" -> Parent sees "my-app:config://settings"
- * - Child registers prompt "help" -> Parent sees "my-app:help"
+ * - Child registers tool "calculate" -> Parent sees "my-app_calculate"
+ * - Child registers resource "config://settings" -> Parent sees "my-app_config://settings"
+ * - Child registers prompt "help" -> Parent sees "my-app_help"
+ *
+ * Note: The prefix separator defaults to underscore (_) to ensure MCP compatibility.
+ * Tool and prompt names must match the pattern: ^[a-zA-Z0-9_-]{1,128}$
  *
  * @example
  * ```typescript
@@ -45,8 +48,39 @@ import type {
 // ============================================================================
 
 const DEFAULT_CALL_TIMEOUT = 30000;
-const DEFAULT_PREFIX_SEPARATOR = ':';
+const DEFAULT_PREFIX_SEPARATOR = '_';
 const DEFAULT_CHANNEL_ID = 'mcp-iframe';
+
+/**
+ * MCP name validation pattern.
+ * Tool/prompt names must match: ^[a-zA-Z0-9_-]{1,128}$
+ */
+const MCP_NAME_PATTERN = /^[a-zA-Z0-9_-]{1,128}$/;
+const MCP_NAME_MAX_LENGTH = 128;
+
+/**
+ * Validates that a string contains only valid MCP name characters.
+ * Valid characters: a-z, A-Z, 0-9, underscore (_), hyphen (-)
+ */
+function isValidMCPNameChars(str: string): boolean {
+  return /^[a-zA-Z0-9_-]*$/.test(str);
+}
+
+/**
+ * Validates a complete MCP name (tool name, prompt name).
+ * Must be 1-128 characters and contain only valid characters.
+ */
+function isValidMCPName(name: string): boolean {
+  return MCP_NAME_PATTERN.test(name);
+}
+
+/**
+ * Sanitizes a string to contain only valid MCP name characters.
+ * Replaces invalid characters with underscores.
+ */
+function sanitizeMCPNamePart(str: string): string {
+  return str.replace(/[^a-zA-Z0-9_-]/g, '_');
+}
 
 /** Standard iframe attributes that are mirrored to the internal iframe */
 const IFRAME_ATTRIBUTES = [
@@ -196,13 +230,24 @@ export class MCPIframeElement extends HTMLElement {
         this.#callTimeout = newValue ? Number.parseInt(newValue, 10) : DEFAULT_CALL_TIMEOUT;
         break;
 
-      case 'prefix-separator':
-        this.#prefixSeparator = newValue ?? DEFAULT_PREFIX_SEPARATOR;
+      case 'prefix-separator': {
+        const separator = newValue ?? DEFAULT_PREFIX_SEPARATOR;
+        if (!isValidMCPNameChars(separator)) {
+          console.warn(
+            `[MCPIframe] Invalid prefix-separator "${separator}". ` +
+              'Only alphanumeric characters, underscores, and hyphens are allowed. ' +
+              `Using sanitized value: "${sanitizeMCPNamePart(separator)}"`
+          );
+          this.#prefixSeparator = sanitizeMCPNamePart(separator);
+        } else {
+          this.#prefixSeparator = separator;
+        }
         if (this.#ready) {
           this.#unregisterAll();
           this.#registerAllOnModelContext();
         }
         break;
+      }
 
       default:
         // Mirror standard iframe attributes
@@ -267,9 +312,16 @@ export class MCPIframeElement extends HTMLElement {
     return [...this.#mcpPrompts];
   }
 
-  /** The item name prefix (id + separator) */
+  /** The item name prefix (id + separator), sanitized for MCP compatibility */
   get itemPrefix(): string {
-    const id = this.id || this.getAttribute('name') || 'iframe';
+    const rawId = this.id || this.getAttribute('name') || 'iframe';
+    const id = sanitizeMCPNamePart(rawId);
+    if (id !== rawId) {
+      console.warn(
+        `[MCPIframe] ID/name "${rawId}" contains invalid characters for MCP names. ` +
+          `Using sanitized value: "${id}"`
+      );
+    }
     return `${id}${this.#prefixSeparator}`;
   }
 
@@ -433,6 +485,24 @@ export class MCPIframeElement extends HTMLElement {
     for (const tool of this.#mcpTools) {
       const prefixedName = `${this.itemPrefix}${tool.name}`;
 
+      // Validate the final tool name
+      if (!isValidMCPName(prefixedName)) {
+        if (prefixedName.length > MCP_NAME_MAX_LENGTH) {
+          console.error(
+            `[MCPIframe] Cannot register tool "${tool.name}": ` +
+              `prefixed name "${prefixedName}" exceeds ${MCP_NAME_MAX_LENGTH} characters ` +
+              `(${prefixedName.length} chars). Skipping registration.`
+          );
+        } else {
+          console.error(
+            `[MCPIframe] Cannot register tool "${tool.name}": ` +
+              `prefixed name "${prefixedName}" contains invalid characters. ` +
+              'Tool names must match pattern: ^[a-zA-Z0-9_-]{1,128}$. Skipping registration.'
+          );
+        }
+        continue;
+      }
+
       const registration = modelContext.registerTool({
         name: prefixedName,
         description: tool.description ?? `Tool from iframe: ${tool.name}`,
@@ -468,6 +538,24 @@ export class MCPIframeElement extends HTMLElement {
   #registerPromptsOnModelContext(modelContext: ModelContext): void {
     for (const prompt of this.#mcpPrompts) {
       const prefixedName = `${this.itemPrefix}${prompt.name}`;
+
+      // Validate the final prompt name
+      if (!isValidMCPName(prefixedName)) {
+        if (prefixedName.length > MCP_NAME_MAX_LENGTH) {
+          console.error(
+            `[MCPIframe] Cannot register prompt "${prompt.name}": ` +
+              `prefixed name "${prefixedName}" exceeds ${MCP_NAME_MAX_LENGTH} characters ` +
+              `(${prefixedName.length} chars). Skipping registration.`
+          );
+        } else {
+          console.error(
+            `[MCPIframe] Cannot register prompt "${prompt.name}": ` +
+              `prefixed name "${prefixedName}" contains invalid characters. ` +
+              'Prompt names must match pattern: ^[a-zA-Z0-9_-]{1,128}$. Skipping registration.'
+          );
+        }
+        continue;
+      }
 
       const promptDescriptor: Parameters<ModelContext['registerPrompt']>[0] = {
         name: prefixedName,

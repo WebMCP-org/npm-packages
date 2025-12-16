@@ -83,7 +83,7 @@ mcpIframe.addEventListener('mcp-iframe-tools-changed', (event) => {
 
 // Test tool calls
 async function callTool(name: string, args: Record<string, unknown>) {
-  const prefixedName = `child-iframe:${name}`;
+  const prefixedName = `child-iframe_${name}`;
   log(`Calling tool: ${prefixedName}`);
   toolResultEl.textContent = 'Calling...';
 
@@ -107,7 +107,7 @@ async function callTool(name: string, args: Record<string, unknown>) {
 
 // Test resource reads
 async function readResource(uri: string) {
-  const prefixedUri = `child-iframe:${uri}`;
+  const prefixedUri = `child-iframe_${uri}`;
   log(`Reading resource: ${prefixedUri}`);
   resourceResultEl.textContent = 'Reading...';
 
@@ -144,7 +144,7 @@ async function readResource(uri: string) {
 
 // Test prompt gets
 async function getPrompt(name: string, args: Record<string, unknown>) {
-  const prefixedName = `child-iframe:${name}`;
+  const prefixedName = `child-iframe_${name}`;
   log(`Getting prompt: ${prefixedName}`);
   promptResultEl.textContent = 'Getting...';
 
