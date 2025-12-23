@@ -34,13 +34,19 @@ export const selectPage = defineTool({
     pageIdx: zod
       .number()
       .describe(
-        'The index of the page to select. Call list_pages to list pages.',
+        `The index of the page to select. Call ${listPages.name} to get available pages.`,
       ),
+    bringToFront: zod
+      .boolean()
+      .optional()
+      .describe('Whether to focus the page and bring it to the top.'),
   },
   handler: async (request, response, context) => {
     const page = context.getPageByIdx(request.params.pageIdx);
-    await page.bringToFront();
     context.selectPage(page);
+    if (request.params.bringToFront) {
+      await page.bringToFront();
+    }
     response.setIncludePages(true);
   },
 });

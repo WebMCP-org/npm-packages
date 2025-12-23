@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import process from 'node:process';
+
 import './polyfill.js';
 
 import type {Channel} from './browser.js';
@@ -27,8 +29,12 @@ import {tools} from './tools/tools.js';
 
 // If moved update release-please config
 // x-release-please-start-version
-const VERSION = '0.11.0';
+const VERSION = '0.12.1';
 // x-release-please-end
+
+process.on('unhandledRejection', (reason, promise) => {
+  logger('Unhandled promise rejection', promise, reason);
+});
 
 export const args = parseArguments(VERSION);
 
@@ -58,12 +64,15 @@ async function getContext(): Promise<McpContext> {
   }
   const devtools = args.experimentalDevtools ?? false;
   const browser =
-    args.browserUrl || args.wsEndpoint
+    args.browserUrl || args.wsEndpoint || args.autoConnect
       ? await ensureBrowserConnected({
           browserURL: args.browserUrl,
           wsEndpoint: args.wsEndpoint,
           wsHeaders: args.wsHeaders,
           devtools,
+          // Important: only pass channel, if autoConnect is true.
+          channel: args.autoConnect ? (args.channel as Channel) : undefined,
+          userDataDir: args.userDataDir,
         })
       : await ensureBrowserLaunched({
           headless: args.headless,
@@ -144,7 +153,10 @@ function registerTool(tool: ToolDefinition): void {
         };
       } catch (err) {
         logger(`${tool.name} error:`, err, err?.stack);
-        const errorText = err && 'message' in err ? err.message : String(err);
+        let errorText = err && 'message' in err ? err.message : String(err);
+        if ('cause' in err && err.cause) {
+          errorText += `\nCause: ${err.cause.message}`;
+        }
         return {
           content: [
             {
