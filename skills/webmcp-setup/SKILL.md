@@ -1,401 +1,622 @@
 ---
 name: webmcp-setup
 version: 1.0.0
-description: Set up WebMCP - browser-native Model Context Protocol integration for web applications. Use when the user wants to add MCP tools to their website, enable browser automation capabilities, integrate with React hooks, or make their web app AI-accessible.
+description: Strategic guidance for adding WebMCP to web applications. Use when the user wants to make their web app AI-accessible, create LLM tools for their UI, or enable browser automation through MCP. Focuses on design principles, tool architecture, and testing workflow.
 allowed-tools:
   - Read
   - Write
   - Bash
   - Glob
   - Grep
+  - mcp__docs__SearchWebMcpDocumentation
+  - mcp__chrome-devtools__*
 ---
 
-# WebMCP Setup Assistant
+# WebMCP Setup - Creating an LLM UI
 
-Guides you through integrating WebMCP (Model Context Protocol for Web) into web applications across different frameworks and setups.
+**Core Philosophy**: WebMCP is about creating a **user interface for LLMs**. Just as humans use buttons, forms, and navigation, LLMs use tools. Your goal is **UI parity** - enable everything a human can do, in a way that makes sense for LLMs.
 
 ## Quick Reference
 
-| Task | Command/Action | Where |
-|------|---------------|-------|
-| **Add to vanilla HTML** | Ask: "Add WebMCP to my HTML page" | This skill adds IIFE script |
-| **Add to React app** | Ask: "Set up WebMCP with React hooks" | This skill installs `@mcp-b/react-webmcp` |
-| **Add to Vue app** | Ask: "Add WebMCP to my Vue app" | This skill installs `@mcp-b/webmcp-ts-sdk` |
-| **Add to Next.js** | Ask: "Set up WebMCP in Next.js" | This skill configures SDK |
-| **Verify setup** | Look for "MCP server ready" message | Browser console |
-| **Test tools** | Use Chrome in Chrome MCP to call tools | Testing |
+| Phase | What You're Building | Tools to Use |
+|-------|---------------------|--------------|
+| **Understanding** | Learn WebMCP patterns | `mcp__docs__SearchWebMcpDocumentation` |
+| **Planning** | Design tool architecture | This skill (you're reading it) |
+| **Implementing** | Write tool code | `mcp__docs__SearchWebMcpDocumentation` for APIs |
+| **Testing** | Dogfood every tool | `mcp__chrome-devtools__*` tools |
+| **Iterating** | Refine based on usage | Chrome DevTools MCP + dogfooding |
 
 ## Success Criteria
 
-After setup, you should see:
+✅ **Every major UI action has a corresponding tool**
+- If a human can do it, the LLM should be able to do it
+- UI parity achieved
 
-✅ **WebMCP loads successfully**
-- No console errors
-- MCP server initializes
+✅ **Tools are categorized by safety**
+- Read-only, read-write, and destructive tools clearly separated
+- Annotations properly set
 
-✅ **Tools are registered**
-- Check available tools via MCP client
-- Tools appear in Chrome DevTools MCP or other MCP clients
+✅ **Forms use two-tool pattern**
+- `fill_*_form` (read-write) + `submit_*_form` (destructive)
+- User can see what's being submitted
 
-✅ **Tools respond correctly**
-- Can call tools and get responses
-- Tool schemas are properly defined
+✅ **All tools tested with Chrome DevTools MCP**
+- Every tool has been called and verified
+- Edge cases tested
+- Return values validated
 
-If any check fails, see [Troubleshooting](references/TROUBLESHOOTING.md).
+✅ **Tools are powerful, not granular**
+- One tool does a complete task
+- Minimizes number of tool calls needed
 
-## What is WebMCP?
+## Tool Design Principles
 
-**WebMCP** is a browser-native implementation of the Model Context Protocol that allows:
-- **MCP Tools** - Expose web app functionality to AI agents
-- **Browser Transport** - postMessage-based communication (no server needed)
-- **React Integration** - `useWebMCP` hook for declarative tool registration
-- **TypeScript SDK** - Full type safety and Zod validation
+### 1. Categorize by Safety
 
-## Prerequisites
+Organize tools into three categories:
 
-### Required
-- Modern browser (Chrome 90+, Firefox 88+, Safari 14+)
-- Node.js 16+ (for package installation)
-- npm, yarn, or pnpm
+#### Read-Only Tools (`readOnlyHint: true`)
+**Purpose**: Let the LLM understand the current state
 
-### Framework-Specific
-- **React**: React 17+ (React 19 recommended)
-- **Vue**: Vue 3+
-- **Next.js**: Next.js 13+ (App Router or Pages Router)
-- **Vanilla**: No additional requirements
+**Characteristics**:
+- No side effects
+- Safe to call repeatedly
+- Idempotent
 
-## Setup Workflow
+**Examples**:
+- `list_todos` - Get all todos with filtering
+- `get_user_profile` - Get current user data
+- `search_products` - Search product catalog
+- `get_cart_contents` - See what's in cart
 
-**CRITICAL - Detect Framework First:**
-Before starting, I'll analyze the project to determine which framework/setup to use.
+**Testing**: Call multiple times, verify data is consistent and nothing changes
 
-### Step 1: Analyze Project Structure
+#### Read-Write Tools (default)
+**Purpose**: Modify UI state in a non-destructive way
 
-I'll check for:
-- `package.json` - Detect framework from dependencies
-- Build config - Vite, Webpack, Next.js config
-- File extensions - `.tsx`, `.jsx`, `.vue`
-- Directory structure - `src/`, `app/`, `pages/`
+**Characteristics**:
+- Changes what user sees on screen
+- Reversible (user can undo)
+- Does NOT commit/submit/save permanently
+- User sees changes in real-time
 
-### Step 2: Choose Integration Method
+**Examples**:
+- `fill_contact_form` - Populate form fields (but don't submit)
+- `set_search_query` - Change search box text (but don't search yet)
+- `apply_filters` - Update filter selection (but don't reload data yet)
+- `navigate_to_page` - Change page/tab (reversible with back button)
 
-Based on the analysis, I'll use one of these approaches:
+**Testing**: Verify changes appear on screen immediately, nothing permanent happens
 
-#### A. React + Hooks (`@mcp-b/react-webmcp`)
+#### Destructive Tools (`destructiveHint: true`)
+**Purpose**: Take permanent, irreversible actions
 
-**When to use:**
-- React 17, 18, or 19 project
-- Want declarative hook API
-- Need automatic tool re-registration with deps
+**Characteristics**:
+- Commits changes permanently
+- Submits forms, deletes data, makes purchases
+- Requires careful use
+- Should be separate from filling/preparation
 
-**What I'll do:**
-1. Install `@mcp-b/react-webmcp` and `@mcp-b/global`
-2. Add `<script>` tag for `@mcp-b/global` IIFE in HTML
-3. Show `useWebMCP` hook examples
-4. Create demo component
+**Examples**:
+- `submit_order` - Actually place the order
+- `delete_item` - Permanently remove item
+- `send_message` - Send email/message
+- `create_account` - Register new user
 
-**Example:**
+**Testing**: Extra careful validation, check for confirmation dialogs, verify action completed
+
+### 2. The Two-Tool Pattern for Forms
+
+**CRITICAL PRINCIPLE**: Separate filling from submission
+
+#### Bad Approach (Single Tool)
 ```tsx
-import { useWebMCP } from '@mcp-b/react-webmcp';
-
-function MyComponent() {
-  const [count, setCount] = useState(0);
-
-  useWebMCP({
-    name: 'get_count',
-    description: `Get current count: ${count}`,
-    handler: async () => ({ count })
-  }, [count]);
-
-  return <button onClick={() => setCount(c => c + 1)}>Count: {count}</button>;
-}
-```
-
-#### B. TypeScript SDK (`@mcp-b/webmcp-ts-sdk`)
-
-**When to use:**
-- Vue, Svelte, Angular, or other framework
-- TypeScript project
-- Want imperative API with full control
-
-**What I'll do:**
-1. Install `@mcp-b/webmcp-ts-sdk` and `@mcp-b/global`
-2. Add `<script>` tag for `@mcp-b/global` IIFE in HTML
-3. Show SDK initialization and tool registration
-4. Create demo service/composable
-
-**Example:**
-```typescript
-import { createWebMCPClient } from '@mcp-b/webmcp-ts-sdk';
-
-const client = await createWebMCPClient();
-
-client.registerTool({
-  name: 'get_status',
-  description: 'Get application status',
-  inputSchema: { type: 'object', properties: {} },
-  handler: async () => {
-    return { status: 'running', version: '1.0.0' };
+// ❌ Don't do this
+useWebMCP({
+  name: 'submit_contact_form',
+  destructiveHint: true, // Destructive from the start!
+  inputSchema: {
+    name: z.string(),
+    email: z.string(),
+    message: z.string()
+  },
+  handler: async ({ name, email, message }) => {
+    // Fill AND submit in one go
+    setName(name);
+    setEmail(email);
+    setMessage(message);
+    await submitForm(); // User never sees what's being submitted!
+    return { success: true };
   }
 });
 ```
 
-#### C. Vanilla HTML (IIFE only)
+**Problems**:
+- User doesn't see what's being submitted
+- No chance to review or correct
+- Single atomic action = risky
+- If submission fails, user loses all filled data
 
-**When to use:**
-- No build system
-- Static HTML files
-- Minimal dependencies
+#### Good Approach (Two Tools)
 
-**What I'll do:**
-1. Add `<script>` tag for `@mcp-b/global` IIFE from CDN
-2. Show vanilla JavaScript tool registration
-3. Create standalone demo HTML file
-
-**Example:**
-```html
-<script src="https://unpkg.com/@mcp-b/global@latest/dist/index.global.js"></script>
-<script>
-  window.webMCP.registerTool({
-    name: 'submit_form',
-    description: 'Submit the contact form',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        name: { type: 'string' },
-        email: { type: 'string' }
-      },
-      required: ['name', 'email']
-    },
-    handler: async (args) => {
-      document.getElementById('name').value = args.name;
-      document.getElementById('email').value = args.email;
-      document.querySelector('form').submit();
-      return { success: true };
-    }
-  });
-</script>
-```
-
-### Step 3: Add Global Bridge Script
-
-**All setups require this:**
-
-Add the `@mcp-b/global` IIFE script to your HTML (usually in `index.html` or layout):
-
-```html
-<!-- Add before closing </body> tag -->
-<script src="https://unpkg.com/@mcp-b/global@latest/dist/index.global.js"></script>
-```
-
-Or use a specific version:
-```html
-<script src="https://unpkg.com/@mcp-b/global@1.2.0/dist/index.global.js"></script>
-```
-
-**What it does:**
-- Sets up postMessage bridge between page and MCP clients
-- Exposes `window.webMCP` global
-- Enables Chrome DevTools MCP and other MCP clients to connect
-
-### Step 4: Register Tools
-
-I'll help you create tools based on your app's functionality:
-
-**Common tool patterns:**
-- **UI Actions** - Click buttons, fill forms, navigate
-- **Data Access** - Read app state, query data
-- **Mutations** - Update state, trigger actions
-- **Queries** - Search, filter, aggregate
-
-See [Tool Patterns](references/TOOL_PATTERNS.md) for detailed examples.
-
-### Step 5: Verify Setup
-
-**Testing approaches:**
-
-1. **Browser Console**
-   - Check for initialization messages
-   - Verify no errors
-
-2. **Chrome DevTools MCP** (Recommended)
-   - Connect to page
-   - List available tools
-   - Call tools and verify responses
-
-3. **Manual Testing**
-   - Use MCP inspector tool
-   - Test each tool individually
-
-## Framework-Specific Guides
-
-- [React Setup](references/REACT_SETUP.md) - Detailed React + hooks guide
-- [Vue Setup](references/VUE_SETUP.md) - Vue 3 + Composition API
-- [Next.js Setup](references/NEXTJS_SETUP.md) - App Router and Pages Router
-- [Vanilla Setup](references/VANILLA_SETUP.md) - Plain HTML/JavaScript
-- [Angular Setup](references/ANGULAR_SETUP.md) - Angular service integration
-- [Svelte Setup](references/SVELTE_SETUP.md) - Svelte stores + actions
-
-## WebMCP Packages Overview
-
-| Package | Purpose | When to Use |
-|---------|---------|-------------|
-| `@mcp-b/global` | Global bridge (IIFE) | **Always required** - Add script tag to HTML |
-| `@mcp-b/react-webmcp` | React hooks | React apps wanting declarative API |
-| `@mcp-b/webmcp-ts-sdk` | TypeScript SDK | Non-React frameworks or imperative control |
-| `@mcp-b/transports` | Low-level transports | Building custom integrations (advanced) |
-
-## Tool Registration Best Practices
-
-### 1. Use Descriptive Names
-```typescript
-// Good
-name: 'user_profile_update'
-
-// Bad
-name: 'update'
-```
-
-### 2. Include Current State in Descriptions
-```typescript
-// Good - helps AI understand current state
-description: `Update user profile. Current name: ${user.name}`
-
-// Bad - static description
-description: 'Update user profile'
-```
-
-### 3. Use Zod Schemas for Type Safety (React)
-```typescript
-const outputSchema = useMemo(() => ({
-  success: z.boolean(),
-  user: z.object({
-    id: z.string(),
-    name: z.string(),
-    email: z.string().email()
-  })
-}), []);
-
+```tsx
+// ✅ Tool 1: Fill the form (read-write)
 useWebMCP({
-  name: 'get_user',
-  outputSchema,
-  handler: async () => ({ success: true, user: currentUser })
-});
-```
+  name: 'fill_contact_form',
+  // No destructiveHint = read-write
+  description: 'Fill out the contact form fields',
+  inputSchema: {
+    name: z.string().optional(),
+    email: z.string().optional(),
+    message: z.string().optional()
+  },
+  handler: async ({ name, email, message }) => {
+    // Only fill the fields, don't submit
+    if (name) setName(name);
+    if (email) setEmail(email);
+    if (message) setMessage(message);
 
-### 4. Handle Errors Gracefully
-```typescript
-handler: async (args) => {
-  try {
-    const result = await updateUser(args);
-    return { success: true, data: result };
-  } catch (error) {
     return {
-      success: false,
-      error: error.message
+      success: true,
+      filledFields: { name, email, message }
     };
   }
-}
-```
+});
 
-### 5. Use Deps Array (React)
-```typescript
-// Re-register when count changes
+// ✅ Tool 2: Submit the form (destructive)
 useWebMCP({
-  name: 'get_count',
-  description: `Current count: ${count}`,
-  handler: async () => ({ count })
-}, [count]); // <-- deps array
-```
-
-## Troubleshooting
-
-See [TROUBLESHOOTING.md](references/TROUBLESHOOTING.md) for:
-- Common setup issues
-- Browser compatibility
-- CORS and security
-- Performance optimization
-- Debugging tools
-
-## Advanced Topics
-
-- [Custom Transports](references/CUSTOM_TRANSPORTS.md) - Build your own transport
-- [Security Best Practices](references/SECURITY.md) - Secure tool registration
-- [Performance Optimization](references/PERFORMANCE.md) - Minimize re-renders
-- [Testing WebMCP Tools](references/TESTING.md) - Unit and integration tests
-- [Production Deployment](references/PRODUCTION.md) - Deploy considerations
-
-## Examples
-
-### Minimal React Example
-
-```tsx
-import { useWebMCP } from '@mcp-b/react-webmcp';
-import { useState } from 'react';
-
-function App() {
-  const [message, setMessage] = useState('Hello');
-
-  useWebMCP({
-    name: 'set_message',
-    description: 'Set the displayed message',
-    inputSchema: useMemo(() => ({
-      message: z.string().min(1).describe('New message to display')
-    }), []),
-    handler: async ({ message }) => {
-      setMessage(message);
-      return { success: true };
+  name: 'submit_contact_form',
+  destructiveHint: true, // Now it's clear this is destructive
+  description: 'Submit the contact form',
+  handler: async () => {
+    // Validate first
+    if (!name || !email) {
+      return { success: false, error: 'Name and email required' };
     }
-  });
 
-  return <h1>{message}</h1>;
-}
+    // Actually submit
+    await submitForm();
+
+    return { success: true, message: 'Form submitted' };
+  }
+});
 ```
 
-### Minimal Vanilla Example
+**Benefits**:
+- User sees form get filled on screen
+- Separate tool call = explicit intent
+- Can fill, review, then submit
+- If submission fails, form is already filled
+- Clear separation of concerns
 
-```html
-<!DOCTYPE html>
-<html>
-<head>
-  <title>WebMCP Demo</title>
-</head>
-<body>
-  <h1 id="message">Hello</h1>
+**Real-world flow**:
+1. LLM calls `fill_contact_form` → User sees form populate
+2. User reviews filled form on screen
+3. LLM calls `submit_contact_form` → Form actually submits
 
-  <script src="https://unpkg.com/@mcp-b/global@latest/dist/index.global.js"></script>
-  <script>
-    window.webMCP.registerTool({
-      name: 'set_message',
-      description: 'Set the displayed message',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          message: { type: 'string', description: 'New message' }
-        },
-        required: ['message']
-      },
-      handler: async (args) => {
-        document.getElementById('message').textContent = args.message;
-        return { success: true };
-      }
-    });
-  </script>
-</body>
-</html>
+### 3. UI Parity - Match Human Capabilities
+
+**Mental Model**: For every major action a human can take in your UI, create a corresponding tool.
+
+**Audit Process**:
+1. Open your app as a human user
+2. List all major actions you can take
+3. For each action, create a tool
+
+**Example Audit - Todo App**:
+- Human can: View todos → Tool: `list_todos`
+- Human can: Add todo → Tools: `fill_todo_form`, `create_todo`
+- Human can: Mark complete → Tool: `mark_todo_complete`
+- Human can: Delete todo → Tool: `delete_todo`
+- Human can: Filter todos → Tool: `set_filter`
+- Human can: Search todos → Tool: `search_todos`
+- Human can: Edit todo → Tools: `fill_edit_form`, `update_todo`
+
+**UI Parity Achieved**: LLM can do everything a human can do.
+
+### 4. Make Tools Powerful, Not Granular
+
+**Principle**: One tool should accomplish a complete task, not just one tiny piece.
+
+#### Too Granular (Bad)
+```tsx
+// ❌ User needs 3 tool calls to fill a form
+useWebMCP({ name: 'set_name', ... });
+useWebMCP({ name: 'set_email', ... });
+useWebMCP({ name: 'set_message', ... });
 ```
 
-## Next Steps
+**Problems**:
+- 3 tool calls instead of 1
+- Inefficient
+- Poor UX (form fields populate one-by-one slowly)
 
-After setup is complete:
-1. Test your tools with Chrome DevTools MCP
-2. Add more tools for your app's functionality
-3. Review [Tool Patterns](references/TOOL_PATTERNS.md) for ideas
-4. Consider security implications in [SECURITY.md](references/SECURITY.md)
+#### Powerful (Good)
+```tsx
+// ✅ One tool call fills entire form
+useWebMCP({
+  name: 'fill_contact_form',
+  inputSchema: {
+    name: z.string().optional(),
+    email: z.string().optional(),
+    message: z.string().optional()
+  },
+  handler: async ({ name, email, message }) => {
+    // Fill all fields at once
+    if (name) setName(name);
+    if (email) setEmail(email);
+    if (message) setMessage(message);
+    return { success: true };
+  }
+});
+```
 
-## Links
+**Benefits**:
+- 1 tool call instead of 3
+- Faster execution
+- Better UX
+- More efficient for LLM
 
-- **WebMCP Documentation**: https://docs.mcp-b.ai
-- **NPM Packages**: https://www.npmjs.com/org/mcp-b
-- **GitHub**: https://github.com/WebMCP-org/npm-packages
-- **Model Context Protocol**: https://modelcontextprotocol.io
+**When to be granular**: Only when operations are truly independent and might be used separately.
+
+## Implementation Strategy
+
+### Phase 1: Read the World (Read-Only Tools)
+
+**Goal**: Give the LLM eyes. Let it understand what's on screen.
+
+**What to build**:
+1. **List tools** - Get collections of items
+   - `list_todos`, `list_products`, `list_users`
+   - Include filtering, pagination options in the tool
+
+2. **Get tools** - Get specific item details
+   - `get_todo_by_id`, `get_product_details`, `get_user_profile`
+
+3. **Search tools** - Find specific information
+   - `search_products`, `search_logs`, `search_messages`
+
+4. **Status tools** - Get current application state
+   - `get_cart_contents`, `get_current_filters`, `get_theme`
+
+**Why first?**:
+- LLM needs context before taking actions
+- Safest to implement and test
+- Builds your confidence with WebMCP
+- No risk of breaking anything
+
+**Testing with Chrome DevTools MCP**:
+```bash
+# For each read-only tool:
+1. Call the tool
+2. Verify returned data matches what's on screen
+3. Call again - should get same data (idempotent)
+4. Try different parameters (filters, IDs)
+5. Check edge cases (empty lists, invalid IDs)
+```
+
+### Phase 2: Modify UI (Read-Write Tools)
+
+**Goal**: Let the LLM interact with the UI without permanent consequences.
+
+**What to build**:
+1. **Fill tools** - Populate forms (but don't submit)
+   - `fill_contact_form`, `fill_checkout_form`, `fill_profile_form`
+
+2. **Set tools** - Change UI state
+   - `set_filter`, `set_search_query`, `set_theme`, `set_language`
+
+3. **Navigate tools** - Move between pages
+   - `navigate_to_page`, `open_modal`, `switch_tab`
+
+**Why second?**:
+- Gives LLM agency without risk
+- User sees changes in real-time
+- Reversible (user can undo)
+- Builds trust
+
+**Testing with Chrome DevTools MCP**:
+```bash
+# For each read-write tool:
+1. Call the tool with test data
+2. Verify changes appear on screen immediately
+3. Check that nothing permanent happened (no submissions, saves)
+4. Try edge cases (empty values, invalid values)
+5. Verify error handling works
+```
+
+**Dogfooding**: Actually use these tools yourself via Chrome DevTools MCP. If it's tedious or confusing for you, it'll be worse for the LLM.
+
+### Phase 3: Take Action (Destructive Tools)
+
+**Goal**: Let the LLM make permanent changes and complete workflows.
+
+**What to build**:
+1. **Submit tools** - Actually commit forms
+   - `submit_contact_form`, `submit_order`, `submit_profile_update`
+
+2. **Create tools** - Add new records
+   - `create_todo`, `create_user`, `create_post`
+
+3. **Delete tools** - Remove items permanently
+   - `delete_todo`, `delete_user`, `delete_post`
+
+4. **Action tools** - Other permanent state changes
+   - `mark_complete`, `send_message`, `publish_post`
+
+**Why last?**:
+- Most risky
+- Requires phases 1-2 to be solid
+- Build confidence first
+- Easier to test when you can inspect state
+
+**Testing with Chrome DevTools MCP**:
+```bash
+# For each destructive tool:
+1. Use Phase 2 tools to set up state (fill forms, etc.)
+2. Call the destructive tool
+3. Verify action completed successfully
+4. Check for confirmation dialogs (if any)
+5. Use Phase 1 tools to verify new state
+6. Test error cases (invalid IDs, missing data)
+7. Test what happens when user cancels/rejects
+```
+
+## Critical: Dogfooding with Chrome DevTools MCP
+
+**MOST IMPORTANT PART**: You MUST test every tool with Chrome DevTools MCP.
+
+### Why Dogfooding Matters
+
+**You are building an interface**. Just like you'd manually test a button to see if it works, you must manually test each tool.
+
+**If you don't test**:
+- Tools might not work at all
+- Return values might be wrong
+- Edge cases will be broken
+- User experience will be poor
+
+**If you DO test**:
+- You'll catch bugs immediately
+- You'll see what the LLM experiences
+- You'll find confusing APIs and fix them
+- You'll build intuition for good tool design
+
+### Dogfooding Workflow
+
+For **EVERY tool you create**:
+
+1. **Register the tool** in your app code
+2. **Start your dev server** (`npm run dev`)
+3. **Open Chrome DevTools MCP** (if not already running)
+4. **Navigate to your app** in Chrome DevTools MCP
+5. **Call the tool** via Chrome DevTools MCP
+6. **Verify the behavior** in the actual browser
+7. **Check the return value** from the tool
+8. **Try edge cases** (empty inputs, invalid IDs, etc.)
+9. **Iterate** - fix issues and test again
+
+**Repeat this for every single tool**. No exceptions.
+
+### Example Dogfooding Session
+
+Let's say you're building a todo app. Here's what testing looks like:
+
+```bash
+# You've just added the 'create_todo' tool
+# Now test it:
+
+1. Start dev server: npm run dev
+2. Chrome DevTools MCP is already connected to localhost:3000
+3. Call the tool:
+   mcp__chrome-devtools__* → call tool 'create_todo'
+   Input: { "text": "Test todo", "priority": "high" }
+
+4. Look at browser → New todo appears on screen ✅
+5. Check return value → { success: true, id: "abc123" } ✅
+6. Call list_todos → New todo is in the list ✅
+
+7. Try edge case: { "text": "", "priority": "invalid" }
+8. Check error handling → Got clear error message ✅
+
+9. Todo works! Move to next tool.
+```
+
+**This is NOT optional**. Every tool must be dogfooded.
+
+### Common Issues Found During Dogfooding
+
+You'll discover:
+- "This tool should return the new todo, not just success:true"
+- "The description doesn't match what the tool actually does"
+- "I need a get_todo_by_id tool to verify the create worked"
+- "This should be two tools - one to fill, one to submit"
+- "The error message is confusing"
+- "This tool is too granular, I need to call it 5 times"
+
+**Fix these immediately**. Dogfooding gives you this feedback.
+
+## Using Available Resources
+
+You have powerful tools at your disposal:
+
+### WebMCP Docs MCP (`mcp__docs__SearchWebMcpDocumentation`)
+
+**Use this for**:
+- API syntax: "How do I use outputSchema in useWebMCP?"
+- Best practices: "WebMCP tool naming conventions"
+- Examples: "WebMCP form filling example"
+- Troubleshooting: "Why is my tool not re-registering?"
+
+**Example queries**:
+```bash
+mcp__docs__SearchWebMcpDocumentation("useWebMCP deps array")
+mcp__docs__SearchWebMcpDocumentation("outputSchema with Zod")
+mcp__docs__SearchWebMcpDocumentation("tool annotations destructiveHint")
+```
+
+### Chrome DevTools MCP (`mcp__chrome-devtools__*`)
+
+**Use this for**:
+- Testing tools: Call them and verify behavior
+- Inspecting state: Read the page to see what's there
+- Debugging: Take screenshots, check console logs
+- Verification: Make sure tools work end-to-end
+
+**This is your testing environment**. Use it constantly.
+
+### This Skill (Strategic Guidance)
+
+**Use this for**:
+- Tool design principles
+- Implementation phases
+- Testing workflow
+- Strategic decisions
+
+**Don't use this for**:
+- Specific API syntax (use WebMCP Docs MCP)
+- Debugging (use Chrome DevTools MCP)
+- Implementation details (use WebMCP Docs MCP)
+
+## Common Patterns
+
+### Pattern: Todo List App
+
+```
+Phase 1 - Read-Only:
+✓ list_todos (readOnlyHint: true)
+  - Input: { filter?, sortBy? }
+  - Returns: { todos: [...], totalCount: number }
+
+✓ get_todo_by_id (readOnlyHint: true)
+  - Input: { id: string }
+  - Returns: { todo: {...} }
+
+Phase 2 - Read-Write:
+✓ fill_todo_form
+  - Input: { text, priority?, dueDate? }
+  - Sets form fields, doesn't create
+
+✓ set_filter
+  - Input: { status: 'all' | 'active' | 'completed' }
+  - Changes visible todos
+
+Phase 3 - Destructive:
+✓ create_todo (destructiveHint: true)
+  - Creates the todo permanently
+
+✓ delete_todo (destructiveHint: true)
+  - Input: { id: string }
+  - Permanently removes todo
+
+✓ mark_complete (destructiveHint: true)
+  - Input: { id: string, completed: boolean }
+  - Changes todo state permanently
+```
+
+### Pattern: E-Commerce Site
+
+```
+Phase 1 - Read-Only:
+✓ search_products
+✓ get_product_details
+✓ get_cart_contents
+✓ get_shipping_options
+
+Phase 2 - Read-Write:
+✓ fill_checkout_form (address, payment)
+✓ set_quantity (in cart UI, not cart state)
+✓ apply_filters (product filters)
+✓ navigate_to_page
+
+Phase 3 - Destructive:
+✓ add_to_cart (changes cart state)
+✓ remove_from_cart
+✓ submit_order (actually purchase)
+✓ apply_coupon
+```
+
+### Pattern: Admin Dashboard
+
+```
+Phase 1 - Read-Only:
+✓ list_users (with pagination, filtering)
+✓ get_user_details
+✓ get_analytics
+✓ search_logs
+
+Phase 2 - Read-Write:
+✓ fill_user_form (for create/edit)
+✓ set_date_range (for analytics)
+✓ apply_filters
+
+Phase 3 - Destructive:
+✓ create_user
+✓ update_user
+✓ delete_user
+✓ ban_user
+✓ reset_password
+```
+
+## Installation & Setup (Technical Details)
+
+**Note**: This section is intentionally brief. Use `mcp__docs__SearchWebMcpDocumentation` for specific syntax and APIs.
+
+### For React Apps
+
+1. Install packages:
+   ```bash
+   pnpm add @mcp-b/react-webmcp @mcp-b/global zod
+   ```
+
+2. Add global bridge to `index.html`:
+   ```html
+   <script src="https://unpkg.com/@mcp-b/global@latest/dist/index.global.js"></script>
+   ```
+
+3. Use the hook:
+   ```tsx
+   import { useWebMCP } from '@mcp-b/react-webmcp';
+
+   useWebMCP({
+     name: 'my_tool',
+     description: 'Does something',
+     handler: async () => ({ success: true })
+   });
+   ```
+
+For more details: `mcp__docs__SearchWebMcpDocumentation("react useWebMCP setup")`
+
+### For Other Frameworks
+
+Use `@mcp-b/webmcp-ts-sdk`:
+```bash
+pnpm add @mcp-b/webmcp-ts-sdk @mcp-b/global zod
+```
+
+For details: `mcp__docs__SearchWebMcpDocumentation("typescript sdk setup")`
+
+## Workflow Summary
+
+1. **Understand the app** - What can humans do?
+2. **Plan tools** - List all needed tools by category
+3. **Phase 1: Read** - Build read-only tools
+   - Test each with Chrome DevTools MCP
+4. **Phase 2: Modify** - Build read-write tools
+   - Test each with Chrome DevTools MCP
+   - Dogfood the experience
+5. **Phase 3: Act** - Build destructive tools
+   - Test each with Chrome DevTools MCP
+   - Extra careful validation
+6. **Iterate** - Use the tools, find gaps, improve
+
+## Remember
+
+- **UI Parity**: LLMs should be able to do everything humans can
+- **Safety First**: Categorize tools by read-only/read-write/destructive
+- **Two-Tool Pattern**: Separate filling from submission
+- **Powerful Tools**: One tool per complete task
+- **Dogfood Everything**: Test every tool with Chrome DevTools MCP
+- **Iterate**: The first version won't be perfect
+
+You're not just adding tools - you're creating an interface for AI. Make it good.

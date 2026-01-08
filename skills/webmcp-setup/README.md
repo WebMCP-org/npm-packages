@@ -1,28 +1,48 @@
 # WebMCP Setup Assistant - Claude Code Skill
 
-A Claude Code skill that guides you through setting up WebMCP (Model Context Protocol for Web) in your web applications across different frameworks.
+A Claude Code skill that provides **strategic guidance** for adding WebMCP (Model Context Protocol for Web) to web applications. Focuses on tool design principles, testing workflow, and creating an effective "LLM UI."
 
 ## What This Skill Does
 
-Helps you integrate WebMCP into websites with:
-- **Framework Detection** - Auto-detects React, Vue, Next.js, or vanilla HTML
-- **Package Installation** - Installs correct packages for your framework
-- **Code Generation** - Creates example tools and integration code
-- **Setup Verification** - Tests that WebMCP is working correctly
+This skill teaches agents how to:
+- **Think of WebMCP as creating an LLM UI** - not just installing packages
+- **Design powerful tools** using the three-category system (read-only, read-write, destructive)
+- **Implement the two-tool pattern** for forms (fill + submit)
+- **Test rigorously** using Chrome DevTools MCP (dogfooding)
+- **Achieve UI parity** - LLMs can do everything humans can do
 
-## What is WebMCP?
+## Core Philosophy
 
-WebMCP is a browser-native implementation of the Model Context Protocol that allows web applications to expose functionality to AI agents through:
-- **React Hooks** (`@mcp-b/react-webmcp`) - Declarative tool registration with automatic re-registration
-- **TypeScript SDK** (`@mcp-b/webmcp-ts-sdk`) - Imperative API for non-React frameworks
-- **Global Bridge** (`@mcp-b/global`) - IIFE script for browser communication
+WebMCP is about creating a user interface for LLMs. Just as humans use buttons, forms, and navigation, LLMs use tools. The goal is **UI parity** - enable everything a human can do, in a way that makes sense for LLMs.
+
+## Key Principles
+
+### 1. Categorize by Safety
+- **Read-only** (`readOnlyHint: true`) - Get data, no side effects
+- **Read-write** (default) - Modify UI state, user sees changes, reversible
+- **Destructive** (`destructiveHint: true`) - Permanent actions, requires care
+
+### 2. Two-Tool Pattern for Forms
+**Critical**: Separate filling from submission
+- Tool 1: `fill_*_form` (read-write) - Populate fields, user sees it
+- Tool 2: `submit_*_form` (destructive) - Actually submit
+
+**Why?** User can review what's being submitted before it happens.
+
+### 3. UI Parity
+For every major action a human can take, create a corresponding tool.
+
+### 4. Powerful, Not Granular
+One tool per complete task. Not `set_name`, `set_email`, `set_message` - instead `fill_contact_form` with all fields.
+
+### 5. Dogfood Everything
+Test every tool with Chrome DevTools MCP. No exceptions.
 
 ## Installation
 
 ### Option 1: Via Claude Code (When Published)
 
 ```bash
-# Install from plugin marketplace
 /plugin marketplace add webmcp/webmcp-setup
 /plugin install webmcp-setup
 ```
@@ -30,7 +50,7 @@ WebMCP is a browser-native implementation of the Model Context Protocol that all
 ### Option 2: Manual Installation
 
 ```bash
-# Clone or copy this directory to your Claude Code skills folder
+# Copy to your Claude Code skills folder
 cp -r skills/webmcp-setup ~/.claude/skills/
 ```
 
@@ -46,250 +66,227 @@ cp -r skills/webmcp-setup .claude/skills/
 
 Once installed, just ask Claude:
 
-> "Set up WebMCP in my app"
+> "Add WebMCP to my website"
 
 or
 
-> "Add WebMCP tools to my React app"
+> "Set up WebMCP tools for my app"
 
-The skill will:
-1. Analyze your project structure
-2. Detect your framework (React, Vue, Next.js, vanilla)
-3. Install the appropriate packages
-4. Add the global bridge script
-5. Create example tools
-6. Verify the setup
+The skill will guide you through:
+1. Understanding your app's UI capabilities
+2. Designing tools by category (read, write, act)
+3. Implementing tools with proper separation
+4. Testing every tool with Chrome DevTools MCP
+5. Iterating based on dogfooding feedback
 
-## Supported Frameworks
+## What Makes This Skill Different
 
-- ✅ **React** (17, 18, 19) - Uses `@mcp-b/react-webmcp` hooks
-- ✅ **Next.js** (13+, App Router and Pages Router) - Uses SDK
-- ✅ **Vue** (3+) - Uses `@mcp-b/webmcp-ts-sdk`
-- ✅ **Vanilla HTML/JS** - Uses `@mcp-b/global` IIFE only
-- ✅ **Angular** (14+) - Uses SDK
-- ✅ **Svelte** (3+, SvelteKit) - Uses SDK
+**Not a package installer** - This skill provides strategic guidance, not mechanical "run this command" instructions.
 
-## What You Need
+**Leverages existing tools**:
+- **WebMCP Docs MCP** - For API syntax and implementation details
+- **Chrome DevTools MCP** - For testing and dogfooding tools
+- **This skill** - For design principles and strategy
 
-### Required
-- Modern browser (Chrome 90+, Firefox 88+, Safari 14+)
-- Node.js 16+ and npm/yarn/pnpm (for package-based setups)
-- Existing web project or willingness to create one
-
-### Optional (Recommended)
-- **Chrome DevTools MCP Server** - For automated testing
-- **WebMCP Docs MCP** - For documentation lookup
-
-## Features
-
-### Automatic Framework Detection
-
-The skill analyzes your project to determine the best integration approach:
-
-```
-Analyzing project...
-✓ Found package.json with React 19
-✓ Using Vite build system
-✓ TypeScript detected
-
-Recommendation: @mcp-b/react-webmcp with hooks
-```
-
-### Package Installation
-
-Automatically installs the correct packages:
-
-```bash
-# For React projects
-pnpm add @mcp-b/react-webmcp @mcp-b/global zod
-
-# For Vue/other frameworks
-pnpm add @mcp-b/webmcp-ts-sdk @mcp-b/global zod
-```
-
-### Code Generation
-
-Creates example tools tailored to your app:
-
-**React Example:**
-```tsx
-import { useWebMCP } from '@mcp-b/react-webmcp';
-
-function MyComponent() {
-  const [count, setCount] = useState(0);
-
-  useWebMCP({
-    name: 'increment_counter',
-    description: 'Increment the counter',
-    handler: async () => {
-      setCount(c => c + 1);
-      return { success: true, newCount: count + 1 };
-    }
-  });
-
-  return <button onClick={() => setCount(c => c + 1)}>Count: {count}</button>;
-}
-```
-
-**Vue Example:**
-```typescript
-import { createWebMCPClient } from '@mcp-b/webmcp-ts-sdk';
-import { ref } from 'vue';
-
-const count = ref(0);
-const client = await createWebMCPClient();
-
-client.registerTool({
-  name: 'increment_counter',
-  description: 'Increment the counter',
-  handler: async () => {
-    count.value++;
-    return { success: true, newCount: count.value };
-  }
-});
-```
-
-### Setup Verification
-
-Tests your setup with Chrome DevTools MCP (if available):
-- ✅ Global bridge loaded
-- ✅ Tools registered correctly
-- ✅ Tool calls succeed
-- ✅ Responses match schemas
+**Emphasizes dogfooding**: Every tool must be tested with Chrome DevTools MCP. This catches bugs early and builds intuition for good tool design.
 
 ## Example Usage
 
-### Add to Existing React App
+### User asks: "Add WebMCP to my todo app"
 
-```
-User: Add WebMCP to my React app
+The skill will guide the agent to:
 
-Claude: I'll set up WebMCP for your React app.
+1. **Understand the UI** - What can humans do?
+   - View todos, add todos, mark complete, delete, filter, search
 
-        Detected:
-        - React 19 with Vite
-        - TypeScript enabled
+2. **Plan tools by category**:
+   ```
+   Phase 1 - Read-Only:
+   ✓ list_todos (readOnlyHint: true)
+   ✓ get_todo_by_id (readOnlyHint: true)
 
-        Installing @mcp-b/react-webmcp...
-        [Installs packages]
+   Phase 2 - Read-Write:
+   ✓ fill_todo_form (populate form fields)
+   ✓ set_filter (change visible todos)
 
-        Adding global bridge to index.html...
-        [Modifies index.html]
+   Phase 3 - Destructive:
+   ✓ create_todo (destructiveHint: true)
+   ✓ delete_todo (destructiveHint: true)
+   ✓ mark_complete (destructiveHint: true)
+   ```
 
-        Creating example component...
-        [Generates MyWebMCPTools.tsx]
+3. **Implement Phase 1 tools**:
+   - Search WebMCP Docs for API syntax
+   - Write the tools
+   - Test with Chrome DevTools MCP
 
-        Done! Your app now exposes MCP tools.
-        Test with: npx @mcp-b/chrome-devtools-mcp
-```
+4. **Dogfood the tools**:
+   - Call `list_todos` via Chrome DevTools MCP
+   - Verify data matches screen
+   - Test edge cases
 
-### Create Demo from Scratch
+5. **Iterate through phases 2-3**:
+   - Build read-write tools, test each
+   - Build destructive tools, test carefully
+   - Refine based on testing
 
-```
-User: Create a WebMCP demo with vanilla JavaScript
+## Implementation Phases
 
-Claude: Creating a minimal WebMCP demo page...
+### Phase 1: Read the World (Read-Only Tools)
+Give the LLM eyes. Build tools that let it understand current state.
+- Safe to implement
+- No risk of breaking anything
+- Builds confidence
 
-        [Creates demo.html with embedded tools]
+### Phase 2: Modify UI (Read-Write Tools)
+Let the LLM interact with the UI without permanent consequences.
+- User sees changes in real-time
+- Reversible
+- Builds trust
 
-        Demo created at: ./demo.html
+### Phase 3: Take Action (Destructive Tools)
+Let the LLM make permanent changes.
+- Most risky
+- Requires phases 1-2 to be solid
+- Extra careful testing
 
-        Tools available:
-        - set_message: Change the displayed message
-        - get_timestamp: Get current timestamp
+## Testing Workflow
 
-        Open in browser to test!
-```
+For **every tool**:
+1. Register the tool in your code
+2. Start dev server
+3. Open Chrome DevTools MCP
+4. Call the tool
+5. Verify behavior in browser
+6. Check return value
+7. Try edge cases
+8. Iterate
+
+**This is mandatory**. Tools that aren't dogfooded will have bugs.
+
+## Common Patterns
+
+### Todo App
+- Read: `list_todos`, `get_todo_by_id`
+- Write: `fill_todo_form`, `set_filter`
+- Act: `create_todo`, `delete_todo`, `mark_complete`
+
+### E-Commerce
+- Read: `search_products`, `get_cart_contents`
+- Write: `fill_checkout_form`, `apply_filters`
+- Act: `add_to_cart`, `submit_order`
+
+### Admin Dashboard
+- Read: `list_users`, `get_analytics`
+- Write: `fill_user_form`, `set_date_range`
+- Act: `create_user`, `delete_user`, `ban_user`
 
 ## Files Included
 
 ```
 skills/webmcp-setup/
-├── SKILL.md                       # Main skill instructions
-├── package.json                   # Skill package metadata
+├── SKILL.md                       # Strategic guidance (main file)
 ├── README.md                      # This file
+├── package.json                   # Skill metadata
+├── CHANGELOG.md                   # Version history
+├── CONTRIBUTING.md                # Contribution guidelines
 ├── references/
-│   ├── REACT_SETUP.md            # Detailed React guide
-│   ├── VUE_SETUP.md              # Vue 3 guide
-│   ├── NEXTJS_SETUP.md           # Next.js guide
-│   ├── VANILLA_SETUP.md          # Vanilla HTML guide
-│   ├── ANGULAR_SETUP.md          # Angular guide
-│   ├── SVELTE_SETUP.md           # Svelte guide
-│   ├── TOOL_PATTERNS.md          # Common tool patterns
-│   ├── TROUBLESHOOTING.md        # Common issues and solutions
-│   ├── SECURITY.md               # Security best practices
-│   ├── PERFORMANCE.md            # Performance optimization
-│   ├── TESTING.md                # Testing strategies
-│   └── PRODUCTION.md             # Production deployment
+│   ├── REACT_SETUP.md            # React-specific examples
+│   ├── TOOL_PATTERNS.md          # Tool design patterns
+│   └── TROUBLESHOOTING.md        # Common issues
 ├── assets/
 │   └── templates/
-│       ├── react-demo.tsx        # React demo component
-│       ├── vue-demo.vue          # Vue demo component
-│       └── vanilla-demo.html     # Vanilla HTML demo
+│       └── vanilla-demo.html     # Working demo
 └── scripts/
-    └── verify-setup.js           # Setup verification script
+    └── verify-setup.js           # Environment check
 ```
 
 ## How It Works
 
-1. **Project Analysis**: Checks for package.json, framework dependencies, build config
-2. **Framework Selection**: Chooses the best integration approach
-3. **Package Installation**: Installs required npm packages
-4. **Code Generation**: Creates example tools and integration code
-5. **HTML Modification**: Adds global bridge script tag
-6. **Verification**: Tests setup with Chrome DevTools MCP (if available)
+The skill provides **strategic guidance** in three areas:
 
-## Testing
+1. **Design Principles**
+   - Three-category system (read/write/act)
+   - Two-tool pattern for forms
+   - UI parity concept
+   - Powerful vs granular tools
 
-### With Chrome DevTools MCP (Recommended)
+2. **Implementation Strategy**
+   - Phase 1: Read-only tools first
+   - Phase 2: Read-write tools second
+   - Phase 3: Destructive tools last
+   - Why this order matters
 
-```bash
-# Start your dev server
-npm run dev
+3. **Testing Workflow**
+   - Dogfooding with Chrome DevTools MCP
+   - What to test for each tool type
+   - Common issues found during testing
+   - Iteration based on feedback
 
-# In another terminal, connect Chrome DevTools MCP
-npx @mcp-b/chrome-devtools-mcp
+**The skill does NOT**:
+- Install packages (agents can figure this out)
+- Provide boilerplate code (use WebMCP Docs MCP)
+- Debug implementation issues (use Chrome DevTools MCP)
 
-# The skill will automatically run verification tests
-```
+**The skill DOES**:
+- Teach strategic thinking about tool design
+- Emphasize testing and dogfooding
+- Provide design principles and patterns
+- Guide the implementation process
 
-### Manual Testing
+## Resources Used
 
-```bash
-# Start your dev server
-npm run dev
+The skill teaches agents to leverage:
 
-# Open browser to http://localhost:3000
-# Open DevTools console
-# Look for: "WebMCP bridge initialized"
+1. **WebMCP Docs MCP** (`mcp__docs__SearchWebMcpDocumentation`)
+   - API syntax and implementation details
+   - Code examples
+   - Troubleshooting
 
-# Try calling a tool (example varies by framework)
-```
+2. **Chrome DevTools MCP** (`mcp__chrome-devtools__*`)
+   - Testing tools
+   - Verifying behavior
+   - Debugging
+
+3. **This Skill** (strategic guidance)
+   - Tool design principles
+   - Implementation phases
+   - Testing workflow
+
+## Success Metrics
+
+A successful WebMCP integration has:
+
+✅ UI parity - Every major UI action has a tool
+✅ Clear safety categories - Read/write/act properly separated
+✅ Two-tool forms - Fill and submit are separate
+✅ All tools tested - Dogfooded with Chrome DevTools MCP
+✅ Powerful tools - One tool per complete task
 
 ## Troubleshooting
 
-Common issues:
+**"The skill doesn't install packages"**
+- Correct. Use WebMCP Docs MCP for API syntax: `mcp__docs__SearchWebMcpDocumentation("react setup")`
 
-**"@mcp-b/global not found"**
-- Make sure the script tag is in your HTML
-- Check the CDN URL is correct
-- Try using a specific version instead of `@latest`
+**"How do I test tools?"**
+- Use Chrome DevTools MCP to call tools and verify behavior
+- See the "Critical: Dogfooding" section in SKILL.md
 
-**"Tools not appearing"**
-- Verify the global bridge script loaded (check console)
-- Ensure tools are registered after the bridge initializes
-- Check for JavaScript errors in console
+**"Should I make one tool per form field?"**
+- No. Make one powerful tool that fills the entire form
+- See "Make Tools Powerful, Not Granular" principle
 
-**"Chrome DevTools MCP can't connect"**
-- Make sure your page is served over HTTP/HTTPS (not `file://`)
-- Check that the page is on localhost or HTTPS
-- Verify Chrome DevTools MCP is running
-
-See [TROUBLESHOOTING.md](skills/webmcp-setup/references/TROUBLESHOOTING.md) for more details.
+**"When should I use destructiveHint?"**
+- For permanent, irreversible actions (submit, delete, purchase)
+- NOT for filling forms or changing UI state
 
 ## Contributing
 
-This skill is part of the WebMCP project. Contributions welcome!
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on:
+- Adding framework-specific patterns
+- Improving testing workflows
+- Expanding design principles
+- Adding real-world examples
 
 ## License
 
@@ -302,8 +299,8 @@ MIT
 - **GitHub**: https://github.com/WebMCP-org/npm-packages
 - **Model Context Protocol**: https://modelcontextprotocol.io
 
-## Related Skills
+## Philosophy
 
-- `char-setup` - Set up Char embedded agent widgets
-- `playwright-skill` - Full Playwright browser automation
-- `webapp-testing` - Anthropic's webapp testing skill
+> "You're not just adding tools - you're creating an interface for AI. Make it good."
+
+This skill helps you build that interface thoughtfully, systematically, and with the right testing discipline.
