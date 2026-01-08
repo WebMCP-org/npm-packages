@@ -1,0 +1,10 @@
+{
+  "name": "webmcp-setup",
+  "version": "0.1.0",
+  "description": "Set up WebMCP - browser-native MCP integration for web applications across multiple frameworks",
+  "author": "WebMCP",
+  "license": "MIT",
+  "repository": "https://github.com/WebMCP-org/npm-packages",
+  "skills": ["skills/webmcp-setup"],
+  "dependencies": {}
+}
