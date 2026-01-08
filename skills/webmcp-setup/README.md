@@ -40,33 +40,35 @@ Test every tool with Chrome DevTools MCP. No exceptions.
 
 ## Installation
 
-### Option 1: Via NPM
+### Option 1: Direct from GitHub (Recommended)
 
 ```bash
-# Install the package
-npm install @mcp-b/skill-webmcp-setup
-# or
-pnpm add @mcp-b/skill-webmcp-setup
+# Clone the WebMCP monorepo
+git clone https://github.com/WebMCP-org/npm-packages.git
 
-# Copy to your Claude Code skills folder
-cp -r node_modules/@mcp-b/skill-webmcp-setup ~/.claude/skills/webmcp-setup
-```
+# Copy skill to your Claude Code skills folder
+cp -r npm-packages/skills/webmcp-setup ~/.claude/skills/
 
-### Option 2: Manual Installation (Personal)
-
-```bash
-# Clone or download, then copy to your Claude Code skills folder
+# Or use sparse checkout for just this skill
+git clone --depth 1 --filter=blob:none --sparse https://github.com/WebMCP-org/npm-packages.git
+cd npm-packages
+git sparse-checkout set skills/webmcp-setup
 cp -r skills/webmcp-setup ~/.claude/skills/
 ```
 
-### Option 3: Project-Specific (Team)
+### Option 2: Project-Specific (For Teams)
 
 ```bash
 # Add to your project's .claude/skills/ directory
-# Team members automatically get the skill when they clone
+# Team members automatically get the skill when they clone your repo
 mkdir -p .claude/skills
-cp -r skills/webmcp-setup .claude/skills/
+cp -r /path/to/npm-packages/skills/webmcp-setup .claude/skills/
+git add .claude/skills
 ```
+
+### Option 3: Via SkillsMP (Auto-indexed)
+
+The skill is automatically indexed on [SkillsMP.com](https://skillsmp.com/) from our GitHub repository. Search for "webmcp" to find it, then follow the installation instructions there.
 
 ### Option 4: Via Plugin Marketplace (Coming Soon)
 
