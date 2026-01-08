@@ -810,6 +810,8 @@ importers:
         specifier: 'catalog:'
         version: 3.25.76
 
+  skills/webmcp-setup: {}
+
   smart-dom-reader:
     dependencies:
       '@modelcontextprotocol/sdk':

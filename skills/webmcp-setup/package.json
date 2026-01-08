@@ -21,10 +21,17 @@
   "author": "WebMCP",
   "type": "module",
   "files": [
-    ".claude-plugin",
-    "skills"
+    "SKILL.md",
+    "references",
+    "examples",
+    "assets",
+    "README.md",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "test": "echo \"Tests not yet implemented\" && exit 0"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
