@@ -16,6 +16,17 @@ allowed-tools:
 
 **Core Philosophy**: WebMCP is about creating a **user interface for LLMs**. Just as humans use buttons, forms, and navigation, LLMs use tools. Your goal is **UI parity** - enable everything a human can do, in a way that makes sense for LLMs.
 
+## Quick Start
+
+1. **Understand the app** - What actions can humans take?
+2. **Plan tools** - List needed tools by category (read/write/destructive)
+3. **Phase 1: Read** - Build read-only tools, test with Chrome DevTools MCP
+4. **Phase 2: Modify** - Build read-write tools, test with Chrome DevTools MCP
+5. **Phase 3: Act** - Build destructive tools, test with Chrome DevTools MCP
+6. **Iterate** - Use the tools, find gaps, improve
+
+**For installation**: See [references/INSTALLATION.md](references/INSTALLATION.md) or `mcp__docs__SearchWebMcpDocumentation("setup guide")`
+
 ## Quick Reference
 
 | Phase | What You're Building | Tools to Use |
@@ -69,8 +80,6 @@ Organize tools into three categories:
 - `search_products` - Search product catalog
 - `get_cart_contents` - See what's in cart
 
-**Testing**: Call multiple times, verify data is consistent and nothing changes
-
 #### Read-Write Tools (default)
 **Purpose**: Modify UI state in a non-destructive way
 
@@ -86,8 +95,6 @@ Organize tools into three categories:
 - `apply_filters` - Update filter selection (but don't reload data yet)
 - `navigate_to_page` - Change page/tab (reversible with back button)
 
-**Testing**: Verify changes appear on screen immediately, nothing permanent happens
-
 #### Destructive Tools (`destructiveHint: true`)
 **Purpose**: Take permanent, irreversible actions
 
@@ -102,8 +109,6 @@ Organize tools into three categories:
 - `delete_item` - Permanently remove item
 - `send_message` - Send email/message
 - `create_account` - Register new user
-
-**Testing**: Extra careful validation, check for confirmation dialogs, verify action completed
 
 ### 2. The Two-Tool Pattern for Forms
 
@@ -135,7 +140,6 @@ useWebMCP({
 - User doesn't see what's being submitted
 - No chance to review or correct
 - Single atomic action = risky
-- If submission fails, user loses all filled data
 
 #### Good Approach (Two Tools)
 
@@ -143,7 +147,6 @@ useWebMCP({
 // ✅ Tool 1: Fill the form (read-write)
 useWebMCP({
   name: 'fill_contact_form',
-  // No destructiveHint = read-write
   description: 'Fill out the contact form fields',
   inputSchema: {
     name: z.string().optional(),
@@ -155,28 +158,20 @@ useWebMCP({
     if (name) setName(name);
     if (email) setEmail(email);
     if (message) setMessage(message);
-
-    return {
-      success: true,
-      filledFields: { name, email, message }
-    };
+    return { success: true, filledFields: { name, email, message } };
   }
 });
 
 // ✅ Tool 2: Submit the form (destructive)
 useWebMCP({
   name: 'submit_contact_form',
-  destructiveHint: true, // Now it's clear this is destructive
+  destructiveHint: true,
   description: 'Submit the contact form',
   handler: async () => {
-    // Validate first
     if (!name || !email) {
       return { success: false, error: 'Name and email required' };
     }
-
-    // Actually submit
     await submitForm();
-
     return { success: true, message: 'Form submitted' };
   }
 });
@@ -187,12 +182,6 @@ useWebMCP({
 - Separate tool call = explicit intent
 - Can fill, review, then submit
 - If submission fails, form is already filled
-- Clear separation of concerns
-
-**Real-world flow**:
-1. LLM calls `fill_contact_form` → User sees form populate
-2. User reviews filled form on screen
-3. LLM calls `submit_contact_form` → Form actually submits
 
 ### 3. UI Parity - Match Human Capabilities
 
@@ -209,8 +198,6 @@ useWebMCP({
 - Human can: Mark complete → Tool: `mark_todo_complete`
 - Human can: Delete todo → Tool: `delete_todo`
 - Human can: Filter todos → Tool: `set_filter`
-- Human can: Search todos → Tool: `search_todos`
-- Human can: Edit todo → Tools: `fill_edit_form`, `update_todo`
 
 **UI Parity Achieved**: LLM can do everything a human can do.
 
@@ -226,10 +213,7 @@ useWebMCP({ name: 'set_email', ... });
 useWebMCP({ name: 'set_message', ... });
 ```
 
-**Problems**:
-- 3 tool calls instead of 1
-- Inefficient
-- Poor UX (form fields populate one-by-one slowly)
+**Problems**: 3 tool calls instead of 1, inefficient, poor UX
 
 #### Powerful (Good)
 ```tsx
@@ -251,393 +235,39 @@ useWebMCP({
 });
 ```
 
-**Benefits**:
-- 1 tool call instead of 3
-- Faster execution
-- Better UX
-- More efficient for LLM
-
-**When to be granular**: Only when operations are truly independent and might be used separately.
-
-## Non-Obvious But Critical Details
-
-These are important patterns and practices that aren't immediately obvious but significantly impact tool design quality. **Always search WebMCP Docs for specifics** when implementing.
-
-### Tool Naming Conventions
-
-Use **verb-noun format with domain prefix** for clarity:
-
-```tsx
-// ✅ Good naming - clear and scoped
-useWebMCP({ name: 'shopping_cart_add_item', ... });
-useWebMCP({ name: 'posts_like', ... });
-useWebMCP({ name: 'graph_navigate', ... });
-useWebMCP({ name: 'table_filter', ... });
-
-// ❌ Bad naming - ambiguous
-useWebMCP({ name: 'add', ... });  // Add what?
-useWebMCP({ name: 'like', ... }); // Like what? Multiple features could use this
-useWebMCP({ name: 'navigate', ... }); // Where? How?
-```
-
-**Why?** With 10+ tools registered, generic names cause confusion. Domain prefixes prevent collisions and make intent clear.
-
-### Complete Annotation System
-
-Beyond `destructiveHint`, use all three annotations:
-
-```tsx
-// Read-only tool
-useWebMCP({
-  name: 'list_products',
-  annotations: {
-    readOnlyHint: true,      // No side effects
-    idempotentHint: true,    // Safe to retry
-    destructiveHint: false   // Not destructive (default)
-  },
-  handler: async () => ({ products: await getProducts() })
-});
-
-// Read-write tool (fills form)
-useWebMCP({
-  name: 'fill_checkout_form',
-  annotations: {
-    readOnlyHint: false,     // Modifies UI state
-    idempotentHint: true,    // Can call multiple times safely
-    destructiveHint: false   // Not destructive - just filling fields
-  },
-  handler: async ({ address, payment }) => {
-    setFormData({ address, payment });
-    return { success: true };
-  }
-});
-
-// Destructive tool (actually submits)
-useWebMCP({
-  name: 'complete_purchase',
-  annotations: {
-    readOnlyHint: false,     // Changes state
-    idempotentHint: false,   // Should only be called once
-    destructiveHint: true    // Charges money - irreversible!
-  },
-  handler: async () => {
-    await chargeCreditCard();
-    return { orderId: '...' };
-  }
-});
-```
-
-**Search docs**: `mcp__docs__SearchWebMcpDocumentation("tool annotations readOnlyHint idempotentHint")`
-
-### Avoid Tool Overload (>50 tools)
-
-**Problem**: Registering too many tools overwhelms AI agents and slows discovery.
-
-**Solutions**:
-
-1. **Progressive Disclosure** - Show tools based on current page/state:
-   ```tsx
-   // Only show cart tools on cart page
-   function CartPage() {
-     useWebMCP({ name: 'cart_add_item', ... });
-     useWebMCP({ name: 'cart_remove_item', ... });
-     useWebMCP({ name: 'cart_update_quantity', ... });
-     // These auto-unregister when component unmounts
-   }
-   ```
-
-2. **Role-Based Tools** - Different tools for different users:
-   ```tsx
-   function AdminTools({ user }) {
-     // Customer tools (everyone)
-     useWebMCP({ name: 'view_products', ... });
-
-     // Moderator tools
-     if (user?.role === 'moderator' || user?.role === 'admin') {
-       useWebMCP({ name: 'hide_comment', ... });
-     }
-
-     // Admin-only tools
-     if (user?.role === 'admin') {
-       useWebMCP({ name: 'delete_user', ... });
-       useWebMCP({ name: 'update_pricing', ... });
-     }
-   }
-   ```
-
-3. **Conditional Registration with `enabled` prop**:
-   ```tsx
-   const [cartOpen, setCartOpen] = useState(false);
-
-   // Only register when cart is open
-   useWebMCP({
-     name: 'apply_coupon',
-     enabled: cartOpen, // ← Conditional without breaking hooks rules
-     handler: async ({ code }) => { ... }
-   });
-   ```
-
-**Search docs**: `mcp__docs__SearchWebMcpDocumentation("enabled prop conditional tools")`
-
-### outputSchema vs formatOutput
-
-**Two different things**:
-
-```tsx
-useWebMCP({
-  name: 'get_cart',
-  // outputSchema: Defines the STRUCTURE (for type safety and validation)
-  outputSchema: useMemo(() => ({
-    items: z.array(z.object({
-      name: z.string(),
-      price: z.number(),
-      quantity: z.number()
-    })),
-    total: z.number(),
-    itemCount: z.number()
-  }), []),
-
-  handler: async () => {
-    const cart = await getCart();
-
-    // Return structured data (matches outputSchema)
-    return {
-      items: cart.items,
-      total: cart.total,
-      itemCount: cart.items.length
-    };
-  },
-
-  // formatOutput: TEXT representation (for display/logging)
-  formatOutput: (output) => {
-    return `Cart has ${output.itemCount} items (total: $${output.total})`;
-  }
-});
-```
-
-**When to use each**:
-- **outputSchema**: Always. Provides type safety and structure.
-- **formatOutput**: Optional. Provides human-readable text summary.
-
-**Search docs**: `mcp__docs__SearchWebMcpDocumentation("outputSchema formatOutput structured content")`
-
-### Tool Descriptions Should Include Return Format
-
-Help AI understand what to expect:
-
-```tsx
-// ✅ Good - describes return format
-useWebMCP({
-  name: 'get_cart',
-  description: 'Get shopping cart contents. Returns {items: Array<{name, price, sku, quantity}>, total: number, itemCount: number}',
-  handler: async () => { ... }
-});
-
-// ❌ Bad - vague
-useWebMCP({
-  name: 'get_cart',
-  description: 'Get cart',
-  handler: async () => { ... }
-});
-```
-
-### Error Handling with onError
-
-Don't just throw errors - use the `onError` callback:
-
-```tsx
-useWebMCP({
-  name: 'add_to_cart',
-  inputSchema: {
-    productId: z.string(),
-    quantity: z.number().positive()
-  },
-  handler: async ({ productId, quantity }) => {
-    // Validation error - return structured error
-    if (quantity > 10) {
-      return {
-        success: false,
-        error: 'Maximum quantity is 10'
-      };
-    }
-
-    // Network error - will trigger onError
-    const result = await addToCart(productId, quantity);
-    return { success: true, cart: result };
-  },
-
-  // Handle errors (logging, toasts, etc.)
-  onError: (error, input) => {
-    console.error('Add to cart failed:', error);
-    showToast(`Failed to add ${input.productId}: ${error.message}`);
-  }
-});
-```
-
-**Pattern**: Return structured errors for validation, throw for unexpected errors. Use `onError` for side effects (logging, UI updates).
-
-**Search docs**: `mcp__docs__SearchWebMcpDocumentation("onError error handling")`
-
-### Confirmation Dialogs for Destructive Actions
-
-**CRITICAL for security**: Use browser confirmation dialogs:
-
-```tsx
-useWebMCP({
-  name: 'delete_account',
-  description: 'Permanently delete user account (irreversible)',
-  annotations: {
-    destructiveHint: true,
-    idempotentHint: false
-  },
-  inputSchema: {
-    // Require explicit confirmation parameter
-    confirmation: z.literal('DELETE_MY_ACCOUNT').describe('Must be exact string DELETE_MY_ACCOUNT')
-  },
-  handler: async ({ confirmation }) => {
-    // Double confirmation with browser dialog
-    const userConfirmed = window.confirm(
-      '⚠️ Delete your account permanently?\n\n' +
-      'This action cannot be undone.\n\n' +
-      'All data will be lost.'
-    );
-
-    if (!userConfirmed) {
-      return { success: false, error: 'User denied permission' };
-    }
-
-    // Optional: Rate limiting
-    if (await isRateLimited('delete_account')) {
-      return { success: false, error: 'Please wait before retrying' };
-    }
-
-    // Optional: Security event logging
-    await logSecurityEvent('ACCOUNT_DELETION', user.id);
-
-    await deleteAccount();
-    return { success: true, message: 'Account deleted' };
-  }
-});
-```
-
-**Layers of protection**:
-1. Literal string in schema (`z.literal('DELETE_MY_ACCOUNT')`)
-2. Browser confirmation dialog (`window.confirm`)
-3. Rate limiting (optional)
-4. Security logging (optional)
-
-**Search docs**: `mcp__docs__SearchWebMcpDocumentation("security confirmation destructive")`
-
-### Performance: Fast Execution
-
-Tools should execute quickly (< 1 second):
-
-```tsx
-// ✅ Good - fast operation
-useWebMCP({
-  name: 'update_cart',
-  handler: async (input) => {
-    updateCartUI(input); // Fast UI update
-    return { success: true };
-  }
-});
-
-// ❌ Bad - slow operation blocks UI
-useWebMCP({
-  name: 'process_order',
-  handler: async (input) => {
-    await longRunningTask(); // Blocks for seconds
-    return { done: true };
-  }
-});
-
-// ✅ Better - delegate heavy work
-useWebMCP({
-  name: 'process_order',
-  handler: async (input) => {
-    // Queue work, return immediately
-    const jobId = await queueBackgroundJob(input);
-    return { queued: true, jobId };
-  }
-});
-
-// Provide status check tool
-useWebMCP({
-  name: 'check_job_status',
-  inputSchema: { jobId: z.string() },
-  handler: async ({ jobId }) => {
-    const status = await getJobStatus(jobId);
-    return { status, progress: status.progress };
-  }
-});
-```
-
-**Search docs**: `mcp__docs__SearchWebMcpDocumentation("performance fast execution")`
-
-### Tool Cleanup (Memory Leaks)
-
-Always unregister tools when done:
-
-```tsx
-// ✅ React - automatic cleanup with useWebMCP
-function MyComponent() {
-  useWebMCP({
-    name: 'my_tool',
-    handler: async () => ({ ... })
-  });
-  // Auto-unregisters when component unmounts
-}
-
-// ❌ Manual registration without cleanup
-useEffect(() => {
-  navigator.modelContext.registerTool({ ... });
-  // No cleanup - memory leak!
-}, []);
-
-// ✅ Manual registration with cleanup
-useEffect(() => {
-  const registration = navigator.modelContext.registerTool({ ... });
-
-  return () => {
-    registration.unregister(); // Clean up
-  };
-}, []);
-```
-
-### Import Order Matters
-
-**CRITICAL**: Import `@mcp-b/global` FIRST in client components:
-
-```tsx
-// ✅ Correct order
-'use client';
-
-import '@mcp-b/global';  // FIRST - initializes polyfill
-import { useWebMCP } from '@mcp-b/react-webmcp';  // AFTER
-
-export function MyTools() {
-  useWebMCP({ ... });
-}
-```
-
-**Why?** The polyfill must initialize before any tools try to register.
-
-**Search docs**: `mcp__docs__SearchWebMcpDocumentation("import order initialization")`
-
-### Key Takeaways
-
-1. **Naming**: Use `domain_verb_noun` format
-2. **Annotations**: Set all three (readOnlyHint, idempotentHint, destructiveHint)
-3. **Tool Limits**: Keep under 50 tools per page, use progressive disclosure
-4. **Output**: Use outputSchema + formatOutput for structure + text
-5. **Descriptions**: Include return format in description
-6. **Errors**: Use onError callback for side effects
-7. **Destructive**: Multiple confirmation layers for safety
-8. **Performance**: Execute quickly, delegate heavy work
-9. **Cleanup**: Always unregister tools
-10. **Import Order**: @mcp-b/global must come first
-
-**When in doubt, search the docs**: `mcp__docs__SearchWebMcpDocumentation("your question here")`
+**Benefits**: 1 tool call, faster execution, better UX
+
+## Advanced Patterns & Best Practices
+
+For detailed patterns that significantly impact tool quality, see:
+
+**[references/ADVANCED_PATTERNS.md](references/ADVANCED_PATTERNS.md)** - Covers:
+- Tool naming conventions (`domain_verb_noun`)
+- Complete annotation system (readOnlyHint, idempotentHint, destructiveHint)
+- Avoiding tool overload (>50 tools)
+- outputSchema vs formatOutput
+- Error handling with onError
+- Confirmation dialogs for destructive actions
+- Performance optimization
+- Tool cleanup and memory management
+- Import order requirements
+- React StrictMode handling
+- Hot Module Replacement (HMR) support
+
+**When to read**: After understanding core principles, before implementing complex tools.
+
+**Always search docs for specifics**: `mcp__docs__SearchWebMcpDocumentation("your question")`
+
+## Common App Patterns
+
+See **[examples/COMMON_APPS.md](examples/COMMON_APPS.md)** for complete tool structures for:
+- Todo List App
+- E-Commerce Site
+- Admin Dashboard
+- Social Media Platform
+- Project Management Tool
+
+Each pattern shows the full tool hierarchy (read → write → destructive) with specific examples.
 
 ## Implementation Strategy
 
@@ -648,7 +278,6 @@ export function MyTools() {
 **What to build**:
 1. **List tools** - Get collections of items
    - `list_todos`, `list_products`, `list_users`
-   - Include filtering, pagination options in the tool
 
 2. **Get tools** - Get specific item details
    - `get_todo_by_id`, `get_product_details`, `get_user_profile`
@@ -665,7 +294,7 @@ export function MyTools() {
 - Builds your confidence with WebMCP
 - No risk of breaking anything
 
-**Testing with Chrome DevTools MCP**:
+**Testing**:
 ```bash
 # For each read-only tool:
 1. Call the tool
@@ -695,12 +324,12 @@ export function MyTools() {
 - Reversible (user can undo)
 - Builds trust
 
-**Testing with Chrome DevTools MCP**:
+**Testing**:
 ```bash
 # For each read-write tool:
 1. Call the tool with test data
 2. Verify changes appear on screen immediately
-3. Check that nothing permanent happened (no submissions, saves)
+3. Check that nothing permanent happened
 4. Try edge cases (empty values, invalid values)
 5. Verify error handling works
 ```
@@ -730,7 +359,7 @@ export function MyTools() {
 - Build confidence first
 - Easier to test when you can inspect state
 
-**Testing with Chrome DevTools MCP**:
+**Testing**:
 ```bash
 # For each destructive tool:
 1. Use Phase 2 tools to set up state (fill forms, etc.)
@@ -777,6 +406,59 @@ For **EVERY tool you create**:
 9. **Iterate** - fix issues and test again
 
 **Repeat this for every single tool**. No exceptions.
+
+### The Build-Test-Iterate Loop
+
+**This is TDD (Test-Driven Development) for AI tools**. The tight feedback cycle with Chrome DevTools MCP enables rapid iteration:
+
+```
+AI writes tool code
+      ↓
+Dev server hot-reloads (instant)
+      ↓
+AI navigates to page via Chrome DevTools MCP
+      ↓
+AI calls list_webmcp_tools (discovers new tool)
+      ↓
+AI calls the tool with test inputs
+      ↓
+Does it work correctly?
+  ├─ Yes → Done! Move to next tool
+  └─ No → Fix the code, loop back to top
+```
+
+**Why this is powerful**:
+- **Instant feedback**: HMR means changes appear immediately
+- **Real testing**: Tools are called in actual browser context
+- **Self-verification**: AI can verify its own work
+- **Rapid iteration**: Fix → test → verify in seconds
+
+**Example workflow**:
+```bash
+Agent: "I'll create a search_products tool"
+1. Agent writes tool code using useWebMCP
+2. Vite dev server hot-reloads (< 1 second)
+3. Agent: mcp__chrome-devtools__navigate("http://localhost:3000")
+4. Agent: mcp__chrome-devtools__list_webmcp_tools
+   → Sees "search_products" in the list ✓
+5. Agent: mcp__chrome-devtools__call_webmcp_tool("search_products", { query: "laptop" })
+   → Returns: { products: [...], count: 5 } ✓
+6. Agent verifies results match expectation
+7. Tool works! Move on.
+```
+
+**If something breaks**:
+```bash
+Agent: "The tool returned undefined instead of products array"
+1. Agent examines the code
+2. Agent: "I see the issue - missing return statement"
+3. Agent fixes the code
+4. Dev server reloads automatically
+5. Agent calls the tool again
+6. Now it works! ✓
+```
+
+This **build-test-iterate loop** is why Chrome DevTools MCP integration is so critical. It turns tool development into an interactive, self-correcting process.
 
 ### Example Dogfooding Session
 
@@ -857,124 +539,6 @@ mcp__docs__SearchWebMcpDocumentation("tool annotations destructiveHint")
 - Specific API syntax (use WebMCP Docs MCP)
 - Debugging (use Chrome DevTools MCP)
 - Implementation details (use WebMCP Docs MCP)
-
-## Common Patterns
-
-### Pattern: Todo List App
-
-```
-Phase 1 - Read-Only:
-✓ list_todos (readOnlyHint: true)
-  - Input: { filter?, sortBy? }
-  - Returns: { todos: [...], totalCount: number }
-
-✓ get_todo_by_id (readOnlyHint: true)
-  - Input: { id: string }
-  - Returns: { todo: {...} }
-
-Phase 2 - Read-Write:
-✓ fill_todo_form
-  - Input: { text, priority?, dueDate? }
-  - Sets form fields, doesn't create
-
-✓ set_filter
-  - Input: { status: 'all' | 'active' | 'completed' }
-  - Changes visible todos
-
-Phase 3 - Destructive:
-✓ create_todo (destructiveHint: true)
-  - Creates the todo permanently
-
-✓ delete_todo (destructiveHint: true)
-  - Input: { id: string }
-  - Permanently removes todo
-
-✓ mark_complete (destructiveHint: true)
-  - Input: { id: string, completed: boolean }
-  - Changes todo state permanently
-```
-
-### Pattern: E-Commerce Site
-
-```
-Phase 1 - Read-Only:
-✓ search_products
-✓ get_product_details
-✓ get_cart_contents
-✓ get_shipping_options
-
-Phase 2 - Read-Write:
-✓ fill_checkout_form (address, payment)
-✓ set_quantity (in cart UI, not cart state)
-✓ apply_filters (product filters)
-✓ navigate_to_page
-
-Phase 3 - Destructive:
-✓ add_to_cart (changes cart state)
-✓ remove_from_cart
-✓ submit_order (actually purchase)
-✓ apply_coupon
-```
-
-### Pattern: Admin Dashboard
-
-```
-Phase 1 - Read-Only:
-✓ list_users (with pagination, filtering)
-✓ get_user_details
-✓ get_analytics
-✓ search_logs
-
-Phase 2 - Read-Write:
-✓ fill_user_form (for create/edit)
-✓ set_date_range (for analytics)
-✓ apply_filters
-
-Phase 3 - Destructive:
-✓ create_user
-✓ update_user
-✓ delete_user
-✓ ban_user
-✓ reset_password
-```
-
-## Installation & Setup (Technical Details)
-
-**Note**: This section is intentionally brief. Use `mcp__docs__SearchWebMcpDocumentation` for specific syntax and APIs.
-
-### For React Apps
-
-1. Install packages:
-   ```bash
-   pnpm add @mcp-b/react-webmcp @mcp-b/global zod
-   ```
-
-2. Add global bridge to `index.html`:
-   ```html
-   <script src="https://unpkg.com/@mcp-b/global@latest/dist/index.global.js"></script>
-   ```
-
-3. Use the hook:
-   ```tsx
-   import { useWebMCP } from '@mcp-b/react-webmcp';
-
-   useWebMCP({
-     name: 'my_tool',
-     description: 'Does something',
-     handler: async () => ({ success: true })
-   });
-   ```
-
-For more details: `mcp__docs__SearchWebMcpDocumentation("react useWebMCP setup")`
-
-### For Other Frameworks
-
-Use `@mcp-b/webmcp-ts-sdk`:
-```bash
-pnpm add @mcp-b/webmcp-ts-sdk @mcp-b/global zod
-```
-
-For details: `mcp__docs__SearchWebMcpDocumentation("typescript sdk setup")`
 
 ## Workflow Summary
 
