@@ -40,26 +40,39 @@ Test every tool with Chrome DevTools MCP. No exceptions.
 
 ## Installation
 
-### Option 1: Via Claude Code (When Published)
+### Option 1: Via NPM
 
 ```bash
-/plugin marketplace add webmcp/webmcp-setup
-/plugin install webmcp-setup
+# Install the package
+npm install @mcp-b/skill-webmcp-setup
+# or
+pnpm add @mcp-b/skill-webmcp-setup
+
+# Copy to your Claude Code skills folder
+cp -r node_modules/@mcp-b/skill-webmcp-setup ~/.claude/skills/webmcp-setup
 ```
 
-### Option 2: Manual Installation
+### Option 2: Manual Installation (Personal)
 
 ```bash
-# Copy to your Claude Code skills folder
+# Clone or download, then copy to your Claude Code skills folder
 cp -r skills/webmcp-setup ~/.claude/skills/
 ```
 
-### Option 3: Project-Specific
+### Option 3: Project-Specific (Team)
 
 ```bash
 # Add to your project's .claude/skills/ directory
+# Team members automatically get the skill when they clone
 mkdir -p .claude/skills
 cp -r skills/webmcp-setup .claude/skills/
+```
+
+### Option 4: Via Plugin Marketplace (Coming Soon)
+
+```bash
+/plugin marketplace add mcp-b/skills
+/plugin install webmcp-setup
 ```
 
 ## Quick Start
