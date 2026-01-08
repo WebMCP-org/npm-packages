@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.0
+
+### Minor Changes
+
+- ce15daf: Initial release of WebMCP setup skill following Claude Code skills best practices:
+
+  - Reduced SKILL.md from 1055 to 566 lines (46% reduction) for better discoverability
+  - Implemented progressive disclosure pattern with reference files
+  - Created `references/ADVANCED_PATTERNS.md` for detailed implementation patterns
+  - Created `examples/COMMON_APPS.md` for real-world application examples
+  - Created `references/INSTALLATION.md` for framework-specific setup instructions
+  - Added build-test-iterate loop documentation for TDD workflow
+  - All references are one-level deep as per Claude Code best practices
+
 All notable changes to the WebMCP Setup skill will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
@@ -8,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.0] - 2026-01-07
 
 ### Added
+
 - Initial release of WebMCP Setup skill
 - Framework detection for React, Vue, Next.js, Angular, Svelte, and vanilla HTML
 - Automatic package installation based on detected framework
@@ -24,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Claude Code plugin configuration
 
 ### Framework Support
+
 - ✅ React (17, 18, 19) with `@mcp-b/react-webmcp`
 - ✅ Vue 3+ with `@mcp-b/webmcp-ts-sdk`
 - ✅ Next.js (13+, App Router and Pages Router)
@@ -32,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ✅ Svelte 3+ and SvelteKit (SDK-based)
 
 ### Documentation
+
 - Comprehensive SKILL.md with setup workflow
 - Quick reference table for common tasks
 - Success criteria checklist

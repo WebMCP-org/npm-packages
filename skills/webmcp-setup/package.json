@@ -1,6 +1,6 @@
 {
   "name": "@webmcp/claude-code-skill-webmcp-setup",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Claude Code skill for setting up WebMCP - browser-native MCP integration for web applications",
   "keywords": [
     "claude",
