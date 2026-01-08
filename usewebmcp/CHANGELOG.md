@@ -1,5 +1,12 @@
 # usewebmcp
 
+## 0.2.3-beta.0
+
+### Patch Changes
+
+- Updated dependencies [334f371]
+  - @mcp-b/react-webmcp@0.3.0-beta.0
+
 ## 0.2.2
 
 ### Patch Changes

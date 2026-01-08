@@ -137,13 +137,16 @@ export interface WebMCPConfig<
   inputSchema?: TInputSchema;
 
   /**
-   * Zod schema object defining the expected output structure.
+   * **Recommended:** Zod schema object defining the expected output structure.
    *
-   * When provided, this enables two key features:
+   * When provided, this enables three key features:
    * 1. **Type Safety**: The handler's return type is inferred from this schema
    * 2. **MCP structuredContent**: The MCP response includes `structuredContent`
-   *    containing the typed output, required when tools define outputSchema
-   *    per the MCP specification
+   *    containing the typed output per the MCP specification
+   * 3. **AI Understanding**: AI models can better understand and use the tool's output
+   *
+   * This is the recommended way to define tool outputs. The schema provides
+   * both compile-time type checking and runtime structure for MCP clients.
    *
    * @see {@link https://spec.modelcontextprotocol.io/specification/server/tools/#output-schemas}
    *
@@ -152,6 +155,9 @@ export interface WebMCPConfig<
    * outputSchema: {
    *   counter: z.number().describe('The current counter value'),
    *   timestamp: z.string().describe('ISO timestamp'),
+   *   metadata: z.object({
+   *     updatedBy: z.string(),
+   *   }).describe('Additional metadata'),
    * }
    * ```
    */
@@ -178,12 +184,11 @@ export interface WebMCPConfig<
   ) => Promise<InferOutput<TOutputSchema>> | InferOutput<TOutputSchema>;
 
   /**
-   * Optional function to format the handler output for the MCP text response.
-   * Defaults to JSON.stringify with indentation.
+   * Custom formatter for the MCP text response.
    *
-   * This formats the `content[].text` field in the MCP response.
-   * When `outputSchema` is defined, `structuredContent` is also included
-   * alongside the formatted text.
+   * @deprecated Use `outputSchema` instead. The `outputSchema` provides type-safe
+   * structured output via MCP's `structuredContent`, which is the recommended
+   * approach for tool outputs. This property will be removed in a future version.
    *
    * @param output - The raw output from the handler
    * @returns Formatted string for the MCP response content

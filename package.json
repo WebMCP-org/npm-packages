@@ -9,8 +9,8 @@
     "changeset:publish": "pnpm build && changeset publish",
     "changeset:version": "changeset version",
     "check": "biome check --write .",
-    "check-all": "pnpm run typecheck && biome ci --linter-enabled=true --formatter-enabled=true .",
     "check:ci": "biome ci .",
+    "check-all": "pnpm run typecheck && biome ci --linter-enabled=true --formatter-enabled=true .",
     "ci:publish": "pnpm publish -r --access public",
     "clean": "git clean -xdf .cache .turbo node_modules",
     "format": "biome format --write .",
@@ -23,7 +23,8 @@
     "test:e2e:debug": "pnpm --filter mcp-e2e-tests test:debug",
     "test:e2e:headed": "pnpm --filter mcp-e2e-tests test:headed",
     "test:e2e:ui": "pnpm --filter mcp-e2e-tests test:ui",
-    "typecheck": "turbo run typecheck"
+    "typecheck": "turbo run typecheck",
+    "validate:publish": "node ./scripts/validate-publish.js"
   },
   "dependencies": {
     "dotenv": "^17.2.1",

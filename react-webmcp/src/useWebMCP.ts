@@ -1,16 +1,18 @@
 import type { InputSchema } from '@mcp-b/global';
 import { zodToJsonSchema } from '@mcp-b/global';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { DependencyList } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { z } from 'zod';
 import type { InferOutput, ToolExecutionState, WebMCPConfig, WebMCPReturn } from './types.js';
 
 /**
  * Default output formatter that converts values to formatted JSON strings.
  *
+ * String values are returned as-is; all other types are serialized to
+ * indented JSON for readability.
+ *
  * @internal
- * @param output - The value to format
- * @returns Formatted string representation
  */
 function defaultFormatOutput(output: unknown): string {
   if (typeof output === 'string') {
@@ -28,18 +30,97 @@ function defaultFormatOutput(output: unknown): string {
  * - Validates input using Zod schemas
  * - Handles tool execution and lifecycle callbacks
  * - Automatically unregisters on component unmount
- * - Properly returns `structuredContent` when `outputSchema` is defined
+ * - Returns `structuredContent` when `outputSchema` is defined
+ *
+ * ## Output Schema (Recommended)
+ *
+ * Always define an `outputSchema` for your tools. This provides:
+ * - **Type Safety**: Handler return type is inferred from the schema
+ * - **MCP structuredContent**: AI models receive structured, typed data
+ * - **Better AI Understanding**: Models can reason about your tool's output format
+ *
+ * ```tsx
+ * useWebMCP({
+ *   name: 'get_user',
+ *   description: 'Get user by ID',
+ *   inputSchema: { userId: z.string() },
+ *   outputSchema: {
+ *     id: z.string(),
+ *     name: z.string(),
+ *     email: z.string().email(),
+ *   },
+ *   handler: async ({ userId }) => {
+ *     const user = await fetchUser(userId);
+ *     return { id: user.id, name: user.name, email: user.email };
+ *   },
+ * });
+ * ```
+ *
+ * ## Re-render Optimization
+ *
+ * This hook is optimized to minimize unnecessary tool re-registrations:
+ *
+ * - **Memoized JSON conversion**: Zod-to-JSON schema conversions are memoized to
+ *   avoid recomputation on every render.
+ *
+ * - **Ref-based callbacks**: `handler`, `onSuccess`, `onError`, and `formatOutput`
+ *   are stored in refs, so changing these functions won't trigger re-registration.
+ *
+ * **IMPORTANT**: If `inputSchema`, `outputSchema`, or `annotations` are defined inline
+ * or change on every render, the tool will re-register unnecessarily. To avoid this,
+ * memoize these values using `useMemo` or define them outside your component:
+ *
+ * ```tsx
+ * // Good: Memoized schema (won't change unless deps change)
+ * const outputSchema = useMemo(() => ({
+ *   count: z.number(),
+ *   items: z.array(z.string()),
+ * }), []);
+ *
+ * // Good: Static schema defined outside component
+ * const OUTPUT_SCHEMA = {
+ *   count: z.number(),
+ *   items: z.array(z.string()),
+ * };
+ *
+ * // Bad: Inline schema (creates new object every render)
+ * useWebMCP({
+ *   outputSchema: { count: z.number() }, // Re-registers every render!
+ * });
+ * ```
+ *
+ * **What triggers re-registration:**
+ * - Changes to `name` or `description`
+ * - Changes to `inputSchema`, `outputSchema`, or `annotations` (reference comparison)
+ * - Changes to any value in the `deps` argument (reference comparison)
+ *
+ * **What does NOT trigger re-registration:**
+ * - Changes to `handler`, `onSuccess`, `onError`, or `formatOutput` functions
  *
  * @template TInputSchema - Zod schema object defining input parameter types
  * @template TOutputSchema - Zod schema object defining output structure (enables structuredContent)
  *
  * @param config - Configuration object for the tool
+ * @param deps - Optional dependency array that triggers tool re-registration when values change.
+ *   Similar to React's `useEffect` dependencies. When any value changes (by reference),
+ *   the tool will be unregistered and re-registered. Prefer primitive values over
+ *   objects/arrays to minimize re-registrations.
+ *
  * @returns Object containing execution state and control methods
+ *
+ * @remarks
+ * The hook uses React refs to store callbacks (`handler`, `onSuccess`, `onError`, `formatOutput`)
+ * which prevents re-registration when these functions change. This is a performance optimization
+ * that follows the "latest ref" pattern.
+ *
+ * When `outputSchema` is provided, the MCP response includes both text content and
+ * `structuredContent` per the MCP specification. The type system ensures that the handler's
+ * return type matches the output schema through Zod's type inference.
  *
  * @public
  *
  * @example
- * Basic tool registration:
+ * Basic tool with outputSchema (recommended):
  * ```tsx
  * function PostActions() {
  *   const likeTool = useWebMCP({
@@ -48,37 +129,23 @@ function defaultFormatOutput(output: unknown): string {
  *     inputSchema: {
  *       postId: z.string().uuid().describe('The ID of the post to like'),
  *     },
+ *     outputSchema: {
+ *       success: z.boolean().describe('Whether the like was successful'),
+ *       likeCount: z.number().describe('Updated like count'),
+ *     },
  *     handler: async ({ postId }) => {
- *       await api.posts.like(postId);
- *       return { success: true, postId };
+ *       const result = await api.posts.like(postId);
+ *       return { success: true, likeCount: result.likes };
  *     },
  *   });
  *
+ *   // likeTool.state.lastResult is typed as { success: boolean; likeCount: number } | null
  *   if (likeTool.state.isExecuting) {
  *     return <Spinner />;
  *   }
  *
- *   return <div>Post actions ready</div>;
+ *   return <div>Likes: {likeTool.state.lastResult?.likeCount ?? 0}</div>;
  * }
- * ```
- *
- * @example
- * Tool with outputSchema (enables MCP structuredContent):
- * ```tsx
- * const counterTool = useWebMCP({
- *   name: 'counter_get',
- *   description: 'Get the current counter value',
- *   outputSchema: {
- *     counter: z.number().describe('Current counter value'),
- *     timestamp: z.string().describe('ISO timestamp'),
- *   },
- *   handler: async () => {
- *     // Return type is inferred from outputSchema
- *     return { counter: getCounter(), timestamp: new Date().toISOString() };
- *   },
- * });
- *
- * // counterTool.state.lastResult is typed as { counter: number; timestamp: string } | null
  * ```
  *
  * @example
@@ -90,13 +157,17 @@ function defaultFormatOutput(output: unknown): string {
  *   inputSchema: {
  *     postId: z.string().uuid(),
  *   },
+ *   outputSchema: {
+ *     deleted: z.boolean(),
+ *     deletedAt: z.string().describe('ISO timestamp of deletion'),
+ *   },
  *   annotations: {
  *     destructiveHint: true,
  *     idempotentHint: false,
  *   },
  *   handler: async ({ postId }) => {
  *     await api.posts.delete(postId);
- *     return { deleted: true };
+ *     return { deleted: true, deletedAt: new Date().toISOString() };
  *   },
  *   onSuccess: () => {
  *     navigate('/posts');
@@ -107,13 +178,72 @@ function defaultFormatOutput(output: unknown): string {
  *   },
  * });
  * ```
+ *
+ * @example
+ * Tool with deps for automatic re-registration:
+ * ```tsx
+ * function SitesManager({ sites }: { sites: Site[] }) {
+ *   // Without deps, you'd need getter functions like: getSiteCount: () => sites.length
+ *   // With deps, values can be used directly in description and handler
+ *   const sitesTool = useWebMCP(
+ *     {
+ *       name: 'sites_query',
+ *       description: `Query available sites. Current count: ${sites.length}`,
+ *       outputSchema: {
+ *         count: z.number(),
+ *         sites: z.array(z.object({ id: z.string(), name: z.string() })),
+ *       },
+ *       handler: async () => ({
+ *         count: sites.length,
+ *         sites: sites.map(s => ({ id: s.id, name: s.name })),
+ *       }),
+ *     },
+ *     [sites] // Re-register tool when sites array changes (by reference)
+ *   );
+ *
+ *   return <SitesList sites={sites} />;
+ * }
+ * ```
+ *
+ * @example
+ * Optimizing with memoization and deps:
+ * ```tsx
+ * function OptimizedSites({ sites }: { sites: Site[] }) {
+ *   // Memoize schema to prevent re-registration on every render
+ *   const outputSchema = useMemo(() => ({
+ *     sites: z.array(z.object({ id: z.string(), name: z.string() })),
+ *   }), []);
+ *
+ *   // Use primitive values in deps for better control
+ *   const siteIds = sites.map(s => s.id).join(',');
+ *   const siteCount = sites.length;
+ *
+ *   const sitesTool = useWebMCP(
+ *     {
+ *       name: 'sites_query',
+ *       description: `Query ${siteCount} available sites`,
+ *       outputSchema,
+ *       handler: async () => ({
+ *         sites: sites.map(s => ({ id: s.id, name: s.name })),
+ *       }),
+ *     },
+ *     [siteIds, siteCount] // Only re-register when IDs or count actually change
+ *   );
+ *
+ *   return <SitesList sites={sites} />;
+ * }
+ * ```
  */
 export function useWebMCP<
   TInputSchema extends Record<string, z.ZodTypeAny> = Record<string, never>,
   TOutputSchema extends Record<string, z.ZodTypeAny> = Record<string, never>,
->(config: WebMCPConfig<TInputSchema, TOutputSchema>): WebMCPReturn<TOutputSchema> {
-  /** Inferred output type from the schema */
+>(
+  config: WebMCPConfig<TInputSchema, TOutputSchema>,
+  deps?: DependencyList
+): WebMCPReturn<TOutputSchema> {
   type TOutput = InferOutput<TOutputSchema>;
+  type TInput = z.infer<z.ZodObject<TInputSchema>>;
+
   const {
     name,
     description,
@@ -138,31 +268,23 @@ export function useWebMCP<
   const onErrorRef = useRef(onError);
   const formatOutputRef = useRef(formatOutput);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     handlerRef.current = handler;
-  }, [handler]);
-
-  useEffect(() => {
     onSuccessRef.current = onSuccess;
-  }, [onSuccess]);
-
-  useEffect(() => {
     onErrorRef.current = onError;
-  }, [onError]);
-
-  useEffect(() => {
     formatOutputRef.current = formatOutput;
-  }, [formatOutput]);
+  });
 
-  // Memoize validator to prevent recreation on every render
-  // This ensures execute callback and registration effect have stable dependencies
+  const inputJsonSchema = useMemo(
+    () => (inputSchema ? zodToJsonSchema(inputSchema) : undefined),
+    [inputSchema]
+  );
+  const outputJsonSchema = useMemo(
+    () => (outputSchema ? zodToJsonSchema(outputSchema) : undefined),
+    [outputSchema]
+  );
+
   const validator = useMemo(() => (inputSchema ? z.object(inputSchema) : null), [inputSchema]);
-
-  // Store validator in ref to avoid execute callback dependency
-  const validatorRef = useRef(validator);
-  useEffect(() => {
-    validatorRef.current = validator;
-  }, [validator]);
 
   /**
    * Executes the tool handler with input validation and state management.
@@ -171,46 +293,48 @@ export function useWebMCP<
    * @returns Promise resolving to the handler's output
    * @throws Error if validation fails or the handler throws
    */
-  const execute = useCallback(async (input: unknown): Promise<TOutput> => {
-    setState((prev) => ({
-      ...prev,
-      isExecuting: true,
-      error: null,
-    }));
-
-    try {
-      const currentValidator = validatorRef.current;
-      const validatedInput = currentValidator ? currentValidator.parse(input) : input;
-      const result = await handlerRef.current(validatedInput as never);
-
-      setState((prev) => ({
-        isExecuting: false,
-        lastResult: result,
-        error: null,
-        executionCount: prev.executionCount + 1,
-      }));
-
-      if (onSuccessRef.current) {
-        onSuccessRef.current(result, input);
-      }
-
-      return result;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-
+  const execute = useCallback(
+    async (input: unknown): Promise<TOutput> => {
       setState((prev) => ({
         ...prev,
-        isExecuting: false,
-        error: err,
+        isExecuting: true,
+        error: null,
       }));
 
-      if (onErrorRef.current) {
-        onErrorRef.current(err, input);
-      }
+      try {
+        const validatedInput: TInput = validator ? validator.parse(input) : (input as TInput);
+        const result = await handlerRef.current(validatedInput);
 
-      throw err;
-    }
-  }, []);
+        setState((prev) => ({
+          isExecuting: false,
+          lastResult: result,
+          error: null,
+          executionCount: prev.executionCount + 1,
+        }));
+
+        if (onSuccessRef.current) {
+          onSuccessRef.current(result, input);
+        }
+
+        return result;
+      } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+
+        setState((prev) => ({
+          ...prev,
+          isExecuting: false,
+          error: err,
+        }));
+
+        if (onErrorRef.current) {
+          onErrorRef.current(err, input);
+        }
+
+        throw err;
+      }
+    },
+    [validator]
+  );
 
   /**
    * Resets the execution state to initial values.
@@ -224,7 +348,6 @@ export function useWebMCP<
     });
   }, []);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: execute is stable (empty deps array) and uses refs internally
   useEffect(() => {
     if (typeof window === 'undefined' || !window.navigator?.modelContext) {
       console.warn(
@@ -233,15 +356,17 @@ export function useWebMCP<
       return;
     }
 
-    const inputJsonSchema = inputSchema ? zodToJsonSchema(inputSchema) : undefined;
-    const outputJsonSchema = outputSchema ? zodToJsonSchema(outputSchema) : undefined;
-
-    const mcpHandler = async (input: unknown, _extra: unknown): Promise<CallToolResult> => {
+    /**
+     * Handles MCP tool execution by running the handler and formatting the response.
+     *
+     * @param input - The input parameters from the MCP client
+     * @returns CallToolResult with text content and optional structuredContent
+     */
+    const mcpHandler = async (input: unknown): Promise<CallToolResult> => {
       try {
         const result = await execute(input);
         const formattedOutput = formatOutputRef.current(result);
 
-        // Build the MCP response with text content
         const response: CallToolResult = {
           content: [
             {
@@ -251,12 +376,6 @@ export function useWebMCP<
           ],
         };
 
-        // When outputSchema is defined, include structuredContent per MCP specification.
-        // The type assertion is safe because:
-        // 1. outputSchema uses Zod schema, which always produces object types
-        // 2. WebMCPConfig constrains handler return type to match outputSchema via InferOutput
-        // 3. The MCP SDK's structuredContent type is Record<string, unknown>
-        // Therefore, result is always assignable to Record<string, unknown> when outputSchema exists.
         if (outputJsonSchema) {
           response.structuredContent = result as Record<string, unknown>;
         }
@@ -288,22 +407,13 @@ export function useWebMCP<
       inputSchema: (inputJsonSchema || fallbackInputSchema) as InputSchema,
       ...(outputJsonSchema && { outputSchema: outputJsonSchema as InputSchema }),
       ...(annotations && { annotations }),
-      execute: async (args: Record<string, unknown>) => {
-        const result = await mcpHandler(args, {});
-        return result;
-      },
+      execute: mcpHandler,
     });
 
-    console.log(`[useWebMCP] Registered tool: ${name}`);
-
     return () => {
-      if (registration) {
-        registration.unregister();
-        console.log(`[useWebMCP] Unregistered tool: ${name}`);
-      }
+      registration?.unregister();
     };
-    // Note: execute is intentionally omitted - it's stable (empty deps) and uses refs internally
-  }, [name, description, inputSchema, outputSchema, annotations]);
+  }, [name, description, inputJsonSchema, outputJsonSchema, annotations, execute, ...(deps ?? [])]);
 
   return {
     state,

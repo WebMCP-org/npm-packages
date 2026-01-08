@@ -115,6 +115,26 @@ Key configurations for optimal monorepo performance:
 - Changesets handle version management and changelogs
 - GitHub Actions automate the entire publish process
 
+### Publishing Safety
+
+**IMPORTANT:** Never use `npm publish` directly - it does NOT resolve `workspace:*` or `catalog:` protocols.
+
+All packages have a `prepublishOnly` hook that validates protocols are resolved before publishing:
+
+```bash
+# This will FAIL if protocols aren't resolved:
+npm publish  # DON'T DO THIS
+
+# This will work - pnpm resolves protocols before packing:
+pnpm --filter @mcp-b/react-webmcp publish --access public
+
+# Best option - use CI/changesets workflow:
+pnpm changeset
+# Then merge the version PR to trigger automated publish
+```
+
+The validation script (`scripts/validate-publish.js`) runs automatically and blocks publishing if it finds unresolved `workspace:*` or `catalog:` protocols.
+
 ## Development Workflow
 
 ### Making Changes
