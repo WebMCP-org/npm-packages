@@ -1,5 +1,5 @@
 import { useWebMCP } from '@mcp-b/react-webmcp';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { z } from 'zod';
 
 // Type definitions
@@ -67,9 +67,33 @@ export function App() {
     }));
   }, []);
 
-  // Derive primitive values for deps to minimize re-registrations
   const noteCount = state.notes.length;
   const noteIds = state.notes.map((n) => n.id).join(',');
+
+  const notesListOutputSchema = useMemo(
+    () => ({
+      notes: z
+        .array(
+          z.object({
+            id: z.string().describe('Unique note identifier'),
+            title: z.string().describe('Note title'),
+            content: z.string().describe('Note content'),
+            createdAt: z.string().describe('ISO timestamp when created'),
+          })
+        )
+        .describe('Array of all notes'),
+      count: z.number().describe('Total number of notes'),
+    }),
+    []
+  );
+
+  const notesListAnnotations = useMemo(
+    () => ({
+      readOnlyHint: true,
+      idempotentHint: true,
+    }),
+    []
+  );
 
   /**
    * Tool: notes_list
@@ -81,44 +105,26 @@ export function App() {
     {
       name: 'notes_list',
       description: `List all notes. Currently ${noteCount} note(s) available.`,
-      outputSchema: {
-        notes: z
-          .array(
-            z.object({
-              id: z.string().describe('Unique note identifier'),
-              title: z.string().describe('Note title'),
-              content: z.string().describe('Note content'),
-              createdAt: z.string().describe('ISO timestamp when created'),
-            })
-          )
-          .describe('Array of all notes'),
-        count: z.number().describe('Total number of notes'),
-      },
-      annotations: {
-        readOnlyHint: true,
-        idempotentHint: true,
-      },
+      outputSchema: notesListOutputSchema,
+      annotations: notesListAnnotations,
       handler: async () => ({
         notes: state.notes,
         count: state.notes.length,
       }),
     },
-    [noteCount, noteIds] // Re-register when notes change
+    [noteCount, noteIds]
   );
 
-  /**
-   * Tool: notes_create
-   *
-   * Creates a new note with inputSchema validation and outputSchema.
-   */
-  useWebMCP({
-    name: 'notes_create',
-    description: 'Create a new note with a title and content.',
-    inputSchema: {
+  const notesCreateInputSchema = useMemo(
+    () => ({
       title: z.string().min(1).max(100).describe('Title for the new note'),
       content: z.string().min(1).describe('Content/body of the note'),
-    },
-    outputSchema: {
+    }),
+    []
+  );
+
+  const notesCreateOutputSchema = useMemo(
+    () => ({
       success: z.boolean().describe('Whether the note was created'),
       note: z
         .object({
@@ -128,10 +134,23 @@ export function App() {
           createdAt: z.string(),
         })
         .describe('The created note'),
-    },
-    annotations: {
-      idempotentHint: false,
-    },
+    }),
+    []
+  );
+
+  const notesCreateAnnotations = useMemo(() => ({ idempotentHint: false }), []);
+
+  /**
+   * Tool: notes_create
+   *
+   * Creates a new note with inputSchema validation and outputSchema.
+   */
+  useWebMCP({
+    name: 'notes_create',
+    description: 'Create a new note with a title and content.',
+    inputSchema: notesCreateInputSchema,
+    outputSchema: notesCreateOutputSchema,
+    annotations: notesCreateAnnotations,
     handler: async ({ title, content }) => {
       const note = addNote(title, content);
       return { success: true, note };
@@ -140,6 +159,29 @@ export function App() {
       console.log('Note created:', result.note.title);
     },
   });
+
+  const notesDeleteInputSchema = useMemo(
+    () => ({
+      id: z.string().describe('The ID of the note to delete'),
+    }),
+    []
+  );
+
+  const notesDeleteOutputSchema = useMemo(
+    () => ({
+      success: z.boolean().describe('Whether the deletion succeeded'),
+      deletedId: z.string().describe('The ID that was deleted'),
+    }),
+    []
+  );
+
+  const notesDeleteAnnotations = useMemo(
+    () => ({
+      destructiveHint: true,
+      idempotentHint: true,
+    }),
+    []
+  );
 
   /**
    * Tool: notes_delete
@@ -150,17 +192,9 @@ export function App() {
     {
       name: 'notes_delete',
       description: 'Delete a note by its ID.',
-      inputSchema: {
-        id: z.string().describe('The ID of the note to delete'),
-      },
-      outputSchema: {
-        success: z.boolean().describe('Whether the deletion succeeded'),
-        deletedId: z.string().describe('The ID that was deleted'),
-      },
-      annotations: {
-        destructiveHint: true,
-        idempotentHint: true,
-      },
+      inputSchema: notesDeleteInputSchema,
+      outputSchema: notesDeleteOutputSchema,
+      annotations: notesDeleteAnnotations,
       handler: async ({ id }) => {
         const exists = state.notes.some((n) => n.id === id);
         if (!exists) {
@@ -170,7 +204,22 @@ export function App() {
         return { success: true, deletedId: id };
       },
     },
-    [noteIds] // Re-register when notes change (to validate IDs)
+    [noteIds]
+  );
+
+  const themeOutputSchema = useMemo(
+    () => ({
+      theme: z.enum(['light', 'dark']).describe('Current theme setting'),
+    }),
+    []
+  );
+
+  const themeReadOnlyAnnotations = useMemo(
+    () => ({
+      readOnlyHint: true,
+      idempotentHint: true,
+    }),
+    []
   );
 
   /**
@@ -182,17 +231,21 @@ export function App() {
     {
       name: 'app_get_theme',
       description: `Get current app theme. Currently: ${state.theme}`,
-      outputSchema: {
-        theme: z.enum(['light', 'dark']).describe('Current theme setting'),
-      },
-      annotations: {
-        readOnlyHint: true,
-        idempotentHint: true,
-      },
+      outputSchema: themeOutputSchema,
+      annotations: themeReadOnlyAnnotations,
       handler: async () => ({ theme: state.theme }),
     },
     [state.theme]
   );
+
+  const toggleThemeOutputSchema = useMemo(
+    () => ({
+      newTheme: z.enum(['light', 'dark']).describe('The new theme after toggle'),
+    }),
+    []
+  );
+
+  const toggleThemeAnnotations = useMemo(() => ({ idempotentHint: false }), []);
 
   /**
    * Tool: app_toggle_theme
@@ -202,12 +255,8 @@ export function App() {
   useWebMCP({
     name: 'app_toggle_theme',
     description: 'Toggle between light and dark theme.',
-    outputSchema: {
-      newTheme: z.enum(['light', 'dark']).describe('The new theme after toggle'),
-    },
-    annotations: {
-      idempotentHint: false,
-    },
+    outputSchema: toggleThemeOutputSchema,
+    annotations: toggleThemeAnnotations,
     handler: async () => {
       toggleTheme();
       const newTheme = state.theme === 'light' ? 'dark' : 'light';

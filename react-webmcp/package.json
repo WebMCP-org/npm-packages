@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/react-webmcp",
-  "version": "0.2.2",
+  "version": "0.3.0-beta.0",
   "description": "React hooks for Model Context Protocol (MCP) - expose React components as AI tools for Claude, ChatGPT, Cursor, and Copilot with Zod validation",
   "keywords": [
     "mcp",
@@ -61,7 +61,7 @@
     "clean": "rm -rf dist .turbo",
     "format": "biome format --write .",
     "lint": "biome lint --write .",
-    "prepublishOnly": "pnpm run build:prod",
+    "prepublishOnly": "node ../scripts/validate-publish.js && pnpm run build:prod",
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
     "typecheck": "tsc --noEmit",

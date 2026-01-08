@@ -1,0 +1,24 @@
+{
+  "mode": "pre",
+  "tag": "beta",
+  "initialVersions": {
+    "mcp-e2e-tests": "1.0.2",
+    "@mcp-ui/chat-ui": "0.0.0",
+    "@mcp-b/mcp-ui-webmcp-starter": "0.0.0",
+    "@mcp-b/webmcp-demo": "0.0.0",
+    "react-webmcp-test-app": "1.0.0",
+    "mcp-tab-transport-test-app": "1.0.0",
+    "web-standards-showcase": "1.0.2",
+    "@mcp-b/extension-tools": "0.3.0",
+    "@mcp-b/global": "1.2.1",
+    "@mcp-b/mcp-iframe": "0.1.0",
+    "@mcp-b/chrome-devtools-mcp": "1.2.1",
+    "@mcp-b/react-webmcp": "0.2.3",
+    "@mcp-b/smart-dom-reader": "1.1.0",
+    "@mcp-b/smart-dom-reader-server": "0.2.0",
+    "@mcp-b/transports": "1.2.0",
+    "usewebmcp": "0.2.2",
+    "@mcp-b/webmcp-ts-sdk": "1.1.0"
+  },
+  "changesets": ["enforce-prefix-validation", "usewebmcp-deps-feature"]
+}
