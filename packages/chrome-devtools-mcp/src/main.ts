@@ -63,29 +63,64 @@ async function getContext(): Promise<McpContext> {
     extraArgs.push(`--proxy-server=${args.proxyServer}`);
   }
   const devtools = args.experimentalDevtools ?? false;
-  const browser =
-    args.browserUrl || args.wsEndpoint || args.autoConnect
-      ? await ensureBrowserConnected({
-          browserURL: args.browserUrl,
-          wsEndpoint: args.wsEndpoint,
-          wsHeaders: args.wsHeaders,
-          devtools,
-          // Important: only pass channel, if autoConnect is true.
-          channel: args.autoConnect ? (args.channel as Channel) : undefined,
-          userDataDir: args.userDataDir,
-        })
-      : await ensureBrowserLaunched({
-          headless: args.headless,
-          executablePath: args.executablePath,
-          channel: args.channel as Channel,
-          isolated: args.isolated ?? false,
-          userDataDir: args.userDataDir,
-          logFile,
-          viewport: args.viewport,
-          args: extraArgs,
-          acceptInsecureCerts: args.acceptInsecureCerts,
-          devtools,
-        });
+
+  let browser: Awaited<ReturnType<typeof ensureBrowserConnected>>;
+
+  // If explicit browserUrl or wsEndpoint is provided, connect without fallback
+  if (args.browserUrl || args.wsEndpoint) {
+    browser = await ensureBrowserConnected({
+      browserURL: args.browserUrl,
+      wsEndpoint: args.wsEndpoint,
+      wsHeaders: args.wsHeaders,
+      devtools,
+      channel: undefined,
+      userDataDir: args.userDataDir,
+    });
+  }
+  // If autoConnect is true, try connecting first, then fall back to launching
+  else if (args.autoConnect) {
+    try {
+      logger('Attempting to connect to running browser instance...');
+      browser = await ensureBrowserConnected({
+        browserURL: undefined,
+        wsEndpoint: undefined,
+        wsHeaders: undefined,
+        devtools,
+        channel: args.channel as Channel,
+        userDataDir: args.userDataDir,
+      });
+      logger('Successfully connected to running browser instance');
+    } catch (err) {
+      logger('Failed to connect to running browser, launching new instance...', err);
+      browser = await ensureBrowserLaunched({
+        headless: args.headless,
+        executablePath: args.executablePath,
+        channel: args.channel as Channel,
+        isolated: args.isolated ?? false,
+        userDataDir: args.userDataDir,
+        logFile,
+        viewport: args.viewport,
+        args: extraArgs,
+        acceptInsecureCerts: args.acceptInsecureCerts,
+        devtools,
+      });
+    }
+  }
+  // Otherwise, just launch a new browser
+  else {
+    browser = await ensureBrowserLaunched({
+      headless: args.headless,
+      executablePath: args.executablePath,
+      channel: args.channel as Channel,
+      isolated: args.isolated ?? false,
+      userDataDir: args.userDataDir,
+      logFile,
+      viewport: args.viewport,
+      args: extraArgs,
+      acceptInsecureCerts: args.acceptInsecureCerts,
+      devtools,
+    });
+  }
 
   if (context?.browser !== browser) {
     context = await McpContext.from(browser, logger, {
