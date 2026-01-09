@@ -101,6 +101,8 @@ The skill will guide you through:
 **Leverages existing tools**:
 - **WebMCP Docs MCP** - For API syntax and implementation details
 - **Chrome DevTools MCP** - For testing and dogfooding tools
+  - Requires Chrome Dev (v145+) or Canary for auto-connect feature
+  - Auto-connect preserves cookies/auth for testing authenticated apps
 - **This skill** - For design principles and strategy
 
 **Emphasizes dogfooding**: Every tool must be tested with Chrome DevTools MCP. This catches bugs early and builds intuition for good tool design.

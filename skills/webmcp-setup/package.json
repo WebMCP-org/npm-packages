@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/skill-webmcp-setup",
-  "version": "0.2.0",
+  "version": "0.0.0-beta-20260109203913",
   "description": "Claude Code skill for setting up WebMCP - browser-native MCP integration for web applications",
   "keywords": [
     "claude",

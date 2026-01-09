@@ -1,5 +1,12 @@
 # @mcp-b/mcp-iframe
 
+## 0.0.0-beta-20260109203913
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-b/transports@0.0.0-beta-20260109203913
+
 ## 0.2.0
 
 ### Minor Changes

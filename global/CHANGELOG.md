@@ -1,5 +1,20 @@
 # @mcp-b/global
 
+## 0.0.0-beta-20260109203913
+
+### Patch Changes
+
+- Add navigation tool debugging logs
+
+  **Improvements:**
+
+  - Log when tools indicate they will trigger navigation via metadata
+  - Better visibility into navigation-triggering tool executions for debugging
+  - Non-breaking addition to existing tool execution flow
+
+- Updated dependencies
+  - @mcp-b/transports@0.0.0-beta-20260109203913
+
 ## 1.2.1
 
 ### Patch Changes

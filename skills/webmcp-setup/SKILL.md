@@ -34,7 +34,7 @@ allowed-tools:
 | **Understanding** | Learn WebMCP patterns | `mcp__docs__SearchWebMcpDocumentation` |
 | **Planning** | Design tool architecture | This skill (you're reading it) |
 | **Implementing** | Write tool code | `mcp__docs__SearchWebMcpDocumentation` for APIs |
-| **Testing** | Dogfood every tool | `mcp__chrome-devtools__*` tools |
+| **Testing** | Dogfood every tool | `mcp__chrome-devtools__*` tools (requires Chrome Dev 145+ for auth testing) |
 | **Iterating** | Refine based on usage | Chrome DevTools MCP + dogfooding |
 
 ## Success Criteria
@@ -393,6 +393,8 @@ Each pattern shows the full tool hierarchy (read → write → destructive) with
 
 ### Dogfooding Workflow
 
+**Prerequisites**: Set up Chrome DevTools MCP with Chrome Dev 145+ for best testing experience. See [Setting Up Chrome DevTools MCP for Testing](#setting-up-chrome-devtools-mcp-for-testing) below for configuration details.
+
 For **EVERY tool you create**:
 
 1. **Register the tool** in your app code
@@ -497,6 +499,162 @@ You'll discover:
 - "This tool is too granular, I need to call it 5 times"
 
 **Fix these immediately**. Dogfooding gives you this feedback.
+
+### Setting Up Chrome DevTools MCP for Testing
+
+To dogfood WebMCP tools effectively, you need Chrome DevTools MCP properly configured. Here's how to set it up for optimal testing workflow:
+
+#### Chrome Version Requirements
+
+**Auto-Connect Feature Requires Chrome 145+**
+
+The auto-connect feature (connects to running Chrome with your cookies/auth) requires:
+- ✅ **Chrome Dev** (v145+) - Available NOW, recommended for testing
+- ✅ **Chrome Canary** (v146+) - Bleeding edge, may be unstable
+- ❌ **Chrome Stable** (v143) - Does NOT support auto-connect yet (coming Feb 2026)
+- ❌ **Chrome Beta** (v144) - Does NOT support auto-connect yet
+
+**Check your Chrome version:**
+```bash
+# Mac
+/Applications/Google\ Chrome\ Dev.app/Contents/MacOS/Google\ Chrome\ Dev --version
+
+# Should show: Google Chrome 145.x.x.x dev
+```
+
+#### Configuration for Testing (Recommended)
+
+**Option 1: Auto-Connect to Running Chrome (Best for Testing)**
+
+Use this when:
+- ✅ Testing with authenticated sessions (logged-in user)
+- ✅ Need browser cookies/localStorage from your dev session
+- ✅ Want to reuse existing browser profile with extensions
+- ✅ Testing WebMCP tools that require auth
+
+**MCP Config:**
+```json
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["-y", "@mcp-b/chrome-devtools-mcp@latest"]
+    }
+  }
+}
+```
+
+**What it does:**
+1. Tries to connect to running Chrome Dev with your profile
+2. Falls back to launching new Chrome Dev if not running
+3. Preserves cookies, auth tokens, localStorage
+4. Perfect for testing authenticated apps
+
+**Option 2: Always Launch Fresh Instance (Headless Testing)**
+
+Use this when:
+- Testing without auth requirements
+- CI/CD pipelines
+- Clean slate needed for each test
+
+**MCP Config:**
+```json
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@mcp-b/chrome-devtools-mcp@latest",
+        "--no-auto-connect",
+        "--isolated"
+      ]
+    }
+  }
+}
+```
+
+**Option 3: Chrome Stable (No Auto-Connect)**
+
+If you don't have Chrome Dev/Canary installed:
+```json
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@mcp-b/chrome-devtools-mcp@latest",
+        "--channel=stable",
+        "--no-auto-connect"
+      ]
+    }
+  }
+}
+```
+
+**Note:** This launches fresh Chrome Stable each time (no preserved auth).
+
+#### Typical Testing Workflow
+
+**For apps requiring authentication:**
+
+1. **Start your dev server**
+   ```bash
+   npm run dev  # Your app runs on localhost:3000
+   ```
+
+2. **Open Chrome Dev manually**
+   - Navigate to localhost:3000
+   - Log in to your app
+   - Chrome DevTools MCP auto-connects to this session
+
+3. **Test tools with your auth session**
+   ```bash
+   # In your MCP client (Claude, Cursor, etc.)
+   "List the WebMCP tools on localhost:3000"
+   → Uses your logged-in session
+   → Tools see your cookies/auth
+   → Can test authenticated endpoints
+   ```
+
+**For apps without auth:**
+- Just use default config
+- Chrome DevTools MCP will launch Chrome Dev automatically
+- Navigate to your app and test
+
+#### Why Auto-Connect Matters for Testing
+
+**Without auto-connect (old way):**
+- Chrome DevTools MCP launches new browser instance
+- No cookies, no auth, no browser state
+- Can't test authenticated features
+- Have to log in manually every time
+
+**With auto-connect (Chrome 145+):**
+- Uses your existing Chrome Dev session
+- Preserves cookies, localStorage, auth tokens
+- Test authenticated tools immediately
+- Reuses browser profile with extensions
+
+**Example: Testing a Todo App with Auth**
+```bash
+# Your workflow:
+1. Open Chrome Dev, navigate to localhost:3000
+2. Log in to your todo app
+3. Add a todo manually (now you have data)
+
+# Now test tools:
+4. "List all WebMCP tools on this page"
+   → list_webmcp_tools shows your todos tools
+5. "Call the list_todos tool"
+   → Returns todos from your logged-in session
+6. "Create a new todo with text 'Test from AI'"
+   → create_todo works with your auth session
+7. Verify todo appears on screen
+```
+
+Without auto-connect, step 2 wouldn't work - you'd have to re-authenticate every time.
 
 ## Using Available Resources
 

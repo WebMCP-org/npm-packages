@@ -171,6 +171,157 @@ export type { CallToolResult };
 export type ToolResponse = CallToolResult;
 
 // ============================================================================
+// Navigation Metadata Types
+// ============================================================================
+
+/**
+ * Metadata for tools that trigger page navigation.
+ *
+ * When a tool needs to navigate the page (e.g., to a different URL), it must include
+ * this metadata in its response to signal the navigation intent to the client. This
+ * allows the client to distinguish between successful navigation and interrupted execution.
+ *
+ * **CRITICAL PATTERN**: Tools MUST return their response BEFORE triggering navigation.
+ * Use `setTimeout()` with a minimum 100ms delay to ensure the response is transmitted
+ * via `postMessage` and received by the client before the page unloads.
+ *
+ * **Why the pattern is necessary**: During page navigation, the JavaScript context
+ * is destroyed. If navigation occurs before the response is sent, the client will
+ * never receive the tool's result and cannot distinguish success from failure.
+ *
+ * @example Correct pattern - Response before navigation
+ * ```typescript
+ * navigator.modelContext.registerTool({
+ *   name: 'navigate_to_docs',
+ *   description: 'Navigate to documentation page',
+ *   inputSchema: { section: z.string() },
+ *   async execute(args) {
+ *     const url = `https://docs.example.com/${args.section}`;
+ *
+ *     // 1. Prepare response with navigation metadata
+ *     const response = {
+ *       content: [{ type: 'text', text: `Navigating to ${url}` }],
+ *       metadata: {
+ *         willNavigate: true,
+ *         navigationUrl: url,
+ *         navigationTiming: 'immediate',
+ *       },
+ *     };
+ *
+ *     // 2. Schedule navigation AFTER response is returned (100ms minimum)
+ *     setTimeout(() => {
+ *       window.location.href = url;
+ *     }, 100);
+ *
+ *     // 3. Return response BEFORE navigation occurs
+ *     return response;
+ *   },
+ * });
+ * ```
+ *
+ * @example Anti-pattern - Navigation before response (DO NOT DO THIS)
+ * ```typescript
+ * // ❌ WRONG - Response will be lost during navigation
+ * async execute(args) {
+ *   window.location.href = computeUrl(args); // Navigation happens first
+ *   return { content: [...] }; // This response is never received!
+ * }
+ * ```
+ *
+ * @see {@link InterruptionMetadata} for metadata added when navigation interrupts execution
+ * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage} for postMessage timing
+ */
+export interface NavigationMetadata {
+  /**
+   * Indicates this tool will trigger page navigation.
+   * This flag signals to the client that the tool succeeded and navigation is expected.
+   */
+  willNavigate: true;
+
+  /**
+   * The URL the page will navigate to (if known).
+   * Helps clients track navigation targets.
+   */
+  navigationUrl?: string;
+
+  /**
+   * When navigation will occur relative to the response.
+   * - 'immediate': Navigation scheduled immediately after return (within ~100ms)
+   * - 'delayed': Navigation will occur after some delay (see navigationDelayMs)
+   * @default 'immediate'
+   */
+  navigationTiming?: 'immediate' | 'delayed';
+
+  /**
+   * Expected delay in milliseconds before navigation (if timing='delayed').
+   * Only meaningful when navigationTiming is 'delayed'.
+   */
+  navigationDelayMs?: number;
+}
+
+/**
+ * Metadata indicating a tool call was interrupted by page navigation.
+ *
+ * This metadata is automatically added by the transport layer (`TabServerTransport`)
+ * when a page navigation occurs while a tool is executing. The transport layer's
+ * `beforeunload` event handler detects the navigation and sends an interrupted
+ * response for any pending tool calls.
+ *
+ * **When this occurs**:
+ * - User clicks browser back/forward buttons during tool execution
+ * - User manually navigates to a different URL
+ * - Tool triggers immediate navigation without following the response-first pattern
+ * - Page is reloaded or closed during tool execution
+ *
+ * **How to distinguish from successful navigation**:
+ * - Tool succeeded and navigated: Response includes `NavigationMetadata` with `willNavigate: true`
+ * - Tool was interrupted: Response includes `InterruptionMetadata` with `navigationInterrupted: true`
+ *
+ * **Client handling**:
+ * ```typescript
+ * const response = await client.callTool('my_tool', args);
+ *
+ * if (response.metadata?.willNavigate) {
+ *   // Tool succeeded and will navigate - expected behavior
+ *   console.log('Tool navigated successfully');
+ * } else if (response.metadata?.navigationInterrupted) {
+ *   // Tool was interrupted - may not have completed
+ *   console.warn('Tool execution interrupted by navigation');
+ * } else {
+ *   // Normal tool response - no navigation
+ *   console.log('Tool completed normally');
+ * }
+ * ```
+ *
+ * @see {@link NavigationMetadata} for metadata indicating intentional navigation
+ * @see {@link TabServerTransport._handleBeforeUnload} for the implementation
+ * @internal This metadata is added automatically by the transport layer
+ */
+export interface InterruptionMetadata {
+  /**
+   * Indicates the tool execution was interrupted by page navigation.
+   * When `true`, the tool may not have completed its operation successfully.
+   */
+  navigationInterrupted: true;
+
+  /**
+   * The original JSON-RPC method that was interrupted.
+   * Typically `'tools/call'` for tool invocations, but could be other MCP methods.
+   *
+   * @example 'tools/call' | 'resources/read' | 'prompts/get'
+   */
+  originalMethod: string;
+
+  /**
+   * Unix timestamp (milliseconds since epoch) when the interruption was detected.
+   * Useful for logging, debugging, and understanding the timeline of events.
+   *
+   * @example 1704067200000 (January 1, 2024, 00:00:00 UTC)
+   */
+  timestamp: number;
+}
+
+// ============================================================================
 // Configuration Types
 // ============================================================================
 

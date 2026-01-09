@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.0.0-beta-20260109203913
+
+### Patch Changes
+
+- Update documentation and skill instructions
+
+  **Improvements:**
+
+  - Enhanced README with additional setup information
+  - Updated SKILL.md with better examples and guidance
+  - Improved documentation clarity
+
 ## 0.2.0
 
 ### Minor Changes

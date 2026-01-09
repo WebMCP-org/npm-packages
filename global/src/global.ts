@@ -1910,6 +1910,14 @@ class WebModelContext implements InternalModelContext {
         }
       }
 
+      // Log navigation tools for debugging
+      if (response.metadata && 'willNavigate' in response.metadata) {
+        console.info(
+          `[Web Model Context] Tool "${toolName}" will trigger navigation`,
+          response.metadata
+        );
+      }
+
       return response;
     } catch (error) {
       console.error(`[Web Model Context] Error executing tool ${toolName}:`, error);

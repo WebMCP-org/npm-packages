@@ -1,5 +1,36 @@
 # @mcp-b/react-webmcp
 
+## 0.0.0-beta-20260109203913
+
+### Minor Changes
+
+- Improve useWebMCP hook lifecycle management and add development warnings
+
+  **New Features:**
+
+  - Development-mode warnings for unstable dependencies that cause unnecessary re-registrations
+  - Memoization recommendations for inputSchema, outputSchema, and annotations
+  - Warning system for non-primitive deps array values
+
+  **Bug Fixes:**
+
+  - Prevent state updates on unmounted components to avoid memory leaks
+  - Fix race condition where callbacks could update after component unmount
+  - Use useEffect instead of useLayoutEffect for ref updates (correct lifecycle)
+
+  **Improvements:**
+
+  - Better development experience with actionable warnings
+  - Reduced re-registration frequency through stable config detection
+  - Enhanced error reporting for common configuration mistakes
+
+### Patch Changes
+
+- Updated dependencies
+- Updated dependencies
+  - @mcp-b/global@0.0.0-beta-20260109203913
+  - @mcp-b/transports@0.0.0-beta-20260109203913
+
 ## 0.3.0
 
 ### Minor Changes

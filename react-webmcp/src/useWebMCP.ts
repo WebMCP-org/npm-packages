@@ -2,7 +2,7 @@ import type { InputSchema } from '@mcp-b/global';
 import { zodToJsonSchema } from '@mcp-b/global';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { DependencyList } from 'react';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { z } from 'zod';
 import type { InferOutput, ToolExecutionState, WebMCPConfig, WebMCPReturn } from './types.js';
 
@@ -243,7 +243,6 @@ export function useWebMCP<
 ): WebMCPReturn<TOutputSchema> {
   type TOutput = InferOutput<TOutputSchema>;
   type TInput = z.infer<z.ZodObject<TInputSchema>>;
-
   const {
     name,
     description,
@@ -267,13 +266,94 @@ export function useWebMCP<
   const onSuccessRef = useRef(onSuccess);
   const onErrorRef = useRef(onError);
   const formatOutputRef = useRef(formatOutput);
+  const isMountedRef = useRef(true);
+  const warnedRef = useRef(new Set<string>());
+  const prevConfigRef = useRef({
+    inputSchema,
+    outputSchema,
+    annotations,
+    description,
+    deps,
+  });
+  const isDev = (() => {
+    const env = (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env
+      ?.NODE_ENV;
+    return env !== undefined ? env !== 'production' : false;
+  })();
 
-  useLayoutEffect(() => {
+  // Update refs when callbacks change (doesn't trigger re-registration)
+  useEffect(() => {
     handlerRef.current = handler;
     onSuccessRef.current = onSuccess;
     onErrorRef.current = onError;
     formatOutputRef.current = formatOutput;
-  });
+  }, [handler, onSuccess, onError, formatOutput]);
+
+  // Cleanup: mark component as unmounted
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isDev) {
+      prevConfigRef.current = { inputSchema, outputSchema, annotations, description, deps };
+      return;
+    }
+
+    const warnOnce = (key: string, message: string) => {
+      if (warnedRef.current.has(key)) {
+        return;
+      }
+      console.warn(`[useWebMCP] ${message}`);
+      warnedRef.current.add(key);
+    };
+
+    const prev = prevConfigRef.current;
+
+    if (inputSchema && prev.inputSchema && prev.inputSchema !== inputSchema) {
+      warnOnce(
+        'inputSchema',
+        `Tool "${name}" inputSchema reference changed; memoize or define it outside the component to avoid re-registration.`
+      );
+    }
+
+    if (outputSchema && prev.outputSchema && prev.outputSchema !== outputSchema) {
+      warnOnce(
+        'outputSchema',
+        `Tool "${name}" outputSchema reference changed; memoize or define it outside the component to avoid re-registration.`
+      );
+    }
+
+    if (annotations && prev.annotations && prev.annotations !== annotations) {
+      warnOnce(
+        'annotations',
+        `Tool "${name}" annotations reference changed; memoize or define it outside the component to avoid re-registration.`
+      );
+    }
+
+    if (description !== prev.description) {
+      warnOnce(
+        'description',
+        `Tool "${name}" description changed; this re-registers the tool. Memoize the description if it does not need to update.`
+      );
+    }
+
+    if (
+      deps?.some(
+        (value) => (typeof value === 'object' && value !== null) || typeof value === 'function'
+      )
+    ) {
+      warnOnce(
+        'deps',
+        `Tool "${name}" deps contains non-primitive values; prefer primitives or memoize objects/functions to reduce re-registration.`
+      );
+    }
+
+    prevConfigRef.current = { inputSchema, outputSchema, annotations, description, deps };
+  }, [annotations, deps, description, inputSchema, isDev, name, outputSchema]);
 
   const inputJsonSchema = useMemo(
     () => (inputSchema ? zodToJsonSchema(inputSchema) : undefined),
@@ -305,12 +385,15 @@ export function useWebMCP<
         const validatedInput: TInput = validator ? validator.parse(input) : (input as TInput);
         const result = await handlerRef.current(validatedInput);
 
-        setState((prev) => ({
-          isExecuting: false,
-          lastResult: result,
-          error: null,
-          executionCount: prev.executionCount + 1,
-        }));
+        // Only update state if component is still mounted
+        if (isMountedRef.current) {
+          setState((prev) => ({
+            isExecuting: false,
+            lastResult: result,
+            error: null,
+            executionCount: prev.executionCount + 1,
+          }));
+        }
 
         if (onSuccessRef.current) {
           onSuccessRef.current(result, input);
@@ -320,11 +403,14 @@ export function useWebMCP<
       } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error));
 
-        setState((prev) => ({
-          ...prev,
-          isExecuting: false,
-          error: err,
-        }));
+        // Only update state if component is still mounted
+        if (isMountedRef.current) {
+          setState((prev) => ({
+            ...prev,
+            isExecuting: false,
+            error: err,
+          }));
+        }
 
         if (onErrorRef.current) {
           onErrorRef.current(err, input);
@@ -413,7 +499,7 @@ export function useWebMCP<
     return () => {
       registration?.unregister();
     };
-  }, [name, description, inputJsonSchema, outputJsonSchema, annotations, execute, ...(deps ?? [])]);
+  }, [name, description, inputJsonSchema, outputJsonSchema, annotations, ...(deps ?? []), execute]);
 
   return {
     state,

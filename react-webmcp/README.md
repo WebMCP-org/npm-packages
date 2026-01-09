@@ -194,10 +194,15 @@ Main hook for registering MCP tools with full control over behavior and state.
 
 ```tsx
 function useWebMCP<
-  TInputSchema extends Record<string, z.ZodTypeAny>,
-  TOutput = string
->(config: WebMCPConfig<TInputSchema, TOutput>): WebMCPReturn<TOutput>
+  TInputSchema extends Record<string, z.ZodTypeAny> = Record<string, never>,
+  TOutputSchema extends Record<string, z.ZodTypeAny> = Record<string, never>
+>(
+  config: WebMCPConfig<TInputSchema, TOutputSchema>,
+  deps?: DependencyList
+): WebMCPReturn<TOutputSchema>
 ```
+
+`InferOutput<TOutputSchema>` is the output type inferred from `outputSchema`.
 
 #### Configuration Options
 
@@ -208,22 +213,59 @@ function useWebMCP<
 | `inputSchema` | `Record<string, ZodType>` | - | Input validation using Zod schemas |
 | `outputSchema` | `Record<string, ZodType>` | - | Output schema for structured responses (recommended) |
 | `annotations` | `ToolAnnotations` | - | Metadata hints for the AI |
-| `elicitation` | `ElicitationConfig` | - | User confirmation settings |
 | `handler` | `(input) => Promise<TOutput>` | ✓ | Function that executes the tool |
 | `formatOutput` | `(output) => string` | - | Custom output formatter |
+| `onSuccess` | `(result, input) => void` | - | Success callback |
 | `onError` | `(error, input) => void` | - | Error handler callback |
+
+#### Memoization and `deps` (important)
+
+`useWebMCP` uses reference equality to decide when to re-register a tool. Inline
+objects/arrays/functions can cause constant re-registration.
+
+Bad:
+```tsx
+useWebMCP({
+  name: 'counter',
+  description: `Count: ${count}`,
+  outputSchema: { count: z.number() },
+  handler: async () => ({ count }),
+});
+```
+
+Good:
+```tsx
+const OUTPUT_SCHEMA = { count: z.number() };
+const description = useMemo(() => `Count: ${count}`, [count]);
+
+useWebMCP(
+  {
+    name: 'counter',
+    description,
+    outputSchema: OUTPUT_SCHEMA,
+    handler: async () => ({ count }),
+  },
+  [count]
+);
+```
+
+`deps` behaves like `useEffect` dependencies (reference comparison). Prefer
+primitive values or memoized objects to avoid unnecessary re-registrations.
+
+`handler` is stored in a ref to avoid re-registration when it changes. If you
+memoize `handler` with stale dependencies, you'll still capture stale values.
 
 #### Return Value
 
 ```tsx
-interface WebMCPReturn<TOutput> {
+interface WebMCPReturn<TOutputSchema> {
   state: {
     isExecuting: boolean;      // Currently running
-    lastResult: TOutput | null; // Last successful result
+    lastResult: InferOutput<TOutputSchema> | null; // Last successful result
     error: Error | null;        // Last error
     executionCount: number;     // Total executions
   };
-  execute: (input: unknown) => Promise<TOutput>; // Manual execution
+  execute: (input: unknown) => Promise<InferOutput<TOutputSchema>>; // Manual execution
   reset: () => void;            // Reset state
 }
 ```
@@ -237,7 +279,7 @@ function useWebMCPContext<T>(
   name: string,
   description: string,
   getValue: () => T
-): WebMCPReturn<T>
+): WebMCPReturn
 ```
 
 ---
