@@ -134,12 +134,52 @@ function waitForElement(selector: string, timeout = 5000): Promise<Element>
 
 See [HELPERS_API.md](references/HELPERS_API.md) for full API.
 
+## Calling Injected Tools
+
+After injection, tools are automatically registered with the Chrome DevTools MCP server
+and become immediately callable. The server sends `tools/list_changed` notifications
+to inform clients about new tools.
+
+### Tool Naming Convention
+
+Tools follow the pattern: `webmcp_{sanitized_domain}_page{N}_{tool_name}`
+
+Examples:
+- `webmcp_news_ycombinator_com_page0_get_stories`
+- `webmcp_old_reddit_com_page0_get_posts`
+- `webmcp_github_com_page1_search_repos`
+
+### In Claude Code Sessions
+
+When calling tools in Claude Code, use the MCP server prefix:
+
+```javascript
+mcp__chrome-devtools__webmcp_news_ycombinator_com_page0_get_stories({
+  limit: 10
+})
+```
+
+The `mcp__chrome-devtools__` prefix routes the call to the correct MCP server.
+
+### In MCP SDK / Tests
+
+When using the MCP SDK directly (e.g., in test scripts), call by the tool name only:
+
+```javascript
+await client.callTool({
+  name: 'webmcp_news_ycombinator_com_page0_get_stories',
+  arguments: { limit: 10 }
+})
+```
+
+**No prefix needed** - the SDK already knows which server to call.
+
 ## Self-Testing Protocol
 
 **CRITICAL**: Verify every tool before considering done.
 
 1. `diff_webmcp_tools` -> Tools appear as `webmcp_{domain}_page{idx}_{name}`
-2. Call each tool directly by its first-class name
+2. Call each tool using the correct calling convention (see above)
 3. If fails: `list_console_messages` + `take_snapshot`
 4. Fix -> reinject -> retest
 5. Only done when ALL tools pass

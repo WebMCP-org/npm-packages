@@ -559,10 +559,17 @@ export const injectWebMCPScript = defineTool({
               'IMPORTANT: Your MCP tool list has been updated with these new tools.',
             );
             response.appendResponseLine(
-              'You can call them directly using: mcp__chrome-devtools__<toolId>',
+              'In Claude Code, call with: mcp__chrome-devtools__<toolId>',
             );
             response.appendResponseLine(
               `Example: mcp__chrome-devtools__${`webmcp_${domain}_page${pageIdx}_${tools[0].name}`}`,
+            );
+            response.appendResponseLine('');
+            response.appendResponseLine(
+              'In MCP SDK, call with: client.callTool({ name: "<toolId>", arguments: {} })',
+            );
+            response.appendResponseLine(
+              `Example: client.callTool({ name: "${`webmcp_${domain}_page${pageIdx}_${tools[0].name}`}", arguments: {} })`,
             );
             return;
           }

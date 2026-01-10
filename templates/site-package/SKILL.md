@@ -34,12 +34,49 @@ Before using these tools, ensure they're injected into the page:
    inject_webmcp_script({ file_path: "./tools/src/{{site}}.ts" })
    ```
 
-3. **Verify**:
+3. **Verify and wait for registration**:
    ```javascript
    diff_webmcp_tools()  // Should show {{site}} tools
    ```
 
+   After injection, tools are automatically registered with the MCP server and become
+   immediately callable. The Chrome DevTools MCP server sends a `tools/list_changed`
+   notification to inform Claude Code that new tools are available.
+
 The tools source is bundled at `tools/src/{{site}}.ts`.
+
+## Calling Tools
+
+Once injected, tools are registered with naming pattern: `webmcp_{{sanitized_domain}}_page{N}_{tool_name}`
+
+Example for {{site_url}}:
+- `webmcp_{{site}}_page0_get_page_info`
+- `webmcp_{{site}}_page0_search_items`
+
+### In Claude Code
+
+Tools appear automatically in your available tools after injection. Call them directly:
+
+```javascript
+// After injection completes, tools are immediately available
+mcp__chrome-devtools__webmcp_{{site}}_page0_get_page_info({})
+```
+
+**Note**: The `mcp__chrome-devtools__` prefix is added by Claude Code when calling
+tools from the chrome-devtools MCP server.
+
+### In MCP SDK Client
+
+When using the MCP SDK directly (e.g., in tests), call tools by their registered name:
+
+```javascript
+await client.callTool({
+  name: 'webmcp_{{site}}_page0_get_page_info',
+  arguments: {}
+})
+```
+
+**No prefix needed** when calling via MCP SDK - just the tool name as shown in `listTools()`.
 
 ## Testing Your Tools
 
