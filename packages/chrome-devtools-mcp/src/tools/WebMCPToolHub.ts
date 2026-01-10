@@ -187,6 +187,19 @@ export class WebMCPToolHub {
 
     this.#pageTools.delete(page);
     this.#logger(`Removed ${removed} WebMCP tools for page`);
+
+    // Notify clients about tool removals
+    if (removed > 0) {
+      try {
+        this.#server.server.notification({
+          method: 'notifications/tools/list_changed',
+        });
+        this.#logger('Sent tools/list_changed notification (removal)');
+      } catch (err) {
+        this.#logger('Failed to send tools/list_changed notification:', err);
+      }
+    }
+
     return removed;
   }
 
@@ -251,6 +264,19 @@ export class WebMCPToolHub {
     this.#logger(
       `WebMCP tool sync: ${synced} added, ${updated} updated, ${removed} removed`,
     );
+
+    // Notify clients about tool list changes if any tools were added, removed, or updated
+    if (synced > 0 || removed > 0 || updated > 0) {
+      try {
+        this.#server.server.notification({
+          method: 'notifications/tools/list_changed',
+        });
+        this.#logger('Sent tools/list_changed notification');
+      } catch (err) {
+        this.#logger('Failed to send tools/list_changed notification:', err);
+      }
+    }
+
     return {synced, removed, updated};
   }
 
