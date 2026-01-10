@@ -12,6 +12,8 @@ import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {type AggregatedIssue} from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
 
 import {extractUrlLikeFromDevToolsTitle, urlsEqual} from './DevtoolsUtils.js';
+import {ToolListChangedNotificationSchema} from './third_party/index.js';
+import type {WebMCPToolHub} from './tools/WebMCPToolHub.js';
 import type {ListenerMap} from './PageCollector.js';
 import {NetworkCollector, ConsoleCollector} from './PageCollector.js';
 import {WEB_MCP_BRIDGE_SCRIPT, CHECK_WEBMCP_AVAILABLE_SCRIPT} from './transports/WebMCPBridgeScript.js';
@@ -46,21 +48,35 @@ export interface GeolocationOptions {
   longitude: number;
 }
 
+/**
+ * Represents a text-based accessibility snapshot of a page.
+ */
 export interface TextSnapshot {
+  /** Root node of the accessibility tree. */
   root: TextSnapshotNode;
+  /** Map of node IDs to their corresponding nodes for O(1) lookup. */
   idToNode: Map<string, TextSnapshotNode>;
+  /** Unique identifier for this snapshot version. */
   snapshotId: string;
+  /** UID of the currently selected element, if it exists in this snapshot. */
   selectedElementUid?: string;
-  // It might happen that there is a selected element, but it is not part of the
-  // snapshot. This flag indicates if there is any selected element.
+  /**
+   * Indicates if any element is selected in DevTools.
+   * Note: The selected element may not be part of this snapshot
+   * (e.g., if it's in an iframe or filtered out).
+   */
   hasSelectedElement: boolean;
+  /** Whether this snapshot includes all accessibility nodes (verbose mode). */
   verbose: boolean;
 }
 
+/**
+ * Configuration options for McpContext initialization.
+ */
 interface McpContextOptions {
-  // Whether the DevTools windows are exposed as pages for debugging of DevTools.
+  /** Whether to expose DevTools windows as debuggable pages. */
   experimentalDevToolsDebugging: boolean;
-  // Whether all page-like targets are exposed as pages.
+  /** Whether to expose all page-like targets (including service workers). */
   experimentalIncludeAllPages?: boolean;
 }
 
@@ -80,9 +96,17 @@ export type WebMCPClientResult =
   | {connected: true; client: Client}
   | {connected: false; error: string};
 
+/** Default timeout for page operations in milliseconds. */
 const DEFAULT_TIMEOUT = 5_000;
+/** Default timeout for navigation operations in milliseconds. */
 const NAVIGATION_TIMEOUT = 10_000;
 
+/**
+ * Get the timeout multiplier for a given network condition.
+ *
+ * @param condition - The network condition name (e.g., "Fast 4G", "Slow 3G").
+ * @returns Multiplier to apply to timeouts (1 = no slowdown, 10 = max slowdown).
+ */
 function getNetworkMultiplierFromString(condition: string | null): number {
   const puppeteerCondition =
     condition as keyof typeof PredefinedNetworkConditions;
@@ -100,7 +124,14 @@ function getNetworkMultiplierFromString(condition: string | null): number {
   return 1;
 }
 
-function getExtensionFromMimeType(mimeType: string) {
+/**
+ * Get the file extension for a given MIME type.
+ *
+ * @param mimeType - The MIME type (e.g., "image/png").
+ * @returns The corresponding file extension without the dot.
+ * @throws Error if the MIME type is not supported.
+ */
+function getExtensionFromMimeType(mimeType: string): string {
   switch (mimeType) {
     case 'image/png':
       return 'png';
@@ -112,15 +143,24 @@ function getExtensionFromMimeType(mimeType: string) {
   throw new Error(`No mapping for Mime type ${mimeType}.`);
 }
 
+/**
+ * Central context for MCP operations on a browser instance.
+ *
+ * Manages page state, accessibility snapshots, network/console collection,
+ * WebMCP connections, and tool registration. This class serves as the primary
+ * interface between MCP tools and the browser.
+ */
 export class McpContext implements Context {
   browser: Browser;
   logger: Debugger;
 
-  // The most recent page state.
+  /** Cached list of available pages (refreshed by createPagesSnapshot). */
   #pages: Page[] = [];
+  /** Mapping of content pages to their associated DevTools inspector pages. */
   #pageToDevToolsPage = new Map<Page, Page>();
+  /** Currently selected page for tool operations. */
   #selectedPage?: Page;
-  // The most recent snapshot.
+  /** Most recent accessibility snapshot of the selected page. */
   #textSnapshot: TextSnapshot | null = null;
   #networkCollector: NetworkCollector;
   #consoleCollector: ConsoleCollector;
@@ -137,6 +177,9 @@ export class McpContext implements Context {
   #locatorClass: typeof Locator;
   #options: McpContextOptions;
   #webMCPConnections = new WeakMap<Page, WebMCPConnection>();
+  #toolHub?: WebMCPToolHub;
+  /** Tracks pages that have WebMCP auto-detection listeners installed. */
+  #pagesWithWebMCPListeners = new WeakSet<Page>();
 
   private constructor(
     browser: Browser,
@@ -231,13 +274,146 @@ export class McpContext implements Context {
     this.#consoleCollector.dispose();
   }
 
+  /**
+   * Set the WebMCPToolHub for dynamic tool registration.
+   * This enables automatic registration of WebMCP tools as native MCP tools.
+   * Also sets up auto-detection for all existing pages.
+   */
+  setToolHub(hub: WebMCPToolHub): void {
+    this.#toolHub = hub;
+    // Trigger auto-detection for all existing pages asynchronously
+    this.#setupWebMCPAutoDetectionForAllPages().catch(err => {
+      this.logger('Error setting up WebMCP auto-detection:', err);
+    });
+  }
+
+  /**
+   * Get the WebMCPToolHub instance (for testing purposes)
+   */
+  getToolHub(): WebMCPToolHub | undefined {
+    return this.#toolHub;
+  }
+
+  /**
+   * Set up automatic WebMCP detection for a page.
+   * This installs listeners that detect WebMCP after navigation and sync tools.
+   */
+  #setupWebMCPAutoDetection(page: Page): void {
+    // Skip if listeners already installed
+    if (this.#pagesWithWebMCPListeners.has(page)) {
+      return;
+    }
+
+    // Skip chrome:// and devtools:// pages
+    const url = page.url();
+    if (
+      url.startsWith('chrome://') ||
+      url.startsWith('chrome-extension://') ||
+      url.startsWith('devtools://')
+    ) {
+      return;
+    }
+
+    this.#pagesWithWebMCPListeners.add(page);
+
+    // Handler for frame navigation - detect WebMCP after main frame navigates
+    const onFrameNavigated = async (frame: unknown) => {
+      // Only handle main frame navigation
+      // @ts-expect-error Frame type not exported
+      if (frame.parentFrame?.() !== null) {
+        return;
+      }
+
+      // Skip internal pages
+      const newUrl = page.url();
+      if (
+        newUrl.startsWith('chrome://') ||
+        newUrl.startsWith('chrome-extension://') ||
+        newUrl.startsWith('devtools://') ||
+        newUrl === 'about:blank'
+      ) {
+        return;
+      }
+
+      // Wait a bit for the page to initialize WebMCP
+      // The bridge script runs on DOMContentLoaded, and WebMCP may initialize after that
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Proactively check for WebMCP and sync tools
+      await this.#proactivelyDetectWebMCP(page);
+    };
+
+    page.on('framenavigated', onFrameNavigated);
+
+    // Clean up listener when page closes
+    page.once('close', () => {
+      page.off('framenavigated', onFrameNavigated);
+      this.#pagesWithWebMCPListeners.delete(page);
+    });
+
+    this.logger(`WebMCP auto-detection listener installed for page: ${url}`);
+  }
+
+  /**
+   * Proactively detect WebMCP on a page and sync tools if available.
+   * This is called after page navigation to automatically discover WebMCP tools.
+   */
+  async #proactivelyDetectWebMCP(page: Page): Promise<void> {
+    // Skip if tool hub is not enabled
+    if (!this.#toolHub?.isEnabled()) {
+      return;
+    }
+
+    try {
+      // Check if WebMCP is available on the page
+      const hasWebMCP = await this.#checkWebMCPAvailable(page);
+      if (!hasWebMCP) {
+        this.logger(`No WebMCP detected on page: ${page.url()}`);
+        return;
+      }
+
+      this.logger(`WebMCP detected on page: ${page.url()}, connecting...`);
+
+      // Connect and sync tools - this handles everything including sending list_changed
+      const result = await this.getWebMCPClient(page);
+      if (result.connected) {
+        this.logger(`WebMCP tools synced for page: ${page.url()}`);
+      } else {
+        this.logger(`Failed to connect to WebMCP: ${result.error}`);
+      }
+    } catch (err) {
+      this.logger('Error during proactive WebMCP detection:', err);
+    }
+  }
+
+  /**
+   * Set up WebMCP auto-detection for all current pages.
+   * Called during initialization and when tool hub is set.
+   */
+  async #setupWebMCPAutoDetectionForAllPages(): Promise<void> {
+    for (const page of this.#pages) {
+      this.#setupWebMCPAutoDetection(page);
+      // Also do an initial check for existing pages
+      await this.#proactivelyDetectWebMCP(page);
+    }
+  }
+
+  /**
+   * Create a new McpContext instance.
+   *
+   * @param browser - Puppeteer browser instance to operate on.
+   * @param logger - Debug logger for internal operations.
+   * @param opts - Configuration options.
+   * @param locatorClass - Locator class to use (injectable for testing with
+   *   unbundled Puppeteer to avoid class instance mismatch errors).
+   * @returns Initialized McpContext ready for use.
+   */
   static async from(
     browser: Browser,
     logger: Debugger,
     opts: McpContextOptions,
-    /* Let tests use unbundled Locator class to avoid overly strict checks within puppeteer that fail when mixing bundled and unbundled class instances */
     locatorClass: typeof Locator = Locator,
-  ) {
+  ): Promise<McpContext> {
     const context = new McpContext(browser, logger, opts, locatorClass);
     await context.#init();
     return context;
@@ -260,6 +436,14 @@ export class McpContext implements Context {
     return this.#networkCollector.getIdForResource(request);
   }
 
+  /**
+   * Resolve a CDP backend node ID to a snapshot element UID.
+   *
+   * @param cdpBackendNodeId - The CDP backend node ID from DevTools.
+   * @returns The corresponding snapshot UID, or undefined if not found.
+   *
+   * @todo Optimize with a backendNodeId index instead of tree traversal.
+   */
   resolveCdpElementId(cdpBackendNodeId: number): string | undefined {
     if (!cdpBackendNodeId) {
       this.logger('no cdpBackendNodeId');
@@ -269,7 +453,6 @@ export class McpContext implements Context {
       this.logger('no text snapshot');
       return;
     }
-    // TODO: index by backendNodeId instead.
     const queue = [this.#textSnapshot.root];
     while (queue.length) {
       const current = queue.pop()!;
@@ -311,6 +494,8 @@ export class McpContext implements Context {
     this.selectPage(page);
     this.#networkCollector.addPage(page);
     this.#consoleCollector.addPage(page);
+    // Set up WebMCP auto-detection for the new page
+    this.#setupWebMCPAutoDetection(page);
     return page;
   }
   async closePage(pageIdx: number): Promise<void> {
@@ -496,10 +681,24 @@ export class McpContext implements Context {
 
     await this.detectOpenDevToolsWindows();
 
+    // Set up WebMCP auto-detection for any new pages
+    // (safe to call for existing pages - it checks if listeners are already installed)
+    for (const page of this.#pages) {
+      this.#setupWebMCPAutoDetection(page);
+    }
+
     return this.#pages;
   }
 
-  async detectOpenDevToolsWindows() {
+  /**
+   * Detect and map open DevTools windows to their inspected pages.
+   *
+   * Iterates through all browser pages to find DevTools windows and
+   * associates them with the pages they're inspecting.
+   *
+   * @todo Optimize page lookup with a URL-indexed map instead of nested loops.
+   */
+  async detectOpenDevToolsWindows(): Promise<void> {
     this.logger('Detecting open DevTools windows');
     const pages = await this.browser.pages(
       this.#options.experimentalIncludeAllPages,
@@ -518,7 +717,6 @@ export class McpContext implements Context {
           if (!urlLike) {
             continue;
           }
-          // TODO: lookup without a loop.
           for (const page of this.#pages) {
             if (urlsEqual(page.url(), urlLike)) {
               this.#pageToDevToolsPage.set(page, devToolsPage);
@@ -780,12 +978,45 @@ export class McpContext implements Context {
         if (currentConn?.client === client) {
           this.#webMCPConnections.delete(targetPage);
         }
+
+        // Remove tools for this page when transport closes
+        this.#toolHub?.removeToolsForPage(targetPage);
       };
+
+      // Also listen for page close events to trigger cleanup
+      // This handles cases where the page is closed without navigation
+      const onPageClose = () => {
+        const currentConn = this.#webMCPConnections.get(targetPage);
+        if (currentConn?.client === client) {
+          this.#webMCPConnections.delete(targetPage);
+        }
+        this.#toolHub?.removeToolsForPage(targetPage);
+        // Clean up the listener
+        targetPage.off('close', onPageClose);
+      };
+      targetPage.on('close', onPageClose);
 
       await client.connect(transport);
 
       // Store connection for this page
       this.#webMCPConnections.set(targetPage, {client, transport, page: targetPage});
+
+      // Subscribe to tool list changes if tool hub is enabled and server supports it
+      const serverCapabilities = client.getServerCapabilities();
+      if (serverCapabilities?.tools?.listChanged && this.#toolHub?.isEnabled()) {
+        client.setNotificationHandler(
+          ToolListChangedNotificationSchema,
+          async () => {
+            this.logger('WebMCP tools changed, re-syncing...');
+            await this.#toolHub?.syncToolsForPage(targetPage, client);
+          },
+        );
+      }
+
+      // Initial tool sync if tool hub is enabled
+      if (this.#toolHub?.isEnabled()) {
+        await this.#toolHub.syncToolsForPage(targetPage, client);
+      }
 
       return {connected: true, client};
     } catch (err) {

@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/chrome-devtools-mcp",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "MCP server for Chrome DevTools with WebMCP integration for connecting to website MCP tools",
   "keywords": [
     "mcp",
@@ -67,6 +67,7 @@
     "verify-server-json-version": "node --experimental-strip-types scripts/verify-server-json-version.ts"
   },
   "dependencies": {
+    "@composio/json-schema-to-zod": "^0.1.17",
     "@modelcontextprotocol/sdk": "1.24.1",
     "core-js": "3.47.0",
     "debug": "4.4.3",

@@ -487,7 +487,7 @@ export function useWebMCP<
       properties: {},
     };
 
-    const registration = window.navigator.modelContext.registerTool({
+    const registration = window.navigator.modelContext?.registerTool({
       name,
       description,
       inputSchema: (inputJsonSchema || fallbackInputSchema) as InputSchema,

@@ -37,9 +37,11 @@ export interface WebMCPClientTransportOptions {
 /**
  * Result of checking for WebMCP availability
  */
-interface WebMCPCheckResult {
+export interface WebMCPCheckResult {
   available: boolean;
   type?: 'modelContext' | 'bridge';
+  /** Set when an error occurred during check (e.g., page closed) */
+  error?: string;
 }
 
 /**
@@ -90,6 +92,8 @@ export class WebMCPClientTransport implements Transport {
   private _page: Page;
   private _cdpSession: CDPSession | null = null;
   private _started = false;
+  /** Guards against concurrent start() calls. */
+  private _starting = false;
   private _closed = false;
   private _readyTimeout: number;
   private _requireWebMCP: boolean;
@@ -98,10 +102,19 @@ export class WebMCPClientTransport implements Transport {
   private _serverReadyPromise: Promise<void>;
   private _serverReadyResolve!: () => void;
   private _serverReadyReject!: (err: Error) => void;
+  /** Tracks if promise was rejected to prevent double rejection. */
+  private _serverReadyRejected = false;
 
-  // Transport callbacks
+  /** Bound handler for frame navigation events (stored for cleanup). */
+  private _frameNavigatedHandler: ((frame: unknown) => void) | null = null;
+  /** Bound handler for CDP binding calls (stored for cleanup). */
+  private _bindingCalledHandler: ((event: {name: string; payload: string}) => void) | null = null;
+
+  /** Callback invoked when transport is closed. */
   onclose?: () => void;
+  /** Callback invoked when an error occurs. */
   onerror?: (error: Error) => void;
+  /** Callback invoked when a JSON-RPC message is received. */
   onmessage?: (message: JSONRPCMessage) => void;
 
   /**
@@ -127,21 +140,44 @@ export class WebMCPClientTransport implements Transport {
     this._readyTimeout = options.readyTimeout ?? 10000;
     this._requireWebMCP = options.requireWebMCP ?? true;
 
-    // Set up server ready promise
+    // Set up server ready promise with attached rejection handler
+    // to prevent unhandled rejection if close() is called before start()
     this._serverReadyPromise = new Promise((resolve, reject) => {
       this._serverReadyResolve = resolve;
-      this._serverReadyReject = reject;
+      this._serverReadyReject = (err: Error) => {
+        this._serverReadyRejected = true;
+        reject(err);
+      };
+    });
+
+    // Attach a no-op catch to prevent unhandled rejection warnings
+    // The actual error will be propagated when the promise is awaited
+    this._serverReadyPromise.catch(() => {
+      // Intentionally empty - errors are handled where the promise is awaited
     });
   }
 
   /**
-   * Check if WebMCP is available on the page
+   * Check if WebMCP is available on the page.
+   *
+   * Returns `available: false` with an `error` field if the check failed due to
+   * page-level issues (closed, navigating, etc.) vs WebMCP simply not being present.
    */
   async checkWebMCPAvailable(): Promise<WebMCPCheckResult> {
     try {
       const result = await this._page.evaluate(CHECK_WEBMCP_AVAILABLE_SCRIPT) as WebMCPCheckResult;
       return result;
-    } catch {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      // Distinguish between "page is broken" vs "WebMCP not present"
+      const isPageError = message.includes('Execution context was destroyed') ||
+                          message.includes('Target closed') ||
+                          message.includes('Session closed') ||
+                          message.includes('Protocol error');
+      if (isPageError) {
+        return {available: false, error: `Page error: ${message}`};
+      }
+      // Other errors (e.g., script threw) mean WebMCP is not available
       return {available: false};
     }
   }
@@ -161,89 +197,114 @@ export class WebMCPClientTransport implements Transport {
       throw new Error('WebMCPClientTransport already started');
     }
 
+    if (this._starting) {
+      throw new Error('WebMCPClientTransport start already in progress');
+    }
+
     if (this._closed) {
       throw new Error('WebMCPClientTransport has been closed');
     }
 
-    // Check if WebMCP is available
-    if (this._requireWebMCP) {
-      const check = await this.checkWebMCPAvailable();
-      if (!check.available) {
-        throw new Error(
-          'WebMCP not detected on this page. ' +
-            'Ensure @mcp-b/global is loaded and initialized.'
-        );
-      }
-    }
-
-    // Create CDP session for this page
-    this._cdpSession = await this._page.createCDPSession();
-
-    // Enable Runtime domain for bindings and evaluation
-    await this._cdpSession.send('Runtime.enable');
-
-    // Set up binding for receiving messages from the bridge
-    // When the bridge calls window.__mcpBridgeToClient(msg), we receive it here
-    await this._cdpSession.send('Runtime.addBinding', {
-      name: '__mcpBridgeToClient',
-    });
-
-    // Listen for binding calls (messages from bridge → this transport)
-    this._cdpSession.on('Runtime.bindingCalled', event => {
-      if (event.name !== '__mcpBridgeToClient') return;
-
-      try {
-        const payload = JSON.parse(event.payload);
-        this._handlePayload(payload);
-      } catch (err) {
-        this.onerror?.(
-          new Error(`Failed to parse message from bridge: ${err}`)
-        );
-      }
-    });
-
-    // Listen for page navigation to detect when bridge is lost
-    this._page.on('framenavigated', frame => {
-      if (frame === this._page.mainFrame()) {
-        // Main frame navigated, bridge is gone
-        this._handleNavigation();
-      }
-    });
-
-    // Inject the bridge script
-    const result = await this._page.evaluate(WEB_MCP_BRIDGE_SCRIPT) as BridgeInjectionResult;
-
-    if (!result.success && !result.alreadyInjected) {
-      throw new Error('Failed to inject WebMCP bridge script');
-    }
-
-    this._started = true;
-
-    // Initiate server-ready handshake
-    await this._page.evaluate(() => {
-      (window as unknown as {__mcpBridge: {checkReady: () => void}}).__mcpBridge?.checkReady();
-    });
-
-    // Wait for server ready with timeout
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      const timer = setTimeout(() => {
-        reject(
-          new Error(
-            `WebMCP server did not respond within ${this._readyTimeout}ms. ` +
-              'Ensure TabServerTransport is running on the page.'
-          )
-        );
-      }, this._readyTimeout);
-
-      // Clear timeout if promise resolves
-      this._serverReadyPromise.then(() => clearTimeout(timer)).catch(() => clearTimeout(timer));
-    });
+    this._starting = true;
 
     try {
-      await Promise.race([this._serverReadyPromise, timeoutPromise]);
+      // Check if WebMCP is available
+      if (this._requireWebMCP) {
+        const check = await this.checkWebMCPAvailable();
+        if (!check.available) {
+          const errorDetail = check.error ? ` (${check.error})` : '';
+          throw new Error(
+            `WebMCP not detected on this page${errorDetail}. ` +
+              'Ensure @mcp-b/global is loaded and initialized.'
+          );
+        }
+      }
+
+      // Create CDP session for this page
+      this._cdpSession = await this._page.createCDPSession();
+
+      // Enable Runtime domain for bindings and evaluation
+      await this._cdpSession.send('Runtime.enable');
+
+      // Set up binding for receiving messages from the bridge
+      // When the bridge calls window.__mcpBridgeToClient(msg), we receive it here
+      await this._cdpSession.send('Runtime.addBinding', {
+        name: '__mcpBridgeToClient',
+      });
+
+      // Create bound handlers so we can remove them later
+      this._bindingCalledHandler = (event: {name: string; payload: string}) => {
+        if (event.name !== '__mcpBridgeToClient') return;
+        // Guard against processing messages after close
+        if (this._closed) return;
+
+        try {
+          const payload = JSON.parse(event.payload);
+          this._handlePayload(payload);
+        } catch (err) {
+          this.onerror?.(
+            new Error(`Failed to parse message from bridge: ${err}`)
+          );
+        }
+      };
+
+      this._frameNavigatedHandler = (frame: unknown) => {
+        if (frame === this._page.mainFrame()) {
+          // Main frame navigated, bridge is gone
+          this._handleNavigation();
+        }
+      };
+
+      // Listen for binding calls (messages from bridge → this transport)
+      this._cdpSession.on('Runtime.bindingCalled', this._bindingCalledHandler);
+
+      // Listen for page navigation to detect when bridge is lost
+      this._page.on('framenavigated', this._frameNavigatedHandler);
+
+      // Inject the bridge script
+      const result = await this._page.evaluate(WEB_MCP_BRIDGE_SCRIPT) as BridgeInjectionResult;
+
+      if (!result.success && !result.alreadyInjected) {
+        throw new Error('Failed to inject WebMCP bridge script');
+      }
+
+      this._started = true;
+
+      // Initiate server-ready handshake
+      await this._page.evaluate(() => {
+        (window as unknown as {__mcpBridge: {checkReady: () => void}}).__mcpBridge?.checkReady();
+      });
+
+      // Wait for server ready with timeout
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        const timer = setTimeout(() => {
+          reject(
+            new Error(
+              `WebMCP server did not respond within ${this._readyTimeout}ms. ` +
+                'Ensure TabServerTransport is running on the page.'
+            )
+          );
+        }, this._readyTimeout);
+
+        // Clear timeout if promise resolves
+        this._serverReadyPromise.then(() => clearTimeout(timer)).catch(() => clearTimeout(timer));
+      });
+
+      try {
+        await Promise.race([this._serverReadyPromise, timeoutPromise]);
+      } catch (err) {
+        await this.close();
+        throw err;
+      }
     } catch (err) {
-      await this.close();
+      // Clean up on any error during start
+      this._starting = false;
+      if (!this._closed) {
+        await this._cleanup();
+      }
       throw err;
+    } finally {
+      this._starting = false;
     }
   }
 
@@ -251,6 +312,9 @@ export class WebMCPClientTransport implements Transport {
    * Handle a payload received from the bridge
    */
   private _handlePayload(payload: unknown): void {
+    // Guard against processing messages after close
+    if (this._closed) return;
+
     // Handle special string payloads (handshake signals)
     if (typeof payload === 'string') {
       if (payload === 'mcp-server-ready') {
@@ -287,22 +351,27 @@ export class WebMCPClientTransport implements Transport {
    * Handle page navigation - bridge is lost
    *
    * Navigation is a normal lifecycle event in browsers, not a fatal error.
-   * We close the connection gracefully and allow the client to reconnect if needed.
+   * We perform full teardown (detach CDP session, remove listeners) and
+   * allow the client to reconnect by creating a new transport instance.
    */
   private _handleNavigation(): void {
     if (this._closed) return;
 
     this._serverReady = false;
-
-    // Mark as closed to prevent further operations
     this._closed = true;
     this._started = false;
 
-    // Reject any pending server ready promise
-    this._serverReadyReject(new Error('Page navigated, connection lost'));
+    // Reject any pending server ready promise (safe - has attached catch handler)
+    if (!this._serverReadyRejected) {
+      this._serverReadyReject(new Error('Page navigated, connection lost'));
+    }
+
+    // Full teardown - detach CDP session and remove listeners
+    this._cleanup().catch(() => {
+      // Ignore cleanup errors during navigation
+    });
 
     // Signal clean disconnection (not an error)
-    // The client can reconnect by creating a new transport instance
     this.onclose?.();
   }
 
@@ -310,6 +379,7 @@ export class WebMCPClientTransport implements Transport {
    * Handle server stopped signal
    */
   private _handleServerStopped(): void {
+    if (this._closed) return;
     this._serverReady = false;
     this.onerror?.(new Error('WebMCP server stopped'));
   }
@@ -330,9 +400,10 @@ export class WebMCPClientTransport implements Transport {
     await this._serverReadyPromise;
 
     // Send via CDP → bridge → postMessage → TabServer
-    const messageJson = JSON.stringify(message);
-
     try {
+      // JSON.stringify inside try block to catch non-serializable messages
+      const messageJson = JSON.stringify(message);
+
       await this._page.evaluate(
         (msg: string) => {
           const bridge = (window as unknown as {__mcpBridge?: {toServer: (msg: string) => boolean}}).__mcpBridge;
@@ -354,14 +425,21 @@ export class WebMCPClientTransport implements Transport {
   }
 
   /**
-   * Close the transport and clean up resources
+   * Internal cleanup method - removes listeners and detaches CDP session.
+   * Does not set _closed flag or call onclose (caller handles those).
    */
-  async close(): Promise<void> {
-    if (this._closed) return;
+  private async _cleanup(): Promise<void> {
+    // Remove page event listener
+    if (this._frameNavigatedHandler) {
+      this._page.off('framenavigated', this._frameNavigatedHandler);
+      this._frameNavigatedHandler = null;
+    }
 
-    this._closed = true;
-    this._started = false;
-    this._serverReady = false;
+    // Remove CDP event listener
+    if (this._cdpSession && this._bindingCalledHandler) {
+      this._cdpSession.off('Runtime.bindingCalled', this._bindingCalledHandler);
+      this._bindingCalledHandler = null;
+    }
 
     // Dispose the bridge script if possible
     try {
@@ -369,7 +447,7 @@ export class WebMCPClientTransport implements Transport {
         (window as unknown as {__mcpBridge?: {dispose: () => void}}).__mcpBridge?.dispose();
       });
     } catch {
-      // Ignore errors during cleanup
+      // Ignore errors during cleanup (page might be closed/navigated)
     }
 
     // Detach CDP session
@@ -381,9 +459,25 @@ export class WebMCPClientTransport implements Transport {
       }
       this._cdpSession = null;
     }
+  }
 
-    // Reject any pending server ready promise
-    this._serverReadyReject(new Error('Transport closed'));
+  /**
+   * Close the transport and clean up resources
+   */
+  async close(): Promise<void> {
+    if (this._closed) return;
+
+    this._closed = true;
+    this._started = false;
+    this._serverReady = false;
+
+    // Full cleanup
+    await this._cleanup();
+
+    // Reject any pending server ready promise (safe - has attached catch handler)
+    if (!this._serverReadyRejected) {
+      this._serverReadyReject(new Error('Transport closed'));
+    }
 
     this.onclose?.();
   }

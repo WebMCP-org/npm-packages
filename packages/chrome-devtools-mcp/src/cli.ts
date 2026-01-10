@@ -12,7 +12,6 @@ export const cliOptions = {
     type: 'boolean',
     description:
       'If specified, automatically connects to a browser (Chrome 145+) running in the user data directory identified by the channel param. Falls back to launching a new instance if no running browser is found.',
-    conflicts: ['isolated', 'executablePath'],
     default: true,
     coerce: (value: boolean | undefined) => {
       if (value === false) {

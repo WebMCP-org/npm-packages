@@ -11,6 +11,7 @@ import type {TraceResult} from '../trace-processing/parse.js';
 import type {PaginationOptions} from '../utils/types.js';
 
 import type {ToolCategory} from './categories.js';
+import type {WebMCPToolHub} from './WebMCPToolHub.js';
 
 export interface ToolDefinition<
   Schema extends zod.ZodRawShape = zod.ZodRawShape,
@@ -125,6 +126,10 @@ export type Context = Readonly<{
    * @param page - Optional page to get client for. Defaults to selected page.
    */
   getWebMCPClient(page?: Page): Promise<WebMCPClientResult>;
+  /**
+   * Get the WebMCPToolHub for accessing registered tools and diff state.
+   */
+  getToolHub(): WebMCPToolHub | undefined;
 }>;
 
 export function defineTool<Schema extends zod.ZodRawShape>(

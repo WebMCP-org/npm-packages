@@ -26,8 +26,12 @@ import {registerPrompts} from './prompts/index.js';
 import {ToolCategory} from './tools/categories.js';
 import type {ToolDefinition} from './tools/ToolDefinition.js';
 import {tools} from './tools/tools.js';
+import {WebMCPToolHub} from './tools/WebMCPToolHub.js';
 
-// If moved update release-please config
+/**
+ * Package version (managed by release-please).
+ * @remarks If moved, update release-please config.
+ */
 // x-release-please-start-version
 const VERSION = '0.12.1';
 // x-release-please-end
@@ -47,7 +51,7 @@ const server = new McpServer(
     title: 'Chrome DevTools MCP server',
     version: VERSION,
   },
-  {capabilities: {logging: {}, prompts: {}}},
+  {capabilities: {logging: {}, prompts: {}, tools: {listChanged: true}}},
 );
 
 // Register WebMCP development prompts
@@ -56,7 +60,19 @@ server.server.setRequestHandler(SetLevelRequestSchema, () => {
   return {};
 });
 
+/** Cached McpContext instance for the current browser. */
 let context: McpContext;
+
+/**
+ * Get or create the McpContext for browser operations.
+ *
+ * Handles browser connection/launch with the following priority:
+ * 1. Explicit browserUrl/wsEndpoint - connect directly
+ * 2. autoConnect enabled - try connecting, fall back to launching
+ * 3. Otherwise - launch a new browser
+ *
+ * @returns Initialized McpContext ready for tool operations.
+ */
 async function getContext(): Promise<McpContext> {
   const extraArgs: string[] = (args.chromeArg ?? []).map(String);
   if (args.proxyServer) {
@@ -127,11 +143,21 @@ async function getContext(): Promise<McpContext> {
       experimentalDevToolsDebugging: devtools,
       experimentalIncludeAllPages: args.experimentalIncludeAllPages,
     });
+
+    // Initialize WebMCP tool hub for dynamic tool registration
+    const toolHub = new WebMCPToolHub(server, context);
+    context.setToolHub(toolHub);
+    logger('WebMCPToolHub initialized for dynamic tool registration');
   }
   return context;
 }
 
-const logDisclaimers = () => {
+/**
+ * Log security disclaimers to stderr.
+ *
+ * Warns users that browser content is exposed to MCP clients.
+ */
+const logDisclaimers = (): void => {
   console.error(
     `chrome-devtools-mcp exposes content of the browser instance to the MCP clients allowing them to inspect,
 debug, and modify any data in the browser or DevTools.
@@ -139,8 +165,19 @@ Avoid sharing sensitive or personal information that you do not want to share wi
   );
 };
 
+/**
+ * Mutex to serialize tool execution and prevent concurrent modifications.
+ */
 const toolMutex = new Mutex();
 
+/**
+ * Register a tool with the MCP server.
+ *
+ * Handles category-based filtering (emulation, performance, network)
+ * and wraps the handler with context initialization and error handling.
+ *
+ * @param tool - Tool definition to register.
+ */
 function registerTool(tool: ToolDefinition): void {
   if (
     tool.annotations.category === ToolCategory.EMULATION &&

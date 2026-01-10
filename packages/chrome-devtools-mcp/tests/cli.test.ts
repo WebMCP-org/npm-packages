@@ -11,6 +11,8 @@ import {parseArguments} from '../src/cli.js';
 
 describe('cli args parsing', () => {
   const defaultArgs = {
+    autoConnect: true,
+    'auto-connect': true,
     'category-emulation': true,
     categoryEmulation: true,
     'category-performance': true,
@@ -26,7 +28,7 @@ describe('cli args parsing', () => {
       _: [],
       headless: false,
       $0: 'npx chrome-devtools-mcp@latest',
-      channel: 'stable',
+      channel: 'dev',
     });
   });
 
@@ -60,7 +62,7 @@ describe('cli args parsing', () => {
       _: [],
       headless: false,
       $0: 'npx chrome-devtools-mcp@latest',
-      channel: 'stable',
+      channel: 'dev',
       'user-data-dir': '/tmp/chrome-profile',
       userDataDir: '/tmp/chrome-profile',
     });
@@ -81,7 +83,7 @@ describe('cli args parsing', () => {
       'browser-url': undefined,
       browserUrl: undefined,
       u: undefined,
-      channel: 'stable',
+      channel: 'dev',
     });
   });
 
@@ -115,7 +117,7 @@ describe('cli args parsing', () => {
       _: [],
       headless: false,
       $0: 'npx chrome-devtools-mcp@latest',
-      channel: 'stable',
+      channel: 'dev',
       viewport: {
         width: 888,
         height: 777,
@@ -135,7 +137,7 @@ describe('cli args parsing', () => {
       _: [],
       headless: false,
       $0: 'npx chrome-devtools-mcp@latest',
-      channel: 'stable',
+      channel: 'dev',
       'chrome-arg': ['--no-sandbox', '--disable-setuid-sandbox'],
       chromeArg: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
@@ -203,7 +205,7 @@ describe('cli args parsing', () => {
       _: [],
       headless: false,
       $0: 'npx chrome-devtools-mcp@latest',
-      channel: 'stable',
+      channel: 'dev',
       'category-emulation': false,
       categoryEmulation: false,
     });

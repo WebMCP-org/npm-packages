@@ -7,6 +7,7 @@
 export {
   WebMCPClientTransport,
   type WebMCPClientTransportOptions,
+  type WebMCPCheckResult,
 } from './WebMCPClientTransport.js';
 
 export {

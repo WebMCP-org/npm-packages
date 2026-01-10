@@ -67,15 +67,23 @@ export function useWebMCPResource(config: WebMCPResourceConfig): WebMCPResourceR
 
   const readRef = useRef(read);
 
+  const isDev = (() => {
+    const env = (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env
+      ?.NODE_ENV;
+    return env !== undefined ? env !== 'production' : false;
+  })();
+
   useEffect(() => {
     readRef.current = read;
   }, [read]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.navigator?.modelContext) {
-      console.warn(
-        `[useWebMCPResource] window.navigator.modelContext is not available. Resource "${uri}" will not be registered.`
-      );
+      if (isDev) {
+        console.warn(
+          `[useWebMCPResource] window.navigator.modelContext is not available. Resource "${uri}" will not be registered.`
+        );
+      }
       return;
     }
 
@@ -86,7 +94,7 @@ export function useWebMCPResource(config: WebMCPResourceConfig): WebMCPResourceR
       return readRef.current(resolvedUri, params);
     };
 
-    const registration = window.navigator.modelContext.registerResource({
+    const registration = window.navigator.modelContext?.registerResource({
       uri,
       name,
       ...(description !== undefined && { description }),
@@ -94,17 +102,21 @@ export function useWebMCPResource(config: WebMCPResourceConfig): WebMCPResourceR
       read: resourceHandler,
     });
 
-    console.log(`[useWebMCPResource] Registered resource: ${uri}`);
+    if (isDev) {
+      console.log(`[useWebMCPResource] Registered resource: ${uri}`);
+    }
     setIsRegistered(true);
 
     return () => {
       if (registration) {
         registration.unregister();
-        console.log(`[useWebMCPResource] Unregistered resource: ${uri}`);
+        if (isDev) {
+          console.log(`[useWebMCPResource] Unregistered resource: ${uri}`);
+        }
         setIsRegistered(false);
       }
     };
-  }, [uri, name, description, mimeType]);
+  }, [uri, name, description, mimeType, isDev]);
 
   return {
     isRegistered,

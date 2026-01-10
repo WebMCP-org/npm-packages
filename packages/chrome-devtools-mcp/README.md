@@ -5,7 +5,7 @@
 [![npm @mcp-b/chrome-devtools-mcp package](https://img.shields.io/npm/v/@mcp-b/chrome-devtools-mcp.svg)](https://www.npmjs.com/package/@mcp-b/chrome-devtools-mcp)
 [![npm downloads](https://img.shields.io/npm/dm/@mcp-b/chrome-devtools-mcp?style=flat-square)](https://www.npmjs.com/package/@mcp-b/chrome-devtools-mcp)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=flat-square)](https://opensource.org/licenses/Apache-2.0)
-[![28 Tools](https://img.shields.io/badge/MCP_Tools-28-green?style=flat-square)](./docs/tool-reference.md)
+[![27 Tools](https://img.shields.io/badge/MCP_Tools-27-green?style=flat-square)](./docs/tool-reference.md)
 [![Chrome](https://img.shields.io/badge/Chrome-DevTools-4285F4?style=flat-square&logo=googlechrome)](https://developer.chrome.com/docs/devtools/)
 
 📖 **[WebMCP Documentation](https://docs.mcp-b.ai)** | 🚀 **[Quick Start](https://docs.mcp-b.ai/quickstart)** | 🔌 **[Connecting Agents](https://docs.mcp-b.ai/connecting-agents)** | 🎯 **[Chrome DevTools Quickstart](https://github.com/WebMCP-org/chrome-devtools-quickstart)**
@@ -21,7 +21,7 @@
 
 | Feature | Benefit |
 |---------|---------|
-| **28 MCP Tools** | Comprehensive browser control - navigation, input, screenshots, performance, debugging |
+| **27 MCP Tools** | Comprehensive browser control - navigation, input, screenshots, performance, debugging |
 | **WebMCP Integration** | Connect to website-specific AI tools via `@mcp-b/global` |
 | **Performance Analysis** | Chrome DevTools-powered performance insights and trace recording |
 | **Reliable Automation** | Puppeteer-based with automatic waiting for action results |
@@ -56,7 +56,7 @@ This fork adds **WebMCP integration** - the ability to call MCP tools that are r
 | **List website MCP tools** | ❌ | ✅ |
 | **AI-driven tool development** | ❌ | ✅ |
 
-The key addition is the `list_webmcp_tools` and `call_webmcp_tool` tools that let your AI agent interact with MCP tools that websites expose via [@mcp-b/global](https://www.npmjs.com/package/@mcp-b/global).
+The key addition is automatic WebMCP tool discovery and registration. When you visit a page with [@mcp-b/global](https://www.npmjs.com/package/@mcp-b/global), its tools are automatically registered as first-class MCP tools that your AI agent can call directly.
 
 ## AI-Driven Development Workflow
 
@@ -123,8 +123,8 @@ The AI can see the actual response, fix any bugs, and repeat until it works perf
 This creates a tight feedback loop where your AI assistant can:
 - **Write** WebMCP tools in your codebase
 - **Deploy** them automatically via hot-reload
-- **Discover** them through `list_webmcp_tools`
-- **Test** them through `call_webmcp_tool`
+- **Discover** them through `diff_webmcp_tools`
+- **Test** them by calling tools directly by their prefixed names (e.g., `webmcp_localhost_3000_page0_search_products`)
 - **Debug** issues using console messages and snapshots
 - **Iterate** until the tool works correctly
 
@@ -475,9 +475,8 @@ If you run into any issues, checkout our [troubleshooting guide](./docs/troubles
   - [`list_console_messages`](docs/tool-reference.md#list_console_messages)
   - [`take_screenshot`](docs/tool-reference.md#take_screenshot)
   - [`take_snapshot`](docs/tool-reference.md#take_snapshot)
-- **Website MCP Tools** (2 tools)
-  - [`list_webmcp_tools`](docs/tool-reference.md#list_webmcp_tools) - List available website tools (auto-connects)
-  - [`call_webmcp_tool`](docs/tool-reference.md#call_webmcp_tool) - Call a website tool (auto-connects)
+- **Website MCP Tools** (1 tool)
+  - [`diff_webmcp_tools`](docs/tool-reference.md#diff_webmcp_tools) - List available website tools across all pages (with diff)
 
 <!-- END AUTO GENERATED TOOLS -->
 
@@ -674,6 +673,14 @@ all instances of `@mcp-b/chrome-devtools-mcp`. Set the `isolated` option to `tru
 to use a temporary user data dir instead which will be cleared automatically after
 the browser is closed.
 
+> [!NOTE]
+> When using a shared user data directory (non-isolated), the server launches
+> Chrome with a local remote debugging port (`--remote-debugging-port=0` and
+> `--remote-debugging-address=127.0.0.1`) so it can auto-connect on future runs.
+> This means any local process can attach to that port. If you prefer pipe-only
+> mode, pass `--chrome-arg=--remote-debugging-pipe` (auto-connect across runs
+> will be disabled).
+
 ### Connecting to a running Chrome instance
 
 You can connect to a running Chrome instance by using the `--browser-url` option. This is useful if you want to use your existing Chrome profile or if you are running the MCP server in a sandboxed environment that does not allow starting a new Chrome instance.
@@ -807,20 +814,42 @@ Navigate to https://example.com/app
 What tools are available on this website?
 ```
 
-The AI agent will use `list_webmcp_tools` to show you what functionality the
+The AI agent will use `diff_webmcp_tools` to show you what functionality the
 website exposes. This automatically connects to the page's WebMCP server.
 
-**3. Use the tools**
+**3. Use the tools directly**
 
 ```
 Search for "wireless headphones" using the website's search tool
 ```
 
-The AI agent will use `call_webmcp_tool` to invoke the website's functionality.
+The AI agent will call the tool directly by its prefixed name (e.g., `webmcp_example_com_page0_search_products`).
+WebMCP tools are registered as first-class MCP tools, so they appear directly in your agent's tool list.
 
 That's it! No explicit connect or disconnect steps needed - WebMCP tools
-auto-connect when called and automatically reconnect when you navigate to
-a different page.
+auto-connect when detected and automatically update when you navigate.
+
+### Dynamic Tool Registration
+
+By default, WebMCP tools are automatically registered as first-class MCP tools when detected on a webpage. This means tools like `search_products` appear directly in your MCP client's tool list with prefixed names like `webmcp_localhost_3000_page0_search_products`.
+
+**MCP Client Compatibility:**
+
+| Client | Dynamic Tool Updates | Notes |
+|--------|---------------------|-------|
+| Claude Code | Yes | Full support for `tools/list_changed` |
+| GitHub Copilot | Yes | Supports list changed notifications |
+| Gemini CLI | Yes | Recently added support |
+| Cursor | No | Use `diff_webmcp_tools` to poll manually |
+| Cline | Partial | May need manual polling with `diff_webmcp_tools` |
+| Continue | Unknown | Use `diff_webmcp_tools` if tools don't appear |
+
+**For clients without dynamic tool support:**
+
+If your MCP client doesn't support `tools/list_changed` notifications, use `diff_webmcp_tools` to manually see which tools are available, then call them directly by their prefixed names. The `diff_webmcp_tools` tool is diff-aware to reduce context pollution:
+- First call returns the full tool list
+- Subsequent calls return only added/removed tools
+- Use `full: true` to force the complete list
 
 ### Example prompts
 
@@ -843,9 +872,9 @@ Call the website's form submission tool to fill out the contact form
 - **"WebMCP not detected"**: The current webpage doesn't have `@mcp-b/global`
   installed or no tools are registered. The page needs the WebMCP polyfill loaded.
 - **Tool call fails**: Check the tool's input schema matches your parameters.
-  Use `list_webmcp_tools` to see the expected input format.
+  Use `diff_webmcp_tools` to see the expected input format.
 - **Tools not appearing after navigation**: WebMCP auto-reconnects when you
-  navigate. If the new page has different tools, call `list_webmcp_tools` again.
+  navigate. If the new page has different tools, call `diff_webmcp_tools` again.
 
 ## Related Packages
 

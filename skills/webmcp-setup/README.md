@@ -8,6 +8,7 @@ This skill teaches agents how to:
 - **Think of WebMCP as creating an LLM UI** - not just installing packages
 - **Design powerful tools** using the three-category system (read-only, read-write, destructive)
 - **Implement the two-tool pattern** for forms (fill + submit)
+- **Use React hooks effectively** - `useWebMCP`, `useWebMCPContext`, `useWebMCPResource` with proper memoization
 - **Test rigorously** using Chrome DevTools MCP (dogfooding)
 - **Achieve UI parity** - LLMs can do everything humans can do
 

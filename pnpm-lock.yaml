@@ -681,6 +681,9 @@ importers:
 
   packages/chrome-devtools-mcp:
     dependencies:
+      '@composio/json-schema-to-zod':
+        specifier: ^0.1.17
+        version: 0.1.17(zod@3.25.76)
       '@modelcontextprotocol/sdk':
         specifier: 1.24.1
         version: 1.24.1(zod@3.25.76)

@@ -258,6 +258,599 @@ For detailed patterns that significantly impact tool quality, see:
 
 **Always search docs for specifics**: `mcp__docs__SearchWebMcpDocumentation("your question")`
 
+## React WebMCP Hooks - Best Practices
+
+When using `@mcp-b/react-webmcp` hooks, follow these patterns for optimal performance and reliability.
+
+### The Three Hooks
+
+**`useWebMCP`** - Main hook for registering tools with full control
+```tsx
+const tool = useWebMCP({
+  name: 'posts_like',
+  description: 'Like a post by ID',
+  inputSchema: { postId: z.string().uuid() },
+  outputSchema: { success: z.boolean(), likeCount: z.number() },
+  handler: async ({ postId }) => {
+    await api.posts.like(postId);
+    return { success: true, likeCount: 42 };
+  }
+});
+```
+
+**`useWebMCPContext`** - Simplified hook for read-only context exposure
+```tsx
+useWebMCPContext(
+  'context_current_post',
+  'Get the currently viewed post ID and metadata',
+  () => ({ postId, title: post?.title, author: post?.author })
+);
+```
+
+**`useWebMCPResource`** - Hook for exposing MCP resources (files, data streams)
+```tsx
+const { isRegistered } = useWebMCPResource({
+  uri: 'user://{userId}/profile',
+  name: 'User Profile',
+  description: 'User profile data by ID',
+  mimeType: 'application/json',
+  read: async (uri, params) => {
+    const profile = await fetchUserProfile(params?.userId);
+    return { contents: [{ uri: uri.href, text: JSON.stringify(profile) }] };
+  }
+});
+```
+
+### Critical: Always Use Output Schemas
+
+**Output schemas are MANDATORY for modern WebMCP integrations**. They enable:
+- AI providers to compile schemas to TypeScript
+- Type-safe code generation by AI
+- Structured responses that AI can reason about
+- Better validation and error handling
+
+```tsx
+// ❌ BAD: No output schema (AI gets untyped text)
+useWebMCP({
+  name: 'get_users',
+  description: 'List users',
+  handler: async () => {
+    return { users: [...] };  // AI receives text blob
+  }
+});
+
+// ✅ GOOD: With output schema (AI gets typed structure)
+const OUTPUT_SCHEMA = {
+  users: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    email: z.string().email()
+  })),
+  total: z.number()
+};
+
+useWebMCP({
+  name: 'get_users',
+  description: 'List users',
+  outputSchema: OUTPUT_SCHEMA,  // AI receives structuredContent
+  handler: async () => ({
+    users: await api.users.list(),
+    total: 10
+  })
+});
+```
+
+**Why this matters**:
+- Without `outputSchema`: AI receives `CallToolResult.content[0].text` (string)
+- With `outputSchema`: AI receives `CallToolResult.structuredContent` (typed object)
+- Modern AI models expect structured data for code generation
+
+### Performance: Memoize Schemas
+
+**Schemas must be stable references** or tools will re-register on every render.
+
+```tsx
+// ❌ BAD: New object every render → re-registers constantly
+useWebMCP({
+  name: 'get_count',
+  outputSchema: { count: z.number() },  // New object!
+  handler: async () => ({ count: 10 })
+});
+
+// ✅ GOOD: Memoized schema → stable reference
+const OUTPUT_SCHEMA = useMemo(() => ({
+  count: z.number(),
+  items: z.array(z.string())
+}), []);
+
+useWebMCP({
+  name: 'get_count',
+  outputSchema: OUTPUT_SCHEMA,  // Stable reference
+  handler: async () => ({ count: 10, items: [] })
+});
+
+// ✅ BEST: Static schema outside component
+const OUTPUT_SCHEMA = {
+  count: z.number(),
+  items: z.array(z.string())
+};
+
+function MyComponent() {
+  useWebMCP({
+    name: 'get_count',
+    outputSchema: OUTPUT_SCHEMA,  // Always stable
+    handler: async () => ({ count: 10, items: [] })
+  });
+}
+```
+
+**What gets memoized**:
+- `inputSchema` - Always memoize or define outside component
+- `outputSchema` - Always memoize or define outside component
+- `annotations` - Always memoize or define outside component
+
+**What does NOT need memoization**:
+- `handler` - Stored in a ref, changes don't trigger re-registration
+- `onSuccess` / `onError` - Stored in refs
+- `formatOutput` - Stored in a ref
+
+### The deps Array
+
+Use the second parameter to control when tools re-register:
+
+```tsx
+function TodoList({ todos }: { todos: Todo[] }) {
+  const todoCount = todos.length;
+  const todoIds = todos.map(t => t.id).join(',');
+
+  // Re-register when count or IDs change
+  useWebMCP(
+    {
+      name: 'list_todos',
+      description: `List all todos (${todoCount} items)`,
+      outputSchema: OUTPUT_SCHEMA,
+      handler: async () => ({ todos, count: todoCount })
+    },
+    [todoCount, todoIds]  // ← deps array
+  );
+}
+```
+
+**Best practices for deps**:
+- Use **primitive values**: `[count, id]` not `[{ count, id }]`
+- **Derive stable values**: `items.map(i => i.id).join(',')` not `[items]`
+- **Don't include callbacks**: Handler changes don't need re-registration
+- **Memoize objects/arrays**: Use `useMemo` if you must include them
+
+```tsx
+// ✅ GOOD: Primitive values
+useWebMCP({ ... }, [count, userId]);
+
+// ✅ GOOD: Derived primitive
+const itemIds = items.map(i => i.id).join(',');
+useWebMCP({ ... }, [items.length, itemIds]);
+
+// ❌ BAD: New object every render
+useWebMCP({ ... }, [{ count }]);  // Re-registers every render!
+
+// ❌ BAD: Array reference changes
+useWebMCP({ ... }, [items]);  // Re-registers when array changes
+```
+
+### React Forms: The Two-Tool Pattern
+
+Follow the same two-tool pattern (fill + submit) with React state:
+
+```tsx
+function ContactForm() {
+  const [formData, setFormData] = useState({
+    name: '', email: '', message: ''
+  });
+
+  // Tool 1: Fill form (read-write, user sees changes)
+  const FILL_SCHEMA = useMemo(() => ({
+    name: z.string().optional(),
+    email: z.string().email().optional(),
+    message: z.string().optional()
+  }), []);
+
+  useWebMCP({
+    name: 'fill_contact_form',
+    description: 'Fill out contact form fields',
+    inputSchema: FILL_SCHEMA,
+    annotations: {
+      title: 'Fill Contact Form',
+      readOnlyHint: false,
+      destructiveHint: false
+    },
+    handler: async ({ name, email, message }) => {
+      setFormData(prev => ({
+        name: name ?? prev.name,
+        email: email ?? prev.email,
+        message: message ?? prev.message
+      }));
+      return { success: true };
+    }
+  });
+
+  // Tool 2: Submit form (destructive, permanent action)
+  const SUBMIT_OUTPUT_SCHEMA = useMemo(() => ({
+    success: z.boolean(),
+    error: z.string().optional()
+  }), []);
+
+  useWebMCP({
+    name: 'submit_contact_form',
+    description: 'Submit the contact form',
+    outputSchema: SUBMIT_OUTPUT_SCHEMA,
+    annotations: {
+      title: 'Submit Contact Form',
+      destructiveHint: true
+    },
+    handler: async () => {
+      if (!formData.name || !formData.email) {
+        return { success: false, error: 'Name and email required' };
+      }
+      await submitForm(formData);
+      return { success: true };
+    }
+  });
+
+  // Tool 3: Read current form state (read-only)
+  const READ_OUTPUT_SCHEMA = useMemo(() => ({
+    formData: z.object({
+      name: z.string(),
+      email: z.string(),
+      message: z.string()
+    }),
+    isValid: z.boolean()
+  }), []);
+
+  useWebMCP({
+    name: 'get_form_data',
+    description: 'Get current contact form data',
+    outputSchema: READ_OUTPUT_SCHEMA,
+    annotations: { readOnlyHint: true },
+    handler: async () => ({
+      formData,
+      isValid: !!(formData.name && formData.email)
+    })
+  }, [formData.name, formData.email, formData.message]);
+
+  return <form>{/* UI */}</form>;
+}
+```
+
+### Context Exposure with useWebMCPContext
+
+Use `useWebMCPContext` for lightweight read-only data:
+
+```tsx
+function PostDetailPage() {
+  const { postId } = useParams();
+  const { data: post } = useQuery(['post', postId], () => fetchPost(postId));
+
+  // Expose current context to AI
+  useWebMCPContext(
+    'context_current_post',
+    'Get the currently viewed post ID and metadata',
+    () => ({
+      postId,
+      title: post?.title,
+      author: post?.author,
+      tags: post?.tags,
+      createdAt: post?.createdAt
+    })
+  );
+
+  return <PostContent post={post} />;
+}
+```
+
+**When to use `useWebMCPContext` vs `useWebMCP`**:
+- Use `useWebMCPContext` for simple read-only context (current page, user session)
+- Use `useWebMCP` when you need `outputSchema` for structured responses
+- Use `useWebMCP` when you need execution state tracking or callbacks
+
+### Tool Execution State
+
+`useWebMCP` returns execution state for UI feedback:
+
+```tsx
+function LikeButton({ postId }: { postId: string }) {
+  const likeTool = useWebMCP({
+    name: 'posts_like',
+    description: 'Like a post',
+    inputSchema: { postId: z.string() },
+    outputSchema: {
+      success: z.boolean(),
+      likeCount: z.number()
+    },
+    handler: async ({ postId }) => {
+      const result = await api.posts.like(postId);
+      return { success: true, likeCount: result.likes };
+    },
+    onSuccess: () => {
+      toast.success('Post liked!');
+    },
+    onError: (error) => {
+      toast.error(`Failed: ${error.message}`);
+    }
+  });
+
+  return (
+    <button onClick={() => likeTool.execute({ postId })}>
+      {likeTool.state.isExecuting && <Spinner />}
+      {likeTool.state.lastResult && (
+        <span>♥ {likeTool.state.lastResult.likeCount}</span>
+      )}
+      {likeTool.state.error && <span>Error</span>}
+    </button>
+  );
+}
+```
+
+### Testing React Tools with Chrome DevTools MCP
+
+See the Chrome DevTools MCP setup section below for how to test React tools with auto-connect to preserve authentication.
+
+**Key workflow**:
+1. Start your React dev server (`npm run dev`)
+2. Open Chrome Dev browser
+3. Log into your app (create account, navigate to test page, etc.)
+4. Launch Chrome DevTools MCP with auto-connect (preserves cookies/auth)
+5. Call tools via MCP client to test them
+6. Verify UI updates in browser
+7. Check return values match `outputSchema`
+
+**Why this matters for React**:
+- React hooks register tools on component mount
+- Chrome DevTools MCP can call those tools from outside the browser
+- Auto-connect preserves your authenticated session
+- Perfect for testing authenticated React apps
+
+### Common React Patterns
+
+**Pattern 1: Todo List with Filtering**
+```tsx
+function TodoList() {
+  const [todos, setTodos] = useState<Todo[]>([]);
+  const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
+
+  const filteredTodos = useMemo(() => {
+    return todos.filter(t => {
+      if (filter === 'all') return true;
+      if (filter === 'active') return !t.completed;
+      return t.completed;
+    });
+  }, [todos, filter]);
+
+  // Phase 1: Read tools
+  const LIST_OUTPUT_SCHEMA = useMemo(() => ({
+    todos: z.array(z.object({
+      id: z.string(),
+      text: z.string(),
+      completed: z.boolean()
+    })),
+    count: z.number(),
+    filter: z.enum(['all', 'active', 'completed'])
+  }), []);
+
+  useWebMCP({
+    name: 'list_todos',
+    description: `List todos (${filteredTodos.length} of ${todos.length})`,
+    outputSchema: LIST_OUTPUT_SCHEMA,
+    annotations: { readOnlyHint: true },
+    handler: async () => ({
+      todos: filteredTodos,
+      count: todos.length,
+      filter
+    })
+  }, [filteredTodos.length, todos.length, filter]);
+
+  // Phase 2: Write tools
+  useWebMCP({
+    name: 'set_filter',
+    description: 'Change todo filter',
+    inputSchema: {
+      filter: z.enum(['all', 'active', 'completed'])
+    },
+    handler: async ({ filter }) => {
+      setFilter(filter);
+      return { success: true };
+    }
+  });
+
+  // Phase 3: Destructive tools
+  const CREATE_OUTPUT_SCHEMA = useMemo(() => ({
+    success: z.boolean(),
+    todo: z.object({
+      id: z.string(),
+      text: z.string(),
+      completed: z.boolean()
+    })
+  }), []);
+
+  useWebMCP({
+    name: 'create_todo',
+    description: 'Create a new todo',
+    inputSchema: { text: z.string().min(1) },
+    outputSchema: CREATE_OUTPUT_SCHEMA,
+    annotations: { destructiveHint: true },
+    handler: async ({ text }) => {
+      const newTodo = { id: crypto.randomUUID(), text, completed: false };
+      setTodos(prev => [...prev, newTodo]);
+      return { success: true, todo: newTodo };
+    }
+  });
+
+  useWebMCP({
+    name: 'toggle_todo',
+    description: 'Toggle todo completion status',
+    inputSchema: { todoId: z.string() },
+    annotations: { destructiveHint: true },
+    handler: async ({ todoId }) => {
+      setTodos(prev => prev.map(t =>
+        t.id === todoId ? { ...t, completed: !t.completed } : t
+      ));
+      return { success: true };
+    }
+  });
+
+  return <div>{/* UI */}</div>;
+}
+```
+
+**Pattern 2: Search with Debouncing**
+```tsx
+function ProductSearch() {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<Product[]>([]);
+
+  // Debounced search effect
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (query) {
+        api.products.search(query).then(setResults);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const SEARCH_OUTPUT_SCHEMA = useMemo(() => ({
+    products: z.array(z.object({
+      id: z.string(),
+      name: z.string(),
+      price: z.number()
+    })),
+    total: z.number()
+  }), []);
+
+  useWebMCP({
+    name: 'search_products',
+    description: 'Search for products',
+    inputSchema: { query: z.string() },
+    outputSchema: SEARCH_OUTPUT_SCHEMA,
+    handler: async ({ query }) => {
+      setQuery(query);
+      // Results update via useEffect debouncing
+      return { products: results, total: results.length };
+    }
+  });
+
+  return <div>{/* UI */}</div>;
+}
+```
+
+### React-Specific Gotchas
+
+**1. StrictMode Double Rendering**
+- React hooks handle StrictMode automatically
+- Tools only register once even with double render
+- No manual deduplication needed
+
+**2. Hot Module Replacement (HMR)**
+- Tools automatically unregister on component unmount
+- New tool versions register on remount
+- Works seamlessly with Vite, Webpack, etc.
+
+**3. Async State Updates**
+- React state updates are async
+- Handler returns immediately after `setState`
+- Don't wait for state to update before returning
+
+```tsx
+// ❌ BAD: Trying to read updated state
+useWebMCP({
+  name: 'increment',
+  handler: async () => {
+    setCount(c => c + 1);
+    return { newCount: count };  // Returns OLD value!
+  }
+});
+
+// ✅ GOOD: Calculate new value directly
+useWebMCP({
+  name: 'increment',
+  handler: async () => {
+    const newCount = count + 1;
+    setCount(newCount);
+    return { newCount };  // Returns correct value
+  }
+});
+```
+
+**4. Memory Leaks**
+- React hooks auto-cleanup on unmount
+- State updates after unmount are prevented
+- No manual cleanup needed
+
+### Framework Integration
+
+**Next.js App Router**
+```tsx
+// app/components/Tools.tsx
+'use client';
+import { useWebMCP } from '@mcp-b/react-webmcp';
+
+export function WebMCPTools() {
+  useWebMCP({ /* ... */ });
+  return null;  // Can be invisible component
+}
+
+// app/layout.tsx
+import { WebMCPTools } from './components/Tools';
+
+export default function RootLayout({ children }) {
+  return (
+    <html>
+      <head>
+        <script src="https://unpkg.com/@mcp-b/global@latest/dist/index.global.js" />
+      </head>
+      <body>
+        <WebMCPTools />
+        {children}
+      </body>
+    </html>
+  );
+}
+```
+
+**Remix**
+```tsx
+// app/root.tsx
+import { useWebMCP } from '@mcp-b/react-webmcp';
+
+export default function App() {
+  useWebMCP({ /* ... */ });
+
+  return (
+    <html>
+      <head>
+        <script src="https://unpkg.com/@mcp-b/global@latest/dist/index.global.js" />
+      </head>
+      <body>
+        <Outlet />
+      </body>
+    </html>
+  );
+}
+```
+
+### Quick Checklist for React Tools
+
+Before testing with Chrome DevTools MCP:
+
+✅ **Output schemas defined** for all tools (use `useMemo` or static const)
+✅ **Schemas are memoized** or static (not inline objects)
+✅ **deps array used correctly** (primitives, no objects/functions)
+✅ **Forms use two-tool pattern** (fill + submit separated)
+✅ **Annotations set properly** (readOnlyHint, destructiveHint)
+✅ **State updates are sync** (don't wait for async setState)
+✅ **Error handling in place** (try/catch in handlers)
+
+For detailed React setup: `mcp__docs__SearchWebMcpDocumentation("react setup")`
+
 ## Common App Patterns
 
 See **[examples/COMMON_APPS.md](examples/COMMON_APPS.md)** for complete tool structures for:

@@ -1,6 +1,6 @@
 import type { InputSchema } from '@mcp-b/global';
 import { zodToJsonSchema } from '@mcp-b/global';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { z } from 'zod';
 import type { PromptMessage, WebMCPPromptConfig, WebMCPPromptReturn } from './types.js';
 
@@ -73,19 +73,30 @@ export function useWebMCPPrompt<
 
   const getRef = useRef(get);
 
+  const isDev = (() => {
+    const env = (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env
+      ?.NODE_ENV;
+    return env !== undefined ? env !== 'production' : false;
+  })();
+
+  const argsJsonSchema = useMemo(
+    () => (argsSchema ? zodToJsonSchema(argsSchema) : undefined),
+    [argsSchema]
+  );
+
   useEffect(() => {
     getRef.current = get;
   }, [get]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.navigator?.modelContext) {
-      console.warn(
-        `[useWebMCPPrompt] window.navigator.modelContext is not available. Prompt "${name}" will not be registered.`
-      );
+      if (isDev) {
+        console.warn(
+          `[useWebMCPPrompt] window.navigator.modelContext is not available. Prompt "${name}" will not be registered.`
+        );
+      }
       return;
     }
-
-    const argsJsonSchema = argsSchema ? zodToJsonSchema(argsSchema) : undefined;
 
     const promptHandler = async (
       args: Record<string, unknown>
@@ -93,24 +104,28 @@ export function useWebMCPPrompt<
       return getRef.current(args as never);
     };
 
-    const registration = window.navigator.modelContext.registerPrompt({
+    const registration = window.navigator.modelContext?.registerPrompt({
       name,
       ...(description !== undefined && { description }),
       ...(argsJsonSchema && { argsSchema: argsJsonSchema as InputSchema }),
       get: promptHandler,
     });
 
-    console.log(`[useWebMCPPrompt] Registered prompt: ${name}`);
+    if (isDev) {
+      console.log(`[useWebMCPPrompt] Registered prompt: ${name}`);
+    }
     setIsRegistered(true);
 
     return () => {
       if (registration) {
         registration.unregister();
-        console.log(`[useWebMCPPrompt] Unregistered prompt: ${name}`);
+        if (isDev) {
+          console.log(`[useWebMCPPrompt] Unregistered prompt: ${name}`);
+        }
         setIsRegistered(false);
       }
     };
-  }, [name, description, argsSchema]);
+  }, [name, description, argsJsonSchema, isDev]);
 
   return {
     isRegistered,
