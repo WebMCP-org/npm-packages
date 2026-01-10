@@ -130,6 +130,12 @@ export type Context = Readonly<{
    * Get the WebMCPToolHub for accessing registered tools and diff state.
    */
   getToolHub(): WebMCPToolHub | undefined;
+  /**
+   * Get all pages.
+   * @returns A snapshot of all currently open pages.
+   *          The returned array is a new copy and can be safely modified.
+   */
+  getPages(): Page[];
 }>;
 
 export function defineTool<Schema extends zod.ZodRawShape>(

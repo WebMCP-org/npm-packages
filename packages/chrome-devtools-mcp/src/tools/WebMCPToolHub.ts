@@ -265,6 +265,12 @@ export class WebMCPToolHub {
       tool.description,
     );
 
+    // Validate tool name and log any warnings
+    const warnings = validateToolName(tool.name);
+    for (const warning of warnings) {
+      this.#logger(`⚠️ Warning: ${warning}`);
+    }
+
     this.#logger(`Registering WebMCP tool: ${toolId}`);
 
     // Store tool name for use in the callback closure
@@ -280,9 +286,12 @@ export class WebMCPToolHub {
         inputSchema: zodSchema,
       },
       async (params: Record<string, unknown>): Promise<CallToolResult> => {
+        this.#logger(`[WebMCPToolHub] Tool call received: ${toolId}`);
+        this.#logger(`[WebMCPToolHub] Params: ${JSON.stringify(params)}`);
         // Look up page dynamically to handle potential stale references
         const currentPage = this.#getPageForTool(toolId);
         if (!currentPage) {
+          this.#logger(`[WebMCPToolHub] Page not found for tool: ${toolId}`);
           return {
             content: [
               {
@@ -293,6 +302,7 @@ export class WebMCPToolHub {
             isError: true,
           };
         }
+        this.#logger(`[WebMCPToolHub] Executing tool: ${originalToolName}`);
         // Pass params directly - they are already parsed by MCP SDK using the Zod schema
         return this.#executeTool(currentPage, originalToolName, params);
       },
@@ -433,6 +443,50 @@ export class WebMCPToolHub {
  */
 export function sanitizeName(name: string): string {
   return name.replace(/[^a-zA-Z0-9_]/g, '_');
+}
+
+/**
+ * Validate a tool name and return any warnings about the first character.
+ * Tool names should start with a letter (a-z, A-Z) for best compatibility
+ * with MCP clients. Starting with underscore, number, or hyphen may cause issues.
+ *
+ * NOTE: Similar validation logic exists in @mcp-b/global/src/global.ts for browser context.
+ * Keep both implementations in sync when making changes.
+ *
+ * @param name - Tool name to validate
+ * @returns Array of warning messages (empty if name starts with a letter)
+ */
+export function validateToolName(name: string): string[] {
+  const warnings: string[] = [];
+
+  // Check if name starts with underscore
+  if (name.startsWith('_')) {
+    warnings.push(
+      `Tool name "${name}" starts with underscore. ` +
+        'This may cause compatibility issues with some MCP clients. ' +
+        'Consider using a letter as the first character.',
+    );
+  }
+
+  // Check if name starts with a number
+  if (/^[0-9]/.test(name)) {
+    warnings.push(
+      `Tool name "${name}" starts with a number. ` +
+        'This may cause compatibility issues. ' +
+        'Consider using a letter as the first character.',
+    );
+  }
+
+  // Check if name starts with hyphen
+  if (name.startsWith('-')) {
+    warnings.push(
+      `Tool name "${name}" starts with hyphen. ` +
+        'This may cause compatibility issues. ' +
+        'Consider using a letter as the first character.',
+    );
+  }
+
+  return warnings;
 }
 
 /**

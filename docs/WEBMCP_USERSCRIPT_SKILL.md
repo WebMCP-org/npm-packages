@@ -8,47 +8,31 @@ This document outlines the implementation of a **unified Claude Code skill** for
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                        SKILL (webmcp-dev)                            │
-│  Progressive disclosure - reveals sections based on context          │
+│                     UNIFIED SKILL (webmcp)                          │
+│           Progressive disclosure - sections loaded as needed        │
 ├─────────────────────────────────────────────────────────────────────┤
-│                                                                      │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐               │
-│  │ Quick Start  │  │  Userscript  │  │  Production  │               │
-│  │  (always)    │  │    Dev       │  │   Testing    │               │
-│  └──────────────┘  └──────────────┘  └──────────────┘               │
-│                                                                      │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐               │
-│  │ Framework-   │  │ Distribution │  │  Marketplace │               │
-│  │    less      │  │   (build)    │  │   (upload)   │  ← Future     │
-│  └──────────────┘  └──────────────┘  └──────────────┘               │
-│                                                                      │
+│                                                                     │
+│  SKILL.md (~300 lines)     references/ (loaded on-demand)          │
+│  ├── Quick Start           ├── REACT_INTEGRATION.md                │
+│  ├── Injection Loop        ├── USERSCRIPT_GUIDE.md                 │
+│  ├── Tool Design           ├── PRODUCTION_TESTING.md               │
+│  └── Self-Testing          ├── VANILLA_JS.md                       │
+│                            └── TROUBLESHOOTING.md                  │
+│                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
                               │
                               │ uses
                               ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                   MCP SERVER (chrome-devtools-mcp)                   │
+│                   MCP SERVER (chrome-devtools-mcp)                  │
 ├─────────────────────────────────────────────────────────────────────┤
-│                                                                      │
-│  Core Tools:           WebMCP Tools:          Future:               │
-│  • navigate_page       • inject_webmcp_script • upload_to_marketplace│
-│  • take_snapshot       • diff_webmcp_tools                          │
-│  • read_console        • call_webmcp_tool                           │
-│  • click_element       • webmcp_{domain}_*                          │
-│                                                                      │
-└─────────────────────────────────────────────────────────────────────┘
-                              │
-                              │ references
-                              ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                         REPO (npm-packages)                          │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                      │
-│  packages/             examples/              skills/                │
-│  • global (polyfill)   • hackernews/         • webmcp-dev/          │
-│  • webmcp-shared       • rails-admin/          ├── SKILL.md         │
-│  • react-webmcp        • vanilla-todo/         └── references/      │
-│                                                                      │
+│                                                                     │
+│  Core Tools:              WebMCP Tools:                             │
+│  • navigate_page          • inject_webmcp_script (with esbuild)    │
+│  • take_snapshot          • diff_webmcp_tools                       │
+│  • read_console           • webmcp_{domain}_page{idx}_{name}        │
+│  • click_element                                                    │
+│                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -58,16 +42,15 @@ This document outlines the implementation of a **unified Claude Code skill** for
 User: "Add MCP tools to my Rails app"  OR  "Create tools for Notion"
       → goes to sleep
 
-Agent (with webmcp-dev skill):
+Agent (with webmcp skill):
   1. Detect context (your app vs external site)
   2. Navigate to target page
   3. Take snapshot to understand structure
-  4. Write tool code (just JavaScript)
-  5. inject_webmcp_script → test → iterate
-  6. Once working:
-     - Your app? → Show code to add to layout
-     - Userscript? → Build for marketplace
-  7. Future: upload_to_marketplace (automated)
+  4. Create workspace with package.json (if dependencies needed)
+  5. Write clean TypeScript source file
+  6. inject_webmcp_script → auto-builds with esbuild → injects → test
+  7. Iterate until working
+  8. Final source is clean, readable, production-ready
 
 User wakes up: working MCP tools, ready for production or distribution
 ```
@@ -88,492 +71,176 @@ This workflow is ideal for a skill because:
 
 ---
 
-## Current Implementation Status
-
-### Already Implemented in chrome-devtools-mcp
-
-The following infrastructure is **already built** and working:
-
-#### WebMCPToolHub (Dynamic Tool Registration)
-- Automatically registers WebMCP tools from web pages as **first-class MCP tools**
-- Tools appear in `client.listTools()` alongside native chrome-devtools-mcp tools
-- **Naming convention**: `webmcp_{domain}_page{idx}_{toolName}`
-  - Example: `webmcp_notion_so_page0_search_pages`
-  - Example: `webmcp_localhost_3000_page0_getTodos`
-- Automatic cleanup when pages navigate or close
-- Subscribes to `tools/list_changed` notifications for dynamic updates
-
-#### WebMCPClientTransport
-- MCP transport connecting to WebMCP servers in browser tabs
-- Bridge script auto-injected into all pages via CDP
-- Handles server-ready handshake, navigation detection, connection lifecycle
-
-#### Available Tools
-| Tool | Description |
-|------|-------------|
-| `diff_webmcp_tools` | List WebMCP tools on current page (with diff tracking) |
-| `call_webmcp_tool` | Call a specific WebMCP tool by name |
-
-#### Auto-Detection
-- Pages with WebMCP are automatically detected after navigation
-- Bridge script injected via `Page.addScriptToEvaluateOnNewDocument`
-- Proactive detection after 500ms post-navigation
-
-### Still Needed
-
-| Component | Status | Description |
-|-----------|--------|-------------|
-| `inject_webmcp_script` tool | **NOT IMPLEMENTED** | Inject built userscript bundles for testing |
-| `userscripts/` directory | **NOT CREATED** | Workspace for userscript development |
-| `@webmcp/shared` package | **NOT CREATED** | Shared DOM helpers |
-| Skill files | **NOT CREATED** | SKILL.md and references |
-
----
-
 ## Architecture
 
-### How WebMCP Tools Become First-Class MCP Tools
+### Two-Tier Build System
+
+The key insight: **clean source files** for humans, **bundled IIFE** for injection.
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         BROWSER (via CDP)                                    │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  Page: https://notion.so                                                    │
-│  ├── Userscript runs (injected or via extension)                           │
-│  ├── Calls navigator.modelContext.registerTool()                           │
-│  └── TabServerTransport broadcasts tool via postMessage                    │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    │ WebMCPBridgeScript (auto-injected)
-                                    │ ferries messages via CDP bindings
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         chrome-devtools-mcp                                  │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  WebMCPClientTransport                                                      │
-│  ├── Connects to page's TabServerTransport                                 │
-│  └── Receives tool registrations                                           │
-│                                                                             │
-│  WebMCPToolHub                                                              │
-│  ├── Syncs tools: webmcp_{domain}_page{idx}_{toolName}                     │
-│  ├── Registers as first-class MCP tools                                    │
-│  └── Handles add/update/remove on list_changed                             │
-│                                                                             │
-│  MCP Server                                                                 │
-│  └── Exposes: take_snapshot, navigate_page, ..., webmcp_notion_so_page0_*  │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    │ MCP Protocol (stdio/SSE)
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         Claude Code / MCP Client                             │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  client.listTools() returns:                                                │
-│  - take_snapshot                                                            │
-│  - navigate_page                                                            │
-│  - diff_webmcp_tools                                                        │
-│  - call_webmcp_tool                                                         │
-│  - webmcp_notion_so_page0_search_pages    ← First-class!                   │
-│  - webmcp_notion_so_page0_toggle_sidebar  ← First-class!                   │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
+SOURCE (human-readable)              BUILD                    RUNTIME
+──────────────────────────────────────────────────────────────────────────
+
+userscripts/gmail/src/index.ts       esbuild (in-memory)      Browser
+├── import { wait }                  ─────────────────►
+│   from '@webmcp/helpers'           IIFE bundle              inject_webmcp_script
+│                                    (deps inlined)           ──────────────────►
+├── registerTool({                                            Tools registered
+│     name: 'get_emails',            ~10-50ms                 as first-class MCP
+│     handler: async () => {                                  tools
+│       await wait('.email-row');
+│       ...
+│     }
+│   })
 ```
 
-### Key Insight: First-Class Tool Exposure
+### Why Two Bundlers?
 
-After injection, WebMCP tools appear as **native MCP tools**. The agent can call them directly:
+| Bundler | Use Case | Why |
+|---------|----------|-----|
+| **esbuild** | `inject_webmcp_script` internal | `write: false` for in-memory output, no disk I/O, ~10ms builds |
+| **tsdown** | Workspace template builds | Better DX, Rollup plugin ecosystem, future-proof (Vite 8+) |
 
+**esbuild** is perfect for injection because:
+```typescript
+const result = await esbuild.build({
+  entryPoints: [filePath],
+  bundle: true,
+  format: 'iife',
+  write: false,  // ← Returns code directly, no temp files
+  platform: 'browser',
+});
+const code = result.outputFiles[0].text;
+// Inject immediately
 ```
-# Old way (still works):
-call_webmcp_tool({ name: "search_pages", arguments: { query: "meeting" } })
 
-# New way (first-class):
-webmcp_notion_so_page0_search_pages({ query: "meeting" })
-```
-
-Both approaches work. First-class tools have better discoverability since they appear in the main tool list.
+**tsdown** is perfect for workspaces because:
+- Rust-based (Rolldown), blazing fast
+- ESM-first, tree-shakable
+- Rollup/Vite plugin compatible
+- Better for library/userscript development
 
 ---
 
-## Skill Structure (Progressive Disclosure)
+## Workspace Structure
+
+Each target site gets its own mini-project with dependencies:
 
 ```
-skills/
-└── webmcp-dev/
-    ├── SKILL.md                      # Main skill - sections revealed by context
-    │
-    ├── references/
-    │   │
-    │   │  # Core (always available)
-    │   ├── QUICK_START.md            # The injection loop
-    │   ├── SELF_TESTING.md           # How to verify tools work
-    │   ├── TROUBLESHOOTING.md        # Common errors and fixes
-    │   │
-    │   │  # Userscript Development
-    │   ├── USERSCRIPT_GUIDE.md       # For sites you don't control
-    │   ├── DISTRIBUTION.md           # Building for marketplace
-    │   │
-    │   │  # Production Testing
-    │   ├── PRODUCTION_TESTING.md     # Rails/Django/Laravel workflow
-    │   ├── VANILLA_JS.md             # Framework-less path to production
-    │   │
-    │   │  # Helpers
-    │   ├── HELPERS.md                # @webmcp/shared API reference
-    │   └── PATTERNS.md               # Common patterns (forms, search, etc.)
-    │
-    └── examples/
-        ├── hackernews.js             # Userscript example
-        ├── rails-admin.js            # Production testing example
-        └── vanilla-todo.js           # Framework-less example
+userscripts/
+├── gmail/
+│   ├── package.json          ← { "dependencies": { "gmail.js": "^1.1" } }
+│   ├── tsconfig.json
+│   ├── tsdown.config.ts      ← For standalone builds (distribution)
+│   ├── node_modules/         ← pnpm install
+│   └── src/
+│       └── index.ts          ← Clean, readable source
+│
+├── notion/
+│   ├── package.json
+│   └── src/
+│       └── index.ts
+│
+└── _template/                ← Agent copies for new sites
+    ├── package.json
+    ├── tsconfig.json
+    ├── tsdown.config.ts
+    └── src/
+        └── index.ts
 ```
 
-### Progressive Disclosure Logic
+### Template package.json
 
-The skill reveals sections based on context:
-
+```json
+{
+  "name": "webmcp-userscript",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsdown src/index.ts --format iife --out-dir dist",
+    "dev": "tsdown src/index.ts --format iife --out-dir dist --watch"
+  },
+  "devDependencies": {
+    "tsdown": "^0.19.0",
+    "typescript": "^5.8.0"
+  },
+  "dependencies": {
+    "@webmcp/helpers": "workspace:*"
+  }
+}
 ```
-User request detected
-    │
-    ├── "tools for Notion/GitHub/etc"
-    │   → Show: QUICK_START + USERSCRIPT_GUIDE + DISTRIBUTION
-    │
-    ├── "MCP for my Rails/Django app"
-    │   → Show: QUICK_START + PRODUCTION_TESTING + VANILLA_JS
-    │
-    ├── "add MCP to my static site"
-    │   → Show: QUICK_START + VANILLA_JS
-    │
-    └── unclear context
-        → Show: QUICK_START (universal)
-        → Ask: "Is this your app or a site you don't control?"
-```
 
----
+### Template tsdown.config.ts
 
-## SKILL.md Design
+```typescript
+import { defineConfig } from 'tsdown';
 
-```yaml
----
-name: webmcp-dev
-version: 1.0.0
-description: |
-  WebMCP tool development for any website or web app. Use when the user wants
-  to create MCP tools - whether for their own app (Rails, Django, Laravel,
-  vanilla JS) or for sites they don't control (Notion, GitHub, etc.).
-
-  This skill enables autonomous iteration: write code → inject → test → fix →
-  repeat. No build step required. Includes self-testing via chrome-devtools-mcp.
-
-  The agent detects context and reveals relevant sections:
-  - Userscript development (sites you don't control)
-  - Production testing (your running app)
-  - Framework-less apps (vanilla JS path to production)
-allowed-tools:
-  - Read
-  - Write
-  - Edit
-  - Bash
-  - Glob
-  - Grep
-  - mcp__chrome-devtools__*
----
-
-# WebMCP Development
-
-**Core Workflow**: Create MCP tools for any website or web app.
-Inject, test, iterate - all via chrome-devtools-mcp. No build step required.
-
----
-
-## Quick Start (Always Shown)
-
-The universal development loop:
-
-1. **Navigate**: `navigate_page` to target URL
-2. **Explore**: `take_snapshot` to understand page structure
-3. **Write**: Tool code (just JavaScript)
-4. **Inject**: `inject_webmcp_script` - polyfill auto-injected if needed
-5. **Verify**: `diff_webmcp_tools` to see registered tools
-6. **Test**: Call tools directly as first-class MCP tools
-7. **Debug**: `read_console_messages` if failures
-8. **Iterate**: Fix code, reinject, retest
-
-```javascript
-// Minimal tool - no imports needed!
-navigator.modelContext.registerTool({
-  name: 'get_page_title',
-  description: 'Get the current page title',
-  inputSchema: { type: 'object', properties: {} },
-  handler: async () => ({
-    content: [{ type: 'text', text: document.title }]
-  })
+export default defineConfig({
+  entry: ['src/index.ts'],
+  format: ['iife'],
+  clean: true,
+  // No externals - bundle everything for standalone distribution
 });
 ```
 
----
-
-## Section: Userscript Development
-
-*Revealed when: user wants tools for Notion, GitHub, external sites*
-
-For sites you don't control, build userscripts that inject tools.
-
-See: [USERSCRIPT_GUIDE.md](references/USERSCRIPT_GUIDE.md)
-See: [DISTRIBUTION.md](references/DISTRIBUTION.md)
-
----
-
-## Section: Production Testing
-
-*Revealed when: user mentions Rails, Django, Laravel, their own app*
-
-Test MCP tools on your running app without rebuilding.
-Once working, copy the code to your layout template.
-
-See: [PRODUCTION_TESTING.md](references/PRODUCTION_TESTING.md)
-See: [VANILLA_JS.md](references/VANILLA_JS.md)
-
----
-
-## Self-Testing Protocol
-
-**CRITICAL**: Verify every tool works before considering done.
-
-```
-1. diff_webmcp_tools
-   → Tools appear as: webmcp_{domain}_page{idx}_{toolName}
-
-2. Call each tool directly:
-   webmcp_example_com_page0_my_tool({ arg: "value" })
-
-3. If fails:
-   read_console_messages → find error
-   take_snapshot → verify DOM state
-   Fix → reinject → retest
-
-4. Only done when ALL tools pass
-```
-
----
-
-## Tool Naming Convention
-
-After injection, tools become first-class MCP tools:
-
-| Your Tool Name | Becomes |
-|----------------|---------|
-| `search_pages` | `webmcp_notion_so_page0_search_pages` |
-| `list_orders` | `webmcp_localhost_3000_page0_list_orders` |
-
----
-
-## When to Use This Skill
-
-**Use this skill when:**
-✅ Creating MCP tools for any website
-✅ Testing tools on your running app (Rails, Django, Laravel, PHP)
-✅ Adding MCP to vanilla JS/HTML/CSS apps
-✅ Prototyping before committing to an approach
-
-**Don't use this skill when:**
-❌ Site already has WebMCP (just use existing tools)
-❌ Deep React/Vue integration needed (use webmcp-setup skill)
-❌ Just exploring without building tools
-
----
-
-## Success Criteria
-
-✅ All tools registered (verify with diff_webmcp_tools)
-✅ All tools callable as first-class MCP tools
-✅ No console errors after injection
-✅ Tools handle edge cases gracefully
-```
-
----
-
-## Repository Structure
-
-```
-npm-packages/
-├── packages/
-│   ├── chrome-devtools-mcp/          # ✅ Has WebMCP infrastructure
-│   │   ├── src/tools/webmcp.ts       # inject_webmcp_script, diff_webmcp_tools, call_webmcp_tool
-│   │   ├── src/tools/WebMCPToolHub.ts # Dynamic first-class tool registration
-│   │   ├── src/transports/           # WebMCPClientTransport, BridgeScript
-│   │   └── src/polyfill.ts           # 🔲 NEW - bundled @mcp-b/global for injection
-│   ├── global/                        # ✅ Existing polyfill
-│   ├── transports/                    # ✅ Existing
-│   ├── react-webmcp/                  # ✅ Existing React hooks
-│   └── webmcp-shared/                 # 🔲 MAYBE - only if helpers needed
-│
-├── examples/                          # 🔲 NEW - reference implementations
-│   ├── hackernews.js                  # Userscript example (external site)
-│   ├── rails-admin.js                 # Production testing example
-│   └── vanilla-todo/                  # Complete framework-less app
-│       ├── index.html
-│       └── mcp-tools.js
-│
-├── skills/
-│   ├── webmcp-setup/                  # ✅ Existing - React integration
-│   └── webmcp-dev/                    # 🔲 NEW - unified dev skill
-│       ├── SKILL.md                   # Progressive disclosure
-│       ├── references/
-│       │   ├── QUICK_START.md
-│       │   ├── SELF_TESTING.md
-│       │   ├── USERSCRIPT_GUIDE.md
-│       │   ├── PRODUCTION_TESTING.md
-│       │   ├── VANILLA_JS.md
-│       │   ├── DISTRIBUTION.md
-│       │   └── TROUBLESHOOTING.md
-│       └── examples/                  # Symlinks to /examples or copies
-│
-└── pnpm-workspace.yaml
-```
-
-### Skill Relationship
-
-```
-webmcp-setup                    webmcp-dev
-(React/Vue integration)         (Injection-based development)
-     │                               │
-     │                               ├── Userscript development
-     │                               ├── Production testing
-     │                               └── Framework-less apps
-     │                               │
-     └───────────┬───────────────────┘
-                 │
-                 ▼
-         chrome-devtools-mcp
-         (common tooling)
-```
-
----
-
-## The `inject_webmcp_script` Tool
-
-### Why It's Needed
-
-The existing infrastructure auto-detects WebMCP on pages, but for **development iteration**, the agent needs to inject and test tools dynamically. This tool serves multiple use cases:
-
-#### Use Case 1: Userscript Development
-Build MCP tools for sites you don't control (Notion, GitHub, etc.)
-
-#### Use Case 2: Production Testing (Rails, Django, Laravel, etc.)
-Test MCP tools on your production app **without rebuilding**:
-```
-# Your Rails app is running at localhost:3000
-# You want to add MCP tools - just inject them!
-
-inject_webmcp_script({
-  code: `
-    navigator.modelContext.registerTool({
-      name: 'list_users',
-      description: 'List users from the admin panel',
-      handler: async () => {
-        const rows = document.querySelectorAll('table.users tr');
-        // ... scrape the data
-      }
-    });
-  `
-})
-```
-No need to add dependencies, rebuild, or redeploy. Test the tools, iterate, then copy the working code into your app.
-
-#### Use Case 3: Framework-less Apps (Vanilla JS/HTML/CSS)
-For apps without React/Vue/etc., MCP tools are just JavaScript:
-```html
-<!-- Your production code can literally be: -->
-<script src="https://unpkg.com/@mcp-b/global"></script>
-<script>
-  navigator.modelContext.registerTool({ ... });
-</script>
-```
-The inject tool lets you prototype and test before committing to production.
-
-#### Use Case 4: Rapid Prototyping
-Test MCP tool ideas on any page before building anything:
-1. Navigate to the target page
-2. Inject tool code directly
-3. Test immediately
-4. Iterate until it works
-5. Then decide: userscript, framework integration, or vanilla JS
-
-### Smart Polyfill Injection
-
-The tool automatically handles the `@mcp-b/global` polyfill:
-
-```
-inject_webmcp_script called
-    │
-    ▼
-Check: Does page have navigator.modelContext?
-    │
-    ├── YES → Inject just the userscript code (~7KB)
-    │
-    └── NO  → Prepend polyfill (~343KB), then inject
-              (polyfill auto-initializes on load)
-```
-
-**Benefits:**
-- **Fast iteration** - After first injection, polyfill exists, only inject tools
-- **No bundling required** - Userscripts don't need to import @mcp-b/global
-- **Simple authoring** - Just write tool registration code
-- **Matches extension pattern** - Same approach as chrome.userScripts
-
-### Userscript Authoring (Simplified)
-
-With smart injection, userscripts are **tools-only**:
+### Template src/index.ts
 
 ```typescript
-// userscripts/hackernews/src/index.ts
-// NO import needed - polyfill injected automatically!
+// Clean, readable source - dependencies bundled at build time
+import { waitForElement, getText } from '@webmcp/helpers';
 
 navigator.modelContext.registerTool({
-  name: 'get_top_stories',
-  description: 'Get top stories from Hacker News',
-  inputSchema: { type: 'object', properties: {} },
-  handler: async () => {
-    const stories = Array.from(document.querySelectorAll('.athing'))
-      .slice(0, 10)
-      .map(el => ({
-        title: el.querySelector('.titleline a')?.textContent,
-        url: el.querySelector('.titleline a')?.getAttribute('href'),
-      }));
+  name: 'example_tool',
+  description: 'An example tool',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      query: { type: 'string', description: 'Search query' }
+    },
+    required: ['query']
+  },
+  handler: async ({ query }) => {
+    const element = await waitForElement('.result');
+    const text = getText(element);
     return {
-      content: [{ type: 'text', text: JSON.stringify(stories, null, 2) }]
+      content: [{ type: 'text', text: `Found: ${text}` }]
     };
   },
 });
 ```
 
-### Implementation
+---
 
-Add to `packages/chrome-devtools-mcp/src/tools/webmcp.ts`:
+## The `inject_webmcp_script` Tool (Enhanced)
+
+### Key Enhancement: Automatic Building
+
+When you pass a `.ts` or `.tsx` file, the tool **automatically builds** with esbuild:
 
 ```typescript
-import { getPolyfillCode } from '../polyfill.js';
+inject_webmcp_script({
+  file_path: 'userscripts/gmail/src/index.ts'  // Source file, not built
+})
 
-/**
- * Inject a WebMCP userscript into the page for testing.
- *
- * Smart polyfill handling:
- * - Checks if @mcp-b/global polyfill already exists on page
- * - If missing, automatically prepends polyfill before injection
- * - If present, injects only the userscript (fast iteration)
- *
- * This enables the autonomous development loop:
- * 1. Agent writes tools-only code (no polyfill import needed)
- * 2. Agent calls inject_webmcp_script with the code
- * 3. Tool auto-adds polyfill if needed
- * 4. Tools register and appear as first-class MCP tools
- * 5. Agent tests directly, iterates until working
- */
+// Tool automatically:
+// 1. Detects .ts extension
+// 2. Resolves imports from node_modules
+// 3. Bundles with esbuild (~10ms, in-memory)
+// 4. Prepends polyfill if needed
+// 5. Injects the IIFE
+// 6. Waits for tool registration
+```
+
+No explicit build step. Agent just edits source and injects.
+
+### Implementation
+
+```typescript
+import * as esbuild from 'esbuild';
+import { readFileSync, existsSync } from 'fs';
+import { dirname, join, extname } from 'path';
+import { getPolyfillCode } from '../polyfillLoader.js';
+
 export const injectWebMCPScript = defineTool({
   name: 'inject_webmcp_script',
   description:
@@ -581,21 +248,27 @@ export const injectWebMCPScript = defineTool({
     'Automatically handles @mcp-b/global polyfill injection - if the page ' +
     'does not have navigator.modelContext, the polyfill is prepended automatically. ' +
     'After injection, tools register as first-class MCP tools (webmcp_{domain}_page{idx}_{name}). ' +
-    'Userscripts should NOT import the polyfill - just call navigator.modelContext.registerTool().',
+    'Userscripts should NOT import the polyfill - just call navigator.modelContext.registerTool(). ' +
+    'Use this for rapid prototyping and testing MCP tools on any website.',
   annotations: {
     title: 'Inject WebMCP Script',
     category: ToolCategory.WEBMCP,
     readOnlyHint: false,
   },
   schema: {
-    code: zod.string().describe(
-      'The userscript code to inject. Can be raw TypeScript/JS or a built bundle. ' +
-      'Does NOT need to include @mcp-b/global - polyfill is auto-injected if needed.'
+    code: zod.string().optional().describe(
+      'The userscript code to inject. Just tool registration code - ' +
+      'polyfill is auto-injected if needed. Either code or file_path must be provided.'
     ),
-    wait_for_tools: zod.boolean().optional().describe(
+    file_path: zod.string().optional().describe(
+      'Path to a JavaScript file containing the userscript to inject. ' +
+      'If .ts/.tsx, automatically bundles with esbuild (resolves imports). ' +
+      'Either code or file_path must be provided.'
+    ),
+    wait_for_tools: zod.boolean().optional().default(true).describe(
       'Wait for tools to register before returning. Default: true'
     ),
-    timeout: zod.number().optional().describe(
+    timeout: zod.number().optional().default(5000).describe(
       'Timeout in ms to wait for tools. Default: 5000'
     ),
     page_index: zod.number().int().optional().describe(
@@ -603,7 +276,11 @@ export const injectWebMCPScript = defineTool({
     ),
   },
   handler: async (request, response, context) => {
-    const { code, wait_for_tools = true, timeout = 5000, page_index } = request.params;
+    const { code, file_path, wait_for_tools = true, timeout = 5000, page_index } = request.params;
+
+    if (!code && !file_path) {
+      throw new Error('Either code or file_path must be provided');
+    }
 
     const page = page_index !== undefined
       ? context.getPageByIdx(page_index)
@@ -612,6 +289,49 @@ export const injectWebMCPScript = defineTool({
     response.appendResponseLine(`Target: ${page.url()}`);
     response.appendResponseLine('');
 
+    let scriptCode: string;
+
+    // Handle file_path - with automatic TypeScript bundling
+    if (file_path) {
+      const ext = extname(file_path).toLowerCase();
+
+      if (ext === '.ts' || ext === '.tsx') {
+        // TypeScript file - bundle with esbuild
+        response.appendResponseLine(`Bundling ${file_path} with esbuild...`);
+
+        try {
+          const result = await esbuild.build({
+            entryPoints: [file_path],
+            bundle: true,
+            format: 'iife',
+            write: false,
+            platform: 'browser',
+            target: 'es2020',
+            // Resolve from the file's directory for node_modules
+            absWorkingDir: dirname(file_path),
+          });
+
+          scriptCode = result.outputFiles[0].text;
+          response.appendResponseLine(`✓ Bundled (${(scriptCode.length / 1024).toFixed(1)}KB)`);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          response.appendResponseLine(`✗ Build failed: ${message}`);
+          response.appendResponseLine('');
+          response.appendResponseLine('Check that dependencies are installed (pnpm install)');
+          return;
+        }
+      } else {
+        // JavaScript file - read directly
+        if (!existsSync(file_path)) {
+          throw new Error(`File not found: ${file_path}`);
+        }
+        scriptCode = readFileSync(file_path, 'utf-8');
+        response.appendResponseLine(`✓ Loaded ${file_path}`);
+      }
+    } else {
+      scriptCode = code!;
+    }
+
     try {
       // Check if polyfill already exists
       const hasPolyfill = await page.evaluate(() =>
@@ -619,14 +339,14 @@ export const injectWebMCPScript = defineTool({
         typeof navigator.modelContext !== 'undefined'
       );
 
-      let codeToInject = code;
+      let codeToInject = scriptCode;
 
       if (hasPolyfill) {
         response.appendResponseLine('✓ Polyfill already present');
       } else {
         response.appendResponseLine('Injecting @mcp-b/global polyfill...');
         const polyfillCode = getPolyfillCode();
-        codeToInject = polyfillCode + '\n;\n' + code;
+        codeToInject = polyfillCode + ';\n' + scriptCode;
         response.appendResponseLine('✓ Polyfill prepended');
       }
 
@@ -650,20 +370,29 @@ export const injectWebMCPScript = defineTool({
         return;
       }
 
-      // Wait for tools to register
+      // Wait for tools with proper polling (not magic sleep)
       response.appendResponseLine(`Waiting for tools (${timeout}ms)...`);
 
       const startTime = Date.now();
+      let lastToolCount = 0;
 
       while (Date.now() - startTime < timeout) {
-        await new Promise(r => setTimeout(r, 200));
+        await new Promise(r => setTimeout(r, 100)); // Fast polling
 
         try {
           const result = await context.getWebMCPClient(page);
           if (result.connected) {
             const { tools } = await result.client.listTools();
+
             if (tools.length > 0) {
-              // Trigger tool hub sync so tools become first-class
+              // Wait a bit more if tools are still registering
+              if (tools.length > lastToolCount) {
+                lastToolCount = tools.length;
+                await new Promise(r => setTimeout(r, 100));
+                continue;
+              }
+
+              // Sync to tool hub
               const toolHub = context.getToolHub();
               if (toolHub) {
                 await toolHub.syncToolsForPage(page, result.client);
@@ -678,11 +407,11 @@ export const injectWebMCPScript = defineTool({
 
               for (const tool of tools) {
                 const firstClassName = `webmcp_${domain}_page${pageIdx}_${tool.name}`;
-                response.appendResponseLine(`  - ${tool.name}`);
+                response.appendResponseLine(`  • ${tool.name}`);
                 response.appendResponseLine(`    → ${firstClassName}`);
                 if (tool.description) {
-                  const desc = tool.description.substring(0, 50);
-                  response.appendResponseLine(`    ${desc}${tool.description.length > 50 ? '...' : ''}`);
+                  const desc = tool.description.substring(0, 60);
+                  response.appendResponseLine(`    ${desc}${tool.description.length > 60 ? '...' : ''}`);
                 }
               }
               response.appendResponseLine('');
@@ -691,23 +420,26 @@ export const injectWebMCPScript = defineTool({
             }
           }
         } catch {
-          // Continue waiting
+          // Continue polling
         }
       }
 
-      // Timeout
+      // Timeout - provide debugging help
       response.appendResponseLine('');
       response.appendResponseLine(`⚠ No tools registered within ${timeout}ms.`);
       response.appendResponseLine('');
       response.appendResponseLine('Debug steps:');
-      response.appendResponseLine('  1. read_console_messages - check for JS errors');
+      response.appendResponseLine('  1. list_console_messages - check for JS errors');
       response.appendResponseLine('  2. take_snapshot - verify page state');
       response.appendResponseLine('  3. Ensure script calls navigator.modelContext.registerTool()');
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
 
       // Detect CSP blocking
-      if (message.includes('Content Security Policy') || message.includes('script-src')) {
+      if (message.includes('Content Security Policy') ||
+          message.includes('script-src') ||
+          message.includes('Refused to execute inline script')) {
+        response.appendResponseLine('');
         response.appendResponseLine('⚠ Site has Content Security Policy blocking inline scripts.');
         response.appendResponseLine('');
         response.appendResponseLine('This site cannot be automated via script injection.');
@@ -717,681 +449,845 @@ export const injectWebMCPScript = defineTool({
 
       response.appendResponseLine(`Error: ${message}`);
       response.appendResponseLine('');
-      response.appendResponseLine('Debug: read_console_messages to see errors');
+      response.appendResponseLine('Debug: list_console_messages to see errors');
     }
   },
 });
+```
 
-// Helper function (already exists in WebMCPToolHub.ts)
-function extractDomain(url: string): string {
-  try {
-    const parsed = new URL(url);
-    let domain = parsed.hostname;
-    if (parsed.port && parsed.hostname === 'localhost') {
-      domain = `${domain}_${parsed.port}`;
-    }
-    return domain.replace(/[^a-zA-Z0-9]/g, '_');
-  } catch {
-    return 'unknown';
-  }
+---
+
+## Script Injection Wisdom (Lessons Learned)
+
+Based on research into CDP, Tampermonkey, Puppeteer, and browser extension patterns:
+
+### 1. Timing is Everything
+
+| Method | When it runs | Use case |
+|--------|--------------|----------|
+| `evaluateOnNewDocument` | Before ANY page JS | Override globals, intercept APIs |
+| `evaluate` / inline script | After page load | Most tool registration ✓ |
+| `@run-at document-start` | Before DOM exists | Monkey-patching built-ins |
+| `@run-at document-end` | After HTML parsed | Most userscripts (default) ✓ |
+
+**For WebMCP tools**, `document-end` timing is fine since we're adding capabilities, not intercepting.
+
+### 2. Avoid Magic Sleep Numbers
+
+**Bad** (what we had):
+```typescript
+await new Promise(r => setTimeout(r, 500)); // ← Magic number
+```
+
+**Good** (proper polling):
+```typescript
+while (Date.now() - startTime < timeout) {
+  await new Promise(r => setTimeout(r, 100)); // Fast poll
+  const { tools } = await client.listTools();
+  if (tools.length > 0) break;
 }
 ```
 
-### Polyfill Source
+From [Puppeteer antipatterns](https://serpapi.com/blog/puppeteer-antipatterns/):
+> "Sleeping causes a race condition... A duration that's long enough today might be too short tomorrow."
 
-The polyfill code needs to be available at runtime. Options:
-
-1. **Bundle at build time** - Include minified @mcp-b/global in chrome-devtools-mcp
-2. **Read from node_modules** - Load from `@mcp-b/global/dist/global.js` at runtime
-
-Recommended: Bundle at build time for reliability. Add to `tsup.config.ts`:
+### 3. Use MutationObserver for Element Waiting
 
 ```typescript
-// packages/chrome-devtools-mcp/src/polyfill.ts
-import polyfillCode from '@mcp-b/global/dist/global.js?raw';
+// Include in @webmcp/helpers
+function waitForElement(selector: string, timeout = 5000): Promise<Element> {
+  return new Promise((resolve, reject) => {
+    // Check if already exists
+    const existing = document.querySelector(selector);
+    if (existing) return resolve(existing);
 
-export function getPolyfillCode(): string {
-  return polyfillCode;
+    const observer = new MutationObserver(() => {
+      const el = document.querySelector(selector);
+      if (el) {
+        observer.disconnect();
+        resolve(el);
+      }
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    setTimeout(() => {
+      observer.disconnect();
+      reject(new Error(`Timeout waiting for ${selector}`));
+    }, timeout);
+  });
+}
+```
+
+MutationObserver is **more responsive** than polling - fires on microtask queue.
+
+### 4. MAIN_WORLD is Required
+
+From [Chrome content scripts docs](https://developer.chrome.com/docs/extensions/develop/concepts/content-scripts):
+> "Content scripts live in an isolated world... JavaScript variables are not visible to the host page."
+
+**We NEED MAIN_WORLD** because:
+- Tools must access `navigator.modelContext` (set by polyfill)
+- Tools must interact with page's DOM and possibly page's JS
+
+Inline `<script>` tags always run in MAIN_WORLD ✓
+
+### 5. CSP Will Block Some Sites
+
+Sites with strict Content Security Policy (no `unsafe-inline`) will block:
+- **Banking/finance** apps
+- **Enterprise** apps (Salesforce, Workday, etc.)
+- **Security-conscious** sites
+
+**Our approach**: Detect early and fail gracefully with clear message:
+```typescript
+if (message.includes('Content Security Policy')) {
+  response.appendResponseLine('⚠ Site has CSP blocking inline scripts.');
+  response.appendResponseLine('Consider: browser extension approach.');
+}
+```
+
+No workaround via CDP alone - this is a browser security feature.
+
+### 6. Navigation Destroys Everything
+
+When page navigates:
+- Injected scripts are lost
+- `navigator.modelContext` is gone
+- All registered tools disappear
+
+**We handle this** in `WebMCPClientTransport`:
+```typescript
+this._page.on('framenavigated', () => {
+  this.onclose?.(); // Triggers tool cleanup in WebMCPToolHub
+});
+```
+
+Agent must reinject after navigation.
+
+### 7. Consider Polyfill Versioning
+
+Future enhancement - check polyfill version before injection:
+```typescript
+if (!navigator.modelContext?.version ||
+    navigator.modelContext.version < REQUIRED_VERSION) {
+  // Inject/upgrade polyfill
+}
+```
+
+### 8. Retry Logic for Transient Failures
+
+```typescript
+async function retryUntil<T>(
+  fn: () => Promise<T>,
+  predicate: (result: T) => boolean,
+  options: { maxAttempts?: number; delay?: number } = {}
+): Promise<T> {
+  const { maxAttempts = 3, delay = 100 } = options;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const result = await fn();
+    if (predicate(result)) return result;
+    await new Promise(r => setTimeout(r, delay));
+  }
+
+  throw new Error(`Failed after ${maxAttempts} attempts`);
 }
 ```
 
 ---
 
-## @webmcp/shared Package
+## @webmcp/helpers Package
 
-### API Reference
+A lightweight, tree-shakable helpers library bundled into userscripts:
+
+### API
 
 ```typescript
-// packages/webmcp-shared/src/dom.ts
-
 // DOM Interaction
-export function clickElement(selector: string, options?: { timeout?: number }): Promise<void>;
-export function typeText(selector: string, text: string, options?: { timeout?: number; clear?: boolean }): Promise<void>;
+export function waitForElement(selector: string, timeout?: number): Promise<Element>;
+export function waitForElementRemoved(selector: string, timeout?: number): Promise<void>;
+export function clickElement(selector: string): Promise<void>;
+export function typeText(selector: string, text: string, options?: { clear?: boolean }): Promise<void>;
 export function selectOption(selector: string, value: string): Promise<void>;
-export function pressKey(key: string): void;
-
-// Waiting
-export function waitForSelector(selector: string, options?: { timeout?: number; hidden?: boolean }): Promise<Element | null>;
-export function waitForElement(predicate: () => Element | null, options?: { timeout?: number }): Promise<Element>;
 
 // Utilities
-export function isElementVisible(selector: string): boolean;
-export function getElementText(selector: string): string | null;
+export function getText(el: Element | string): string | null;
 export function getAllElements(selector: string): Element[];
-export function scrollToElement(selector: string): Promise<void>;
+export function isVisible(selector: string): boolean;
+export function scrollIntoView(selector: string): Promise<void>;
 
-// Server helpers
-export function formatSuccess(message: string, data?: unknown): ToolResponse;
-export function formatError(message: string): ToolResponse;
+// Response Helpers
+export function textResponse(text: string): ToolResponse;
+export function jsonResponse(data: unknown): ToolResponse;
+export function errorResponse(message: string): ToolResponse;
+
+// Retry Logic
+export function retryUntil<T>(fn: () => Promise<T>, predicate: (r: T) => boolean, options?: RetryOptions): Promise<T>;
 ```
 
-### Implementation
+### Implementation Highlights
 
 ```typescript
-// packages/webmcp-shared/src/dom.ts
+// waitForElement with MutationObserver (not polling)
+export function waitForElement(selector: string, timeout = 5000): Promise<Element> {
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector(selector);
+    if (existing) return resolve(existing);
 
-/**
- * Click an element by selector.
- */
-export async function clickElement(
-  selector: string,
-  options: { timeout?: number } = {}
-): Promise<void> {
-  const { timeout = 5000 } = options;
-  const element = await waitForSelector(selector, { timeout });
+    const observer = new MutationObserver(() => {
+      const el = document.querySelector(selector);
+      if (el) {
+        observer.disconnect();
+        resolve(el);
+      }
+    });
 
-  if (!(element instanceof HTMLElement)) {
-    throw new Error(`Element not clickable: ${selector}`);
-  }
-
-  element.click();
+    observer.observe(document.body, { childList: true, subtree: true });
+    setTimeout(() => {
+      observer.disconnect();
+      reject(new Error(`Timeout waiting for ${selector}`));
+    }, timeout);
+  });
 }
 
-/**
- * Type text into an input element.
- * Triggers proper React/Vue events for state updates.
- */
+// typeText that triggers React/Vue events properly
 export async function typeText(
   selector: string,
   text: string,
-  options: { timeout?: number; clear?: boolean } = {}
+  options: { clear?: boolean } = {}
 ): Promise<void> {
-  const { timeout = 5000, clear = true } = options;
-  const element = await waitForSelector(selector, { timeout });
-
-  if (!(element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement)) {
+  const el = await waitForElement(selector);
+  if (!(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) {
     throw new Error(`Element not typeable: ${selector}`);
   }
 
-  if (clear) {
-    element.value = '';
+  if (options.clear !== false) {
+    el.value = '';
   }
 
-  element.value = text;
+  el.value = text;
 
-  // Trigger events for React/Vue
-  element.dispatchEvent(new Event('input', { bubbles: true }));
-  element.dispatchEvent(new Event('change', { bubbles: true }));
+  // Trigger events for React/Vue state updates
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  el.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
-/**
- * Wait for an element to appear (or disappear) in the DOM.
- */
-export async function waitForSelector(
-  selector: string,
-  options: { timeout?: number; hidden?: boolean } = {}
-): Promise<Element | null> {
-  const { timeout = 5000, hidden = false } = options;
-  const startTime = Date.now();
-
-  while (Date.now() - startTime < timeout) {
-    const element = document.querySelector(selector);
-
-    if (hidden) {
-      if (!element) return null;
-    } else {
-      if (element) return element;
-    }
-
-    await new Promise(r => setTimeout(r, 100));
-  }
-
-  if (hidden) {
-    throw new Error(`Timeout waiting for selector to disappear: ${selector}`);
-  }
-  throw new Error(`Timeout waiting for selector: ${selector}`);
+// Response helpers
+export function textResponse(text: string): ToolResponse {
+  return { content: [{ type: 'text', text }] };
 }
 
-/**
- * Get text content from an element.
- */
-export function getElementText(selector: string): string | null {
-  const element = document.querySelector(selector);
-  return element?.textContent?.trim() ?? null;
+export function jsonResponse(data: unknown): ToolResponse {
+  return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
 }
 
-/**
- * Get all elements matching a selector.
- */
-export function getAllElements(selector: string): Element[] {
-  return Array.from(document.querySelectorAll(selector));
-}
-
-/**
- * Check if an element is visible.
- */
-export function isElementVisible(selector: string): boolean {
-  const element = document.querySelector(selector);
-  if (!element) return false;
-
-  const style = window.getComputedStyle(element);
-  return style.display !== 'none' && style.visibility !== 'hidden';
-}
-
-/**
- * Scroll an element into view.
- */
-export async function scrollToElement(selector: string): Promise<void> {
-  const element = await waitForSelector(selector);
-  element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-}
-
-/**
- * Select an option from a dropdown.
- */
-export async function selectOption(
-  selector: string,
-  value: string
-): Promise<void> {
-  const element = await waitForSelector(selector);
-
-  if (element instanceof HTMLSelectElement) {
-    element.value = value;
-    element.dispatchEvent(new Event('change', { bubbles: true }));
-  } else {
-    throw new Error(`Element is not a select: ${selector}`);
-  }
-}
-
-/**
- * Press a keyboard key.
- */
-export function pressKey(key: string): void {
-  document.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
-  document.dispatchEvent(new KeyboardEvent('keyup', { key, bubbles: true }));
-}
-```
-
-```typescript
-// packages/webmcp-shared/src/server.ts
-
-import type { ToolResponse } from './types.js';
-
-/**
- * Format a successful tool response.
- */
-export function formatSuccess(message: string, data?: unknown): ToolResponse {
-  return {
-    content: [{
-      type: 'text',
-      text: data ? `${message}\n${JSON.stringify(data, null, 2)}` : message,
-    }],
-  };
-}
-
-/**
- * Format an error tool response.
- */
-export function formatError(message: string): ToolResponse {
-  return {
-    content: [{ type: 'text', text: message }],
-    isError: true,
-  };
+export function errorResponse(message: string): ToolResponse {
+  return { content: [{ type: 'text', text: message }], isError: true };
 }
 ```
 
 ---
 
-## Template Structure
+## Agent Workflow
 
-With smart polyfill injection, userscripts are **lightweight tools-only code**:
+### Quick Iteration (No Dependencies)
 
 ```
-userscripts/
-├── _template/
-│   ├── src/
-│   │   └── index.ts      # Tools-only code, no polyfill import
-│   └── package.json
-└── hackernews/
-    ├── src/
-    │   └── index.ts
-    └── package.json
+1. navigate_page({ url: "https://example.com" })
+2. take_snapshot  // Understand page structure
+3. inject_webmcp_script({ code: `
+     navigator.modelContext.registerTool({
+       name: 'get_data',
+       handler: async () => { ... }
+     });
+   ` })
+4. Test: webmcp_example_com_page0_get_data()
+5. If fails: list_console_messages → fix → reinject
+6. Repeat until working
 ```
 
-### Template index.ts
+### With Dependencies (Workspace)
 
-```typescript
-// userscripts/_template/src/index.ts
-// NO import needed - polyfill auto-injected by inject_webmcp_script!
+```
+1. Create workspace:
+   mkdir -p userscripts/gmail/src
+   Write package.json, tsconfig.json
+   pnpm install
 
-navigator.modelContext.registerTool({
-  name: 'example_tool',
-  description: 'An example tool',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      query: { type: 'string', description: 'Search query' }
-    },
-    required: ['query']
-  },
-  handler: async ({ query }) => {
-    // Your tool implementation here
-    return {
-      content: [{ type: 'text', text: `You searched for: ${query}` }]
-    };
-  },
-});
+2. Write clean source:
+   userscripts/gmail/src/index.ts
+   - Import helpers, external deps
+   - Register tools
+   - Readable, maintainable code
+
+3. navigate_page({ url: "https://mail.google.com" })
+
+4. inject_webmcp_script({
+     file_path: "userscripts/gmail/src/index.ts"
+   })
+   // esbuild bundles automatically, resolves imports
+   // Polyfill prepended if needed
+   // IIFE injected
+
+5. Test: webmcp_mail_google_com_page0_get_emails()
+
+6. Edit src/index.ts → reinject → test
+   // No manual build step!
+
+7. Final source is clean, readable, ready for:
+   - Production deployment
+   - Distribution as userscript
+   - Version control
 ```
 
-### Template package.json
+### Production Testing (Rails/Django/Laravel)
 
-```json
-{
-  "name": "example-mcp",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "build": "esbuild src/index.ts --bundle --outfile=dist/example.js --format=iife"
-  },
-  "devDependencies": {
-    "esbuild": "^0.20.0"
-  }
-}
 ```
+1. App running at localhost:3000
+2. navigate_page({ url: "http://localhost:3000/admin" })
+3. take_snapshot
+4. inject_webmcp_script({ code: `
+     navigator.modelContext.registerTool({
+       name: 'list_orders',
+       handler: async () => {
+         const rows = document.querySelectorAll('.order-row');
+         // ... scrape data
+       }
+     });
+   ` })
+5. Test until working
+6. Copy working code to production layout:
 
-### Development Workflow
-
-Since `inject_webmcp_script` handles the polyfill, development is simple:
-
-```bash
-# 1. Write your tools in src/index.ts
-
-# 2. Build (optional - can inject raw TS if simple enough)
-pnpm build --filter=hackernews-mcp
-
-# 3. Agent reads and injects
-# inject_webmcp_script({ code: "<contents of dist/hackernews.js>" })
-# OR for quick iteration, inject raw code directly
-```
-
-### For Distribution (Extension Marketplace)
-
-When publishing to the extension marketplace, **do** bundle the polyfill:
-
-```typescript
-// For distribution only - vite.config.ts
-import { defineConfig } from 'vite';
-import monkey from 'vite-plugin-monkey';
-
-export default defineConfig({
-  plugins: [
-    monkey({
-      entry: 'src/index.ts',
-      userscript: {
-        name: 'HackerNews MCP Tools',
-        namespace: 'webmcp',
-        match: ['https://news.ycombinator.com/*'],
-        grant: 'none',
-      },
-      build: {
-        externalGlobals: {}, // Bundle polyfill for standalone distribution
-      },
-    }),
-  ],
-});
+   <!-- app/views/layouts/application.html.erb -->
+   <script src="https://unpkg.com/@mcp-b/global"></script>
+   <script>
+     // Paste tested code here
+     navigator.modelContext.registerTool({ ... });
+   </script>
 ```
 
 ---
 
-## Production Testing → Production Code Workflow
-
-For Rails, Django, Laravel, PHP, or vanilla JS apps, the workflow is:
-
-### 1. Prototype with Injection
+## Skill Structure
 
 ```
-# Navigate to your running app
-navigate_page({ url: "http://localhost:3000/admin" })
-
-# Inject and test tools
-inject_webmcp_script({
-  code: `
-    navigator.modelContext.registerTool({
-      name: 'list_orders',
-      description: 'List recent orders from the admin panel',
-      inputSchema: { type: 'object', properties: {} },
-      handler: async () => {
-        const orders = Array.from(document.querySelectorAll('.order-row'))
-          .map(row => ({
-            id: row.dataset.orderId,
-            customer: row.querySelector('.customer-name')?.textContent,
-            total: row.querySelector('.order-total')?.textContent,
-          }));
-        return {
-          content: [{ type: 'text', text: JSON.stringify(orders, null, 2) }]
-        };
-      }
-    });
-  `
-})
-
-# Test it
-webmcp_localhost_3000_page0_list_orders()
-# → Iterate until it works perfectly
+skills/
+└── webmcp/
+    ├── SKILL.md                      # Main skill (<500 lines)
+    │
+    └── references/
+        ├── REACT_INTEGRATION.md      # React hooks, useWebMCP
+        ├── USERSCRIPT_GUIDE.md       # Sites you don't control
+        ├── PRODUCTION_TESTING.md     # Rails/Django/Laravel
+        ├── VANILLA_JS.md             # Framework-less apps
+        ├── TOOL_DESIGN.md            # Patterns, categories
+        ├── SELF_TESTING.md           # Verification protocol
+        ├── HELPERS_API.md            # @webmcp/helpers reference
+        └── TROUBLESHOOTING.md        # Common errors
 ```
 
-### 2. Copy to Production
+### Progressive Disclosure
 
-Once the tool works, add it to your app:
+The skill reveals sections based on context:
 
-**Rails (app/views/layouts/application.html.erb):**
-```erb
-<%= javascript_include_tag "https://unpkg.com/@mcp-b/global" %>
-<script>
-  // Paste your tested tool code here
-  navigator.modelContext.registerTool({
-    name: 'list_orders',
-    // ... exact same code that worked during testing
-  });
-</script>
 ```
-
-**Django (templates/base.html):**
-```html
-<script src="https://unpkg.com/@mcp-b/global"></script>
-<script>
-  navigator.modelContext.registerTool({ ... });
-</script>
+User request detected
+    │
+    ├── "tools for Notion/GitHub/etc"
+    │   → Show: Quick Start + USERSCRIPT_GUIDE
+    │
+    ├── "MCP for my Rails/Django app"
+    │   → Show: Quick Start + PRODUCTION_TESTING
+    │
+    ├── "React app with MCP"
+    │   → Show: Quick Start + REACT_INTEGRATION
+    │
+    └── "vanilla JS/HTML app"
+        → Show: Quick Start + VANILLA_JS
 ```
-
-**Laravel (resources/views/layouts/app.blade.php):**
-```php
-<script src="https://unpkg.com/@mcp-b/global"></script>
-<script>
-  navigator.modelContext.registerTool({ ... });
-</script>
-```
-
-**Vanilla HTML:**
-```html
-<script src="https://unpkg.com/@mcp-b/global"></script>
-<script src="/js/mcp-tools.js"></script>
-```
-
-### 3. Benefits
-
-- **No build step** - Tools are just JavaScript
-- **Test in production** - Inject on staging/prod without deploying
-- **Copy-paste ready** - Code that works in inject works in production
-- **Framework agnostic** - Same pattern for Rails, Django, Laravel, PHP, static HTML
 
 ---
 
-## Self-Testing Protocol
-
-You MUST verify every tool works before considering the script complete.
-
-### The Verification Loop
-
-After building and injecting your script:
-
-#### Step 1: Verify Tools Registered
+## Repository Structure
 
 ```
-diff_webmcp_tools
+npm-packages/
+├── packages/
+│   ├── chrome-devtools-mcp/
+│   │   ├── src/tools/webmcp.ts       # inject_webmcp_script (with esbuild)
+│   │   ├── src/tools/WebMCPToolHub.ts
+│   │   ├── src/polyfillLoader.ts     # Loads @mcp-b/global IIFE
+│   │   └── src/transports/
+│   │
+│   ├── global/                       # @mcp-b/global polyfill
+│   │   └── dist/index.iife.js
+│   │
+│   ├── webmcp-helpers/               # NEW - @webmcp/helpers
+│   │   ├── package.json
+│   │   └── src/
+│   │       ├── dom.ts                # waitForElement, typeText, etc.
+│   │       ├── response.ts           # textResponse, errorResponse
+│   │       └── index.ts
+│   │
+│   └── react-webmcp/                 # React hooks
+│
+├── userscripts/                      # NEW - workspace for userscripts
+│   ├── _template/                    # Starting point
+│   │   ├── package.json
+│   │   ├── tsconfig.json
+│   │   ├── tsdown.config.ts
+│   │   └── src/index.ts
+│   │
+│   └── [site-name]/                  # Agent creates as needed
+│       ├── package.json
+│       └── src/index.ts
+│
+├── examples/                         # Reference implementations
+│   ├── hackernews.js
+│   ├── github.js
+│   └── ...
+│
+└── skills/
+    └── webmcp/
+        ├── SKILL.md
+        └── references/
 ```
 
-Expected: Your tools appear in the list with their first-class names.
+---
 
-If tools don't appear:
-- Check `read_console_messages` for errors
-- Verify script imports `@mcp-b/global`
-- Verify script calls `navigator.modelContext.registerTool()`
+## The Complete Development & Distribution Flow
 
-#### Step 2: Test Each Tool
-
-Tools are now first-class MCP tools! Call them directly:
+When a user says "I want to automate Gmail", the agent:
 
 ```
-# If your tool is "search_pages" on notion.so:
-webmcp_notion_so_page0_search_pages({ query: "meeting notes" })
+┌─────────────────────────────────────────────────────────────────────┐
+│ 1. SETUP WORKSPACE                                                  │
+│    └── Clone site-package template to user's project                │
+│        └── gmail-mcp/                                               │
+│            ├── skills/gmail/SKILL.md    (mostly empty template)     │
+│            └── userscript/src/index.ts  (empty template)            │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ 2. DEVELOP TOOLS                                                    │
+│    ├── Navigate to Gmail, take snapshots                            │
+│    ├── Write tools in userscript/src/index.ts:                      │
+│    │   ├── get_emails                                               │
+│    │   ├── search_inbox                                             │
+│    │   ├── send_email                                               │
+│    │   └── archive_email                                            │
+│    ├── inject_webmcp_script → esbuild bundles → test                │
+│    └── Iterate until all tools work ✓                               │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ 3. UPDATE SKILL (the intelligence!)                                 │
+│    └── Agent writes skills/gmail/SKILL.md documenting:              │
+│        ├── What tools exist and what they do                        │
+│        ├── How to COMBINE tools for common tasks:                   │
+│        │   ├── "To find and archive old emails:"                    │
+│        │   │   1. search_inbox({ query: "older_than:1y" })          │
+│        │   │   2. For each: archive_email({ id })                   │
+│        │   │                                                        │
+│        │   ├── "To send a reply:"                                   │
+│        │   │   1. get_emails({ thread_id })                         │
+│        │   │   2. send_email({ reply_to, body })                    │
+│        │   │                                                        │
+│        │   └── "To organize inbox:" ...                             │
+│        │                                                            │
+│        ├── Gmail-specific quirks and tips                           │
+│        └── Real examples and scenarios                              │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ 4. DISTRIBUTE                                                       │
+│    ├── Userscript → Upload to WebMCP Marketplace                    │
+│    │   └── Syncs to Chrome extension, injects tools on Gmail        │
+│    │                                                                │
+│    └── Skill → Upload to Anthropic Skills Registry                  │
+│        └── Others install: /install gmail-mcp                       │
+│        └── They get the INTELLIGENCE without rediscovering!         │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ 5. OTHERS USE IT                                                    │
+│                                                                     │
+│    User: "Clean up my Gmail inbox"                                  │
+│                                                                     │
+│    Agent (finds gmail-mcp skill):                                   │
+│      1. Reads SKILL.md → knows exactly how to combine tools         │
+│      2. Follows documented "Inbox Zero" workflow                    │
+│      3. Doesn't rediscover patterns - just executes!                │
+│                                                                     │
+│    The skill CAPTURES the intelligence the first agent developed.   │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-Or use the legacy approach:
+### Why This Is Powerful
+
+1. **First agent learns** → Documents in SKILL.md
+2. **Future agents benefit** → Read the skill, skip the learning
+3. **Community grows** → Each new site package adds to ecosystem
+4. **Tools + Intelligence** → Not just plumbing, but how to use it
+
+---
+
+## Site Package Structure (Self-Contained)
+
+**Key insight**: The skill is **completely self-contained**. Tools are bundled INSIDE the skill package. When distributed via Anthropic Skills Registry, users get EVERYTHING - both the intelligence AND the tools.
+
 ```
-call_webmcp_tool({ name: "search_pages", arguments: { query: "meeting notes" } })
+gmail-mcp/
+├── SKILL.md                     # THE INTELLIGENCE
+│   ├── name: gmail-mcp
+│   ├── description: "Gmail automation..."
+│   ├── ## Setup ← CRITICAL: tells agent where to find tools
+│   ├── ## Available Tools
+│   ├── ## Workflows (how to combine)
+│   ├── ## Gmail-Specific Tips
+│   └── ## Examples
+│
+├── tools/                       # THE PLUMBING (bundled with skill!)
+│   ├── package.json             # Dependencies (gmail.js, etc.)
+│   ├── tsconfig.json
+│   └── src/
+│       └── gmail.ts             # Clean, readable source
+│
+├── reference/                   # Progressive disclosure
+│   ├── api.md                   # Detailed tool documentation
+│   └── workflows.md             # Complex multi-step patterns
+│
+└── scripts/
+    └── setup.sh                 # Optional automation
 ```
 
-Verify:
-1. **Return value** - Does it return expected data?
-2. **UI effect** - Did the page update correctly?
-3. **No errors** - Is isError: false?
+### How the Agent Finds and Injects Tools
 
-Use `take_snapshot` after tool calls to verify UI changes.
+The SKILL.md contains a **Setup section** that tells the agent exactly where to find the tools:
 
-#### Step 3: Debug Failures
+```markdown
+## Setup
 
-If a tool fails:
+Before using these tools, ensure they're injected:
 
-1. **Read console**:
-   ```
-   read_console_messages
-   ```
-   Look for: TypeError, ReferenceError, SyntaxError
+1. Navigate to Gmail: `navigate_page({ url: "https://mail.google.com" })`
+2. Inject tools: `inject_webmcp_script({ file_path: "./tools/src/gmail.ts" })`
+3. Verify: `diff_webmcp_tools` should show gmail tools
 
-2. **Check page state**:
-   ```
-   take_snapshot
-   ```
-   Verify: Is the element you're targeting actually there?
+The tools source is bundled at `tools/src/gmail.ts`.
+```
 
-3. **Common fixes**:
-   - Selector wrong → Update selector based on snapshot
-   - Element not found → Add waitForSelector
-   - React not updating → Use dispatchEvent for input/change
+### The Injection Flow
 
-#### Step 4: Fix and Retest
+```
+User installs gmail-mcp from Anthropic Skills Registry
+                    │
+                    ▼
+User: "Clean up my Gmail"
+                    │
+                    ▼
+Agent finds gmail-mcp skill, reads SKILL.md
+                    │
+                    ▼
+Agent checks: Are Gmail tools available? (diff_webmcp_tools)
+                    │
+        ┌───────────┴───────────┐
+        │                       │
+       YES                     NO
+        │                       │
+        ▼                       ▼
+   Use workflows          Agent reads Setup section
+   from SKILL.md          Agent runs: inject_webmcp_script({
+        │                   file_path: "./tools/src/gmail.ts"
+        │                 })
+        │                 esbuild bundles automatically
+        │                       │
+        │                       ▼
+        │                 Tools now available!
+        │                       │
+        └───────────┬───────────┘
+                    │
+                    ▼
+           Agent executes workflows from SKILL.md
+```
 
-1. Edit the source code
-2. Rebuild: `pnpm build --filter=[name]-mcp`
-3. Read the new bundle
-4. Reinject: `inject_webmcp_script`
-5. Retest the failing tool
+### Why Self-Contained?
 
-### Checklist Before Commit
+| Aspect | Benefit |
+|--------|---------|
+| **Single distribution** | Just Anthropic Skills Registry - one place |
+| **Everything included** | Tools + Intelligence in one package |
+| **Agent knows where to find tools** | Documented path in Setup section |
+| **Clean source travels** | Human-readable .ts, not bundled blob |
+| **esbuild at inject time** | Handles bundling automatically |
+| **Dependencies work** | tools/package.json has deps, esbuild resolves |
 
-- [ ] All tools appear in diff_webmcp_tools
-- [ ] All tools callable as first-class MCP tools
-- [ ] All tools return expected results
-- [ ] No console errors after injection
-- [ ] Edge cases handled (empty input, etc.)
-- [ ] UI updates verified with take_snapshot
+### Marketplace Is Optional
+
+- **With Claude Code**: Skill brings everything, agent injects tools
+- **Without Claude Code**: Marketplace + Chrome extension for auto-injection
+
+The Anthropic Skills Registry is the primary distribution. The marketplace is for non-Claude-Code users who want browser-native injection.
+
+### SKILL.md Template (Agent Fills In)
+
+```markdown
+---
+name: {{site}}-mcp
+description: |
+  {{Site}} automation tools. Use when user wants to [actions].
+  Triggers: {{site}}, [related keywords]
+---
+
+# {{Site}} MCP
+
+## Setup
+
+Before using these tools, ensure they're injected:
+
+1. Navigate to {{Site}}: `navigate_page({ url: "{{site_url}}" })`
+2. Inject tools: `inject_webmcp_script({ file_path: "./tools/src/{{site}}.ts" })`
+3. Verify: `diff_webmcp_tools` should show {{site}} tools
+
+The tools source is bundled at `tools/src/{{site}}.ts`.
+
+## Available Tools
+
+| Tool | Description |
+|------|-------------|
+| `tool_name` | What it does |
+
+## Workflows
+
+### [Common Task 1]
+1. First tool call
+2. Second tool call
+3. Expected result
+
+### [Common Task 2]
+...
+
+## {{Site}}-Specific Tips
+
+- Quirk 1
+- Quirk 2
+
+## Examples
+
+See [reference/examples.md](reference/examples.md)
+```
 
 ---
 
 ## Implementation Phases
 
-### Phase 0: Add inject_webmcp_script Tool
+### Phase 1: Enhance inject_webmcp_script ← CURRENT
 
-**Goal**: Complete the development loop.
+**Goal**: Automatic TypeScript bundling with esbuild
 
-**Status**: WebMCP infrastructure exists, just need the inject tool.
+1. Add esbuild as dependency to chrome-devtools-mcp
+2. Enhance inject_webmcp_script to detect .ts/.tsx
+3. Bundle with esbuild when TypeScript detected
+4. Resolve imports from node_modules automatically
 
-1. **Add `inject_webmcp_script` tool** to chrome-devtools-mcp
-   - Smart polyfill injection (prepend if not present)
-   - Integrate with existing WebMCPToolHub
-   - Build and test
+**Success criteria**:
+- [ ] `.ts` files auto-bundled before injection
+- [ ] Imports from node_modules resolved
+- [ ] No manual build step required
+- [ ] Fast (~10-50ms for small files)
 
-2. **Add `getPolyfillCode()` helper**
-   - Bundle @mcp-b/global at build time
-   - Expose for injection
+### Phase 2: Create @webmcp/helpers Package
 
-3. **Success criteria**:
-   - [ ] `inject_webmcp_script` tool works
-   - [ ] Polyfill auto-injected when needed
-   - [ ] Tools appear as first-class after injection
-   - [ ] Agent can iterate (fix → reinject → test)
+**Goal**: Lightweight helpers library
 
-### Phase 1: Create examples/ Directory
+1. Create `packages/webmcp-helpers/`
+2. Implement DOM helpers (waitForElement, typeText, etc.)
+3. Implement response helpers
+4. Configure for tree-shaking (ESM exports)
+5. Add to workspace dependencies
 
-**Goal**: Reference implementations for each use case.
+**Success criteria**:
+- [ ] Helpers work when bundled into userscripts
+- [ ] Tree-shakable (unused helpers removed)
+- [ ] Well-documented API
 
-1. **Create `examples/hackernews.js`**
-   - Userscript example (external site)
-   - Validate injection loop
+### Phase 3: Create Site Package Template
 
-2. **Create `examples/rails-admin.js`**
-   - Production testing example
-   - Show the test → copy to production flow
+**Goal**: Complete self-contained template for tools + skill
 
-3. **Create `examples/vanilla-todo.js`**
-   - Framework-less example
-   - Complete working app with MCP
-
-4. **Success criteria**:
-   - [ ] All examples work via injection
-   - [ ] Each demonstrates its use case clearly
-
-### Phase 2: Create @webmcp/shared Package (Optional)
-
-**Goal**: Extract reusable DOM helpers if patterns emerge.
-
-1. **Create `packages/webmcp-shared/`** only if needed
-   - DOM helpers (clickElement, waitForSelector, etc.)
-   - Response formatters
-
-2. **Note**: May not be needed initially
-   - Start with inline helpers in examples
-   - Extract if repetition emerges
-
-3. **Success criteria**:
-   - [ ] Helpers are genuinely reusable
-   - [ ] Not over-engineered
-
-### Phase 3: Create Unified Skill
-
-**Goal**: Package everything into a single progressive-disclosure skill.
-
-1. **Create `skills/webmcp-dev/`**
-   - SKILL.md with context-aware sections
-   - references/ for each use case
-   - examples/ linked from references
-
-2. **Reference documents**:
-   - QUICK_START.md (universal)
-   - SELF_TESTING.md
-   - USERSCRIPT_GUIDE.md
-   - PRODUCTION_TESTING.md
-   - VANILLA_JS.md
-   - DISTRIBUTION.md
-   - TROUBLESHOOTING.md
-
-3. **Success criteria**:
-   - [ ] Skill activates for "add MCP tools" requests
-   - [ ] Correct sections revealed by context
-   - [ ] Agent follows workflow autonomously
-
-### Phase 4: Validate Across Use Cases
-
-**Goal**: Test skill with different contexts.
-
-1. **Userscript test**: Create tools for GitHub issues
-2. **Production test**: Add tools to a Rails/Django app
-3. **Vanilla test**: Create a complete framework-less app
-
-4. **Capture feedback** and iterate on skill
-
-### Phase 5: Marketplace Integration (Future)
-
-**Goal**: Automate distribution to extension marketplace.
-
-1. **Add `upload_to_marketplace` tool** to chrome-devtools-mcp
-   - Authenticate with marketplace API
-   - Build userscript with polyfill bundled
-   - Upload and publish
-
-2. **Update skill** with distribution section
-   - When to distribute vs keep local
-   - Marketplace best practices
-
-3. **Full autonomous loop**:
+1. Create `templates/site-package/` (self-contained structure)
    ```
-   User: "Create and publish tools for Notion"
-   Agent: develop → test → build → upload → done
+   templates/site-package/
+   ├── SKILL.md                    # Template with Setup section
+   │   ├── ## Setup ← Points to tools/src/{{site}}.ts
+   │   ├── ## Available Tools
+   │   ├── ## Workflows
+   │   └── ## Tips
+   │
+   ├── tools/                      # Tools bundled WITH skill
+   │   ├── package.json
+   │   ├── tsconfig.json
+   │   └── src/
+   │       └── {{site}}.ts         # Agent writes tools here
+   │
+   ├── reference/
+   │   ├── api.md
+   │   └── workflows.md
+   │
+   └── scripts/
+       └── setup.sh                # Optional automation
    ```
 
-4. **Success criteria**:
-   - [ ] Agent can upload without human intervention
-   - [ ] Versioning handled
-   - [ ] Updates work
+2. Setup script that:
+   - Clones template to user's project
+   - Renames {{site}} placeholders
+   - Updates SKILL.md Setup section with correct paths
+   - Installs dependencies (pnpm install in tools/)
 
----
+3. **Key requirement**: SKILL.md must include Setup section telling agent:
+   - Where tools are located: `./tools/src/{{site}}.ts`
+   - How to inject: `inject_webmcp_script({ file_path: "..." })`
+   - How to verify: `diff_webmcp_tools`
 
-## Prerequisites
+**Success criteria**:
+- [ ] Agent can clone and customize template
+- [ ] Template is self-contained (tools inside skill package)
+- [ ] SKILL.md Setup section points to bundled tools
+- [ ] Distribution via Anthropic Skills Registry includes everything
 
-- **chrome-devtools-mcp connected to Chrome** - The skill relies on CDP tools
-- **pnpm workspace** - Scripts are built as workspace packages
-- **Node 22.12+** - Required by chrome-devtools-mcp
+### Phase 4: Update webmcp-dev Skill
+
+**Goal**: Teach agents the complete flow
+
+1. Update SKILL.md to include:
+   - Tool development workflow
+   - **Skill writing workflow** (documenting tools + workflows)
+   - Distribution instructions
+
+2. Add reference files:
+   - SKILL_WRITING.md - How to document tools and workflows
+   - DISTRIBUTION.md - How to upload to registries
+
+**Success criteria**:
+- [ ] Agent develops tools AND writes skill
+- [ ] Skill captures how to combine tools
+- [ ] Ready for distribution to both registries
+
+### Phase 5: Validate End-to-End
+
+**Goal**: Complete flow from request to distribution
+
+Test scenario:
+```
+User: "Create automation tools for Hacker News"
+
+Agent:
+  1. Clones site-package template
+  2. Develops tools (get_stories, get_comments, etc.)
+  3. Writes SKILL.md with workflows:
+     - "To find trending topics..."
+     - "To track a discussion..."
+  4. Package ready for upload
+
+Verify:
+  - [ ] Tools work via injection
+  - [ ] Skill documents all tools
+  - [ ] Skill includes meaningful workflows
+  - [ ] Another agent can use the skill effectively
+```
+
+### Phase 6: Distribution Integration (Future)
+
+**Goal**: Automate upload to registries
+
+1. Add `upload_to_marketplace` for userscripts
+2. Document Anthropic Skills Registry upload process
+3. Consider automation for skill publishing
+
+**Success criteria**:
+- [ ] One-command distribution
+- [ ] Versioning handled
+- [ ] Updates work
 
 ---
 
 ## Known Limitations
 
 ### 1. Content Security Policy (CSP)
-Some sites block inline `<script>` tags via CSP. The inject tool will detect this and fail with a clear message.
-
-**Affected sites**: Banking, enterprise apps, security-conscious sites
-
-**Workaround**: Browser extension approach instead.
+Some sites block inline scripts. Detect and fail gracefully.
+**Workaround**: Browser extension approach.
 
 ### 2. Page Navigation Clears Tools
-If the page navigates after injection, tools are lost. Reinject after navigation.
+Reinject after navigation.
 
 ### 3. Authenticated Pages
-Agent cannot fully test scripts on auth-required pages unless user has already authenticated.
+User must log in manually first.
 
-**Solution**: User logs in manually, then agent takes over.
+### 4. Large Dependencies
+Very large dependencies (e.g., full React) increase bundle size and injection time.
+**Mitigation**: Keep userscripts focused; prefer lightweight helpers.
 
-### 4. Single Script Per Session
-Reinjecting replaces the previous script.
+### 5. Source Maps
+Bundled code has no source maps for debugging.
+**Mitigation**: Use `list_console_messages` for error details.
 
 ---
 
 ## Success Criteria
 
 ### Core Loop Works
-- [ ] Agent can write userscript code
-- [ ] Agent can build via Bash (pnpm build)
-- [ ] Agent can inject via inject_webmcp_script
-- [ ] Agent can verify via diff_webmcp_tools
-- [ ] Agent can call first-class tools directly
-- [ ] Agent can debug via read_console_messages + take_snapshot
-- [ ] Agent can iterate (fix → rebuild → reinject → retest)
+- [x] Agent can write tool code
+- [x] Agent can inject via inject_webmcp_script
+- [x] Agent can verify via diff_webmcp_tools
+- [x] Agent can call first-class tools directly
+- [x] Agent can debug via console + snapshot
+- [x] Agent can iterate (fix → reinject → retest)
 
-### First-Class Tool Integration
-- [ ] WebMCPToolHub syncs tools after injection
-- [ ] Tools appear in client.listTools()
-- [ ] Tools callable by first-class name
+### Enhanced Features
+- [ ] TypeScript auto-bundled with esbuild
+- [ ] Imports resolved from node_modules
+- [ ] @webmcp/helpers available
+- [ ] Site package template ready
 
-### Skill Auto-Applies
-- [ ] Skill activates when user asks for userscript
-- [ ] Agent follows the workflow without manual prompting
-- [ ] Reference docs are consulted when needed
+### Complete Development Flow
+- [ ] Agent clones site-package template
+- [ ] Agent develops tools (the plumbing)
+- [ ] Agent writes SKILL.md (the intelligence)
+- [ ] Skill documents how to COMBINE tools
+- [ ] Package ready for dual distribution
+
+### Distribution (Self-Contained)
+- [ ] Skill package includes tools (in tools/ directory)
+- [ ] SKILL.md Setup section tells agent where to find tools
+- [ ] Single distribution: Anthropic Skills Registry
+- [ ] Users get EVERYTHING: tools + intelligence
+- [ ] Agent reads Setup → injects bundled tools → uses workflows
+- [ ] Marketplace optional (for non-Claude-Code users)
 
 ---
 
 ## Related Documents
 
-- [webmcp-setup skill](../skills/webmcp-setup/SKILL.md) - For React app integration
-- [WEBMCP_DYNAMIC_TOOLS_IMPLEMENTATION.md](./WEBMCP_DYNAMIC_TOOLS_IMPLEMENTATION.md) - Dynamic tool registration
-- [Claude Code Skills](https://code.claude.com/docs/en/skills) - Official docs
+- [react-webmcp hooks](../react-webmcp/)
+- [WEBMCP_DYNAMIC_TOOLS_IMPLEMENTATION.md](./WEBMCP_DYNAMIC_TOOLS_IMPLEMENTATION.md)
+- [Claude Code Skills](https://code.claude.com/docs/en/skills)
+- [esbuild API](https://esbuild.github.io/api/)
+- [tsdown docs](https://tsdown.dev/)
+
+---
+
+## References
+
+### Script Injection Research
+- [Chrome DevTools Protocol](https://chromedevtools.github.io/devtools-protocol/)
+- [Tampermonkey Documentation](https://www.tampermonkey.net/documentation.php)
+- [Content scripts - Chrome Developers](https://developer.chrome.com/docs/extensions/develop/concepts/content-scripts)
+- [Puppeteer Antipatterns](https://serpapi.com/blog/puppeteer-antipatterns/)
+- [Apify - Injecting Code](https://docs.apify.com/academy/puppeteer-playwright/executing-scripts/injecting-code)
+- [MutationObserver Pattern](https://macarthur.me/posts/use-mutation-observer-to-handle-nodes-that-dont-exist-yet/)
+- [CSP Bypasses](https://www.cobalt.io/blog/csp-and-bypasses)

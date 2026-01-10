@@ -9,6 +9,30 @@ import type {JSONRPCMessage} from '@modelcontextprotocol/sdk/types.js';
 import type {CDPSession, Page} from 'puppeteer-core';
 
 import {WEB_MCP_BRIDGE_SCRIPT, CHECK_WEBMCP_AVAILABLE_SCRIPT} from './WebMCPBridgeScript.js';
+import {CDP_BRIDGE_WINDOW_PROPERTY, CDP_BRIDGE_BINDING} from './bridgeConstants.js';
+
+/**
+ * WebMCP CDP Bridge interface injected into the page via window property.
+ */
+interface WebMCPCdpBridge {
+  version: string;
+  toServer(msg: string): boolean;
+  checkReady(): void;
+  dispose(): void;
+}
+
+/**
+ * CDP Bridge binding function for receiving messages from the page.
+ */
+type McpBridgeToClientFn = (payload: string) => void;
+
+/**
+ * Window extensions added by the WebMCP CDP bridge.
+ */
+interface WindowWithMCPBridge extends Window {
+  [CDP_BRIDGE_WINDOW_PROPERTY]?: WebMCPCdpBridge;
+  [CDP_BRIDGE_BINDING]?: McpBridgeToClientFn;
+}
 
 /**
  * Options for creating a WebMCPClientTransport
@@ -229,21 +253,35 @@ export class WebMCPClientTransport implements Transport {
       // Set up binding for receiving messages from the bridge
       // When the bridge calls window.__mcpBridgeToClient(msg), we receive it here
       await this._cdpSession.send('Runtime.addBinding', {
-        name: '__mcpBridgeToClient',
+        name: CDP_BRIDGE_BINDING,
       });
 
       // Create bound handlers so we can remove them later
       this._bindingCalledHandler = (event: {name: string; payload: string}) => {
-        if (event.name !== '__mcpBridgeToClient') return;
+        if (event.name !== CDP_BRIDGE_BINDING) return;
         // Guard against processing messages after close
         if (this._closed) return;
 
+        let payload;
         try {
-          const payload = JSON.parse(event.payload);
+          payload = JSON.parse(event.payload);
+        } catch (err) {
+          this.onerror?.(
+            new Error(
+              `Failed to parse JSON message from bridge: ${err instanceof Error ? err.message : String(err)}. ` +
+              `Raw payload: ${event.payload.substring(0, 200)}`
+            )
+          );
+          return;
+        }
+
+        try {
           this._handlePayload(payload);
         } catch (err) {
           this.onerror?.(
-            new Error(`Failed to parse message from bridge: ${err}`)
+            new Error(
+              `Failed to handle message from bridge: ${err instanceof Error ? err.message : String(err)}`
+            )
           );
         }
       };
@@ -271,9 +309,9 @@ export class WebMCPClientTransport implements Transport {
       this._started = true;
 
       // Initiate server-ready handshake
-      await this._page.evaluate(() => {
-        (window as unknown as {__mcpBridge: {checkReady: () => void}}).__mcpBridge?.checkReady();
-      });
+      await this._page.evaluate((bridgeProp: string) => {
+        (window as WindowWithMCPBridge)[bridgeProp as typeof CDP_BRIDGE_WINDOW_PROPERTY]?.checkReady();
+      }, CDP_BRIDGE_WINDOW_PROPERTY);
 
       // Wait for server ready with timeout
       const timeoutPromise = new Promise<never>((_, reject) => {
@@ -367,8 +405,11 @@ export class WebMCPClientTransport implements Transport {
     }
 
     // Full teardown - detach CDP session and remove listeners
-    this._cleanup().catch(() => {
-      // Ignore cleanup errors during navigation
+    this._cleanup().catch((err) => {
+      // Cleanup errors during navigation are expected and non-critical
+      const message = err instanceof Error ? err.message : String(err);
+      const logFn = console.debug || console.log;
+      logFn('[WebMCPClientTransport] Cleanup error during navigation (non-critical):', message);
     });
 
     // Signal clean disconnection (not an error)
@@ -405,8 +446,8 @@ export class WebMCPClientTransport implements Transport {
       const messageJson = JSON.stringify(message);
 
       await this._page.evaluate(
-        (msg: string) => {
-          const bridge = (window as unknown as {__mcpBridge?: {toServer: (msg: string) => boolean}}).__mcpBridge;
+        (msg: string, bridgeProp: string) => {
+          const bridge = (window as WindowWithMCPBridge)[bridgeProp as typeof CDP_BRIDGE_WINDOW_PROPERTY];
           if (!bridge) {
             throw new Error('WebMCP bridge not found');
           }
@@ -415,7 +456,8 @@ export class WebMCPClientTransport implements Transport {
             throw new Error('Bridge failed to send message');
           }
         },
-        messageJson
+        messageJson,
+        CDP_BRIDGE_WINDOW_PROPERTY
       );
     } catch (err) {
       const error = new Error(`Failed to send message: ${err}`);
@@ -443,19 +485,25 @@ export class WebMCPClientTransport implements Transport {
 
     // Dispose the bridge script if possible
     try {
-      await this._page.evaluate(() => {
-        (window as unknown as {__mcpBridge?: {dispose: () => void}}).__mcpBridge?.dispose();
-      });
-    } catch {
-      // Ignore errors during cleanup (page might be closed/navigated)
+      await this._page.evaluate((bridgeProp: string) => {
+        (window as WindowWithMCPBridge)[bridgeProp as typeof CDP_BRIDGE_WINDOW_PROPERTY]?.dispose();
+      }, CDP_BRIDGE_WINDOW_PROPERTY);
+    } catch (err) {
+      // Cleanup errors during navigation are expected and non-critical
+      const message = err instanceof Error ? err.message : String(err);
+      const logFn = console.debug || console.log;
+      logFn('[WebMCPClientTransport] Bridge dispose skipped:', message);
     }
 
     // Detach CDP session
     if (this._cdpSession) {
       try {
         await this._cdpSession.detach();
-      } catch {
-        // Ignore detach errors
+      } catch (err) {
+        // Expected when session already detached - log for debugging only
+        const message = err instanceof Error ? err.message : String(err);
+        const logFn = console.debug || console.log;
+        logFn('[WebMCPClientTransport] CDP detach skipped:', message);
       }
       this._cdpSession = null;
     }

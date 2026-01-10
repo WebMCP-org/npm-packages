@@ -984,6 +984,31 @@ class WebModelContext implements InternalModelContext {
 
     // Register tools
     for (const tool of context.tools ?? []) {
+      // Validate tool name and log warnings for potential compatibility issues
+      // NOTE: Similar validation exists in @mcp-b/chrome-devtools-mcp/src/tools/WebMCPToolHub.ts
+      // Keep both implementations in sync when making changes.
+      if (tool.name.startsWith('_')) {
+        console.warn(
+          `[Web Model Context] ⚠️ Warning: Tool name "${tool.name}" starts with underscore. ` +
+            'This may cause compatibility issues with some MCP clients. ' +
+            'Consider using a letter as the first character.'
+        );
+      }
+      if (/^[0-9]/.test(tool.name)) {
+        console.warn(
+          `[Web Model Context] ⚠️ Warning: Tool name "${tool.name}" starts with a number. ` +
+            'This may cause compatibility issues. ' +
+            'Consider using a letter as the first character.'
+        );
+      }
+      if (tool.name.startsWith('-')) {
+        console.warn(
+          `[Web Model Context] ⚠️ Warning: Tool name "${tool.name}" starts with hyphen. ` +
+            'This may cause compatibility issues. ' +
+            'Consider using a letter as the first character.'
+        );
+      }
+
       if (this.dynamicTools.has(tool.name)) {
         throw new Error(
           `[Web Model Context] Tool name collision: "${tool.name}" is already registered via registerTool(). ` +
@@ -1108,6 +1133,31 @@ class WebModelContext implements InternalModelContext {
     TOutputSchema extends ZodSchemaObject = Record<string, never>,
   >(tool: ToolDescriptor<TInputSchema, TOutputSchema>): { unregister: () => void } {
     console.log(`[Web Model Context] Registering tool dynamically: ${tool.name}`);
+
+    // Validate tool name and log warnings for potential compatibility issues
+    // NOTE: Similar validation exists in @mcp-b/chrome-devtools-mcp/src/tools/WebMCPToolHub.ts
+    // Keep both implementations in sync when making changes.
+    if (tool.name.startsWith('_')) {
+      console.warn(
+        `[Web Model Context] ⚠️ Warning: Tool name "${tool.name}" starts with underscore. ` +
+          'This may cause compatibility issues with some MCP clients. ' +
+          'Consider using a letter as the first character.'
+      );
+    }
+    if (/^[0-9]/.test(tool.name)) {
+      console.warn(
+        `[Web Model Context] ⚠️ Warning: Tool name "${tool.name}" starts with a number. ` +
+          'This may cause compatibility issues. ' +
+          'Consider using a letter as the first character.'
+      );
+    }
+    if (tool.name.startsWith('-')) {
+      console.warn(
+        `[Web Model Context] ⚠️ Warning: Tool name "${tool.name}" starts with hyphen. ` +
+          'This may cause compatibility issues. ' +
+          'Consider using a letter as the first character.'
+      );
+    }
 
     const now = Date.now();
     const lastRegistration = this.toolRegistrationTimestamps.get(tool.name);

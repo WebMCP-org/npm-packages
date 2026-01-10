@@ -730,7 +730,7 @@ export class McpContext implements Context {
   }
 
   getPages(): Page[] {
-    return this.#pages;
+    return [...this.#pages];
   }
 
   getDevToolsPage(page: Page): Page | undefined {

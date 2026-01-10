@@ -68,9 +68,11 @@
   },
   "dependencies": {
     "@composio/json-schema-to-zod": "^0.1.17",
+    "@mcp-b/global": "workspace:*",
     "@modelcontextprotocol/sdk": "1.24.1",
     "core-js": "3.47.0",
     "debug": "4.4.3",
+    "esbuild": "^0.24.2",
     "puppeteer": "24.32.0",
     "puppeteer-core": "24.32.0",
     "yargs": "18.0.0",

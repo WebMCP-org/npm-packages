@@ -355,13 +355,24 @@ export function useWebMCP<
     prevConfigRef.current = { inputSchema, outputSchema, annotations, description, deps };
   }, [annotations, deps, description, inputSchema, isDev, name, outputSchema]);
 
+  // Stable schema memoization: Convert to JSON strings first, then memoize based on string value.
+  // This prevents infinite re-registration when users pass inline schema objects, because
+  // strings are compared by value (not reference) in React's dependency comparison.
+  const inputSchemaStr = inputSchema ? JSON.stringify(zodToJsonSchema(inputSchema)) : null;
+  const outputSchemaStr = outputSchema ? JSON.stringify(zodToJsonSchema(outputSchema)) : null;
+  const annotationsStr = annotations ? JSON.stringify(annotations) : null;
+
   const inputJsonSchema = useMemo(
-    () => (inputSchema ? zodToJsonSchema(inputSchema) : undefined),
-    [inputSchema]
+    () => (inputSchemaStr ? JSON.parse(inputSchemaStr) : undefined),
+    [inputSchemaStr]
   );
   const outputJsonSchema = useMemo(
-    () => (outputSchema ? zodToJsonSchema(outputSchema) : undefined),
-    [outputSchema]
+    () => (outputSchemaStr ? JSON.parse(outputSchemaStr) : undefined),
+    [outputSchemaStr]
+  );
+  const stableAnnotations = useMemo(
+    () => (annotationsStr ? JSON.parse(annotationsStr) : undefined),
+    [annotationsStr]
   );
 
   const validator = useMemo(() => (inputSchema ? z.object(inputSchema) : null), [inputSchema]);
@@ -492,14 +503,26 @@ export function useWebMCP<
       description,
       inputSchema: (inputJsonSchema || fallbackInputSchema) as InputSchema,
       ...(outputJsonSchema && { outputSchema: outputJsonSchema as InputSchema }),
-      ...(annotations && { annotations }),
+      ...(stableAnnotations && { annotations: stableAnnotations }),
       execute: mcpHandler,
     });
 
     return () => {
       registration?.unregister();
     };
-  }, [name, description, inputJsonSchema, outputJsonSchema, annotations, ...(deps ?? []), execute]);
+    // Spread operator in dependencies: Allows users to provide additional dependencies
+    // via the `deps` parameter. While unconventional, this pattern is intentional to support
+    // dynamic dependency injection. The spread is safe because deps is validated and warned
+    // about non-primitive values earlier in this hook.
+  }, [
+    name,
+    description,
+    inputJsonSchema,
+    outputJsonSchema,
+    stableAnnotations,
+    ...(deps ?? []),
+    execute,
+  ]);
 
   return {
     state,

@@ -8,8 +8,10 @@ packages:
   - smart-dom-reader
   - smart-dom-reader/mcp-server
   - transports
+  - webmcp-helpers
   - webmcp-ts-sdk
   - skills/webmcp-setup
+  - examples/test-with-helpers
   - e2e
   - e2e/test-app
   - e2e/react-webmcp-test-app

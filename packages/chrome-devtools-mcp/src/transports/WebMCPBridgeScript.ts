@@ -14,7 +14,7 @@
  * Communication flow:
  *
  * CDP → Page (requests):
- *   1. CDP calls Runtime.evaluate with __mcpBridge.toServer(messageJson)
+ *   1. CDP calls Runtime.evaluate with __mcpCdpBridge.toServer(messageJson)
  *   2. Bridge parses the message and posts it via window.postMessage
  *   3. TabServerTransport receives it and processes the MCP request
  *
@@ -39,8 +39,8 @@ export const WEB_MCP_BRIDGE_SCRIPT = `
   var CHANNEL_ID = 'mcp-default';
   var BRIDGE_VERSION = '1.1.0';
 
-  // Prevent double injection
-  if (window.__mcpBridge && window.__mcpBridge.version === BRIDGE_VERSION) {
+  // Prevent double injection - use __mcpCdpBridge to avoid collision with polyfill's __mcpBridge
+  if (window.__mcpCdpBridge && window.__mcpCdpBridge.version === BRIDGE_VERSION) {
     return { alreadyInjected: true };
   }
 
@@ -69,8 +69,13 @@ export const WEB_MCP_BRIDGE_SCRIPT = `
       serverReady = false;
     }
 
-    // Forward to CDP client via the binding
-    // The binding '__mcpBridgeToClient' is set up by CDPClientTransport before injection
+    // Forward to CDP client via the binding.
+    // NOTE: We use '__mcpBridgeToClient' (not '__mcpCdpBridgeToClient') for the CDP binding
+    // because this name is set up by WebMCPClientTransport.connect() via Runtime.addBinding,
+    // which is separate from the window property '__mcpCdpBridge'. The window property was
+    // renamed to avoid collision with the polyfill's internal '__mcpBridge', but the CDP
+    // binding name doesn't conflict with anything and changing it would require coordinated
+    // updates to both the bridge script and WebMCPClientTransport.
     if (typeof window.__mcpBridgeToClient === 'function') {
       try {
         var messageJson = typeof payload === 'string' ? JSON.stringify(payload) : JSON.stringify(payload);
@@ -100,7 +105,8 @@ export const WEB_MCP_BRIDGE_SCRIPT = `
   checkWebMCPAvailable();
 
   // Expose the bridge API for CDP to call
-  Object.defineProperty(window, '__mcpBridge', {
+  // Use __mcpCdpBridge to avoid collision with polyfill's __mcpBridge
+  Object.defineProperty(window, '__mcpCdpBridge', {
     value: {
     version: BRIDGE_VERSION,
 
@@ -180,7 +186,7 @@ export const WEB_MCP_BRIDGE_SCRIPT = `
      */
     dispose: function() {
       window.removeEventListener('message', handleServerMessage);
-      delete window.__mcpBridge;
+      delete window.__mcpCdpBridge;
     }
   },
   writable: true,

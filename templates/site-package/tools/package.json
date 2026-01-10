@@ -1,0 +1,16 @@
+{
+  "name": "{{site}}-mcp-tools",
+  "version": "1.0.0",
+  "private": true,
+  "description": "WebMCP tools for {{Site}}",
+  "type": "module",
+  "scripts": {
+    "build": "tsdown src/{{site}}.ts --format iife --out-dir dist",
+    "dev": "tsdown src/{{site}}.ts --format iife --out-dir dist --watch"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "tsdown": "^0.15.10",
+    "typescript": "^5.8.3"
+  }
+}
