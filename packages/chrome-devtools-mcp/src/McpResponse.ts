@@ -44,6 +44,7 @@ export class McpResponse implements Response {
   #attachedConsoleMessageId?: number;
   #textResponseLines: string[] = [];
   #images: ImageContentData[] = [];
+  #isError = false;
   #networkRequestsOptions?: {
     include: boolean;
     pagination?: PaginationOptions;
@@ -161,6 +162,14 @@ export class McpResponse implements Response {
 
   appendResponseLine(value: string): void {
     this.#textResponseLines.push(value);
+  }
+
+  setIsError(value: boolean): void {
+    this.#isError = value;
+  }
+
+  get isError(): boolean {
+    return this.#isError;
   }
 
   attachImage(value: ImageContentData): void {

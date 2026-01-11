@@ -77,6 +77,11 @@ export interface Response {
   attachConsoleMessage(msgid: number): void;
   // Allows re-using DevTools data queried by some tools.
   attachDevToolsData(data: DevToolsData): void;
+  /**
+   * Mark this response as an error response.
+   * When set to true, the tool result will include isError: true.
+   */
+  setIsError(value: boolean): void;
 }
 
 /**

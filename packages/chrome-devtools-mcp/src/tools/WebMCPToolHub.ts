@@ -5,49 +5,19 @@
  */
 
 import type {Client} from '@modelcontextprotocol/sdk/client/index.js';
-import {jsonSchemaToZod} from '@composio/json-schema-to-zod';
 
 import type {McpContext} from '../McpContext.js';
 import {
-  zod,
   type McpServer,
-  type CallToolResult,
   type Tool,
   type Page,
   type Debugger,
 } from '../third_party/index.js';
 
 /**
- * Convert a JSON Schema inputSchema from WebMCP to a Zod schema.
- *
- * Falls back to a permissive passthrough schema if conversion fails,
- * allowing the tool to still be registered and used.
- *
- * @param inputSchema - The JSON Schema from the WebMCP tool definition.
- * @param logger - Optional logger for conversion errors.
- * @returns A Zod schema for parameter validation.
+ * Metadata for a tracked WebMCP tool
  */
-function convertInputSchema(
-  inputSchema?: Tool['inputSchema'],
-  logger?: Debugger,
-): zod.ZodTypeAny {
-  if (!inputSchema) {
-    return zod.object({}).passthrough();
-  }
-
-  try {
-    return jsonSchemaToZod(inputSchema as object);
-  } catch (err) {
-    logger?.('Failed to convert inputSchema to Zod:', err);
-    return zod.object({}).passthrough();
-  }
-}
-
-/**
- * Metadata for a registered WebMCP tool
- */
-interface RegisteredTool {
-  handle: ReturnType<typeof McpServer.prototype.registerTool>;
+interface TrackedTool {
   page: Page;
   originalName: string;
   domain: string;
@@ -82,15 +52,15 @@ export class WebMCPToolHub {
   #server: McpServer;
   #context: McpContext;
   #logger: Debugger;
-  /** Map of tool IDs to their registration metadata. */
-  #registeredTools = new Map<string, RegisteredTool>();
+  /** Map of tool IDs to their tracking metadata. */
+  #trackedTools = new Map<string, TrackedTool>();
   /** Tracks which tool IDs belong to each page (for cleanup on navigation). */
   #pageTools = new WeakMap<Page, Set<string>>();
   /** Guards against concurrent sync operations per page. */
   #syncInProgress = new WeakSet<Page>();
-  /** Whether automatic tool registration is enabled. */
+  /** Whether automatic tool tracking is enabled. */
   #enabled = true;
-  /** Global diff state for diff_webmcp_tools - tracks last seen tool IDs. */
+  /** Last seen tool IDs for diff_webmcp_tools. */
   #lastSeenToolIds: Set<string> | null = null;
 
   constructor(server: McpServer, context: McpContext, enabled = true) {
@@ -164,7 +134,7 @@ export class WebMCPToolHub {
   }
 
   /**
-   * Remove all tools for a page. Called on:
+   * Remove all tracked tools for a page. Called on:
    * 1. Transport close (navigation/page close)
    * 2. Manual removal
    */
@@ -176,29 +146,15 @@ export class WebMCPToolHub {
 
     let removed = 0;
     for (const toolId of toolIds) {
-      const registered = this.#registeredTools.get(toolId);
-      if (registered) {
-        this.#logger(`Removing WebMCP tool: ${toolId}`);
-        registered.handle.remove();
-        this.#registeredTools.delete(toolId);
+      if (this.#trackedTools.has(toolId)) {
+        this.#logger(`Removing tracked WebMCP tool: ${toolId}`);
+        this.#trackedTools.delete(toolId);
         removed++;
       }
     }
 
     this.#pageTools.delete(page);
-    this.#logger(`Removed ${removed} WebMCP tools for page`);
-
-    // Notify clients about tool removals
-    if (removed > 0) {
-      try {
-        this.#server.server.notification({
-          method: 'notifications/tools/list_changed',
-        });
-        this.#logger('Sent tools/list_changed notification (removal)');
-      } catch (err) {
-        this.#logger('Failed to send tools/list_changed notification:', err);
-      }
-    }
+    this.#logger(`Removed ${removed} tracked WebMCP tools for page`);
 
     return removed;
   }
@@ -229,18 +185,16 @@ export class WebMCPToolHub {
       const toolId = this.#generateToolId(domain, pageIdx, tool.name);
       newToolIds.add(toolId);
 
-      const existing = this.#registeredTools.get(toolId);
+      const existing = this.#trackedTools.get(toolId);
       if (existing) {
-        // Remove and re-register to ensure schema updates are applied
-        // (MCP SDK's update() doesn't support schema changes)
-        this.#logger(`Re-registering WebMCP tool: ${toolId}`);
-        existing.handle.remove();
-        this.#registeredTools.delete(toolId);
-        this.#registerTool(page, domain, pageIdx, tool);
+        // Re-track to ensure metadata updates are applied
+        this.#logger(`Re-tracking WebMCP tool: ${toolId}`);
+        this.#trackedTools.delete(toolId);
+        this.#trackTool(page, domain, pageIdx, tool);
         updated++;
       } else {
-        // Register new tool
-        this.#registerTool(page, domain, pageIdx, tool);
+        // Track new tool
+        this.#trackTool(page, domain, pageIdx, tool);
         synced++;
       }
     }
@@ -250,11 +204,9 @@ export class WebMCPToolHub {
     let removed = 0;
     for (const toolId of existingToolIds) {
       if (!newToolIds.has(toolId)) {
-        const registered = this.#registeredTools.get(toolId);
-        if (registered) {
+        if (this.#trackedTools.has(toolId)) {
           this.#logger(`Removing stale WebMCP tool: ${toolId}`);
-          registered.handle.remove();
-          this.#registeredTools.delete(toolId);
+          this.#trackedTools.delete(toolId);
           removed++;
         }
       }
@@ -262,34 +214,19 @@ export class WebMCPToolHub {
 
     this.#pageTools.set(page, newToolIds);
     this.#logger(
-      `WebMCP tool sync: ${synced} added, ${updated} updated, ${removed} removed`,
+      `WebMCP tool tracking: ${synced} added, ${updated} updated, ${removed} removed`,
     );
 
-    // Notify clients about tool list changes if any tools were added, removed, or updated
-    if (synced > 0 || removed > 0 || updated > 0) {
-      try {
-        this.#server.server.notification({
-          method: 'notifications/tools/list_changed',
-        });
-        this.#logger('Sent tools/list_changed notification');
-      } catch (err) {
-        this.#logger('Failed to send tools/list_changed notification:', err);
-      }
-    }
+    // No longer send tools/list_changed - tools are called directly via call_webmcp_tool
 
     return {synced, removed, updated};
   }
 
   /**
-   * Register a single tool with the MCP server
+   * Track a tool (tools are called directly via call_webmcp_tool, not registered with MCP server)
    */
-  #registerTool(page: Page, domain: string, pageIdx: number, tool: Tool): void {
+  #trackTool(page: Page, domain: string, pageIdx: number, tool: Tool): void {
     const toolId = this.#generateToolId(domain, pageIdx, tool.name);
-    const description = this.#generateDescription(
-      domain,
-      pageIdx,
-      tool.description,
-    );
 
     // Validate tool name and log any warnings
     const warnings = validateToolName(tool.name);
@@ -297,102 +234,21 @@ export class WebMCPToolHub {
       this.#logger(`⚠️ Warning: ${warning}`);
     }
 
-    this.#logger(`Registering WebMCP tool: ${toolId}`);
+    this.#logger(`Tracking WebMCP tool: ${toolId}`);
 
-    // Store tool name for use in the callback closure
-    const originalToolName = tool.name;
-
-    // Convert the JSON Schema inputSchema to Zod for MCP SDK registration
-    const zodSchema = convertInputSchema(tool.inputSchema, this.#logger);
-
-    const handle = this.#server.registerTool(
-      toolId,
-      {
-        description,
-        inputSchema: zodSchema,
-      },
-      async (params: Record<string, unknown>): Promise<CallToolResult> => {
-        this.#logger(`[WebMCPToolHub] Tool call received: ${toolId}`);
-        this.#logger(`[WebMCPToolHub] Params: ${JSON.stringify(params)}`);
-        // Look up page dynamically to handle potential stale references
-        const currentPage = this.#getPageForTool(toolId);
-        if (!currentPage) {
-          this.#logger(`[WebMCPToolHub] Page not found for tool: ${toolId}`);
-          return {
-            content: [
-              {
-                type: 'text',
-                text: 'Tool no longer available - page may have closed or navigated',
-              },
-            ],
-            isError: true,
-          };
-        }
-        this.#logger(`[WebMCPToolHub] Executing tool: ${originalToolName}`);
-        // Pass params directly - they are already parsed by MCP SDK using the Zod schema
-        return this.#executeTool(currentPage, originalToolName, params);
-      },
-    );
-
-    this.#registeredTools.set(toolId, {
-      handle,
+    // Track tool metadata
+    this.#trackedTools.set(toolId, {
       page,
       originalName: tool.name,
       domain,
       toolId,
-      description,
+      description: tool.description || '',
     });
 
     // Track tool for this page
     const pageToolSet = this.#pageTools.get(page) || new Set();
     pageToolSet.add(toolId);
     this.#pageTools.set(page, pageToolSet);
-  }
-
-  /**
-   * Execute a WebMCP tool on a page
-   */
-  async #executeTool(
-    page: Page,
-    toolName: string,
-    args: Record<string, unknown>,
-  ): Promise<CallToolResult> {
-    try {
-      const result = await this.#context.getWebMCPClient(page);
-      if (!result.connected) {
-        return {
-          content: [{type: 'text', text: 'WebMCP connection lost'}],
-          isError: true,
-        };
-      }
-
-      const callResult = await result.client.callTool({
-        name: toolName,
-        arguments: args,
-      });
-
-      // The SDK's callTool returns CallToolResult, but we need to handle
-      // the content array properly
-      return callResult as CallToolResult;
-    } catch (err) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Tool error: ${err instanceof Error ? err.message : String(err)}`,
-          },
-        ],
-        isError: true,
-      };
-    }
-  }
-
-  /**
-   * Get the page associated with a registered tool
-   */
-  #getPageForTool(toolId: string): Page | undefined {
-    const registered = this.#registeredTools.get(toolId);
-    return registered?.page;
   }
 
   /**
@@ -403,36 +259,24 @@ export class WebMCPToolHub {
   }
 
   /**
-   * Generate a tool description with WebMCP context
-   */
-  #generateDescription(
-    domain: string,
-    pageIdx: number,
-    originalDescription?: string,
-  ): string {
-    const displayDomain = getDisplayDomain(domain);
-    return `[WebMCP - ${displayDomain} - Page ${pageIdx}] ${originalDescription || 'No description'}`;
-  }
-
-  /**
-   * Get the total number of registered tools
+   * Get the total number of tracked tools
    */
   getToolCount(): number {
-    return this.#registeredTools.size;
+    return this.#trackedTools.size;
   }
 
   /**
-   * Get all registered tool IDs
+   * Get all tracked tool IDs
    */
   getRegisteredToolIds(): string[] {
-    return Array.from(this.#registeredTools.keys());
+    return Array.from(this.#trackedTools.keys());
   }
 
   /**
-   * Get all registered tools with their metadata (for diff_webmcp_tools)
+   * Get all tracked tools with their metadata
    */
   getRegisteredTools(): RegisteredToolInfo[] {
-    return Array.from(this.#registeredTools.values()).map(rt => ({
+    return Array.from(this.#trackedTools.values()).map(rt => ({
       toolId: rt.toolId,
       originalName: rt.originalName,
       domain: rt.domain,
@@ -442,24 +286,17 @@ export class WebMCPToolHub {
   }
 
   /**
-   * Get the last seen tool IDs for diff tracking
+   * Get the last seen tool IDs (for diff_webmcp_tools)
    */
   getLastSeenToolIds(): Set<string> | null {
     return this.#lastSeenToolIds;
   }
 
   /**
-   * Set the last seen tool IDs for diff tracking
+   * Set the last seen tool IDs (for diff_webmcp_tools)
    */
   setLastSeenToolIds(toolIds: Set<string>): void {
     this.#lastSeenToolIds = toolIds;
-  }
-
-  /**
-   * Clear the last seen tool IDs (resets diff state)
-   */
-  clearLastSeenToolIds(): void {
-    this.#lastSeenToolIds = null;
   }
 }
 

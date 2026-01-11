@@ -21,6 +21,7 @@ import {
   StdioServerTransport,
   type CallToolResult,
   SetLevelRequestSchema,
+  zod,
 } from './third_party/index.js';
 import {registerPrompts} from './prompts/index.js';
 import {ToolCategory} from './tools/categories.js';
@@ -201,10 +202,13 @@ function registerTool(tool: ToolDefinition): void {
     tool.name,
     {
       description: tool.description,
-      inputSchema: tool.schema,
+      // For call_webmcp_tool, use a fully permissive schema to allow any properties
+      inputSchema: tool.name === 'call_webmcp_tool'
+        ? zod.record(zod.unknown())
+        : zod.object(tool.schema).passthrough(),
       annotations: tool.annotations,
     },
-    async (params): Promise<CallToolResult> => {
+    async (params: Record<string, unknown>): Promise<CallToolResult> => {
       const guard = await toolMutex.acquire();
       try {
         logger(`${tool.name} request: ${JSON.stringify(params, null, '  ')}`);
@@ -220,9 +224,13 @@ function registerTool(tool: ToolDefinition): void {
           context,
         );
         const content = await response.handle(tool.name, context);
-        return {
+        const result: CallToolResult = {
           content,
         };
+        if (response.isError) {
+          result.isError = true;
+        }
+        return result;
       } catch (err) {
         logger(`${tool.name} error:`, err, err?.stack);
         let errorText = err && 'message' in err ? err.message : String(err);

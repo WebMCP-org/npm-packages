@@ -16,7 +16,7 @@ import {ToolListChangedNotificationSchema} from './third_party/index.js';
 import type {WebMCPToolHub} from './tools/WebMCPToolHub.js';
 import type {ListenerMap} from './PageCollector.js';
 import {NetworkCollector, ConsoleCollector} from './PageCollector.js';
-import {WEB_MCP_BRIDGE_SCRIPT, CHECK_WEBMCP_AVAILABLE_SCRIPT} from './transports/WebMCPBridgeScript.js';
+import {WEB_MCP_BRIDGE_SCRIPT} from './transports/WebMCPBridgeScript.js';
 import {WebMCPClientTransport} from './transports/WebMCPClientTransport.js';
 import {Locator} from './third_party/index.js';
 import type {
@@ -335,12 +335,11 @@ export class McpContext implements Context {
         return;
       }
 
-      // Wait a bit for the page to initialize WebMCP
-      // The bridge script runs on DOMContentLoaded, and WebMCP may initialize after that
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Proactively check for WebMCP and sync tools
-      await this.#proactivelyDetectWebMCP(page);
+      // Immediately try to connect - no polling needed
+      // If no WebMCP, connection will timeout gracefully
+      this.#tryConnectWebMCP(page).catch(err => {
+        this.logger('WebMCP connection attempt failed (expected if page has no WebMCP):', err);
+      });
     };
 
     page.on('framenavigated', onFrameNavigated);
@@ -355,34 +354,37 @@ export class McpContext implements Context {
   }
 
   /**
-   * Proactively detect WebMCP on a page and sync tools if available.
-   * This is called after page navigation to automatically discover WebMCP tools.
+   * Attempt to connect to WebMCP on a page without pre-checking.
+   * Uses the extension's approach: just try to connect, handle failure gracefully.
+   *
+   * This matches the WebMCP extension's behavior:
+   * - No pre-flight detection polling
+   * - Immediate connection attempt
+   * - Graceful handling if no server exists
+   * - Notification-based syncing when tools appear later
+   *
+   * Reference: /WebMCP/apps/extension/entrypoints/content/connection.ts lines 88-118
    */
-  async #proactivelyDetectWebMCP(page: Page): Promise<void> {
+  async #tryConnectWebMCP(page: Page): Promise<void> {
     // Skip if tool hub is not enabled
     if (!this.#toolHub?.isEnabled()) {
       return;
     }
 
     try {
-      // Check if WebMCP is available on the page
-      const hasWebMCP = await this.#checkWebMCPAvailable(page);
-      if (!hasWebMCP) {
-        this.logger(`No WebMCP detected on page: ${page.url()}`);
-        return;
-      }
-
-      this.logger(`WebMCP detected on page: ${page.url()}, connecting...`);
-
-      // Connect and sync tools - this handles everything including sending list_changed
+      // Immediately try to get/create WebMCP client
+      // Transport is configured with requireWebMCP: false and 30s timeout in getWebMCPClient
       const result = await this.getWebMCPClient(page);
+
       if (result.connected) {
-        this.logger(`WebMCP tools synced for page: ${page.url()}`);
+        this.logger(`WebMCP connected for page: ${page.url()}`);
       } else {
-        this.logger(`Failed to connect to WebMCP: ${result.error}`);
+        // This is normal for pages without WebMCP
+        this.logger(`No WebMCP on page: ${page.url()}`);
       }
     } catch (err) {
-      this.logger('Error during proactive WebMCP detection:', err);
+      // Connection timeout or error is expected on pages without WebMCP
+      this.logger(`WebMCP connection failed for ${page.url()} (normal if page has no WebMCP):`, err);
     }
   }
 
@@ -393,8 +395,10 @@ export class McpContext implements Context {
   async #setupWebMCPAutoDetectionForAllPages(): Promise<void> {
     for (const page of this.#pages) {
       this.#setupWebMCPAutoDetection(page);
-      // Also do an initial check for existing pages
-      await this.#proactivelyDetectWebMCP(page);
+      // Try to connect immediately (don't await - run in parallel for all pages)
+      this.#tryConnectWebMCP(page).catch(err => {
+        this.logger('Initial WebMCP connection attempt failed (expected):', err);
+      });
     }
   }
 
@@ -952,18 +956,12 @@ export class McpContext implements Context {
       this.#webMCPConnections.delete(targetPage);
     }
 
-    // Check if WebMCP is available
-    const hasWebMCP = await this.#checkWebMCPAvailable(targetPage);
-    if (!hasWebMCP) {
-      return {connected: false, error: 'WebMCP not detected on this page'};
-    }
-
-    // Connect
+    // Connect - no pre-checking needed (extension approach)
     try {
       const transport = new WebMCPClientTransport({
         page: targetPage,
-        readyTimeout: 10000,
-        requireWebMCP: false, // We already checked
+        readyTimeout: 30000,     // 30s to handle slow React apps (up from 10s)
+        requireWebMCP: false,    // Don't pre-check, just try to connect
       });
 
       const client = new Client(
@@ -1024,19 +1022,6 @@ export class McpContext implements Context {
         connected: false,
         error: `Failed to connect: ${err instanceof Error ? err.message : String(err)}`,
       };
-    }
-  }
-
-  /**
-   * Check if WebMCP is available on a page by checking the bridge's hasWebMCP() method.
-   * The bridge is auto-injected into all pages, so we just need to check if it detected WebMCP.
-   */
-  async #checkWebMCPAvailable(page: Page): Promise<boolean> {
-    try {
-      const result = await page.evaluate(CHECK_WEBMCP_AVAILABLE_SCRIPT);
-      return (result as {available: boolean}).available;
-    } catch {
-      return false;
     }
   }
 
