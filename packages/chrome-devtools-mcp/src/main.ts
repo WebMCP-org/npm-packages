@@ -145,10 +145,10 @@ async function getContext(): Promise<McpContext> {
       experimentalIncludeAllPages: args.experimentalIncludeAllPages,
     });
 
-    // Always create a new page for this MCP session
+    // Always create a new window for this MCP session
     // This ensures multiple MCP clients don't step on each other's toes
-    await context.newPage();
-    logger('Created new page for this MCP session');
+    await context.newWindow();
+    logger('Created new window for this MCP session');
 
     // Initialize WebMCP tool hub for dynamic tool registration
     const toolHub = new WebMCPToolHub(server, context);

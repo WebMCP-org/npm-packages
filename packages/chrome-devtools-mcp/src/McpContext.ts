@@ -502,6 +502,42 @@ export class McpContext implements Context {
     this.#setupWebMCPAutoDetection(page);
     return page;
   }
+
+  async newWindow(): Promise<Page> {
+    // Use CDP to create a new browser window instead of just a tab
+    const browserTarget = this.browser.target();
+    const cdpSession = await browserTarget.createCDPSession();
+
+    // Create a new target with newWindow: true
+    const {targetId} = await cdpSession.send('Target.createTarget', {
+      url: 'about:blank',
+      newWindow: true,
+    });
+
+    await cdpSession.detach();
+
+    // Wait for the new page to be available
+    const target = await this.browser.waitForTarget(
+      target => {
+        // @ts-expect-error _targetId is internal but stable
+        return target._targetId === targetId;
+      },
+      {timeout: 5000},
+    );
+
+    const page = await target.page();
+    if (!page) {
+      throw new Error('Failed to get page from new window target');
+    }
+
+    await this.createPagesSnapshot();
+    this.selectPage(page);
+    this.#networkCollector.addPage(page);
+    this.#consoleCollector.addPage(page);
+    // Set up WebMCP auto-detection for the new page
+    this.#setupWebMCPAutoDetection(page);
+    return page;
+  }
   async closePage(pageIdx: number): Promise<void> {
     if (this.#pages.length === 1) {
       throw new Error(CLOSE_PAGE_ERROR);
