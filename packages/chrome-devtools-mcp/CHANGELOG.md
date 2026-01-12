@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.4.0
+
+### Minor Changes
+
+- bd559c1: Rename diff_webmcp_tools to list_webmcp_tools for improved UX
+
+  The tool name has been changed from `diff_webmcp_tools` to `list_webmcp_tools` to better represent its primary use case. The new name is more intuitive - users expect to "list" tools, not "diff" them - while all the intelligent diff tracking functionality remains intact.
+
+  **What's Changed:**
+  - Tool name: `diff_webmcp_tools` → `list_webmcp_tools`
+  - All documentation and error messages updated
+  - Tests updated to reflect new name
+
+  **What Stays the Same:**
+  - ✅ Diff tracking behavior (first call = full list, subsequent = diff)
+  - ✅ `full` parameter to force complete list
+  - ✅ Error propagation with isError flag
+  - ✅ Token efficiency for large tool lists
+  - ✅ All functionality preserved
+
+  **Migration:**
+  This is a breaking change. Update any code that calls `diff_webmcp_tools` to use `list_webmcp_tools` instead.
+
 ## 1.3.1
 
 ### Patch Changes
@@ -13,18 +36,15 @@
 - 6bf4a41: Enable auto-connect by default with smart fallback for improved developer experience
 
   **Breaking Changes:**
-
   - Auto-connect is now enabled by default (previously disabled)
   - Default Chrome channel changed from `stable` to `dev` (Chrome 145+ required for auto-connect)
 
   **New Features:**
-
   - Smart fallback logic: automatically tries to connect to running Chrome instance first, then launches new instance if connection fails
   - Graceful degradation prevents errors when no running browser is found
   - Updated CLI descriptions to reflect new fallback behavior
 
   **Benefits:**
-
   - Faster iteration during development (instant reconnection to running Chrome)
   - Zero-friction setup (no manual browser launch required)
   - Better DX with automatic fallback handling
@@ -61,7 +81,6 @@
 ### Patch Changes
 
 - docs(chrome-devtools-mcp): add benchmark data, demo images, and quickstart links
-
   - Add Token Efficiency section with benchmark comparison chart showing 77-89% token savings vs screenshot-based workflows
   - Add demo result image showing successful WebMCP tool execution
   - Add prominent link to Chrome DevTools Quickstart in the header
@@ -72,7 +91,6 @@
 ### Minor Changes
 
 - 9b49dce: Add per-page WebMCP connection support and improve CDP lifecycle handling
-
   - Support per-page WebMCP connections instead of global state
   - Move WebMCP state from module-level to McpContext for proper isolation
   - Handle browser close/reopen scenarios for WebMCP transport
@@ -89,7 +107,6 @@
 ### Minor Changes
 
 - Add per-page WebMCP connection support and improve CDP lifecycle handling
-
   - Support per-page WebMCP connections instead of global state
   - Move WebMCP state from module-level to McpContext for proper isolation
   - Handle browser close/reopen scenarios for WebMCP transport
@@ -138,7 +155,6 @@
 - 79de6d9: Add WebMCP integration to connect to MCP tools registered on webpages
 
   This adds two new tools for interacting with website-specific MCP functionality:
-
   - `list_webmcp_tools`: List available website tools (auto-connects to WebMCP)
   - `call_webmcp_tool`: Call a website tool (auto-connects to WebMCP)
 
@@ -176,12 +192,10 @@ This is the first stable release of `@mcp-b/chrome-devtools-mcp`, a fork of Chro
 ### Features
 
 - **WebMCP Integration**: Connect to MCP tools registered on webpages via [@mcp-b/global](https://www.npmjs.com/package/@mcp-b/global)
-
   - `list_webmcp_tools`: List available website tools (auto-connects)
   - `call_webmcp_tool`: Call a website tool (auto-connects)
 
 - **AI-Driven Development Workflow**: Build and test WebMCP tools in real-time
-
   - Write tools in your codebase
   - Hot-reload sees the changes
   - AI discovers tools via `list_webmcp_tools`
@@ -220,7 +234,6 @@ This package is a fork of [ChromeDevTools/chrome-devtools-mcp](https://github.co
 - 79de6d9: Add WebMCP integration to connect to MCP tools registered on webpages
 
   This adds two new tools for interacting with website-specific MCP functionality:
-
   - `list_webmcp_tools`: List available website tools
   - `call_webmcp_tool`: Call a website tool
 
