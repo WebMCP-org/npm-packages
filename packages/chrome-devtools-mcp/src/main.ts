@@ -34,7 +34,7 @@ import {WebMCPToolHub} from './tools/WebMCPToolHub.js';
  * @remarks If moved, update release-please config.
  */
 // x-release-please-start-version
-const VERSION = '0.12.1';
+const VERSION = '1.5.6';
 // x-release-please-end
 
 process.on('unhandledRejection', (reason, promise) => {

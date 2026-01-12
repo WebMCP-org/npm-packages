@@ -1,5 +1,8 @@
 import { initializeWebModelContext } from './global.js';
+import { createLogger } from './logger.js';
 import type { TransportConfiguration, WebModelContextInitOptions } from './types.js';
+
+const logger = createLogger('WebModelContext');
 
 type TabServerConfig = NonNullable<TransportConfiguration['tabServer']>;
 
@@ -55,7 +58,7 @@ function parseScriptTagOptions(
     try {
       return JSON.parse(dataset.webmcpOptions) as WebModelContextInitOptions;
     } catch (error) {
-      console.error('[Web Model Context] Invalid JSON in data-webmcp-options:', error);
+      logger.error('Invalid JSON in data-webmcp-options:', error);
       return undefined;
     }
   }
@@ -121,10 +124,11 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
       initializeWebModelContext(mergedOptions);
     }
   } catch (error) {
-    console.error('[Web Model Context] Auto-initialization failed:', error);
+    logger.error('Auto-initialization failed:', error);
   }
 }
 
 export { cleanupWebModelContext, initializeWebModelContext } from './global.js';
+export { createLogger } from './logger.js';
 export type * from './types.js';
 export { zodToJsonSchema } from './validation.js';

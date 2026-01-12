@@ -99,7 +99,7 @@ export type Context = Readonly<{
   isPageSelected(page: Page): boolean;
   newPage(): Promise<Page>;
   closePage(pageIdx: number): Promise<void>;
-  selectPage(page: Page): void;
+  selectPage(page: Page, explicit?: boolean): void;
   getElementByUid(uid: string): Promise<ElementHandle<Element>>;
   getAXNodeByUid(uid: string): TextSnapshotNode | undefined;
   setNetworkConditions(conditions: string | null): void;

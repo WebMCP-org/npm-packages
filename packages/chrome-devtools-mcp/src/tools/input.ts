@@ -14,7 +14,7 @@ import {defineTool} from './ToolDefinition.js';
 
 export const click = defineTool({
   name: 'click',
-  description: `Clicks on the provided element`,
+  description: `Clicks on the provided element. IMPORTANT: Always call take_snapshot first to get a fresh uid - UIDs expire when the page changes.`,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,

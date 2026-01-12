@@ -12,8 +12,9 @@ import {defineTool, timeoutSchema} from './ToolDefinition.js';
 export const takeSnapshot = defineTool({
   name: 'take_snapshot',
   description: `Take a text snapshot of the currently selected page based on the a11y tree. The snapshot lists page elements along with a unique
-identifier (uid). Always use the latest snapshot. Prefer taking a snapshot over taking a screenshot. The snapshot indicates the element selected
-in the DevTools Elements panel (if any).`,
+identifier (uid). IMPORTANT: UIDs expire when the page changes. Always take a fresh snapshot immediately before using UIDs for click/type/etc.
+Workflow: 1) take_snapshot, 2) find the uid you need, 3) use it in click/type, 4) take_snapshot again for next action.
+Prefer taking a snapshot over taking a screenshot. The snapshot indicates the element selected in the DevTools Elements panel (if any).`,
   annotations: {
     category: ToolCategory.DEBUGGING,
     // Not read-only due to filePath param.

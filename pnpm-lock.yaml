@@ -684,9 +684,6 @@ importers:
       '@composio/json-schema-to-zod':
         specifier: 'catalog:'
         version: 0.1.17(zod@3.25.76)
-      '@mcp-b/global':
-        specifier: workspace:*
-        version: link:../../global
       '@modelcontextprotocol/sdk':
         specifier: 'catalog:'
         version: 1.24.3(zod@3.25.76)

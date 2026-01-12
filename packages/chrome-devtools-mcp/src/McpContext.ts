@@ -160,6 +160,12 @@ export class McpContext implements Context {
   #pageToDevToolsPage = new Map<Page, Page>();
   /** Currently selected page for tool operations. */
   #selectedPage?: Page;
+  /**
+   * Whether the selected page has been explicitly set for this session.
+   * When true, createPagesSnapshot() won't auto-switch to pages[0].
+   * This prevents MCP sessions from interfering with each other in shared browsers.
+   */
+  #pageExplicitlySelected = false;
   /** Most recent accessibility snapshot of the selected page. */
   #textSnapshot: TextSnapshot | null = null;
   #networkCollector: NetworkCollector;
@@ -495,7 +501,8 @@ export class McpContext implements Context {
   async newPage(): Promise<Page> {
     const page = await this.browser.newPage();
     await this.createPagesSnapshot();
-    this.selectPage(page);
+    // Mark as explicitly selected so this session sticks to this page
+    this.selectPage(page, true);
     this.#networkCollector.addPage(page);
     this.#consoleCollector.addPage(page);
     // Set up WebMCP auto-detection for the new page
@@ -531,7 +538,8 @@ export class McpContext implements Context {
     }
 
     await this.createPagesSnapshot();
-    this.selectPage(page);
+    // Mark as explicitly selected so this session sticks to this window
+    this.selectPage(page, true);
     this.#networkCollector.addPage(page);
     this.#consoleCollector.addPage(page);
     // Set up WebMCP auto-detection for the new page
@@ -636,12 +644,16 @@ export class McpContext implements Context {
     return this.#selectedPage === page;
   }
 
-  selectPage(newPage: Page): void {
+  selectPage(newPage: Page, explicit = false): void {
     const oldPage = this.#selectedPage;
     if (oldPage) {
       oldPage.off('dialog', this.#dialogHandler);
     }
     this.#selectedPage = newPage;
+    if (explicit) {
+      // Mark page as explicitly selected to prevent auto-switching
+      this.#pageExplicitlySelected = true;
+    }
     newPage.on('dialog', this.#dialogHandler);
     this.#updateSelectedPageTimeouts();
   }
@@ -680,7 +692,9 @@ export class McpContext implements Context {
 
     if (this.#textSnapshot.snapshotId !== snapshotId) {
       throw new Error(
-        'This uid is coming from a stale snapshot. Call take_snapshot to get a fresh snapshot.',
+        `This uid (${uid}) is from an old snapshot. The page has changed since then. ` +
+        'Always call take_snapshot immediately before using UIDs from it. ' +
+        'Workflow: 1) take_snapshot, 2) use the UIDs from that response, 3) repeat for each action.',
       );
     }
 
@@ -712,7 +726,11 @@ export class McpContext implements Context {
       );
     });
 
+    // Only auto-select pages[0] if:
+    // 1. No page has been explicitly selected for this session AND
+    // 2. Either there's no selected page OR the selected page is no longer valid
     if (
+      !this.#pageExplicitlySelected &&
       (!this.#selectedPage || this.#pages.indexOf(this.#selectedPage) === -1) &&
       this.#pages[0]
     ) {

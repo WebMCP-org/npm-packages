@@ -93,8 +93,8 @@ export const listWebMCPTools = defineTool({
     'List all WebMCP tools registered across all pages, with diff since last call. ' +
     'First call returns full list. Subsequent calls return only added/removed tools. ' +
     'Use full=true to force complete list. ' +
-    'Tools are shown with their callable names (e.g., webmcp_localhost_3000_page0_test_add). ' +
-    'Call these tools directly by name instead of using a separate call tool.',
+    'To call these tools, use call_webmcp_tool with the ORIGINAL tool name (without the webmcp_ prefix). ' +
+    'Example: call_webmcp_tool({ name: "idp_config_get" }) NOT "webmcp_localhost_3000_page0_idp_config_get".',
   annotations: {
     title: 'Diff Website MCP Tools',
     category: ToolCategory.WEBMCP,
@@ -131,28 +131,41 @@ export const listWebMCPTools = defineTool({
         return;
       }
 
-      response.appendResponseLine(`${tools.length} WebMCP tool(s) registered:`);
+      response.appendResponseLine(`Found ${tools.length} WebMCP tool(s):`);
       response.appendResponseLine('');
 
+      // Group tools by page
+      const toolsByPage = new Map<number, typeof tools>();
       for (const tool of tools) {
-        response.appendResponseLine(`- ${tool.toolId}`);
-        response.appendResponseLine(`  Original: ${tool.originalName}`);
-        response.appendResponseLine(`  Domain: ${tool.domain} (page ${tool.pageIdx})`);
-        if (tool.description) {
-          response.appendResponseLine(`  Description: ${tool.description}`);
+        if (!toolsByPage.has(tool.pageIdx)) {
+          toolsByPage.set(tool.pageIdx, []);
+        }
+        toolsByPage.get(tool.pageIdx)!.push(tool);
+      }
+
+      // Sort pages by index
+      const sortedPages = Array.from(toolsByPage.keys()).sort((a, b) => a - b);
+
+      for (const pageIdx of sortedPages) {
+        const pageTools = toolsByPage.get(pageIdx)!;
+        const domain = pageTools[0].domain;
+
+        response.appendResponseLine(`Page ${pageIdx}: ${domain}`);
+        for (const tool of pageTools) {
+          response.appendResponseLine(`  • ${tool.originalName}`);
+          if (tool.description) {
+            response.appendResponseLine(`    ${tool.description}`);
+          }
         }
         response.appendResponseLine('');
       }
 
       response.appendResponseLine(
-        'IMPORTANT: These tools are available in your MCP tool list.',
-      );
-      response.appendResponseLine(
-        'Call them directly using: mcp__chrome-devtools__<toolId>',
+        'To call a tool: call_webmcp_tool({ name: "tool_name", arguments: {...} })',
       );
       if (tools.length > 0) {
         response.appendResponseLine(
-          `Example: mcp__chrome-devtools__${tools[0].toolId}`,
+          `Example: call_webmcp_tool({ name: "${tools[0].originalName}" })`,
         );
       }
       return;
@@ -165,37 +178,71 @@ export const listWebMCPTools = defineTool({
 
     if (added.length === 0 && removed.length === 0) {
       response.appendResponseLine('No changes since last poll.');
+      response.appendResponseLine('');
+
       if (tools.length > 0) {
-        const toolNames = tools.map(t => t.originalName).join(', ');
-        response.appendResponseLine(
-          `${tools.length} tools available: ${toolNames}`,
-        );
+        // Group tools by page
+        const toolsByPage = new Map<number, typeof tools>();
+        for (const tool of tools) {
+          if (!toolsByPage.has(tool.pageIdx)) {
+            toolsByPage.set(tool.pageIdx, []);
+          }
+          toolsByPage.get(tool.pageIdx)!.push(tool);
+        }
+
+        response.appendResponseLine(`${tools.length} tool(s) available:`);
+        const sortedPages = Array.from(toolsByPage.keys()).sort((a, b) => a - b);
+        for (const pageIdx of sortedPages) {
+          const pageTools = toolsByPage.get(pageIdx)!;
+          const toolNames = pageTools.map(t => t.originalName).join(', ');
+          response.appendResponseLine(`  Page ${pageIdx}: ${toolNames}`);
+        }
       }
       return;
     }
 
     if (added.length > 0) {
-      response.appendResponseLine(`Added (${added.length}):`);
-      for (const tool of added) {
-        response.appendResponseLine(`+ ${tool.toolId}`);
-        if (tool.description) {
-          response.appendResponseLine(`  ${tool.description}`);
-        }
-      }
+      response.appendResponseLine(`Added ${added.length} new tool(s):`);
       response.appendResponseLine('');
+
+      // Group by page
+      const addedByPage = new Map<number, typeof added>();
+      for (const tool of added) {
+        if (!addedByPage.has(tool.pageIdx)) {
+          addedByPage.set(tool.pageIdx, []);
+        }
+        addedByPage.get(tool.pageIdx)!.push(tool);
+      }
+
+      const sortedPages = Array.from(addedByPage.keys()).sort((a, b) => a - b);
+      for (const pageIdx of sortedPages) {
+        const pageTools = addedByPage.get(pageIdx)!;
+        const domain = pageTools[0].domain;
+
+        response.appendResponseLine(`Page ${pageIdx}: ${domain}`);
+        for (const tool of pageTools) {
+          response.appendResponseLine(`  + ${tool.originalName}`);
+          if (tool.description) {
+            response.appendResponseLine(`    ${tool.description}`);
+          }
+        }
+        response.appendResponseLine('');
+      }
+
       response.appendResponseLine(
-        'NEW TOOLS AVAILABLE: Your MCP tool list has been updated.',
-      );
-      response.appendResponseLine(
-        `Call them using: mcp__chrome-devtools__${added[0].toolId}`,
+        `Call with: call_webmcp_tool({ name: "${added[0].originalName}" })`,
       );
       response.appendResponseLine('');
     }
 
     if (removed.length > 0) {
-      response.appendResponseLine(`Removed (${removed.length}):`);
+      response.appendResponseLine(`Removed ${removed.length} tool(s)`);
+      response.appendResponseLine('');
       for (const id of removed) {
-        response.appendResponseLine(`- ${id}`);
+        // Extract original name from toolId format: webmcp_{domain}_page{idx}_{name}
+        const parts = id.split('_');
+        const name = parts.slice(3).join('_'); // Everything after page index
+        response.appendResponseLine(`  - ${name || id}`);
       }
     }
   },

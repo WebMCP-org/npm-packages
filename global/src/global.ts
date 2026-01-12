@@ -21,6 +21,7 @@ import {
   ReadResourceRequestSchema,
 } from '@mcp-b/webmcp-ts-sdk';
 import type { z } from 'zod';
+import { createLogger } from './logger.js';
 import type {
   ElicitationParams,
   ElicitationResult,
@@ -44,6 +45,12 @@ import type {
   ZodSchemaObject,
 } from './types.js';
 import { jsonSchemaToZod, normalizeSchema, validateWithZod } from './validation.js';
+
+// Create namespaced loggers for different components
+const logger = createLogger('WebModelContext');
+const nativeLogger = createLogger('NativeAdapter');
+const bridgeLogger = createLogger('MCPBridge');
+const testingLogger = createLogger('ModelContextTesting');
 
 declare global {
   interface Window {
@@ -186,7 +193,7 @@ class NativeModelContextAdapter implements InternalModelContext {
 
           this.bridge.tools.set(toolInfo.name, validatedTool);
         } catch (error) {
-          console.error(`[Native Adapter] Failed to sync tool "${toolInfo.name}":`, error);
+          nativeLogger.error(`Failed to sync tool "${toolInfo.name}":`, error);
         }
       }
 
@@ -311,7 +318,7 @@ class NativeModelContextAdapter implements InternalModelContext {
       const result = await this.nativeTesting.executeTool(toolName, JSON.stringify(args));
       return this.convertToToolResponse(result);
     } catch (error) {
-      console.error(`[Native Adapter] Error executing tool "${toolName}":`, error);
+      nativeLogger.error(`Error executing tool "${toolName}":`, error);
       return {
         content: [
           {
@@ -348,7 +355,7 @@ class NativeModelContextAdapter implements InternalModelContext {
    * This is a polyfill-only feature.
    */
   registerResource(_resource: ResourceDescriptor): { unregister: () => void } {
-    console.warn('[Native Adapter] registerResource is not supported by native API');
+    nativeLogger.warn('registerResource is not supported by native API');
     return { unregister: () => {} };
   }
 
@@ -357,7 +364,7 @@ class NativeModelContextAdapter implements InternalModelContext {
    * Note: Native Chromium API does not yet support resources.
    */
   unregisterResource(_uri: string): void {
-    console.warn('[Native Adapter] unregisterResource is not supported by native API');
+    nativeLogger.warn('unregisterResource is not supported by native API');
   }
 
   /**
@@ -400,7 +407,7 @@ class NativeModelContextAdapter implements InternalModelContext {
   registerPrompt<TArgsSchema extends ZodSchemaObject = Record<string, never>>(
     _prompt: PromptDescriptor<TArgsSchema>
   ): { unregister: () => void } {
-    console.warn('[Native Adapter] registerPrompt is not supported by native API');
+    nativeLogger.warn('registerPrompt is not supported by native API');
     return { unregister: () => {} };
   }
 
@@ -409,7 +416,7 @@ class NativeModelContextAdapter implements InternalModelContext {
    * Note: Native Chromium API does not yet support prompts.
    */
   unregisterPrompt(_name: string): void {
-    console.warn('[Native Adapter] unregisterPrompt is not supported by native API');
+    nativeLogger.warn('unregisterPrompt is not supported by native API');
   }
 
   /**
@@ -686,7 +693,7 @@ class WebModelContextTesting implements ModelContextTesting {
       try {
         callback();
       } catch (error) {
-        console.error('[Model Context Testing] Error in tools changed callback:', error);
+        testingLogger.error('Error in tools changed callback:', error);
       }
     }
   }
@@ -971,9 +978,6 @@ class WebModelContext implements InternalModelContext {
    */
   provideContext(context: ModelContextInput): void {
     // Verbose logging removed to reduce console spam
-    const toolCount = context.tools?.length ?? 0;
-    const resourceCount = context.resources?.length ?? 0;
-    const promptCount = context.prompts?.length ?? 0;
 
     // Clear base items (Bucket A)
     this.provideContextTools.clear();
@@ -986,22 +990,22 @@ class WebModelContext implements InternalModelContext {
       // NOTE: Similar validation exists in @mcp-b/chrome-devtools-mcp/src/tools/WebMCPToolHub.ts
       // Keep both implementations in sync when making changes.
       if (tool.name.startsWith('_')) {
-        console.warn(
-          `[Web Model Context] ⚠️ Warning: Tool name "${tool.name}" starts with underscore. ` +
+        logger.warn(
+          `⚠️ Warning: Tool name "${tool.name}" starts with underscore. ` +
             'This may cause compatibility issues with some MCP clients. ' +
             'Consider using a letter as the first character.'
         );
       }
       if (/^[0-9]/.test(tool.name)) {
-        console.warn(
-          `[Web Model Context] ⚠️ Warning: Tool name "${tool.name}" starts with a number. ` +
+        logger.warn(
+          `⚠️ Warning: Tool name "${tool.name}" starts with a number. ` +
             'This may cause compatibility issues. ' +
             'Consider using a letter as the first character.'
         );
       }
       if (tool.name.startsWith('-')) {
-        console.warn(
-          `[Web Model Context] ⚠️ Warning: Tool name "${tool.name}" starts with hyphen. ` +
+        logger.warn(
+          `⚠️ Warning: Tool name "${tool.name}" starts with hyphen. ` +
             'This may cause compatibility issues. ' +
             'Consider using a letter as the first character.'
         );
@@ -1136,22 +1140,22 @@ class WebModelContext implements InternalModelContext {
     // NOTE: Similar validation exists in @mcp-b/chrome-devtools-mcp/src/tools/WebMCPToolHub.ts
     // Keep both implementations in sync when making changes.
     if (tool.name.startsWith('_')) {
-      console.warn(
-        `[Web Model Context] ⚠️ Warning: Tool name "${tool.name}" starts with underscore. ` +
+      logger.warn(
+        `⚠️ Warning: Tool name "${tool.name}" starts with underscore. ` +
           'This may cause compatibility issues with some MCP clients. ' +
           'Consider using a letter as the first character.'
       );
     }
     if (/^[0-9]/.test(tool.name)) {
-      console.warn(
-        `[Web Model Context] ⚠️ Warning: Tool name "${tool.name}" starts with a number. ` +
+      logger.warn(
+        `⚠️ Warning: Tool name "${tool.name}" starts with a number. ` +
           'This may cause compatibility issues. ' +
           'Consider using a letter as the first character.'
       );
     }
     if (tool.name.startsWith('-')) {
-      console.warn(
-        `[Web Model Context] ⚠️ Warning: Tool name "${tool.name}" starts with hyphen. ` +
+      logger.warn(
+        `⚠️ Warning: Tool name "${tool.name}" starts with hyphen. ` +
           'This may cause compatibility issues. ' +
           'Consider using a letter as the first character.'
       );
@@ -1161,8 +1165,8 @@ class WebModelContext implements InternalModelContext {
     const lastRegistration = this.toolRegistrationTimestamps.get(tool.name);
 
     if (lastRegistration && now - lastRegistration < RAPID_DUPLICATE_WINDOW_MS) {
-      console.warn(
-        `[Web Model Context] Tool "${tool.name}" registered multiple times within ${RAPID_DUPLICATE_WINDOW_MS}ms. ` +
+      logger.warn(
+        `Tool "${tool.name}" registered multiple times within ${RAPID_DUPLICATE_WINDOW_MS}ms. ` +
           'This is likely due to React Strict Mode double-mounting. Ignoring duplicate registration.'
       );
 
@@ -1217,9 +1221,7 @@ class WebModelContext implements InternalModelContext {
       }
 
       if (!this.dynamicTools.has(tool.name)) {
-        console.warn(
-          `[Web Model Context] Tool "${tool.name}" is not registered, ignoring unregister call`
-        );
+        logger.warn(`Tool "${tool.name}" is not registered, ignoring unregister call`);
         return;
       }
 
@@ -1252,8 +1254,8 @@ class WebModelContext implements InternalModelContext {
     const lastRegistration = this.resourceRegistrationTimestamps.get(resource.uri);
 
     if (lastRegistration && now - lastRegistration < RAPID_DUPLICATE_WINDOW_MS) {
-      console.warn(
-        `[Web Model Context] Resource "${resource.uri}" registered multiple times within ${RAPID_DUPLICATE_WINDOW_MS}ms. ` +
+      logger.warn(
+        `Resource "${resource.uri}" registered multiple times within ${RAPID_DUPLICATE_WINDOW_MS}ms. ` +
           'This is likely due to React Strict Mode double-mounting. Ignoring duplicate registration.'
       );
 
@@ -1294,9 +1296,7 @@ class WebModelContext implements InternalModelContext {
       }
 
       if (!this.dynamicResources.has(resource.uri)) {
-        console.warn(
-          `[Web Model Context] Resource "${resource.uri}" is not registered, ignoring unregister call`
-        );
+        logger.warn(`Resource "${resource.uri}" is not registered, ignoring unregister call`);
         return;
       }
 
@@ -1325,9 +1325,7 @@ class WebModelContext implements InternalModelContext {
     const inDynamic = this.dynamicResources.has(uri);
 
     if (!inProvideContext && !inDynamic) {
-      console.warn(
-        `[Web Model Context] Resource "${uri}" is not registered, ignoring unregister call`
-      );
+      logger.warn(`Resource "${uri}" is not registered, ignoring unregister call`);
       return;
     }
 
@@ -1403,8 +1401,8 @@ class WebModelContext implements InternalModelContext {
     const lastRegistration = this.promptRegistrationTimestamps.get(prompt.name);
 
     if (lastRegistration && now - lastRegistration < RAPID_DUPLICATE_WINDOW_MS) {
-      console.warn(
-        `[Web Model Context] Prompt "${prompt.name}" registered multiple times within ${RAPID_DUPLICATE_WINDOW_MS}ms. ` +
+      logger.warn(
+        `Prompt "${prompt.name}" registered multiple times within ${RAPID_DUPLICATE_WINDOW_MS}ms. ` +
           'This is likely due to React Strict Mode double-mounting. Ignoring duplicate registration.'
       );
 
@@ -1445,9 +1443,7 @@ class WebModelContext implements InternalModelContext {
       }
 
       if (!this.dynamicPrompts.has(prompt.name)) {
-        console.warn(
-          `[Web Model Context] Prompt "${prompt.name}" is not registered, ignoring unregister call`
-        );
+        logger.warn(`Prompt "${prompt.name}" is not registered, ignoring unregister call`);
         return;
       }
 
@@ -1476,9 +1472,7 @@ class WebModelContext implements InternalModelContext {
     const inDynamic = this.dynamicPrompts.has(name);
 
     if (!inProvideContext && !inDynamic) {
-      console.warn(
-        `[Web Model Context] Prompt "${name}" is not registered, ignoring unregister call`
-      );
+      logger.warn(`Prompt "${name}" is not registered, ignoring unregister call`);
       return;
     }
 
@@ -1529,9 +1523,7 @@ class WebModelContext implements InternalModelContext {
     const inDynamic = this.dynamicTools.has(name);
 
     if (!inProvideContext && !inDynamic) {
-      console.warn(
-        `[Web Model Context] Tool "${name}" is not registered, ignoring unregister call`
-      );
+      logger.warn(`Tool "${name}" is not registered, ignoring unregister call`);
       return;
     }
 
@@ -1742,7 +1734,7 @@ class WebModelContext implements InternalModelContext {
         default: {
           // Exhaustiveness check: TypeScript will error if a case is missing
           const _exhaustive: never = listType;
-          console.error(`[Web Model Context] Unknown list type: ${_exhaustive}`);
+          logger.error(`Unknown list type: ${_exhaustive}`);
         }
       }
     });
@@ -1767,7 +1759,7 @@ class WebModelContext implements InternalModelContext {
         const parsedUri = new URL(uri);
         return await staticResource.read(parsedUri);
       } catch (error) {
-        console.error(`[Web Model Context] Error reading resource ${uri}:`, error);
+        logger.error(`Error reading resource ${uri}:`, error);
         throw error;
       }
     }
@@ -1782,7 +1774,7 @@ class WebModelContext implements InternalModelContext {
           const parsedUri = new URL(uri);
           return await resource.read(parsedUri, params);
         } catch (error) {
-          console.error(`[Web Model Context] Error reading resource ${uri}:`, error);
+          logger.error(`Error reading resource ${uri}:`, error);
           throw error;
         }
       }
@@ -1856,10 +1848,7 @@ class WebModelContext implements InternalModelContext {
     if (prompt.argsValidator && args) {
       const validation = validateWithZod(args, prompt.argsValidator);
       if (!validation.success) {
-        console.error(
-          `[Web Model Context] Argument validation failed for prompt ${name}:`,
-          validation.error
-        );
+        logger.error(`Argument validation failed for prompt ${name}:`, validation.error);
         throw new Error(`Argument validation error for prompt "${name}":\n${validation.error}`);
       }
     }
@@ -1867,7 +1856,7 @@ class WebModelContext implements InternalModelContext {
     try {
       return await prompt.get(args ?? {});
     } catch (error) {
-      console.error(`[Web Model Context] Error getting prompt ${name}:`, error);
+      logger.error(`Error getting prompt ${name}:`, error);
       throw error;
     }
   }
@@ -1897,10 +1886,7 @@ class WebModelContext implements InternalModelContext {
     // Verbose logging removed to reduce console spam
     const validation = validateWithZod(args, tool.inputValidator);
     if (!validation.success) {
-      console.error(
-        `[Web Model Context] Input validation failed for ${toolName}:`,
-        validation.error
-      );
+      logger.error(`Input validation failed for ${toolName}:`, validation.error);
       return {
         content: [
           {
@@ -1945,24 +1931,22 @@ class WebModelContext implements InternalModelContext {
       if (tool.outputValidator && response.structuredContent) {
         const outputValidation = validateWithZod(response.structuredContent, tool.outputValidator);
         if (!outputValidation.success) {
-          console.warn(
-            `[Web Model Context] Output validation failed for ${toolName}:`,
-            outputValidation.error
-          );
+          logger.warn(`Output validation failed for ${toolName}:`, outputValidation.error);
         }
       }
 
       // Log navigation tools for debugging
-      if (response.metadata && 'willNavigate' in response.metadata) {
-        console.info(
-          `[Web Model Context] Tool "${toolName}" will trigger navigation`,
-          response.metadata
-        );
+      if (
+        response.metadata &&
+        typeof response.metadata === 'object' &&
+        'willNavigate' in response.metadata
+      ) {
+        logger.info(`Tool "${toolName}" will trigger navigation`, response.metadata);
       }
 
       return response;
     } catch (error) {
-      console.error(`[Web Model Context] Error executing tool ${toolName}:`, error);
+      logger.error(`Error executing tool ${toolName}:`, error);
       return {
         content: [
           {
@@ -2086,7 +2070,7 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
           ...(response.structuredContent && { structuredContent: response.structuredContent }),
         };
       } catch (error) {
-        console.error(`[MCP Bridge] Error calling tool ${toolName}:`, error);
+        bridgeLogger.error(`Error calling tool ${toolName}:`, error);
         throw error;
       }
     });
@@ -2108,7 +2092,7 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
       try {
         return await bridge.modelContext.readResource(request.params.uri);
       } catch (error) {
-        console.error(`[MCP Bridge] Error reading resource ${request.params.uri}:`, error);
+        bridgeLogger.error(`Error reading resource ${request.params.uri}:`, error);
         throw error;
       }
     });
@@ -2130,7 +2114,7 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
           request.params.arguments as Record<string, unknown> | undefined
         );
       } catch (error) {
-        console.error(`[MCP Bridge] Error getting prompt ${request.params.name}:`, error);
+        bridgeLogger.error(`Error getting prompt ${request.params.name}:`, error);
         throw error;
       }
     });
@@ -2287,7 +2271,7 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
  */
 export function initializeWebModelContext(options?: WebModelContextInitOptions): void {
   if (typeof window === 'undefined') {
-    console.warn('[Web Model Context] Not in browser environment, skipping initialization');
+    logger.warn('Not in browser environment, skipping initialization');
     return;
   }
 
@@ -2299,13 +2283,13 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
     const nativeTesting = window.navigator.modelContextTesting;
 
     if (!nativeContext || !nativeTesting) {
-      console.error('[Web Model Context] Native API detection mismatch');
+      logger.error('Native API detection mismatch');
       return;
     }
 
-    console.log('✅ [Web Model Context] Native Chromium API detected');
-    console.log('   Using native implementation with MCP bridge synchronization');
-    console.log('   Native API will automatically collect tools from embedded iframes');
+    logger.info('✅ Native Chromium API detected');
+    logger.info('   Using native implementation with MCP bridge synchronization');
+    logger.info('   Native API will automatically collect tools from embedded iframes');
 
     try {
       const bridge = initializeMCPBridge(effectiveOptions);
@@ -2321,10 +2305,10 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
         configurable: true,
       });
 
-      console.log('✅ [Web Model Context] MCP bridge synced with native API');
-      console.log('   MCP clients will receive automatic tool updates from native registry');
+      logger.info('✅ MCP bridge synced with native API');
+      logger.info('   MCP clients will receive automatic tool updates from native registry');
     } catch (error) {
-      console.error('[Web Model Context] Failed to initialize native adapter:', error);
+      logger.error('Failed to initialize native adapter:', error);
       throw error;
     }
 
@@ -2332,24 +2316,22 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
   }
 
   if (native.hasNativeContext && !native.hasNativeTesting) {
-    console.warn('[Web Model Context] Partial native API detected');
-    console.warn('   navigator.modelContext exists but navigator.modelContextTesting is missing');
-    console.warn('   Cannot sync with native API. Please enable experimental features:');
-    console.warn('      - Navigate to chrome://flags');
-    console.warn('      - Enable "Experimental Web Platform Features"');
-    console.warn('      - Or launch with: --enable-experimental-web-platform-features');
-    console.warn('   Skipping initialization to avoid conflicts');
+    logger.warn('Partial native API detected');
+    logger.warn('   navigator.modelContext exists but navigator.modelContextTesting is missing');
+    logger.warn('   Cannot sync with native API. Please enable experimental features:');
+    logger.warn('      - Navigate to chrome://flags');
+    logger.warn('      - Enable "Experimental Web Platform Features"');
+    logger.warn('      - Or launch with: --enable-experimental-web-platform-features');
+    logger.warn('   Skipping initialization to avoid conflicts');
     return;
   }
 
   if (window.navigator.modelContext) {
-    console.warn(
-      '[Web Model Context] window.navigator.modelContext already exists, skipping initialization'
-    );
+    logger.warn('window.navigator.modelContext already exists, skipping initialization');
     return;
   }
 
-  console.log('[Web Model Context] Native API not detected, installing polyfill');
+  logger.info('Native API not detected, installing polyfill');
 
   try {
     const bridge = initializeMCPBridge(effectiveOptions);
@@ -2366,13 +2348,13 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
       configurable: true,
     });
 
-    console.log('✅ [Web Model Context] window.navigator.modelContext initialized successfully');
+    logger.info('✅ window.navigator.modelContext initialized successfully');
 
-    console.log('[Model Context Testing] Installing polyfill');
-    console.log('   💡 To use the native implementation in Chromium:');
-    console.log('      - Navigate to chrome://flags');
-    console.log('      - Enable "Experimental Web Platform Features"');
-    console.log('      - Or launch with: --enable-experimental-web-platform-features');
+    testingLogger.info('Installing polyfill');
+    testingLogger.info('   💡 To use the native implementation in Chromium:');
+    testingLogger.info('      - Navigate to chrome://flags');
+    testingLogger.info('      - Enable "Experimental Web Platform Features"');
+    testingLogger.info('      - Or launch with: --enable-experimental-web-platform-features');
 
     const testingAPI = new WebModelContextTesting(bridge);
     bridge.modelContextTesting = testingAPI;
@@ -2385,11 +2367,9 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
       configurable: true,
     });
 
-    console.log(
-      '✅ [Model Context Testing] Polyfill installed at window.navigator.modelContextTesting'
-    );
+    testingLogger.info('✅ Polyfill installed at window.navigator.modelContextTesting');
   } catch (error) {
-    console.error('[Web Model Context] Failed to initialize:', error);
+    logger.error('Failed to initialize:', error);
     throw error;
   }
 }
@@ -2417,7 +2397,7 @@ export function cleanupWebModelContext(): void {
         window.__mcpBridge.iframeServer.close();
       }
     } catch (error) {
-      console.warn('[Web Model Context] Error closing MCP servers:', error);
+      logger.warn('Error closing MCP servers:', error);
     }
   }
 
@@ -2425,5 +2405,5 @@ export function cleanupWebModelContext(): void {
   delete (window.navigator as unknown as { modelContextTesting?: unknown }).modelContextTesting;
   delete (window as unknown as { __mcpBridge?: unknown }).__mcpBridge;
 
-  console.log('[Web Model Context] Cleaned up');
+  logger.info('Cleaned up');
 }

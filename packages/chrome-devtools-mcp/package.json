@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/chrome-devtools-mcp",
-  "version": "1.5.0",
+  "version": "1.5.6",
   "description": "MCP server for Chrome DevTools with WebMCP integration for connecting to website MCP tools",
   "keywords": [
     "mcp",
@@ -56,6 +56,7 @@
     "docs:generate": "node --experimental-strip-types scripts/generate-docs.ts",
     "format": "eslint --cache --fix . && prettier --write --cache .",
     "prepare": "node --experimental-strip-types scripts/prepare.ts",
+    "prepublishOnly": "node ../../scripts/validate-publish.js",
     "start": "npm run build && node build/src/index.js",
     "start-debug": "DEBUG=mcp:* DEBUG_COLORS=false npm run build && node build/src/index.js",
     "test": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test-reporter spec --test-force-exit --test \"build/tests/**/*.test.js\"",
@@ -68,7 +69,6 @@
   },
   "dependencies": {
     "@composio/json-schema-to-zod": "catalog:",
-    "@mcp-b/global": "workspace:*",
     "@modelcontextprotocol/sdk": "catalog:",
     "core-js": "3.47.0",
     "debug": "4.4.3",

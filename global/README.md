@@ -1011,6 +1011,43 @@ if ("modelContext" in navigator) {
 
 ## 🐛 Debugging
 
+### Enable Debug Logging
+
+The @mcp-b/global library includes a lightweight logging system that can be enabled in the browser console. By default, the console is kept clean (only errors and warnings are shown). You can enable detailed debug logging when troubleshooting:
+
+```javascript
+// Enable all debug logging
+localStorage.setItem('WEBMCP_DEBUG', '*');
+
+// Enable specific namespaces
+localStorage.setItem('WEBMCP_DEBUG', 'WebModelContext');
+localStorage.setItem('WEBMCP_DEBUG', 'NativeAdapter,MCPBridge');
+
+// Refresh the page to apply changes
+location.reload();
+```
+
+To disable debug logging:
+
+```javascript
+localStorage.removeItem('WEBMCP_DEBUG');
+location.reload();
+```
+
+**Available Namespaces:**
+- `WebModelContext` - Main polyfill implementation
+- `NativeAdapter` - Native Chromium API adapter
+- `MCPBridge` - MCP server and transport setup
+- `ModelContextTesting` - Testing API operations
+
+**Log Levels:**
+- **Error** (always shown): Critical failures and exceptions
+- **Warn** (always shown): Compatibility warnings and potential issues
+- **Info** (debug mode only): Initialization and setup progress
+- **Debug** (debug mode only): Detailed operation traces
+
+### Access Internal Bridge
+
 In development mode, access the internal bridge:
 
 ```javascript
