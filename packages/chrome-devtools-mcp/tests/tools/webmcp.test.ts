@@ -174,7 +174,7 @@ const MOCK_WEBMCP_PAGE = `
 describe('webmcp tools', () => {
   const server = serverHooks();
 
-  describe('diff_webmcp_tools', () => {
+  describe('list_webmcp_tools', () => {
     it('shows message when no tools registered', async () => {
       await withMcpContext(
         async (response, context) => {
@@ -210,7 +210,7 @@ describe('webmcp tools', () => {
           const result = await context.getWebMCPClient(page);
           assert.ok(result.connected, 'Should connect to WebMCP');
 
-          // Now diff_webmcp_tools should show the registered tools
+          // Now list_webmcp_tools should show the registered tools
           await diffWebMCPTools.handler({params: {}}, response, context);
 
           const output = response.responseLines.join('\n');

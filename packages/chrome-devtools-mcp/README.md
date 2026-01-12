@@ -123,7 +123,7 @@ The AI can see the actual response, fix any bugs, and repeat until it works perf
 This creates a tight feedback loop where your AI assistant can:
 - **Write** WebMCP tools in your codebase
 - **Deploy** them automatically via hot-reload
-- **Discover** them through `diff_webmcp_tools`
+- **Discover** them through `list_webmcp_tools`
 - **Test** them by calling tools directly by their prefixed names (e.g., `webmcp_localhost_3000_page0_search_products`)
 - **Debug** issues using console messages and snapshots
 - **Iterate** until the tool works correctly
@@ -476,7 +476,7 @@ If you run into any issues, checkout our [troubleshooting guide](./docs/troubles
   - [`take_screenshot`](docs/tool-reference.md#take_screenshot)
   - [`take_snapshot`](docs/tool-reference.md#take_snapshot)
 - **Website MCP Tools** (1 tool)
-  - [`diff_webmcp_tools`](docs/tool-reference.md#diff_webmcp_tools) - List available website tools across all pages (with diff)
+  - [`list_webmcp_tools`](docs/tool-reference.md#list_webmcp_tools) - List available website tools across all pages (with diff)
 
 <!-- END AUTO GENERATED TOOLS -->
 
@@ -814,7 +814,7 @@ Navigate to https://example.com/app
 What tools are available on this website?
 ```
 
-The AI agent will use `diff_webmcp_tools` to show you what functionality the
+The AI agent will use `list_webmcp_tools` to show you what functionality the
 website exposes. This automatically connects to the page's WebMCP server.
 
 **3. Use the tools directly**
@@ -840,13 +840,13 @@ By default, WebMCP tools are automatically registered as first-class MCP tools w
 | Claude Code | Yes | Full support for `tools/list_changed` |
 | GitHub Copilot | Yes | Supports list changed notifications |
 | Gemini CLI | Yes | Recently added support |
-| Cursor | No | Use `diff_webmcp_tools` to poll manually |
-| Cline | Partial | May need manual polling with `diff_webmcp_tools` |
-| Continue | Unknown | Use `diff_webmcp_tools` if tools don't appear |
+| Cursor | No | Use `list_webmcp_tools` to poll manually |
+| Cline | Partial | May need manual polling with `list_webmcp_tools` |
+| Continue | Unknown | Use `list_webmcp_tools` if tools don't appear |
 
 **For clients without dynamic tool support:**
 
-If your MCP client doesn't support `tools/list_changed` notifications, use `diff_webmcp_tools` to manually see which tools are available, then call them directly by their prefixed names. The `diff_webmcp_tools` tool is diff-aware to reduce context pollution:
+If your MCP client doesn't support `tools/list_changed` notifications, use `list_webmcp_tools` to manually see which tools are available, then call them directly by their prefixed names. The `list_webmcp_tools` tool is diff-aware to reduce context pollution:
 - First call returns the full tool list
 - Subsequent calls return only added/removed tools
 - Use `full: true` to force the complete list
@@ -872,9 +872,9 @@ Call the website's form submission tool to fill out the contact form
 - **"WebMCP not detected"**: The current webpage doesn't have `@mcp-b/global`
   installed or no tools are registered. The page needs the WebMCP polyfill loaded.
 - **Tool call fails**: Check the tool's input schema matches your parameters.
-  Use `diff_webmcp_tools` to see the expected input format.
+  Use `list_webmcp_tools` to see the expected input format.
 - **Tools not appearing after navigation**: WebMCP auto-reconnects when you
-  navigate. If the new page has different tools, call `diff_webmcp_tools` again.
+  navigate. If the new page has different tools, call `list_webmcp_tools` again.
 
 ## Related Packages
 

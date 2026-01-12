@@ -23,10 +23,11 @@ interface TrackedTool {
   domain: string;
   toolId: string;
   description: string;
+  inputSchema?: Record<string, unknown>;
 }
 
 /**
- * Public info about a registered WebMCP tool (for diff_webmcp_tools)
+ * Public info about a registered WebMCP tool (for list_webmcp_tools)
  */
 export interface RegisteredToolInfo {
   toolId: string;
@@ -46,7 +47,7 @@ export interface RegisteredToolInfo {
  * 4. Removes tools when pages navigate or close
  *
  * This allows Claude Code to call WebMCP tools directly without the two-step
- * diff_webmcp_tools -> call_webmcp_tool process.
+ * list_webmcp_tools -> call_webmcp_tool process.
  */
 export class WebMCPToolHub {
   #server: McpServer;
@@ -60,7 +61,7 @@ export class WebMCPToolHub {
   #syncInProgress = new WeakSet<Page>();
   /** Whether automatic tool tracking is enabled. */
   #enabled = true;
-  /** Last seen tool IDs for diff_webmcp_tools. */
+  /** Last seen tool IDs for list_webmcp_tools. */
   #lastSeenToolIds: Set<string> | null = null;
 
   constructor(server: McpServer, context: McpContext, enabled = true) {
@@ -236,13 +237,14 @@ export class WebMCPToolHub {
 
     this.#logger(`Tracking WebMCP tool: ${toolId}`);
 
-    // Track tool metadata
+    // Track tool metadata including schema
     this.#trackedTools.set(toolId, {
       page,
       originalName: tool.name,
       domain,
       toolId,
       description: tool.description || '',
+      inputSchema: tool.inputSchema as Record<string, unknown> | undefined,
     });
 
     // Track tool for this page
@@ -286,17 +288,37 @@ export class WebMCPToolHub {
   }
 
   /**
-   * Get the last seen tool IDs (for diff_webmcp_tools)
+   * Get the last seen tool IDs (for list_webmcp_tools)
    */
   getLastSeenToolIds(): Set<string> | null {
     return this.#lastSeenToolIds;
   }
 
   /**
-   * Set the last seen tool IDs (for diff_webmcp_tools)
+   * Set the last seen tool IDs (for list_webmcp_tools)
    */
   setLastSeenToolIds(toolIds: Set<string>): void {
     this.#lastSeenToolIds = toolIds;
+  }
+
+  /**
+   * Get a tracked tool by name and page.
+   * Used by get_webmcp_tool_schema to retrieve schema.
+   */
+  getToolByName(toolName: string, page: Page): TrackedTool | undefined {
+    const pageToolIds = this.#pageTools.get(page);
+    if (!pageToolIds) {
+      return undefined;
+    }
+
+    for (const toolId of pageToolIds) {
+      const tool = this.#trackedTools.get(toolId);
+      if (tool && tool.originalName === toolName) {
+        return tool;
+      }
+    }
+
+    return undefined;
   }
 }
 

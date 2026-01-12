@@ -4,7 +4,7 @@
 
 ### Patch Changes
 
-- Improve diff_webmcp_tools output: now shows available tool names summary when no changes detected, making it easier to see current tools without using full=true.
+- Improve list_webmcp_tools output: now shows available tool names summary when no changes detected, making it easier to see current tools without using full=true.
 
 ## 1.3.0
 

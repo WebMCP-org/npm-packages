@@ -34,7 +34,7 @@ export function registerPrompts(server: McpServer): void {
 1. **Write the Tool**: I'll ask you to create a WebMCP tool in my codebase using @mcp-b/global
 2. **Hot Reload**: My dev server will automatically reload with the new tool
 3. **Navigate**: Use navigate_page to open my dev server (e.g., http://localhost:3000)
-4. **Discover**: Use diff_webmcp_tools to see registered tools (shown with callable names like webmcp_localhost_3000_page0_my_tool)
+4. **Discover**: Use list_webmcp_tools to see registered tools (shown with callable names like webmcp_localhost_3000_page0_my_tool)
 5. **Test**: Call the tool directly by its prefixed name (e.g., webmcp_localhost_3000_page0_my_tool)
 6. **Iterate**: If something is wrong, fix the code and repeat
 
@@ -108,7 +108,7 @@ What would you like to build? Describe the tool you need and I'll help you imple
 ## Test Plan
 
 1. Navigate to ${url}
-2. Use diff_webmcp_tools to discover registered tools (shown with callable names like webmcp_localhost_3000_page0_tool_name)
+2. Use list_webmcp_tools to discover registered tools (shown with callable names like webmcp_localhost_3000_page0_tool_name)
 3. ${toolNameInstruction}
 4. Call the tool directly by its prefixed name and test with various inputs:
    - Valid inputs (happy path)
@@ -161,7 +161,7 @@ ${urlInstruction}
    - Errors loading @mcp-b/global
    - Tool registration errors
    - Any JavaScript errors
-3. **Test WebMCP**: Try diff_webmcp_tools to see if connection works
+3. **Test WebMCP**: Try list_webmcp_tools to see if connection works
 4. **Verify registration**: If no tools appear, check if the code properly imports '@mcp-b/global' and calls registerTool
 
 ## Common Issues

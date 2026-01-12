@@ -88,9 +88,9 @@ import {extractDomain} from './WebMCPToolHub.js';
  * First call returns full list. Subsequent calls return only added/removed tools.
  */
 export const diffWebMCPTools = defineTool({
-  name: 'diff_webmcp_tools',
+  name: 'list_webmcp_tools',
   description:
-    'Show all WebMCP tools registered across all pages, with diff since last call. ' +
+    'List all WebMCP tools registered across all pages, with diff since last call. ' +
     'First call returns full list. Subsequent calls return only added/removed tools. ' +
     'Use full=true to force complete list. ' +
     'Tools are shown with their callable names (e.g., webmcp_localhost_3000_page0_test_add). ' +
@@ -202,6 +202,68 @@ export const diffWebMCPTools = defineTool({
 });
 
 /**
+ * Get the JSON Schema for a WebMCP tool.
+ * Use this to understand what arguments a tool expects before calling it.
+ */
+export const getWebMCPToolSchema = defineTool({
+  name: 'get_webmcp_tool_schema',
+  description:
+    'Get the JSON Schema for a WebMCP tool registered on a webpage. ' +
+    'Use this to understand what arguments a tool expects before calling it with call_webmcp_tool. ' +
+    'Returns the inputSchema from the tool definition.',
+  annotations: {
+    title: 'Get WebMCP Tool Schema',
+    category: ToolCategory.WEBMCP,
+    readOnlyHint: true,
+  },
+  schema: {
+    name: zod.string().describe('The name of the tool to get the schema for'),
+    page_index: zod
+      .number()
+      .int()
+      .optional()
+      .describe(
+        'Index of the page where the tool is registered. If not specified, uses the currently selected page. ' +
+          'Use list_pages to see available pages and their indices.',
+      ),
+  },
+  handler: async (request, response, context) => {
+    const {name, page_index} = request.params;
+
+    // Get the target page
+    const page =
+      page_index !== undefined
+        ? context.getPageByIdx(page_index)
+        : context.getSelectedPage();
+
+    const toolHub = context.getToolHub();
+    if (!toolHub) {
+      response.appendResponseLine('WebMCPToolHub not initialized.');
+      response.setIsError(true);
+      return;
+    }
+
+    const trackedTool = toolHub.getToolByName(name, page);
+    if (!trackedTool) {
+      response.appendResponseLine(`Tool "${name}" not found on this page.`);
+      response.appendResponseLine('');
+      response.appendResponseLine('Use list_webmcp_tools to see available tools.');
+      response.setIsError(true);
+      return;
+    }
+
+    if (!trackedTool.inputSchema) {
+      response.appendResponseLine(`Tool "${name}" has no schema defined.`);
+      return;
+    }
+
+    response.appendResponseLine(`Schema for tool "${name}":`);
+    response.appendResponseLine('');
+    response.appendResponseLine(JSON.stringify(trackedTool.inputSchema, null, 2));
+  },
+});
+
+/**
  * Call a tool registered on a webpage via WebMCP.
  * Auto-connects to WebMCP if not already connected.
  */
@@ -210,7 +272,7 @@ export const callWebMCPTool = defineTool({
   description:
     'Call a tool registered on a webpage via WebMCP. ' +
     'Automatically connects if the page has @mcp-b/global loaded. ' +
-    'Use diff_webmcp_tools to see available tools and their schemas. ' +
+    'Use list_webmcp_tools to see available tools and their schemas. ' +
     'Use page_index to target a specific page.',
   annotations: {
     title: 'Call Website MCP Tool',
@@ -235,6 +297,17 @@ export const callWebMCPTool = defineTool({
   handler: async (request, response, context) => {
     const {name, arguments: args, page_index} = request.params;
 
+    // Validate required parameter
+    if (!name || typeof name !== 'string') {
+      response.appendResponseLine('Error: Missing required parameter "name"');
+      response.appendResponseLine('');
+      response.appendResponseLine('Usage: call_webmcp_tool({ name: "tool_name", arguments: {...} })');
+      response.appendResponseLine('');
+      response.appendResponseLine('Use list_webmcp_tools to see available tools.');
+      response.setIsError(true);
+      return;
+    }
+
     // Get the target page
     const page =
       page_index !== undefined
@@ -247,6 +320,7 @@ export const callWebMCPTool = defineTool({
       response.appendResponseLine(
         result.error || 'No WebMCP tools available on this page.',
       );
+      response.setIsError(true);
       return;
     }
 
@@ -293,11 +367,42 @@ export const callWebMCPTool = defineTool({
       if (callResult.isError) {
         response.appendResponseLine('');
         response.appendResponseLine('(Tool returned an error)');
+        response.setIsError(true);
       }
     } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+
+      // Handle "Connection closed" gracefully for navigation tools
+      if (errorMessage.includes('Connection closed')) {
+        // Check if this was a navigation by inspecting the arguments
+        const navigationTarget = args && typeof args === 'object' && 'to' in args
+          ? (args as {to?: string}).to
+          : null;
+
+        if (navigationTarget && typeof navigationTarget === 'string') {
+          // Wait a moment for navigation to complete
+          await new Promise(resolve => setTimeout(resolve, 100));
+
+          const currentUrl = page.url();
+          const urlObj = new URL(currentUrl);
+          const currentPath = urlObj.pathname + urlObj.search + urlObj.hash;
+
+          // Check if we navigated to the expected path
+          if (currentPath === navigationTarget || currentPath.startsWith(navigationTarget)) {
+            response.appendResponseLine('');
+            response.appendResponseLine(`✓ Navigation successful: ${currentUrl}`);
+            response.appendResponseLine('');
+            response.appendResponseLine('(Connection closed during navigation - this is expected)');
+            // Don't set isError - this is a success
+            return;
+          }
+        }
+      }
+
       response.appendResponseLine(
-        `Failed to call tool: ${err instanceof Error ? err.message : String(err)}`,
+        `Failed to call tool: ${errorMessage}`,
       );
+      response.setIsError(true);
     }
   },
 });
@@ -507,7 +612,7 @@ export const callWebMCPTool = defineTool({
 //       if (!wait_for_tools) {
 //         response.appendResponseLine('');
 //         response.appendResponseLine(
-//           'Use diff_webmcp_tools to verify registration.',
+//           'Use list_webmcp_tools to verify registration.',
 //         );
 //         return;
 //       }
