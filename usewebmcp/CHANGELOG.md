@@ -1,5 +1,11 @@
 # usewebmcp
 
+## 0.0.0
+
+### Patch Changes
+
+- @mcp-b/react-webmcp@0.0.0
+
 ## 0.0.0-beta-20260109203913
 
 ### Patch Changes

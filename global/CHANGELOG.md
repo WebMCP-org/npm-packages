@@ -1,5 +1,17 @@
 # @mcp-b/global
 
+## 0.0.0
+
+### Patch Changes
+
+- **Chrome DevTools MCP:**
+  - feat: Create new browser window for each MCP session instead of tab - prevents multiple clients from interfering with each other
+  - feat: Restore autoConnect default to true - automatically reconnects to existing browser sessions
+  - fix: Rename export constant listWebMCPTools to match tool name
+
+  **Global Package:**
+  - fix: Remove verbose console logging to reduce spam during tool registration/unregistration
+
 ## 0.0.0-beta-20260109203913
 
 ### Patch Changes
@@ -7,7 +19,6 @@
 - Add navigation tool debugging logs
 
   **Improvements:**
-
   - Log when tools indicate they will trigger navigation via metadata
   - Better visibility into navigation-triggering tool executions for debugging
   - Non-breaking addition to existing tool execution flow
@@ -22,7 +33,6 @@
 - b57ebab: fix: return structuredContent when outputSchema is defined
 
   When a tool is registered with an outputSchema, the MCP specification requires the execute result to include both content and structuredContent. This fix ensures compliance with the MCP spec by:
-
   - Returning structuredContent in the MCP response when outputSchema is provided
   - Passing through structuredContent in the @mcp-b/global bridge handler
   - Adding InferOutput utility type for better Zod schema type inference
@@ -34,7 +44,6 @@
 - 057071a: fix: return structuredContent when outputSchema is defined
 
   When a tool is registered with an outputSchema, the MCP specification requires the execute result to include both content and structuredContent. This fix ensures compliance with the MCP spec by:
-
   - Returning structuredContent in the MCP response when outputSchema is provided
   - Passing through structuredContent in the @mcp-b/global bridge handler
   - Adding InferOutput utility type for better Zod schema type inference
@@ -127,7 +136,6 @@
 ### Minor Changes
 
 - Add dual-server mode with iframe support
-
   - Implemented dual-server mode allowing multiple MCP server instances
   - Added iframe-based server communication support
   - Enhanced navigator.modelContext polyfill with multi-server capabilities

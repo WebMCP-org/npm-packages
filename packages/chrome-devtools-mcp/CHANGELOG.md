@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.5.0
+
+### Minor Changes
+
+- **Chrome DevTools MCP:**
+  - feat: Create new browser window for each MCP session instead of tab - prevents multiple clients from interfering with each other
+  - feat: Restore autoConnect default to true - automatically reconnects to existing browser sessions
+  - fix: Rename export constant listWebMCPTools to match tool name
+
+  **Global Package:**
+  - fix: Remove verbose console logging to reduce spam during tool registration/unregistration
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-b/global@0.0.0
+
 ## 1.4.0
 
 ### Minor Changes

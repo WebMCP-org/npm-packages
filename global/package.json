@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/global",
-  "version": "0.0.0-beta-20260109203913",
+  "version": "0.0.0",
   "description": "W3C Web Model Context API polyfill - Let AI agents like Claude, ChatGPT, and Gemini interact with your website via navigator.modelContext",
   "keywords": [
     "mcp",
