@@ -7,7 +7,7 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {diffWebMCPTools} from '../../src/tools/webmcp.js';
+import {listWebMCPTools} from '../../src/tools/webmcp.js';
 import {serverHooks} from '../server.js';
 import {withMcpContext} from '../utils.js';
 
@@ -178,7 +178,7 @@ describe('webmcp tools', () => {
     it('shows message when no tools registered', async () => {
       await withMcpContext(
         async (response, context) => {
-          await diffWebMCPTools.handler({params: {}}, response, context);
+          await listWebMCPTools.handler({params: {}}, response, context);
 
           const output = response.responseLines.join('\n');
           assert.ok(
@@ -211,7 +211,7 @@ describe('webmcp tools', () => {
           assert.ok(result.connected, 'Should connect to WebMCP');
 
           // Now list_webmcp_tools should show the registered tools
-          await diffWebMCPTools.handler({params: {}}, response, context);
+          await listWebMCPTools.handler({params: {}}, response, context);
 
           const output = response.responseLines.join('\n');
           assert.ok(
@@ -252,7 +252,7 @@ describe('webmcp tools', () => {
           await context.getWebMCPClient(page);
 
           // First call - full list
-          await diffWebMCPTools.handler({params: {}}, response, context);
+          await listWebMCPTools.handler({params: {}}, response, context);
           assert.ok(
             response.responseLines.join('\n').includes('3 WebMCP tool(s) registered'),
             'First call should show tools',
@@ -261,7 +261,7 @@ describe('webmcp tools', () => {
           response.resetResponseLineForTesting();
 
           // Second call - should show diff (no changes)
-          await diffWebMCPTools.handler({params: {}}, response, context);
+          await listWebMCPTools.handler({params: {}}, response, context);
           const output = response.responseLines.join('\n');
           assert.ok(
             output.includes('No changes since last poll'),
@@ -295,11 +295,11 @@ describe('webmcp tools', () => {
           await context.getWebMCPClient(page);
 
           // First call
-          await diffWebMCPTools.handler({params: {}}, response, context);
+          await listWebMCPTools.handler({params: {}}, response, context);
           response.resetResponseLineForTesting();
 
           // Second call with full=true - should show full list again
-          await diffWebMCPTools.handler({params: {full: true}}, response, context);
+          await listWebMCPTools.handler({params: {full: true}}, response, context);
           assert.ok(
             response.responseLines.join('\n').includes('3 WebMCP tool(s) registered'),
             'Should show full list when full=true',
@@ -309,10 +309,10 @@ describe('webmcp tools', () => {
       );
     });
 
-    // Test removed: diffWebMCPTools no longer has page_index parameter
+    // Test removed: listWebMCPTools no longer has page_index parameter
     // it('returns error when page not found', async () =>{
     //   await withMcpContext(async (response, context) => {
-    //     await diffWebMCPTools.handler({params: {page_index: 99}}, response, context);
+    //     await listWebMCPTools.handler({params: {page_index: 99}}, response, context);
     //
     //     const output = response.responseLines.join('\n');
     //     assert.ok(

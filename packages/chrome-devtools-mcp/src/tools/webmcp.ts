@@ -87,7 +87,7 @@ import {extractDomain} from './WebMCPToolHub.js';
  * Show all WebMCP tools registered across all pages, with diff since last call.
  * First call returns full list. Subsequent calls return only added/removed tools.
  */
-export const diffWebMCPTools = defineTool({
+export const listWebMCPTools = defineTool({
   name: 'list_webmcp_tools',
   description:
     'List all WebMCP tools registered across all pages, with diff since last call. ' +
