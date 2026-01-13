@@ -190,7 +190,7 @@ describe('webmcp tools', () => {
       );
     });
 
-    it('shows registered tools after WebMCP connection', async () => {
+    it('shows registered tools with schemas after WebMCP connection', async () => {
       server.addHtmlRoute('/webmcp', MOCK_WEBMCP_PAGE);
 
       await withMcpContext(
@@ -210,30 +210,27 @@ describe('webmcp tools', () => {
           const result = await context.getWebMCPClient(page);
           assert.ok(result.connected, 'Should connect to WebMCP');
 
-          // Now list_webmcp_tools should show the registered tools
+          // Now list_webmcp_tools should show the registered tools as JSON
           await listWebMCPTools.handler({params: {}}, response, context);
 
           const output = response.responseLines.join('\n');
-          assert.ok(
-            output.includes('3 WebMCP tool(s) registered'),
-            'Should show 3 tools',
-          );
-          // Check for prefixed tool names
-          assert.ok(
-            output.includes('webmcp_localhost'),
-            'Should show prefixed tool names',
-          );
-          assert.ok(output.includes('test_add'), 'Should include test_add');
-          assert.ok(
-            output.includes('Add two numbers'),
-            'Should show description',
-          );
+          const parsed = JSON.parse(output);
+
+          assert.ok(Array.isArray(parsed.tools), 'Should have tools array');
+          assert.strictEqual(parsed.tools.length, 3, 'Should have 3 tools');
+
+          // Check tool structure
+          const testAdd = parsed.tools.find((t: {name: string}) => t.name === 'test_add');
+          assert.ok(testAdd, 'Should include test_add');
+          assert.ok(testAdd.description.includes('Add two numbers'), 'Should have description');
+          assert.ok(testAdd.inputSchema, 'Should include inputSchema');
+          assert.deepStrictEqual(testAdd.inputSchema.required, ['a', 'b'], 'Should have required params');
         },
         {withToolHub: true},
       );
     });
 
-    it('shows tools consistently across calls', async () => {
+    it('returns same full list on every call (no diff)', async () => {
       server.addHtmlRoute('/webmcp2', MOCK_WEBMCP_PAGE);
 
       await withMcpContext(
@@ -251,75 +248,26 @@ describe('webmcp tools', () => {
           // Connect and sync tools
           await context.getWebMCPClient(page);
 
-          // First call - full list
-          await listWebMCPTools.handler({params: {}}, response, context);
-          assert.ok(
-            response.responseLines.join('\n').includes('3 WebMCP tool(s) registered'),
-            'First call should show tools',
-          );
-
-          response.resetResponseLineForTesting();
-
-          // Second call - should show diff (no changes)
-          await listWebMCPTools.handler({params: {}}, response, context);
-          const output = response.responseLines.join('\n');
-          assert.ok(
-            output.includes('No changes since last poll'),
-            'Second call should show no changes',
-          );
-          assert.ok(
-            output.includes('3 tools available'),
-            'Should show tool count',
-          );
-        },
-        {withToolHub: true},
-      );
-    });
-
-    it('can force full list with full parameter', async () => {
-      server.addHtmlRoute('/webmcp3', MOCK_WEBMCP_PAGE);
-
-      await withMcpContext(
-        async (response, context) => {
-          const page = context.getSelectedPage();
-          await page.goto(server.getRoute('/webmcp3'));
-
-          await page.waitForFunction(() => {
-            return (
-              typeof (window as {navigator: {modelContext?: unknown}}).navigator
-                .modelContext !== 'undefined'
-            );
-          });
-
-          // Connect and sync tools
-          await context.getWebMCPClient(page);
-
           // First call
           await listWebMCPTools.handler({params: {}}, response, context);
+          const firstOutput = response.responseLines.join('\n');
+          const firstParsed = JSON.parse(firstOutput);
+
           response.resetResponseLineForTesting();
 
-          // Second call with full=true - should show full list again
-          await listWebMCPTools.handler({params: {full: true}}, response, context);
-          assert.ok(
-            response.responseLines.join('\n').includes('3 WebMCP tool(s) registered'),
-            'Should show full list when full=true',
+          // Second call - should return same full list (no diff)
+          await listWebMCPTools.handler({params: {}}, response, context);
+          const secondOutput = response.responseLines.join('\n');
+          const secondParsed = JSON.parse(secondOutput);
+
+          assert.strictEqual(
+            firstParsed.tools.length,
+            secondParsed.tools.length,
+            'Both calls should return same number of tools',
           );
         },
         {withToolHub: true},
       );
     });
-
-    // Test removed: listWebMCPTools no longer has page_index parameter
-    // it('returns error when page not found', async () =>{
-    //   await withMcpContext(async (response, context) => {
-    //     await listWebMCPTools.handler({params: {page_index: 99}}, response, context);
-    //
-    //     const output = response.responseLines.join('\n');
-    //     assert.ok(
-    //       output.includes('Page 99 not found'),
-    //       'Should indicate page not found',
-    //     );
-    //   });
-    // });
   });
 });

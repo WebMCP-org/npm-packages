@@ -10,11 +10,10 @@
 // import * as esbuild from 'esbuild';
 // import {getPolyfillCode} from '../polyfillLoader.js';
 
-import {zod} from '../third_party/index.js';
+import { zod } from '../third_party/index.js';
 
-import {ToolCategory} from './categories.js';
-import {defineTool, type Response} from './ToolDefinition.js';
-import {extractDomain} from './WebMCPToolHub.js';
+import { ToolCategory } from './categories.js';
+import { defineTool } from './ToolDefinition.js';
 
 // Commented out: helper functions only used by inject_webmcp_script tool
 // /**
@@ -84,30 +83,21 @@ import {extractDomain} from './WebMCPToolHub.js';
 // }
 
 /**
- * Show all WebMCP tools registered across all pages, with diff since last call.
- * First call returns full list. Subsequent calls return only added/removed tools.
+ * List all WebMCP tools registered across all pages with full definitions including schemas.
  */
 export const listWebMCPTools = defineTool({
   name: 'list_webmcp_tools',
   description:
-    'List all WebMCP tools registered across all pages, with diff since last call. ' +
-    'First call returns full list. Subsequent calls return only added/removed tools. ' +
-    'Use full=true to force complete list. ' +
-    'To call these tools, use call_webmcp_tool with the ORIGINAL tool name (without the webmcp_ prefix). ' +
-    'Example: call_webmcp_tool({ name: "idp_config_get" }) NOT "webmcp_localhost_3000_page0_idp_config_get".',
+    'List all WebMCP tools registered across all pages. ' +
+    'Returns full tool definitions including input schemas. ' +
+    'To call a tool, use call_webmcp_tool({ name: "tool_name", arguments: {...} }).',
   annotations: {
-    title: 'Diff Website MCP Tools',
+    title: 'List Website MCP Tools',
     category: ToolCategory.WEBMCP,
     readOnlyHint: true,
   },
-  schema: {
-    full: zod
-      .boolean()
-      .optional()
-      .describe('Force full tool list instead of diff. Default: false'),
-  },
-  handler: async (request, response, context) => {
-    const {full} = request.params;
+  schema: {},
+  handler: async (_request, response, context) => {
     const toolHub = context.getToolHub();
 
     if (!toolHub) {
@@ -116,197 +106,25 @@ export const listWebMCPTools = defineTool({
     }
 
     const tools = toolHub.getRegisteredTools();
-    const currentToolIds = new Set(tools.map(t => t.toolId));
-    const lastSeen = toolHub.getLastSeenToolIds();
 
-    // First call or full=true: return full list
-    if (!lastSeen || full) {
-      toolHub.setLastSeenToolIds(currentToolIds);
-
-      if (tools.length === 0) {
-        response.appendResponseLine('No WebMCP tools registered.');
-        response.appendResponseLine(
-          'Navigate to a page with @mcp-b/global loaded to discover tools.',
-        );
-        return;
-      }
-
-      response.appendResponseLine(`Found ${tools.length} WebMCP tool(s):`);
-      response.appendResponseLine('');
-
-      // Group tools by page
-      const toolsByPage = new Map<number, typeof tools>();
-      for (const tool of tools) {
-        if (!toolsByPage.has(tool.pageIdx)) {
-          toolsByPage.set(tool.pageIdx, []);
-        }
-        toolsByPage.get(tool.pageIdx)!.push(tool);
-      }
-
-      // Sort pages by index
-      const sortedPages = Array.from(toolsByPage.keys()).sort((a, b) => a - b);
-
-      for (const pageIdx of sortedPages) {
-        const pageTools = toolsByPage.get(pageIdx)!;
-        const domain = pageTools[0].domain;
-
-        response.appendResponseLine(`Page ${pageIdx}: ${domain}`);
-        for (const tool of pageTools) {
-          response.appendResponseLine(`  • ${tool.originalName}`);
-          if (tool.description) {
-            response.appendResponseLine(`    ${tool.description}`);
-          }
-        }
-        response.appendResponseLine('');
-      }
-
+    if (tools.length === 0) {
+      response.appendResponseLine('No WebMCP tools registered.');
       response.appendResponseLine(
-        'To call a tool: call_webmcp_tool({ name: "tool_name", arguments: {...} })',
+        'Navigate to a page with @mcp-b/global loaded to discover tools.',
       );
-      if (tools.length > 0) {
-        response.appendResponseLine(
-          `Example: call_webmcp_tool({ name: "${tools[0].originalName}" })`,
-        );
-      }
       return;
     }
 
-    // Subsequent calls: return diff
-    const added = tools.filter(t => !lastSeen.has(t.toolId));
-    const removed = [...lastSeen].filter(id => !currentToolIds.has(id));
-    toolHub.setLastSeenToolIds(currentToolIds);
+    // Format as JSON for easy parsing by the model
+    const toolDefinitions = tools.map(tool => ({
+      name: tool.originalName,
+      description: tool.description,
+      inputSchema: tool.inputSchema,
+      pageIdx: tool.pageIdx,
+      domain: tool.domain,
+    }));
 
-    if (added.length === 0 && removed.length === 0) {
-      response.appendResponseLine('No changes since last poll.');
-      response.appendResponseLine('');
-
-      if (tools.length > 0) {
-        // Group tools by page
-        const toolsByPage = new Map<number, typeof tools>();
-        for (const tool of tools) {
-          if (!toolsByPage.has(tool.pageIdx)) {
-            toolsByPage.set(tool.pageIdx, []);
-          }
-          toolsByPage.get(tool.pageIdx)!.push(tool);
-        }
-
-        response.appendResponseLine(`${tools.length} tool(s) available:`);
-        const sortedPages = Array.from(toolsByPage.keys()).sort((a, b) => a - b);
-        for (const pageIdx of sortedPages) {
-          const pageTools = toolsByPage.get(pageIdx)!;
-          const toolNames = pageTools.map(t => t.originalName).join(', ');
-          response.appendResponseLine(`  Page ${pageIdx}: ${toolNames}`);
-        }
-      }
-      return;
-    }
-
-    if (added.length > 0) {
-      response.appendResponseLine(`Added ${added.length} new tool(s):`);
-      response.appendResponseLine('');
-
-      // Group by page
-      const addedByPage = new Map<number, typeof added>();
-      for (const tool of added) {
-        if (!addedByPage.has(tool.pageIdx)) {
-          addedByPage.set(tool.pageIdx, []);
-        }
-        addedByPage.get(tool.pageIdx)!.push(tool);
-      }
-
-      const sortedPages = Array.from(addedByPage.keys()).sort((a, b) => a - b);
-      for (const pageIdx of sortedPages) {
-        const pageTools = addedByPage.get(pageIdx)!;
-        const domain = pageTools[0].domain;
-
-        response.appendResponseLine(`Page ${pageIdx}: ${domain}`);
-        for (const tool of pageTools) {
-          response.appendResponseLine(`  + ${tool.originalName}`);
-          if (tool.description) {
-            response.appendResponseLine(`    ${tool.description}`);
-          }
-        }
-        response.appendResponseLine('');
-      }
-
-      response.appendResponseLine(
-        `Call with: call_webmcp_tool({ name: "${added[0].originalName}" })`,
-      );
-      response.appendResponseLine('');
-    }
-
-    if (removed.length > 0) {
-      response.appendResponseLine(`Removed ${removed.length} tool(s)`);
-      response.appendResponseLine('');
-      for (const id of removed) {
-        // Extract original name from toolId format: webmcp_{domain}_page{idx}_{name}
-        const parts = id.split('_');
-        const name = parts.slice(3).join('_'); // Everything after page index
-        response.appendResponseLine(`  - ${name || id}`);
-      }
-    }
-  },
-});
-
-/**
- * Get the JSON Schema for a WebMCP tool.
- * Use this to understand what arguments a tool expects before calling it.
- */
-export const getWebMCPToolSchema = defineTool({
-  name: 'get_webmcp_tool_schema',
-  description:
-    'Get the JSON Schema for a WebMCP tool registered on a webpage. ' +
-    'Use this to understand what arguments a tool expects before calling it with call_webmcp_tool. ' +
-    'Returns the inputSchema from the tool definition.',
-  annotations: {
-    title: 'Get WebMCP Tool Schema',
-    category: ToolCategory.WEBMCP,
-    readOnlyHint: true,
-  },
-  schema: {
-    name: zod.string().describe('The name of the tool to get the schema for'),
-    page_index: zod
-      .number()
-      .int()
-      .optional()
-      .describe(
-        'Index of the page where the tool is registered. If not specified, uses the currently selected page. ' +
-          'Use list_pages to see available pages and their indices.',
-      ),
-  },
-  handler: async (request, response, context) => {
-    const {name, page_index} = request.params;
-
-    // Get the target page
-    const page =
-      page_index !== undefined
-        ? context.getPageByIdx(page_index)
-        : context.getSelectedPage();
-
-    const toolHub = context.getToolHub();
-    if (!toolHub) {
-      response.appendResponseLine('WebMCPToolHub not initialized.');
-      response.setIsError(true);
-      return;
-    }
-
-    const trackedTool = toolHub.getToolByName(name, page);
-    if (!trackedTool) {
-      response.appendResponseLine(`Tool "${name}" not found on this page.`);
-      response.appendResponseLine('');
-      response.appendResponseLine('Use list_webmcp_tools to see available tools.');
-      response.setIsError(true);
-      return;
-    }
-
-    if (!trackedTool.inputSchema) {
-      response.appendResponseLine(`Tool "${name}" has no schema defined.`);
-      return;
-    }
-
-    response.appendResponseLine(`Schema for tool "${name}":`);
-    response.appendResponseLine('');
-    response.appendResponseLine(JSON.stringify(trackedTool.inputSchema, null, 2));
+    response.appendResponseLine(JSON.stringify({ tools: toolDefinitions }, null, 2));
   },
 });
 
@@ -318,7 +136,7 @@ export const callWebMCPTool = defineTool({
   name: 'call_webmcp_tool',
   description:
     'Call a tool registered on a webpage via WebMCP. ' +
-    'Automatically connects if the page has @mcp-b/global loaded. ' +
+    'Usage: call_webmcp_tool({ name: "tool_name", arguments: { key: "value" } }). ' +
     'Use list_webmcp_tools to see available tools and their schemas. ' +
     'Use page_index to target a specific page.',
   annotations: {
@@ -338,11 +156,11 @@ export const callWebMCPTool = defineTool({
       .optional()
       .describe(
         'Index of the page to call the tool on. If not specified, uses the currently selected page. ' +
-          'Use list_pages to see available pages and their indices.',
+        'Use list_pages to see available pages and their indices.',
       ),
   },
   handler: async (request, response, context) => {
-    const {name, arguments: args, page_index} = request.params;
+    const { name, arguments: args, page_index } = request.params;
 
     // Validate required parameter
     if (!name || typeof name !== 'string') {
@@ -374,23 +192,12 @@ export const callWebMCPTool = defineTool({
     const client = result.client;
 
     try {
-      if (page_index !== undefined) {
-        response.appendResponseLine(`Page ${page_index}: ${page.url()}`);
-      }
-      response.appendResponseLine(`Calling tool: ${name}`);
-      if (args && Object.keys(args).length > 0) {
-        response.appendResponseLine(`Arguments: ${JSON.stringify(args)}`);
-      }
-      response.appendResponseLine('');
-
       const callResult = await client.callTool({
         name,
         arguments: args || {},
       });
 
-      response.appendResponseLine('Result:');
-
-      // Format the result content
+      // Pass through the result content directly (includes Zod validation errors)
       if (callResult.content && Array.isArray(callResult.content)) {
         for (const content of callResult.content) {
           if (content.type === 'text') {
@@ -412,8 +219,6 @@ export const callWebMCPTool = defineTool({
       }
 
       if (callResult.isError) {
-        response.appendResponseLine('');
-        response.appendResponseLine('(Tool returned an error)');
         response.setIsError(true);
       }
     } catch (err) {
@@ -423,7 +228,7 @@ export const callWebMCPTool = defineTool({
       if (errorMessage.includes('Connection closed')) {
         // Check if this was a navigation by inspecting the arguments
         const navigationTarget = args && typeof args === 'object' && 'to' in args
-          ? (args as {to?: string}).to
+          ? (args as { to?: string }).to
           : null;
 
         if (navigationTarget && typeof navigationTarget === 'string') {
@@ -526,7 +331,7 @@ export const callWebMCPTool = defineTool({
 //       timeout = 5000,
 //       page_index,
 //     } = request.params;
-// 
+//
 //     // Validate that exactly one of code or file_path is provided
 //     if (!code && !file_path) {
 //       response.appendResponseLine(
@@ -534,20 +339,20 @@ export const callWebMCPTool = defineTool({
 //       );
 //       return;
 //     }
-// 
+//
 //     if (code && file_path) {
 //       response.appendResponseLine(
 //         'Error: Provide either code or file_path, not both.',
 //       );
 //       return;
 //     }
-// 
+//
 //     // Get the script code - from file or inline
 //     let scriptCode: string;
 //     if (file_path) {
 //       const ext = extname(file_path).toLowerCase();
 //       const isTypeScript = ext === '.ts' || ext === '.tsx';
-// 
+//
 //       try {
 //         if (isTypeScript) {
 //           // Bundle TypeScript with esbuild (in-memory, ~10ms)
@@ -562,7 +367,7 @@ export const callWebMCPTool = defineTool({
 //         }
 //       } catch (err) {
 //         const message = err instanceof Error ? err.message : String(err);
-// 
+//
 //         // Log the error with full context for debugging
 //         console.error('[injectWebMCPScript] File operation failed', {
 //           file_path,
@@ -572,7 +377,7 @@ export const callWebMCPTool = defineTool({
 //           errno: (err as NodeJS.ErrnoException).errno,
 //           code: (err as NodeJS.ErrnoException).code,
 //         });
-// 
+//
 //         if (isTypeScript) {
 //           response.appendResponseLine(`Error bundling TypeScript: ${message}`);
 //           response.appendResponseLine('');
@@ -582,7 +387,7 @@ export const callWebMCPTool = defineTool({
 //           response.appendResponseLine('  - Invalid import paths');
 //         } else {
 //           response.appendResponseLine(`Error reading file: ${message}`);
-// 
+//
 //           // Provide specific guidance based on error code
 //           if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
 //             response.appendResponseLine('');
@@ -597,7 +402,7 @@ export const callWebMCPTool = defineTool({
 //     } else {
 //       scriptCode = code!;
 //     }
-// 
+//
 //     // Get the target page with proper error handling
 //     let page;
 //     try {
@@ -610,10 +415,10 @@ export const callWebMCPTool = defineTool({
 //       response.appendResponseLine(`Error: Invalid page_index - ${message}`);
 //       return;
 //     }
-// 
+//
 //     response.appendResponseLine(`Target: ${page.url()}`);
 //     response.appendResponseLine('');
-// 
+//
 //     try {
 //       // Check if polyfill already exists
 //       const hasPolyfill = await page.evaluate(() =>
@@ -621,9 +426,9 @@ export const callWebMCPTool = defineTool({
 //         typeof (navigator as Navigator & {modelContext?: unknown}).modelContext !==
 //           'undefined',
 //       );
-// 
+//
 //       let codeToInject = scriptCode;
-// 
+//
 //       if (hasPolyfill) {
 //         response.appendResponseLine('Polyfill already present');
 //       } else {
@@ -642,10 +447,10 @@ export const callWebMCPTool = defineTool({
 //           return;
 //         }
 //       }
-// 
+//
 //       // Inject the script
 //       response.appendResponseLine('Injecting userscript...');
-// 
+//
 //       await page.evaluate((bundleCode: string) => {
 //         const script = document.createElement('script');
 //         script.textContent = bundleCode;
@@ -653,9 +458,9 @@ export const callWebMCPTool = defineTool({
 //         document.getElementById('__webmcp_injected_script__')?.remove();
 //         document.head.appendChild(script);
 //       }, codeToInject);
-// 
+//
 //       response.appendResponseLine('Script injected');
-// 
+//
 //       if (!wait_for_tools) {
 //         response.appendResponseLine('');
 //         response.appendResponseLine(
@@ -663,17 +468,17 @@ export const callWebMCPTool = defineTool({
 //         );
 //         return;
 //       }
-// 
+//
 //       // Poll for polyfill initialization instead of using a magic sleep number.
 //       // TabServerTransport registers asynchronously after the polyfill script executes.
 //       // We poll at 100ms intervals until navigator.modelContext is available.
 //       response.appendResponseLine('Waiting for polyfill to initialize...');
-// 
+//
 //       const polyfillTimeout = Math.min(timeout, 5000); // Cap at 5s for polyfill init
 //       const polyfillStart = Date.now();
 //       let polyfillReady = false;
 //       const polyfillErrors: Array<{time: number; error: string}> = [];
-// 
+//
 //       while (Date.now() - polyfillStart < polyfillTimeout) {
 //         try {
 //           polyfillReady = await page.evaluate(() =>
@@ -687,7 +492,7 @@ export const callWebMCPTool = defineTool({
 //         } catch (err) {
 //           const message = err instanceof Error ? err.message : String(err);
 //           polyfillErrors.push({time: Date.now() - polyfillStart, error: message});
-// 
+//
 //           // Abort on non-retryable errors
 //           if (
 //             message.includes('Target closed') ||
@@ -703,7 +508,7 @@ export const callWebMCPTool = defineTool({
 //         }
 //         await new Promise(r => setTimeout(r, 100));
 //       }
-// 
+//
 //       if (!polyfillReady) {
 //         response.appendResponseLine('');
 //         response.appendResponseLine(
@@ -725,18 +530,18 @@ export const callWebMCPTool = defineTool({
 //         appendDebugSteps(response);
 //         return;
 //       }
-// 
+//
 //       response.appendResponseLine('Polyfill initialized');
-// 
+//
 //       // Make a single connection attempt (don't poll - that creates racing transports)
 //       response.appendResponseLine('Connecting to WebMCP server...');
-// 
+//
 //       const result = await context.getWebMCPClient(page);
 //       if (!result.connected) {
 //         response.appendResponseLine('');
 //         response.appendResponseLine(`Connection failed: ${result.error}`);
 //         response.appendResponseLine('');
-// 
+//
 //         // Provide error-specific guidance
 //         const errorLower = result.error.toLowerCase();
 //         if (errorLower.includes('timeout')) {
@@ -756,28 +561,28 @@ export const callWebMCPTool = defineTool({
 //           );
 //           response.appendResponseLine('');
 //         }
-// 
+//
 //         appendDebugSteps(response);
 //         return;
 //       }
-// 
+//
 //       // TypeScript now knows result is {connected: true; client: Client}
 //       response.appendResponseLine('Connected to WebMCP server');
-// 
+//
 //       // Now poll for tools (using the established connection)
 //       response.appendResponseLine(`Waiting for tools (${timeout}ms)...`);
-// 
+//
 //       const startTime = Date.now();
 //       let lastError: Error | null = null;
 //       let successfulPolls = 0;
 //       let failedPolls = 0;
-// 
+//
 //       while (Date.now() - startTime < timeout) {
 //         try {
 //           const {tools} = await result.client.listTools();
 //           successfulPolls++;
 //           lastError = null;
-// 
+//
 //           if (tools.length > 0) {
 //             const toolHub = context.getToolHub();
 //             if (toolHub) {
@@ -791,15 +596,15 @@ export const callWebMCPTool = defineTool({
 //               response.appendResponseLine('⚠️  Warning: Tool hub unavailable. Tools detected but may not be callable.');
 //               response.appendResponseLine('');
 //             }
-// 
+//
 //             response.appendResponseLine('');
 //             response.appendResponseLine(`${tools.length} tool(s) detected:`);
 //             response.appendResponseLine('');
-// 
+//
 //             const domain = extractDomain(page.url());
 //             const pages = context.getPages();
 //             const pageIdx = pages.indexOf(page);
-// 
+//
 //             for (const tool of tools) {
 //               const toolId = `webmcp_${domain}_page${pageIdx}_${tool.name}`;
 //               response.appendResponseLine(`  - ${tool.name}`);
@@ -831,7 +636,7 @@ export const callWebMCPTool = defineTool({
 //         } catch (err) {
 //           lastError = err instanceof Error ? err : new Error(String(err));
 //           failedPolls++;
-// 
+//
 //           // Non-retryable errors should abort immediately
 //           const message = lastError.message.toLowerCase();
 //           if (
@@ -849,10 +654,10 @@ export const callWebMCPTool = defineTool({
 //             return;
 //           }
 //         }
-// 
+//
 //         await new Promise(r => setTimeout(r, 200));
 //       }
-// 
+//
 //       // Timeout reached - provide context about what happened
 //       response.appendResponseLine('');
 //       response.appendResponseLine(`No tools registered within ${timeout}ms.`);
@@ -867,7 +672,7 @@ export const callWebMCPTool = defineTool({
 //       appendDebugSteps(response);
 //     } catch (err) {
 //       const message = err instanceof Error ? err.message : String(err);
-// 
+//
 //       if (
 //         message.includes('Content Security Policy') ||
 //         message.includes('script-src')
@@ -886,11 +691,11 @@ export const callWebMCPTool = defineTool({
 //         );
 //         return;
 //       }
-// 
+//
 //       // Categorize the error for better user guidance
 //       response.appendResponseLine(`Error: ${message}`);
 //       response.appendResponseLine('');
-// 
+//
 //       if (
 //         message.includes('Execution context was destroyed') ||
 //         message.includes('page has been closed')

@@ -82,6 +82,7 @@ async function getContext(): Promise<McpContext> {
   const devtools = args.experimentalDevtools ?? false;
 
   let browser: Awaited<ReturnType<typeof ensureBrowserConnected>>;
+  let wasLaunched = false;
 
   // If explicit browserUrl or wsEndpoint is provided, connect without fallback
   if (args.browserUrl || args.wsEndpoint) {
@@ -121,6 +122,7 @@ async function getContext(): Promise<McpContext> {
         acceptInsecureCerts: args.acceptInsecureCerts,
         devtools,
       });
+      wasLaunched = true;
     }
   }
   // Otherwise, just launch a new browser
@@ -137,6 +139,7 @@ async function getContext(): Promise<McpContext> {
       acceptInsecureCerts: args.acceptInsecureCerts,
       devtools,
     });
+    wasLaunched = true;
   }
 
   if (context?.browser !== browser) {
@@ -145,10 +148,46 @@ async function getContext(): Promise<McpContext> {
       experimentalIncludeAllPages: args.experimentalIncludeAllPages,
     });
 
-    // Always create a new window for this MCP session
-    // This ensures multiple MCP clients don't step on each other's toes
-    await context.newWindow();
-    logger('Created new window for this MCP session');
+    if (wasLaunched) {
+      // Fresh browser launch - use the existing default page
+      // Mark it as explicitly selected so this session stays pinned to it
+      context.selectPage(context.getSelectedPage(), true);
+      logger('Using existing window for this MCP session');
+
+      // Resize the window to nearly full screen
+      try {
+        const page = context.getSelectedPage();
+        const browserTarget = browser.target();
+        const cdpSession = await browserTarget.createCDPSession();
+
+        // @ts-expect-error _targetId is internal but stable
+        const targetId = page.target()._targetId;
+        const {windowId} = await cdpSession.send('Browser.getWindowForTarget', {
+          targetId,
+        });
+
+        await cdpSession.send('Browser.setWindowBounds', {
+          windowId,
+          bounds: {
+            left: 20,
+            top: 20,
+            width: 1800,
+            height: 1200,
+            windowState: 'normal',
+          },
+        });
+        await cdpSession.detach();
+        logger('Resized window to nearly full screen');
+      } catch (err) {
+        // Non-fatal: window sizing is best-effort
+        logger('Failed to resize window:', err);
+      }
+    } else {
+      // Connected to existing browser - create new window for isolation
+      // This ensures multiple MCP clients don't step on each other's toes
+      await context.newWindow();
+      logger('Created new window for this MCP session');
+    }
 
     // Initialize WebMCP tool hub for dynamic tool registration
     const toolHub = new WebMCPToolHub(server, context);
@@ -207,10 +246,7 @@ function registerTool(tool: ToolDefinition): void {
     tool.name,
     {
       description: tool.description,
-      // For call_webmcp_tool, use a fully permissive schema to allow any properties
-      inputSchema: tool.name === 'call_webmcp_tool'
-        ? zod.record(zod.unknown())
-        : zod.object(tool.schema).passthrough(),
+      inputSchema: zod.object(tool.schema).passthrough(),
       annotations: tool.annotations,
     },
     async (params: Record<string, unknown>): Promise<CallToolResult> => {

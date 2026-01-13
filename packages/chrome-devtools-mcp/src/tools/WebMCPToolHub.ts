@@ -35,6 +35,7 @@ export interface RegisteredToolInfo {
   domain: string;
   pageIdx: number;
   description: string;
+  inputSchema?: Record<string, unknown>;
 }
 
 /**
@@ -61,8 +62,6 @@ export class WebMCPToolHub {
   #syncInProgress = new WeakSet<Page>();
   /** Whether automatic tool tracking is enabled. */
   #enabled = true;
-  /** Last seen tool IDs for list_webmcp_tools. */
-  #lastSeenToolIds: Set<string> | null = null;
 
   constructor(server: McpServer, context: McpContext, enabled = true) {
     this.#server = server;
@@ -284,26 +283,12 @@ export class WebMCPToolHub {
       domain: rt.domain,
       pageIdx: this.#context.getPages().indexOf(rt.page),
       description: rt.description,
+      inputSchema: rt.inputSchema,
     }));
   }
 
   /**
-   * Get the last seen tool IDs (for list_webmcp_tools)
-   */
-  getLastSeenToolIds(): Set<string> | null {
-    return this.#lastSeenToolIds;
-  }
-
-  /**
-   * Set the last seen tool IDs (for list_webmcp_tools)
-   */
-  setLastSeenToolIds(toolIds: Set<string>): void {
-    this.#lastSeenToolIds = toolIds;
-  }
-
-  /**
    * Get a tracked tool by name and page.
-   * Used by get_webmcp_tool_schema to retrieve schema.
    */
   getToolByName(toolName: string, page: Page): TrackedTool | undefined {
     const pageToolIds = this.#pageTools.get(page);

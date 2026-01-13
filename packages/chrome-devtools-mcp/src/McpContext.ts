@@ -521,8 +521,6 @@ export class McpContext implements Context {
       newWindow: true,
     });
 
-    await cdpSession.detach();
-
     // Wait for the new page to be available
     const target = await this.browser.waitForTarget(
       target => {
@@ -536,6 +534,32 @@ export class McpContext implements Context {
     if (!page) {
       throw new Error('Failed to get page from new window target');
     }
+
+    // Set window to nearly full screen (large size that fits most displays)
+    try {
+      // Get window ID for this target
+      const {windowId} = await cdpSession.send('Browser.getWindowForTarget', {
+        targetId,
+      });
+
+      // Set to large dimensions (works well on 1920x1080 and larger displays)
+      // This is ~95% of common display sizes without being truly fullscreen
+      await cdpSession.send('Browser.setWindowBounds', {
+        windowId,
+        bounds: {
+          left: 20,
+          top: 20,
+          width: 1800,
+          height: 1200,
+          windowState: 'normal',
+        },
+      });
+    } catch (err) {
+      // Non-fatal: window sizing is best-effort
+      this.logger('Failed to resize window:', err);
+    }
+
+    await cdpSession.detach();
 
     await this.createPagesSnapshot();
     // Mark as explicitly selected so this session sticks to this window
