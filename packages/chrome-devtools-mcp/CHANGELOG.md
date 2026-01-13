@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.8
+
+### Patch Changes
+
+- Set browser window to nearly full screen (1800x1200) for better UX when launching or connecting to browser
+
 ## 1.5.0
 
 ### Minor Changes
