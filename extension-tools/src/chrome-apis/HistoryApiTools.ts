@@ -1,6 +1,6 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
-import zodToJsonSchema from 'zod-to-json-schema';
+import { z } from 'zod/v4';
+
 import { type ApiAvailability, BaseApiTools } from '../BaseApiTools';
 
 export interface HistoryApiToolsOptions {
@@ -125,8 +125,7 @@ export class HistoryApiTools extends BaseApiTools<HistoryApiToolsOptions> {
             return this.formatError(new Error(`Action "${action}" is not supported`));
           }
 
-          const toJson = (schema: z.ZodTypeAny, name: string) =>
-            zodToJsonSchema(schema, { name, $refStrategy: 'none' });
+          const toJson = (schema: z.ZodTypeAny, name: string) => z.toJSONSchema(schema);
 
           const payloadBase = {
             tool: 'extension_tool_history_operations',
