@@ -14,7 +14,7 @@ import type {
   ToolAnnotations,
   Transport,
 } from '@mcp-b/webmcp-ts-sdk';
-import type { z } from 'zod';
+import type { z } from 'zod/v4';
 
 // ============================================================================
 // MCP SDK Type Re-exports
@@ -139,7 +139,7 @@ export interface InputSchema {
  *
  * @example
  * ```typescript
- * import { z } from 'zod';
+ * import { z } from 'zod/v4';
  *
  * const mySchema: ZodSchemaObject = {
  *   query: z.string().describe('Search query'),

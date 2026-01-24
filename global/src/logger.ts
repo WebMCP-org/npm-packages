@@ -47,8 +47,13 @@ function isDebugEnabled(namespace: string): boolean {
 
     const patterns = debugConfig.split(',').map((p) => p.trim());
     return patterns.some((pattern) => namespace === pattern || namespace.startsWith(`${pattern}:`));
-  } catch {
+  } catch (err) {
     // localStorage might throw in some browsers (private mode, disabled storage)
+    // Log once to console so developers know debug logging is disabled
+    if (typeof console !== 'undefined' && console.warn) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`[WebMCP] localStorage access failed, debug logging disabled: ${message}`);
+    }
     return false;
   }
 }

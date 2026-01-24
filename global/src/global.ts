@@ -20,7 +20,7 @@ import {
   Server as McpServer,
   ReadResourceRequestSchema,
 } from '@mcp-b/webmcp-ts-sdk';
-import type { z } from 'zod';
+import type { z } from 'zod/v4';
 import { createLogger } from './logger.js';
 import type {
   ElicitationParams,
@@ -146,7 +146,6 @@ class NativeModelContextAdapter implements InternalModelContext {
     this.nativeTesting = nativeTesting;
 
     this.nativeTesting.registerToolsChangedCallback(() => {
-      // Verbose logging removed to reduce console spam
       this.syncToolsFromNative();
     });
 
@@ -169,7 +168,6 @@ class NativeModelContextAdapter implements InternalModelContext {
 
     try {
       const nativeTools = this.nativeTesting.listTools();
-      // Verbose logging removed to reduce console spam
 
       this.bridge.tools.clear();
 
@@ -262,7 +260,6 @@ class NativeModelContextAdapter implements InternalModelContext {
    * @param {ModelContextInput} context - Context containing tools to register
    */
   provideContext(context: ModelContextInput): void {
-    // Verbose logging removed to reduce console spam
     this.nativeContext.provideContext(context);
   }
 
@@ -278,7 +275,6 @@ class NativeModelContextAdapter implements InternalModelContext {
     TInputSchema extends ZodSchemaObject = Record<string, never>,
     TOutputSchema extends ZodSchemaObject = Record<string, never>,
   >(tool: ToolDescriptor<TInputSchema, TOutputSchema>): { unregister: () => void } {
-    // Verbose logging removed to reduce console spam
     const result = this.nativeContext.registerTool(tool);
     return result;
   }
@@ -290,7 +286,6 @@ class NativeModelContextAdapter implements InternalModelContext {
    * @param {string} name - Name of the tool to unregister
    */
   unregisterTool(name: string): void {
-    // Verbose logging removed to reduce console spam
     this.nativeContext.unregisterTool(name);
   }
 
@@ -299,7 +294,6 @@ class NativeModelContextAdapter implements InternalModelContext {
    * Delegates to navigator.modelContext.clearContext().
    */
   clearContext(): void {
-    // Verbose logging removed to reduce console spam
     this.nativeContext.clearContext();
   }
 
@@ -313,7 +307,6 @@ class NativeModelContextAdapter implements InternalModelContext {
    * @internal
    */
   async executeTool(toolName: string, args: Record<string, unknown>): Promise<ToolResponse> {
-    // Verbose logging removed to reduce console spam
     try {
       const result = await this.nativeTesting.executeTool(toolName, JSON.stringify(args));
       return this.convertToToolResponse(result);
@@ -490,7 +483,6 @@ class NativeModelContextAdapter implements InternalModelContext {
    * This is handled by the polyfill.
    */
   async createMessage(params: SamplingRequestParams): Promise<SamplingResult> {
-    // Verbose logging removed to reduce console spam
     const server = this.bridge.tabServer;
 
     // Access the underlying Server instance to call createMessage
@@ -515,7 +507,6 @@ class NativeModelContextAdapter implements InternalModelContext {
    * This is handled by the polyfill.
    */
   async elicitInput(params: ElicitationParams): Promise<ElicitationResult> {
-    // Verbose logging removed to reduce console spam
     const server = this.bridge.tabServer;
 
     // Access the underlying Server instance to call elicitInput
@@ -709,8 +700,6 @@ class WebModelContextTesting implements ModelContextTesting {
    * @throws {Error} If the tool does not exist
    */
   async executeTool(toolName: string, inputArgsJson: string): Promise<unknown> {
-    // Verbose logging removed to reduce console spam
-
     let args: Record<string, unknown>;
     try {
       args = JSON.parse(inputArgsJson);
@@ -768,7 +757,6 @@ class WebModelContextTesting implements ModelContextTesting {
    */
   registerToolsChangedCallback(callback: () => void): void {
     this.toolsChangedCallbacks.add(callback);
-    // Verbose logging removed to reduce console spam
   }
 
   /**
@@ -789,7 +777,6 @@ class WebModelContextTesting implements ModelContextTesting {
    */
   clearToolCalls(): void {
     this.toolCallHistory = [];
-    // Verbose logging removed to reduce console spam
   }
 
   /**
@@ -801,7 +788,6 @@ class WebModelContextTesting implements ModelContextTesting {
    */
   setMockToolResponse(toolName: string, response: ToolResponse): void {
     this.mockResponses.set(toolName, response);
-    // Verbose logging removed to reduce console spam
   }
 
   /**
@@ -811,7 +797,6 @@ class WebModelContextTesting implements ModelContextTesting {
    */
   clearMockToolResponse(toolName: string): void {
     this.mockResponses.delete(toolName);
-    // Verbose logging removed to reduce console spam
   }
 
   /**
@@ -819,7 +804,6 @@ class WebModelContextTesting implements ModelContextTesting {
    */
   clearAllMockToolResponses(): void {
     this.mockResponses.clear();
-    // Verbose logging removed to reduce console spam
   }
 
   /**
@@ -838,7 +822,6 @@ class WebModelContextTesting implements ModelContextTesting {
   reset(): void {
     this.clearToolCalls();
     this.clearAllMockToolResponses();
-    // Verbose logging removed to reduce console spam
   }
 }
 
@@ -977,8 +960,6 @@ class WebModelContext implements InternalModelContext {
    * @throws {Error} If a name/uri collides with existing dynamic items
    */
   provideContext(context: ModelContextInput): void {
-    // Verbose logging removed to reduce console spam
-
     // Clear base items (Bucket A)
     this.provideContextTools.clear();
     this.provideContextResources.clear();
@@ -1134,8 +1115,6 @@ class WebModelContext implements InternalModelContext {
     TInputSchema extends ZodSchemaObject = Record<string, never>,
     TOutputSchema extends ZodSchemaObject = Record<string, never>,
   >(tool: ToolDescriptor<TInputSchema, TOutputSchema>): { unregister: () => void } {
-    // Verbose logging removed to reduce console spam
-
     // Validate tool name and log warnings for potential compatibility issues
     // NOTE: Similar validation exists in @mcp-b/chrome-devtools-mcp/src/tools/WebMCPToolHub.ts
     // Keep both implementations in sync when making changes.
@@ -1211,8 +1190,6 @@ class WebModelContext implements InternalModelContext {
     this.scheduleListChanged('tools');
 
     const unregisterFn = () => {
-      // Verbose logging removed to reduce console spam
-
       if (this.provideContextTools.has(tool.name)) {
         throw new Error(
           `[Web Model Context] Cannot unregister tool "${tool.name}": ` +
@@ -1248,8 +1225,6 @@ class WebModelContext implements InternalModelContext {
    * @throws {Error} If resource URI collides with existing resources
    */
   registerResource(resource: ResourceDescriptor): { unregister: () => void } {
-    // Verbose logging removed to reduce console spam
-
     const now = Date.now();
     const lastRegistration = this.resourceRegistrationTimestamps.get(resource.uri);
 
@@ -1286,8 +1261,6 @@ class WebModelContext implements InternalModelContext {
     this.scheduleListChanged('resources');
 
     const unregisterFn = () => {
-      // Verbose logging removed to reduce console spam
-
       if (this.provideContextResources.has(resource.uri)) {
         throw new Error(
           `[Web Model Context] Cannot unregister resource "${resource.uri}": ` +
@@ -1319,8 +1292,6 @@ class WebModelContext implements InternalModelContext {
    * @param {string} uri - URI of the resource to unregister
    */
   unregisterResource(uri: string): void {
-    // Verbose logging removed to reduce console spam
-
     const inProvideContext = this.provideContextResources.has(uri);
     const inDynamic = this.dynamicResources.has(uri);
 
@@ -1395,8 +1366,6 @@ class WebModelContext implements InternalModelContext {
   registerPrompt<TArgsSchema extends ZodSchemaObject = Record<string, never>>(
     prompt: PromptDescriptor<TArgsSchema>
   ): { unregister: () => void } {
-    // Verbose logging removed to reduce console spam
-
     const now = Date.now();
     const lastRegistration = this.promptRegistrationTimestamps.get(prompt.name);
 
@@ -1433,8 +1402,6 @@ class WebModelContext implements InternalModelContext {
     this.scheduleListChanged('prompts');
 
     const unregisterFn = () => {
-      // Verbose logging removed to reduce console spam
-
       if (this.provideContextPrompts.has(prompt.name)) {
         throw new Error(
           `[Web Model Context] Cannot unregister prompt "${prompt.name}": ` +
@@ -1466,8 +1433,6 @@ class WebModelContext implements InternalModelContext {
    * @param {string} name - Name of the prompt to unregister
    */
   unregisterPrompt(name: string): void {
-    // Verbose logging removed to reduce console spam
-
     const inProvideContext = this.provideContextPrompts.has(name);
     const inDynamic = this.dynamicPrompts.has(name);
 
@@ -1517,8 +1482,6 @@ class WebModelContext implements InternalModelContext {
    * @param {string} name - Name of the tool to unregister
    */
   unregisterTool(name: string): void {
-    // Verbose logging removed to reduce console spam
-
     const inProvideContext = this.provideContextTools.has(name);
     const inDynamic = this.dynamicTools.has(name);
 
@@ -1546,8 +1509,6 @@ class WebModelContext implements InternalModelContext {
    * Removes all tools, resources, and prompts registered via provideContext() and register* methods.
    */
   clearContext(): void {
-    // Verbose logging removed to reduce console spam
-
     // Clear tools
     this.provideContextTools.clear();
     this.dynamicTools.clear();
@@ -1593,8 +1554,6 @@ class WebModelContext implements InternalModelContext {
     for (const [name, tool] of this.dynamicTools) {
       this.bridge.tools.set(name, tool);
     }
-
-    // Verbose logging removed to reduce console spam
   }
 
   /**
@@ -1638,8 +1597,6 @@ class WebModelContext implements InternalModelContext {
     for (const [uri, resource] of this.dynamicResources) {
       this.bridge.resources.set(uri, resource);
     }
-
-    // Verbose logging removed to reduce console spam
   }
 
   /**
@@ -1678,8 +1635,6 @@ class WebModelContext implements InternalModelContext {
     for (const [name, prompt] of this.dynamicPrompts) {
       this.bridge.prompts.set(name, prompt);
     }
-
-    // Verbose logging removed to reduce console spam
   }
 
   /**
@@ -1750,8 +1705,6 @@ class WebModelContext implements InternalModelContext {
    * @internal
    */
   async readResource(uri: string): Promise<{ contents: ResourceContents[] }> {
-    // Verbose logging removed to reduce console spam
-
     // First, try to find an exact match (static resource)
     const staticResource = this.bridge.resources.get(uri);
     if (staticResource && !staticResource.isTemplate) {
@@ -1837,8 +1790,6 @@ class WebModelContext implements InternalModelContext {
     name: string,
     args?: Record<string, unknown>
   ): Promise<{ messages: PromptMessage[] }> {
-    // Verbose logging removed to reduce console spam
-
     const prompt = this.bridge.prompts.get(name);
     if (!prompt) {
       throw new Error(`Prompt not found: ${name}`);
@@ -1883,7 +1834,6 @@ class WebModelContext implements InternalModelContext {
       throw new Error(`Tool not found: ${toolName}`);
     }
 
-    // Verbose logging removed to reduce console spam
     const validation = validateWithZod(args, tool.inputValidator);
     if (!validation.success) {
       logger.error(`Input validation failed for ${toolName}:`, validation.error);
@@ -1907,7 +1857,6 @@ class WebModelContext implements InternalModelContext {
     if (this.testingAPI?.hasMockResponse(toolName)) {
       const mockResponse = this.testingAPI.getMockResponse(toolName);
       if (mockResponse) {
-        // Verbose logging removed to reduce console spam
         return mockResponse;
       }
     }
@@ -1919,12 +1868,10 @@ class WebModelContext implements InternalModelContext {
     if (event.defaultPrevented && event.hasResponse()) {
       const response = event.getResponse();
       if (response) {
-        // Verbose logging removed to reduce console spam
         return response;
       }
     }
 
-    // Verbose logging removed to reduce console spam
     try {
       const response = await tool.execute(validatedArgs);
 
@@ -1986,7 +1933,6 @@ class WebModelContext implements InternalModelContext {
    * @returns {Promise<SamplingResult>} The LLM completion result
    */
   async createMessage(params: SamplingRequestParams): Promise<SamplingResult> {
-    // Verbose logging removed to reduce console spam
     const server = this.bridge.tabServer;
 
     // Access the underlying Server instance to call createMessage
@@ -2013,7 +1959,6 @@ class WebModelContext implements InternalModelContext {
    * @returns {Promise<ElicitationResult>} The user's response
    */
   async elicitInput(params: ElicitationParams): Promise<ElicitationResult> {
-    // Verbose logging removed to reduce console spam
     const server = this.bridge.tabServer;
 
     // Access the underlying Server instance to call elicitInput
@@ -2042,23 +1987,18 @@ class WebModelContext implements InternalModelContext {
  * @returns {MCPBridge} The initialized MCP bridge
  */
 function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
-  // Verbose logging removed to reduce console spam
-
   const hostname = window.location.hostname || 'localhost';
   const transportOptions = options?.transport;
 
   const setupServerHandlers = (server: McpServer, bridge: MCPBridge) => {
     // ==================== TOOL HANDLERS ====================
     server.setRequestHandler(ListToolsRequestSchema, async () => {
-      // Verbose logging removed to reduce console spam
       return {
         tools: bridge.modelContext.listTools(),
       };
     });
 
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
-      // Verbose logging removed to reduce console spam
-
       const toolName = request.params.name;
       const args = (request.params.arguments || {}) as Record<string, unknown>;
 
@@ -2077,7 +2017,6 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
 
     // ==================== RESOURCE HANDLERS ====================
     server.setRequestHandler(ListResourcesRequestSchema, async () => {
-      // Verbose logging removed to reduce console spam
       return {
         resources: bridge.modelContext.listResources(),
         // Note: Resource templates are included in the resources list as the MCP SDK
@@ -2087,8 +2026,6 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
     });
 
     server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-      // Verbose logging removed to reduce console spam
-
       try {
         return await bridge.modelContext.readResource(request.params.uri);
       } catch (error) {
@@ -2099,15 +2036,12 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
 
     // ==================== PROMPT HANDLERS ====================
     server.setRequestHandler(ListPromptsRequestSchema, async () => {
-      // Verbose logging removed to reduce console spam
       return {
         prompts: bridge.modelContext.listPrompts(),
       };
     });
 
     server.setRequestHandler(GetPromptRequestSchema, async (request) => {
-      // Verbose logging removed to reduce console spam
-
       try {
         return await bridge.modelContext.getPrompt(
           request.params.name,
@@ -2127,8 +2061,6 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
   const customTransport: Transport | undefined = transportOptions?.create?.();
 
   if (customTransport) {
-    // Verbose logging removed to reduce console spam
-
     const server = new McpServer(
       {
         name: hostname,
@@ -2158,11 +2090,8 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
     setupServerHandlers(server, bridge);
     server.connect(customTransport);
 
-    // Verbose logging removed to reduce console spam
     return bridge;
   }
-
-  // Verbose logging removed to reduce console spam
 
   const tabServerEnabled = transportOptions?.tabServer !== false;
   const tabServer = new McpServer(
@@ -2204,7 +2133,6 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
     });
 
     tabServer.connect(tabTransport);
-    // Verbose logging removed to reduce console spam
   }
 
   const isInIframe = typeof window !== 'undefined' && window.parent !== window;
@@ -2213,8 +2141,6 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
     iframeServerConfig !== false && (iframeServerConfig !== undefined || isInIframe);
 
   if (iframeServerEnabled) {
-    // Verbose logging removed to reduce console spam
-
     const iframeServer = new McpServer(
       {
         name: `${hostname}-iframe`,
@@ -2242,8 +2168,6 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
 
     iframeServer.connect(iframeTransport);
     bridge.iframeServer = iframeServer;
-
-    // Verbose logging removed to reduce console spam
   }
 
   return bridge;
