@@ -23,7 +23,9 @@ interface TrackedTool {
   domain: string;
   toolId: string;
   description: string;
-  inputSchema?: Record<string, unknown>;
+  inputSchema?: Tool['inputSchema'];
+  outputSchema?: Tool['outputSchema'];
+  annotations?: Tool['annotations'];
 }
 
 /**
@@ -35,7 +37,9 @@ export interface RegisteredToolInfo {
   domain: string;
   pageIdx: number;
   description: string;
-  inputSchema?: Record<string, unknown>;
+  inputSchema?: Tool['inputSchema'];
+  outputSchema?: Tool['outputSchema'];
+  annotations?: Tool['annotations'];
 }
 
 /**
@@ -102,7 +106,7 @@ export class WebMCPToolHub {
   async syncToolsForPage(
     page: Page,
     client: Client,
-  ): Promise<{synced: number; removed: number; updated: number}> {
+  ): Promise<{synced: number; removed: number; updated: number; error?: string}> {
     if (!this.#enabled) {
       return {synced: 0, removed: 0, updated: 0};
     }
@@ -126,8 +130,10 @@ export class WebMCPToolHub {
 
       return this.#applyToolChanges(page, tools as Tool[]);
     } catch (err) {
-      this.#logger('Failed to sync WebMCP tools:', err);
-      return {synced: 0, removed: 0, updated: 0};
+      const message = err instanceof Error ? err.message : String(err);
+      this.#logger(`Failed to sync WebMCP tools: ${message}`);
+      // Return error indicator so callers know sync failed vs "no tools found"
+      return {synced: 0, removed: 0, updated: 0, error: message};
     } finally {
       this.#syncInProgress.delete(page);
     }
@@ -236,14 +242,16 @@ export class WebMCPToolHub {
 
     this.#logger(`Tracking WebMCP tool: ${toolId}`);
 
-    // Track tool metadata including schema
+    // Track tool metadata including schemas and annotations
     this.#trackedTools.set(toolId, {
       page,
       originalName: tool.name,
       domain,
       toolId,
       description: tool.description || '',
-      inputSchema: tool.inputSchema as Record<string, unknown> | undefined,
+      inputSchema: tool.inputSchema,
+      outputSchema: tool.outputSchema,
+      annotations: tool.annotations,
     });
 
     // Track tool for this page
@@ -274,17 +282,31 @@ export class WebMCPToolHub {
   }
 
   /**
-   * Get all tracked tools with their metadata
+   * Get all tracked tools with their metadata.
+   * Only returns tools from pages in the current session's window scope.
    */
   getRegisteredTools(): RegisteredToolInfo[] {
-    return Array.from(this.#trackedTools.values()).map(rt => ({
-      toolId: rt.toolId,
-      originalName: rt.originalName,
-      domain: rt.domain,
-      pageIdx: this.#context.getPages().indexOf(rt.page),
-      description: rt.description,
-      inputSchema: rt.inputSchema,
-    }));
+    const sessionPages = this.#context.getPages();
+    const result: RegisteredToolInfo[] = [];
+
+    for (const rt of this.#trackedTools.values()) {
+      const pageIdx = sessionPages.indexOf(rt.page);
+      // Only include tools from pages in the session's window scope
+      if (pageIdx !== -1) {
+        result.push({
+          toolId: rt.toolId,
+          originalName: rt.originalName,
+          domain: rt.domain,
+          pageIdx,
+          description: rt.description,
+          inputSchema: rt.inputSchema,
+          outputSchema: rt.outputSchema,
+          annotations: rt.annotations,
+        });
+      }
+    }
+
+    return result;
   }
 
   /**
@@ -382,7 +404,12 @@ export function extractDomain(url: string): string {
       ? `localhost_${urlObj.port || '80'}`
       : hostname;
     return sanitizeName(domain);
-  } catch {
+  } catch (err) {
+    // Log at debug level for troubleshooting malformed URLs
+    if (typeof console !== 'undefined' && console.debug) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.debug(`[WebMCPToolHub] Failed to extract domain from URL "${url}": ${message}`);
+    }
     return 'unknown';
   }
 }

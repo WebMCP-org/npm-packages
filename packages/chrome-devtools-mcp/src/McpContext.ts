@@ -21,6 +21,7 @@ import {WebMCPClientTransport} from './transports/WebMCPClientTransport.js';
 import {Locator} from './third_party/index.js';
 import type {
   Browser,
+  CDPSession,
   ConsoleMessage,
   Debugger,
   Dialog,
@@ -186,6 +187,13 @@ export class McpContext implements Context {
   #toolHub?: WebMCPToolHub;
   /** Tracks pages that have WebMCP auto-detection listeners installed. */
   #pagesWithWebMCPListeners = new WeakSet<Page>();
+  /**
+   * The windowId that this MCP session owns.
+   * When set, page operations are scoped to only pages in this window.
+   */
+  #sessionWindowId?: number;
+  /** Cached browser-level CDP session for window operations. */
+  #browserCdpSession?: CDPSession;
 
   private constructor(
     browser: Browser,
@@ -263,8 +271,10 @@ export class McpContext implements Context {
           }
 
           await page.evaluate(WEB_MCP_BRIDGE_SCRIPT);
-        } catch {
-          // Page might not be ready or accessible, ignore
+        } catch (err) {
+          // Page might not be ready or accessible - log for debugging
+          const message = err instanceof Error ? err.message : String(err);
+          this.logger(`Bridge injection skipped for ${page.url()}: ${message}`);
         }
       }
 
@@ -289,7 +299,10 @@ export class McpContext implements Context {
     this.#toolHub = hub;
     // Trigger auto-detection for all existing pages asynchronously
     this.#setupWebMCPAutoDetectionForAllPages().catch(err => {
-      this.logger('Error setting up WebMCP auto-detection:', err);
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger(`WebMCP auto-detection setup failed: ${message}`);
+      // Note: This is non-fatal - individual page connections may still work
+      // when explicitly requested via getWebMCPClient()
     });
   }
 
@@ -298,6 +311,97 @@ export class McpContext implements Context {
    */
   getToolHub(): WebMCPToolHub | undefined {
     return this.#toolHub;
+  }
+
+  /**
+   * Get or create a browser-level CDP session for window operations.
+   * Recreates the session if it has become invalid.
+   */
+  async #getBrowserCdpSession(): Promise<CDPSession> {
+    if (this.#browserCdpSession) {
+      // Verify session is still valid by attempting a simple operation
+      try {
+        await this.#browserCdpSession.send('Browser.getVersion');
+        return this.#browserCdpSession;
+      } catch (err) {
+        // Session is stale, recreate it
+        const message = err instanceof Error ? err.message : String(err);
+        this.logger(`Browser CDP session stale (${message}), recreating...`);
+        this.#browserCdpSession = undefined;
+      }
+    }
+    this.#browserCdpSession = await this.browser.target().createCDPSession();
+    return this.#browserCdpSession;
+  }
+
+  /**
+   * Get the windowId for a given page using CDP.
+   */
+  async getWindowIdForPage(page: Page): Promise<number> {
+    const cdpSession = await this.#getBrowserCdpSession();
+    // @ts-expect-error _targetId is internal but stable
+    const targetId = page.target()._targetId as string;
+    const {windowId} = await cdpSession.send('Browser.getWindowForTarget', {
+      targetId,
+    });
+    return windowId;
+  }
+
+  /**
+   * Set the window that this session owns.
+   * When set, page operations are scoped to only pages in this window.
+   */
+  setSessionWindowId(windowId: number): void {
+    this.#sessionWindowId = windowId;
+    this.logger(`Session bound to windowId: ${windowId}`);
+  }
+
+  /**
+   * Get the session's window ID, or undefined if not set.
+   */
+  getSessionWindowId(): number | undefined {
+    return this.#sessionWindowId;
+  }
+
+  /**
+   * Close all pages in the session's window.
+   * Called during cleanup when the MCP server is shutting down.
+   */
+  async closeSessionWindow(): Promise<void> {
+    if (this.#sessionWindowId === undefined) {
+      this.logger('No session window to close');
+      return;
+    }
+
+    this.logger(`Closing session window ${this.#sessionWindowId}...`);
+
+    // Get all pages in this session's window and close them
+    const pagesToClose = [...this.#pages];
+    for (const page of pagesToClose) {
+      try {
+        if (!page.isClosed()) {
+          await page.close();
+        }
+      } catch (err) {
+        // Ignore errors during cleanup - page might already be closed
+        const message = err instanceof Error ? err.message : String(err);
+        this.logger(`Error closing page during cleanup: ${message}`);
+      }
+    }
+
+    // Clean up the CDP session
+    if (this.#browserCdpSession) {
+      try {
+        await this.#browserCdpSession.detach();
+      } catch (err) {
+        // Detach errors during cleanup are expected - log for debugging
+        const message = err instanceof Error ? err.message : String(err);
+        this.logger(`CDP detach during cleanup: ${message}`);
+      }
+      this.#browserCdpSession = undefined;
+    }
+
+    this.logger('Session window closed');
   }
 
   /**
@@ -344,7 +448,16 @@ export class McpContext implements Context {
       // Immediately try to connect - no polling needed
       // If no WebMCP, connection will timeout gracefully
       this.#tryConnectWebMCP(page).catch(err => {
-        this.logger('WebMCP connection attempt failed (expected if page has no WebMCP):', err);
+        const message = err instanceof Error ? err.message : String(err);
+        // Differentiate expected timeouts from unexpected errors
+        const isExpected = message.includes('timeout') ||
+                           message.includes('WebMCP not detected') ||
+                           message.includes('server did not respond');
+        if (isExpected) {
+          this.logger(`No WebMCP detected after navigation: ${page.url()}`);
+        } else {
+          this.logger(`Unexpected WebMCP connection error for ${page.url()}: ${message}`);
+        }
       });
     };
 
@@ -403,7 +516,16 @@ export class McpContext implements Context {
       this.#setupWebMCPAutoDetection(page);
       // Try to connect immediately (don't await - run in parallel for all pages)
       this.#tryConnectWebMCP(page).catch(err => {
-        this.logger('Initial WebMCP connection attempt failed (expected):', err);
+        const message = err instanceof Error ? err.message : String(err);
+        // Differentiate expected timeouts from unexpected errors
+        const isExpected = message.includes('timeout') ||
+                           message.includes('WebMCP not detected') ||
+                           message.includes('server did not respond');
+        if (isExpected) {
+          this.logger(`No WebMCP on page during initial scan: ${page.url()}`);
+        } else {
+          this.logger(`Unexpected error during initial WebMCP scan for ${page.url()}: ${message}`);
+        }
       });
     }
   }
@@ -499,7 +621,41 @@ export class McpContext implements Context {
   }
 
   async newPage(): Promise<Page> {
+    // If we have a session window, ensure our window is focused first
+    // This increases the chance that Chrome creates the new tab in our window
+    if (this.#sessionWindowId !== undefined && this.#pages.length > 0) {
+      try {
+        const existingPage = this.#pages[0];
+        if (existingPage) {
+          await existingPage.bringToFront();
+        }
+      } catch (err) {
+        // Best effort - focus might fail if page is closing
+        const message = err instanceof Error ? err.message : String(err);
+        this.logger(`Window focus failed (non-critical): ${message}`);
+      }
+    }
+
     const page = await this.browser.newPage();
+
+    // Verify the new page is in our window (if session scoping is active)
+    if (this.#sessionWindowId !== undefined) {
+      try {
+        const newPageWindowId = await this.getWindowIdForPage(page);
+        if (newPageWindowId !== this.#sessionWindowId) {
+          // New tab went to wrong window - this is a known Chrome behavior issue
+          this.logger(
+            `Warning: new_page created tab in window ${newPageWindowId} instead of session window ${this.#sessionWindowId}. ` +
+              `Tab may not be visible in list_pages.`,
+          );
+        }
+      } catch (err) {
+        // Failed to get windowId - page might be in an unexpected state
+        const message = err instanceof Error ? err.message : String(err);
+        this.logger(`Window ID check failed (non-critical): ${message}`);
+      }
+    }
+
     await this.createPagesSnapshot();
     // Mark as explicitly selected so this session sticks to this page
     this.selectPage(page, true);
@@ -510,7 +666,7 @@ export class McpContext implements Context {
     return page;
   }
 
-  async newWindow(): Promise<Page> {
+  async newWindow(): Promise<{page: Page; windowId: number}> {
     // Use CDP to create a new browser window instead of just a tab
     const browserTarget = this.browser.target();
     const cdpSession = await browserTarget.createCDPSession();
@@ -535,13 +691,13 @@ export class McpContext implements Context {
       throw new Error('Failed to get page from new window target');
     }
 
+    // Get window ID for this target (required for session scoping)
+    const {windowId} = await cdpSession.send('Browser.getWindowForTarget', {
+      targetId,
+    });
+
     // Set window to nearly full screen (large size that fits most displays)
     try {
-      // Get window ID for this target
-      const {windowId} = await cdpSession.send('Browser.getWindowForTarget', {
-        targetId,
-      });
-
       // Set to large dimensions (works well on 1920x1080 and larger displays)
       // This is ~95% of common display sizes without being truly fullscreen
       await cdpSession.send('Browser.setWindowBounds', {
@@ -568,7 +724,7 @@ export class McpContext implements Context {
     this.#consoleCollector.addPage(page);
     // Set up WebMCP auto-detection for the new page
     this.#setupWebMCPAutoDetection(page);
-    return page;
+    return {page, windowId};
   }
   async closePage(pageIdx: number): Promise<void> {
     if (this.#pages.length === 1) {
@@ -735,20 +891,88 @@ export class McpContext implements Context {
 
   /**
    * Creates a snapshot of the pages.
+   * If a sessionWindowId is set, only pages from that window are included.
    */
   async createPagesSnapshot(): Promise<Page[]> {
     const allPages = await this.browser.pages(
       this.#options.experimentalIncludeAllPages,
     );
 
-    this.#pages = allPages.filter(page => {
-      // If we allow debugging DevTools windows, return all pages.
-      // If we are in regular mode, the user should only see non-DevTools page.
+    this.logger(`createPagesSnapshot: found ${allPages.length} total pages`);
+    for (const page of allPages) {
+      this.logger(`  - ${page.url()}`);
+    }
+
+    // First filter: DevTools pages (unless experimental mode is enabled)
+    let filteredPages = allPages.filter(page => {
       return (
         this.#options.experimentalDevToolsDebugging ||
         !page.url().startsWith('devtools://')
       );
     });
+
+    // Second filter: Session window scoping
+    // If we have a sessionWindowId, only include pages from that window
+    if (this.#sessionWindowId !== undefined) {
+      const windowFilteredPages: Page[] = [];
+      // Check window IDs in parallel for better performance
+      const windowIdResults = await Promise.allSettled(
+        filteredPages.map(async page => {
+          // Try to get windowId with retry for pages that might be in transitional state
+          let windowId: number | null = null;
+          let lastError: string | null = null;
+
+          for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+              windowId = await this.getWindowIdForPage(page);
+              break; // Success, exit retry loop
+            } catch (err) {
+              lastError = err instanceof Error ? err.message : String(err);
+              if (attempt < 2) {
+                // Wait before retry (50ms, then 100ms)
+                await new Promise(r => setTimeout(r, 50 * (attempt + 1)));
+              }
+            }
+          }
+
+          if (windowId !== null) {
+            return {page, windowId, url: page.url()};
+          }
+
+          // All retries failed
+          this.logger(`Failed to get windowId for page ${page.url()} after 3 attempts: ${lastError}`);
+          return null;
+        }),
+      );
+
+      for (const result of windowIdResults) {
+        if (result.status === 'fulfilled' && result.value) {
+          if (result.value.windowId === this.#sessionWindowId) {
+            windowFilteredPages.push(result.value.page);
+          } else {
+            this.logger(
+              `Excluding page ${result.value.url} (windowId ${result.value.windowId} != session ${this.#sessionWindowId})`,
+            );
+          }
+        }
+      }
+      filteredPages = windowFilteredPages;
+      this.logger(`Window filter: ${windowFilteredPages.length} pages in session window ${this.#sessionWindowId}`);
+
+      // Always include the explicitly selected page even if window filtering excluded it
+      // This handles edge cases where windowId lookup fails after cross-origin navigation
+      if (
+        this.#pageExplicitlySelected &&
+        this.#selectedPage &&
+        !this.#selectedPage.isClosed() &&
+        !filteredPages.includes(this.#selectedPage)
+      ) {
+        this.logger(`Re-adding explicitly selected page that was filtered out: ${this.#selectedPage.url()}`);
+        filteredPages.unshift(this.#selectedPage);
+      }
+    }
+
+    this.#pages = filteredPages;
 
     // Only auto-select pages[0] if:
     // 1. No page has been explicitly selected for this session AND
@@ -805,7 +1029,8 @@ export class McpContext implements Context {
             }
           }
         } catch (error) {
-          this.logger('Issue occurred while trying to find DevTools', error);
+          const message = error instanceof Error ? error.message : String(error);
+          this.logger(`DevTools detection failed for ${devToolsPage.url()}: ${message}`);
         }
       }
     }
@@ -1028,8 +1253,10 @@ export class McpContext implements Context {
     if (conn) {
       try {
         await conn.client.close();
-      } catch {
-        // Ignore close errors
+      } catch (err) {
+        // Close errors during reconnection are expected - log for debugging
+        const message = err instanceof Error ? err.message : String(err);
+        this.logger(`WebMCP client close during reconnection: ${message}`);
       }
       this.#webMCPConnections.delete(targetPage);
     }

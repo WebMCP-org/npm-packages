@@ -41,6 +41,44 @@ process.on('unhandledRejection', (reason, promise) => {
   logger('Unhandled promise rejection', promise, reason);
 });
 
+/**
+ * Cleanup handler for graceful shutdown.
+ * Closes the session window when the MCP server is killed.
+ */
+let isCleaningUp = false;
+async function cleanup(): Promise<void> {
+  if (isCleaningUp) return;
+  isCleaningUp = true;
+
+  logger('Shutting down MCP server...');
+
+  if (context) {
+    try {
+      await context.closeSessionWindow();
+    } catch (err) {
+      logger('Error during cleanup:', err);
+    }
+  }
+
+  process.exit(0);
+}
+
+// Handle various termination signals
+process.on('SIGINT', () => {
+  logger('Received SIGINT');
+  cleanup();
+});
+
+process.on('SIGTERM', () => {
+  logger('Received SIGTERM');
+  cleanup();
+});
+
+process.on('SIGHUP', () => {
+  logger('Received SIGHUP');
+  cleanup();
+});
+
 export const args = parseArguments(VERSION);
 
 const logFile = args.logFile ? saveLogsToFile(args.logFile) : undefined;
@@ -152,20 +190,17 @@ async function getContext(): Promise<McpContext> {
       // Fresh browser launch - use the existing default page
       // Mark it as explicitly selected so this session stays pinned to it
       context.selectPage(context.getSelectedPage(), true);
-      logger('Using existing window for this MCP session');
 
-      // Resize the window to nearly full screen
+      // Capture windowId for session scoping and resize the window
       try {
         const page = context.getSelectedPage();
+        const windowId = await context.getWindowIdForPage(page);
+        context.setSessionWindowId(windowId);
+        logger(`Using existing window for this MCP session, windowId: ${windowId}`);
+
+        // Resize to nearly full screen
         const browserTarget = browser.target();
         const cdpSession = await browserTarget.createCDPSession();
-
-        // @ts-expect-error _targetId is internal but stable
-        const targetId = page.target()._targetId;
-        const {windowId} = await cdpSession.send('Browser.getWindowForTarget', {
-          targetId,
-        });
-
         await cdpSession.send('Browser.setWindowBounds', {
           windowId,
           bounds: {
@@ -179,14 +214,15 @@ async function getContext(): Promise<McpContext> {
         await cdpSession.detach();
         logger('Resized window to nearly full screen');
       } catch (err) {
-        // Non-fatal: window sizing is best-effort
-        logger('Failed to resize window:', err);
+        // Non-fatal: window sizing is best-effort, but windowId capture is important
+        logger('Failed to capture windowId or resize window:', err);
       }
     } else {
       // Connected to existing browser - create new window for isolation
       // This ensures multiple MCP clients don't step on each other's toes
-      await context.newWindow();
-      logger('Created new window for this MCP session');
+      const {windowId} = await context.newWindow();
+      context.setSessionWindowId(windowId);
+      logger(`Created new window for this MCP session, windowId: ${windowId}`);
     }
 
     // Initialize WebMCP tool hub for dynamic tool registration
@@ -246,7 +282,7 @@ function registerTool(tool: ToolDefinition): void {
     tool.name,
     {
       description: tool.description,
-      inputSchema: zod.object(tool.schema).passthrough(),
+      inputSchema: zod.object(tool.schema).strict(),
       annotations: tool.annotations,
     },
     async (params: Record<string, unknown>): Promise<CallToolResult> => {

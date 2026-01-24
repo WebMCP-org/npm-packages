@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.6.3
+
+### Patch Changes
+
+- fix: improve error handling and logging across WebMCP tools
+  - Fix silent failures in McpContext.ts - all catch blocks now log with context
+  - Fix overly broad catch in WebMCPToolHub.syncToolsForPage - now returns error state
+  - Improve error classification in call_webmcp_tool with actionable guidance
+  - Add warning when localStorage access fails in logger.ts
+  - Remove 51 misleading "verbose logging removed" placeholder comments
+  - Differentiate expected timeouts from unexpected errors in WebMCP connections
+
 ## 1.5.8
 
 ### Patch Changes

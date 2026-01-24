@@ -22,7 +22,7 @@ export {
   type TextContent,
   type Tool,
 } from '@modelcontextprotocol/sdk/types.js';
-export {z as zod} from 'zod';
+export {z as zod} from 'zod/v4';
 export {
   Locator,
   PredefinedNetworkConditions,

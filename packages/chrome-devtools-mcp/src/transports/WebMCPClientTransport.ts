@@ -133,6 +133,8 @@ export class WebMCPClientTransport implements Transport {
   private _frameNavigatedHandler: ((frame: unknown) => void) | null = null;
   /** Bound handler for CDP binding calls (stored for cleanup). */
   private _bindingCalledHandler: ((event: {name: string; payload: string}) => void) | null = null;
+  /** Guards against concurrent navigation handling. */
+  private _navigationInProgress = false;
 
   /** Callback invoked when transport is closed. */
   onclose?: () => void;
@@ -288,8 +290,13 @@ export class WebMCPClientTransport implements Transport {
 
       this._frameNavigatedHandler = (frame: unknown) => {
         if (frame === this._page.mainFrame()) {
-          // Main frame navigated, bridge is gone
-          this._handleNavigation();
+          // Main frame navigated - check if bridge survived (SPA navigation)
+          this._handleNavigation().catch((err) => {
+            // Log navigation handling errors for debugging
+            const message = err instanceof Error ? err.message : String(err);
+            const logFn = console.debug || console.log;
+            logFn('[WebMCPClientTransport] Navigation handling error:', message);
+          });
         }
       };
 
@@ -386,34 +393,76 @@ export class WebMCPClientTransport implements Transport {
   }
 
   /**
-   * Handle page navigation - bridge is lost
+   * Handle page navigation - check if OUR BRIDGE survived (SPA navigation)
    *
-   * Navigation is a normal lifecycle event in browsers, not a fatal error.
-   * We perform full teardown (detach CDP session, remove listeners) and
-   * allow the client to reconnect by creating a new transport instance.
+   * The `framenavigated` event fires for BOTH:
+   * 1. Full page navigations (where the bridge IS destroyed)
+   * 2. Client-side SPA navigations via History API (where the bridge survives)
+   *
+   * For SPA navigations (React Router, TanStack Router, Next.js, etc.),
+   * the page doesn't actually reload - only the URL changes.
+   * The injected bridge script remains intact and functional.
+   *
+   * IMPORTANT: We check for OUR bridge (window.__mcpCdpBridge), not just the
+   * page's WebMCP availability. A full navigation to another WebMCP page would
+   * have a new TabServerTransport but our bridge would be destroyed.
    */
-  private _handleNavigation(): void {
-    if (this._closed) return;
+  private async _handleNavigation(): Promise<void> {
+    // Guard against concurrent navigation handling
+    if (this._closed || this._navigationInProgress) return;
+    this._navigationInProgress = true;
 
-    this._serverReady = false;
-    this._closed = true;
-    this._started = false;
+    try {
+      // Give the page a moment to settle after navigation
+      // This helps with rapid SPA navigations
+      await new Promise(resolve => setTimeout(resolve, 50));
 
-    // Reject any pending server ready promise (safe - has attached catch handler)
-    if (!this._serverReadyRejected) {
-      this._serverReadyReject(new Error('Page navigated, connection lost'));
+      // Re-check closed state after the wait (could have been closed during delay)
+      if (this._closed) return;
+
+      // Check if OUR BRIDGE survived the navigation (not just the page's WebMCP)
+      // This distinguishes SPA navigation from full navigation to another WebMCP page
+      try {
+        const bridgeAlive = await this._page.evaluate((bridgeProp: string) => {
+          return !!(window as WindowWithMCPBridge)[bridgeProp as typeof CDP_BRIDGE_WINDOW_PROPERTY];
+        }, CDP_BRIDGE_WINDOW_PROPERTY);
+
+        if (bridgeAlive) {
+          // Our bridge survived - this was an SPA navigation, don't close
+          const logFn = console.debug || console.log;
+          logFn('[WebMCPClientTransport] Bridge survived navigation (SPA), keeping connection open');
+          return;
+        }
+      } catch {
+        // Evaluation failed - page context is gone, proceed with close
+      }
+
+      // Re-check closed state (could have been closed during bridge check)
+      if (this._closed) return;
+
+      // Bridge is lost - full navigation occurred
+      this._serverReady = false;
+      this._closed = true;
+      this._started = false;
+
+      // Reject any pending server ready promise (safe - has attached catch handler)
+      if (!this._serverReadyRejected) {
+        this._serverReadyReject(new Error('Page navigated, connection lost'));
+      }
+
+      // Full teardown - detach CDP session and remove listeners
+      this._cleanup().catch((err) => {
+        // Cleanup errors during navigation are expected and non-critical
+        const message = err instanceof Error ? err.message : String(err);
+        const logFn = console.debug || console.log;
+        logFn('[WebMCPClientTransport] Cleanup error during navigation (non-critical):', message);
+      });
+
+      // Signal clean disconnection (not an error)
+      this.onclose?.();
+    } finally {
+      this._navigationInProgress = false;
     }
-
-    // Full teardown - detach CDP session and remove listeners
-    this._cleanup().catch((err) => {
-      // Cleanup errors during navigation are expected and non-critical
-      const message = err instanceof Error ? err.message : String(err);
-      const logFn = console.debug || console.log;
-      logFn('[WebMCPClientTransport] Cleanup error during navigation (non-critical):', message);
-    });
-
-    // Signal clean disconnection (not an error)
-    this.onclose?.();
   }
 
   /**

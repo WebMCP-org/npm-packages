@@ -35,7 +35,7 @@ export interface ToolDefinition<
 }
 
 export interface Request<Schema extends zod.ZodRawShape> {
-  params: zod.objectOutputType<Schema, zod.ZodTypeAny>;
+  params: zod.infer<zod.ZodObject<Schema>>;
 }
 
 export interface ImageContentData {

@@ -466,6 +466,15 @@ Call ${handleDialog.name} to handle it before continuing.`);
         );
       } else {
         response.push('<no console messages found>');
+        // Provide helpful hint about preserved messages if not already enabled
+        if (!this.#consoleDataOptions.includePreservedMessages) {
+          response.push('');
+          response.push('Tip: Use includePreservedMessages: true to see messages from previous navigations.');
+        }
+        // Provide hint about type filtering if specified
+        if (this.#consoleDataOptions.types?.length) {
+          response.push(`(Filtering by types: ${this.#consoleDataOptions.types.join(', ')})`);
+        }
       }
     }
 

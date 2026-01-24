@@ -83,21 +83,56 @@ import { defineTool } from './ToolDefinition.js';
 // }
 
 /**
- * List all WebMCP tools registered across all pages with full definitions including schemas.
+ * Convert a glob-style pattern to a RegExp.
+ * Supports * (any chars) and ? (single char).
+ */
+function globToRegex(pattern: string): RegExp {
+  const escaped = pattern
+    .replace(/[.+^${}()|[\]\\]/g, '\\$&')  // Escape regex special chars except * and ?
+    .replace(/\*/g, '.*')                   // * -> .*
+    .replace(/\?/g, '.');                   // ? -> .
+  return new RegExp(`^${escaped}$`, 'i');   // Case insensitive, full match
+}
+
+/**
+ * List WebMCP tools registered on browser pages.
+ * By default returns tools from the currently selected page only.
+ * Use all_pages=true to see tools from all tabs.
  */
 export const listWebMCPTools = defineTool({
   name: 'list_webmcp_tools',
   description:
-    'List all WebMCP tools registered across all pages. ' +
-    'Returns full tool definitions including input schemas. ' +
-    'To call a tool, use call_webmcp_tool({ name: "tool_name", arguments: {...} }).',
+    'List WebMCP tools registered on browser pages. ' +
+    'By default, returns tools from the currently selected page only. ' +
+    'Use all_pages=true to see tools from all tabs. ' +
+    'Returns tool definitions including name, description, input schema, and page index. ' +
+    'Use call_webmcp_tool to invoke a tool.',
   annotations: {
     title: 'List Website MCP Tools',
     category: ToolCategory.WEBMCP,
     readOnlyHint: true,
   },
-  schema: {},
-  handler: async (_request, response, context) => {
+  schema: {
+    page_index: zod
+      .number()
+      .int()
+      .optional()
+      .describe('Only show tools from this specific page index'),
+    all_pages: zod
+      .boolean()
+      .optional()
+      .describe('If true, return tools from all pages instead of just the selected page (default: false)'),
+    pattern: zod
+      .string()
+      .optional()
+      .describe('Glob pattern to filter tool names (e.g., "skill*", "*_config")'),
+    summary: zod
+      .boolean()
+      .optional()
+      .describe('If true, return only name and first line of description, omitting full schemas (default: false)'),
+  },
+  handler: async (request, response, context) => {
+    const { page_index, all_pages, pattern, summary } = request.params;
     const toolHub = context.getToolHub();
 
     if (!toolHub) {
@@ -105,26 +140,95 @@ export const listWebMCPTools = defineTool({
       return;
     }
 
-    const tools = toolHub.getRegisteredTools();
+    let tools = toolHub.getRegisteredTools();
+
+    // If no tools found, try connecting to WebMCP on the current page
+    // This handles cases where auto-detection is still in progress or timed out
+    if (tools.length === 0) {
+      const page = context.getSelectedPage();
+      const result = await context.getWebMCPClient(page);
+      if (result.connected) {
+        // Re-fetch tools after connection (sync happens in getWebMCPClient)
+        tools = toolHub.getRegisteredTools();
+      }
+    }
+
+    // Determine which page(s) to show
+    const selectedPageIdx = context.getPages().indexOf(context.getSelectedPage());
+
+    // Filter by page
+    if (page_index !== undefined) {
+      // Specific page requested
+      tools = tools.filter(t => t.pageIdx === page_index);
+    } else if (!all_pages) {
+      // Default: selected page only
+      tools = tools.filter(t => t.pageIdx === selectedPageIdx);
+    }
+    // else: all_pages=true, show everything
+
+    // Filter by pattern
+    if (pattern) {
+      const regex = globToRegex(pattern);
+      tools = tools.filter(t => regex.test(t.originalName));
+    }
 
     if (tools.length === 0) {
-      response.appendResponseLine('No WebMCP tools registered.');
-      response.appendResponseLine(
-        'Navigate to a page with @mcp-b/global loaded to discover tools.',
-      );
+      const filters: string[] = [];
+      if (page_index !== undefined) {
+        filters.push(`page_index=${page_index}`);
+      } else if (!all_pages) {
+        filters.push(`selected page (${selectedPageIdx})`);
+      }
+      if (pattern) {
+        filters.push(`pattern="${pattern}"`);
+      }
+
+      const filterMsg = filters.length > 0 ? ` (filters: ${filters.join(', ')})` : '';
+      response.appendResponseLine(`No WebMCP tools found${filterMsg}.`);
+
+      if (!all_pages && page_index === undefined) {
+        response.appendResponseLine('');
+        response.appendResponseLine('Tip: Use all_pages=true to search across all pages.');
+      }
+      response.appendResponseLine('');
+      response.appendResponseLine('Navigate to a page with @mcp-b/global loaded to discover tools.');
       return;
     }
 
-    // Format as JSON for easy parsing by the model
-    const toolDefinitions = tools.map(tool => ({
-      name: tool.originalName,
-      description: tool.description,
-      inputSchema: tool.inputSchema,
-      pageIdx: tool.pageIdx,
-      domain: tool.domain,
-    }));
-
-    response.appendResponseLine(JSON.stringify({ tools: toolDefinitions }, null, 2));
+    // Format output
+    if (summary) {
+      // Compact output: name + first line of description
+      const toolSummaries = tools.map(tool => {
+        const firstLine = tool.description.split('\n')[0].split('. ')[0];
+        const truncated = firstLine.length > 60 ? firstLine.slice(0, 57) + '...' : firstLine;
+        return {
+          name: tool.originalName,
+          description: truncated,
+          pageIdx: tool.pageIdx,
+        };
+      });
+      response.appendResponseLine(JSON.stringify({ tools: toolSummaries, count: tools.length }, null, 2));
+    } else {
+      // Full output with schemas and annotations
+      const toolDefinitions = tools.map(tool => {
+        const def: Record<string, unknown> = {
+          name: tool.originalName,
+          description: tool.description,
+          inputSchema: tool.inputSchema,
+          pageIdx: tool.pageIdx,
+          domain: tool.domain,
+        };
+        // Only include optional fields if present
+        if (tool.outputSchema) {
+          def.outputSchema = tool.outputSchema;
+        }
+        if (tool.annotations) {
+          def.annotations = tool.annotations;
+        }
+        return def;
+      });
+      response.appendResponseLine(JSON.stringify({ tools: toolDefinitions, count: tools.length }, null, 2));
+    }
   },
 });
 
@@ -135,10 +239,9 @@ export const listWebMCPTools = defineTool({
 export const callWebMCPTool = defineTool({
   name: 'call_webmcp_tool',
   description:
-    'Call a tool registered on a webpage via WebMCP. ' +
-    'Usage: call_webmcp_tool({ name: "tool_name", arguments: { key: "value" } }). ' +
-    'Use list_webmcp_tools to see available tools and their schemas. ' +
-    'Use page_index to target a specific page.',
+    'Call a WebMCP tool registered on a webpage. ' +
+    'Auto-connects to the page if needed. ' +
+    'Use list_webmcp_tools first to see available tools and their input schemas.',
   annotations: {
     title: 'Call Website MCP Tool',
     category: ToolCategory.WEBMCP,
@@ -147,9 +250,30 @@ export const callWebMCPTool = defineTool({
   schema: {
     name: zod.string().describe('The name of the tool to call'),
     arguments: zod
-      .record(zod.any())
+      .union([
+        zod.record(zod.string(), zod.any()),
+        zod.string().transform((str, ctx) => {
+          try {
+            const parsed = JSON.parse(str);
+            if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+              ctx.addIssue({
+                code: zod.ZodIssueCode.custom,
+                message: 'Arguments must be a JSON object, not an array or primitive',
+              });
+              return zod.NEVER;
+            }
+            return parsed as Record<string, unknown>;
+          } catch {
+            ctx.addIssue({
+              code: zod.ZodIssueCode.custom,
+              message: `Invalid JSON string for arguments: ${str.slice(0, 100)}${str.length > 100 ? '...' : ''}`,
+            });
+            return zod.NEVER;
+          }
+        }),
+      ])
       .optional()
-      .describe('Arguments to pass to the tool as a JSON object'),
+      .describe('Arguments to pass to the tool as a JSON object (or JSON string that will be parsed)'),
     page_index: zod
       .number()
       .int()
@@ -190,6 +314,34 @@ export const callWebMCPTool = defineTool({
     }
 
     const client = result.client;
+
+    // Check if arguments are empty but the tool expects required fields
+    const toolHub = context.getToolHub();
+    const toolDef = toolHub?.getToolByName(name, page);
+    const argsEmpty = !args || Object.keys(args).length === 0;
+
+    if (argsEmpty && toolDef?.inputSchema) {
+      const schema = toolDef.inputSchema;
+      const requiredFields = (schema.required as string[] | undefined) ?? [];
+      const properties = schema.properties as Record<string, unknown> | undefined;
+
+      if (requiredFields.length > 0) {
+        response.appendResponseLine(`⚠️  Warning: Calling "${name}" with empty arguments, but tool expects required fields: ${requiredFields.join(', ')}`);
+        response.appendResponseLine('');
+
+        // Show the expected schema
+        if (properties) {
+          response.appendResponseLine('Expected schema:');
+          for (const field of requiredFields) {
+            const prop = properties[field] as { type?: string; description?: string } | undefined;
+            const typeStr = prop?.type || 'unknown';
+            const descStr = prop?.description ? ` - ${prop.description}` : '';
+            response.appendResponseLine(`  • ${field} (${typeStr})${descStr}`);
+          }
+          response.appendResponseLine('');
+        }
+      }
+    }
 
     try {
       const callResult = await client.callTool({
@@ -251,9 +403,26 @@ export const callWebMCPTool = defineTool({
         }
       }
 
-      response.appendResponseLine(
-        `Failed to call tool: ${errorMessage}`,
-      );
+      // Classify errors and provide actionable guidance
+      if (errorMessage.includes('timeout') || errorMessage.includes('Timeout')) {
+        response.appendResponseLine(`Tool call timed out: ${name}`);
+        response.appendResponseLine('');
+        response.appendResponseLine('The page may be unresponsive. Try:');
+        response.appendResponseLine('  1. Refresh the page with navigate_page({ type: "reload" })');
+        response.appendResponseLine('  2. Check list_console_messages for JavaScript errors');
+      } else if (errorMessage.includes('validation') || errorMessage.includes('schema')) {
+        response.appendResponseLine(`Tool argument validation failed: ${errorMessage}`);
+        response.appendResponseLine('');
+        response.appendResponseLine('Check the tool schema with list_webmcp_tools to see expected arguments.');
+      } else if (errorMessage.includes('not found') || errorMessage.includes('No such tool')) {
+        response.appendResponseLine(`Tool not found: ${name}`);
+        response.appendResponseLine('');
+        response.appendResponseLine('The tool may have been unregistered. Use list_webmcp_tools to see available tools.');
+      } else {
+        response.appendResponseLine(`Failed to call tool: ${errorMessage}`);
+        response.appendResponseLine('');
+        response.appendResponseLine('For debugging, check list_console_messages for page errors.');
+      }
       response.setIsError(true);
     }
   },
