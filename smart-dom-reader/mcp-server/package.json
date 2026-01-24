@@ -21,7 +21,7 @@
     "@modelcontextprotocol/sdk": "^1.17.3",
     "playwright": "^1.54.2",
     "tsx": "^4.20.4",
-    "zod": "^3.24.1"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",

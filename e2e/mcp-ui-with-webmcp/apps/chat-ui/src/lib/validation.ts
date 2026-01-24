@@ -2,7 +2,7 @@
  * Zod validation schemas for application settings
  */
 
-import { z } from 'zod';
+import { z } from 'zod/v4';
 
 /**
  * Settings form validation schema
