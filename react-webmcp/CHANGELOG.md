@@ -7,6 +7,13 @@
 - Updated dependencies
   - @mcp-b/global@0.0.0
 
+## 0.0.0
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-b/global@0.0.0
+
 ## 0.0.0-beta-20260109203913
 
 ### Minor Changes

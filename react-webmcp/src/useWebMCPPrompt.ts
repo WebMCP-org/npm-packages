@@ -1,7 +1,7 @@
 import type { InputSchema } from '@mcp-b/global';
 import { zodToJsonSchema } from '@mcp-b/global';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { z } from 'zod';
+import type { z } from 'zod/v4';
 import type { PromptMessage, WebMCPPromptConfig, WebMCPPromptReturn } from './types.js';
 
 /**

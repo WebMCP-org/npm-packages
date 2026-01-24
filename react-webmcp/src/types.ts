@@ -1,6 +1,6 @@
 import type { PromptMessage, ResourceContents, ToolAnnotations } from '@mcp-b/webmcp-ts-sdk';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import type { z } from 'zod';
+import type { z } from 'zod/v4';
 
 // Re-export PromptMessage and ResourceContents for use in hook types
 export type { PromptMessage, ResourceContents };
