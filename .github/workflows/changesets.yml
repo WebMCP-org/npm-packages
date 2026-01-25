@@ -21,16 +21,16 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
           # Fetch all history for proper changelog generation
           fetch-depth: 0
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@c5ba7f7862a0f64c1b1a05fbac13e0b8e86ba08c # v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
         with:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
@@ -43,7 +43,7 @@ jobs:
         run: pnpm build
 
       - name: Create Release PR or Publish
-        uses: changesets/action@v1
+        uses: changesets/action@e4156907cdd269dcaa37f03263be504a3570994d # v1
         with:
           # Follow conventional commit format for version commits
           commit: "chore(release): version packages"
