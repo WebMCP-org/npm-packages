@@ -40,7 +40,7 @@
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
     "husky": "^9.1.7",
-    "jiti": "^2.5.1",
+    "jiti": "^2.6.1",
     "lint-staged": "^16.1.5"
   },
   "packageManager": "pnpm@10.14.0",
