@@ -151,12 +151,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Override zod version for react-webmcp
-        run: |
-          pnpm --filter @mcp-b/react-webmcp add -D zod@${{ matrix.zod-version }}
-
       - name: Build packages
         run: pnpm build
+
+      - name: Override zod version for react-webmcp tests
+        run: |
+          pnpm --filter @mcp-b/react-webmcp add -D zod@${{ matrix.zod-version }} --ignore-workspace-root-check
 
       - name: Install Playwright Browsers
         run: pnpm --filter @mcp-b/react-webmcp exec playwright install --with-deps chromium
