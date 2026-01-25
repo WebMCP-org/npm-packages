@@ -11,13 +11,13 @@
     "browser",
     "web-model-context"
   ],
-  "homepage": "https://github.com/MiguelsPizza/WebMCP#readme",
+  "homepage": "https://github.com/WebMCP-org/npm-packages#readme",
   "bugs": {
-    "url": "https://github.com/MiguelsPizza/WebMCP/issues"
+    "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/MiguelsPizza/WebMCP.git",
+    "url": "git+https://github.com/WebMCP-org/npm-packages.git",
     "directory": "packages/mcp-iframe"
   },
   "license": "MIT",

@@ -78,7 +78,7 @@ jobs:
         run: |
           pnpm publish -r --access public --tag ${{ inputs.tag || 'canary' }} --no-git-checks
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
 
       - name: Install cosign
