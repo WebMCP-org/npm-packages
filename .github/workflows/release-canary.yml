@@ -50,17 +50,25 @@ jobs:
       - name: Create canary versions
         id: versions
         run: |
-          # Generate snapshot version with timestamp
-          pnpm changeset version --snapshot ${{ inputs.tag || 'canary' }}
+          # Generate timestamp for canary version
+          TIMESTAMP=$(date +%Y%m%d%H%M%S)
+          TAG_SUFFIX="${{ inputs.tag || 'canary' }}"
 
-          # Collect package info for later steps
+          # Update each package version to canary format: 0.0.0-<tag>.<timestamp>
           PACKAGES_JSON="[]"
           for pkg in packages/*/; do
             if [ -f "$pkg/package.json" ]; then
               name=$(jq -r '.name' "$pkg/package.json")
-              version=$(jq -r '.version' "$pkg/package.json")
-              if [ "$name" != "null" ] && [ "$version" != "null" ]; then
-                PACKAGES_JSON=$(echo "$PACKAGES_JSON" | jq --arg n "$name" --arg v "$version" '. + [{"name": $n, "version": $v}]')
+              current_version=$(jq -r '.version' "$pkg/package.json")
+              if [ "$name" != "null" ] && [ "$current_version" != "null" ]; then
+                # Create canary version
+                canary_version="${current_version}-${TAG_SUFFIX}.${TIMESTAMP}"
+                # Update package.json
+                jq --arg v "$canary_version" '.version = $v' "$pkg/package.json" > "$pkg/package.json.tmp"
+                mv "$pkg/package.json.tmp" "$pkg/package.json"
+                echo "Updated $name to $canary_version"
+                # Add to packages list
+                PACKAGES_JSON=$(echo "$PACKAGES_JSON" | jq -c --arg n "$name" --arg v "$canary_version" '. + [{"name": $n, "version": $v}]')
               fi
             fi
           done
