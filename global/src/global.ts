@@ -1709,7 +1709,17 @@ class WebModelContext implements InternalModelContext {
     const staticResource = this.bridge.resources.get(uri);
     if (staticResource && !staticResource.isTemplate) {
       try {
-        const parsedUri = new URL(uri);
+        // Try to parse as URL, but fall back to a pseudo-URL for custom schemes
+        let parsedUri: URL;
+        try {
+          parsedUri = new URL(uri);
+        } catch {
+          // Custom URI scheme (e.g., "iframe://config", "prefix_iframe://config")
+          // Create a pseudo-URL with the original URI as the pathname
+          parsedUri = new URL(`custom-scheme:///${encodeURIComponent(uri)}`);
+          // Store original URI for handlers that need it
+          (parsedUri as URL & { originalUri: string }).originalUri = uri;
+        }
         return await staticResource.read(parsedUri);
       } catch (error) {
         logger.error(`Error reading resource ${uri}:`, error);
@@ -1724,7 +1734,15 @@ class WebModelContext implements InternalModelContext {
       const params = this.matchUriTemplate(resource.uri, uri);
       if (params) {
         try {
-          const parsedUri = new URL(uri);
+          // Try to parse as URL, but fall back to a pseudo-URL for custom schemes
+          let parsedUri: URL;
+          try {
+            parsedUri = new URL(uri);
+          } catch {
+            // Custom URI scheme - create a pseudo-URL
+            parsedUri = new URL(`custom-scheme:///${encodeURIComponent(uri)}`);
+            (parsedUri as URL & { originalUri: string }).originalUri = uri;
+          }
           return await resource.read(parsedUri, params);
         } catch (error) {
           logger.error(`Error reading resource ${uri}:`, error);
