@@ -113,8 +113,15 @@ jobs:
       - name: Install Playwright Browsers
         run: pnpm --filter @mcp-b/global exec playwright install --with-deps chromium
 
-      - name: Run unit tests
-        run: pnpm test:unit
+      - name: Run unit tests with coverage
+        run: pnpm test:unit --coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+          verbose: true
 
   security:
     name: Security Audit
