@@ -90,7 +90,7 @@ jobs:
             PKG_VERSION=$(echo "$pkg" | jq -r '.version')
             TAG="${PKG_NAME}@${PKG_VERSION}"
 
-            echo "- \`${PKG_NAME}@${PKG_VERSION}\`" >> $GITHUB_STEP_SUMMARY
+            echo "- ${PKG_NAME}@${PKG_VERSION}" >> $GITHUB_STEP_SUMMARY
 
             # Create safe filename (replace @ and / with -)
             SAFE_NAME=$(echo "${PKG_NAME}-${PKG_VERSION}" | sed 's/@//g' | sed 's/\//-/g')
@@ -108,31 +108,30 @@ jobs:
                 --output-certificate "/tmp/${SAFE_NAME}.tar.gz.pem" \
                 --bundle "/tmp/${SAFE_NAME}.tar.gz.sigstore"
 
+              # Create release notes file
+              cat > /tmp/release-notes.md << NOTES_EOF
+          Canary release of ${PKG_NAME}
+
+          **Install:** npm install ${PKG_NAME}@${TAG_SUFFIX}
+
+          **Verify signature:**
+          cosign verify-blob ${SAFE_NAME}.tar.gz --signature ${SAFE_NAME}.tar.gz.sig --certificate ${SAFE_NAME}.tar.gz.pem --certificate-identity-regexp https://github.com/WebMCP-org/npm-packages --certificate-oidc-issuer https://token.actions.githubusercontent.com
+          NOTES_EOF
+
               # Create GitHub release (prerelease for canary)
               gh release create "$TAG" \
                 --title "${PKG_NAME} ${PKG_VERSION}" \
-                --notes "Canary release of ${PKG_NAME}
-
-**Install:** \`npm install ${PKG_NAME}@${TAG_SUFFIX}\`
-
-**Verify signature:**
-\`\`\`bash
-cosign verify-blob ${SAFE_NAME}.tar.gz \\
-  --signature ${SAFE_NAME}.tar.gz.sig \\
-  --certificate ${SAFE_NAME}.tar.gz.pem \\
-  --certificate-identity-regexp 'https://github.com/WebMCP-org/npm-packages' \\
-  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
-\`\`\`" \
+                --notes-file /tmp/release-notes.md \
                 --prerelease \
                 "/tmp/${SAFE_NAME}.tar.gz" \
                 "/tmp/${SAFE_NAME}.tar.gz.sig" \
                 "/tmp/${SAFE_NAME}.tar.gz.pem" \
                 "/tmp/${SAFE_NAME}.tar.gz.sigstore" \
-                2>/dev/null || echo "  ⚠ Release may already exist for $TAG"
+                2>/dev/null || echo "  Warning: Release may already exist for $TAG"
 
-              echo "  ✓ Created signed release for $TAG"
+              echo "  Created signed release for $TAG"
             fi
           done
 
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "All packages signed with [sigstore](https://sigstore.dev) (keyless OIDC)" >> $GITHUB_STEP_SUMMARY
+          echo "All packages signed with sigstore (keyless OIDC)" >> $GITHUB_STEP_SUMMARY
