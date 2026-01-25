@@ -88,8 +88,10 @@ export function useWebMCPContext<T>(
       destructiveHint: false,
       openWorldHint: false,
     },
-    handler: async () => {
-      return getValueRef.current();
+    // Cast to unknown since context tools return arbitrary types
+    // that don't need to conform to a specific schema
+    handler: async (_input: Record<string, never>) => {
+      return getValueRef.current() as Record<string, unknown>;
     },
     formatOutput: (output) => {
       if (typeof output === 'string') {
