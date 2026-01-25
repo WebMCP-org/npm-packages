@@ -1,17 +1,7 @@
 packages:
-  - extension-tools
-  - global
-  - mcp-iframe
-  - packages/chrome-devtools-mcp
-  - react-webmcp
-  - usewebmcp
-  - smart-dom-reader
-  - smart-dom-reader/mcp-server
-  - transports
-  - webmcp-helpers
-  - webmcp-ts-sdk
+  - packages/*
+  - packages/smart-dom-reader/mcp-server
   - skills/webmcp-setup
-  - examples/test-with-helpers
   - e2e
   - e2e/test-app
   - e2e/react-webmcp-test-app

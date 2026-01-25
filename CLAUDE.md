@@ -252,7 +252,7 @@ pnpm --filter @mcp-b/chrome-devtools-mcp publish --access public --no-git-checks
 **All commits must follow this format:** `<type>(<scope>): <subject>`
 
 Valid scopes:
-- Package scopes: `transports`, `extension-tools`, `mcp-react-hooks`, `mcp-react-hook-form`, `global`
+- Package scopes: `chrome-devtools-mcp`, `extension-tools`, `global`, `mcp-iframe`, `react-webmcp`, `smart-dom-reader`, `transports`, `usewebmcp`, `webmcp-helpers`, `webmcp-ts-sdk`
 - Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*` (multiple packages)
 
 Valid types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`

@@ -110,13 +110,13 @@ importers:
     dependencies:
       '@mcp-b/global':
         specifier: workspace:*
-        version: link:../../global
+        version: link:../../packages/global
       '@mcp-b/react-webmcp':
         specifier: workspace:*
-        version: link:../../react-webmcp
+        version: link:../../packages/react-webmcp
       '@mcp-b/transports':
         specifier: workspace:*
-        version: link:../../transports
+        version: link:../../packages/transports
       '@modelcontextprotocol/sdk':
         specifier: 'catalog:'
         version: 1.25.2(hono@4.10.4)(zod@4.3.5)
@@ -150,13 +150,13 @@ importers:
     dependencies:
       '@mcp-b/global':
         specifier: workspace:*
-        version: link:../../global
+        version: link:../../packages/global
       '@mcp-b/mcp-iframe':
         specifier: workspace:*
-        version: link:../../mcp-iframe
+        version: link:../../packages/mcp-iframe
       '@mcp-b/transports':
         specifier: workspace:*
-        version: link:../../transports
+        version: link:../../packages/transports
       '@modelcontextprotocol/sdk':
         specifier: 'catalog:'
         version: 1.25.2(hono@4.10.4)(zod@4.3.5)
@@ -252,96 +252,6 @@ importers:
       wrangler:
         specifier: ^4.45.2
         version: 4.45.3(@cloudflare/workers-types@4.20251014.0)
-
-  extension-tools:
-    dependencies:
-      '@mcp-b/smart-dom-reader':
-        specifier: workspace:*
-        version: link:../smart-dom-reader
-      '@mcp-b/webmcp-ts-sdk':
-        specifier: workspace:*
-        version: link:../webmcp-ts-sdk
-      zod:
-        specifier: 'catalog:'
-        version: 4.3.5
-    devDependencies:
-      '@anthropic-ai/sdk':
-        specifier: ^0.60.0
-        version: 0.60.0
-      '@types/chrome':
-        specifier: 'catalog:'
-        version: 0.0.326
-      '@types/node':
-        specifier: 'catalog:'
-        version: 22.17.2
-      cheerio:
-        specifier: ^1.1.2
-        version: 1.1.2
-      dotenv:
-        specifier: ^17.2.1
-        version: 17.2.1
-      playwright:
-        specifier: ^1.54.2
-        version: 1.54.2
-      tsdown:
-        specifier: 'catalog:'
-        version: 0.15.10(typescript@5.9.2)
-      typescript:
-        specifier: 'catalog:'
-        version: 5.9.2
-
-  global:
-    dependencies:
-      '@mcp-b/transports':
-        specifier: workspace:*
-        version: link:../transports
-      '@mcp-b/webmcp-ts-sdk':
-        specifier: workspace:*
-        version: link:../webmcp-ts-sdk
-      zod:
-        specifier: 'catalog:'
-        version: 4.3.5
-    devDependencies:
-      '@types/node':
-        specifier: 'catalog:'
-        version: 22.17.2
-      '@vitest/browser':
-        specifier: 'catalog:'
-        version: 4.0.18(vite@7.1.2(@types/node@22.17.2)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.4)(yaml@2.8.1))(vitest@4.0.18)
-      '@vitest/browser-playwright':
-        specifier: 'catalog:'
-        version: 4.0.18(playwright@1.58.0)(vite@7.1.2(@types/node@22.17.2)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.4)(yaml@2.8.1))(vitest@4.0.18)
-      playwright:
-        specifier: 'catalog:'
-        version: 1.58.0
-      tsdown:
-        specifier: 'catalog:'
-        version: 0.15.10(typescript@5.9.2)
-      typescript:
-        specifier: 'catalog:'
-        version: 5.9.2
-      vitest:
-        specifier: 'catalog:'
-        version: 4.0.18(@types/node@22.17.2)(@vitest/browser-playwright@4.0.18)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.4)(yaml@2.8.1)
-
-  mcp-iframe:
-    dependencies:
-      '@mcp-b/transports':
-        specifier: workspace:*
-        version: link:../transports
-      '@modelcontextprotocol/sdk':
-        specifier: ^1.15.0
-        version: 1.20.2
-    devDependencies:
-      '@types/node':
-        specifier: 'catalog:'
-        version: 22.17.2
-      tsdown:
-        specifier: 'catalog:'
-        version: 0.15.10(typescript@5.9.2)
-      typescript:
-        specifier: 'catalog:'
-        version: 5.9.2
 
   packages/chrome-devtools-mcp:
     dependencies:
@@ -446,7 +356,97 @@ importers:
         specifier: ^8.43.0
         version: 8.46.2(eslint@9.38.0(jiti@2.6.1))(typescript@5.9.3)
 
-  react-webmcp:
+  packages/extension-tools:
+    dependencies:
+      '@mcp-b/smart-dom-reader':
+        specifier: workspace:*
+        version: link:../smart-dom-reader
+      '@mcp-b/webmcp-ts-sdk':
+        specifier: workspace:*
+        version: link:../webmcp-ts-sdk
+      zod:
+        specifier: 'catalog:'
+        version: 4.3.5
+    devDependencies:
+      '@anthropic-ai/sdk':
+        specifier: ^0.60.0
+        version: 0.60.0
+      '@types/chrome':
+        specifier: 'catalog:'
+        version: 0.0.326
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.17.2
+      cheerio:
+        specifier: ^1.1.2
+        version: 1.1.2
+      dotenv:
+        specifier: ^17.2.1
+        version: 17.2.1
+      playwright:
+        specifier: ^1.54.2
+        version: 1.58.0
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.15.10(typescript@5.9.2)
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.2
+
+  packages/global:
+    dependencies:
+      '@mcp-b/transports':
+        specifier: workspace:*
+        version: link:../transports
+      '@mcp-b/webmcp-ts-sdk':
+        specifier: workspace:*
+        version: link:../webmcp-ts-sdk
+      zod:
+        specifier: 'catalog:'
+        version: 4.3.5
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.17.2
+      '@vitest/browser':
+        specifier: 'catalog:'
+        version: 4.0.18(vite@6.4.1(@types/node@22.17.2)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.4)(yaml@2.8.1))(vitest@4.0.18)
+      '@vitest/browser-playwright':
+        specifier: 'catalog:'
+        version: 4.0.18(playwright@1.58.0)(vite@6.4.1(@types/node@22.17.2)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.4)(yaml@2.8.1))(vitest@4.0.18)
+      playwright:
+        specifier: 'catalog:'
+        version: 1.58.0
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.15.10(typescript@5.9.2)
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.2
+      vitest:
+        specifier: 'catalog:'
+        version: 4.0.18(@types/node@22.17.2)(@vitest/browser-playwright@4.0.18)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.4)(yaml@2.8.1)
+
+  packages/mcp-iframe:
+    dependencies:
+      '@mcp-b/transports':
+        specifier: workspace:*
+        version: link:../transports
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.15.0
+        version: 1.25.2(hono@4.10.4)(zod@4.3.5)
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.17.2
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.15.10(typescript@5.9.2)
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.2
+
+  packages/react-webmcp:
     dependencies:
       '@mcp-b/global':
         specifier: workspace:*
@@ -466,10 +466,10 @@ importers:
         version: 19.1.10
       '@vitest/browser':
         specifier: 'catalog:'
-        version: 4.0.18(vite@6.4.1(@types/node@22.17.2)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.4)(yaml@2.8.1))(vitest@4.0.18)
+        version: 4.0.18(vite@7.1.2(@types/node@22.17.2)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.4)(yaml@2.8.1))(vitest@4.0.18)
       '@vitest/browser-playwright':
         specifier: 'catalog:'
-        version: 4.0.18(playwright@1.58.0)(vite@6.4.1(@types/node@22.17.2)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.4)(yaml@2.8.1))(vitest@4.0.18)
+        version: 4.0.18(playwright@1.58.0)(vite@7.1.2(@types/node@22.17.2)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.4)(yaml@2.8.1))(vitest@4.0.18)
       playwright:
         specifier: 'catalog:'
         version: 1.58.0
@@ -495,13 +495,11 @@ importers:
         specifier: 'catalog:'
         version: 4.3.5
 
-  skills/webmcp-setup: {}
-
-  smart-dom-reader:
+  packages/smart-dom-reader:
     dependencies:
       '@modelcontextprotocol/sdk':
         specifier: ^1.15.0
-        version: 1.17.3
+        version: 1.25.2(hono@4.10.4)(zod@4.3.5)
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -519,14 +517,14 @@ importers:
         specifier: 'catalog:'
         version: 6.0.1(postcss@8.5.6)(vite@7.1.2(@types/node@22.17.2)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.4)(yaml@2.8.1))
 
-  smart-dom-reader/mcp-server:
+  packages/smart-dom-reader/mcp-server:
     dependencies:
       '@modelcontextprotocol/sdk':
         specifier: ^1.17.3
-        version: 1.17.3
+        version: 1.25.2(hono@4.10.4)(zod@4.3.5)
       playwright:
         specifier: ^1.54.2
-        version: 1.54.2
+        version: 1.58.0
       tsx:
         specifier: ^4.20.4
         version: 4.20.4
@@ -539,9 +537,9 @@ importers:
         version: 22.17.2
       typescript:
         specifier: ^5.8.0
-        version: 5.9.2
+        version: 5.9.3
 
-  transports:
+  packages/transports:
     dependencies:
       '@mcp-b/webmcp-ts-sdk':
         specifier: workspace:*
@@ -575,7 +573,7 @@ importers:
         specifier: 'catalog:'
         version: 4.0.18(@types/node@22.17.2)(@vitest/browser-playwright@4.0.18)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.4)(yaml@2.8.1)
 
-  usewebmcp:
+  packages/usewebmcp:
     dependencies:
       '@mcp-b/react-webmcp':
         specifier: workspace:*
@@ -600,7 +598,7 @@ importers:
         specifier: 'catalog:'
         version: 5.9.2
 
-  webmcp-helpers:
+  packages/webmcp-helpers:
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -612,7 +610,7 @@ importers:
         specifier: 'catalog:'
         version: 5.9.2
 
-  webmcp-ts-sdk:
+  packages/webmcp-ts-sdk:
     dependencies:
       '@modelcontextprotocol/sdk':
         specifier: 'catalog:'
@@ -627,6 +625,8 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 5.9.2
+
+  skills/webmcp-setup: {}
 
 packages:
 
@@ -1632,14 +1632,6 @@ packages:
 
   '@manypkg/get-packages@1.1.3':
     resolution: {integrity: sha512-fo+QhuU3qE/2TQMQmbVMqaQ6EWbMhi4ABWP+O4AM1NqPBuy0OrApV5LO6BrrgnhtAHS2NH6RrVk9OL181tTi8A==}
-
-  '@modelcontextprotocol/sdk@1.17.3':
-    resolution: {integrity: sha512-JPwUKWSsbzx+DLFznf/QZ32Qa+ptfbUlHhRLrBQBAFu9iI1iYvizM4p+zhhRDceSsPutXp4z+R/HPVphlIiclg==}
-    engines: {node: '>=18'}
-
-  '@modelcontextprotocol/sdk@1.20.2':
-    resolution: {integrity: sha512-6rqTdFt67AAAzln3NOKsXRmv5ZzPkgbfaebKBqUbts7vK1GZudqnrun5a8d3M/h955cam9RHZ6Jb4Y1XhnmFPg==}
-    engines: {node: '>=18'}
 
   '@modelcontextprotocol/sdk@1.25.2':
     resolution: {integrity: sha512-LZFeo4F9M5qOhC/Uc1aQSrBHxMrvxett+9KLHt7OhcExtoiRN9DKgbZffMP/nxjutWDQpfMDfP3nkHI4X9ijww==}
@@ -3720,10 +3712,6 @@ packages:
   events-universal@1.0.1:
     resolution: {integrity: sha512-LUd5euvbMLpwOF8m6ivPCbhQeSiYVNb8Vs0fQ8QjXo0JTkEHpz8pxdQf0gStltaPpw0Cca8b39KxvK9cfKRiAw==}
 
-  eventsource-parser@3.0.3:
-    resolution: {integrity: sha512-nVpZkTMM9rF6AQ9gPJpFsNAMt48wIzB5TQgiTLdHiuO8XEDhUgZEhqKlZWXbIzo9VmJ/HvysHqEaVeD5v9TPvA==}
-    engines: {node: '>=20.0.0'}
-
   eventsource-parser@3.0.6:
     resolution: {integrity: sha512-Vo1ab+QXPzZ4tCa8SwIHJFaSzy4R6SHf7BY79rFBDf0idraZWAkYrDjDj8uWaSm3S2TK+hJ7/t1CEmZ7jXw+pg==}
     engines: {node: '>=18.0.0'}
@@ -3909,9 +3897,6 @@ packages:
   get-symbol-description@1.1.0:
     resolution: {integrity: sha512-w9UMqWwJxHNOvoNzSJ2oPF5wvYcvP7jUvYzhp67yEhTi17ZDBBC1z9pTdGuzjD+EFIqLSYRweZjqfiPzQ06Ebg==}
     engines: {node: '>= 0.4'}
-
-  get-tsconfig@4.10.1:
-    resolution: {integrity: sha512-auHyJ4AgMz7vgS8Hp3N6HXSmlMdUyhSUrfBF16w153rxtLIEOE+HGqaBppczZvnHLqQJfiHotCYpNhl0lUROFQ==}
 
   get-tsconfig@4.13.0:
     resolution: {integrity: sha512-1VKTZJCwBrvbd+Wn3AOgQP/2Av+TfTCOlE4AcRJE72W1ksZXbAx8PPBR9RzgTeSPzlPMHrbANMH3LbltH73wxQ==}
@@ -4482,9 +4467,6 @@ packages:
   magic-string@0.25.9:
     resolution: {integrity: sha512-RmF0AsMzgt25qzqqLc1+MbHmhdx0ojF2Fvs4XnOqz2ZOBXzzkEwc/dJQZCYHAn7v1jbVOjAZfK8msRn4BxO4VQ==}
 
-  magic-string@0.30.17:
-    resolution: {integrity: sha512-sNPKHvyjVf7gyjwS4xGTaW/mCnF8wnjtifKBEhxfZ7E/S8tQ0rssrwGNn6q8JH/ohItJfSQp9mBtQYuTlH5QnA==}
-
   magic-string@0.30.21:
     resolution: {integrity: sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ==}
 
@@ -4813,11 +4795,6 @@ packages:
     resolution: {integrity: sha512-ueGLflrrnvwB3xuo/uGob5pd5FN7l0MsLf0Z87o/UQmRtwjvfylfc9MurIxRAWywCYTgrvpXBcqjV4OfCYGCIQ==}
     engines: {node: '>=16.20.0'}
 
-  playwright-core@1.54.2:
-    resolution: {integrity: sha512-n5r4HFbMmWsB4twG7tJLDN9gmBUeSPcsBZiWSE4DnYz9mJMAFqr2ID7+eGC9kpEnxExJ1epttwR59LEWCk8mtA==}
-    engines: {node: '>=18'}
-    hasBin: true
-
   playwright-core@1.56.1:
     resolution: {integrity: sha512-hutraynyn31F+Bifme+Ps9Vq59hKuUCz7H1kDOcBs+2oGguKkWTU50bBWrtz34OUWmIwpBTWDxaRPXrIXkgvmQ==}
     engines: {node: '>=18'}
@@ -4825,11 +4802,6 @@ packages:
 
   playwright-core@1.58.0:
     resolution: {integrity: sha512-aaoB1RWrdNi3//rOeKuMiS65UCcgOVljU46At6eFcOFPFHWtd2weHRRow6z/n+Lec0Lvu0k9ZPKJSjPugikirw==}
-    engines: {node: '>=18'}
-    hasBin: true
-
-  playwright@1.54.2:
-    resolution: {integrity: sha512-Hu/BMoA1NAdRUuulyvQC0pEqZ4vQbGfn8f7wPXcnqQmM+zct9UliKxsIkLNmz/ku7LElUNqmaiv1TG/aL5ACsw==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -5574,10 +5546,6 @@ packages:
   undici-types@7.16.0:
     resolution: {integrity: sha512-Zz+aZWSj8LE6zoxD+xrjh4VfkIG8Ya6LvYkZqtUQGJPZjYl53ypCaUwWqo7eI0x66KBGeRo+mlBEkMSeSZ38Nw==}
 
-  undici@7.13.0:
-    resolution: {integrity: sha512-l+zSMssRqrzDcb3fjMkjjLGmuiiK2pMIcV++mJaAc9vhjSGpvM7h43QgP+OAMb1GImHmbPyG2tBXeuyG5iY4gA==}
-    engines: {node: '>=20.18.1'}
-
   undici@7.14.0:
     resolution: {integrity: sha512-Vqs8HTzjpQXZeXdpsfChQTlafcMQaaIwnGwLam1wudSSjlJeQ3bw1j+TLPePgrCnCpUXx7Ba5Pdpf5OBih62NQ==}
     engines: {node: '>=20.18.1'}
@@ -5799,6 +5767,7 @@ packages:
   whatwg-encoding@3.1.1:
     resolution: {integrity: sha512-6qN4hJdMwfYBtE3YBTTHhoeuUrDBPZmbQaxWAqSALV/MeEnR5z1xd8UKud2RAkFoPkmB+hli1TZSnyi84xz1vQ==}
     engines: {node: '>=18'}
+    deprecated: Use @exodus/bytes instead for a more spec-conformant and faster implementation
 
   whatwg-mimetype@4.0.0:
     resolution: {integrity: sha512-QaKxh0eNIi2mE9p2vEdzfagOKHCcj1pJ56EEHGQOVxp8r9/iszLUUV7v89x9O1p/T+NlTM5W7jW6+cz4Fq1YVg==}
@@ -5935,11 +5904,6 @@ packages:
 
   youch@4.1.0-beta.10:
     resolution: {integrity: sha512-rLfVLB4FgQneDr0dv1oddCVZmKjcJ6yX6mS4pU82Mq/Dt9a3cLZQ62pDBL4AUO+uVrCvtWz3ZFUL2HFAFJ/BXQ==}
-
-  zod-to-json-schema@3.24.6:
-    resolution: {integrity: sha512-h/z3PKvcTcTetyjl1fkj79MHNEjm+HpD6NXheWjzOekY7kV+lwDYnHw+ivHkijnCSMz1yJaWBD9vu/Fcmk+vEg==}
-    peerDependencies:
-      zod: ^3.24.1
 
   zod-to-json-schema@3.25.0:
     resolution: {integrity: sha512-HvWtU2UG41LALjajJrML6uQejQhNJx+JBO9IflpSja4R03iNWfKXrj6W2h7ljuLyc1nKS+9yDyL/9tD1U/yBnQ==}
@@ -6853,40 +6817,6 @@ snapshots:
       fs-extra: 8.1.0
       globby: 11.1.0
       read-yaml-file: 1.1.0
-
-  '@modelcontextprotocol/sdk@1.17.3':
-    dependencies:
-      ajv: 6.12.6
-      content-type: 1.0.5
-      cors: 2.8.5
-      cross-spawn: 7.0.6
-      eventsource: 3.0.7
-      eventsource-parser: 3.0.3
-      express: 5.1.0
-      express-rate-limit: 7.5.1(express@5.1.0)
-      pkce-challenge: 5.0.0
-      raw-body: 3.0.0
-      zod: 3.25.76
-      zod-to-json-schema: 3.24.6(zod@3.25.76)
-    transitivePeerDependencies:
-      - supports-color
-
-  '@modelcontextprotocol/sdk@1.20.2':
-    dependencies:
-      ajv: 6.12.6
-      content-type: 1.0.5
-      cors: 2.8.5
-      cross-spawn: 7.0.6
-      eventsource: 3.0.7
-      eventsource-parser: 3.0.6
-      express: 5.1.0
-      express-rate-limit: 7.5.1(express@5.1.0)
-      pkce-challenge: 5.0.0
-      raw-body: 3.0.0
-      zod: 3.25.76
-      zod-to-json-schema: 3.24.6(zod@3.25.76)
-    transitivePeerDependencies:
-      - supports-color
 
   '@modelcontextprotocol/sdk@1.25.2(hono@4.10.4)(zod@4.3.5)':
     dependencies:
@@ -8430,7 +8360,7 @@ snapshots:
       parse5: 7.3.0
       parse5-htmlparser2-tree-adapter: 7.1.0
       parse5-parser-stream: 7.1.2
-      undici: 7.13.0
+      undici: 7.14.0
       whatwg-mimetype: 4.0.0
 
   chokidar@4.0.3:
@@ -9105,8 +9035,6 @@ snapshots:
     transitivePeerDependencies:
       - bare-abort-controller
 
-  eventsource-parser@3.0.3: {}
-
   eventsource-parser@3.0.6: {}
 
   eventsource@3.0.7:
@@ -9323,10 +9251,6 @@ snapshots:
       call-bound: 1.0.4
       es-errors: 1.3.0
       get-intrinsic: 1.3.0
-
-  get-tsconfig@4.10.1:
-    dependencies:
-      resolve-pkg-maps: 1.0.0
 
   get-tsconfig@4.13.0:
     dependencies:
@@ -9849,10 +9773,6 @@ snapshots:
     dependencies:
       sourcemap-codec: 1.4.8
 
-  magic-string@0.30.17:
-    dependencies:
-      '@jridgewell/sourcemap-codec': 1.5.5
-
   magic-string@0.30.21:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
@@ -10147,17 +10067,9 @@ snapshots:
 
   pkce-challenge@5.0.0: {}
 
-  playwright-core@1.54.2: {}
-
   playwright-core@1.56.1: {}
 
   playwright-core@1.58.0: {}
-
-  playwright@1.54.2:
-    dependencies:
-      playwright-core: 1.54.2
-    optionalDependencies:
-      fsevents: 2.3.2
 
   playwright@1.56.1:
     dependencies:
@@ -10930,7 +10842,7 @@ snapshots:
       rolldown: 1.0.0-beta.44
       rolldown-plugin-dts: 0.17.1(rolldown@1.0.0-beta.44)(typescript@5.9.2)
       semver: 7.7.3
-      tinyexec: 1.0.1
+      tinyexec: 1.0.2
       tinyglobby: 0.2.15
       tree-kill: 1.2.2
       unconfig: 7.3.3
@@ -10949,7 +10861,7 @@ snapshots:
   tsx@4.20.4:
     dependencies:
       esbuild: 0.25.9
-      get-tsconfig: 4.10.1
+      get-tsconfig: 4.13.0
     optionalDependencies:
       fsevents: 2.3.3
 
@@ -11066,8 +10978,6 @@ snapshots:
 
   undici-types@7.16.0: {}
 
-  undici@7.13.0: {}
-
   undici@7.14.0: {}
 
   unenv@2.0.0-rc.21:
@@ -11164,7 +11074,7 @@ snapshots:
       cross-spawn: 7.0.6
       htmlparser2: 10.0.0
       import-meta-resolve: 4.1.0
-      magic-string: 0.30.17
+      magic-string: 0.30.21
       mrmime: 2.0.1
       open: 10.2.0
       picocolors: 1.1.1
@@ -11272,7 +11182,7 @@ snapshots:
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@types/node': 22.17.2
-      '@vitest/browser-playwright': 4.0.18(playwright@1.58.0)(vite@7.1.2(@types/node@22.17.2)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.4)(yaml@2.8.1))(vitest@4.0.18)
+      '@vitest/browser-playwright': 4.0.18(playwright@1.58.0)(vite@6.4.1(@types/node@22.17.2)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.4)(yaml@2.8.1))(vitest@4.0.18)
     transitivePeerDependencies:
       - jiti
       - less
@@ -11447,10 +11357,6 @@ snapshots:
       '@speed-highlight/core': 1.2.8
       cookie: 1.0.2
       youch-core: 0.3.3
-
-  zod-to-json-schema@3.24.6(zod@3.25.76):
-    dependencies:
-      zod: 3.25.76
 
   zod-to-json-schema@3.25.0(zod@4.3.5):
     dependencies:
