@@ -23,7 +23,7 @@ catalog:
   '@types/chrome': ^0.0.326
   '@types/node': 22.17.2
   '@types/react': ^19.1.2
-  '@types/react-dom': ^19.1.2
+  '@types/react-dom': ^19.2.3
   '@use-gesture/react': ^10.3.1
   ai: ^5.0.83
   babel-plugin-react-compiler: ^1.0.0
