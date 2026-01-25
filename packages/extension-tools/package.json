@@ -78,7 +78,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@anthropic-ai/sdk": "^0.60.0",
+    "@anthropic-ai/sdk": "^0.71.2",
     "@types/chrome": "catalog:",
     "@types/node": "catalog:",
     "cheerio": "^1.1.2",
