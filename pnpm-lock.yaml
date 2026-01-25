@@ -19,10 +19,10 @@ catalogs:
       specifier: 22.17.2
       version: 22.17.2
     '@types/react':
-      specifier: ^19.1.2
+      specifier: ^19.2.9
       version: 19.2.9
     '@types/react-dom':
-      specifier: ^19.2.3
+      specifier: ^19.1.2
       version: 19.2.3
     '@vitest/browser':
       specifier: ^4.0.18
@@ -195,7 +195,7 @@ importers:
         specifier: ^6.0.0-beta.23
         version: 6.0.0-beta.23(@rjsf/core@6.0.0-beta.23(@rjsf/utils@6.2.5(react@19.2.3))(react@19.2.3))(@rjsf/utils@6.2.5(react@19.2.3))(@types/react-dom@19.2.3(@types/react@19.2.9))(@types/react@19.2.9)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(tailwindcss@4.1.16)
       '@rjsf/utils':
-        specifier: ^6.0.0-beta.23
+        specifier: ^6.2.5
         version: 6.2.5(react@19.2.3)
       '@rjsf/validator-ajv8':
         specifier: 6.0.0-beta.23
@@ -210,13 +210,13 @@ importers:
         specifier: ^0.548.0
         version: 0.548.0(react@19.2.3)
       react:
-        specifier: ^19.1.1
+        specifier: ^19.2.3
         version: 19.2.3
       react-dom:
-        specifier: ^19.2.3
+        specifier: ^19.1.1
         version: 19.2.3(react@19.2.3)
       tailwind-merge:
-        specifier: ^3.3.1
+        specifier: ^3.4.0
         version: 3.4.0
     devDependencies:
       '@cloudflare/vite-plugin':
@@ -229,10 +229,10 @@ importers:
         specifier: 'catalog:'
         version: 22.17.2
       '@types/react':
-        specifier: ^19.1.10
+        specifier: ^19.2.9
         version: 19.2.9
       '@types/react-dom':
-        specifier: ^19.2.3
+        specifier: ^19.1.7
         version: 19.2.3(@types/react@19.2.9)
       '@vitejs/plugin-react':
         specifier: ^5.0.0
