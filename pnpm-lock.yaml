@@ -7,8 +7,8 @@ settings:
 catalogs:
   default:
     '@composio/json-schema-to-zod':
-      specifier: ^0.1.17
-      version: 0.1.17
+      specifier: ^0.1.19
+      version: 0.1.19
     '@modelcontextprotocol/sdk':
       specifier: 1.25.2
       version: 1.25.2
@@ -257,7 +257,7 @@ importers:
     dependencies:
       '@composio/json-schema-to-zod':
         specifier: 'catalog:'
-        version: 0.1.17(zod@4.3.5)
+        version: 0.1.19(zod@4.3.5)
       '@modelcontextprotocol/sdk':
         specifier: 'catalog:'
         version: 1.25.2(hono@4.10.4)(zod@4.3.5)
@@ -950,10 +950,10 @@ packages:
     resolution: {integrity: sha512-/yCrWGCoA1SVKOks25EGadP9Pnj0oAIHGpl2wH2M2Y46dPM2ueb8wyCVOD7O3WCTkaJ0IkKvzhl1JY7+uCT2Dw==}
     engines: {node: '>=v18'}
 
-  '@composio/json-schema-to-zod@0.1.17':
-    resolution: {integrity: sha512-eD7FOLZnvVebCTeQW4Y7gTwM6ENXXNwxJcfMEH1KCDavaHO1RhAlPVgQXFKkuygw68y/IYbqrYpcbAQNXgbOvg==}
+  '@composio/json-schema-to-zod@0.1.19':
+    resolution: {integrity: sha512-OynnORVWjsqDv13EvFa4Bb+B1SzBqpkWGi6qXm4vpB3EG65o3T9FbhDCqWB3ZufnMmH1T/NYS526O0lnn2LoCQ==}
     peerDependencies:
-      zod: '>=3.25.76 <5'
+      zod: '>=3.25.76 <4 || >=4.1 <5'
 
   '@cspotcode/source-map-support@0.8.1':
     resolution: {integrity: sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw==}
@@ -6526,7 +6526,7 @@ snapshots:
       '@types/conventional-commits-parser': 5.0.1
       chalk: 5.5.0
 
-  '@composio/json-schema-to-zod@0.1.17(zod@4.3.5)':
+  '@composio/json-schema-to-zod@0.1.19(zod@4.3.5)':
     dependencies:
       zod: 4.3.5
 
