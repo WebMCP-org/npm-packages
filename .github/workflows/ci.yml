@@ -127,6 +127,43 @@ jobs:
           fail_ci_if_error: false
           verbose: true
 
+  zod-compat:
+    name: Zod Compatibility (${{ matrix.zod-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        zod-version: ['3.25.0', '4.3.5']
+    env:
+      NODE_OPTIONS: --max-old-space-size=16384
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@c5ba7f7862a0f64c1b1a05fbac13e0b8e86ba08c # v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Override zod version for react-webmcp
+        run: |
+          pnpm --filter @mcp-b/react-webmcp add -D zod@${{ matrix.zod-version }}
+
+      - name: Build packages
+        run: pnpm build
+
+      - name: Install Playwright Browsers
+        run: pnpm --filter @mcp-b/react-webmcp exec playwright install --with-deps chromium
+
+      - name: Run react-webmcp tests with Zod ${{ matrix.zod-version }}
+        run: pnpm --filter @mcp-b/react-webmcp test
+
   security:
     name: Security Audit
     runs-on: ubuntu-latest
