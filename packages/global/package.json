@@ -37,7 +37,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/WebMCP-org/npm-packages.git",
-    "directory": "global"
+    "directory": "packages/global"
   },
   "license": "MIT",
   "author": "Alex Nahas",

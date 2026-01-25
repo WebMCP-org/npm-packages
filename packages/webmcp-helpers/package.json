@@ -18,7 +18,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/WebMCP-org/npm-packages.git",
-    "directory": "webmcp-helpers"
+    "directory": "packages/webmcp-helpers"
   },
   "license": "MIT",
   "author": "WebMCP Contributors",

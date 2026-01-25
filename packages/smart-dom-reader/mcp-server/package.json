@@ -26,5 +26,8 @@
   "devDependencies": {
     "@types/node": "^22.10.5",
     "typescript": "^5.8.0"
+  },
+  "repository": {
+    "directory": "packages/smart-dom-reader/mcp-server"
   }
 }

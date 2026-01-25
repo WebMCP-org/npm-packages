@@ -39,7 +39,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/WebMCP-org/npm-packages.git",
-    "directory": "extension-tools"
+    "directory": "packages/extension-tools"
   },
   "license": "MIT",
   "author": "Alex Nahas",

@@ -35,7 +35,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/WebMCP-org/npm-packages.git",
-    "directory": "webmcp-ts-sdk"
+    "directory": "packages/webmcp-ts-sdk"
   },
   "license": "MIT",
   "author": "Alex Nahas",

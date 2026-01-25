@@ -38,7 +38,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/WebMCP-org/npm-packages.git",
-    "directory": "transports"
+    "directory": "packages/transports"
   },
   "license": "MIT",
   "author": "Alex Nahas",

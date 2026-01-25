@@ -119,13 +119,17 @@ We follow the [Conventional Commits](https://www.conventionalcommits.org/) speci
 - `chore:` Other changes that don't modify src or test files
 
 #### Scopes (Required)
-Package scopes:
-- `global` - Changes to @mcp-b/global
-- `webmcp-ts-sdk` - Changes to @mcp-b/webmcp-ts-sdk
-- `transports` - Changes to @mcp-b/transports
-- `react-webmcp` - Changes to @mcp-b/react-webmcp
-- `extension-tools` - Changes to @mcp-b/extension-tools
-- `smart-dom-reader` - Changes to @mcp-b/smart-dom-reader
+Package scopes (all in `packages/` directory):
+- `chrome-devtools-mcp` - @mcp-b/chrome-devtools-mcp
+- `extension-tools` - @mcp-b/extension-tools
+- `global` - @mcp-b/global
+- `mcp-iframe` - @mcp-b/mcp-iframe
+- `react-webmcp` - @mcp-b/react-webmcp
+- `smart-dom-reader` - @mcp-b/smart-dom-reader
+- `transports` - @mcp-b/transports
+- `usewebmcp` - usewebmcp (alias package)
+- `webmcp-helpers` - @webmcp/helpers
+- `webmcp-ts-sdk` - @mcp-b/webmcp-ts-sdk
 
 Repository-wide scopes:
 - `root` - Changes to root config files
@@ -180,14 +184,20 @@ git commit -m "refactor(*): update to new MCP SDK types"
 
 ```
 npm-packages/
-├── global/               # Navigator.modelContext polyfill
-├── webmcp-ts-sdk/        # TypeScript SDK adapter
-├── transports/           # Core transport implementations
-├── react-webmcp/         # React hooks for MCP (provider & client)
-├── extension-tools/      # Chrome Extension API tools
-├── smart-dom-reader/     # DOM extraction for AI
-├── e2e/                  # E2E tests and test apps
-└── .changeset/           # Changeset files
+├── packages/                    # All NPM packages
+│   ├── chrome-devtools-mcp/     # Chrome DevTools MCP server
+│   ├── extension-tools/         # Chrome Extension API tools
+│   ├── global/                  # Navigator.modelContext polyfill
+│   ├── mcp-iframe/              # Iframe MCP element
+│   ├── react-webmcp/            # React hooks for MCP
+│   ├── smart-dom-reader/        # DOM extraction for AI
+│   ├── transports/              # Core transport implementations
+│   ├── usewebmcp/               # Alias for react-webmcp
+│   ├── webmcp-helpers/          # Userscript helpers
+│   └── webmcp-ts-sdk/           # TypeScript SDK adapter
+├── e2e/                         # E2E tests and test apps
+├── docs/                        # Technical documentation
+└── .changeset/                  # Changeset files
 ```
 
 ## Package Guidelines
@@ -230,6 +240,24 @@ When contributing to a specific package:
 - Handle shadow DOM and iframes
 - Maintain stateless architecture
 
+### @mcp-b/chrome-devtools-mcp
+- Test with Chrome DevTools Protocol
+- Handle browser window lifecycle
+- Support WebMCP tool integration
+- Test auto-connect and session management
+
+### @mcp-b/mcp-iframe
+- Test cross-origin scenarios
+- Handle postMessage security properly
+- Support tool prefixing for namespacing
+- Test connection lifecycle
+
+### @webmcp/helpers
+- Keep utilities lightweight
+- Maintain tree-shakeability
+- Document all helper functions
+- Test DOM manipulation edge cases
+
 ## Testing
 
 ### Manual Testing
@@ -247,7 +275,7 @@ You can test GitHub Actions workflows locally before pushing:
 2. Set up your tokens and configuration
 3. Run workflows locally
 
-See our [Testing with Act Guide](./TESTING-WITH-ACT.md) for detailed instructions.
+See our [Testing with Act Guide](./docs/TESTING-WITH-ACT.md) for detailed instructions.
 
 ## Documentation
 

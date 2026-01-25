@@ -66,14 +66,46 @@ pnpm exec lint-staged
 
 This is a **pnpm workspace monorepo** containing the official NPM packages for MCP-B (Model Context Protocol for Browsers). The repository implements browser-specific transports and tools for the Model Context Protocol.
 
+### Monorepo Structure
+
+```
+npm-packages/
+├── packages/                    # All NPM packages
+│   ├── chrome-devtools-mcp/     # Chrome DevTools MCP server
+│   ├── extension-tools/         # Chrome Extension API tools
+│   ├── global/                  # Web Model Context API polyfill
+│   ├── mcp-iframe/              # Iframe MCP element
+│   ├── react-webmcp/            # React hooks for WebMCP
+│   ├── smart-dom-reader/        # AI-friendly DOM extraction
+│   │   └── mcp-server/          # MCP server for smart-dom-reader
+│   ├── transports/              # Browser transport implementations
+│   ├── usewebmcp/               # Alias for react-webmcp
+│   ├── webmcp-helpers/          # Userscript helper utilities
+│   └── webmcp-ts-sdk/           # Core TypeScript SDK
+├── e2e/                         # End-to-end tests
+│   ├── test-app/                # Tab transport test app
+│   ├── react-webmcp-test-app/   # React hooks test app
+│   └── web-standards-showcase/  # Native API showcase
+├── docs/                        # Technical documentation
+├── skills/                      # Claude Code skills
+│   └── webmcp-setup/            # WebMCP setup skill
+└── templates/                   # Project templates
+```
+
 ### Key Packages
 
-1. **@mcp-b/webmcp-ts-sdk** - Core TypeScript SDK with Zod schemas for WebMCP (leaf dependency)
-2. **@mcp-b/transports** - Browser transport implementations (postMessage, Chrome runtime, iframe)
-3. **@mcp-b/global** - W3C Web Model Context API polyfill (`navigator.modelContext`)
-4. **@mcp-b/react-webmcp** - React hooks for WebMCP integration (`useWebMCP`, `useWebMCPPrompt`)
-5. **@mcp-b/chrome-devtools-mcp** - Chrome DevTools MCP server for browser automation
-6. **@mcp-b/extension-tools** - Auto-generated tools for Chrome Extension APIs
+| Package | Path | Description |
+|---------|------|-------------|
+| @mcp-b/webmcp-ts-sdk | `packages/webmcp-ts-sdk` | Core TypeScript SDK with Zod schemas (leaf dependency) |
+| @mcp-b/transports | `packages/transports` | Browser transports (postMessage, Chrome runtime, iframe) |
+| @mcp-b/global | `packages/global` | Web Model Context API polyfill (`navigator.modelContext`) |
+| @mcp-b/react-webmcp | `packages/react-webmcp` | React hooks (`useWebMCP`, `useWebMCPPrompt`) |
+| @mcp-b/chrome-devtools-mcp | `packages/chrome-devtools-mcp` | Chrome DevTools MCP server |
+| @mcp-b/extension-tools | `packages/extension-tools` | Auto-generated Chrome Extension API tools |
+| @mcp-b/smart-dom-reader | `packages/smart-dom-reader` | Token-efficient DOM extraction |
+| @mcp-b/mcp-iframe | `packages/mcp-iframe` | Custom element for iframe MCP tools |
+| @webmcp/helpers | `packages/webmcp-helpers` | DOM and response helpers for userscripts |
+| usewebmcp | `packages/usewebmcp` | Alias package for @mcp-b/react-webmcp |
 
 **Note:** All packages require **Zod 4.x** (not Zod 3.x)
 
