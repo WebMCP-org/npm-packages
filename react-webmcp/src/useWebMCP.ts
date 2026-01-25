@@ -3,7 +3,7 @@ import { zodToJsonSchema } from '@mcp-b/global';
 import type { CallToolResult } from '@mcp-b/webmcp-ts-sdk';
 import type { DependencyList } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { z } from 'zod/v4';
+import { z } from 'zod';
 import type { InferOutput, ToolExecutionState, WebMCPConfig, WebMCPReturn } from './types.js';
 
 /**

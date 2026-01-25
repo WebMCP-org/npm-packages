@@ -4,7 +4,7 @@ import type {
   ResourceContents,
   ToolAnnotations,
 } from '@mcp-b/webmcp-ts-sdk';
-import type { z } from 'zod/v4';
+import type { z } from 'zod';
 
 // Re-export PromptMessage and ResourceContents for use in hook types
 export type { PromptMessage, ResourceContents };

@@ -2,7 +2,7 @@ import type { ModelContext, ModelContextTesting } from '@mcp-b/global';
 import { initializeWebModelContext } from '@mcp-b/global';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
-import { z } from 'zod/v4';
+import { z } from 'zod';
 import { useWebMCP } from './useWebMCP.js';
 
 // Extend Navigator type for testing

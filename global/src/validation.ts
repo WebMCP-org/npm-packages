@@ -1,4 +1,4 @@
-import { z } from 'zod/v4';
+import { z } from 'zod';
 import { createLogger } from './logger.js';
 import type { InputSchema } from './types.js';
 

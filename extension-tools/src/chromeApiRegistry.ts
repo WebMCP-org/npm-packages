@@ -1,4 +1,4 @@
-import { z } from 'zod/v4';
+import { z } from 'zod';
 
 /**
  * Enum of all Chrome Extension APIs

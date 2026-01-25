@@ -2,7 +2,7 @@ import { TabClientTransport } from '@mcp-b/transports';
 import type { JSONRPCMessage } from '@mcp-b/webmcp-ts-sdk';
 import { Client } from '@mcp-b/webmcp-ts-sdk';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { z } from 'zod/v4';
+import { z } from 'zod';
 import { cleanupWebModelContext, initializeWebModelContext } from './global.js';
 import type { InternalModelContext, ModelContext, ModelContextTesting } from './types.js';
 

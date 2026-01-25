@@ -1,5 +1,5 @@
 // import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-// import { z } from 'zod/v4';
+// import { z } from 'zod';
 // import { ApiAvailability, BaseApiTools } from '../BaseApiTools';
 
 // export interface PrivacyApiToolsOptions {

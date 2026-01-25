@@ -1,5 +1,5 @@
 import type { McpServer } from '@mcp-b/webmcp-ts-sdk';
-import { z } from 'zod/v4';
+import { z } from 'zod';
 import { type ApiAvailability, BaseApiTools } from '../BaseApiTools';
 
 export interface WallpaperApiToolsOptions {

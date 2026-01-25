@@ -1,4 +1,4 @@
-// import { z } from 'zod/v4';
+// import { z } from 'zod';
 // import { BaseApiTools } from './BaseApiTools.js';
 // import type { McpTool } from '../types/mcp.js';
 

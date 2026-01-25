@@ -8,7 +8,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { type CallToolResult, ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { type Browser, chromium, type LaunchOptions, type Page } from 'playwright';
-import { z } from 'zod/v4';
+import { z } from 'zod';
 
 const { F_OK } = fsConstants;
 

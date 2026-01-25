@@ -20,7 +20,7 @@ import {
   Server as McpServer,
   ReadResourceRequestSchema,
 } from '@mcp-b/webmcp-ts-sdk';
-import type { z } from 'zod/v4';
+import type { z } from 'zod';
 import { createLogger } from './logger.js';
 import type {
   ElicitationParams,
