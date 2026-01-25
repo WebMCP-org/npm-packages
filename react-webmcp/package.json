@@ -64,6 +64,8 @@
     "prepublishOnly": "node ../scripts/validate-publish.js && pnpm run build:prod",
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "version:major": "pnpm version major --no-git-tag-version",
     "version:minor": "pnpm version minor --no-git-tag-version",
@@ -77,8 +79,15 @@
   "devDependencies": {
     "@types/node": "catalog:",
     "@types/react": "catalog:",
+    "@vitest/browser": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
+    "playwright": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
+    "vitest": "catalog:",
+    "vitest-browser-react": "^2.0.4",
     "zod": "catalog:"
   },
   "peerDependencies": {

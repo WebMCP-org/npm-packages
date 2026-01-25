@@ -1,0 +1,20 @@
+import { playwright } from '@vitest/browser-playwright';
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  test: {
+    // Use browser mode for real DOM, React rendering, and navigator testing
+    browser: {
+      enabled: true,
+      provider: playwright(),
+      instances: [{ browser: 'chromium' }],
+      headless: true,
+    },
+    // Test file patterns
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    // Exclude build output
+    exclude: ['dist', 'node_modules'],
+    // Enable globals for cleaner test syntax
+    globals: true,
+  },
+});
