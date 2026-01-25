@@ -58,7 +58,7 @@
     "clean": "rm -rf dist .turbo",
     "format": "biome format --write .",
     "lint": "biome lint --write .",
-    "prepublishOnly": "node ../scripts/validate-publish.js && pnpm run build",
+    "prepublishOnly": "node ../../scripts/validate-publish.js && pnpm run build",
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
     "typecheck": "tsc --noEmit",

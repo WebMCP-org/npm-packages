@@ -64,7 +64,7 @@
     "format": "biome format --write .",
     "generate-chrome-api-tools": "pnpx tsx src/aiScripts/generate-chrome-api-tools.ts",
     "lint": "biome lint --write .",
-    "prepublishOnly": "node ../scripts/validate-publish.js && pnpm run build",
+    "prepublishOnly": "node ../../scripts/validate-publish.js && pnpm run build",
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
     "typecheck": "tsc --noEmit",

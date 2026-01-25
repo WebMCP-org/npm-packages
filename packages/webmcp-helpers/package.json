@@ -44,7 +44,7 @@
     "dev": "tsdown --watch",
     "format": "biome format --write .",
     "lint": "biome lint --write .",
-    "prepublishOnly": "node ../scripts/validate-publish.js && pnpm run build",
+    "prepublishOnly": "node ../../scripts/validate-publish.js && pnpm run build",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
