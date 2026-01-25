@@ -52,16 +52,41 @@ pnpm add @mcp-b/react-webmcp zod
 
 ## ⚠️ Zod Version Compatibility
 
-| Package Version | Zod Version | Notes |
-|-----------------|-------------|-------|
-| `@mcp-b/react-webmcp@1.x` | **Zod 4** | Uses `zod/v4` imports, requires Zod 4.x |
-| `@mcp-b/react-webmcp@0.x` | **Zod 3** | Compatible with Zod 3.x projects |
+This package accepts **Zod 3.25+ or Zod 4** as a peer dependency. However, Zod schema support (automatic JSON Schema conversion) requires Zod 4 APIs.
 
-**If your project uses Zod 3:**
-- Use `@mcp-b/react-webmcp@0.x`: `npm install @mcp-b/react-webmcp@0`
+### Supported Configurations
 
-**If your project uses Zod 4:**
-- Use `@mcp-b/react-webmcp@1.x` (latest): `npm install @mcp-b/react-webmcp`
+| Your Zod Version | Schema Support | Notes |
+|------------------|----------------|-------|
+| **Zod 4.x** | Full Zod + JSON Schema | Import normally: `import { z } from 'zod'` |
+| **Zod 3.25+** | Full Zod + JSON Schema | Use subpath: `import { z } from 'zod/v4'` |
+| **Zod 3.24 and below** | Upgrade required | Update to 3.25+ or 4.x |
+
+### Using Zod Schemas with Zod 3.25+
+
+If your project uses Zod 3.25+, import from the `zod/v4` subpath to access Zod 4 APIs:
+
+```typescript
+// Instead of: import { z } from 'zod'
+import { z } from 'zod/v4';
+
+function MyComponent() {
+  useWebMCP({
+    name: 'my_tool',
+    description: 'My tool',
+    inputSchema: {
+      name: z.string().describe('User name'),
+    },
+    handler: async ({ name }) => ({ message: `Hello, ${name}!` }),
+  });
+}
+```
+
+### Runtime Detection
+
+If you pass a Zod 3 schema (from `import { z } from 'zod'` on Zod 3.x), you'll get a helpful `Zod3SchemaError` with migration instructions.
+
+See [@mcp-b/global's Zod compatibility section](https://www.npmjs.com/package/@mcp-b/global#%EF%B8%8F-zod-version-compatibility) for full details and JSON Schema alternatives.
 
 For client functionality, you'll also need:
 ```bash
