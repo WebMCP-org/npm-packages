@@ -9,6 +9,7 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, 'index.html'),
         'mcp-iframe-host': resolve(__dirname, 'mcp-iframe-host.html'),
+        'mcp-iframe-client': resolve(__dirname, 'mcp-iframe-client.html'),
         'iframe-child': resolve(__dirname, 'iframe-child.html'),
       },
     },
