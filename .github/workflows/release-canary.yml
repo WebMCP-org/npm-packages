@@ -1,0 +1,77 @@
+name: Release Canary
+
+on:
+  # Manual trigger for canary releases
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Canary tag suffix (e.g., "canary", "alpha", "beta")'
+        required: false
+        default: 'canary'
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  CI: true
+
+jobs:
+  canary:
+    name: Publish Canary
+    # Only run on the main repository, not forks
+    if: github.repository == 'WebMCP-org/npm-packages'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build packages
+        run: pnpm build
+
+      - name: Create canary versions
+        run: |
+          # Generate snapshot version with timestamp
+          pnpm changeset version --snapshot ${{ inputs.tag || 'canary' }}
+
+      - name: Publish canary packages
+        run: |
+          pnpm publish -r --access public --tag ${{ inputs.tag || 'canary' }} --no-git-checks
+        env:
+          # Uses OIDC for authentication - no NPM_TOKEN needed
+          # Fallback to NPM_TOKEN if OIDC not configured yet
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true
+
+      - name: Get published versions
+        id: versions
+        run: |
+          echo "## Published Canary Versions" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          for pkg in packages/*/; do
+            if [ -f "$pkg/package.json" ]; then
+              name=$(jq -r '.name' "$pkg/package.json")
+              version=$(jq -r '.version' "$pkg/package.json")
+              if [ "$name" != "null" ] && [ "$version" != "null" ]; then
+                echo "- \`$name@$version\`" >> $GITHUB_STEP_SUMMARY
+              fi
+            fi
+          done

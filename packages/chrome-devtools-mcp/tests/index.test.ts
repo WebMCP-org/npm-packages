@@ -13,7 +13,10 @@ import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 import {executablePath} from 'puppeteer';
 
 describe('e2e', () => {
-  async function withClient(cb: (client: Client) => Promise<void>) {
+  async function withClient(
+    cb: (client: Client) => Promise<void>,
+    extraArgs: string[] = [],
+  ) {
     const transport = new StdioClientTransport({
       command: 'node',
       args: [
@@ -22,6 +25,7 @@ describe('e2e', () => {
         '--isolated',
         '--executable-path',
         executablePath(),
+        ...extraArgs,
       ],
     });
     const client = new Client(
@@ -86,7 +90,8 @@ describe('e2e', () => {
       const files = fs.readdirSync('build/src/tools');
       const definedNames = [];
       for (const file of files) {
-        if (file === 'ToolDefinition.js') {
+        // Skip non-tool files
+        if (file === 'ToolDefinition.js' || file === 'WebMCPToolHub.js') {
           continue;
         }
         const fileTools = await import(`../src/tools/${file}`);

@@ -44,6 +44,7 @@ export class McpResponse implements Response {
   #attachedConsoleMessageId?: number;
   #textResponseLines: string[] = [];
   #images: ImageContentData[] = [];
+  #isError = false;
   #networkRequestsOptions?: {
     include: boolean;
     pagination?: PaginationOptions;
@@ -161,6 +162,14 @@ export class McpResponse implements Response {
 
   appendResponseLine(value: string): void {
     this.#textResponseLines.push(value);
+  }
+
+  setIsError(value: boolean): void {
+    this.#isError = value;
+  }
+
+  get isError(): boolean {
+    return this.#isError;
   }
 
   attachImage(value: ImageContentData): void {
@@ -457,6 +466,15 @@ Call ${handleDialog.name} to handle it before continuing.`);
         );
       } else {
         response.push('<no console messages found>');
+        // Provide helpful hint about preserved messages if not already enabled
+        if (!this.#consoleDataOptions.includePreservedMessages) {
+          response.push('');
+          response.push('Tip: Use includePreservedMessages: true to see messages from previous navigations.');
+        }
+        // Provide hint about type filtering if specified
+        if (this.#consoleDataOptions.types?.length) {
+          response.push(`(Filtering by types: ${this.#consoleDataOptions.types.join(', ')})`);
+        }
       }
     }
 

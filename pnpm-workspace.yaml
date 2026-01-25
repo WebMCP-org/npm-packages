@@ -1,25 +1,21 @@
 packages:
-  - extension-tools
-  - global
-  - mcp-iframe
-  - packages/chrome-devtools-mcp
-  - react-webmcp
-  - usewebmcp
-  - smart-dom-reader
-  - smart-dom-reader/mcp-server
-  - transports
-  - webmcp-ts-sdk
+  - packages/*
+  - packages/smart-dom-reader/mcp-server
+  - skills/webmcp-setup
   - e2e
   - e2e/test-app
   - e2e/react-webmcp-test-app
   - e2e/web-standards-showcase
-  - e2e/mcp-ui-with-webmcp/**
 
 catalog:
+  '@vitest/browser': ^4.0.18
+  '@vitest/browser-playwright': ^4.0.18
+  '@vitest/coverage-v8': ^4.0.18
+  playwright: ^1.58.0
   '@cloudflare/vite-plugin': ^1.13.18
   '@composio/json-schema-to-zod': ^0.1.17
   '@hookform/resolvers': ^5.2.2
-  '@modelcontextprotocol/sdk': 1.24.3
+  '@modelcontextprotocol/sdk': 1.25.2
   '@radix-ui/react-collapsible': ^1.1.12
   '@sentry/cloudflare': ^10.22.0
   '@sentry/react': ^10.22.0
@@ -39,9 +35,9 @@ catalog:
   typescript: ^5.8.3
   vite: ^7.1.2
   vite-plugin-monkey: ^6.0.1
+  vitest: ^4.0.18
   wrangler: ^4.45.3
-  zod: 3.25.76
-  zod-to-json-schema: ^3.24.5
+  zod: 4.3.5
 
 onlyBuiltDependencies:
   - '@axodotdev/oranda'

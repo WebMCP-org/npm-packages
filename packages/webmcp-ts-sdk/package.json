@@ -1,0 +1,84 @@
+{
+  "name": "@mcp-b/webmcp-ts-sdk",
+  "version": "2.0.0",
+  "description": "Browser-adapted MCP TypeScript SDK - Dynamic tool registration for W3C Web Model Context API and AI agent integration",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "browser",
+    "typescript",
+    "sdk",
+    "adapter",
+    "web-model-context",
+    "navigator-modelcontext",
+    "w3c",
+    "ai-agents",
+    "llm",
+    "claude",
+    "chatgpt",
+    "openai",
+    "anthropic",
+    "cursor",
+    "copilot",
+    "gemini",
+    "webmcp",
+    "dynamic-tools",
+    "mcp-server",
+    "mcp-client",
+    "tool-registration",
+    "ai-integration"
+  ],
+  "homepage": "https://docs.mcp-b.ai/packages/webmcp-ts-sdk",
+  "bugs": {
+    "url": "https://github.com/WebMCP-org/npm-packages/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WebMCP-org/npm-packages.git",
+    "directory": "packages/webmcp-ts-sdk"
+  },
+  "license": "MIT",
+  "author": "Alex Nahas",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "check": "biome check --write .",
+    "clean": "rm -rf dist .turbo",
+    "format": "biome format --write .",
+    "lint": "biome lint --write .",
+    "prepublishOnly": "node ../scripts/validate-publish.js && pnpm run build",
+    "publish:dry": "pnpm publish --access public --dry-run",
+    "publish:npm": "pnpm publish --access public",
+    "typecheck": "tsc --noEmit",
+    "version:major": "pnpm version major --no-git-tag-version",
+    "version:minor": "pnpm version minor --no-git-tag-version",
+    "version:patch": "pnpm version patch --no-git-tag-version"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}

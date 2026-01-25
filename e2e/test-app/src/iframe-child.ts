@@ -22,9 +22,11 @@ function updateStatus(text: string) {
   if (statusEl) statusEl.textContent = text;
 }
 
-// ==================== Register Tools ====================
+// ==================== Register Tools, Resources, and Prompts ====================
+// IMPORTANT: provideContext() clears previous registrations, so we must register
+// all items in a single call.
 
-log('Registering tools...');
+log('Registering tools, resources, and prompts...');
 
 navigator.modelContext.provideContext({
   tools: [
@@ -90,15 +92,6 @@ navigator.modelContext.provideContext({
       },
     },
   ],
-});
-
-log('Tools registered: add, multiply, greet');
-
-// ==================== Register Resources ====================
-
-log('Registering resources...');
-
-navigator.modelContext.provideContext({
   resources: [
     {
       uri: 'iframe://config',
@@ -138,15 +131,6 @@ navigator.modelContext.provideContext({
       },
     },
   ],
-});
-
-log('Resources registered: iframe://config, iframe://timestamp');
-
-// ==================== Register Prompts ====================
-
-log('Registering prompts...');
-
-navigator.modelContext.provideContext({
   prompts: [
     {
       name: 'summarize',
@@ -205,7 +189,7 @@ navigator.modelContext.provideContext({
   ],
 });
 
-log('Prompts registered: summarize, translate');
+log('Registered: 3 tools, 2 resources, 2 prompts');
 
 // ==================== Ready ====================
 

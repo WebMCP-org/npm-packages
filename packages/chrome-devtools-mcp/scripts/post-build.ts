@@ -106,6 +106,7 @@ function copyThirdPartyLicenseFiles() {
     }
 
     const destinationDir = path.join(BUILD_DIR, thirdPartyDir);
+    fs.mkdirSync(destinationDir, {recursive: true});
     const destinationFile = path.join(destinationDir, 'LICENSE');
     fs.copyFileSync(licenseFile, destinationFile);
   }
@@ -119,6 +120,7 @@ function main(): void {
 
   // Create i18n mock
   const i18nDir = path.join(BUILD_DIR, devtoolsFrontEndCorePath, 'i18n');
+  fs.mkdirSync(i18nDir, {recursive: true});
   const localesFile = path.join(i18nDir, 'locales.js');
   const localesContent = `
 export const LOCALES = [

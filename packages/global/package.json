@@ -1,0 +1,103 @@
+{
+  "name": "@mcp-b/global",
+  "version": "2.0.2",
+  "description": "W3C Web Model Context API polyfill - Let AI agents like Claude, ChatGPT, and Gemini interact with your website via navigator.modelContext",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "web-model-context",
+    "navigator-modelcontext",
+    "w3c",
+    "browser",
+    "polyfill",
+    "web-standard",
+    "ai-agents",
+    "ai-tools",
+    "llm",
+    "claude",
+    "chatgpt",
+    "openai",
+    "anthropic",
+    "cursor",
+    "copilot",
+    "gemini",
+    "webmcp",
+    "tool-registration",
+    "ai-integration",
+    "browser-ai",
+    "web-ai",
+    "ai-assistant",
+    "chromium",
+    "iife"
+  ],
+  "homepage": "https://docs.mcp-b.ai/packages/global",
+  "bugs": {
+    "url": "https://github.com/WebMCP-org/npm-packages/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WebMCP-org/npm-packages.git",
+    "directory": "packages/global"
+  },
+  "license": "MIT",
+  "author": "Alex Nahas",
+  "sideEffects": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./iife": {
+      "script": "./dist/index.iife.js",
+      "default": "./dist/index.iife.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "browser": "./dist/index.iife.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "check": "biome check --write .",
+    "clean": "rm -rf dist .turbo",
+    "format": "biome format --write .",
+    "lint": "biome lint --write .",
+    "prepublishOnly": "node ../scripts/validate-publish.js && pnpm run build",
+    "publish:dry": "pnpm publish --access public --dry-run",
+    "publish:npm": "pnpm publish --access public",
+    "test": "vitest run",
+    "test:browser": "vitest run --browser.headless",
+    "test:browser:ui": "vitest --browser",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "version:major": "pnpm version major --no-git-tag-version",
+    "version:minor": "pnpm version minor --no-git-tag-version",
+    "version:patch": "pnpm version patch --no-git-tag-version"
+  },
+  "dependencies": {
+    "@mcp-b/transports": "workspace:*",
+    "@mcp-b/webmcp-ts-sdk": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@vitest/browser": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
+    "playwright": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}

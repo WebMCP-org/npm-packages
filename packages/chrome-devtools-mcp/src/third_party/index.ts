@@ -17,8 +17,10 @@ export {StdioServerTransport} from '@modelcontextprotocol/sdk/server/stdio.js';
 export {
   type CallToolResult,
   SetLevelRequestSchema,
+  ToolListChangedNotificationSchema,
   type ImageContent,
   type TextContent,
+  type Tool,
 } from '@modelcontextprotocol/sdk/types.js';
 export {z as zod} from 'zod';
 export {

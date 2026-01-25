@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebMCP Vanilla Demo</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem;
+      line-height: 1.6;
+    }
+
+    h1 {
+      color: #2563eb;
+    }
+
+    .status {
+      background: #f0fdf4;
+      border: 1px solid #86efac;
+      border-radius: 0.5rem;
+      padding: 1rem;
+      margin: 1rem 0;
+    }
+
+    .status.error {
+      background: #fef2f2;
+      border-color: #fca5a5;
+    }
+
+    .counter {
+      font-size: 2rem;
+      font-weight: bold;
+      color: #1e40af;
+      margin: 1rem 0;
+    }
+
+    button {
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 0.375rem;
+      cursor: pointer;
+      font-size: 1rem;
+      margin: 0.25rem;
+    }
+
+    button:hover {
+      background: #1d4ed8;
+    }
+
+    .form-group {
+      margin: 1rem 0;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 0.25rem;
+      font-weight: 500;
+    }
+
+    input, textarea {
+      width: 100%;
+      padding: 0.5rem;
+      border: 1px solid #d1d5db;
+      border-radius: 0.375rem;
+      font-size: 1rem;
+    }
+
+    textarea {
+      min-height: 100px;
+      resize: vertical;
+    }
+
+    .tools-list {
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 0.5rem;
+      padding: 1rem;
+      margin: 1rem 0;
+    }
+
+    .tool-item {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      margin: 0.25rem 0;
+    }
+
+    .tool-indicator {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #22c55e;
+    }
+
+    code {
+      background: #f3f4f6;
+      padding: 0.125rem 0.25rem;
+      border-radius: 0.25rem;
+      font-family: 'Courier New', monospace;
+    }
+  </style>
+</head>
+<body>
+  <h1>WebMCP Vanilla Demo</h1>
+
+  <div id="status" class="status">
+    <strong>Status:</strong> <span id="status-text">Initializing...</span>
+  </div>
+
+  <h2>Available MCP Tools</h2>
+  <div class="tools-list">
+    <div class="tool-item">
+      <span class="tool-indicator"></span>
+      <code>set_message</code> - Change the displayed message
+    </div>
+    <div class="tool-item">
+      <span class="tool-indicator"></span>
+      <code>increment_counter</code> - Increment the counter
+    </div>
+    <div class="tool-item">
+      <span class="tool-indicator"></span>
+      <code>reset_counter</code> - Reset the counter to zero
+    </div>
+    <div class="tool-item">
+      <span class="tool-indicator"></span>
+      <code>fill_contact_form</code> - Fill out the contact form
+    </div>
+    <div class="tool-item">
+      <span class="tool-indicator"></span>
+      <code>get_form_data</code> - Get current form data
+    </div>
+  </div>
+
+  <h2>Interactive Counter</h2>
+  <div class="counter" id="counter">0</div>
+  <button onclick="incrementCounter()">Increment</button>
+  <button onclick="resetCounter()">Reset</button>
+
+  <h2>Message Display</h2>
+  <div id="message">Hello, WebMCP!</div>
+
+  <h2>Contact Form</h2>
+  <form id="contact-form">
+    <div class="form-group">
+      <label for="name">Name:</label>
+      <input type="text" id="name" name="name" placeholder="Enter your name" autocomplete="name">
+    </div>
+
+    <div class="form-group">
+      <label for="email">Email:</label>
+      <input type="email" id="email" name="email" placeholder="Enter your email" autocomplete="email">
+    </div>
+
+    <div class="form-group">
+      <label for="message-input">Message:</label>
+      <textarea id="message-input" name="message" placeholder="Enter your message"></textarea>
+    </div>
+
+    <button type="submit">Submit</button>
+  </form>
+
+  <!-- WebMCP Global Bridge - auto-initializes navigator.modelContext -->
+  <script src="https://unpkg.com/@mcp-b/global@2.0.0/dist/index.iife.js"></script>
+
+  <script>
+    // State
+    let counter = 0;
+
+    // Wait for WebMCP to be available
+    function initializeWebMCP() {
+      if (!window.navigator.modelContext) {
+        console.warn('navigator.modelContext not available yet, retrying...');
+        setTimeout(initializeWebMCP, 100);
+        return;
+      }
+
+      console.log('navigator.modelContext initialized!');
+      updateStatus('WebMCP ready - registering tools...', false);
+
+      // Register tools
+      registerTools();
+    }
+
+    function registerTools() {
+      const modelContext = window.navigator.modelContext;
+
+      // Tool: set_message
+      modelContext.registerTool({
+        name: 'set_message',
+        description: 'Change the displayed message',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            message: {
+              type: 'string',
+              description: 'New message to display'
+            }
+          },
+          required: ['message']
+        },
+        execute: async (args) => {
+          document.getElementById('message').textContent = args.message;
+          return {
+            content: [{ type: 'text', text: `Message set to: ${args.message}` }]
+          };
+        }
+      });
+
+      // Tool: increment_counter
+      modelContext.registerTool({
+        name: 'increment_counter',
+        description: `Increment the counter (current value: ${counter})`,
+        inputSchema: {
+          type: 'object',
+          properties: {
+            amount: {
+              type: 'number',
+              description: 'Amount to increment by (default: 1)',
+              default: 1
+            }
+          }
+        },
+        execute: async (args) => {
+          const amount = args.amount || 1;
+          counter += amount;
+          document.getElementById('counter').textContent = counter;
+          return {
+            content: [{ type: 'text', text: `Counter incremented to ${counter}` }],
+            structuredContent: { success: true, newValue: counter }
+          };
+        }
+      });
+
+      // Tool: reset_counter
+      modelContext.registerTool({
+        name: 'reset_counter',
+        description: 'Reset the counter to zero',
+        inputSchema: {
+          type: 'object',
+          properties: {}
+        },
+        execute: async () => {
+          counter = 0;
+          document.getElementById('counter').textContent = counter;
+          return {
+            content: [{ type: 'text', text: 'Counter reset to 0' }],
+            structuredContent: { success: true, newValue: counter }
+          };
+        }
+      });
+
+      // Tool: fill_contact_form
+      modelContext.registerTool({
+        name: 'fill_contact_form',
+        description: 'Fill out the contact form',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            name: {
+              type: 'string',
+              description: 'Name field value'
+            },
+            email: {
+              type: 'string',
+              description: 'Email field value'
+            },
+            message: {
+              type: 'string',
+              description: 'Message field value'
+            }
+          }
+        },
+        execute: async (args) => {
+          if (args.name) {
+            document.getElementById('name').value = args.name;
+          }
+          if (args.email) {
+            document.getElementById('email').value = args.email;
+          }
+          if (args.message) {
+            document.getElementById('message-input').value = args.message;
+          }
+          return {
+            content: [{ type: 'text', text: 'Form filled successfully' }],
+            structuredContent: { success: true }
+          };
+        }
+      });
+
+      // Tool: get_form_data
+      modelContext.registerTool({
+        name: 'get_form_data',
+        description: 'Get current contact form data',
+        inputSchema: {
+          type: 'object',
+          properties: {}
+        },
+        execute: async () => {
+          const formData = {
+            name: document.getElementById('name').value,
+            email: document.getElementById('email').value,
+            message: document.getElementById('message-input').value
+          };
+          return {
+            content: [{ type: 'text', text: JSON.stringify(formData, null, 2) }],
+            structuredContent: { success: true, formData }
+          };
+        }
+      });
+
+      console.log('All tools registered successfully!');
+      console.log('Try using Chrome DevTools MCP to call these tools');
+      updateStatus('WebMCP ready - 5 tools registered', false);
+    }
+
+    // Helper functions
+    function incrementCounter() {
+      counter++;
+      document.getElementById('counter').textContent = counter;
+    }
+
+    function resetCounter() {
+      counter = 0;
+      document.getElementById('counter').textContent = counter;
+    }
+
+    function updateStatus(message, isError = false) {
+      const statusEl = document.getElementById('status');
+      const statusText = document.getElementById('status-text');
+
+      statusText.textContent = message;
+
+      if (isError) {
+        statusEl.classList.add('error');
+      } else {
+        statusEl.classList.remove('error');
+      }
+    }
+
+    // Handle form submission
+    document.getElementById('contact-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      alert('Form submitted! (This is a demo)');
+    });
+
+    // Initialize
+    window.addEventListener('load', () => {
+      initializeWebMCP();
+    });
+  </script>
+</body>
+</html>

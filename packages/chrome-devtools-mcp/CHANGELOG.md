@@ -1,11 +1,151 @@
 # Changelog
 
+## 2.0.0
+
+### Major Changes
+
+- BREAKING CHANGE: Migrate from window.webMCP to navigator.modelContext API
+
+  This release migrates the WebMCP API from the legacy `window.webMCP` interface to the W3C-aligned `navigator.modelContext` API.
+
+  ### Migration Guide
+
+  **Before (v1.x):**
+
+  ```javascript
+  window.webMCP.registerTool({
+    name: 'my_tool',
+    // ...
+  });
+  ```
+
+  **After (v2.x):**
+
+  ```javascript
+  navigator.modelContext.registerTool({
+    name: 'my_tool',
+    // ...
+  });
+  ```
+
+  The IIFE build (`@mcp-b/global/dist/index.iife.js`) now auto-initializes `navigator.modelContext` when loaded via script tag.
+
+## 1.6.3
+
+### Patch Changes
+
+- fix: improve error handling and logging across WebMCP tools
+  - Fix silent failures in McpContext.ts - all catch blocks now log with context
+  - Fix overly broad catch in WebMCPToolHub.syncToolsForPage - now returns error state
+  - Improve error classification in call_webmcp_tool with actionable guidance
+  - Add warning when localStorage access fails in logger.ts
+  - Remove 51 misleading "verbose logging removed" placeholder comments
+  - Differentiate expected timeouts from unexpected errors in WebMCP connections
+
+## 1.5.8
+
+### Patch Changes
+
+- Set browser window to nearly full screen (1800x1200) for better UX when launching or connecting to browser
+
+## 1.5.0
+
+### Minor Changes
+
+- **Chrome DevTools MCP:**
+  - feat: Create new browser window for each MCP session instead of tab - prevents multiple clients from interfering with each other
+  - feat: Restore autoConnect default to true - automatically reconnects to existing browser sessions
+  - fix: Rename export constant listWebMCPTools to match tool name
+
+  **Global Package:**
+  - fix: Remove verbose console logging to reduce spam during tool registration/unregistration
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-b/global@0.0.0
+
+## 1.4.0
+
+### Minor Changes
+
+- bd559c1: Rename diff_webmcp_tools to list_webmcp_tools for improved UX
+
+  The tool name has been changed from `diff_webmcp_tools` to `list_webmcp_tools` to better represent its primary use case. The new name is more intuitive - users expect to "list" tools, not "diff" them - while all the intelligent diff tracking functionality remains intact.
+
+  **What's Changed:**
+  - Tool name: `diff_webmcp_tools` → `list_webmcp_tools`
+  - All documentation and error messages updated
+  - Tests updated to reflect new name
+
+  **What Stays the Same:**
+  - ✅ Diff tracking behavior (first call = full list, subsequent = diff)
+  - ✅ `full` parameter to force complete list
+  - ✅ Error propagation with isError flag
+  - ✅ Token efficiency for large tool lists
+  - ✅ All functionality preserved
+
+  **Migration:**
+  This is a breaking change. Update any code that calls `diff_webmcp_tools` to use `list_webmcp_tools` instead.
+
+## 1.3.1
+
+### Patch Changes
+
+- Improve list_webmcp_tools output: now shows available tool names summary when no changes detected, making it easier to see current tools without using full=true.
+
+## 1.3.0
+
+### Minor Changes
+
+- 6bf4a41: Enable auto-connect by default with smart fallback for improved developer experience
+
+  **Breaking Changes:**
+  - Auto-connect is now enabled by default (previously disabled)
+  - Default Chrome channel changed from `stable` to `dev` (Chrome 145+ required for auto-connect)
+
+  **New Features:**
+  - Smart fallback logic: automatically tries to connect to running Chrome instance first, then launches new instance if connection fails
+  - Graceful degradation prevents errors when no running browser is found
+  - Updated CLI descriptions to reflect new fallback behavior
+
+  **Benefits:**
+  - Faster iteration during development (instant reconnection to running Chrome)
+  - Zero-friction setup (no manual browser launch required)
+  - Better DX with automatic fallback handling
+
+  **Migration Guide:**
+  To use the old behavior (launch new instance always), add `--no-auto-connect` flag:
+
+  ```json
+  {
+    "mcpServers": {
+      "chrome-devtools": {
+        "command": "npx",
+        "args": ["-y", "@mcp-b/chrome-devtools-mcp@latest", "--no-auto-connect"]
+      }
+    }
+  }
+  ```
+
+  To use Chrome Stable instead of Dev, add `--channel=stable` flag:
+
+  ```json
+  {
+    "mcpServers": {
+      "chrome-devtools": {
+        "command": "npx",
+        "args": ["-y", "@mcp-b/chrome-devtools-mcp@latest", "--channel=stable"]
+      }
+    }
+  }
+  ```
+
 ## 1.2.1
 
 ### Patch Changes
 
 - docs(chrome-devtools-mcp): add benchmark data, demo images, and quickstart links
-
   - Add Token Efficiency section with benchmark comparison chart showing 77-89% token savings vs screenshot-based workflows
   - Add demo result image showing successful WebMCP tool execution
   - Add prominent link to Chrome DevTools Quickstart in the header
@@ -16,7 +156,6 @@
 ### Minor Changes
 
 - 9b49dce: Add per-page WebMCP connection support and improve CDP lifecycle handling
-
   - Support per-page WebMCP connections instead of global state
   - Move WebMCP state from module-level to McpContext for proper isolation
   - Handle browser close/reopen scenarios for WebMCP transport
@@ -33,7 +172,6 @@
 ### Minor Changes
 
 - Add per-page WebMCP connection support and improve CDP lifecycle handling
-
   - Support per-page WebMCP connections instead of global state
   - Move WebMCP state from module-level to McpContext for proper isolation
   - Handle browser close/reopen scenarios for WebMCP transport
@@ -82,7 +220,6 @@
 - 79de6d9: Add WebMCP integration to connect to MCP tools registered on webpages
 
   This adds two new tools for interacting with website-specific MCP functionality:
-
   - `list_webmcp_tools`: List available website tools (auto-connects to WebMCP)
   - `call_webmcp_tool`: Call a website tool (auto-connects to WebMCP)
 
@@ -120,12 +257,10 @@ This is the first stable release of `@mcp-b/chrome-devtools-mcp`, a fork of Chro
 ### Features
 
 - **WebMCP Integration**: Connect to MCP tools registered on webpages via [@mcp-b/global](https://www.npmjs.com/package/@mcp-b/global)
-
   - `list_webmcp_tools`: List available website tools (auto-connects)
   - `call_webmcp_tool`: Call a website tool (auto-connects)
 
 - **AI-Driven Development Workflow**: Build and test WebMCP tools in real-time
-
   - Write tools in your codebase
   - Hot-reload sees the changes
   - AI discovers tools via `list_webmcp_tools`
@@ -164,7 +299,6 @@ This package is a fork of [ChromeDevTools/chrome-devtools-mcp](https://github.co
 - 79de6d9: Add WebMCP integration to connect to MCP tools registered on webpages
 
   This adds two new tools for interacting with website-specific MCP functionality:
-
   - `list_webmcp_tools`: List available website tools
   - `call_webmcp_tool`: Call a website tool
 

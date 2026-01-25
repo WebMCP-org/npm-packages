@@ -43,7 +43,8 @@ export const selectPage = defineTool({
   },
   handler: async (request, response, context) => {
     const page = context.getPageByIdx(request.params.pageIdx);
-    context.selectPage(page);
+    // Mark as explicitly selected so this session stays on this page
+    context.selectPage(page, true);
     if (request.params.bringToFront) {
       await page.bringToFront();
     }

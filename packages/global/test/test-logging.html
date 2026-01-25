@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>@mcp-b/global Logging Test</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 0 20px;
+    }
+    h1 { color: #333; }
+    .test-section {
+      margin: 20px 0;
+      padding: 15px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      background: #f9f9f9;
+    }
+    button {
+      padding: 10px 15px;
+      margin: 5px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover { background: #0056b3; }
+    .status {
+      margin-top: 10px;
+      padding: 10px;
+      background: #fff;
+      border-left: 3px solid #28a745;
+    }
+    code {
+      background: #f4f4f4;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'Monaco', 'Courier New', monospace;
+    }
+  </style>
+</head>
+<body>
+  <h1>@mcp-b/global Logging Test</h1>
+
+  <div class="test-section">
+    <h2>Test Instructions</h2>
+    <ol>
+      <li>Open the browser console (F12 or Cmd+Option+I)</li>
+      <li>By default, you should only see errors and warnings</li>
+      <li>Click "Enable Debug Logging" to see detailed logs</li>
+      <li>Click "Test Namespace Filter" to see only WebModelContext logs</li>
+      <li>Refresh the page to apply changes</li>
+    </ol>
+  </div>
+
+  <div class="test-section">
+    <h2>Debug Configuration</h2>
+    <button onclick="enableAllDebug()">Enable All Debug Logging</button>
+    <button onclick="enableWebModelContext()">Enable WebModelContext Only</button>
+    <button onclick="disableDebug()">Disable Debug Logging</button>
+    <button onclick="checkDebugStatus()">Check Current Status</button>
+    <div id="status" class="status"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>Logging Tests</h2>
+    <button onclick="testErrorLog()">Test Error Log</button>
+    <button onclick="testWarnLog()">Test Warning Log</button>
+    <button onclick="testDebugLog()">Test Debug Log</button>
+    <button onclick="testInfoLog()">Test Info Log</button>
+    <button onclick="triggerToolRegistration()">Register Test Tool</button>
+  </div>
+
+  <script src="../dist/index.iife.js"></script>
+  <script>
+    const { createLogger, initializeWebModelContext } = window.WebMCP;
+
+    // Create test loggers
+    const testLogger = createLogger('WebModelContext');
+    const nativeLogger = createLogger('NativeAdapter');
+    const bridgeLogger = createLogger('MCPBridge');
+
+    function setStatus(message) {
+      document.getElementById('status').innerHTML = message;
+    }
+
+    function enableAllDebug() {
+      localStorage.setItem('WEBMCP_DEBUG', '*');
+      setStatus('✅ Enabled all debug logging. <strong>Refresh the page</strong> to apply.');
+    }
+
+    function enableWebModelContext() {
+      localStorage.setItem('WEBMCP_DEBUG', 'WebModelContext');
+      setStatus('✅ Enabled WebModelContext logging only. <strong>Refresh the page</strong> to apply.');
+    }
+
+    function disableDebug() {
+      localStorage.removeItem('WEBMCP_DEBUG');
+      setStatus('✅ Disabled debug logging. <strong>Refresh the page</strong> to apply.');
+    }
+
+    function checkDebugStatus() {
+      const debugConfig = localStorage.getItem('WEBMCP_DEBUG');
+      if (!debugConfig) {
+        setStatus('❌ Debug logging is <strong>disabled</strong> (default state)');
+      } else {
+        setStatus(`✅ Debug logging is <strong>enabled</strong>: <code>${debugConfig}</code>`);
+      }
+    }
+
+    function testErrorLog() {
+      testLogger.error('This is a test error message', { detail: 'Always visible' });
+      setStatus('Sent error log. Check console.');
+    }
+
+    function testWarnLog() {
+      testLogger.warn('This is a test warning message', { detail: 'Always visible' });
+      setStatus('Sent warning log. Check console.');
+    }
+
+    function testDebugLog() {
+      testLogger.debug('This is a test debug message', { detail: 'Only visible with WEBMCP_DEBUG' });
+      nativeLogger.debug('NativeAdapter debug message');
+      bridgeLogger.debug('MCPBridge debug message');
+      setStatus('Sent debug logs. Check console (only visible if WEBMCP_DEBUG is enabled).');
+    }
+
+    function testInfoLog() {
+      testLogger.info('This is a test info message', { detail: 'Only visible with WEBMCP_DEBUG' });
+      setStatus('Sent info log. Check console (only visible if WEBMCP_DEBUG is enabled).');
+    }
+
+    function triggerToolRegistration() {
+      try {
+        // This will trigger internal logging in @mcp-b/global
+        if (window.ai?.tools?.register) {
+          window.ai.tools.register({
+            name: 'test_tool',
+            description: 'A test tool',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                message: { type: 'string' }
+              }
+            },
+            handler: async (input) => {
+              return { content: [{ type: 'text', text: `Echo: ${input.message}` }] };
+            }
+          });
+          setStatus('✅ Registered test tool. Check console for logging.');
+        } else {
+          setStatus('❌ WebModelContext API not available. Check if polyfill initialized.');
+        }
+      } catch (error) {
+        testLogger.error('Failed to register tool:', error);
+        setStatus('❌ Failed to register tool. Check console.');
+      }
+    }
+
+    // Initialize on load
+    window.addEventListener('DOMContentLoaded', () => {
+      console.log('='.repeat(60));
+      console.log('🧪 @mcp-b/global Logging Test Page Loaded');
+      console.log('='.repeat(60));
+
+      checkDebugStatus();
+
+      // Test that loggers work at page load
+      testLogger.error('Page loaded - error log (always visible)');
+      testLogger.warn('Page loaded - warning log (always visible)');
+      testLogger.debug('Page loaded - debug log (only visible with WEBMCP_DEBUG)');
+      testLogger.info('Page loaded - info log (only visible with WEBMCP_DEBUG)');
+
+      console.log('='.repeat(60));
+    });
+  </script>
+</body>
+</html>

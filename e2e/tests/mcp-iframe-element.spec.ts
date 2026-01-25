@@ -180,3 +180,19 @@ test.describe('MCPIframeElement E2E Tests', () => {
     expect(elementInfo.itemPrefix).toBe('child-iframe_');
   });
 });
+
+test.describe('MCP Iframe Client E2E Tests', () => {
+  test('should connect and call tool via MCP client', async ({ page }) => {
+    await page.goto('/mcp-iframe-client.html');
+    await page.waitForSelector('#client-status[data-status="pass"]', { timeout: 15000 });
+
+    const status = page.locator('#client-status');
+    await expect(status).toHaveAttribute('data-status', 'pass');
+
+    const tools = page.locator('#client-tools');
+    await expect(tools).toContainText('add');
+
+    const result = page.locator('#client-result');
+    await expect(result).toHaveAttribute('data-result', '5');
+  });
+});

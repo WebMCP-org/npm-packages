@@ -21,6 +21,8 @@ import {AggregatedIssue} from '../node_modules/chrome-devtools-frontend/mcp/mcp.
 import {McpContext} from '../src/McpContext.js';
 import {McpResponse} from '../src/McpResponse.js';
 import {stableIdSymbol} from '../src/PageCollector.js';
+import {WebMCPToolHub} from '../src/tools/WebMCPToolHub.js';
+import type {McpServer} from '../src/third_party/index.js';
 
 export function getTextContent(
   content: CallToolResult['content'][number],
@@ -76,9 +78,47 @@ export async function withBrowser(
   await cb(browser, newPage);
 }
 
+/**
+ * Create a mock MCP server for testing WebMCPToolHub.
+ * This mock implements just enough of the McpServer interface
+ * to support registerTool with update and remove methods.
+ */
+export function createMockMcpServer(): McpServer {
+  const registeredTools = new Map<
+    string,
+    {
+      config: unknown;
+      callback: (...args: unknown[]) => Promise<unknown>;
+    }
+  >();
+
+  return {
+    registerTool: (
+      name: string,
+      config: unknown,
+      callback: (...args: unknown[]) => Promise<unknown>,
+    ) => {
+      registeredTools.set(name, {config, callback});
+      return {
+        update: (newConfig: unknown) => {
+          const existing = registeredTools.get(name);
+          if (existing) {
+            registeredTools.set(name, {...existing, config: newConfig});
+          }
+        },
+        remove: () => {
+          registeredTools.delete(name);
+        },
+      };
+    },
+    // Expose for test verification
+    _registeredTools: registeredTools,
+  } as unknown as McpServer;
+}
+
 export async function withMcpContext(
   cb: (response: McpResponse, context: McpContext) => Promise<void>,
-  options: {debug?: boolean; autoOpenDevTools?: boolean} = {},
+  options: {debug?: boolean; autoOpenDevTools?: boolean; withToolHub?: boolean} = {},
 ) {
   await withBrowser(async browser => {
     const response = new McpResponse();
@@ -93,6 +133,13 @@ export async function withMcpContext(
       },
       Locator,
     );
+
+    // Optionally create and attach a tool hub with a mock server
+    if (options.withToolHub) {
+      const mockServer = createMockMcpServer();
+      const toolHub = new WebMCPToolHub(mockServer, context);
+      context.setToolHub(toolHub);
+    }
 
     await cb(response, context);
   }, options);

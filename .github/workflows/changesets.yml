@@ -1,4 +1,4 @@
-name: Changesets
+name: Release
 
 on:
   push:
@@ -11,40 +11,54 @@ env:
 permissions:
   contents: write
   pull-requests: write
-  id-token: write  # Required for npm provenance
+  id-token: write  # Required for npm provenance/OIDC
 
 jobs:
-  version:
+  release:
+    name: Release
     timeout-minutes: 15
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout code repository
-        uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          # Fetch all history for proper changelog generation
+          fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
-      - name: Setup node.js
-        uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
         with:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
           registry-url: 'https://registry.npmjs.org'
-      
+
       - name: Install dependencies
         run: pnpm install
-      
+
       - name: Build packages
         run: pnpm build
-      
-      - name: Create and publish versions
+
+      - name: Create Release PR or Publish
         uses: changesets/action@v1
         with:
-          commit: "chore: update versions"
-          title: "chore: update versions"
+          # Follow conventional commit format for version commits
+          commit: "chore(release): version packages"
+          title: "chore(release): version packages"
+          # Publish command
           publish: pnpm ci:publish
+          # Create GitHub releases for each published package
+          createGithubReleases: true
         env:
+          # Use PAT if available (allows triggering other workflows)
+          # Falls back to GITHUB_TOKEN (won't trigger other workflows)
           GITHUB_TOKEN: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
+          # npm authentication - uses NPM_TOKEN until OIDC is configured
+          # To use OIDC: configure trusted publisher on npmjs.com and remove these
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # Enable provenance attestations
           NPM_CONFIG_PROVENANCE: true

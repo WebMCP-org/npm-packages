@@ -7,7 +7,7 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {listWebMCPTools, callWebMCPTool} from '../../src/tools/webmcp.js';
+import {listWebMCPTools} from '../../src/tools/webmcp.js';
 import {serverHooks} from '../server.js';
 import {withMcpContext} from '../utils.js';
 
@@ -171,200 +171,103 @@ const MOCK_WEBMCP_PAGE = `
 </html>
 `;
 
-/**
- * A page without WebMCP to test detection
- */
-const NO_WEBMCP_PAGE = `
-<!DOCTYPE html>
-<html>
-<head><title>Regular Page</title></head>
-<body><h1>No WebMCP here</h1></body>
-</html>
-`;
-
 describe('webmcp tools', () => {
   const server = serverHooks();
 
   describe('list_webmcp_tools', () => {
-    it('auto-connects and lists tools on WebMCP page', async () => {
+    it('shows message when no tools registered', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          await listWebMCPTools.handler({params: {}}, response, context);
+
+          const output = response.responseLines.join('\n');
+          assert.ok(
+            output.includes('No WebMCP tools registered'),
+            'Should indicate no tools registered',
+          );
+        },
+        {withToolHub: true},
+      );
+    });
+
+    it('shows registered tools with schemas after WebMCP connection', async () => {
       server.addHtmlRoute('/webmcp', MOCK_WEBMCP_PAGE);
 
-      await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPage();
-        await page.goto(server.getRoute('/webmcp'));
+      await withMcpContext(
+        async (response, context) => {
+          const page = context.getSelectedPage();
+          await page.goto(server.getRoute('/webmcp'));
 
-        // Wait for page to initialize
-        await page.waitForFunction(() => {
-          return typeof (window as {navigator: {modelContext?: unknown}}).navigator.modelContext !== 'undefined';
-        });
+          // Wait for page to initialize
+          await page.waitForFunction(() => {
+            return (
+              typeof (window as {navigator: {modelContext?: unknown}}).navigator
+                .modelContext !== 'undefined'
+            );
+          });
 
-        await listWebMCPTools.handler({params: {}}, response, context);
+          // Connect to WebMCP to sync tools to the hub
+          const result = await context.getWebMCPClient(page);
+          assert.ok(result.connected, 'Should connect to WebMCP');
 
-        const output = response.responseLines.join('\\n');
-        assert.ok(output.includes('3 tool(s) available'), 'Should show 3 tools');
-        assert.ok(output.includes('test_add'), 'Should list test_add');
-        assert.ok(output.includes('Add two numbers'), 'Should show description');
-      });
+          // Now list_webmcp_tools should show the registered tools as JSON
+          await listWebMCPTools.handler({params: {}}, response, context);
+
+          const output = response.responseLines.join('\n');
+          const parsed = JSON.parse(output);
+
+          assert.ok(Array.isArray(parsed.tools), 'Should have tools array');
+          assert.strictEqual(parsed.tools.length, 3, 'Should have 3 tools');
+
+          // Check tool structure
+          const testAdd = parsed.tools.find((t: {name: string}) => t.name === 'test_add');
+          assert.ok(testAdd, 'Should include test_add');
+          assert.ok(testAdd.description.includes('Add two numbers'), 'Should have description');
+          assert.ok(testAdd.inputSchema, 'Should include inputSchema');
+          assert.deepStrictEqual(testAdd.inputSchema.required, ['a', 'b'], 'Should have required params');
+        },
+        {withToolHub: true},
+      );
     });
 
-    it('shows error on page without WebMCP', async () => {
-      server.addHtmlRoute('/regular', NO_WEBMCP_PAGE);
-
-      await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPage();
-        await page.goto(server.getRoute('/regular'));
-
-        await listWebMCPTools.handler({params: {}}, response, context);
-
-        const output = response.responseLines.join('\\n');
-        assert.ok(output.includes('WebMCP not detected'), 'Should show not detected message');
-      });
-    });
-
-    it('reconnects when navigating to different WebMCP page', async () => {
-      server.addHtmlRoute('/webmcp1', MOCK_WEBMCP_PAGE);
+    it('returns same full list on every call (no diff)', async () => {
       server.addHtmlRoute('/webmcp2', MOCK_WEBMCP_PAGE);
 
-      await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPage();
+      await withMcpContext(
+        async (response, context) => {
+          const page = context.getSelectedPage();
+          await page.goto(server.getRoute('/webmcp2'));
 
-        // First page
-        await page.goto(server.getRoute('/webmcp1'));
-        await page.waitForFunction(() => {
-          return typeof (window as {navigator: {modelContext?: unknown}}).navigator.modelContext !== 'undefined';
-        });
+          await page.waitForFunction(() => {
+            return (
+              typeof (window as {navigator: {modelContext?: unknown}}).navigator
+                .modelContext !== 'undefined'
+            );
+          });
 
-        await listWebMCPTools.handler({params: {}}, response, context);
-        assert.ok(response.responseLines.join('\\n').includes('3 tool(s)'), 'Should list tools from first page');
+          // Connect and sync tools
+          await context.getWebMCPClient(page);
 
-        response.resetResponseLineForTesting();
+          // First call
+          await listWebMCPTools.handler({params: {}}, response, context);
+          const firstOutput = response.responseLines.join('\n');
+          const firstParsed = JSON.parse(firstOutput);
 
-        // Navigate to second page
-        await page.goto(server.getRoute('/webmcp2'));
-        await page.waitForFunction(() => {
-          return typeof (window as {navigator: {modelContext?: unknown}}).navigator.modelContext !== 'undefined';
-        });
+          response.resetResponseLineForTesting();
 
-        // Should auto-reconnect to new page
-        await listWebMCPTools.handler({params: {}}, response, context);
-        assert.ok(response.responseLines.join('\\n').includes('3 tool(s)'), 'Should list tools from second page');
-      });
-    });
+          // Second call - should return same full list (no diff)
+          await listWebMCPTools.handler({params: {}}, response, context);
+          const secondOutput = response.responseLines.join('\n');
+          const secondParsed = JSON.parse(secondOutput);
 
-    it('reconnects after page reload with same URL', async () => {
-      server.addHtmlRoute('/webmcp-reload', MOCK_WEBMCP_PAGE);
-
-      await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPage();
-
-        // Load page and connect
-        await page.goto(server.getRoute('/webmcp-reload'));
-        await page.waitForFunction(() => {
-          return typeof (window as {navigator: {modelContext?: unknown}}).navigator.modelContext !== 'undefined';
-        });
-
-        await listWebMCPTools.handler({params: {}}, response, context);
-        assert.ok(response.responseLines.join('\\n').includes('3 tool(s)'), 'Should list tools before reload');
-
-        response.resetResponseLineForTesting();
-
-        // Reload the page (same URL, but frames are recreated)
-        await page.reload();
-        await page.waitForFunction(() => {
-          return typeof (window as {navigator: {modelContext?: unknown}}).navigator.modelContext !== 'undefined';
-        });
-
-        // Should auto-reconnect after reload (this was previously failing with "detached Frame" error)
-        await listWebMCPTools.handler({params: {}}, response, context);
-        assert.ok(response.responseLines.join('\\n').includes('3 tool(s)'), 'Should list tools after reload');
-      });
-    });
-  });
-
-  describe('call_webmcp_tool', () => {
-    it('auto-connects and calls a tool', async () => {
-      server.addHtmlRoute('/webmcp3', MOCK_WEBMCP_PAGE);
-
-      await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPage();
-        await page.goto(server.getRoute('/webmcp3'));
-
-        await page.waitForFunction(() => {
-          return typeof (window as {navigator: {modelContext?: unknown}}).navigator.modelContext !== 'undefined';
-        });
-
-        await callWebMCPTool.handler(
-          {params: {name: 'test_add', arguments: {a: 5, b: 3}}},
-          response,
-          context
-        );
-
-        const output = response.responseLines.join('\\n');
-        assert.ok(output.includes('Calling tool: test_add'), 'Should show tool name');
-        assert.ok(output.includes('8'), 'Should show result (5+3=8)');
-      });
-    });
-
-    it('calls a tool with string result', async () => {
-      server.addHtmlRoute('/webmcp4', MOCK_WEBMCP_PAGE);
-
-      await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPage();
-        await page.goto(server.getRoute('/webmcp4'));
-
-        await page.waitForFunction(() => {
-          return typeof (window as {navigator: {modelContext?: unknown}}).navigator.modelContext !== 'undefined';
-        });
-
-        await callWebMCPTool.handler(
-          {params: {name: 'test_greet', arguments: {name: 'World'}}},
-          response,
-          context
-        );
-
-        const output = response.responseLines.join('\\n');
-        assert.ok(output.includes('Hello, World!'), 'Should show greeting');
-      });
-    });
-
-    it('shows error for tool that returns isError', async () => {
-      server.addHtmlRoute('/webmcp5', MOCK_WEBMCP_PAGE);
-
-      await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPage();
-        await page.goto(server.getRoute('/webmcp5'));
-
-        await page.waitForFunction(() => {
-          return typeof (window as {navigator: {modelContext?: unknown}}).navigator.modelContext !== 'undefined';
-        });
-
-        await callWebMCPTool.handler(
-          {params: {name: 'test_error', arguments: {}}},
-          response,
-          context
-        );
-
-        const output = response.responseLines.join('\\n');
-        assert.ok(output.includes('Tool returned an error'), 'Should indicate error');
-      });
-    });
-
-    it('shows error on page without WebMCP', async () => {
-      server.addHtmlRoute('/regular2', NO_WEBMCP_PAGE);
-
-      await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPage();
-        await page.goto(server.getRoute('/regular2'));
-
-        await callWebMCPTool.handler(
-          {params: {name: 'test_add', arguments: {a: 1, b: 2}}},
-          response,
-          context
-        );
-
-        const output = response.responseLines.join('\\n');
-        assert.ok(output.includes('WebMCP not detected'), 'Should show not detected message');
-      });
+          assert.strictEqual(
+            firstParsed.tools.length,
+            secondParsed.tools.length,
+            'Both calls should return same number of tools',
+          );
+        },
+        {withToolHub: true},
+      );
     });
   });
 });

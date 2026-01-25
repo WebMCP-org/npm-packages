@@ -11,6 +11,7 @@ import type {TraceResult} from '../trace-processing/parse.js';
 import type {PaginationOptions} from '../utils/types.js';
 
 import type {ToolCategory} from './categories.js';
+import type {WebMCPToolHub} from './WebMCPToolHub.js';
 
 export interface ToolDefinition<
   Schema extends zod.ZodRawShape = zod.ZodRawShape,
@@ -34,7 +35,7 @@ export interface ToolDefinition<
 }
 
 export interface Request<Schema extends zod.ZodRawShape> {
-  params: zod.objectOutputType<Schema, zod.ZodTypeAny>;
+  params: zod.infer<zod.ZodObject<Schema>>;
 }
 
 export interface ImageContentData {
@@ -76,6 +77,11 @@ export interface Response {
   attachConsoleMessage(msgid: number): void;
   // Allows re-using DevTools data queried by some tools.
   attachDevToolsData(data: DevToolsData): void;
+  /**
+   * Mark this response as an error response.
+   * When set to true, the tool result will include isError: true.
+   */
+  setIsError(value: boolean): void;
 }
 
 /**
@@ -93,7 +99,7 @@ export type Context = Readonly<{
   isPageSelected(page: Page): boolean;
   newPage(): Promise<Page>;
   closePage(pageIdx: number): Promise<void>;
-  selectPage(page: Page): void;
+  selectPage(page: Page, explicit?: boolean): void;
   getElementByUid(uid: string): Promise<ElementHandle<Element>>;
   getAXNodeByUid(uid: string): TextSnapshotNode | undefined;
   setNetworkConditions(conditions: string | null): void;
@@ -125,6 +131,16 @@ export type Context = Readonly<{
    * @param page - Optional page to get client for. Defaults to selected page.
    */
   getWebMCPClient(page?: Page): Promise<WebMCPClientResult>;
+  /**
+   * Get the WebMCPToolHub for accessing registered tools and diff state.
+   */
+  getToolHub(): WebMCPToolHub | undefined;
+  /**
+   * Get all pages.
+   * @returns A snapshot of all currently open pages.
+   *          The returned array is a new copy and can be safely modified.
+   */
+  getPages(): Page[];
 }>;
 
 export function defineTool<Schema extends zod.ZodRawShape>(

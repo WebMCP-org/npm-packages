@@ -1,0 +1,101 @@
+{
+  "name": "@mcp-b/smart-dom-reader",
+  "version": "1.1.0",
+  "description": "Token-efficient DOM extraction for AI agents - Extract interactive elements, semantic structure, and stable CSS selectors for LLM-powered browser automation",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "browser",
+    "dom",
+    "extraction",
+    "ai",
+    "selector",
+    "interactive",
+    "semantic",
+    "llm",
+    "claude",
+    "chatgpt",
+    "openai",
+    "anthropic",
+    "web-scraping",
+    "css-selector",
+    "xpath",
+    "browser-automation",
+    "puppeteer",
+    "playwright",
+    "ai-agents",
+    "token-efficient",
+    "dom-parser",
+    "web-ai",
+    "userscript",
+    "shadow-dom",
+    "iframe"
+  ],
+  "homepage": "https://docs.mcp-b.ai/packages/smart-dom-reader",
+  "bugs": {
+    "url": "https://github.com/WebMCP-org/npm-packages/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WebMCP-org/npm-packages.git",
+    "directory": "packages/smart-dom-reader"
+  },
+  "license": "MIT",
+  "author": "Alex Nahas",
+  "sideEffects": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./bundle-string": {
+      "types": "./dist/bundle-string.d.ts",
+      "import": "./dist/bundle-string.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "browser": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "prebuild": "pnpm build:bundle && node generate-bundle-module.mjs",
+    "build": "tsdown",
+    "build:bundle": "vite build --config vite.config.bundle.ts",
+    "bundle:mcp": "pnpm --filter @mcp-b/smart-dom-reader build && pnpm --filter @mcp-b/smart-dom-reader-server bundle",
+    "check": "biome check --write .",
+    "clean": "rm -rf dist .turbo",
+    "format": "biome format --write .",
+    "lint": "biome lint --write .",
+    "prepublishOnly": "node ../scripts/validate-publish.js && pnpm run build",
+    "publish:dry": "pnpm publish --access public --dry-run",
+    "publish:npm": "pnpm publish --access public",
+    "test:local": "node test/local-playwright-runner.mjs",
+    "typecheck": "tsc --noEmit",
+    "version:major": "pnpm version major --no-git-tag-version",
+    "version:minor": "pnpm version minor --no-git-tag-version",
+    "version:patch": "pnpm version patch --no-git-tag-version"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plugin-monkey": "catalog:"
+  },
+  "peerDependencies": {
+    "@modelcontextprotocol/sdk": "^1.15.0"
+  },
+  "peerDependenciesMeta": {
+    "@modelcontextprotocol/sdk": {
+      "optional": true
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}

@@ -65,20 +65,28 @@ pnpm add @mcp-b/smart-dom-reader
 
 | Package | Version | Description |
 |---------|---------|-------------|
-| [@mcp-b/global](./global) | [![npm](https://img.shields.io/npm/v/@mcp-b/global)](https://www.npmjs.com/package/@mcp-b/global) | Navigator.modelContext polyfill - implements the Web Model Context API |
-| [@mcp-b/webmcp-ts-sdk](./webmcp-ts-sdk) | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-ts-sdk)](https://www.npmjs.com/package/@mcp-b/webmcp-ts-sdk) | TypeScript SDK adapter for MCP with browser-specific features |
-| [@mcp-b/transports](./transports) | [![npm](https://img.shields.io/npm/v/@mcp-b/transports)](https://www.npmjs.com/package/@mcp-b/transports) | Browser transport implementations (Tab, Chrome Extension) |
-| [@mcp-b/react-webmcp](./react-webmcp) | [![npm](https://img.shields.io/npm/v/@mcp-b/react-webmcp)](https://www.npmjs.com/package/@mcp-b/react-webmcp) | React hooks for registering and consuming MCP tools |
-| [@mcp-b/extension-tools](./extension-tools) | [![npm](https://img.shields.io/npm/v/@mcp-b/extension-tools)](https://www.npmjs.com/package/@mcp-b/extension-tools) | Auto-generated MCP tools for Chrome Extension APIs |
-| [@mcp-b/smart-dom-reader](./smart-dom-reader) | [![npm](https://img.shields.io/npm/v/@mcp-b/smart-dom-reader)](https://www.npmjs.com/package/@mcp-b/smart-dom-reader) | Token-efficient DOM extraction for AI agents |
+| [@mcp-b/global](./packages/global) | [![npm](https://img.shields.io/npm/v/@mcp-b/global)](https://www.npmjs.com/package/@mcp-b/global) | Navigator.modelContext polyfill - implements the Web Model Context API |
+| [@mcp-b/webmcp-ts-sdk](./packages/webmcp-ts-sdk) | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-ts-sdk)](https://www.npmjs.com/package/@mcp-b/webmcp-ts-sdk) | TypeScript SDK adapter for MCP with browser-specific features |
+| [@mcp-b/transports](./packages/transports) | [![npm](https://img.shields.io/npm/v/@mcp-b/transports)](https://www.npmjs.com/package/@mcp-b/transports) | Browser transport implementations (Tab, Chrome Extension) |
+| [@mcp-b/react-webmcp](./packages/react-webmcp) | [![npm](https://img.shields.io/npm/v/@mcp-b/react-webmcp)](https://www.npmjs.com/package/@mcp-b/react-webmcp) | React hooks for registering and consuming MCP tools |
+| [@mcp-b/extension-tools](./packages/extension-tools) | [![npm](https://img.shields.io/npm/v/@mcp-b/extension-tools)](https://www.npmjs.com/package/@mcp-b/extension-tools) | Auto-generated MCP tools for Chrome Extension APIs |
+| [@mcp-b/smart-dom-reader](./packages/smart-dom-reader) | [![npm](https://img.shields.io/npm/v/@mcp-b/smart-dom-reader)](https://www.npmjs.com/package/@mcp-b/smart-dom-reader) | Token-efficient DOM extraction for AI agents |
 | [@mcp-b/chrome-devtools-mcp](./packages/chrome-devtools-mcp) | [![npm](https://img.shields.io/npm/v/@mcp-b/chrome-devtools-mcp)](https://www.npmjs.com/package/@mcp-b/chrome-devtools-mcp) | MCP server for Chrome DevTools with WebMCP integration |
+| [@mcp-b/mcp-iframe](./packages/mcp-iframe) | [![npm](https://img.shields.io/npm/v/@mcp-b/mcp-iframe)](https://www.npmjs.com/package/@mcp-b/mcp-iframe) | Custom element for exposing iframe MCP tools to parent page |
+| [@webmcp/helpers](./packages/webmcp-helpers) | [![npm](https://img.shields.io/npm/v/@webmcp/helpers)](https://www.npmjs.com/package/@webmcp/helpers) | DOM and response helpers for WebMCP userscript development |
+
+### Alias Packages
+
+| Package | Description |
+|---------|-------------|
+| [usewebmcp](./packages/usewebmcp) | Shorter alias for @mcp-b/react-webmcp |
 
 ### Deprecated Packages
 
 | Package | Status | Migration |
 |---------|--------|-----------|
-| ~~@mcp-b/mcp-react-hooks~~ | ⚠️ Deprecated | Use [@mcp-b/react-webmcp](./react-webmcp) instead |
-| ~~@mcp-b/mcp-react-hook-form~~ | ⚠️ Removed | Use custom `useWebMCP` wrappers |
+| ~~@mcp-b/mcp-react-hooks~~ | Deprecated | Use [@mcp-b/react-webmcp](./packages/react-webmcp) instead |
+| ~~@mcp-b/mcp-react-hook-form~~ | Removed | Use custom `useWebMCP` wrappers |
 
 ## Quick Start
 
@@ -237,7 +245,8 @@ pnpm --filter @mcp-b/react-webmcp add zod
 
 - [CONTRIBUTING.md](./CONTRIBUTING.md) - Contribution guidelines
 - [CLAUDE.md](./CLAUDE.md) - Developer guidance for Claude Code
-- [TESTING.md](./TESTING.md) - Testing documentation
+- [docs/TESTING.md](./docs/TESTING.md) - Testing documentation
+- [docs/](./docs) - Additional technical documentation
 
 ## Contributing
 

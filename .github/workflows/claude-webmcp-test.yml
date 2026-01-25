@@ -1,0 +1,140 @@
+name: Claude WebMCP Integration Test
+
+on:
+  # Manual trigger for testing
+  workflow_dispatch:
+    inputs:
+      prompt:
+        description: 'Custom prompt for Claude (optional)'
+        required: false
+        type: string
+  # Run on PRs that modify WebMCP packages
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'packages/global/**'
+      - 'packages/react-webmcp/**'
+      - 'packages/transports/**'
+      - 'packages/chrome-devtools-mcp/**'
+      - 'e2e/react-webmcp-test-app/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  webmcp-integration-test:
+    name: WebMCP Integration Test with Claude
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build packages
+        run: pnpm build
+
+      - name: Setup Chrome
+        uses: browser-actions/setup-chrome@latest
+        with:
+          chrome-version: stable
+
+      - name: Start test app in background
+        run: |
+          cd e2e/react-webmcp-test-app
+          pnpm preview --port 4173 &
+          echo "Waiting for server to start..."
+          sleep 5
+          # Verify server is running
+          curl -s http://localhost:4173 > /dev/null || echo "Server check failed"
+
+      - name: Create MCP Config
+        run: |
+          cat > /tmp/chrome-devtools-mcp-config.json << 'EOF'
+          {
+            "mcpServers": {
+              "chrome-devtools": {
+                "command": "npx",
+                "args": [
+                  "-y",
+                  "@mcp-b/chrome-devtools-mcp@latest",
+                  "--headless=true",
+                  "--isolated=true",
+                  "--viewport=1280x720"
+                ]
+              }
+            }
+          }
+          EOF
+          cat /tmp/chrome-devtools-mcp-config.json
+
+      - name: Run Claude WebMCP Integration Test
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            You are testing WebMCP integration. Your task is to verify that WebMCP tools are working correctly.
+
+            ## Instructions
+
+            1. **Navigate to the test app**: Use the Chrome DevTools MCP to navigate to http://localhost:4173
+
+            2. **List WebMCP tools**: Use `list_webmcp_tools` to discover the available WebMCP tools on the page.
+               Expected tools include:
+               - counter_increment
+               - counter_decrement
+               - counter_reset
+               - counter_get
+               - posts_like
+               - posts_search
+               - context_app_state
+
+            3. **Test a WebMCP tool**: Call the `counter_get` tool to verify it returns the current counter value.
+
+            4. **Test a mutation**: Call `counter_increment` with amount=5 to increment the counter.
+
+            5. **Verify the change**: Call `counter_get` again to verify the counter was incremented.
+
+            6. **Report results**: Provide a summary of what worked and what didn't.
+
+            ## Success Criteria
+            - Successfully navigated to the test app
+            - Listed at least 5 WebMCP tools
+            - Successfully called counter_get and received a response
+            - Successfully incremented the counter
+            - Verified the counter value changed
+
+            If all criteria pass, respond with "WEBMCP_TEST_PASSED" at the end.
+            If any criteria fail, respond with "WEBMCP_TEST_FAILED" and explain what went wrong.
+          claude_args: |
+            --mcp-config /tmp/chrome-devtools-mcp-config.json
+            --allowedTools "mcp__chrome-devtools__*"
+            --max-turns 20
+          track_progress: true
+
+      - name: Cleanup
+        if: always()
+        run: |
+          # Kill the preview server
+          pkill -f "vite preview" || true

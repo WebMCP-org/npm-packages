@@ -1,0 +1,77 @@
+{
+  "name": "@mcp-b/mcp-iframe",
+  "version": "0.0.0",
+  "description": "Custom element for exposing iframe MCP tools, resources, and prompts to parent page",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "iframe",
+    "custom-element",
+    "web-component",
+    "browser",
+    "web-model-context"
+  ],
+  "homepage": "https://github.com/MiguelsPizza/WebMCP#readme",
+  "bugs": {
+    "url": "https://github.com/MiguelsPizza/WebMCP/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MiguelsPizza/WebMCP.git",
+    "directory": "packages/mcp-iframe"
+  },
+  "license": "MIT",
+  "author": "Alex Nahas",
+  "sideEffects": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "check": "biome check --write .",
+    "clean": "rm -rf dist .turbo",
+    "format": "biome format --write .",
+    "lint": "biome lint --write .",
+    "prepublishOnly": "node ../scripts/validate-publish.js && pnpm run build",
+    "publish:dry": "pnpm publish --access public --dry-run",
+    "publish:npm": "pnpm publish --access public",
+    "typecheck": "tsc --noEmit",
+    "version:major": "pnpm version major --no-git-tag-version",
+    "version:minor": "pnpm version minor --no-git-tag-version",
+    "version:patch": "pnpm version patch --no-git-tag-version"
+  },
+  "dependencies": {
+    "@mcp-b/transports": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:"
+  },
+  "peerDependencies": {
+    "@modelcontextprotocol/sdk": "^1.15.0"
+  },
+  "peerDependenciesMeta": {
+    "@modelcontextprotocol/sdk": {
+      "optional": false
+    }
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}

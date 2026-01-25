@@ -1,6 +1,43 @@
 # Contributing to MCP-B NPM Packages
 
-First off, thank you for considering contributing to MCP-B! It's people like you that make MCP-B such a great tool for the developer community.
+Thank you for considering contributing to MCP-B!
+
+## Code Quality Requirements
+
+**All contributions must meet these standards before being merged:**
+
+### Type Safety
+- All code must be written in TypeScript with strict mode enabled
+- No `any` types unless absolutely necessary (and documented why)
+- All public APIs must have explicit type annotations
+- No `@ts-ignore` or `@ts-expect-error` without explanation
+
+### Testing
+- All new features must include tests
+- All bug fixes must include a regression test
+- Tests must pass before submitting a PR:
+  ```bash
+  pnpm test:unit    # Unit tests must pass
+  pnpm test:e2e     # E2E tests must pass (if applicable)
+  ```
+
+### Code Quality Checks
+- All code must pass linting and formatting:
+  ```bash
+  pnpm check        # Biome linting and formatting
+  pnpm typecheck    # TypeScript type checking
+  pnpm build        # Build must succeed
+  ```
+
+### Before Submitting a PR
+Run the full validation suite:
+```bash
+pnpm build && pnpm typecheck && pnpm check && pnpm test:unit
+```
+
+If any of these fail, your PR will not be merged.
+
+---
 
 ## Code of Conduct
 
@@ -38,11 +75,14 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 ### Pull Requests
 
 1. Fork the repo and create your branch from `main`
-2. If you've added code that should be tested, add tests
-3. If you've changed APIs, update the documentation
-4. Ensure the test suite passes
-5. Make sure your code follows the existing code style
-6. Issue that pull request!
+2. Write your code following TypeScript strict mode
+3. Add tests for all new features and bug fixes
+4. Update documentation for any API changes
+5. **Run the full validation suite** (see Code Quality Requirements above)
+6. Create a changeset: `pnpm changeset`
+7. Submit your pull request
+
+**PRs that don't pass all checks will not be merged.**
 
 ## Development Process
 
@@ -72,24 +112,26 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 
 ### Making Changes
 
-1. **Write your code**
-   - Follow the existing code style
-   - Add TypeScript types for all new code
-   - Update documentation as needed
+1. **Write type-safe code**
+   - Use TypeScript strict mode (already configured)
+   - Add explicit types for all public APIs
+   - Avoid `any` - use `unknown` and type guards instead
+   - Follow existing code patterns
 
-2. **Test your changes**
+2. **Add tests**
+   - Write unit tests for new functionality
+   - Add regression tests for bug fixes
+   - Test edge cases and error conditions
+
+3. **Validate your changes**
    ```bash
-   # Build all packages
-   pnpm build
-   
-   # Run type checking
-   pnpm typecheck
-   
-   # Run linting and formatting
-   pnpm check
+   pnpm build        # Must succeed
+   pnpm typecheck    # No type errors
+   pnpm check        # No lint errors
+   pnpm test:unit    # All tests pass
    ```
 
-3. **Create a changeset**
+4. **Create a changeset**
    ```bash
    pnpm changeset
    ```
@@ -119,13 +161,17 @@ We follow the [Conventional Commits](https://www.conventionalcommits.org/) speci
 - `chore:` Other changes that don't modify src or test files
 
 #### Scopes (Required)
-Package scopes:
-- `global` - Changes to @mcp-b/global
-- `webmcp-ts-sdk` - Changes to @mcp-b/webmcp-ts-sdk
-- `transports` - Changes to @mcp-b/transports
-- `react-webmcp` - Changes to @mcp-b/react-webmcp
-- `extension-tools` - Changes to @mcp-b/extension-tools
-- `smart-dom-reader` - Changes to @mcp-b/smart-dom-reader
+Package scopes (all in `packages/` directory):
+- `chrome-devtools-mcp` - @mcp-b/chrome-devtools-mcp
+- `extension-tools` - @mcp-b/extension-tools
+- `global` - @mcp-b/global
+- `mcp-iframe` - @mcp-b/mcp-iframe
+- `react-webmcp` - @mcp-b/react-webmcp
+- `smart-dom-reader` - @mcp-b/smart-dom-reader
+- `transports` - @mcp-b/transports
+- `usewebmcp` - usewebmcp (alias package)
+- `webmcp-helpers` - @webmcp/helpers
+- `webmcp-ts-sdk` - @mcp-b/webmcp-ts-sdk
 
 Repository-wide scopes:
 - `root` - Changes to root config files
@@ -180,14 +226,20 @@ git commit -m "refactor(*): update to new MCP SDK types"
 
 ```
 npm-packages/
-├── global/               # Navigator.modelContext polyfill
-├── webmcp-ts-sdk/        # TypeScript SDK adapter
-├── transports/           # Core transport implementations
-├── react-webmcp/         # React hooks for MCP (provider & client)
-├── extension-tools/      # Chrome Extension API tools
-├── smart-dom-reader/     # DOM extraction for AI
-├── e2e/                  # E2E tests and test apps
-└── .changeset/           # Changeset files
+├── packages/                    # All NPM packages
+│   ├── chrome-devtools-mcp/     # Chrome DevTools MCP server
+│   ├── extension-tools/         # Chrome Extension API tools
+│   ├── global/                  # Navigator.modelContext polyfill
+│   ├── mcp-iframe/              # Iframe MCP element
+│   ├── react-webmcp/            # React hooks for MCP
+│   ├── smart-dom-reader/        # DOM extraction for AI
+│   ├── transports/              # Core transport implementations
+│   ├── usewebmcp/               # Alias for react-webmcp
+│   ├── webmcp-helpers/          # Userscript helpers
+│   └── webmcp-ts-sdk/           # TypeScript SDK adapter
+├── e2e/                         # E2E tests and test apps
+├── docs/                        # Technical documentation
+└── .changeset/                  # Changeset files
 ```
 
 ## Package Guidelines
@@ -230,24 +282,55 @@ When contributing to a specific package:
 - Handle shadow DOM and iframes
 - Maintain stateless architecture
 
+### @mcp-b/chrome-devtools-mcp
+- Test with Chrome DevTools Protocol
+- Handle browser window lifecycle
+- Support WebMCP tool integration
+- Test auto-connect and session management
+
+### @mcp-b/mcp-iframe
+- Test cross-origin scenarios
+- Handle postMessage security properly
+- Support tool prefixing for namespacing
+- Test connection lifecycle
+
+### @webmcp/helpers
+- Keep utilities lightweight
+- Maintain tree-shakeability
+- Document all helper functions
+- Test DOM manipulation edge cases
+
 ## Testing
+
+### Required Tests
+
+All PRs must include appropriate tests:
+
+```bash
+pnpm test:unit      # Run unit tests (required)
+pnpm test:e2e       # Run E2E tests (if applicable)
+```
+
+### Writing Tests
+
+- **Unit tests**: Use Vitest, co-located with source files (`*.test.ts`)
+- **Browser tests**: Use Vitest with `@vitest/browser` for browser-specific code
+- **E2E tests**: Use Playwright in the `e2e/` directory
+
+### Test Coverage
+
+- New features must have tests covering the main functionality
+- Bug fixes must include a test that would have caught the bug
+- Edge cases and error conditions should be tested
 
 ### Manual Testing
 
-1. Manually test your changes thoroughly
-2. Test in different browsers when applicable
-3. Test in both development and production builds
-4. Include testing steps in your PR description
+For browser-specific changes:
+1. Test in Chrome, Firefox, and Safari
+2. Test in both development and production builds
+3. Include testing steps in your PR description
 
-### Testing GitHub Actions Locally
-
-You can test GitHub Actions workflows locally before pushing:
-
-1. Install [act](https://github.com/nektos/act) (simulates GitHub Actions)
-2. Set up your tokens and configuration
-3. Run workflows locally
-
-See our [Testing with Act Guide](./TESTING-WITH-ACT.md) for detailed instructions.
+See [docs/TESTING.md](./docs/TESTING.md) for detailed testing documentation.
 
 ## Documentation
 

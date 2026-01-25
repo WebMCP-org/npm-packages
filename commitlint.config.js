@@ -5,13 +5,17 @@ export default {
       2,
       'always',
       [
-        // Packages
-        'transports',
-        'extension-tools',
-        'mcp-react-hooks',
-        'mcp-react-hook-form',
-        'global',
+        // Packages (in packages/)
         'chrome-devtools-mcp',
+        'extension-tools',
+        'global',
+        'mcp-iframe',
+        'react-webmcp',
+        'smart-dom-reader',
+        'transports',
+        'usewebmcp',
+        'webmcp-helpers',
+        'webmcp-ts-sdk',
 
         // Repository-wide scopes
         'root',

@@ -11,14 +11,13 @@ export const cliOptions = {
   autoConnect: {
     type: 'boolean',
     description:
-      'If specified, automatically connects to a browser (Chrome 145+) running in the user data directory identified by the channel param. Requires remote debugging being enabled in Chrome here: chrome://inspect/#remote-debugging.',
-    conflicts: ['isolated', 'executablePath'],
-    default: false,
+      'If specified, automatically connects to a browser (Chrome 145+) running in the user data directory identified by the channel param. Falls back to launching a new instance if no running browser is found.',
+    default: true,
     coerce: (value: boolean | undefined) => {
-      if (!value) {
-        return;
+      if (value === false) {
+        return false;
       }
-      return value;
+      return true;
     },
   },
   browserUrl: {
@@ -193,7 +192,7 @@ export function parseArguments(version: string, argv = process.argv) {
         !args.wsEndpoint &&
         !args.executablePath
       ) {
-        args.channel = 'stable';
+        args.channel = 'dev';
       }
       return true;
     })

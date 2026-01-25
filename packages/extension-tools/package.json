@@ -1,0 +1,94 @@
+{
+  "name": "@mcp-b/extension-tools",
+  "version": "0.3.0",
+  "description": "62+ Chrome Extension API tools for Model Context Protocol (MCP) - Let AI agents control tabs, bookmarks, history, storage, and more",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "chrome-extension",
+    "browser-extension",
+    "chrome-api",
+    "extension-api",
+    "tabs-api",
+    "bookmarks-api",
+    "storage-api",
+    "browser-automation",
+    "ai-agents",
+    "llm",
+    "claude",
+    "chatgpt",
+    "openai",
+    "anthropic",
+    "cursor",
+    "copilot",
+    "gemini",
+    "webmcp",
+    "chrome-tabs",
+    "chrome-history",
+    "chrome-cookies",
+    "chrome-scripting",
+    "ai-browser-control",
+    "manifest-v3",
+    "browser-control",
+    "automation"
+  ],
+  "homepage": "https://docs.mcp-b.ai/packages/extension-tools",
+  "bugs": {
+    "url": "https://github.com/WebMCP-org/npm-packages/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WebMCP-org/npm-packages.git",
+    "directory": "packages/extension-tools"
+  },
+  "license": "MIT",
+  "author": "Alex Nahas",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "check": "biome check --write .",
+    "clean": "rm -rf dist .turbo",
+    "format": "biome format --write .",
+    "generate-chrome-api-tools": "pnpx tsx src/aiScripts/generate-chrome-api-tools.ts",
+    "lint": "biome lint --write .",
+    "prepublishOnly": "node ../scripts/validate-publish.js && pnpm run build",
+    "publish:dry": "pnpm publish --access public --dry-run",
+    "publish:npm": "pnpm publish --access public",
+    "typecheck": "tsc --noEmit",
+    "version:major": "pnpm version major --no-git-tag-version",
+    "version:minor": "pnpm version minor --no-git-tag-version",
+    "version:patch": "pnpm version patch --no-git-tag-version"
+  },
+  "dependencies": {
+    "@mcp-b/smart-dom-reader": "workspace:*",
+    "@mcp-b/webmcp-ts-sdk": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@anthropic-ai/sdk": "^0.60.0",
+    "@types/chrome": "catalog:",
+    "@types/node": "catalog:",
+    "cheerio": "^1.1.2",
+    "dotenv": "^17.2.1",
+    "playwright": "^1.54.2",
+    "tsdown": "catalog:",
+    "typescript": "catalog:"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}

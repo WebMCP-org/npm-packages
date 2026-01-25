@@ -34,8 +34,8 @@ export function registerPrompts(server: McpServer): void {
 1. **Write the Tool**: I'll ask you to create a WebMCP tool in my codebase using @mcp-b/global
 2. **Hot Reload**: My dev server will automatically reload with the new tool
 3. **Navigate**: Use navigate_page to open my dev server (e.g., http://localhost:3000)
-4. **Discover**: Use list_webmcp_tools to see if the tool appears
-5. **Test**: Use call_webmcp_tool to test the tool with sample inputs
+4. **Discover**: Use list_webmcp_tools to see registered tools (shown with callable names like webmcp_localhost_3000_page0_my_tool)
+5. **Test**: Call the tool directly by its prefixed name (e.g., webmcp_localhost_3000_page0_my_tool)
 6. **Iterate**: If something is wrong, fix the code and repeat
 
 ## Tool Registration Pattern
@@ -108,9 +108,9 @@ What would you like to build? Describe the tool you need and I'll help you imple
 ## Test Plan
 
 1. Navigate to ${url}
-2. Use list_webmcp_tools to discover available tools
+2. Use list_webmcp_tools to discover registered tools (shown with callable names like webmcp_localhost_3000_page0_tool_name)
 3. ${toolNameInstruction}
-4. Test the tool with various inputs:
+4. Call the tool directly by its prefixed name and test with various inputs:
    - Valid inputs (happy path)
    - Edge cases (empty strings, nulls, etc.)
    - Invalid inputs (wrong types, missing required fields)

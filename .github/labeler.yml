@@ -1,0 +1,76 @@
+# Package labels
+packages/transports:
+  - changed-files:
+      - any-glob-to-any-file: 'packages/transports/**'
+
+packages/global:
+  - changed-files:
+      - any-glob-to-any-file: 'packages/global/**'
+
+packages/react-webmcp:
+  - changed-files:
+      - any-glob-to-any-file: 'packages/react-webmcp/**'
+
+packages/webmcp-ts-sdk:
+  - changed-files:
+      - any-glob-to-any-file: 'packages/webmcp-ts-sdk/**'
+
+packages/chrome-devtools-mcp:
+  - changed-files:
+      - any-glob-to-any-file: 'packages/chrome-devtools-mcp/**'
+
+packages/extension-tools:
+  - changed-files:
+      - any-glob-to-any-file: 'packages/extension-tools/**'
+
+packages/mcp-iframe:
+  - changed-files:
+      - any-glob-to-any-file: 'packages/mcp-iframe/**'
+
+packages/smart-dom-reader:
+  - changed-files:
+      - any-glob-to-any-file: 'packages/smart-dom-reader/**'
+
+packages/webmcp-helpers:
+  - changed-files:
+      - any-glob-to-any-file: 'packages/webmcp-helpers/**'
+
+packages/usewebmcp:
+  - changed-files:
+      - any-glob-to-any-file: 'packages/usewebmcp/**'
+
+# Category labels
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/*.md'
+          - 'docs/**'
+
+testing:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/*.test.ts'
+          - '**/*.spec.ts'
+          - 'e2e/**'
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/**'
+
+config:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '*.json'
+          - '*.yaml'
+          - '*.yml'
+          - '.nvmrc'
+          - 'biome.json'
+          - 'turbo.json'
+          - 'pnpm-workspace.yaml'
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'pnpm-lock.yaml'
+          - '**/package.json'
