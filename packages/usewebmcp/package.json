@@ -15,13 +15,13 @@
     "zod",
     "usewebmcp"
   ],
-  "homepage": "https://github.com/WebMCP-org/WebMCP#readme",
+  "homepage": "https://github.com/WebMCP-org/npm-packages#readme",
   "bugs": {
-    "url": "https://github.com/WebMCP-org/WebMCP/issues"
+    "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/WebMCP-org/WebMCP.git",
+    "url": "git+https://github.com/WebMCP-org/npm-packages.git",
     "directory": "packages/usewebmcp"
   },
   "license": "MIT",
