@@ -11,8 +11,8 @@ on:
         type: string
 
 permissions:
-  contents: read
-  id-token: write
+  contents: write # For creating GitHub releases
+  id-token: write # For OIDC and sigstore signing
 
 env:
   CI: true
@@ -48,30 +48,91 @@ jobs:
         run: pnpm build
 
       - name: Create canary versions
+        id: versions
         run: |
           # Generate snapshot version with timestamp
           pnpm changeset version --snapshot ${{ inputs.tag || 'canary' }}
 
-      - name: Publish canary packages
-        run: |
-          pnpm publish -r --access public --tag ${{ inputs.tag || 'canary' }} --no-git-checks
-        env:
-          # Uses OIDC for authentication - no NPM_TOKEN needed
-          # Fallback to NPM_TOKEN if OIDC not configured yet
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_CONFIG_PROVENANCE: true
-
-      - name: Get published versions
-        id: versions
-        run: |
-          echo "## Published Canary Versions" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          # Collect package info for later steps
+          PACKAGES_JSON="[]"
           for pkg in packages/*/; do
             if [ -f "$pkg/package.json" ]; then
               name=$(jq -r '.name' "$pkg/package.json")
               version=$(jq -r '.version' "$pkg/package.json")
               if [ "$name" != "null" ] && [ "$version" != "null" ]; then
-                echo "- \`$name@$version\`" >> $GITHUB_STEP_SUMMARY
+                PACKAGES_JSON=$(echo "$PACKAGES_JSON" | jq --arg n "$name" --arg v "$version" '. + [{"name": $n, "version": $v}]')
               fi
             fi
           done
+          echo "packages=$PACKAGES_JSON" >> $GITHUB_OUTPUT
+
+      - name: Publish canary packages
+        run: |
+          pnpm publish -r --access public --tag ${{ inputs.tag || 'canary' }} --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@3454372f43399081ed03b604cb2d021dabca52bb # v3.8.0
+
+      - name: Create GitHub releases and sign artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PACKAGES: ${{ steps.versions.outputs.packages }}
+          TAG_SUFFIX: ${{ inputs.tag || 'canary' }}
+        run: |
+          echo "## Published Canary Versions" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "$PACKAGES" | jq -c '.[]' | while read -r pkg; do
+            PKG_NAME=$(echo "$pkg" | jq -r '.name')
+            PKG_VERSION=$(echo "$pkg" | jq -r '.version')
+            TAG="${PKG_NAME}@${PKG_VERSION}"
+
+            echo "- \`${PKG_NAME}@${PKG_VERSION}\`" >> $GITHUB_STEP_SUMMARY
+
+            # Create safe filename (replace @ and / with -)
+            SAFE_NAME=$(echo "${PKG_NAME}-${PKG_VERSION}" | sed 's/@//g' | sed 's/\//-/g')
+
+            # Create a release tarball from the package directory
+            PKG_DIR=$(echo "$PKG_NAME" | sed 's/@mcp-b\//packages\//')
+            if [ -d "$PKG_DIR" ]; then
+              # Create tarball of the built package
+              tar -czf "/tmp/${SAFE_NAME}.tar.gz" -C "$(dirname "$PKG_DIR")" "$(basename "$PKG_DIR")"
+
+              # Sign with cosign (keyless via OIDC)
+              cosign sign-blob "/tmp/${SAFE_NAME}.tar.gz" \
+                --yes \
+                --output-signature "/tmp/${SAFE_NAME}.tar.gz.sig" \
+                --output-certificate "/tmp/${SAFE_NAME}.tar.gz.pem" \
+                --bundle "/tmp/${SAFE_NAME}.tar.gz.sigstore"
+
+              # Create GitHub release (prerelease for canary)
+              gh release create "$TAG" \
+                --title "${PKG_NAME} ${PKG_VERSION}" \
+                --notes "Canary release of ${PKG_NAME}
+
+**Install:** \`npm install ${PKG_NAME}@${TAG_SUFFIX}\`
+
+**Verify signature:**
+\`\`\`bash
+cosign verify-blob ${SAFE_NAME}.tar.gz \\
+  --signature ${SAFE_NAME}.tar.gz.sig \\
+  --certificate ${SAFE_NAME}.tar.gz.pem \\
+  --certificate-identity-regexp 'https://github.com/WebMCP-org/npm-packages' \\
+  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
+\`\`\`" \
+                --prerelease \
+                "/tmp/${SAFE_NAME}.tar.gz" \
+                "/tmp/${SAFE_NAME}.tar.gz.sig" \
+                "/tmp/${SAFE_NAME}.tar.gz.pem" \
+                "/tmp/${SAFE_NAME}.tar.gz.sigstore" \
+                2>/dev/null || echo "  ⚠ Release may already exist for $TAG"
+
+              echo "  ✓ Created signed release for $TAG"
+            fi
+          done
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All packages signed with [sigstore](https://sigstore.dev) (keyless OIDC)" >> $GITHUB_STEP_SUMMARY

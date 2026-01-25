@@ -79,3 +79,58 @@ jobs:
           name: sbom
           path: ./sbom.spdx.json
           retention-days: 90
+
+      - name: Sign release artifacts with sigstore
+        if: steps.changesets.outputs.published == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Install cosign for keyless signing
+          COSIGN_VERSION="v2.4.1"
+          curl -sSfL https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64 -o /tmp/cosign
+          chmod +x /tmp/cosign
+
+          # Get published packages from changesets output
+          PACKAGES='${{ steps.changesets.outputs.publishedPackages }}'
+
+          # Process each published package
+          echo "$PACKAGES" | jq -c '.[]' | while read -r pkg; do
+            PKG_NAME=$(echo "$pkg" | jq -r '.name')
+            PKG_VERSION=$(echo "$pkg" | jq -r '.version')
+
+            # Convert scoped package name to GitHub release tag format
+            # @mcp-b/transports@1.0.0 -> @mcp-b/transports@1.0.0
+            TAG="${PKG_NAME}@${PKG_VERSION}"
+
+            echo "Signing release: $TAG"
+
+            # Download the source tarball from the release
+            TARBALL_URL=$(gh release view "$TAG" --json tarballUrl -q '.tarballUrl' 2>/dev/null || echo "")
+
+            if [ -n "$TARBALL_URL" ]; then
+              TARBALL_FILE="${PKG_NAME//\//-}-${PKG_VERSION}.tar.gz"
+              curl -sSfL "$TARBALL_URL" -o "/tmp/$TARBALL_FILE"
+
+              # Sign with cosign (keyless via OIDC)
+              /tmp/cosign sign-blob "/tmp/$TARBALL_FILE" \
+                --yes \
+                --output-signature "/tmp/${TARBALL_FILE}.sig" \
+                --output-certificate "/tmp/${TARBALL_FILE}.pem"
+
+              # Also create bundle for full verification
+              /tmp/cosign sign-blob "/tmp/$TARBALL_FILE" \
+                --yes \
+                --bundle "/tmp/${TARBALL_FILE}.sigstore"
+
+              # Upload signatures to the release
+              gh release upload "$TAG" \
+                "/tmp/${TARBALL_FILE}.sig" \
+                "/tmp/${TARBALL_FILE}.pem" \
+                "/tmp/${TARBALL_FILE}.sigstore" \
+                --clobber
+
+              echo "✓ Signed and uploaded signatures for $TAG"
+            else
+              echo "⚠ No release found for $TAG, skipping"
+            fi
+          done
