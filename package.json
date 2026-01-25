@@ -4,7 +4,7 @@
   "private": false,
   "type": "module",
   "scripts": {
-    "build": "turbo run build --filter='!@mcp-ui/chat-ui' --filter='!@mcp-b/mcp-ui-webmcp-starter'",
+    "build": "turbo run build",
     "changeset": "changeset",
     "changeset:publish": "pnpm build && changeset publish",
     "changeset:version": "changeset version",
