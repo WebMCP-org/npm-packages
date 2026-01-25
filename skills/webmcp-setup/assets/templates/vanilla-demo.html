@@ -148,12 +148,12 @@
   <form id="contact-form">
     <div class="form-group">
       <label for="name">Name:</label>
-      <input type="text" id="name" name="name" placeholder="Enter your name">
+      <input type="text" id="name" name="name" placeholder="Enter your name" autocomplete="name">
     </div>
 
     <div class="form-group">
       <label for="email">Email:</label>
-      <input type="email" id="email" name="email" placeholder="Enter your email">
+      <input type="email" id="email" name="email" placeholder="Enter your email" autocomplete="email">
     </div>
 
     <div class="form-group">
@@ -164,8 +164,8 @@
     <button type="submit">Submit</button>
   </form>
 
-  <!-- WebMCP Global Bridge -->
-  <script src="https://unpkg.com/@mcp-b/global@latest/dist/index.global.js"></script>
+  <!-- WebMCP Global Bridge - auto-initializes navigator.modelContext -->
+  <script src="https://unpkg.com/@mcp-b/global@2.0.0/dist/index.iife.js"></script>
 
   <script>
     // State
@@ -173,22 +173,24 @@
 
     // Wait for WebMCP to be available
     function initializeWebMCP() {
-      if (!window.webMCP) {
-        console.warn('WebMCP not available yet, retrying...');
+      if (!window.navigator.modelContext) {
+        console.warn('navigator.modelContext not available yet, retrying...');
         setTimeout(initializeWebMCP, 100);
         return;
       }
 
-      console.log('✅ WebMCP initialized!');
-      updateStatus('WebMCP ready - tools registered', false);
+      console.log('navigator.modelContext initialized!');
+      updateStatus('WebMCP ready - registering tools...', false);
 
       // Register tools
       registerTools();
     }
 
     function registerTools() {
+      const modelContext = window.navigator.modelContext;
+
       // Tool: set_message
-      window.webMCP.registerTool({
+      modelContext.registerTool({
         name: 'set_message',
         description: 'Change the displayed message',
         inputSchema: {
@@ -201,42 +203,59 @@
           },
           required: ['message']
         },
-        handler: async (args) => {
+        execute: async (args) => {
           document.getElementById('message').textContent = args.message;
-          return { success: true, message: args.message };
+          return {
+            content: [{ type: 'text', text: `Message set to: ${args.message}` }]
+          };
         }
       });
 
       // Tool: increment_counter
-      window.webMCP.registerTool({
+      modelContext.registerTool({
         name: 'increment_counter',
         description: `Increment the counter (current value: ${counter})`,
         inputSchema: {
           type: 'object',
-          properties: {}
+          properties: {
+            amount: {
+              type: 'number',
+              description: 'Amount to increment by (default: 1)',
+              default: 1
+            }
+          }
         },
-        handler: async () => {
-          incrementCounter();
-          return { success: true, newValue: counter };
+        execute: async (args) => {
+          const amount = args.amount || 1;
+          counter += amount;
+          document.getElementById('counter').textContent = counter;
+          return {
+            content: [{ type: 'text', text: `Counter incremented to ${counter}` }],
+            structuredContent: { success: true, newValue: counter }
+          };
         }
       });
 
       // Tool: reset_counter
-      window.webMCP.registerTool({
+      modelContext.registerTool({
         name: 'reset_counter',
         description: 'Reset the counter to zero',
         inputSchema: {
           type: 'object',
           properties: {}
         },
-        handler: async () => {
-          resetCounter();
-          return { success: true, newValue: counter };
+        execute: async () => {
+          counter = 0;
+          document.getElementById('counter').textContent = counter;
+          return {
+            content: [{ type: 'text', text: 'Counter reset to 0' }],
+            structuredContent: { success: true, newValue: counter }
+          };
         }
       });
 
       // Tool: fill_contact_form
-      window.webMCP.registerTool({
+      modelContext.registerTool({
         name: 'fill_contact_form',
         description: 'Fill out the contact form',
         inputSchema: {
@@ -256,7 +275,7 @@
             }
           }
         },
-        handler: async (args) => {
+        execute: async (args) => {
           if (args.name) {
             document.getElementById('name').value = args.name;
           }
@@ -266,69 +285,48 @@
           if (args.message) {
             document.getElementById('message-input').value = args.message;
           }
-          return { success: true };
+          return {
+            content: [{ type: 'text', text: 'Form filled successfully' }],
+            structuredContent: { success: true }
+          };
         }
       });
 
       // Tool: get_form_data
-      window.webMCP.registerTool({
+      modelContext.registerTool({
         name: 'get_form_data',
         description: 'Get current contact form data',
         inputSchema: {
           type: 'object',
           properties: {}
         },
-        handler: async () => {
+        execute: async () => {
+          const formData = {
+            name: document.getElementById('name').value,
+            email: document.getElementById('email').value,
+            message: document.getElementById('message-input').value
+          };
           return {
-            success: true,
-            formData: {
-              name: document.getElementById('name').value,
-              email: document.getElementById('email').value,
-              message: document.getElementById('message-input').value
-            }
+            content: [{ type: 'text', text: JSON.stringify(formData, null, 2) }],
+            structuredContent: { success: true, formData }
           };
         }
       });
 
-      console.log('✅ All tools registered successfully!');
-      console.log('💡 Try using Chrome DevTools MCP to call these tools');
+      console.log('All tools registered successfully!');
+      console.log('Try using Chrome DevTools MCP to call these tools');
+      updateStatus('WebMCP ready - 5 tools registered', false);
     }
 
     // Helper functions
     function incrementCounter() {
       counter++;
       document.getElementById('counter').textContent = counter;
-
-      // Update tool description with new counter value
-      if (window.webMCP) {
-        window.webMCP.registerTool({
-          name: 'increment_counter',
-          description: `Increment the counter (current value: ${counter})`,
-          inputSchema: { type: 'object', properties: {} },
-          handler: async () => {
-            incrementCounter();
-            return { success: true, newValue: counter };
-          }
-        });
-      }
     }
 
     function resetCounter() {
       counter = 0;
       document.getElementById('counter').textContent = counter;
-
-      // Update tool description
-      if (window.webMCP) {
-        window.webMCP.registerTool({
-          name: 'increment_counter',
-          description: `Increment the counter (current value: ${counter})`,
-          inputSchema: { type: 'object', properties: {} },
-          handler: async () => {
-            incrementCounter();
-            return { success: true, newValue: counter };
-          }
-        });
-      }
     }
 
     function updateStatus(message, isError = false) {
