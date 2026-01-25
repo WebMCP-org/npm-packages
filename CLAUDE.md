@@ -1,327 +1,58 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code when working with this repository.
 
-## Essential Commands
-
-### Development
-```bash
-# Install dependencies (use pnpm)
-pnpm install
-
-# Development mode with watch
-pnpm dev
-
-# Build all packages
-pnpm build
-
-# Build only NPM packages (in ./packages/*)
-pnpm build:packages
-```
-
-### Code Quality
-```bash
-# Lint and format code (auto-fix)
-pnpm check
-
-# Type checking
-pnpm typecheck
-
-# Run all checks (typecheck + biome)
-pnpm check-all
-
-# Run tests (when implemented)
-pnpm test
-```
-
-### Publishing
-```bash
-# Create a changeset for version management
-pnpm changeset
-
-# Version packages using changesets
-pnpm changeset:version
-
-# Build and publish to npm
-pnpm changeset:publish
-
-# CI publish command (used by GitHub Actions)
-pnpm ci:publish
-```
-
-**See [.claude/PUBLISHING.md](.claude/PUBLISHING.md) for detailed publishing documentation**, including:
-- Manual publishing workflow
-- Common issues and fixes (missing build files, Zod compatibility, etc.)
-- Package-specific build notes
-- Troubleshooting checklist
-
-### Git Hooks
-```bash
-# Pre-commit hook runs automatically via Husky
-# Manually run lint-staged
-pnpm exec lint-staged
-```
-
-## Architecture Overview
-
-This is a **pnpm workspace monorepo** containing the official NPM packages for MCP-B (Model Context Protocol for Browsers). The repository implements browser-specific transports and tools for the Model Context Protocol.
-
-### Monorepo Structure
-
-```
-npm-packages/
-├── packages/                    # All NPM packages
-│   ├── chrome-devtools-mcp/     # Chrome DevTools MCP server
-│   ├── extension-tools/         # Chrome Extension API tools
-│   ├── global/                  # Web Model Context API polyfill
-│   ├── mcp-iframe/              # Iframe MCP element
-│   ├── react-webmcp/            # React hooks for WebMCP
-│   ├── smart-dom-reader/        # AI-friendly DOM extraction
-│   │   └── mcp-server/          # MCP server for smart-dom-reader
-│   ├── transports/              # Browser transport implementations
-│   ├── usewebmcp/               # Alias for react-webmcp
-│   ├── webmcp-helpers/          # Userscript helper utilities
-│   └── webmcp-ts-sdk/           # Core TypeScript SDK
-├── e2e/                         # End-to-end tests
-│   ├── test-app/                # Tab transport test app
-│   ├── react-webmcp-test-app/   # React hooks test app
-│   └── web-standards-showcase/  # Native API showcase
-├── docs/                        # Technical documentation
-├── skills/                      # Claude Code skills
-│   └── webmcp-setup/            # WebMCP setup skill
-└── templates/                   # Project templates
-```
-
-### Key Packages
-
-| Package | Path | Description |
-|---------|------|-------------|
-| @mcp-b/webmcp-ts-sdk | `packages/webmcp-ts-sdk` | Core TypeScript SDK with Zod schemas (leaf dependency) |
-| @mcp-b/transports | `packages/transports` | Browser transports (postMessage, Chrome runtime, iframe) |
-| @mcp-b/global | `packages/global` | Web Model Context API polyfill (`navigator.modelContext`) |
-| @mcp-b/react-webmcp | `packages/react-webmcp` | React hooks (`useWebMCP`, `useWebMCPPrompt`) |
-| @mcp-b/chrome-devtools-mcp | `packages/chrome-devtools-mcp` | Chrome DevTools MCP server |
-| @mcp-b/extension-tools | `packages/extension-tools` | Auto-generated Chrome Extension API tools |
-| @mcp-b/smart-dom-reader | `packages/smart-dom-reader` | Token-efficient DOM extraction |
-| @mcp-b/mcp-iframe | `packages/mcp-iframe` | Custom element for iframe MCP tools |
-| @webmcp/helpers | `packages/webmcp-helpers` | DOM and response helpers for userscripts |
-| usewebmcp | `packages/usewebmcp` | Alias package for @mcp-b/react-webmcp |
-
-**Note:** All packages require **Zod 4.x** (not Zod 3.x)
-
-### Build System
-
-- Uses **Turbo** for monorepo task orchestration
-- **tsup** for TypeScript bundling in packages
-- **Biome** for linting and formatting (not ESLint/Prettier)
-- **Changesets** for version management and publishing
-
-### Important Technical Details
-
-- All packages use ES modules (`"type": "module"`)
-- Minimum Node version: 22.12
-- TypeScript 5.8+ required
-- Packages depend on `@modelcontextprotocol/sdk` as a peer dependency
-- Chrome Extension API tools are auto-generated from Chrome types
-
-## pnpm Workspace Configuration
-
-This monorepo uses pnpm's advanced features for optimal dependency management and publishing:
-
-### Workspace Protocol
-- Internal package dependencies use `workspace:*` protocol
-- Automatically converted to actual versions during publishing
-- Example: `"@mcp-b/transports": "workspace:*"`
-- Packages list in pnpm-workspace.yaml must match actual package directories
-
-### Catalog Protocol
-All shared dependencies are managed through the pnpm catalog in `pnpm-workspace.yaml`:
-- TypeScript, build tools, and types use `catalog:` protocol
-- Single source of truth for dependency versions
-- Reduces merge conflicts and simplifies upgrades
-- Example: `"typescript": "catalog:"` resolves to version in catalog
-
-### pnpm Settings (.npmrc)
-Key configurations for optimal monorepo performance:
-- `catalog-mode=prefer` - Automatically use catalog versions when adding deps
-- `link-workspace-packages=true` - Auto-link workspace packages
-- `prefer-workspace-packages=true` - Prioritize workspace packages
-- `node-linker=isolated` - Better module isolation
-- `engine-strict=true` - Enforce Node version requirements
-- `publish-branch=main` - Restrict publishing to main branch
-
-### Publishing Configuration
-- All packages have `publishConfig` with public access
-- Workspace and catalog protocols are automatically replaced during publish
-- Changesets handle version management and changelogs
-- GitHub Actions automate the entire publish process
-
-### Publishing Safety
-
-**IMPORTANT:** Never use `npm publish` directly - it does NOT resolve `workspace:*` or `catalog:` protocols.
-
-All packages have a `prepublishOnly` hook that validates protocols are resolved before publishing:
+## Commands
 
 ```bash
-# This will FAIL if protocols aren't resolved:
-npm publish  # DON'T DO THIS
-
-# This will work - pnpm resolves protocols before packing:
-pnpm --filter @mcp-b/react-webmcp publish --access public
-
-# Best option - use CI/changesets workflow:
-pnpm changeset
-# Then merge the version PR to trigger automated publish
+pnpm install          # Install dependencies
+pnpm build            # Build all packages
+pnpm typecheck        # Type checking
+pnpm check            # Lint and format (Biome)
+pnpm check-all        # All checks (typecheck + lint)
+pnpm test             # Run tests
+pnpm test:unit        # Unit tests only
+pnpm test:e2e         # E2E tests only
+pnpm changeset        # Create a changeset for versioning
 ```
 
-The validation script (`scripts/validate-publish.js`) runs automatically and blocks publishing if it finds unresolved `workspace:*` or `catalog:` protocols.
-
-### Manual Publishing (Local Development)
-
-When publishing manually from your local machine, you need to set up NPM_TOKEN:
-
-1. **Store your NPM token in `.env`** (already gitignored):
-   ```bash
-   # .env file (DO NOT COMMIT)
-   NPM_TOKEN=npm_xxxxxxxxxxxxxxxxxxxx
-   ```
-
-2. **Load the token and publish**:
-   ```bash
-   # Load NPM_TOKEN from .env and publish all packages
-   export $(grep NPM_TOKEN .env | xargs) && pnpm publish:all
-   ```
-
-3. **Or publish individual packages**:
-   ```bash
-   export $(grep NPM_TOKEN .env | xargs) && pnpm --filter @mcp-b/global publish --access public --no-git-checks
-   ```
-
-### Package Dependency Graph & Publish Order
-
-**CRITICAL:** Packages must be published in topological order (dependencies first):
+## Structure
 
 ```
-@mcp-b/webmcp-ts-sdk     (no internal deps - publish FIRST)
-       ↓
-@mcp-b/transports        (depends on webmcp-ts-sdk)
-       ↓
-@mcp-b/global            (depends on transports, webmcp-ts-sdk)
-       ↓
-@mcp-b/react-webmcp      (depends on global, transports, webmcp-ts-sdk)
-       ↓
-@mcp-b/chrome-devtools-mcp (depends on transports)
+packages/           # All NPM packages (@mcp-b/*)
+e2e/                # E2E tests and test apps
+docs/               # Technical documentation
+skills/             # Claude Code skills
+templates/          # Project templates
 ```
 
-**Why this matters:** The `workspace:*` protocol resolves to the **current version in the workspace** at publish time. If you publish a dependent package before its dependency is updated, it will reference the OLD version.
+## Key Files
 
-**Example of what goes wrong:**
-1. `transports` is at 1.0.0, you bump it to 2.0.0
-2. You publish `global` BEFORE publishing `transports`
-3. `global` gets published with `"@mcp-b/transports": "1.0.0"` (the old version!)
-4. Now you have to bump and republish `global` again
+| File | Purpose |
+|------|---------|
+| [CONTRIBUTING.md](./CONTRIBUTING.md) | Code quality requirements, commit format, PR process |
+| [.claude/PUBLISHING.md](.claude/PUBLISHING.md) | Publishing workflow and troubleshooting |
+| [docs/TESTING.md](./docs/TESTING.md) | Testing documentation |
+| [pnpm-workspace.yaml](./pnpm-workspace.yaml) | Workspace packages and dependency catalog |
+| [biome.json](./biome.json) | Linting and formatting rules |
 
-**Correct workflow:**
+## Quick Reference
+
+- **Node**: >= 22.12 (see `.nvmrc`)
+- **Package manager**: pnpm (not npm/yarn)
+- **Linter**: Biome (not ESLint/Prettier)
+- **Zod version**: 4.x required (not 3.x)
+- **Commit format**: `<type>(<scope>): <subject>` (enforced by hook)
+
+### Commit Scopes
+
+Package scopes: `chrome-devtools-mcp`, `extension-tools`, `global`, `mcp-iframe`, `react-webmcp`, `smart-dom-reader`, `transports`, `usewebmcp`, `webmcp-helpers`, `webmcp-ts-sdk`
+
+Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
+
+## Before Committing
+
+All code must pass:
 ```bash
-# 1. Bump all versions first
-pnpm changeset version
-
-# 2. Build all packages
-pnpm build
-
-# 3. Publish in order (or use publish:all which does -r for recursive)
-export $(grep NPM_TOKEN .env | xargs)
-pnpm --filter @mcp-b/webmcp-ts-sdk publish --access public --no-git-checks
-pnpm --filter @mcp-b/transports publish --access public --no-git-checks
-pnpm --filter @mcp-b/global publish --access public --no-git-checks
-pnpm --filter @mcp-b/react-webmcp publish --access public --no-git-checks
-pnpm --filter @mcp-b/chrome-devtools-mcp publish --access public --no-git-checks
+pnpm build && pnpm typecheck && pnpm check && pnpm test:unit
 ```
-
-## Development Workflow
-
-### Making Changes
-
-1. **Create a feature branch**
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
-
-2. **Make your changes**
-   - Follow existing code patterns and conventions
-   - Ensure TypeScript types are properly defined
-   - Update documentation if needed
-
-3. **Test your changes**
-   ```bash
-   pnpm build
-   pnpm typecheck
-   pnpm check
-   ```
-
-4. **Create a changeset**
-   ```bash
-   pnpm changeset
-   # Select packages that changed
-   # Choose version bump type (patch/minor/major)
-   # Write a brief description of changes
-   ```
-
-5. **Commit and push**
-   ```bash
-   git add .
-   # IMPORTANT: Use proper commit format with package scope!
-   # Format: <type>(<scope>): <subject>
-   # Examples:
-   git commit -m "feat(transports): add timeout option"
-   git commit -m "fix(extension-tools): handle chrome runtime errors"
-   git commit -m "chore(deps): update dependencies"
-   git push origin feature/your-feature-name
-   ```
-
-### Commit Message Format
-
-**All commits must follow this format:** `<type>(<scope>): <subject>`
-
-Valid scopes:
-- Package scopes: `chrome-devtools-mcp`, `extension-tools`, `global`, `mcp-iframe`, `react-webmcp`, `smart-dom-reader`, `transports`, `usewebmcp`, `webmcp-helpers`, `webmcp-ts-sdk`
-- Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*` (multiple packages)
-
-Valid types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`
-
-The commit-msg hook will reject commits that don't follow this format!
-
-### CI/CD Pipeline
-
-- **Pull Requests**: Automatically run linting, type checking, and builds
-- **Main branch**: Automatically creates version PRs via changesets
-- **Version PRs**: When merged, automatically publish to npm
-
-### Code Style Guidelines
-
-- Use **Biome** for formatting and linting (configured in `biome.json`)
-- No manual prettier or ESLint configuration needed
-- Pre-commit hooks automatically format staged files
-- Follow TypeScript strict mode requirements
-- Use explicit return types for public APIs
-
-### Package Conventions
-
-- Each package should have:
-  - `README.md` with usage examples
-  - Proper TypeScript exports in `src/index.ts`
-  - Build configuration via `tsup.config.ts` or `vite.config.ts`
-  - `package.json` with correct exports field
-
-### Troubleshooting
-
-- **Build errors**: Check that all packages are using correct tsconfig extends
-- **Type errors**: Ensure peer dependencies are installed
-- **Publishing issues**: Verify NPM_TOKEN is set in `.env` (local) or GitHub secrets (CI)
-- **Changeset issues**: Make sure you're on a feature branch, not main
-- **Dependency conflicts**: Run `pnpm dedupe` to resolve duplicates
-- **Catalog issues**: Use `pnpm update` to sync with catalog versions
-- **Workspace linking**: Ensure package is listed in `pnpm-workspace.yaml`
-- **Peer dependency warnings**: Check catalog version matches requirements
-- **Zod errors** (`Cannot read properties of undefined (reading 'def')`): Consumer app needs Zod 4.x, not Zod 3.x
-- **Wrong dependency versions after publish**: You published out of order - see "Package Dependency Graph & Publish Order" above
