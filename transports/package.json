@@ -64,6 +64,10 @@
     "prepublishOnly": "node ../scripts/validate-publish.js && pnpm run build",
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
+    "test": "vitest run",
+    "test:browser": "VITEST_BROWSER=true vitest run --browser.headless src/TabTransport.browser.test.ts",
+    "test:browser:ui": "VITEST_BROWSER=true vitest --browser src/TabTransport.browser.test.ts",
+    "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "version:major": "pnpm version major --no-git-tag-version",
     "version:minor": "pnpm version minor --no-git-tag-version",
@@ -76,8 +80,12 @@
   "devDependencies": {
     "@types/chrome": "catalog:",
     "@types/node": "catalog:",
+    "@vitest/browser": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
+    "playwright": "catalog:",
     "tsdown": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "publishConfig": {
     "access": "public",
