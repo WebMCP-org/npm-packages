@@ -161,6 +161,9 @@ export class TabClientTransport implements Transport {
   /** Internal rejector for serverReadyPromise */
   private readonly _serverReadyReject: (reason: unknown) => void;
 
+  /** Tracks if serverReadyPromise has been settled */
+  private _serverReadySettled = false;
+
   /**
    * Active request tracking for timeout management.
    *
@@ -244,7 +247,10 @@ export class TabClientTransport implements Transport {
 
       // Handle server ready signal
       if (typeof payload === 'string' && payload === 'mcp-server-ready') {
-        this._serverReadyResolve();
+        if (!this._serverReadySettled) {
+          this._serverReadySettled = true;
+          this._serverReadyResolve();
+        }
         return;
       }
 
@@ -260,7 +266,10 @@ export class TabClientTransport implements Transport {
         const message = JSONRPCMessageSchema.parse(payload);
 
         // Server is ready if it's sending messages
-        this._serverReadyResolve();
+        if (!this._serverReadySettled) {
+          this._serverReadySettled = true;
+          this._serverReadyResolve();
+        }
 
         // Clear timeout for responses
         this._clearRequestTimeout(message);
@@ -303,7 +312,7 @@ export class TabClientTransport implements Transport {
     await this.serverReadyPromise;
 
     // Start timeout tracking for requests (not notifications)
-    if ('method' in message && message.id !== undefined) {
+    if ('method' in message && 'id' in message && message.id !== undefined) {
       this._startRequestTimeout(message);
     }
 
@@ -343,7 +352,10 @@ export class TabClientTransport implements Transport {
     this._activeRequests.clear();
 
     // Reject server ready promise if still pending
-    this._serverReadyReject(new Error('Transport closed before server ready'));
+    if (!this._serverReadySettled) {
+      this._serverReadySettled = true;
+      this._serverReadyReject(new Error('Transport closed before server ready'));
+    }
 
     this._started = false;
     this.onclose?.();

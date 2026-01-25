@@ -78,7 +78,7 @@ export class TabServerTransport implements Transport {
         const message = JSONRPCMessageSchema.parse(payload);
 
         // Track incoming requests (messages with method and id, but not notifications)
-        if ('method' in message && message.id !== undefined) {
+        if ('method' in message && 'id' in message && message.id !== undefined) {
           this._pendingRequests.set(message.id, {
             request: message,
             receivedAt: Date.now(),
