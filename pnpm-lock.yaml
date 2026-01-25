@@ -63,7 +63,7 @@ importers:
   .:
     dependencies:
       dotenv:
-        specifier: ^17.2.1
+        specifier: ^17.2.3
         version: 17.2.3
       tslib:
         specifier: ^2.0.0
@@ -378,10 +378,10 @@ importers:
         specifier: 'catalog:'
         version: 22.17.2
       cheerio:
-        specifier: ^1.2.0
+        specifier: ^1.1.2
         version: 1.2.0
       dotenv:
-        specifier: ^17.2.1
+        specifier: ^17.2.3
         version: 17.2.3
       playwright:
         specifier: ^1.54.2

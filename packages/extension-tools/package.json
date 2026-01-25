@@ -81,8 +81,8 @@
     "@anthropic-ai/sdk": "^0.60.0",
     "@types/chrome": "catalog:",
     "@types/node": "catalog:",
-    "cheerio": "^1.2.0",
-    "dotenv": "^17.2.1",
+    "cheerio": "^1.1.2",
+    "dotenv": "^17.2.3",
     "playwright": "^1.54.2",
     "tsdown": "catalog:",
     "typescript": "catalog:"
