@@ -84,7 +84,10 @@ export class StorageApiTools extends BaseApiTools<StorageApiToolsOptions> {
         description: 'Perform operations on Chrome storage API',
         inputSchema: {
           action: storageActionSchema,
-          params: z.record(z.any()).optional().describe('Parameters for the chosen action'),
+          params: z
+            .record(z.string(), z.any())
+            .optional()
+            .describe('Parameters for the chosen action'),
         },
       },
       async ({ action, params = {} }) => {
@@ -128,7 +131,7 @@ export class StorageApiTools extends BaseApiTools<StorageApiToolsOptions> {
             return this.formatError(new Error(`Action "${action}" is not supported`));
           }
 
-          const toJson = (schema: z.ZodTypeAny, name: string) => z.toJSONSchema(schema);
+          const toJson = (schema: z.ZodTypeAny, _name: string) => z.toJSONSchema(schema);
 
           const payloadBase = {
             tool: 'extension_tool_storage_operations',
@@ -322,7 +325,7 @@ export class StorageApiTools extends BaseApiTools<StorageApiToolsOptions> {
   });
 
   private setStorageSchema = z.object({
-    data: z.record(z.any()).describe('Key-value pairs to store'),
+    data: z.record(z.string(), z.any()).describe('Key-value pairs to store'),
     area: z
       .enum(this.getAvailableAreas() as any)
       .optional()

@@ -82,7 +82,10 @@ export class WindowsApiTools extends BaseApiTools<WindowsApiToolsOptions> {
         inputSchema: {
           action: windowActionSchema,
           // Parameters vary by action; validated in handler using specific schemas
-          params: z.record(z.any()).optional().describe('Parameters for the chosen action'),
+          params: z
+            .record(z.string(), z.any())
+            .optional()
+            .describe('Parameters for the chosen action'),
         },
       },
       async ({ action, params = {} }) => {
@@ -127,7 +130,7 @@ export class WindowsApiTools extends BaseApiTools<WindowsApiToolsOptions> {
       async ({ action }) => {
         try {
           // Build JSON Schema for the params of the requested action so an LLM can construct a valid call
-          const toJson = (schema: z.ZodTypeAny, name: string) => z.toJSONSchema(schema);
+          const toJson = (schema: z.ZodTypeAny, _name: string) => z.toJSONSchema(schema);
 
           const payloadBase = {
             tool: 'extension_tool_window_operations',

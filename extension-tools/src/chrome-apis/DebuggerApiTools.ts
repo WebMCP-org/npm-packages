@@ -188,7 +188,10 @@ export class DebuggerApiTools extends BaseApiTools<DebuggerApiToolsOptions> {
           targetId: z.string().optional().describe('The opaque ID of the debug target'),
           sessionId: z.string().optional().describe('The session ID for child protocol sessions'),
           method: z.string().describe('CDP method name (e.g., Runtime.evaluate, Page.navigate)'),
-          commandParams: z.record(z.any()).optional().describe('Parameters for the CDP command'),
+          commandParams: z
+            .record(z.string(), z.any())
+            .optional()
+            .describe('Parameters for the CDP command'),
         },
       },
       async ({ tabId, extensionId, targetId, sessionId, method, commandParams }) => {

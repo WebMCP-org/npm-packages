@@ -100,7 +100,10 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
         description: 'Perform various tab operations using the Chrome Tabs API',
         inputSchema: {
           action: tabActionSchema,
-          params: z.record(z.any()).optional().describe('Parameters for the chosen action'),
+          params: z
+            .record(z.string(), z.any())
+            .optional()
+            .describe('Parameters for the chosen action'),
         },
       },
       async ({ action, params = {} }) => {
@@ -176,7 +179,7 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
             return this.formatError(new Error(`Action "${action}" is not supported`));
           }
 
-          const toJson = (schema: z.ZodTypeAny, name: string) => z.toJSONSchema(schema);
+          const toJson = (schema: z.ZodTypeAny, _name: string) => z.toJSONSchema(schema);
 
           const payloadBase = {
             tool: 'extension_tool_tab_operations',

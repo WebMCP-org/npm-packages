@@ -81,15 +81,15 @@ export class TabCaptureApiTools extends BaseApiTools<TabCaptureApiToolsOptions> 
           video: z.boolean().optional().describe('Whether to capture video from the tab'),
           audioConstraints: z
             .object({
-              mandatory: z.record(z.any()).optional(),
-              optional: z.record(z.any()).optional(),
+              mandatory: z.record(z.string(), z.any()).optional(),
+              optional: z.record(z.string(), z.any()).optional(),
             })
             .optional()
             .describe('Audio constraints for the media stream'),
           videoConstraints: z
             .object({
-              mandatory: z.record(z.any()).optional(),
-              optional: z.record(z.any()).optional(),
+              mandatory: z.record(z.string(), z.any()).optional(),
+              optional: z.record(z.string(), z.any()).optional(),
             })
             .optional()
             .describe('Video constraints for the media stream'),

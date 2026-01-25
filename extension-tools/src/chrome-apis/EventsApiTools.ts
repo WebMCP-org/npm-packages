@@ -343,8 +343,8 @@
 //               z.object({
 //                 id: z.string().optional().describe('Optional identifier for the rule'),
 //                 priority: z.number().optional().describe('Optional priority (defaults to 100)'),
-//                 conditions: z.array(z.record(z.any())).describe('Array of condition objects'),
-//                 actions: z.array(z.record(z.any())).describe('Array of action objects'),
+//                 conditions: z.array(z.record(z.string(), z.any())).describe('Array of condition objects'),
+//                 actions: z.array(z.record(z.string(), z.any())).describe('Array of action objects'),
 //                 tags: z.array(z.string()).optional().describe('Optional tags for the rule'),
 //               })
 //             )

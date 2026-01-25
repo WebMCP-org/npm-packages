@@ -567,7 +567,7 @@ export class DeclarativeNetRequestApiTools extends BaseApiTools<DeclarativeNetRe
             .optional()
             .describe('The initiator URL (if any) for the hypothetical request'),
           responseHeaders: z
-            .record(z.array(z.string()))
+            .record(z.string(), z.array(z.string()))
             .optional()
             .describe('The headers provided by a hypothetical response'),
         },

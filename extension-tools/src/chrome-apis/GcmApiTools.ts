@@ -118,7 +118,7 @@ export class GcmApiTools extends BaseApiTools<GcmApiToolsOptions> {
               'The ID of the message. Must be unique for each message in scope of the application'
             ),
           data: z
-            .record(z.string())
+            .record(z.string(), z.string())
             .describe(
               'Message data to send to the server. Case-insensitive goog. and google, as well as case-sensitive collapse_key are disallowed as key prefixes'
             ),

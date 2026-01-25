@@ -159,7 +159,7 @@ export class InstanceIDApiTools extends BaseApiTools<InstanceIDApiToolsOptions> 
               'Identifies authorized actions that the authorized entity can take. E.g. for sending GCM messages, GCM scope should be used'
             ),
           options: z
-            .record(z.string())
+            .record(z.string(), z.string())
             .optional()
             .describe(
               'Optional key/value pairs that will be associated with the token (deprecated since Chrome 89)'

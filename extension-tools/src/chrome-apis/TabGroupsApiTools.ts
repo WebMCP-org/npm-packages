@@ -72,7 +72,10 @@ export class TabGroupsApiTools extends BaseApiTools<TabGroupsApiToolsOptions> {
         description: 'Perform operations on tab groups using Chrome TabGroups API',
         inputSchema: {
           action: tabGroupSchema,
-          params: z.record(z.any()).optional().describe('Parameters for the chosen action'),
+          params: z
+            .record(z.string(), z.any())
+            .optional()
+            .describe('Parameters for the chosen action'),
         },
       },
       async ({ action, params = {} }) => {
@@ -114,7 +117,7 @@ export class TabGroupsApiTools extends BaseApiTools<TabGroupsApiToolsOptions> {
           if (!this.shouldRegisterTool(action)) {
             return this.formatError(new Error(`Action "${action}" is not supported`));
           }
-          const toJson = (schema: z.ZodTypeAny, name: string) => z.toJSONSchema(schema);
+          const toJson = (schema: z.ZodTypeAny, _name: string) => z.toJSONSchema(schema);
 
           const payloadBase = {
             tool: 'extension_tool_tab_group_operations',

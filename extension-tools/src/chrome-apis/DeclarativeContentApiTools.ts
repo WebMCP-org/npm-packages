@@ -185,7 +185,7 @@ export class DeclarativeContentApiTools extends BaseApiTools<DeclarativeContentA
                     z.object({
                       type: z.enum(['ShowAction', 'SetIcon']).describe('Type of action to perform'),
                       imageData: z
-                        .record(z.string())
+                        .record(z.string(), z.string())
                         .optional()
                         .describe('Icon image data for SetIcon action'),
                     })
