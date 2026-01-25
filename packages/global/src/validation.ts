@@ -5,28 +5,68 @@ import type { InputSchema } from './types.js';
 const logger = createLogger('WebModelContext');
 
 /**
- * Detect if a schema is a Zod schema object (Record<string, ZodType>)
- * or a JSON Schema object.
- *
- * Uses duck-typing to detect Zod 4 schemas by checking for the `_zod` property.
+ * Result of Zod schema detection with version information
  */
-export function isZodSchema(schema: unknown): boolean {
+export interface ZodSchemaDetection {
+  isZodSchema: boolean;
+  hasZod4: boolean;
+  hasZod3: boolean;
+}
+
+/**
+ * Detect if a schema is a Zod schema object and which version.
+ *
+ * Uses duck-typing to detect Zod schemas:
+ * - Zod 4 schemas have `_zod` property
+ * - Zod 3 schemas have `_def` property (but not `_zod`)
+ */
+export function detectZodSchema(schema: unknown): ZodSchemaDetection {
   if (typeof schema !== 'object' || schema === null) {
-    return false;
+    return { isZodSchema: false, hasZod4: false, hasZod3: false };
   }
 
   // JSON Schema has a 'type' property that's a string
   if ('type' in schema && typeof (schema as { type: unknown }).type === 'string') {
-    return false;
+    return { isZodSchema: false, hasZod4: false, hasZod3: false };
   }
 
   const values = Object.values(schema);
   if (values.length === 0) {
-    return false;
+    return { isZodSchema: false, hasZod4: false, hasZod3: false };
   }
 
-  // Duck-type check: Zod 4 schemas have `_zod` property
-  return values.some((val) => val != null && typeof val === 'object' && '_zod' in (val as object));
+  let hasZod4 = false;
+  let hasZod3 = false;
+
+  for (const val of values) {
+    if (val == null || typeof val !== 'object') continue;
+    const obj = val as object;
+
+    if ('_zod' in obj) {
+      hasZod4 = true;
+    } else if ('_def' in obj) {
+      // Has _def but not _zod = Zod 3
+      hasZod3 = true;
+    }
+  }
+
+  return {
+    isZodSchema: hasZod4 || hasZod3,
+    hasZod4,
+    hasZod3,
+  };
+}
+
+/**
+ * Detect if a schema is a Zod schema object (Record<string, ZodType>)
+ * or a JSON Schema object.
+ *
+ * Uses duck-typing to detect Zod schemas:
+ * - Zod 4 schemas have `_zod` property
+ * - Zod 3 schemas have `_def` property
+ */
+export function isZodSchema(schema: unknown): boolean {
+  return detectZodSchema(schema).isZodSchema;
 }
 
 /**
@@ -61,16 +101,41 @@ export function zodToJsonSchema(schema: Record<string, z.ZodTypeAny>): InputSche
 }
 
 /**
+ * Error thrown when Zod 3 schemas are detected.
+ * Zod 4 is required for schema conversion.
+ */
+export class Zod3SchemaError extends Error {
+  constructor() {
+    super(
+      'Zod 3 schema detected. This package requires Zod 4 for schema support.\n\n' +
+        'Solutions:\n' +
+        '  1. Upgrade to zod@4.x: pnpm add zod@4\n' +
+        '  2. If using zod@3.25+, import from the v4 subpath:\n' +
+        '     import { z } from "zod/v4"\n' +
+        '  3. Use JSON Schema instead of Zod schemas\n\n' +
+        'See https://zod.dev/v4/versioning for more information.'
+    );
+    this.name = 'Zod3SchemaError';
+  }
+}
+
+/**
  * Normalize a schema to both JSON Schema and Zod formats
  * Detects which format is provided and converts to the other
+ *
+ * @throws {Zod3SchemaError} If Zod 3 schemas are detected
  */
 export function normalizeSchema(schema: InputSchema | Record<string, z.ZodTypeAny>): {
   jsonSchema: InputSchema;
   zodValidator: z.ZodType;
 } {
-  const isZod = isZodSchema(schema);
+  const detection = detectZodSchema(schema);
 
-  if (isZod) {
+  if (detection.hasZod3 && !detection.hasZod4) {
+    throw new Zod3SchemaError();
+  }
+
+  if (detection.isZodSchema) {
     const jsonSchema = zodToJsonSchema(schema as Record<string, z.ZodTypeAny>);
     const zodValidator = z.object(schema as Record<string, z.ZodTypeAny>);
     return { jsonSchema, zodValidator };
