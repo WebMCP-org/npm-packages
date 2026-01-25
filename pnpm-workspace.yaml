@@ -13,7 +13,7 @@ catalog:
   '@vitest/coverage-v8': ^4.0.18
   playwright: ^1.58.0
   '@cloudflare/vite-plugin': ^1.13.18
-  '@composio/json-schema-to-zod': ^0.1.17
+  '@composio/json-schema-to-zod': ^0.1.19
   '@hookform/resolvers': ^5.2.2
   '@modelcontextprotocol/sdk': 1.25.2
   '@radix-ui/react-collapsible': ^1.1.12
