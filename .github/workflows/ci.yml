@@ -110,6 +110,9 @@ jobs:
       - name: Build packages
         run: pnpm build
 
+      - name: Install Playwright Browsers
+        run: pnpm --filter @mcp-b/global exec playwright install --with-deps chromium
+
       - name: Run unit tests
         run: pnpm test:unit
 
