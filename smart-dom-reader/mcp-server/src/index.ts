@@ -186,6 +186,7 @@ class SmartDomReaderServer {
         title: 'Connect with Playwright',
         description:
           'Launch Chromium for subsequent tools. Use this first. Returns a brief status message. Run headless=false for visual debugging.',
+        // Cast to any for Zod v4 compatibility with SDK's v3 type expectations
         inputSchema: {
           executablePath: z
             .string()
@@ -201,10 +202,9 @@ class SmartDomReaderServer {
             .describe(
               'Run without a visible window. Set false to watch interactions. Default: false.'
             ),
-        },
+        } as any,
       },
-      // @ts-expect-error - Complex Zod schema causes TypeScript recursion depth error (TS2589)
-      async (args: ConnectBrowserArgs) => this.connectBrowser(args)
+      async (args: any) => this.connectBrowser(args as ConnectBrowserArgs)
     );
 
     this.server.registerTool(
@@ -218,10 +218,9 @@ class SmartDomReaderServer {
             .string()
             .url('url must be a valid absolute URL')
             .describe('Absolute URL to navigate to (e.g., https://example.com).'),
-        },
+        } as any,
       },
-      // @ts-expect-error - Complex Zod schema causes TypeScript recursion depth error (TS2589)
-      async (args: NavigateArgs) => this.navigate(args)
+      async (args: any) => this.navigate(args as NavigateArgs)
     );
 
     this.server.registerTool(
@@ -254,10 +253,9 @@ class SmartDomReaderServer {
             .min(0)
             .describe('Limit number of listed items per group (buttons, links, etc.).')
             .optional(),
-        },
+        } as any,
       },
-      // @ts-expect-error - Complex Zod schema causes TypeScript recursion depth error (TS2589)
-      async (args: OptionalSelectorArgs) => this.extractStructure(args)
+      async (args: any) => this.extractStructure(args as OptionalSelectorArgs)
     );
 
     this.server.registerTool(
@@ -311,10 +309,9 @@ class SmartDomReaderServer {
                 .optional(),
             })
             .optional(),
-        },
+        } as any,
       },
-      // @ts-expect-error - Complex Zod schema causes TypeScript recursion depth error (TS2589)
-      async (args: RegionArgs) => this.extractRegion(args)
+      async (args: any) => this.extractRegion(args as RegionArgs)
     );
 
     this.server.registerTool(
@@ -362,10 +359,9 @@ class SmartDomReaderServer {
                 .optional(),
             })
             .optional(),
-        },
+        } as any,
       },
-      // @ts-expect-error - Complex Zod schema causes TypeScript recursion depth error (TS2589)
-      async (args: ContentArgs) => this.extractContent(args)
+      async (args: any) => this.extractContent(args as ContentArgs)
     );
 
     this.server.registerTool(
@@ -414,10 +410,9 @@ class SmartDomReaderServer {
                 .optional(),
             })
             .optional(),
-        },
+        } as any,
       },
-      // @ts-expect-error - Complex Zod schema causes TypeScript recursion depth error (TS2589)
-      async (args: InteractiveArgs) => this.extractInteractive(args)
+      async (args: any) => this.extractInteractive(args as InteractiveArgs)
     );
 
     this.server.registerTool(
@@ -439,9 +434,9 @@ class SmartDomReaderServer {
             .boolean()
             .default(false)
             .describe('Capture the full scrollable page. Default: false.'),
-        },
+        } as any,
       },
-      async (args: ScreenshotArgs) => this.captureScreenshot(args)
+      async (args: any) => this.captureScreenshot(args as ScreenshotArgs)
     );
 
     this.server.registerTool(
