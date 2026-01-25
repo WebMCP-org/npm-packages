@@ -71,14 +71,13 @@ jobs:
 
       - name: Create MCP Config
         run: |
-          cat > /tmp/chrome-devtools-mcp-config.json << 'EOF'
+          cat > /tmp/chrome-devtools-mcp-config.json << EOF
           {
             "mcpServers": {
               "chrome-devtools": {
-                "command": "npx",
+                "command": "node",
                 "args": [
-                  "-y",
-                  "@mcp-b/chrome-devtools-mcp@latest",
+                  "${{ github.workspace }}/packages/chrome-devtools-mcp/build/src/index.js",
                   "--channel=stable",
                   "--headless=true",
                   "--isolated=true",

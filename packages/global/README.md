@@ -127,6 +127,316 @@ window.navigator.modelContext.provideContext({
 });
 ```
 
+## 📜 Traditional Web Standard Usage
+
+The Web Model Context API follows the same patterns as other browser APIs. Here's how to use it as a traditional web standard:
+
+### Basic Pattern (Vanilla JavaScript)
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Web Model Context API Example</title>
+  <script src="https://unpkg.com/@mcp-b/global@latest/dist/index.iife.js"></script>
+</head>
+<body>
+  <h1>Counter App</h1>
+  <p>Count: <span id="count">0</span></p>
+  <button id="increment">+</button>
+  <button id="decrement">-</button>
+
+  <script>
+    // State
+    let count = 0;
+
+    // DOM elements
+    const countEl = document.getElementById('count');
+    const incrementBtn = document.getElementById('increment');
+    const decrementBtn = document.getElementById('decrement');
+
+    // Update UI
+    function updateUI() {
+      countEl.textContent = count;
+    }
+
+    // Button handlers
+    incrementBtn.addEventListener('click', () => { count++; updateUI(); });
+    decrementBtn.addEventListener('click', () => { count--; updateUI(); });
+
+    // Feature detection (like navigator.geolocation)
+    if ('modelContext' in navigator) {
+      // Register tools with the Web Model Context API
+      navigator.modelContext.provideContext({
+        tools: [
+          {
+            name: 'counter_get',
+            description: 'Get the current counter value',
+            inputSchema: { type: 'object', properties: {} },
+            execute: async () => ({
+              content: [{ type: 'text', text: String(count) }]
+            })
+          },
+          {
+            name: 'counter_set',
+            description: 'Set the counter to a specific value',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                value: { type: 'number', description: 'The new counter value' }
+              },
+              required: ['value']
+            },
+            execute: async ({ value }) => {
+              count = value;
+              updateUI();
+              return {
+                content: [{ type: 'text', text: `Counter set to ${count}` }]
+              };
+            }
+          },
+          {
+            name: 'counter_increment',
+            description: 'Increment the counter by a specified amount',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                amount: { type: 'number', description: 'Amount to increment by', default: 1 }
+              }
+            },
+            execute: async ({ amount = 1 }) => {
+              count += amount;
+              updateUI();
+              return {
+                content: [{ type: 'text', text: `Counter incremented to ${count}` }]
+              };
+            }
+          }
+        ]
+      });
+
+      console.log('Web Model Context API: Tools registered');
+    } else {
+      console.warn('Web Model Context API not supported');
+    }
+  </script>
+</body>
+</html>
+```
+
+### Single Tool Registration Pattern
+
+Like `navigator.permissions.query()`, you can register tools one at a time:
+
+```javascript
+// Feature detection
+if ('modelContext' in navigator) {
+  // Register a single tool (returns an object with unregister method)
+  const registration = navigator.modelContext.registerTool({
+    name: 'get_page_info',
+    description: 'Get information about the current page',
+    inputSchema: { type: 'object', properties: {} },
+    execute: async () => ({
+      content: [{
+        type: 'text',
+        text: JSON.stringify({
+          title: document.title,
+          url: location.href,
+          timestamp: new Date().toISOString()
+        }, null, 2)
+      }]
+    })
+  });
+
+  // Later, unregister if needed (e.g., when component unmounts)
+  // registration.unregister();
+}
+```
+
+### Event-Driven Pattern
+
+Similar to other DOM events, you can listen for tool calls:
+
+```javascript
+if ('modelContext' in navigator) {
+  // Listen for tool calls (like 'message' or 'click' events)
+  navigator.modelContext.addEventListener('toolcall', (event) => {
+    console.log(`Tool "${event.name}" called with:`, event.arguments);
+
+    // Optionally intercept and provide custom response
+    if (event.name === 'custom_handler') {
+      event.preventDefault();
+      event.respondWith({
+        content: [{ type: 'text', text: 'Custom response' }]
+      });
+    }
+  });
+}
+```
+
+### Complete Standalone Example
+
+Save this as `index.html` and open in a browser:
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebMCP Demo</title>
+  <script src="https://unpkg.com/@mcp-b/global@latest/dist/index.iife.js"></script>
+  <style>
+    body { font-family: system-ui; max-width: 600px; margin: 2rem auto; padding: 0 1rem; }
+    .card { border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin: 1rem 0; }
+    button { padding: 0.5rem 1rem; margin: 0.25rem; cursor: pointer; }
+    #log { font-family: monospace; font-size: 0.85rem; background: #f5f5f5; padding: 1rem; max-height: 200px; overflow-y: auto; }
+  </style>
+</head>
+<body>
+  <h1>🤖 WebMCP Demo</h1>
+
+  <div class="card">
+    <h2>Notes App</h2>
+    <input type="text" id="noteInput" placeholder="Enter a note..." style="width: 100%; padding: 0.5rem; box-sizing: border-box;">
+    <button id="addNote">Add Note</button>
+    <ul id="notesList"></ul>
+  </div>
+
+  <div class="card">
+    <h3>Tool Call Log</h3>
+    <div id="log">Waiting for AI tool calls...</div>
+  </div>
+
+  <script>
+    // Application state
+    const notes = [];
+
+    // DOM elements
+    const noteInput = document.getElementById('noteInput');
+    const addNoteBtn = document.getElementById('addNote');
+    const notesList = document.getElementById('notesList');
+    const logEl = document.getElementById('log');
+
+    // UI functions
+    function renderNotes() {
+      notesList.innerHTML = notes.map((note, i) =>
+        `<li>${note} <button onclick="deleteNote(${i})">×</button></li>`
+      ).join('');
+    }
+
+    function log(message) {
+      const time = new Date().toLocaleTimeString();
+      logEl.innerHTML = `[${time}] ${message}\n` + logEl.innerHTML;
+    }
+
+    // User interactions
+    addNoteBtn.addEventListener('click', () => {
+      if (noteInput.value.trim()) {
+        notes.push(noteInput.value.trim());
+        noteInput.value = '';
+        renderNotes();
+      }
+    });
+
+    window.deleteNote = (index) => {
+      notes.splice(index, 1);
+      renderNotes();
+    };
+
+    // Web Model Context API - Register tools for AI agents
+    if ('modelContext' in navigator) {
+      navigator.modelContext.provideContext({
+        tools: [
+          {
+            name: 'notes_list',
+            description: 'Get all notes',
+            inputSchema: { type: 'object', properties: {} },
+            execute: async () => {
+              log('🔧 notes_list called');
+              return {
+                content: [{
+                  type: 'text',
+                  text: notes.length ? notes.map((n, i) => `${i + 1}. ${n}`).join('\n') : 'No notes yet'
+                }]
+              };
+            }
+          },
+          {
+            name: 'notes_add',
+            description: 'Add a new note',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                text: { type: 'string', description: 'The note text' }
+              },
+              required: ['text']
+            },
+            execute: async ({ text }) => {
+              log(`🔧 notes_add called: "${text}"`);
+              notes.push(text);
+              renderNotes();
+              return {
+                content: [{ type: 'text', text: `Added note: "${text}"` }]
+              };
+            }
+          },
+          {
+            name: 'notes_delete',
+            description: 'Delete a note by index (1-based)',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                index: { type: 'number', description: 'Note index (1-based)' }
+              },
+              required: ['index']
+            },
+            execute: async ({ index }) => {
+              log(`🔧 notes_delete called: index ${index}`);
+              if (index < 1 || index > notes.length) {
+                return { content: [{ type: 'text', text: 'Invalid index' }], isError: true };
+              }
+              const deleted = notes.splice(index - 1, 1)[0];
+              renderNotes();
+              return {
+                content: [{ type: 'text', text: `Deleted: "${deleted}"` }]
+              };
+            }
+          },
+          {
+            name: 'notes_clear',
+            description: 'Delete all notes',
+            inputSchema: { type: 'object', properties: {} },
+            execute: async () => {
+              log('🔧 notes_clear called');
+              const count = notes.length;
+              notes.length = 0;
+              renderNotes();
+              return {
+                content: [{ type: 'text', text: `Cleared ${count} notes` }]
+              };
+            }
+          }
+        ]
+      });
+
+      log('✅ Web Model Context API initialized');
+      log('📋 Tools: notes_list, notes_add, notes_delete, notes_clear');
+    } else {
+      log('❌ Web Model Context API not available');
+    }
+  </script>
+</body>
+</html>
+```
+
+This example demonstrates:
+- **Feature detection** using `'modelContext' in navigator`
+- **Tool registration** via `navigator.modelContext.provideContext()`
+- **Standard input schemas** following JSON Schema specification
+- **Async execute functions** returning MCP-compatible responses
+- **Real-time UI updates** when AI agents call tools
+
 ## ⚙️ Configuration
 
 The polyfill exposes `initializeWebModelContext(options?: WebModelContextInitOptions)` to let you control transport behaviour. When you import `@mcp-b/global` as a module it auto-initializes by default, but you can customise or defer initialization:
