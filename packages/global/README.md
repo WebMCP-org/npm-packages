@@ -1595,25 +1595,12 @@ test('todo tool creates correct response', async () => {
 
 The polyfill automatically detects and defers to the native implementation when available, ensuring forward compatibility as browsers adopt this standard.
 
-## ⚠️ Zod Version Compatibility
+## Zod Version Compatibility
 
-This package uses **Zod 4 APIs** internally (`z.toJSONSchema()`, `z.fromJSONSchema()`) for schema conversion. However, peer dependencies are flexible to accommodate different project setups.
-
-### Supported Configurations
-
-| Your Zod Version | Schema Support | Notes |
-|------------------|----------------|-------|
-| **Zod 4.x** | Full Zod + JSON Schema | Import normally: `import { z } from 'zod'` |
-| **Zod 3.25+** | Full Zod + JSON Schema | Use subpath: `import { z } from 'zod/v4'` |
-| **Zod 3.24 and below** | JSON Schema only | Upgrade to 3.25+ or use JSON Schema |
-
-### Using Zod Schemas with Zod 3.25+
-
-If your project uses Zod 3.25+, you can still use Zod schemas by importing from the `zod/v4` subpath:
+This package supports **Zod 3.25+** and **Zod 4.x**. Simply use the standard import:
 
 ```typescript
-// Instead of: import { z } from 'zod'
-import { z } from 'zod/v4';
+import { z } from 'zod';
 
 window.navigator.modelContext.provideContext({
   tools: [{
@@ -1629,28 +1616,11 @@ window.navigator.modelContext.provideContext({
 });
 ```
 
-### Runtime Detection
+### JSON Schema Alternative
 
-If you pass a Zod 3 schema (created with `import { z } from 'zod'` on Zod 3.x), you'll get a helpful error:
-
-```
-Zod3SchemaError: Zod 3 schema detected. This package requires Zod 4 for schema support.
-
-Solutions:
-  1. Upgrade to zod@4.x: pnpm add zod@4
-  2. If using zod@3.25+, import from the v4 subpath:
-     import { z } from "zod/v4"
-  3. Use JSON Schema instead of Zod schemas
-
-See https://zod.dev/v4/versioning for more information.
-```
-
-### JSON Schema Always Works
-
-JSON Schema is always supported regardless of your Zod version:
+JSON Schema is also supported if you prefer not to use Zod:
 
 ```javascript
-// JSON Schema works with any Zod version (or no Zod at all)
 window.navigator.modelContext.provideContext({
   tools: [{
     name: "my-tool",
@@ -1667,10 +1637,6 @@ window.navigator.modelContext.provideContext({
   }]
 });
 ```
-
-### Why Zod 4?
-
-Zod 4 introduced `z.toJSONSchema()` and `z.fromJSONSchema()` for native JSON Schema conversion. These APIs are required for converting Zod schemas to MCP-compatible JSON Schema format. See [Zod's versioning guide](https://zod.dev/v4/versioning) for more details.
 
 ## 📦 What's Included
 

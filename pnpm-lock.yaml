@@ -407,9 +407,6 @@ importers:
       '@mcp-b/webmcp-ts-sdk':
         specifier: workspace:*
         version: link:../webmcp-ts-sdk
-      zod:
-        specifier: 'catalog:'
-        version: 4.3.5
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -438,6 +435,9 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 4.0.18(@types/node@22.17.2)(@vitest/browser-playwright@4.0.18)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.1)
+      zod:
+        specifier: 'catalog:'
+        version: 4.3.5
 
   packages/mcp-iframe:
     dependencies:

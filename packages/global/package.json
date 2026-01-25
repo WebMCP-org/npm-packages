@@ -81,8 +81,7 @@
   },
   "dependencies": {
     "@mcp-b/transports": "workspace:*",
-    "@mcp-b/webmcp-ts-sdk": "workspace:*",
-    "zod": "catalog:"
+    "@mcp-b/webmcp-ts-sdk": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",
@@ -93,7 +92,11 @@
     "playwright": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "zod": "catalog:"
+  },
+  "peerDependencies": {
+    "zod": "^3.25.0 || ^4.0.0"
   },
   "engines": {
     "node": ">=18"
