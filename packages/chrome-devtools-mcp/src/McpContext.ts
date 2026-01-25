@@ -1155,20 +1155,23 @@ export class McpContext implements Context {
         dir,
         `screenshot.${getExtensionFromMimeType(mimeType)}`,
       );
-      await fs.writeFile(filename, data);
+      // Use mode 0o600 (owner read/write only) for secure temp file creation
+      await fs.writeFile(filename, data, {mode: 0o600});
       return {filename};
     } catch (err) {
       this.logger(err);
       throw new Error('Could not save a screenshot to a file', {cause: err});
     }
   }
+
   async saveFile(
     data: Uint8Array<ArrayBufferLike>,
     filename: string,
   ): Promise<{filename: string}> {
     try {
       const filePath = path.resolve(filename);
-      await fs.writeFile(filePath, data);
+      // Use mode 0o644 (owner read/write, others read) for user-specified paths
+      await fs.writeFile(filePath, data, {mode: 0o644});
       return {filename};
     } catch (err) {
       this.logger(err);

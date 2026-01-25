@@ -1058,7 +1058,8 @@ class WebModelContext implements InternalModelContext {
    */
   private validateResource(resource: ResourceDescriptor): ValidatedResourceDescriptor {
     // Extract template parameters from URI (e.g., "file://{path}" -> ["path"])
-    const templateParamRegex = /\{([^}]+)\}/g;
+    // Limit parameter name length to 100 chars to prevent ReDoS on malicious input
+    const templateParamRegex = /\{([^}]{1,100})\}/g;
     const templateParams: string[] = [];
     for (const match of resource.uri.matchAll(templateParamRegex)) {
       const paramName = match[1];

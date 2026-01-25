@@ -98,12 +98,12 @@ async function fetchApiDocumentation(api: ChromeApi): Promise<string> {
 
   if (!forceRefetch) {
     try {
-      await fs.access(cacheFilePath);
+      // Directly attempt to read - avoids TOCTOU race condition
       const cachedDocs = await fs.readFile(cacheFilePath, 'utf-8');
       console.log(`Using cached documentation for ${api}`);
       return cachedDocs;
     } catch {
-      // Not cached, proceed to fetch
+      // Not cached or read failed, proceed to fetch
     }
   }
 
