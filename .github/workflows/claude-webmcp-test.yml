@@ -26,6 +26,10 @@ concurrency:
 env:
   CI: true
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   webmcp-integration-test:
     name: WebMCP Integration Test with Claude
