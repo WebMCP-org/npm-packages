@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MCP Iframe Child</title>
+    <style>
+      body {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+          'Courier New', monospace;
+        padding: 16px;
+        background: #ffffff;
+        color: #1b1b1b;
+      }
+      .badge {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 12px;
+        background: #f0f0f0;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="badge">Child iframe ready</div>
+
+    <script type="module">
+      import { initializeWebModelContext } from '../global/dist/index.js';
+
+      initializeWebModelContext({
+        transport: {
+          iframeServer: {
+            allowedOrigins: [window.location.origin],
+          },
+        },
+      });
+
+      navigator.modelContext?.provideContext({
+        tools: [
+          {
+            name: 'add',
+            description: 'Add two numbers from iframe',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                a: { type: 'number' },
+                b: { type: 'number' },
+              },
+              required: ['a', 'b'],
+            },
+            execute: async ({ a, b }) => {
+              const sum = Number(a) + Number(b);
+              return {
+                content: [{ type: 'text', text: String(sum) }],
+                structuredContent: { sum },
+              };
+            },
+          },
+        ],
+      });
+    </script>
+  </body>
+</html>

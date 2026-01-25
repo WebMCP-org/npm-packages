@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MCP Iframe Parent Test</title>
+    <style>
+      body {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+          'Courier New', monospace;
+        padding: 24px;
+        background: #f7f7f5;
+        color: #1b1b1b;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0 0 12px 0;
+      }
+      #summary {
+        font-weight: 700;
+        margin: 12px 0 16px 0;
+      }
+      #summary[data-status='pass'] {
+        color: #1a7f37;
+      }
+      #summary[data-status='fail'] {
+        color: #b42318;
+      }
+      #log {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 24px 0;
+      }
+      #log li {
+        margin: 6px 0;
+        padding: 8px 10px;
+        background: #ffffff;
+        border-radius: 6px;
+        border: 1px solid #e5e5e5;
+      }
+      #log li[data-status='PASS'] {
+        border-left: 4px solid #1a7f37;
+      }
+      #log li[data-status='FAIL'] {
+        border-left: 4px solid #b42318;
+      }
+      mcp-iframe {
+        display: block;
+        width: 100%;
+        height: 200px;
+        border: 1px dashed #c7c7c7;
+        border-radius: 8px;
+        background: #ffffff;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>MCP Iframe Parent Test</h1>
+    <div id="summary" data-status="pending">Status: waiting for iframe</div>
+    <ul id="log"></ul>
+
+    <mcp-iframe
+      id="child"
+      src="./test-iframe-child.html"
+      target-origin=""
+      width="100%"
+      height="200"
+    ></mcp-iframe>
+
+    <script type="module">
+      import { initializeWebModelContext } from '../global/dist/index.js';
+      import { Client } from '../webmcp-ts-sdk/dist/index.js';
+      import { TabClientTransport } from '../transports/dist/index.js';
+      import { registerMCPIframeElement } from './dist/index.js';
+
+      const summary = document.getElementById('summary');
+      const log = document.getElementById('log');
+      const iframeElement = document.querySelector('mcp-iframe');
+
+      const channelId = `mcp-iframe-test-${Date.now()}`;
+      const targetOrigin = window.location.origin;
+
+      iframeElement.setAttribute('target-origin', targetOrigin);
+
+      const report = (status, message, detail) => {
+        const item = document.createElement('li');
+        item.dataset.status = status;
+        item.textContent = detail ? `${status}: ${message} (${detail})` : `${status}: ${message}`;
+        log.appendChild(item);
+      };
+
+      const finish = (status, message) => {
+        summary.dataset.status = status;
+        summary.textContent = `Status: ${message}`;
+        window.__mcpIframeTestStatus = status;
+      };
+
+      const fail = (message, error) => {
+        const detail = error instanceof Error ? error.message : error;
+        report('FAIL', message, detail);
+        finish('fail', message);
+      };
+
+      const pass = (message, detail) => {
+        report('PASS', message, detail);
+      };
+
+      initializeWebModelContext({
+        transport: {
+          tabServer: {
+            channelId,
+            allowedOrigins: [targetOrigin],
+          },
+        },
+      });
+
+      registerMCPIframeElement();
+
+      let timeoutId = setTimeout(() => {
+        fail('Timed out waiting for mcp-iframe-ready');
+      }, 15000);
+
+      iframeElement.addEventListener('mcp-iframe-error', (event) => {
+        clearTimeout(timeoutId);
+        fail('mcp-iframe-error', event?.detail?.error);
+      });
+
+      iframeElement.addEventListener('mcp-iframe-ready', async (event) => {
+        clearTimeout(timeoutId);
+        pass('mcp-iframe-ready fired');
+
+        const client = new Client({ name: 'parent-test', version: '1.0.0' });
+        const transport = new TabClientTransport({
+          targetOrigin,
+          channelId,
+          requestTimeout: 5000,
+        });
+
+        try {
+          await client.connect(transport);
+          pass('MCP client connected');
+
+          const toolName = `${iframeElement.id}_add`;
+          const tools = await client.listTools();
+
+          if (!tools.tools.some((tool) => tool.name === toolName)) {
+            fail('Tool not exposed in parent context', toolName);
+            await transport.close();
+            return;
+          }
+
+          pass('Tool exposed in parent context', toolName);
+
+          const result = await client.callTool({
+            name: toolName,
+            arguments: { a: 2, b: 3 },
+          });
+
+          const text = result.content?.[0]?.text ?? '';
+          if (text !== '5') {
+            fail('Tool call returned unexpected result', text);
+            await transport.close();
+            return;
+          }
+
+          pass('Tool call succeeded', text);
+          await transport.close();
+          finish('pass', 'all checks passed');
+        } catch (error) {
+          fail('Test failed', error);
+        }
+      });
+    </script>
+  </body>
+</html>
