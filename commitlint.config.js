@@ -14,7 +14,6 @@ export default {
         'smart-dom-reader',
         'transports',
         'usewebmcp',
-        'webmcp-helpers',
         'webmcp-ts-sdk',
 
         // Repository-wide scopes

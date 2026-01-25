@@ -170,7 +170,6 @@ Package scopes (all in `packages/` directory):
 - `smart-dom-reader` - @mcp-b/smart-dom-reader
 - `transports` - @mcp-b/transports
 - `usewebmcp` - usewebmcp (alias package)
-- `webmcp-helpers` - @webmcp/helpers
 - `webmcp-ts-sdk` - @mcp-b/webmcp-ts-sdk
 
 Repository-wide scopes:
@@ -235,7 +234,6 @@ npm-packages/
 │   ├── smart-dom-reader/        # DOM extraction for AI
 │   ├── transports/              # Core transport implementations
 │   ├── usewebmcp/               # Alias for react-webmcp
-│   ├── webmcp-helpers/          # Userscript helpers
 │   └── webmcp-ts-sdk/           # TypeScript SDK adapter
 ├── e2e/                         # E2E tests and test apps
 ├── docs/                        # Technical documentation

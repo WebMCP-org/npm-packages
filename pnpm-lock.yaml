@@ -604,18 +604,6 @@ importers:
         specifier: 'catalog:'
         version: 5.9.3
 
-  packages/webmcp-helpers:
-    devDependencies:
-      '@types/node':
-        specifier: 'catalog:'
-        version: 22.17.2
-      tsdown:
-        specifier: 'catalog:'
-        version: 0.15.10(typescript@5.9.3)
-      typescript:
-        specifier: 'catalog:'
-        version: 5.9.3
-
   packages/webmcp-ts-sdk:
     dependencies:
       '@modelcontextprotocol/sdk':

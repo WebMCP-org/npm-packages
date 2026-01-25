@@ -31,10 +31,6 @@ packages/smart-dom-reader:
   - changed-files:
       - any-glob-to-any-file: 'packages/smart-dom-reader/**'
 
-packages/webmcp-helpers:
-  - changed-files:
-      - any-glob-to-any-file: 'packages/webmcp-helpers/**'
-
 packages/usewebmcp:
   - changed-files:
       - any-glob-to-any-file: 'packages/usewebmcp/**'
