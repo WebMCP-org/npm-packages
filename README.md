@@ -8,7 +8,7 @@
 [![codecov](https://codecov.io/gh/WebMCP-org/npm-packages/graph/badge.svg)](https://codecov.io/gh/WebMCP-org/npm-packages)
 [![CodeQL](https://github.com/WebMCP-org/npm-packages/actions/workflows/codeql.yml/badge.svg)](https://github.com/WebMCP-org/npm-packages/actions/workflows/codeql.yml)
 [![E2E Tests](https://github.com/WebMCP-org/npm-packages/actions/workflows/e2e.yml/badge.svg)](https://github.com/WebMCP-org/npm-packages/actions/workflows/e2e.yml)
-[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/XXXXX/badge)](https://www.bestpractices.dev/projects/XXXXX)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/WebMCP-org/npm-packages/badge)](https://scorecard.dev/viewer/?uri=github.com/WebMCP-org/npm-packages)
 
 [![npm version](https://img.shields.io/npm/v/@mcp-b/transports?style=flat-square)](https://www.npmjs.com/org/mcp-b)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
