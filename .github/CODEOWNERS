@@ -1,0 +1,27 @@
+# CODEOWNERS - Define code owners for automatic review requests
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owners for everything in the repo
+* @WebMCP-org/maintainers
+
+# Package-specific owners
+/packages/chrome-devtools-mcp/ @WebMCP-org/maintainers
+/packages/extension-tools/ @WebMCP-org/maintainers
+/packages/global/ @WebMCP-org/maintainers
+/packages/mcp-iframe/ @WebMCP-org/maintainers
+/packages/react-webmcp/ @WebMCP-org/maintainers
+/packages/smart-dom-reader/ @WebMCP-org/maintainers
+/packages/transports/ @WebMCP-org/maintainers
+/packages/usewebmcp/ @WebMCP-org/maintainers
+/packages/webmcp-ts-sdk/ @WebMCP-org/maintainers
+
+# CI/CD and infrastructure
+/.github/ @WebMCP-org/maintainers
+/biome.json @WebMCP-org/maintainers
+/pnpm-workspace.yaml @WebMCP-org/maintainers
+/turbo.json @WebMCP-org/maintainers
+
+# Security-sensitive files require maintainer review
+/SECURITY.md @WebMCP-org/maintainers
+/.github/workflows/ @WebMCP-org/maintainers
+/.github/CODEOWNERS @WebMCP-org/maintainers

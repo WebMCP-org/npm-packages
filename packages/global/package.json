@@ -89,6 +89,7 @@
     "@vitest/browser": "catalog:",
     "@vitest/browser-playwright": "catalog:",
     "@vitest/coverage-v8": "catalog:",
+    "fast-check": "catalog:",
     "playwright": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",

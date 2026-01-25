@@ -12,6 +12,7 @@ permissions:
   contents: write
   pull-requests: write
   id-token: write  # Required for npm provenance/OIDC
+  attestations: write  # Required for SBOM attestations
 
 jobs:
   release:
@@ -62,3 +63,17 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           # Enable provenance attestations
           NPM_CONFIG_PROVENANCE: true
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@f325610c9f50a54015d37c8d16cb3b0e2c8f4de0 # v0.18.0
+        with:
+          artifact-name: sbom-${{ github.sha }}.spdx.json
+          output-file: ./sbom.spdx.json
+
+      - name: Upload SBOM as release artifact
+        if: steps.changesets.outputs.published == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sbom
+          path: ./sbom.spdx.json
+          retention-days: 90
