@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/chrome-devtools-mcp",
-  "version": "1.6.3",
+  "version": "2.0.2",
   "description": "MCP server for Chrome DevTools with WebMCP integration for connecting to website MCP tools",
   "keywords": [
     "mcp",
@@ -48,7 +48,7 @@
     "!*.tsbuildinfo"
   ],
   "scripts": {
-    "build": "tsc && node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/post-build.ts",
+    "build": "rm -rf build/vendor build/node_modules build/tsconfig.tsbuildinfo && tsc && node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/post-build.ts",
     "bundle": "npm run clean && npm run build && rollup -c rollup.config.mjs",
     "check-format": "eslint --cache . && prettier --check --cache .;",
     "clean": "node -e \"require('fs').rmSync('build', {recursive: true, force: true})\"",
@@ -56,7 +56,7 @@
     "docs:generate": "node --experimental-strip-types scripts/generate-docs.ts",
     "format": "eslint --cache --fix . && prettier --write --cache .",
     "prepare": "node --experimental-strip-types scripts/prepare.ts",
-    "prepublishOnly": "node ../../scripts/validate-publish.js",
+    "prepublishOnly": "node ../../scripts/validate-publish.js && pnpm run build",
     "start": "npm run build && node build/src/index.js",
     "start-debug": "DEBUG=mcp:* DEBUG_COLORS=false npm run build && node build/src/index.js",
     "test": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test-reporter spec --test-force-exit --test \"build/tests/**/*.test.js\"",

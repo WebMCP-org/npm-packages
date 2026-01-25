@@ -74,7 +74,7 @@
   },
   "dependencies": {
     "@mcp-b/smart-dom-reader": "workspace:*",
-    "@modelcontextprotocol/sdk": "catalog:",
+    "@mcp-b/webmcp-ts-sdk": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

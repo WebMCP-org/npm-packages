@@ -1,4 +1,4 @@
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@mcp-b/webmcp-ts-sdk';
 import { type ApiAvailability, BaseApiTools } from '../BaseApiTools';
 
 export interface SystemCpuApiToolsOptions {
