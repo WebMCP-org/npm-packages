@@ -57,8 +57,14 @@ jobs:
 
       - name: Setup Chrome
         uses: browser-actions/setup-chrome@b94431e051d1c52dcbe9a7092a4f10f827795416 # latest
+        id: setup-chrome
         with:
           chrome-version: stable
+
+      - name: Verify Chrome installation
+        run: |
+          echo "Chrome path: ${{ steps.setup-chrome.outputs.chrome-path }}"
+          "${{ steps.setup-chrome.outputs.chrome-path }}" --version
 
       - name: Start test app in background
         run: |
@@ -78,7 +84,7 @@ jobs:
                 "command": "node",
                 "args": [
                   "${{ github.workspace }}/packages/chrome-devtools-mcp/build/src/index.js",
-                  "--channel=stable",
+                  "--executablePath=${{ steps.setup-chrome.outputs.chrome-path }}",
                   "--headless=true",
                   "--isolated=true",
                   "--viewport=1280x720"
