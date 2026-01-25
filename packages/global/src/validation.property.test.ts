@@ -8,10 +8,12 @@ import * as fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import {
+  detectZodSchema,
   isZodSchema,
   jsonSchemaToZod,
   normalizeSchema,
   validateWithZod,
+  Zod3SchemaError,
   zodToJsonSchema,
 } from './validation.js';
 
@@ -53,6 +55,68 @@ describe('Validation Property-Based Tests', () => {
 
     it('should return false for empty objects', () => {
       expect(isZodSchema({})).toBe(false);
+    });
+  });
+
+  describe('detectZodSchema', () => {
+    it('should detect Zod 4 schemas (have _zod property)', () => {
+      const schema = { name: z.string() };
+      const result = detectZodSchema(schema);
+
+      expect(result.isZodSchema).toBe(true);
+      expect(result.hasZod4).toBe(true);
+      expect(result.hasZod3).toBe(false);
+    });
+
+    it('should detect Zod 3 schemas (have _def but not _zod)', () => {
+      // Simulate a Zod 3 schema structure
+      const fakeZod3Schema = {
+        name: { _def: { typeName: 'ZodString' } },
+      };
+      const result = detectZodSchema(fakeZod3Schema);
+
+      expect(result.isZodSchema).toBe(true);
+      expect(result.hasZod4).toBe(false);
+      expect(result.hasZod3).toBe(true);
+    });
+
+    it('should return false for JSON Schema', () => {
+      const jsonSchema = { type: 'object', properties: { name: { type: 'string' } } };
+      const result = detectZodSchema(jsonSchema);
+
+      expect(result.isZodSchema).toBe(false);
+      expect(result.hasZod4).toBe(false);
+      expect(result.hasZod3).toBe(false);
+    });
+
+    it('should return false for non-objects', () => {
+      expect(detectZodSchema(null).isZodSchema).toBe(false);
+      expect(detectZodSchema(undefined).isZodSchema).toBe(false);
+      expect(detectZodSchema('string').isZodSchema).toBe(false);
+      expect(detectZodSchema(123).isZodSchema).toBe(false);
+    });
+  });
+
+  describe('Zod3SchemaError', () => {
+    it('should throw Zod3SchemaError when Zod 3 schema is passed to normalizeSchema', () => {
+      // Simulate a Zod 3 schema structure
+      const fakeZod3Schema = {
+        name: { _def: { typeName: 'ZodString' } },
+      };
+
+      expect(() => normalizeSchema(fakeZod3Schema)).toThrow(Zod3SchemaError);
+      expect(() => normalizeSchema(fakeZod3Schema)).toThrow(/Zod 3 schema detected/);
+      expect(() => normalizeSchema(fakeZod3Schema)).toThrow(/import { z } from "zod\/v4"/);
+    });
+
+    it('should not throw for Zod 4 schemas', () => {
+      const schema = { name: z.string() };
+      expect(() => normalizeSchema(schema)).not.toThrow();
+    });
+
+    it('should not throw for JSON Schema', () => {
+      const jsonSchema = { type: 'object', properties: { name: { type: 'string' } } };
+      expect(() => normalizeSchema(jsonSchema)).not.toThrow();
     });
   });
 
