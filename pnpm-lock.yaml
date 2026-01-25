@@ -407,6 +407,9 @@ importers:
       '@mcp-b/webmcp-ts-sdk':
         specifier: workspace:*
         version: link:../webmcp-ts-sdk
+      '@n8n/json-schema-to-zod':
+        specifier: ^1.6.0
+        version: 1.6.0(zod@4.3.5)
       zod-to-json-schema:
         specifier: ^3.25.1
         version: 3.25.1(zod@4.3.5)
@@ -1675,6 +1678,11 @@ packages:
     peerDependenciesMeta:
       '@cfworker/json-schema':
         optional: true
+
+  '@n8n/json-schema-to-zod@1.6.0':
+    resolution: {integrity: sha512-5AryA/GdX0U0+Qx2u3S14vME9ZK4ubS+rOC2MYlRDtRPCalBMGd5heVzU+W5o95JWAm4XQL/s0PZGM9a1xEhHg==}
+    peerDependencies:
+      zod: ^3.0.0
 
   '@napi-rs/wasm-runtime@0.2.12':
     resolution: {integrity: sha512-ZVWUcfwY4E/yPitQJl481FjFo3K22D6qF0DuFH6Y/nbnE11GY5uguDxZMGXPQ8WQ0128MXQD7TnfHyK4oWoIJQ==}
@@ -6950,6 +6958,10 @@ snapshots:
     transitivePeerDependencies:
       - hono
       - supports-color
+
+  '@n8n/json-schema-to-zod@1.6.0(zod@4.3.5)':
+    dependencies:
+      zod: 4.3.5
 
   '@napi-rs/wasm-runtime@0.2.12':
     dependencies:
