@@ -79,6 +79,7 @@ jobs:
                 "args": [
                   "-y",
                   "@mcp-b/chrome-devtools-mcp@latest",
+                  "--channel=stable",
                   "--headless=true",
                   "--isolated=true",
                   "--viewport=1280x720"
