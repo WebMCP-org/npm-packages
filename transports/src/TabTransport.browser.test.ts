@@ -278,11 +278,10 @@ browserDescribe('Tab transports (browser)', () => {
   describe('Client-Server Communication', () => {
     let clientTransport: TabClientTransport;
     let serverTransport: TabServerTransport;
-    let channelId: string;
 
     beforeEach(async () => {
       const pair = await startPair({ requestTimeout: 120 });
-      ({ clientTransport, serverTransport, channelId } = pair);
+      ({ clientTransport, serverTransport } = pair);
     });
 
     afterEach(async () => {

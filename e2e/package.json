@@ -4,10 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "playwright test tests/tab-transport.spec.ts && playwright test --config=playwright-react-webmcp.config.ts",
+    "test": "playwright test tests/tab-transport.spec.ts && playwright test tests/mcp-iframe-element.spec.ts && playwright test --config=playwright-react-webmcp.config.ts",
     "test:codegen": "playwright codegen http://localhost:5173",
     "test:debug": "playwright test --debug",
     "test:headed": "playwright test --headed",
+    "test:mcp-iframe": "playwright test tests/mcp-iframe-element.spec.ts",
     "test:native-showcase": "playwright test --config=playwright-native-showcase.config.ts",
     "test:native-showcase:debug": "playwright test --config=playwright-native-showcase.config.ts --debug",
     "test:native-showcase:headed": "playwright test --config=playwright-native-showcase.config.ts --headed",

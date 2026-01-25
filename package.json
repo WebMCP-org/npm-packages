@@ -20,11 +20,12 @@
     "prepare": "husky",
     "publish:all": "pnpm run build && pnpm publish -r --access public --no-git-checks",
     "publish:order": "echo 'Publish order: webmcp-ts-sdk → transports → global → react-webmcp → chrome-devtools-mcp'",
-    "test": "pnpm --filter mcp-e2e-tests test",
+    "test": "pnpm test:unit && pnpm test:e2e",
     "test:e2e": "pnpm --filter mcp-e2e-tests test",
     "test:e2e:debug": "pnpm --filter mcp-e2e-tests test:debug",
     "test:e2e:headed": "pnpm --filter mcp-e2e-tests test:headed",
     "test:e2e:ui": "pnpm --filter mcp-e2e-tests test:ui",
+    "test:unit": "pnpm --filter @mcp-b/transports test && pnpm --filter @mcp-b/global test && pnpm --filter @mcp-b/react-webmcp test",
     "typecheck": "turbo run typecheck",
     "validate:publish": "node ./scripts/validate-publish.js"
   },
