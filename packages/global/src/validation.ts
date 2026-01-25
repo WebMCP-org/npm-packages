@@ -1,8 +1,7 @@
-// Import from 'zod' - this works with both Zod 3.25+ (compat layer) and Zod 4
-// In Zod 3.25+, 'zod' exports the Zod 3 compat layer which includes Zod 4 features
-// In Zod 4.x, 'zod' exports Zod 4 directly
-// Users can import { z } from 'zod' and pass schemas to these functions
+// Use 'zod' for schema types (works with both Zod 3.25+ and Zod 4)
+// Use 'zod/v4' for toJSONSchema/fromJSONSchema (available in both versions)
 import { z } from 'zod';
+import { fromJSONSchema, toJSONSchema } from 'zod/v4';
 import { createLogger } from './logger.js';
 import type { InputSchema } from './types.js';
 
@@ -48,14 +47,12 @@ export function isZodSchema(schema: unknown): boolean {
 
 /**
  * Convert JSON Schema to Zod validator.
- * Uses z.fromJSONSchema() which is available in Zod 4.2+.
- *
- * Works with both Zod 3.25+ and Zod 4.
+ * Uses fromJSONSchema from 'zod/v4' which is available in Zod 3.25+ and Zod 4.
  */
 export function jsonSchemaToZod(jsonSchema: InputSchema): z.ZodType {
   try {
-    const zodSchema = z.fromJSONSchema(jsonSchema as z.core.JSONSchema.BaseSchema);
-    return zodSchema;
+    const zodSchema = fromJSONSchema(jsonSchema as Parameters<typeof fromJSONSchema>[0]);
+    return zodSchema as unknown as z.ZodType;
   } catch (error) {
     logger.warn('Failed to convert JSON Schema to Zod:', error);
     return z.object({}).passthrough();
@@ -64,7 +61,7 @@ export function jsonSchemaToZod(jsonSchema: InputSchema): z.ZodType {
 
 /**
  * Convert Zod schema object to JSON Schema.
- * Uses the toJSONSchema function from zod/v4.
+ * Uses toJSONSchema from 'zod/v4' which is available in Zod 3.25+ and Zod 4.
  *
  * Works with schemas created from both `import { z } from 'zod'` (Zod 3.25+ compat)
  * and `import { z } from 'zod/v4'` (native Zod 4).
@@ -74,11 +71,12 @@ export function jsonSchemaToZod(jsonSchema: InputSchema): z.ZodType {
  */
 export function zodToJsonSchema(schema: Record<string, z.ZodTypeAny>): InputSchema {
   const zodObject = z.object(schema);
-  // Use z.toJSONSchema() - available in both Zod 3.25+ (via compat) and Zod 4
-  const jsonSchema = z.toJSONSchema(zodObject);
+  // toJSONSchema from 'zod/v4' works with both Zod 3.25+ compat schemas and Zod 4 schemas
+  // Cast through unknown due to type differences between zod compat and zod/v4
+  const jsonSchema = toJSONSchema(zodObject as unknown as Parameters<typeof toJSONSchema>[0]);
 
   // Remove $schema field as it's not needed for MCP
-  const { $schema: _, ...rest } = jsonSchema as { $schema?: string } & InputSchema;
+  const { $schema: _, ...rest } = jsonSchema as unknown as { $schema?: string } & InputSchema;
   return rest as InputSchema;
 }
 
