@@ -1,5 +1,4 @@
-import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import { type JSONRPCMessage, JSONRPCMessageSchema } from '@modelcontextprotocol/sdk/types.js';
+import { type JSONRPCMessage, JSONRPCMessageSchema, type Transport } from '@mcp-b/webmcp-ts-sdk';
 
 export interface IframeParentTransportOptions {
   /** Reference to the iframe element */

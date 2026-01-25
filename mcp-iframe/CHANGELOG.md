@@ -1,5 +1,12 @@
 # @mcp-b/mcp-iframe
 
+## 0.0.0
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-b/transports@0.0.0
+
 ## 0.0.0-beta-20260109203913
 
 ### Patch Changes
@@ -18,7 +25,6 @@
   Tool and prompt names must match the pattern `^[a-zA-Z0-9_-]{1,128}# @mcp-b/mcp-iframe. The previous default separator `:` was invalid according to this schema.
 
   Changes:
-
   - Changed default `prefix-separator` from `:` to `_`
   - Added runtime validation for prefix separator (warns and sanitizes invalid characters)
   - Added validation for element ID/name (warns and sanitizes invalid characters)
@@ -26,7 +32,6 @@
   - Names exceeding 128 characters will not be registered
 
   If you were relying on the `:` separator, you can either:
-
   1. Accept the new `_` separator (recommended for MCP compatibility)
   2. Explicitly set `prefix-separator=":"` attribute (not recommended as it may cause MCP validation errors)
 
@@ -41,7 +46,6 @@
   Tool and prompt names must match the pattern `^[a-zA-Z0-9_-]{1,128}# @mcp-b/mcp-iframe. The previous default separator `:` was invalid according to this schema.
 
   Changes:
-
   - Changed default `prefix-separator` from `:` to `_`
   - Added runtime validation for prefix separator (warns and sanitizes invalid characters)
   - Added validation for element ID/name (warns and sanitizes invalid characters)
@@ -49,7 +53,6 @@
   - Names exceeding 128 characters will not be registered
 
   If you were relying on the `:` separator, you can either:
-
   1. Accept the new `_` separator (recommended for MCP compatibility)
   2. Explicitly set `prefix-separator=":"` attribute (not recommended as it may cause MCP validation errors)
 

@@ -1,15 +1,13 @@
-import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import type { RequestOptions } from '@modelcontextprotocol/sdk/shared/protocol.js';
-import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import type {
-  Tool as McpTool,
-  Resource,
-  ServerCapabilities,
-} from '@modelcontextprotocol/sdk/types.js';
 import {
+  type Client,
+  type Tool as McpTool,
+  type RequestOptions,
+  type Resource,
   ResourceListChangedNotificationSchema,
+  type ServerCapabilities,
   ToolListChangedNotificationSchema,
-} from '@modelcontextprotocol/sdk/types.js';
+  type Transport,
+} from '@mcp-b/webmcp-ts-sdk';
 import {
   createContext,
   type ReactElement,

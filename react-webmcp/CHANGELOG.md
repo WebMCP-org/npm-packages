@@ -1,5 +1,41 @@
 # @mcp-b/react-webmcp
 
+## 1.0.0
+
+### Major Changes
+
+- BREAKING CHANGE: Migrate from window.webMCP to navigator.modelContext API
+
+  This release migrates the WebMCP API from the legacy `window.webMCP` interface to the W3C-aligned `navigator.modelContext` API.
+
+  ### Migration Guide
+
+  **Before (v1.x):**
+
+  ```javascript
+  window.webMCP.registerTool({
+    name: "my_tool",
+    // ...
+  });
+  ```
+
+  **After (v2.x):**
+
+  ```javascript
+  navigator.modelContext.registerTool({
+    name: "my_tool",
+    // ...
+  });
+  ```
+
+  The IIFE build (`@mcp-b/global/dist/index.iife.js`) now auto-initializes `navigator.modelContext` when loaded via script tag.
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-b/global@2.0.0
+  - @mcp-b/transports@0.0.0
+
 ## 0.0.0
 
 ### Patch Changes

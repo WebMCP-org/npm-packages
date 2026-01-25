@@ -18,6 +18,8 @@
     "lint": "biome lint --write .",
     "lint:check": "biome lint .",
     "prepare": "husky",
+    "publish:all": "pnpm run build && pnpm publish -r --access public --no-git-checks",
+    "publish:order": "echo 'Publish order: webmcp-ts-sdk → transports → global → react-webmcp → chrome-devtools-mcp'",
     "test": "pnpm --filter mcp-e2e-tests test",
     "test:e2e": "pnpm --filter mcp-e2e-tests test",
     "test:e2e:debug": "pnpm --filter mcp-e2e-tests test:debug",

@@ -50,6 +50,19 @@
 pnpm add @mcp-b/react-webmcp zod
 ```
 
+## ⚠️ Zod Version Compatibility
+
+| Package Version | Zod Version | Notes |
+|-----------------|-------------|-------|
+| `@mcp-b/react-webmcp@1.x` | **Zod 4** | Uses `zod/v4` imports, requires Zod 4.x |
+| `@mcp-b/react-webmcp@0.x` | **Zod 3** | Compatible with Zod 3.x projects |
+
+**If your project uses Zod 3:**
+- Use `@mcp-b/react-webmcp@0.x`: `npm install @mcp-b/react-webmcp@0`
+
+**If your project uses Zod 4:**
+- Use `@mcp-b/react-webmcp@1.x` (latest): `npm install @mcp-b/react-webmcp`
+
 For client functionality, you'll also need:
 ```bash
 pnpm add @mcp-b/transports @modelcontextprotocol/sdk

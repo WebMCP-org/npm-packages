@@ -22,7 +22,7 @@ catalog:
   '@cloudflare/vite-plugin': ^1.13.18
   '@composio/json-schema-to-zod': ^0.1.17
   '@hookform/resolvers': ^5.2.2
-  '@modelcontextprotocol/sdk': 1.24.3
+  '@modelcontextprotocol/sdk': 1.25.2
   '@radix-ui/react-collapsible': ^1.1.12
   '@sentry/cloudflare': ^10.22.0
   '@sentry/react': ^10.22.0

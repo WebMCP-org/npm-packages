@@ -1,6 +1,6 @@
 import type { InputSchema } from '@mcp-b/global';
 import { zodToJsonSchema } from '@mcp-b/global';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@mcp-b/webmcp-ts-sdk';
 import type { DependencyList } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { z } from 'zod/v4';

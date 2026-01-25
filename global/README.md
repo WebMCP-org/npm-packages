@@ -1285,6 +1285,40 @@ test('todo tool creates correct response', async () => {
 
 The polyfill automatically detects and defers to the native implementation when available, ensuring forward compatibility as browsers adopt this standard.
 
+## ⚠️ Zod Version Compatibility
+
+| Package Version | Zod Version | Notes |
+|-----------------|-------------|-------|
+| `@mcp-b/global@2.x` | **Zod 4** | Uses `zod/v4` imports, `z.toJSONSchema()`, `z.fromJSONSchema()` |
+| `@mcp-b/global@1.x` | **Zod 3** | Compatible with Zod 3.x projects |
+
+**If your project uses Zod 3:**
+- Use `@mcp-b/global@1.x`: `npm install @mcp-b/global@1`
+- Or use JSON schemas instead of Zod schemas (works with any version):
+
+```javascript
+// JSON Schema works regardless of Zod version
+window.navigator.modelContext.provideContext({
+  tools: [{
+    name: "my-tool",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" }
+      },
+      required: ["name"]
+    },
+    async execute({ name }) {
+      return { content: [{ type: "text", text: `Hello, ${name}!` }] };
+    }
+  }]
+});
+```
+
+**If your project uses Zod 4:**
+- Use `@mcp-b/global@2.x` (latest): `npm install @mcp-b/global`
+- Full Zod schema support with automatic JSON Schema conversion
+
 ## 📦 What's Included
 
 - **Web Model Context API** - Standard `window.navigator.modelContext` interface

@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/transports",
-  "version": "0.0.0-beta-20260109203913",
+  "version": "2.0.1",
   "description": "Browser transport implementations for Model Context Protocol (MCP) - postMessage, Chrome extension messaging, and iframe communication for AI agents and LLMs",
   "keywords": [
     "mcp",
@@ -70,6 +70,7 @@
     "version:patch": "pnpm version patch --no-git-tag-version"
   },
   "dependencies": {
+    "@mcp-b/webmcp-ts-sdk": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {
@@ -77,14 +78,6 @@
     "@types/node": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:"
-  },
-  "peerDependencies": {
-    "@modelcontextprotocol/sdk": "^1.15.0"
-  },
-  "peerDependenciesMeta": {
-    "@modelcontextprotocol/sdk": {
-      "optional": false
-    }
   },
   "publishConfig": {
     "access": "public",

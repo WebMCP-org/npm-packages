@@ -26,14 +26,9 @@ export type {
 } from '@mcp-b/global';
 /**
  * Re-export MCP SDK types for convenience.
- * These types come from the official @modelcontextprotocol/sdk.
+ * These types come from @mcp-b/webmcp-ts-sdk which re-exports from @modelcontextprotocol/sdk.
  */
-export type {
-  CallToolResult,
-  Resource,
-  ServerCapabilities,
-  Tool,
-} from '@modelcontextprotocol/sdk/types.js';
+export type { CallToolResult, Resource, ServerCapabilities, Tool } from '@mcp-b/webmcp-ts-sdk';
 /**
  * Re-export shared types from @mcp-b packages.
  * These maintain the type hierarchy:

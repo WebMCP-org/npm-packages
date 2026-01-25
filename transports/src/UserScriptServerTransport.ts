@@ -1,8 +1,9 @@
-import type {
-  Transport,
-  TransportSendOptions,
-} from '@modelcontextprotocol/sdk/shared/transport.js';
-import { type JSONRPCMessage, JSONRPCMessageSchema } from '@modelcontextprotocol/sdk/types.js';
+import {
+  type JSONRPCMessage,
+  JSONRPCMessageSchema,
+  type Transport,
+  type TransportSendOptions,
+} from '@mcp-b/webmcp-ts-sdk';
 
 /**
  * Configuration options for UserScriptServerTransport

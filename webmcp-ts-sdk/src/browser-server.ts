@@ -3,6 +3,7 @@ import { McpServer as BaseMcpServer } from '@modelcontextprotocol/sdk/server/mcp
 import { mergeCapabilities } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type { Implementation } from '@modelcontextprotocol/sdk/types.js';
+import { NoOpJsonSchemaValidator } from './no-op-validator.js';
 
 /**
  * Browser-optimized MCP Server for Web Model Context API (navigator.modelContext).
@@ -14,11 +15,14 @@ import type { Implementation } from '@modelcontextprotocol/sdk/types.js';
  * Key differences from base McpServer:
  * - Pre-registers tool, resource, and prompt capabilities before connection
  * - Allows items to be registered after transport is connected
+ * - Uses no-op JSON Schema validator to avoid ajv errors in browser environments
  * - Designed for browser environments where items arrive asynchronously
  */
 export class BrowserMcpServer extends BaseMcpServer {
   constructor(serverInfo: Implementation, options?: ServerOptions) {
     // Ensure tools, resources, and prompts capabilities are registered from the start
+    // Use NoOpJsonSchemaValidator by default to avoid ajv "Error compiling schema" errors
+    // in browser environments. Validation is handled by Zod in @mcp-b/global.
     const enhancedOptions: ServerOptions = {
       ...options,
       capabilities: mergeCapabilities(options?.capabilities || {}, {
@@ -26,6 +30,7 @@ export class BrowserMcpServer extends BaseMcpServer {
         resources: { listChanged: true },
         prompts: { listChanged: true },
       }),
+      jsonSchemaValidator: options?.jsonSchemaValidator ?? new NoOpJsonSchemaValidator(),
     };
 
     super(serverInfo, enhancedOptions);
