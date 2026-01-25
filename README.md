@@ -4,9 +4,16 @@
 
 **Official Model Context Protocol implementation for browsers**
 
+[![CI](https://github.com/WebMCP-org/npm-packages/actions/workflows/ci.yml/badge.svg)](https://github.com/WebMCP-org/npm-packages/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/WebMCP-org/npm-packages/graph/badge.svg)](https://codecov.io/gh/WebMCP-org/npm-packages)
+[![CodeQL](https://github.com/WebMCP-org/npm-packages/actions/workflows/codeql.yml/badge.svg)](https://github.com/WebMCP-org/npm-packages/actions/workflows/codeql.yml)
+[![E2E Tests](https://github.com/WebMCP-org/npm-packages/actions/workflows/e2e.yml/badge.svg)](https://github.com/WebMCP-org/npm-packages/actions/workflows/e2e.yml)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/XXXXX/badge)](https://www.bestpractices.dev/projects/XXXXX)
+
 [![npm version](https://img.shields.io/npm/v/@mcp-b/transports?style=flat-square)](https://www.npmjs.com/org/mcp-b)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8+-blue?style=flat-square)](https://www.typescriptlang.org/)
+[![TypeScript: Strict](https://img.shields.io/badge/TypeScript-Strict-blue?style=flat-square)](https://www.typescriptlang.org/tsconfig#strict)
 [![pnpm](https://img.shields.io/badge/maintained%20with-pnpm-cc00ff.svg?style=flat-square)](https://pnpm.io/)
 
 </div>
