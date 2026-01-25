@@ -6,10 +6,10 @@
  * Checks that the environment is ready for WebMCP integration.
  */
 
-import { exec } from 'child_process';
-import { existsSync } from 'fs';
-import { join, resolve } from 'path';
-import { promisify } from 'util';
+import { exec } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { promisify } from 'node:util';
 
 const execAsync = promisify(exec);
 
@@ -46,7 +46,7 @@ async function checkNodeVersion() {
   try {
     const { stdout } = await execAsync('node --version');
     const version = stdout.trim();
-    const majorVersion = Number.parseInt(version.slice(1).split('.')[0]);
+    const majorVersion = Number.parseInt(version.slice(1).split('.')[0], 10);
 
     if (majorVersion >= 16) {
       success(`Node.js ${version} (>= 16.0.0)`);
@@ -153,7 +153,7 @@ function detectFramework() {
   }
 
   try {
-    const packageJson = JSON.parse(require('fs').readFileSync(packageJsonPath, 'utf-8'));
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
 
     const deps = {
       ...packageJson.dependencies,
@@ -182,7 +182,7 @@ function detectFramework() {
     }
     info('JavaScript/TypeScript project (framework not detected)');
     return 'other';
-  } catch (err) {
+  } catch (_err) {
     error('Could not read package.json');
     return 'unknown';
   }
@@ -207,7 +207,7 @@ async function main() {
   checks.push(await checkNetworkAccess());
 
   // Summary
-  log('\n' + '='.repeat(50), 'blue');
+  log(`\n${'='.repeat(50)}`, 'blue');
 
   const passed = checks.filter(Boolean).length;
   const total = checks.length;
