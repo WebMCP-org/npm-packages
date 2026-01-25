@@ -93,6 +93,7 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          allowed_bots: '*'
           prompt: |
             You are testing WebMCP integration. Your task is to verify that WebMCP tools are working correctly.
 
