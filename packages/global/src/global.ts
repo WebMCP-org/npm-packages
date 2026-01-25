@@ -88,6 +88,7 @@ function detectNativeAPI(): {
   hasNativeContext: boolean;
   hasNativeTesting: boolean;
 } {
+  /* c8 ignore next 2 */
   if (typeof window === 'undefined' || typeof navigator === 'undefined') {
     return { hasNativeContext: false, hasNativeTesting: false };
   }
@@ -96,7 +97,10 @@ function detectNativeAPI(): {
   const modelContextTesting = navigator.modelContextTesting;
 
   if (!modelContext || !modelContextTesting) {
-    return { hasNativeContext: false, hasNativeTesting: false };
+    return {
+      hasNativeContext: Boolean(modelContext),
+      hasNativeTesting: Boolean(modelContextTesting),
+    };
   }
 
   // Check for polyfill marker property.
@@ -1062,10 +1066,8 @@ class WebModelContext implements InternalModelContext {
     const templateParamRegex = /\{([^}]{1,100})\}/g;
     const templateParams: string[] = [];
     for (const match of resource.uri.matchAll(templateParamRegex)) {
-      const paramName = match[1];
-      if (paramName) {
-        templateParams.push(paramName);
-      }
+      const paramName = match[1]!;
+      templateParams.push(paramName);
     }
 
     return {
@@ -1786,11 +1788,9 @@ class WebModelContext implements InternalModelContext {
 
     const params: Record<string, string> = {};
     for (let i = 0; i < paramNames.length; i++) {
-      const paramName = paramNames[i];
-      const paramValue = match[i + 1];
-      if (paramName !== undefined && paramValue !== undefined) {
-        params[paramName] = paramValue;
-      }
+      const paramName = paramNames[i]!;
+      const paramValue = match[i + 1]!;
+      params[paramName] = paramValue;
     }
 
     return params;
@@ -2213,6 +2213,7 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
  * ```
  */
 export function initializeWebModelContext(options?: WebModelContextInitOptions): void {
+  /* c8 ignore next 4 */
   if (typeof window === 'undefined') {
     logger.warn('Not in browser environment, skipping initialization');
     return;
@@ -2330,6 +2331,7 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
  * ```
  */
 export function cleanupWebModelContext(): void {
+  /* c8 ignore next */
   if (typeof window === 'undefined') return;
 
   if (window.__mcpBridge) {

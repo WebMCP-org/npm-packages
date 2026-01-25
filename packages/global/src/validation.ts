@@ -8,7 +8,9 @@ const logger = createLogger('WebModelContext');
  * Detect if a schema is a Zod schema object (Record<string, ZodType>)
  * or a JSON Schema object.
  *
- * Uses duck-typing to detect Zod 4 schemas by checking for the `_zod` property.
+ * Uses duck-typing to detect Zod schemas:
+ * - Zod 4 schemas have `_zod` property
+ * - Zod 3 schemas have `_def` property
  */
 export function isZodSchema(schema: unknown): boolean {
   if (typeof schema !== 'object' || schema === null) {
@@ -25,8 +27,12 @@ export function isZodSchema(schema: unknown): boolean {
     return false;
   }
 
-  // Duck-type check: Zod 4 schemas have `_zod` property
-  return values.some((val) => val != null && typeof val === 'object' && '_zod' in (val as object));
+  // Duck-type check: Zod 4 has `_zod`, Zod 3 has `_def`
+  return values.some((val) => {
+    if (val == null || typeof val !== 'object') return false;
+    const obj = val as object;
+    return '_zod' in obj || '_def' in obj;
+  });
 }
 
 /**
