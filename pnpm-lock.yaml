@@ -407,6 +407,9 @@ importers:
       '@mcp-b/webmcp-ts-sdk':
         specifier: workspace:*
         version: link:../webmcp-ts-sdk
+      zod-to-json-schema:
+        specifier: ^3.25.1
+        version: 3.25.1(zod@4.3.5)
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -5994,6 +5997,11 @@ packages:
     peerDependencies:
       zod: ^3.25 || ^4
 
+  zod-to-json-schema@3.25.1:
+    resolution: {integrity: sha512-pM/SU9d3YAggzi6MtR4h7ruuQlqKtad8e9S0fmxcMi+ueAK5Korys/aWcV9LIIHTVbj01NdzxcnXSN+O74ZIVA==}
+    peerDependencies:
+      zod: ^3.25 || ^4
+
   zod@3.22.3:
     resolution: {integrity: sha512-EjIevzuJRiRPbVH4mGc8nApb/lVLKVpmUhAaR5R5doKGfAnGJ6Gr3CViAVjP+4FWSxCsybeWQdcgCtbX+7oZug==}
 
@@ -11562,6 +11570,10 @@ snapshots:
       youch-core: 0.3.3
 
   zod-to-json-schema@3.25.0(zod@4.3.5):
+    dependencies:
+      zod: 4.3.5
+
+  zod-to-json-schema@3.25.1(zod@4.3.5):
     dependencies:
       zod: 4.3.5
 
