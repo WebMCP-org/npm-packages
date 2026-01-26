@@ -32,8 +32,8 @@ publish_package() {
         return 0
     fi
 
-    # Publish
-    if pnpm publish --access public --no-git-checks; then
+    # Publish with explicit latest tag (needed because npm remembers unpublished 2.0.x)
+    if pnpm publish --access public --no-git-checks --tag latest; then
         echo -e "${GREEN}✓ Published ${pkg_name}@${pkg_version}${NC}"
     else
         echo -e "${RED}✗ Failed to publish ${pkg_name}${NC}"
