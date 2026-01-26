@@ -61,7 +61,7 @@ describe('useWebMCPPrompt', () => {
         })
       );
 
-      const prompts = navigator.modelContext!.listPrompts();
+      const prompts = navigator.modelContext?.listPrompts();
       expect(prompts).toHaveLength(1);
       expect(prompts[0].name).toBe('help_prompt');
       expect(prompts[0].description).toBe('Get help with the application');
@@ -77,7 +77,7 @@ describe('useWebMCPPrompt', () => {
         })
       );
 
-      const prompts = navigator.modelContext!.listPrompts();
+      const prompts = navigator.modelContext?.listPrompts();
       expect(prompts).toHaveLength(1);
       expect(prompts[0].name).toBe('simple_prompt');
     });
@@ -102,7 +102,7 @@ describe('useWebMCPPrompt', () => {
         })
       );
 
-      const prompts = navigator.modelContext!.listPrompts();
+      const prompts = navigator.modelContext?.listPrompts();
       expect(prompts).toHaveLength(1);
       expect(prompts[0].name).toBe('code_review');
       // Check that arguments were registered
@@ -119,11 +119,11 @@ describe('useWebMCPPrompt', () => {
         })
       );
 
-      expect(navigator.modelContext!.listPrompts()).toHaveLength(1);
+      expect(navigator.modelContext?.listPrompts()).toHaveLength(1);
 
       unmount();
 
-      expect(navigator.modelContext!.listPrompts()).toHaveLength(0);
+      expect(navigator.modelContext?.listPrompts()).toHaveLength(0);
     });
   });
 
@@ -144,7 +144,7 @@ describe('useWebMCPPrompt', () => {
       );
 
       // Get the prompt and execute it via the internal model context
-      const prompts = navigator.modelContext!.listPrompts();
+      const prompts = navigator.modelContext?.listPrompts();
       expect(prompts).toHaveLength(1);
       expect(prompts[0].name).toBe('dynamic_prompt');
     });
@@ -163,11 +163,11 @@ describe('useWebMCPPrompt', () => {
         { initialProps: { name: 'prompt_v1' } }
       );
 
-      expect(navigator.modelContext!.listPrompts()[0].name).toBe('prompt_v1');
+      expect(navigator.modelContext?.listPrompts()[0].name).toBe('prompt_v1');
 
       await rerender({ name: 'prompt_v2' });
 
-      expect(navigator.modelContext!.listPrompts()[0].name).toBe('prompt_v2');
+      expect(navigator.modelContext?.listPrompts()[0].name).toBe('prompt_v2');
     });
 
     it('should re-register when description changes', async () => {
@@ -183,15 +183,15 @@ describe('useWebMCPPrompt', () => {
         { initialProps: { description: 'Version 1' } }
       );
 
-      expect(navigator.modelContext!.listPrompts()[0].description).toBe('Version 1');
+      expect(navigator.modelContext?.listPrompts()[0].description).toBe('Version 1');
 
       await rerender({ description: 'Version 2' });
 
-      expect(navigator.modelContext!.listPrompts()[0].description).toBe('Version 2');
+      expect(navigator.modelContext?.listPrompts()[0].description).toBe('Version 2');
     });
 
     it('should not re-register when get function changes (ref-based)', async () => {
-      const firstPrompts = navigator.modelContext!.listPrompts();
+      const firstPrompts = navigator.modelContext?.listPrompts();
       expect(firstPrompts).toHaveLength(0);
 
       const { rerender } = await renderHook(
@@ -209,7 +209,7 @@ describe('useWebMCPPrompt', () => {
         }
       );
 
-      expect(navigator.modelContext!.listPrompts()).toHaveLength(1);
+      expect(navigator.modelContext?.listPrompts()).toHaveLength(1);
 
       await rerender({
         get: async () => ({
@@ -218,7 +218,7 @@ describe('useWebMCPPrompt', () => {
       });
 
       // Should still have 1 prompt (not re-registered)
-      expect(navigator.modelContext!.listPrompts()).toHaveLength(1);
+      expect(navigator.modelContext?.listPrompts()).toHaveLength(1);
     });
   });
 });

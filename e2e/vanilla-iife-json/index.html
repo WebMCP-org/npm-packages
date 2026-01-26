@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vanilla IIFE + JSON Schema Test</title>
+  <script src="/node_modules/@mcp-b/global/dist/index.iife.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding: 2rem;
+      background: #f0f4f8;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      padding: 2rem;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    }
+    h1 { color: #2d3748; margin-bottom: 0.5rem; }
+    .subtitle { color: #718096; margin-bottom: 2rem; }
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .badge.json { background: #e6fffa; color: #234e52; }
+    .badge.iife { background: #fef3c7; color: #78350f; }
+    .section {
+      margin-bottom: 2rem;
+      padding: 1.5rem;
+      background: #f7fafc;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+    }
+    .section h2 { color: #2d3748; margin-bottom: 1rem; font-size: 1.25rem; }
+    #status { padding: 1rem; border-radius: 6px; margin-bottom: 1rem; }
+    #status.success { background: #c6f6d5; color: #22543d; }
+    #status.error { background: #fed7d7; color: #742a2a; }
+    #results {
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 0.85rem;
+      background: #1a202c;
+      color: #a0aec0;
+      padding: 1rem;
+      border-radius: 6px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .result-item { padding: 0.5rem 0; border-bottom: 1px solid #2d3748; }
+    .result-item:last-child { border-bottom: none; }
+    .result-item.success { color: #68d391; }
+    .result-item.error { color: #fc8181; }
+    .result-item.info { color: #63b3ed; }
+    button {
+      padding: 0.75rem 1.5rem;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+      margin-right: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    button.primary { background: #4299e1; color: white; }
+    button.primary:hover { background: #3182ce; }
+    button.danger { background: #f56565; color: white; }
+    button.danger:hover { background: #e53e3e; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Vanilla IIFE + JSON Schema Test</h1>
+    <p class="subtitle">
+      <span class="badge iife">IIFE Build</span>
+      <span class="badge json">JSON Schema</span>
+      Testing validation with pure JSON Schema inputSchema
+    </p>
+
+    <div id="status">Initializing...</div>
+
+    <div class="section">
+      <h2>Registered Tools</h2>
+      <div id="tools-list">Loading...</div>
+    </div>
+
+    <div class="section">
+      <h2>Test Results</h2>
+      <div id="results"></div>
+    </div>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const resultsEl = document.getElementById('results');
+    const toolsListEl = document.getElementById('tools-list');
+
+    function log(msg, type = 'info') {
+      const div = document.createElement('div');
+      div.className = `result-item ${type}`;
+      div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      resultsEl.appendChild(div);
+      resultsEl.scrollTop = resultsEl.scrollHeight;
+    }
+
+    async function runTests() {
+      if (!window.navigator.modelContext) {
+        statusEl.className = 'error';
+        statusEl.textContent = 'modelContext not available';
+        return;
+      }
+
+      statusEl.className = 'success';
+      statusEl.textContent = 'modelContext available - Running tests...';
+
+      const mc = window.navigator.modelContext;
+
+      // Register tool with pure JSON Schema
+      try {
+        mc.registerTool({
+          name: "json-user-validator",
+          description: "Validate user data using JSON Schema",
+          inputSchema: {
+            type: "object",
+            properties: {
+              username: {
+                type: "string",
+                minLength: 3,
+                maxLength: 20,
+                description: "Username (3-20 characters)"
+              },
+              email: {
+                type: "string",
+                format: "email",
+                description: "Valid email address"
+              },
+              age: {
+                type: "integer",
+                minimum: 18,
+                maximum: 120,
+                description: "Age (18-120)"
+              },
+              role: {
+                type: "string",
+                enum: ["admin", "user", "guest"],
+                description: "User role"
+              }
+            },
+            required: ["username", "email", "age"]
+          },
+          async execute({ username, email, age, role }) {
+            return {
+              content: [{
+                type: "text",
+                text: `JSON Schema validated: ${username}, ${email}, age=${age}, role=${role || 'none'}`
+              }]
+            };
+          }
+        });
+        log('Tool "json-user-validator" registered successfully', 'success');
+
+        // Update tools list
+        const tools = await mc.listTools();
+        toolsListEl.innerHTML = tools.map(t =>
+          `<div style="padding: 0.5rem; background: white; border-radius: 4px; margin-bottom: 0.5rem;">
+            <strong>${t.name}</strong> - ${t.description}
+          </div>`
+        ).join('');
+
+        // Test 1: Valid input
+        log('Test 1: Valid input...', 'info');
+        const r1 = await mc.executeTool('json-user-validator', {
+          username: "validuser",
+          email: "test@example.com",
+          age: 25,
+          role: "user"
+        });
+        log(`Valid input: ${r1.isError ? 'FAILED' : 'PASSED'} - ${r1.content?.[0]?.text}`, r1.isError ? 'error' : 'success');
+
+        // Test 2: Missing required field
+        log('Test 2: Missing required field (email)...', 'info');
+        const r2 = await mc.executeTool('json-user-validator', {
+          username: "testuser",
+          age: 30
+        });
+        log(`Missing email: ${r2.isError ? 'PASSED (rejected)' : 'FAILED (should reject)'}`, r2.isError ? 'success' : 'error');
+
+        // Test 3: Invalid type (age as string)
+        log('Test 3: Invalid type (age as string)...', 'info');
+        const r3 = await mc.executeTool('json-user-validator', {
+          username: "testuser",
+          email: "test@example.com",
+          age: "twenty-five"
+        });
+        log(`Invalid type: ${r3.isError ? 'PASSED (rejected)' : 'FAILED (should reject)'}`, r3.isError ? 'success' : 'error');
+
+        // Test 4: Value out of range (age too low)
+        log('Test 4: Value out of range (age=15)...', 'info');
+        const r4 = await mc.executeTool('json-user-validator', {
+          username: "testuser",
+          email: "test@example.com",
+          age: 15
+        });
+        log(`Age too low: ${r4.isError ? 'PASSED (rejected)' : 'FAILED (should reject)'}`, r4.isError ? 'success' : 'error');
+
+        // Test 5: String too short (username)
+        log('Test 5: String too short (username="ab")...', 'info');
+        const r5 = await mc.executeTool('json-user-validator', {
+          username: "ab",
+          email: "test@example.com",
+          age: 25
+        });
+        log(`Username too short: ${r5.isError ? 'PASSED (rejected)' : 'FAILED (should reject)'}`, r5.isError ? 'success' : 'error');
+
+        // Test 6: Invalid enum value
+        log('Test 6: Invalid enum value (role="superuser")...', 'info');
+        const r6 = await mc.executeTool('json-user-validator', {
+          username: "testuser",
+          email: "test@example.com",
+          age: 25,
+          role: "superuser"
+        });
+        log(`Invalid enum: ${r6.isError ? 'PASSED (rejected)' : 'FAILED (should reject)'}`, r6.isError ? 'success' : 'error');
+
+        // Test 7: Invalid email format
+        log('Test 7: Invalid email format...', 'info');
+        const r7 = await mc.executeTool('json-user-validator', {
+          username: "testuser",
+          email: "not-an-email",
+          age: 25
+        });
+        log(`Invalid email: ${r7.isError ? 'PASSED (rejected)' : 'FAILED (should reject)'}`, r7.isError ? 'success' : 'error');
+
+        statusEl.textContent = 'All tests completed!';
+        log('All tests completed!', 'success');
+
+      } catch (error) {
+        log(`Error: ${error.message}`, 'error');
+        console.error(error);
+      }
+    }
+
+    // Run tests when page loads
+    runTests();
+  </script>
+</body>
+</html>

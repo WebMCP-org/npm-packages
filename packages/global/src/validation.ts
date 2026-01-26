@@ -1,172 +1,168 @@
+import { jsonSchemaToZod as n8nJsonSchemaToZod } from '@n8n/json-schema-to-zod';
 import { z } from 'zod';
+import { zodToJsonSchema as zodToJsonSchemaV3 } from 'zod-to-json-schema';
 import { createLogger } from './logger.js';
-import type { InputSchema } from './types.js';
+import type { InputSchema, ZodSchemaObject } from './types.js';
 
 const logger = createLogger('WebModelContext');
 
-/**
- * Result of Zod schema detection with version information
- */
-export interface ZodSchemaDetection {
-  isZodSchema: boolean;
-  hasZod4: boolean;
-  hasZod3: boolean;
-}
+const nativeToJsonSchema = (
+  z as {
+    toJSONSchema?: (schema: z.ZodTypeAny, options?: { target?: string }) => unknown;
+  }
+).toJSONSchema;
 
-/**
- * Detect if a schema is a Zod schema object and which version.
- *
- * Uses duck-typing to detect Zod schemas:
- * - Zod 4 schemas have `_zod` property
- * - Zod 3 schemas have `_def` property (but not `_zod`)
- */
-export function detectZodSchema(schema: unknown): ZodSchemaDetection {
-  if (typeof schema !== 'object' || schema === null) {
-    return { isZodSchema: false, hasZod4: false, hasZod3: false };
+const hasNativeToJSONSchema = typeof nativeToJsonSchema === 'function';
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+const isZod4Schema = (schema: unknown): boolean => isRecord(schema) && '_zod' in schema;
+
+const isZod3Schema = (schema: unknown): boolean =>
+  isRecord(schema) && '_def' in schema && !('_zod' in schema);
+
+const stripSchemaMeta = <T extends Record<string, unknown>>(schema: T): T => {
+  const { $schema: _, ...rest } = schema as T & { $schema?: string };
+  return rest as T;
+};
+
+const isOptionalSchema = (schema: z.ZodTypeAny): boolean => {
+  const typeName = (schema as { _def?: { typeName?: string } })._def?.typeName;
+  return typeName === 'ZodOptional' || typeName === 'ZodDefault';
+};
+
+export function isZodSchema(schema: unknown): schema is ZodSchemaObject {
+  if (!isRecord(schema)) {
+    return false;
   }
 
-  // JSON Schema has a 'type' property that's a string
   if ('type' in schema && typeof (schema as { type: unknown }).type === 'string') {
-    return { isZodSchema: false, hasZod4: false, hasZod3: false };
+    return false;
   }
 
   const values = Object.values(schema);
   if (values.length === 0) {
-    return { isZodSchema: false, hasZod4: false, hasZod3: false };
+    return false;
   }
 
-  let hasZod4 = false;
-  let hasZod3 = false;
+  return values.some((value) => isZod4Schema(value) || isZod3Schema(value));
+}
 
-  for (const val of values) {
-    if (val == null || typeof val !== 'object') continue;
-    const obj = val as object;
+const hasZod4Schemas = (schema: ZodSchemaObject): boolean =>
+  Object.values(schema).some((value) => isZod4Schema(value));
 
-    if ('_zod' in obj) {
-      hasZod4 = true;
-    } else if ('_def' in obj) {
-      // Has _def but not _zod = Zod 3
-      hasZod3 = true;
+const tryNativeZodToJsonSchema = (schema: ZodSchemaObject): InputSchema | null => {
+  if (!hasZod4Schemas(schema) || !hasNativeToJSONSchema) {
+    return null;
+  }
+
+  try {
+    const jsonSchema = (nativeToJsonSchema as NonNullable<typeof nativeToJsonSchema>)(
+      z.object(schema),
+      { target: 'draft-7' }
+    );
+    return stripSchemaMeta(jsonSchema as InputSchema);
+  } catch (error) {
+    logger.warn('z.toJSONSchema failed, falling back to zod-to-json-schema:', error);
+    return null;
+  }
+};
+
+const fallbackZodToJsonSchema = (schema: ZodSchemaObject): InputSchema => {
+  const properties: NonNullable<InputSchema['properties']> = {};
+  const required: string[] = [];
+
+  for (const [key, zodSchema] of Object.entries(schema)) {
+    // Cast to any to handle Zod 3/4 type incompatibility - zod-to-json-schema works at runtime
+    // biome-ignore lint/suspicious/noExplicitAny: Zod 3/4 type incompatibility
+    const propSchema = zodToJsonSchemaV3(zodSchema as any, {
+      strictUnions: true,
+      $refStrategy: 'none',
+    });
+
+    properties[key] = stripSchemaMeta(propSchema as InputSchema);
+
+    if (!isOptionalSchema(zodSchema)) {
+      required.push(key);
     }
   }
 
-  return {
-    isZodSchema: hasZod4 || hasZod3,
-    hasZod4,
-    hasZod3,
+  const result: InputSchema = {
+    type: 'object',
+    properties,
   };
+
+  if (required.length > 0) {
+    result.required = required;
+  }
+
+  return result;
+};
+
+export function zodToJsonSchema(schema: ZodSchemaObject): InputSchema {
+  const nativeSchema = tryNativeZodToJsonSchema(schema);
+  if (nativeSchema) {
+    return nativeSchema;
+  }
+
+  try {
+    return fallbackZodToJsonSchema(schema);
+  } catch (error) {
+    logger.warn('zodToJsonSchema failed:', error);
+    return { type: 'object', properties: {} };
+  }
 }
 
-/**
- * Detect if a schema is a Zod schema object (Record<string, ZodType>)
- * or a JSON Schema object.
- *
- * Uses duck-typing to detect Zod schemas:
- * - Zod 4 schemas have `_zod` property
- * - Zod 3 schemas have `_def` property
- */
-export function isZodSchema(schema: unknown): boolean {
-  return detectZodSchema(schema).isZodSchema;
-}
-
-/**
- * Convert JSON Schema to Zod validator
- * Uses Zod 4's native z.fromJSONSchema() for conversion
- */
 export function jsonSchemaToZod(jsonSchema: InputSchema): z.ZodType {
   try {
-    // Zod 4 has native fromJSONSchema support
-    const zodSchema = z.fromJSONSchema(jsonSchema as z.core.JSONSchema.BaseSchema);
-    return zodSchema;
+    const zodSchema = n8nJsonSchemaToZod(jsonSchema);
+    return zodSchema as unknown as z.ZodType;
   } catch (error) {
-    logger.warn('Failed to convert JSON Schema to Zod:', error);
+    logger.warn('jsonSchemaToZod failed:', error);
     return z.object({}).passthrough();
   }
 }
 
-/**
- * Convert Zod schema object to JSON Schema
- * Uses Zod 4's native z.toJSONSchema() for conversion
- *
- * @param schema - Record of Zod type definitions (e.g., { name: z.string(), age: z.number() })
- * @returns JSON Schema object compatible with MCP InputSchema
- */
-export function zodToJsonSchema(schema: Record<string, z.ZodTypeAny>): InputSchema {
-  const zodObject = z.object(schema);
-  const jsonSchema = z.toJSONSchema(zodObject);
-
-  // Remove $schema field as it's not needed for MCP
-  const { $schema: _, ...rest } = jsonSchema as { $schema?: string } & InputSchema;
-  return rest as InputSchema;
-}
-
-/**
- * Error thrown when Zod 3 schemas are detected.
- * Zod 4 is required for schema conversion.
- */
-export class Zod3SchemaError extends Error {
-  constructor() {
-    super(
-      'Zod 3 schema detected. This package requires Zod 4 for schema support.\n\n' +
-        'Solutions:\n' +
-        '  1. Upgrade to zod@4.x: pnpm add zod@4\n' +
-        '  2. If using zod@3.25+, import from the v4 subpath:\n' +
-        '     import { z } from "zod/v4"\n' +
-        '  3. Use JSON Schema instead of Zod schemas\n\n' +
-        'See https://zod.dev/v4/versioning for more information.'
-    );
-    this.name = 'Zod3SchemaError';
+const buildZodValidator = (schema: ZodSchemaObject, jsonSchema: InputSchema): z.ZodType => {
+  if (hasZod4Schemas(schema) && hasNativeToJSONSchema) {
+    return z.object(schema);
   }
-}
 
-/**
- * Normalize a schema to both JSON Schema and Zod formats
- * Detects which format is provided and converts to the other
- *
- * @throws {Zod3SchemaError} If Zod 3 schemas are detected
- */
-export function normalizeSchema(schema: InputSchema | Record<string, z.ZodTypeAny>): {
+  return jsonSchemaToZod(jsonSchema);
+};
+
+export function normalizeSchema(schema: InputSchema | ZodSchemaObject): {
   jsonSchema: InputSchema;
   zodValidator: z.ZodType;
 } {
-  const detection = detectZodSchema(schema);
-
-  if (detection.hasZod3 && !detection.hasZod4) {
-    throw new Zod3SchemaError();
+  if (isZodSchema(schema)) {
+    const jsonSchema = zodToJsonSchema(schema);
+    return { jsonSchema, zodValidator: buildZodValidator(schema, jsonSchema) };
   }
 
-  if (detection.isZodSchema) {
-    const jsonSchema = zodToJsonSchema(schema as Record<string, z.ZodTypeAny>);
-    const zodValidator = z.object(schema as Record<string, z.ZodTypeAny>);
-    return { jsonSchema, zodValidator };
-  }
-
-  const jsonSchema = schema as InputSchema;
-  const zodValidator = jsonSchemaToZod(jsonSchema);
-  return { jsonSchema, zodValidator };
+  return { jsonSchema: schema, zodValidator: jsonSchemaToZod(schema) };
 }
 
-/**
- * Validate data with Zod schema and return formatted result
- */
 export function validateWithZod(
   data: unknown,
   validator: z.ZodType
 ): { success: true; data: unknown } | { success: false; error: string } {
   const result = validator.safeParse(data);
 
-  if (!result.success) {
-    const errors = result.error.issues
-      .map((err) => `  - ${err.path.join('.') || 'root'}: ${err.message}`)
-      .join('\n');
+  if (result.success) {
     return {
-      success: false,
-      error: `Validation failed:\n${errors}`,
+      success: true,
+      data: result.data,
     };
   }
 
+  const errors = result.error.issues
+    .map((err) => `  - ${err.path.join('.') || 'root'}: ${err.message}`)
+    .join('\n');
+
   return {
-    success: true,
-    data: result.data,
+    success: false,
+    error: `Validation failed:\n${errors}`,
   };
 }

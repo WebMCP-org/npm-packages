@@ -6,6 +6,12 @@ packages:
   - e2e/test-app
   - e2e/react-webmcp-test-app
   - e2e/web-standards-showcase
+  - e2e/vanilla-iife-json
+  - e2e/vanilla-iife-zod3
+  - e2e/vanilla-iife-zod4
+  - e2e/vanilla-esm-zod3
+  - e2e/vanilla-esm-zod4
+  - e2e/react18-zod3
 
 catalog:
   fast-check: ^4.0.0

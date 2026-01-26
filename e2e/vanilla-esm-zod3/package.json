@@ -1,0 +1,19 @@
+{
+  "name": "vanilla-esm-zod3-test-app",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite --port 3013",
+    "preview": "vite preview --port 3013"
+  },
+  "dependencies": {
+    "@mcp-b/global": "workspace:*",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  }
+}

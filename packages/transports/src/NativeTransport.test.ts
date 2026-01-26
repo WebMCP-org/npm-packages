@@ -124,7 +124,7 @@ nodeDescribe('NativeClientTransport', () => {
     await transport.start();
 
     let resolved = false;
-    const writeSpy = vi.spyOn(stdout, 'write').mockImplementation((chunk, _enc, cb) => {
+    const writeSpy = vi.spyOn(stdout, 'write').mockImplementation((_chunk, _enc, cb) => {
       if (typeof _enc === 'function') {
         _enc();
       } else if (typeof cb === 'function') {

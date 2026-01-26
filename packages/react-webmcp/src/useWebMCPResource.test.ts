@@ -63,7 +63,7 @@ describe('useWebMCPResource', () => {
         })
       );
 
-      const resources = navigator.modelContext!.listResources();
+      const resources = navigator.modelContext?.listResources();
       expect(resources).toHaveLength(1);
       expect(resources[0].uri).toBe('config://app');
       expect(resources[0].name).toBe('App Configuration');
@@ -82,7 +82,7 @@ describe('useWebMCPResource', () => {
         })
       );
 
-      const resources = navigator.modelContext!.listResources();
+      const resources = navigator.modelContext?.listResources();
       expect(resources).toHaveLength(1);
       expect(resources[0].uri).toBe('data://items');
       expect(resources[0].name).toBe('Items');
@@ -99,11 +99,11 @@ describe('useWebMCPResource', () => {
         })
       );
 
-      expect(navigator.modelContext!.listResources()).toHaveLength(1);
+      expect(navigator.modelContext?.listResources()).toHaveLength(1);
 
       unmount();
 
-      expect(navigator.modelContext!.listResources()).toHaveLength(0);
+      expect(navigator.modelContext?.listResources()).toHaveLength(0);
     });
   });
 
@@ -122,7 +122,7 @@ describe('useWebMCPResource', () => {
       );
 
       // The resource is registered, verify it's there
-      const resources = navigator.modelContext!.listResources();
+      const resources = navigator.modelContext?.listResources();
       expect(resources).toHaveLength(1);
       expect(resources[0].uri).toBe('app://settings');
     });
@@ -144,7 +144,7 @@ describe('useWebMCPResource', () => {
         })
       );
 
-      const resources = navigator.modelContext!.listResources();
+      const resources = navigator.modelContext?.listResources();
       expect(resources).toHaveLength(1);
       expect(resources[0].name).toBe('Items');
     });
@@ -164,11 +164,11 @@ describe('useWebMCPResource', () => {
         { initialProps: { uri: 'data://v1' } }
       );
 
-      expect(navigator.modelContext!.listResources()[0].uri).toBe('data://v1');
+      expect(navigator.modelContext?.listResources()[0].uri).toBe('data://v1');
 
       await rerender({ uri: 'data://v2' });
 
-      expect(navigator.modelContext!.listResources()[0].uri).toBe('data://v2');
+      expect(navigator.modelContext?.listResources()[0].uri).toBe('data://v2');
     });
 
     it('should re-register when name changes', async () => {
@@ -184,11 +184,11 @@ describe('useWebMCPResource', () => {
         { initialProps: { name: 'Resource V1' } }
       );
 
-      expect(navigator.modelContext!.listResources()[0].name).toBe('Resource V1');
+      expect(navigator.modelContext?.listResources()[0].name).toBe('Resource V1');
 
       await rerender({ name: 'Resource V2' });
 
-      expect(navigator.modelContext!.listResources()[0].name).toBe('Resource V2');
+      expect(navigator.modelContext?.listResources()[0].name).toBe('Resource V2');
     });
 
     it('should re-register when description changes', async () => {
@@ -205,11 +205,11 @@ describe('useWebMCPResource', () => {
         { initialProps: { description: 'Desc V1' } }
       );
 
-      expect(navigator.modelContext!.listResources()[0].description).toBe('Desc V1');
+      expect(navigator.modelContext?.listResources()[0].description).toBe('Desc V1');
 
       await rerender({ description: 'Desc V2' });
 
-      expect(navigator.modelContext!.listResources()[0].description).toBe('Desc V2');
+      expect(navigator.modelContext?.listResources()[0].description).toBe('Desc V2');
     });
 
     it('should re-register when mimeType changes', async () => {
@@ -226,11 +226,11 @@ describe('useWebMCPResource', () => {
         { initialProps: { mimeType: 'text/plain' } }
       );
 
-      expect(navigator.modelContext!.listResources()[0].mimeType).toBe('text/plain');
+      expect(navigator.modelContext?.listResources()[0].mimeType).toBe('text/plain');
 
       await rerender({ mimeType: 'application/json' });
 
-      expect(navigator.modelContext!.listResources()[0].mimeType).toBe('application/json');
+      expect(navigator.modelContext?.listResources()[0].mimeType).toBe('application/json');
     });
 
     it('should not re-register when read function changes (ref-based)', async () => {
@@ -250,7 +250,7 @@ describe('useWebMCPResource', () => {
         }
       );
 
-      expect(navigator.modelContext!.listResources()).toHaveLength(1);
+      expect(navigator.modelContext?.listResources()).toHaveLength(1);
 
       await rerender({
         read: async () => ({
@@ -259,7 +259,7 @@ describe('useWebMCPResource', () => {
       });
 
       // Should still have 1 resource (not re-registered unnecessarily)
-      expect(navigator.modelContext!.listResources()).toHaveLength(1);
+      expect(navigator.modelContext?.listResources()).toHaveLength(1);
     });
   });
 });
