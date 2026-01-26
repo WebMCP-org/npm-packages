@@ -1072,9 +1072,17 @@ export interface ModelContext {
 export interface InternalModelContext extends ModelContext {
   /**
    * Execute a tool (internal use only by MCP bridge)
+   * @param toolName - Name of the tool to execute
+   * @param args - Arguments to pass to the tool
+   * @param options - Optional execution options
+   * @param options.skipValidation - Skip input validation (used when SDK already validated)
    * @internal
    */
-  executeTool(toolName: string, args: Record<string, unknown>): Promise<ToolResponse>;
+  executeTool(
+    toolName: string,
+    args: Record<string, unknown>,
+    options?: { skipValidation?: boolean }
+  ): Promise<ToolResponse>;
 
   /**
    * Read a resource by URI (internal use only by MCP bridge)
