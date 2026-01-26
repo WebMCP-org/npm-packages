@@ -1,0 +1,75 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createLogger } from './logger.js';
+
+const DEBUG_CONFIG_KEY = 'WEBMCP_DEBUG';
+
+const clearDebugConfig = () => {
+  try {
+    window.localStorage.removeItem(DEBUG_CONFIG_KEY);
+  } catch {}
+};
+
+const createLogSpy = () => vi.spyOn(console, 'log').mockImplementation(() => {});
+
+describe('Logger', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    clearDebugConfig();
+  });
+
+  it('disables debug when localStorage is unavailable', () => {
+    const logSpy = createLogSpy();
+    vi.spyOn(window, 'localStorage', 'get').mockReturnValue(undefined as unknown as Storage);
+
+    const logger = createLogger('TestLogger');
+    logger.debug('hidden');
+
+    expect(logSpy).not.toHaveBeenCalled();
+  });
+
+  it('returns false when debug config is empty', () => {
+    const logSpy = createLogSpy();
+    window.localStorage.removeItem(DEBUG_CONFIG_KEY);
+
+    const logger = createLogger('EmptyConfig');
+    logger.debug('hidden');
+
+    expect(logSpy).not.toHaveBeenCalled();
+  });
+
+  it('enables debug for wildcard config', () => {
+    const logSpy = createLogSpy();
+    window.localStorage.setItem(DEBUG_CONFIG_KEY, '*');
+
+    const logger = createLogger('Any');
+    logger.debug('visible');
+    logger.info('visible');
+
+    expect(logSpy).toHaveBeenCalled();
+  });
+
+  it('matches namespace patterns with prefixes', () => {
+    const logSpy = createLogSpy();
+    window.localStorage.setItem(DEBUG_CONFIG_KEY, 'WebModelContext,OtherNamespace');
+
+    const matched = createLogger('WebModelContext:child');
+    matched.info('visible');
+
+    const missed = createLogger('Unmatched');
+    missed.debug('hidden');
+
+    expect(logSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('warns when localStorage access fails', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+
+    const logger = createLogger('Failure');
+    logger.debug('hidden');
+
+    expect(warnSpy).toHaveBeenCalled();
+  });
+});

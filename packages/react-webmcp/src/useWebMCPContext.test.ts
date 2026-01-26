@@ -1,6 +1,6 @@
 import type { ModelContext, ModelContextTesting } from '@mcp-b/global';
 import { initializeWebModelContext } from '@mcp-b/global';
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
 import { useWebMCPContext } from './useWebMCPContext.js';
 
@@ -42,7 +42,7 @@ describe('useWebMCPContext', () => {
         }))
       );
 
-      const tools = navigator.modelContextTesting!.listTools();
+      const tools = navigator.modelContextTesting?.listTools();
       expect(tools).toHaveLength(1);
       expect(tools[0].name).toBe('context_user');
       expect(tools[0].description).toBe('Get current user information');
@@ -53,7 +53,7 @@ describe('useWebMCPContext', () => {
         useWebMCPContext('context_settings', 'Get app settings', () => ({ theme: 'dark' }))
       );
 
-      const tools = navigator.modelContextTesting!.listTools();
+      const tools = navigator.modelContextTesting?.listTools();
       expect(tools).toHaveLength(1);
       // The tool should be registered (annotations are internal metadata)
       expect(tools[0].name).toBe('context_settings');
@@ -64,11 +64,11 @@ describe('useWebMCPContext', () => {
         useWebMCPContext('context_test', 'Test context', () => 'test')
       );
 
-      expect(navigator.modelContextTesting!.listTools()).toHaveLength(1);
+      expect(navigator.modelContextTesting?.listTools()).toHaveLength(1);
 
       unmount();
 
-      expect(navigator.modelContextTesting!.listTools()).toHaveLength(0);
+      expect(navigator.modelContextTesting?.listTools()).toHaveLength(0);
     });
   });
 
@@ -81,7 +81,7 @@ describe('useWebMCPContext', () => {
       );
 
       // Execute via testing API - returns formatted text directly, not wrapped in { content: [...] }
-      const result = await navigator.modelContextTesting!.executeTool(
+      const result = await navigator.modelContextTesting?.executeTool(
         'context_current_user',
         JSON.stringify({})
       );
@@ -92,7 +92,7 @@ describe('useWebMCPContext', () => {
     it('should return string values as-is', async () => {
       await renderHook(() => useWebMCPContext('context_status', 'Get status', () => 'active'));
 
-      const result = await navigator.modelContextTesting!.executeTool(
+      const result = await navigator.modelContextTesting?.executeTool(
         'context_status',
         JSON.stringify({})
       );
@@ -105,7 +105,7 @@ describe('useWebMCPContext', () => {
 
       await renderHook(() => useWebMCPContext('context_items', 'Get items', () => contextValue));
 
-      const result = await navigator.modelContextTesting!.executeTool(
+      const result = await navigator.modelContextTesting?.executeTool(
         'context_items',
         JSON.stringify({})
       );
@@ -122,7 +122,7 @@ describe('useWebMCPContext', () => {
       );
 
       // First execution
-      let result = await navigator.modelContextTesting!.executeTool(
+      let result = await navigator.modelContextTesting?.executeTool(
         'context_dynamic',
         JSON.stringify({})
       );
@@ -133,7 +133,7 @@ describe('useWebMCPContext', () => {
       await rerender({ getValue: () => value });
 
       // Second execution should use latest value
-      result = await navigator.modelContextTesting!.executeTool(
+      result = await navigator.modelContextTesting?.executeTool(
         'context_dynamic',
         JSON.stringify({})
       );
@@ -194,11 +194,11 @@ describe('useWebMCPContext', () => {
         { initialProps: { name: 'context_v1' } }
       );
 
-      expect(navigator.modelContextTesting!.listTools()[0].name).toBe('context_v1');
+      expect(navigator.modelContextTesting?.listTools()[0].name).toBe('context_v1');
 
       await rerender({ name: 'context_v2' });
 
-      expect(navigator.modelContextTesting!.listTools()[0].name).toBe('context_v2');
+      expect(navigator.modelContextTesting?.listTools()[0].name).toBe('context_v2');
     });
 
     it('should re-register when description changes', async () => {
@@ -207,11 +207,11 @@ describe('useWebMCPContext', () => {
         { initialProps: { description: 'Desc V1' } }
       );
 
-      expect(navigator.modelContextTesting!.listTools()[0].description).toBe('Desc V1');
+      expect(navigator.modelContextTesting?.listTools()[0].description).toBe('Desc V1');
 
       await rerender({ description: 'Desc V2' });
 
-      expect(navigator.modelContextTesting!.listTools()[0].description).toBe('Desc V2');
+      expect(navigator.modelContextTesting?.listTools()[0].description).toBe('Desc V2');
     });
 
     it('should not re-register when getValue function changes (ref-based)', async () => {
@@ -220,12 +220,12 @@ describe('useWebMCPContext', () => {
         { initialProps: { getValue: () => 'v1' } }
       );
 
-      expect(navigator.modelContextTesting!.listTools()).toHaveLength(1);
+      expect(navigator.modelContextTesting?.listTools()).toHaveLength(1);
 
       await rerender({ getValue: () => 'v2' });
 
       // Should still have 1 tool (not re-registered unnecessarily)
-      expect(navigator.modelContextTesting!.listTools()).toHaveLength(1);
+      expect(navigator.modelContextTesting?.listTools()).toHaveLength(1);
     });
   });
 });

@@ -8,7 +8,7 @@
 
 import { exec } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { promisify } from 'node:util';
 
 const execAsync = promisify(exec);
@@ -54,7 +54,7 @@ async function checkNodeVersion() {
     }
     error(`Node.js ${version} is too old (requires >= 16.0.0)`);
     return false;
-  } catch (err) {
+  } catch (_err) {
     error('Node.js not found');
     return false;
   }
@@ -81,7 +81,7 @@ async function checkBrowser() {
     }
     success('Chrome/Chromium found');
     return true;
-  } catch (err) {
+  } catch (_err) {
     warning('Could not detect browser');
     return false;
   }
@@ -97,7 +97,7 @@ async function checkPackageManager() {
       success(`${manager} is available`);
       found = true;
       break;
-    } catch (err) {
+    } catch (_err) {
       // Try next manager
     }
   }
@@ -137,7 +137,7 @@ async function checkNetworkAccess() {
     }
     warning('Could not reach unpkg.com');
     return false;
-  } catch (err) {
+  } catch (_err) {
     warning('Network check failed (offline or firewall?)');
     return false;
   }

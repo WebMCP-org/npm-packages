@@ -1,0 +1,15 @@
+{
+  "name": "vanilla-iife-json-test-app",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite --port 3010",
+    "preview": "vite preview --port 3010"
+  },
+  "devDependencies": {
+    "@mcp-b/global": "workspace:*",
+    "vite": "catalog:"
+  }
+}

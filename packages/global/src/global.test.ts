@@ -4,9 +4,13 @@ import { Client } from '@mcp-b/webmcp-ts-sdk';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { cleanupWebModelContext, initializeWebModelContext } from './global.js';
-import type { InternalModelContext, ModelContext, ModelContextTesting } from './types.js';
+import type {
+  InternalModelContext,
+  ModelContext,
+  ModelContextInput,
+  ModelContextTesting,
+} from './types.js';
 
-// Extend Navigator type for testing
 declare global {
   interface Navigator {
     modelContext?: ModelContext;
@@ -14,7 +18,6 @@ declare global {
   }
 }
 
-// Use a unique channel ID for the entire test suite to avoid conflicts
 const TEST_CHANNEL_ID = `test-suite-${Date.now()}`;
 const DEFAULT_INIT_OPTIONS = {
   transport: {
@@ -25,20 +28,38 @@ const DEFAULT_INIT_OPTIONS = {
   },
 } as const;
 
+const textResult = (text: string, structuredContent?: Record<string, unknown>) => ({
+  content: [{ type: 'text', text }],
+  ...(structuredContent ? { structuredContent } : {}),
+});
+
+const provideTools = (tools: ModelContextInput['tools']) => {
+  navigator.modelContext?.provideContext({ tools });
+};
+
+const provideResources = (resources: ModelContextInput['resources']) => {
+  navigator.modelContext?.provideContext({ resources });
+};
+
+const providePrompts = (prompts: ModelContextInput['prompts']) => {
+  navigator.modelContext?.provideContext({ prompts });
+};
+
+const executeTool = (name: string, args: Record<string, unknown>) =>
+  navigator.modelContextTesting?.executeTool(name, JSON.stringify(args));
+
 async function resetPolyfill(options = DEFAULT_INIT_OPTIONS) {
   await flushMicrotasks();
   const descriptor = Object.getOwnPropertyDescriptor(window.navigator, 'modelContext');
 
-  if (descriptor && descriptor.configurable === false) {
+  if (descriptor?.configurable === false) {
     installNotificationGuards();
     return;
   }
 
   try {
     cleanupWebModelContext();
-  } catch {
-    // Navigator properties are non-configurable when the polyfill is installed
-  }
+  } catch {}
   initializeWebModelContext(options);
   installNotificationGuards();
 }
@@ -77,9 +98,6 @@ function installNotificationGuards(): void {
   wrap(bridge.iframeServer);
 }
 
-/**
- * Helper to create an MCP client connected to the polyfill server.
- */
 async function createMCPClient(): Promise<{
   transport: TabClientTransport;
   sendRequest: (method: string, params?: Record<string, unknown>) => Promise<unknown>;
@@ -97,24 +115,28 @@ async function createMCPClient(): Promise<{
     { resolve: (value: unknown) => void; reject: (error: Error) => void }
   >();
 
-  transport.onmessage = (message: JSONRPCMessage) => {
-    if ('id' in message && message.id !== undefined) {
-      const pending = pendingRequests.get(message.id as number);
-      if (pending) {
-        pendingRequests.delete(message.id as number);
-        if ('error' in message) {
-          pending.reject(new Error((message.error as { message: string }).message));
-        } else {
-          pending.resolve('result' in message ? message.result : undefined);
-        }
-      }
+  const handleMessage = (message: JSONRPCMessage) => {
+    if (!('id' in message) || message.id === undefined) return;
+
+    const pending = pendingRequests.get(message.id as number);
+    if (!pending) return;
+
+    pendingRequests.delete(message.id as number);
+
+    if ('error' in message) {
+      pending.reject(new Error((message.error as { message: string }).message));
+      return;
     }
+
+    pending.resolve('result' in message ? message.result : undefined);
   };
+
+  transport.onmessage = handleMessage;
 
   await transport.start();
   await transport.serverReadyPromise;
 
-  const sendRequest = (method: string, params?: Record<string, unknown>): Promise<unknown> => {
+  const sendRequest = (method: string, params: Record<string, unknown> = {}): Promise<unknown> => {
     const id = ++requestId;
     return new Promise((resolve, reject) => {
       pendingRequests.set(id, { resolve, reject });
@@ -122,7 +144,7 @@ async function createMCPClient(): Promise<{
         jsonrpc: '2.0',
         id,
         method,
-        params: params ?? {},
+        params,
       });
     });
   };
@@ -131,9 +153,7 @@ async function createMCPClient(): Promise<{
     pendingRequests.clear();
     try {
       await transport.close();
-    } catch {
-      // Ignore close errors
-    }
+    } catch {}
   };
 
   return { transport, sendRequest, close };
@@ -148,13 +168,9 @@ describe('Web Model Context Polyfill', () => {
     await flushMicrotasks();
     try {
       cleanupWebModelContext();
-    } catch {
-      // navigator properties may be non-configurable in jsdom/browser environments
-    }
+    } catch {}
   });
 
-  // Initialize polyfill once for all tests
-  // Clear context before each test to ensure clean state
   beforeEach(async () => {
     if (!navigator.modelContext || !navigator.modelContextTesting) {
       await resetPolyfill();
@@ -182,86 +198,78 @@ describe('Web Model Context Polyfill', () => {
     });
 
     it('should start with empty context after clearContext', () => {
-      expect(navigator.modelContextTesting!.listTools()).toHaveLength(0);
-      expect(navigator.modelContext!.listResources()).toHaveLength(0);
-      expect(navigator.modelContext!.listPrompts()).toHaveLength(0);
+      expect(navigator.modelContextTesting?.listTools()).toHaveLength(0);
+      expect(navigator.modelContext?.listResources()).toHaveLength(0);
+      expect(navigator.modelContext?.listPrompts()).toHaveLength(0);
     });
   });
 
   describe('Tool Registration via provideContext', () => {
     it('should register tools via provideContext', () => {
-      navigator.modelContext!.provideContext({
-        tools: [
-          {
-            name: 'test_tool',
-            description: 'A test tool',
-            inputSchema: { name: z.string() },
-            execute: async () => ({ content: [{ type: 'text', text: 'done' }] }),
-          },
-        ],
-      });
+      provideTools([
+        {
+          name: 'test_tool',
+          description: 'A test tool',
+          inputSchema: { name: z.string() },
+          execute: async () => textResult('done'),
+        },
+      ]);
 
-      const tools = navigator.modelContextTesting!.listTools();
+      const tools = navigator.modelContextTesting?.listTools();
       expect(tools).toHaveLength(1);
       expect(tools[0].name).toBe('test_tool');
       expect(tools[0].description).toBe('A test tool');
     });
 
     it('should support JSON Schema input format', () => {
-      navigator.modelContext!.provideContext({
-        tools: [
-          {
-            name: 'json_schema_tool',
-            description: 'Tool with JSON Schema',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                name: { type: 'string' },
-              },
-              required: ['name'],
+      provideTools([
+        {
+          name: 'json_schema_tool',
+          description: 'Tool with JSON Schema',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              name: { type: 'string' },
             },
-            execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+            required: ['name'],
           },
-        ],
-      });
+          execute: async () => textResult('ok'),
+        },
+      ]);
 
-      const tools = navigator.modelContextTesting!.listTools();
+      const tools = navigator.modelContextTesting?.listTools();
       expect(tools).toHaveLength(1);
       expect(tools[0].name).toBe('json_schema_tool');
     });
 
     it('should replace tools on subsequent provideContext calls', () => {
-      navigator.modelContext!.provideContext({
-        tools: [
-          {
-            name: 'tool_a',
-            description: 'Tool A',
-            inputSchema: {},
-            execute: async () => ({ content: [{ type: 'text', text: 'a' }] }),
-          },
-        ],
-      });
+      provideTools([
+        {
+          name: 'tool_a',
+          description: 'Tool A',
+          inputSchema: {},
+          execute: async () => textResult('a'),
+        },
+      ]);
 
-      expect(navigator.modelContextTesting!.listTools()).toHaveLength(1);
+      expect(navigator.modelContextTesting?.listTools()).toHaveLength(1);
 
-      navigator.modelContext!.provideContext({
-        tools: [
-          {
-            name: 'tool_b',
-            description: 'Tool B',
-            inputSchema: {},
-            execute: async () => ({ content: [{ type: 'text', text: 'b' }] }),
-          },
-          {
-            name: 'tool_c',
-            description: 'Tool C',
-            inputSchema: {},
-            execute: async () => ({ content: [{ type: 'text', text: 'c' }] }),
-          },
-        ],
-      });
+      provideTools([
+        {
+          name: 'tool_b',
+          description: 'Tool B',
+          inputSchema: {},
+          execute: async () => textResult('b'),
+        },
+        {
+          name: 'tool_c',
+          description: 'Tool C',
+          inputSchema: {},
+          execute: async () => textResult('c'),
+        },
+      ]);
 
-      const tools = navigator.modelContextTesting!.listTools();
+      const tools = navigator.modelContextTesting?.listTools();
       expect(tools).toHaveLength(2);
       expect(tools.map((t) => t.name).sort()).toEqual(['tool_b', 'tool_c']);
     });
@@ -269,66 +277,59 @@ describe('Web Model Context Polyfill', () => {
 
   describe('Tool Registration via registerTool', () => {
     it('should register and unregister tools dynamically', () => {
-      const { unregister } = navigator.modelContext!.registerTool({
+      const result = navigator.modelContext?.registerTool({
         name: 'dynamic_tool',
         description: 'A dynamic tool',
         inputSchema: { value: z.number() },
-        execute: async ({ value }) => ({
-          content: [{ type: 'text', text: String(value * 2) }],
-        }),
+        execute: async ({ value }) => textResult(String(value * 2)),
       });
+      const { unregister } = result!;
 
-      expect(navigator.modelContextTesting!.listTools()).toHaveLength(1);
+      expect(navigator.modelContextTesting?.listTools()).toHaveLength(1);
 
       unregister();
 
-      expect(navigator.modelContextTesting!.listTools()).toHaveLength(0);
+      expect(navigator.modelContextTesting?.listTools()).toHaveLength(0);
     });
 
     it('should persist dynamic tools across provideContext calls', () => {
-      // Register dynamic tool first
-      navigator.modelContext!.registerTool({
+      navigator.modelContext?.registerTool({
         name: 'dynamic_tool',
         description: 'Dynamic',
         inputSchema: {},
-        execute: async () => ({ content: [{ type: 'text', text: 'dynamic' }] }),
+        execute: async () => textResult('dynamic'),
       });
 
-      // provideContext should not remove dynamic tools
-      navigator.modelContext!.provideContext({
-        tools: [
-          {
-            name: 'base_tool',
-            description: 'Base',
-            inputSchema: {},
-            execute: async () => ({ content: [{ type: 'text', text: 'base' }] }),
-          },
-        ],
-      });
+      provideTools([
+        {
+          name: 'base_tool',
+          description: 'Base',
+          inputSchema: {},
+          execute: async () => textResult('base'),
+        },
+      ]);
 
-      const tools = navigator.modelContextTesting!.listTools();
+      const tools = navigator.modelContextTesting?.listTools();
       expect(tools).toHaveLength(2);
       expect(tools.map((t) => t.name).sort()).toEqual(['base_tool', 'dynamic_tool']);
     });
 
     it('should throw on name collision with provideContext tools', () => {
-      navigator.modelContext!.provideContext({
-        tools: [
-          {
-            name: 'collision_tool',
-            description: 'Base',
-            inputSchema: {},
-            execute: async () => ({ content: [{ type: 'text', text: 'base' }] }),
-          },
-        ],
-      });
+      provideTools([
+        {
+          name: 'collision_tool',
+          description: 'Base',
+          inputSchema: {},
+          execute: async () => textResult('base'),
+        },
+      ]);
 
       expect(() => {
-        navigator.modelContext!.registerTool({
+        navigator.modelContext?.registerTool({
           name: 'collision_tool',
           description: 'Dynamic',
           inputSchema: {},
-          execute: async () => ({ content: [{ type: 'text', text: 'dynamic' }] }),
+          execute: async () => textResult('dynamic'),
         });
       }).toThrow(/collision/i);
     });
@@ -336,77 +337,54 @@ describe('Web Model Context Polyfill', () => {
 
   describe('Tool Execution', () => {
     it('should execute tools via testing API', async () => {
-      navigator.modelContext!.provideContext({
-        tools: [
-          {
-            name: 'echo',
-            description: 'Echo tool',
-            inputSchema: { message: z.string() },
-            execute: async ({ message }) => ({
-              content: [{ type: 'text', text: `Echo: ${message}` }],
-            }),
-          },
-        ],
-      });
+      provideTools([
+        {
+          name: 'echo',
+          description: 'Echo tool',
+          inputSchema: { message: z.string() },
+          execute: async ({ message }) => textResult(`Echo: ${message}`),
+        },
+      ]);
 
-      const result = await navigator.modelContextTesting!.executeTool(
-        'echo',
-        JSON.stringify({ message: 'hello' })
-      );
+      const result = await executeTool('echo', { message: 'hello' });
 
       expect(result).toBe('Echo: hello');
     });
 
     it('should return structured content when present', async () => {
-      navigator.modelContext!.provideContext({
-        tools: [
-          {
-            name: 'structured',
-            description: 'Returns structured data',
-            inputSchema: {},
-            execute: async () => ({
-              content: [{ type: 'text', text: 'JSON response' }],
-              structuredContent: { foo: 'bar', count: 42 },
-            }),
-          },
-        ],
-      });
+      provideTools([
+        {
+          name: 'structured',
+          description: 'Returns structured data',
+          inputSchema: {},
+          execute: async () => textResult('JSON response', { foo: 'bar', count: 42 }),
+        },
+      ]);
 
-      const result = await navigator.modelContextTesting!.executeTool(
-        'structured',
-        JSON.stringify({})
-      );
+      const result = await executeTool('structured', {});
 
       expect(result).toEqual({ foo: 'bar', count: 42 });
     });
 
     it('should handle tool execution errors', async () => {
-      navigator.modelContext!.provideContext({
-        tools: [
-          {
-            name: 'failing_tool',
-            description: 'Always fails',
-            inputSchema: {},
-            execute: async () => {
-              throw new Error('Intentional failure');
-            },
+      provideTools([
+        {
+          name: 'failing_tool',
+          description: 'Always fails',
+          inputSchema: {},
+          execute: async () => {
+            throw new Error('Intentional failure');
           },
-        ],
-      });
+        },
+      ]);
 
-      // Should return undefined for errors (as per native API behavior)
-      const result = await navigator.modelContextTesting!.executeTool(
-        'failing_tool',
-        JSON.stringify({})
-      );
+      const result = await executeTool('failing_tool', {});
 
       expect(result).toBeUndefined();
     });
 
     it('should throw for non-existent tools', async () => {
-      await expect(
-        navigator.modelContextTesting!.executeTool('nonexistent', JSON.stringify({}))
-      ).rejects.toThrow(/not found/i);
+      await expect(executeTool('nonexistent', {})).rejects.toThrow(/not found/i);
     });
   });
 
@@ -414,28 +392,23 @@ describe('Web Model Context Polyfill', () => {
     let client: Awaited<ReturnType<typeof createMCPClient>>;
 
     beforeEach(async () => {
-      // Register some tools before connecting client
-      navigator.modelContext!.provideContext({
-        tools: [
-          {
-            name: 'add',
-            description: 'Add two numbers',
-            inputSchema: { a: z.number(), b: z.number() },
-            execute: async ({ a, b }) => ({
-              content: [{ type: 'text', text: String((a as number) + (b as number)) }],
-              structuredContent: { result: (a as number) + (b as number) },
-            }),
+      provideTools([
+        {
+          name: 'add',
+          description: 'Add two numbers',
+          inputSchema: { a: z.number(), b: z.number() },
+          execute: async ({ a, b }) => {
+            const result = (a as number) + (b as number);
+            return textResult(String(result), { result });
           },
-          {
-            name: 'greet',
-            description: 'Greet a person',
-            inputSchema: { name: z.string() },
-            execute: async ({ name }) => ({
-              content: [{ type: 'text', text: `Hello, ${name}!` }],
-            }),
-          },
-        ],
-      });
+        },
+        {
+          name: 'greet',
+          description: 'Greet a person',
+          inputSchema: { name: z.string() },
+          execute: async ({ name }) => textResult(`Hello, ${name}!`),
+        },
+      ]);
 
       client = await createMCPClient();
     });
@@ -492,15 +465,13 @@ describe('Web Model Context Polyfill', () => {
 
       await mcpClient.connect(transport);
 
-      navigator.modelContext!.provideContext({
+      navigator.modelContext?.provideContext({
         tools: [
           {
             name: 'sum',
             description: 'Add numbers',
             inputSchema: { a: z.number(), b: z.number() },
-            execute: async ({ a, b }) => ({
-              content: [{ type: 'text', text: String((a as number) + (b as number)) }],
-            }),
+            execute: async ({ a, b }) => textResult(String((a as number) + (b as number))),
           },
         ],
         prompts: [
@@ -540,79 +511,76 @@ describe('Web Model Context Polyfill', () => {
 
   describe('Resource Registration', () => {
     it('should register resources via provideContext', () => {
-      navigator.modelContext!.provideContext({
-        resources: [
-          {
-            uri: 'app://settings',
-            name: 'App Settings',
-            description: 'Application settings',
-            mimeType: 'application/json',
-            read: async () => ({
-              contents: [
-                {
-                  uri: 'app://settings',
-                  mimeType: 'application/json',
-                  text: JSON.stringify({ theme: 'dark' }),
-                },
-              ],
-            }),
-          },
-        ],
-      });
+      provideResources([
+        {
+          uri: 'app://settings',
+          name: 'App Settings',
+          description: 'Application settings',
+          mimeType: 'application/json',
+          read: async () => ({
+            contents: [
+              {
+                uri: 'app://settings',
+                mimeType: 'application/json',
+                text: JSON.stringify({ theme: 'dark' }),
+              },
+            ],
+          }),
+        },
+      ]);
 
-      const resources = navigator.modelContext!.listResources();
+      const resources = navigator.modelContext?.listResources();
       expect(resources).toHaveLength(1);
       expect(resources[0].uri).toBe('app://settings');
     });
 
     it('should register and unregister resources dynamically', () => {
-      const { unregister } = navigator.modelContext!.registerResource({
+      const result = navigator.modelContext?.registerResource({
         uri: 'dynamic://data',
         name: 'Dynamic Data',
         read: async () => ({
           contents: [{ uri: 'dynamic://data', text: 'dynamic content' }],
         }),
       });
+      const { unregister } = result!;
 
-      expect(navigator.modelContext!.listResources()).toHaveLength(1);
+      expect(navigator.modelContext?.listResources()).toHaveLength(1);
 
       unregister();
 
-      expect(navigator.modelContext!.listResources()).toHaveLength(0);
+      expect(navigator.modelContext?.listResources()).toHaveLength(0);
     });
 
     it('should support resource templates and template reads', async () => {
       const internalContext = navigator.modelContext as unknown as InternalModelContext;
 
-      navigator.modelContext!.provideContext({
-        resources: [
-          {
-            uri: 'app://config',
-            name: 'Config',
-            description: 'Static config',
-            read: async (uri: URL) => ({
-              contents: [{ uri: uri.toString(), text: 'config-json' }],
-            }),
-          },
-          {
-            uri: 'app://files/{path}',
-            name: 'Dynamic File',
-            description: 'File template',
-            read: async (_uri: URL, params?: Record<string, string>) => ({
-              contents: [
-                {
-                  uri: `app://files/${params?.path}`,
-                  text: `file:${params?.path}`,
-                },
-              ],
-            }),
-          },
-        ],
-      });
+      provideResources([
+        {
+          uri: 'app://config',
+          name: 'Config',
+          description: 'Static config',
+          read: async (uri: URL) => ({
+            contents: [{ uri: uri.toString(), text: 'config-json' }],
+          }),
+        },
+        {
+          uri: 'app://files/{path}',
+          name: 'Dynamic File',
+          description: 'File template',
+          read: async (_uri: URL, params?: Record<string, string>) => ({
+            contents: [
+              {
+                uri: `app://files/${params?.path}`,
+                text: `file:${params?.path}`,
+              },
+            ],
+          }),
+        },
+      ]);
 
-      expect(navigator.modelContext!.listResources().map((r) => r.uri)).toEqual(['app://config']);
+      expect(navigator.modelContext?.listResources().map((r) => r.uri)).toEqual(['app://config']);
 
-      expect(navigator.modelContext!.listResourceTemplates()).toEqual([
+      expect(navigator.modelContext?.listResourceTemplates()).toEqual([
         {
           uriTemplate: 'app://files/{path}',
           name: 'Dynamic File',
@@ -627,63 +595,54 @@ describe('Web Model Context Polyfill', () => {
 
   describe('Prompt Registration', () => {
     it('should register prompts via provideContext', () => {
-      navigator.modelContext!.provideContext({
-        prompts: [
-          {
-            name: 'code_review',
-            description: 'Review code',
-            get: async () => ({
-              messages: [{ role: 'user', content: { type: 'text', text: 'Review this code' } }],
-            }),
-          },
-        ],
-      });
+      providePrompts([
+        {
+          name: 'code_review',
+          description: 'Review code',
+          get: async () => ({
+            messages: [{ role: 'user', content: { type: 'text', text: 'Review this code' } }],
+          }),
+        },
+      ]);
 
-      const prompts = navigator.modelContext!.listPrompts();
+      const prompts = navigator.modelContext?.listPrompts();
       expect(prompts).toHaveLength(1);
       expect(prompts[0].name).toBe('code_review');
     });
 
     it('should register and unregister prompts dynamically', () => {
-      const { unregister } = navigator.modelContext!.registerPrompt({
+      const result = navigator.modelContext?.registerPrompt({
         name: 'dynamic_prompt',
         description: 'Dynamic prompt',
         get: async () => ({
           messages: [{ role: 'user', content: { type: 'text', text: 'Dynamic' } }],
         }),
       });
+      const { unregister } = result!;
 
-      expect(navigator.modelContext!.listPrompts()).toHaveLength(1);
+      expect(navigator.modelContext?.listPrompts()).toHaveLength(1);
 
       unregister();
 
-      expect(navigator.modelContext!.listPrompts()).toHaveLength(0);
+      expect(navigator.modelContext?.listPrompts()).toHaveLength(0);
     });
   });
 
   describe('Testing API', () => {
     it('should record tool call history', async () => {
-      navigator.modelContext!.provideContext({
-        tools: [
-          {
-            name: 'tracked_tool',
-            description: 'Tracked tool',
-            inputSchema: { value: z.number() },
-            execute: async () => ({ content: [{ type: 'text', text: 'done' }] }),
-          },
-        ],
-      });
+      provideTools([
+        {
+          name: 'tracked_tool',
+          description: 'Tracked tool',
+          inputSchema: { value: z.number() },
+          execute: async () => textResult('done'),
+        },
+      ]);
 
-      await navigator.modelContextTesting!.executeTool(
-        'tracked_tool',
-        JSON.stringify({ value: 42 })
-      );
-      await navigator.modelContextTesting!.executeTool(
-        'tracked_tool',
-        JSON.stringify({ value: 100 })
-      );
+      await executeTool('tracked_tool', { value: 42 });
+      await executeTool('tracked_tool', { value: 100 });
 
-      const history = navigator.modelContextTesting!.getToolCalls();
+      const history = navigator.modelContextTesting?.getToolCalls();
       expect(history).toHaveLength(2);
       expect(history[0].toolName).toBe('tracked_tool');
       expect(history[0].arguments).toEqual({ value: 42 });
@@ -691,92 +650,78 @@ describe('Web Model Context Polyfill', () => {
     });
 
     it('should support mock responses', async () => {
-      navigator.modelContext!.provideContext({
-        tools: [
-          {
-            name: 'mockable_tool',
-            description: 'Can be mocked',
-            inputSchema: {},
-            execute: async () => ({ content: [{ type: 'text', text: 'real response' }] }),
-          },
-        ],
-      });
+      provideTools([
+        {
+          name: 'mockable_tool',
+          description: 'Can be mocked',
+          inputSchema: {},
+          execute: async () => textResult('real response'),
+        },
+      ]);
 
-      // Set mock
-      navigator.modelContextTesting!.setMockToolResponse('mockable_tool', {
+      navigator.modelContextTesting?.setMockToolResponse('mockable_tool', {
         content: [{ type: 'text', text: 'mocked!' }],
       });
 
-      const result = await navigator.modelContextTesting!.executeTool(
-        'mockable_tool',
-        JSON.stringify({})
-      );
+      const result = await executeTool('mockable_tool', {});
 
       expect(result).toBe('mocked!');
 
-      // Clear mock
-      navigator.modelContextTesting!.clearMockToolResponse('mockable_tool');
+      navigator.modelContextTesting?.clearMockToolResponse('mockable_tool');
 
-      const realResult = await navigator.modelContextTesting!.executeTool(
-        'mockable_tool',
-        JSON.stringify({})
-      );
+      const realResult = await executeTool('mockable_tool', {});
 
       expect(realResult).toBe('real response');
     });
 
     it('should notify toolsChanged callbacks with microtask batching', async () => {
       const callback = vi.fn();
-      navigator.modelContextTesting!.registerToolsChangedCallback(callback);
+      navigator.modelContextTesting?.registerToolsChangedCallback(callback);
 
-      navigator.modelContext!.provideContext({
-        tools: [
-          {
-            name: 'batched_tool',
-            description: 'Batched',
-            inputSchema: {},
-            execute: async () => ({ content: [{ type: 'text', text: 'base' }] }),
-          },
-        ],
-      });
+      provideTools([
+        {
+          name: 'batched_tool',
+          description: 'Batched',
+          inputSchema: {},
+          execute: async () => textResult('base'),
+        },
+      ]);
 
-      navigator.modelContext!.registerTool({
+      navigator.modelContext?.registerTool({
         name: 'batched_dynamic',
         description: 'Dynamic',
         inputSchema: {},
-        execute: async () => ({ content: [{ type: 'text', text: 'dyn' }] }),
+        execute: async () => textResult('dyn'),
       });
 
       await flushMicrotasks();
       expect(callback).toHaveBeenCalledTimes(1);
 
-      navigator.modelContext!.unregisterTool('batched_dynamic');
+      navigator.modelContext?.unregisterTool('batched_dynamic');
       await flushMicrotasks();
       expect(callback).toHaveBeenCalledTimes(2);
     });
 
     it('should reset testing state', async () => {
-      navigator.modelContext!.provideContext({
-        tools: [
-          {
-            name: 'reset_test_tool',
-            description: 'Test',
-            inputSchema: {},
-            execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
-          },
-        ],
-      });
+      provideTools([
+        {
+          name: 'reset_test_tool',
+          description: 'Test',
+          inputSchema: {},
+          execute: async () => textResult('ok'),
+        },
+      ]);
 
-      await navigator.modelContextTesting!.executeTool('reset_test_tool', JSON.stringify({}));
-      navigator.modelContextTesting!.setMockToolResponse('reset_test_tool', {
+      await executeTool('reset_test_tool', {});
+      navigator.modelContextTesting?.setMockToolResponse('reset_test_tool', {
         content: [{ type: 'text', text: 'mock' }],
       });
 
-      expect(navigator.modelContextTesting!.getToolCalls()).toHaveLength(1);
+      expect(navigator.modelContextTesting?.getToolCalls()).toHaveLength(1);
 
-      navigator.modelContextTesting!.reset();
+      navigator.modelContextTesting?.reset();
 
-      expect(navigator.modelContextTesting!.getToolCalls()).toHaveLength(0);
+      expect(navigator.modelContextTesting?.getToolCalls()).toHaveLength(0);
     });
   });
 
@@ -802,10 +747,10 @@ describe('Web Model Context Polyfill', () => {
         elicitInput,
       };
 
-      const samplingResult = await navigator.modelContext!.createMessage({
+      const samplingResult = await navigator.modelContext?.createMessage({
         messages: [{ role: 'user', content: { type: 'text', text: 'hi' } }],
       });
-      const elicitationResult = await navigator.modelContext!.elicitInput({
+      const elicitationResult = await navigator.modelContext?.elicitInput({
         message: 'Need input',
         requestedSchema: {
           type: 'object',
@@ -826,29 +771,24 @@ describe('Web Model Context Polyfill', () => {
     it('should dispatch toolcall events', async () => {
       const eventHandler = vi.fn();
 
-      navigator.modelContext!.addEventListener('toolcall', eventHandler);
+      navigator.modelContext?.addEventListener('toolcall', eventHandler);
 
-      navigator.modelContext!.provideContext({
-        tools: [
-          {
-            name: 'event_tool',
-            description: 'Tool with events',
-            inputSchema: { value: z.string() },
-            execute: async () => ({ content: [{ type: 'text', text: 'done' }] }),
-          },
-        ],
-      });
+      provideTools([
+        {
+          name: 'event_tool',
+          description: 'Tool with events',
+          inputSchema: { value: z.string() },
+          execute: async () => textResult('done'),
+        },
+      ]);
 
-      await navigator.modelContextTesting!.executeTool(
-        'event_tool',
-        JSON.stringify({ value: 'test' })
-      );
+      await executeTool('event_tool', { value: 'test' });
 
       expect(eventHandler).toHaveBeenCalledOnce();
       expect(eventHandler.mock.calls[0][0].name).toBe('event_tool');
       expect(eventHandler.mock.calls[0][0].arguments).toEqual({ value: 'test' });
 
-      navigator.modelContext!.removeEventListener('toolcall', eventHandler);
+      navigator.modelContext?.removeEventListener('toolcall', eventHandler);
     });
 
     it('should allow intercepting tool calls via respondWith', async () => {
@@ -862,39 +802,34 @@ describe('Web Model Context Polyfill', () => {
         });
       };
 
-      navigator.modelContext!.addEventListener('toolcall', interceptor);
+      navigator.modelContext?.addEventListener('toolcall', interceptor);
 
-      navigator.modelContext!.provideContext({
-        tools: [
-          {
-            name: 'interceptable_tool',
-            description: 'Can be intercepted',
-            inputSchema: {},
-            execute: async () => ({ content: [{ type: 'text', text: 'original' }] }),
-          },
-        ],
-      });
+      provideTools([
+        {
+          name: 'interceptable_tool',
+          description: 'Can be intercepted',
+          inputSchema: {},
+          execute: async () => textResult('original'),
+        },
+      ]);
 
-      const result = await navigator.modelContextTesting!.executeTool(
-        'interceptable_tool',
-        JSON.stringify({})
-      );
+      const result = await executeTool('interceptable_tool', {});
 
       expect(result).toBe('intercepted!');
 
-      navigator.modelContext!.removeEventListener('toolcall', interceptor);
+      navigator.modelContext?.removeEventListener('toolcall', interceptor);
     });
   });
 
   describe('clearContext', () => {
     it('should clear all registered items', () => {
-      navigator.modelContext!.provideContext({
+      navigator.modelContext?.provideContext({
         tools: [
           {
             name: 'tool1',
             description: 'Tool 1',
             inputSchema: {},
-            execute: async () => ({ content: [{ type: 'text', text: '1' }] }),
+            execute: async () => textResult('1'),
           },
         ],
         resources: [
@@ -915,22 +850,22 @@ describe('Web Model Context Polyfill', () => {
         ],
       });
 
-      navigator.modelContext!.registerTool({
+      navigator.modelContext?.registerTool({
         name: 'dynamic_tool',
         description: 'Dynamic',
         inputSchema: {},
-        execute: async () => ({ content: [{ type: 'text', text: 'd' }] }),
+        execute: async () => textResult('d'),
       });
 
-      expect(navigator.modelContextTesting!.listTools()).toHaveLength(2);
-      expect(navigator.modelContext!.listResources()).toHaveLength(1);
-      expect(navigator.modelContext!.listPrompts()).toHaveLength(1);
+      expect(navigator.modelContextTesting?.listTools()).toHaveLength(2);
+      expect(navigator.modelContext?.listResources()).toHaveLength(1);
+      expect(navigator.modelContext?.listPrompts()).toHaveLength(1);
 
-      navigator.modelContext!.clearContext();
+      navigator.modelContext?.clearContext();
 
-      expect(navigator.modelContextTesting!.listTools()).toHaveLength(0);
-      expect(navigator.modelContext!.listResources()).toHaveLength(0);
-      expect(navigator.modelContext!.listPrompts()).toHaveLength(0);
+      expect(navigator.modelContextTesting?.listTools()).toHaveLength(0);
+      expect(navigator.modelContext?.listResources()).toHaveLength(0);
+      expect(navigator.modelContext?.listPrompts()).toHaveLength(0);
     });
   });
 });

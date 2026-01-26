@@ -1,6 +1,6 @@
 import type { ModelContext, ModelContextTesting } from '@mcp-b/global';
 import { initializeWebModelContext } from '@mcp-b/global';
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
 import { z } from 'zod';
 import { useWebMCP } from './useWebMCP.js';
@@ -76,7 +76,7 @@ describe('useWebMCP', () => {
         })
       );
 
-      const tools = navigator.modelContextTesting!.listTools();
+      const tools = navigator.modelContextTesting?.listTools();
       expect(tools).toHaveLength(1);
       expect(tools[0].name).toBe('my_tool');
       expect(tools[0].description).toBe('My test tool');
@@ -94,7 +94,7 @@ describe('useWebMCP', () => {
         })
       );
 
-      const tools = navigator.modelContextTesting!.listTools();
+      const tools = navigator.modelContextTesting?.listTools();
       expect(tools).toHaveLength(1);
       expect(tools[0].name).toBe('greet');
       // The testing API returns inputSchema as a JSON string
@@ -111,11 +111,11 @@ describe('useWebMCP', () => {
         })
       );
 
-      expect(navigator.modelContextTesting!.listTools()).toHaveLength(1);
+      expect(navigator.modelContextTesting?.listTools()).toHaveLength(1);
 
       unmount();
 
-      expect(navigator.modelContextTesting!.listTools()).toHaveLength(0);
+      expect(navigator.modelContextTesting?.listTools()).toHaveLength(0);
     });
   });
 
@@ -211,7 +211,7 @@ describe('useWebMCP', () => {
         })
       );
 
-      const result = await navigator.modelContextTesting!.executeTool(
+      const result = await navigator.modelContextTesting?.executeTool(
         'echo_tool',
         JSON.stringify({ message: 'hello' })
       );
@@ -235,7 +235,7 @@ describe('useWebMCP', () => {
         })
       );
 
-      const result = await navigator.modelContextTesting!.executeTool(
+      const result = await navigator.modelContextTesting?.executeTool(
         'calc_tool',
         JSON.stringify({ a: 5, b: 3 })
       );
@@ -335,11 +335,11 @@ describe('useWebMCP', () => {
         { initialProps: { name: 'tool_v1' } }
       );
 
-      expect(navigator.modelContextTesting!.listTools()[0].name).toBe('tool_v1');
+      expect(navigator.modelContextTesting?.listTools()[0].name).toBe('tool_v1');
 
       await rerender({ name: 'tool_v2' });
 
-      expect(navigator.modelContextTesting!.listTools()[0].name).toBe('tool_v2');
+      expect(navigator.modelContextTesting?.listTools()[0].name).toBe('tool_v2');
     });
 
     it('should re-register when description changes', async () => {
@@ -353,11 +353,11 @@ describe('useWebMCP', () => {
         { initialProps: { description: 'Version 1' } }
       );
 
-      expect(navigator.modelContextTesting!.listTools()[0].description).toBe('Version 1');
+      expect(navigator.modelContextTesting?.listTools()[0].description).toBe('Version 1');
 
       await rerender({ description: 'Version 2' });
 
-      expect(navigator.modelContextTesting!.listTools()[0].description).toBe('Version 2');
+      expect(navigator.modelContextTesting?.listTools()[0].description).toBe('Version 2');
     });
   });
 });
