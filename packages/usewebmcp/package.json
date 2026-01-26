@@ -1,6 +1,6 @@
 {
   "name": "usewebmcp",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "description": "React hooks for Model Context Protocol - alias for @mcp-b/react-webmcp",
   "keywords": [
     "mcp",
@@ -60,7 +60,7 @@
   },
   "peerDependencies": {
     "react": "^17.0.0 || ^18.0.0 || ^19.0.0",
-    "zod": "^3.25.0 || ^4.0.0"
+    "zod": "^3.25.0"
   },
   "publishConfig": {
     "access": "public",

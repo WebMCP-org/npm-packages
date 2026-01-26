@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/webmcp-ts-sdk",
-  "version": "2.0.0",
+  "version": "1.2.0",
   "description": "Browser-adapted MCP TypeScript SDK - Dynamic tool registration for W3C Web Model Context API and AI agent integration",
   "keywords": [
     "mcp",

@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/react-webmcp",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "React hooks for Model Context Protocol (MCP) - expose React components as AI tools for Claude, ChatGPT, Cursor, and Copilot with Zod validation",
   "keywords": [
     "mcp",
@@ -93,7 +93,7 @@
   },
   "peerDependencies": {
     "react": "^17.0.0 || ^18.0.0 || ^19.0.0",
-    "zod": "^3.25.0 || ^4.0.0"
+    "zod": "^3.25.0"
   },
   "publishConfig": {
     "access": "public",
