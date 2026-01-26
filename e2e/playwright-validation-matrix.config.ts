@@ -4,7 +4,9 @@ import { defineConfig, devices } from '@playwright/test';
  * Playwright config for Validation Matrix tests
  *
  * This config starts all test apps and runs validation tests across
- * all Zod/build/framework combinations.
+ * all Zod 3/build/framework combinations.
+ *
+ * Note: Only Zod 3.25+ is supported. Zod 4 is NOT supported.
  */
 export default defineConfig({
   testDir: './tests',
@@ -54,26 +56,10 @@ export default defineConfig({
       stdout: 'ignore',
       stderr: 'pipe',
     },
-    {
-      command: 'pnpm --filter vanilla-iife-zod4-test-app dev',
-      url: 'http://localhost:3012',
-      reuseExistingServer: !process.env.CI,
-      timeout: 60 * 1000,
-      stdout: 'ignore',
-      stderr: 'pipe',
-    },
     // ESM apps (Vite with bundling)
     {
       command: 'pnpm --filter vanilla-esm-zod3-test-app dev',
       url: 'http://localhost:3013',
-      reuseExistingServer: !process.env.CI,
-      timeout: 60 * 1000,
-      stdout: 'ignore',
-      stderr: 'pipe',
-    },
-    {
-      command: 'pnpm --filter vanilla-esm-zod4-test-app dev',
-      url: 'http://localhost:3014',
       reuseExistingServer: !process.env.CI,
       timeout: 60 * 1000,
       stdout: 'ignore',

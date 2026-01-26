@@ -175,9 +175,16 @@ describe('Validation Property-Based Tests', () => {
       );
     });
 
-    it('should reject Infinity values with default z.number()', () => {
-      // This test documents that Zod rejects Infinity by default
+    it('should accept Infinity values with default z.number() in Zod 3.25+', () => {
+      // Zod 3.25+ accepts Infinity by default with z.number()
       const validator = z.number();
+      expect(validateWithZod(Number.POSITIVE_INFINITY, validator).success).toBe(true);
+      expect(validateWithZod(Number.NEGATIVE_INFINITY, validator).success).toBe(true);
+    });
+
+    it('should reject Infinity values with z.number().finite()', () => {
+      // Use .finite() to reject Infinity in Zod 3.25+
+      const validator = z.number().finite();
       expect(validateWithZod(Number.POSITIVE_INFINITY, validator).success).toBe(false);
       expect(validateWithZod(Number.NEGATIVE_INFINITY, validator).success).toBe(false);
     });

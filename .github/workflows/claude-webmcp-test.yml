@@ -60,10 +60,15 @@ jobs:
         id: setup-chrome
         with:
           chrome-version: stable
+          install-dependencies: true
 
       - name: Verify Chrome installation
         run: |
           echo "Chrome path: ${{ steps.setup-chrome.outputs.chrome-path }}"
+          if [ -z "${{ steps.setup-chrome.outputs.chrome-path }}" ]; then
+            echo "ERROR: Chrome path is empty!"
+            exit 1
+          fi
           "${{ steps.setup-chrome.outputs.chrome-path }}" --version
 
       - name: Start test app in background

@@ -258,18 +258,28 @@ class NativeModelContextAdapter implements InternalModelContext {
 
   /**
    * Provides context (tools) to AI models via the native API.
-   * Delegates to navigator.modelContext.provideContext().
+   * Converts Zod schemas to JSON Schema before passing to native API.
    * Tool change callback will fire and trigger sync automatically.
    *
    * @param {ModelContextInput} context - Context containing tools to register
    */
   provideContext(context: ModelContextInput): void {
-    this.nativeContext.provideContext(context);
+    // Convert Zod schemas to JSON Schema for native API compatibility
+    // Destructure tools separately to avoid exactOptionalPropertyTypes issues
+    const { tools, ...rest } = context;
+    const normalizedContext: ModelContextInput = { ...rest };
+    if (tools) {
+      normalizedContext.tools = tools.map((tool) => ({
+        ...tool,
+        inputSchema: normalizeSchema(tool.inputSchema).jsonSchema,
+      }));
+    }
+    this.nativeContext.provideContext(normalizedContext);
   }
 
   /**
    * Registers a single tool dynamically via the native API.
-   * Delegates to navigator.modelContext.registerTool().
+   * Converts Zod schemas to JSON Schema before passing to native API.
    * Tool change callback will fire and trigger sync automatically.
    *
    * @param {ToolDescriptor} tool - The tool descriptor to register
@@ -279,7 +289,12 @@ class NativeModelContextAdapter implements InternalModelContext {
     TInputSchema extends ZodSchemaObject = Record<string, never>,
     TOutputSchema extends ZodSchemaObject = Record<string, never>,
   >(tool: ToolDescriptor<TInputSchema, TOutputSchema>): { unregister: () => void } {
-    const result = this.nativeContext.registerTool(tool);
+    // Convert Zod schema to JSON Schema for native API compatibility
+    const normalizedTool = {
+      ...tool,
+      inputSchema: normalizeSchema(tool.inputSchema).jsonSchema,
+    };
+    const result = this.nativeContext.registerTool(normalizedTool);
     return result;
   }
 
@@ -304,13 +319,19 @@ class NativeModelContextAdapter implements InternalModelContext {
   /**
    * Executes a tool via the native API.
    * Delegates to navigator.modelContextTesting.executeTool() with JSON string args.
+   * Note: skipValidation option is ignored - native API handles its own validation.
    *
    * @param {string} toolName - Name of the tool to execute
    * @param {Record<string, unknown>} args - Arguments to pass to the tool
+   * @param {Object} [_options] - Execution options (ignored for native adapter)
    * @returns {Promise<ToolResponse>} The tool's response in MCP format
    * @internal
    */
-  async executeTool(toolName: string, args: Record<string, unknown>): Promise<ToolResponse> {
+  async executeTool(
+    toolName: string,
+    args: Record<string, unknown>,
+    _options?: { skipValidation?: boolean }
+  ): Promise<ToolResponse> {
     try {
       const result = await this.nativeTesting.executeTool(toolName, JSON.stringify(args));
       return this.convertToToolResponse(result);
@@ -1834,7 +1855,7 @@ class WebModelContext implements InternalModelContext {
   /**
    * Executes a tool with validation and event dispatch.
    * Follows this sequence:
-   * 1. Validates input arguments against schema
+   * 1. Validates input arguments against schema (unless skipValidation is true)
    * 2. Records tool call in testing API (if available)
    * 3. Checks for mock response (if testing)
    * 4. Dispatches 'toolcall' event to listeners
@@ -1843,31 +1864,43 @@ class WebModelContext implements InternalModelContext {
    *
    * @param {string} toolName - Name of the tool to execute
    * @param {Record<string, unknown>} args - Arguments to pass to the tool
+   * @param {Object} [options] - Execution options
+   * @param {boolean} [options.skipValidation] - Skip input validation (used when MCP SDK already validated)
    * @returns {Promise<ToolResponse>} The tool's response
    * @throws {Error} If tool is not found
    * @internal
    */
-  async executeTool(toolName: string, args: Record<string, unknown>): Promise<ToolResponse> {
+  async executeTool(
+    toolName: string,
+    args: Record<string, unknown>,
+    options?: { skipValidation?: boolean }
+  ): Promise<ToolResponse> {
     const tool = this.bridge.tools.get(toolName);
     if (!tool) {
       throw new Error(`Tool not found: ${toolName}`);
     }
 
-    const validation = validateWithZod(args, tool.inputValidator);
-    if (!validation.success) {
-      logger.error(`Input validation failed for ${toolName}:`, validation.error);
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Input validation error for tool "${toolName}":\n${validation.error}`,
-          },
-        ],
-        isError: true,
-      };
+    // Skip validation if requested (MCP SDK already validated via safeParseAsync)
+    // Keep validation for polyfill/testing path where SDK validation doesn't apply
+    let validatedArgs: Record<string, unknown>;
+    if (options?.skipValidation) {
+      validatedArgs = args;
+    } else {
+      const validation = validateWithZod(args, tool.inputValidator);
+      if (!validation.success) {
+        logger.error(`Input validation failed for ${toolName}:`, validation.error);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Input validation error for tool "${toolName}":\n${validation.error}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+      validatedArgs = validation.data as Record<string, unknown>;
     }
-
-    const validatedArgs = validation.data as Record<string, unknown>;
 
     if (this.testingAPI) {
       this.testingAPI.recordToolCall(toolName, validatedArgs);
