@@ -61,8 +61,8 @@ catalogs:
       specifier: ^4.0.18
       version: 4.0.18
     zod:
-      specifier: 4.3.5
-      version: 4.3.5
+      specifier: 3.25.76
+      version: 3.25.76
 
 importers:
 
@@ -125,7 +125,7 @@ importers:
         version: link:../../packages/transports
       '@modelcontextprotocol/sdk':
         specifier: 'catalog:'
-        version: 1.25.2(hono@4.10.4)(zod@4.3.5)
+        version: 1.25.2(hono@4.10.4)(zod@3.25.76)
       react:
         specifier: 'catalog:'
         version: 19.2.3
@@ -134,7 +134,7 @@ importers:
         version: 19.2.3(react@19.2.3)
       zod:
         specifier: 'catalog:'
-        version: 4.3.5
+        version: 3.25.76
     devDependencies:
       '@types/react':
         specifier: 'catalog:'
@@ -205,10 +205,10 @@ importers:
         version: link:../../packages/transports
       '@modelcontextprotocol/sdk':
         specifier: 'catalog:'
-        version: 1.25.2(hono@4.10.4)(zod@4.3.5)
+        version: 1.25.2(hono@4.10.4)(zod@3.25.76)
       zod:
         specifier: 'catalog:'
-        version: 4.3.5
+        version: 3.25.76
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -233,22 +233,6 @@ importers:
         specifier: 'catalog:'
         version: 7.1.2(@types/node@24.9.2)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.1)
 
-  e2e/vanilla-esm-zod4:
-    dependencies:
-      '@mcp-b/global':
-        specifier: workspace:*
-        version: link:../../packages/global
-      zod:
-        specifier: 'catalog:'
-        version: 4.3.5
-    devDependencies:
-      typescript:
-        specifier: 'catalog:'
-        version: 5.9.3
-      vite:
-        specifier: 'catalog:'
-        version: 7.1.2(@types/node@24.9.2)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.1)
-
   e2e/vanilla-iife-json:
     devDependencies:
       '@mcp-b/global':
@@ -259,15 +243,6 @@ importers:
         version: 7.1.2(@types/node@24.9.2)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.1)
 
   e2e/vanilla-iife-zod3:
-    devDependencies:
-      '@mcp-b/global':
-        specifier: workspace:*
-        version: link:../../packages/global
-      vite:
-        specifier: 'catalog:'
-        version: 7.1.2(@types/node@24.9.2)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.1)
-
-  e2e/vanilla-iife-zod4:
     devDependencies:
       '@mcp-b/global':
         specifier: workspace:*
@@ -362,10 +337,10 @@ importers:
     dependencies:
       '@composio/json-schema-to-zod':
         specifier: 'catalog:'
-        version: 0.1.19(zod@4.3.5)
+        version: 0.1.19(zod@3.25.76)
       '@modelcontextprotocol/sdk':
         specifier: 'catalog:'
-        version: 1.25.2(hono@4.10.4)(zod@4.3.5)
+        version: 1.25.2(hono@4.10.4)(zod@3.25.76)
       core-js:
         specifier: 3.47.0
         version: 3.47.0
@@ -386,7 +361,7 @@ importers:
         version: 18.0.0
       zod:
         specifier: 'catalog:'
-        version: 4.3.5
+        version: 3.25.76
     devDependencies:
       '@eslint/js':
         specifier: ^9.35.0
@@ -471,11 +446,11 @@ importers:
         version: link:../webmcp-ts-sdk
       zod:
         specifier: 'catalog:'
-        version: 4.3.5
+        version: 3.25.76
     devDependencies:
       '@anthropic-ai/sdk':
         specifier: ^0.71.2
-        version: 0.71.2(zod@4.3.5)
+        version: 0.71.2(zod@3.25.76)
       '@types/chrome':
         specifier: 'catalog:'
         version: 0.0.326
@@ -508,10 +483,10 @@ importers:
         version: link:../webmcp-ts-sdk
       '@n8n/json-schema-to-zod':
         specifier: ^1.6.0
-        version: 1.6.0(zod@4.3.5)
+        version: 1.6.0(zod@3.25.76)
       zod-to-json-schema:
         specifier: ^3.25.1
-        version: 3.25.1(zod@4.3.5)
+        version: 3.25.1(zod@3.25.76)
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -542,7 +517,7 @@ importers:
         version: 4.0.18(@types/node@22.17.2)(@vitest/browser-playwright@4.0.18)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.1)
       zod:
         specifier: 'catalog:'
-        version: 4.3.5
+        version: 3.25.76
 
   packages/mcp-iframe:
     dependencies:
@@ -613,7 +588,7 @@ importers:
         version: 2.0.4(@types/react-dom@19.2.3(@types/react@19.2.9))(@types/react@19.2.9)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(vitest@4.0.18)
       zod:
         specifier: 'catalog:'
-        version: 4.3.5
+        version: 3.25.76
 
   packages/smart-dom-reader:
     dependencies:
@@ -641,7 +616,7 @@ importers:
     dependencies:
       '@modelcontextprotocol/sdk':
         specifier: ^1.17.3
-        version: 1.25.2(hono@4.10.4)(zod@4.3.5)
+        version: 1.25.2(hono@4.10.4)(zod@3.25.76)
       playwright:
         specifier: ^1.54.2
         version: 1.58.0
@@ -650,7 +625,7 @@ importers:
         version: 4.21.0
       zod:
         specifier: 'catalog:'
-        version: 4.3.5
+        version: 3.25.76
     devDependencies:
       '@types/node':
         specifier: ^22.10.5
@@ -666,7 +641,7 @@ importers:
         version: link:../webmcp-ts-sdk
       zod:
         specifier: 'catalog:'
-        version: 4.3.5
+        version: 3.25.76
     devDependencies:
       '@types/chrome':
         specifier: 'catalog:'
@@ -6138,11 +6113,11 @@ packages:
 
 snapshots:
 
-  '@anthropic-ai/sdk@0.71.2(zod@4.3.5)':
+  '@anthropic-ai/sdk@0.71.2(zod@3.25.76)':
     dependencies:
       json-schema-to-ts: 3.1.1
     optionalDependencies:
-      zod: 4.3.5
+      zod: 3.25.76
 
   '@babel/code-frame@7.27.1':
     dependencies:
@@ -6592,9 +6567,9 @@ snapshots:
       '@types/conventional-commits-parser': 5.0.1
       chalk: 5.5.0
 
-  '@composio/json-schema-to-zod@0.1.19(zod@4.3.5)':
+  '@composio/json-schema-to-zod@0.1.19(zod@3.25.76)':
     dependencies:
-      zod: 4.3.5
+      zod: 3.25.76
 
   '@cspotcode/source-map-support@0.8.1':
     dependencies:
@@ -7098,9 +7073,9 @@ snapshots:
       - hono
       - supports-color
 
-  '@n8n/json-schema-to-zod@1.6.0(zod@4.3.5)':
+  '@n8n/json-schema-to-zod@1.6.0(zod@3.25.76)':
     dependencies:
-      zod: 4.3.5
+      zod: 3.25.76
 
   '@napi-rs/wasm-runtime@0.2.12':
     dependencies:
