@@ -1,0 +1,26 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "mcp-e2e-tests": "1.0.3",
+    "react-webmcp-test-app": "1.0.0",
+    "react18-zod3-test-app": "1.0.0",
+    "mcp-tab-transport-test-app": "1.0.0",
+    "vanilla-esm-zod3-test-app": "1.0.0",
+    "vanilla-iife-json-test-app": "1.0.0",
+    "vanilla-iife-zod3-test-app": "1.0.0",
+    "web-standards-showcase": "1.0.3",
+    "@mcp-b/chrome-devtools-mcp": "2.0.2",
+    "@mcp-b/extension-tools": "0.3.0",
+    "@mcp-b/global": "2.0.3",
+    "@mcp-b/mcp-iframe": "0.0.0",
+    "@mcp-b/react-webmcp": "1.0.2",
+    "@mcp-b/smart-dom-reader": "1.1.0",
+    "@mcp-b/smart-dom-reader-server": "0.2.0",
+    "@mcp-b/transports": "2.0.1",
+    "usewebmcp": "0.0.2",
+    "@mcp-b/webmcp-ts-sdk": "2.0.0",
+    "@mcp-b/skill-webmcp-setup": "0.0.0-beta-20260109203913"
+  },
+  "changesets": ["fix-zod4-mixed-versions"]
+}

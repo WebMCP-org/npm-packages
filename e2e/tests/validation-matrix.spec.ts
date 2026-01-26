@@ -3,31 +3,29 @@ import { expect, test } from '@playwright/test';
 /**
  * Validation Matrix E2E Tests
  *
- * Tests validation across all Zod/build/framework combinations:
- * - vanilla-iife-json: IIFE + JSON Schema
+ * Tests validation across all Zod 3/build/framework combinations:
+ * - vanilla-iife-json: IIFE + JSON Schema (no Zod)
  * - vanilla-iife-zod3: IIFE + Zod 3 CDN
- * - vanilla-iife-zod4: IIFE + Zod 4 CDN
  * - vanilla-esm-zod3: ESM + Zod 3
- * - vanilla-esm-zod4: ESM + Zod 4
  * - react18-zod3: React 18 + Zod 3
- * - react-webmcp-test-app: React 19 + Zod 4 (existing)
+ * - react-webmcp-test-app: React 19 + Zod 3
+ *
+ * Note: Zod 4 is NOT supported. Only Zod 3.25+ is supported.
  */
 
 interface TestApp {
   name: string;
   port: number;
-  type: 'json' | 'zod3' | 'zod4';
+  type: 'json' | 'zod3';
   isReact: boolean;
 }
 
 const apps: TestApp[] = [
   { name: 'vanilla-iife-json', port: 3010, type: 'json', isReact: false },
   { name: 'vanilla-iife-zod3', port: 3011, type: 'zod3', isReact: false },
-  { name: 'vanilla-iife-zod4', port: 3012, type: 'zod4', isReact: false },
   { name: 'vanilla-esm-zod3', port: 3013, type: 'zod3', isReact: false },
-  { name: 'vanilla-esm-zod4', port: 3014, type: 'zod4', isReact: false },
   { name: 'react18-zod3', port: 3015, type: 'zod3', isReact: true },
-  { name: 'react-webmcp-test-app', port: 8888, type: 'zod4', isReact: true },
+  { name: 'react-webmcp-test-app', port: 8888, type: 'zod3', isReact: true },
 ];
 
 // Test each app in the matrix
@@ -55,7 +53,8 @@ for (const app of apps) {
         }
       });
 
-      if (app.type === 'zod3') {
+      // Only react18-zod3 has a Zod version UI section
+      if (app.type === 'zod3' && app.name === 'react18-zod3') {
         test('should detect correct Zod version (Zod 3)', async ({ page }) => {
           // react18-zod3 app has a Zod version check section with text "Zod 3.x detected"
           await page.waitForSelector('.section h2:has-text("Zod Version")', { timeout: 5000 });
@@ -95,12 +94,6 @@ for (const app of apps) {
         test('should detect correct Zod version (Zod 3)', async ({ page }) => {
           const zodVersion = page.locator('#zod-version');
           await expect(zodVersion).toContainText('Zod 3');
-          await expect(zodVersion).not.toContainText('Zod 4');
-        });
-      } else if (app.type === 'zod4') {
-        test('should detect correct Zod version (Zod 4)', async ({ page }) => {
-          const zodVersion = page.locator('#zod-version');
-          await expect(zodVersion).toContainText('Zod 4');
         });
       }
 

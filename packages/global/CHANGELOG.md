@@ -1,5 +1,27 @@
 # @mcp-b/global
 
+## 2.0.3-canary.4
+
+### Patch Changes
+
+- fix: Simplify to Zod 3.25+ only support
+
+  Remove Zod 4 support and simplify the validation layer to work only with Zod 3.25+.
+  This resolves compatibility issues with projects using Zod 3 and provides a simpler,
+  more reliable implementation using zod-to-json-schema.
+
+  Breaking: Projects must use Zod 3.25+ (not Zod 4). Update peer dependency accordingly.
+
+## 2.0.3-canary.3
+
+### Patch Changes
+
+- 96eb3ad: Add Zod 3.25+ and Zod 4 dual version support for React packages
+  - `@mcp-b/react-webmcp` and `usewebmcp` now accept `zod@^3.25.0 || ^4.0.0` as peer dependency
+  - Users on Zod 3.25+ can use `import { z } from "zod/v4"` for Zod 4 APIs
+  - `@mcp-b/global` improved schema detection to recognize both Zod 3 (`_def`) and Zod 4 (`_zod`) schemas
+  - Note: Using Zod schemas directly with `@mcp-b/global` (web standard polyfill) still requires Zod 4 APIs (`z.toJSONSchema`, `z.fromJSONSchema`)
+
 ## 2.0.0
 
 ### Major Changes

@@ -877,7 +877,7 @@ describe('Validation Utilities', () => {
     const jsonSchema = zodToJsonSchema({
       name: z.string(),
       age: z.number(),
-      email: z.email().optional(),
+      email: z.string().email().optional(),
     });
 
     expect(jsonSchema.type).toBe('object');

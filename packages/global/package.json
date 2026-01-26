@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/global",
-  "version": "2.0.3-canary.2",
+  "version": "2.0.3-canary.4",
   "description": "W3C Web Model Context API polyfill - Let AI agents like Claude, ChatGPT, and Gemini interact with your website via navigator.modelContext",
   "keywords": [
     "mcp",
@@ -98,7 +98,7 @@
     "zod": "catalog:"
   },
   "peerDependencies": {
-    "zod": "^3.25.0 || ^4.0.0"
+    "zod": "^3.25.0"
   },
   "engines": {
     "node": ">=18"
