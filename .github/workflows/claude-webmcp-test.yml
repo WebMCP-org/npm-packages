@@ -8,16 +8,17 @@ on:
         description: 'Custom prompt for Claude (optional)'
         required: false
         type: string
+  # TODO: Re-enable once Chrome detection issues are resolved
   # Run on PRs that modify WebMCP packages
-  pull_request:
-    branches:
-      - main
-    paths:
-      - 'packages/global/**'
-      - 'packages/react-webmcp/**'
-      - 'packages/transports/**'
-      - 'packages/chrome-devtools-mcp/**'
-      - 'e2e/react-webmcp-test-app/**'
+  # pull_request:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - 'packages/global/**'
+  #     - 'packages/react-webmcp/**'
+  #     - 'packages/transports/**'
+  #     - 'packages/chrome-devtools-mcp/**'
+  #     - 'e2e/react-webmcp-test-app/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
