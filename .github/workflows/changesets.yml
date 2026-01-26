@@ -22,13 +22,13 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           # Fetch all history for proper changelog generation
           fetch-depth: 0
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@c5ba7f7862a0f64c1b1a05fbac13e0b8e86ba08c # v4
+        uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
 
       - name: Setup Node.js
         uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
@@ -45,7 +45,7 @@ jobs:
 
       - name: Create Release PR or Publish
         id: changesets
-        uses: changesets/action@e4156907cdd269dcaa37f03263be504a3570994d # v1
+        uses: changesets/action@c48e67d110a68bc90ccf1098e9646092baacaa87 # v1
         with:
           # Follow conventional commit format for version commits
           commit: "chore(release): version packages"
@@ -67,14 +67,14 @@ jobs:
 
       - name: Generate SBOM
         if: steps.changesets.outputs.published == 'true'
-        uses: anchore/sbom-action@f325610c9f50a54015d37c8d16cb3b0e2c8f4de0 # v0.18.0
+        uses: anchore/sbom-action@62ad5284b8ced813296287a0b63906cb364b73ee # v0.18.0
         with:
           artifact-name: sbom-${{ github.sha }}.spdx.json
           output-file: ./sbom.spdx.json
 
       - name: Upload SBOM as release artifact
         if: steps.changesets.outputs.published == 'true'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4
         with:
           name: sbom
           path: ./sbom.spdx.json

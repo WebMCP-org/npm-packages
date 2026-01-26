@@ -1,54 +1,119 @@
 version: 2
 updates:
-  # NPM dependencies
+  # Published packages only
   - package-ecosystem: "npm"
-    directory: "/"
+    directory: "/packages/chrome-devtools-mcp"
     schedule:
       interval: "weekly"
-      day: "monday"
-      time: "09:00"
-      timezone: "UTC"
-    open-pull-requests-limit: 10
     commit-message:
       prefix: "chore(deps)"
     labels:
       - "dependencies"
-    groups:
-      # Group dev dependencies together
-      dev-dependencies:
-        patterns:
-          - "@types/*"
-          - "typescript"
-          - "vitest"
-          - "@vitest/*"
-          - "@biomejs/*"
-          - "tsup"
-          - "husky"
-          - "lint-staged"
-          - "@commitlint/*"
-        update-types:
-          - "minor"
-          - "patch"
-      # Group testing dependencies
-      testing:
-        patterns:
-          - "@playwright/*"
-          - "playwright"
-          - "vitest"
-          - "@vitest/*"
-        update-types:
-          - "minor"
-          - "patch"
-      # Group build tools
-      build-tools:
-        patterns:
-          - "turbo"
-          - "tsup"
-          - "esbuild"
-        update-types:
-          - "minor"
-          - "patch"
-    # Ignore major version updates (require manual review)
+      - "packages/chrome-devtools-mcp"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: "npm"
+    directory: "/packages/extension-tools"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "dependencies"
+      - "packages/extension-tools"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: "npm"
+    directory: "/packages/global"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "dependencies"
+      - "packages/global"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: "npm"
+    directory: "/packages/mcp-iframe"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "dependencies"
+      - "packages/mcp-iframe"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: "npm"
+    directory: "/packages/react-webmcp"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "dependencies"
+      - "packages/react-webmcp"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: "npm"
+    directory: "/packages/smart-dom-reader"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "dependencies"
+      - "packages/smart-dom-reader"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: "npm"
+    directory: "/packages/transports"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "dependencies"
+      - "packages/transports"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: "npm"
+    directory: "/packages/usewebmcp"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "dependencies"
+      - "packages/usewebmcp"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: "npm"
+    directory: "/packages/webmcp-ts-sdk"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "dependencies"
+      - "packages/webmcp-ts-sdk"
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
@@ -58,9 +123,6 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
-      day: "monday"
-      time: "09:00"
-      timezone: "UTC"
     commit-message:
       prefix: "ci(deps)"
     labels:
