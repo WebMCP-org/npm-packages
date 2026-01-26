@@ -70,7 +70,7 @@
   "dependencies": {
     "@composio/json-schema-to-zod": "catalog:",
     "@modelcontextprotocol/sdk": "catalog:",
-    "core-js": "3.47.0",
+    "core-js": "3.48.0",
     "debug": "4.4.3",
     "esbuild": "^0.27.2",
     "puppeteer": "24.32.0",
@@ -93,7 +93,7 @@
     "@typescript-eslint/eslint-plugin": "^8.53.1",
     "@typescript-eslint/parser": "^8.43.0",
     "chrome-devtools-frontend": "1.0.1550444",
-    "core-js": "3.47.0",
+    "core-js": "3.48.0",
     "debug": "4.4.3",
     "eslint": "^9.39.2",
     "eslint-import-resolver-typescript": "^4.4.4",
