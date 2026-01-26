@@ -19,7 +19,7 @@
     "@radix-ui/react-select": "^2.2.6",
     "@radix-ui/react-slot": "^1.2.3",
     "@rjsf/core": "^6.0.0-beta.23",
-    "@rjsf/shadcn": "^6.0.0-beta.23",
+    "@rjsf/shadcn": "^6.2.5",
     "@rjsf/utils": "^6.2.5",
     "@rjsf/validator-ajv8": "6.0.0-beta.23",
     "class-variance-authority": "^0.7.1",
