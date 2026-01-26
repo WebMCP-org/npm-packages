@@ -186,11 +186,12 @@ export function parseArguments(version: string, argv = process.argv) {
     .check(args => {
       // We can't set default in the options else
       // Yargs will complain
+      // Note: Use explicit undefined checks since empty strings are valid falsy values
       if (
-        !args.channel &&
-        !args.browserUrl &&
-        !args.wsEndpoint &&
-        !args.executablePath
+        args.channel === undefined &&
+        args.browserUrl === undefined &&
+        args.wsEndpoint === undefined &&
+        args.executablePath === undefined
       ) {
         args.channel = 'dev';
       }
