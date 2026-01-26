@@ -41,7 +41,7 @@ catalog:
   vite: ^7.1.2
   vite-plugin-monkey: ^6.0.1
   vitest: ^4.0.18
-  wrangler: ^4.45.3
+  wrangler: ^4.60.0
   zod: 3.25.76
 
 onlyBuiltDependencies:
