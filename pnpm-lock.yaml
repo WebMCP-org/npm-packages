@@ -278,8 +278,8 @@ importers:
         specifier: ^6.2.5
         version: 6.2.5(react@19.2.3)
       '@rjsf/validator-ajv8':
-        specifier: 6.0.0-beta.23
-        version: 6.0.0-beta.23(@rjsf/utils@6.2.5(react@19.2.3))
+        specifier: 6.2.5
+        version: 6.2.5(@rjsf/utils@6.2.5(react@19.2.3))
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -680,8 +680,8 @@ importers:
         specifier: ^17.0.0 || ^18.0.0 || ^19.0.0
         version: 19.1.1
       zod:
-        specifier: ^3.25.0 || ^4.0.0
-        version: 4.3.5
+        specifier: ^3.25.0
+        version: 3.25.76
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -2228,11 +2228,11 @@ packages:
     peerDependencies:
       react: '>=18'
 
-  '@rjsf/validator-ajv8@6.0.0-beta.23':
-    resolution: {integrity: sha512-Rtjm+ZZiPfYHCV7dPEGcWrBqXaxH6J1LLfWToIYOyM95+zaFcffUises6epsXOMFXq8AC7RWKjhUiadjSOk5HA==}
+  '@rjsf/validator-ajv8@6.2.5':
+    resolution: {integrity: sha512-+yLhFRuT2aY91KiUujhUKg8SyTBrUuQP3QAFINeGi+RljA3S+NQN56oeCaNdz9X+35+Sdy6jqmxy/0Q2K+K9vQ==}
     engines: {node: '>=20'}
     peerDependencies:
-      '@rjsf/utils': ^6.0.0-beta.23
+      '@rjsf/utils': ^6.2.x
 
   '@rolldown/binding-android-arm64@1.0.0-beta.44':
     resolution: {integrity: sha512-g9ejDOehJFhxC1DIXQuZQ9bKv4lRDioOTL42cJjFjqKPl1L7DVb9QQQE1FxokGEIMr6FezLipxwnzOXWe7DNPg==}
@@ -7583,13 +7583,13 @@ snapshots:
       react: 19.2.3
       react-is: 18.3.1
 
-  '@rjsf/validator-ajv8@6.0.0-beta.23(@rjsf/utils@6.2.5(react@19.2.3))':
+  '@rjsf/validator-ajv8@6.2.5(@rjsf/utils@6.2.5(react@19.2.3))':
     dependencies:
       '@rjsf/utils': 6.2.5(react@19.2.3)
       ajv: 8.17.1
       ajv-formats: 2.1.1(ajv@8.17.1)
-      lodash: 4.17.21
-      lodash-es: 4.17.21
+      lodash: 4.17.23
+      lodash-es: 4.17.23
 
   '@rolldown/binding-android-arm64@1.0.0-beta.44':
     optional: true
