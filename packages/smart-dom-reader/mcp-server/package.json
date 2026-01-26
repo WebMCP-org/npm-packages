@@ -2,6 +2,9 @@
   "name": "@mcp-b/smart-dom-reader-server",
   "version": "0.2.0",
   "description": "MCP server for smart-dom-reader backed by Playwright",
+  "repository": {
+    "directory": "packages/smart-dom-reader/mcp-server"
+  },
   "type": "module",
   "main": "src/index.ts",
   "bin": {
@@ -24,10 +27,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@types/node": "^22.10.5",
+    "@types/node": "^22.19.7",
     "typescript": "^5.8.0"
-  },
-  "repository": {
-    "directory": "packages/smart-dom-reader/mcp-server"
   }
 }
