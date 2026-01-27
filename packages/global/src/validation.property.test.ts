@@ -286,4 +286,229 @@ describe('Validation Property-Based Tests', () => {
       );
     });
   });
+
+  describe('jsonSchemaToZod - complex types', () => {
+    it('should handle nested objects', () => {
+      const nestedSchema = {
+        type: 'object' as const,
+        properties: {
+          user: {
+            type: 'object' as const,
+            properties: {
+              name: { type: 'string' as const },
+              age: { type: 'number' as const },
+            },
+            required: ['name'],
+          },
+        },
+        required: ['user'],
+      };
+
+      const zodValidator = jsonSchemaToZod(nestedSchema);
+
+      // Valid nested object
+      const validResult = validateWithZod({ user: { name: 'Alice', age: 30 } }, zodValidator);
+      expect(validResult.success).toBe(true);
+
+      // Missing required nested field
+      const invalidResult = validateWithZod({ user: { age: 30 } }, zodValidator);
+      expect(invalidResult.success).toBe(false);
+
+      // Missing required top-level field
+      const missingUserResult = validateWithZod({}, zodValidator);
+      expect(missingUserResult.success).toBe(false);
+    });
+
+    it('should handle deeply nested objects', () => {
+      const deepSchema = {
+        type: 'object' as const,
+        properties: {
+          level1: {
+            type: 'object' as const,
+            properties: {
+              level2: {
+                type: 'object' as const,
+                properties: {
+                  level3: {
+                    type: 'object' as const,
+                    properties: {
+                      value: { type: 'string' as const },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      const zodValidator = jsonSchemaToZod(deepSchema);
+      const validResult = validateWithZod(
+        { level1: { level2: { level3: { value: 'deep' } } } },
+        zodValidator
+      );
+      expect(validResult.success).toBe(true);
+    });
+
+    it('should handle arrays of primitives', () => {
+      const arraySchema = {
+        type: 'object' as const,
+        properties: {
+          tags: {
+            type: 'array' as const,
+            items: { type: 'string' as const },
+          },
+        },
+      };
+
+      const zodValidator = jsonSchemaToZod(arraySchema);
+
+      // Valid array
+      const validResult = validateWithZod({ tags: ['a', 'b', 'c'] }, zodValidator);
+      expect(validResult.success).toBe(true);
+
+      // Empty array should be valid
+      const emptyResult = validateWithZod({ tags: [] }, zodValidator);
+      expect(emptyResult.success).toBe(true);
+
+      // Invalid array item type
+      const invalidResult = validateWithZod({ tags: [1, 2, 3] }, zodValidator);
+      expect(invalidResult.success).toBe(false);
+    });
+
+    it('should handle arrays of objects', () => {
+      const arrayOfObjectsSchema = {
+        type: 'object' as const,
+        properties: {
+          users: {
+            type: 'array' as const,
+            items: {
+              type: 'object' as const,
+              properties: {
+                name: { type: 'string' as const },
+                age: { type: 'number' as const },
+              },
+              required: ['name'],
+            },
+          },
+        },
+      };
+
+      const zodValidator = jsonSchemaToZod(arrayOfObjectsSchema);
+
+      // Valid array of objects
+      const validResult = validateWithZod(
+        { users: [{ name: 'Alice', age: 30 }, { name: 'Bob' }] },
+        zodValidator
+      );
+      expect(validResult.success).toBe(true);
+
+      // Invalid: missing required field in array item
+      const invalidResult = validateWithZod({ users: [{ age: 30 }] }, zodValidator);
+      expect(invalidResult.success).toBe(false);
+    });
+
+    it('should handle enum values', () => {
+      const enumSchema = {
+        type: 'object' as const,
+        properties: {
+          status: {
+            type: 'string' as const,
+            enum: ['active', 'inactive', 'pending'],
+          },
+        },
+        required: ['status'],
+      };
+
+      const zodValidator = jsonSchemaToZod(enumSchema);
+
+      // Valid enum value
+      const validResult = validateWithZod({ status: 'active' }, zodValidator);
+      expect(validResult.success).toBe(true);
+
+      // Invalid enum value
+      const invalidResult = validateWithZod({ status: 'unknown' }, zodValidator);
+      expect(invalidResult.success).toBe(false);
+    });
+
+    it('should handle optional fields', () => {
+      const optionalSchema = {
+        type: 'object' as const,
+        properties: {
+          name: { type: 'string' as const },
+          nickname: { type: 'string' as const },
+        },
+        required: ['name'],
+      };
+
+      const zodValidator = jsonSchemaToZod(optionalSchema);
+
+      // With optional field
+      const withOptionalResult = validateWithZod({ name: 'Alice', nickname: 'Al' }, zodValidator);
+      expect(withOptionalResult.success).toBe(true);
+
+      // Without optional field
+      const withoutOptionalResult = validateWithZod({ name: 'Alice' }, zodValidator);
+      expect(withoutOptionalResult.success).toBe(true);
+
+      // Missing required field
+      const missingRequiredResult = validateWithZod({ nickname: 'Al' }, zodValidator);
+      expect(missingRequiredResult.success).toBe(false);
+    });
+
+    it('should handle numeric constraints', () => {
+      const constraintSchema = {
+        type: 'object' as const,
+        properties: {
+          count: {
+            type: 'integer' as const,
+            minimum: 0,
+            maximum: 100,
+          },
+        },
+        required: ['count'],
+      };
+
+      const zodValidator = jsonSchemaToZod(constraintSchema);
+
+      // Valid within range
+      const validResult = validateWithZod({ count: 50 }, zodValidator);
+      expect(validResult.success).toBe(true);
+
+      // At boundaries
+      const minResult = validateWithZod({ count: 0 }, zodValidator);
+      expect(minResult.success).toBe(true);
+      const maxResult = validateWithZod({ count: 100 }, zodValidator);
+      expect(maxResult.success).toBe(true);
+    });
+
+    it('should handle empty properties schema', () => {
+      // Empty properties is valid JSON Schema - should work correctly
+      const emptyPropsSchema = {
+        type: 'object' as const,
+        properties: {},
+      };
+
+      // Should not throw
+      const zodValidator = jsonSchemaToZod(emptyPropsSchema);
+      expect(zodValidator).toBeDefined();
+
+      // Empty object should be valid
+      const emptyResult = validateWithZod({}, zodValidator);
+      expect(emptyResult.success).toBe(true);
+    });
+
+    it('should not throw on conversion and return a validator', () => {
+      // Even unusual schemas should return a validator (may use fallback)
+      const unusualSchema = {
+        type: 'object' as const,
+      };
+
+      // Should not throw
+      expect(() => jsonSchemaToZod(unusualSchema)).not.toThrow();
+
+      const zodValidator = jsonSchemaToZod(unusualSchema);
+      expect(zodValidator).toBeDefined();
+    });
+  });
 });

@@ -70,9 +70,10 @@
     "prepublishOnly": "node ../../scripts/validate-publish.js && pnpm run build",
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
-    "test": "vitest run",
+    "test": "vitest run && vitest run --config vitest.node.config.ts",
     "test:browser": "vitest run --browser.headless",
     "test:browser:ui": "vitest --browser",
+    "test:node": "vitest run --config vitest.node.config.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "version:major": "pnpm version major --no-git-tag-version",
@@ -80,9 +81,9 @@
     "version:patch": "pnpm version patch --no-git-tag-version"
   },
   "dependencies": {
+    "@composio/json-schema-to-zod": "^0.1.19",
     "@mcp-b/transports": "workspace:*",
     "@mcp-b/webmcp-ts-sdk": "workspace:*",
-    "@n8n/json-schema-to-zod": "^1.6.0",
     "zod-to-json-schema": "^3.25.1"
   },
   "devDependencies": {
@@ -98,7 +99,7 @@
     "zod": "catalog:"
   },
   "peerDependencies": {
-    "zod": "^3.25.0"
+    "zod": ">=3.25.76 <4 || >=4.1 <5"
   },
   "engines": {
     "node": ">=18"

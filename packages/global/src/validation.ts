@@ -1,4 +1,4 @@
-import { jsonSchemaToZod as n8nJsonSchemaToZod } from '@n8n/json-schema-to-zod';
+import { jsonSchemaToZod as composioJsonSchemaToZod } from '@composio/json-schema-to-zod';
 import { z } from 'zod';
 import { zodToJsonSchema as zodToJsonSchemaLib } from 'zod-to-json-schema';
 import { createLogger } from './logger.js';
@@ -51,7 +51,11 @@ export function zodToJsonSchema(schema: ZodSchemaObject): InputSchema {
 
 export function jsonSchemaToZod(jsonSchema: InputSchema): z.ZodType {
   try {
-    const zodSchema = n8nJsonSchemaToZod(jsonSchema);
+    // Cast to unknown first since InputSchema is compatible at runtime but
+    // has a more permissive type signature than the library expects
+    const zodSchema = composioJsonSchemaToZod(
+      jsonSchema as unknown as Parameters<typeof composioJsonSchemaToZod>[0]
+    );
     return zodSchema as unknown as z.ZodType;
   } catch (error) {
     logger.warn('jsonSchemaToZod failed:', error);
