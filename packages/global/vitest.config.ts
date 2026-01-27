@@ -11,10 +11,9 @@ export default defineConfig({
       provider: playwright(),
       instances: [{ browser: 'chromium' }],
     },
-    // Test file patterns
+    // Test file patterns - exclude esm-resolution tests as they need Node.js
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
-    // Exclude build output
-    exclude: ['dist', 'node_modules'],
+    exclude: ['dist', 'node_modules', 'src/esm-resolution.test.ts'],
     // Enable globals for cleaner test syntax
     globals: true,
     // Limit concurrency in CI to prevent resource exhaustion
