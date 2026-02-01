@@ -67,7 +67,7 @@ jobs:
 
       - name: Generate SBOM
         if: steps.changesets.outputs.published == 'true'
-        uses: anchore/sbom-action@62ad5284b8ced813296287a0b63906cb364b73ee # v0.18.0
+        uses: anchore/sbom-action@deef08a0db64bfad603422135db61477b16cef56 # v0.18.0
         with:
           artifact-name: sbom-${{ github.sha }}.spdx.json
           output-file: ./sbom.spdx.json
