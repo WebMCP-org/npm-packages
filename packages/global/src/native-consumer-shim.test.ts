@@ -163,6 +163,14 @@ function flushMicrotasks(count = 1): Promise<void> {
   return promise;
 }
 
+function requireBridge(): MCPBridge {
+  const bridge = (window as unknown as { __mcpBridge?: MCPBridge }).__mcpBridge;
+  if (!bridge) {
+    throw new Error('Expected __mcpBridge to be initialized');
+  }
+  return bridge;
+}
+
 const NATIVE_TEST_INIT_OPTIONS = {
   transport: {
     tabServer: {
@@ -433,11 +441,7 @@ describe('Native adapter (with modelContextTesting)', () => {
 
     initializeWebModelContext(NATIVE_TEST_INIT_OPTIONS);
 
-    const bridge = (window as unknown as { __mcpBridge?: MCPBridge }).__mcpBridge;
-    expect(bridge).toBeDefined();
-    if (!bridge) {
-      throw new Error('Expected __mcpBridge to be initialized');
-    }
+    const bridge = requireBridge();
 
     const firstResult = await bridge.modelContext.callTool({
       name: 'native_calltool_normalize',
@@ -464,11 +468,7 @@ describe('Native adapter (with modelContextTesting)', () => {
   it('delegates bridge tool registration lifecycle to native APIs', async () => {
     initializeWebModelContext(NATIVE_TEST_INIT_OPTIONS);
 
-    const bridge = (window as unknown as { __mcpBridge?: MCPBridge }).__mcpBridge;
-    expect(bridge).toBeDefined();
-    if (!bridge) {
-      throw new Error('Expected __mcpBridge to be initialized');
-    }
+    const bridge = requireBridge();
 
     bridge.modelContext.provideContext({
       tools: [
@@ -510,11 +510,7 @@ describe('Native adapter (with modelContextTesting)', () => {
   it('exposes adapter fallbacks for resources/prompts and forwards events', async () => {
     initializeWebModelContext(NATIVE_TEST_INIT_OPTIONS);
 
-    const bridge = (window as unknown as { __mcpBridge?: MCPBridge }).__mcpBridge;
-    expect(bridge).toBeDefined();
-    if (!bridge) {
-      throw new Error('Expected __mcpBridge to be initialized');
-    }
+    const bridge = requireBridge();
 
     const resourceRegistration = bridge.modelContext.registerResource({
       uri: 'memory://resource',
@@ -565,15 +561,10 @@ describe('Native adapter (with modelContextTesting)', () => {
   it('throws explicit errors when sampling and elicitation capabilities are unavailable', async () => {
     initializeWebModelContext(NATIVE_TEST_INIT_OPTIONS);
 
-    const bridge = (
-      window as unknown as {
-        __mcpBridge?: { tabServer: { server?: unknown }; modelContext: MCPBridge['modelContext'] };
-      }
-    ).__mcpBridge;
-    expect(bridge).toBeDefined();
-    if (!bridge) {
-      throw new Error('Expected __mcpBridge to be initialized');
-    }
+    const bridge = requireBridge() as {
+      tabServer: { server?: unknown };
+      modelContext: MCPBridge['modelContext'];
+    };
 
     const originalServer = bridge.tabServer.server;
     (bridge.tabServer as { server?: unknown }).server = {};
@@ -599,15 +590,10 @@ describe('Native adapter (with modelContextTesting)', () => {
   it('delegates sampling and elicitation to connected tab server capabilities', async () => {
     initializeWebModelContext(NATIVE_TEST_INIT_OPTIONS);
 
-    const bridge = (
-      window as unknown as {
-        __mcpBridge?: { tabServer: { server?: unknown }; modelContext: MCPBridge['modelContext'] };
-      }
-    ).__mcpBridge;
-    expect(bridge).toBeDefined();
-    if (!bridge) {
-      throw new Error('Expected __mcpBridge to be initialized');
-    }
+    const bridge = requireBridge() as {
+      tabServer: { server?: unknown };
+      modelContext: MCPBridge['modelContext'];
+    };
 
     const samplingResponse = {
       model: 'test-model',

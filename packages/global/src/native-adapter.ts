@@ -1,4 +1,8 @@
 import { createLogger } from './logger.js';
+import {
+  requireCreateMessageCapability,
+  requireElicitInputCapability,
+} from './tab-server-capabilities.js';
 import type {
   ElicitationParams,
   ElicitationResult,
@@ -562,36 +566,10 @@ export class NativeModelContextAdapter implements InternalModelContext {
   }
 
   async createMessage(params: SamplingRequestParams): Promise<SamplingResult> {
-    const server = this.bridge.tabServer;
-
-    const underlyingServer = (
-      server as unknown as {
-        server: { createMessage: (params: unknown) => Promise<SamplingResult> };
-      }
-    ).server;
-
-    if (!underlyingServer?.createMessage) {
-      throw new Error('Sampling is not supported: no connected client with sampling capability');
-    }
-
-    return underlyingServer.createMessage(params);
+    return requireCreateMessageCapability(this.bridge.tabServer)(params);
   }
 
   async elicitInput(params: ElicitationParams): Promise<ElicitationResult> {
-    const server = this.bridge.tabServer;
-
-    const underlyingServer = (
-      server as unknown as {
-        server: { elicitInput: (params: unknown) => Promise<ElicitationResult> };
-      }
-    ).server;
-
-    if (!underlyingServer?.elicitInput) {
-      throw new Error(
-        'Elicitation is not supported: no connected client with elicitation capability'
-      );
-    }
-
-    return underlyingServer.elicitInput(params);
+    return requireElicitInputCapability(this.bridge.tabServer)(params);
   }
 }

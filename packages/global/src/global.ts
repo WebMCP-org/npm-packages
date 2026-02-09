@@ -28,6 +28,10 @@ import {
   installDeprecatedTestingAccessor,
   NativeModelContextAdapter,
 } from './native-adapter.js';
+import {
+  requireCreateMessageCapability,
+  requireElicitInputCapability,
+} from './tab-server-capabilities.js';
 import type {
   ElicitationParams,
   ElicitationResult,
@@ -1515,20 +1519,7 @@ class WebModelContext implements InternalModelContext {
    * @returns {Promise<SamplingResult>} The LLM completion result
    */
   async createMessage(params: SamplingRequestParams): Promise<SamplingResult> {
-    const server = this.bridge.tabServer;
-
-    // Access the underlying Server instance to call createMessage
-    const underlyingServer = (
-      server as unknown as {
-        server: { createMessage: (params: unknown) => Promise<SamplingResult> };
-      }
-    ).server;
-
-    if (!underlyingServer?.createMessage) {
-      throw new Error('Sampling is not supported: no connected client with sampling capability');
-    }
-
-    return underlyingServer.createMessage(params);
+    return requireCreateMessageCapability(this.bridge.tabServer)(params);
   }
 
   // ==================== ELICITATION METHODS ====================
@@ -1541,22 +1532,7 @@ class WebModelContext implements InternalModelContext {
    * @returns {Promise<ElicitationResult>} The user's response
    */
   async elicitInput(params: ElicitationParams): Promise<ElicitationResult> {
-    const server = this.bridge.tabServer;
-
-    // Access the underlying Server instance to call elicitInput
-    const underlyingServer = (
-      server as unknown as {
-        server: { elicitInput: (params: unknown) => Promise<ElicitationResult> };
-      }
-    ).server;
-
-    if (!underlyingServer?.elicitInput) {
-      throw new Error(
-        'Elicitation is not supported: no connected client with elicitation capability'
-      );
-    }
-
-    return underlyingServer.elicitInput(params);
+    return requireElicitInputCapability(this.bridge.tabServer)(params);
   }
 }
 
