@@ -25,6 +25,7 @@ const DEFAULT_INIT_OPTIONS = {
       channelId: TEST_CHANNEL_ID,
       allowedOrigins: [window.location.origin],
     },
+    iframeServer: false,
   },
 } as const;
 
@@ -189,6 +190,7 @@ describe('Web Model Context Polyfill', () => {
       expect(typeof navigator.modelContext?.registerTool).toBe('function');
       expect(typeof navigator.modelContext?.provideContext).toBe('function');
       expect(typeof navigator.modelContext?.clearContext).toBe('function');
+      expect(typeof navigator.modelContext?.callTool).toBe('function');
     });
 
     it('should have navigator.modelContextTesting installed', () => {
@@ -283,7 +285,11 @@ describe('Web Model Context Polyfill', () => {
         inputSchema: { value: z.number() },
         execute: async ({ value }) => textResult(String(value * 2)),
       });
-      const { unregister } = result!;
+      expect(result).toBeDefined();
+      if (!result) {
+        throw new Error('registerTool should return an unregister handle');
+      }
+      const { unregister } = result;
 
       expect(navigator.modelContextTesting?.listTools()).toHaveLength(1);
 
@@ -385,6 +391,83 @@ describe('Web Model Context Polyfill', () => {
 
     it('should throw for non-existent tools', async () => {
       await expect(executeTool('nonexistent', {})).rejects.toThrow(/not found/i);
+    });
+  });
+
+  describe('ModelContext Consumer API', () => {
+    it('should execute tools via modelContext.callTool with object arguments', async () => {
+      provideTools([
+        {
+          name: 'call_tool_echo',
+          description: 'Echo tool',
+          inputSchema: { message: z.string() },
+          execute: async ({ message }) => textResult(`Echo: ${message}`),
+        },
+      ]);
+
+      const result = await navigator.modelContext?.callTool({
+        name: 'call_tool_echo',
+        arguments: { message: 'hello' },
+      });
+
+      expect(result?.content[0].type).toBe('text');
+      expect(result?.content[0].text).toBe('Echo: hello');
+    });
+
+    it('should throw via callTool when tool does not exist', async () => {
+      await expect(
+        navigator.modelContext?.callTool({
+          name: 'missing_tool',
+          arguments: {},
+        })
+      ).rejects.toThrow(/not found/i);
+    });
+
+    it('should return MCP-style error result for validation failures', async () => {
+      provideTools([
+        {
+          name: 'validated_call_tool',
+          description: 'Needs numeric value',
+          inputSchema: { value: z.number() },
+          execute: async ({ value }) => textResult(String(value)),
+        },
+      ]);
+
+      const result = await navigator.modelContext?.callTool({
+        name: 'validated_call_tool',
+        arguments: { value: 'not-a-number' },
+      });
+
+      expect(result?.isError).toBe(true);
+      expect(result?.content[0].text).toMatch(/validation/i);
+    });
+
+    it('should emit toolschanged events with microtask batching', async () => {
+      const callback = vi.fn();
+      navigator.modelContext?.addEventListener('toolschanged', callback);
+
+      provideTools([
+        {
+          name: 'changed_tool_a',
+          description: 'A',
+          inputSchema: {},
+          execute: async () => textResult('a'),
+        },
+      ]);
+
+      navigator.modelContext?.registerTool({
+        name: 'changed_tool_b',
+        description: 'B',
+        inputSchema: {},
+        execute: async () => textResult('b'),
+      });
+
+      await flushMicrotasks();
+      expect(callback).toHaveBeenCalledTimes(1);
+
+      navigator.modelContext?.clearContext();
+      await flushMicrotasks();
+      expect(callback).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -542,7 +625,11 @@ describe('Web Model Context Polyfill', () => {
           contents: [{ uri: 'dynamic://data', text: 'dynamic content' }],
         }),
       });
-      const { unregister } = result!;
+      expect(result).toBeDefined();
+      if (!result) {
+        throw new Error('registerResource should return an unregister handle');
+      }
+      const { unregister } = result;
 
       expect(navigator.modelContext?.listResources()).toHaveLength(1);
 
@@ -618,7 +705,11 @@ describe('Web Model Context Polyfill', () => {
           messages: [{ role: 'user', content: { type: 'text', text: 'Dynamic' } }],
         }),
       });
-      const { unregister } = result!;
+      expect(result).toBeDefined();
+      if (!result) {
+        throw new Error('registerPrompt should return an unregister handle');
+      }
+      const { unregister } = result;
 
       expect(navigator.modelContext?.listPrompts()).toHaveLength(1);
 
@@ -764,6 +855,30 @@ describe('Web Model Context Polyfill', () => {
       expect(elicitationResult).toEqual({ action: 'accept', content: { field: 'value' } });
 
       (bridge.tabServer as { server: unknown }).server = originalServer;
+    });
+
+    it('should throw clear errors when sampling or elicitation capabilities are unavailable', async () => {
+      const bridge = (window as unknown as { __mcpBridge: { tabServer: { server?: unknown } } })
+        .__mcpBridge;
+      const originalServer = bridge.tabServer.server;
+      (bridge.tabServer as { server?: unknown }).server = {};
+
+      try {
+        await expect(
+          navigator.modelContext?.createMessage({
+            messages: [{ role: 'user', content: { type: 'text', text: 'hi' } }],
+          })
+        ).rejects.toThrow(/sampling is not supported/i);
+
+        await expect(
+          navigator.modelContext?.elicitInput({
+            message: 'Need input',
+            requestedSchema: { type: 'object', properties: {} },
+          })
+        ).rejects.toThrow(/elicitation is not supported/i);
+      } finally {
+        (bridge.tabServer as { server?: unknown }).server = originalServer;
+      }
     });
   });
 

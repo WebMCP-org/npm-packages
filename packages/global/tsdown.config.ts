@@ -2,7 +2,10 @@ import type { Options } from 'tsdown';
 
 // ESM build for npm package
 const esmConfig: Options = {
-  entry: 'src/index.ts',
+  entry: {
+    index: 'src/index.ts',
+    testing: 'src/testing.ts',
+  },
   format: ['esm'],
   dts: true,
   sourcemap: true,

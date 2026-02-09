@@ -1371,6 +1371,37 @@ if (window.__mcpBridge) {
 
 This package provides a **Model Context Testing API** at `window.navigator.modelContextTesting` for debugging and testing your tools during development.
 
+> [!WARNING]
+> `navigator.modelContextTesting` is deprecated and kept for compatibility.
+> For in-page consumers, use `navigator.modelContext.callTool({ name, arguments })` and
+> `navigator.modelContext.addEventListener("toolschanged", ...)`.
+
+### Unified Consumer API (Recommended)
+
+```javascript
+// Execute tools with object args (no JSON stringification)
+const result = await navigator.modelContext.callTool({
+  name: "greet",
+  arguments: { name: "Alice" }
+});
+
+// React to tool list changes
+navigator.modelContext.addEventListener("toolschanged", () => {
+  console.log("Tools changed:", navigator.modelContext.listTools());
+});
+```
+
+### Testing Helpers Module
+
+Use `@mcp-b/global/testing` to avoid depending on global-only testing extensions directly:
+
+```javascript
+import { createTestHelper } from "@mcp-b/global/testing";
+
+const testing = createTestHelper();
+await testing.executeTool("greet", { name: "Alice" });
+```
+
 ### Native Support in Chromium
 
 **IMPORTANT**: The `modelContextTesting` API is available natively in Chromium-based browsers when the experimental feature flag is enabled. This polyfill will detect and use the native implementation when available.

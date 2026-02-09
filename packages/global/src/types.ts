@@ -931,6 +931,16 @@ export interface ModelContext {
    */
   listTools(): ToolListItem[];
 
+  /**
+   * Execute a registered tool using MCP-style parameters.
+   * This is the consumer-friendly equivalent of MCP SDK Client.callTool().
+   *
+   * @param params - Tool execution request containing name and optional arguments
+   * @returns Promise resolving to MCP CallToolResult shape
+   * @throws {Error} If the tool does not exist
+   */
+  callTool(params: { name: string; arguments?: Record<string, unknown> }): Promise<ToolResponse>;
+
   // ==================== RESOURCES ====================
 
   /**
@@ -1046,11 +1056,30 @@ export interface ModelContext {
   ): void;
 
   /**
+   * Add event listener for tool list changes.
+   * Fired when tool registrations change via provideContext/registerTool/unregisterTool/clearContext.
+   */
+  addEventListener(
+    type: 'toolschanged',
+    listener: () => void,
+    options?: boolean | AddEventListenerOptions
+  ): void;
+
+  /**
    * Remove event listener
    */
   removeEventListener(
     type: 'toolcall',
     listener: (event: ToolCallEvent) => void | Promise<void>,
+    options?: boolean | EventListenerOptions
+  ): void;
+
+  /**
+   * Remove event listener for tool list changes.
+   */
+  removeEventListener(
+    type: 'toolschanged',
+    listener: () => void,
     options?: boolean | EventListenerOptions
   ): void;
 
@@ -1149,6 +1178,9 @@ export interface ToolInfo {
  *
  * **Polyfill**: If the native API is not available, this polyfill provides
  * a compatible implementation for testing purposes.
+ *
+ * @deprecated Use navigator.modelContext.callTool() and
+ * navigator.modelContext.addEventListener('toolschanged', ...) instead.
  */
 export interface ModelContextTesting {
   /**
@@ -1238,6 +1270,9 @@ declare global {
      *
      * If not available natively, the @mcp-b/global polyfill provides
      * a compatible implementation.
+     *
+     * @deprecated Use navigator.modelContext.callTool() and
+     * navigator.modelContext.addEventListener('toolschanged', ...) instead.
      */
     modelContextTesting?: ModelContextTesting;
   }
