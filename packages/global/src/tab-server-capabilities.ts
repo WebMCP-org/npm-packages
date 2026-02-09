@@ -22,21 +22,23 @@ function getTabServerCapabilities(server: McpServer): TabServerCapabilities | un
 export function requireCreateMessageCapability(
   server: McpServer
 ): (params: SamplingRequestParams) => Promise<SamplingResult> {
-  const createMessage = getTabServerCapabilities(server)?.createMessage;
+  const capabilities = getTabServerCapabilities(server);
+  const createMessage = capabilities?.createMessage;
   if (!createMessage) {
     throw new Error('Sampling is not supported: no connected client with sampling capability');
   }
-  return createMessage;
+  return createMessage.bind(capabilities);
 }
 
 export function requireElicitInputCapability(
   server: McpServer
 ): (params: ElicitationParams) => Promise<ElicitationResult> {
-  const elicitInput = getTabServerCapabilities(server)?.elicitInput;
+  const capabilities = getTabServerCapabilities(server);
+  const elicitInput = capabilities?.elicitInput;
   if (!elicitInput) {
     throw new Error(
       'Elicitation is not supported: no connected client with elicitation capability'
     );
   }
-  return elicitInput;
+  return elicitInput.bind(capabilities);
 }

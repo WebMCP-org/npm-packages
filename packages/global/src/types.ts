@@ -788,32 +788,22 @@ export interface SamplingResult {
 
 /**
  * Parameters for a form elicitation request.
+ *
+ * Note: This is the WebMCP polyfill surface for in-page user interaction.
+ * It is MCP-inspired, but intentionally not a strict alias of MCP's
+ * `ElicitRequest['params']` while WebMCP elicitation API is still evolving.
  */
 export interface ElicitationFormParams {
   /** Mode of elicitation */
   mode?: 'form';
   /** Message to show to the user */
   message: string;
-  /** Schema for the form fields */
+  /** Form schema for requested user input */
   requestedSchema: {
     type: 'object';
-    properties: Record<
-      string,
-      {
-        type: 'string' | 'number' | 'integer' | 'boolean';
-        title?: string;
-        description?: string;
-        default?: string | number | boolean;
-        minLength?: number;
-        maxLength?: number;
-        minimum?: number;
-        maximum?: number;
-        enum?: Array<string | number>;
-        enumNames?: string[];
-        format?: string;
-      }
-    >;
+    properties: Record<string, InputSchema>;
     required?: string[];
+    [key: string]: unknown;
   };
 }
 
