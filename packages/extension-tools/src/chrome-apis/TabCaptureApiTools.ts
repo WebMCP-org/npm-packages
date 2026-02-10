@@ -8,6 +8,11 @@ export interface TabCaptureApiToolsOptions {
   getMediaStreamId?: boolean;
 }
 
+type CaptureTrackConstraintsInput = {
+  mandatory?: Record<string, unknown>;
+  optional?: Record<string, unknown>;
+};
+
 export class TabCaptureApiTools extends BaseApiTools<TabCaptureApiToolsOptions> {
   protected apiName = 'TabCapture';
 
@@ -101,10 +106,26 @@ export class TabCaptureApiTools extends BaseApiTools<TabCaptureApiToolsOptions> 
 
           if (audio !== undefined) options.audio = audio;
           if (video !== undefined) options.video = video;
-          // @ts-expect-error - TODO: fix this
-          if (audioConstraints !== undefined) options.audioConstraints = audioConstraints;
-          // @ts-expect-error - TODO: fix this
-          if (videoConstraints !== undefined) options.videoConstraints = videoConstraints;
+
+          const normalizeConstraints = (
+            constraints?: CaptureTrackConstraintsInput
+          ): chrome.tabCapture.MediaStreamConstraint | undefined => {
+            if (!constraints) {
+              return undefined;
+            }
+
+            return constraints as unknown as chrome.tabCapture.MediaStreamConstraint;
+          };
+
+          const normalizedAudioConstraints = normalizeConstraints(audioConstraints);
+          if (normalizedAudioConstraints !== undefined) {
+            options.audioConstraints = normalizedAudioConstraints;
+          }
+
+          const normalizedVideoConstraints = normalizeConstraints(videoConstraints);
+          if (normalizedVideoConstraints !== undefined) {
+            options.videoConstraints = normalizedVideoConstraints;
+          }
 
           const stream = await new Promise<MediaStream>((resolve, reject) => {
             chrome.tabCapture.capture(options, (stream) => {
