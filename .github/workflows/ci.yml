@@ -140,7 +140,7 @@ jobs:
         run: pnpm --filter @mcp-b/global exec playwright install --with-deps chromium
 
       - name: Run unit tests with coverage
-        run: pnpm test:unit --coverage
+        run: pnpm test:unit:coverage
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5
