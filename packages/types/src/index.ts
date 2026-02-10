@@ -6,6 +6,10 @@ export type {
   BlobResourceContents,
   CallToolResult,
   ContentBlock,
+  ElicitationFormParams,
+  ElicitationParams,
+  ElicitationResult,
+  ElicitationUrlParams,
   EmbeddedResource,
   ImageContent,
   InputSchema,
@@ -22,18 +26,10 @@ export type {
 } from './common.js';
 export type {
   AnyToolDescriptor,
-  ElicitationFormParams,
-  ElicitationParams,
-  ElicitationResult,
-  ElicitationUrlParams,
   InferToolArgs,
   InferToolResult,
   ModelContext,
   ModelContextInput,
-  ModelPreferences,
-  SamplingRequestMessage,
-  SamplingRequestParams,
-  SamplingResult,
   ToolArgsByName,
   ToolByName,
   ToolCallEvent,
@@ -42,7 +38,12 @@ export type {
   ToolResultByName,
   TypedModelContext,
 } from './model-context.js';
-export type { ToolAnnotations, ToolDescriptor, ToolListItem } from './tool.js';
+export type {
+  ToolAnnotations,
+  ToolDescriptor,
+  ToolExecutionContext,
+  ToolListItem,
+} from './tool.js';
 
 // ============================================================================
 // Global Augmentation

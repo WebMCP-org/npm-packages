@@ -1,6 +1,16 @@
 import { expectTypeOf, test } from 'vitest';
-import type { CallToolResult, InputSchema } from './common.js';
-import type { ToolAnnotations, ToolDescriptor, ToolListItem } from './tool.js';
+import type {
+  CallToolResult,
+  ElicitationParams,
+  ElicitationResult,
+  InputSchema,
+} from './common.js';
+import type {
+  ToolAnnotations,
+  ToolDescriptor,
+  ToolExecutionContext,
+  ToolListItem,
+} from './tool.js';
 
 test('ToolDescriptor has required fields', () => {
   expectTypeOf<ToolDescriptor>().toHaveProperty('name');
@@ -11,7 +21,17 @@ test('ToolDescriptor has required fields', () => {
 
 test('ToolDescriptor.execute accepts Record and returns Promise<CallToolResult>', () => {
   expectTypeOf<ToolDescriptor['execute']>().parameter(0).toEqualTypeOf<Record<string, unknown>>();
+  expectTypeOf<ToolDescriptor['execute']>().parameter(1).toEqualTypeOf<ToolExecutionContext>();
   expectTypeOf<ToolDescriptor['execute']>().returns.toEqualTypeOf<Promise<CallToolResult>>();
+});
+
+test('ToolExecutionContext.elicitInput accepts ElicitationParams and returns ElicitationResult', () => {
+  expectTypeOf<ToolExecutionContext['elicitInput']>()
+    .parameter(0)
+    .toEqualTypeOf<ElicitationParams>();
+  expectTypeOf<ToolExecutionContext['elicitInput']>().returns.toEqualTypeOf<
+    Promise<ElicitationResult>
+  >();
 });
 
 test('ToolDescriptor supports strongly typed args and result via generics', () => {

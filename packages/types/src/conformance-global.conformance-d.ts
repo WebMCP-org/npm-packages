@@ -6,22 +6,17 @@ import type {
   InputSchema as GlobalInputSchema,
   ModelContext as GlobalModelContext,
   ModelContextInput as GlobalModelContextInput,
-  SamplingRequestParams as GlobalSamplingRequestParams,
-  SamplingResult as GlobalSamplingResult,
   ToolCallEvent as GlobalToolCallEvent,
   ToolDescriptor as GlobalToolDescriptor,
   ToolListItem as GlobalToolListItem,
 } from '../../global/src/types.js';
-import type { CallToolResult, InputSchema } from './common.js';
 import type {
+  CallToolResult,
   ElicitationParams,
   ElicitationResult,
-  ModelContext,
-  ModelContextInput,
-  SamplingRequestParams,
-  SamplingResult,
-  ToolCallEvent,
-} from './model-context.js';
+  InputSchema,
+} from './common.js';
+import type { ModelContext, ModelContextInput, ToolCallEvent } from './model-context.js';
 import type { ToolDescriptor, ToolListItem } from './tool.js';
 
 type IsAssignable<TFrom, TTo> = TFrom extends TTo ? true : false;
@@ -41,9 +36,13 @@ export type GlobalConformanceChecks = [
       Parameters<GlobalJsonToolDescriptor['execute']>[0]
     >
   >,
+  Assert<
+    IsAssignable<
+      Parameters<ToolDescriptor<Record<string, unknown>, CallToolResult, string>['execute']>[1],
+      { elicitInput: (params: GlobalElicitationParams) => Promise<GlobalElicitationResult> }
+    >
+  >,
   Assert<IsAssignable<ToolListItem, GlobalToolListItem>>,
-  Assert<IsAssignable<SamplingRequestParams, GlobalSamplingRequestParams>>,
-  Assert<IsAssignable<SamplingResult, GlobalSamplingResult>>,
   Assert<IsAssignable<ElicitationParams, GlobalElicitationParams>>,
   Assert<IsAssignable<ElicitationResult, GlobalElicitationResult>>,
   Assert<IsAssignable<ModelContextInput, GlobalModelContextInput>>,
@@ -56,18 +55,6 @@ export type GlobalConformanceChecks = [
     IsAssignable<
       Parameters<ModelContext['callTool']>[0],
       Parameters<GlobalModelContext['callTool']>[0]
-    >
-  >,
-  Assert<
-    IsAssignable<
-      Parameters<ModelContext['createMessage']>[0],
-      Parameters<GlobalModelContext['createMessage']>[0]
-    >
-  >,
-  Assert<
-    IsAssignable<
-      Parameters<ModelContext['elicitInput']>[0],
-      Parameters<GlobalModelContext['elicitInput']>[0]
     >
   >,
   Assert<

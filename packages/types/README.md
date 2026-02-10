@@ -7,9 +7,10 @@ Zero dependencies. Zero runtime. Just `.d.ts` declarations.
 ## What's included
 
 - Global `Navigator` augmentation (`navigator.modelContext`)
-- Core descriptors: tools, resources, prompts
+- Core descriptors: tools
 - Content and result payload types (`ContentBlock`, `CallToolResult`, `ResourceContents`)
-- Consumer APIs: `callTool`, `createMessage`, `elicitInput`
+- Consumer API: `callTool`
+- Tool-scoped elicitation types (`ElicitationParams`, `ElicitationResult`, `ToolExecutionContext`)
 - Typed event surface (`ToolCallEvent`)
 
 ## Install
@@ -76,20 +77,19 @@ navigator.modelContext.registerTool({
 ```typescript
 import type {
   ElicitationParams,
+  ElicitationResult,
   ModelContext,
-  SamplingRequestParams,
+  ToolExecutionContext,
   ToolDescriptor,
   TypedModelContext,
-  ResourceDescriptor,
-  PromptDescriptor,
   CallToolResult,
 } from '@mcp-b/types';
 ```
 
-### Typed tool/prompt descriptors
+### Typed tool descriptors
 
 ```typescript
-import type { PromptDescriptor, ToolDescriptor } from '@mcp-b/types';
+import type { ElicitationParams, ToolDescriptor } from '@mcp-b/types';
 
 type SearchArgs = {
   query: string;
@@ -107,35 +107,68 @@ const searchTool: ToolDescriptor<SearchArgs> = {
     },
     required: ['query'],
   },
-  execute: async ({ query, limit }) => ({
-    content: [{ type: 'text', text: `Searching for "${query}" (limit: ${limit ?? 10})` }],
-  }),
-};
+  execute: async ({ query, limit }, context) => {
+    const approval = await context.elicitInput({
+      mode: 'form',
+      message: 'Run search?',
+      requestedSchema: {
+        type: 'object',
+        properties: {
+          confirmed: { type: 'boolean' },
+        },
+        required: ['confirmed'],
+      },
+    } satisfies ElicitationParams);
 
-type ReviewPromptArgs = {
-  code: string;
-  language: 'ts' | 'js';
-};
+    if (approval.action !== 'accept') {
+      return {
+        content: [{ type: 'text', text: 'Search cancelled by user.' }],
+      };
+    }
 
-const reviewPrompt: PromptDescriptor<ReviewPromptArgs> = {
-  name: 'review',
-  description: 'Review source code',
-  argsSchema: {
+    return {
+      content: [{ type: 'text', text: `Searching for "${query}" (limit: ${limit ?? 10})` }],
+    };
+  },
+};
+```
+
+### Tool-scoped elicitation
+
+```typescript
+navigator.modelContext.registerTool({
+  name: 'deploy',
+  description: 'Deploy current build',
+  inputSchema: {
     type: 'object',
     properties: {
-      code: { type: 'string' },
-      language: { type: 'string' },
+      environment: { type: 'string' },
     },
-    required: ['code', 'language'],
+    required: ['environment'],
   },
-  get: async ({ code, language }) => ({
-    messages: [
-      {
-        role: 'user',
-        content: { type: 'text', text: `Review this ${language} code:\n${code}` },
+  async execute({ environment }, context) {
+    const confirmation = await context.elicitInput({
+      mode: 'form',
+      message: `Confirm deploy to ${environment}?`,
+      requestedSchema: {
+        type: 'object',
+        properties: {
+          confirm: { type: 'boolean' },
+        },
+        required: ['confirm'],
       },
-    ],
-  }),
+    });
+
+    if (confirmation.action !== 'accept' || !confirmation.content?.confirm) {
+      return {
+        content: [{ type: 'text', text: 'Deployment cancelled.' }],
+      };
+    }
+
+    return {
+      content: [{ type: 'text', text: `Deployment started for ${environment}.` }],
+    };
+  },
 };
 ```
 
@@ -163,28 +196,6 @@ const searchResult = await modelContext.callTool({
 
 await modelContext.callTool({ name: 'ping' });
 // 'ping' arguments are optional because the args type is Record<string, never>.
-```
-
-### Sampling and elicitation
-
-```typescript
-const messageResult = await navigator.modelContext.createMessage({
-  messages: [{ role: 'user', content: { type: 'text', text: 'Summarize this page' } }],
-  maxTokens: 300,
-});
-
-const elicitationResult = await navigator.modelContext.elicitInput({
-  mode: 'form',
-  message: 'Please confirm deployment settings',
-  requestedSchema: {
-    type: 'object',
-    properties: {
-      environment: { type: 'string' },
-      confirm: { type: 'boolean' },
-    },
-    required: ['environment', 'confirm'],
-  },
-});
 ```
 
 ## Relationship to `@mcp-b/global`

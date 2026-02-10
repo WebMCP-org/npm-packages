@@ -1,4 +1,9 @@
-import type { CallToolResult, InputSchema } from './common.js';
+import type {
+  CallToolResult,
+  ElicitationParams,
+  ElicitationResult,
+  InputSchema,
+} from './common.js';
 
 // ============================================================================
 // Tool Annotations
@@ -39,6 +44,19 @@ export interface ToolAnnotations {
 // ============================================================================
 // Tool Descriptor
 // ============================================================================
+
+/**
+ * Per-call execution context provided to tool handlers.
+ */
+export interface ToolExecutionContext {
+  /**
+   * Requests user input for the current tool call.
+   *
+   * This function is bound to the active tool call and should only be used
+   * during execution of that call.
+   */
+  elicitInput(params: ElicitationParams): Promise<ElicitationResult>;
+}
 
 /**
  * Tool descriptor for the Web Model Context API.
@@ -85,7 +103,7 @@ export interface ToolDescriptor<
   /**
    * Tool execution function.
    */
-  execute: (args: TArgs) => Promise<TResult>;
+  execute: (args: TArgs, context: ToolExecutionContext) => Promise<TResult>;
 }
 
 // ============================================================================

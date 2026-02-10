@@ -258,6 +258,95 @@ export interface CallToolResult {
  */
 export type ToolResponse = CallToolResult;
 
+// ============================================================================
+// Elicitation Types
+// ============================================================================
+
+/**
+ * Form-based elicitation request parameters.
+ */
+export interface ElicitationFormParams {
+  /**
+   * Elicitation mode. Omit or set to `'form'` for form input.
+   */
+  mode?: 'form';
+
+  /**
+   * User-facing message.
+   */
+  message: string;
+
+  /**
+   * Requested form schema.
+   */
+  requestedSchema: {
+    /**
+     * Root schema type.
+     */
+    type: 'object';
+
+    /**
+     * Field definitions.
+     */
+    properties: Record<string, InputSchema>;
+
+    /**
+     * Required field names.
+     */
+    required?: string[];
+
+    /**
+     * Additional schema keywords.
+     */
+    [key: string]: unknown;
+  };
+}
+
+/**
+ * URL-based elicitation request parameters.
+ */
+export interface ElicitationUrlParams {
+  /**
+   * Elicitation mode.
+   */
+  mode: 'url';
+
+  /**
+   * User-facing message.
+   */
+  message: string;
+
+  /**
+   * Unique elicitation identifier.
+   */
+  elicitationId: string;
+
+  /**
+   * URL to open.
+   */
+  url: string;
+}
+
+/**
+ * Elicitation request parameters.
+ */
+export type ElicitationParams = ElicitationFormParams | ElicitationUrlParams;
+
+/**
+ * Result returned by an elicitation request.
+ */
+export interface ElicitationResult {
+  /**
+   * User decision.
+   */
+  action: 'accept' | 'decline' | 'cancel';
+
+  /**
+   * Submitted values when `action` is `'accept'`.
+   */
+  content?: Record<string, string | number | boolean | string[]>;
+}
+
 /**
  * Registration handle returned by registration methods.
  */
