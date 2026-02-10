@@ -288,7 +288,7 @@ export class NativeModelContextAdapter implements InternalModelContext {
             name: toolInfo.name,
             description: toolInfo.description,
             inputSchema,
-            execute: async (args: Record<string, unknown>) => {
+            execute: async (args: Record<string, unknown>, _context) => {
               return this.executeTool(toolInfo.name, args);
             },
             inputValidator: jsonSchemaToZod(inputSchema),

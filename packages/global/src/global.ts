@@ -46,6 +46,7 @@ import type {
   SamplingResult,
   ToolCallEvent,
   ToolDescriptor,
+  ToolExecutionContext,
   ToolResponse,
   ValidatedPromptDescriptor,
   ValidatedResourceDescriptor,
@@ -713,7 +714,11 @@ class WebModelContext implements InternalModelContext {
       inputSchema: inputJson,
       ...(normalizedOutput && { outputSchema: normalizedOutput.jsonSchema }),
       ...(tool.annotations && { annotations: tool.annotations }),
-      execute: tool.execute as (args: Record<string, unknown>) => Promise<ToolResponse>,
+      // Tool handlers receive a per-call execution context for elicitation.
+      execute: tool.execute as (
+        args: Record<string, unknown>,
+        context: ToolExecutionContext
+      ) => Promise<ToolResponse>,
       inputValidator: inputZod,
       ...(normalizedOutput && { outputValidator: normalizedOutput.zodValidator }),
     };
@@ -1439,8 +1444,21 @@ class WebModelContext implements InternalModelContext {
       }
     }
 
+    let contextActive = true;
     try {
-      const response = await tool.execute(validatedArgs);
+      const executionContext: ToolExecutionContext = {
+        elicitInput: async (params) => {
+          if (!contextActive) {
+            throw new Error(
+              `Elicitation context for tool "${toolName}" is no longer active after execute() resolved`
+            );
+          }
+
+          return requireElicitInputCapability(this.bridge.tabServer)(params);
+        },
+      };
+
+      const response = await tool.execute(validatedArgs, executionContext);
 
       if (tool.outputValidator && response.structuredContent) {
         const outputValidation = validateWithZod(response.structuredContent, tool.outputValidator);
@@ -1470,6 +1488,8 @@ class WebModelContext implements InternalModelContext {
         ],
         isError: true,
       };
+    } finally {
+      contextActive = false;
     }
   }
 

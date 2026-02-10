@@ -480,13 +480,27 @@ export interface ToolDescriptor<
    * Function that executes the tool logic
    *
    * When using Zod schemas, the args parameter type is automatically inferred from TInputSchema
-   * When using JSON Schema, args is Record<string, unknown>
+   * When using JSON Schema, args is Record<string, unknown>.
+   *
+   * The second parameter provides tool-call-scoped helpers such as elicitation.
    */
   execute: (
     args: TInputSchema extends Record<string, never>
       ? Record<string, unknown>
-      : z.infer<z.ZodObject<TInputSchema>>
+      : z.infer<z.ZodObject<TInputSchema>>,
+    context: ToolExecutionContext
   ) => Promise<ToolResponse>;
+}
+
+/**
+ * Tool execution helpers bound to a single tool invocation.
+ */
+export interface ToolExecutionContext {
+  /**
+   * Request user input for the active tool call.
+   * This helper is only valid during the current execute() invocation.
+   */
+  elicitInput(params: ElicitationParams): Promise<ElicitationResult>;
 }
 
 /**
@@ -501,7 +515,7 @@ export interface ValidatedToolDescriptor {
   inputSchema: InputSchema;
   outputSchema?: InputSchema;
   annotations?: ToolAnnotations;
-  execute: (args: Record<string, unknown>) => Promise<ToolResponse>;
+  execute: (args: Record<string, unknown>, context: ToolExecutionContext) => Promise<ToolResponse>;
 
   /** Zod validator for input arguments (not exposed via MCP) */
   inputValidator: z.ZodType;
