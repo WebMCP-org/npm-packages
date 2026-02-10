@@ -4,12 +4,9 @@ import type {
   InputSchema,
   JsonObject,
   RegistrationHandle,
-  Resource,
   TextContent,
   ToolResponse,
 } from './common.js';
-import type { Prompt, PromptDescriptor } from './prompt.js';
-import type { ResourceDescriptor, ResourceTemplateInfo } from './resource.js';
 import type { ToolDescriptor, ToolListItem } from './tool.js';
 
 // ============================================================================
@@ -19,25 +16,11 @@ import type { ToolDescriptor, ToolListItem } from './tool.js';
 /**
  * Context provided to models via provideContext().
  */
-export interface ModelContextInput<
-  TTools extends readonly ToolDescriptor[] = ToolDescriptor[],
-  TResources extends readonly ResourceDescriptor[] = ResourceDescriptor[],
-  TPrompts extends readonly PromptDescriptor[] = PromptDescriptor[],
-> {
+export interface ModelContextInput<TTools extends readonly ToolDescriptor[] = ToolDescriptor[]> {
   /**
    * Base tool descriptors to expose.
    */
   tools?: TTools;
-
-  /**
-   * Base resource descriptors to expose.
-   */
-  resources?: TResources;
-
-  /**
-   * Base prompt descriptors to expose.
-   */
-  prompts?: TPrompts;
 }
 
 // ============================================================================
@@ -50,13 +33,6 @@ export interface ModelContextInput<
  * Uses `never` for args so descriptors with stricter argument objects remain assignable.
  */
 export type AnyToolDescriptor = ToolDescriptor<never, CallToolResult, string>;
-
-/**
- * Any supported prompt descriptor.
- *
- * Uses `never` for args so descriptors with stricter argument objects remain assignable.
- */
-export type AnyPromptDescriptor = PromptDescriptor<never, string>;
 
 /**
  * Infers argument shape from a tool descriptor.
@@ -78,13 +54,6 @@ export type InferToolResult<TTool> = TTool extends ToolDescriptor<
   infer _TName
 >
   ? TResult
-  : never;
-
-/**
- * Infers argument shape from a prompt descriptor.
- */
-export type InferPromptArgs<TPrompt> = TPrompt extends PromptDescriptor<infer TArgs, infer _TName>
-  ? TArgs
   : never;
 
 /**
@@ -115,27 +84,6 @@ export type ToolResultByName<
   TTools extends readonly { name: string }[],
   TName extends ToolName<TTools>,
 > = InferToolResult<ToolByName<TTools, TName>>;
-
-/**
- * Union of prompt names from a tuple/array of descriptors.
- */
-export type PromptName<TPrompts extends readonly { name: string }[]> = TPrompts[number]['name'];
-
-/**
- * Extracts a prompt descriptor by name from a tuple/array.
- */
-export type PromptByName<
-  TPrompts extends readonly { name: string }[],
-  TName extends PromptName<TPrompts>,
-> = Extract<TPrompts[number], { name: TName }>;
-
-/**
- * Prompt argument type by prompt name from a tuple/array.
- */
-export type PromptArgsByName<
-  TPrompts extends readonly { name: string }[],
-  TName extends PromptName<TPrompts>,
-> = InferPromptArgs<PromptByName<TPrompts, TName>>;
 
 /**
  * Typed parameters for `callTool`.
@@ -292,7 +240,7 @@ export interface SamplingResult {
  */
 export interface ElicitationFormParams {
   /**
-   * Elicitation mode. Omit or set to `'form'` for form prompts.
+   * Elicitation mode. Omit or set to `'form'` for form input.
    */
   mode?: 'form';
 
@@ -384,7 +332,7 @@ export interface ModelContext {
   // ==================== CONTEXT ====================
 
   /**
-   * Replaces base context with provided tools/resources/prompts.
+   * Replaces base context with provided tools.
    */
   provideContext(context: ModelContextInput): void;
 
@@ -416,48 +364,6 @@ export interface ModelContext {
     TName extends string = string,
     TArgs extends Record<string, unknown> = Record<string, unknown>,
   >(params: { name: TName; arguments?: TArgs }): Promise<ToolResponse>;
-
-  // ==================== RESOURCES ====================
-
-  /**
-   * Registers a dynamic resource.
-   */
-  registerResource(resource: ResourceDescriptor): RegistrationHandle;
-
-  /**
-   * Unregisters a dynamic resource by URI.
-   */
-  unregisterResource(uri: string): void;
-
-  /**
-   * Lists currently registered resources.
-   */
-  listResources(): Resource[];
-
-  /**
-   * Lists resource templates derived from registered resources.
-   */
-  listResourceTemplates(): ResourceTemplateInfo[];
-
-  // ==================== PROMPTS ====================
-
-  /**
-   * Registers a dynamic prompt.
-   */
-  registerPrompt<
-    TArgs extends Record<string, unknown> = Record<string, unknown>,
-    TName extends string = string,
-  >(prompt: PromptDescriptor<TArgs, TName>): RegistrationHandle;
-
-  /**
-   * Unregisters a dynamic prompt by name.
-   */
-  unregisterPrompt(name: string): void;
-
-  /**
-   * Lists currently registered prompts.
-   */
-  listPrompts(): Prompt[];
 
   // ==================== GENERAL ====================
 
@@ -529,14 +435,13 @@ export interface ModelContext {
 // ============================================================================
 
 /**
- * Strongly-typed `ModelContext` view derived from known tool/prompt descriptors.
+ * Strongly-typed `ModelContext` view derived from known tool descriptors.
  *
  * This is useful when your project has a static tool registry and you want
  * name-aware inference for `callTool`.
  */
 export type TypedModelContext<
   TTools extends readonly { name: string }[] = readonly ToolDescriptor[],
-  TPrompts extends readonly { name: string }[] = readonly PromptDescriptor[],
 > = ModelContext & {
   /**
    * Executes a known tool with name-aware argument and response inference.
@@ -554,9 +459,4 @@ export type TypedModelContext<
    * Lists tools with a narrowed name union.
    */
   listTools(): Array<ToolListItem<ToolName<TTools>>>;
-
-  /**
-   * Lists prompts with a narrowed name union.
-   */
-  listPrompts(): Array<Prompt<PromptName<TPrompts>>>;
 };

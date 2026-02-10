@@ -14,7 +14,6 @@ export type {
   JsonPrimitive,
   JsonValue,
   RegistrationHandle,
-  Resource,
   ResourceContents,
   ResourceLink,
   TextContent,
@@ -22,21 +21,16 @@ export type {
   ToolResponse,
 } from './common.js';
 export type {
-  AnyPromptDescriptor,
   AnyToolDescriptor,
   ElicitationFormParams,
   ElicitationParams,
   ElicitationResult,
   ElicitationUrlParams,
-  InferPromptArgs,
   InferToolArgs,
   InferToolResult,
   ModelContext,
   ModelContextInput,
   ModelPreferences,
-  PromptArgsByName,
-  PromptByName,
-  PromptName,
   SamplingRequestMessage,
   SamplingRequestParams,
   SamplingResult,
@@ -48,8 +42,6 @@ export type {
   ToolResultByName,
   TypedModelContext,
 } from './model-context.js';
-export type { Prompt, PromptArgument, PromptDescriptor, PromptMessage } from './prompt.js';
-export type { ResourceDescriptor, ResourceTemplateInfo } from './resource.js';
 export type { ToolAnnotations, ToolDescriptor, ToolListItem } from './tool.js';
 
 // ============================================================================

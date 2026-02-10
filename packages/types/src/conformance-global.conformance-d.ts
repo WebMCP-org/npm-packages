@@ -6,18 +6,13 @@ import type {
   InputSchema as GlobalInputSchema,
   ModelContext as GlobalModelContext,
   ModelContextInput as GlobalModelContextInput,
-  PromptDescriptor as GlobalPromptDescriptor,
-  Resource as GlobalResource,
-  ResourceContents as GlobalResourceContents,
-  ResourceDescriptor as GlobalResourceDescriptor,
-  ResourceTemplateInfo as GlobalResourceTemplateInfo,
   SamplingRequestParams as GlobalSamplingRequestParams,
   SamplingResult as GlobalSamplingResult,
   ToolCallEvent as GlobalToolCallEvent,
   ToolDescriptor as GlobalToolDescriptor,
   ToolListItem as GlobalToolListItem,
 } from '../../global/src/types.js';
-import type { CallToolResult, InputSchema, Resource, ResourceContents } from './common.js';
+import type { CallToolResult, InputSchema } from './common.js';
 import type {
   ElicitationParams,
   ElicitationResult,
@@ -27,21 +22,16 @@ import type {
   SamplingResult,
   ToolCallEvent,
 } from './model-context.js';
-import type { PromptDescriptor } from './prompt.js';
-import type { ResourceDescriptor, ResourceTemplateInfo } from './resource.js';
 import type { ToolDescriptor, ToolListItem } from './tool.js';
 
 type IsAssignable<TFrom, TTo> = TFrom extends TTo ? true : false;
 type Assert<T extends true> = T;
 
 type GlobalJsonToolDescriptor = GlobalToolDescriptor<Record<string, never>, Record<string, never>>;
-type GlobalJsonPromptDescriptor = GlobalPromptDescriptor<Record<string, never>>;
 
 export type GlobalConformanceChecks = [
   Assert<IsAssignable<InputSchema['type'], GlobalInputSchema['type']>>,
   Assert<IsAssignable<CallToolResult['content'], GlobalCallToolResult['content']>>,
-  Assert<IsAssignable<Resource, GlobalResource>>,
-  Assert<IsAssignable<ResourceContents, GlobalResourceContents>>,
   Assert<IsAssignable<ToolDescriptor['name'], GlobalJsonToolDescriptor['name']>>,
   Assert<IsAssignable<ToolDescriptor['description'], GlobalJsonToolDescriptor['description']>>,
   Assert<IsAssignable<ToolDescriptor['inputSchema'], GlobalInputSchema>>,
@@ -52,10 +42,6 @@ export type GlobalConformanceChecks = [
     >
   >,
   Assert<IsAssignable<ToolListItem, GlobalToolListItem>>,
-  Assert<IsAssignable<ResourceDescriptor, GlobalResourceDescriptor>>,
-  Assert<IsAssignable<ResourceTemplateInfo, GlobalResourceTemplateInfo>>,
-  Assert<IsAssignable<PromptDescriptor['name'], GlobalJsonPromptDescriptor['name']>>,
-  Assert<IsAssignable<PromptDescriptor['description'], GlobalJsonPromptDescriptor['description']>>,
   Assert<IsAssignable<SamplingRequestParams, GlobalSamplingRequestParams>>,
   Assert<IsAssignable<SamplingResult, GlobalSamplingResult>>,
   Assert<IsAssignable<ElicitationParams, GlobalElicitationParams>>,
@@ -82,30 +68,6 @@ export type GlobalConformanceChecks = [
     IsAssignable<
       Parameters<ModelContext['elicitInput']>[0],
       Parameters<GlobalModelContext['elicitInput']>[0]
-    >
-  >,
-  Assert<
-    IsAssignable<
-      ReturnType<ModelContext['listResources']>,
-      ReturnType<GlobalModelContext['listResources']>
-    >
-  >,
-  Assert<
-    IsAssignable<
-      ReturnType<ModelContext['listResourceTemplates']>,
-      ReturnType<GlobalModelContext['listResourceTemplates']>
-    >
-  >,
-  Assert<
-    IsAssignable<
-      ReturnType<ModelContext['registerResource']>,
-      ReturnType<GlobalModelContext['registerResource']>
-    >
-  >,
-  Assert<
-    IsAssignable<
-      ReturnType<ModelContext['registerPrompt']>,
-      ReturnType<GlobalModelContext['registerPrompt']>
     >
   >,
   Assert<

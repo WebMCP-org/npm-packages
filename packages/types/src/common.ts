@@ -42,13 +42,13 @@ export interface InputSchemaProperty {
 }
 
 /**
- * JSON Schema definition for tool/prompt input parameters.
+ * JSON Schema definition for tool input parameters.
  *
  * @see {@link https://json-schema.org/}
  */
 export interface InputSchema {
   /**
-   * JSON Schema type for the root value (usually `'object'` for tool and prompt args).
+   * JSON Schema type for the root value (usually `'object'` for tool args).
    */
   type: string;
 
@@ -218,7 +218,7 @@ export interface ResourceLink {
 }
 
 /**
- * Any content block allowed in tool/prompt responses.
+ * Any content block allowed in tool responses.
  */
 export type ContentBlock =
   | TextContent
@@ -258,53 +258,8 @@ export interface CallToolResult {
  */
 export type ToolResponse = CallToolResult;
 
-// ============================================================================
-// Resource Types (MCP spec shapes)
-// ============================================================================
-
 /**
- * Resource metadata exposed by `listResources()`.
- *
- * @see {@link https://spec.modelcontextprotocol.io/specification/server/resources/}
- */
-export interface Resource {
-  /**
-   * Canonical resource URI.
-   */
-  uri: string;
-
-  /**
-   * Human-friendly name.
-   */
-  name: string;
-
-  /**
-   * Optional short title.
-   */
-  title?: string;
-
-  /**
-   * Optional human-readable description.
-   */
-  description?: string;
-
-  /**
-   * Optional MIME type.
-   */
-  mimeType?: string;
-
-  /**
-   * Optional size in bytes.
-   */
-  size?: number;
-}
-
-// ============================================================================
-// Registration Handle
-// ============================================================================
-
-/**
- * Registration handle returned by `registerTool`, `registerResource`, and `registerPrompt`.
+ * Registration handle returned by registration methods.
  */
 export interface RegistrationHandle {
   /**

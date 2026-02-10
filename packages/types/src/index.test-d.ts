@@ -1,5 +1,5 @@
 import { expectTypeOf, test } from 'vitest';
-import type { CallToolResult, RegistrationHandle, Resource } from './common.js';
+import type { CallToolResult, RegistrationHandle } from './common.js';
 import type {
   ElicitationParams,
   ElicitationResult,
@@ -9,8 +9,6 @@ import type {
   SamplingResult,
   ToolCallEvent,
 } from './index.js';
-import type { Prompt, PromptDescriptor } from './prompt.js';
-import type { ResourceDescriptor, ResourceTemplateInfo } from './resource.js';
 import type { ToolDescriptor, ToolListItem } from './tool.js';
 
 // === Producer API ===
@@ -34,32 +32,6 @@ test('ModelContext.provideContext accepts ModelContextInput', () => {
 // === Consumer API ===
 test('ModelContext.callTool returns Promise<CallToolResult>', () => {
   expectTypeOf<ModelContext['callTool']>().returns.toEqualTypeOf<Promise<CallToolResult>>();
-});
-
-// === Resources ===
-test('ModelContext.registerResource accepts ResourceDescriptor', () => {
-  expectTypeOf<ModelContext['registerResource']>().parameter(0).toEqualTypeOf<ResourceDescriptor>();
-  expectTypeOf<ModelContext['registerResource']>().returns.toEqualTypeOf<RegistrationHandle>();
-});
-
-test('ModelContext.listResources returns Resource[]', () => {
-  expectTypeOf<ModelContext['listResources']>().returns.toEqualTypeOf<Resource[]>();
-});
-
-test('ModelContext.listResourceTemplates returns ResourceTemplateInfo[]', () => {
-  expectTypeOf<ModelContext['listResourceTemplates']>().returns.toEqualTypeOf<
-    ResourceTemplateInfo[]
-  >();
-});
-
-// === Prompts ===
-test('ModelContext.registerPrompt accepts PromptDescriptor', () => {
-  expectTypeOf<ModelContext['registerPrompt']>().parameter(0).toMatchTypeOf<PromptDescriptor>();
-  expectTypeOf<ModelContext['registerPrompt']>().returns.toEqualTypeOf<RegistrationHandle>();
-});
-
-test('ModelContext.listPrompts returns Prompt[]', () => {
-  expectTypeOf<ModelContext['listPrompts']>().returns.toEqualTypeOf<Prompt[]>();
 });
 
 // === General ===

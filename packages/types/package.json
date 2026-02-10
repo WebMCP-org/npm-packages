@@ -37,8 +37,6 @@
     "src/common.ts",
     "src/index.ts",
     "src/model-context.ts",
-    "src/prompt.ts",
-    "src/resource.ts",
     "src/tool.ts"
   ],
   "scripts": {
