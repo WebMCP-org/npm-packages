@@ -6,6 +6,7 @@
   },
   "include": [
     "src/**/*.conformance-d.ts",
+    "src/conformance-dependency-shims.d.ts",
     "src/common.ts",
     "src/model-context.ts",
     "src/prompt.ts",
