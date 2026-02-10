@@ -8,7 +8,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue?style=flat-square)](https://www.typescriptlang.org/)
 [![Chrome APIs](https://img.shields.io/badge/Chrome_APIs-62+-4285F4?style=flat-square&logo=googlechrome)](https://developer.chrome.com/docs/extensions/reference/)
 
-📖 **[Full Documentation](https://docs.mcp-b.ai/packages/extension-tools)** | 🚀 **[Quick Start](https://docs.mcp-b.ai/quickstart)**
+**[Full Documentation](https://docs.mcp-b.ai/packages/extension-tools)** | **[Quick Start](https://docs.mcp-b.ai/quickstart)**
 
 **@mcp-b/extension-tools** exposes Chrome Extension APIs as MCP tools, enabling AI agents like Claude, ChatGPT, Gemini, Cursor, and Copilot to control browser tabs, manage bookmarks, access history, execute scripts, and more.
 
@@ -49,7 +49,7 @@ yarn add @mcp-b/extension-tools @modelcontextprotocol/sdk
 
 ## API Implementation Status
 
-### ✅ Available API Tools (62 APIs)
+### Available API Tools (62 APIs)
 
 The following Chrome Extension APIs have been fully implemented and are ready to use:
 
@@ -124,7 +124,7 @@ The following Chrome Extension APIs have been fully implemented and are ready to
 - `WebRequestApiTools` - Intercept and modify requests
 - `WindowsApiTools` - Control browser windows
 
-### 🚧 APIs Under Development (12 APIs)
+### APIs Under Development (12 APIs)
 
 The following Chrome Extension APIs are not yet implemented or need additional work:
 

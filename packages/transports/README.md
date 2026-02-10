@@ -8,7 +8,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue?style=flat-square)](https://www.typescriptlang.org/)
 [![Bundle Size](https://img.shields.io/bundlephobia/minzip/@mcp-b/transports?style=flat-square)](https://bundlephobia.com/package/@mcp-b/transports)
 
-📖 **[Full Documentation](https://docs.mcp-b.ai/packages/transports)** | 🚀 **[Quick Start](https://docs.mcp-b.ai/quickstart)** | 🔌 **[Transport Concepts](https://docs.mcp-b.ai/concepts/transports)**
+**[Full Documentation](https://docs.mcp-b.ai/packages/transports)** | **[Quick Start](https://docs.mcp-b.ai/quickstart)** | **[Transport Concepts](https://docs.mcp-b.ai/concepts/transports)**
 
 **@mcp-b/transports** provides browser-native MCP transport implementations that enable AI agents and LLMs to communicate with web applications. Whether you're building Chrome extensions, embedded iframes, or in-page AI integrations, this library provides the secure messaging layer you need.
 

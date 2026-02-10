@@ -8,7 +8,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue?style=flat-square)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-18+-61DAFB?style=flat-square&logo=react)](https://reactjs.org/)
 
-📖 **[Full Documentation](https://docs.mcp-b.ai/packages/react-webmcp)** | 🚀 **[Quick Start](https://docs.mcp-b.ai/quickstart)** | ⚛️ **[AI Framework Integration](https://docs.mcp-b.ai/ai-frameworks)**
+**[Full Documentation](https://docs.mcp-b.ai/packages/react-webmcp)** | **[Quick Start](https://docs.mcp-b.ai/quickstart)** | **[AI Framework Integration](https://docs.mcp-b.ai/ai-frameworks)**
 
 **@mcp-b/react-webmcp** provides React hooks that expose your components as AI-callable tools via the Model Context Protocol. Build AI-powered React applications where Claude, ChatGPT, Gemini, Cursor, and Copilot can interact with your app's functionality.
 
@@ -50,7 +50,7 @@
 pnpm add @mcp-b/react-webmcp zod
 ```
 
-## ⚠️ Zod Version Compatibility
+## Zod Version Compatibility
 
 This package supports **Zod 3.25+** and **Zod 4.x**. Simply use the standard import:
 
@@ -227,12 +227,12 @@ function useWebMCP<
 
 | Option | Type | Required | Description |
 |--------|------|----------|-------------|
-| `name` | `string` | ✓ | Unique tool identifier (e.g., 'posts_like') |
-| `description` | `string` | ✓ | Human-readable description for AI |
+| `name` | `string` |  | Unique tool identifier (e.g., 'posts_like') |
+| `description` | `string` |  | Human-readable description for AI |
 | `inputSchema` | `Record<string, ZodType>` | - | Input validation using Zod schemas |
 | `outputSchema` | `Record<string, ZodType>` | - | Output schema for structured responses (recommended) |
 | `annotations` | `ToolAnnotations` | - | Metadata hints for the AI |
-| `handler` | `(input) => Promise<TOutput>` | ✓ | Function that executes the tool |
+| `handler` | `(input) => Promise<TOutput>` |  | Function that executes the tool |
 | `formatOutput` | `(output) => string` | - | Custom output formatter |
 | `onSuccess` | `(result, input) => void` | - | Success callback |
 | `onError` | `(error, input) => void` | - | Error handler callback |
@@ -369,7 +369,7 @@ function ToolList() {
     <div>
       <h3>Tools ({tools.length})</h3>
       {capabilities?.tools?.listChanged && (
-        <p>✓ Server supports real-time tool updates</p>
+        <p> Server supports real-time tool updates</p>
       )}
       {tools.map(tool => (
         <div key={tool.name}>

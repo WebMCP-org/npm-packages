@@ -11,19 +11,19 @@ The E2E suite includes:
 - **Web Standards Showcase**: Interactive demo of native Chromium Web Model Context API (NEW!)
 - **Full MCP Protocol**: Tool registration, listing, execution, and lifecycle management
 
-## 🎨 Web Standards Showcase (NEW!)
+## Web Standards Showcase (NEW!)
 
 **Location:** `web-standards-showcase/`
 
 Interactive CodePen-style playground demonstrating the **native Chromium Web Model Context API** without any polyfills.
 
 **Features:**
-- 📝 Live code editor with syntax highlighting
-- 🔧 Pre-built tool templates (Counter, Calculator, Todo, Timer, State Machine)
-- 📊 Two-bucket system demonstration (provideContext vs registerTool)
-- 🧪 Testing API explorer (navigator.modelContextTesting)
-- 📝 Real-time event logging
-- 🚫 **No polyfill** - Validates native implementation only
+- Live code editor with syntax highlighting
+- Pre-built tool templates (Counter, Calculator, Todo, Timer, State Machine)
+- Two-bucket system demonstration (provideContext vs registerTool)
+- Testing API explorer (navigator.modelContextTesting)
+- Real-time event logging
+- **No polyfill** - Validates native implementation only
 
 **Quick Start:**
 ```bash
@@ -123,22 +123,22 @@ pnpm test:report
 The test suite covers:
 
 ### Basic Functionality
-- ✅ Load test application
-- ✅ Start MCP server
-- ✅ Connect MCP client to server
-- ✅ List available tools
+- Load test application
+- Start MCP server
+- Connect MCP client to server
+- List available tools
 
 ### Tool Execution
-- ✅ Increment counter via MCP tool
-- ✅ Decrement counter via MCP tool
-- ✅ Reset counter via MCP tool
-- ✅ Get counter value via MCP tool
+- Increment counter via MCP tool
+- Decrement counter via MCP tool
+- Reset counter via MCP tool
+- Get counter value via MCP tool
 
 ### Advanced Scenarios
-- ✅ Multiple rapid tool calls (concurrency)
-- ✅ Disconnect and reconnect client
-- ✅ Stop and restart server
-- ✅ Programmatic API testing
+- Multiple rapid tool calls (concurrency)
+- Disconnect and reconnect client
+- Stop and restart server
+- Programmatic API testing
 
 ## Manual Testing
 
@@ -224,7 +224,7 @@ test.describe('My Feature', () => {
 ## Browser Support
 
 Currently testing on:
-- ✅ Chromium (Chrome/Edge)
+- Chromium (Chrome/Edge)
 
 To add more browsers, update `playwright.config.ts`:
 

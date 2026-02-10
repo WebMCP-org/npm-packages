@@ -8,7 +8,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue?style=flat-square)](https://www.typescriptlang.org/)
 [![Minimal Code](https://img.shields.io/badge/Custom_Code-~50_lines-green?style=flat-square)](https://github.com/WebMCP-org/npm-packages)
 
-📖 **[Full Documentation](https://docs.mcp-b.ai/packages/webmcp-ts-sdk)** | 🚀 **[Quick Start](https://docs.mcp-b.ai/quickstart)**
+**[Full Documentation](https://docs.mcp-b.ai/packages/webmcp-ts-sdk)** | **[Quick Start](https://docs.mcp-b.ai/quickstart)**
 
 **@mcp-b/webmcp-ts-sdk** adapts the official MCP TypeScript SDK for browser environments, enabling dynamic tool registration required by the W3C Web Model Context API. This allows AI agents like Claude, ChatGPT, Gemini, Cursor, and Copilot to interact with browser-based applications.
 
@@ -185,10 +185,10 @@ server.registerTool('analyze-data', {
 
 This package is designed for **minimal maintenance**:
 
-- ✅ **~50 lines** of custom code
-- ✅ **Automatic updates** for types, protocol, validation via official SDK dependency
-- ✅ **Single modification point** - only capability registration behavior
-- ✅ **Type-safe** - no prototype hacks or unsafe casts
+- **~50 lines** of custom code
+- **Automatic updates** for types, protocol, validation via official SDK dependency
+- **Single modification point** - only capability registration behavior
+- **Type-safe** - no prototype hacks or unsafe casts
 
 ### Syncing with Upstream
 
