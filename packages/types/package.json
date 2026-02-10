@@ -36,6 +36,7 @@
     "dist",
     "src/common.ts",
     "src/index.ts",
+    "src/json-schema.ts",
     "src/model-context.ts",
     "src/tool.ts"
   ],

@@ -1,5 +1,6 @@
 import type { CallToolResult, RegistrationHandle, ToolResponse } from './common.js';
-import type { ToolDescriptor, ToolListItem } from './tool.js';
+import type { JsonSchemaForInference } from './json-schema.js';
+import type { ToolDescriptor, ToolDescriptorFromSchema, ToolListItem } from './tool.js';
 
 // ============================================================================
 // Model Context Input
@@ -131,7 +132,16 @@ export interface ModelContext {
   // ==================== TOOLS ====================
 
   /**
-   * Registers a dynamic tool.
+   * Registers a dynamic tool with args inferred from `inputSchema`.
+   */
+  registerTool<
+    TInputSchema extends JsonSchemaForInference,
+    TResult extends CallToolResult = CallToolResult,
+    TName extends string = string,
+  >(tool: ToolDescriptorFromSchema<TInputSchema, TResult, TName>): RegistrationHandle;
+
+  /**
+   * Registers a dynamic tool with explicitly typed args/result.
    */
   registerTool<
     TArgs extends Record<string, unknown> = Record<string, unknown>,

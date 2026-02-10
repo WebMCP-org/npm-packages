@@ -5,7 +5,22 @@ import type { ToolDescriptor, ToolListItem } from './tool.js';
 
 // === Producer API ===
 test('ModelContext.registerTool accepts ToolDescriptor and returns RegistrationHandle', () => {
-  expectTypeOf<ModelContext['registerTool']>().parameter(0).toMatchTypeOf<ToolDescriptor>();
+  const tool: ToolDescriptor = {
+    name: 'health',
+    description: 'Health check',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+    async execute() {
+      return {
+        content: [{ type: 'text', text: 'ok' }],
+      };
+    },
+  };
+
+  expectTypeOf<ModelContext['registerTool']>().toBeCallableWith(tool);
   expectTypeOf<ModelContext['registerTool']>().returns.toEqualTypeOf<RegistrationHandle>();
 });
 

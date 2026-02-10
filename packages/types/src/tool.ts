@@ -4,6 +4,7 @@ import type {
   ElicitationResult,
   InputSchema,
 } from './common.js';
+import type { InferArgsFromInputSchema, JsonSchemaForInference } from './json-schema.js';
 
 // ============================================================================
 // Tool Annotations
@@ -105,6 +106,19 @@ export interface ToolDescriptor<
    */
   execute: (args: TArgs, context: ToolExecutionContext) => Promise<TResult>;
 }
+
+/**
+ * Tool descriptor whose `execute` args are inferred from a literal JSON Schema.
+ *
+ * For widened/non-literal schemas, arguments fall back to `Record<string, unknown>`.
+ */
+export type ToolDescriptorFromSchema<
+  TInputSchema extends JsonSchemaForInference,
+  TResult extends CallToolResult = CallToolResult,
+  TName extends string = string,
+> = Omit<ToolDescriptor<InferArgsFromInputSchema<TInputSchema>, TResult, TName>, 'inputSchema'> & {
+  inputSchema: TInputSchema;
+};
 
 // ============================================================================
 // Tool List Item

@@ -12,6 +12,7 @@ Zero dependencies. Zero runtime. Just `.d.ts` declarations.
 - Consumer API: `callTool`
 - Tool-scoped elicitation types (`ElicitationParams`, `ElicitationResult`, `ToolExecutionContext`)
 - Typed event surface (`ToolCallEvent`)
+- Pure JSON Schema inference helpers (`JsonSchemaForInference`, `InferArgsFromInputSchema`, `ToolDescriptorFromSchema`)
 
 ## Install
 
@@ -78,9 +79,12 @@ navigator.modelContext.registerTool({
 import type {
   ElicitationParams,
   ElicitationResult,
+  InferArgsFromInputSchema,
+  JsonSchemaForInference,
   ModelContext,
   ToolExecutionContext,
   ToolDescriptor,
+  ToolDescriptorFromSchema,
   TypedModelContext,
   CallToolResult,
 } from '@mcp-b/types';
@@ -132,6 +136,37 @@ const searchTool: ToolDescriptor<SearchArgs> = {
   },
 };
 ```
+
+### Pure JSON Schema inference (no manual args type needed)
+
+```typescript
+import type { JsonSchemaForInference } from '@mcp-b/types';
+
+const inputSchema = {
+  type: 'object',
+  properties: {
+    query: { type: 'string' },
+    limit: { type: 'integer', minimum: 1, maximum: 50 },
+  },
+  required: ['query'],
+  additionalProperties: false,
+} as const satisfies JsonSchemaForInference;
+
+navigator.modelContext.registerTool({
+  name: 'search',
+  description: 'Search indexed docs',
+  inputSchema,
+  async execute(args) {
+    // args is inferred as:
+    // { query: string; limit?: number }
+    return {
+      content: [{ type: 'text', text: `Searching for ${args.query}` }],
+    };
+  },
+});
+```
+
+If your schema is not a literal (for example loaded from runtime config), inference safely falls back to `Record<string, unknown>`.
 
 ### Tool-scoped elicitation
 

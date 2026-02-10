@@ -25,6 +25,20 @@ export type {
   ToolResponse,
 } from './common.js';
 export type {
+  InferArgsFromInputSchema,
+  InferJsonSchema,
+  JsonSchemaArray,
+  JsonSchemaBoolean,
+  JsonSchemaEnumValue,
+  JsonSchemaForInference,
+  JsonSchemaNull,
+  JsonSchemaNumber,
+  JsonSchemaObject,
+  JsonSchemaPrimitiveType,
+  JsonSchemaString,
+  JsonSchemaType,
+} from './json-schema.js';
+export type {
   AnyToolDescriptor,
   InferToolArgs,
   InferToolResult,
@@ -41,6 +55,7 @@ export type {
 export type {
   ToolAnnotations,
   ToolDescriptor,
+  ToolDescriptorFromSchema,
   ToolExecutionContext,
   ToolListItem,
 } from './tool.js';
