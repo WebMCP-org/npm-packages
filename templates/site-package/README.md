@@ -1,112 +1,145 @@
-# {{Site}} MCP
+# {{Site}} MCP Skill Template
 
-WebMCP tools for {{Site}}.
+Starter template for building a site-specific WebMCP skill.
 
-## Development Workflow
+This template helps you:
 
-### Step 1: Inspect the Target Site
+- inspect a target website,
+- extract structured data from DOM elements,
+- expose that data and actions through MCP tools, and
+- iterate quickly with an inject → test → refine workflow.
 
-Before writing any code, understand the page structure:
+## Documentation and Tool Design Standards
 
-1. Open {{site_url}} in Chrome
-2. Right-click → Inspect to open DevTools
-3. Identify key elements:
-   - What CSS classes identify items you want to extract?
-   - Are items in a list, table, or nested divs?
-   - Where is the metadata (points, dates, authors)?
-   - What's the relationship between elements (siblings, children)?
+Adopt these modern defaults when creating new site skills:
 
-**Example Inspection:**
+- **Start with user intent**: define what an agent must accomplish before
+  defining APIs.
+- **Keep tool names verb-first** (`get_`, `search_`, `create_`, `update_`,
+  `delete_`).
+- **Prefer structured outputs**: return machine-friendly fields over long
+  free-form strings.
+- **Document failure modes**: include empty-state and permission-denied
+  behavior in tool docs.
+- **Design for idempotency where possible**: repeated calls should avoid
+  accidental duplicate side effects.
+
+## Recommended Development Workflow
+
+### 1) Inspect the Target Site
+
+Before writing code, confirm the real DOM structure in DevTools.
+
+1. Open `{{site_url}}` in Chrome.
+1. Open DevTools (`Right-click → Inspect`).
+1. Identify stable selectors and data locations:
+   - Which classes or attributes identify items you need?
+   - Are items organized as cards, rows, or nested containers?
+   - Where do metadata fields live (date, author, score, status)?
+1. Validate assumptions in Console:
+
 ```javascript
-// In console
-document.querySelectorAll('.item')  // Find all items
-document.querySelector('.item .title')  // Find title within item
+document.querySelectorAll('.item');
+document.querySelector('.item .title');
 ```
 
-4. Take notes on the structure you discover
-5. Use this knowledge to write your parsing functions
+1. Capture notes you can reuse in parser helpers.
 
-### Step 2: Write Parsing Functions
+### 2) Write Parsing Functions
 
-Create helper functions that extract data from the DOM elements you identified.
+Implement focused parser utilities for each domain entity.
 
 ```typescript
 interface Item {
   id: string;
   title: string;
-  // ... other fields
 }
 
 function parseItem(element: Element): Item | null {
-  try {
-    const titleEl = element.querySelector('.title');
-    if (!titleEl) return null;
+  const titleEl = element.querySelector('.title');
+  if (!titleEl) return null;
 
-    return {
-      id: element.id,
-      title: getText(titleEl),
-      // ... extract other fields
-    };
-  } catch (error) {
-    console.error('Parse error:', error);
-    return null;
-  }
+  return {
+    id: element.id,
+    title: getText(titleEl),
+  };
 }
 ```
 
-### Step 3: Register Tools
+### 3) Register MCP Tools
 
-Use your parsing functions in tool handlers.
+Use parser helpers inside tool handlers and keep tool names action-oriented.
 
-### Step 4: Test and Iterate
+### 4) Test and Iterate
 
-Inject → test → fix → reinject
+Use a short feedback loop:
+
+1. Inject updated script.
+1. Run tools from the MCP client.
+1. Verify output shape and edge cases.
+1. Repeat.
 
 ## Quick Start
 
-1. **Setup**:
-   ```bash
-   cd tools && npm install
-   ```
+1. Install dependencies:
 
-2. **Use with Claude Code**:
-   - Navigate to {{site_url}} in Chrome
-   - Inject the tools:
-     ```javascript
-     inject_webmcp_script({ file_path: "./tools/src/{{site}}.ts" })
-     ```
-   - Call tools directly:
-     ```javascript
-     webmcp_{{site}}_page0_get_page_info()
-     ```
+```bash
+cd tools
+npm install
+```
 
-## Tools
+1. Open `{{site_url}}` in Chrome.
+1. Inject your tools script:
+
+```javascript
+inject_webmcp_script({ file_path: './tools/src/{{site}}.ts' });
+```
+
+1. Call a tool:
+
+```javascript
+webmcp_{{site}}_page0_get_page_info();
+```
+
+## Tool Inventory (Example)
 
 | Tool | Description |
-|------|-------------|
-| `get_page_info` | Get basic page information |
-| `search_items` | Search for items on the page |
-| `click_button` | Click a button by label |
+| --- | --- |
+| `get_page_info` | Return high-level page context and metadata. |
+| `search_items` | Search or filter visible items. |
+| `click_button` | Trigger a button action by label or selector. |
 
-See [SKILL.md](SKILL.md) for complete documentation.
+See [SKILL.md](SKILL.md) for complete usage and behavioral guidance.
 
-## Development
+## File Layout
 
-Edit `tools/src/{{site}}.ts` to add or modify tools, then reinject to test.
-
-## Structure
-
-```
+```text
 {{site}}-mcp/
-├── SKILL.md              # Main skill documentation
+├── SKILL.md
 ├── tools/
-│   ├── package.json      # Tools dependencies
+│   ├── package.json
 │   ├── tsconfig.json
 │   └── src/
-│       └── {{site}}.ts   # Tool implementations
+│       └── {{site}}.ts
 ├── reference/
-│   ├── api.md            # Detailed API docs
-│   └── workflows.md      # Usage examples
+│   ├── api.md
+│   └── workflows.md
 └── scripts/
-    └── setup.sh          # Setup automation
+    └── setup.sh
 ```
+
+## Development Notes
+
+- Keep selectors resilient (prefer stable attributes over visual class names).
+- Return consistent schemas across tools.
+- Handle empty states and partially-loaded DOM content gracefully.
+
+## Definition of Done Checklist
+
+Before publishing a site skill, verify:
+
+- [ ] All local links in `README.md` and `SKILL.md` resolve.
+- [ ] Every tool has a clear description and JSON schema.
+- [ ] Read-only and mutating tools are clearly separated.
+- [ ] At least one end-to-end usage workflow is documented.
+- [ ] Known limitations and troubleshooting guidance are included.
