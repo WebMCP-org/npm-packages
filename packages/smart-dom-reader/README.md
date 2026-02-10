@@ -8,7 +8,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue?style=flat-square)](https://www.typescriptlang.org/)
 [![Zero Dependencies](https://img.shields.io/badge/Dependencies-0-green?style=flat-square)](https://bundlephobia.com/package/@mcp-b/smart-dom-reader)
 
-📖 **[Full Documentation](https://docs.mcp-b.ai/packages/smart-dom-reader)** | 🚀 **[Quick Start](https://docs.mcp-b.ai/quickstart)**
+**[Full Documentation](https://docs.mcp-b.ai/packages/smart-dom-reader)** | **[Quick Start](https://docs.mcp-b.ai/quickstart)**
 
 **@mcp-b/smart-dom-reader** extracts DOM structure optimized for AI/LLM consumption. Get stable CSS selectors, interactive elements, and semantic page structure while minimizing token usage. Perfect for AI-powered browser automation, userscript generation, and web scraping with Claude, ChatGPT, or any LLM.
 

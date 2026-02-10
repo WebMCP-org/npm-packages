@@ -120,17 +120,17 @@ The skill will guide the agent to:
 2. **Plan tools by category**:
    ```
    Phase 1 - Read-Only:
-   ✓ list_todos (readOnlyHint: true)
-   ✓ get_todo_by_id (readOnlyHint: true)
+    list_todos (readOnlyHint: true)
+    get_todo_by_id (readOnlyHint: true)
 
    Phase 2 - Read-Write:
-   ✓ fill_todo_form (populate form fields)
-   ✓ set_filter (change visible todos)
+    fill_todo_form (populate form fields)
+    set_filter (change visible todos)
 
    Phase 3 - Destructive:
-   ✓ create_todo (destructiveHint: true)
-   ✓ delete_todo (destructiveHint: true)
-   ✓ mark_complete (destructiveHint: true)
+    create_todo (destructiveHint: true)
+    delete_todo (destructiveHint: true)
+    mark_complete (destructiveHint: true)
    ```
 
 3. **Implement Phase 1 tools**:
@@ -275,11 +275,11 @@ The skill teaches agents to leverage:
 
 A successful WebMCP integration has:
 
-✅ UI parity - Every major UI action has a tool
-✅ Clear safety categories - Read/write/act properly separated
-✅ Two-tool forms - Fill and submit are separate
-✅ All tools tested - Dogfooded with Chrome DevTools MCP
-✅ Powerful tools - One tool per complete task
+- UI parity - Every major UI action has a tool
+- Clear safety categories - Read/write/act properly separated
+- Two-tool forms - Fill and submit are separate
+- All tools tested - Dogfooded with Chrome DevTools MCP
+- Powerful tools - One tool per complete task
 
 ## Troubleshooting
 

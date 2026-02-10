@@ -8,7 +8,7 @@
 [![Bundle Size](https://img.shields.io/badge/IIFE-285KB-blue?style=flat-square)](https://bundlephobia.com/package/@mcp-b/global)
 [![W3C](https://img.shields.io/badge/W3C-Web_Model_Context-005A9C?style=flat-square)](https://github.com/nicolo-ribaudo/model-context-protocol-api)
 
-📖 **[Full Documentation](https://docs.mcp-b.ai/packages/global)** | 🚀 **[Quick Start](https://docs.mcp-b.ai/quickstart)** | 🔧 **[Tool Registration](https://docs.mcp-b.ai/concepts/tool-registration)**
+**[Full Documentation](https://docs.mcp-b.ai/packages/global)** | **[Quick Start](https://docs.mcp-b.ai/quickstart)** | **[Tool Registration](https://docs.mcp-b.ai/concepts/tool-registration)**
 
 **@mcp-b/global** implements the [W3C Web Model Context API](https://github.com/nicolo-ribaudo/model-context-protocol-api) (`navigator.modelContext`) specification, allowing AI agents like Claude, ChatGPT, Gemini, Cursor, and Copilot to discover and call functions on your website.
 
@@ -31,7 +31,7 @@
 - **Content Management**: Let AI edit, publish, and organize content
 - **Embedded Widgets**: AI tools accessible from parent pages via iframes
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Via IIFE Script Tag (Easiest - No Build Required)
 
@@ -78,11 +78,11 @@ Add the script to your HTML `<head>`:
 ```
 
 **What you get:**
-- ✅ **Self-contained** - All dependencies bundled (285KB minified)
-- ✅ **Auto-initializes** - `window.navigator.modelContext` ready immediately
-- ✅ **No build step** - Just drop it in your HTML
-- ✅ **Works everywhere** - Compatible with all modern browsers
-- ✅ **Global access** - Also exposes `window.WebMCP` for advanced usage
+- **Self-contained** - All dependencies bundled (285KB minified)
+- **Auto-initializes** - `window.navigator.modelContext` ready immediately
+- **No build step** - Just drop it in your HTML
+- **Works everywhere** - Compatible with all modern browsers
+- **Global access** - Also exposes `window.WebMCP` for advanced usage
 
 ### Via ES Module Script Tag
 
@@ -127,7 +127,7 @@ window.navigator.modelContext.provideContext({
 });
 ```
 
-## 📜 Traditional Web Standard Usage
+## Traditional Web Standard Usage
 
 The Web Model Context API follows the same patterns as other browser APIs. Here's how to use it as a traditional web standard:
 
@@ -294,7 +294,7 @@ Save this as `index.html` and open in a browser:
   </style>
 </head>
 <body>
-  <h1>🤖 WebMCP Demo</h1>
+  <h1> WebMCP Demo</h1>
 
   <div class="card">
     <h2>Notes App</h2>
@@ -353,7 +353,7 @@ Save this as `index.html` and open in a browser:
             description: 'Get all notes',
             inputSchema: { type: 'object', properties: {} },
             execute: async () => {
-              log('🔧 notes_list called');
+              log(' notes_list called');
               return {
                 content: [{
                   type: 'text',
@@ -373,7 +373,7 @@ Save this as `index.html` and open in a browser:
               required: ['text']
             },
             execute: async ({ text }) => {
-              log(`🔧 notes_add called: "${text}"`);
+              log(` notes_add called: "${text}"`);
               notes.push(text);
               renderNotes();
               return {
@@ -392,7 +392,7 @@ Save this as `index.html` and open in a browser:
               required: ['index']
             },
             execute: async ({ index }) => {
-              log(`🔧 notes_delete called: index ${index}`);
+              log(` notes_delete called: index ${index}`);
               if (index < 1 || index > notes.length) {
                 return { content: [{ type: 'text', text: 'Invalid index' }], isError: true };
               }
@@ -408,7 +408,7 @@ Save this as `index.html` and open in a browser:
             description: 'Delete all notes',
             inputSchema: { type: 'object', properties: {} },
             execute: async () => {
-              log('🔧 notes_clear called');
+              log(' notes_clear called');
               const count = notes.length;
               notes.length = 0;
               renderNotes();
@@ -420,10 +420,10 @@ Save this as `index.html` and open in a browser:
         ]
       });
 
-      log('✅ Web Model Context API initialized');
-      log('📋 Tools: notes_list, notes_add, notes_delete, notes_clear');
+      log(' Web Model Context API initialized');
+      log(' Tools: notes_list, notes_add, notes_delete, notes_clear');
     } else {
-      log('❌ Web Model Context API not available');
+      log(' Web Model Context API not available');
     }
   </script>
 </body>
@@ -437,7 +437,7 @@ This example demonstrates:
 - **Async execute functions** returning MCP-compatible responses
 - **Real-time UI updates** when AI agents call tools
 
-## ⚙️ Configuration
+## Configuration
 
 The polyfill exposes `initializeWebModelContext(options?: WebModelContextInitOptions)` to let you control transport behaviour. When you import `@mcp-b/global` as a module it auto-initializes by default, but you can customise or defer initialization:
 
@@ -548,7 +548,7 @@ initializeWebModelContext({
 });
 ```
 
-## 🔄 Native Chromium API Support
+## Native Chromium API Support
 
 This package **automatically detects and integrates** with Chromium's native Web Model Context API when available. No configuration needed - it just works!
 
@@ -574,11 +574,11 @@ When you call `initializeWebModelContext()` (or when auto-initialization runs):
 
 When the native Chromium API is available, you get:
 
-- ✅ **Automatic tool synchronization** - Tools registered in native API are synced to MCP bridge via `registerToolsChangedCallback()`
-- ✅ **Iframe tool collection** - Native API automatically collects tools from embedded iframes (no manual transport setup needed)
-- ✅ **MCP compatibility** - Your MCP clients (extensions, apps) continue to work seamlessly
-- ✅ **Tool change notifications** - MCP servers receive `tools/list_changed` notifications automatically
-- ✅ **Consistent API** - Same code works with both native and polyfill implementations
+- **Automatic tool synchronization** - Tools registered in native API are synced to MCP bridge via `registerToolsChangedCallback()`
+- **Iframe tool collection** - Native API automatically collects tools from embedded iframes (no manual transport setup needed)
+- **MCP compatibility** - Your MCP clients (extensions, apps) continue to work seamlessly
+- **Tool change notifications** - MCP servers receive `tools/list_changed` notifications automatically
+- **Consistent API** - Same code works with both native and polyfill implementations
 
 ### How Tool Synchronization Works
 
@@ -680,10 +680,10 @@ With native API, `navigator.modelContextTesting.listTools()` in the parent will 
 When you initialize the package, check the console logs:
 
 ```
-✅ [Web Model Context] Native Chromium API detected
+ [Web Model Context] Native Chromium API detected
    Using native implementation with MCP bridge synchronization
    Native API will automatically collect tools from embedded iframes
-✅ [Web Model Context] MCP bridge synced with native API
+ [Web Model Context] MCP bridge synced with native API
    MCP clients will receive automatic tool updates from native registry
 ```
 
@@ -691,12 +691,12 @@ Or if polyfill is used:
 
 ```
 [Web Model Context] Native API not detected, installing polyfill
-✅ [Web Model Context] window.navigator.modelContext initialized successfully
+ [Web Model Context] window.navigator.modelContext initialized successfully
 [Model Context Testing] Installing polyfill
-✅ [Model Context Testing] Polyfill installed at window.navigator.modelContextTesting
+ [Model Context Testing] Polyfill installed at window.navigator.modelContextTesting
 ```
 
-## 📖 API Reference
+## API Reference
 
 ### Two-Bucket Tool Management System
 
@@ -706,10 +706,10 @@ This package uses a **two-bucket system** for tool management to support both ap
 - **Bucket B (Dynamic Tools)**: Registered via `registerTool()` - component-scoped tools that persist across `provideContext()` calls
 
 **Key behaviors:**
-- ✅ `provideContext()` only clears Bucket A, leaving Bucket B intact
-- ✅ `registerTool()` adds to Bucket B and persists across `provideContext()` calls
-- ✅ Tool name collisions between buckets throw an error
-- ✅ Cannot `unregister()` a tool that was registered via `provideContext()`
+- `provideContext()` only clears Bucket A, leaving Bucket B intact
+- `registerTool()` adds to Bucket B and persists across `provideContext()` calls
+- Tool name collisions between buckets throw an error
+- Cannot `unregister()` a tool that was registered via `provideContext()`
 
 **Use case:** React components can use `registerTool()` in `useEffect()` to manage tool lifecycle independently of the app's base tools.
 
@@ -762,10 +762,10 @@ window.navigator.modelContext.provideContext({
 ### `window.navigator.modelContext.registerTool(tool)`
 
 Register a single tool dynamically (Bucket B). Tools registered this way:
-- ✅ Persist across `provideContext()` calls
-- ✅ Perfect for component lifecycle management
-- ✅ Can be unregistered via the returned `unregister()` function
-- ❌ Cannot have the same name as a tool in Bucket A (provideContext)
+- Persist across `provideContext()` calls
+- Perfect for component lifecycle management
+- Can be unregistered via the returned `unregister()` function
+- Cannot have the same name as a tool in Bucket A (provideContext)
 
 **Parameters:**
 - `tool` - A single tool descriptor
@@ -993,7 +993,7 @@ Tools must return an object with:
 }
 ```
 
-## 🎯 Complete Examples
+## Complete Examples
 
 ### Todo List Application
 
@@ -1027,7 +1027,7 @@ window.navigator.modelContext.provideContext({
       inputSchema: { type: "object", properties: {} },
       async execute() {
         const list = todos.map(t =>
-          `${t.done ? '✓' : '○'} ${t.text}`
+          `${t.done ? '' : '○'} ${t.text}`
         ).join('\n');
         return {
           content: [{ type: "text", text: list || "No todos" }]
@@ -1065,7 +1065,7 @@ window.navigator.modelContext.provideContext({
 function updateUI() {
   // Update your UI
   document.getElementById('todo-list').innerHTML =
-    todos.map(t => `<li>${t.done ? '✓' : ''} ${t.text}</li>`).join('');
+    todos.map(t => `<li>${t.done ? '' : ''} ${t.text}</li>`).join('');
 }
 ```
 
@@ -1140,7 +1140,7 @@ window.navigator.modelContext.provideContext({
 });
 ```
 
-## 🔧 Dynamic Tool Registration (Component Lifecycle)
+## Dynamic Tool Registration (Component Lifecycle)
 
 ### React Component Example
 
@@ -1203,7 +1203,7 @@ window.navigator.modelContext.provideContext({
   ]
 });
 // Tools: ["base-tool-2", "dynamic-tool"]
-// ✅ "dynamic-tool" persists! Only "base-tool-1" was cleared
+//  "dynamic-tool" persists! Only "base-tool-1" was cleared
 
 // Step 4: Clean up dynamic tool
 reg.unregister();
@@ -1223,7 +1223,7 @@ window.navigator.modelContext.provideContext({
 // This will throw an error!
 try {
   window.navigator.modelContext.registerTool({
-    name: "my-tool", // ❌ Name collision with Bucket A
+    name: "my-tool", //  Name collision with Bucket A
     description: "Dynamic",
     inputSchema: {},
     async execute() {}
@@ -1247,7 +1247,7 @@ try {
 }
 ```
 
-## 🔧 Event-Based Tool Calls (Advanced)
+## Event-Based Tool Calls (Advanced)
 
 For manifest-based or advanced scenarios, you can handle tool calls as events:
 
@@ -1282,7 +1282,7 @@ The API supports both approaches simultaneously:
 
 This allows flexibility for different use cases.
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 ┌─────────────────┐
@@ -1308,7 +1308,7 @@ This package:
 3. Bridges tool calls between the two protocols
 4. Uses TabServerTransport for browser communication
 
-## 🔍 Feature Detection
+## Feature Detection
 
 Check if the API is available:
 
@@ -1321,7 +1321,7 @@ if ("modelContext" in navigator) {
 }
 ```
 
-## 🐛 Debugging
+## Debugging
 
 ### Enable Debug Logging
 
@@ -1369,7 +1369,7 @@ if (window.__mcpBridge) {
 }
 ```
 
-## 🧪 Testing API (`navigator.modelContextTesting`)
+## Testing API (`navigator.modelContextTesting`)
 
 This package provides a **Model Context Testing API** at `window.navigator.modelContextTesting` for debugging and testing your tools during development.
 
@@ -1424,7 +1424,7 @@ chrome --enable-experimental-web-platform-features
 
 **Detection**: When the native API is detected, you'll see this console message:
 ```
-✅ [Model Context Testing] Native implementation detected (Chromium experimental feature)
+ [Model Context Testing] Native implementation detected (Chromium experimental feature)
    Using native window.navigator.modelContextTesting from browser
 ```
 
@@ -1434,11 +1434,11 @@ If the native API is not available, this package automatically provides a polyfi
 
 ```
 [Model Context Testing] Native implementation not found, installing polyfill
-   💡 To use the native implementation in Chromium:
+    To use the native implementation in Chromium:
       - Navigate to chrome://flags
       - Enable "Experimental Web Platform Features"
       - Or launch with: --enable-experimental-web-platform-features
-✅ [Model Context Testing] Polyfill installed at window.navigator.modelContextTesting
+ [Model Context Testing] Polyfill installed at window.navigator.modelContextTesting
 ```
 
 ### API Reference
@@ -1620,11 +1620,11 @@ test('todo tool creates correct response', async () => {
 
 | Browser | Native Support | Polyfill |
 |---------|---------------|----------|
-| Chrome/Edge (with flag) | ✅ Yes | N/A |
-| Chrome/Edge (default) | ❌ No | ✅ Yes |
-| Firefox | ❌ No | ✅ Yes |
-| Safari | ❌ No | ✅ Yes |
-| Other browsers | ❌ No | ✅ Yes |
+| Chrome/Edge (with flag) |  Yes | N/A |
+| Chrome/Edge (default) |  No |  Yes |
+| Firefox |  No |  Yes |
+| Safari |  No |  Yes |
+| Other browsers |  No |  Yes |
 
 The polyfill automatically detects and defers to the native implementation when available, ensuring forward compatibility as browsers adopt this standard.
 
@@ -1671,7 +1671,7 @@ window.navigator.modelContext.provideContext({
 });
 ```
 
-## 📦 What's Included
+## What's Included
 
 - **Web Model Context API** - Standard `window.navigator.modelContext` interface
 - **Model Context Testing API** - `window.navigator.modelContextTesting` for debugging and testing (with native Chromium support detection)
@@ -1681,7 +1681,7 @@ window.navigator.modelContext.provideContext({
 - **Event System** - Hybrid tool call handling
 - **TypeScript Types** - Full type definitions included
 
-## 🔒 Security Considerations
+## Security Considerations
 
 ### Origin Restrictions
 
@@ -1748,7 +1748,7 @@ Yes! The polyfill handles tool registration, lifecycle management, and automatic
 
 Works in all modern browsers. Native API support is available in Chromium with experimental flags enabled.
 
-## 🤝 Related Packages
+## Related Packages
 
 - [`@mcp-b/transports`](https://docs.mcp-b.ai/packages/transports) - MCP transport implementations
 - [`@mcp-b/react-webmcp`](https://docs.mcp-b.ai/packages/react-webmcp) - React hooks for MCP
@@ -1756,18 +1756,18 @@ Works in all modern browsers. Native API support is available in Chromium with e
 - [`@mcp-b/chrome-devtools-mcp`](https://docs.mcp-b.ai/packages/chrome-devtools-mcp) - Connect desktop AI agents to browser tools
 - [`@modelcontextprotocol/sdk`](https://www.npmjs.com/package/@modelcontextprotocol/sdk) - Official MCP SDK
 
-## 📚 Resources
+## Resources
 
 - [WebMCP Documentation](https://docs.mcp-b.ai)
 - [Web Model Context API Explainer](https://github.com/nicolo-ribaudo/model-context-protocol-api)
 - [Model Context Protocol Spec](https://modelcontextprotocol.io/)
 - [MCP GitHub Repository](https://github.com/modelcontextprotocol)
 
-## 📝 License
+## License
 
 MIT - see [LICENSE](../../LICENSE) for details
 
-## 🙋 Support
+## Support
 
 - [GitHub Issues](https://github.com/WebMCP-org/npm-packages/issues)
 - [Documentation](https://docs.mcp-b.ai)

@@ -8,7 +8,7 @@
 [![27 Tools](https://img.shields.io/badge/MCP_Tools-27-green?style=flat-square)](./docs/tool-reference.md)
 [![Chrome](https://img.shields.io/badge/Chrome-DevTools-4285F4?style=flat-square&logo=googlechrome)](https://developer.chrome.com/docs/devtools/)
 
-📖 **[WebMCP Documentation](https://docs.mcp-b.ai)** | 🚀 **[Quick Start](https://docs.mcp-b.ai/quickstart)** | 🔌 **[Connecting Agents](https://docs.mcp-b.ai/connecting-agents)** | 🎯 **[Chrome DevTools Quickstart](https://github.com/WebMCP-org/chrome-devtools-quickstart)**
+**[WebMCP Documentation](https://docs.mcp-b.ai)** | **[Quick Start](https://docs.mcp-b.ai/quickstart)** | **[Connecting Agents](https://docs.mcp-b.ai/connecting-agents)** | **[Chrome DevTools Quickstart](https://github.com/WebMCP-org/chrome-devtools-quickstart)**
 
 **@mcp-b/chrome-devtools-mcp** lets AI coding agents like Claude, Gemini, Cursor, and Copilot control and inspect a live Chrome browser via the Model Context Protocol (MCP). Get performance insights, debug network requests, take screenshots, and interact with website-specific MCP tools through WebMCP integration.
 
@@ -48,13 +48,13 @@ This fork adds **WebMCP integration** - the ability to call MCP tools that are r
 
 | Feature | Chrome DevTools MCP | @mcp-b/chrome-devtools-mcp |
 |---------|--------------------|-----------------------------|
-| Browser automation | ✅ | ✅ |
-| Performance analysis | ✅ | ✅ |
-| Network inspection | ✅ | ✅ |
-| Screenshot/snapshot | ✅ | ✅ |
-| **Call website MCP tools** | ❌ | ✅ |
-| **List website MCP tools** | ❌ | ✅ |
-| **AI-driven tool development** | ❌ | ✅ |
+| Browser automation | Yes | Yes |
+| Performance analysis | Yes | Yes |
+| Network inspection | Yes | Yes |
+| Screenshot/snapshot | Yes | Yes |
+| **Call website MCP tools** | No | Yes |
+| **List website MCP tools** | No | Yes |
+| **AI-driven tool development** | No | Yes |
 
 The key addition is automatic WebMCP tool discovery and registration. When you visit a page with [@mcp-b/global](https://www.npmjs.com/package/@mcp-b/global), its tools are automatically registered as first-class MCP tools that your AI agent can call directly.
 

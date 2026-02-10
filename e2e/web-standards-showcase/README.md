@@ -7,7 +7,7 @@ running in Chromium without any polyfills.**
 ![No Polyfill](https://img.shields.io/badge/Polyfill-NONE-success?style=for-the-badge)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.8+-blue?style=for-the-badge&logo=typescript)
 
-## 🎯 Overview
+## Overview
 
 This application is a **CodePen-style interactive playground** that
 showcases the native Web Model Context API implementation in Chromium.
@@ -28,7 +28,7 @@ registration.
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -77,7 +77,7 @@ chrome.exe --enable-experimental-web-platform-features http://localhost:5174
 
 ---
 
-## 📖 User Guide
+## User Guide
 
 ### Live Code Editor
 
@@ -129,7 +129,7 @@ Load a template from the dropdown, modify it, and click **▶ Register Tool**.
 
 ---
 
-## 🔬 API Demonstrations
+## API Demonstrations
 
 ### Two-Bucket Tool Management
 
@@ -203,7 +203,7 @@ Advanced testing features for debugging and development.
 
 #### Key Differences from Main API
 
-⚠️ **Important:** The Testing API has subtle but critical differences:
+ **Important:** The Testing API has subtle but critical differences:
 
 - **`executeTool()`**
   - Main API: takes an object input, e.g. `{ key: value }`.
@@ -253,7 +253,7 @@ navigator.modelContextTesting.registerToolsChangedCallback(() => {
 
 ---
 
-## ✅ Modern Tooling Best Practices
+## Modern Tooling Best Practices
 
 When authoring tools in the live editor, prefer these patterns:
 
@@ -269,7 +269,7 @@ When authoring tools in the live editor, prefer these patterns:
 
 ---
 
-## 🧪 Testing
+## Testing
 
 ### Run E2E Tests
 
@@ -293,19 +293,19 @@ pnpm test:native-showcase:headed
 
 The test suite covers:
 
-- ✅ Native API detection and validation
-- ✅ Live code editor functionality
-- ✅ Template loading and execution
-- ✅ Two-bucket system behavior
-- ✅ All native methods (listTools, executeTool, unregisterTool, clearContext)
-- ✅ Testing API methods
-- ✅ Tool executor with various inputs
-- ✅ Event logging
-- ✅ Error handling
+- Native API detection and validation
+- Live code editor functionality
+- Template loading and execution
+- Two-bucket system behavior
+- All native methods (listTools, executeTool, unregisterTool, clearContext)
+- Testing API methods
+- Tool executor with various inputs
+- Event logging
+- Error handling
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ### Project Structure
 
@@ -349,15 +349,15 @@ web-standards-showcase/
 
 ---
 
-## 🎨 UI Components
+## UI Components
 
 ### Status Banner
 
 Shows the native API detection status:
 
-- 🟢 **Green (Success)** - Native API detected and ready
-- 🟡 **Yellow (Warning)** - Polyfill detected (app disabled)
-- 🔴 **Red (Error)** - API not available (app disabled)
+- **Green (Success)** - Native API detected and ready
+- **Yellow (Warning)** - Polyfill detected (app disabled)
+- **Red (Error)** - API not available (app disabled)
 
 ### Code Editor Panel
 
@@ -382,7 +382,7 @@ Shows the native API detection status:
 
 ---
 
-## 🔍 Debugging
+## Debugging
 
 ### Check API Availability
 
@@ -430,7 +430,7 @@ console.log('Methods:', Object.getOwnPropertyNames(
 
 ---
 
-## 📚 Additional Resources
+## Additional Resources
 
 - **Chromium Source:** [blink/web_tests/external/wpt/model-context/](https://chromium.googlesource.com/chromium/src/+/main/third_party/blink/web_tests/external/wpt/model-context/)
 - **CHROMIUM_FLAGS.md** - Detailed flag documentation
@@ -439,7 +439,7 @@ console.log('Methods:', Object.getOwnPropertyNames(
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 This is a demonstration app within the MCP-B monorepo.
 For contribution guidelines, see the main project
@@ -447,13 +447,13 @@ For contribution guidelines, see the main project
 
 ---
 
-## 📄 License
+## License
 
 MIT License - See [LICENSE](../../LICENSE) for details.
 
 ---
 
-## 🎓 Learning Resources
+## Learning Resources
 
 ### Understanding the Two-Bucket System
 
@@ -472,12 +472,12 @@ tools in the same context.
 
 |Scenario|Use Bucket A|Use Bucket B|
 |---|---|---|
-|Tools that change together|✅ Yes|❌ No|
-|Individual tool lifecycle|❌ No|✅ Yes|
-|Page/context-specific tools|✅ Yes|❌ No|
-|Cross-context persistent tools|❌ No|✅ Yes|
-|Full replacement needed|✅ Yes|❌ No|
-|Partial updates|❌ No|✅ Yes|
+|Tools that change together|Yes|No|
+|Individual tool lifecycle|No|Yes|
+|Page/context-specific tools|Yes|No|
+|Cross-context persistent tools|No|Yes|
+|Full replacement needed|Yes|No|
+|Partial updates|No|Yes|
 
 ### Example: Chat Application with Tools
 
@@ -511,4 +511,4 @@ navigator.modelContext.registerTool({
 
 ---
 
-**Built with ❤️ as part of the [MCP-B Project](https://github.com/WebMCP-org/WebMCP)**
+**Part of the [MCP-B Project](https://github.com/WebMCP-org/WebMCP).**
