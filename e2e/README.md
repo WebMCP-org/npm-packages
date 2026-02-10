@@ -8,14 +8,14 @@ The E2E suite includes:
 
 - **Tab Transport Tests**: Validates `@mcp-b/transports` package functionality
 - **React WebMCP Tests**: Tests React hooks integration
-- **Web Standards Showcase**: Interactive demo of native Chromium Web Model Context API (NEW!)
+- **Web Standards Showcase**: Interactive demo of the native Chromium Web Model Context API
 - **Full MCP Protocol**: Tool registration, listing, execution, and lifecycle management
 
-## Web Standards Showcase (NEW!)
+## Web Standards Showcase
 
 **Location:** `web-standards-showcase/`
 
-Interactive CodePen-style playground demonstrating the **native Chromium Web Model Context API** without any polyfills.
+Interactive playground demonstrating the **native Chromium Web Model Context API** without polyfills.
 
 **Features:**
 - Live code editor with syntax highlighting
@@ -100,19 +100,19 @@ pnpm test
 # Run specific test suites
 pnpm test:tab-transport
 pnpm test:react-webmcp
-pnpm test:native-showcase        # NEW! Native API tests
+pnpm test:native-showcase        # Native API tests
 
 # Open Playwright UI
 pnpm test:ui
-pnpm test:native-showcase:ui     # NEW! Native showcase UI
+pnpm test:native-showcase:ui     # Native showcase UI
 
 # Run in headed mode
 pnpm test:headed
-pnpm test:native-showcase:headed # NEW! Watch native tests
+pnpm test:native-showcase:headed # Watch native tests
 
 # Debug tests
 pnpm test:debug
-pnpm test:native-showcase:debug  # NEW! Debug native tests
+pnpm test:native-showcase:debug  # Debug native tests
 
 # View test report
 pnpm test:report

@@ -33,9 +33,9 @@
 
 ## Quick Start
 
-### Via IIFE Script Tag (Easiest - No Build Required)
+### Via IIFE Script Tag (No Build Required)
 
-The **IIFE (Immediately Invoked Function Expression)** version bundles everything into a single file and auto-initializes when loaded. Perfect for simple HTML pages or prototyping.
+The **IIFE (Immediately Invoked Function Expression)** version bundles everything into a single file and auto-initializes when loaded. This is useful for simple HTML pages and prototyping.
 
 Add the script to your HTML `<head>`:
 
@@ -550,7 +550,7 @@ initializeWebModelContext({
 
 ## Native Chromium API Support
 
-This package **automatically detects and integrates** with Chromium's native Web Model Context API when available. No configuration needed - it just works!
+This package **automatically detects and integrates** with Chromium's native Web Model Context API when available. No configuration is required; it works automatically.
 
 For standards/source tracking and future conformance planning, see `./WEBMCP-CONFORMANCE-REFERENCES.md`.
 
@@ -568,7 +568,7 @@ When you call `initializeWebModelContext()` (or when auto-initialization runs):
    - Installs full polyfill implementation
    - Provides identical API surface
 
-**Zero configuration required** - the package automatically adapts to your environment!
+**Zero configuration required** - the package automatically adapts to your environment.
 
 ### Native API Features
 

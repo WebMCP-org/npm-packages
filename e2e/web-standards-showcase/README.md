@@ -9,7 +9,7 @@ running in Chromium without any polyfills.**
 
 ## Overview
 
-This application is a **CodePen-style interactive playground** that
+This application is a **split-pane interactive playground** that
 showcases the native Web Model Context API implementation in Chromium.
 It demonstrates all API surfaces, the two-bucket tool management
 system, and provides a live code editor for experimenting with tool
@@ -18,7 +18,7 @@ registration.
 ### Key Features
 
 - **Live Code Editor** - Write and execute tool definitions in real time.
-- **CodePen-style UI** - Split-screen editor with live output.
+- **Split-pane UI** - Split-screen editor with live output.
 - **Pre-built Templates** - Counter, Calculator, Todo, Timer, and
   State Machine examples.
 - **Two-Bucket System** - Demonstrates `provideContext()` versus `registerTool()`.
@@ -161,7 +161,7 @@ navigator.modelContext.provideContext({
 - Tools registered via `registerTool(tool)`
 - **Persist across** `provideContext()` calls
 - Must be individually unregistered via `unregister()` method
-- Perfect for long-lived tools
+- Suitable for long-lived tools
 - Color-coded **green** in the UI
 
 **Example:**
@@ -203,7 +203,7 @@ Advanced testing features for debugging and development.
 
 #### Key Differences from Main API
 
- **Important:** The Testing API has subtle but critical differences:
+**Important:** The Testing API has subtle but critical differences:
 
 - **`executeTool()`**
   - Main API: takes an object input, e.g. `{ key: value }`.
@@ -334,7 +334,7 @@ web-standards-showcase/
 
 - **Build Tool:** Vite 6
 - **Language:** TypeScript 5.8+
-- **Framework:** Vanilla TypeScript (no frameworks!)
+- **Framework:** Vanilla TypeScript (framework-free)
 - **Styling:** Modern CSS with custom properties
 - **Testing:** Playwright
 - **Module System:** ES Modules

@@ -80,7 +80,7 @@ The skill is automatically indexed on [SkillsMP.com](https://skillsmp.com/) from
 
 ## Quick Start
 
-Once installed, just ask Claude:
+Once installed, ask Claude:
 
 > "Add WebMCP to my website"
 
@@ -180,7 +180,7 @@ For **every tool**:
 7. Try edge cases
 8. Iterate
 
-**This is mandatory**. Tools that aren't dogfooded will have bugs.
+**This is mandatory**. Tools that are not tested end-to-end are likely to contain defects.
 
 ## Common Patterns
 
