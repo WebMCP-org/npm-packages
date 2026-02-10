@@ -1,0 +1,44 @@
+import { expectTypeOf, test } from 'vitest';
+import type { CallToolResult, InputSchema } from './common.js';
+import type { ToolAnnotations, ToolDescriptor, ToolListItem } from './tool.js';
+
+test('ToolDescriptor has required fields', () => {
+  expectTypeOf<ToolDescriptor>().toHaveProperty('name');
+  expectTypeOf<ToolDescriptor>().toHaveProperty('description');
+  expectTypeOf<ToolDescriptor>().toHaveProperty('inputSchema');
+  expectTypeOf<ToolDescriptor>().toHaveProperty('execute');
+});
+
+test('ToolDescriptor.execute accepts Record and returns Promise<CallToolResult>', () => {
+  expectTypeOf<ToolDescriptor['execute']>().parameter(0).toEqualTypeOf<Record<string, unknown>>();
+  expectTypeOf<ToolDescriptor['execute']>().returns.toEqualTypeOf<Promise<CallToolResult>>();
+});
+
+test('ToolDescriptor.inputSchema is InputSchema', () => {
+  expectTypeOf<ToolDescriptor['inputSchema']>().toEqualTypeOf<InputSchema>();
+});
+
+test('ToolDescriptor.outputSchema is optional InputSchema', () => {
+  expectTypeOf<ToolDescriptor>().toHaveProperty('outputSchema');
+  expectTypeOf<Required<ToolDescriptor>['outputSchema']>().toEqualTypeOf<InputSchema>();
+});
+
+test('ToolDescriptor.annotations is optional ToolAnnotations', () => {
+  expectTypeOf<ToolDescriptor>().toHaveProperty('annotations');
+  expectTypeOf<Required<ToolDescriptor>['annotations']>().toEqualTypeOf<ToolAnnotations>();
+});
+
+test('ToolAnnotations has optional behavioral hints', () => {
+  expectTypeOf<ToolAnnotations>().toMatchTypeOf<{
+    title?: string;
+    destructiveHint?: boolean;
+    readOnlyHint?: boolean;
+  }>();
+});
+
+test('ToolListItem mirrors ToolDescriptor metadata without execute', () => {
+  expectTypeOf<ToolListItem>().toHaveProperty('name');
+  expectTypeOf<ToolListItem>().toHaveProperty('description');
+  expectTypeOf<ToolListItem>().toHaveProperty('inputSchema');
+  expectTypeOf<ToolListItem>().not.toHaveProperty('execute');
+});

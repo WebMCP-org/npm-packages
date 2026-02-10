@@ -1,0 +1,59 @@
+{
+  "name": "@mcp-b/types",
+  "version": "0.1.0",
+  "description": "TypeScript type definitions for the W3C Web Model Context API (navigator.modelContext)",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "web-model-context",
+    "navigator-modelcontext",
+    "w3c",
+    "types",
+    "typescript",
+    "web-standard"
+  ],
+  "homepage": "https://docs.mcp-b.ai/packages/types",
+  "bugs": {
+    "url": "https://github.com/WebMCP-org/npm-packages/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WebMCP-org/npm-packages.git",
+    "directory": "packages/types"
+  },
+  "license": "MIT",
+  "author": "Alex Nahas",
+  "sideEffects": false,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "main": "",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check": "biome check --write .",
+    "clean": "rm -rf dist .turbo",
+    "format": "biome format --write .",
+    "lint": "biome lint --write .",
+    "prepublishOnly": "node ../../scripts/validate-publish.js && pnpm run build",
+    "publish:dry": "pnpm publish --access public --dry-run",
+    "publish:npm": "pnpm publish --access public",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}

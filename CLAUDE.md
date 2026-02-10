@@ -46,7 +46,7 @@ templates/          # Project templates
 
 ### Commit Scopes
 
-Package scopes: `chrome-devtools-mcp`, `extension-tools`, `global`, `mcp-iframe`, `react-webmcp`, `smart-dom-reader`, `transports`, `usewebmcp`, `webmcp-helpers`, `webmcp-ts-sdk`
+Package scopes: `chrome-devtools-mcp`, `extension-tools`, `global`, `mcp-iframe`, `react-webmcp`, `smart-dom-reader`, `transports`, `types`, `usewebmcp`, `webmcp-helpers`, `webmcp-ts-sdk`
 
 Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 
