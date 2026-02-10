@@ -4,7 +4,12 @@ import type {
   ElicitationResult,
   InputSchema,
 } from './common.js';
-import type { InferArgsFromInputSchema, JsonSchemaForInference } from './json-schema.js';
+import type {
+  InferArgsFromInputSchema,
+  InferJsonSchema,
+  JsonSchemaForInference,
+  JsonSchemaObject,
+} from './json-schema.js';
 
 // ============================================================================
 // Tool Annotations
@@ -108,17 +113,37 @@ export interface ToolDescriptor<
 }
 
 /**
+ * Tool response shape inferred from an `outputSchema`.
+ */
+export type ToolResultFromOutputSchema<
+  TOutputSchema extends JsonSchemaObject | undefined = undefined,
+> = TOutputSchema extends JsonSchemaObject
+  ? CallToolResult & { structuredContent?: InferJsonSchema<TOutputSchema> }
+  : CallToolResult;
+
+/**
  * Tool descriptor whose `execute` args are inferred from a literal JSON Schema.
  *
  * For widened/non-literal schemas, arguments fall back to `Record<string, unknown>`.
+ * When `outputSchema` is a literal object schema, `structuredContent` is inferred.
  */
 export type ToolDescriptorFromSchema<
   TInputSchema extends JsonSchemaForInference,
-  TResult extends CallToolResult = CallToolResult,
+  TOutputSchema extends JsonSchemaObject | undefined = undefined,
   TName extends string = string,
-> = Omit<ToolDescriptor<InferArgsFromInputSchema<TInputSchema>, TResult, TName>, 'inputSchema'> & {
+  TResult extends CallToolResult = ToolResultFromOutputSchema<TOutputSchema>,
+> = Omit<
+  ToolDescriptor<InferArgsFromInputSchema<TInputSchema>, TResult, TName>,
+  'inputSchema' | 'outputSchema'
+> & {
   inputSchema: TInputSchema;
-};
+} & (TOutputSchema extends JsonSchemaObject
+    ? {
+        outputSchema: TOutputSchema;
+      }
+    : {
+        outputSchema?: InputSchema;
+      });
 
 // ============================================================================
 // Tool List Item

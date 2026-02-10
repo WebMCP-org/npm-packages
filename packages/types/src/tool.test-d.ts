@@ -10,6 +10,7 @@ import type {
   ToolDescriptor,
   ToolExecutionContext,
   ToolListItem,
+  ToolResultFromOutputSchema,
 } from './tool.js';
 
 test('ToolDescriptor has required fields', () => {
@@ -64,6 +65,34 @@ test('ToolDescriptor.inputSchema is InputSchema', () => {
 test('ToolDescriptor.outputSchema is optional InputSchema', () => {
   expectTypeOf<ToolDescriptor>().toHaveProperty('outputSchema');
   expectTypeOf<Required<ToolDescriptor>['outputSchema']>().toEqualTypeOf<InputSchema>();
+});
+
+test('ToolResultFromOutputSchema infers structuredContent for object output schemas', () => {
+  type OutputSchema = {
+    type: 'object';
+    properties: {
+      total: { type: 'integer' };
+      status: { type: 'string'; enum: ['ok', 'error'] };
+    };
+    required: ['total'];
+    additionalProperties: false;
+  };
+
+  type StructuredContent = ToolResultFromOutputSchema<OutputSchema>['structuredContent'];
+  const structuredContent: NonNullable<StructuredContent> = {
+    total: 1,
+    status: 'ok',
+  };
+
+  expectTypeOf(structuredContent.total).toEqualTypeOf<number>();
+  expectTypeOf(structuredContent.status).toEqualTypeOf<'ok' | 'error' | undefined>();
+  expectTypeOf<StructuredContent>().toMatchTypeOf<
+    | {
+        total: number;
+        status?: 'ok' | 'error';
+      }
+    | undefined
+  >();
 });
 
 test('ToolDescriptor.annotations is optional ToolAnnotations', () => {

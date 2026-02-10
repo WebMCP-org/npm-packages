@@ -12,7 +12,7 @@ Zero dependencies. Zero runtime. Just `.d.ts` declarations.
 - Consumer API: `callTool`
 - Tool-scoped elicitation types (`ElicitationParams`, `ElicitationResult`, `ToolExecutionContext`)
 - Typed event surface (`ToolCallEvent`)
-- Pure JSON Schema inference helpers (`JsonSchemaForInference`, `InferArgsFromInputSchema`, `ToolDescriptorFromSchema`)
+- Pure JSON Schema inference helpers (`JsonSchemaForInference`, `InferArgsFromInputSchema`, `ToolDescriptorFromSchema`, `ToolResultFromOutputSchema`)
 
 ## Install
 
@@ -137,7 +137,7 @@ const searchTool: ToolDescriptor<SearchArgs> = {
 };
 ```
 
-### Pure JSON Schema inference (no manual args type needed)
+### Pure JSON Schema inference (input + output)
 
 ```typescript
 import type { JsonSchemaForInference } from '@mcp-b/types';
@@ -152,15 +152,35 @@ const inputSchema = {
   additionalProperties: false,
 } as const satisfies JsonSchemaForInference;
 
+const outputSchema = {
+  type: 'object',
+  properties: {
+    total: { type: 'integer' },
+    items: {
+      type: 'array',
+      items: { type: 'string' },
+    },
+  },
+  required: ['total'],
+  additionalProperties: false,
+} as const satisfies JsonSchemaForInference;
+
 navigator.modelContext.registerTool({
   name: 'search',
   description: 'Search indexed docs',
   inputSchema,
+  outputSchema,
   async execute(args) {
     // args is inferred as:
     // { query: string; limit?: number }
     return {
       content: [{ type: 'text', text: `Searching for ${args.query}` }],
+      // structuredContent is inferred from outputSchema as:
+      // { total: number; items?: string[] }
+      structuredContent: {
+        total: 1,
+        items: [args.query],
+      },
     };
   },
 });

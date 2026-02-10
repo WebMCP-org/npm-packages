@@ -26,6 +26,19 @@ const openSchema = {
   required: ['query'],
 } as const satisfies JsonSchemaForInference;
 
+const outputSchema = {
+  type: 'object',
+  properties: {
+    total: { type: 'integer' },
+    items: {
+      type: 'array',
+      items: { type: 'string' },
+    },
+  },
+  required: ['total'],
+  additionalProperties: false,
+} as const satisfies JsonSchemaForInference;
+
 declare const runtimeSchema: InputSchema;
 declare const registerTool: ModelContext['registerTool'];
 const shouldInvokeRegisterTool = Date.now() < 0;
@@ -69,6 +82,27 @@ test('ToolDescriptorFromSchema infers execute args from inputSchema', () => {
   expectTypeOf(args.limit).toEqualTypeOf<number | undefined>();
 });
 
+test('ToolDescriptorFromSchema infers structuredContent from outputSchema', () => {
+  type ExecuteResult = Awaited<
+    ReturnType<ToolDescriptorFromSchema<typeof closedSchema, typeof outputSchema>['execute']>
+  >;
+  type StructuredContent = ExecuteResult['structuredContent'];
+
+  const structuredContent: NonNullable<StructuredContent> = {
+    total: 1,
+    items: ['a'],
+  };
+  expectTypeOf(structuredContent.total).toEqualTypeOf<number>();
+  expectTypeOf(structuredContent.items).toEqualTypeOf<string[] | undefined>();
+  expectTypeOf<StructuredContent>().toMatchTypeOf<
+    | {
+        total: number;
+        items?: string[];
+      }
+    | undefined
+  >();
+});
+
 test('ModelContext.registerTool infers execute args from literal schema', () => {
   if (shouldInvokeRegisterTool) {
     registerTool({
@@ -81,6 +115,27 @@ test('ModelContext.registerTool infers execute args from literal schema', () => 
         const text = args.query;
         return {
           content: [{ type: 'text', text }],
+        };
+      },
+    });
+  }
+});
+
+test('ModelContext.registerTool infers execute output from outputSchema', () => {
+  if (shouldInvokeRegisterTool) {
+    registerTool({
+      name: 'search_with_summary',
+      description: 'Search docs with structured summary',
+      inputSchema: closedSchema,
+      outputSchema,
+      async execute(args) {
+        const query = args.query;
+        return {
+          content: [{ type: 'text', text: query }],
+          structuredContent: {
+            total: 1,
+            items: [query],
+          },
         };
       },
     });
