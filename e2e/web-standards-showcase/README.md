@@ -1,26 +1,30 @@
 # Web Model Context API - Native Chromium Showcase
 
-**A live, interactive demonstration of the native Web Model Context API running in Chromium without any polyfills.**
+**A live, interactive demonstration of the native Web Model Context API
+running in Chromium without any polyfills.**
 
 ![Native API Showcase](https://img.shields.io/badge/Native%20API-Chromium-4285F4?style=for-the-badge&logo=google-chrome)
 ![No Polyfill](https://img.shields.io/badge/Polyfill-NONE-success?style=for-the-badge)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.8+-blue?style=for-the-badge&logo=typescript)
 
----
-
 ## 🎯 Overview
 
-This application is a **CodePen-style interactive playground** that showcases the native Web Model Context API implementation in Chromium. It demonstrates all API surfaces, the two-bucket tool management system, and provides a live code editor for experimenting with tool registration.
+This application is a **CodePen-style interactive playground** that
+showcases the native Web Model Context API implementation in Chromium.
+It demonstrates all API surfaces, the two-bucket tool management
+system, and provides a live code editor for experimenting with tool
+registration.
 
 ### Key Features
 
-✨ **Live Code Editor** - Write and execute tool definitions in real-time
-🎨 **CodePen-style UI** - Split-screen editor with live output
-🔧 **Pre-built Templates** - Counter, Calculator, Todo, Timer, State Machine
-📊 **Two-Bucket System** - Demonstrates `provideContext()` vs `registerTool()`
-🧪 **Testing API** - Full explorer for `navigator.modelContextTesting`
-📝 **Event Log** - Real-time tracking of all API operations
-🚫 **No Polyfill** - Explicitly requires and validates native implementation
+- **Live Code Editor** - Write and execute tool definitions in real time.
+- **CodePen-style UI** - Split-screen editor with live output.
+- **Pre-built Templates** - Counter, Calculator, Todo, Timer, and
+  State Machine examples.
+- **Two-Bucket System** - Demonstrates `provideContext()` versus `registerTool()`.
+- **Testing API Explorer** - Full access to `navigator.modelContextTesting` methods.
+- **Event Log** - Real-time tracking of API operations.
+- **Native-Only Validation** - Explicitly requires and validates native implementation.
 
 ---
 
@@ -42,9 +46,12 @@ pnpm install
 pnpm dev
 ```
 
+Then open `http://localhost:5174` in Chromium with the experimental flag enabled.
+
 ### Running with Native API
 
-The native Web Model Context API is an experimental Chromium feature that must be explicitly enabled.
+The native Web Model Context API is an experimental Chromium feature
+that must be explicitly enabled.
 
 #### Option 1: Launch Chromium with Flags (Recommended)
 
@@ -74,7 +81,8 @@ chrome.exe --enable-experimental-web-platform-features http://localhost:5174
 
 ### Live Code Editor
 
-The editor allows you to write tool definitions in JavaScript and register them in real-time.
+The editor allows you to write tool definitions in JavaScript and
+register them in real-time.
 
 #### Basic Tool Template
 
@@ -170,7 +178,8 @@ registration.unregister();
 
 ### Native Chromium Methods
 
-These methods are **only available in the native Chromium implementation** (not in polyfills):
+These methods are **only available in the native Chromium
+implementation** (not in polyfills):
 
 #### `unregisterTool(name: string)`
 
@@ -196,11 +205,15 @@ Advanced testing features for debugging and development.
 
 ⚠️ **Important:** The Testing API has subtle but critical differences:
 
-| Method | Main API | Testing API |
-|--------|----------|-------------|
-| `executeTool()` | Takes object: `{key: value}` | Takes **JSON string**: `'{"key":"value"}'` |
-| `listTools()` | Returns `inputSchema` as **object** | Returns `inputSchema` as **JSON string** |
-| Return value | Returns result **object** | Returns **string** extracted from `content[0].text` |
+- **`executeTool()`**
+  - Main API: takes an object input, e.g. `{ key: value }`.
+  - Testing API: takes a JSON string input, e.g. `'{"key":"value"}'`.
+- **`listTools()`**
+  - Main API: returns `inputSchema` as an object.
+  - Testing API: returns `inputSchema` as a JSON string.
+- **Return value behavior**
+  - Main API: returns a result object.
+  - Testing API: returns the string from `content[0].text`.
 
 #### Testing API Methods
 
@@ -237,6 +250,22 @@ navigator.modelContextTesting.registerToolsChangedCallback(() => {
   console.log('Tools changed!');
 });
 ```
+
+---
+
+## ✅ Modern Tooling Best Practices
+
+When authoring tools in the live editor, prefer these patterns:
+
+- **Use stable, action-first tool names** such as `search_products` or
+  `create_ticket`.
+- **Keep input schemas explicit and narrow** (required fields, clear types,
+  and concise descriptions).
+- **Return deterministic output** so clients can parse and validate results
+  reliably.
+- **Separate read and write tools** to reduce accidental destructive actions.
+- **Follow least-privilege behavior** (only expose capabilities required for
+  the immediate task).
 
 ---
 
@@ -280,7 +309,7 @@ The test suite covers:
 
 ### Project Structure
 
-```
+```text
 web-standards-showcase/
 ├── src/
 │   ├── main.ts              # Application entry point
@@ -405,20 +434,22 @@ console.log('Methods:', Object.getOwnPropertyNames(
 
 - **Chromium Source:** [blink/web_tests/external/wpt/model-context/](https://chromium.googlesource.com/chromium/src/+/main/third_party/blink/web_tests/external/wpt/model-context/)
 - **CHROMIUM_FLAGS.md** - Detailed flag documentation
-- **Main Project README** - `/home/user/npm-packages/README.md`
-- **E2E Testing Guide** - `/home/user/npm-packages/e2e/README.md`
+- **Main Project README** - [../../README.md](../../README.md)
+- **E2E Testing Guide** - [../README.md](../README.md)
 
 ---
 
 ## 🤝 Contributing
 
-This is a demonstration app within the MCP-B monorepo. For contribution guidelines, see the main project [CONTRIBUTING.md](/home/user/npm-packages/CONTRIBUTING.md).
+This is a demonstration app within the MCP-B monorepo.
+For contribution guidelines, see the main project
+[CONTRIBUTING.md](../../CONTRIBUTING.md).
 
 ---
 
 ## 📄 License
 
-MIT License - See [LICENSE](/home/user/npm-packages/LICENSE) for details.
+MIT License - See [LICENSE](../../LICENSE) for details.
 
 ---
 
@@ -426,23 +457,27 @@ MIT License - See [LICENSE](/home/user/npm-packages/LICENSE) for details.
 
 ### Understanding the Two-Bucket System
 
-The two-bucket architecture solves a common problem: how to manage both **dynamic** (frequently changing) and **persistent** (long-lived) tools in the same context.
+The two-bucket architecture solves a common problem: how to manage
+both **dynamic** (frequently changing) and **persistent** (long-lived)
+tools in the same context.
 
 **Real-world analogy:**
 
-- **Bucket A (provideContext):** Like a whiteboard - you erase everything and write new content
-- **Bucket B (registerTool):** Like sticky notes - they stay until you peel them off individually
+- **Bucket A (provideContext):** Like a whiteboard—erase everything
+  and write new content.
+- **Bucket B (registerTool):** Like sticky notes—they stay until you
+  peel them off individually.
 
 ### When to Use Each Bucket
 
-| Scenario | Use Bucket A | Use Bucket B |
-|----------|--------------|--------------|
-| Tools that change together | ✅ Yes | ❌ No |
-| Individual tool lifecycle | ❌ No | ✅ Yes |
-| Page/context-specific tools | ✅ Yes | ❌ No |
-| Cross-context persistent tools | ❌ No | ✅ Yes |
-| Full replacement needed | ✅ Yes | ❌ No |
-| Partial updates | ❌ No | ✅ Yes |
+|Scenario|Use Bucket A|Use Bucket B|
+|---|---|---|
+|Tools that change together|✅ Yes|❌ No|
+|Individual tool lifecycle|❌ No|✅ Yes|
+|Page/context-specific tools|✅ Yes|❌ No|
+|Cross-context persistent tools|❌ No|✅ Yes|
+|Full replacement needed|✅ Yes|❌ No|
+|Partial updates|❌ No|✅ Yes|
 
 ### Example: Chat Application with Tools
 
