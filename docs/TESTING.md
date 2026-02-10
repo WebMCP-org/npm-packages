@@ -89,6 +89,7 @@ pnpm test:e2e
 # Run specific test suites
 pnpm --filter mcp-e2e-tests test                    # Tab transport tests
 pnpm --filter mcp-e2e-tests test:react-webmcp       # React WebMCP tests
+pnpm test:e2e:tarball:global                        # Install packed @mcp-b/global into test app and run tab-transport E2E
 
 # Run with Playwright UI (recommended for development)
 pnpm test:e2e:ui
@@ -210,7 +211,8 @@ Tests run automatically in GitHub Actions:
 2. Build all packages
 3. Install Playwright browsers
 4. Run E2E tests
-5. Upload test reports and screenshots
+5. Run tarball validation (`@mcp-b/global`) against the real test app
+6. Upload test reports and screenshots
 
 **Artifacts**:
 - Playwright HTML report (30 days retention)

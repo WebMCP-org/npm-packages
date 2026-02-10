@@ -24,6 +24,7 @@
     "test:e2e": "pnpm --filter mcp-e2e-tests test",
     "test:e2e:debug": "pnpm --filter mcp-e2e-tests test:debug",
     "test:e2e:headed": "pnpm --filter mcp-e2e-tests test:headed",
+    "test:e2e:tarball:global": "node ./scripts/test-global-tarball-e2e.mjs",
     "test:e2e:ui": "pnpm --filter mcp-e2e-tests test:ui",
     "test:unit": "pnpm --filter @mcp-b/transports test && pnpm --filter @mcp-b/global test && pnpm --filter @mcp-b/react-webmcp test",
     "typecheck": "turbo run typecheck",

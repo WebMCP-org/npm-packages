@@ -50,6 +50,9 @@ jobs:
       - name: Run E2E tests
         run: pnpm --filter mcp-e2e-tests test
 
+      - name: Run tarball E2E validation (@mcp-b/global)
+        run: pnpm test:e2e:tarball:global
+
       - name: Upload Playwright Report
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()

@@ -552,6 +552,8 @@ initializeWebModelContext({
 
 This package **automatically detects and integrates** with Chromium's native Web Model Context API when available. No configuration needed - it just works!
 
+For standards/source tracking and future conformance planning, see `./WEBMCP-CONFORMANCE-REFERENCES.md`.
+
 ### Automatic Detection & Integration
 
 When you call `initializeWebModelContext()` (or when auto-initialization runs):
