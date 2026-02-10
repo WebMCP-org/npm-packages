@@ -788,32 +788,22 @@ export interface SamplingResult {
 
 /**
  * Parameters for a form elicitation request.
+ *
+ * Note: This is the WebMCP polyfill surface for in-page user interaction.
+ * It is MCP-inspired, but intentionally not a strict alias of MCP's
+ * `ElicitRequest['params']` while WebMCP elicitation API is still evolving.
  */
 export interface ElicitationFormParams {
   /** Mode of elicitation */
   mode?: 'form';
   /** Message to show to the user */
   message: string;
-  /** Schema for the form fields */
+  /** Form schema for requested user input */
   requestedSchema: {
     type: 'object';
-    properties: Record<
-      string,
-      {
-        type: 'string' | 'number' | 'integer' | 'boolean';
-        title?: string;
-        description?: string;
-        default?: string | number | boolean;
-        minLength?: number;
-        maxLength?: number;
-        minimum?: number;
-        maximum?: number;
-        enum?: Array<string | number>;
-        enumNames?: string[];
-        format?: string;
-      }
-    >;
+    properties: Record<string, InputSchema>;
     required?: string[];
+    [key: string]: unknown;
   };
 }
 
@@ -931,6 +921,16 @@ export interface ModelContext {
    */
   listTools(): ToolListItem[];
 
+  /**
+   * Execute a registered tool using MCP-style parameters.
+   * This is the consumer-friendly equivalent of MCP SDK Client.callTool().
+   *
+   * @param params - Tool execution request containing name and optional arguments
+   * @returns Promise resolving to MCP CallToolResult shape
+   * @throws {Error} If the tool does not exist
+   */
+  callTool(params: { name: string; arguments?: Record<string, unknown> }): Promise<ToolResponse>;
+
   // ==================== RESOURCES ====================
 
   /**
@@ -1046,11 +1046,30 @@ export interface ModelContext {
   ): void;
 
   /**
+   * Add event listener for tool list changes.
+   * Fired when tool registrations change via provideContext/registerTool/unregisterTool/clearContext.
+   */
+  addEventListener(
+    type: 'toolschanged',
+    listener: () => void,
+    options?: boolean | AddEventListenerOptions
+  ): void;
+
+  /**
    * Remove event listener
    */
   removeEventListener(
     type: 'toolcall',
     listener: (event: ToolCallEvent) => void | Promise<void>,
+    options?: boolean | EventListenerOptions
+  ): void;
+
+  /**
+   * Remove event listener for tool list changes.
+   */
+  removeEventListener(
+    type: 'toolschanged',
+    listener: () => void,
     options?: boolean | EventListenerOptions
   ): void;
 
@@ -1149,6 +1168,9 @@ export interface ToolInfo {
  *
  * **Polyfill**: If the native API is not available, this polyfill provides
  * a compatible implementation for testing purposes.
+ *
+ * @deprecated Use navigator.modelContext.callTool() and
+ * navigator.modelContext.addEventListener('toolschanged', ...) instead.
  */
 export interface ModelContextTesting {
   /**
@@ -1238,6 +1260,9 @@ declare global {
      *
      * If not available natively, the @mcp-b/global polyfill provides
      * a compatible implementation.
+     *
+     * @deprecated Use navigator.modelContext.callTool() and
+     * navigator.modelContext.addEventListener('toolschanged', ...) instead.
      */
     modelContextTesting?: ModelContextTesting;
   }

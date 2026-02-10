@@ -552,6 +552,8 @@ initializeWebModelContext({
 
 This package **automatically detects and integrates** with Chromium's native Web Model Context API when available. No configuration needed - it just works!
 
+For standards/source tracking and future conformance planning, see `./WEBMCP-CONFORMANCE-REFERENCES.md`.
+
 ### Automatic Detection & Integration
 
 When you call `initializeWebModelContext()` (or when auto-initialization runs):
@@ -1370,6 +1372,37 @@ if (window.__mcpBridge) {
 ## 🧪 Testing API (`navigator.modelContextTesting`)
 
 This package provides a **Model Context Testing API** at `window.navigator.modelContextTesting` for debugging and testing your tools during development.
+
+> [!WARNING]
+> `navigator.modelContextTesting` is deprecated and kept for compatibility.
+> For in-page consumers, use `navigator.modelContext.callTool({ name, arguments })` and
+> `navigator.modelContext.addEventListener("toolschanged", ...)`.
+
+### Unified Consumer API (Recommended)
+
+```javascript
+// Execute tools with object args (no JSON stringification)
+const result = await navigator.modelContext.callTool({
+  name: "greet",
+  arguments: { name: "Alice" }
+});
+
+// React to tool list changes
+navigator.modelContext.addEventListener("toolschanged", () => {
+  console.log("Tools changed:", navigator.modelContext.listTools());
+});
+```
+
+### Testing Helpers Module
+
+Use `@mcp-b/global/testing` to avoid depending on global-only testing extensions directly:
+
+```javascript
+import { createTestHelper } from "@mcp-b/global/testing";
+
+const testing = createTestHelper();
+await testing.executeTool("greet", { name: "Alice" });
+```
 
 ### Native Support in Chromium
 
