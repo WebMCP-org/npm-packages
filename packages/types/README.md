@@ -4,19 +4,56 @@ TypeScript type definitions for the [W3C Web Model Context API](https://github.c
 
 Zero dependencies. Zero runtime. Just `.d.ts` declarations.
 
+## What's included
+
+- Global `Navigator` augmentation (`navigator.modelContext`)
+- Core descriptors: tools, resources, prompts
+- Content and result payload types (`ContentBlock`, `CallToolResult`, `ResourceContents`)
+- Consumer APIs: `callTool`, `createMessage`, `elicitInput`
+- Typed event surface (`ToolCallEvent`)
+
 ## Install
 
 ```bash
-npm install @mcp-b/types
+npm install --save-dev @mcp-b/types
 # or
-pnpm add @mcp-b/types
+pnpm add -D @mcp-b/types
 ```
+
+If your published library exposes `@mcp-b/types` in its own `.d.ts` surface, install it as a production dependency instead of a dev dependency.
 
 ## Usage
 
-### Global types (automatic)
+### Enable global types
 
-Simply installing the package adds `navigator.modelContext` to TypeScript's `Navigator` interface:
+TypeScript does not always include global declarations from regular npm packages automatically.
+Use one of the following activation methods:
+
+1. Add to `tsconfig.json`:
+
+```json
+{
+  "compilerOptions": {
+    "types": ["@mcp-b/types"]
+  }
+}
+```
+
+2. Add a triple-slash reference in a global `.d.ts` file:
+
+```typescript
+/// <reference types="@mcp-b/types" />
+```
+
+3. Add a type-only import in your app/library entry:
+
+```typescript
+import type {} from '@mcp-b/types';
+```
+
+### Global API example
+
+After activating the types, `navigator.modelContext` is available on `Navigator`:
 
 ```typescript
 // No import needed - types are globally augmented
@@ -38,12 +75,116 @@ navigator.modelContext.registerTool({
 
 ```typescript
 import type {
+  ElicitationParams,
   ModelContext,
+  SamplingRequestParams,
   ToolDescriptor,
+  TypedModelContext,
   ResourceDescriptor,
   PromptDescriptor,
   CallToolResult,
 } from '@mcp-b/types';
+```
+
+### Typed tool/prompt descriptors
+
+```typescript
+import type { PromptDescriptor, ToolDescriptor } from '@mcp-b/types';
+
+type SearchArgs = {
+  query: string;
+  limit?: number;
+};
+
+const searchTool: ToolDescriptor<SearchArgs> = {
+  name: 'search',
+  description: 'Search indexed docs',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      query: { type: 'string' },
+      limit: { type: 'number' },
+    },
+    required: ['query'],
+  },
+  execute: async ({ query, limit }) => ({
+    content: [{ type: 'text', text: `Searching for "${query}" (limit: ${limit ?? 10})` }],
+  }),
+};
+
+type ReviewPromptArgs = {
+  code: string;
+  language: 'ts' | 'js';
+};
+
+const reviewPrompt: PromptDescriptor<ReviewPromptArgs> = {
+  name: 'review',
+  description: 'Review source code',
+  argsSchema: {
+    type: 'object',
+    properties: {
+      code: { type: 'string' },
+      language: { type: 'string' },
+    },
+    required: ['code', 'language'],
+  },
+  get: async ({ code, language }) => ({
+    messages: [
+      {
+        role: 'user',
+        content: { type: 'text', text: `Review this ${language} code:\n${code}` },
+      },
+    ],
+  }),
+};
+```
+
+### Name-aware typed context (advanced)
+
+```typescript
+import type { CallToolResult, ToolDescriptor, TypedModelContext } from '@mcp-b/types';
+
+type SearchTool = ToolDescriptor<
+  { query: string },
+  CallToolResult & { structuredContent: { total: number } },
+  'search'
+>;
+
+type PingTool = ToolDescriptor<Record<string, never>, CallToolResult, 'ping'>;
+
+type AppModelContext = TypedModelContext<readonly [SearchTool, PingTool]>;
+declare const modelContext: AppModelContext;
+
+const searchResult = await modelContext.callTool({
+  name: 'search',
+  arguments: { query: 'webmcp' },
+});
+// searchResult is inferred from the 'search' tool result type.
+
+await modelContext.callTool({ name: 'ping' });
+// 'ping' arguments are optional because the args type is Record<string, never>.
+```
+
+### Sampling and elicitation
+
+```typescript
+const messageResult = await navigator.modelContext.createMessage({
+  messages: [{ role: 'user', content: { type: 'text', text: 'Summarize this page' } }],
+  maxTokens: 300,
+});
+
+const elicitationResult = await navigator.modelContext.elicitInput({
+  mode: 'form',
+  message: 'Please confirm deployment settings',
+  requestedSchema: {
+    type: 'object',
+    properties: {
+      environment: { type: 'string' },
+      confirm: { type: 'boolean' },
+    },
+    required: ['environment', 'confirm'],
+  },
+});
 ```
 
 ## Relationship to `@mcp-b/global`

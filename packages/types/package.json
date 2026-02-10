@@ -34,7 +34,11 @@
   "types": "./dist/index.d.ts",
   "files": [
     "dist",
-    "src"
+    "src/common.ts",
+    "src/index.ts",
+    "src/prompt.ts",
+    "src/resource.ts",
+    "src/tool.ts"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

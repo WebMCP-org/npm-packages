@@ -14,6 +14,29 @@ test('ToolDescriptor.execute accepts Record and returns Promise<CallToolResult>'
   expectTypeOf<ToolDescriptor['execute']>().returns.toEqualTypeOf<Promise<CallToolResult>>();
 });
 
+test('ToolDescriptor supports strongly typed args and result via generics', () => {
+  type SearchArgs = { query: string; limit?: number };
+  type SearchResult = CallToolResult & {
+    structuredContent: {
+      query: string;
+      total: number;
+    };
+  };
+
+  expectTypeOf<ToolDescriptor<SearchArgs, SearchResult>['execute']>()
+    .parameter(0)
+    .toEqualTypeOf<SearchArgs>();
+  expectTypeOf<ToolDescriptor<SearchArgs, SearchResult>['execute']>().returns.toEqualTypeOf<
+    Promise<SearchResult>
+  >();
+});
+
+test('ToolDescriptor supports literal tool names via generics', () => {
+  expectTypeOf<
+    ToolDescriptor<Record<string, never>, CallToolResult, 'health'>['name']
+  >().toEqualTypeOf<'health'>();
+});
+
 test('ToolDescriptor.inputSchema is InputSchema', () => {
   expectTypeOf<ToolDescriptor['inputSchema']>().toEqualTypeOf<InputSchema>();
 });
@@ -41,4 +64,8 @@ test('ToolListItem mirrors ToolDescriptor metadata without execute', () => {
   expectTypeOf<ToolListItem>().toHaveProperty('description');
   expectTypeOf<ToolListItem>().toHaveProperty('inputSchema');
   expectTypeOf<ToolListItem>().not.toHaveProperty('execute');
+});
+
+test('ToolListItem supports literal tool names via generics', () => {
+  expectTypeOf<ToolListItem<'search'>['name']>().toEqualTypeOf<'search'>();
 });

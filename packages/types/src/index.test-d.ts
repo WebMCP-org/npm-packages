@@ -1,6 +1,14 @@
 import { expectTypeOf, test } from 'vitest';
 import type { CallToolResult, RegistrationHandle, Resource } from './common.js';
-import type { ModelContext, ModelContextInput, ToolCallEvent } from './index.js';
+import type {
+  ElicitationParams,
+  ElicitationResult,
+  ModelContext,
+  ModelContextInput,
+  SamplingRequestParams,
+  SamplingResult,
+  ToolCallEvent,
+} from './index.js';
 import type { Prompt, PromptDescriptor } from './prompt.js';
 import type { ResourceDescriptor, ResourceTemplateInfo } from './resource.js';
 import type { ToolDescriptor, ToolListItem } from './tool.js';
@@ -57,6 +65,17 @@ test('ModelContext.listPrompts returns Prompt[]', () => {
 // === General ===
 test('ModelContext.clearContext returns void', () => {
   expectTypeOf<ModelContext['clearContext']>().returns.toEqualTypeOf<void>();
+});
+
+// === Sampling + elicitation ===
+test('ModelContext.createMessage accepts SamplingRequestParams and returns SamplingResult', () => {
+  expectTypeOf<ModelContext['createMessage']>().parameter(0).toEqualTypeOf<SamplingRequestParams>();
+  expectTypeOf<ModelContext['createMessage']>().returns.toEqualTypeOf<Promise<SamplingResult>>();
+});
+
+test('ModelContext.elicitInput accepts ElicitationParams and returns ElicitationResult', () => {
+  expectTypeOf<ModelContext['elicitInput']>().parameter(0).toEqualTypeOf<ElicitationParams>();
+  expectTypeOf<ModelContext['elicitInput']>().returns.toEqualTypeOf<Promise<ElicitationResult>>();
 });
 
 // === Events ===

@@ -28,11 +28,28 @@ test('PromptDescriptor.get accepts Record and returns Promise with messages', ()
   >();
 });
 
+test('PromptDescriptor supports strongly typed args via generics', () => {
+  type PromptArgs = {
+    code: string;
+    language: 'ts' | 'js';
+  };
+
+  expectTypeOf<PromptDescriptor<PromptArgs>['get']>().parameter(0).toEqualTypeOf<PromptArgs>();
+});
+
+test('PromptDescriptor supports literal prompt names via generics', () => {
+  expectTypeOf<PromptDescriptor<Record<string, never>, 'help'>['name']>().toEqualTypeOf<'help'>();
+});
+
 test('Prompt has name and optional description and arguments', () => {
   expectTypeOf<Prompt>().toHaveProperty('name');
   expectTypeOf<Prompt['name']>().toEqualTypeOf<string>();
   expectTypeOf<Prompt>().toHaveProperty('description');
   expectTypeOf<Prompt>().toHaveProperty('arguments');
+});
+
+test('Prompt supports literal prompt names via generics', () => {
+  expectTypeOf<Prompt<'review'>['name']>().toEqualTypeOf<'review'>();
 });
 
 test('PromptMessage has role and content', () => {

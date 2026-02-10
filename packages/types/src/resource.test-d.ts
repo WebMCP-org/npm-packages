@@ -39,6 +39,13 @@ test('ResourceDescriptor.read accepts optional params', () => {
     .toEqualTypeOf<Record<string, string> | undefined>();
 });
 
+test('ResourceContents supports text and blob payload variants', () => {
+  expectTypeOf<ResourceContents>().toMatchTypeOf<
+    | { uri: string; mimeType?: string; text: string }
+    | { uri: string; mimeType?: string; blob: string }
+  >();
+});
+
 test('ResourceTemplateInfo has required fields', () => {
   expectTypeOf<ResourceTemplateInfo>().toHaveProperty('uriTemplate');
   expectTypeOf<ResourceTemplateInfo>().toHaveProperty('name');
