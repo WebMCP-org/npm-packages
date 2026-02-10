@@ -26,7 +26,7 @@
     "test:e2e:headed": "pnpm --filter mcp-e2e-tests test:headed",
     "test:e2e:tarball:global": "node ./scripts/test-global-tarball-e2e.mjs",
     "test:e2e:ui": "pnpm --filter mcp-e2e-tests test:ui",
-    "test:unit": "pnpm --filter @mcp-b/transports test && pnpm --filter @mcp-b/global test && pnpm --filter @mcp-b/react-webmcp test",
+    "test:unit": "pnpm --filter @mcp-b/transports test && pnpm --filter @mcp-b/global test && pnpm --filter @mcp-b/react-webmcp test && pnpm --filter @mcp-b/types test",
     "typecheck": "turbo run typecheck",
     "validate:publish": "node ./scripts/validate-publish.js"
   },

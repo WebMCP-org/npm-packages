@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "../..",
+    "types": ["vitest/globals"]
+  },
+  "include": [
+    "src/**/*.conformance-d.ts",
+    "src/common.ts",
+    "src/model-context.ts",
+    "src/prompt.ts",
+    "src/resource.ts",
+    "src/tool.ts",
+    "../global/src/types.ts"
+  ]
+}

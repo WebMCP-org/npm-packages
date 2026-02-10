@@ -36,6 +36,7 @@
     "dist",
     "src/common.ts",
     "src/index.ts",
+    "src/model-context.ts",
     "src/prompt.ts",
     "src/resource.ts",
     "src/tool.ts"
@@ -49,7 +50,8 @@
     "prepublishOnly": "node ../../scripts/validate-publish.js && pnpm run build",
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
-    "test": "vitest run",
+    "test": "vitest run && pnpm run test:conformance",
+    "test:conformance": "vitest run --config vitest.conformance.config.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
