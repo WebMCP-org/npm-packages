@@ -132,7 +132,10 @@ export interface ModelContext {
   // ==================== TOOLS ====================
 
   /**
-   * Registers a dynamic tool with args inferred from `inputSchema`.
+   * Registers a dynamic tool with JSON Schema-driven inference.
+   *
+   * `execute(args)` is inferred from `inputSchema`, and when a literal object
+   * `outputSchema` is provided, `execute(...).structuredContent` is inferred too.
    */
   registerTool<
     TInputSchema extends JsonSchemaForInference,

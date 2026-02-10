@@ -45,6 +45,9 @@ interface UnsupportedJsonSchemaKeywords {
   unevaluatedProperties?: never;
 }
 
+/**
+ * Non-validation metadata accepted by the MVP inference subset.
+ */
 interface JsonSchemaMetadata extends UnsupportedJsonSchemaKeywords {
   default?: JsonValue;
   description?: string;
@@ -114,7 +117,7 @@ export interface JsonSchemaObject extends JsonSchemaMetadata {
   additionalProperties?: boolean;
   maxProperties?: number;
   minProperties?: number;
-  properties?: Record<string, JsonSchemaForInference>;
+  properties?: Readonly<Record<string, JsonSchemaForInference>>;
   required?: readonly string[];
   type: 'object';
 }

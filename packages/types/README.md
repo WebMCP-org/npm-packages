@@ -85,6 +85,7 @@ import type {
   ToolExecutionContext,
   ToolDescriptor,
   ToolDescriptorFromSchema,
+  ToolResultFromOutputSchema,
   TypedModelContext,
   CallToolResult,
 } from '@mcp-b/types';

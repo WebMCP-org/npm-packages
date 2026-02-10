@@ -114,6 +114,12 @@ export interface ToolDescriptor<
 
 /**
  * Tool response shape inferred from an `outputSchema`.
+ *
+ * When a literal object output schema is provided, `structuredContent` is
+ * narrowed to the inferred schema type. Otherwise, this resolves to the
+ * base `CallToolResult`.
+ *
+ * @template TOutputSchema - Optional literal JSON object schema.
  */
 export type ToolResultFromOutputSchema<
   TOutputSchema extends JsonSchemaObject | undefined = undefined,
@@ -126,12 +132,18 @@ export type ToolResultFromOutputSchema<
  *
  * For widened/non-literal schemas, arguments fall back to `Record<string, unknown>`.
  * When `outputSchema` is a literal object schema, `structuredContent` is inferred.
+ *
+ * @template TInputSchema - Literal JSON Schema for tool arguments.
+ * @template TOutputSchema - Optional literal JSON object schema for `structuredContent`.
+ * @template TName - Tool name literal type.
+ * @template TResult - Optional result type override constrained by inferred output schema.
  */
 export type ToolDescriptorFromSchema<
   TInputSchema extends JsonSchemaForInference,
   TOutputSchema extends JsonSchemaObject | undefined = undefined,
   TName extends string = string,
-  TResult extends CallToolResult = ToolResultFromOutputSchema<TOutputSchema>,
+  TResult extends
+    ToolResultFromOutputSchema<TOutputSchema> = ToolResultFromOutputSchema<TOutputSchema>,
 > = Omit<
   ToolDescriptor<InferArgsFromInputSchema<TInputSchema>, TResult, TName>,
   'inputSchema' | 'outputSchema'
