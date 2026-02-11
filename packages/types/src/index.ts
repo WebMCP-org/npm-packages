@@ -17,6 +17,7 @@ export type {
   JsonObject,
   JsonPrimitive,
   JsonValue,
+  LooseContentBlock,
   RegistrationHandle,
   ResourceContents,
   ResourceLink,
@@ -31,12 +32,14 @@ export type {
   JsonSchemaBoolean,
   JsonSchemaEnumValue,
   JsonSchemaForInference,
+  JsonSchemaMultiType,
   JsonSchemaNull,
   JsonSchemaNumber,
   JsonSchemaObject,
   JsonSchemaPrimitiveType,
   JsonSchemaString,
   JsonSchemaType,
+  JsonSchemaTypeArray,
 } from './json-schema.js';
 export type {
   AnyToolDescriptor,
@@ -53,6 +56,7 @@ export type {
   TypedModelContext,
 } from './model-context.js';
 export type {
+  MaybePromise,
   ToolAnnotations,
   ToolDescriptor,
   ToolDescriptorFromSchema,

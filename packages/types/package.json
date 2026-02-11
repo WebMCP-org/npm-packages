@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/types",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "description": "TypeScript type definitions for the W3C Web Model Context API (navigator.modelContext)",
   "keywords": [
     "mcp",

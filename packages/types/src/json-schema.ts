@@ -11,47 +11,56 @@ export type JsonSchemaPrimitiveType = 'string' | 'number' | 'integer' | 'boolean
 export type JsonSchemaType = JsonSchemaPrimitiveType | 'object' | 'array';
 
 /**
- * Literal values supported in JSON Schema `enum`/`const`.
+ * JSON Schema multi-type tuple (for example `["string", "null"]`).
  */
-export type JsonSchemaEnumValue = JsonPrimitive;
+export type JsonSchemaTypeArray = readonly [JsonSchemaType, ...JsonSchemaType[]];
 
 /**
- * JSON Schema keywords intentionally unsupported in the MVP subset.
- *
- * These are typed as `never` so `satisfies JsonSchemaForInference` can catch
- * them at compile time for literal schemas.
+ * Literal values supported in JSON Schema `enum`/`const`.
  */
-interface UnsupportedJsonSchemaKeywords {
-  $defs?: never;
-  $ref?: never;
-  additionalItems?: never;
-  allOf?: never;
-  anyOf?: never;
-  contains?: never;
-  definitions?: never;
-  dependentRequired?: never;
-  dependentSchemas?: never;
-  format?: never;
-  if?: never;
-  maxContains?: never;
-  minContains?: never;
-  not?: never;
-  oneOf?: never;
-  patternProperties?: never;
-  prefixItems?: never;
-  propertyNames?: never;
-  then?: never;
-  unevaluatedItems?: never;
-  unevaluatedProperties?: never;
+export type JsonSchemaEnumValue = JsonPrimitive | JsonValue;
+
+/**
+ * Extra JSON Schema keywords tolerated by the inference layer.
+ *
+ * These keys are intentionally accepted as opaque metadata. Inference only uses
+ * the core MVP keywords and ignores these fields.
+ */
+interface SupplementalJsonSchemaKeywords {
+  $defs?: unknown;
+  $ref?: unknown;
+  additionalItems?: unknown;
+  allOf?: unknown;
+  anyOf?: unknown;
+  contains?: unknown;
+  definitions?: unknown;
+  dependentRequired?: unknown;
+  dependentSchemas?: unknown;
+  format?: unknown;
+  if?: unknown;
+  maxContains?: unknown;
+  minContains?: unknown;
+  not?: unknown;
+  oneOf?: unknown;
+  patternProperties?: unknown;
+  prefixItems?: unknown;
+  propertyNames?: unknown;
+  then?: unknown;
+  unevaluatedItems?: unknown;
+  unevaluatedProperties?: unknown;
 }
 
 /**
  * Non-validation metadata accepted by the MVP inference subset.
  */
-interface JsonSchemaMetadata extends UnsupportedJsonSchemaKeywords {
+interface JsonSchemaMetadata extends SupplementalJsonSchemaKeywords {
   default?: JsonValue;
   description?: string;
   examples?: readonly JsonValue[];
+  /**
+   * OpenAPI-compatible nullability marker.
+   */
+  nullable?: boolean;
   title?: string;
 }
 
@@ -114,7 +123,7 @@ export interface JsonSchemaArray extends JsonSchemaMetadata {
  * JSON Schema for `type: "object"`.
  */
 export interface JsonSchemaObject extends JsonSchemaMetadata {
-  additionalProperties?: boolean;
+  additionalProperties?: boolean | JsonSchemaForInference;
   maxProperties?: number;
   minProperties?: number;
   properties?: Readonly<Record<string, JsonSchemaForInference>>;
@@ -123,17 +132,33 @@ export interface JsonSchemaObject extends JsonSchemaMetadata {
 }
 
 /**
+ * JSON Schema for multi-type unions via `type: [...]`.
+ */
+export interface JsonSchemaMultiType extends JsonSchemaMetadata {
+  additionalProperties?: boolean | JsonSchemaForInference;
+  const?: JsonSchemaEnumValue;
+  enum?: readonly JsonSchemaEnumValue[];
+  items?: JsonSchemaForInference;
+  properties?: Readonly<Record<string, JsonSchemaForInference>>;
+  required?: readonly string[];
+  type: JsonSchemaTypeArray;
+}
+
+/**
  * JSON Schema subset supported by the MVP type inference layer.
  */
 export type JsonSchemaForInference =
   | JsonSchemaArray
   | JsonSchemaBoolean
+  | JsonSchemaMultiType
   | JsonSchemaNull
   | JsonSchemaNumber
   | JsonSchemaObject
   | JsonSchemaString;
 
 type Simplify<T> = { [K in keyof T]: T[K] } & {};
+
+type EmptyObject = Record<never, never>;
 
 type EnumLiteral<TSchema> = TSchema extends { enum: infer TEnum extends readonly unknown[] }
   ? Extract<TEnum[number], JsonSchemaEnumValue>
@@ -147,12 +172,14 @@ type PropertiesOf<TSchema> = TSchema extends {
   properties: infer TProperties extends Readonly<Record<string, JsonSchemaForInference>>;
 }
   ? TProperties
-  : Record<string, never>;
+  : EmptyObject;
 
 type RequiredKeysOf<TSchema, TProperties extends Record<string, unknown>> = TSchema extends {
   required: readonly (infer TRequired)[];
 }
-  ? Extract<TRequired, keyof TProperties & string>
+  ? string extends TRequired
+    ? never
+    : Extract<TRequired, keyof TProperties & string>
   : never;
 
 type RequiredProps<
@@ -171,17 +198,57 @@ type OptionalProps<
   [K in keyof TProperties as K extends TRequiredKeys ? never : K]?: InferJsonSchema<TProperties[K]>;
 };
 
-type EmptyObject = Record<never, never>;
+type PropertyKeysOf<TSchema> = keyof PropertiesOf<TSchema> & string;
+
+type AdditionalSchemaOf<TSchema> = TSchema extends { additionalProperties: infer TAdditional }
+  ? TAdditional
+  : undefined;
+
+type AdditionalPropsValue<TSchema> = AdditionalSchemaOf<TSchema> extends JsonSchemaForInference
+  ? InferJsonSchema<AdditionalSchemaOf<TSchema>>
+  : unknown;
 
 type AdditionalPropsOf<TSchema> = TSchema extends { additionalProperties: false }
   ? EmptyObject
-  : Record<string, unknown>;
+  : AdditionalSchemaOf<TSchema> extends JsonSchemaForInference
+    ? PropertyKeysOf<TSchema> extends never
+      ? Record<string, AdditionalPropsValue<TSchema>>
+      : Record<string, unknown>
+    : Record<string, unknown>;
 
-type InferObject<TSchema extends { type: 'object' }> = Simplify<
+type InferObject<TSchema> = Simplify<
   RequiredProps<PropertiesOf<TSchema>, RequiredKeysOf<TSchema, PropertiesOf<TSchema>>> &
     OptionalProps<PropertiesOf<TSchema>, RequiredKeysOf<TSchema, PropertiesOf<TSchema>>> &
     AdditionalPropsOf<TSchema>
 >;
+
+type TypeKeywordOf<TSchema> = TSchema extends { type: infer TType } ? TType : never;
+
+type TypeOptionsOf<TSchema> = TypeKeywordOf<TSchema> extends readonly unknown[]
+  ? Extract<TypeKeywordOf<TSchema>[number], JsonSchemaType>
+  : Extract<TypeKeywordOf<TSchema>, JsonSchemaType>;
+
+type InferFromTypeOption<TSchema, TType extends JsonSchemaType> = TType extends 'object'
+  ? InferObject<TSchema>
+  : TType extends 'array'
+    ? TSchema extends { items: infer TItems }
+      ? InferJsonSchema<TItems>[]
+      : unknown[]
+    : TType extends 'string'
+      ? string
+      : TType extends 'number' | 'integer'
+        ? number
+        : TType extends 'boolean'
+          ? boolean
+          : TType extends 'null'
+            ? null
+            : unknown;
+
+type InferFromTypeKeyword<TSchema> = TypeOptionsOf<TSchema> extends never
+  ? unknown
+  : InferFromTypeOption<TSchema, TypeOptionsOf<TSchema>>;
+
+type ApplyNullable<TSchema, TValue> = TSchema extends { nullable: true } ? TValue | null : TValue;
 
 /**
  * Infers a TypeScript type from the supported JSON Schema subset.
@@ -190,21 +257,23 @@ type InferObject<TSchema extends { type: 'object' }> = Simplify<
  */
 export type InferJsonSchema<TSchema> = [ConstLiteral<TSchema>] extends [never]
   ? [EnumLiteral<TSchema>] extends [never]
-    ? TSchema extends { type: 'object' }
-      ? InferObject<TSchema>
-      : TSchema extends { items: infer TItems; type: 'array' }
-        ? InferJsonSchema<TItems>[]
-        : TSchema extends { type: 'string' }
-          ? string
-          : TSchema extends { type: 'number' | 'integer' }
-            ? number
-            : TSchema extends { type: 'boolean' }
-              ? boolean
-              : TSchema extends { type: 'null' }
-                ? null
-                : unknown
-    : EnumLiteral<TSchema>
-  : ConstLiteral<TSchema>;
+    ? ApplyNullable<TSchema, InferFromTypeKeyword<TSchema>>
+    : ApplyNullable<TSchema, EnumLiteral<TSchema>>
+  : ApplyNullable<TSchema, ConstLiteral<TSchema>>;
+
+type IsWidenedTypeKeyword<TTypeKeyword> = string extends TTypeKeyword
+  ? true
+  : TTypeKeyword extends readonly unknown[]
+    ? string extends TTypeKeyword[number]
+      ? true
+      : false
+    : false;
+
+type IncludesObjectType<TSchema> = TypeOptionsOf<TSchema> extends never
+  ? false
+  : 'object' extends TypeOptionsOf<TSchema>
+    ? true
+    : false;
 
 /**
  * Infers tool argument types from a root `InputSchema`.
@@ -213,9 +282,9 @@ export type InferJsonSchema<TSchema> = [ConstLiteral<TSchema>] extends [never]
  * `InputSchema` loaded at runtime), this intentionally falls back to
  * `Record<string, unknown>`.
  */
-export type InferArgsFromInputSchema<TSchema extends { type: string }> =
-  string extends TSchema['type']
+export type InferArgsFromInputSchema<TSchema extends { type: string | readonly string[] }> =
+  IsWidenedTypeKeyword<TSchema['type']> extends true
     ? Record<string, unknown>
-    : TSchema extends { type: 'object' }
+    : IncludesObjectType<TSchema> extends true
       ? InferObject<TSchema>
       : Record<string, unknown>;

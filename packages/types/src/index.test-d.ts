@@ -1,6 +1,12 @@
 import { expectTypeOf, test } from 'vitest';
 import type { CallToolResult, RegistrationHandle } from './common.js';
-import type { ModelContext, ModelContextInput, ToolCallEvent } from './index.js';
+import type {
+  LooseContentBlock,
+  MaybePromise,
+  ModelContext,
+  ModelContextInput,
+  ToolCallEvent,
+} from './index.js';
 import type { ToolDescriptor, ToolListItem } from './tool.js';
 
 // === Producer API ===
@@ -57,4 +63,11 @@ test('ToolCallEvent extends Event with name, arguments, respondWith', () => {
 // === Global augmentation ===
 test('navigator.modelContext is typed as ModelContext', () => {
   expectTypeOf<Navigator['modelContext']>().toEqualTypeOf<ModelContext>();
+});
+
+test('index re-exports helper types for permissive results', () => {
+  expectTypeOf<MaybePromise<CallToolResult>>().toEqualTypeOf<
+    CallToolResult | Promise<CallToolResult>
+  >();
+  expectTypeOf<LooseContentBlock>().toMatchTypeOf<Record<string, unknown>>();
 });
