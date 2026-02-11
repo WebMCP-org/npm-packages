@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test Clean Build - Local IIFE</title>
+  <!-- Load from freshly built local dist -->
+  <script src="dist/index.iife.js"></script>
+</head>
+<body>
+  <h1>Clean Build Test</h1>
+  <div id="status" style="font-family: monospace; padding: 20px; background: #f0f0f0;"></div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+
+    function log(message, color = 'green') {
+      const p = document.createElement('p');
+      p.style.color = color;
+      p.style.margin = '5px 0';
+      p.textContent = message;
+      statusEl.appendChild(p);
+      console.log(message);
+    }
+
+    log('✓ Script loaded');
+
+    // Check WebMCP global
+    if (typeof WebMCP !== 'undefined') {
+      log('✓ WebMCP global available', 'blue');
+    } else {
+      log('✗ WebMCP global NOT available', 'red');
+    }
+
+    // Check navigator.modelContext
+    if (window.navigator.modelContext) {
+      log('✓ navigator.modelContext available');
+
+      try {
+        // Register a test tool
+        window.navigator.modelContext.provideContext({
+          tools: [
+            {
+              name: "get-page-title",
+              description: "Get the current page title",
+              inputSchema: {
+                type: "object",
+                properties: {}
+              },
+              async execute() {
+                return {
+                  content: [{
+                    type: "text",
+                    text: document.title
+                  }]
+                };
+              }
+            }
+          ]
+        });
+
+        log('✓ Tool registered successfully');
+
+        // List tools
+        const tools = window.navigator.modelContextTesting?.listTools();
+        if (tools && tools.length > 0) {
+          log(`✓ ${tools.length} tool(s) registered`);
+          log('Tool names: ' + tools.map(t => t.name).join(', '), 'blue');
+        }
+
+        log('🎉 ALL TESTS PASSED!', 'green');
+      } catch (error) {
+        log(`✗ Error: ${error.message}`, 'red');
+        log(`Stack: ${error.stack}`, 'red');
+        console.error(error);
+      }
+    } else {
+      log('✗ navigator.modelContext NOT available', 'red');
+    }
+  </script>
+</body>
+</html>

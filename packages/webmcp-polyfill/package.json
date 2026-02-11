@@ -1,7 +1,7 @@
 {
-  "name": "@mcp-b/global",
+  "name": "@mcp-b/webmcp-polyfill",
   "version": "1.5.0",
-  "description": "W3C Web Model Context API polyfill - Let AI agents like Claude, ChatGPT, and Gemini interact with your website via navigator.modelContext",
+  "description": "Pure W3C Web Model Context API polyfill implementing navigator.modelContext",
   "keywords": [
     "mcp",
     "model-context-protocol",
@@ -30,14 +30,14 @@
     "chromium",
     "iife"
   ],
-  "homepage": "https://docs.mcp-b.ai/packages/global",
+  "homepage": "https://docs.mcp-b.ai/packages/webmcp-polyfill",
   "bugs": {
     "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/WebMCP-org/npm-packages.git",
-    "directory": "packages/global"
+    "directory": "packages/webmcp-polyfill"
   },
   "license": "MIT",
   "author": "Alex Nahas",
@@ -75,10 +75,9 @@
     "prepublishOnly": "node ../../scripts/validate-publish.js && pnpm run build",
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
-    "test": "vitest run && vitest run --config vitest.node.config.ts",
+    "test": "vitest run",
     "test:browser": "vitest run --browser.headless",
     "test:browser:ui": "vitest --browser",
-    "test:node": "vitest run --config vitest.node.config.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "version:major": "pnpm version major --no-git-tag-version",
@@ -86,11 +85,7 @@
     "version:patch": "pnpm version patch --no-git-tag-version"
   },
   "dependencies": {
-    "@composio/json-schema-to-zod": "^0.1.19",
-    "@mcp-b/transports": "workspace:*",
-    "@mcp-b/webmcp-polyfill": "workspace:*",
-    "@mcp-b/webmcp-ts-sdk": "workspace:*",
-    "zod-to-json-schema": "^3.25.1"
+    "@mcp-b/types": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",
@@ -101,11 +96,7 @@
     "playwright": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:",
-    "zod": "catalog:"
-  },
-  "peerDependencies": {
-    "zod": ">=3.25.76 <4 || >=4.1 <5"
+    "vitest": "catalog:"
   },
   "engines": {
     "node": ">=18"
