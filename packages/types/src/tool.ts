@@ -4,12 +4,7 @@ import type {
   ElicitationResult,
   InputSchema,
 } from './common.js';
-import type {
-  InferArgsFromInputSchema,
-  InferJsonSchema,
-  JsonSchemaForInference,
-  JsonSchemaObject,
-} from './json-schema.js';
+import type { InferArgsFromInputSchema, InferJsonSchema, JsonSchemaObject } from './json-schema.js';
 
 // ============================================================================
 // Tool Annotations
@@ -65,6 +60,11 @@ export interface ToolExecutionContext {
 }
 
 /**
+ * Value that may be returned synchronously or via Promise.
+ */
+export type MaybePromise<T> = T | Promise<T>;
+
+/**
  * Tool descriptor for the Web Model Context API.
  *
  * Tools are functions that AI models can call to perform actions or retrieve
@@ -109,7 +109,7 @@ export interface ToolDescriptor<
   /**
    * Tool execution function.
    */
-  execute: (args: TArgs, context: ToolExecutionContext) => Promise<TResult>;
+  execute: (args: TArgs, context: ToolExecutionContext) => MaybePromise<TResult>;
 }
 
 /**
@@ -128,24 +128,26 @@ export type ToolResultFromOutputSchema<
   : CallToolResult;
 
 /**
- * Tool descriptor whose `execute` args are inferred from a literal JSON Schema.
+ * Tool descriptor whose `execute` args are inferred from a JSON Schema.
  *
  * For widened/non-literal schemas, arguments fall back to `Record<string, unknown>`.
- * When `outputSchema` is a literal object schema, `structuredContent` is inferred.
+ * When `outputSchema` is an inferable literal object schema, `structuredContent` is inferred.
  *
- * @template TInputSchema - Literal JSON Schema for tool arguments.
- * @template TOutputSchema - Optional literal JSON object schema for `structuredContent`.
+ * @template TInputSchema - JSON Schema for tool arguments.
+ * @template TOutputSchema - Optional JSON schema for `structuredContent`.
  * @template TName - Tool name literal type.
  * @template TResult - Optional result type override constrained by inferred output schema.
  */
 export type ToolDescriptorFromSchema<
-  TInputSchema extends JsonSchemaForInference,
+  TInputSchema extends { type: string | readonly string[] },
   TOutputSchema extends JsonSchemaObject | undefined = undefined,
   TName extends string = string,
-  TResult extends
-    ToolResultFromOutputSchema<TOutputSchema> = ToolResultFromOutputSchema<TOutputSchema>,
 > = Omit<
-  ToolDescriptor<InferArgsFromInputSchema<TInputSchema>, TResult, TName>,
+  ToolDescriptor<
+    InferArgsFromInputSchema<TInputSchema>,
+    ToolResultFromOutputSchema<TOutputSchema>,
+    TName
+  >,
   'inputSchema' | 'outputSchema'
 > & {
   inputSchema: TInputSchema;
@@ -154,7 +156,7 @@ export type ToolDescriptorFromSchema<
         outputSchema: TOutputSchema;
       }
     : {
-        outputSchema?: InputSchema;
+        outputSchema?: undefined;
       });
 
 // ============================================================================

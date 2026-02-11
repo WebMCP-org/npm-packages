@@ -60,7 +60,7 @@ export interface InputSchema {
   /**
    * List of required property names.
    */
-  required?: string[];
+  required?: readonly string[];
 
   /**
    * Additional JSON Schema keywords.
@@ -227,6 +227,16 @@ export type ContentBlock =
   | ResourceLink
   | EmbeddedResource;
 
+/**
+ * Looser content block shape accepted by many MCP tool implementations.
+ *
+ * This keeps tool return typing practical while preserving strict content
+ * unions via {@link ContentBlock} for consumers that want discriminated checks.
+ */
+export type LooseContentBlock = Record<string, unknown> & {
+  type?: string;
+};
+
 // ============================================================================
 // Result Types
 // ============================================================================
@@ -240,7 +250,7 @@ export interface CallToolResult {
   /**
    * Ordered content blocks to return to the model.
    */
-  content: ContentBlock[];
+  content: Array<ContentBlock | LooseContentBlock>;
 
   /**
    * Optional machine-readable payload.
@@ -293,7 +303,7 @@ export interface ElicitationFormParams {
     /**
      * Required field names.
      */
-    required?: string[];
+    required?: readonly string[];
 
     /**
      * Additional schema keywords.

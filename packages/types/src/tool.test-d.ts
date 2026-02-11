@@ -1,11 +1,14 @@
 import { expectTypeOf, test } from 'vitest';
 import type {
   CallToolResult,
+  ContentBlock,
   ElicitationParams,
   ElicitationResult,
   InputSchema,
+  LooseContentBlock,
 } from './common.js';
 import type {
+  MaybePromise,
   ToolAnnotations,
   ToolDescriptor,
   ToolExecutionContext,
@@ -20,10 +23,10 @@ test('ToolDescriptor has required fields', () => {
   expectTypeOf<ToolDescriptor>().toHaveProperty('execute');
 });
 
-test('ToolDescriptor.execute accepts Record and returns Promise<CallToolResult>', () => {
+test('ToolDescriptor.execute accepts Record and returns MaybePromise<CallToolResult>', () => {
   expectTypeOf<ToolDescriptor['execute']>().parameter(0).toEqualTypeOf<Record<string, unknown>>();
   expectTypeOf<ToolDescriptor['execute']>().parameter(1).toEqualTypeOf<ToolExecutionContext>();
-  expectTypeOf<ToolDescriptor['execute']>().returns.toEqualTypeOf<Promise<CallToolResult>>();
+  expectTypeOf<ToolDescriptor['execute']>().returns.toEqualTypeOf<MaybePromise<CallToolResult>>();
 });
 
 test('ToolExecutionContext.elicitInput accepts ElicitationParams and returns ElicitationResult', () => {
@@ -48,8 +51,58 @@ test('ToolDescriptor supports strongly typed args and result via generics', () =
     .parameter(0)
     .toEqualTypeOf<SearchArgs>();
   expectTypeOf<ToolDescriptor<SearchArgs, SearchResult>['execute']>().returns.toEqualTypeOf<
-    Promise<SearchResult>
+    MaybePromise<SearchResult>
   >();
+});
+
+test('ToolDescriptor accepts both sync and async execute implementations', () => {
+  const syncTool: ToolDescriptor<{ message: string }, CallToolResult, 'sync_echo'> = {
+    name: 'sync_echo',
+    description: 'Synchronous echo',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string' },
+      },
+      required: ['message'],
+    },
+    execute(args) {
+      return {
+        content: [{ type: 'text', text: args.message }],
+      };
+    },
+  };
+
+  const asyncTool: ToolDescriptor<{ message: string }, CallToolResult, 'async_echo'> = {
+    name: 'async_echo',
+    description: 'Asynchronous echo',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string' },
+      },
+      required: ['message'],
+    },
+    async execute(args) {
+      return {
+        content: [{ type: 'text', text: args.message }],
+      };
+    },
+  };
+
+  expectTypeOf(syncTool.execute).returns.toEqualTypeOf<MaybePromise<CallToolResult>>();
+  expectTypeOf(asyncTool.execute).returns.toEqualTypeOf<MaybePromise<CallToolResult>>();
+});
+
+test('CallToolResult.content accepts strict and loose content blocks', () => {
+  const strictBlock: ContentBlock = { type: 'text', text: 'ok' };
+  const looseBlock: LooseContentBlock = { text: 'legacy', data: 'opaque' };
+
+  const result: CallToolResult = {
+    content: [strictBlock, looseBlock],
+  };
+
+  expectTypeOf(result.content).toEqualTypeOf<Array<ContentBlock | LooseContentBlock>>();
 });
 
 test('ToolDescriptor supports literal tool names via generics', () => {

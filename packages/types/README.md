@@ -81,6 +81,8 @@ import type {
   ElicitationResult,
   InferArgsFromInputSchema,
   JsonSchemaForInference,
+  LooseContentBlock,
+  MaybePromise,
   ModelContext,
   ToolExecutionContext,
   ToolDescriptor,
@@ -89,6 +91,44 @@ import type {
   TypedModelContext,
   CallToolResult,
 } from '@mcp-b/types';
+```
+
+### Sync or async execute handlers
+
+`execute` can return a plain result or a `Promise`.
+
+```typescript
+import type { CallToolResult, ToolDescriptor } from '@mcp-b/types';
+
+const syncTool: ToolDescriptor<{ message: string }, CallToolResult, 'sync_echo'> = {
+  name: 'sync_echo',
+  description: 'Synchronous echo',
+  inputSchema: {
+    type: 'object',
+    properties: { message: { type: 'string' } },
+    required: ['message'],
+  },
+  execute(args) {
+    return {
+      content: [{ type: 'text', text: args.message }],
+    };
+  },
+};
+```
+
+### Strict and loose content blocks
+
+`CallToolResult.content` accepts strict MCP content blocks and pragmatic loose objects.
+
+```typescript
+import type { CallToolResult } from '@mcp-b/types';
+
+const result: CallToolResult = {
+  content: [
+    { type: 'text', text: 'strict block' },
+    { text: 'loose block', data: 'opaque payload' },
+  ],
+};
 ```
 
 ### Typed tool descriptors
@@ -139,6 +179,8 @@ const searchTool: ToolDescriptor<SearchArgs> = {
 ```
 
 ### Pure JSON Schema inference (input + output)
+
+Inference focuses on core keywords (`type`, `properties`, `required`, `items`, `enum`, `const`) and tolerates additional schema metadata.
 
 ```typescript
 import type { JsonSchemaForInference } from '@mcp-b/types';
