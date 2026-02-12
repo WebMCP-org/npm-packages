@@ -8,16 +8,17 @@ on:
         description: 'Custom prompt for Claude (optional)'
         required: false
         type: string
+  # TODO: Re-enable once Chrome detection issues are resolved
   # Run on PRs that modify WebMCP packages
-  pull_request:
-    branches:
-      - main
-    paths:
-      - 'packages/global/**'
-      - 'packages/react-webmcp/**'
-      - 'packages/transports/**'
-      - 'packages/chrome-devtools-mcp/**'
-      - 'e2e/react-webmcp-test-app/**'
+  # pull_request:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - 'packages/global/**'
+  #     - 'packages/react-webmcp/**'
+  #     - 'packages/transports/**'
+  #     - 'packages/chrome-devtools-mcp/**'
+  #     - 'e2e/react-webmcp-test-app/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -38,7 +39,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Setup pnpm
         uses: pnpm/action-setup@c5ba7f7862a0f64c1b1a05fbac13e0b8e86ba08c # v4
@@ -101,7 +102,7 @@ jobs:
           cat /tmp/chrome-devtools-mcp-config.json
 
       - name: Run Claude WebMCP Integration Test
-        uses: anthropics/claude-code-action@35037bb980d9bc03f0f74b65b68618b0be46c268 # v1
+        uses: anthropics/claude-code-action@f64219702d7454cf29fe32a74104be6ed43dc637 # v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           allowed_bots: '*'
