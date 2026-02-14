@@ -2,7 +2,11 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { z } from 'zod';
 import { cleanupWebModelContext, initializeWebModelContext } from './global.js';
 import { createTestHelper } from './testing.js';
-import type { ModelContext, ModelContextTesting } from './types.js';
+import type {
+  ModelContext,
+  ModelContextTesting,
+  ModelContextTestingPolyfillExtensions,
+} from './types.js';
 
 declare global {
   interface Navigator {
@@ -13,6 +17,20 @@ declare global {
 
 function flushMicrotasks(): Promise<void> {
   return Promise.resolve();
+}
+
+type SerializedTestingToolResult = {
+  content: Array<{ type: string; text?: string }>;
+  structuredContent?: Record<string, unknown>;
+  isError?: boolean;
+  metadata?: Record<string, unknown>;
+};
+
+function parseTestingToolResult(result: string | null): SerializedTestingToolResult | null {
+  if (result === null) {
+    return null;
+  }
+  return JSON.parse(result) as SerializedTestingToolResult;
 }
 
 describe('@mcp-b/global/testing', () => {
@@ -53,7 +71,9 @@ describe('@mcp-b/global/testing', () => {
     const helper = createTestHelper();
     const result = await helper.executeTool('helper_echo', { message: 'hello' });
 
-    expect(result).toBe('Echo: hello');
+    const parsedResult = parseTestingToolResult(result);
+    expect(parsedResult?.content[0]).toMatchObject({ type: 'text', text: 'Echo: hello' });
+    await expect(helper.getCrossDocumentScriptToolResult()).resolves.toBe('[]');
   });
 
   it('falls back to navigator.modelContextTesting when bridge reference is missing', async () => {
@@ -72,7 +92,8 @@ describe('@mcp-b/global/testing', () => {
     try {
       const helper = createTestHelper();
       const result = await helper.executeTool('helper_navigator_fallback', { message: 'path' });
-      expect(result).toBe('Fallback: path');
+      const parsedResult = parseTestingToolResult(result);
+      expect(parsedResult?.content[0]).toMatchObject({ type: 'text', text: 'Fallback: path' });
     } finally {
       if (bridgeDescriptor) {
         Object.defineProperty(window, '__mcpBridge', bridgeDescriptor);
@@ -109,16 +130,16 @@ describe('@mcp-b/global/testing', () => {
     helper.setMockToolResponse('helper_changed', {
       content: [{ type: 'text', text: 'mocked' }],
     });
-    await expect(helper.executeTool('helper_changed', {})).resolves.toBe('mocked');
+    await expect(helper.executeTool('helper_changed', {})).resolves.toMatch(/"text":"mocked"/);
 
     helper.clearMockToolResponse('helper_changed');
-    await expect(helper.executeTool('helper_changed', {})).resolves.toBe('ok');
+    await expect(helper.executeTool('helper_changed', {})).resolves.toMatch(/"text":"ok"/);
 
     helper.setMockToolResponse('helper_changed', {
       content: [{ type: 'text', text: 'mocked-again' }],
     });
     helper.clearAllMockToolResponses();
-    await expect(helper.executeTool('helper_changed', {})).resolves.toBe('ok');
+    await expect(helper.executeTool('helper_changed', {})).resolves.toMatch(/"text":"ok"/);
 
     helper.clearToolCalls();
     expect(helper.getToolCalls()).toHaveLength(0);
@@ -152,23 +173,51 @@ describe('@mcp-b/global/testing', () => {
 
   it('supports native-style overrides and errors only on polyfill-only extensions', async () => {
     let receivedJsonArgs = '';
+    let crossDocumentResultCalls = 0;
 
     const nativeLikeTesting = {
-      executeTool: async (_toolName: string, inputArgsJson: string) => {
+      executeTool: async (
+        _toolName: string,
+        inputArgsJson: string,
+        _options?: { signal?: AbortSignal }
+      ) => {
         receivedJsonArgs = inputArgsJson;
         return 'ok';
       },
       listTools: () => [],
       registerToolsChangedCallback: () => {},
-    } as unknown as ModelContextTesting;
+      getCrossDocumentScriptToolResult: async () => {
+        crossDocumentResultCalls += 1;
+        return '{"ok":true}';
+      },
+    } as unknown as ModelContextTesting & Partial<ModelContextTestingPolyfillExtensions>;
 
     const helper = createTestHelper(nativeLikeTesting);
     const result = await helper.executeTool('native_style', { value: 5 });
     expect(result).toBe('ok');
     expect(receivedJsonArgs).toBe(JSON.stringify({ value: 5 }));
+    await expect(helper.getCrossDocumentScriptToolResult()).resolves.toBe('{"ok":true}');
+    expect(crossDocumentResultCalls).toBe(1);
 
     expect(() => helper.getToolCalls()).toThrow(
       /require the @mcp-b\/global polyfill testing extensions/i
     );
+  });
+
+  it('throws a clear error when helper args cannot be JSON-stringified', async () => {
+    const helper = createTestHelper();
+    const cyclic: { self?: unknown } = {};
+    cyclic.self = cyclic;
+
+    expect(() => helper.executeTool('any_tool', cyclic as Record<string, unknown>)).toThrow(
+      /Failed to serialize tool arguments/i
+    );
+  });
+
+  it('throws for unsupported JSON argument values (BigInt)', async () => {
+    const helper = createTestHelper();
+    expect(() =>
+      helper.executeTool('any_tool', { unsupported: BigInt(1) } as Record<string, unknown>)
+    ).toThrow(/Failed to serialize tool arguments/i);
   });
 });

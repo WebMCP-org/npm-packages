@@ -9,6 +9,7 @@ import type {
   ModelContext,
   ModelContextInput,
   ModelContextTesting,
+  ModelContextTestingPolyfillExtensions,
 } from './types.js';
 
 declare global {
@@ -46,8 +47,58 @@ const providePrompts = (prompts: ModelContextInput['prompts']) => {
   navigator.modelContext?.provideContext({ prompts });
 };
 
-const executeTool = (name: string, args: Record<string, unknown>) =>
-  navigator.modelContextTesting?.executeTool(name, JSON.stringify(args));
+const executeTool = async (
+  name: string,
+  args: Record<string, unknown>,
+  options?: { signal?: AbortSignal }
+) => {
+  if (!navigator.modelContextTesting) {
+    throw new Error('modelContextTesting is not available');
+  }
+  return navigator.modelContextTesting.executeTool(name, JSON.stringify(args), options);
+};
+
+type SerializedTestingToolResult = {
+  content: Array<{ type: string; text?: string }>;
+  structuredContent?: Record<string, unknown>;
+  isError?: boolean;
+  metadata?: Record<string, unknown>;
+};
+
+function parseTestingToolResult(result: string | null): SerializedTestingToolResult | null {
+  if (result === null) {
+    return null;
+  }
+  return JSON.parse(result) as SerializedTestingToolResult;
+}
+
+function getPolyfillTestingExtensions(): ModelContextTestingPolyfillExtensions {
+  const testing = navigator.modelContextTesting as
+    | (ModelContextTesting & Partial<ModelContextTestingPolyfillExtensions>)
+    | undefined;
+
+  if (!testing) {
+    throw new Error('modelContextTesting is not available');
+  }
+
+  const methods: Array<keyof ModelContextTestingPolyfillExtensions> = [
+    'getToolCalls',
+    'clearToolCalls',
+    'setMockToolResponse',
+    'clearMockToolResponse',
+    'clearAllMockToolResponses',
+    'getRegisteredTools',
+    'reset',
+  ];
+
+  for (const method of methods) {
+    if (typeof testing[method] !== 'function') {
+      throw new Error(`Missing polyfill testing extension: ${String(method)}`);
+    }
+  }
+
+  return testing as ModelContextTestingPolyfillExtensions;
+}
 
 async function resetPolyfill(options = DEFAULT_INIT_OPTIONS) {
   await flushMicrotasks();
@@ -177,7 +228,7 @@ describe('Web Model Context Polyfill', () => {
       await resetPolyfill();
     }
     navigator.modelContext?.clearContext();
-    navigator.modelContextTesting?.reset();
+    getPolyfillTestingExtensions().reset();
   });
 
   afterEach(async () => {
@@ -197,12 +248,133 @@ describe('Web Model Context Polyfill', () => {
       expect(navigator.modelContextTesting).toBeDefined();
       expect(typeof navigator.modelContextTesting?.executeTool).toBe('function');
       expect(typeof navigator.modelContextTesting?.listTools).toBe('function');
+      expect(typeof navigator.modelContextTesting?.getCrossDocumentScriptToolResult).toBe(
+        'function'
+      );
     });
 
     it('should start with empty context after clearContext', () => {
       expect(navigator.modelContextTesting?.listTools()).toHaveLength(0);
       expect(navigator.modelContext?.listResources()).toHaveLength(0);
       expect(navigator.modelContext?.listPrompts()).toHaveLength(0);
+    });
+
+    it('should be idempotent when initializeWebModelContext is called twice with the same options', () => {
+      cleanupWebModelContext();
+
+      const options = {
+        transport: {
+          tabServer: {
+            channelId: `${TEST_CHANNEL_ID}-idempotent-same`,
+            allowedOrigins: [window.location.origin],
+          },
+          iframeServer: false,
+        },
+      } as const;
+
+      initializeWebModelContext(options);
+      const firstBridge = window.__mcpBridge;
+      const firstInitState = window.__mcpBridgeInitState;
+
+      initializeWebModelContext(options);
+
+      expect(window.__mcpBridge).toBe(firstBridge);
+      expect(window.__mcpBridgeInitState).toEqual(firstInitState);
+    });
+
+    it('should keep first initialization when re-initialized with different options', () => {
+      cleanupWebModelContext();
+
+      const firstOptions = {
+        transport: {
+          tabServer: {
+            channelId: `${TEST_CHANNEL_ID}-first`,
+            allowedOrigins: [window.location.origin],
+          },
+          iframeServer: false,
+        },
+      } as const;
+      const secondOptions = {
+        transport: {
+          tabServer: {
+            channelId: `${TEST_CHANNEL_ID}-second`,
+            allowedOrigins: ['https://different-origin.example'],
+          },
+          iframeServer: false,
+        },
+      } as const;
+
+      initializeWebModelContext(firstOptions);
+      const firstBridge = window.__mcpBridge;
+      const firstInitState = window.__mcpBridgeInitState;
+
+      initializeWebModelContext(secondOptions);
+
+      expect(window.__mcpBridge).toBe(firstBridge);
+      expect(window.__mcpBridgeInitState).toEqual(firstInitState);
+    });
+
+    it('should attach to an existing polyfill-marked modelContext without replacing the object', () => {
+      cleanupWebModelContext();
+
+      type ExternalTool = Parameters<ModelContext['registerTool']>[0];
+      const externalToolRegistry = new Map<string, ExternalTool>();
+
+      const externalModelContext = {
+        __isWebMCPPolyfill: true,
+        provideContext: (context?: { tools?: ExternalTool[] }) => {
+          externalToolRegistry.clear();
+          for (const tool of context?.tools ?? []) {
+            externalToolRegistry.set(tool.name, tool);
+          }
+        },
+        clearContext: () => {
+          externalToolRegistry.clear();
+        },
+        registerTool: (tool: ExternalTool) => {
+          externalToolRegistry.set(tool.name, tool);
+        },
+        unregisterTool: (name: string) => {
+          externalToolRegistry.delete(name);
+        },
+      };
+
+      Object.defineProperty(window.navigator, 'modelContext', {
+        value: externalModelContext as unknown as ModelContext,
+        writable: true,
+        configurable: true,
+      });
+      delete (window.navigator as unknown as { modelContextTesting?: unknown }).modelContextTesting;
+
+      initializeWebModelContext(DEFAULT_INIT_OPTIONS);
+
+      expect(navigator.modelContext).toBe(externalModelContext);
+      expect(window.__mcpBridge).toBeDefined();
+      expect(window.__mcpBridgeInitState?.mode).toBe('attach-existing');
+
+      navigator.modelContext?.registerTool({
+        name: 'attach_mode_tool',
+        description: 'registered after attach',
+        inputSchema: {},
+        execute: async () => textResult('ok'),
+      });
+
+      expect(
+        navigator.modelContext?.listTools().some((tool) => tool.name === 'attach_mode_tool')
+      ).toBe(true);
+    });
+
+    it('cleanup should clear bridge init metadata', () => {
+      cleanupWebModelContext();
+      initializeWebModelContext(DEFAULT_INIT_OPTIONS);
+
+      expect(window.__mcpBridge).toBeDefined();
+      expect(window.__mcpBridgeInitState?.initialized).toBe(true);
+
+      cleanupWebModelContext();
+
+      expect(window.__mcpBridge).toBeUndefined();
+      expect(window.__mcpBridgeInitState).toBeUndefined();
     });
   });
 
@@ -221,6 +393,7 @@ describe('Web Model Context Polyfill', () => {
       expect(tools).toHaveLength(1);
       expect(tools[0].name).toBe('test_tool');
       expect(tools[0].description).toBe('A test tool');
+      expect(typeof tools[0].inputSchema).toBe('string');
     });
 
     it('should support JSON Schema input format', () => {
@@ -285,20 +458,16 @@ describe('Web Model Context Polyfill', () => {
         inputSchema: { value: z.number() },
         execute: async ({ value }) => textResult(String(value * 2)),
       });
-      expect(result).toBeDefined();
-      if (!result) {
-        throw new Error('registerTool should return an unregister handle');
-      }
-      const { unregister } = result;
+      expect(result).toBeUndefined();
 
       expect(navigator.modelContextTesting?.listTools()).toHaveLength(1);
 
-      unregister();
+      navigator.modelContext?.unregisterTool('dynamic_tool');
 
       expect(navigator.modelContextTesting?.listTools()).toHaveLength(0);
     });
 
-    it('should persist dynamic tools across provideContext calls', () => {
+    it('should replace dynamic tools on provideContext calls', () => {
       navigator.modelContext?.registerTool({
         name: 'dynamic_tool',
         description: 'Dynamic',
@@ -316,8 +485,8 @@ describe('Web Model Context Polyfill', () => {
       ]);
 
       const tools = navigator.modelContextTesting?.listTools();
-      expect(tools).toHaveLength(2);
-      expect(tools.map((t) => t.name).sort()).toEqual(['base_tool', 'dynamic_tool']);
+      expect(tools).toHaveLength(1);
+      expect(tools.map((t) => t.name).sort()).toEqual(['base_tool']);
     });
 
     it('should throw on name collision with provideContext tools', () => {
@@ -352,12 +521,11 @@ describe('Web Model Context Polyfill', () => {
         },
       ]);
 
-      const result = await executeTool('echo', { message: 'hello' });
-
-      expect(result).toBe('Echo: hello');
+      const result = parseTestingToolResult(await executeTool('echo', { message: 'hello' }));
+      expect(result?.content[0]).toMatchObject({ type: 'text', text: 'Echo: hello' });
     });
 
-    it('should return structured content when present', async () => {
+    it('should return first text content when structured content is also present', async () => {
       provideTools([
         {
           name: 'structured',
@@ -367,9 +535,9 @@ describe('Web Model Context Polyfill', () => {
         },
       ]);
 
-      const result = await executeTool('structured', {});
-
-      expect(result).toEqual({ foo: 'bar', count: 42 });
+      const result = parseTestingToolResult(await executeTool('structured', {}));
+      expect(result?.content[0]).toMatchObject({ type: 'text', text: 'JSON response' });
+      expect(result?.structuredContent).toEqual({ foo: 'bar', count: 42 });
     });
 
     it('should handle tool execution errors', async () => {
@@ -384,13 +552,176 @@ describe('Web Model Context Polyfill', () => {
         },
       ]);
 
-      const result = await executeTool('failing_tool', {});
-
-      expect(result).toBeUndefined();
+      await expect(executeTool('failing_tool', {})).rejects.toMatchObject({
+        name: 'UnknownError',
+      });
+      await expect(executeTool('failing_tool', {})).rejects.toThrow(/intentional failure/i);
     });
 
     it('should throw for non-existent tools', async () => {
       await expect(executeTool('nonexistent', {})).rejects.toThrow(/not found/i);
+    });
+
+    it('should throw when inputArgsJson is not valid JSON', async () => {
+      const testing = navigator.modelContextTesting;
+      if (!testing) {
+        throw new Error('modelContextTesting is not available');
+      }
+
+      await expect(testing.executeTool('echo', '{"invalid"', undefined)).rejects.toMatchObject({
+        name: 'UnknownError',
+        message: 'Failed to parse input arguments',
+      });
+    });
+
+    it('should throw when inputArgsJson does not decode to an object', async () => {
+      const testing = navigator.modelContextTesting;
+      if (!testing) {
+        throw new Error('modelContextTesting is not available');
+      }
+
+      await expect(testing.executeTool('echo', '"not-object"', undefined)).rejects.toMatchObject({
+        name: 'UnknownError',
+        message: 'Failed to parse input arguments',
+      });
+    });
+
+    it('should throw when inputArgsJson decodes to an array payload', async () => {
+      const testing = navigator.modelContextTesting;
+      if (!testing) {
+        throw new Error('modelContextTesting is not available');
+      }
+
+      await expect(testing.executeTool('echo', '[]', undefined)).rejects.toMatchObject({
+        name: 'UnknownError',
+        message: 'Failed to parse input arguments',
+      });
+    });
+
+    it('should reject with UnknownError when signal is aborted before execution', async () => {
+      provideTools([
+        {
+          name: 'abortable_pre',
+          description: 'Abortable pre',
+          inputSchema: {},
+          execute: async () => textResult('never'),
+        },
+      ]);
+
+      const controller = new AbortController();
+      controller.abort();
+
+      await expect(
+        executeTool('abortable_pre', {}, { signal: controller.signal })
+      ).rejects.toMatchObject({
+        name: 'UnknownError',
+      });
+      await expect(executeTool('abortable_pre', {}, { signal: controller.signal })).rejects.toThrow(
+        /invocation failed/i
+      );
+    });
+
+    it('should reject with UnknownError when signal aborts during execution', async () => {
+      provideTools([
+        {
+          name: 'abortable_during',
+          description: 'Abortable during',
+          inputSchema: {},
+          execute: async () => {
+            await new Promise((resolve) => setTimeout(resolve, 30));
+            return textResult('late');
+          },
+        },
+      ]);
+
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), 5);
+
+      await expect(
+        executeTool('abortable_during', {}, { signal: controller.signal })
+      ).rejects.toMatchObject({ name: 'UnknownError' });
+      await expect(
+        executeTool('abortable_during', {}, { signal: controller.signal })
+      ).rejects.toThrow(/cancelled|invocation failed/i);
+    });
+
+    it('should return null when tool execution indicates navigation', async () => {
+      provideTools([
+        {
+          name: 'navigating_tool',
+          description: 'Navigation tool',
+          inputSchema: {},
+          execute: async () => ({
+            content: [{ type: 'text', text: 'navigating' }],
+            metadata: { willNavigate: true },
+          }),
+        },
+      ]);
+
+      await expect(executeTool('navigating_tool', {})).resolves.toBeNull();
+    });
+
+    it('should map MCP-style isError results to UnknownError with normalized text', async () => {
+      provideTools([
+        {
+          name: 'error_result_tool',
+          description: 'Returns isError payload',
+          inputSchema: {},
+          execute: async () => ({
+            isError: true,
+            content: [{ type: 'text', text: 'Error: Explicit tool failure' }],
+          }),
+        },
+      ]);
+
+      await expect(executeTool('error_result_tool', {})).rejects.toMatchObject({
+        name: 'UnknownError',
+        message: 'Explicit tool failure',
+      });
+    });
+
+    it('should fall back to invocation-failed message for empty isError text', async () => {
+      provideTools([
+        {
+          name: 'error_empty_text_tool',
+          description: 'Returns empty error text',
+          inputSchema: {},
+          execute: async () => ({
+            isError: true,
+            content: [{ type: 'text', text: 'Error:   ' }],
+          }),
+        },
+      ]);
+
+      await expect(executeTool('error_empty_text_tool', {})).rejects.toMatchObject({
+        name: 'UnknownError',
+      });
+      await expect(executeTool('error_empty_text_tool', {})).rejects.toThrow(/invocation failed/i);
+    });
+
+    it('should throw UnknownError when serialized result cannot be stringified', async () => {
+      provideTools([
+        {
+          name: 'non_serializable_tool_result',
+          description: 'Returns unserializable structuredContent',
+          inputSchema: {},
+          execute: async () =>
+            ({
+              content: [{ type: 'text', text: 'non-serializable' }],
+              structuredContent: { unsupported: BigInt(1) },
+            }) as unknown as {
+              content: Array<{ type: 'text'; text: string }>;
+              structuredContent: Record<string, unknown>;
+            },
+        },
+      ]);
+
+      await expect(executeTool('non_serializable_tool_result', {})).rejects.toMatchObject({
+        name: 'UnknownError',
+      });
+      await expect(executeTool('non_serializable_tool_result', {})).rejects.toThrow(
+        /invocation failed/i
+      );
     });
   });
 
@@ -733,7 +1064,7 @@ describe('Web Model Context Polyfill', () => {
       await executeTool('tracked_tool', { value: 42 });
       await executeTool('tracked_tool', { value: 100 });
 
-      const history = navigator.modelContextTesting?.getToolCalls();
+      const history = getPolyfillTestingExtensions().getToolCalls();
       expect(history).toHaveLength(2);
       expect(history[0].toolName).toBe('tracked_tool');
       expect(history[0].arguments).toEqual({ value: 42 });
@@ -750,19 +1081,17 @@ describe('Web Model Context Polyfill', () => {
         },
       ]);
 
-      navigator.modelContextTesting?.setMockToolResponse('mockable_tool', {
+      getPolyfillTestingExtensions().setMockToolResponse('mockable_tool', {
         content: [{ type: 'text', text: 'mocked!' }],
       });
 
-      const result = await executeTool('mockable_tool', {});
+      const result = parseTestingToolResult(await executeTool('mockable_tool', {}));
+      expect(result?.content[0]).toMatchObject({ type: 'text', text: 'mocked!' });
 
-      expect(result).toBe('mocked!');
+      getPolyfillTestingExtensions().clearMockToolResponse('mockable_tool');
 
-      navigator.modelContextTesting?.clearMockToolResponse('mockable_tool');
-
-      const realResult = await executeTool('mockable_tool', {});
-
-      expect(realResult).toBe('real response');
+      const realResult = parseTestingToolResult(await executeTool('mockable_tool', {}));
+      expect(realResult?.content[0]).toMatchObject({ type: 'text', text: 'real response' });
     });
 
     it('should notify toolsChanged callbacks with microtask batching', async () => {
@@ -793,6 +1122,42 @@ describe('Web Model Context Polyfill', () => {
       expect(callback).toHaveBeenCalledTimes(2);
     });
 
+    it('should replace previously registered toolsChanged callbacks', async () => {
+      const testing = navigator.modelContextTesting;
+      if (!testing) {
+        throw new Error('modelContextTesting is not available');
+      }
+
+      const first = vi.fn();
+      const second = vi.fn();
+      testing.registerToolsChangedCallback(first);
+      testing.registerToolsChangedCallback(second);
+
+      provideTools([
+        {
+          name: 'callback_replace_tool',
+          description: 'Callback replace',
+          inputSchema: {},
+          execute: async () => textResult('ok'),
+        },
+      ]);
+
+      await flushMicrotasks();
+      expect(first).toHaveBeenCalledTimes(0);
+      expect(second).toHaveBeenCalledTimes(1);
+    });
+
+    it('should throw TypeError for non-function registerToolsChangedCallback inputs', () => {
+      const testing = navigator.modelContextTesting;
+      if (!testing) {
+        throw new Error('modelContextTesting is not available');
+      }
+
+      expect(() =>
+        testing.registerToolsChangedCallback(null as unknown as () => void)
+      ).toThrowError(TypeError);
+    });
+
     it('should reset testing state', async () => {
       provideTools([
         {
@@ -804,15 +1169,26 @@ describe('Web Model Context Polyfill', () => {
       ]);
 
       await executeTool('reset_test_tool', {});
-      navigator.modelContextTesting?.setMockToolResponse('reset_test_tool', {
+      getPolyfillTestingExtensions().setMockToolResponse('reset_test_tool', {
         content: [{ type: 'text', text: 'mock' }],
       });
 
-      expect(navigator.modelContextTesting?.getToolCalls()).toHaveLength(1);
+      expect(getPolyfillTestingExtensions().getToolCalls()).toHaveLength(1);
 
-      navigator.modelContextTesting?.reset();
+      getPolyfillTestingExtensions().reset();
 
-      expect(navigator.modelContextTesting?.getToolCalls()).toHaveLength(0);
+      expect(getPolyfillTestingExtensions().getToolCalls()).toHaveLength(0);
+    });
+
+    it('should expose explicit behavior for cross-document script tool result in polyfill mode', async () => {
+      const testing = navigator.modelContextTesting;
+      if (!testing) {
+        throw new Error('modelContextTesting is not available');
+      }
+
+      const result = await testing.getCrossDocumentScriptToolResult();
+      expect(typeof result).toBe('string');
+      expect(JSON.parse(result)).toEqual([]);
     });
   });
 
@@ -929,8 +1305,8 @@ describe('Web Model Context Polyfill', () => {
       ]);
 
       const result = await executeTool('interceptable_tool', {});
-
-      expect(result).toBe('intercepted!');
+      const parsedResult = parseTestingToolResult(result);
+      expect(parsedResult?.content[0]).toMatchObject({ type: 'text', text: 'intercepted!' });
 
       navigator.modelContext?.removeEventListener('toolcall', interceptor);
     });

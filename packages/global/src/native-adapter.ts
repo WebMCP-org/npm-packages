@@ -10,7 +10,8 @@ import type {
   InternalModelContext,
   MCPBridge,
   ModelContext,
-  ModelContextInput,
+  ModelContextClient,
+  ModelContextOptions,
   ModelContextTesting,
   Prompt,
   PromptDescriptor,
@@ -26,7 +27,7 @@ import type {
   ValidatedToolDescriptor,
   ZodSchemaObject,
 } from './types.js';
-import { jsonSchemaToZod, normalizeSchema } from './validation.js';
+import { jsonSchemaToZod, normalizeSchema, validateWithZod } from './validation.js';
 
 const nativeLogger = createLogger('NativeAdapter');
 const testingLogger = createLogger('ModelContextTesting');
@@ -35,7 +36,16 @@ const POLYFILL_MARKER_PROPERTY = '__isWebMCPPolyfill' as const;
 const CONSUMER_SHIM_MARKER_PROPERTY = '__webMCPConsumerShimInstalled' as const;
 const CONSUMER_CALL_TOOL_SHIM_MARKER_PROPERTY = '__webMCPCallToolShimInstalled' as const;
 const MODEL_CONTEXT_TESTING_DEPRECATION_MESSAGE =
-  "navigator.modelContextTesting is deprecated. Use navigator.modelContext.callTool() and addEventListener('toolschanged', ...) instead.";
+  "navigator.modelContextTesting is deprecated for long-term consumer usage, but remains the native testing path in Chromium early preview. Prefer navigator.modelContext.callTool() and addEventListener('toolschanged', ...) for in-page consumers.";
+
+interface NativeToolsChangedCallbackMultiplexer {
+  addInternalCallback(callback: () => void): void;
+}
+
+const nativeToolsChangedMultiplexerByTesting = new WeakMap<
+  ModelContextTesting,
+  NativeToolsChangedCallbackMultiplexer
+>();
 
 interface MayHavePolyfillMarker {
   [POLYFILL_MARKER_PROPERTY]?: true;
@@ -116,6 +126,103 @@ function dispatchToolsChangedEvent(modelContext: ModelContext): void {
   }
 }
 
+function safelyInvokeToolsChangedCallback(
+  callback: () => void,
+  source: 'internal' | 'external'
+): void {
+  try {
+    callback();
+  } catch (error) {
+    nativeLogger.warn(`Error in ${source} registerToolsChangedCallback callback:`, error);
+  }
+}
+
+/**
+ * Installs a callback multiplexer around native registerToolsChangedCallback().
+ *
+ * The multiplexer keeps internal bridge-sync listeners pinned while preserving
+ * external replacement semantics (latest external callback wins).
+ */
+function installToolsChangedCallbackMultiplexer(
+  nativeTesting: ModelContextTesting
+): NativeToolsChangedCallbackMultiplexer | null {
+  const existingMultiplexer = nativeToolsChangedMultiplexerByTesting.get(nativeTesting);
+  if (existingMultiplexer) {
+    return existingMultiplexer;
+  }
+
+  const target = nativeTesting as ModelContextTesting;
+
+  const originalRegister = target.registerToolsChangedCallback;
+  if (typeof originalRegister !== 'function') {
+    return null;
+  }
+
+  const boundOriginalRegister = originalRegister.bind(target) as (callback: () => void) => void;
+  const internalCallbacks = new Set<() => void>();
+  let externalCallback: (() => void) | null = null;
+
+  const composedCallback = () => {
+    for (const callback of internalCallbacks) {
+      safelyInvokeToolsChangedCallback(callback, 'internal');
+    }
+
+    if (externalCallback) {
+      safelyInvokeToolsChangedCallback(externalCallback, 'external');
+    }
+  };
+
+  const wrappedRegister = (callback: () => void) => {
+    if (typeof callback !== 'function') {
+      // Delegate invalid-input errors to the native implementation.
+      boundOriginalRegister(callback as unknown as () => void);
+      return;
+    }
+
+    externalCallback = callback;
+    boundOriginalRegister(composedCallback);
+  };
+
+  try {
+    Object.defineProperty(target, 'registerToolsChangedCallback', {
+      configurable: true,
+      writable: true,
+      value: wrappedRegister,
+    });
+  } catch (error) {
+    nativeLogger.warn('Failed to install registerToolsChangedCallback multiplexer:', error);
+    return null;
+  }
+
+  try {
+    boundOriginalRegister(composedCallback);
+  } catch (error) {
+    nativeLogger.warn('Failed to prime registerToolsChangedCallback multiplexer:', error);
+
+    try {
+      Object.defineProperty(target, 'registerToolsChangedCallback', {
+        configurable: true,
+        writable: true,
+        value: originalRegister,
+      });
+    } catch {
+      // Best-effort rollback only.
+    }
+    return null;
+  }
+
+  const multiplexer: NativeToolsChangedCallbackMultiplexer = {
+    addInternalCallback(callback: () => void): void {
+      internalCallbacks.add(callback);
+      boundOriginalRegister(composedCallback);
+    },
+  };
+
+  nativeToolsChangedMultiplexerByTesting.set(nativeTesting, multiplexer);
+
+  return multiplexer;
+}
+
 /**
  * Installs consumer methods on an existing modelContext object.
  * This allows native producer APIs to expose consumer semantics without replacing the object.
@@ -126,7 +233,14 @@ export function installConsumerShim(
     name: string;
     arguments?: Record<string, unknown>;
   }) => Promise<ToolResponse>,
-  options: { hasNativeTesting: boolean; onToolRegistryMutated?: () => void }
+  options: {
+    hasNativeTesting: boolean;
+    onBeforeProducerMutation?: (
+      methodName: 'provideContext' | 'registerTool' | 'unregisterTool' | 'clearContext',
+      args: unknown[]
+    ) => void;
+    onToolRegistryMutated?: () => void;
+  }
 ): void {
   const target = nativeContext as ModelContext &
     MayHaveConsumerShimMarker & {
@@ -138,6 +252,9 @@ export function installConsumerShim(
       provideContext?: (...args: unknown[]) => unknown;
       unregisterTool?: (...args: unknown[]) => unknown;
       clearContext?: (...args: unknown[]) => unknown;
+      addEventListener?: (...args: unknown[]) => unknown;
+      removeEventListener?: (...args: unknown[]) => unknown;
+      dispatchEvent?: (...args: unknown[]) => unknown;
     };
 
   if (target[CONSUMER_SHIM_MARKER_PROPERTY] === true) {
@@ -158,9 +275,40 @@ export function installConsumerShim(
     }
   }
 
-  // If native testing callbacks are unavailable, patch producer mutation methods so
-  // toolschanged listeners still receive notifications for same-page registrations.
-  if (!options.hasNativeTesting) {
+  // Some Chromium preview builds expose modelContext without full EventTarget methods.
+  // Install minimal event shims so toolschanged listeners remain functional.
+  const localEventTarget = new EventTarget();
+  const ensureEventMethod = (
+    methodName: 'addEventListener' | 'removeEventListener' | 'dispatchEvent'
+  ) => {
+    if (typeof target[methodName] === 'function') {
+      return;
+    }
+
+    try {
+      Object.defineProperty(target, methodName, {
+        configurable: true,
+        writable: true,
+        value: (...args: unknown[]) =>
+          (localEventTarget[methodName] as (...a: unknown[]) => unknown).apply(
+            localEventTarget,
+            args
+          ),
+      });
+    } catch (error) {
+      nativeLogger.warn(`Failed to install modelContext.${methodName} shim:`, error);
+    }
+  };
+
+  ensureEventMethod('addEventListener');
+  ensureEventMethod('removeEventListener');
+  ensureEventMethod('dispatchEvent');
+
+  // If native testing callbacks are unavailable OR a bridge refresh callback is provided,
+  // patch producer mutation methods so toolschanged listeners still receive notifications
+  // for same-page registrations. This also protects bridge sync if another consumer
+  // replaces registerToolsChangedCallback in native testing implementations.
+  if (!options.hasNativeTesting || options.onToolRegistryMutated) {
     const queueToolsChanged = () => {
       if (options.onToolRegistryMutated) {
         queueMicrotask(options.onToolRegistryMutated);
@@ -181,7 +329,11 @@ export function installConsumerShim(
         Object.defineProperty(target, methodName, {
           configurable: true,
           writable: true,
-          value: (...args: unknown[]) => {
+          value: (...rawArgs: unknown[]) => {
+            const args = methodName === 'provideContext' && rawArgs.length === 0 ? [{}] : rawArgs;
+
+            options.onBeforeProducerMutation?.(methodName, args);
+
             const result = original.apply(target, args);
 
             if (
@@ -236,6 +388,58 @@ export function installConsumerShim(
 }
 
 /**
+ * The polyfill-only method names that may not exist on the native context.
+ * Each stub delegates to the corresponding method on the adapter.
+ */
+const POLYFILL_METHOD_NAMES = [
+  'listTools',
+  'registerPrompt',
+  'unregisterPrompt',
+  'listPrompts',
+  'getPrompt',
+  'registerResource',
+  'unregisterResource',
+  'listResources',
+  'listResourceTemplates',
+  'readResource',
+] as const;
+
+/**
+ * Installs safe stub methods on the native context for any polyfill API methods
+ * that don't exist natively. Each stub delegates to the adapter so that
+ * websites calling e.g. `navigator.modelContext.registerPrompt(...)` get
+ * consistent behavior instead of a TypeError.
+ */
+export function installMissingMethodStubs(
+  nativeContext: ModelContext,
+  adapter: NativeModelContextAdapter
+): void {
+  const target = nativeContext as unknown as Record<string, unknown>;
+
+  for (const methodName of POLYFILL_METHOD_NAMES) {
+    if (typeof target[methodName] === 'function') {
+      continue;
+    }
+
+    const adapterMethod = (adapter as unknown as Record<string, unknown>)[methodName];
+    if (typeof adapterMethod !== 'function') {
+      continue;
+    }
+
+    try {
+      Object.defineProperty(target, methodName, {
+        configurable: true,
+        writable: true,
+        value: (...args: unknown[]) =>
+          (adapterMethod as (...a: unknown[]) => unknown).apply(adapter, args),
+      });
+    } catch (error) {
+      nativeLogger.warn(`Failed to install modelContext.${methodName} stub:`, error);
+    }
+  }
+}
+
+/**
  * Adapter that wraps the native Chromium Web Model Context API.
  * Synchronizes tool changes from the native API to the MCP bridge,
  * enabling MCP clients to stay in sync with the native tool registry.
@@ -246,16 +450,51 @@ export class NativeModelContextAdapter implements InternalModelContext {
   private bridge: MCPBridge;
   private syncInProgress = false;
   private hasCompletedInitialToolSync = false;
+  private mirroredTools = new Map<string, ValidatedToolDescriptor>();
+  private readonly nativeProvideContext: (context?: ModelContextOptions) => void;
+  private readonly nativeRegisterTool: (tool: unknown) => void;
+  private readonly nativeUnregisterTool: (name: string) => void;
+  private readonly nativeClearContext: () => void;
+  private readonly nativeAddEventListener: EventTarget['addEventListener'] | null;
+  private readonly nativeRemoveEventListener: EventTarget['removeEventListener'] | null;
+  private readonly nativeDispatchEvent: EventTarget['dispatchEvent'] | null;
+  private readonly fallbackEventTarget = new EventTarget();
+
+  private static readonly DEFAULT_INPUT_SCHEMA: InputSchema = { type: 'object', properties: {} };
 
   constructor(bridge: MCPBridge, nativeContext: ModelContext, nativeTesting?: ModelContextTesting) {
     this.bridge = bridge;
     this.nativeContext = nativeContext;
     this.nativeTesting = nativeTesting;
+    this.nativeProvideContext = nativeContext.provideContext.bind(nativeContext);
+    this.nativeRegisterTool = nativeContext.registerTool.bind(nativeContext) as (
+      tool: unknown
+    ) => void;
+    this.nativeUnregisterTool = nativeContext.unregisterTool.bind(nativeContext);
+    this.nativeClearContext = nativeContext.clearContext.bind(nativeContext);
+    this.nativeAddEventListener =
+      typeof nativeContext.addEventListener === 'function'
+        ? nativeContext.addEventListener.bind(nativeContext)
+        : null;
+    this.nativeRemoveEventListener =
+      typeof nativeContext.removeEventListener === 'function'
+        ? nativeContext.removeEventListener.bind(nativeContext)
+        : null;
+    this.nativeDispatchEvent =
+      typeof nativeContext.dispatchEvent === 'function'
+        ? nativeContext.dispatchEvent.bind(nativeContext)
+        : null;
 
     if (this.nativeTesting) {
-      this.nativeTesting.registerToolsChangedCallback(() => {
+      const multiplexer = installToolsChangedCallbackMultiplexer(this.nativeTesting);
+      const syncFromNative = () => {
         this.syncToolsFromNative();
-      });
+      };
+      if (multiplexer) {
+        multiplexer.addInternalCallback(syncFromNative);
+      } else {
+        this.nativeTesting.registerToolsChangedCallback(syncFromNative);
+      }
     }
 
     this.syncToolsFromNative();
@@ -269,20 +508,30 @@ export class NativeModelContextAdapter implements InternalModelContext {
     this.syncInProgress = true;
 
     try {
-      const nativeTestingTools = this.nativeTesting?.listTools();
-      const nativeTools = this.nativeContext.listTools();
+      if (!this.nativeTesting) {
+        this.bridge.tools.clear();
+        for (const [name, tool] of this.mirroredTools) {
+          this.bridge.tools.set(name, tool);
+        }
+        this.notifyMCPServers();
+        if (this.hasCompletedInitialToolSync) {
+          dispatchToolsChangedEvent(this.nativeContext);
+        } else {
+          this.hasCompletedInitialToolSync = true;
+        }
+        return;
+      }
+
+      const nativeTestingTools = this.nativeTesting.listTools();
 
       this.bridge.tools.clear();
 
-      const sourceTools = nativeTestingTools ?? nativeTools;
-      for (const toolInfo of sourceTools) {
+      for (const toolInfo of nativeTestingTools) {
         try {
           const inputSchema =
-            nativeTestingTools &&
-            'inputSchema' in toolInfo &&
             typeof toolInfo.inputSchema === 'string'
               ? (JSON.parse(toolInfo.inputSchema) as InputSchema)
-              : ((toolInfo as { inputSchema: InputSchema }).inputSchema ?? { type: 'object' });
+              : ({ type: 'object', properties: {} } as InputSchema);
 
           const validatedTool: ValidatedToolDescriptor = {
             name: toolInfo.name,
@@ -313,59 +562,207 @@ export class NativeModelContextAdapter implements InternalModelContext {
   }
 
   /**
-   * Public refresh hook for consumer shims that detect native tool mutations
-   * without modelContextTesting callbacks.
+   * Public refresh hook for explicit sync requests.
    */
   refreshToolsFromNative(): void {
     this.syncToolsFromNative();
+  }
+
+  private createMirroredTool(tool: ToolDescriptor): ValidatedToolDescriptor {
+    const inputSchema = tool.inputSchema ?? NativeModelContextAdapter.DEFAULT_INPUT_SCHEMA;
+    const normalizedInput = normalizeSchema(inputSchema, { strict: true });
+    const normalizedOutput = tool.outputSchema
+      ? normalizeSchema(tool.outputSchema, { strict: true })
+      : null;
+
+    return {
+      name: tool.name,
+      description: tool.description,
+      inputSchema: normalizedInput.jsonSchema,
+      ...(normalizedOutput && { outputSchema: normalizedOutput.jsonSchema }),
+      ...(tool.annotations && { annotations: tool.annotations }),
+      execute: async (args: Record<string, unknown>, client: ModelContextClient) =>
+        await tool.execute(args, client),
+      inputValidator: normalizedInput.zodValidator,
+      ...(normalizedOutput && { outputValidator: normalizedOutput.zodValidator }),
+    };
+  }
+
+  /**
+   * Applies producer-side native mutations directly to the mirrored registry.
+   * Used in native-without-testing mode where listTools()/executeTool introspection
+   * cannot be delegated to modelContextTesting.
+   */
+  applyProducerMutation(
+    methodName: 'provideContext' | 'registerTool' | 'unregisterTool' | 'clearContext',
+    args: unknown[]
+  ): void {
+    if (methodName === 'clearContext') {
+      this.mirroredTools.clear();
+      this.syncToolsFromNative();
+      return;
+    }
+
+    if (methodName === 'unregisterTool') {
+      const toolName = args[0];
+      if (typeof toolName === 'string') {
+        this.mirroredTools.delete(toolName);
+        this.syncToolsFromNative();
+      }
+      return;
+    }
+
+    if (methodName === 'provideContext') {
+      const context = (args[0] ?? {}) as ModelContextOptions;
+      const nextMirroredTools = new Map<string, ValidatedToolDescriptor>();
+
+      for (const tool of context.tools ?? []) {
+        if (nextMirroredTools.has(tool.name)) {
+          throw new Error(
+            `[Web Model Context] Tool name collision: "${tool.name}" is already registered in provideContext(). ` +
+              'Each tool name in provideContext(options.tools) must be unique.'
+          );
+        }
+        nextMirroredTools.set(tool.name, this.createMirroredTool(tool as ToolDescriptor));
+      }
+
+      this.mirroredTools = nextMirroredTools;
+      this.syncToolsFromNative();
+      return;
+    }
+
+    const tool = args[0] as ToolDescriptor | undefined;
+    if (!tool || typeof tool !== 'object' || typeof tool.name !== 'string') {
+      throw new Error('Invalid tool registration');
+    }
+
+    if (this.mirroredTools.has(tool.name)) {
+      throw new Error(`Tool already registered: ${tool.name}`);
+    }
+
+    this.mirroredTools.set(tool.name, this.createMirroredTool(tool));
+    this.syncToolsFromNative();
+  }
+
+  private stringifyInputArgs(args: Record<string, unknown>): string {
+    try {
+      const serialized = JSON.stringify(args);
+      if (serialized === undefined) {
+        throw new TypeError('Serialized arguments were undefined');
+      }
+      return serialized;
+    } catch (error) {
+      throw new TypeError(
+        `[Native Adapter] Failed to serialize tool arguments: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
   }
 
   private async executeToolViaNative(
     toolName: string,
     args: Record<string, unknown>
   ): Promise<ToolResponse> {
-    const nativeWithConsumer = this.nativeContext as ModelContext &
-      MayHaveConsumerShimMarker & {
-        callTool?: (params: {
-          name: string;
-          arguments?: Record<string, unknown>;
-        }) => Promise<unknown>;
-        executeTool?: (name: string, args: Record<string, unknown>) => Promise<unknown>;
+    if (!this.nativeTesting) {
+      return this.executeToolViaMirror(toolName, args);
+    }
+    const result = await this.nativeTesting.executeTool(toolName, this.stringifyInputArgs(args));
+    return this.convertToToolResponse(result);
+  }
+
+  private async executeToolViaMirror(
+    toolName: string,
+    args: Record<string, unknown>
+  ): Promise<ToolResponse> {
+    const tool = this.mirroredTools.get(toolName);
+    if (!tool) {
+      throw new Error(`Tool not found: ${toolName}`);
+    }
+
+    const validation = validateWithZod(args, tool.inputValidator);
+    if (!validation.success) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Input validation error for tool "${toolName}":\n${validation.error}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    let contextActive = true;
+    try {
+      const executionContext = {
+        requestUserInteraction: async (callback: () => Promise<unknown>) => {
+          if (!contextActive) {
+            throw new Error(
+              `ModelContextClient for tool "${toolName}" is no longer active after execute() resolved`
+            );
+          }
+          if (typeof callback !== 'function') {
+            throw new TypeError('requestUserInteraction(callback) requires a function callback');
+          }
+          return callback();
+        },
+        elicitInput: async (params: ElicitationParams): Promise<ElicitationResult> => {
+          if (!contextActive) {
+            throw new Error(
+              `Elicitation context for tool "${toolName}" is no longer active after execute() resolved`
+            );
+          }
+          return requireElicitInputCapability(this.bridge.tabServer)(params);
+        },
+      } as ModelContextClient & {
+        elicitInput: (params: ElicitationParams) => Promise<ElicitationResult>;
       };
 
-    if (
-      typeof nativeWithConsumer.callTool === 'function' &&
-      nativeWithConsumer[CONSUMER_CALL_TOOL_SHIM_MARKER_PROPERTY] !== true
-    ) {
-      const result = await nativeWithConsumer.callTool({ name: toolName, arguments: args });
-      if (
-        result &&
-        typeof result === 'object' &&
-        'content' in result &&
-        Array.isArray((result as { content?: unknown }).content)
-      ) {
-        return result as ToolResponse;
-      }
-      return this.convertToToolResponse(result);
+      return await tool.execute(validation.data as Record<string, unknown>, executionContext);
+    } finally {
+      contextActive = false;
+    }
+  }
+
+  private asToolResponse(value: unknown): ToolResponse | null {
+    if (!value || typeof value !== 'object') {
+      return null;
     }
 
-    if (this.nativeTesting) {
-      const result = await this.nativeTesting.executeTool(toolName, JSON.stringify(args));
-      return this.convertToToolResponse(result);
+    const candidate = value as Partial<ToolResponse>;
+    if (!Array.isArray(candidate.content)) {
+      return null;
     }
 
-    if (typeof nativeWithConsumer.executeTool === 'function') {
-      const result = await nativeWithConsumer.executeTool(toolName, args);
-      return this.convertToToolResponse(result);
-    }
-
-    throw new Error(
-      '[Native Adapter] Tool execution is not supported by this native implementation'
-    );
+    return candidate as ToolResponse;
   }
 
   private convertToToolResponse(result: unknown): ToolResponse {
     if (typeof result === 'string') {
+      try {
+        const parsed = JSON.parse(result) as unknown;
+        const parsedToolResponse = this.asToolResponse(parsed);
+        if (parsedToolResponse) {
+          return parsedToolResponse;
+        }
+
+        if (parsed === null || parsed === undefined) {
+          return { content: [{ type: 'text', text: '' }] };
+        }
+
+        if (typeof parsed === 'object') {
+          return {
+            content: [{ type: 'text', text: JSON.stringify(parsed, null, 2) }],
+            structuredContent: parsed as NonNullable<ToolResponse['structuredContent']>,
+          };
+        }
+
+        return { content: [{ type: 'text', text: String(parsed) }] };
+      } catch {
+        // Not a JSON payload; treat as plain text.
+      }
+
       return { content: [{ type: 'text', text: result }] };
     }
 
@@ -376,7 +773,7 @@ export class NativeModelContextAdapter implements InternalModelContext {
     if (typeof result === 'object') {
       return {
         content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-        structuredContent: result as Record<string, unknown>,
+        structuredContent: result as NonNullable<ToolResponse['structuredContent']>,
       };
     }
 
@@ -401,36 +798,93 @@ export class NativeModelContextAdapter implements InternalModelContext {
     }
   }
 
-  provideContext(context: ModelContextInput): void {
+  provideContext(context: ModelContextOptions = {}): void {
     const { tools, ...rest } = context;
-    const normalizedContext: ModelContextInput = { ...rest };
+    const normalizedContext: ModelContextOptions = { ...rest };
+    const nextMirroredTools = new Map<string, ValidatedToolDescriptor>();
     if (tools) {
-      normalizedContext.tools = tools.map((tool) => ({
-        ...tool,
-        inputSchema: normalizeSchema(tool.inputSchema).jsonSchema,
-      }));
+      normalizedContext.tools = tools.map((tool) => {
+        const inputSchema = tool.inputSchema ?? NativeModelContextAdapter.DEFAULT_INPUT_SCHEMA;
+        const normalizedInput = normalizeSchema(inputSchema, { strict: true });
+        const normalizedOutput = tool.outputSchema
+          ? normalizeSchema(tool.outputSchema, { strict: true })
+          : null;
+
+        nextMirroredTools.set(tool.name, {
+          name: tool.name,
+          description: tool.description,
+          inputSchema: normalizedInput.jsonSchema,
+          ...(normalizedOutput && { outputSchema: normalizedOutput.jsonSchema }),
+          ...(tool.annotations && { annotations: tool.annotations }),
+          execute: tool.execute as (
+            args: Record<string, unknown>,
+            client: ModelContextClient
+          ) => Promise<ToolResponse>,
+          inputValidator: normalizedInput.zodValidator,
+          ...(normalizedOutput && { outputValidator: normalizedOutput.zodValidator }),
+        });
+
+        return {
+          ...tool,
+          inputSchema: normalizedInput.jsonSchema,
+          ...(normalizedOutput && { outputSchema: normalizedOutput.jsonSchema }),
+        };
+      });
     }
-    this.nativeContext.provideContext(normalizedContext);
+
+    this.nativeProvideContext(normalizedContext);
+    this.mirroredTools = nextMirroredTools;
+    this.syncToolsFromNative();
   }
 
   registerTool<
     TInputSchema extends ZodSchemaObject = Record<string, never>,
     TOutputSchema extends ZodSchemaObject = Record<string, never>,
-  >(tool: ToolDescriptor<TInputSchema, TOutputSchema>): { unregister: () => void } {
+  >(tool: ToolDescriptor<TInputSchema, TOutputSchema>): void {
+    if (this.mirroredTools.has(tool.name)) {
+      throw new Error(`Tool already registered: ${tool.name}`);
+    }
+
+    const inputSchema = tool.inputSchema ?? NativeModelContextAdapter.DEFAULT_INPUT_SCHEMA;
+    const normalizedInput = normalizeSchema(inputSchema, { strict: true });
+    const normalizedOutput = tool.outputSchema
+      ? normalizeSchema(tool.outputSchema, { strict: true })
+      : null;
+
     const normalizedTool = {
       ...tool,
-      inputSchema: normalizeSchema(tool.inputSchema).jsonSchema,
+      inputSchema: normalizedInput.jsonSchema,
+      ...(normalizedOutput && { outputSchema: normalizedOutput.jsonSchema }),
     };
-    const result = this.nativeContext.registerTool(normalizedTool);
-    return result;
+    this.nativeRegisterTool(normalizedTool);
+
+    this.mirroredTools.set(tool.name, {
+      name: tool.name,
+      description: tool.description,
+      inputSchema: normalizedInput.jsonSchema,
+      ...(normalizedOutput && { outputSchema: normalizedOutput.jsonSchema }),
+      ...(tool.annotations && { annotations: tool.annotations }),
+      execute: tool.execute as (
+        args: Record<string, unknown>,
+        client: ModelContextClient
+      ) => Promise<ToolResponse>,
+      inputValidator: normalizedInput.zodValidator,
+      ...(normalizedOutput && { outputValidator: normalizedOutput.zodValidator }),
+    });
+
+    this.syncToolsFromNative();
   }
 
   unregisterTool(name: string): void {
-    this.nativeContext.unregisterTool(name);
+    this.nativeUnregisterTool(name);
+    this.mirroredTools.delete(name);
+    this.syncToolsFromNative();
   }
 
   clearContext(): void {
-    this.nativeContext.clearContext();
+    this.nativeClearContext();
+    this.mirroredTools.clear();
+    this.syncToolsFromNative();
   }
 
   async executeTool(
@@ -533,15 +987,19 @@ export class NativeModelContextAdapter implements InternalModelContext {
     options?: boolean | AddEventListenerOptions
   ): void {
     if (type === 'toolcall') {
-      this.nativeContext.addEventListener(
-        'toolcall',
-        listener as (event: ToolCallEvent) => void | Promise<void>,
-        options
-      );
+      if (this.nativeAddEventListener) {
+        this.nativeAddEventListener('toolcall', listener as EventListener, options);
+      } else {
+        this.fallbackEventTarget.addEventListener('toolcall', listener as EventListener, options);
+      }
       return;
     }
 
-    this.nativeContext.addEventListener('toolschanged', listener as () => void, options);
+    if (this.nativeAddEventListener) {
+      this.nativeAddEventListener('toolschanged', listener as () => void, options);
+    } else {
+      this.fallbackEventTarget.addEventListener('toolschanged', listener as EventListener, options);
+    }
   }
 
   removeEventListener(
@@ -550,19 +1008,34 @@ export class NativeModelContextAdapter implements InternalModelContext {
     options?: boolean | EventListenerOptions
   ): void {
     if (type === 'toolcall') {
-      this.nativeContext.removeEventListener(
-        'toolcall',
-        listener as (event: ToolCallEvent) => void | Promise<void>,
-        options
-      );
+      if (this.nativeRemoveEventListener) {
+        this.nativeRemoveEventListener('toolcall', listener as EventListener, options);
+      } else {
+        this.fallbackEventTarget.removeEventListener(
+          'toolcall',
+          listener as EventListener,
+          options
+        );
+      }
       return;
     }
 
-    this.nativeContext.removeEventListener('toolschanged', listener as () => void, options);
+    if (this.nativeRemoveEventListener) {
+      this.nativeRemoveEventListener('toolschanged', listener as () => void, options);
+    } else {
+      this.fallbackEventTarget.removeEventListener(
+        'toolschanged',
+        listener as EventListener,
+        options
+      );
+    }
   }
 
   dispatchEvent(event: Event): boolean {
-    return this.nativeContext.dispatchEvent(event);
+    if (this.nativeDispatchEvent) {
+      return this.nativeDispatchEvent(event);
+    }
+    return this.fallbackEventTarget.dispatchEvent(event);
   }
 
   async createMessage(params: SamplingRequestParams): Promise<SamplingResult> {

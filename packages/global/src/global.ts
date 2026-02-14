@@ -4,6 +4,7 @@ import {
   TabServerTransport,
   type TabServerTransportOptions,
 } from '@mcp-b/transports';
+import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
 import type {
   Prompt,
   PromptMessage,
@@ -26,6 +27,7 @@ import {
   detectNativeAPI,
   installConsumerShim,
   installDeprecatedTestingAccessor,
+  installMissingMethodStubs,
   NativeModelContextAdapter,
 } from './native-adapter.js';
 import {
@@ -38,15 +40,19 @@ import type {
   InputSchema,
   InternalModelContext,
   MCPBridge,
-  ModelContextInput,
+  MCPBridgeInitState,
+  ModelContext,
+  ModelContextClient,
+  ModelContextOptions,
   ModelContextTesting,
+  ModelContextTestingExecuteToolOptions,
+  ModelContextTestingPolyfillExtensions,
   PromptDescriptor,
   ResourceDescriptor,
   SamplingRequestParams,
   SamplingResult,
   ToolCallEvent,
   ToolDescriptor,
-  ToolExecutionContext,
   ToolResponse,
   ValidatedPromptDescriptor,
   ValidatedResourceDescriptor,
@@ -60,12 +66,7 @@ import { normalizeSchema, validateWithZod } from './validation.js';
 const logger = createLogger('WebModelContext');
 const bridgeLogger = createLogger('MCPBridge');
 const testingLogger = createLogger('ModelContextTesting');
-
-declare global {
-  interface Window {
-    __webModelContextOptions?: WebModelContextInitOptions;
-  }
-}
+const GLOBAL_RUNTIME_VERSION = 'unknown';
 
 /**
  * Marker property name used to identify polyfill implementations.
@@ -139,12 +140,183 @@ class WebToolCallEvent extends Event implements ToolCallEvent {
  * Used to filter out double-registrations caused by React Strict Mode.
  */
 const RAPID_DUPLICATE_WINDOW_MS = 50;
+const DEFAULT_INPUT_SCHEMA: InputSchema = { type: 'object', properties: {} };
 
 /**
  * Types of lists that can trigger change notifications.
  * Single source of truth for notification batching logic.
  */
 type ListChangeType = 'tools' | 'resources' | 'prompts';
+
+const FAILED_TO_PARSE_INPUT_ARGUMENTS_MESSAGE = 'Failed to parse input arguments';
+const TOOL_INVOCATION_FAILED_MESSAGE =
+  'Tool was executed but the invocation failed. For example, the script function threw an error';
+const TOOL_CANCELLED_MESSAGE = 'Tool was cancelled';
+
+function createUnknownError(message: string): Error {
+  try {
+    return new DOMException(message, 'UnknownError');
+  } catch {
+    const error = new Error(message);
+    error.name = 'UnknownError';
+    return error;
+  }
+}
+
+function parseInputArgsJson(inputArgsJson: string): Record<string, unknown> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(inputArgsJson);
+  } catch {
+    throw createUnknownError(FAILED_TO_PARSE_INPUT_ARGUMENTS_MESSAGE);
+  }
+
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw createUnknownError(FAILED_TO_PARSE_INPUT_ARGUMENTS_MESSAGE);
+  }
+
+  return parsed as Record<string, unknown>;
+}
+
+function getFirstTextBlock(result: ToolResponse): string | null {
+  for (const block of result.content ?? []) {
+    if (block.type === 'text' && 'text' in block && typeof block.text === 'string') {
+      return block.text;
+    }
+  }
+
+  return null;
+}
+
+function toSerializedTestingResult(result: ToolResponse): string | null {
+  if (result.isError) {
+    const toolErrorText = getFirstTextBlock(result);
+    const errorMessage = toolErrorText
+      ? toolErrorText.replace(/^Error:\s*/i, '').trim() || TOOL_INVOCATION_FAILED_MESSAGE
+      : TOOL_INVOCATION_FAILED_MESSAGE;
+    throw createUnknownError(errorMessage);
+  }
+
+  if (
+    result.metadata &&
+    typeof result.metadata === 'object' &&
+    (result.metadata as { willNavigate?: boolean }).willNavigate
+  ) {
+    return null;
+  }
+
+  try {
+    return JSON.stringify(result);
+  } catch {
+    throw createUnknownError(TOOL_INVOCATION_FAILED_MESSAGE);
+  }
+}
+
+function createToolCancelledError(): Error {
+  return createUnknownError(TOOL_CANCELLED_MESSAGE);
+}
+
+function createToolInvocationFailedError(): Error {
+  return createUnknownError(TOOL_INVOCATION_FAILED_MESSAGE);
+}
+
+function withAbortSignal<T>(operation: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) {
+    return operation;
+  }
+
+  if (signal.aborted) {
+    return Promise.reject(createToolInvocationFailedError());
+  }
+
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => {
+      cleanup();
+      reject(createToolCancelledError());
+    };
+
+    const cleanup = () => {
+      signal.removeEventListener('abort', onAbort);
+    };
+
+    signal.addEventListener('abort', onAbort, { once: true });
+
+    operation.then(
+      (value) => {
+        cleanup();
+        resolve(value);
+      },
+      (error) => {
+        cleanup();
+        reject(error);
+      }
+    );
+  });
+}
+
+function withSingleToolsChangedCallback(callback: unknown): () => void {
+  if (typeof callback !== 'function') {
+    throw new TypeError(
+      "Failed to execute 'registerToolsChangedCallback' on 'ModelContextTesting': parameter 1 is not of type 'Function'."
+    );
+  }
+
+  const typedCallback = callback as () => void;
+
+  return () => {
+    try {
+      typedCallback();
+    } catch (error) {
+      testingLogger.error('Error in tools changed callback:', error);
+    }
+  };
+}
+
+const BRIDGE_MODEL_CONTEXT_METHODS = [
+  'provideContext',
+  'clearContext',
+  'registerTool',
+  'unregisterTool',
+  'executeTool',
+  'setTestingAPI',
+  'listTools',
+  'callTool',
+  'registerResource',
+  'unregisterResource',
+  'listResources',
+  'listResourceTemplates',
+  'readResource',
+  'registerPrompt',
+  'unregisterPrompt',
+  'listPrompts',
+  'getPrompt',
+  'createMessage',
+  'elicitInput',
+  'addEventListener',
+  'removeEventListener',
+  'dispatchEvent',
+] as const;
+
+function attachBridgeBackedModelContext(
+  targetContext: ModelContext,
+  bridgeContext: InternalModelContext
+): void {
+  const target = targetContext as unknown as Record<string, unknown>;
+  const source = bridgeContext as unknown as Record<string, unknown>;
+
+  for (const methodName of BRIDGE_MODEL_CONTEXT_METHODS) {
+    const method = source[methodName];
+    if (typeof method !== 'function') {
+      continue;
+    }
+
+    Object.defineProperty(target, methodName, {
+      configurable: true,
+      writable: true,
+      value: method.bind(bridgeContext),
+    });
+  }
+}
 
 /**
  * Testing API implementation for the Model Context Protocol.
@@ -154,7 +326,7 @@ type ListChangeType = 'tools' | 'resources' | 'prompts';
  * @class WebModelContextTesting
  * @implements {ModelContextTesting}
  */
-class WebModelContextTesting implements ModelContextTesting {
+class WebModelContextTesting implements ModelContextTesting, ModelContextTestingPolyfillExtensions {
   /**
    * Marker property to identify this as a polyfill implementation.
    * Used by detectNativeAPI() to distinguish polyfill from native Chromium API.
@@ -171,7 +343,7 @@ class WebModelContextTesting implements ModelContextTesting {
     timestamp: number;
   }> = [];
   private mockResponses: Map<string, ToolResponse> = new Map();
-  private toolsChangedCallbacks: Set<() => void> = new Set();
+  private toolsChangedCallback: (() => void) | null = null;
   private bridge: MCPBridge;
 
   /**
@@ -228,73 +400,63 @@ class WebModelContextTesting implements ModelContextTesting {
    * @internal
    */
   notifyToolsChanged(): void {
-    for (const callback of this.toolsChangedCallbacks) {
-      try {
-        callback();
-      } catch (error) {
-        testingLogger.error('Error in tools changed callback:', error);
-      }
-    }
+    this.toolsChangedCallback?.();
   }
 
   /**
    * Executes a tool directly with JSON string input (Chromium native API).
-   * Parses the JSON input, validates it, and executes the tool.
    *
    * @param {string} toolName - Name of the tool to execute
    * @param {string} inputArgsJson - JSON string of input arguments
-   * @returns {Promise<unknown>} The tool's result, or undefined on error
-   * @throws {SyntaxError} If the input JSON is invalid
-   * @throws {Error} If the tool does not exist
+   * @param {ModelContextTestingExecuteToolOptions} options - Optional execution controls
+   * @returns {Promise<string | null>} Serialized tool output JSON, or null when navigation is triggered
+   * @throws {DOMException} UnknownError if invocation fails or input is invalid
    */
-  async executeTool(toolName: string, inputArgsJson: string): Promise<unknown> {
-    let args: Record<string, unknown>;
-    try {
-      args = JSON.parse(inputArgsJson);
-    } catch (error) {
-      throw new SyntaxError(
-        `Invalid JSON input: ${error instanceof Error ? error.message : String(error)}`
-      );
+  async executeTool(
+    toolName: string,
+    inputArgsJson: string,
+    options?: ModelContextTestingExecuteToolOptions
+  ): Promise<string | null> {
+    if (options?.signal?.aborted) {
+      throw createToolInvocationFailedError();
     }
+
+    const args = parseInputArgsJson(inputArgsJson);
 
     const tool = this.bridge.tools.get(toolName);
     if (!tool) {
-      throw new Error(`Tool not found: ${toolName}`);
+      throw createUnknownError(`Tool not found: ${toolName}`);
     }
 
-    const result = await this.bridge.modelContext.executeTool(toolName, args);
+    const execution = this.bridge.modelContext
+      .executeTool(toolName, args)
+      .then((result) => toSerializedTestingResult(result));
 
-    if (result.isError) {
-      return undefined;
-    }
-
-    if (result.structuredContent) {
-      return result.structuredContent;
-    }
-
-    if (result.content && result.content.length > 0) {
-      const firstContent = result.content[0];
-      if (firstContent && firstContent.type === 'text') {
-        return firstContent.text;
-      }
-    }
-
-    return undefined;
+    return withAbortSignal(execution, options?.signal);
   }
 
   /**
    * Lists all registered tools with inputSchema as JSON string (Chromium native API).
    * Returns an array of ToolInfo objects where inputSchema is stringified.
    *
-   * @returns {Array<{name: string, description: string, inputSchema: string}>} Array of tool information
+   * @returns {Array<{name: string, description: string, inputSchema?: string}>} Array of tool information
    */
-  listTools(): Array<{ name: string; description: string; inputSchema: string }> {
+  listTools(): Array<{ name: string; description: string; inputSchema?: string }> {
     const tools = this.bridge.modelContext.listTools();
-    return tools.map((tool) => ({
-      name: tool.name,
-      description: tool.description,
-      inputSchema: JSON.stringify(tool.inputSchema),
-    }));
+    return tools.map((tool) => {
+      const toolInfo: { name: string; description: string; inputSchema?: string } = {
+        name: tool.name,
+        description: tool.description,
+      };
+
+      try {
+        toolInfo.inputSchema = JSON.stringify(tool.inputSchema);
+      } catch {
+        // Keep schema omitted when serialization fails.
+      }
+
+      return toolInfo;
+    });
   }
 
   /**
@@ -304,7 +466,13 @@ class WebModelContextTesting implements ModelContextTesting {
    * @param {() => void} callback - Function to call when tools change
    */
   registerToolsChangedCallback(callback: () => void): void {
-    this.toolsChangedCallbacks.add(callback);
+    this.toolsChangedCallback = withSingleToolsChangedCallback(callback);
+  }
+
+  async getCrossDocumentScriptToolResult(): Promise<string> {
+    // This polyfill does not model cross-document declarative execution yet.
+    // Return an empty JSON list for compatibility with Chromium's string return type.
+    return '[]';
   }
 
   /**
@@ -375,9 +543,7 @@ class WebModelContextTesting implements ModelContextTesting {
 
 /**
  * ModelContext implementation that bridges to the Model Context Protocol SDK.
- * Implements the W3C Web Model Context API proposal with two-bucket tool management:
- * - Bucket A (provideContextTools): Tools registered via provideContext()
- * - Bucket B (dynamicTools): Tools registered via registerTool()
+ * Implements the W3C Web Model Context API proposal and MCPB extension surface.
  *
  * This separation ensures that component-scoped dynamic tools persist across
  * app-level provideContext() calls.
@@ -389,25 +555,23 @@ class WebModelContext implements InternalModelContext {
   private bridge: MCPBridge;
   private eventTarget: EventTarget;
 
-  // Tool storage (Bucket A = provideContext, Bucket B = dynamic)
+  // Tool storage
   private provideContextTools: Map<string, ValidatedToolDescriptor>;
   private dynamicTools: Map<string, ValidatedToolDescriptor>;
 
-  // Resource storage (Bucket A = provideContext, Bucket B = dynamic)
+  // Resource storage
   private provideContextResources: Map<string, ValidatedResourceDescriptor>;
   private dynamicResources: Map<string, ValidatedResourceDescriptor>;
 
-  // Prompt storage (Bucket A = provideContext, Bucket B = dynamic)
+  // Prompt storage
   private provideContextPrompts: Map<string, ValidatedPromptDescriptor>;
   private dynamicPrompts: Map<string, ValidatedPromptDescriptor>;
 
-  // Registration tracking for duplicate detection
-  private toolRegistrationTimestamps: Map<string, number>;
+  // Registration tracking for duplicate detection (extensions only)
   private resourceRegistrationTimestamps: Map<string, number>;
   private promptRegistrationTimestamps: Map<string, number>;
 
-  // Unregister functions for dynamic registrations
-  private toolUnregisterFunctions: Map<string, () => void>;
+  // Unregister functions for extension registrations
   private resourceUnregisterFunctions: Map<string, () => void>;
   private promptUnregisterFunctions: Map<string, () => void>;
 
@@ -432,9 +596,6 @@ class WebModelContext implements InternalModelContext {
     // Initialize tool storage
     this.provideContextTools = new Map();
     this.dynamicTools = new Map();
-    this.toolRegistrationTimestamps = new Map();
-    this.toolUnregisterFunctions = new Map();
-
     // Initialize resource storage
     this.provideContextResources = new Map();
     this.dynamicResources = new Map();
@@ -486,16 +647,16 @@ class WebModelContext implements InternalModelContext {
   }
 
   /**
-   * Provides context (tools, resources, prompts) to AI models by registering base items (Bucket A).
-   * Clears and replaces all previously registered base items while preserving
-   * dynamic items registered via register* methods.
+   * Provides context (tools, resources, prompts) to AI models.
+   * For tools, this replaces the existing tool set per strict WebMCP behavior.
    *
-   * @param {ModelContextInput} context - Context containing tools, resources, and prompts to register
+   * @param {ModelContextOptions} context - Context containing tools, resources, and prompts to register
    * @throws {Error} If a name/uri collides with existing dynamic items
    */
-  provideContext(context: ModelContextInput): void {
-    // Clear base items (Bucket A)
+  provideContext(context: ModelContextOptions = {}): void {
+    // Strict WebMCP behavior: replace existing tool context entirely.
     this.provideContextTools.clear();
+    this.dynamicTools.clear();
     this.provideContextResources.clear();
     this.provideContextPrompts.clear();
 
@@ -526,15 +687,20 @@ class WebModelContext implements InternalModelContext {
         );
       }
 
-      if (this.dynamicTools.has(tool.name)) {
+      if (this.provideContextTools.has(tool.name)) {
         throw new Error(
-          `[Web Model Context] Tool name collision: "${tool.name}" is already registered via registerTool(). ` +
-            'Please use a different name or unregister the dynamic tool first.'
+          `[Web Model Context] Tool name collision: "${tool.name}" is already registered in provideContext(). ` +
+            'Each tool name in provideContext(options.tools) must be unique.'
         );
       }
 
-      const { jsonSchema: inputJson, zodValidator: inputZod } = normalizeSchema(tool.inputSchema);
-      const normalizedOutput = tool.outputSchema ? normalizeSchema(tool.outputSchema) : null;
+      const inputSchema = tool.inputSchema ?? DEFAULT_INPUT_SCHEMA;
+      const { jsonSchema: inputJson, zodValidator: inputZod } = normalizeSchema(inputSchema, {
+        strict: true,
+      });
+      const normalizedOutput = tool.outputSchema
+        ? normalizeSchema(tool.outputSchema, { strict: true })
+        : null;
 
       const validatedTool: ValidatedToolDescriptor = {
         name: tool.name,
@@ -542,7 +708,10 @@ class WebModelContext implements InternalModelContext {
         inputSchema: inputJson,
         ...(normalizedOutput && { outputSchema: normalizedOutput.jsonSchema }),
         ...(tool.annotations && { annotations: tool.annotations }),
-        execute: tool.execute,
+        execute: tool.execute as (
+          args: Record<string, unknown>,
+          client: ModelContextClient
+        ) => Promise<ToolResponse>,
         inputValidator: inputZod,
         ...(normalizedOutput && { outputValidator: normalizedOutput.zodValidator }),
       };
@@ -639,17 +808,15 @@ class WebModelContext implements InternalModelContext {
   }
 
   /**
-   * Registers a single tool dynamically (Bucket B).
-   * Dynamic tools persist across provideContext() calls and can be independently managed.
+   * Registers a single tool dynamically.
    *
    * @param {ToolDescriptor} tool - The tool descriptor to register
-   * @returns {{unregister: () => void}} Object with unregister function
    * @throws {Error} If tool name collides with existing tools
    */
   registerTool<
     TInputSchema extends ZodSchemaObject = Record<string, never>,
     TOutputSchema extends ZodSchemaObject = Record<string, never>,
-  >(tool: ToolDescriptor<TInputSchema, TOutputSchema>): { unregister: () => void } {
+  >(tool: ToolDescriptor<TInputSchema, TOutputSchema>): void {
     // Validate tool name and log warnings for potential compatibility issues
     // NOTE: Similar validation exists in @mcp-b/chrome-devtools-mcp/src/tools/WebMCPToolHub.ts
     // Keep both implementations in sync when making changes.
@@ -675,38 +842,21 @@ class WebModelContext implements InternalModelContext {
       );
     }
 
-    const now = Date.now();
-    const lastRegistration = this.toolRegistrationTimestamps.get(tool.name);
-
-    if (lastRegistration && now - lastRegistration < RAPID_DUPLICATE_WINDOW_MS) {
-      logger.warn(
-        `Tool "${tool.name}" registered multiple times within ${RAPID_DUPLICATE_WINDOW_MS}ms. ` +
-          'This is likely due to React Strict Mode double-mounting. Ignoring duplicate registration.'
-      );
-
-      const existingUnregister = this.toolUnregisterFunctions.get(tool.name);
-      if (existingUnregister) {
-        return { unregister: existingUnregister };
-      }
-    }
-
-    if (this.provideContextTools.has(tool.name)) {
+    if (this.provideContextTools.has(tool.name) || this.dynamicTools.has(tool.name)) {
       throw new Error(
-        `[Web Model Context] Tool name collision: "${tool.name}" is already registered via provideContext(). ` +
-          'Please use a different name or update your provideContext() call.'
-      );
-    }
-
-    if (this.dynamicTools.has(tool.name)) {
-      throw new Error(
-        `[Web Model Context] Tool name collision: "${tool.name}" is already registered via registerTool(). ` +
+        `[Web Model Context] Tool name collision: "${tool.name}" is already registered. ` +
           'Please unregister it first or use a different name.'
       );
     }
 
-    const { jsonSchema: inputJson, zodValidator: inputZod } = normalizeSchema(tool.inputSchema);
+    const inputSchema = tool.inputSchema ?? DEFAULT_INPUT_SCHEMA;
+    const { jsonSchema: inputJson, zodValidator: inputZod } = normalizeSchema(inputSchema, {
+      strict: true,
+    });
 
-    const normalizedOutput = tool.outputSchema ? normalizeSchema(tool.outputSchema) : null;
+    const normalizedOutput = tool.outputSchema
+      ? normalizeSchema(tool.outputSchema, { strict: true })
+      : null;
 
     const validatedTool: ValidatedToolDescriptor = {
       name: tool.name,
@@ -717,40 +867,15 @@ class WebModelContext implements InternalModelContext {
       // Tool handlers receive a per-call execution context for elicitation.
       execute: tool.execute as (
         args: Record<string, unknown>,
-        context: ToolExecutionContext
+        client: ModelContextClient
       ) => Promise<ToolResponse>,
       inputValidator: inputZod,
       ...(normalizedOutput && { outputValidator: normalizedOutput.zodValidator }),
     };
 
     this.dynamicTools.set(tool.name, validatedTool);
-    this.toolRegistrationTimestamps.set(tool.name, now);
     this.updateBridgeTools();
     this.scheduleListChanged('tools');
-
-    const unregisterFn = () => {
-      if (this.provideContextTools.has(tool.name)) {
-        throw new Error(
-          `[Web Model Context] Cannot unregister tool "${tool.name}": ` +
-            'This tool was registered via provideContext(). Use provideContext() to update the base tool set.'
-        );
-      }
-
-      if (!this.dynamicTools.has(tool.name)) {
-        logger.warn(`Tool "${tool.name}" is not registered, ignoring unregister call`);
-        return;
-      }
-
-      this.dynamicTools.delete(tool.name);
-      this.toolRegistrationTimestamps.delete(tool.name);
-      this.toolUnregisterFunctions.delete(tool.name);
-      this.updateBridgeTools();
-      this.scheduleListChanged('tools');
-    };
-
-    this.toolUnregisterFunctions.set(tool.name, unregisterFn);
-
-    return { unregister: unregisterFn };
   }
 
   // ==================== RESOURCE METHODS ====================
@@ -1016,7 +1141,7 @@ class WebModelContext implements InternalModelContext {
 
   /**
    * Unregisters a tool by name (Chromium native API).
-   * Can unregister tools from either Bucket A (provideContext) or Bucket B (registerTool).
+   * Unregisters a tool by name, regardless of registration path.
    *
    * @param {string} name - Name of the tool to unregister
    */
@@ -1035,8 +1160,6 @@ class WebModelContext implements InternalModelContext {
 
     if (inDynamic) {
       this.dynamicTools.delete(name);
-      this.toolRegistrationTimestamps.delete(name);
-      this.toolUnregisterFunctions.delete(name);
     }
 
     this.updateBridgeTools();
@@ -1044,15 +1167,13 @@ class WebModelContext implements InternalModelContext {
   }
 
   /**
-   * Clears all registered context from both buckets (Chromium native API).
+   * Clears all registered context.
    * Removes all tools, resources, and prompts registered via provideContext() and register* methods.
    */
   clearContext(): void {
     // Clear tools
     this.provideContextTools.clear();
     this.dynamicTools.clear();
-    this.toolRegistrationTimestamps.clear();
-    this.toolUnregisterFunctions.clear();
 
     // Clear resources
     this.provideContextResources.clear();
@@ -1078,8 +1199,7 @@ class WebModelContext implements InternalModelContext {
   }
 
   /**
-   * Updates the bridge tools map with merged tools from both buckets.
-   * The final tool list is the union of Bucket A (provideContext) and Bucket B (dynamic).
+   * Rebuilds the bridge tool map from current provideContext and dynamic registrations.
    *
    * @private
    */
@@ -1446,7 +1566,20 @@ class WebModelContext implements InternalModelContext {
 
     let contextActive = true;
     try {
-      const executionContext: ToolExecutionContext = {
+      const executionContext = {
+        requestUserInteraction: async (callback: () => Promise<unknown>): Promise<unknown> => {
+          if (!contextActive) {
+            throw new Error(
+              `ModelContextClient for tool "${toolName}" is no longer active after execute() resolved`
+            );
+          }
+
+          if (typeof callback !== 'function') {
+            throw new TypeError('requestUserInteraction(callback) requires a function callback');
+          }
+
+          return callback();
+        },
         elicitInput: async (params) => {
           if (!contextActive) {
             throw new Error(
@@ -1456,6 +1589,8 @@ class WebModelContext implements InternalModelContext {
 
           return requireElicitInputCapability(this.bridge.tabServer)(params);
         },
+      } as ModelContextClient & {
+        elicitInput: (params: ElicitationParams) => Promise<ElicitationResult>;
       };
 
       const response = await tool.execute(validatedArgs, executionContext);
@@ -1495,7 +1630,7 @@ class WebModelContext implements InternalModelContext {
 
   /**
    * Lists all registered tools in MCP format.
-   * Returns tools from both buckets with full MCP specification including
+   * Returns tools with full MCP specification including
    * annotations and output schemas.
    *
    * @returns {Array<{name: string, description: string, inputSchema: InputSchema, outputSchema?: InputSchema, annotations?: ToolAnnotations}>} Array of tool descriptors
@@ -1751,6 +1886,94 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
   return bridge;
 }
 
+function canonicalizeForFingerprint(value: unknown): unknown {
+  if (value === null) {
+    return null;
+  }
+
+  const valueType = typeof value;
+  if (valueType === 'string' || valueType === 'number' || valueType === 'boolean') {
+    return value;
+  }
+
+  if (valueType === 'bigint') {
+    return `${String(value)}n`;
+  }
+
+  if (valueType === 'function') {
+    const fnName = (value as { name?: string }).name;
+    return `[Function:${fnName || 'anonymous'}]`;
+  }
+
+  if (valueType === 'symbol') {
+    return String(value);
+  }
+
+  if (valueType === 'undefined') {
+    return '[undefined]';
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((entry) => canonicalizeForFingerprint(entry));
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  if (valueType === 'object') {
+    const result: Record<string, unknown> = {};
+    const entries = Object.entries(value as Record<string, unknown>).sort(([left], [right]) =>
+      left.localeCompare(right)
+    );
+
+    for (const [key, entryValue] of entries) {
+      if (typeof entryValue === 'undefined') {
+        continue;
+      }
+      result[key] = canonicalizeForFingerprint(entryValue);
+    }
+
+    return result;
+  }
+
+  return String(value);
+}
+
+function createOptionsFingerprint(options?: WebModelContextInitOptions): string {
+  return JSON.stringify(canonicalizeForFingerprint(options ?? {}));
+}
+
+function createBridgeInitState(
+  mode: MCPBridgeInitState['mode'],
+  optionsFingerprint: string
+): MCPBridgeInitState {
+  return {
+    initialized: true,
+    mode,
+    optionsFingerprint,
+    version: GLOBAL_RUNTIME_VERSION,
+  };
+}
+
+function setBridgeInitState(initState: MCPBridgeInitState): void {
+  Object.defineProperty(window, '__mcpBridgeInitState', {
+    value: initState,
+    writable: false,
+    configurable: true,
+  });
+}
+
+function installBridgeGlobals(bridge: MCPBridge, initState: MCPBridgeInitState): void {
+  Object.defineProperty(window, '__mcpBridge', {
+    value: bridge,
+    writable: false,
+    configurable: true,
+  });
+
+  setBridgeInitState(initState);
+}
+
 /**
  * Initializes the Web Model Context API on window.navigator.
  * Creates and exposes navigator.modelContext and navigator.modelContextTesting.
@@ -1779,13 +2002,40 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
   }
 
   const effectiveOptions = options ?? window.__webModelContextOptions;
+  const optionsFingerprint = createOptionsFingerprint(effectiveOptions);
+  const existingModelContext = window.navigator.modelContext as
+    | (ModelContext & Record<string, unknown>)
+    | undefined;
+  const isKnownPolyfillContext = existingModelContext?.[POLYFILL_MARKER_PROPERTY] === true;
+
+  if (window.__mcpBridge) {
+    const initState = window.__mcpBridgeInitState;
+    if (initState?.initialized) {
+      if (initState.optionsFingerprint !== optionsFingerprint) {
+        logger.warn(
+          'initializeWebModelContext() options mismatch ignored; first initialization wins'
+        );
+      }
+      logger.info('Web Model Context already initialized, skipping');
+      return;
+    }
+
+    const nativeForAdoption = detectNativeAPI();
+    const adoptedMode: MCPBridgeInitState['mode'] = nativeForAdoption.hasNativeContext
+      ? isKnownPolyfillContext
+        ? 'polyfill-installed'
+        : 'native'
+      : 'polyfill-installed';
+    setBridgeInitState(createBridgeInitState(adoptedMode, optionsFingerprint));
+    logger.info('Adopted existing __mcpBridge state; skipping re-initialization');
+    return;
+  }
+
   const native = detectNativeAPI();
 
-  if (native.hasNativeContext) {
+  if (native.hasNativeContext && !isKnownPolyfillContext) {
     const nativeContext = window.navigator.modelContext;
-    const nativeTesting = native.hasNativeTesting
-      ? window.navigator.modelContextTesting
-      : undefined;
+    const nativeTesting = window.navigator.modelContextTesting;
 
     if (!nativeContext) {
       logger.error('Native API detection mismatch');
@@ -1793,19 +2043,20 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
     }
 
     logger.info('✅ Native Chromium API detected');
-    if (nativeTesting) {
-      logger.info('   Using native implementation with MCP bridge synchronization');
-      logger.info('   Native API will automatically collect tools from embedded iframes');
-    } else {
-      logger.info(
-        '   Native modelContextTesting not detected; installing consumer shim on modelContext'
-      );
-    }
+    logger.info(
+      `   Using native implementation with MCP bridge synchronization${
+        nativeTesting ? ' (with modelContextTesting)' : ' (without modelContextTesting)'
+      }`
+    );
 
     try {
       const bridge = initializeMCPBridge(effectiveOptions);
 
-      const adapter = new NativeModelContextAdapter(bridge, nativeContext, nativeTesting);
+      const adapter = new NativeModelContextAdapter(
+        bridge,
+        nativeContext as unknown as ModelContext,
+        nativeTesting
+      );
 
       bridge.modelContext = adapter;
       if (nativeTesting) {
@@ -1814,30 +2065,27 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
       }
 
       installConsumerShim(
-        nativeContext,
+        nativeContext as unknown as ModelContext,
         (params: { name: string; arguments?: Record<string, unknown> }) => adapter.callTool(params),
         {
           hasNativeTesting: Boolean(nativeTesting),
-          ...(!nativeTesting && {
-            onToolRegistryMutated: () => adapter.refreshToolsFromNative(),
-          }),
+          onBeforeProducerMutation: (methodName, args) => {
+            adapter.applyProducerMutation(methodName, args);
+          },
+          onToolRegistryMutated: () => adapter.refreshToolsFromNative(),
         }
       );
 
-      Object.defineProperty(window, '__mcpBridge', {
-        value: bridge,
-        writable: false,
-        configurable: true,
-      });
+      installMissingMethodStubs(nativeContext as unknown as ModelContext, adapter);
+
+      installBridgeGlobals(bridge, createBridgeInitState('native', optionsFingerprint));
 
       logger.info('✅ MCP bridge synced with native API');
-      if (nativeTesting) {
-        logger.info('   MCP clients will receive automatic tool updates from native registry');
-      } else {
-        logger.warn(
-          '   Native testing callbacks are unavailable; tool list change events are best-effort.'
-        );
-      }
+      logger.info(
+        `   MCP clients will receive automatic tool updates from native registry${
+          nativeTesting ? '' : ' (mutation-driven sync fallback)'
+        }`
+      );
     } catch (error) {
       logger.error('Failed to initialize native adapter:', error);
       throw error;
@@ -1846,40 +2094,54 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
     return;
   }
 
-  if (window.navigator.modelContext) {
-    logger.warn('window.navigator.modelContext already exists, skipping initialization');
+  if (existingModelContext) {
+    logger.info('Existing navigator.modelContext detected; attach-only mode activated');
+
+    try {
+      const bridge = initializeMCPBridge(effectiveOptions);
+      attachBridgeBackedModelContext(existingModelContext, bridge.modelContext);
+      bridge.modelContext = existingModelContext as unknown as InternalModelContext;
+      installBridgeGlobals(bridge, createBridgeInitState('attach-existing', optionsFingerprint));
+      logger.info('✅ Attached MCP bridge to existing navigator.modelContext (attach-only mode)');
+    } catch (error) {
+      logger.error('Failed to initialize attach-only bridge mode:', error);
+      throw error;
+    }
     return;
   }
 
   logger.info('Native API not detected, installing polyfill');
 
   try {
+    initializeWebMCPPolyfill({
+      forceOverride: true,
+      installTestingShim: false,
+    });
+
     const bridge = initializeMCPBridge(effectiveOptions);
+    const modelContextTarget = window.navigator.modelContext as ModelContext | undefined;
 
-    Object.defineProperty(window.navigator, 'modelContext', {
-      value: bridge.modelContext,
-      writable: false,
-      configurable: false,
-    });
+    if (modelContextTarget) {
+      attachBridgeBackedModelContext(modelContextTarget, bridge.modelContext);
+      bridge.modelContext = modelContextTarget as unknown as InternalModelContext;
+    }
 
-    Object.defineProperty(window, '__mcpBridge', {
-      value: bridge,
-      writable: false,
-      configurable: true,
-    });
+    installBridgeGlobals(bridge, createBridgeInitState('polyfill-installed', optionsFingerprint));
 
     logger.info('✅ window.navigator.modelContext initialized successfully');
 
     testingLogger.info('Installing polyfill');
     testingLogger.info('   💡 To use the native implementation in Chromium:');
-    testingLogger.info('      - Navigate to chrome://flags');
-    testingLogger.info('      - Enable "Experimental Web Platform Features"');
-    testingLogger.info('      - Or launch with: --enable-experimental-web-platform-features');
+    testingLogger.info('      - Navigate to chrome://flags/#enable-webmcp-testing');
+    testingLogger.info('      - Enable "WebMCP for testing"');
+    testingLogger.info('      - Restart the browser');
 
     const testingAPI = new WebModelContextTesting(bridge);
     bridge.modelContextTesting = testingAPI;
 
-    (bridge.modelContext as WebModelContext).setTestingAPI(testingAPI);
+    if ('setTestingAPI' in bridge.modelContext) {
+      (bridge.modelContext as WebModelContext).setTestingAPI(testingAPI);
+    }
 
     installDeprecatedTestingAccessor(testingAPI);
 
@@ -1937,6 +2199,7 @@ export function cleanupWebModelContext(): void {
   safeDeleteNavigatorProperty('modelContext');
   safeDeleteNavigatorProperty('modelContextTesting');
   delete (window as unknown as { __mcpBridge?: unknown }).__mcpBridge;
+  delete (window as unknown as { __mcpBridgeInitState?: unknown }).__mcpBridgeInitState;
 
   logger.info('Cleaned up');
 }

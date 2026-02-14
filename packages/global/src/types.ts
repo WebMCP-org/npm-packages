@@ -1,6 +1,5 @@
 import type { IframeChildTransportOptions, TabServerTransportOptions } from '@mcp-b/transports';
 import type {
-  CallToolResult,
   CreateMessageRequest,
   CreateMessageResult,
   ElicitRequest,
@@ -11,9 +10,28 @@ import type {
   Resource,
   ResourceContents,
   ResourceTemplate,
-  ToolAnnotations,
   Transport,
 } from '@mcp-b/webmcp-ts-sdk';
+import type {
+  CallToolResult as CoreCallToolResult,
+  ElicitationFormParams as CoreElicitationFormParams,
+  ElicitationParams as CoreElicitationParams,
+  ElicitationResult as CoreElicitationResult,
+  ElicitationUrlParams as CoreElicitationUrlParams,
+  InputSchema as CoreInputSchema,
+  ModelContextClient as CoreModelContextClient,
+  ModelContextCore as CoreModelContextCore,
+  ModelContextExtensions as CoreModelContextExtensions,
+  ModelContextOptions as CoreModelContextOptions,
+  ModelContextTesting as CoreModelContextTesting,
+  ModelContextTestingExecuteToolOptions as CoreModelContextTestingExecuteToolOptions,
+  ModelContextTestingToolInfo as CoreModelContextTestingToolInfo,
+  RegistrationHandle as CoreRegistrationHandle,
+  ToolAnnotations as CoreToolAnnotations,
+  ToolCallEvent as CoreToolCallEvent,
+  ToolListItem as CoreToolListItem,
+  ToolResponse as CoreToolResponse,
+} from '@mcp-b/webmcp-types';
 import type { z } from 'zod';
 
 // ============================================================================
@@ -110,26 +128,7 @@ export type { ElicitResult };
  * };
  * ```
  */
-export interface InputSchema {
-  /** The JSON Schema type (typically "object" for tool inputs) */
-  type: string;
-  /** Property definitions for object schemas */
-  properties?: Record<
-    string,
-    {
-      /** The property type */
-      type: string;
-      /** Human-readable description of the property */
-      description?: string;
-      /** Additional JSON Schema keywords */
-      [key: string]: unknown;
-    }
-  >;
-  /** Array of required property names */
-  required?: string[];
-  /** Additional JSON Schema keywords */
-  [key: string]: unknown;
-}
+export type InputSchema = CoreInputSchema;
 
 /**
  * Zod schema object type for type-safe tool and prompt definitions.
@@ -150,25 +149,31 @@ export interface InputSchema {
 export type ZodSchemaObject = Record<string, z.ZodTypeAny>;
 
 /**
+ * Value that may be returned synchronously or via Promise.
+ */
+export type MaybePromise<T> = T | Promise<T>;
+
+/**
  * Re-export ToolAnnotations from MCP SDK.
  * Provides hints about tool behavior (e.g., destructive, idempotent).
  * @see {@link https://spec.modelcontextprotocol.io/specification/server/tools/}
  */
-export type { ToolAnnotations };
+export type ToolAnnotations = CoreToolAnnotations;
 
 /**
  * Re-export CallToolResult from MCP SDK.
  * The result returned from tool execution.
  * @see {@link https://spec.modelcontextprotocol.io/specification/server/tools/}
  */
-export type { CallToolResult };
+export type CallToolResult = CoreCallToolResult;
 
 /**
  * Tool response format for the Web Model Context API.
- * This is an alias for MCP SDK's CallToolResult for API consistency.
- * @see {@link CallToolResult}
+ * Extends strict core response with MCPB-only metadata used by bridge flows.
  */
-export type ToolResponse = CallToolResult;
+export interface ToolResponse extends CoreToolResponse {
+  metadata?: NavigationMetadata | InterruptionMetadata | Record<string, unknown>;
+}
 
 // ============================================================================
 // Navigation Metadata Types
@@ -462,7 +467,7 @@ export interface ToolDescriptor<
    *
    * When using Zod, TypeScript will infer the execute parameter types automatically
    */
-  inputSchema: InputSchema | TInputSchema;
+  inputSchema?: InputSchema | TInputSchema;
 
   /**
    * Optional output schema - accepts EITHER:
@@ -488,14 +493,20 @@ export interface ToolDescriptor<
     args: TInputSchema extends Record<string, never>
       ? Record<string, unknown>
       : z.infer<z.ZodObject<TInputSchema>>,
-    context: ToolExecutionContext
-  ) => Promise<ToolResponse>;
+    client: ModelContextClient
+  ) => MaybePromise<ToolResponse>;
 }
 
 /**
- * Tool execution helpers bound to a single tool invocation.
+ * Agent/client context bound to a single tool invocation.
  */
-export interface ToolExecutionContext {
+export type ModelContextClient = CoreModelContextClient;
+
+/**
+ * Internal tool execution helpers bound to a single tool invocation.
+ * Includes MCPB compatibility helpers beyond the strict WebMCP core.
+ */
+export interface ToolExecutionContext extends ModelContextClient {
   /**
    * Request user input for the active tool call.
    * This helper is only valid during the current execute() invocation.
@@ -708,18 +719,7 @@ export interface ValidatedPromptDescriptor {
  * Tool information returned by listTools().
  * Provides metadata about a registered tool without exposing the execute function.
  */
-export interface ToolListItem {
-  /** Unique identifier for the tool */
-  name: string;
-  /** Natural language description of what the tool does */
-  description: string;
-  /** JSON Schema for tool input parameters */
-  inputSchema: InputSchema;
-  /** Optional JSON Schema for tool output */
-  outputSchema?: InputSchema;
-  /** Optional annotations providing hints about tool behavior */
-  annotations?: ToolAnnotations;
-}
+export type ToolListItem = CoreToolListItem;
 
 /**
  * Resource template information returned by listResourceTemplates().
@@ -740,10 +740,7 @@ export interface ResourceTemplateInfo {
  * Registration handle returned by registerTool, registerResource, registerPrompt.
  * Provides a method to unregister the item.
  */
-export interface RegistrationHandle {
-  /** Unregister the item, removing it from the context */
-  unregister: () => void;
-}
+export type RegistrationHandle = CoreRegistrationHandle;
 
 // ============================================================================
 // Sampling and Elicitation Types
@@ -807,49 +804,23 @@ export interface SamplingResult {
  * It is MCP-inspired, but intentionally not a strict alias of MCP's
  * `ElicitRequest['params']` while WebMCP elicitation API is still evolving.
  */
-export interface ElicitationFormParams {
-  /** Mode of elicitation */
-  mode?: 'form';
-  /** Message to show to the user */
-  message: string;
-  /** Form schema for requested user input */
-  requestedSchema: {
-    type: 'object';
-    properties: Record<string, InputSchema>;
-    required?: string[];
-    [key: string]: unknown;
-  };
-}
+export type ElicitationFormParams = CoreElicitationFormParams;
 
 /**
  * Parameters for a URL elicitation request.
  */
-export interface ElicitationUrlParams {
-  /** Mode of elicitation */
-  mode: 'url';
-  /** Message explaining why the URL needs to be opened */
-  message: string;
-  /** Unique identifier for this elicitation */
-  elicitationId: string;
-  /** URL to open */
-  url: string;
-}
+export type ElicitationUrlParams = CoreElicitationUrlParams;
 
 /**
  * Parameters for an elicitation request.
  * Can be either form-based or URL-based.
  */
-export type ElicitationParams = ElicitationFormParams | ElicitationUrlParams;
+export type ElicitationParams = CoreElicitationParams;
 
 /**
  * Result of an elicitation request.
  */
-export interface ElicitationResult {
-  /** User action */
-  action: 'accept' | 'decline' | 'cancel';
-  /** Content returned when action is 'accept' */
-  content?: Record<string, string | number | boolean | string[]>;
-}
+export type ElicitationResult = CoreElicitationResult;
 
 // ============================================================================
 // Model Context Types
@@ -859,13 +830,7 @@ export interface ElicitationResult {
  * Context provided to models via provideContext().
  * Contains the base set of tools, resources, and prompts (Bucket A).
  */
-export interface ModelContextInput {
-  /**
-   * Array of tool descriptors
-   * Supports both JSON Schema and Zod schema formats
-   */
-  tools?: ToolDescriptor[];
-
+export interface ModelContextInput extends CoreModelContextOptions {
   /**
    * Array of resource descriptors
    * Resources expose data that AI models can read
@@ -880,125 +845,51 @@ export interface ModelContextInput {
 }
 
 /**
- * Tool call event
+ * Public options accepted by provideContext().
+ * This is an alias of ModelContextInput for backward compatibility.
  */
-export interface ToolCallEvent extends Event {
-  /**
-   * Name of the tool being called
-   */
-  name: string;
-
-  /**
-   * Arguments passed to the tool
-   */
-  arguments: Record<string, unknown>;
-
-  /**
-   * Respond with a result
-   */
-  respondWith: (response: ToolResponse) => void;
-}
+export type ModelContextOptions = ModelContextInput;
 
 /**
- * ModelContext interface on window.navigator
- * Implements the W3C Web Model Context API proposal
+ * Tool call event
  */
-export interface ModelContext {
-  /**
-   * Provide context (tools, resources, prompts) to AI models
-   * Clears base items (Bucket A) and replaces with the provided arrays.
-   * Dynamic items (Bucket B) registered via register* methods persist.
-   */
-  provideContext(context: ModelContextInput): void;
+export type ToolCallEvent = CoreToolCallEvent;
 
+/**
+ * Strict WebMCP core interface exposed at navigator.modelContext.
+ */
+export type ModelContextCore = CoreModelContextCore;
+
+/**
+ * Non-standard MCPB extensions available on navigator.modelContext.
+ */
+export interface ModelContextExtensions extends CoreModelContextExtensions {
   // ==================== TOOLS ====================
 
   /**
-   * Register a single tool dynamically.
-   * Returns a handle to unregister the tool.
-   * Supports both JSON Schema and Zod schema formats.
-   */
-  registerTool<
-    TInputSchema extends ZodSchemaObject = Record<string, never>,
-    TOutputSchema extends ZodSchemaObject = Record<string, never>,
-  >(tool: ToolDescriptor<TInputSchema, TOutputSchema>): RegistrationHandle;
-
-  /**
-   * Unregister a tool by name
-   * Available in Chromium's native implementation
-   */
-  unregisterTool(name: string): void;
-
-  /**
    * Get the list of all registered tools.
-   * Returns tools from both buckets (provideContext and registerTool).
    */
   listTools(): ToolListItem[];
 
   /**
    * Execute a registered tool using MCP-style parameters.
-   * This is the consumer-friendly equivalent of MCP SDK Client.callTool().
-   *
-   * @param params - Tool execution request containing name and optional arguments
-   * @returns Promise resolving to MCP CallToolResult shape
-   * @throws {Error} If the tool does not exist
    */
   callTool(params: { name: string; arguments?: Record<string, unknown> }): Promise<ToolResponse>;
 
   // ==================== RESOURCES ====================
 
-  /**
-   * Register a single resource dynamically.
-   * Returns a handle to unregister the resource.
-   */
   registerResource(resource: ResourceDescriptor): RegistrationHandle;
-
-  /**
-   * Unregister a resource by URI
-   */
   unregisterResource(uri: string): void;
-
-  /**
-   * Get the list of all registered resources
-   * Returns resources from both buckets (provideContext and registerResource)
-   */
   listResources(): Resource[];
-
-  /**
-   * Get the list of all resource templates.
-   * Returns only resources with URI templates (dynamic resources).
-   */
   listResourceTemplates(): ResourceTemplateInfo[];
 
   // ==================== PROMPTS ====================
 
-  /**
-   * Register a single prompt dynamically.
-   * Returns a handle to unregister the prompt.
-   * Supports both JSON Schema and Zod schema formats for argsSchema.
-   */
   registerPrompt<TArgsSchema extends ZodSchemaObject = Record<string, never>>(
     prompt: PromptDescriptor<TArgsSchema>
   ): RegistrationHandle;
-
-  /**
-   * Unregister a prompt by name
-   */
   unregisterPrompt(name: string): void;
-
-  /**
-   * Get the list of all registered prompts
-   * Returns prompts from both buckets (provideContext and registerPrompt)
-   */
   listPrompts(): Prompt[];
-
-  // ==================== GENERAL ====================
-
-  /**
-   * Clear all registered context (tools, resources, prompts from both buckets)
-   * Available in Chromium's native implementation
-   */
-  clearContext(): void;
 
   // ==================== SAMPLING ====================
 
@@ -1093,6 +984,11 @@ export interface ModelContext {
   dispatchEvent(event: Event): boolean;
 }
 
+/**
+ * Public ModelContext surface: strict WebMCP core + MCPB extension methods.
+ */
+export type ModelContext = ModelContextCore & ModelContextExtensions;
+
 // ============================================================================
 // Internal/Bridge Types
 // ============================================================================
@@ -1154,59 +1050,58 @@ export interface MCPBridge {
   isInitialized: boolean;
 }
 
+/**
+ * Internal initialization metadata for run-once global setup.
+ * Used to ensure repeated script injection does not create duplicate bridge instances.
+ * @internal
+ */
+export interface MCPBridgeInitState {
+  initialized: true;
+  mode: 'native' | 'attach-existing' | 'polyfill-installed';
+  optionsFingerprint: string;
+  version: string;
+}
+
 // ============================================================================
 // Testing Types
 // ============================================================================
 
 /**
  * Tool info returned by listTools() in the testing API.
- * Note: inputSchema is a JSON string, not an object (matches Chromium implementation).
+ * Note: inputSchema is a JSON string when present (matches Chromium implementation).
  */
-export interface ToolInfo {
-  name: string;
-  description: string;
-  inputSchema: string;
-}
+export type ToolInfo = CoreModelContextTestingToolInfo;
+
+/**
+ * Options for modelContextTesting.executeTool().
+ * Mirrors Chromium's early-preview API shape.
+ */
+export type ModelContextTestingExecuteToolOptions = CoreModelContextTestingExecuteToolOptions;
 
 /**
  * Testing API for Model Context
  *
  * **Native Support**: This API is available natively in Chromium-based browsers
- * when the experimental "Model Context Testing" feature flag is enabled.
+ * when the "WebMCP for testing" feature flag is enabled in Chrome 146+.
  *
  * **How to enable in Chromium**:
- * - Navigate to `chrome://flags`
- * - Search for "experimental web platform features" or "model context"
+ * - Navigate to `chrome://flags/#enable-webmcp-testing`
+ * - Search for "WebMCP for testing"
  * - Enable the feature and restart the browser
- * - Or launch with: `--enable-experimental-web-platform-features`
  *
  * **Polyfill**: If the native API is not available, this polyfill provides
  * a compatible implementation for testing purposes.
  *
- * @deprecated Use navigator.modelContext.callTool() and
- * navigator.modelContext.addEventListener('toolschanged', ...) instead.
+ * @deprecated Prefer navigator.modelContext.callTool() and
+ * navigator.modelContext.addEventListener('toolschanged', ...) for in-page consumers.
+ * Chromium early preview still exposes this testing API for manual/debug workflows.
  */
-export interface ModelContextTesting {
-  /**
-   * Execute a tool directly with JSON string input (Chromium native API)
-   * @param toolName - Name of the tool to execute
-   * @param inputArgsJson - JSON string of input arguments
-   * @returns Promise resolving to the tool's result
-   */
-  executeTool(toolName: string, inputArgsJson: string): Promise<unknown>;
+export type ModelContextTesting = CoreModelContextTesting;
 
-  /**
-   * List all registered tools (Chromium native API)
-   * Returns tools with inputSchema as JSON string
-   */
-  listTools(): ToolInfo[];
-
-  /**
-   * Register a callback that fires when the tools list changes (Chromium native API)
-   * Callback will fire on: registerTool, unregisterTool, provideContext, clearContext
-   */
-  registerToolsChangedCallback(callback: () => void): void;
-
+/**
+ * Polyfill-only testing extensions layered on top of Chromium's core testing API.
+ */
+export interface ModelContextTestingPolyfillExtensions {
   /**
    * Get all tool calls that have been made (for testing/debugging)
    * Polyfill-specific extension
@@ -1257,34 +1152,20 @@ export interface ModelContextTesting {
 }
 
 declare global {
-  interface Navigator {
-    /**
-     * Web Model Context API
-     * Provides tools and context to AI agents
-     */
-    modelContext: ModelContext;
-
-    /**
-     * Model Context Testing API
-     *
-     * **IMPORTANT**: This API is only available in Chromium-based browsers
-     * with the experimental feature flag enabled:
-     * - `chrome://flags` → "Experimental Web Platform Features"
-     * - Or launch with: `--enable-experimental-web-platform-features`
-     *
-     * If not available natively, the @mcp-b/global polyfill provides
-     * a compatible implementation.
-     *
-     * @deprecated Use navigator.modelContext.callTool() and
-     * navigator.modelContext.addEventListener('toolschanged', ...) instead.
-     */
-    modelContextTesting?: ModelContextTesting;
-  }
-
   interface Window {
+    /**
+     * Initialization options consumed by module auto-initialization.
+     */
+    __webModelContextOptions?: WebModelContextInitOptions;
+
     /**
      * Internal MCP server instance (for debugging/advanced use)
      */
     __mcpBridge?: MCPBridge;
+
+    /**
+     * Internal runtime metadata for one-time initialization semantics.
+     */
+    __mcpBridgeInitState?: MCPBridgeInitState;
   }
 }

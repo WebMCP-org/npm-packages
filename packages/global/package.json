@@ -88,7 +88,9 @@
   "dependencies": {
     "@composio/json-schema-to-zod": "^0.1.19",
     "@mcp-b/transports": "workspace:*",
+    "@mcp-b/webmcp-polyfill": "workspace:*",
     "@mcp-b/webmcp-ts-sdk": "workspace:*",
+    "@mcp-b/webmcp-types": "workspace:*",
     "zod-to-json-schema": "^3.25.1"
   },
   "devDependencies": {
@@ -104,7 +106,7 @@
     "zod": "catalog:"
   },
   "peerDependencies": {
-    "zod": ">=3.25.76 <4 || >=4.1 <5"
+    "zod": ">=3.25.76 <4"
   },
   "engines": {
     "node": ">=18"

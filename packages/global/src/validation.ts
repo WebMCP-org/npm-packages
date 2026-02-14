@@ -14,6 +14,72 @@ const stripSchemaMeta = <T extends Record<string, unknown>>(schema: T): T => {
   return rest as T;
 };
 
+const JSON_SCHEMA_PRIMITIVE_TYPES = new Set([
+  'string',
+  'number',
+  'integer',
+  'boolean',
+  'object',
+  'array',
+  'null',
+]);
+
+function validateJsonSchemaStrict(schema: unknown, path = 'schema'): void {
+  if (!isRecord(schema)) {
+    throw new TypeError(`${path} must be an object`);
+  }
+
+  if ('type' in schema) {
+    const typeValue = schema.type;
+    if (typeof typeValue === 'string') {
+      if (!JSON_SCHEMA_PRIMITIVE_TYPES.has(typeValue)) {
+        throw new TypeError(
+          `${path}.type must be one of: ${Array.from(JSON_SCHEMA_PRIMITIVE_TYPES).join(', ')}`
+        );
+      }
+    } else if (Array.isArray(typeValue)) {
+      if (typeValue.length === 0) {
+        throw new TypeError(`${path}.type must not be an empty array`);
+      }
+      for (const [index, typeItem] of typeValue.entries()) {
+        if (typeof typeItem !== 'string' || !JSON_SCHEMA_PRIMITIVE_TYPES.has(typeItem)) {
+          throw new TypeError(`${path}.type[${index}] is not a valid JSON Schema type`);
+        }
+      }
+    } else {
+      throw new TypeError(`${path}.type must be a string or string[]`);
+    }
+  }
+
+  if ('properties' in schema && schema.properties !== undefined) {
+    if (!isRecord(schema.properties)) {
+      throw new TypeError(`${path}.properties must be an object`);
+    }
+    for (const [key, value] of Object.entries(schema.properties)) {
+      validateJsonSchemaStrict(value, `${path}.properties.${key}`);
+    }
+  }
+
+  if ('items' in schema && schema.items !== undefined) {
+    if (Array.isArray(schema.items)) {
+      for (const [index, itemSchema] of schema.items.entries()) {
+        validateJsonSchemaStrict(itemSchema, `${path}.items[${index}]`);
+      }
+    } else {
+      validateJsonSchemaStrict(schema.items, `${path}.items`);
+    }
+  }
+
+  if ('required' in schema && schema.required !== undefined) {
+    if (
+      !Array.isArray(schema.required) ||
+      schema.required.some((item) => typeof item !== 'string')
+    ) {
+      throw new TypeError(`${path}.required must be an array of strings`);
+    }
+  }
+}
+
 const isOptionalSchema = (schema: z.ZodTypeAny): boolean => {
   const typeName = (schema as { _def?: { typeName?: string } })._def?.typeName;
   return typeName === 'ZodOptional' || typeName === 'ZodDefault';
@@ -63,16 +129,54 @@ export function jsonSchemaToZod(jsonSchema: InputSchema): z.ZodType {
   }
 }
 
+export function jsonSchemaToZodStrict(jsonSchema: InputSchema): z.ZodType {
+  validateJsonSchemaStrict(jsonSchema);
+
+  try {
+    const zodSchema = composioJsonSchemaToZod(
+      jsonSchema as unknown as Parameters<typeof composioJsonSchemaToZod>[0]
+    );
+    return zodSchema as unknown as z.ZodType;
+  } catch (error) {
+    throw new TypeError(
+      `[Web Model Context] Invalid JSON schema: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+  }
+}
+
 export function normalizeSchema(schema: InputSchema | ZodSchemaObject): {
   jsonSchema: InputSchema;
   zodValidator: z.ZodType;
+};
+export function normalizeSchema(
+  schema: InputSchema | ZodSchemaObject,
+  options: { strict?: boolean }
+): {
+  jsonSchema: InputSchema;
+  zodValidator: z.ZodType;
+};
+export function normalizeSchema(
+  schema: InputSchema | ZodSchemaObject,
+  options?: { strict?: boolean }
+): {
+  jsonSchema: InputSchema;
+  zodValidator: z.ZodType;
 } {
+  const isStrict = options?.strict === true;
   if (isZodSchema(schema)) {
     const jsonSchema = zodToJsonSchema(schema);
-    return { jsonSchema, zodValidator: jsonSchemaToZod(jsonSchema) };
+    return {
+      jsonSchema,
+      zodValidator: isStrict ? jsonSchemaToZodStrict(jsonSchema) : jsonSchemaToZod(jsonSchema),
+    };
   }
 
-  return { jsonSchema: schema, zodValidator: jsonSchemaToZod(schema) };
+  return {
+    jsonSchema: schema,
+    zodValidator: isStrict ? jsonSchemaToZodStrict(schema) : jsonSchemaToZod(schema),
+  };
 }
 
 export function validateWithZod(
