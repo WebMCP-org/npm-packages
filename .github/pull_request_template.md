@@ -15,6 +15,9 @@
 ## Checklist
 
 - [ ] PR title follows conventional commit format: `type(scope): description`
+- [ ] I followed `docs/AI_CONTRIBUTION_MANIFESTO.md` for safety, contracts, and SSOT decisions
+- [ ] I followed `docs/MCPB_PACKAGE_PHILOSOPHY.md` for package boundaries and ownership
+- [ ] I followed `docs/TESTING_PHILOSOPHY.md` and selected the right test layer(s)
 - [ ] Code builds without errors (`pnpm build`)
 - [ ] Tests pass (`pnpm test:unit`)
 - [ ] Linting passes (`pnpm check`)
@@ -24,6 +27,7 @@
 ## Testing
 
 <!-- How did you test these changes? -->
+<!-- Include exact commands run and coverage layer: contract/slice/browser/E2E/artifact -->
 
 ## Screenshots
 

@@ -2,6 +2,16 @@
 
 Thank you for considering contributing to MCP-B!
 
+## Required Engineering Standards
+
+All contributions in this repo are expected to follow these baseline standards:
+
+- [AI Contribution Manifesto](./docs/AI_CONTRIBUTION_MANIFESTO.md)
+- [MCP-B Package Philosophy](./docs/MCPB_PACKAGE_PHILOSOPHY.md)
+- [Testing Philosophy](./docs/TESTING_PHILOSOPHY.md)
+
+These docs define review expectations for safety, contract synchronization, and validation evidence.
+
 ## Code Quality Requirements
 
 **All contributions must meet these standards before being merged:**
@@ -36,6 +46,8 @@ pnpm build && pnpm typecheck && pnpm check && pnpm test:unit
 ```
 
 If any of these fail, your PR will not be merged.
+
+Also include the exact commands you ran in the PR description.
 
 ---
 
@@ -92,52 +104,7 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 - pnpm >= 10.0.0
 - Git
 
-### Setting Up Your Development Environment
-
-1. **Fork and clone the repository**
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/npm-packages.git
-   cd npm-packages
-   ```
-
-2. **Install dependencies**
-   ```bash
-   pnpm install
-   ```
-
-3. **Create a feature branch**
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
-
-### Making Changes
-
-1. **Write type-safe code**
-   - Use TypeScript strict mode (already configured)
-   - Add explicit types for all public APIs
-   - Avoid `any` - use `unknown` and type guards instead
-   - Follow existing code patterns
-
-2. **Add tests**
-   - Write unit tests for new functionality
-   - Add regression tests for bug fixes
-   - Test edge cases and error conditions
-
-3. **Validate your changes**
-   ```bash
-   pnpm build        # Must succeed
-   pnpm typecheck    # No type errors
-   pnpm check        # No lint errors
-   pnpm test:unit    # All tests pass
-   ```
-
-4. **Create a changeset**
-   ```bash
-   pnpm changeset
-   ```
-   - Select the packages you've changed
-   - Choose the appropriate version bump (patch/minor/major)
-   - Write a clear description of your changes
+For environment setup and workspace commands, see [Development](./README.md#development) in the root README.
 
 ### Commit Guidelines
 
@@ -169,9 +136,10 @@ Package scopes (all in `packages/` directory):
 - `react-webmcp` - @mcp-b/react-webmcp
 - `smart-dom-reader` - @mcp-b/smart-dom-reader
 - `transports` - @mcp-b/transports
-- `types` - @mcp-b/types
-- `usewebmcp` - usewebmcp (alias package)
+- `usewebmcp` - usewebmcp (strict core WebMCP React hooks)
+- `webmcp-polyfill` - @mcp-b/webmcp-polyfill
 - `webmcp-ts-sdk` - @mcp-b/webmcp-ts-sdk
+- `webmcp-types` - @mcp-b/webmcp-types
 
 Repository-wide scopes:
 - `root` - Changes to root config files
@@ -214,7 +182,7 @@ git commit -m "refactor(*): update to new MCP SDK types"
    - Fill in the PR template with:
      - Clear description of changes
      - Related issue numbers
-     - Testing steps
+     - Testing layer coverage and exact commands run
      - Screenshots (if applicable)
 
 3. **Address review feedback**
@@ -229,13 +197,14 @@ npm-packages/
 ├── packages/                    # All NPM packages
 │   ├── chrome-devtools-mcp/     # Chrome DevTools MCP server
 │   ├── extension-tools/         # Chrome Extension API tools
-│   ├── global/                  # Navigator.modelContext polyfill
+│   ├── global/                  # Full MCP-B runtime (core + extensions)
 │   ├── mcp-iframe/              # Iframe MCP element
-│   ├── react-webmcp/            # React hooks for MCP
+│   ├── react-webmcp/            # React hooks for MCP-B runtime
 │   ├── smart-dom-reader/        # DOM extraction for AI
 │   ├── transports/              # Core transport implementations
-│   ├── types/                   # Type definitions for Web Model Context API
-│   ├── usewebmcp/               # Alias for react-webmcp
+│   ├── webmcp-polyfill/         # Strict core WebMCP runtime polyfill
+│   ├── webmcp-types/            # Strict core WebMCP type definitions
+│   ├── usewebmcp/               # React hooks for strict core WebMCP API
 │   └── webmcp-ts-sdk/           # TypeScript SDK adapter
 ├── e2e/                         # E2E tests and test apps
 ├── docs/                        # Technical documentation
@@ -294,43 +263,15 @@ When contributing to a specific package:
 - Support tool prefixing for namespacing
 - Test connection lifecycle
 
-### @webmcp/helpers
-- Keep utilities lightweight
-- Maintain tree-shakeability
-- Document all helper functions
-- Test DOM manipulation edge cases
-
 ## Testing
 
-### Required Tests
-
-All PRs must include appropriate tests:
-
 ```bash
-pnpm test:unit      # Run unit tests (required)
-pnpm test:e2e       # Run E2E tests (if applicable)
+pnpm test:unit      # Unit tests (required for all PRs)
+pnpm test:e2e       # E2E tests (if applicable)
 ```
 
-### Writing Tests
-
-- **Unit tests**: Use Vitest, co-located with source files (`*.test.ts`)
-- **Browser tests**: Use Vitest with `@vitest/browser` for browser-specific code
-- **E2E tests**: Use Playwright in the `e2e/` directory
-
-### Test Coverage
-
-- New features must have tests covering the main functionality
-- Bug fixes must include a test that would have caught the bug
-- Edge cases and error conditions should be tested
-
-### Manual Testing
-
-For browser-specific changes:
-1. Test in Chrome, Firefox, and Safari
-2. Test in both development and production builds
-3. Include testing steps in your PR description
-
-See [docs/TESTING.md](./docs/TESTING.md) for detailed testing documentation.
+- [Testing Philosophy](./docs/TESTING_PHILOSOPHY.md) - Test-layer strategy, mocking policy, coverage expectations
+- [E2E Testing Infrastructure](./docs/TESTING.md) - Playwright setup, test apps, debugging
 
 ## Documentation
 

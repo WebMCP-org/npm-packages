@@ -85,8 +85,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Run @mcp-b/types conformance checks
-        run: pnpm --filter @mcp-b/types test:conformance
+      - name: Run @mcp-b/webmcp-types conformance checks
+        run: pnpm --filter @mcp-b/webmcp-types test:conformance
 
   build:
     name: Build
