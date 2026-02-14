@@ -14,6 +14,15 @@ declare global {
 
 const TEST_CHANNEL_ID = `useWebMCPContext-test-${Date.now()}`;
 
+function parseSerializedToolResponse(result: string | null | undefined): {
+  content: Array<{ type: string; text?: string }>;
+} {
+  if (!result) {
+    throw new Error('Expected serialized tool response, received null/undefined');
+  }
+  return JSON.parse(result) as { content: Array<{ type: string; text?: string }> };
+}
+
 describe('useWebMCPContext', () => {
   beforeAll(() => {
     if (!navigator.modelContext) {
@@ -80,13 +89,13 @@ describe('useWebMCPContext', () => {
         useWebMCPContext('context_current_user', 'Get current user', () => contextValue)
       );
 
-      // Execute via testing API - returns formatted text directly, not wrapped in { content: [...] }
       const result = await navigator.modelContextTesting?.executeTool(
         'context_current_user',
         JSON.stringify({})
       );
 
-      expect(result).toBe(JSON.stringify(contextValue, null, 2));
+      const parsed = parseSerializedToolResponse(result);
+      expect(parsed.content[0]?.text).toBe(JSON.stringify(contextValue, null, 2));
     });
 
     it('should return string values as-is', async () => {
@@ -97,7 +106,8 @@ describe('useWebMCPContext', () => {
         JSON.stringify({})
       );
 
-      expect(result).toBe('active');
+      const parsed = parseSerializedToolResponse(result);
+      expect(parsed.content[0]?.text).toBe('active');
     });
 
     it('should format object values as JSON', async () => {
@@ -110,7 +120,8 @@ describe('useWebMCPContext', () => {
         JSON.stringify({})
       );
 
-      expect(result).toBe(JSON.stringify(contextValue, null, 2));
+      const parsed = parseSerializedToolResponse(result);
+      expect(parsed.content[0]?.text).toBe(JSON.stringify(contextValue, null, 2));
     });
 
     it('should always use latest getValue function', async () => {
@@ -126,7 +137,8 @@ describe('useWebMCPContext', () => {
         'context_dynamic',
         JSON.stringify({})
       );
-      expect(result).toBe('initial');
+      let parsed = parseSerializedToolResponse(result);
+      expect(parsed.content[0]?.text).toBe('initial');
 
       // Update value and rerender with new getValue
       value = 'updated';
@@ -137,7 +149,8 @@ describe('useWebMCPContext', () => {
         'context_dynamic',
         JSON.stringify({})
       );
-      expect(result).toBe('updated');
+      parsed = parseSerializedToolResponse(result);
+      expect(parsed.content[0]?.text).toBe('updated');
     });
   });
 

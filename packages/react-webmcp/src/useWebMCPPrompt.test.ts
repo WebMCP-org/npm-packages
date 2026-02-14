@@ -47,6 +47,30 @@ describe('useWebMCPPrompt', () => {
 
       expect(result.current.isRegistered).toBe(true);
     });
+
+    it('should keep isRegistered as false when registration handle is missing', async () => {
+      const registerPromptSpy = vi
+        .spyOn(navigator.modelContext as ModelContext, 'registerPrompt')
+        .mockImplementation(
+          () => undefined as unknown as ReturnType<ModelContext['registerPrompt']>
+        );
+
+      try {
+        const { result } = await renderHook(() =>
+          useWebMCPPrompt({
+            name: 'no_handle_prompt',
+            get: async () => ({
+              messages: [{ role: 'user', content: { type: 'text', text: 'Hello' } }],
+            }),
+          })
+        );
+
+        expect(registerPromptSpy).toHaveBeenCalledTimes(1);
+        expect(result.current.isRegistered).toBe(false);
+      } finally {
+        registerPromptSpy.mockRestore();
+      }
+    });
   });
 
   describe('prompt registration', () => {

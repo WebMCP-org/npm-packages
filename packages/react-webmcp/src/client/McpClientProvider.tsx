@@ -36,6 +36,7 @@ interface McpClientContextValue {
 }
 
 const McpClientContext = createContext<McpClientContextValue | null>(null);
+const EMPTY_REQUEST_OPTS: RequestOptions = {};
 
 /**
  * Props for the McpClientProvider component.
@@ -136,7 +137,7 @@ export function McpClientProvider({
   children,
   client,
   transport,
-  opts = {},
+  opts,
 }: McpClientProviderProps): ReactElement {
   const [resources, setResources] = useState<Resource[]>([]);
   const [tools, setTools] = useState<McpTool[]>([]);
@@ -144,6 +145,7 @@ export function McpClientProvider({
   const [error, setError] = useState<Error | null>(null);
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [capabilities, setCapabilities] = useState<ServerCapabilities | null>(null);
+  const requestOpts = opts ?? EMPTY_REQUEST_OPTS;
 
   const connectionStateRef = useRef<'disconnected' | 'connecting' | 'connected'>('disconnected');
 
@@ -209,7 +211,7 @@ export function McpClientProvider({
     setError(null);
 
     try {
-      await client.connect(transport, opts);
+      await client.connect(transport, requestOpts);
       const caps = client.getServerCapabilities();
       setIsConnected(true);
       setCapabilities(caps || null);
@@ -224,7 +226,7 @@ export function McpClientProvider({
     } finally {
       setIsLoading(false);
     }
-  }, [client, transport, opts, fetchResourcesInternal, fetchToolsInternal]);
+  }, [client, transport, requestOpts, fetchResourcesInternal, fetchToolsInternal]);
 
   useEffect(() => {
     if (!isConnected || !client) {

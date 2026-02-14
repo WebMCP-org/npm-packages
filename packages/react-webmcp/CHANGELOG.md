@@ -190,7 +190,7 @@
   ## Performance Optimizations
 
   The hook is now optimized to minimize unnecessary JSON-RPC tool update calls:
-  - **Stable schema comparison**: `inputSchema`, `outputSchema`, and `annotations` are compared by content (JSON serialization), not reference. Passing a new object with the same content won't trigger re-registration.
+  - **React-style schema dependencies**: `inputSchema`, `outputSchema`, and `annotations` follow reference semantics. Memoize these objects to avoid unnecessary re-registration.
   - **Memoized JSON conversion**: Zod-to-JSON schema conversions are memoized.
   - **Ref-based callbacks**: `handler`, `onSuccess`, `onError`, and `formatOutput` changes don't trigger re-registration.
 

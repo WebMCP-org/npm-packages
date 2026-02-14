@@ -1,4 +1,4 @@
-import type { SamplingRequestParams, SamplingResult } from '@mcp-b/global';
+import type { ModelContext, SamplingRequestParams, SamplingResult } from '@mcp-b/global';
 import { useCallback, useState } from 'react';
 
 /**
@@ -105,6 +105,7 @@ export function useSampling(config: UseSamplingConfig = {}): UseSamplingReturn {
       if (typeof window === 'undefined' || !window.navigator?.modelContext) {
         throw new Error('navigator.modelContext is not available');
       }
+      const modelContext = window.navigator.modelContext as ModelContext;
 
       setState((prev) => ({
         ...prev,
@@ -113,7 +114,7 @@ export function useSampling(config: UseSamplingConfig = {}): UseSamplingReturn {
       }));
 
       try {
-        const result = await window.navigator.modelContext.createMessage(params);
+        const result = await modelContext.createMessage(params);
 
         setState((prev) => ({
           isLoading: false,

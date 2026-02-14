@@ -47,6 +47,31 @@ describe('useWebMCPResource', () => {
 
       expect(result.current.isRegistered).toBe(true);
     });
+
+    it('should keep isRegistered as false when registration handle is missing', async () => {
+      const registerResourceSpy = vi
+        .spyOn(navigator.modelContext as ModelContext, 'registerResource')
+        .mockImplementation(
+          () => undefined as unknown as ReturnType<ModelContext['registerResource']>
+        );
+
+      try {
+        const { result } = await renderHook(() =>
+          useWebMCPResource({
+            uri: 'app://missing-handle',
+            name: 'Missing Handle',
+            read: async () => ({
+              contents: [{ uri: 'app://missing-handle', text: '{}' }],
+            }),
+          })
+        );
+
+        expect(registerResourceSpy).toHaveBeenCalledTimes(1);
+        expect(result.current.isRegistered).toBe(false);
+      } finally {
+        registerResourceSpy.mockRestore();
+      }
+    });
   });
 
   describe('resource registration', () => {

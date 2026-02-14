@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useMemo, useRef } from 'react';
 import type { WebMCPReturn } from './types.js';
 import { useWebMCP } from './useWebMCP.js';
 
@@ -74,6 +74,16 @@ export function useWebMCPContext<T>(
 ): WebMCPReturn {
   const getValueRef = useRef(getValue);
   getValueRef.current = getValue;
+  const annotations = useMemo(
+    () => ({
+      title: `Context: ${name}`,
+      readOnlyHint: true,
+      idempotentHint: true,
+      destructiveHint: false,
+      openWorldHint: false,
+    }),
+    [name]
+  );
 
   // Use default generics (no input/output schema) since context tools
   // don't define structured schemas. The handler returns T but it's
@@ -81,13 +91,7 @@ export function useWebMCPContext<T>(
   return useWebMCP({
     name,
     description,
-    annotations: {
-      title: `Context: ${name}`,
-      readOnlyHint: true,
-      idempotentHint: true,
-      destructiveHint: false,
-      openWorldHint: false,
-    },
+    annotations,
     // Cast to unknown since context tools return arbitrary types
     // that don't need to conform to a specific schema
     handler: async (_input: Record<string, unknown>) => {

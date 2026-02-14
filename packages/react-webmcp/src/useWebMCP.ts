@@ -1,6 +1,5 @@
-import type { InputSchema } from '@mcp-b/global';
+import type { CallToolResult, InputSchema, ModelContext } from '@mcp-b/global';
 import { zodToJsonSchema } from '@mcp-b/global';
-import type { CallToolResult } from '@mcp-b/webmcp-ts-sdk';
 import type { DependencyList } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { z } from 'zod';
@@ -19,6 +18,25 @@ function defaultFormatOutput(output: unknown): string {
     return output;
   }
   return JSON.stringify(output, null, 2);
+}
+
+const TOOL_OWNER_BY_NAME = new Map<string, symbol>();
+type StructuredContent = Exclude<CallToolResult['structuredContent'], undefined>;
+
+function toStructuredContent(value: unknown): StructuredContent | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+
+  try {
+    const normalized = JSON.parse(JSON.stringify(value)) as unknown;
+    if (!normalized || typeof normalized !== 'object' || Array.isArray(normalized)) {
+      return null;
+    }
+    return normalized as StructuredContent;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -355,24 +373,13 @@ export function useWebMCP<
     prevConfigRef.current = { inputSchema, outputSchema, annotations, description, deps };
   }, [annotations, deps, description, inputSchema, isDev, name, outputSchema]);
 
-  // Stable schema memoization: Convert to JSON strings first, then memoize based on string value.
-  // This prevents infinite re-registration when users pass inline schema objects, because
-  // strings are compared by value (not reference) in React's dependency comparison.
-  const inputSchemaStr = inputSchema ? JSON.stringify(zodToJsonSchema(inputSchema)) : null;
-  const outputSchemaStr = outputSchema ? JSON.stringify(zodToJsonSchema(outputSchema)) : null;
-  const annotationsStr = annotations ? JSON.stringify(annotations) : null;
-
   const inputJsonSchema = useMemo(
-    () => (inputSchemaStr ? JSON.parse(inputSchemaStr) : undefined),
-    [inputSchemaStr]
+    () => (inputSchema ? zodToJsonSchema(inputSchema) : undefined),
+    [inputSchema]
   );
   const outputJsonSchema = useMemo(
-    () => (outputSchemaStr ? JSON.parse(outputSchemaStr) : undefined),
-    [outputSchemaStr]
-  );
-  const stableAnnotations = useMemo(
-    () => (annotationsStr ? JSON.parse(annotationsStr) : undefined),
-    [annotationsStr]
+    () => (outputSchema ? zodToJsonSchema(outputSchema) : undefined),
+    [outputSchema]
   );
 
   const validator = useMemo(() => (inputSchema ? z.object(inputSchema) : null), [inputSchema]);
@@ -432,6 +439,11 @@ export function useWebMCP<
     },
     [validator]
   );
+  const executeRef = useRef(execute);
+
+  useEffect(() => {
+    executeRef.current = execute;
+  }, [execute]);
 
   /**
    * Resets the execution state to initial values.
@@ -452,6 +464,7 @@ export function useWebMCP<
       );
       return;
     }
+    const modelContext = window.navigator.modelContext as ModelContext;
 
     /**
      * Handles MCP tool execution by running the handler and formatting the response.
@@ -461,7 +474,7 @@ export function useWebMCP<
      */
     const mcpHandler = async (input: unknown): Promise<CallToolResult> => {
       try {
-        const result = await execute(input);
+        const result = await executeRef.current(input);
         const formattedOutput = formatOutputRef.current(result);
 
         const response: CallToolResult = {
@@ -474,7 +487,13 @@ export function useWebMCP<
         };
 
         if (outputJsonSchema) {
-          response.structuredContent = result as Record<string, unknown>;
+          const structuredContent = toStructuredContent(result);
+          if (!structuredContent) {
+            throw new Error(
+              `Tool "${name}" outputSchema requires the handler to return a JSON object result`
+            );
+          }
+          response.structuredContent = structuredContent;
         }
 
         return response;
@@ -498,31 +517,37 @@ export function useWebMCP<
       properties: {},
     };
 
-    const registration = window.navigator.modelContext?.registerTool({
+    const ownerToken = Symbol(name);
+    modelContext.registerTool({
       name,
       description,
       inputSchema: (inputJsonSchema || fallbackInputSchema) as InputSchema,
       ...(outputJsonSchema && { outputSchema: outputJsonSchema as InputSchema }),
-      ...(stableAnnotations && { annotations: stableAnnotations }),
+      ...(annotations && { annotations }),
       execute: mcpHandler,
     });
+    TOOL_OWNER_BY_NAME.set(name, ownerToken);
 
     return () => {
-      registration?.unregister();
+      const currentOwner = TOOL_OWNER_BY_NAME.get(name);
+      if (currentOwner !== ownerToken) {
+        return;
+      }
+
+      TOOL_OWNER_BY_NAME.delete(name);
+      try {
+        modelContext.unregisterTool(name);
+      } catch (error) {
+        if (isDev) {
+          console.warn(`[useWebMCP] Failed to unregister tool "${name}":`, error);
+        }
+      }
     };
     // Spread operator in dependencies: Allows users to provide additional dependencies
     // via the `deps` parameter. While unconventional, this pattern is intentional to support
     // dynamic dependency injection. The spread is safe because deps is validated and warned
     // about non-primitive values earlier in this hook.
-  }, [
-    name,
-    description,
-    inputJsonSchema,
-    outputJsonSchema,
-    stableAnnotations,
-    ...(deps ?? []),
-    execute,
-  ]);
+  }, [name, description, inputJsonSchema, outputJsonSchema, annotations, isDev, ...(deps ?? [])]);
 
   return {
     state,
