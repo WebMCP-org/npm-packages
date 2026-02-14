@@ -41,12 +41,12 @@ templates/          # Project templates
 - **Node**: >= 22.12 (see `.nvmrc`)
 - **Package manager**: pnpm (not npm/yarn)
 - **Linter**: Biome (not ESLint/Prettier)
-- **Zod version**: 4.x required (not 3.x)
+- **Zod version**: 3.25.76+ required (3.x only, not 4.x)
 - **Commit format**: `<type>(<scope>): <subject>` (enforced by hook)
 
 ### Commit Scopes
 
-Package scopes: `chrome-devtools-mcp`, `extension-tools`, `global`, `mcp-iframe`, `react-webmcp`, `smart-dom-reader`, `transports`, `types`, `usewebmcp`, `webmcp-helpers`, `webmcp-ts-sdk`
+Package scopes: `chrome-devtools-mcp`, `extension-tools`, `global`, `mcp-iframe`, `react-webmcp`, `smart-dom-reader`, `transports`, `usewebmcp`, `webmcp-polyfill`, `webmcp-ts-sdk`, `webmcp-types`
 
 Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 

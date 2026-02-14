@@ -294,13 +294,9 @@ pnpm build
 
 ## Zod Version Compatibility
 
-**Current packages (2.x)**: Require Zod 4
-- Uses `zod/v4` imports
-- Built-in JSON schema conversion
-
-**Legacy packages (1.x)**: For Zod 3 users
-- `@mcp-b/global@1.x`
-- `@mcp-b/react-webmcp@0.x`
+**Current packages (2.x)**: Require Zod 3.25.76+
+- Uses `zod` imports (Zod 3 bridge version)
+- Schema conversion via `zod-to-json-schema`
 
 ## NPM Token Setup
 

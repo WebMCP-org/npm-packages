@@ -50,3 +50,6 @@ e2e/test-results
 
 # Vitest screenshots
 **/__screenshots__
+docs/plans/WEBMCP_SPEC.md
+.codex
+.agents
