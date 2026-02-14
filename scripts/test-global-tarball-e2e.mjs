@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, '..');
 const filesToRestore = [
+  path.join(repoRoot, 'package.json'),
   path.join(repoRoot, 'e2e/test-app/package.json'),
   path.join(repoRoot, 'pnpm-lock.yaml'),
 ];
@@ -81,24 +82,64 @@ async function main() {
   try {
     tempDir = await mkdtemp(path.join(tmpdir(), 'mcpb-global-tarball-'));
 
+    // Collect workspace:* dependencies from @mcp-b/global.
+    const globalPkg = JSON.parse(
+      await readFile(path.join(repoRoot, 'packages/global/package.json'), 'utf8')
+    );
+    const workspaceDeps = Object.entries(globalPkg.dependencies || {})
+      .filter(([, version]) => version.startsWith('workspace:'))
+      .map(([name]) => name);
+
+    // Build and pack every workspace dependency plus @mcp-b/global itself.
+    const tarballMap = new Map(); // @mcp-b/<name> -> absolute tarball path
+
+    for (const depName of workspaceDeps) {
+      const shortName = depName.replace('@mcp-b/', '');
+      const depDir = `packages/${shortName}`;
+      runCommand('pnpm', ['-C', depDir, 'build']);
+      runCommand('pnpm', ['-C', depDir, 'pack', '--pack-destination', tempDir]);
+    }
+
     runCommand('pnpm', ['-C', 'packages/global', 'build']);
     runCommand('pnpm', ['-C', 'packages/global', 'pack', '--pack-destination', tempDir]);
 
-    const tarballs = (await readdir(tempDir)).filter((fileName) => fileName.endsWith('.tgz'));
-    if (tarballs.length !== 1) {
-      throw new Error(
-        `Expected exactly one tarball in ${tempDir}, found ${tarballs.length}: ${tarballs.join(', ')}`
-      );
+    // Map each tarball back to its package name.
+    const allTarballs = (await readdir(tempDir)).filter((f) => f.endsWith('.tgz'));
+    for (const fileName of allTarballs) {
+      // Tarball filenames: mcp-b-<name>-<version>.tgz
+      for (const depName of [...workspaceDeps, '@mcp-b/global']) {
+        const slug = depName.replace('@mcp-b/', '').replace('/', '-');
+        if (fileName.startsWith(`mcp-b-${slug}-`)) {
+          tarballMap.set(depName, path.join(tempDir, fileName));
+        }
+      }
     }
 
-    const tarballPath = path.join(tempDir, tarballs[0]);
+    // Add pnpm.overrides to root package.json so that transitive workspace
+    // dependencies resolve from local tarballs instead of the npm registry.
+    // This is necessary when workspace packages haven't been published yet.
+    const rootPkg = JSON.parse(await readFile(path.join(repoRoot, 'package.json'), 'utf8'));
+    const overrides = {};
+    for (const [name, tarballPath] of tarballMap) {
+      if (name !== '@mcp-b/global') {
+        overrides[name] = `file:${tarballPath}`;
+      }
+    }
+    rootPkg.pnpm = rootPkg.pnpm || {};
+    rootPkg.pnpm.overrides = { ...(rootPkg.pnpm.overrides || {}), ...overrides };
+    await writeFile(path.join(repoRoot, 'package.json'), JSON.stringify(rootPkg, null, 2) + '\n');
+
+    const globalTarball = tarballMap.get('@mcp-b/global');
+    if (!globalTarball) {
+      throw new Error(`Global tarball not found in ${tempDir}`);
+    }
 
     didAttemptDependencyMutation = true;
     runCommand('pnpm', [
       '-C',
       'e2e/test-app',
       'add',
-      tarballPath,
+      globalTarball,
       '--save-exact',
       '--ignore-scripts',
       '--store-dir',
