@@ -1,5 +1,8 @@
 # Navigation Handling Implementation Summary
 
+> **Status:** Reference (post-implementation record)
+> **Related:** [NAVIGATION_HANDLING.md](./NAVIGATION_HANDLING.md), [BEFOREUNLOAD_ANALYSIS.md](./BEFOREUNLOAD_ANALYSIS.md)
+
 ## Overview
 
 Implemented a three-layer approach to handle page navigation scenarios in WebMCP:
@@ -536,9 +539,9 @@ All three layers should:
 4. **global/src/global.ts** - Added navigation metadata logging
 
 ### Documentation
-5. **docs/NAVIGATION_HANDLING.md** - Comprehensive navigation handling guide
-6. **docs/BEFOREUNLOAD_ANALYSIS.md** - Deep analysis of beforeunload approach
-7. **docs/IMPLEMENTATION_SUMMARY.md** - This document
+5. **docs/plans/NAVIGATION_HANDLING.md** - Comprehensive navigation handling guide
+6. **docs/plans/BEFOREUNLOAD_ANALYSIS.md** - Deep analysis of beforeunload approach
+7. **docs/plans/IMPLEMENTATION_SUMMARY.md** - This document
 
 ### Demo
 8. **examples/navigation-demo.html** - Interactive demo with test cases

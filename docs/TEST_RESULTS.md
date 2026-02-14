@@ -126,7 +126,7 @@ The test suite includes:
 - ✓ Method availability (executeTool, listTools, registerToolsChangedCallback)
 - ✓ Execute with valid JSON
 - ✓ Execute returns correct value
-- ✓ Throw on invalid JSON (SyntaxError)
+- ✓ Throw on invalid JSON (UnknownError)
 - ✓ Throw on non-existent tool
 - ✓ List tools with string inputSchema
 - ✓ Return proper ToolInfo structure
@@ -134,7 +134,7 @@ The test suite includes:
 - ✓ Callbacks fire on unregisterTool
 - ✓ Callbacks fire on provideContext
 - ✓ Callbacks fire on clearContext
-- ✓ Multiple callbacks supported
+- ✓ Callback replacement semantics (latest callback wins)
 - ✓ Error handling in callbacks
 
 ### Integration Tests (3 tests)
@@ -149,7 +149,7 @@ When you run the tests locally, verify:
 1. **All 25 tests pass** in polyfill mode
 2. **API methods exist** and have correct signatures
 3. **Callbacks trigger** on all tool operations
-4. **Error handling works** (SyntaxError, Error)
+4. **Error handling works** (UnknownError, Error)
 5. **Integration works** between APIs
 
 If you have Chromium with the experimental flag enabled, also verify:

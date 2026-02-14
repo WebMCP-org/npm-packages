@@ -1,5 +1,9 @@
 # Pure JSON Schema Inference + Validation Plan (Polyfill)
 
+> **Status:** Planned (not yet implemented)
+> **Scope:** `@mcp-b/global` and `@mcp-b/webmcp-polyfill`
+> **Chrome API:** WebMCP available behind flag in Chrome 146+. Native Chrome API uses pure JSON Schema; this plan aligns the polyfill DX.
+
 ## Objective
 
 Enable a pure JSON Schema developer experience for WebMCP polyfill registration APIs (for example `navigator.modelContext.registerTool`) with both:
@@ -26,7 +30,7 @@ Result: JSON Schema users get runtime checks but usually lose strongly inferred 
 - Current validation path: `packages/global/src/validation.ts`
 - Native adapter behavior and parity context: `packages/global/src/native-adapter.ts`
 - Chromium/spec/source pointers: `packages/global/WEBMCP-CONFORMANCE-REFERENCES.md`
-- Existing perf expectations baseline: `docs/TESTING_GUIDE.md` and `docs/BEFOREUNLOAD_ANALYSIS.md`
+- Existing perf expectations baseline: `docs/TESTING_GUIDE.md` and `docs/plans/BEFOREUNLOAD_ANALYSIS.md`
 
 ### External References (via conformance index)
 
@@ -146,7 +150,7 @@ Plan:
 Baseline perf constraints should not regress compared to current transport/per-request expectations documented in:
 
 - `docs/TESTING_GUIDE.md`
-- `docs/BEFOREUNLOAD_ANALYSIS.md`
+- `docs/plans/BEFOREUNLOAD_ANALYSIS.md`
 
 Additional acceptance targets for schema validation path:
 
@@ -247,7 +251,7 @@ Deliverable:
 2. Measure per-call validation overhead.
 3. Ensure no meaningful regression in current expected behavior documented in:
    - `docs/TESTING_GUIDE.md`
-   - `docs/BEFOREUNLOAD_ANALYSIS.md`
+   - `docs/plans/BEFOREUNLOAD_ANALYSIS.md`
 
 ## Risks and Mitigations
 
