@@ -2,7 +2,10 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "rootDir": "../..",
-    "types": ["vitest/globals"]
+    "types": ["vitest/globals"],
+    "paths": {
+      "@mcp-b/webmcp-types": ["./src/index.ts"]
+    }
   },
   "include": [
     "src/**/*.conformance-d.ts",
