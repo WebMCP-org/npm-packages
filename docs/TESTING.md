@@ -1,65 +1,8 @@
-# Testing Infrastructure
+# E2E Testing Infrastructure
 
-This document describes the testing infrastructure for the MCP-B NPM packages monorepo.
+This document covers the Playwright E2E testing setup for the MCP-B NPM packages monorepo.
 
-## Overview
-
-We use **Playwright** for end-to-end testing of browser-based transports, which is the appropriate choice because:
-
-1. **Real Browser Environment**: MCP transports rely on browser APIs like `postMessage`, Chrome runtime messaging, and DOM events
-2. **Integration Testing**: Tests the complete communication flow between MCP servers and clients
-3. **User Perspective**: Validates behavior from the user's perspective, not just unit-level correctness
-4. **Visual Debugging**: Playwright UI mode makes it easy to see what's happening in tests
-
-## Test Architecture
-
-### E2E Tests with Playwright
-
-Located in `/e2e/`, the test infrastructure includes:
-
-- **Tab Transport Test App** (`e2e/test-app/`): A Vite + TypeScript application that demonstrates Tab Transport usage
-- **React WebMCP Test App** (`e2e/react-webmcp-test-app/`): React application testing `useWebMCP` hooks and tool registration
-- **Test Suites** (`e2e/tests/`): Playwright tests that validate transport behavior and React integration
-- **Configuration**: Multiple Playwright configs for different test scenarios
-
-### Test App Features
-
-#### Tab Transport Test App (`e2e/test-app/`)
-
-1. **MCP Server**: Implements a counter service with 4 tools:
-   - `incrementCounter` - Increment counter by 1
-   - `decrementCounter` - Decrement counter by 1
-   - `resetCounter` - Reset counter to 0
-   - `getCounter` - Get current counter value
-
-2. **MCP Client**: Connects to the server in the same browser context using TabClientTransport
-
-3. **Interactive UI**: Manual testing interface with:
-   - Server start/stop controls
-   - Client connect/disconnect controls
-   - Tool execution buttons
-   - Event log
-   - Counter display
-
-4. **Programmatic API**: Exposed `testApp` object for Playwright to control
-
-#### React WebMCP Test App (`e2e/react-webmcp-test-app/`)
-
-1. **Provider Component**: Demonstrates `useWebMCP` hook for tool registration
-   - Registers tools via `navigator.modelContext`
-   - State-aware tool execution
-   - Component-scoped tool lifecycle
-
-2. **Client Component**: Demonstrates MCP client consuming tools
-   - Lists available tools
-   - Calls tools via MCP protocol
-   - Connection management
-
-3. **Test Scenarios**: Validates React integration
-   - Tool registration on component mount
-   - Tool unregistration on component unmount
-   - StrictMode compatibility
-   - State management during tool execution
+For test-layer definitions, mocking policy, and coverage expectations, see [TESTING_PHILOSOPHY.md](./TESTING_PHILOSOPHY.md).
 
 ## Running Tests
 
@@ -327,53 +270,6 @@ use: {
 - **Test parallelization**: Enabled by default (can be configured in `playwright.config.ts`)
 - **CI optimization**: Uses single worker on CI for stability
 
-## Future Enhancements
-
-### Unit Tests
-
-Consider adding Vitest for unit testing individual transport methods:
-
-```bash
-pnpm add -D vitest @vitest/coverage-v8 -w
-```
-
-Benefits:
-- Faster feedback loop
-- Test edge cases without browser
-- Measure code coverage
-
-### Additional E2E Tests
-
-Planned test scenarios:
-
-- [ ] WebSocket transport testing
-- [ ] Extension transport testing (requires Chrome extension setup)
-- [ ] Multi-tab communication scenarios
-- [ ] Error handling and recovery
-- [ ] Performance benchmarks
-
-### Visual Regression Testing
-
-Add visual regression tests using Playwright's screenshot comparison:
-
-```typescript
-await expect(page).toHaveScreenshot('counter-view.png');
-```
-
-### Code Coverage
-
-Integrate coverage reporting with Playwright:
-
-```typescript
-// In playwright.config.ts
-use: {
-  coverage: {
-    enabled: true,
-    provider: 'v8',
-  },
-}
-```
-
 ## Troubleshooting
 
 ### Playwright Installation Issues
@@ -392,11 +288,14 @@ pnpm --filter mcp-e2e-tests exec playwright install chromium
 
 
 
-If port 5173 is in use:
+Playwright tab-transport runs default to `PLAYWRIGHT_TAB_TRANSPORT_PORT=4173`
+and only reuse existing servers when `PLAYWRIGHT_REUSE_SERVER=1`.
+
+If the configured port is in use:
 
 ```bash
 # Find and kill process
-lsof -ti:5173 | xargs kill
+lsof -ti:4173 | xargs kill
 
 # Or change port in playwright.config.ts and vite.config.ts
 ```
@@ -430,15 +329,3 @@ Common CI issues:
 - [Playwright Documentation](https://playwright.dev/docs/intro)
 - [Playwright Best Practices](https://playwright.dev/docs/best-practices)
 - [MCP Specification](https://modelcontextprotocol.io/)
-- [E2E Test Suite README](./e2e/README.md)
-
-## Contributing
-
-When adding new transports or features:
-
-1. Add corresponding E2E tests
-2. Update test app if needed for new features
-3. Ensure tests pass locally before pushing
-4. Check CI results on PR
-
-For questions or issues with testing, see [CONTRIBUTING.md](./CONTRIBUTING.md).

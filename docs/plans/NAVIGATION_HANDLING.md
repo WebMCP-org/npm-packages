@@ -1,5 +1,9 @@
 # WebMCP Navigation Handling Guide
 
+> **Status:** Implemented
+> **Implemented in:** `packages/global/src/types.ts` (NavigationMetadata), `packages/transports/src/TabServerTransport.ts` (beforeunload detection)
+> **Summary:** See [IMPLEMENTATION_SUMMARY.md](./IMPLEMENTATION_SUMMARY.md) for what was built.
+
 ## Problem Statement
 
 When a WebMCP tool causes a page navigation, the current implementation has no mechanism to handle the tool call lifecycle correctly. This leads to:

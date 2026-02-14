@@ -1,5 +1,9 @@
 # WebMCP Development Skill
 
+> **Status:** Implemented
+> **Implemented in:** `skills/webmcp/` (SKILL.md + reference docs)
+> **Chrome API:** WebMCP available behind flag in Chrome 146+. Skill works with both native and polyfill runtimes.
+
 ## Executive Summary
 
 This document outlines the implementation of a **unified Claude Code skill** for WebMCP tool development. The skill teaches agents to create, test, and iterate on MCP tools for any website or web app - using chrome-devtools-mcp for the entire development loop.

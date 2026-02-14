@@ -1,5 +1,8 @@
 # BeforeUnload Navigation Handling - Deep Analysis
 
+> **Status:** Reference (analysis complete, implementation shipped)
+> **Related:** [NAVIGATION_HANDLING.md](./NAVIGATION_HANDLING.md), [IMPLEMENTATION_SUMMARY.md](./IMPLEMENTATION_SUMMARY.md)
+
 ## Executive Summary
 
 This document analyzes the feasibility and implementation strategies for using the `beforeunload` event to handle navigation scenarios in WebMCP. We explore:
@@ -1022,8 +1025,8 @@ Each layer handles different failure modes:
   - Add logging for willNavigate tools
 
 ### Documentation to Update
-- `docs/NAVIGATION_HANDLING.md` - Already created
-- `docs/BEFOREUNLOAD_ANALYSIS.md` - This document
+- `docs/plans/NAVIGATION_HANDLING.md` - Already created
+- `docs/plans/BEFOREUNLOAD_ANALYSIS.md` - This document
 - `transports/README.md` - Document timeout option
 - `global/README.md` - Document navigation metadata
 - Migration guide for existing tool authors

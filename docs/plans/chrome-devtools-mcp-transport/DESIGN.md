@@ -1,5 +1,9 @@
 # Chrome DevTools MCP Transport - Design Document
 
+> **Status:** Implemented
+> **Implemented in:** `packages/chrome-devtools-mcp/src/transports/` (`WebMCPClientTransport`, `WebMCPBridgeScript`)
+> **Chrome API:** WebMCP available behind flag in Chrome 146+. Transport works with both native and polyfill runtimes.
+
 > Enabling local MCP clients to connect to WebMCP tools running in browser tabs via Chrome DevTools Protocol.
 
 ## Table of Contents

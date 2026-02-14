@@ -1,5 +1,9 @@
 # CDP → Extension MCP Bridge Implementation Plan
 
+> **Status:** Planned (not yet implemented)
+> **Depends on:** MCP-B Chrome Extension with McpHub service worker
+> **Note:** Current chrome-devtools-mcp uses direct CDP-to-page bridging. This plan proposes an alternative path through the extension service worker.
+
 ## Overview
 
 Connect chrome-devtools-mcp directly to the MCP-B Extension's McpHub via CDP, enabling:

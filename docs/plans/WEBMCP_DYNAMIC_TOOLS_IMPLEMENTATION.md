@@ -1,5 +1,9 @@
 # WebMCP Dynamic Tool Registration - Implementation Plan
 
+> **Status:** Implemented
+> **Implemented in:** `packages/chrome-devtools-mcp` (`WebMCPToolHub`, `McpContext`, `webmcp.ts`)
+> **Chrome API:** WebMCP available behind flag in Chrome 146+. Dynamic tools work with both native and polyfill runtimes.
+
 ## Executive Summary
 
 This document outlines the implementation of dynamic WebMCP tool registration in `chrome-devtools-mcp`. WebMCP tools will be exposed as first-class MCP tools, allowing Claude Code to call them directly without the two-step `list_webmcp_tools` → `call_webmcp_tool` process.
