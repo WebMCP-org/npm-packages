@@ -113,7 +113,8 @@ interface ModelContext {
     description: string;
     inputSchema: Tool['inputSchema'];
     execute: (args: Record<string, unknown>) => Promise<CallToolResult>;
-  }): RegistrationHandle;
+  }): void;
+  unregisterTool(name: string): void;
 
   registerResource(resource: {
     uri: string;
@@ -183,7 +184,7 @@ export class MCPIframeElement extends HTMLElement {
   #mcpPrompts: Prompt[] = [];
 
   // Registered items on parent
-  #registeredTools = new Map<string, RegistrationHandle>();
+  #registeredTools = new Set<string>();
   #registeredResources = new Map<string, RegistrationHandle>();
   #registeredPrompts = new Map<string, RegistrationHandle>();
 
@@ -284,7 +285,7 @@ export class MCPIframeElement extends HTMLElement {
 
   /** List of exposed tool names (with prefix) */
   get exposedTools(): string[] {
-    return Array.from(this.#registeredTools.keys());
+    return Array.from(this.#registeredTools.values());
   }
 
   /** List of exposed resource URIs (with prefix) */
@@ -503,14 +504,14 @@ export class MCPIframeElement extends HTMLElement {
         continue;
       }
 
-      const registration = modelContext.registerTool({
+      modelContext.registerTool({
         name: prefixedName,
         description: tool.description ?? `Tool from iframe: ${tool.name}`,
         inputSchema: tool.inputSchema,
         execute: (args) => this.#callIframeTool(tool.name, args),
       });
 
-      this.#registeredTools.set(prefixedName, registration);
+      this.#registeredTools.add(prefixedName);
     }
   }
 
@@ -583,8 +584,15 @@ export class MCPIframeElement extends HTMLElement {
   }
 
   #unregisterAll(): void {
-    for (const registration of this.#registeredTools.values()) {
-      registration.unregister();
+    const modelContext = (navigator as NavigatorWithModelContext).modelContext;
+    if (modelContext) {
+      for (const toolName of this.#registeredTools.values()) {
+        try {
+          modelContext.unregisterTool(toolName);
+        } catch {
+          // Ignore unregister errors during cleanup/reconnect.
+        }
+      }
     }
     this.#registeredTools.clear();
 
