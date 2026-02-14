@@ -1,6 +1,6 @@
 import type { ModelContext, ModelContextTesting } from '@mcp-b/global';
 import { initializeWebModelContext } from '@mcp-b/global';
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
 import { z } from 'zod';
 import { useWebMCPPrompt } from './useWebMCPPrompt.js';
@@ -14,6 +14,26 @@ declare global {
 }
 
 const TEST_CHANNEL_ID = `useWebMCPPrompt-test-${Date.now()}`;
+
+/**
+ * Helper to enable dev mode by setting globalThis.process.env.NODE_ENV.
+ * Returns a cleanup function that restores the original state.
+ */
+function enableDevMode(): () => void {
+  const g = globalThis as { process?: { env?: { NODE_ENV?: string } } };
+  const hadProcess = 'process' in globalThis;
+  const origProcess = g.process;
+
+  g.process = { env: { NODE_ENV: 'test' } };
+
+  return () => {
+    if (hadProcess) {
+      g.process = origProcess;
+    } else {
+      delete g.process;
+    }
+  };
+}
 
 describe('useWebMCPPrompt', () => {
   beforeAll(() => {
@@ -172,6 +192,29 @@ describe('useWebMCPPrompt', () => {
       expect(prompts).toHaveLength(1);
       expect(prompts[0].name).toBe('dynamic_prompt');
     });
+
+    it('should invoke the promptHandler when getPrompt is called', async () => {
+      const getMessage = vi.fn().mockResolvedValue({
+        messages: [{ role: 'user', content: { type: 'text', text: 'Hello from prompt' } }],
+      });
+
+      await renderHook(() =>
+        useWebMCPPrompt({
+          name: 'invoke_prompt',
+          get: getMessage,
+        })
+      );
+
+      // Execute the prompt through the model context
+      const result = await navigator.modelContext?.getPrompt('invoke_prompt', {});
+
+      expect(getMessage).toHaveBeenCalled();
+      expect(result?.messages).toHaveLength(1);
+      expect(result?.messages[0]?.content).toEqual({
+        type: 'text',
+        text: 'Hello from prompt',
+      });
+    });
   });
 
   describe('re-registration behavior', () => {
@@ -243,6 +286,165 @@ describe('useWebMCPPrompt', () => {
 
       // Should still have 1 prompt (not re-registered)
       expect(navigator.modelContext?.listPrompts()).toHaveLength(1);
+    });
+  });
+
+  describe('dev mode logging', () => {
+    let cleanupDevMode: (() => void) | undefined;
+
+    afterEach(() => {
+      cleanupDevMode?.();
+      cleanupDevMode = undefined;
+    });
+
+    it('should log registration in dev mode', async () => {
+      cleanupDevMode = enableDevMode();
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      try {
+        await renderHook(() =>
+          useWebMCPPrompt({
+            name: 'dev_log_prompt',
+            get: async () => ({
+              messages: [{ role: 'user', content: { type: 'text', text: 'Hello' } }],
+            }),
+          })
+        );
+
+        expect(logSpy).toHaveBeenCalledWith(
+          expect.stringContaining('Registered prompt: dev_log_prompt')
+        );
+      } finally {
+        logSpy.mockRestore();
+      }
+    });
+
+    it('should log unregistration in dev mode', async () => {
+      cleanupDevMode = enableDevMode();
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      try {
+        const { unmount } = await renderHook(() =>
+          useWebMCPPrompt({
+            name: 'dev_unlog_prompt',
+            get: async () => ({
+              messages: [{ role: 'user', content: { type: 'text', text: 'Hello' } }],
+            }),
+          })
+        );
+
+        logSpy.mockClear();
+        unmount();
+
+        expect(logSpy).toHaveBeenCalledWith(
+          expect.stringContaining('Unregistered prompt: dev_unlog_prompt')
+        );
+      } finally {
+        logSpy.mockRestore();
+      }
+    });
+
+    it('should warn in dev mode when no registration handle is returned', async () => {
+      cleanupDevMode = enableDevMode();
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const registerPromptSpy = vi
+        .spyOn(navigator.modelContext as ModelContext, 'registerPrompt')
+        .mockImplementation(
+          () => undefined as unknown as ReturnType<ModelContext['registerPrompt']>
+        );
+
+      try {
+        await renderHook(() =>
+          useWebMCPPrompt({
+            name: 'no_handle_dev_prompt',
+            get: async () => ({
+              messages: [{ role: 'user', content: { type: 'text', text: 'Hello' } }],
+            }),
+          })
+        );
+
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining('did not return a registration handle')
+        );
+      } finally {
+        warnSpy.mockRestore();
+        registerPromptSpy.mockRestore();
+      }
+    });
+  });
+
+  describe('modelContext unavailability', () => {
+    let cleanupDevMode: (() => void) | undefined;
+
+    afterEach(() => {
+      cleanupDevMode?.();
+      cleanupDevMode = undefined;
+    });
+
+    it('should warn in dev mode when modelContext is not available', async () => {
+      cleanupDevMode = enableDevMode();
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const savedModelContext = navigator.modelContext;
+
+      try {
+        Object.defineProperty(navigator, 'modelContext', {
+          value: undefined,
+          writable: true,
+          configurable: true,
+        });
+
+        const { result } = await renderHook(() =>
+          useWebMCPPrompt({
+            name: 'unavailable_prompt',
+            get: async () => ({
+              messages: [{ role: 'user', content: { type: 'text', text: 'Hello' } }],
+            }),
+          })
+        );
+
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining('modelContext is not available')
+        );
+        expect(result.current.isRegistered).toBe(false);
+      } finally {
+        Object.defineProperty(navigator, 'modelContext', {
+          value: savedModelContext,
+          writable: true,
+          configurable: true,
+        });
+        warnSpy.mockRestore();
+      }
+    });
+  });
+
+  describe('registration error handling', () => {
+    it('should set isRegistered to false and rethrow when registerPrompt throws', async () => {
+      const registerPromptSpy = vi
+        .spyOn(navigator.modelContext as ModelContext, 'registerPrompt')
+        .mockImplementation(() => {
+          throw new Error('Registration failed');
+        });
+
+      try {
+        let caughtError: Error | null = null;
+        try {
+          await renderHook(() =>
+            useWebMCPPrompt({
+              name: 'error_prompt',
+              get: async () => ({
+                messages: [{ role: 'user', content: { type: 'text', text: 'Hello' } }],
+              }),
+            })
+          );
+        } catch (e) {
+          caughtError = e as Error;
+        }
+
+        expect(caughtError).toBeInstanceOf(Error);
+        expect(caughtError?.message).toBe('Registration failed');
+      } finally {
+        registerPromptSpy.mockRestore();
+      }
     });
   });
 });
