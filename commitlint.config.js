@@ -13,9 +13,10 @@ export default {
         'react-webmcp',
         'smart-dom-reader',
         'transports',
-        'types',
         'usewebmcp',
+        'webmcp-polyfill',
         'webmcp-ts-sdk',
+        'webmcp-types',
 
         // Repository-wide scopes
         'root',
