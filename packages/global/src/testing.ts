@@ -1,4 +1,10 @@
-import type { ModelContextTesting, ToolInfo, ToolListItem, ToolResponse } from './types.js';
+import type {
+  ModelContextTesting,
+  ModelContextTestingPolyfillExtensions,
+  ToolInfo,
+  ToolListItem,
+  ToolResponse,
+} from './types.js';
 
 /**
  * Test helper API exposed via @mcp-b/global/testing.
@@ -9,7 +15,7 @@ export interface ModelContextTestHelper {
    * Execute a tool with object arguments.
    * Internally delegates to modelContextTesting.executeTool(name, JSON.stringify(args)).
    */
-  executeTool(toolName: string, args?: Record<string, unknown>): Promise<unknown>;
+  executeTool(toolName: string, args?: Record<string, unknown>): Promise<string | null>;
 
   /**
    * List tools exposed by modelContextTesting.
@@ -20,6 +26,11 @@ export interface ModelContextTestHelper {
    * Register for tool list updates.
    */
   onToolsChanged(callback: () => void): void;
+
+  /**
+   * Get the latest cross-document declarative tool result payload.
+   */
+  getCrossDocumentScriptToolResult(): Promise<string>;
 
   /**
    * Get recorded tool calls.
@@ -68,16 +79,23 @@ export interface ModelContextTestHelper {
   reset(): void;
 }
 
-type PolyfillTestingExtensions = Pick<
-  ModelContextTesting,
-  | 'getToolCalls'
-  | 'clearToolCalls'
-  | 'setMockToolResponse'
-  | 'clearMockToolResponse'
-  | 'clearAllMockToolResponses'
-  | 'getRegisteredTools'
-  | 'reset'
->;
+type PolyfillTestingExtensions = ModelContextTestingPolyfillExtensions;
+
+function stringifyInputArgs(args: Record<string, unknown>): string {
+  try {
+    const serialized = JSON.stringify(args);
+    if (serialized === undefined) {
+      throw new TypeError('Serialized arguments were undefined');
+    }
+    return serialized;
+  } catch (error) {
+    throw new TypeError(
+      `[Model Context Testing] Failed to serialize tool arguments: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+  }
+}
 
 function resolveTestingAPI(override?: ModelContextTesting): ModelContextTesting {
   if (override) {
@@ -136,9 +154,10 @@ export function createTestHelper(testingOverride?: ModelContextTesting): ModelCo
 
   return {
     executeTool: (toolName: string, args: Record<string, unknown> = {}) =>
-      testing.executeTool(toolName, JSON.stringify(args)),
+      testing.executeTool(toolName, stringifyInputArgs(args)),
     listTools: () => testing.listTools(),
     onToolsChanged: (callback: () => void) => testing.registerToolsChangedCallback(callback),
+    getCrossDocumentScriptToolResult: () => testing.getCrossDocumentScriptToolResult(),
     getToolCalls: () => polyfillExtensions().getToolCalls(),
     clearToolCalls: () => polyfillExtensions().clearToolCalls(),
     setMockToolResponse: (toolName: string, response: ToolResponse) =>
