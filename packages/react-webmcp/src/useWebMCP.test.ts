@@ -1,6 +1,6 @@
 import type { ModelContext, ModelContextTesting } from '@mcp-b/global';
 import { initializeWebModelContext } from '@mcp-b/global';
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
 import { z } from 'zod';
 import { useWebMCP } from './useWebMCP.js';
@@ -25,6 +25,26 @@ function parseSerializedToolResponse(result: string | null | undefined): {
   return JSON.parse(result) as {
     content: Array<{ type: string; text?: string }>;
     structuredContent?: Record<string, unknown>;
+  };
+}
+
+/**
+ * Helper to enable dev mode by setting globalThis.process.env.NODE_ENV.
+ * Returns a cleanup function that restores the original state.
+ */
+function enableDevMode(): () => void {
+  const g = globalThis as { process?: { env?: { NODE_ENV?: string } } };
+  const hadProcess = 'process' in globalThis;
+  const origProcess = g.process;
+
+  g.process = { env: { NODE_ENV: 'test' } };
+
+  return () => {
+    if (hadProcess) {
+      g.process = origProcess;
+    } else {
+      delete g.process;
+    }
   };
 }
 
@@ -209,6 +229,29 @@ describe('useWebMCP', () => {
       expect(result.current.state.error?.message).toBe('Handler failed');
       expect(result.current.state.isExecuting).toBe(false);
     });
+
+    it('should handle non-Error throws and convert to string', async () => {
+      const { result, act } = await renderHook(() =>
+        useWebMCP({
+          name: 'non_error_throw_tool',
+          description: 'Throws non-Error',
+          handler: async () => {
+            throw 'string error';
+          },
+        })
+      );
+
+      await act(async () => {
+        try {
+          await result.current.execute({});
+        } catch {
+          // Expected
+        }
+      });
+
+      expect(result.current.state.error).toBeInstanceOf(Error);
+      expect(result.current.state.error?.message).toBe('string error');
+    });
   });
 
   describe('MCP tool execution via testing API', () => {
@@ -257,6 +300,130 @@ describe('useWebMCP', () => {
 
       const parsed = parseSerializedToolResponse(result);
       expect(parsed.structuredContent).toEqual({ result: 8 });
+    });
+
+    it('should throw when handler throws via MCP execution', async () => {
+      await renderHook(() =>
+        useWebMCP({
+          name: 'error_tool',
+          description: 'Throws error',
+          handler: async () => {
+            throw new Error('MCP handler error');
+          },
+        })
+      );
+
+      // The testing API throws DOMException for error responses
+      await expect(
+        navigator.modelContextTesting?.executeTool('error_tool', JSON.stringify({}))
+      ).rejects.toThrow();
+    });
+
+    it('should throw when outputSchema is defined but handler returns non-object', async () => {
+      await renderHook(() =>
+        useWebMCP({
+          name: 'bad_output_tool',
+          description: 'Bad output',
+          outputSchema: {
+            value: z.string(),
+          },
+          handler: async () => 'not an object' as never,
+        })
+      );
+
+      // toStructuredContent returns null for strings, causing an error
+      await expect(
+        navigator.modelContextTesting?.executeTool('bad_output_tool', JSON.stringify({}))
+      ).rejects.toThrow();
+    });
+
+    it('should throw when outputSchema is defined but handler returns an array', async () => {
+      await renderHook(() =>
+        useWebMCP({
+          name: 'array_output_tool',
+          description: 'Array output',
+          outputSchema: {
+            value: z.string(),
+          },
+          handler: async () => ['not', 'an', 'object'] as never,
+        })
+      );
+
+      await expect(
+        navigator.modelContextTesting?.executeTool('array_output_tool', JSON.stringify({}))
+      ).rejects.toThrow();
+    });
+
+    it('should throw when outputSchema is defined but handler returns null', async () => {
+      await renderHook(() =>
+        useWebMCP({
+          name: 'null_output_tool',
+          description: 'Null output',
+          outputSchema: {
+            value: z.string(),
+          },
+          handler: async () => null as never,
+        })
+      );
+
+      await expect(
+        navigator.modelContextTesting?.executeTool('null_output_tool', JSON.stringify({}))
+      ).rejects.toThrow();
+    });
+
+    it('should throw when MCP execution receives non-Error throw', async () => {
+      await renderHook(() =>
+        useWebMCP({
+          name: 'non_error_mcp_tool',
+          description: 'Non-Error throw via MCP',
+          handler: async () => {
+            throw 42;
+          },
+        })
+      );
+
+      await expect(
+        navigator.modelContextTesting?.executeTool('non_error_mcp_tool', JSON.stringify({}))
+      ).rejects.toThrow();
+    });
+  });
+
+  describe('formatOutput', () => {
+    it('should use default formatOutput for non-string values', async () => {
+      await renderHook(() =>
+        useWebMCP({
+          name: 'obj_tool',
+          description: 'Returns object',
+          handler: async () => ({ key: 'value' }),
+        })
+      );
+
+      const result = await navigator.modelContextTesting?.executeTool(
+        'obj_tool',
+        JSON.stringify({})
+      );
+
+      const parsed = parseSerializedToolResponse(result);
+      expect(parsed.content[0]?.text).toBe(JSON.stringify({ key: 'value' }, null, 2));
+    });
+
+    it('should use custom formatOutput when provided', async () => {
+      await renderHook(() =>
+        useWebMCP({
+          name: 'custom_format_tool',
+          description: 'Custom format',
+          handler: async () => 42,
+          formatOutput: (output) => `Result: ${output}`,
+        })
+      );
+
+      const result = await navigator.modelContextTesting?.executeTool(
+        'custom_format_tool',
+        JSON.stringify({})
+      );
+
+      const parsed = parseSerializedToolResponse(result);
+      expect(parsed.content[0]?.text).toBe('Result: 42');
     });
   });
 
@@ -399,6 +566,343 @@ describe('useWebMCP', () => {
       await rerender({ description: 'Version 2' });
 
       expect(navigator.modelContextTesting?.listTools()[0].description).toBe('Version 2');
+    });
+  });
+
+  describe('annotations', () => {
+    it('should register tool with annotations', async () => {
+      await renderHook(() =>
+        useWebMCP({
+          name: 'annotated_tool',
+          description: 'Tool with annotations',
+          annotations: {
+            destructiveHint: true,
+            idempotentHint: false,
+          },
+          handler: async () => 'result',
+        })
+      );
+
+      const tools = navigator.modelContextTesting?.listTools();
+      expect(tools).toHaveLength(1);
+      expect(tools[0].name).toBe('annotated_tool');
+    });
+  });
+
+  describe('output schema registration', () => {
+    it('should register tool with output schema JSON', async () => {
+      await renderHook(() =>
+        useWebMCP({
+          name: 'schema_tool',
+          description: 'Has output schema',
+          outputSchema: {
+            count: z.number(),
+            label: z.string(),
+          },
+          handler: async () => ({ count: 1, label: 'test' }),
+        })
+      );
+
+      const tools = navigator.modelContextTesting?.listTools();
+      expect(tools).toHaveLength(1);
+      expect(tools[0].name).toBe('schema_tool');
+    });
+  });
+
+  describe('deps behavior', () => {
+    it('should re-register when deps change', async () => {
+      const registerToolSpy = vi.spyOn(navigator.modelContext as ModelContext, 'registerTool');
+
+      try {
+        const { rerender } = await renderHook(
+          ({ count }) =>
+            useWebMCP(
+              {
+                name: 'deps_tool',
+                description: `Count: ${count}`,
+                handler: async () => count,
+              },
+              [count]
+            ),
+          { initialProps: { count: 1 } }
+        );
+
+        expect(registerToolSpy).toHaveBeenCalledTimes(1);
+
+        await rerender({ count: 2 });
+
+        expect(registerToolSpy).toHaveBeenCalledTimes(2);
+      } finally {
+        registerToolSpy.mockRestore();
+      }
+    });
+  });
+
+  describe('dev mode warnings', () => {
+    let cleanupDevMode: (() => void) | undefined;
+
+    afterEach(() => {
+      cleanupDevMode?.();
+      cleanupDevMode = undefined;
+    });
+
+    it('should warn when inputSchema reference changes', async () => {
+      cleanupDevMode = enableDevMode();
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      try {
+        const { rerender } = await renderHook(
+          ({ inputSchema }) =>
+            useWebMCP({
+              name: 'warn_input_tool',
+              description: 'Test',
+              inputSchema,
+              handler: async () => 'result',
+            }),
+          {
+            initialProps: {
+              inputSchema: { name: z.string() },
+            },
+          }
+        );
+
+        await rerender({ inputSchema: { name: z.string() } });
+
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining('inputSchema reference changed')
+        );
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    it('should warn when outputSchema reference changes', async () => {
+      cleanupDevMode = enableDevMode();
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      try {
+        const { rerender } = await renderHook(
+          ({ outputSchema }) =>
+            useWebMCP({
+              name: 'warn_output_tool',
+              description: 'Test',
+              outputSchema,
+              handler: async () => ({ value: 'test' }),
+            }),
+          {
+            initialProps: {
+              outputSchema: { value: z.string() },
+            },
+          }
+        );
+
+        await rerender({ outputSchema: { value: z.string() } });
+
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining('outputSchema reference changed')
+        );
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    it('should warn when annotations reference changes', async () => {
+      cleanupDevMode = enableDevMode();
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      try {
+        const { rerender } = await renderHook(
+          ({ annotations }) =>
+            useWebMCP({
+              name: 'warn_annotations_tool',
+              description: 'Test',
+              annotations,
+              handler: async () => 'result',
+            }),
+          {
+            initialProps: {
+              annotations: { destructiveHint: true } as const,
+            },
+          }
+        );
+
+        await rerender({ annotations: { destructiveHint: true } });
+
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining('annotations reference changed')
+        );
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    it('should warn when description changes in dev mode', async () => {
+      cleanupDevMode = enableDevMode();
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      try {
+        const { rerender } = await renderHook(
+          ({ description }) =>
+            useWebMCP({
+              name: 'warn_desc_tool',
+              description,
+              handler: async () => 'result',
+            }),
+          { initialProps: { description: 'v1' } }
+        );
+
+        await rerender({ description: 'v2' });
+
+        expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('description changed'));
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    it('should warn when deps contain non-primitive values', async () => {
+      cleanupDevMode = enableDevMode();
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      try {
+        const objDep = { key: 'value' };
+        await renderHook(() =>
+          useWebMCP(
+            {
+              name: 'warn_deps_tool',
+              description: 'Test',
+              handler: async () => 'result',
+            },
+            [objDep]
+          )
+        );
+
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining('deps contains non-primitive values')
+        );
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    it('should warn when deps contain function values', async () => {
+      cleanupDevMode = enableDevMode();
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      try {
+        const fnDep = () => {};
+        await renderHook(() =>
+          useWebMCP(
+            {
+              name: 'warn_fn_deps_tool',
+              description: 'Test',
+              handler: async () => 'result',
+            },
+            [fnDep]
+          )
+        );
+
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining('deps contains non-primitive values')
+        );
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    it('should only warn once per key (warnOnce behavior)', async () => {
+      cleanupDevMode = enableDevMode();
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      try {
+        const { rerender } = await renderHook(
+          ({ description }) =>
+            useWebMCP({
+              name: 'warn_once_tool',
+              description,
+              handler: async () => 'result',
+            }),
+          { initialProps: { description: 'v1' } }
+        );
+
+        await rerender({ description: 'v2' });
+        await rerender({ description: 'v3' });
+
+        // Should only warn once for description
+        const descWarnings = warnSpy.mock.calls.filter((call) =>
+          String(call[0]).includes('description changed')
+        );
+        expect(descWarnings).toHaveLength(1);
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+  });
+
+  describe('cleanup edge cases', () => {
+    it('should handle unregister errors gracefully in dev mode', async () => {
+      const cleanupDev = enableDevMode();
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const unregisterSpy = vi
+        .spyOn(navigator.modelContext as ModelContext, 'unregisterTool')
+        .mockImplementation(() => {
+          throw new Error('Unregister failed');
+        });
+
+      try {
+        const { unmount } = await renderHook(() =>
+          useWebMCP({
+            name: 'unregister_error_tool',
+            description: 'Test',
+            handler: async () => 'result',
+          })
+        );
+
+        // Should not throw, just warn in dev mode
+        unmount();
+
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining('Failed to unregister tool'),
+          expect.any(Error)
+        );
+      } finally {
+        warnSpy.mockRestore();
+        unregisterSpy.mockRestore();
+        cleanupDev();
+      }
+    });
+  });
+
+  describe('modelContext unavailability', () => {
+    it('should warn when modelContext is not available', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const savedModelContext = navigator.modelContext;
+
+      try {
+        Object.defineProperty(navigator, 'modelContext', {
+          value: undefined,
+          writable: true,
+          configurable: true,
+        });
+
+        await renderHook(() =>
+          useWebMCP({
+            name: 'unavailable_tool',
+            description: 'Test',
+            handler: async () => 'result',
+          })
+        );
+
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining('modelContext is not available')
+        );
+      } finally {
+        Object.defineProperty(navigator, 'modelContext', {
+          value: savedModelContext,
+          writable: true,
+          configurable: true,
+        });
+        warnSpy.mockRestore();
+      }
     });
   });
 });

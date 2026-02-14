@@ -1,6 +1,6 @@
 import type { ModelContext, ModelContextTesting } from '@mcp-b/global';
 import { initializeWebModelContext } from '@mcp-b/global';
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
 import { useWebMCPResource } from './useWebMCPResource.js';
 
@@ -13,6 +13,26 @@ declare global {
 }
 
 const TEST_CHANNEL_ID = `useWebMCPResource-test-${Date.now()}`;
+
+/**
+ * Helper to enable dev mode by setting globalThis.process.env.NODE_ENV.
+ * Returns a cleanup function that restores the original state.
+ */
+function enableDevMode(): () => void {
+  const g = globalThis as { process?: { env?: { NODE_ENV?: string } } };
+  const hadProcess = 'process' in globalThis;
+  const origProcess = g.process;
+
+  g.process = { env: { NODE_ENV: 'test' } };
+
+  return () => {
+    if (hadProcess) {
+      g.process = origProcess;
+    } else {
+      delete g.process;
+    }
+  };
+}
 
 describe('useWebMCPResource', () => {
   beforeAll(() => {
@@ -152,6 +172,27 @@ describe('useWebMCPResource', () => {
       expect(resources[0].uri).toBe('app://settings');
     });
 
+    it('should invoke the resourceHandler when readResource is called', async () => {
+      const readFn = vi.fn().mockResolvedValue({
+        contents: [{ uri: 'app://data', text: '{"result":"ok"}' }],
+      });
+
+      await renderHook(() =>
+        useWebMCPResource({
+          uri: 'app://data',
+          name: 'Data Resource',
+          read: readFn,
+        })
+      );
+
+      // Execute the resource read through the model context
+      const result = await navigator.modelContext?.readResource('app://data');
+
+      expect(readFn).toHaveBeenCalled();
+      expect(result?.contents).toHaveLength(1);
+      expect(result?.contents[0]?.text).toBe('{"result":"ok"}');
+    });
+
     it('should register resource with correct structure', async () => {
       await renderHook(() =>
         useWebMCPResource({
@@ -285,6 +326,170 @@ describe('useWebMCPResource', () => {
 
       // Should still have 1 resource (not re-registered unnecessarily)
       expect(navigator.modelContext?.listResources()).toHaveLength(1);
+    });
+  });
+
+  describe('dev mode logging', () => {
+    let cleanupDevMode: (() => void) | undefined;
+
+    afterEach(() => {
+      cleanupDevMode?.();
+      cleanupDevMode = undefined;
+    });
+
+    it('should log registration in dev mode', async () => {
+      cleanupDevMode = enableDevMode();
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      try {
+        await renderHook(() =>
+          useWebMCPResource({
+            uri: 'log://registered',
+            name: 'Log Resource',
+            read: async () => ({
+              contents: [{ uri: 'log://registered', text: '{}' }],
+            }),
+          })
+        );
+
+        expect(logSpy).toHaveBeenCalledWith(
+          expect.stringContaining('Registered resource: log://registered')
+        );
+      } finally {
+        logSpy.mockRestore();
+      }
+    });
+
+    it('should log unregistration in dev mode', async () => {
+      cleanupDevMode = enableDevMode();
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      try {
+        const { unmount } = await renderHook(() =>
+          useWebMCPResource({
+            uri: 'log://unregistered',
+            name: 'Unlog Resource',
+            read: async () => ({
+              contents: [{ uri: 'log://unregistered', text: '{}' }],
+            }),
+          })
+        );
+
+        logSpy.mockClear();
+        unmount();
+
+        expect(logSpy).toHaveBeenCalledWith(
+          expect.stringContaining('Unregistered resource: log://unregistered')
+        );
+      } finally {
+        logSpy.mockRestore();
+      }
+    });
+
+    it('should warn in dev mode when no registration handle is returned', async () => {
+      cleanupDevMode = enableDevMode();
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const registerResourceSpy = vi
+        .spyOn(navigator.modelContext as ModelContext, 'registerResource')
+        .mockImplementation(
+          () => undefined as unknown as ReturnType<ModelContext['registerResource']>
+        );
+
+      try {
+        await renderHook(() =>
+          useWebMCPResource({
+            uri: 'nohandle://resource',
+            name: 'No Handle Dev',
+            read: async () => ({
+              contents: [{ uri: 'nohandle://resource', text: '{}' }],
+            }),
+          })
+        );
+
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining('did not return a registration handle')
+        );
+      } finally {
+        warnSpy.mockRestore();
+        registerResourceSpy.mockRestore();
+      }
+    });
+  });
+
+  describe('modelContext unavailability', () => {
+    let cleanupDevMode: (() => void) | undefined;
+
+    afterEach(() => {
+      cleanupDevMode?.();
+      cleanupDevMode = undefined;
+    });
+
+    it('should warn in dev mode when modelContext is not available', async () => {
+      cleanupDevMode = enableDevMode();
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const savedModelContext = navigator.modelContext;
+
+      try {
+        Object.defineProperty(navigator, 'modelContext', {
+          value: undefined,
+          writable: true,
+          configurable: true,
+        });
+
+        const { result } = await renderHook(() =>
+          useWebMCPResource({
+            uri: 'unavailable://resource',
+            name: 'Unavailable',
+            read: async () => ({
+              contents: [{ uri: 'unavailable://resource', text: '{}' }],
+            }),
+          })
+        );
+
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining('modelContext is not available')
+        );
+        expect(result.current.isRegistered).toBe(false);
+      } finally {
+        Object.defineProperty(navigator, 'modelContext', {
+          value: savedModelContext,
+          writable: true,
+          configurable: true,
+        });
+        warnSpy.mockRestore();
+      }
+    });
+  });
+
+  describe('registration error handling', () => {
+    it('should set isRegistered to false and rethrow when registerResource throws', async () => {
+      const registerResourceSpy = vi
+        .spyOn(navigator.modelContext as ModelContext, 'registerResource')
+        .mockImplementation(() => {
+          throw new Error('Resource registration failed');
+        });
+
+      try {
+        let caughtError: Error | null = null;
+        try {
+          await renderHook(() =>
+            useWebMCPResource({
+              uri: 'error://resource',
+              name: 'Error Resource',
+              read: async () => ({
+                contents: [{ uri: 'error://resource', text: '{}' }],
+              }),
+            })
+          );
+        } catch (e) {
+          caughtError = e as Error;
+        }
+
+        expect(caughtError).toBeInstanceOf(Error);
+        expect(caughtError?.message).toBe('Resource registration failed');
+      } finally {
+        registerResourceSpy.mockRestore();
+      }
     });
   });
 });
