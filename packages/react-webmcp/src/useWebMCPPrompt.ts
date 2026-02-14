@@ -1,4 +1,4 @@
-import type { InputSchema } from '@mcp-b/global';
+import type { InputSchema, ModelContext } from '@mcp-b/global';
 import { zodToJsonSchema } from '@mcp-b/global';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { z } from 'zod';
@@ -97,6 +97,7 @@ export function useWebMCPPrompt<
       }
       return;
     }
+    const modelContext = window.navigator.modelContext as ModelContext;
 
     const promptHandler = async (
       args: Record<string, unknown>
@@ -104,12 +105,26 @@ export function useWebMCPPrompt<
       return getRef.current(args as never);
     };
 
-    const registration = window.navigator.modelContext?.registerPrompt({
-      name,
-      ...(description !== undefined && { description }),
-      ...(argsJsonSchema && { argsSchema: argsJsonSchema as InputSchema }),
-      get: promptHandler,
-    });
+    let registration: { unregister: () => void } | undefined;
+    try {
+      registration = modelContext.registerPrompt({
+        name,
+        ...(description !== undefined && { description }),
+        ...(argsJsonSchema && { argsSchema: argsJsonSchema as InputSchema }),
+        get: promptHandler,
+      });
+    } catch (error) {
+      setIsRegistered(false);
+      throw error;
+    }
+
+    if (!registration) {
+      if (isDev) {
+        console.warn(`[useWebMCPPrompt] Prompt "${name}" did not return a registration handle.`);
+      }
+      setIsRegistered(false);
+      return;
+    }
 
     if (isDev) {
       console.log(`[useWebMCPPrompt] Registered prompt: ${name}`);
@@ -117,13 +132,11 @@ export function useWebMCPPrompt<
     setIsRegistered(true);
 
     return () => {
-      if (registration) {
-        registration.unregister();
-        if (isDev) {
-          console.log(`[useWebMCPPrompt] Unregistered prompt: ${name}`);
-        }
-        setIsRegistered(false);
+      registration.unregister();
+      if (isDev) {
+        console.log(`[useWebMCPPrompt] Unregistered prompt: ${name}`);
       }
+      setIsRegistered(false);
     };
   }, [name, description, argsJsonSchema, isDev]);
 

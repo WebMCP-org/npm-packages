@@ -1,3 +1,4 @@
+import type { ModelContext } from '@mcp-b/global';
 import { useEffect, useRef, useState } from 'react';
 import type { ResourceContents, WebMCPResourceConfig, WebMCPResourceReturn } from './types.js';
 
@@ -86,6 +87,7 @@ export function useWebMCPResource(config: WebMCPResourceConfig): WebMCPResourceR
       }
       return;
     }
+    const modelContext = window.navigator.modelContext as ModelContext;
 
     const resourceHandler = async (
       resolvedUri: URL,
@@ -94,13 +96,27 @@ export function useWebMCPResource(config: WebMCPResourceConfig): WebMCPResourceR
       return readRef.current(resolvedUri, params);
     };
 
-    const registration = window.navigator.modelContext?.registerResource({
-      uri,
-      name,
-      ...(description !== undefined && { description }),
-      ...(mimeType !== undefined && { mimeType }),
-      read: resourceHandler,
-    });
+    let registration: { unregister: () => void } | undefined;
+    try {
+      registration = modelContext.registerResource({
+        uri,
+        name,
+        ...(description !== undefined && { description }),
+        ...(mimeType !== undefined && { mimeType }),
+        read: resourceHandler,
+      });
+    } catch (error) {
+      setIsRegistered(false);
+      throw error;
+    }
+
+    if (!registration) {
+      if (isDev) {
+        console.warn(`[useWebMCPResource] Resource "${uri}" did not return a registration handle.`);
+      }
+      setIsRegistered(false);
+      return;
+    }
 
     if (isDev) {
       console.log(`[useWebMCPResource] Registered resource: ${uri}`);
@@ -108,13 +124,11 @@ export function useWebMCPResource(config: WebMCPResourceConfig): WebMCPResourceR
     setIsRegistered(true);
 
     return () => {
-      if (registration) {
-        registration.unregister();
-        if (isDev) {
-          console.log(`[useWebMCPResource] Unregistered resource: ${uri}`);
-        }
-        setIsRegistered(false);
+      registration.unregister();
+      if (isDev) {
+        console.log(`[useWebMCPResource] Unregistered resource: ${uri}`);
       }
+      setIsRegistered(false);
     };
   }, [uri, name, description, mimeType, isDev]);
 

@@ -1,7 +1,11 @@
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, renderHook } from 'vitest-browser-react';
-import { McpClientProvider, useMcpClient } from './McpClientProvider.js';
+import {
+  McpClientProvider,
+  type McpClientProviderProps,
+  useMcpClient,
+} from './McpClientProvider.js';
 
 // Create mock client and transport
 const mockConnect = vi.fn();
@@ -26,13 +30,25 @@ const createMockTransport = () => ({
   send: vi.fn(),
 });
 
+function toProviderProps(
+  client: ReturnType<typeof createMockClient>,
+  transport: ReturnType<typeof createMockTransport>
+): Pick<McpClientProviderProps, 'client' | 'transport'> {
+  return {
+    client: client as unknown as McpClientProviderProps['client'],
+    transport: transport as unknown as McpClientProviderProps['transport'],
+  };
+}
+
 describe('McpClientProvider', () => {
   let mockClient: ReturnType<typeof createMockClient>;
   let mockTransport: ReturnType<typeof createMockTransport>;
+  let providerProps: Pick<McpClientProviderProps, 'client' | 'transport'>;
 
   beforeEach(() => {
     mockClient = createMockClient();
     mockTransport = createMockTransport();
+    providerProps = toProviderProps(mockClient, mockTransport);
 
     // Default mocks
     mockConnect.mockResolvedValue(undefined);
@@ -51,7 +67,7 @@ describe('McpClientProvider', () => {
   describe('connection', () => {
     it('should connect client on mount', async () => {
       await render(
-        <McpClientProvider client={mockClient as any} transport={mockTransport as any}>
+        <McpClientProvider {...providerProps}>
           <div>Test</div>
         </McpClientProvider>
       );
@@ -71,7 +87,7 @@ describe('McpClientProvider', () => {
       });
 
       await render(
-        <McpClientProvider client={mockClient as any} transport={mockTransport as any}>
+        <McpClientProvider {...providerProps}>
           <div>Test</div>
         </McpClientProvider>
       );
@@ -89,7 +105,7 @@ describe('McpClientProvider', () => {
       });
 
       await render(
-        <McpClientProvider client={mockClient as any} transport={mockTransport as any}>
+        <McpClientProvider {...providerProps}>
           <div>Test</div>
         </McpClientProvider>
       );
@@ -111,7 +127,7 @@ describe('McpClientProvider', () => {
       });
 
       await render(
-        <McpClientProvider client={mockClient as any} transport={mockTransport as any}>
+        <McpClientProvider {...providerProps}>
           <div>Test</div>
         </McpClientProvider>
       );
@@ -129,9 +145,7 @@ describe('McpClientProvider', () => {
 
   describe('useMcpClient hook', () => {
     const wrapper = ({ children }: { children: ReactNode }) => (
-      <McpClientProvider client={mockClient as any} transport={mockTransport as any}>
-        {children}
-      </McpClientProvider>
+      <McpClientProvider {...providerProps}>{children}</McpClientProvider>
     );
 
     it('should provide client instance', async () => {
@@ -230,9 +244,7 @@ describe('McpClientProvider', () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       const wrapper = ({ children }: { children: ReactNode }) => (
-        <McpClientProvider client={mockClient as any} transport={mockTransport as any}>
-          {children}
-        </McpClientProvider>
+        <McpClientProvider {...providerProps}>{children}</McpClientProvider>
       );
 
       const { result } = await renderHook(() => useMcpClient(), { wrapper });
@@ -249,7 +261,7 @@ describe('McpClientProvider', () => {
   describe('notification handlers', () => {
     it('should set up notification handlers for tool changes', async () => {
       await render(
-        <McpClientProvider client={mockClient as any} transport={mockTransport as any}>
+        <McpClientProvider {...providerProps}>
           <div>Test</div>
         </McpClientProvider>
       );
@@ -261,7 +273,7 @@ describe('McpClientProvider', () => {
 
     it('should set up notification handlers for resource changes', async () => {
       await render(
-        <McpClientProvider client={mockClient as any} transport={mockTransport as any}>
+        <McpClientProvider {...providerProps}>
           <div>Test</div>
         </McpClientProvider>
       );
@@ -275,7 +287,7 @@ describe('McpClientProvider', () => {
   describe('cleanup', () => {
     it('should clean up on unmount', async () => {
       const { unmount } = await render(
-        <McpClientProvider client={mockClient as any} transport={mockTransport as any}>
+        <McpClientProvider {...providerProps}>
           <div>Test</div>
         </McpClientProvider>
       );

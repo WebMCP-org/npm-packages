@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * @mcp-b/react-webmcp
  *
@@ -17,6 +19,7 @@
  * Re-export sampling and elicitation types from @mcp-b/global.
  */
 export type {
+  CallToolResult,
   ElicitationFormParams,
   ElicitationParams,
   ElicitationResult,
@@ -28,13 +31,10 @@ export type {
  * Re-export MCP SDK types for convenience.
  * These types come from @mcp-b/webmcp-ts-sdk which re-exports from @modelcontextprotocol/sdk.
  */
-export type { CallToolResult, Resource, ServerCapabilities, Tool } from '@mcp-b/webmcp-ts-sdk';
+export type { Resource, ServerCapabilities, Tool } from '@mcp-b/webmcp-ts-sdk';
 /**
  * Re-export shared types from @mcp-b packages.
- * These maintain the type hierarchy:
- * - ToolAnnotations and CallToolResult come from @modelcontextprotocol/sdk
- * - ToolDescriptor and ModelContextProtocol come from @mcp-b/global
- * - All are re-exported through our types.ts for convenience
+ * React provider hooks should consume the MCP-B extension type surface from @mcp-b/global.
  */
 export type {
   ModelContextProtocol,

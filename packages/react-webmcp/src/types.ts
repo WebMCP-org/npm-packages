@@ -3,13 +3,13 @@ import type {
   PromptMessage,
   ResourceContents,
   ToolAnnotations,
-} from '@mcp-b/webmcp-ts-sdk';
+} from '@mcp-b/global';
 import type { z } from 'zod';
 
 // Re-export PromptMessage and ResourceContents for use in hook types
 export type { PromptMessage, ResourceContents };
 
-// Re-export types from SDK packages
+// Re-export core/runtime types from MCP-B packages
 export type { ToolAnnotations, CallToolResult };
 
 /**
@@ -56,7 +56,7 @@ export interface ToolExecutionState<TOutput = unknown> {
 
   /**
    * Total number of times this tool has been executed.
-   * Increments on both successful and failed executions.
+   * Increments on successful executions only.
    */
   executionCount: number;
 }

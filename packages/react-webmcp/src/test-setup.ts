@@ -27,6 +27,11 @@ export function setupPolyfill() {
   // Clear context before each test to ensure clean state
   beforeEach(() => {
     navigator.modelContext?.clearContext();
-    navigator.modelContextTesting?.reset();
+    const testing = navigator.modelContextTesting as
+      | {
+          reset?: () => void;
+        }
+      | undefined;
+    testing?.reset?.();
   });
 }

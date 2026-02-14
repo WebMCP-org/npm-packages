@@ -15,6 +15,19 @@ declare global {
 
 const TEST_CHANNEL_ID = `useWebMCP-test-${Date.now()}`;
 
+function parseSerializedToolResponse(result: string | null | undefined): {
+  content: Array<{ type: string; text?: string }>;
+  structuredContent?: Record<string, unknown>;
+} {
+  if (!result) {
+    throw new Error('Expected serialized tool response, received null/undefined');
+  }
+  return JSON.parse(result) as {
+    content: Array<{ type: string; text?: string }>;
+    structuredContent?: Record<string, unknown>;
+  };
+}
+
 describe('useWebMCP', () => {
   beforeAll(() => {
     if (!navigator.modelContext) {
@@ -216,7 +229,9 @@ describe('useWebMCP', () => {
         JSON.stringify({ message: 'hello' })
       );
 
-      expect(result).toBe('Echo: hello');
+      const parsed = parseSerializedToolResponse(result);
+      expect(parsed.content[0]?.type).toBe('text');
+      expect(parsed.content[0]?.text).toBe('Echo: hello');
     });
 
     it('should return structured content when outputSchema is provided', async () => {
@@ -240,7 +255,8 @@ describe('useWebMCP', () => {
         JSON.stringify({ a: 5, b: 3 })
       );
 
-      expect(result).toEqual({ result: 8 });
+      const parsed = parseSerializedToolResponse(result);
+      expect(parsed.structuredContent).toEqual({ result: 8 });
     });
   });
 
@@ -324,6 +340,31 @@ describe('useWebMCP', () => {
   });
 
   describe('re-registration behavior', () => {
+    it('should not re-register when rerendered with unchanged config', async () => {
+      const registerToolSpy = vi.spyOn(navigator.modelContext as ModelContext, 'registerTool');
+      const stableHandler = async () => 'result';
+
+      try {
+        const { rerender } = await renderHook(() =>
+          useWebMCP({
+            name: 'stable_tool',
+            description: 'Stable tool',
+            handler: stableHandler,
+          })
+        );
+
+        expect(registerToolSpy).toHaveBeenCalledTimes(1);
+        expect(navigator.modelContextTesting?.listTools()).toHaveLength(1);
+
+        await rerender();
+
+        expect(registerToolSpy).toHaveBeenCalledTimes(1);
+        expect(navigator.modelContextTesting?.listTools()).toHaveLength(1);
+      } finally {
+        registerToolSpy.mockRestore();
+      }
+    });
+
     it('should re-register when name changes', async () => {
       const { rerender } = await renderHook(
         ({ name }) =>
