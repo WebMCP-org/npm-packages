@@ -8,7 +8,14 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   treeshake: true,
-  // Don't bundle peer dependencies or the main package
-  external: ['react', 'react/jsx-runtime', 'react-dom', 'zod', '@mcp-b/react-webmcp'],
+  // Don't bundle peer dependencies or type-only dependencies
+  external: [
+    'react',
+    'react/jsx-runtime',
+    'react-dom',
+    'zod',
+    '@mcp-b/webmcp-types',
+    'zod-to-json-schema',
+  ],
   tsconfig: './tsconfig.json',
 });

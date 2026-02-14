@@ -1,11 +1,30 @@
+'use client';
+
 /**
  * usewebmcp
  *
- * This package is an alias for @mcp-b/react-webmcp, providing the same
- * React hooks for Model Context Protocol under a simpler package name.
+ * Standalone React hooks for the Web Model Context Protocol.
+ * Registers tools with `navigator.modelContext` directly.
  *
  * @packageDocumentation
  */
 
-// Re-export everything from the main package
-export * from '@mcp-b/react-webmcp';
+// ============================================
+// Types
+// ============================================
+
+export type {
+  CallToolResult,
+  InferOutput,
+  InputSchema,
+  ToolAnnotations,
+  ToolExecutionState,
+  WebMCPConfig,
+  WebMCPReturn,
+} from './types.js';
+
+// ============================================
+// Hooks
+// ============================================
+
+export { useWebMCP } from './useWebMCP.js';
