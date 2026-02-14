@@ -1,7 +1,7 @@
 {
   "name": "usewebmcp",
   "version": "0.1.1",
-  "description": "React hooks for Model Context Protocol - alias for @mcp-b/react-webmcp",
+  "description": "Standalone React hooks for strict core WebMCP tool registration with navigator.modelContext",
   "keywords": [
     "mcp",
     "model-context-protocol",
@@ -47,16 +47,29 @@
     "prepublishOnly": "pnpm run build:prod",
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@mcp-b/react-webmcp": "workspace:*"
+    "@mcp-b/webmcp-types": "workspace:*",
+    "zod-to-json-schema": "^3.25.1"
   },
   "devDependencies": {
+    "@mcp-b/global": "workspace:*",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
+    "@vitest/browser": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "playwright": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
     "tsdown": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "vitest-browser-react": "^2.0.4",
+    "zod": "catalog:"
   },
   "peerDependencies": {
     "react": "^17.0.0 || ^18.0.0 || ^19.0.0",
