@@ -1,0 +1,65 @@
+{
+  "name": "@mcp-b/webmcp-polyfill",
+  "version": "0.1.0",
+  "description": "Strict WebMCP core runtime polyfill for navigator.modelContext",
+  "keywords": [
+    "webmcp",
+    "model-context",
+    "navigator-modelcontext",
+    "polyfill",
+    "browser"
+  ],
+  "homepage": "https://docs.mcp-b.ai/packages/webmcp-polyfill",
+  "bugs": {
+    "url": "https://github.com/WebMCP-org/npm-packages/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WebMCP-org/npm-packages.git",
+    "directory": "packages/webmcp-polyfill"
+  },
+  "license": "MIT",
+  "author": "Alex Nahas",
+  "sideEffects": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "pnpm --filter @mcp-b/webmcp-types build && tsdown",
+    "check": "biome check --write .",
+    "clean": "rm -rf dist .turbo",
+    "format": "biome format --write .",
+    "lint": "biome lint --write .",
+    "prepublishOnly": "node ../../scripts/validate-publish.js && pnpm run build",
+    "publish:dry": "pnpm publish --access public --dry-run",
+    "publish:npm": "pnpm publish --access public",
+    "test": "vitest run",
+    "typecheck": "pnpm --filter @mcp-b/webmcp-types build && tsc --noEmit"
+  },
+  "dependencies": {
+    "@mcp-b/webmcp-types": "workspace:*"
+  },
+  "devDependencies": {
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}
