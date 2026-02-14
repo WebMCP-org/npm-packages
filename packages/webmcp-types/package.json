@@ -1,0 +1,62 @@
+{
+  "name": "@mcp-b/webmcp-types",
+  "version": "0.1.0",
+  "description": "Strict TypeScript type definitions for the WebMCP core API (navigator.modelContext)",
+  "keywords": [
+    "webmcp",
+    "model-context",
+    "navigator-modelcontext",
+    "types",
+    "typescript",
+    "web-standard"
+  ],
+  "homepage": "https://docs.mcp-b.ai/packages/webmcp-types",
+  "bugs": {
+    "url": "https://github.com/WebMCP-org/npm-packages/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WebMCP-org/npm-packages.git",
+    "directory": "packages/webmcp-types"
+  },
+  "license": "MIT",
+  "author": "Alex Nahas",
+  "sideEffects": false,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "main": "",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "src/common.ts",
+    "src/index.ts",
+    "src/json-schema.ts",
+    "src/model-context.ts",
+    "src/tool.ts"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check": "biome check --write .",
+    "clean": "rm -rf dist .turbo",
+    "format": "biome format --write .",
+    "lint": "biome lint --write .",
+    "prepublishOnly": "node ../../scripts/validate-publish.js && pnpm run build",
+    "publish:dry": "pnpm publish --access public --dry-run",
+    "publish:npm": "pnpm publish --access public",
+    "test": "vitest run && pnpm run test:conformance",
+    "test:conformance": "vitest run --config vitest.conformance.config.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}
