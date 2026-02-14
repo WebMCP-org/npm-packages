@@ -105,7 +105,7 @@ test.describe('Web Model Context API E2E Tests', () => {
     ).toBe(true);
   });
 
-  test('should persist dynamic tool across provideContext calls (two-bucket system)', async ({
+  test('should replace dynamic tools on provideContext calls (strict core behavior)', async ({
     page,
   }) => {
     // Register dynamic tool
@@ -118,26 +118,25 @@ test.describe('Web Model Context API E2E Tests', () => {
     let logEntries = await page.locator('#log .log-entry').allTextContents();
     expect(logEntries.some((entry) => entry.includes('Total tools registered: 5'))).toBe(true);
 
-    // Replace base tools (Bucket A)
+    // Replace base tools (strict mode replaces all registered tools)
     await page.click('#replace-base-tools');
     await page.waitForTimeout(500);
 
-    // Verify dynamic tool persisted
+    // Verify strict replacement message
     logEntries = await page.locator('#log .log-entry').allTextContents();
     expect(
       logEntries.some((entry) =>
-        entry.includes('Dynamic tool still registered! (Bucket B persists)')
+        entry.includes('Dynamic tool cleared by strict provideContext() replacement behavior')
       )
     ).toBe(true);
 
-    // List tools again - should now have 3 tools (2 new base + 1 dynamic)
-    await page.click('#list-all-tools');
-    await page.waitForTimeout(500);
-    logEntries = await page.locator('#log .log-entry').allTextContents();
-    expect(logEntries.some((entry) => entry.includes('Total tools registered: 3'))).toBe(true);
-    expect(logEntries.some((entry) => entry.includes('dynamicTool'))).toBe(true);
-    expect(logEntries.some((entry) => entry.includes('doubleCounter'))).toBe(true);
-    expect(logEntries.some((entry) => entry.includes('halveCounter'))).toBe(true);
+    const toolNames = await page.evaluate(() => {
+      return navigator.modelContext.listTools().map((tool) => tool.name);
+    });
+    expect(toolNames).toHaveLength(2);
+    expect(toolNames).toContain('doubleCounter');
+    expect(toolNames).toContain('halveCounter');
+    expect(toolNames).not.toContain('dynamicTool');
   });
 
   test('should access tools via __mcpBridge for debugging', async ({ page }) => {

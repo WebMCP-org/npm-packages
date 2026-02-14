@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "test": "playwright test tests/tab-transport.spec.ts && playwright test tests/mcp-iframe-element.spec.ts && playwright test --config=playwright-react-webmcp.config.ts && playwright test --config=playwright-validation-matrix.config.ts",
+    "test:chrome-beta:webmcp": "playwright test --config=playwright-chrome-beta-webmcp.config.ts",
+    "test:chrome-beta:webmcp:headed": "playwright test --config=playwright-chrome-beta-webmcp.config.ts --headed",
+    "test:chrome-beta:webmcp:ui": "playwright test --config=playwright-chrome-beta-webmcp.config.ts --ui",
     "test:codegen": "playwright codegen http://localhost:5173",
     "test:debug": "playwright test --debug",
     "test:headed": "playwright test --headed",

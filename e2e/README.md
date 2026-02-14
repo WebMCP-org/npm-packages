@@ -244,10 +244,14 @@ Tests typically run in ~30-60 seconds for the full suite.
 
 ### Port Already in Use
 
-If you see `EADDRINUSE` errors, kill the process using port 5173:
+`tab-transport` Playwright suites use an isolated local port by default:
+- `PLAYWRIGHT_TAB_TRANSPORT_PORT=4173` (default)
+- `PLAYWRIGHT_REUSE_SERVER=1` to explicitly reuse an already-running server
+
+If you still see `EADDRINUSE` errors, kill the process using that configured port:
 
 ```bash
-lsof -ti:5173 | xargs kill
+lsof -ti:4173 | xargs kill
 ```
 
 ### Playwright Browsers Not Installed

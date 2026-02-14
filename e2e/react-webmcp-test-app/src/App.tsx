@@ -11,6 +11,70 @@ import { z } from 'zod';
 // Counter state (shared across the app)
 let globalCounter = 0;
 
+const COUNTER_AMOUNT_INPUT_SCHEMA = {
+  amount: z.number().min(1).max(100).default(1).describe('Amount to increment'),
+};
+
+const INCREMENT_ANNOTATIONS = {
+  title: 'Increment Counter',
+  readOnlyHint: false,
+  idempotentHint: false,
+};
+
+const DECREMENT_ANNOTATIONS = {
+  title: 'Decrement Counter',
+  readOnlyHint: false,
+  idempotentHint: false,
+};
+
+const RESET_ANNOTATIONS = {
+  title: 'Reset Counter',
+  readOnlyHint: false,
+  destructiveHint: true,
+};
+
+const GET_COUNTER_OUTPUT_SCHEMA = {
+  counter: z.number().describe('The current counter value'),
+  timestamp: z.string().describe('ISO timestamp when the value was retrieved'),
+};
+
+const GET_COUNTER_ANNOTATIONS = {
+  title: 'Get Counter',
+  readOnlyHint: true,
+  idempotentHint: true,
+};
+
+const LIKE_POST_INPUT_SCHEMA = {
+  postId: z.string().describe('The post ID to like'),
+};
+
+const LIKE_POST_ANNOTATIONS = {
+  title: 'Like Post',
+  readOnlyHint: false,
+  idempotentHint: true,
+};
+
+const SEARCH_POSTS_INPUT_SCHEMA = {
+  query: z.string().min(1).describe('Search query'),
+  limit: z.number().min(1).max(10).default(10).describe('Max results'),
+};
+
+const SEARCH_POSTS_ANNOTATIONS = {
+  title: 'Search Posts',
+  readOnlyHint: true,
+  idempotentHint: true,
+};
+
+const CODE_REVIEW_ARGS_SCHEMA = {
+  code: z.string().describe('The code to review'),
+  language: z.string().optional().describe('Programming language (optional)'),
+};
+
+const SUMMARIZE_ARGS_SCHEMA = {
+  text: z.string().min(1).describe('The text to summarize'),
+  maxLength: z.number().optional().describe('Maximum summary length'),
+};
+
 function App() {
   const [posts, setPosts] = useState([
     { id: '1', title: 'First Post', likes: 0 },
@@ -36,14 +100,8 @@ function App() {
   const incrementTool = useWebMCP({
     name: 'counter_increment',
     description: 'Increment the counter by a specified amount',
-    inputSchema: {
-      amount: z.number().min(1).max(100).default(1).describe('Amount to increment'),
-    },
-    annotations: {
-      title: 'Increment Counter',
-      readOnlyHint: false,
-      idempotentHint: false,
-    },
+    inputSchema: COUNTER_AMOUNT_INPUT_SCHEMA,
+    annotations: INCREMENT_ANNOTATIONS,
     handler: async (input) => {
       await new Promise((resolve) => setTimeout(resolve, 500)); // Simulate async
       globalCounter += input.amount;
@@ -59,14 +117,8 @@ function App() {
   const decrementTool = useWebMCP({
     name: 'counter_decrement',
     description: 'Decrement the counter by a specified amount',
-    inputSchema: {
-      amount: z.number().min(1).max(100).default(1).describe('Amount to decrement'),
-    },
-    annotations: {
-      title: 'Decrement Counter',
-      readOnlyHint: false,
-      idempotentHint: false,
-    },
+    inputSchema: COUNTER_AMOUNT_INPUT_SCHEMA,
+    annotations: DECREMENT_ANNOTATIONS,
     handler: async (input) => {
       await new Promise((resolve) => setTimeout(resolve, 500));
       globalCounter -= input.amount;
@@ -79,11 +131,7 @@ function App() {
   const resetTool = useWebMCP({
     name: 'counter_reset',
     description: 'Reset the counter to zero. This action cannot be undone.',
-    annotations: {
-      title: 'Reset Counter',
-      readOnlyHint: false,
-      destructiveHint: true,
-    },
+    annotations: RESET_ANNOTATIONS,
     elicitation: {
       message: 'Are you sure you want to reset the counter? This cannot be undone.',
       when: () => globalCounter !== 0,
@@ -100,15 +148,8 @@ function App() {
   const getCounterTool = useWebMCP({
     name: 'counter_get',
     description: 'Get the current counter value',
-    outputSchema: {
-      counter: z.number().describe('The current counter value'),
-      timestamp: z.string().describe('ISO timestamp when the value was retrieved'),
-    },
-    annotations: {
-      title: 'Get Counter',
-      readOnlyHint: true,
-      idempotentHint: true,
-    },
+    outputSchema: GET_COUNTER_OUTPUT_SCHEMA,
+    annotations: GET_COUNTER_ANNOTATIONS,
     handler: async () => {
       const timestamp = new Date().toISOString();
       addLog(`Retrieved counter value: ${globalCounter}`, 'info');
@@ -120,14 +161,8 @@ function App() {
   const likePostTool = useWebMCP({
     name: 'posts_like',
     description: 'Like a post by ID. Increments the like count.',
-    inputSchema: {
-      postId: z.string().describe('The post ID to like'),
-    },
-    annotations: {
-      title: 'Like Post',
-      readOnlyHint: false,
-      idempotentHint: true,
-    },
+    inputSchema: LIKE_POST_INPUT_SCHEMA,
+    annotations: LIKE_POST_ANNOTATIONS,
     handler: async (input) => {
       await new Promise((resolve) => setTimeout(resolve, 300));
       setPosts((prev) =>
@@ -146,15 +181,8 @@ function App() {
   const searchPostsTool = useWebMCP({
     name: 'posts_search',
     description: 'Search posts by keyword',
-    inputSchema: {
-      query: z.string().min(1).describe('Search query'),
-      limit: z.number().min(1).max(10).default(10).describe('Max results'),
-    },
-    annotations: {
-      title: 'Search Posts',
-      readOnlyHint: true,
-      idempotentHint: true,
-    },
+    inputSchema: SEARCH_POSTS_INPUT_SCHEMA,
+    annotations: SEARCH_POSTS_ANNOTATIONS,
     handler: async (input) => {
       await new Promise((resolve) => setTimeout(resolve, 400));
       const results = posts
@@ -204,10 +232,7 @@ function App() {
   const codeReviewPrompt = useWebMCPPrompt({
     name: 'review_code',
     description: 'Review code for best practices and potential issues',
-    argsSchema: {
-      code: z.string().describe('The code to review'),
-      language: z.string().optional().describe('Programming language (optional)'),
-    },
+    argsSchema: CODE_REVIEW_ARGS_SCHEMA,
     get: async ({ code, language }) => ({
       messages: [
         {
@@ -225,10 +250,7 @@ function App() {
   const summarizePrompt = useWebMCPPrompt({
     name: 'summarize',
     description: 'Summarize a piece of text',
-    argsSchema: {
-      text: z.string().min(1).describe('The text to summarize'),
-      maxLength: z.number().optional().describe('Maximum summary length'),
-    },
+    argsSchema: SUMMARIZE_ARGS_SCHEMA,
     get: async ({ text, maxLength }) => ({
       messages: [
         {

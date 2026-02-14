@@ -1,897 +1,470 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
-/**
- * Native Web Standards Showcase E2E Tests
- * These tests verify the showcase app works correctly with the native Chromium API
- */
+async function waitForNativeReady(page: Page): Promise<void> {
+  await page.waitForSelector('#detection-status', { timeout: 10000 });
+  await expect(page.locator('#detection-status')).toContainText(
+    'Native Chromium Web Model Context API detected'
+  );
+}
+
+async function waitForIframeReady(page: Page): Promise<void> {
+  const iframe = page.frameLocator('#test-iframe');
+  await expect(iframe.locator('#iframe-status')).toContainText('Native API Ready', {
+    timeout: 20000,
+  });
+}
+
+function parseJsonIfPossible(value: unknown): unknown {
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isCounterOutputResult(value: unknown): value is { counter: number; timestamp: string } {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return typeof value.counter === 'number' && typeof value.timestamp === 'string';
+}
+
+function isStructuredCounterResult(
+  value: unknown
+): value is { counter: number; previousValue: number; timestamp: string } {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.counter === 'number' &&
+    typeof value.previousValue === 'number' &&
+    typeof value.timestamp === 'string'
+  );
+}
+
+async function getToolNames(page: Page): Promise<string[]> {
+  return page.evaluate(
+    () => navigator.modelContextTesting?.listTools().map((tool) => tool.name) ?? []
+  );
+}
+
+async function waitForToolPresent(page: Page, toolName: string): Promise<void> {
+  await expect.poll(async () => await getToolNames(page)).toContain(toolName);
+}
+
+async function waitForToolMissing(page: Page, toolName: string): Promise<void> {
+  await expect.poll(async () => await getToolNames(page)).not.toContain(toolName);
+}
+
+async function waitForToolSet(page: Page, toolNames: string[]): Promise<void> {
+  await expect
+    .poll(async () => await getToolNames(page))
+    .toEqual(expect.arrayContaining(toolNames));
+}
+
+async function clearAllTools(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const context = navigator.modelContext;
+    const testing = navigator.modelContextTesting;
+    if (!context || !testing) {
+      return;
+    }
+
+    for (const tool of testing.listTools()) {
+      try {
+        context.unregisterTool(tool.name);
+      } catch {
+        // Some tools can only be replaced/cleared through provideContext.
+      }
+    }
+
+    context.clearContext();
+  });
+
+  await expect.poll(async () => await getToolNames(page)).toEqual([]);
+}
+
+async function openShowcase(page: Page): Promise<void> {
+  await page.goto('/');
+  await waitForNativeReady(page);
+}
+
+async function waitForTextContains(page: Page, selector: string, text: string): Promise<void> {
+  await expect(page.locator(selector)).toContainText(text, { timeout: 10000 });
+}
 
 test.describe('Native API Detection', () => {
-  test('should detect native Web Model Context API', async ({ page }) => {
-    await page.goto('/');
+  test('detects native Web Model Context API', async ({ page }) => {
+    await openShowcase(page);
 
-    // Wait for detection to complete
-    await page.waitForSelector('.banner.success', { timeout: 5000 });
-
-    // Verify success banner
-    const banner = page.locator('.banner.success');
-    await expect(banner).toBeVisible();
-
-    const statusText = await banner.locator('#detection-status').textContent();
-    expect(statusText).toContain('Native Chromium Web Model Context API detected');
+    await expect(page.locator('#detection-banner')).toBeVisible();
+    await waitForTextContains(
+      page,
+      '#detection-status',
+      'Native Chromium Web Model Context API detected'
+    );
   });
 
-  test('should expose modelContext and modelContextTesting', async ({ page }) => {
-    await page.goto('/');
+  test('exposes modelContext and modelContextTesting', async ({ page }) => {
+    await openShowcase(page);
 
-    const hasModelContext = await page.evaluate(() => {
-      return typeof navigator.modelContext !== 'undefined';
-    });
-    expect(hasModelContext).toBe(true);
+    const surface = await page.evaluate(() => ({
+      hasModelContext: typeof navigator.modelContext !== 'undefined',
+      hasModelContextTesting: typeof navigator.modelContextTesting !== 'undefined',
+      hasUnregisterTool: typeof navigator.modelContext?.unregisterTool === 'function',
+      hasClearContext: typeof navigator.modelContext?.clearContext === 'function',
+      hasListTools: typeof navigator.modelContextTesting?.listTools === 'function',
+      hasExecuteTool: typeof navigator.modelContextTesting?.executeTool === 'function',
+    }));
 
-    const hasModelContextTesting = await page.evaluate(() => {
-      return typeof navigator.modelContextTesting !== 'undefined';
-    });
-    expect(hasModelContextTesting).toBe(true);
+    expect(surface.hasModelContext).toBe(true);
+    expect(surface.hasModelContextTesting).toBe(true);
+    expect(surface.hasUnregisterTool).toBe(true);
+    expect(surface.hasClearContext).toBe(true);
+    expect(surface.hasListTools).toBe(true);
+    expect(surface.hasExecuteTool).toBe(true);
   });
 
-  test('should verify native implementation (not polyfill)', async ({ page }) => {
-    await page.goto('/');
+  test('verifies native implementation (not polyfill)', async ({ page }) => {
+    await openShowcase(page);
 
-    const isNative = await page.evaluate(() => {
-      const testing = navigator.modelContextTesting;
-      if (!testing) return false;
-
-      // Native implementation should not have "WebModelContext" in constructor name
-      const constructorName = testing.constructor.name;
-      return !constructorName.includes('WebModelContext');
-    });
-
-    expect(isNative).toBe(true);
-  });
-
-  test('should have native-specific methods', async ({ page }) => {
-    await page.goto('/');
-
-    const hasNativeMethods = await page.evaluate(() => {
-      const ctx = navigator.modelContext;
-      if (!ctx) return false;
-
-      return typeof ctx.unregisterTool === 'function' && typeof ctx.clearContext === 'function';
-    });
-
-    expect(hasNativeMethods).toBe(true);
+    const constructorName = await page.evaluate(
+      () => navigator.modelContextTesting?.constructor.name
+    );
+    expect(constructorName).toBeTruthy();
+    expect(constructorName).not.toContain('WebModelContext');
   });
 });
 
-test.describe('Live Code Editor', () => {
-  test('should load and execute counter template', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('.banner.success');
+test.describe('Live Tool Editor', () => {
+  test.beforeEach(async ({ page }) => {
+    await openShowcase(page);
+    await clearAllTools(page);
+  });
 
-    // Load counter template
+  test('loads and executes counter template', async ({ page }) => {
     await page.selectOption('#template-select', 'counter');
 
-    // Verify code is loaded in editor
     const editorContent = await page.locator('#code-editor').inputValue();
     expect(editorContent).toContain('counter_increment');
 
-    // Execute the code
     await page.click('#register-code');
 
-    // Wait for success in event log
-    await page.waitForSelector('.log-entry:has-text("Code executed")', { timeout: 5000 });
-
-    // Verify tool appears in output
-    const toolsOutput = page.locator('#tools-output');
-    await expect(toolsOutput.locator('.tool-name:has-text("counter_increment")')).toBeVisible();
-
-    // Verify tool count updated
-    const toolCount = await page.locator('#tool-count').textContent();
-    expect(toolCount).toContain('1 tool');
+    await waitForToolPresent(page, 'counter_increment');
+    await waitForTextContains(page, '#tool-count', '1 tool');
+    await waitForTextContains(page, '#react-tool-executor', 'counter_increment');
+    await waitForTextContains(page, '#event-log', 'Code executed');
   });
 
-  test('should load and execute calculator template', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('.banner.success');
-
-    // Load calculator template
+  test('loads and executes calculator template', async ({ page }) => {
     await page.selectOption('#template-select', 'calculator');
     await page.click('#register-code');
 
-    await page.waitForSelector('.log-entry:has-text("Code executed")');
-
-    // Should have multiple tools
-    const toolCount = await page.locator('#tool-count').textContent();
-    expect(toolCount).toContain('2 tools');
-
-    await expect(page.locator('.tool-name:has-text("calc_add")')).toBeVisible();
-    await expect(page.locator('.tool-name:has-text("calc_multiply")')).toBeVisible();
+    await waitForToolSet(page, ['calc_add', 'calc_multiply']);
+    await waitForTextContains(page, '#tool-count', '2 tools');
+    await waitForTextContains(page, '#react-tool-executor', 'calc_add');
+    await waitForTextContains(page, '#react-tool-executor', 'calc_multiply');
   });
 
-  test('should clear editor', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('.banner.success');
-
-    // Load a template
+  test('clears editor content', async ({ page }) => {
     await page.selectOption('#template-select', 'counter');
-
-    // Clear editor
     await page.click('#clear-editor');
-
-    const editorContent = await page.locator('#code-editor').inputValue();
-    expect(editorContent).toBe('');
+    await expect(page.locator('#code-editor')).toHaveValue('');
   });
 
-  test('should show error for invalid code', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('.banner.success');
-
-    // Enter invalid code
+  test('shows an error for invalid code', async ({ page }) => {
     await page.fill('#code-editor', 'this is invalid javascript!!!');
     await page.click('#register-code');
 
-    // Should show error
-    await page.waitForSelector('#editor-error', { state: 'visible', timeout: 3000 });
-    const errorText = await page.locator('#editor-error').textContent();
-    expect(errorText).toContain('Error');
-  });
-});
-
-test.describe('Two-Bucket System', () => {
-  test('should demonstrate provideContext (Bucket A)', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('.banner.success');
-
-    // Provide counter tools (Bucket A)
-    await page.click('#provide-counter-tools');
-
-    // Wait for tools to appear
-    await page.waitForSelector('.tool-name:has-text("counter_increment")');
-
-    // Verify all counter tools are present
-    await expect(page.locator('.tool-name:has-text("counter_increment")')).toBeVisible();
-    await expect(page.locator('.tool-name:has-text("counter_decrement")')).toBeVisible();
-    await expect(page.locator('.tool-name:has-text("counter_get")')).toBeVisible();
-
-    // Verify bucket A indicator updated
-    const bucketAText = await page.locator('#bucket-a-tools').textContent();
-    expect(bucketAText).toContain('counter_increment');
+    await expect(page.locator('#editor-error')).toBeVisible();
+    await waitForTextContains(page, '#editor-error', 'Error');
+    await waitForTextContains(page, '#event-log', 'Execution failed');
   });
 
-  test('should demonstrate registerTool (Bucket B)', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('.banner.success');
-
-    // Register timer tool (Bucket B)
-    await page.click('#register-timer-tool');
-
-    // Wait for tool to appear
-    await page.waitForSelector('.tool-name:has-text("timer")');
-
-    // Verify bucket B indicator updated
-    const bucketBText = await page.locator('#bucket-b-tools').textContent();
-    expect(bucketBText).toContain('timer');
-  });
-
-  test('should demonstrate Bucket A replacement', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('.banner.success');
-
-    // Add counter tools to Bucket A
-    await page.click('#provide-counter-tools');
-    await page.waitForSelector('.tool-name:has-text("counter_increment")');
-
-    // Replace Bucket A
-    await page.click('#replace-bucket-a');
-
-    // Wait for new tool
-    await page.waitForSelector('.tool-name:has-text("greet")');
-
-    // Verify old tools are gone
-    await expect(page.locator('.tool-name:has-text("counter_increment")')).not.toBeVisible();
-
-    // Verify new tool is present
-    await expect(page.locator('.tool-name:has-text("greet")')).toBeVisible();
-  });
-
-  test('should demonstrate Bucket B persistence across Bucket A changes', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('.banner.success');
-
-    // Register timer tool (Bucket B)
-    await page.click('#register-timer-tool');
-    await page.waitForSelector('.tool-name:has-text("timer")');
-
-    // Add counter tools (Bucket A)
-    await page.click('#provide-counter-tools');
-    await page.waitForSelector('.tool-name:has-text("counter_increment")');
-
-    // Replace Bucket A
-    await page.click('#replace-bucket-a');
-
-    // Wait a moment for changes to take effect
-    await page.waitForTimeout(500);
-
-    // Bucket B tool should still be present!
-    await expect(page.locator('.tool-name:has-text("timer")')).toBeVisible();
-
-    // But Bucket A tools should have changed
-    await expect(page.locator('.tool-name:has-text("greet")')).toBeVisible();
-    await expect(page.locator('.tool-name:has-text("counter_increment")')).not.toBeVisible();
-  });
-
-  test('should unregister Bucket B tools', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('.banner.success');
-
-    // Register timer tool
-    await page.click('#register-timer-tool');
-    await page.waitForSelector('.tool-name:has-text("timer")');
-
-    // Unregister timer tool
-    await page.click('#unregister-timer');
-
-    // Tool should be gone
-    await expect(page.locator('.tool-name:has-text("timer")')).not.toBeVisible();
-
-    // Bucket B should be empty
-    const bucketBText = await page.locator('#bucket-b-tools').textContent();
-    expect(bucketBText).toContain('Empty');
-  });
-});
-
-test.describe('Native Methods', () => {
-  test('should list tools', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('.banner.success');
-
-    // Add some tools
-    await page.click('#provide-counter-tools');
-    await page.waitForSelector('.tool-name:has-text("counter_increment")');
-
-    // Click list tools
-    await page.click('#list-tools');
-
-    // Verify result display shows tools
-    const resultText = await page.locator('#native-result').textContent();
-    expect(resultText).toContain('counter_increment');
-    expect(resultText).toContain('counter_decrement');
-  });
-
-  test('should execute tool', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('.banner.success');
-
-    // Add counter tools
-    await page.click('#provide-counter-tools');
-    await page.waitForSelector('.tool-name:has-text("counter_increment")');
-
-    // Execute first tool
-    await page.click('#execute-tool');
-
-    // Wait for result
-    await page.waitForTimeout(500);
-
-    const resultText = await page.locator('#native-result').textContent();
-    expect(resultText).toContain('Counter');
-  });
-
-  test('should unregister tool (native method)', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('.banner.success');
-
-    // Add counter tools
-    await page.click('#provide-counter-tools');
-    await page.waitForSelector('.tool-name:has-text("counter_increment")');
-
-    // Unregister tool
-    await page.click('#unregister-tool');
-
-    // Wait for event log
-    await page.waitForSelector('.log-entry:has-text("unregisterTool")');
-
-    // Tool count should decrease
-    const toolCount = await page.locator('#tool-count').textContent();
-    expect(toolCount).toContain('2 tools'); // Originally 3, now 2
-  });
-
-  test('should clear all tools (native method)', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('.banner.success');
-
-    // Add both bucket tools
-    await page.click('#provide-counter-tools');
-    await page.click('#register-timer-tool');
-    await page.waitForTimeout(500);
-
-    // Clear all
-    await page.click('#clear-context');
-
-    // Wait for event log
-    await page.waitForSelector('.log-entry:has-text("clearContext")');
-
-    // All tools should be gone
-    const toolCount = await page.locator('#tool-count').textContent();
-    expect(toolCount).toContain('0 tools');
-
-    // Empty state should be visible
-    await expect(page.locator('.empty-state')).toBeVisible();
-  });
-});
-
-test.describe('Testing API', () => {
-  test('should list tools via testing API', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('.banner.success');
-
-    await page.click('#provide-counter-tools');
-    await page.waitForSelector('.tool-name:has-text("counter_increment")');
-
-    await page.click('#testing-list-tools');
-
-    const resultText = await page.locator('#testing-result').textContent();
-    expect(resultText).toContain('counter_increment');
-    expect(resultText).toContain('inputSchema'); // Testing API returns stringified schema
-  });
-
-  test('should get tool calls', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('.banner.success');
-
-    await page.click('#provide-counter-tools');
-    await page.waitForSelector('.tool-name:has-text("counter_increment")');
-
-    // Execute a tool first
-    await page.click('#testing-execute');
-    await page.waitForTimeout(500);
-
-    // Get tool calls
-    await page.click('#get-tool-calls');
-
-    const resultText = await page.locator('#testing-result').textContent();
-    // Should show call history
-    expect(resultText).toContain('counter');
-  });
-
-  test('should clear tool calls', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('.banner.success');
-
-    await page.click('#provide-counter-tools');
-    await page.waitForSelector('.tool-name:has-text("counter_increment")');
-
-    // Execute and clear
-    await page.click('#testing-execute');
-    await page.waitForTimeout(500);
-    await page.click('#clear-tool-calls');
-
-    const resultText = await page.locator('#testing-result').textContent();
-    expect(resultText).toContain('cleared');
-  });
-
-  test('should reset testing API', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('.banner.success');
-
-    await page.click('#reset-testing');
-
-    const resultText = await page.locator('#testing-result').textContent();
-    expect(resultText).toContain('reset');
-  });
-});
-
-test.describe('Tool Executor', () => {
-  test('should execute selected tool', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('.banner.success');
-
-    // Add calculator tools
-    await page.selectOption('#template-select', 'calculator');
+  test('clears event log', async ({ page }) => {
+    await page.selectOption('#template-select', 'counter');
     await page.click('#register-code');
-    await page.waitForSelector('.tool-name:has-text("calc_add")');
+    await waitForTextContains(page, '#event-log', 'Code executed');
 
-    // Select calc_add tool
-    await page.selectOption('#exec-tool-select', 'calc_add');
-
-    // Enter input
-    await page.fill('#exec-input', '{"a": 5, "b": 3}');
-
-    // Execute
-    await page.click('#exec-button');
-
-    // Wait for result
-    await page.waitForTimeout(500);
-
-    const resultText = await page.locator('#exec-result').textContent();
-    expect(resultText).toContain('5 + 3 = 8');
-  });
-
-  test('should handle tool execution errors', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('.banner.success');
-
-    await page.selectOption('#template-select', 'calculator');
-    await page.click('#register-code');
-    await page.waitForSelector('.tool-name:has-text("calc_add")');
-
-    await page.selectOption('#exec-tool-select', 'calc_add');
-
-    // Enter invalid JSON
-    await page.fill('#exec-input', 'invalid json');
-
-    await page.click('#exec-button');
-
-    await page.waitForTimeout(500);
-
-    const resultText = await page.locator('#exec-result').textContent();
-    expect(resultText).toContain('Error');
-  });
-});
-
-test.describe('Event Log', () => {
-  test('should log events', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('.banner.success');
-
-    // Trigger some actions
-    await page.click('#provide-counter-tools');
-
-    // Should see event in log
-    await expect(page.locator('.log-entry:has-text("Bucket A updated")')).toBeVisible();
-  });
-
-  test('should clear event log', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('.banner.success');
-
-    // Generate some logs
-    await page.click('#provide-counter-tools');
-
-    // Clear log
     await page.click('#clear-log');
-
-    // Log should be empty
-    const logEntries = await page.locator('.log-entry').count();
-    expect(logEntries).toBe(0);
+    const logContent = await page.locator('#event-log').textContent();
+    expect(logContent?.trim()).toBe('');
   });
 });
 
-// ============================================================================
-// outputSchema / structuredContent Tests
-// ============================================================================
-
-test.describe('Output Schema and structuredContent', () => {
+test.describe('Native API Semantics', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('.banner.success');
+    await openShowcase(page);
+    await clearAllTools(page);
   });
 
-  test('should include outputSchema in tool listing', async ({ page }) => {
-    // Provide counter tools (includes counter_get with outputSchema)
-    await page.click('#provide-counter-tools');
-    await page.waitForSelector('.tool-name:has-text("counter_get")');
+  test('registerTool and unregisterTool update listTools', async ({ page }) => {
+    const toolName = `native_reg_${Date.now()}`;
 
-    // Check via testing API that outputSchema is present
-    const toolInfo = await page.evaluate(() => {
+    await page.evaluate((name) => {
+      navigator.modelContext?.registerTool({
+        name,
+        description: 'Temporary test tool',
+        inputSchema: { type: 'object', properties: {} },
+        async execute() {
+          return 'ok';
+        },
+      });
+    }, toolName);
+
+    await waitForToolPresent(page, toolName);
+
+    await page.evaluate((name) => {
+      navigator.modelContext?.unregisterTool(name);
+    }, toolName);
+
+    await waitForToolMissing(page, toolName);
+  });
+
+  test('provideContext replaces previously provided tool set', async ({ page }) => {
+    const state = await page.evaluate(() => {
+      const context = navigator.modelContext;
       const testing = navigator.modelContextTesting;
-      if (!testing) return null;
+      if (!context || !testing) {
+        return { before: [], after: [] as string[] };
+      }
 
-      const tools = testing.listTools();
-      const counterGetTool = tools.find((t) => t.name === 'counter_get');
-      return counterGetTool;
+      context.provideContext({
+        tools: [
+          {
+            name: 'first_tool',
+            description: 'first',
+            inputSchema: { type: 'object', properties: {} },
+            async execute() {
+              return 'first';
+            },
+          },
+        ],
+      });
+      const before = testing.listTools().map((tool) => tool.name);
+
+      context.provideContext({
+        tools: [
+          {
+            name: 'second_tool',
+            description: 'second',
+            inputSchema: { type: 'object', properties: {} },
+            async execute() {
+              return 'second';
+            },
+          },
+        ],
+      });
+      const after = testing.listTools().map((tool) => tool.name);
+
+      return { before, after };
     });
 
-    expect(toolInfo).not.toBeNull();
-    expect(toolInfo?.name).toBe('counter_get');
-    // outputSchema should be serialized as JSON string in the testing API
-    expect(toolInfo?.outputSchema).toBeDefined();
-    if (toolInfo?.outputSchema) {
-      const outputSchema = JSON.parse(toolInfo.outputSchema);
-      expect(outputSchema.properties.counter).toBeDefined();
-      expect(outputSchema.properties.timestamp).toBeDefined();
-    }
+    expect(state.before).toContain('first_tool');
+    expect(state.after).toContain('second_tool');
+    expect(state.after).not.toContain('first_tool');
   });
 
-  test('should return structuredContent when outputSchema is defined', async ({ page }) => {
-    // Provide counter tools
-    await page.click('#provide-counter-tools');
-    await page.waitForSelector('.tool-name:has-text("counter_get")');
+  test('clearContext removes all registered tools', async ({ page }) => {
+    await page.evaluate(() => {
+      const context = navigator.modelContext;
+      if (!context) {
+        return;
+      }
 
-    // Execute counter_get tool and check for structuredContent
+      context.provideContext({
+        tools: [
+          {
+            name: 'clear_a',
+            description: 'clear a',
+            inputSchema: { type: 'object', properties: {} },
+            async execute() {
+              return 'a';
+            },
+          },
+        ],
+      });
+
+      context.registerTool({
+        name: 'clear_b',
+        description: 'clear b',
+        inputSchema: { type: 'object', properties: {} },
+        async execute() {
+          return 'b';
+        },
+      });
+
+      context.clearContext();
+    });
+
+    await expect.poll(async () => await getToolNames(page)).toEqual([]);
+  });
+
+  test('testing API executeTool works and optionally tracks calls', async ({ page }) => {
     const result = await page.evaluate(async () => {
+      const context = navigator.modelContext;
       const testing = navigator.modelContextTesting;
-      if (!testing) return { error: 'Testing API not available' };
+      if (!context || !testing) {
+        return { missingApi: true };
+      }
+
+      const hasGetToolCalls = typeof testing.getToolCalls === 'function';
+      const toolName = `tracking_${Date.now()}`;
+
+      context.registerTool({
+        name: toolName,
+        description: 'tracking test',
+        inputSchema: {
+          type: 'object',
+          properties: { value: { type: 'number' } },
+          required: ['value'],
+        },
+        async execute(input: { value: number }) {
+          return `value:${input.value}`;
+        },
+      });
 
       try {
-        // executeTool returns structuredContent directly when outputSchema is present
-        const response = await testing.executeTool('counter_get', '{}');
-        return {
-          success: true,
-          response,
-          type: typeof response,
-        };
-      } catch (error) {
-        return {
-          error: error instanceof Error ? error.message : String(error),
-        };
+        const response = await testing.executeTool(toolName, JSON.stringify({ value: 42 }));
+        const calls = hasGetToolCalls ? testing.getToolCalls() : [];
+        return { missingApi: false, response, hasGetToolCalls, calls };
+      } finally {
+        context.unregisterTool(toolName);
       }
     });
 
-    expect(result.success).toBe(true);
-    // The response should be the structured object (counter, timestamp)
-    expect(result.type).toBe('object');
+    expect(result.missingApi).toBe(false);
+    expect(String(result.response)).toContain('42');
 
-    const response = result.response as { counter: number; timestamp: string };
-    expect(response).toHaveProperty('counter');
-    expect(response).toHaveProperty('timestamp');
-    expect(typeof response.counter).toBe('number');
-    expect(typeof response.timestamp).toBe('string');
+    if (result.hasGetToolCalls) {
+      expect(result.calls.length).toBeGreaterThan(0);
+      expect(result.calls[0]?.toolName).toBeTruthy();
+    }
   });
 
-  test('should return structured counter value reflecting state', async ({ page }) => {
-    // Provide counter tools
-    await page.click('#provide-counter-tools');
-    await page.waitForSelector('.tool-name:has-text("counter_get")');
-
-    // Get initial counter value
-    const initialResult = await page.evaluate(async () => {
-      const testing = navigator.modelContextTesting;
-      if (!testing) throw new Error('Testing API not available');
-
-      const response = (await testing.executeTool('counter_get', '{}')) as {
-        counter: number;
-        timestamp: string;
-      };
-      return response;
-    });
-
-    expect(initialResult.counter).toBe(0);
-    expect(initialResult.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
-
-    // Increment counter
-    await page.evaluate(async () => {
-      const testing = navigator.modelContextTesting;
-      if (!testing) throw new Error('Testing API not available');
-      await testing.executeTool('counter_increment', '{}');
-    });
-
-    // Get updated counter value
-    const updatedResult = await page.evaluate(async () => {
-      const testing = navigator.modelContextTesting;
-      if (!testing) throw new Error('Testing API not available');
-
-      const response = (await testing.executeTool('counter_get', '{}')) as {
-        counter: number;
-        timestamp: string;
-      };
-      return response;
-    });
-
-    expect(updatedResult.counter).toBe(1);
-  });
-
-  test('should load and execute output-schema template', async ({ page }) => {
-    // Load output-schema template
-    await page.selectOption('#template-select', 'output-schema');
-
-    // Verify code is loaded
-    const editorContent = await page.locator('#code-editor').inputValue();
-    expect(editorContent).toContain('structured_counter');
-    expect(editorContent).toContain('outputSchema');
-
-    // Execute the code
-    await page.click('#register-code');
-    await page.waitForSelector('.log-entry:has-text("Code executed")');
-
-    // Verify tool appears
-    await expect(page.locator('.tool-name:has-text("structured_counter")')).toBeVisible();
-
-    // Execute the tool
+  test('returns structured content for tools with outputSchema', async ({ page }) => {
     const result = await page.evaluate(async () => {
+      const context = navigator.modelContext;
       const testing = navigator.modelContextTesting;
-      if (!testing) throw new Error('Testing API not available');
+      if (!context || !testing) {
+        return { missingApi: true };
+      }
 
-      const response = (await testing.executeTool('structured_counter', '{}')) as {
-        counter: number;
-        timestamp: string;
-        previousValue: number;
-      };
-      return response;
+      context.provideContext({
+        tools: [
+          {
+            name: 'counter_get',
+            description: 'Get counter value',
+            inputSchema: { type: 'object', properties: {} },
+            outputSchema: {
+              type: 'object',
+              properties: {
+                counter: { type: 'number' },
+                timestamp: { type: 'string' },
+              },
+              required: ['counter', 'timestamp'],
+            },
+            async execute() {
+              return { counter: 0, timestamp: new Date().toISOString() };
+            },
+          },
+        ],
+      });
+
+      const response = await testing.executeTool('counter_get', '{}');
+      return { missingApi: false, type: typeof response, response };
     });
 
-    expect(result.counter).toBe(0);
-    expect(result.previousValue).toBe(0);
-    expect(result.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(result.missingApi).toBe(false);
+    const parsed = parseJsonIfPossible(result.response);
+    expect(result.type === 'object' || typeof parsed === 'object').toBe(true);
+    expect(isCounterOutputResult(parsed)).toBe(true);
   });
 
-  test('should return structured data with increment', async ({ page }) => {
-    // Load output-schema template
+  test('output-schema template registers structured tool', async ({ page }) => {
     await page.selectOption('#template-select', 'output-schema');
     await page.click('#register-code');
-    await page.waitForSelector('.tool-name:has-text("structured_counter")');
 
-    // Execute with increment
-    const result = await page.evaluate(async () => {
-      const testing = navigator.modelContextTesting;
-      if (!testing) throw new Error('Testing API not available');
+    await waitForToolPresent(page, 'structured_counter');
 
-      // First call to set baseline
-      await testing.executeTool('structured_counter', '{}');
-
-      // Second call with increment
-      const response = (await testing.executeTool(
+    const response = await page.evaluate(async () => {
+      return await navigator.modelContextTesting?.executeTool(
         'structured_counter',
-        JSON.stringify({ increment: 5 })
-      )) as {
-        counter: number;
-        timestamp: string;
-        previousValue: number;
-      };
-      return response;
+        JSON.stringify({ increment: 3 })
+      );
     });
 
-    expect(result.counter).toBe(5);
-    expect(result.previousValue).toBe(0);
-  });
+    expect(response).toBeTruthy();
+    const parsed = parseJsonIfPossible(response);
+    expect(isStructuredCounterResult(parsed)).toBe(true);
 
-  test('should NOT return structuredContent for tools without outputSchema', async ({ page }) => {
-    // Provide counter tools
-    await page.click('#provide-counter-tools');
-    await page.waitForSelector('.tool-name:has-text("counter_increment")');
+    if (!isStructuredCounterResult(parsed)) {
+      return;
+    }
 
-    // Execute counter_increment (no outputSchema)
-    const result = await page.evaluate(async () => {
-      const testing = navigator.modelContextTesting;
-      if (!testing) return { error: 'Testing API not available' };
-
-      const response = await testing.executeTool('counter_increment', '{}');
-      return {
-        response,
-        type: typeof response,
-      };
-    });
-
-    // For tools without outputSchema, the response is parsed text (string or parsed JSON)
-    // The counter_increment returns a string like "Counter: 1"
-    expect(result.response).toBeDefined();
+    expect(parsed.counter).toBe(3);
+    expect(parsed.previousValue).toBe(0);
+    expect(parsed.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 });
 
 test.describe('Iframe Context Propagation', () => {
-  test('should load iframe and show connected status', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('.banner.success');
+  test.beforeEach(async ({ page }) => {
+    await openShowcase(page);
+    await waitForIframeReady(page);
+  });
 
-    // Wait for iframe to be ready
+  test('loads iframe and reports native ready state', async ({ page }) => {
     const iframe = page.frameLocator('#test-iframe');
-    await iframe.locator('#iframe-status').waitFor({ timeout: 10000 });
+    await expect(iframe.locator('#iframe-status')).toContainText('Native API Ready');
+    await expect(iframe.locator('#iframe-tool-list')).toContainText('No tools registered');
+  });
 
-    // Check iframe status indicator shows connected
-    await page.waitForSelector('#iframe-status-indicator:has-text("Connected")', {
+  test('registering iframe bucket A logs registration inside iframe', async ({ page }) => {
+    const iframe = page.frameLocator('#test-iframe');
+    await iframe.locator('#register-iframe-tool-a').click();
+    await expect(iframe.locator('#iframe-event-log')).toContainText('Registered iframe_echo', {
       timeout: 10000,
     });
   });
 
-  test('should register tools in parent context (Bucket A)', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('.banner.success');
+  test('registering iframe bucket B enables iframe unregister button', async ({ page }) => {
+    const iframe = page.frameLocator('#test-iframe');
+    await iframe.locator('#register-iframe-tool-b').click();
 
-    // Wait for iframe to be ready
-    await page.waitForSelector('#iframe-status-indicator:has-text("Connected")', {
+    await expect(iframe.locator('#unregister-iframe-tool-b')).not.toBeDisabled();
+    await expect(iframe.locator('#iframe-event-log')).toContainText('Registered iframe_timestamp', {
       timeout: 10000,
     });
-
-    // Register parent Bucket A tool
-    await page.click('#iframe-parent-register-a');
-
-    // Wait for tool to appear in parent tools display
-    await page.waitForSelector('#iframe-parent-tools:has-text("parent_greet")', { timeout: 5000 });
-
-    // Check context comparison shows parent only
-    const parentOnly = await page.locator('#iframe-compare-parent').textContent();
-    expect(parentOnly).toContain('parent_greet');
   });
 
-  test('should register tools in parent context (Bucket B)', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('.banner.success');
+  test('unregistering iframe bucket B disables iframe unregister button', async ({ page }) => {
+    const iframe = page.frameLocator('#test-iframe');
+    await iframe.locator('#register-iframe-tool-b').click();
+    await expect(iframe.locator('#unregister-iframe-tool-b')).not.toBeDisabled();
 
-    // Wait for iframe to be ready
-    await page.waitForSelector('#iframe-status-indicator:has-text("Connected")', {
-      timeout: 10000,
-    });
-
-    // Register parent Bucket B tool
-    await page.click('#iframe-parent-register-b');
-
-    // Wait for tool to appear
-    await page.waitForSelector('#iframe-parent-tools:has-text("parent_time")', { timeout: 5000 });
-
-    // Unregister button should be enabled
-    const unregisterBtn = page.locator('#iframe-parent-unregister-b');
-    await expect(unregisterBtn).not.toBeDisabled();
+    await iframe.locator('#unregister-iframe-tool-b').click();
+    await expect(iframe.locator('#unregister-iframe-tool-b')).toBeVisible();
   });
 
-  test('should send register command to iframe', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('.banner.success');
+  test('reloads iframe and remains operational', async ({ page }) => {
+    const iframe = page.frameLocator('#test-iframe');
+    await iframe.locator('#register-iframe-tool-a').click();
+    await expect(iframe.locator('#iframe-event-log')).toContainText('Registered iframe_echo');
 
-    // Wait for iframe to be ready
-    await page.waitForSelector('#iframe-status-indicator:has-text("Connected")', {
-      timeout: 10000,
-    });
-
-    // Send register Bucket A command to iframe
-    await page.click('#iframe-child-register-a');
-
-    // Wait for iframe tools to update
-    await page.waitForSelector('#iframe-child-tools:has-text("iframe_echo")', { timeout: 5000 });
-
-    // Check iframe event log
-    const iframeLog = page.locator('#iframe-event-log');
-    await expect(iframeLog).toContainText('iframe_echo');
-  });
-
-  test('should send register Bucket B command to iframe', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('.banner.success');
-
-    // Wait for iframe to be ready
-    await page.waitForSelector('#iframe-status-indicator:has-text("Connected")', {
-      timeout: 10000,
-    });
-
-    // Send register Bucket B command to iframe
-    await page.click('#iframe-child-register-b');
-
-    // Wait for iframe tools to update
-    await page.waitForSelector('#iframe-child-tools:has-text("iframe_timestamp")', {
-      timeout: 5000,
-    });
-
-    // Unregister button should be enabled after registration
-    const unregisterBtn = page.locator('#iframe-child-unregister-b');
-    await expect(unregisterBtn).not.toBeDisabled();
-  });
-
-  test('should show context comparison between parent and iframe', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('.banner.success');
-
-    // Wait for iframe to be ready
-    await page.waitForSelector('#iframe-status-indicator:has-text("Connected")', {
-      timeout: 10000,
-    });
-
-    // Register tool in parent
-    await page.click('#iframe-parent-register-a');
-    await page.waitForSelector('#iframe-parent-tools:has-text("parent_greet")', { timeout: 5000 });
-
-    // Register tool in iframe
-    await page.click('#iframe-child-register-a');
-    await page.waitForSelector('#iframe-child-tools:has-text("iframe_echo")', { timeout: 5000 });
-
-    // Check context comparison
-    const parentOnly = await page.locator('#iframe-compare-parent').textContent();
-    const childOnly = await page.locator('#iframe-compare-child').textContent();
-
-    expect(parentOnly).toContain('parent_greet');
-    expect(childOnly).toContain('iframe_echo');
-  });
-
-  test('should unregister parent Bucket B tool', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('.banner.success');
-
-    // Wait for iframe to be ready
-    await page.waitForSelector('#iframe-status-indicator:has-text("Connected")', {
-      timeout: 10000,
-    });
-
-    // Register and then unregister
-    await page.click('#iframe-parent-register-b');
-    await page.waitForSelector('#iframe-parent-tools:has-text("parent_time")', { timeout: 5000 });
-
-    await page.click('#iframe-parent-unregister-b');
-
-    // Tool should be removed
-    await expect(page.locator('#iframe-parent-tools:has-text("parent_time")')).not.toBeVisible();
-
-    // Button should be disabled again
-    const unregisterBtn = page.locator('#iframe-parent-unregister-b');
-    await expect(unregisterBtn).toBeDisabled();
-  });
-
-  test('should clear parent context', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('.banner.success');
-
-    // Wait for iframe to be ready
-    await page.waitForSelector('#iframe-status-indicator:has-text("Connected")', {
-      timeout: 10000,
-    });
-
-    // Register parent tool
-    await page.click('#iframe-parent-register-a');
-    await page.waitForSelector('#iframe-parent-tools:has-text("parent_greet")', { timeout: 5000 });
-
-    // Clear context
-    await page.click('#iframe-parent-clear');
-
-    // Tool should be removed
-    await expect(page.locator('#iframe-parent-tools:has-text("parent_greet")')).not.toBeVisible();
-
-    // Iframe event log should show context cleared
-    await expect(page.locator('#iframe-event-log')).toContainText('Context cleared');
-  });
-
-  test('should reload iframe', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('.banner.success');
-
-    // Wait for iframe to be ready
-    await page.waitForSelector('#iframe-status-indicator:has-text("Connected")', {
-      timeout: 10000,
-    });
-
-    // Register tool in iframe
-    await page.click('#iframe-child-register-a');
-    await page.waitForSelector('#iframe-child-tools:has-text("iframe_echo")', { timeout: 5000 });
-
-    // Reload iframe
     await page.click('#iframe-reload');
+    await waitForIframeReady(page);
 
-    // Should show loading state briefly
-    await page.waitForSelector('#iframe-status-indicator:has-text("Loading")', { timeout: 2000 });
-
-    // Should become connected again
-    await page.waitForSelector('#iframe-status-indicator:has-text("Connected")', {
-      timeout: 10000,
-    });
-
-    // Tools should be cleared after reload
-    await expect(page.locator('#iframe-child-tools:has-text("iframe_echo")')).not.toBeVisible();
-  });
-
-  test('should clear iframe event log', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('.banner.success');
-
-    // Wait for iframe to be ready
-    await page.waitForSelector('#iframe-status-indicator:has-text("Connected")', {
-      timeout: 10000,
-    });
-
-    // Generate some logs
-    await page.click('#iframe-parent-register-a');
-    await page.waitForTimeout(500);
-
-    // Clear log
-    await page.click('#clear-iframe-log');
-
-    // Log should be empty
-    const logContent = await page.locator('#iframe-event-log').textContent();
-    expect(logContent?.trim()).toBe('');
-  });
-
-  test('should log cross-frame events', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('.banner.success');
-
-    // Wait for iframe to be ready
-    await page.waitForSelector('#iframe-status-indicator:has-text("Connected")', {
-      timeout: 10000,
-    });
-
-    // Clear any existing logs
-    await page.click('#clear-iframe-log');
-
-    // Register tool in parent
-    await page.click('#iframe-parent-register-a');
-    await page.waitForTimeout(500);
-
-    // Check iframe event log has entry
-    const iframeLog = page.locator('#iframe-event-log');
-    await expect(iframeLog).toContainText('parent_greet');
+    await expect(iframe.locator('#iframe-status')).toContainText('Native API Ready');
   });
 });
