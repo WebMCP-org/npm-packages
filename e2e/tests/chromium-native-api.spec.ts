@@ -1,5 +1,22 @@
 import { expect, test } from '@playwright/test';
 
+function isDirectOrWrappedText(value: unknown, expectedText: string): boolean {
+  if (value === expectedText) {
+    return true;
+  }
+  if (typeof value !== 'string') {
+    return false;
+  }
+  try {
+    const parsed = JSON.parse(value) as {
+      content?: Array<{ type?: string; text?: string }>;
+    };
+    return parsed.content?.[0]?.type === 'text' && parsed.content?.[0]?.text === expectedText;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * E2E Tests for Chromium Native API Compatibility
  *
@@ -11,8 +28,9 @@ import { expect, test } from '@playwright/test';
  * - Polyfill implementation (when native is not available)
  *
  * To test with Chromium native:
- * 1. Launch Chromium with: chromium --enable-experimental-web-platform-features
- * 2. Or enable "Experimental Web Platform Features" at chrome://flags
+ * 1. Launch Chromium/Chrome Beta with:
+ *    --enable-experimental-web-platform-features --enable-features=WebMCPForTesting
+ * 2. Or enable "WebMCP for testing" at chrome://flags/#enable-webmcp-testing
  */
 test.describe('Chromium Native API - ModelContext', () => {
   test.beforeEach(async ({ page }) => {
@@ -221,7 +239,7 @@ test.describe('Chromium Native API - ModelContextTesting', () => {
       return await testingAPI.executeTool('echoTest', inputJson);
     });
 
-    expect(result).toBe('Hello World');
+    expect(isDirectOrWrappedText(result, 'Hello World')).toBe(true);
   });
 
   test('should executeTool throw on invalid JSON', async ({ page }) => {
@@ -239,7 +257,7 @@ test.describe('Chromium Native API - ModelContextTesting', () => {
       }
     });
 
-    expect(result.error).toBe('SyntaxError');
+    expect(result.error).toBe('UnknownError');
   });
 
   test('should executeTool throw on non-existent tool', async ({ page }) => {
@@ -364,17 +382,18 @@ test.describe('Chromium Native API - ModelContextTesting', () => {
     );
   });
 
-  test('should registerToolsChangedCallback handle multiple callbacks', async ({ page }) => {
-    const callbackCount = await page.evaluate(() => {
+  test('should registerToolsChangedCallback replace prior callback', async ({ page }) => {
+    const callbackCounts = await page.evaluate(() => {
       const testingAPI = navigator.modelContextTesting;
-      if (!testingAPI) return 0;
+      if (!testingAPI) return { first: 0, second: 0 };
 
-      let count = 0;
+      let first = 0;
+      let second = 0;
       const callback1 = () => {
-        count++;
+        first++;
       };
       const callback2 = () => {
-        count++;
+        second++;
       };
 
       testingAPI.registerToolsChangedCallback(callback1);
@@ -390,11 +409,12 @@ test.describe('Chromium Native API - ModelContextTesting', () => {
         },
       });
 
-      return count;
+      return { first, second };
     });
 
-    // Both callbacks should fire
-    expect(callbackCount).toBe(2);
+    // Chromium early preview uses replacement semantics (latest callback wins).
+    expect(callbackCounts.first).toBe(0);
+    expect(callbackCounts.second).toBe(1);
   });
 
   test('should registerToolsChangedCallback not break on callback error', async ({ page }) => {

@@ -3,6 +3,10 @@ import { defineConfig, devices } from '@playwright/test';
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
+const tabTransportPort = Number.parseInt(process.env.PLAYWRIGHT_TAB_TRANSPORT_PORT ?? '4173', 10);
+const tabTransportBaseUrl = `http://localhost:${tabTransportPort}`;
+const reuseExistingServer = process.env.PLAYWRIGHT_REUSE_SERVER === '1';
+
 export default defineConfig({
   testDir: './tests',
   /* Run tests in files in parallel */
@@ -18,7 +22,7 @@ export default defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: 'http://localhost:5173',
+    baseURL: tabTransportBaseUrl,
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
     /* Screenshot on failure */
@@ -45,9 +49,9 @@ export default defineConfig({
 
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: 'pnpm --filter mcp-tab-transport-test-app dev',
-    url: 'http://localhost:5173',
-    reuseExistingServer: !process.env.CI,
+    command: `pnpm --filter mcp-tab-transport-test-app exec vite --port ${tabTransportPort}`,
+    url: tabTransportBaseUrl,
+    reuseExistingServer,
     timeout: 120 * 1000,
     stdout: 'ignore',
     stderr: 'pipe',

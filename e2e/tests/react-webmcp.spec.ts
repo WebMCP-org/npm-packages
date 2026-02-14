@@ -628,8 +628,6 @@ test.describe('React WebMCP structuredContent Tests', () => {
   });
 
   test('should return structuredContent for tools with outputSchema', async ({ page }) => {
-    // Call the counter_get tool via modelContextTesting (it has outputSchema defined)
-    // The executeTool returns structuredContent directly when outputSchema is present
     const result = await page.evaluate(async () => {
       const testing = navigator.modelContextTesting;
       if (!testing) {
@@ -637,12 +635,24 @@ test.describe('React WebMCP structuredContent Tests', () => {
       }
 
       try {
-        // executeTool returns structuredContent directly for tools with outputSchema
-        const response = await testing.executeTool('counter_get', '{}');
+        const serialized = await testing.executeTool('counter_get', '{}');
+        if (serialized === null) {
+          return {
+            success: false,
+            error: 'Expected non-null tool result',
+          };
+        }
+
+        const parsed = JSON.parse(serialized) as { structuredContent?: unknown };
+        const structuredContent = parsed.structuredContent as
+          | { counter?: unknown; timestamp?: unknown }
+          | undefined;
+
         return {
           success: true,
-          response,
-          isObject: typeof response === 'object' && response !== null,
+          hasStructuredContent: typeof structuredContent === 'object' && structuredContent !== null,
+          counterType: typeof structuredContent?.counter,
+          timestampType: typeof structuredContent?.timestamp,
         };
       } catch (error) {
         return {
@@ -654,18 +664,9 @@ test.describe('React WebMCP structuredContent Tests', () => {
 
     // Verify the tool call was successful
     expect(result.success).toBe(true);
-
-    // modelContextTesting.executeTool returns structuredContent directly when present
-    // (it returns the value itself, not wrapped in a response object)
-    expect(result.isObject).toBe(true);
-
-    // Verify the response has the expected structure (counter and timestamp)
-    const response = result.response as { counter: number; timestamp: string };
-    expect(response).toBeDefined();
-    expect(response).toHaveProperty('counter');
-    expect(response).toHaveProperty('timestamp');
-    expect(typeof response.counter).toBe('number');
-    expect(typeof response.timestamp).toBe('string');
+    expect(result.hasStructuredContent).toBe(true);
+    expect(result.counterType).toBe('number');
+    expect(result.timestampType).toBe('string');
   });
 
   test('should return parsed text for tools without outputSchema', async ({ page }) => {
@@ -704,55 +705,76 @@ test.describe('React WebMCP structuredContent Tests', () => {
   });
 
   test('should return correct counter value from structuredContent', async ({ page }) => {
-    // Test that structuredContent contains the actual data from the handler
     const result = await page.evaluate(async () => {
       const testing = navigator.modelContextTesting;
       if (!testing) {
         throw new Error('modelContextTesting not available');
       }
 
-      // Call counter_get - returns { counter, timestamp }
-      const response = (await testing.executeTool('counter_get', '{}')) as {
-        counter: number;
-        timestamp: string;
+      const serialized = await testing.executeTool('counter_get', '{}');
+      if (serialized === null) {
+        return {
+          counter: undefined,
+          hasTimestamp: false,
+          timestampIsISO: false,
+        };
+      }
+
+      const parsed = JSON.parse(serialized) as {
+        structuredContent?: { counter?: number; timestamp?: string };
       };
+      const response = parsed.structuredContent;
 
       return {
-        counter: response.counter,
-        hasTimestamp: typeof response.timestamp === 'string',
-        timestampIsISO: /^\d{4}-\d{2}-\d{2}T/.test(response.timestamp),
+        counter: response?.counter,
+        hasTimestamp: typeof response?.timestamp === 'string',
+        timestampIsISO:
+          typeof response?.timestamp === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(response.timestamp),
       };
     });
 
-    // The counter starts at 0
     expect(typeof result.counter).toBe('number');
     expect(result.hasTimestamp).toBe(true);
     expect(result.timestampIsISO).toBe(true);
   });
 
   test('should validate structuredContent reflects updated state', async ({ page }) => {
-    // Call counter_get multiple times and verify structuredContent reflects actual values
     const results = await page.evaluate(async () => {
       const testing = navigator.modelContextTesting;
       if (!testing) {
         throw new Error('modelContextTesting not available');
       }
 
-      // First call - get initial counter value
-      const response1 = (await testing.executeTool('counter_get', '{}')) as {
-        counter: number;
-        timestamp: string;
+      const first = await testing.executeTool('counter_get', '{}');
+      if (first === null) {
+        return {
+          initialCounter: undefined,
+          updatedCounter: undefined,
+          incrementedBy5: false,
+          hasValidTimestamp: false,
+        };
+      }
+      const parsedFirst = JSON.parse(first) as {
+        structuredContent?: { counter?: number; timestamp?: string };
       };
+      const response1 = parsedFirst.structuredContent ?? {};
       const initialCounter = response1.counter;
 
-      // Increment counter by 5
       await testing.executeTool('counter_increment', JSON.stringify({ amount: 5 }));
 
-      // Second call - get updated counter value
-      const response2 = (await testing.executeTool('counter_get', '{}')) as {
-        counter: number;
-        timestamp: string;
+      const second = await testing.executeTool('counter_get', '{}');
+      if (second === null) {
+        return {
+          initialCounter,
+          updatedCounter: undefined,
+          incrementedBy5: false,
+          hasValidTimestamp: typeof response1.timestamp === 'string',
+        };
+      }
+      const parsedSecond = JSON.parse(second) as {
+        structuredContent?: { counter?: number; timestamp?: string };
       };
+      const response2 = parsedSecond.structuredContent ?? {};
       const updatedCounter = response2.counter;
 
       return {

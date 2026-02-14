@@ -112,7 +112,7 @@
 
     <div class="section">
       <h2>Dynamic Tools (Bucket B - registerTool)</h2>
-      <p>These tools are registered via <code>registerTool()</code> and persist across <code>provideContext()</code> calls.</p>
+      <p>These tools are registered via <code>registerTool()</code> and can be removed when <code>provideContext()</code> replaces tool context in strict core mode.</p>
       <div style="text-align: center;">
         <button id="register-dynamic">Register Dynamic Tool</button>
         <button id="unregister-dynamic" disabled>Unregister Dynamic Tool</button>
@@ -125,7 +125,7 @@
 
     <div class="section">
       <h2>Test Two-Bucket System</h2>
-      <p>Test that Bucket B (dynamic tools) persist when Bucket A is replaced.</p>
+      <p>Test strict replacement behavior: <code>provideContext()</code> replaces tool context, including dynamic tools.</p>
       <button id="replace-base-tools">Replace Base Tools (provideContext)</button>
       <button id="list-all-tools">List All Tools</button>
     </div>

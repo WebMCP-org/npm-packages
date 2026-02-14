@@ -1,5 +1,5 @@
 // Web Model Context API Test App
-// Tests window.navigator.modelContext with two-bucket tool management
+// Tests strict tool replacement plus MCPB extension APIs
 
 // Import the global package to initialize navigator.modelContext
 import '@mcp-b/global';
@@ -7,8 +7,7 @@ import '@mcp-b/global';
 // Counter state
 let counter = 0;
 
-// Dynamic tool registration
-let dynamicToolRegistration: { unregister: () => void } | null = null;
+const DYNAMIC_TOOL_NAME = 'dynamicTool';
 
 // Dynamic resource registration
 let dynamicResourceRegistration: { unregister: () => void } | null = null;
@@ -104,6 +103,10 @@ function log(message: string, type: 'info' | 'success' | 'error' = 'info') {
 function updateCounterDisplay() {
   counterDisplayEl.textContent = counter.toString();
   counterDisplayEl.setAttribute('data-counter', counter.toString());
+}
+
+function hasRegisteredTool(name: string): boolean {
+  return navigator.modelContext.listTools().some((tool) => tool.name === name);
 }
 
 // Check if API is available
@@ -225,16 +228,16 @@ function registerBaseTools() {
 // Register a dynamic tool (Bucket B) using registerTool
 function registerDynamicTool() {
   try {
-    if (dynamicToolRegistration) {
+    if (hasRegisteredTool(DYNAMIC_TOOL_NAME)) {
       log('Dynamic tool already registered', 'error');
       return;
     }
 
     log('Registering dynamic tool via registerTool()...');
 
-    dynamicToolRegistration = navigator.modelContext.registerTool({
-      name: 'dynamicTool',
-      description: 'A dynamically registered tool that persists across provideContext calls',
+    navigator.modelContext.registerTool({
+      name: DYNAMIC_TOOL_NAME,
+      description: 'A dynamically registered tool',
       inputSchema: {
         type: 'object',
         properties: {},
@@ -267,14 +270,13 @@ function registerDynamicTool() {
 // Unregister the dynamic tool
 function unregisterDynamicTool() {
   try {
-    if (!dynamicToolRegistration) {
+    if (!hasRegisteredTool(DYNAMIC_TOOL_NAME)) {
       log('No dynamic tool to unregister', 'error');
       return;
     }
 
     log('Unregistering dynamic tool...');
-    dynamicToolRegistration.unregister();
-    dynamicToolRegistration = null;
+    navigator.modelContext.unregisterTool(DYNAMIC_TOOL_NAME);
 
     log('Dynamic tool unregistered successfully', 'success');
     dynamicStatusEl.textContent = 'Dynamic tool status: Not registered';
@@ -290,7 +292,7 @@ function unregisterDynamicTool() {
 
 // Test calling the dynamic tool (simulated)
 function callDynamicTool() {
-  if (!dynamicToolRegistration) {
+  if (!hasRegisteredTool(DYNAMIC_TOOL_NAME)) {
     log('Dynamic tool is not registered', 'error');
     return;
   }
@@ -352,8 +354,18 @@ function replaceBaseTools() {
     });
 
     log('Base tools replaced! Old tools (increment, decrement, etc.) are gone.', 'success');
-    if (dynamicToolRegistration) {
-      log('✅ Dynamic tool still registered! (Bucket B persists)', 'success');
+    if (hasRegisteredTool(DYNAMIC_TOOL_NAME)) {
+      log(
+        '⚠️ Dynamic tool still registered (unexpected under strict provideContext() replacement)',
+        'error'
+      );
+    } else {
+      log('ℹ️ Dynamic tool cleared by strict provideContext() replacement behavior', 'info');
+      dynamicStatusEl.textContent = 'Dynamic tool status: Not registered';
+      dynamicStatusEl.style.background = '#f5f5f5';
+      registerDynamicBtn.disabled = false;
+      unregisterDynamicBtn.disabled = true;
+      callDynamicBtn.disabled = true;
     }
   } catch (error) {
     log(`Failed to replace base tools: ${error}`, 'error');
@@ -1278,15 +1290,14 @@ function testChromiumUnregisterTool() {
   try {
     log('Testing unregisterTool() (Chromium native API)...', 'info');
 
-    if (!dynamicToolRegistration) {
+    if (!hasRegisteredTool(DYNAMIC_TOOL_NAME)) {
       log('No dynamic tool registered. Register one first.', 'error');
       return;
     }
 
-    const toolName = 'dynamicTool';
+    const toolName = DYNAMIC_TOOL_NAME;
     navigator.modelContext.unregisterTool(toolName);
 
-    dynamicToolRegistration = null;
     dynamicStatusEl.textContent = 'Dynamic tool status: Not registered';
     dynamicStatusEl.style.background = '#f5f5f5';
     registerDynamicBtn.disabled = false;
@@ -1306,7 +1317,6 @@ function testChromiumClearContext() {
 
     navigator.modelContext.clearContext();
 
-    dynamicToolRegistration = null;
     dynamicStatusEl.textContent = 'Dynamic tool status: Not registered';
     dynamicStatusEl.style.background = '#f5f5f5';
     registerDynamicBtn.disabled = false;
@@ -1459,9 +1469,8 @@ function testChromiumCallbackUnregister() {
     });
 
     // Unregister the dynamic tool to trigger callback
-    if (dynamicToolRegistration) {
-      navigator.modelContext.unregisterTool('dynamicTool');
-      dynamicToolRegistration = null;
+    if (hasRegisteredTool(DYNAMIC_TOOL_NAME)) {
+      navigator.modelContext.unregisterTool(DYNAMIC_TOOL_NAME);
 
       setTimeout(() => {
         if (callbackFired) {
@@ -1653,20 +1662,21 @@ function testRapidToolRegistration(count: number): Promise<{
     }
 
     // Register N tools synchronously (should batch into 1 notification)
-    const registrations: Array<{ unregister: () => void }> = [];
+    const registeredToolNames: string[] = [];
     for (let i = 0; i < count; i++) {
-      const reg = navigator.modelContext.registerTool({
-        name: `batchTestTool_${i}`,
+      const toolName = `batchTestTool_${i}`;
+      navigator.modelContext.registerTool({
+        name: toolName,
         description: `Batch test tool ${i}`,
         inputSchema: { type: 'object', properties: {} },
         async execute() {
           return { content: [{ type: 'text', text: `Tool ${i} executed` }] };
         },
       });
-      registrations.push(reg);
+      registeredToolNames.push(toolName);
     }
 
-    log(`Registered ${registrations.length} tools synchronously`, 'info');
+    log(`Registered ${registeredToolNames.length} tools synchronously`, 'info');
 
     // Wait for microtask to complete, then check notification count
     // Use setTimeout to ensure we're after the microtask queue
@@ -1674,7 +1684,7 @@ function testRapidToolRegistration(count: number): Promise<{
       notificationTrackingEnabled = false;
 
       const result = {
-        registeredCount: registrations.length,
+        registeredCount: registeredToolNames.length,
         notificationCount: toolNotificationCount,
       };
 
@@ -1684,8 +1694,8 @@ function testRapidToolRegistration(count: number): Promise<{
       );
 
       // Cleanup: unregister all test tools
-      for (const reg of registrations) {
-        reg.unregister();
+      for (const toolName of registeredToolNames) {
+        navigator.modelContext.unregisterTool(toolName);
       }
 
       resolve(result);
@@ -1714,7 +1724,7 @@ function testMultiTaskToolRegistration(count: number): Promise<{
       });
     }
 
-    const registrations: Array<{ unregister: () => void }> = [];
+    const registeredToolNames: string[] = [];
     let registered = 0;
 
     // Register tools across separate tasks using setTimeout
@@ -1725,7 +1735,7 @@ function testMultiTaskToolRegistration(count: number): Promise<{
           notificationTrackingEnabled = false;
 
           const result = {
-            registeredCount: registrations.length,
+            registeredCount: registeredToolNames.length,
             notificationCount: toolNotificationCount,
           };
 
@@ -1735,8 +1745,8 @@ function testMultiTaskToolRegistration(count: number): Promise<{
           );
 
           // Cleanup
-          for (const reg of registrations) {
-            reg.unregister();
+          for (const toolName of registeredToolNames) {
+            navigator.modelContext.unregisterTool(toolName);
           }
 
           resolve(result);
@@ -1745,15 +1755,16 @@ function testMultiTaskToolRegistration(count: number): Promise<{
       }
 
       const i = registered++;
-      const reg = navigator.modelContext.registerTool({
-        name: `multiTaskTool_${i}`,
+      const toolName = `multiTaskTool_${i}`;
+      navigator.modelContext.registerTool({
+        name: toolName,
         description: `Multi-task test tool ${i}`,
         inputSchema: { type: 'object', properties: {} },
         async execute() {
           return { content: [{ type: 'text', text: `Tool ${i} executed` }] };
         },
       });
-      registrations.push(reg);
+      registeredToolNames.push(toolName);
 
       // Schedule next registration in a new task
       setTimeout(registerNext, 10);
@@ -1786,20 +1797,20 @@ function testMixedRegistrationBatching(): Promise<{
       });
     }
 
-    const allRegistrations: Array<{ unregister: () => void }> = [];
+    const allRegistrationToolNames: string[] = [];
 
     // Phase 1: Register 5 tools synchronously (should batch to 1 notification)
     for (let i = 0; i < 5; i++) {
-      allRegistrations.push(
-        navigator.modelContext.registerTool({
-          name: `mixedPhase1_${i}`,
-          description: `Mixed phase 1 tool ${i}`,
-          inputSchema: { type: 'object', properties: {} },
-          async execute() {
-            return { content: [{ type: 'text', text: 'test' }] };
-          },
-        })
-      );
+      const toolName = `mixedPhase1_${i}`;
+      navigator.modelContext.registerTool({
+        name: toolName,
+        description: `Mixed phase 1 tool ${i}`,
+        inputSchema: { type: 'object', properties: {} },
+        async execute() {
+          return { content: [{ type: 'text', text: 'test' }] };
+        },
+      });
+      allRegistrationToolNames.push(toolName);
     }
 
     // After microtask, move to phase 2
@@ -1808,16 +1819,16 @@ function testMixedRegistrationBatching(): Promise<{
 
       // Phase 2: Register 3 more tools synchronously (should batch to 1 notification)
       for (let i = 0; i < 3; i++) {
-        allRegistrations.push(
-          navigator.modelContext.registerTool({
-            name: `mixedPhase2_${i}`,
-            description: `Mixed phase 2 tool ${i}`,
-            inputSchema: { type: 'object', properties: {} },
-            async execute() {
-              return { content: [{ type: 'text', text: 'test' }] };
-            },
-          })
-        );
+        const toolName = `mixedPhase2_${i}`;
+        navigator.modelContext.registerTool({
+          name: toolName,
+          description: `Mixed phase 2 tool ${i}`,
+          inputSchema: { type: 'object', properties: {} },
+          async execute() {
+            return { content: [{ type: 'text', text: 'test' }] };
+          },
+        });
+        allRegistrationToolNames.push(toolName);
       }
 
       setTimeout(() => {
@@ -1825,16 +1836,16 @@ function testMixedRegistrationBatching(): Promise<{
 
         // Phase 3: Register 2 more tools synchronously (should batch to 1 notification)
         for (let i = 0; i < 2; i++) {
-          allRegistrations.push(
-            navigator.modelContext.registerTool({
-              name: `mixedPhase3_${i}`,
-              description: `Mixed phase 3 tool ${i}`,
-              inputSchema: { type: 'object', properties: {} },
-              async execute() {
-                return { content: [{ type: 'text', text: 'test' }] };
-              },
-            })
-          );
+          const toolName = `mixedPhase3_${i}`;
+          navigator.modelContext.registerTool({
+            name: toolName,
+            description: `Mixed phase 3 tool ${i}`,
+            inputSchema: { type: 'object', properties: {} },
+            async execute() {
+              return { content: [{ type: 'text', text: 'test' }] };
+            },
+          });
+          allRegistrationToolNames.push(toolName);
         }
 
         setTimeout(() => {
@@ -1852,8 +1863,8 @@ function testMixedRegistrationBatching(): Promise<{
           );
 
           // Cleanup
-          for (const reg of allRegistrations) {
-            reg.unregister();
+          for (const toolName of allRegistrationToolNames) {
+            navigator.modelContext.unregisterTool(toolName);
           }
 
           resolve(result);
