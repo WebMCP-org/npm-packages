@@ -9,7 +9,7 @@ export default defineConfig({
     browser: {
       enabled: true,
       provider: playwright({
-        launchOptions: isCI ? { channel: 'chrome-beta' } : {},
+        launchOptions: process.env.CHROME_BIN ? { executablePath: process.env.CHROME_BIN } : {},
       }),
       instances: [{ browser: 'chromium' }],
     },
