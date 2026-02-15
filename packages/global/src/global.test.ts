@@ -5,6 +5,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { z } from 'zod';
 import { cleanupWebModelContext, initializeWebModelContext } from './global.js';
 import type {
+  InputSchema,
   InternalModelContext,
   ModelContext,
   ModelContextInput,
@@ -224,7 +225,20 @@ describe('Web Model Context Polyfill', () => {
   });
 
   beforeEach(async () => {
-    if (!navigator.modelContext || !navigator.modelContextTesting) {
+    const testing = navigator.modelContextTesting as
+      | (ModelContextTesting & Partial<ModelContextTestingPolyfillExtensions>)
+      | undefined;
+    const hasPolyfillExtensions =
+      Boolean(testing) &&
+      typeof testing?.getToolCalls === 'function' &&
+      typeof testing?.clearToolCalls === 'function' &&
+      typeof testing?.setMockToolResponse === 'function' &&
+      typeof testing?.clearMockToolResponse === 'function' &&
+      typeof testing?.clearAllMockToolResponses === 'function' &&
+      typeof testing?.getRegisteredTools === 'function' &&
+      typeof testing?.reset === 'function';
+
+    if (!navigator.modelContext || !navigator.modelContextTesting || !hasPolyfillExtensions) {
       await resetPolyfill();
     }
     navigator.modelContext?.clearContext();
@@ -319,6 +333,13 @@ describe('Web Model Context Polyfill', () => {
 
       type ExternalTool = Parameters<ModelContext['registerTool']>[0];
       const externalToolRegistry = new Map<string, ExternalTool>();
+      const events = new EventTarget();
+      let toolsChangedCallback: (() => void) | null = null;
+      const externalCallTool = vi.fn(
+        async (params: { name: string; arguments?: Record<string, unknown> }) => ({
+          content: [{ type: 'text', text: `called ${params.name}` }],
+        })
+      );
 
       const externalModelContext = {
         __isWebMCPPolyfill: true,
@@ -327,16 +348,55 @@ describe('Web Model Context Polyfill', () => {
           for (const tool of context?.tools ?? []) {
             externalToolRegistry.set(tool.name, tool);
           }
+          events.dispatchEvent(new Event('toolschanged'));
+          toolsChangedCallback?.();
         },
         clearContext: () => {
           externalToolRegistry.clear();
+          events.dispatchEvent(new Event('toolschanged'));
+          toolsChangedCallback?.();
         },
         registerTool: (tool: ExternalTool) => {
           externalToolRegistry.set(tool.name, tool);
+          events.dispatchEvent(new Event('toolschanged'));
+          toolsChangedCallback?.();
         },
         unregisterTool: (name: string) => {
           externalToolRegistry.delete(name);
+          events.dispatchEvent(new Event('toolschanged'));
+          toolsChangedCallback?.();
         },
+        listTools: () =>
+          Array.from(externalToolRegistry.values()).map((tool) => ({
+            name: tool.name,
+            description: tool.description,
+            inputSchema: tool.inputSchema as InputSchema,
+          })),
+        callTool: externalCallTool,
+        addEventListener: events.addEventListener.bind(events),
+        removeEventListener: events.removeEventListener.bind(events),
+        dispatchEvent: events.dispatchEvent.bind(events),
+      };
+
+      const externalModelContextTesting: ModelContextTesting = {
+        executeTool: async (toolName: string, inputArgsJson: string) => {
+          const parsed = JSON.parse(inputArgsJson) as Record<string, unknown>;
+          const result = await externalCallTool({
+            name: toolName,
+            arguments: parsed,
+          });
+          return JSON.stringify(result);
+        },
+        listTools: () =>
+          externalModelContext.listTools().map((tool) => ({
+            name: tool.name,
+            description: tool.description,
+            inputSchema: JSON.stringify(tool.inputSchema),
+          })),
+        registerToolsChangedCallback: (callback: () => void) => {
+          toolsChangedCallback = callback;
+        },
+        getCrossDocumentScriptToolResult: async () => '[]',
       };
 
       Object.defineProperty(window.navigator, 'modelContext', {
@@ -344,13 +404,18 @@ describe('Web Model Context Polyfill', () => {
         writable: true,
         configurable: true,
       });
-      delete (window.navigator as unknown as { modelContextTesting?: unknown }).modelContextTesting;
+      Object.defineProperty(window.navigator, 'modelContextTesting', {
+        value: externalModelContextTesting,
+        writable: true,
+        configurable: true,
+      });
 
       initializeWebModelContext(DEFAULT_INIT_OPTIONS);
 
       expect(navigator.modelContext).toBe(externalModelContext);
       expect(window.__mcpBridge).toBeDefined();
       expect(window.__mcpBridgeInitState?.mode).toBe('attach-existing');
+      const notificationSpy = vi.spyOn(window.__mcpBridge!.tabServer, 'notification');
 
       navigator.modelContext?.registerTool({
         name: 'attach_mode_tool',
@@ -362,6 +427,23 @@ describe('Web Model Context Polyfill', () => {
       expect(
         navigator.modelContext?.listTools().some((tool) => tool.name === 'attach_mode_tool')
       ).toBe(true);
+      expect(notificationSpy).toHaveBeenCalledWith({
+        method: 'notifications/tools/list_changed',
+        params: {},
+      });
+
+      return window
+        .__mcpBridge!.modelContext.executeTool('attach_mode_tool', {})
+        .then((result) => {
+          expect(externalCallTool).toHaveBeenCalledWith({
+            name: 'attach_mode_tool',
+            arguments: {},
+          });
+          expect(result.content[0]?.type).toBe('text');
+        })
+        .finally(() => {
+          notificationSpy.mockRestore();
+        });
     });
 
     it('cleanup should clear bridge init metadata', () => {

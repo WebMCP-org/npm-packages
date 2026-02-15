@@ -10,7 +10,6 @@ import type {
   InternalModelContext,
   MCPBridge,
   ModelContext,
-  ModelContextClient,
   ModelContextOptions,
   ModelContextTesting,
   Prompt,
@@ -27,7 +26,7 @@ import type {
   ValidatedToolDescriptor,
   ZodSchemaObject,
 } from './types.js';
-import { jsonSchemaToZod, normalizeSchema, validateWithZod } from './validation.js';
+import { jsonSchemaToZod, normalizeSchema } from './validation.js';
 
 const nativeLogger = createLogger('NativeAdapter');
 const testingLogger = createLogger('ModelContextTesting');
@@ -446,11 +445,10 @@ export function installMissingMethodStubs(
  */
 export class NativeModelContextAdapter implements InternalModelContext {
   private nativeContext: ModelContext;
-  private nativeTesting: ModelContextTesting | undefined;
+  private nativeTesting: ModelContextTesting;
   private bridge: MCPBridge;
   private syncInProgress = false;
   private hasCompletedInitialToolSync = false;
-  private mirroredTools = new Map<string, ValidatedToolDescriptor>();
   private readonly nativeProvideContext: (context?: ModelContextOptions) => void;
   private readonly nativeRegisterTool: (tool: unknown) => void;
   private readonly nativeUnregisterTool: (name: string) => void;
@@ -459,10 +457,11 @@ export class NativeModelContextAdapter implements InternalModelContext {
   private readonly nativeRemoveEventListener: EventTarget['removeEventListener'] | null;
   private readonly nativeDispatchEvent: EventTarget['dispatchEvent'] | null;
   private readonly fallbackEventTarget = new EventTarget();
+  private syncSequence = 0;
 
   private static readonly DEFAULT_INPUT_SCHEMA: InputSchema = { type: 'object', properties: {} };
 
-  constructor(bridge: MCPBridge, nativeContext: ModelContext, nativeTesting?: ModelContextTesting) {
+  constructor(bridge: MCPBridge, nativeContext: ModelContext, nativeTesting: ModelContextTesting) {
     this.bridge = bridge;
     this.nativeContext = nativeContext;
     this.nativeTesting = nativeTesting;
@@ -485,44 +484,46 @@ export class NativeModelContextAdapter implements InternalModelContext {
         ? nativeContext.dispatchEvent.bind(nativeContext)
         : null;
 
-    if (this.nativeTesting) {
-      const multiplexer = installToolsChangedCallbackMultiplexer(this.nativeTesting);
-      const syncFromNative = () => {
-        this.syncToolsFromNative();
-      };
-      if (multiplexer) {
-        multiplexer.addInternalCallback(syncFromNative);
-      } else {
-        this.nativeTesting.registerToolsChangedCallback(syncFromNative);
-      }
+    const multiplexer = installToolsChangedCallbackMultiplexer(this.nativeTesting);
+    const syncFromNative = () => {
+      this.syncToolsFromNative('nativeTesting.registerToolsChangedCallback');
+    };
+    if (multiplexer) {
+      multiplexer.addInternalCallback(syncFromNative);
+    } else {
+      this.nativeTesting.registerToolsChangedCallback(syncFromNative);
     }
 
-    this.syncToolsFromNative();
+    this.syncToolsFromNative('constructor.initial');
   }
 
-  private syncToolsFromNative(): void {
+  private traceToolFlow(stage: string, details: Record<string, unknown>): void {
+    nativeLogger.debug(`[ToolFlow] ${stage}`, details);
+  }
+
+  private syncToolsFromNative(source: string): void {
+    const syncId = ++this.syncSequence;
     if (this.syncInProgress) {
+      this.traceToolFlow('sync_skipped_in_progress', { syncId, source });
       return;
     }
 
     this.syncInProgress = true;
+    const startTime = Date.now();
+    this.traceToolFlow('sync_start', {
+      syncId,
+      source,
+    });
 
     try {
-      if (!this.nativeTesting) {
-        this.bridge.tools.clear();
-        for (const [name, tool] of this.mirroredTools) {
-          this.bridge.tools.set(name, tool);
-        }
-        this.notifyMCPServers();
-        if (this.hasCompletedInitialToolSync) {
-          dispatchToolsChangedEvent(this.nativeContext);
-        } else {
-          this.hasCompletedInitialToolSync = true;
-        }
-        return;
-      }
-
+      const listToolsStart = Date.now();
       const nativeTestingTools = this.nativeTesting.listTools();
+      this.traceToolFlow('sync_native_listTools_result', {
+        syncId,
+        source,
+        durationMs: Date.now() - listToolsStart,
+        nativeToolsCount: nativeTestingTools.length,
+      });
 
       this.bridge.tools.clear();
 
@@ -549,7 +550,12 @@ export class NativeModelContextAdapter implements InternalModelContext {
         }
       }
 
-      this.notifyMCPServers();
+      this.traceToolFlow('sync_bridge_rebuilt', {
+        syncId,
+        source,
+        bridgeToolsCount: this.bridge.tools.size,
+      });
+      this.notifyMCPServers(syncId, source);
 
       if (this.hasCompletedInitialToolSync) {
         dispatchToolsChangedEvent(this.nativeContext);
@@ -557,6 +563,12 @@ export class NativeModelContextAdapter implements InternalModelContext {
         this.hasCompletedInitialToolSync = true;
       }
     } finally {
+      this.traceToolFlow('sync_end', {
+        syncId,
+        source,
+        durationMs: Date.now() - startTime,
+        bridgeToolsCount: this.bridge.tools.size,
+      });
       this.syncInProgress = false;
     }
   }
@@ -565,10 +577,19 @@ export class NativeModelContextAdapter implements InternalModelContext {
    * Public refresh hook for explicit sync requests.
    */
   refreshToolsFromNative(): void {
-    this.syncToolsFromNative();
+    this.syncToolsFromNative('consumerShim.onToolRegistryMutated');
   }
 
-  private createMirroredTool(tool: ToolDescriptor): ValidatedToolDescriptor {
+  private normalizeToolForNativeRegistration<
+    TInputSchema extends ZodSchemaObject = Record<string, never>,
+    TOutputSchema extends ZodSchemaObject = Record<string, never>,
+  >(
+    tool: ToolDescriptor<TInputSchema, TOutputSchema>
+  ): ToolDescriptor<TInputSchema, TOutputSchema> {
+    if (!tool || typeof tool !== 'object' || typeof tool.name !== 'string') {
+      throw new TypeError('Invalid tool registration');
+    }
+
     const inputSchema = tool.inputSchema ?? NativeModelContextAdapter.DEFAULT_INPUT_SCHEMA;
     const normalizedInput = normalizeSchema(inputSchema, { strict: true });
     const normalizedOutput = tool.outputSchema
@@ -576,72 +597,56 @@ export class NativeModelContextAdapter implements InternalModelContext {
       : null;
 
     return {
-      name: tool.name,
-      description: tool.description,
+      ...tool,
       inputSchema: normalizedInput.jsonSchema,
       ...(normalizedOutput && { outputSchema: normalizedOutput.jsonSchema }),
-      ...(tool.annotations && { annotations: tool.annotations }),
-      execute: async (args: Record<string, unknown>, client: ModelContextClient) =>
-        await tool.execute(args, client),
-      inputValidator: normalizedInput.zodValidator,
-      ...(normalizedOutput && { outputValidator: normalizedOutput.zodValidator }),
-    };
+    } as ToolDescriptor<TInputSchema, TOutputSchema>;
   }
 
-  /**
-   * Applies producer-side native mutations directly to the mirrored registry.
-   * Used in native-without-testing mode where listTools()/executeTool introspection
-   * cannot be delegated to modelContextTesting.
-   */
-  applyProducerMutation(
+  prepareProducerMutation(
     methodName: 'provideContext' | 'registerTool' | 'unregisterTool' | 'clearContext',
     args: unknown[]
   ): void {
-    if (methodName === 'clearContext') {
-      this.mirroredTools.clear();
-      this.syncToolsFromNative();
-      return;
-    }
-
-    if (methodName === 'unregisterTool') {
-      const toolName = args[0];
-      if (typeof toolName === 'string') {
-        this.mirroredTools.delete(toolName);
-        this.syncToolsFromNative();
-      }
+    if (methodName === 'clearContext' || methodName === 'unregisterTool') {
       return;
     }
 
     if (methodName === 'provideContext') {
       const context = (args[0] ?? {}) as ModelContextOptions;
-      const nextMirroredTools = new Map<string, ValidatedToolDescriptor>();
+      if (!context || typeof context !== 'object') {
+        throw new TypeError('provideContext options must be an object');
+      }
 
-      for (const tool of context.tools ?? []) {
-        if (nextMirroredTools.has(tool.name)) {
+      const { tools, ...rest } = context;
+      if (!tools) {
+        args[0] = { ...rest };
+        return;
+      }
+
+      const seen = new Set<string>();
+      const normalizedTools = tools.map((tool) => {
+        if (seen.has(tool.name)) {
           throw new Error(
             `[Web Model Context] Tool name collision: "${tool.name}" is already registered in provideContext(). ` +
               'Each tool name in provideContext(options.tools) must be unique.'
           );
         }
-        nextMirroredTools.set(tool.name, this.createMirroredTool(tool as ToolDescriptor));
-      }
+        seen.add(tool.name);
+        return this.normalizeToolForNativeRegistration(tool as ToolDescriptor);
+      });
 
-      this.mirroredTools = nextMirroredTools;
-      this.syncToolsFromNative();
+      args[0] = {
+        ...rest,
+        tools: normalizedTools,
+      } as ModelContextOptions;
       return;
     }
 
-    const tool = args[0] as ToolDescriptor | undefined;
-    if (!tool || typeof tool !== 'object' || typeof tool.name !== 'string') {
-      throw new Error('Invalid tool registration');
-    }
-
-    if (this.mirroredTools.has(tool.name)) {
+    const tool = this.normalizeToolForNativeRegistration(args[0] as ToolDescriptor);
+    if (this.bridge.tools.has(tool.name)) {
       throw new Error(`Tool already registered: ${tool.name}`);
     }
-
-    this.mirroredTools.set(tool.name, this.createMirroredTool(tool));
-    this.syncToolsFromNative();
+    args[0] = tool;
   }
 
   private stringifyInputArgs(args: Record<string, unknown>): string {
@@ -664,65 +669,8 @@ export class NativeModelContextAdapter implements InternalModelContext {
     toolName: string,
     args: Record<string, unknown>
   ): Promise<ToolResponse> {
-    if (!this.nativeTesting) {
-      return this.executeToolViaMirror(toolName, args);
-    }
     const result = await this.nativeTesting.executeTool(toolName, this.stringifyInputArgs(args));
     return this.convertToToolResponse(result);
-  }
-
-  private async executeToolViaMirror(
-    toolName: string,
-    args: Record<string, unknown>
-  ): Promise<ToolResponse> {
-    const tool = this.mirroredTools.get(toolName);
-    if (!tool) {
-      throw new Error(`Tool not found: ${toolName}`);
-    }
-
-    const validation = validateWithZod(args, tool.inputValidator);
-    if (!validation.success) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Input validation error for tool "${toolName}":\n${validation.error}`,
-          },
-        ],
-        isError: true,
-      };
-    }
-
-    let contextActive = true;
-    try {
-      const executionContext = {
-        requestUserInteraction: async (callback: () => Promise<unknown>) => {
-          if (!contextActive) {
-            throw new Error(
-              `ModelContextClient for tool "${toolName}" is no longer active after execute() resolved`
-            );
-          }
-          if (typeof callback !== 'function') {
-            throw new TypeError('requestUserInteraction(callback) requires a function callback');
-          }
-          return callback();
-        },
-        elicitInput: async (params: ElicitationParams): Promise<ElicitationResult> => {
-          if (!contextActive) {
-            throw new Error(
-              `Elicitation context for tool "${toolName}" is no longer active after execute() resolved`
-            );
-          }
-          return requireElicitInputCapability(this.bridge.tabServer)(params);
-        },
-      } as ModelContextClient & {
-        elicitInput: (params: ElicitationParams) => Promise<ElicitationResult>;
-      };
-
-      return await tool.execute(validation.data as Record<string, unknown>, executionContext);
-    } finally {
-      contextActive = false;
-    }
   }
 
   private asToolResponse(value: unknown): ToolResponse | null {
@@ -782,26 +730,40 @@ export class NativeModelContextAdapter implements InternalModelContext {
     };
   }
 
-  private notifyMCPServers(): void {
-    if (this.bridge.tabServer?.notification) {
-      this.bridge.tabServer.notification({
-        method: 'notifications/tools/list_changed',
-        params: {},
-      });
-    }
-
-    if (this.bridge.iframeServer?.notification) {
-      this.bridge.iframeServer.notification({
-        method: 'notifications/tools/list_changed',
-        params: {},
-      });
-    }
+  private notifyMCPServers(syncId: number, source: string): void {
+    this.traceToolFlow('notify_tools_list_changed_start', {
+      syncId,
+      source,
+      bridgeToolsCount: this.bridge.tools.size,
+    });
+    // TODO: Keep MCP tools/list_changed notifications sourced only from
+    // modelContextTesting.registerToolsChangedCallback in global.ts.
+    // if (this.bridge.tabServer?.notification) {
+    //   this.bridge.tabServer.notification({
+    //     method: 'notifications/tools/list_changed',
+    //     params: {},
+    //   });
+    //   this.traceToolFlow('notify_tools_list_changed_sent_tabServer', {
+    //     syncId,
+    //     source,
+    //   });
+    // }
+    //
+    // if (this.bridge.iframeServer?.notification) {
+    //   this.bridge.iframeServer.notification({
+    //     method: 'notifications/tools/list_changed',
+    //     params: {},
+    //   });
+    //   this.traceToolFlow('notify_tools_list_changed_sent_iframeServer', {
+    //     syncId,
+    //     source,
+    //   });
+    // }
   }
 
   provideContext(context: ModelContextOptions = {}): void {
     const { tools, ...rest } = context;
     const normalizedContext: ModelContextOptions = { ...rest };
-    const nextMirroredTools = new Map<string, ValidatedToolDescriptor>();
     if (tools) {
       normalizedContext.tools = tools.map((tool) => {
         const inputSchema = tool.inputSchema ?? NativeModelContextAdapter.DEFAULT_INPUT_SCHEMA;
@@ -809,20 +771,6 @@ export class NativeModelContextAdapter implements InternalModelContext {
         const normalizedOutput = tool.outputSchema
           ? normalizeSchema(tool.outputSchema, { strict: true })
           : null;
-
-        nextMirroredTools.set(tool.name, {
-          name: tool.name,
-          description: tool.description,
-          inputSchema: normalizedInput.jsonSchema,
-          ...(normalizedOutput && { outputSchema: normalizedOutput.jsonSchema }),
-          ...(tool.annotations && { annotations: tool.annotations }),
-          execute: tool.execute as (
-            args: Record<string, unknown>,
-            client: ModelContextClient
-          ) => Promise<ToolResponse>,
-          inputValidator: normalizedInput.zodValidator,
-          ...(normalizedOutput && { outputValidator: normalizedOutput.zodValidator }),
-        });
 
         return {
           ...tool,
@@ -833,58 +781,29 @@ export class NativeModelContextAdapter implements InternalModelContext {
     }
 
     this.nativeProvideContext(normalizedContext);
-    this.mirroredTools = nextMirroredTools;
-    this.syncToolsFromNative();
+    this.syncToolsFromNative('adapter.provideContext');
   }
 
   registerTool<
     TInputSchema extends ZodSchemaObject = Record<string, never>,
     TOutputSchema extends ZodSchemaObject = Record<string, never>,
   >(tool: ToolDescriptor<TInputSchema, TOutputSchema>): void {
-    if (this.mirroredTools.has(tool.name)) {
-      throw new Error(`Tool already registered: ${tool.name}`);
+    const normalizedTool = this.normalizeToolForNativeRegistration(tool);
+    if (this.bridge.tools.has(normalizedTool.name)) {
+      throw new Error(`Tool already registered: ${normalizedTool.name}`);
     }
-
-    const inputSchema = tool.inputSchema ?? NativeModelContextAdapter.DEFAULT_INPUT_SCHEMA;
-    const normalizedInput = normalizeSchema(inputSchema, { strict: true });
-    const normalizedOutput = tool.outputSchema
-      ? normalizeSchema(tool.outputSchema, { strict: true })
-      : null;
-
-    const normalizedTool = {
-      ...tool,
-      inputSchema: normalizedInput.jsonSchema,
-      ...(normalizedOutput && { outputSchema: normalizedOutput.jsonSchema }),
-    };
     this.nativeRegisterTool(normalizedTool);
-
-    this.mirroredTools.set(tool.name, {
-      name: tool.name,
-      description: tool.description,
-      inputSchema: normalizedInput.jsonSchema,
-      ...(normalizedOutput && { outputSchema: normalizedOutput.jsonSchema }),
-      ...(tool.annotations && { annotations: tool.annotations }),
-      execute: tool.execute as (
-        args: Record<string, unknown>,
-        client: ModelContextClient
-      ) => Promise<ToolResponse>,
-      inputValidator: normalizedInput.zodValidator,
-      ...(normalizedOutput && { outputValidator: normalizedOutput.zodValidator }),
-    });
-
-    this.syncToolsFromNative();
+    this.syncToolsFromNative('adapter.registerTool');
   }
 
   unregisterTool(name: string): void {
     this.nativeUnregisterTool(name);
-    this.mirroredTools.delete(name);
-    this.syncToolsFromNative();
+    this.syncToolsFromNative('adapter.unregisterTool');
   }
 
   clearContext(): void {
     this.nativeClearContext();
-    this.mirroredTools.clear();
-    this.syncToolsFromNative();
+    this.syncToolsFromNative('adapter.clearContext');
   }
 
   async executeTool(

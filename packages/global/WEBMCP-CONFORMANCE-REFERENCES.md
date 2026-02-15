@@ -77,3 +77,26 @@ Goal: keep one place to track standards decisions and implementation details bef
 - [ ] Sampling conformance for `createMessage` request/response handling
 - [ ] Native-vs-polyfill parity matrix (Chromium native + shimmed consumer API)
 - [ ] `modelContextTesting` compatibility/deprecation behavior checks
+
+## Runtime Conformance Matrix (Implemented)
+
+- Shared suite: `src/conformance/runtime-core-conformance.shared.ts`
+- Polyfill runtime entry: `src/conformance/polyfill-runtime.e2e.test.ts`
+- Native runtime entry: `src/conformance/native-runtime.e2e.test.ts`
+
+Run commands:
+
+- Polyfill runtime (non-beta Chromium):
+  - `pnpm --filter @mcp-b/global run test:conformance:polyfill`
+- Native runtime (Chrome Beta + flags):
+  - `CHROME_BIN=\"/path/to/chrome-beta\" CHROME_FLAGS=\"--enable-experimental-web-platform-features --enable-features=WebMCPTesting\" pnpm --filter @mcp-b/global run test:conformance:native`
+- Matrix:
+  - `CHROME_BIN=\"/path/to/chrome-beta\" CHROME_FLAGS=\"--enable-experimental-web-platform-features --enable-features=WebMCPTesting\" pnpm --filter @mcp-b/global run test:conformance:matrix`
+
+## Native Validation Behavior Note (Observed February 15, 2026)
+
+- In current Chrome Beta native mode (`--enable-experimental-web-platform-features --enable-features=WebMCPTesting`), `navigator.modelContext.callTool` is not exposed.
+- Tool execution goes through `navigator.modelContextTesting.executeTool(toolName, inputArgsJson)`.
+- Native `modelContextTesting.executeTool(...)` currently appears to validate malformed JSON parsing (throws `UnknownError: Failed to parse input arguments`) but does not enforce tool `inputSchema` type/required constraints in the same way as the polyfill path.
+- `@mcp-b/webmcp-polyfill` does enforce schema checks in its testing shim path and rejects schema-invalid args.
+- Conformance implication: keep dedicated native vs polyfill validation parity tests and avoid assuming schema-validation parity in native early preview.

@@ -157,6 +157,11 @@ This package supports **Zod 3.25.76+** (3.x only). JSON Schema is also supported
 - **Event System** - Hybrid tool call handling
 - **TypeScript Types** - Full type definitions included
 
+## Tool Routing Contract (Current)
+
+- MCP `tools/list`, `tools/call`, and tool list update notifications are sourced from `navigator.modelContextTesting`.
+- `@mcp-b/global` requires `navigator.modelContextTesting` to be available at initialization time.
+
 ## Documentation
 
 For advanced usage, configuration, native Chromium integration, output schemas, testing API, and complete examples, see the [Global Package Guide](../../docs/global-guide.md).

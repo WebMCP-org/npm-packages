@@ -1,5 +1,14 @@
 # @mcp-b/global
 
+## Unreleased
+
+### Major Changes
+
+- BREAKING: Tool operations are now sourced from `navigator.modelContextTesting`.
+  - MCP `tools/list` and `tools/call` are routed through `modelContextTesting`.
+  - Tool list update notifications are forwarded from `registerToolsChangedCallback`.
+  - Initialization now throws if `navigator.modelContextTesting` is unavailable.
+
 ## 2.0.0
 
 ### Major Changes

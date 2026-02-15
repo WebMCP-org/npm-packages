@@ -297,65 +297,11 @@ describe('Native consumer shim (no modelContextTesting)', () => {
     }
   });
 
-  it('initializes when native modelContext exists without modelContextTesting', () => {
-    expect(() => initializeWebModelContext(NATIVE_TEST_INIT_OPTIONS)).not.toThrow();
-    expect(navigator.modelContext).toBeDefined();
-  });
-
-  it('creates __mcpBridge when initialized without modelContextTesting', () => {
-    initializeWebModelContext(NATIVE_TEST_INIT_OPTIONS);
-    expect((window as unknown as { __mcpBridge?: unknown }).__mcpBridge).toBeDefined();
-  });
-
-  it('is idempotent across repeated initialization in native-without-testing mode', async () => {
-    initializeWebModelContext(NATIVE_TEST_INIT_OPTIONS);
-
-    const firstBridge = (window as unknown as { __mcpBridge?: unknown }).__mcpBridge;
-    const firstInitState = window.__mcpBridgeInitState;
-
-    initializeWebModelContext(NATIVE_TEST_INIT_OPTIONS);
-
-    expect((window as unknown as { __mcpBridge?: unknown }).__mcpBridge).toBe(firstBridge);
-    expect(window.__mcpBridgeInitState).toEqual(firstInitState);
-
-    navigator.modelContext?.registerTool({
-      name: 'native_no_testing_after_reinit',
-      description: 'native-no-testing reinit parity',
-      inputSchema: { type: 'object', properties: {} },
-      execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
-    });
-
-    await flushMicrotasks(2);
-    expect(navigator.modelContext?.listTools().map((tool) => tool.name)).toContain(
-      'native_no_testing_after_reinit'
+  it('throws when native modelContext exists without modelContextTesting', () => {
+    expect(() => initializeWebModelContext(NATIVE_TEST_INIT_OPTIONS)).toThrow(
+      /modelContextTesting is required/i
     );
-  });
-
-  it('installs listTools stub when native modelContext does not provide it', async () => {
-    Object.defineProperty(nativeModelContext, 'listTools', {
-      value: undefined,
-      writable: true,
-      configurable: true,
-    });
-
-    initializeWebModelContext(NATIVE_TEST_INIT_OPTIONS);
-
-    const context = navigator.modelContext as ModelContext & {
-      listTools?: () => ToolListItem[];
-    };
-
-    expect(typeof context.listTools).toBe('function');
-
-    context.registerTool({
-      name: 'native_stubbed_list_tools',
-      description: 'Stubbed listTools parity check',
-      inputSchema: { type: 'object', properties: {} },
-      execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
-    });
-
-    await flushMicrotasks(2);
-
-    expect(context.listTools?.().map((tool) => tool.name)).toContain('native_stubbed_list_tools');
+    expect((window as unknown as { __mcpBridge?: unknown }).__mcpBridge).toBeUndefined();
   });
 });
 
@@ -852,7 +798,7 @@ describe('Native adapter (with modelContextTesting)', () => {
   });
 });
 
-type CoreConformanceMode = 'polyfill' | 'native-testing' | 'native-no-testing';
+type CoreConformanceMode = 'polyfill' | 'native-testing';
 
 interface CoreConformanceHarness {
   mode: CoreConformanceMode;
@@ -860,11 +806,7 @@ interface CoreConformanceHarness {
   nativeTesting?: NativeModelContextTestingMock;
 }
 
-const CORE_CONFORMANCE_MODES: CoreConformanceMode[] = [
-  'polyfill',
-  'native-testing',
-  'native-no-testing',
-];
+const CORE_CONFORMANCE_MODES: CoreConformanceMode[] = ['polyfill', 'native-testing'];
 
 function safeSetNavigatorProperty(
   key: 'modelContext' | 'modelContextTesting',
@@ -953,16 +895,12 @@ async function withCoreConformanceHarness(
 
     safeSetNavigatorProperty('modelContext', nativeModelContext as unknown as ModelContext);
 
-    if (mode === 'native-testing') {
-      nativeTesting = new NativeModelContextTestingMock(nativeModelContext);
-      nativeModelContext.setMutationListener(() => nativeTesting?.notifyToolsChanged());
-      safeSetNavigatorProperty(
-        'modelContextTesting',
-        nativeTesting as unknown as ModelContextTesting
-      );
-    } else {
-      safeDeleteNavigatorProperty('modelContextTesting');
-    }
+    nativeTesting = new NativeModelContextTestingMock(nativeModelContext);
+    nativeModelContext.setMutationListener(() => nativeTesting?.notifyToolsChanged());
+    safeSetNavigatorProperty(
+      'modelContextTesting',
+      nativeTesting as unknown as ModelContextTesting
+    );
   }
 
   initializeWebModelContext(NATIVE_TEST_INIT_OPTIONS);

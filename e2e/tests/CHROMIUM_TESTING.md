@@ -22,7 +22,7 @@ This runs `tests/chrome-beta-webmcp.spec.ts` through
 
 ```bash
 --enable-experimental-web-platform-features
---enable-features=WebMCPForTesting
+--enable-features=WebMCPTesting
 ```
 
 ## API Surface Validated

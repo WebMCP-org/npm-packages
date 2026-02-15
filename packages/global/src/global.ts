@@ -53,6 +53,7 @@ import type {
   SamplingResult,
   ToolCallEvent,
   ToolDescriptor,
+  ToolListItem,
   ToolResponse,
   ValidatedPromptDescriptor,
   ValidatedResourceDescriptor,
@@ -272,6 +273,156 @@ function withSingleToolsChangedCallback(callback: unknown): () => void {
   };
 }
 
+interface ToolsChangedCallbackMultiplexer {
+  addInternalCallback(callback: () => void): void;
+}
+
+const toolsChangedMultiplexerByTesting = new WeakMap<
+  ModelContextTesting,
+  ToolsChangedCallbackMultiplexer
+>();
+
+function installToolsChangedCallbackMultiplexer(
+  modelContextTesting: ModelContextTesting
+): ToolsChangedCallbackMultiplexer | null {
+  const existing = toolsChangedMultiplexerByTesting.get(modelContextTesting);
+  if (existing) {
+    return existing;
+  }
+
+  const target = modelContextTesting as ModelContextTesting;
+  const originalRegister = target.registerToolsChangedCallback;
+  if (typeof originalRegister !== 'function') {
+    return null;
+  }
+
+  const boundOriginalRegister = originalRegister.bind(target) as (callback: () => void) => void;
+  const internalCallbacks = new Set<() => void>();
+  let externalCallback: (() => void) | null = null;
+
+  const composedCallback = () => {
+    for (const callback of internalCallbacks) {
+      try {
+        callback();
+      } catch (error) {
+        testingLogger.error('Error in internal registerToolsChangedCallback callback:', error);
+      }
+    }
+
+    if (externalCallback) {
+      try {
+        externalCallback();
+      } catch (error) {
+        testingLogger.error('Error in external registerToolsChangedCallback callback:', error);
+      }
+    }
+  };
+
+  const wrappedRegister = (callback: () => void) => {
+    if (typeof callback !== 'function') {
+      boundOriginalRegister(callback as unknown as () => void);
+      return;
+    }
+
+    externalCallback = withSingleToolsChangedCallback(callback);
+    boundOriginalRegister(composedCallback);
+  };
+
+  try {
+    Object.defineProperty(target, 'registerToolsChangedCallback', {
+      configurable: true,
+      writable: true,
+      value: wrappedRegister,
+    });
+  } catch (error) {
+    testingLogger.warn('Failed to install registerToolsChangedCallback multiplexer:', error);
+    return null;
+  }
+
+  try {
+    boundOriginalRegister(composedCallback);
+  } catch (error) {
+    testingLogger.warn('Failed to prime registerToolsChangedCallback multiplexer:', error);
+    return null;
+  }
+
+  const multiplexer: ToolsChangedCallbackMultiplexer = {
+    addInternalCallback(callback: () => void): void {
+      internalCallbacks.add(callback);
+      boundOriginalRegister(composedCallback);
+    },
+  };
+
+  toolsChangedMultiplexerByTesting.set(modelContextTesting, multiplexer);
+  return multiplexer;
+}
+
+function requireModelContextTesting(source: string, bridge?: MCPBridge): ModelContextTesting {
+  const modelContextTesting =
+    bridge?.modelContextTesting ??
+    (window.navigator.modelContextTesting as ModelContextTesting | undefined);
+
+  if (!modelContextTesting) {
+    throw new Error(
+      `[WebModelContext] modelContextTesting is required for tool operations (${source})`
+    );
+  }
+
+  if (
+    typeof modelContextTesting.listTools !== 'function' ||
+    typeof modelContextTesting.executeTool !== 'function' ||
+    typeof modelContextTesting.registerToolsChangedCallback !== 'function'
+  ) {
+    throw new Error(
+      `[WebModelContext] modelContextTesting is missing required tool methods (${source})`
+    );
+  }
+
+  return modelContextTesting;
+}
+
+function parseTestingToolList(list: ReturnType<ModelContextTesting['listTools']>): ToolListItem[] {
+  return list.map((toolInfo) => {
+    let parsedSchema: InputSchema = DEFAULT_INPUT_SCHEMA;
+
+    if (typeof toolInfo.inputSchema === 'string') {
+      try {
+        const candidate = JSON.parse(toolInfo.inputSchema) as unknown;
+        if (candidate && typeof candidate === 'object' && !Array.isArray(candidate)) {
+          parsedSchema = candidate as InputSchema;
+        }
+      } catch {
+        parsedSchema = DEFAULT_INPUT_SCHEMA;
+      }
+    }
+
+    return {
+      name: toolInfo.name,
+      description: toolInfo.description,
+      inputSchema: parsedSchema,
+    };
+  });
+}
+
+function parseSerializedTestingToolResult(serializedResult: string | null): ToolResponse {
+  if (serializedResult === null) {
+    return { content: [] };
+  }
+
+  try {
+    const parsed = JSON.parse(serializedResult) as unknown;
+    if (parsed && typeof parsed === 'object' && 'content' in parsed) {
+      return parsed as ToolResponse;
+    }
+  } catch {
+    // Fall back to plain text response below.
+  }
+
+  return {
+    content: [{ type: 'text', text: serializedResult }],
+  };
+}
+
 const BRIDGE_MODEL_CONTEXT_METHODS = [
   'provideContext',
   'clearContext',
@@ -299,12 +450,18 @@ const BRIDGE_MODEL_CONTEXT_METHODS = [
 
 function attachBridgeBackedModelContext(
   targetContext: ModelContext,
-  bridgeContext: InternalModelContext
+  bridgeContext: InternalModelContext,
+  options?: { overwriteExisting?: boolean }
 ): void {
   const target = targetContext as unknown as Record<string, unknown>;
   const source = bridgeContext as unknown as Record<string, unknown>;
+  const overwriteExisting = options?.overwriteExisting ?? true;
 
   for (const methodName of BRIDGE_MODEL_CONTEXT_METHODS) {
+    if (!overwriteExisting && typeof target[methodName] === 'function') {
+      continue;
+    }
+
     const method = source[methodName];
     if (typeof method !== 'function') {
       continue;
@@ -316,6 +473,109 @@ function attachBridgeBackedModelContext(
       value: method.bind(bridgeContext),
     });
   }
+}
+
+function createAttachedModelContextAdapter(
+  existingContext: ModelContext,
+  fallbackContext: InternalModelContext
+): InternalModelContext {
+  const existing = existingContext as ModelContext &
+    Partial<InternalModelContext> & {
+      callTool?: (params: {
+        name: string;
+        arguments?: Record<string, unknown>;
+      }) => Promise<ToolResponse>;
+      listTools?: () => ToolListItem[];
+    };
+
+  const adapter = Object.create(null) as InternalModelContext;
+  const hasExistingListTools = typeof existing.listTools === 'function';
+  const hasExistingCallTool = typeof existing.callTool === 'function';
+
+  if (!hasExistingListTools || !hasExistingCallTool) {
+    logger.warn(
+      'attach-existing mode expected existing listTools/callTool methods; falling back to bridge-backed tool methods where missing'
+    );
+  }
+
+  const bindExistingOrFallback = (
+    methodName: (typeof BRIDGE_MODEL_CONTEXT_METHODS)[number]
+  ): void => {
+    const existingMethod = (existing as unknown as Record<string, unknown>)[methodName];
+    if (typeof existingMethod === 'function') {
+      (adapter as unknown as Record<string, unknown>)[methodName] = (
+        existingMethod as (...args: unknown[]) => unknown
+      ).bind(existingContext);
+      return;
+    }
+
+    const fallbackMethod = (fallbackContext as unknown as Record<string, unknown>)[methodName];
+    if (typeof fallbackMethod === 'function') {
+      (adapter as unknown as Record<string, unknown>)[methodName] = (
+        fallbackMethod as (...args: unknown[]) => unknown
+      ).bind(fallbackContext);
+    }
+  };
+
+  for (const methodName of BRIDGE_MODEL_CONTEXT_METHODS) {
+    bindExistingOrFallback(methodName);
+  }
+
+  const existingExecuteTool = existing.executeTool;
+  if (hasExistingCallTool) {
+    adapter.executeTool = async (toolName: string, args: Record<string, unknown>) =>
+      existing.callTool!({ name: toolName, arguments: args });
+  } else if (typeof existingExecuteTool === 'function') {
+    adapter.executeTool = existingExecuteTool.bind(existingContext);
+  } else {
+    adapter.executeTool = fallbackContext.executeTool.bind(fallbackContext);
+  }
+
+  if (hasExistingCallTool) {
+    adapter.callTool = existing.callTool.bind(existingContext);
+  }
+
+  if (hasExistingListTools) {
+    adapter.listTools = existing.listTools.bind(existingContext);
+  }
+
+  return adapter;
+}
+
+let detachTestingToolsChangedForwarder: (() => void) | null = null;
+
+function installTestingToolsChangedForwarder(
+  modelContextTesting: ModelContextTesting,
+  bridge: MCPBridge
+): () => void {
+  const onToolsChanged = () => {
+    if (bridge.tabServer.notification) {
+      bridge.tabServer.notification({
+        method: 'notifications/tools/list_changed',
+        params: {},
+      });
+    }
+
+    if (bridge.iframeServer?.notification) {
+      bridge.iframeServer.notification({
+        method: 'notifications/tools/list_changed',
+        params: {},
+      });
+    }
+  };
+
+  const multiplexer = installToolsChangedCallbackMultiplexer(modelContextTesting);
+  if (multiplexer) {
+    multiplexer.addInternalCallback(onToolsChanged);
+    return () => {
+      // TODO: Add internal callback removal if we need dynamic teardown semantics.
+    };
+  }
+
+  modelContextTesting.registerToolsChangedCallback(onToolsChanged);
+  return () => {
+    // No-op: registerToolsChangedCallback only supports replacing the callback.
+  };
 }
 
 /**
@@ -581,6 +841,7 @@ class WebModelContext implements InternalModelContext {
    * (e.g., React mount phase) into a single notification per list type.
    */
   private pendingNotifications = new Set<ListChangeType>();
+  private notificationSequence = 0;
 
   private testingAPI?: WebModelContextTesting;
 
@@ -1222,25 +1483,37 @@ class WebModelContext implements InternalModelContext {
    * @private
    */
   private notifyToolsListChanged(): void {
-    if (this.bridge.tabServer.notification) {
-      this.bridge.tabServer.notification({
-        method: 'notifications/tools/list_changed',
-        params: {},
-      });
-    }
-
-    if (this.bridge.iframeServer?.notification) {
-      this.bridge.iframeServer.notification({
-        method: 'notifications/tools/list_changed',
-        params: {},
-      });
-    }
+    const notificationId = ++this.notificationSequence;
+    logger.debug('[ToolFlow] notifyToolsListChanged:start', {
+      notificationId,
+      toolCount: this.bridge.tools.size,
+    });
+    // TODO: Keep MCP tool list notifications sourced from modelContextTesting callbacks only.
+    // if (this.bridge.tabServer.notification) {
+    //   this.bridge.tabServer.notification({
+    //     method: 'notifications/tools/list_changed',
+    //     params: {},
+    //   });
+    //   logger.debug('[ToolFlow] notifyToolsListChanged:sent_tabServer', { notificationId });
+    // }
+    //
+    // if (this.bridge.iframeServer?.notification) {
+    //   this.bridge.iframeServer.notification({
+    //     method: 'notifications/tools/list_changed',
+    //     params: {},
+    //   });
+    //   logger.debug('[ToolFlow] notifyToolsListChanged:sent_iframeServer', { notificationId });
+    // }
 
     if (this.testingAPI && 'notifyToolsChanged' in this.testingAPI) {
       (this.testingAPI as WebModelContextTesting).notifyToolsChanged();
+      logger.debug('[ToolFlow] notifyToolsListChanged:testing_callback', { notificationId });
     }
 
     this.dispatchEvent(new Event('toolschanged'));
+    logger.debug('[ToolFlow] notifyToolsListChanged:toolschanged_dispatched', {
+      notificationId,
+    });
   }
 
   /**
@@ -1329,11 +1602,16 @@ class WebModelContext implements InternalModelContext {
    * @private
    */
   private scheduleListChanged(listType: ListChangeType): void {
-    if (this.pendingNotifications.has(listType)) return;
+    if (this.pendingNotifications.has(listType)) {
+      logger.debug('[ToolFlow] scheduleListChanged:coalesced', { listType });
+      return;
+    }
 
     this.pendingNotifications.add(listType);
+    logger.debug('[ToolFlow] scheduleListChanged:queued', { listType });
     queueMicrotask(() => {
       this.pendingNotifications.delete(listType);
+      logger.debug('[ToolFlow] scheduleListChanged:flushed', { listType });
 
       // Dispatch to the appropriate notification method
       // Exhaustive switch ensures compile-time safety when adding new list types
@@ -1704,25 +1982,72 @@ function initializeMCPBridge(options?: WebModelContextInitOptions): MCPBridge {
   const transportOptions = options?.transport;
 
   const setupServerHandlers = (server: McpServer, bridge: MCPBridge) => {
+    let listToolsRequestCount = 0;
+    let callToolRequestCount = 0;
+
     // ==================== TOOL HANDLERS ====================
     server.setRequestHandler(ListToolsRequestSchema, async () => {
+      const requestId = ++listToolsRequestCount;
+      const startedAt = Date.now();
+      const modelContextTesting = requireModelContextTesting('tools/list handler', bridge);
+      const tools = parseTestingToolList(modelContextTesting.listTools());
+      bridgeLogger.debug('[ToolFlow] tools/list request completed', {
+        requestId,
+        durationMs: Date.now() - startedAt,
+        toolCount: tools.length,
+        source: 'modelContextTesting',
+      });
       return {
-        tools: bridge.modelContext.listTools(),
+        tools,
       };
     });
 
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
+      const requestId = ++callToolRequestCount;
+      const startedAt = Date.now();
       const toolName = request.params.name;
       const args = (request.params.arguments || {}) as Record<string, unknown>;
 
       try {
-        const response = await bridge.modelContext.executeTool(toolName, args);
+        const modelContextTesting = requireModelContextTesting('tools/call handler', bridge);
+        let serializedResult: string | null;
+        try {
+          serializedResult = await modelContextTesting.executeTool(toolName, JSON.stringify(args));
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          if (/validation/i.test(errorMessage)) {
+            bridgeLogger.debug('[ToolFlow] tools/call validation error result', {
+              requestId,
+              toolName,
+              durationMs: Date.now() - startedAt,
+              source: 'modelContextTesting',
+            });
+            return {
+              content: [{ type: 'text', text: `Error: ${errorMessage}` }],
+              isError: true,
+            };
+          }
+          throw error;
+        }
+        const response = parseSerializedTestingToolResult(serializedResult);
+        bridgeLogger.debug('[ToolFlow] tools/call request completed', {
+          requestId,
+          toolName,
+          durationMs: Date.now() - startedAt,
+          isError: Boolean(response.isError),
+          source: 'modelContextTesting',
+        });
         return {
           content: response.content,
           isError: response.isError,
           ...(response.structuredContent && { structuredContent: response.structuredContent }),
         };
       } catch (error) {
+        bridgeLogger.debug('[ToolFlow] tools/call request failed', {
+          requestId,
+          toolName,
+          durationMs: Date.now() - startedAt,
+        });
         bridgeLogger.error(`Error calling tool ${toolName}:`, error);
         throw error;
       }
@@ -2042,12 +2367,14 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
       return;
     }
 
+    if (!nativeTesting) {
+      throw new Error(
+        '[WebModelContext] modelContextTesting is required in native mode for tool operations'
+      );
+    }
+
     logger.info('✅ Native Chromium API detected');
-    logger.info(
-      `   Using native implementation with MCP bridge synchronization${
-        nativeTesting ? ' (with modelContextTesting)' : ' (without modelContextTesting)'
-      }`
-    );
+    logger.info('   Using native implementation with modelContextTesting-backed tool routing');
 
     try {
       const bridge = initializeMCPBridge(effectiveOptions);
@@ -2059,20 +2386,27 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
       );
 
       bridge.modelContext = adapter;
-      if (nativeTesting) {
-        bridge.modelContextTesting = nativeTesting;
-        installDeprecatedTestingAccessor(nativeTesting);
-      }
+      bridge.modelContextTesting = nativeTesting;
+      installDeprecatedTestingAccessor(nativeTesting);
+
+      detachTestingToolsChangedForwarder?.();
+      detachTestingToolsChangedForwarder = installTestingToolsChangedForwarder(
+        nativeTesting,
+        bridge
+      );
 
       installConsumerShim(
         nativeContext as unknown as ModelContext,
         (params: { name: string; arguments?: Record<string, unknown> }) => adapter.callTool(params),
         {
-          hasNativeTesting: Boolean(nativeTesting),
+          hasNativeTesting: true,
           onBeforeProducerMutation: (methodName, args) => {
-            adapter.applyProducerMutation(methodName, args);
+            adapter.prepareProducerMutation(methodName, args);
           },
-          onToolRegistryMutated: () => adapter.refreshToolsFromNative(),
+          onToolRegistryMutated: () => {
+            logger.debug('[ToolFlow] installConsumerShim:onToolRegistryMutated');
+            adapter.refreshToolsFromNative();
+          },
         }
       );
 
@@ -2081,11 +2415,7 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
       installBridgeGlobals(bridge, createBridgeInitState('native', optionsFingerprint));
 
       logger.info('✅ MCP bridge synced with native API');
-      logger.info(
-        `   MCP clients will receive automatic tool updates from native registry${
-          nativeTesting ? '' : ' (mutation-driven sync fallback)'
-        }`
-      );
+      logger.info('   MCP clients receive tool updates via modelContextTesting callbacks');
     } catch (error) {
       logger.error('Failed to initialize native adapter:', error);
       throw error;
@@ -2098,9 +2428,26 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
     logger.info('Existing navigator.modelContext detected; attach-only mode activated');
 
     try {
+      const existingTesting = requireModelContextTesting('attach-existing initialization');
       const bridge = initializeMCPBridge(effectiveOptions);
-      attachBridgeBackedModelContext(existingModelContext, bridge.modelContext);
-      bridge.modelContext = existingModelContext as unknown as InternalModelContext;
+      const attachedContext = createAttachedModelContextAdapter(
+        existingModelContext,
+        bridge.modelContext
+      );
+      attachBridgeBackedModelContext(existingModelContext, attachedContext, {
+        overwriteExisting: false,
+      });
+      bridge.modelContext = attachedContext;
+      bridge.modelContextTesting = existingTesting;
+      installDeprecatedTestingAccessor(existingTesting);
+
+      // TODO: Keep non-modelContextTesting toolschanged forwarding disabled in attach-existing mode.
+
+      detachTestingToolsChangedForwarder?.();
+      detachTestingToolsChangedForwarder = installTestingToolsChangedForwarder(
+        existingTesting,
+        bridge
+      );
       installBridgeGlobals(bridge, createBridgeInitState('attach-existing', optionsFingerprint));
       logger.info('✅ Attached MCP bridge to existing navigator.modelContext (attach-only mode)');
     } catch (error) {
@@ -2114,8 +2461,7 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
 
   try {
     initializeWebMCPPolyfill({
-      forceOverride: true,
-      installTestingShim: false,
+      installTestingShim: true,
     });
 
     const bridge = initializeMCPBridge(effectiveOptions);
@@ -2144,6 +2490,8 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
     }
 
     installDeprecatedTestingAccessor(testingAPI);
+    detachTestingToolsChangedForwarder?.();
+    detachTestingToolsChangedForwarder = installTestingToolsChangedForwarder(testingAPI, bridge);
 
     testingLogger.info('✅ Polyfill installed at window.navigator.modelContextTesting');
   } catch (error) {
@@ -2167,6 +2515,9 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
 export function cleanupWebModelContext(): void {
   /* c8 ignore next */
   if (typeof window === 'undefined') return;
+
+  detachTestingToolsChangedForwarder?.();
+  detachTestingToolsChangedForwarder = null;
 
   if (window.__mcpBridge) {
     try {

@@ -29,7 +29,7 @@ function isDirectOrWrappedText(value: unknown, expectedText: string): boolean {
  *
  * To test with Chromium native:
  * 1. Launch Chromium/Chrome Beta with:
- *    --enable-experimental-web-platform-features --enable-features=WebMCPForTesting
+ *    --enable-experimental-web-platform-features --enable-features=WebMCPTesting
  * 2. Or enable "WebMCP for testing" at chrome://flags/#enable-webmcp-testing
  */
 test.describe('Chromium Native API - ModelContext', () => {

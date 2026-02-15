@@ -26,7 +26,7 @@ export default defineConfig({
       args: [
         // In current Chrome Beta builds, this switch is still required for native exposure.
         '--enable-experimental-web-platform-features',
-        '--enable-features=WebMCPForTesting',
+        '--enable-features=WebMCPTesting',
       ],
     },
   },
