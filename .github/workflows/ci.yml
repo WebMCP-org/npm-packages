@@ -64,12 +64,15 @@ jobs:
         run: pnpm install
 
       - name: Setup Chrome Beta
+        id: chrome
         uses: browser-actions/setup-chrome@b94431e051d1c52dcbe9a7092a4f10f827795416
         with:
           chrome-version: beta
           install-dependencies: true
 
       - name: Run typecheck
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
         run: pnpm typecheck
 
   types-conformance:
@@ -143,12 +146,15 @@ jobs:
         run: pnpm build
 
       - name: Setup Chrome Beta
+        id: chrome
         uses: browser-actions/setup-chrome@b94431e051d1c52dcbe9a7092a4f10f827795416
         with:
           chrome-version: beta
           install-dependencies: true
 
       - name: Run unit tests with coverage
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
         run: pnpm test:unit:coverage
 
       - name: Upload coverage to Codecov
