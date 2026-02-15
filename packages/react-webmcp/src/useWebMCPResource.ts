@@ -1,5 +1,6 @@
 import type { ModelContext } from '@mcp-b/global';
-import { useEffect, useRef, useState } from 'react';
+import { createLogger } from '@mcp-b/global';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ResourceContents, WebMCPResourceConfig, WebMCPResourceReturn } from './types.js';
 
 /**
@@ -63,16 +64,11 @@ import type { ResourceContents, WebMCPResourceConfig, WebMCPResourceReturn } fro
  */
 export function useWebMCPResource(config: WebMCPResourceConfig): WebMCPResourceReturn {
   const { uri, name, description, mimeType, read } = config;
+  const logger = useMemo(() => createLogger('ReactWebMCP:useWebMCPResource'), []);
 
   const [isRegistered, setIsRegistered] = useState(false);
 
   const readRef = useRef(read);
-
-  const isDev = (() => {
-    const env = (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env
-      ?.NODE_ENV;
-    return env !== undefined ? env !== 'production' : false;
-  })();
 
   useEffect(() => {
     readRef.current = read;
@@ -80,11 +76,9 @@ export function useWebMCPResource(config: WebMCPResourceConfig): WebMCPResourceR
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.navigator?.modelContext) {
-      if (isDev) {
-        console.warn(
-          `[useWebMCPResource] window.navigator.modelContext is not available. Resource "${uri}" will not be registered.`
-        );
-      }
+      logger.warn(
+        `window.navigator.modelContext is not available. Resource "${uri}" will not be registered.`
+      );
       return;
     }
     const modelContext = window.navigator.modelContext as ModelContext;
@@ -111,26 +105,20 @@ export function useWebMCPResource(config: WebMCPResourceConfig): WebMCPResourceR
     }
 
     if (!registration) {
-      if (isDev) {
-        console.warn(`[useWebMCPResource] Resource "${uri}" did not return a registration handle.`);
-      }
+      logger.warn(`Resource "${uri}" did not return a registration handle.`);
       setIsRegistered(false);
       return;
     }
 
-    if (isDev) {
-      console.log(`[useWebMCPResource] Registered resource: ${uri}`);
-    }
+    logger.info(`Registered resource: ${uri}`);
     setIsRegistered(true);
 
     return () => {
       registration.unregister();
-      if (isDev) {
-        console.log(`[useWebMCPResource] Unregistered resource: ${uri}`);
-      }
+      logger.info(`Unregistered resource: ${uri}`);
       setIsRegistered(false);
     };
-  }, [uri, name, description, mimeType, isDev]);
+  }, [uri, name, description, mimeType, logger]);
 
   return {
     isRegistered,

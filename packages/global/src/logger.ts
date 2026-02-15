@@ -27,6 +27,7 @@
 
 /** localStorage key for debug configuration */
 const DEBUG_CONFIG_KEY = 'WEBMCP_DEBUG' as const;
+let hasWarnedStorageAccessFailure = false;
 
 /**
  * Check if debug logging is enabled for a namespace
@@ -35,12 +36,13 @@ const DEBUG_CONFIG_KEY = 'WEBMCP_DEBUG' as const;
  * both 'WebModelContext' and 'WebModelContext:init', but NOT 'WebModelContextTesting'.
  */
 function isDebugEnabled(namespace: string): boolean {
-  if (typeof window === 'undefined' || !window.localStorage) {
+  const storage = getLocalStorage();
+  if (!storage) {
     return false;
   }
 
   try {
-    const debugConfig = localStorage.getItem(DEBUG_CONFIG_KEY);
+    const debugConfig = storage.getItem(DEBUG_CONFIG_KEY);
     if (!debugConfig) return false;
 
     if (debugConfig === '*') return true;
@@ -48,13 +50,23 @@ function isDebugEnabled(namespace: string): boolean {
     const patterns = debugConfig.split(',').map((p) => p.trim());
     return patterns.some((pattern) => namespace === pattern || namespace.startsWith(`${pattern}:`));
   } catch (err) {
-    // localStorage might throw in some browsers (private mode, disabled storage)
-    // Log once to console so developers know debug logging is disabled
-    if (typeof console !== 'undefined' && console.warn) {
+    if (!hasWarnedStorageAccessFailure) {
+      hasWarnedStorageAccessFailure = true;
       const message = err instanceof Error ? err.message : String(err);
-      console.warn(`[WebMCP] localStorage access failed, debug logging disabled: ${message}`);
+      bindConsoleMethod(
+        'warn',
+        '[WebMCP]'
+      )(`localStorage access failed, debug logging disabled: ${message}`);
     }
     return false;
+  }
+}
+
+function getLocalStorage(): Storage | undefined {
+  try {
+    return globalThis.localStorage;
+  } catch {
+    return undefined;
   }
 }
 
@@ -62,6 +74,27 @@ function isDebugEnabled(namespace: string): boolean {
  * No-op function for disabled log levels
  */
 const noop = (): void => {};
+type ConsoleMethodName = 'debug' | 'info' | 'warn' | 'error' | 'log';
+
+function bindConsoleMethod(
+  method: ConsoleMethodName,
+  prefix: string
+): (message?: unknown, ...optionalParams: unknown[]) => void {
+  const consoleRef = globalThis.console;
+  if (!consoleRef) {
+    return noop;
+  }
+
+  const selected = consoleRef[method] ?? (method === 'log' ? undefined : consoleRef.log);
+  if (typeof selected !== 'function') {
+    return noop;
+  }
+
+  return selected.bind(consoleRef, prefix) as (
+    message?: unknown,
+    ...optionalParams: unknown[]
+  ) => void;
+}
 
 /**
  * Logger interface with standard log levels
@@ -80,6 +113,14 @@ export interface Logger {
   error(message?: unknown, ...optionalParams: unknown[]): void;
 }
 
+export interface CreateLoggerOptions {
+  /**
+   * Forces debug/info output even when WEBMCP_DEBUG does not match the namespace.
+   * This is useful for temporary trace channels that must bypass normal gating.
+   */
+  forceDebug?: boolean;
+}
+
 /**
  * Create a namespaced logger
  *
@@ -89,6 +130,7 @@ export interface Logger {
  * loggers. Refresh the page to apply new WEBMCP_DEBUG settings.
  *
  * @param namespace - Namespace for the logger (e.g., 'WebModelContext', 'NativeAdapter')
+ * @param options - Optional logger behavior overrides
  * @returns Logger instance with debug, info, warn, error methods
  *
  * @example
@@ -98,17 +140,18 @@ export interface Logger {
  * logger.error('Execution failed:', error); // Always enabled
  * ```
  */
-export function createLogger(namespace: string): Logger {
+export function createLogger(namespace: string, options: CreateLoggerOptions = {}): Logger {
   const prefix = `[${namespace}]`;
 
   // Note: Debug enablement is checked once at creation time for performance.
   // Changes to localStorage after creation won't affect existing loggers.
-  const isDebug = isDebugEnabled(namespace);
+  const isDebug = options.forceDebug || isDebugEnabled(namespace);
 
   // Create bound console methods that include the namespace prefix
-  const boundWarn = console.warn.bind(console, prefix);
-  const boundError = console.error.bind(console, prefix);
-  const boundLog = console.log.bind(console, prefix);
+  const boundWarn = bindConsoleMethod('warn', prefix);
+  const boundError = bindConsoleMethod('error', prefix);
+  const boundDebug = bindConsoleMethod('debug', prefix);
+  const boundInfo = bindConsoleMethod('info', prefix);
 
   return {
     // Warnings and errors are always enabled (production-safe)
@@ -116,7 +159,7 @@ export function createLogger(namespace: string): Logger {
     error: boundError,
 
     // Debug and info are conditional - use bound methods or no-ops
-    debug: isDebug ? boundLog : noop,
-    info: isDebug ? boundLog : noop,
+    debug: isDebug ? boundDebug : noop,
+    info: isDebug ? boundInfo : noop,
   };
 }

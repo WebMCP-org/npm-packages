@@ -14,6 +14,7 @@ declare global {
 }
 
 const TEST_CHANNEL_ID = `useWebMCP-test-${Date.now()}`;
+const DEBUG_CONFIG_KEY = 'WEBMCP_DEBUG';
 
 function parseSerializedToolResponse(result: string | null | undefined): {
   content: Array<{ type: string; text?: string }>;
@@ -28,23 +29,16 @@ function parseSerializedToolResponse(result: string | null | undefined): {
   };
 }
 
-/**
- * Helper to enable dev mode by setting globalThis.process.env.NODE_ENV.
- * Returns a cleanup function that restores the original state.
- */
-function enableDevMode(): () => void {
-  const g = globalThis as { process?: { env?: { NODE_ENV?: string } } };
-  const hadProcess = 'process' in globalThis;
-  const origProcess = g.process;
-
-  g.process = { env: { NODE_ENV: 'test' } };
+function enableDebugLogging(config = '*'): () => void {
+  const previous = window.localStorage.getItem(DEBUG_CONFIG_KEY);
+  window.localStorage.setItem(DEBUG_CONFIG_KEY, config);
 
   return () => {
-    if (hadProcess) {
-      g.process = origProcess;
-    } else {
-      delete g.process;
+    if (previous === null) {
+      window.localStorage.removeItem(DEBUG_CONFIG_KEY);
+      return;
     }
+    window.localStorage.setItem(DEBUG_CONFIG_KEY, previous);
   };
 }
 
@@ -65,6 +59,7 @@ describe('useWebMCP', () => {
   beforeEach(() => {
     navigator.modelContext?.clearContext();
     navigator.modelContextTesting?.reset();
+    window.localStorage.removeItem(DEBUG_CONFIG_KEY);
   });
 
   describe('initial state', () => {
@@ -638,209 +633,95 @@ describe('useWebMCP', () => {
     });
   });
 
-  describe('dev mode warnings', () => {
-    let cleanupDevMode: (() => void) | undefined;
+  describe('debug diagnostics', () => {
+    let cleanupDebugLogging: (() => void) | undefined;
 
     afterEach(() => {
-      cleanupDevMode?.();
-      cleanupDevMode = undefined;
+      cleanupDebugLogging?.();
+      cleanupDebugLogging = undefined;
     });
 
-    it('should warn when inputSchema reference changes', async () => {
-      cleanupDevMode = enableDevMode();
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    it('handles schema reference changes during rerender', async () => {
+      cleanupDebugLogging = enableDebugLogging('*');
+      const { rerender } = await renderHook(
+        ({ inputSchema, outputSchema, annotations }) =>
+          useWebMCP({
+            name: 'diag_schema_tool',
+            description: 'Test',
+            inputSchema,
+            outputSchema,
+            annotations,
+            handler: async () => ({ value: 'test' }),
+          }),
+        {
+          initialProps: {
+            inputSchema: { name: z.string() },
+            outputSchema: { value: z.string() },
+            annotations: { destructiveHint: true } as const,
+          },
+        }
+      );
 
-      try {
-        const { rerender } = await renderHook(
-          ({ inputSchema }) =>
-            useWebMCP({
-              name: 'warn_input_tool',
-              description: 'Test',
-              inputSchema,
-              handler: async () => 'result',
-            }),
-          {
-            initialProps: {
-              inputSchema: { name: z.string() },
-            },
-          }
-        );
+      await rerender({
+        inputSchema: { name: z.string() },
+        outputSchema: { value: z.string() },
+        annotations: { destructiveHint: true },
+      });
 
-        await rerender({ inputSchema: { name: z.string() } });
-
-        expect(warnSpy).toHaveBeenCalledWith(
-          expect.stringContaining('inputSchema reference changed')
-        );
-      } finally {
-        warnSpy.mockRestore();
-      }
+      expect(navigator.modelContextTesting?.listTools()).toHaveLength(1);
     });
 
-    it('should warn when outputSchema reference changes', async () => {
-      cleanupDevMode = enableDevMode();
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    it('handles description and deps changes without breaking registration', async () => {
+      cleanupDebugLogging = enableDebugLogging('*');
 
-      try {
-        const { rerender } = await renderHook(
-          ({ outputSchema }) =>
-            useWebMCP({
-              name: 'warn_output_tool',
-              description: 'Test',
-              outputSchema,
-              handler: async () => ({ value: 'test' }),
-            }),
-          {
-            initialProps: {
-              outputSchema: { value: z.string() },
-            },
-          }
-        );
+      const objDep = { key: 'value' };
+      const fnDep = () => {};
 
-        await rerender({ outputSchema: { value: z.string() } });
-
-        expect(warnSpy).toHaveBeenCalledWith(
-          expect.stringContaining('outputSchema reference changed')
-        );
-      } finally {
-        warnSpy.mockRestore();
-      }
-    });
-
-    it('should warn when annotations reference changes', async () => {
-      cleanupDevMode = enableDevMode();
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-      try {
-        const { rerender } = await renderHook(
-          ({ annotations }) =>
-            useWebMCP({
-              name: 'warn_annotations_tool',
-              description: 'Test',
-              annotations,
-              handler: async () => 'result',
-            }),
-          {
-            initialProps: {
-              annotations: { destructiveHint: true } as const,
-            },
-          }
-        );
-
-        await rerender({ annotations: { destructiveHint: true } });
-
-        expect(warnSpy).toHaveBeenCalledWith(
-          expect.stringContaining('annotations reference changed')
-        );
-      } finally {
-        warnSpy.mockRestore();
-      }
-    });
-
-    it('should warn when description changes in dev mode', async () => {
-      cleanupDevMode = enableDevMode();
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-      try {
-        const { rerender } = await renderHook(
-          ({ description }) =>
-            useWebMCP({
-              name: 'warn_desc_tool',
-              description,
-              handler: async () => 'result',
-            }),
-          { initialProps: { description: 'v1' } }
-        );
-
-        await rerender({ description: 'v2' });
-
-        expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('description changed'));
-      } finally {
-        warnSpy.mockRestore();
-      }
-    });
-
-    it('should warn when deps contain non-primitive values', async () => {
-      cleanupDevMode = enableDevMode();
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-      try {
-        const objDep = { key: 'value' };
-        await renderHook(() =>
+      const { rerender } = await renderHook(
+        ({ description, currentDep }) =>
           useWebMCP(
             {
-              name: 'warn_deps_tool',
-              description: 'Test',
-              handler: async () => 'result',
-            },
-            [objDep]
-          )
-        );
-
-        expect(warnSpy).toHaveBeenCalledWith(
-          expect.stringContaining('deps contains non-primitive values')
-        );
-      } finally {
-        warnSpy.mockRestore();
-      }
-    });
-
-    it('should warn when deps contain function values', async () => {
-      cleanupDevMode = enableDevMode();
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-      try {
-        const fnDep = () => {};
-        await renderHook(() =>
-          useWebMCP(
-            {
-              name: 'warn_fn_deps_tool',
-              description: 'Test',
-              handler: async () => 'result',
-            },
-            [fnDep]
-          )
-        );
-
-        expect(warnSpy).toHaveBeenCalledWith(
-          expect.stringContaining('deps contains non-primitive values')
-        );
-      } finally {
-        warnSpy.mockRestore();
-      }
-    });
-
-    it('should only warn once per key (warnOnce behavior)', async () => {
-      cleanupDevMode = enableDevMode();
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-      try {
-        const { rerender } = await renderHook(
-          ({ description }) =>
-            useWebMCP({
-              name: 'warn_once_tool',
+              name: 'diag_deps_tool',
               description,
               handler: async () => 'result',
-            }),
-          { initialProps: { description: 'v1' } }
-        );
+            },
+            [currentDep]
+          ),
+        {
+          initialProps: {
+            description: 'v1',
+            currentDep: objDep as unknown,
+          },
+        }
+      );
 
-        await rerender({ description: 'v2' });
-        await rerender({ description: 'v3' });
+      await rerender({ description: 'v2', currentDep: fnDep as unknown });
 
-        // Should only warn once for description
-        const descWarnings = warnSpy.mock.calls.filter((call) =>
-          String(call[0]).includes('description changed')
-        );
-        expect(descWarnings).toHaveLength(1);
-      } finally {
-        warnSpy.mockRestore();
-      }
+      expect(navigator.modelContextTesting?.listTools()).toHaveLength(1);
+    });
+
+    it('keeps a single active registration across repeated rerenders', async () => {
+      cleanupDebugLogging = enableDebugLogging('*');
+
+      const { rerender } = await renderHook(
+        ({ description }) =>
+          useWebMCP({
+            name: 'diag_once_tool',
+            description,
+            handler: async () => 'result',
+          }),
+        { initialProps: { description: 'v1' } }
+      );
+
+      await rerender({ description: 'v2' });
+      await rerender({ description: 'v3' });
+
+      expect(navigator.modelContextTesting?.listTools()).toHaveLength(1);
     });
   });
 
   describe('cleanup edge cases', () => {
-    it('should handle unregister errors gracefully in dev mode', async () => {
-      const cleanupDev = enableDevMode();
+    it('should handle unregister errors gracefully', async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const unregisterSpy = vi
         .spyOn(navigator.modelContext as ModelContext, 'unregisterTool')
@@ -857,17 +738,17 @@ describe('useWebMCP', () => {
           })
         );
 
-        // Should not throw, just warn in dev mode
+        // Should not throw, just warn
         unmount();
 
         expect(warnSpy).toHaveBeenCalledWith(
+          '[ReactWebMCP:useWebMCP]',
           expect.stringContaining('Failed to unregister tool'),
           expect.any(Error)
         );
       } finally {
         warnSpy.mockRestore();
         unregisterSpy.mockRestore();
-        cleanupDev();
       }
     });
   });
@@ -893,6 +774,7 @@ describe('useWebMCP', () => {
         );
 
         expect(warnSpy).toHaveBeenCalledWith(
+          '[ReactWebMCP:useWebMCP]',
           expect.stringContaining('modelContext is not available')
         );
       } finally {

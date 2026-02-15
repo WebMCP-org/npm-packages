@@ -13,24 +13,18 @@ declare global {
 }
 
 const TEST_CHANNEL_ID = `useWebMCPResource-test-${Date.now()}`;
+const DEBUG_CONFIG_KEY = 'WEBMCP_DEBUG';
 
-/**
- * Helper to enable dev mode by setting globalThis.process.env.NODE_ENV.
- * Returns a cleanup function that restores the original state.
- */
-function enableDevMode(): () => void {
-  const g = globalThis as { process?: { env?: { NODE_ENV?: string } } };
-  const hadProcess = 'process' in globalThis;
-  const origProcess = g.process;
-
-  g.process = { env: { NODE_ENV: 'test' } };
+function enableDebugLogging(config = '*'): () => void {
+  const previous = window.localStorage.getItem(DEBUG_CONFIG_KEY);
+  window.localStorage.setItem(DEBUG_CONFIG_KEY, config);
 
   return () => {
-    if (hadProcess) {
-      g.process = origProcess;
-    } else {
-      delete g.process;
+    if (previous === null) {
+      window.localStorage.removeItem(DEBUG_CONFIG_KEY);
+      return;
     }
+    window.localStorage.setItem(DEBUG_CONFIG_KEY, previous);
   };
 }
 
@@ -51,6 +45,7 @@ describe('useWebMCPResource', () => {
   beforeEach(() => {
     navigator.modelContext?.clearContext();
     navigator.modelContextTesting?.reset();
+    window.localStorage.removeItem(DEBUG_CONFIG_KEY);
   });
 
   describe('initial state', () => {
@@ -329,16 +324,17 @@ describe('useWebMCPResource', () => {
     });
   });
 
-  describe('dev mode logging', () => {
-    let cleanupDevMode: (() => void) | undefined;
+  describe('debug logging', () => {
+    let cleanupDebugLogging: (() => void) | undefined;
 
     afterEach(() => {
-      cleanupDevMode?.();
-      cleanupDevMode = undefined;
+      cleanupDebugLogging?.();
+      cleanupDebugLogging = undefined;
     });
 
-    it('should log registration in dev mode', async () => {
-      cleanupDevMode = enableDevMode();
+    it('should log registration when debug logging is enabled', async () => {
+      cleanupDebugLogging = enableDebugLogging('*');
+      const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
       const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
       try {
@@ -352,16 +348,23 @@ describe('useWebMCPResource', () => {
           })
         );
 
-        expect(logSpy).toHaveBeenCalledWith(
-          expect.stringContaining('Registered resource: log://registered')
-        );
+        const calls = [...infoSpy.mock.calls, ...logSpy.mock.calls];
+        expect(
+          calls.some(
+            (call) =>
+              call[0] === '[ReactWebMCP:useWebMCPResource]' &&
+              String(call[1]).includes('Registered resource: log://registered')
+          )
+        ).toBe(true);
       } finally {
+        infoSpy.mockRestore();
         logSpy.mockRestore();
       }
     });
 
-    it('should log unregistration in dev mode', async () => {
-      cleanupDevMode = enableDevMode();
+    it('should log unregistration when debug logging is enabled', async () => {
+      cleanupDebugLogging = enableDebugLogging('*');
+      const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
       const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
       try {
@@ -375,19 +378,25 @@ describe('useWebMCPResource', () => {
           })
         );
 
+        infoSpy.mockClear();
         logSpy.mockClear();
         unmount();
 
-        expect(logSpy).toHaveBeenCalledWith(
-          expect.stringContaining('Unregistered resource: log://unregistered')
-        );
+        const calls = [...infoSpy.mock.calls, ...logSpy.mock.calls];
+        expect(
+          calls.some(
+            (call) =>
+              call[0] === '[ReactWebMCP:useWebMCPResource]' &&
+              String(call[1]).includes('Unregistered resource: log://unregistered')
+          )
+        ).toBe(true);
       } finally {
+        infoSpy.mockRestore();
         logSpy.mockRestore();
       }
     });
 
-    it('should warn in dev mode when no registration handle is returned', async () => {
-      cleanupDevMode = enableDevMode();
+    it('should warn when no registration handle is returned', async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const registerResourceSpy = vi
         .spyOn(navigator.modelContext as ModelContext, 'registerResource')
@@ -407,6 +416,7 @@ describe('useWebMCPResource', () => {
         );
 
         expect(warnSpy).toHaveBeenCalledWith(
+          '[ReactWebMCP:useWebMCPResource]',
           expect.stringContaining('did not return a registration handle')
         );
       } finally {
@@ -417,15 +427,7 @@ describe('useWebMCPResource', () => {
   });
 
   describe('modelContext unavailability', () => {
-    let cleanupDevMode: (() => void) | undefined;
-
-    afterEach(() => {
-      cleanupDevMode?.();
-      cleanupDevMode = undefined;
-    });
-
-    it('should warn in dev mode when modelContext is not available', async () => {
-      cleanupDevMode = enableDevMode();
+    it('should warn when modelContext is not available', async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const savedModelContext = navigator.modelContext;
 
@@ -447,6 +449,7 @@ describe('useWebMCPResource', () => {
         );
 
         expect(warnSpy).toHaveBeenCalledWith(
+          '[ReactWebMCP:useWebMCPResource]',
           expect.stringContaining('modelContext is not available')
         );
         expect(result.current.isRegistered).toBe(false);

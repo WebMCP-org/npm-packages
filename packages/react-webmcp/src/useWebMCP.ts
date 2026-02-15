@@ -1,7 +1,7 @@
 import type { CallToolResult, InputSchema, ModelContext } from '@mcp-b/global';
-import { zodToJsonSchema } from '@mcp-b/global';
+import { createLogger, zodToJsonSchema } from '@mcp-b/global';
 import type { DependencyList } from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { z } from 'zod';
 import type { InferOutput, ToolExecutionState, WebMCPConfig, WebMCPReturn } from './types.js';
 
@@ -38,6 +38,8 @@ function toStructuredContent(value: unknown): StructuredContent | null {
     return null;
   }
 }
+
+const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 /**
  * React hook for registering and managing Model Context Protocol (MCP) tools.
@@ -272,6 +274,7 @@ export function useWebMCP<
     onSuccess,
     onError,
   } = config;
+  const logger = useMemo(() => createLogger('ReactWebMCP:useWebMCP'), []);
 
   const [state, setState] = useState<ToolExecutionState<TOutput>>({
     isExecuting: false,
@@ -293,14 +296,8 @@ export function useWebMCP<
     description,
     deps,
   });
-  const isDev = (() => {
-    const env = (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env
-      ?.NODE_ENV;
-    return env !== undefined ? env !== 'production' : false;
-  })();
-
   // Update refs when callbacks change (doesn't trigger re-registration)
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     handlerRef.current = handler;
     onSuccessRef.current = onSuccess;
     onErrorRef.current = onError;
@@ -316,16 +313,11 @@ export function useWebMCP<
   }, []);
 
   useEffect(() => {
-    if (!isDev) {
-      prevConfigRef.current = { inputSchema, outputSchema, annotations, description, deps };
-      return;
-    }
-
     const warnOnce = (key: string, message: string) => {
       if (warnedRef.current.has(key)) {
         return;
       }
-      console.warn(`[useWebMCP] ${message}`);
+      logger.debug(message);
       warnedRef.current.add(key);
     };
 
@@ -371,7 +363,7 @@ export function useWebMCP<
     }
 
     prevConfigRef.current = { inputSchema, outputSchema, annotations, description, deps };
-  }, [annotations, deps, description, inputSchema, isDev, name, outputSchema]);
+  }, [annotations, deps, description, inputSchema, logger, name, outputSchema]);
 
   const inputJsonSchema = useMemo(
     () => (inputSchema ? zodToJsonSchema(inputSchema) : undefined),
@@ -445,6 +437,11 @@ export function useWebMCP<
     executeRef.current = execute;
   }, [execute]);
 
+  const stableExecute = useCallback(
+    (input: unknown): Promise<TOutput> => executeRef.current(input),
+    []
+  );
+
   /**
    * Resets the execution state to initial values.
    */
@@ -459,8 +456,8 @@ export function useWebMCP<
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.navigator?.modelContext) {
-      console.warn(
-        `[useWebMCP] window.navigator.modelContext is not available. Tool "${name}" will not be registered.`
+      logger.warn(
+        `window.navigator.modelContext is not available. Tool "${name}" will not be registered.`
       );
       return;
     }
@@ -538,20 +535,18 @@ export function useWebMCP<
       try {
         modelContext.unregisterTool(name);
       } catch (error) {
-        if (isDev) {
-          console.warn(`[useWebMCP] Failed to unregister tool "${name}":`, error);
-        }
+        logger.warn(`Failed to unregister tool "${name}":`, error);
       }
     };
     // Spread operator in dependencies: Allows users to provide additional dependencies
     // via the `deps` parameter. While unconventional, this pattern is intentional to support
     // dynamic dependency injection. The spread is safe because deps is validated and warned
     // about non-primitive values earlier in this hook.
-  }, [name, description, inputJsonSchema, outputJsonSchema, annotations, isDev, ...(deps ?? [])]);
+  }, [name, description, inputJsonSchema, outputJsonSchema, annotations, logger, ...(deps ?? [])]);
 
   return {
     state,
-    execute,
+    execute: stableExecute,
     reset,
   };
 }

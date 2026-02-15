@@ -1,3 +1,4 @@
+import { createLogger } from '@mcp-b/global';
 import {
   type Client,
   type Tool as McpTool,
@@ -15,6 +16,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -37,6 +39,33 @@ interface McpClientContextValue {
 
 const McpClientContext = createContext<McpClientContextValue | null>(null);
 const EMPTY_REQUEST_OPTS: RequestOptions = {};
+const TOOL_FLOW_TRACE_KEY = 'WEBMCP_TRACE_TOOL_FLOW';
+
+function emitForcedToolFlowTrace(event: string, details: Record<string, unknown>): void {
+  const consoleRef = globalThis.console;
+  if (!consoleRef) {
+    return;
+  }
+
+  const method = consoleRef.debug ?? consoleRef.log;
+  if (typeof method !== 'function') {
+    return;
+  }
+
+  method.call(consoleRef, '[ReactWebMCP:McpClientProvider:ToolFlow]', event, details);
+}
+
+function isToolFlowTraceEnabled(): boolean {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  try {
+    return window.localStorage.getItem(TOOL_FLOW_TRACE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Props for the McpClientProvider component.
@@ -146,8 +175,25 @@ export function McpClientProvider({
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [capabilities, setCapabilities] = useState<ServerCapabilities | null>(null);
   const requestOpts = opts ?? EMPTY_REQUEST_OPTS;
+  const providerLogger = useMemo(() => createLogger('ReactWebMCP:McpClientProvider'), []);
+  const toolFlowLogger = useMemo(() => createLogger('ReactWebMCP:McpClientProvider:ToolFlow'), []);
 
   const connectionStateRef = useRef<'disconnected' | 'connecting' | 'connected'>('disconnected');
+  const toolFlowSequenceRef = useRef(0);
+  const logToolFlow = useCallback(
+    (event: string, details: Record<string, unknown> = {}) => {
+      const sequence = ++toolFlowSequenceRef.current;
+      const message = `[${sequence}] ${event}`;
+
+      if (isToolFlowTraceEnabled()) {
+        emitForcedToolFlowTrace(message, details);
+        return;
+      }
+
+      toolFlowLogger.debug(message, details);
+    },
+    [toolFlowLogger]
+  );
 
   /**
    * Fetches available resources from the MCP server.
@@ -166,10 +212,10 @@ export function McpClientProvider({
       const response = await client.listResources();
       setResources(response.resources);
     } catch (e) {
-      console.error('Error fetching resources:', e);
+      providerLogger.error('Error fetching resources:', e);
       throw e;
     }
-  }, [client]);
+  }, [client, providerLogger]);
 
   /**
    * Fetches available tools from the MCP server.
@@ -180,18 +226,31 @@ export function McpClientProvider({
 
     const serverCapabilities = client.getServerCapabilities();
     if (!serverCapabilities?.tools) {
+      logToolFlow('listTools:capability_missing', {});
       setTools([]);
       return;
     }
 
+    const startedAt = Date.now();
+    logToolFlow('listTools:start', {
+      hasToolsCapability: Boolean(serverCapabilities.tools),
+    });
     try {
       const response = await client.listTools();
       setTools(response.tools);
+      logToolFlow('listTools:success', {
+        durationMs: Date.now() - startedAt,
+        toolCount: response.tools.length,
+      });
     } catch (e) {
-      console.error('Error fetching tools:', e);
+      logToolFlow('listTools:error', {
+        durationMs: Date.now() - startedAt,
+        errorMessage: e instanceof Error ? e.message : String(e),
+      });
+      providerLogger.error('Error fetching tools:', e);
       throw e;
     }
-  }, [client]);
+  }, [client, logToolFlow, providerLogger]);
 
   /**
    * Establishes connection to the MCP server.
@@ -216,6 +275,9 @@ export function McpClientProvider({
       setIsConnected(true);
       setCapabilities(caps || null);
       connectionStateRef.current = 'connected';
+      logToolFlow('reconnect:connected', {
+        hasToolsListChanged: Boolean(caps?.tools?.listChanged),
+      });
 
       await Promise.all([fetchResourcesInternal(), fetchToolsInternal()]);
     } catch (e) {
@@ -226,7 +288,7 @@ export function McpClientProvider({
     } finally {
       setIsLoading(false);
     }
-  }, [client, transport, requestOpts, fetchResourcesInternal, fetchToolsInternal]);
+  }, [client, transport, requestOpts, fetchResourcesInternal, fetchToolsInternal, logToolFlow]);
 
   useEffect(() => {
     if (!isConnected || !client) {
@@ -236,11 +298,16 @@ export function McpClientProvider({
     const serverCapabilities = client.getServerCapabilities();
 
     const handleResourcesChanged = () => {
-      fetchResourcesInternal().catch(console.error);
+      fetchResourcesInternal().catch((error) => {
+        providerLogger.error('Failed to refresh resources after list_changed:', error);
+      });
     };
 
     const handleToolsChanged = () => {
-      fetchToolsInternal().catch(console.error);
+      logToolFlow('notification:tools/list_changed', {});
+      fetchToolsInternal().catch((error) => {
+        providerLogger.error('Failed to refresh tools after list_changed:', error);
+      });
     };
 
     if (serverCapabilities?.resources?.listChanged) {
@@ -253,7 +320,9 @@ export function McpClientProvider({
 
     // Re-fetch after setting up handlers to catch any changes that occurred
     // during the gap between initial fetch and handler setup
-    Promise.all([fetchResourcesInternal(), fetchToolsInternal()]).catch(console.error);
+    Promise.all([fetchResourcesInternal(), fetchToolsInternal()]).catch((error) => {
+      providerLogger.error('Failed to refresh tools/resources after handler registration:', error);
+    });
 
     return () => {
       if (serverCapabilities?.resources?.listChanged) {
@@ -264,13 +333,20 @@ export function McpClientProvider({
         client.removeNotificationHandler('notifications/tools/list_changed');
       }
     };
-  }, [client, isConnected, fetchResourcesInternal, fetchToolsInternal]);
+  }, [
+    client,
+    isConnected,
+    fetchResourcesInternal,
+    fetchToolsInternal,
+    logToolFlow,
+    providerLogger,
+  ]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentional - reconnect when client/transport props change
   useEffect(() => {
     // Initial connection - reconnect() has its own guard to prevent concurrent connections
     reconnect().catch((err) => {
-      console.error('Failed to connect MCP client:', err);
+      providerLogger.error('Failed to connect MCP client:', err);
     });
 
     // Cleanup: mark as disconnected so next mount will reconnect
@@ -278,7 +354,7 @@ export function McpClientProvider({
       connectionStateRef.current = 'disconnected';
       setIsConnected(false);
     };
-  }, [client, transport]);
+  }, [client, transport, providerLogger, reconnect]);
 
   return (
     <McpClientContext.Provider
