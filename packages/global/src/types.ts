@@ -864,6 +864,12 @@ export type ModelContextCore = CoreModelContextCore;
  * Non-standard MCPB extensions available on navigator.modelContext.
  */
 export interface ModelContextExtensions extends CoreModelContextExtensions {
+  /**
+   * Replaces base context with tools, resources, and prompts.
+   * Extends strict core options with MCPB resource/prompt support.
+   */
+  provideContext(options?: ModelContextOptions): void;
+
   // ==================== TOOLS ====================
 
   /**

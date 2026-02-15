@@ -53,6 +53,17 @@ function getText(selectorOrElement: string | Element | null): string | null {
   return el?.textContent?.trim() ?? null;
 }
 
+interface ModelContextLike {
+  registerTool(tool: {
+    name: string;
+    description: string;
+    inputSchema?: unknown;
+    execute: (args: Record<string, unknown>) => Promise<ToolResponse>;
+  }): void;
+}
+
+const modelContext = (navigator as Navigator & { modelContext: ModelContextLike }).modelContext;
+
 // biome-ignore lint/correctness/noUnusedVariables: Exported for use in tools
 function waitForElement(selector: string, timeout = 5000): Promise<Element> {
   return new Promise((resolve, reject) => {
@@ -83,7 +94,7 @@ function waitForElement(selector: string, timeout = 5000): Promise<Element> {
 }
 
 // Example read-only tool
-navigator.modelContext.registerTool({
+modelContext.registerTool({
   name: 'get_page_info',
   description: 'Get basic information about the current {{Site}} page',
   inputSchema: {
@@ -107,7 +118,7 @@ navigator.modelContext.registerTool({
 });
 
 // Example tool with parameters
-navigator.modelContext.registerTool({
+modelContext.registerTool({
   name: 'search_items',
   description: 'Search for items on the page. Returns matching results.',
   inputSchema: {
@@ -124,8 +135,10 @@ navigator.modelContext.registerTool({
     },
     required: ['query'],
   },
-  execute: async ({ query, limit = 10 }) => {
+  execute: async (args: Record<string, unknown>) => {
     try {
+      const query = typeof args.query === 'string' ? args.query : '';
+      const limit = typeof args.limit === 'number' ? args.limit : 10;
       // TODO: Implement search logic
       // Example:
       // const items = getAllElements('.item-selector');
@@ -146,7 +159,7 @@ navigator.modelContext.registerTool({
 });
 
 // Example action tool (read-write)
-navigator.modelContext.registerTool({
+modelContext.registerTool({
   name: 'click_button',
   description: 'Click a button on the page by its label',
   inputSchema: {
@@ -159,8 +172,9 @@ navigator.modelContext.registerTool({
     },
     required: ['label'],
   },
-  execute: async ({ label }) => {
+  execute: async (args: Record<string, unknown>) => {
     try {
+      const label = typeof args.label === 'string' ? args.label : '';
       const buttons = getAllElements('button');
       const button = buttons.find((btn) => getText(btn)?.toLowerCase() === label.toLowerCase());
 
