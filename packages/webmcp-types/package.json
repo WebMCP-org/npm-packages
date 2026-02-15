@@ -49,7 +49,7 @@
     "publish:npm": "pnpm publish --access public",
     "test": "vitest run && pnpm run test:conformance",
     "test:conformance": "vitest run --config vitest.conformance.config.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && vitest run --typecheck --silent"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "catalog:",
