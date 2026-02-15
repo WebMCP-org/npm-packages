@@ -45,7 +45,7 @@ jobs:
 
       - name: Create Release PR or Publish
         id: changesets
-        uses: changesets/action@c48e67d110a68bc90ccf1098e9646092baacaa87 # v1
+        uses: changesets/action@6a0a831ff30acef54f2c6aa1cbbc1096b066edaf # v1
         with:
           # Follow conventional commit format for version commits
           commit: "chore(release): version packages"
@@ -67,7 +67,7 @@ jobs:
 
       - name: Generate SBOM
         if: steps.changesets.outputs.published == 'true'
-        uses: anchore/sbom-action@62ad5284b8ced813296287a0b63906cb364b73ee # v0.18.0
+        uses: anchore/sbom-action@28d71544de8eaf1b958d335707167c5f783590ad # v0.18.0
         with:
           artifact-name: sbom-${{ github.sha }}.spdx.json
           output-file: ./sbom.spdx.json
