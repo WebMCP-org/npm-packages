@@ -14,10 +14,16 @@
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true,
     "incremental": true,
-    "allowJs": true,
+    "allowJs": false,
     "allowImportingTsExtensions": true,
     "noEmit": true,
     "useUnknownInCatchVariables": false
   },
-  "include": ["./**/*.ts", "./**/*.js"]
+  "include": [
+    "./prepare.ts",
+    "./post-build.ts",
+    "./sed.ts",
+    "./verify-server-json-version.ts"
+  ],
+  "exclude": ["./ignored/**", "./eslint_rules/**", "../build/**", "../vendor/**"]
 }
