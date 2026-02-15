@@ -12,11 +12,6 @@ packages:
   - e2e/react18-zod3
 
 catalog:
-  fast-check: ^4.0.0
-  '@vitest/browser': ^4.0.18
-  '@vitest/browser-playwright': ^4.0.18
-  '@vitest/coverage-v8': ^4.0.18
-  playwright: ^1.58.0
   '@cloudflare/vite-plugin': ^1.13.18
   '@composio/json-schema-to-zod': ^0.1.19
   '@hookform/resolvers': ^5.2.2
@@ -30,8 +25,13 @@ catalog:
   '@types/react': ^19.2.9
   '@types/react-dom': ^19.1.2
   '@use-gesture/react': ^10.3.1
+  '@vitest/browser': ^4.0.18
+  '@vitest/browser-playwright': ^4.0.18
+  '@vitest/coverage-v8': ^4.0.18
   ai: ^5.0.83
   babel-plugin-react-compiler: ^1.0.0
+  fast-check: ^4.0.0
+  playwright: ^1.58.0
   react: ^19.1.0
   react-dom: ^19.1.0
   react-markdown: ^10.1.0
@@ -49,6 +49,7 @@ onlyBuiltDependencies:
   - '@tailwindcss/oxide'
   - dtrace-provider
   - esbuild
+  - puppeteer
   - sharp
   - spawn-sync
   - unrs-resolver
