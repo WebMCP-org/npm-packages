@@ -29,7 +29,8 @@
     "test": {
       "dependsOn": ["^build"],
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "passThroughEnv": ["CHROME_BIN"]
     },
     "test:e2e": {
       "dependsOn": ["build"],
@@ -46,7 +47,8 @@
     },
     "typecheck": {
       "dependsOn": ["^build"],
-      "outputs": []
+      "outputs": [],
+      "passThroughEnv": ["CHROME_BIN"]
     },
     "prepublishOnly": {
       "dependsOn": ["build"],
