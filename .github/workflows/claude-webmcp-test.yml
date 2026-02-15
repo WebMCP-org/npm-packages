@@ -89,16 +89,21 @@ jobs:
                 "command": "node",
                 "args": [
                   "${{ github.workspace }}/packages/chrome-devtools-mcp/build/src/index.js",
-                  "--executablePath=${{ steps.setup-chrome.outputs.chrome-path }}",
-                  "--headless=true",
-                  "--isolated=true",
+                  "--executable-path",
+                  "${{ steps.setup-chrome.outputs.chrome-path }}",
+                  "--no-auto-connect",
+                  "--headless",
+                  "--isolated",
                   "--viewport=1280x720"
                 ]
               }
             }
           }
           EOF
+          echo "Generated MCP config:"
           cat /tmp/chrome-devtools-mcp-config.json
+          echo ""
+          echo "Chrome path: ${{ steps.setup-chrome.outputs.chrome-path }}"
 
       - name: Run Claude WebMCP Integration Test
         uses: anthropics/claude-code-action@35037bb980d9bc03f0f74b65b68618b0be46c268 # v1
