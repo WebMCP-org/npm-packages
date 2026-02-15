@@ -101,7 +101,7 @@ test.describe('Chromium Native API - ModelContext', () => {
     // Verify specific tool is gone
     const hasIncrementTool = await page.evaluate(() => {
       const tools = navigator.modelContext.listTools();
-      return tools.some((tool) => tool.name === 'incrementCounter');
+      return tools.some((tool: { name: string }) => tool.name === 'incrementCounter');
     });
     expect(hasIncrementTool).toBe(false);
   });

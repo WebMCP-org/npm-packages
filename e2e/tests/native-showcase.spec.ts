@@ -54,7 +54,8 @@ function isStructuredCounterResult(
 
 async function getToolNames(page: Page): Promise<string[]> {
   return page.evaluate(
-    () => navigator.modelContextTesting?.listTools().map((tool) => tool.name) ?? []
+    () =>
+      navigator.modelContextTesting?.listTools().map((tool: { name: string }) => tool.name) ?? []
   );
 }
 
@@ -251,7 +252,7 @@ test.describe('Native API Semantics', () => {
           },
         ],
       });
-      const before = testing.listTools().map((tool) => tool.name);
+      const before = testing.listTools().map((tool: { name: string }) => tool.name);
 
       context.provideContext({
         tools: [
@@ -265,7 +266,7 @@ test.describe('Native API Semantics', () => {
           },
         ],
       });
-      const after = testing.listTools().map((tool) => tool.name);
+      const after = testing.listTools().map((tool: { name: string }) => tool.name);
 
       return { before, after };
     });

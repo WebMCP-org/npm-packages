@@ -156,14 +156,28 @@ test.describe('MCPIframeElement E2E Tests', () => {
     // Verify the result structure
     expect(result).toHaveProperty('content');
     const content = (result as { content: Array<{ type: string; text: string }> }).content;
-    expect(content[0].type).toBe('text');
-    expect(content[0].text).toBe('30');
+    const firstContent = content[0];
+    expect(firstContent).toBeDefined();
+    if (!firstContent) {
+      throw new Error('Tool response content was empty');
+    }
+    expect(firstContent.type).toBe('text');
+    expect(firstContent.text).toBe('30');
   });
 
   test('should have mcp-iframe element with correct properties', async ({ page }) => {
     // Check the element's properties via JavaScript
     const elementInfo = await page.evaluate(() => {
-      const el = window.mcpIframeHost.getMcpIframe();
+      const el = window.mcpIframeHost.getMcpIframe() as {
+        ready: boolean;
+        exposedTools: unknown[];
+        exposedResources: unknown[];
+        exposedPrompts: unknown[];
+        itemPrefix: string;
+      } | null;
+      if (!el) {
+        return null;
+      }
       return {
         ready: el.ready,
         exposedToolsCount: el.exposedTools.length,
@@ -173,6 +187,10 @@ test.describe('MCPIframeElement E2E Tests', () => {
       };
     });
 
+    expect(elementInfo).not.toBeNull();
+    if (!elementInfo) {
+      throw new Error('MCP iframe element not found');
+    }
     expect(elementInfo.ready).toBe(true);
     expect(elementInfo.exposedToolsCount).toBe(3);
     expect(elementInfo.exposedResourcesCount).toBe(2);

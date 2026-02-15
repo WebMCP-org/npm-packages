@@ -28,7 +28,8 @@
     "test:validation-matrix": "playwright test --config=playwright-validation-matrix.config.ts",
     "test:validation-matrix:debug": "playwright test --config=playwright-validation-matrix.config.ts --debug",
     "test:validation-matrix:headed": "playwright test --config=playwright-validation-matrix.config.ts --headed",
-    "test:validation-matrix:ui": "playwright test --config=playwright-validation-matrix.config.ts --ui"
+    "test:validation-matrix:ui": "playwright test --config=playwright-validation-matrix.config.ts --ui",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.0",

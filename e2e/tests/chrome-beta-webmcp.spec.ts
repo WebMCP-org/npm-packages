@@ -61,25 +61,27 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
       const tools = testing.listTools();
       const invalidEntries: Array<{ index: number; reason: string }> = [];
 
-      tools.forEach((tool, index) => {
-        if (typeof tool.name !== 'string' || !tool.name) {
-          invalidEntries.push({ index, reason: 'name' });
-        }
-        if (typeof tool.description !== 'string') {
-          invalidEntries.push({ index, reason: 'description' });
-        }
-        if (tool.inputSchema !== undefined) {
-          if (typeof tool.inputSchema !== 'string') {
-            invalidEntries.push({ index, reason: 'inputSchema-type' });
-            return;
+      tools.forEach(
+        (tool: { name: string; description: string; inputSchema?: string }, index: number) => {
+          if (typeof tool.name !== 'string' || !tool.name) {
+            invalidEntries.push({ index, reason: 'name' });
           }
-          try {
-            JSON.parse(tool.inputSchema);
-          } catch {
-            invalidEntries.push({ index, reason: 'inputSchema-json' });
+          if (typeof tool.description !== 'string') {
+            invalidEntries.push({ index, reason: 'description' });
+          }
+          if (tool.inputSchema !== undefined) {
+            if (typeof tool.inputSchema !== 'string') {
+              invalidEntries.push({ index, reason: 'inputSchema-type' });
+              return;
+            }
+            try {
+              JSON.parse(tool.inputSchema);
+            } catch {
+              invalidEntries.push({ index, reason: 'inputSchema-json' });
+            }
           }
         }
-      });
+      );
 
       return { missingApi: false, count: tools.length, invalidEntries };
     });
@@ -109,11 +111,15 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
       });
 
       const afterRegister = testing.listTools().length;
-      const hasToolAfterRegister = testing.listTools().some((tool) => tool.name === toolName);
+      const hasToolAfterRegister = testing
+        .listTools()
+        .some((tool: { name: string }) => tool.name === toolName);
 
       context.unregisterTool(toolName);
       const afterUnregister = testing.listTools().length;
-      const hasToolAfterUnregister = testing.listTools().some((tool) => tool.name === toolName);
+      const hasToolAfterUnregister = testing
+        .listTools()
+        .some((tool: { name: string }) => tool.name === toolName);
 
       return {
         missingApi: false,
@@ -167,8 +173,10 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
 
       try {
         const tools = testing.listTools();
-        const noSchemaTool = tools.find((tool) => tool.name === noSchemaName);
-        const undefinedSchemaTool = tools.find((tool) => tool.name === undefinedSchemaName);
+        const noSchemaTool = tools.find((tool: { name: string }) => tool.name === noSchemaName);
+        const undefinedSchemaTool = tools.find(
+          (tool: { name: string }) => tool.name === undefinedSchemaName
+        );
 
         const parseableOrEmpty = (value: unknown) => {
           if (typeof value !== 'string') {
@@ -372,7 +380,7 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
     expect(result.missingApi).toBe(false);
     expect(result.didThrow).toBe(true);
     expect(result.name).toBe('UnknownError');
-    expect(result.message.length).toBeGreaterThan(0);
+    expect((result.message ?? '').length).toBeGreaterThan(0);
   });
 
   test('executeTool with aborted signal before call rejects', async ({ page }) => {
@@ -432,8 +440,8 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
         const controller = new AbortController();
         const pending = testing
           .executeTool(toolName, '{}', { signal: controller.signal })
-          .then((value) => ({ didThrow: false, value }))
-          .catch((error) => ({
+          .then((value: string | null) => ({ didThrow: false, value }))
+          .catch((error: unknown) => ({
             didThrow: true,
             name: error instanceof Error ? error.name : String(error),
             message: error instanceof Error ? error.message : String(error),
@@ -446,6 +454,9 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
       }
     });
 
+    if (result.missingApi) {
+      throw new Error('modelContext/modelContextTesting not available');
+    }
     expect(result.missingApi).toBe(false);
     expect(result.didThrow).toBe(true);
     expect(result.name).toBe('UnknownError');
@@ -479,11 +490,14 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
     });
 
     expect(result.missingApi).toBe(false);
-    expect(result.outcomes.null).toBe('TypeError');
-    expect(result.outcomes.undefined).toBe('TypeError');
-    expect(result.outcomes.number).toBe('TypeError');
-    expect(result.outcomes.object).toBe('TypeError');
-    expect(result.outcomes.function).toBe('ok');
+    if (result.missingApi) {
+      throw new Error('modelContextTesting not available');
+    }
+    expect(result.outcomes?.null).toBe('TypeError');
+    expect(result.outcomes?.undefined).toBe('TypeError');
+    expect(result.outcomes?.number).toBe('TypeError');
+    expect(result.outcomes?.object).toBe('TypeError');
+    expect(result.outcomes?.function).toBe('ok');
   });
 
   test('registerToolsChangedCallback replaces prior callback and does not break operations when callback throws', async ({
@@ -632,7 +646,7 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
 
       try {
         const tools = testing.listTools();
-        const tool = tools.find((t) => t.name === toolName);
+        const tool = tools.find((t: { name: string }) => t.name === toolName);
 
         let parsedSchemaType: string | null = null;
         if (tool?.inputSchema) {
