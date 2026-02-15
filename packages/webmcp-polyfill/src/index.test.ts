@@ -174,7 +174,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
   // =========================================================================
 
   describe('initializeWebMCPPolyfill options', () => {
-    it('does not override existing modelContext without forceOverride', () => {
+    it('does not override existing modelContext when one already exists', () => {
       // First install
       initializeWebMCPPolyfill();
       // Cleanup and manually set something
@@ -189,27 +189,11 @@ describe('@mcp-b/webmcp-polyfill', () => {
         value: fakeContext,
       });
 
-      // Without forceOverride, should not replace existing
       initializeWebMCPPolyfill();
       expect((navigator.modelContext as unknown as { fake?: boolean }).fake).toBe(true);
 
       // Cleanup manually
       delete (navigator as unknown as Record<string, unknown>).modelContext;
-    });
-
-    it('overrides existing modelContext with forceOverride=true', () => {
-      // Set a fake modelContext
-      const fakeContext = { fake: true } as unknown as Navigator['modelContext'];
-      Object.defineProperty(navigator, 'modelContext', {
-        configurable: true,
-        enumerable: true,
-        writable: true,
-        value: fakeContext,
-      });
-
-      initializeWebMCPPolyfill({ forceOverride: true });
-      expect((navigator.modelContext as unknown as { fake?: boolean }).fake).toBeUndefined();
-      expect(typeof navigator.modelContext.registerTool).toBe('function');
     });
 
     it('does not install modelContextTesting when installTestingShim=false', () => {
@@ -218,15 +202,14 @@ describe('@mcp-b/webmcp-polyfill', () => {
       expect(navigator.modelContextTesting).toBeUndefined();
     });
 
-    it('re-initializes when already installed (calls cleanup first)', () => {
+    it('is idempotent when already installed', () => {
       initializeWebMCPPolyfill();
       const first = navigator.modelContext;
 
-      // Re-initialize (should cleanup old and install new)
-      initializeWebMCPPolyfill({ forceOverride: true });
+      initializeWebMCPPolyfill();
       const second = navigator.modelContext;
 
-      expect(first).not.toBe(second);
+      expect(first).toBe(second);
       expect(typeof second.registerTool).toBe('function');
     });
   });
@@ -238,7 +221,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
       cleanupWebMCPPolyfill();
     });
 
-    it('restores previous descriptors when forceOverride was used', () => {
+    it('does not mutate pre-existing descriptors when initialization no-ops', () => {
       // Set a fake modelContext first
       const originalFake = { original: true } as unknown as Navigator['modelContext'];
       Object.defineProperty(navigator, 'modelContext', {
@@ -258,11 +241,9 @@ describe('@mcp-b/webmcp-polyfill', () => {
         value: originalTestingFake,
       });
 
-      // Override with polyfill
-      initializeWebMCPPolyfill({ forceOverride: true });
-      expect(typeof navigator.modelContext.registerTool).toBe('function');
+      initializeWebMCPPolyfill();
+      expect((navigator.modelContext as unknown as { original?: boolean }).original).toBe(true);
 
-      // Cleanup should restore previous
       cleanupWebMCPPolyfill();
       expect((navigator.modelContext as unknown as { original?: boolean }).original).toBe(true);
       expect(

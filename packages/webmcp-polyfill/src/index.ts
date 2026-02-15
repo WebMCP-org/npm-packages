@@ -35,12 +35,6 @@ const installState: InstallState = {
 
 export interface WebMCPPolyfillInitOptions {
   /**
-   * Force installation even when navigator.modelContext already exists.
-   * Existing descriptors are restored by cleanupWebMCPPolyfill().
-   */
-  forceOverride?: boolean;
-
-  /**
    * Installs navigator.modelContextTesting when this polyfill provides modelContext.
    * @default true
    */
@@ -489,10 +483,9 @@ export function initializeWebMCPPolyfill(options?: WebMCPPolyfillInitOptions): v
     return;
   }
 
-  const forceOverride = options?.forceOverride ?? false;
   const hasModelContext = Boolean(nav.modelContext);
 
-  if (hasModelContext && !forceOverride) {
+  if (hasModelContext) {
     return;
   }
 

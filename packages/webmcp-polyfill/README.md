@@ -30,19 +30,22 @@ initializeWebMCPPolyfill();
 
 ```ts
 initializeWebMCPPolyfill({
-  forceOverride: false,
   installTestingShim: true,
 });
 ```
 
-- `forceOverride`: replace an existing `navigator.modelContext` if present.
 - `installTestingShim`: install `navigator.modelContextTesting` parity helpers.
 
 ## Interop with `@mcp-b/global`
 
-- Default behavior is non-destructive: if `navigator.modelContext` already exists, this package does nothing unless `forceOverride: true` is passed.
+- Default behavior is non-destructive: if `navigator.modelContext` already exists, this package does nothing.
 - When a page already has this core polyfill and later loads `@mcp-b/global`, global runs in attach-only mode (keeps the existing object identity and adds bridge/runtime features).
 - Repeated injection of `@mcp-b/global` is idempotent (first initialization wins).
+
+## Migration Notes
+
+- `forceOverride` has been removed from `initializeWebMCPPolyfill` options.
+- Existing callers passing `forceOverride` should remove that field.
 
 ## Testing Shim
 
