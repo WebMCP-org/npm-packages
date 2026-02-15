@@ -8,7 +8,9 @@ export default defineConfig({
     // Use browser mode for real DOM, React rendering, and navigator testing
     browser: {
       enabled: true,
-      provider: playwright(),
+      provider: playwright({
+        launch: isCI ? { channel: 'chrome-beta' } : {},
+      }),
       instances: [{ browser: 'chromium' }],
       headless: true,
     },

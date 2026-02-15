@@ -8,7 +8,9 @@ export default defineConfig({
     // Use browser mode for real DOM, postMessage, and navigator testing
     browser: {
       enabled: true,
-      provider: playwright(),
+      provider: playwright({
+        launch: isCI ? { channel: 'chrome-beta' } : {},
+      }),
       instances: [{ browser: 'chromium' }],
     },
     // Test file patterns - exclude esm-resolution tests as they need Node.js
