@@ -63,6 +63,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      - name: Setup Chrome Beta
+        uses: browser-actions/setup-chrome@b94431e051d1c52dcbe9a7092a4f10f827795416
+        with:
+          chrome-version: beta
+          install-dependencies: true
+
       - name: Run typecheck
         run: pnpm typecheck
 
@@ -136,8 +142,11 @@ jobs:
       - name: Build packages
         run: pnpm build
 
-      - name: Install Playwright Browsers
-        run: pnpm --filter @mcp-b/global exec playwright install --with-deps chromium
+      - name: Setup Chrome Beta
+        uses: browser-actions/setup-chrome@b94431e051d1c52dcbe9a7092a4f10f827795416
+        with:
+          chrome-version: beta
+          install-dependencies: true
 
       - name: Run unit tests with coverage
         run: pnpm test:unit:coverage
