@@ -80,7 +80,7 @@
     "test:browser:ui": "vitest --browser",
     "test:node": "vitest run --config vitest.node.config.ts",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && vitest run --typecheck --silent && vitest run --config vitest.node.config.ts --typecheck --silent",
     "version:major": "pnpm version major --no-git-tag-version",
     "version:minor": "pnpm version minor --no-git-tag-version",
     "version:patch": "pnpm version patch --no-git-tag-version"

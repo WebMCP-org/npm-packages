@@ -45,7 +45,7 @@
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
     "test": "vitest run",
-    "typecheck": "pnpm --filter @mcp-b/webmcp-types build && tsc --noEmit"
+    "typecheck": "pnpm --filter @mcp-b/webmcp-types build && tsc --noEmit && vitest run --typecheck --silent"
   },
   "dependencies": {
     "@mcp-b/webmcp-types": "workspace:*"
