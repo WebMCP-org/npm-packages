@@ -131,7 +131,7 @@ test.describe('Web Model Context API E2E Tests', () => {
     ).toBe(true);
 
     const toolNames = await page.evaluate(() => {
-      return navigator.modelContext.listTools().map((tool) => tool.name);
+      return navigator.modelContext.listTools().map((tool: { name: string }) => tool.name);
     });
     expect(toolNames).toHaveLength(2);
     expect(toolNames).toContain('doubleCounter');

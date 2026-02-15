@@ -621,7 +621,7 @@ test.describe('React WebMCP structuredContent Tests', () => {
         if (!testing) return false;
         const tools = testing.listTools();
         // Wait until counter_get tool is registered
-        return tools.some((t) => t.name === 'counter_get');
+        return tools.some((t: { name: string }) => t.name === 'counter_get');
       },
       { timeout: 10000 }
     );
@@ -776,11 +776,13 @@ test.describe('React WebMCP structuredContent Tests', () => {
       };
       const response2 = parsedSecond.structuredContent ?? {};
       const updatedCounter = response2.counter;
+      const hasBothCounters =
+        typeof initialCounter === 'number' && typeof updatedCounter === 'number';
 
       return {
         initialCounter,
         updatedCounter,
-        incrementedBy5: updatedCounter === initialCounter + 5,
+        incrementedBy5: hasBothCounters && updatedCounter === initialCounter + 5,
         hasValidTimestamp: typeof response1.timestamp === 'string',
       };
     });
@@ -790,6 +792,9 @@ test.describe('React WebMCP structuredContent Tests', () => {
     expect(results.hasValidTimestamp).toBe(true);
     expect(typeof results.initialCounter).toBe('number');
     expect(typeof results.updatedCounter).toBe('number');
+    if (typeof results.initialCounter !== 'number' || typeof results.updatedCounter !== 'number') {
+      throw new Error('Missing counter values in structuredContent');
+    }
     expect(results.updatedCounter).toBe(results.initialCounter + 5);
   });
 });

@@ -52,7 +52,7 @@ async function waitForToolsRegistered(page: Page, toolNames: string[]): Promise<
       const testing = navigator.modelContextTesting;
       if (!testing) return false;
       const tools = testing.listTools();
-      return names.every((name) => tools.some((t) => t.name === name));
+      return names.every((name) => tools.some((t: { name: string }) => t.name === name));
     },
     toolNames,
     { timeout: 10000 }
@@ -144,7 +144,7 @@ test.describe('Production Build - Polyfill Detection Tests', () => {
       return {
         exists: true,
         hasMarker,
-        markerValue,
+        ...(markerValue !== undefined ? { markerValue } : {}),
         constructorName: testing.constructor?.name || 'unknown',
       };
     }, POLYFILL_MARKER);
@@ -264,7 +264,7 @@ test.describe('Production Build - Tool Registration Tests', () => {
     const tools = await page.evaluate(() => {
       const testing = navigator.modelContextTesting;
       if (!testing) return [];
-      return testing.listTools().map((t) => t.name);
+      return testing.listTools().map((t: { name: string }) => t.name);
     });
 
     // Check for duplicates
@@ -286,16 +286,16 @@ test.describe('Production Build - Tool Registration Tests', () => {
       const testing = navigator.modelContextTesting;
       if (!testing) return { tools: [] as string[], hasDuplicates: false };
 
-      const tools = testing.listTools().map((t) => t.name);
+      const tools = testing.listTools().map((t: { name: string }) => t.name);
       const toolCounts = tools.reduce(
-        (acc, name) => {
+        (acc: Record<string, number>, name: string) => {
           acc[name] = (acc[name] || 0) + 1;
           return acc;
         },
         {} as Record<string, number>
       );
 
-      const duplicates = Object.entries(toolCounts)
+      const duplicates = (Object.entries(toolCounts) as Array<[string, number]>)
         .filter(([, count]) => count > 1)
         .map(([name, count]) => ({ name, count }));
 
