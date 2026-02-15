@@ -132,10 +132,6 @@ function App() {
     name: 'counter_reset',
     description: 'Reset the counter to zero. This action cannot be undone.',
     annotations: RESET_ANNOTATIONS,
-    elicitation: {
-      message: 'Are you sure you want to reset the counter? This cannot be undone.',
-      when: () => globalCounter !== 0,
-    },
     handler: async () => {
       const oldValue = globalCounter;
       globalCounter = 0;
@@ -197,7 +193,8 @@ function App() {
       };
     },
     formatOutput: (output) => {
-      return `Found ${output.count} posts:\n${output.results.map((r) => `• ${r.title} (${r.likes} likes)`).join('\n')}`;
+      const results = output.results as Array<{ title: string; likes: number }>;
+      return `Found ${output.count} posts:\n${results.map((r) => `• ${r.title} (${r.likes} likes)`).join('\n')}`;
     },
   });
 

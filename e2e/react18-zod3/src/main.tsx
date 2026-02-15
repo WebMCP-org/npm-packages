@@ -1,7 +1,9 @@
 import '@mcp-b/global'; // Initialize navigator.modelContext polyfill
+import type { McpClientProviderProps } from '@mcp-b/react-webmcp';
 import { McpClientProvider } from '@mcp-b/react-webmcp';
 import { TabClientTransport } from '@mcp-b/transports';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import type { ComponentType } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 
@@ -17,6 +19,9 @@ const transport = new TabClientTransport({
   targetOrigin: '*',
   channelId: 'mcp',
 });
+const Provider = McpClientProvider as unknown as ComponentType<McpClientProviderProps>;
+const providerClient = client as unknown as McpClientProviderProps['client'];
+const providerTransport = transport as unknown as McpClientProviderProps['transport'];
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -24,7 +29,7 @@ if (!rootElement) {
 }
 
 ReactDOM.createRoot(rootElement).render(
-  <McpClientProvider client={client} transport={transport}>
+  <Provider client={providerClient} transport={providerTransport}>
     <App />
-  </McpClientProvider>
+  </Provider>
 );

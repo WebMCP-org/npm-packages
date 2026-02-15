@@ -11,6 +11,7 @@ import '@mcp-b/global';
 // Import the MCPIframeElement (auto-registers as <mcp-iframe>)
 import '@mcp-b/mcp-iframe';
 
+import type { InternalModelContext } from '@mcp-b/global';
 import type { MCPIframeElement } from '@mcp-b/mcp-iframe';
 
 // DOM elements
@@ -22,6 +23,7 @@ const toolResultEl = document.getElementById('tool-result')!;
 const resourceResultEl = document.getElementById('resource-result')!;
 const promptResultEl = document.getElementById('prompt-result')!;
 const logEl = document.getElementById('log')!;
+const modelContext = navigator.modelContext as unknown as InternalModelContext;
 
 // Get the mcp-iframe element
 const mcpIframe = document.getElementById('child-iframe') as MCPIframeElement;
@@ -89,9 +91,10 @@ async function callTool(name: string, args: Record<string, unknown>) {
 
   try {
     // Use the parent's modelContext to call the exposed tool
-    const result = await navigator.modelContext.executeTool(prefixedName, args);
-    const text =
+    const result = await modelContext.executeTool(prefixedName, args);
+    const rawText =
       result.content[0]?.type === 'text' ? result.content[0].text : JSON.stringify(result);
+    const text = typeof rawText === 'string' ? rawText : JSON.stringify(rawText);
     log(`Tool result: ${text}`, 'success');
     toolResultEl.textContent = `Result: ${text}`;
     toolResultEl.setAttribute('data-result', text);

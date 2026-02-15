@@ -1,15 +1,19 @@
 import { IframeParentTransport } from '@mcp-b/transports';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 
-const statusEl = document.getElementById('client-status');
-const toolsEl = document.getElementById('client-tools');
-const resultEl = document.getElementById('client-result');
-const logEl = document.getElementById('client-log');
-const iframeEl = document.getElementById('client-iframe') as HTMLIFrameElement | null;
-
-if (!statusEl || !toolsEl || !resultEl || !logEl || !iframeEl) {
-  throw new Error('Required DOM elements not found for MCP iframe client test');
+function requireElement<T extends HTMLElement>(id: string): T {
+  const element = document.getElementById(id);
+  if (!element) {
+    throw new Error(`Required DOM element not found: ${id}`);
+  }
+  return element as T;
 }
+
+const statusEl = requireElement<HTMLDivElement>('client-status');
+const toolsEl = requireElement<HTMLPreElement>('client-tools');
+const resultEl = requireElement<HTMLDivElement>('client-result');
+const logEl = requireElement<HTMLDivElement>('client-log');
+const iframeEl = requireElement<HTMLIFrameElement>('client-iframe');
 
 type LogLevel = 'info' | 'success' | 'error';
 
@@ -82,9 +86,11 @@ async function runClientTest() {
       arguments: { a: 2, b: 3 },
     });
 
+    const contentItems = Array.isArray(result.content)
+      ? (result.content as Array<{ type?: string; text?: string }>)
+      : [];
     const text =
-      result.content?.find((item) => item.type === 'text')?.text ??
-      JSON.stringify(result.content ?? []);
+      contentItems.find((item) => item.type === 'text')?.text ?? JSON.stringify(contentItems);
     resultEl.textContent = `Result: ${text}`;
     resultEl.setAttribute('data-result', text);
 
