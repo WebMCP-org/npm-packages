@@ -1,3 +1,4 @@
+import type { InternalModelContext } from '@mcp-b/global';
 import { initializeWebModelContext } from '@mcp-b/global';
 import { z } from 'zod';
 
@@ -12,6 +13,13 @@ function log(msg: string, type: 'info' | 'success' | 'error' = 'info') {
   div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
   resultsEl.appendChild(div);
   resultsEl.scrollTop = resultsEl.scrollHeight;
+}
+
+function getFirstText(result: { content?: Array<{ type?: string; text?: string }> }): string {
+  const textBlock = result.content?.find(
+    (item) => item.type === 'text' && typeof item.text === 'string'
+  );
+  return textBlock?.text ?? '';
 }
 
 // Check Zod version
@@ -47,11 +55,12 @@ async function runTests() {
   statusEl.className = 'success';
   statusEl.textContent = 'ESM + Zod 3 initialized - Running tests...';
 
-  const mc = window.navigator.modelContext;
+  const mc = window.navigator.modelContext as unknown as InternalModelContext;
+  const registerTool = mc.registerTool as unknown as (tool: unknown) => void;
 
   try {
     // Register tool with Zod 3 schemas
-    mc.registerTool({
+    registerTool({
       name: 'esm-zod3-validator',
       description: 'Validate data using ESM + Zod 3',
       inputSchema: {
@@ -61,7 +70,14 @@ async function runTests() {
         active: z.boolean().optional().describe('Is active'),
         tags: z.array(z.string()).optional().describe('Optional tags'),
       },
-      async execute({ name, email, score, active, tags }) {
+      async execute(args: {
+        name: string;
+        email: string;
+        score: number;
+        active?: boolean;
+        tags?: string[];
+      }) {
+        const { name, email, score, active, tags } = args;
         return {
           content: [
             {
@@ -93,7 +109,7 @@ async function runTests() {
       score: 85,
     });
     log(
-      `Valid input: ${r1.isError ? 'FAILED' : 'PASSED'} - ${r1.content?.[0]?.text}`,
+      `Valid input: ${r1.isError ? 'FAILED' : 'PASSED'} - ${getFirstText(r1 as { content?: Array<{ type?: string; text?: string }> })}`,
       r1.isError ? 'error' : 'success'
     );
 
@@ -107,7 +123,7 @@ async function runTests() {
       tags: ['premium', 'verified'],
     });
     log(
-      `With optionals: ${r2.isError ? 'FAILED' : 'PASSED'} - ${r2.content?.[0]?.text}`,
+      `With optionals: ${r2.isError ? 'FAILED' : 'PASSED'} - ${getFirstText(r2 as { content?: Array<{ type?: string; text?: string }> })}`,
       r2.isError ? 'error' : 'success'
     );
 

@@ -6,7 +6,8 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite --port 3015",
-    "preview": "vite preview --port 3015"
+    "preview": "vite preview --port 3015",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@mcp-b/global": "workspace:*",

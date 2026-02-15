@@ -7,6 +7,13 @@
 
 // Import the polyfill to create the MCP server
 import '@mcp-b/global';
+import type { InternalModelContext } from '@mcp-b/global';
+
+const modelContext = navigator.modelContext as unknown as InternalModelContext;
+
+function provideExtendedContext(options: unknown): void {
+  (modelContext as unknown as { provideContext: (value: unknown) => void }).provideContext(options);
+}
 
 const statusEl = document.getElementById('status');
 const logEl = document.getElementById('log');
@@ -28,7 +35,7 @@ function updateStatus(text: string) {
 
 log('Registering tools, resources, and prompts...');
 
-navigator.modelContext.provideContext({
+provideExtendedContext({
   tools: [
     {
       name: 'add',
@@ -208,7 +215,7 @@ declare global {
 }
 
 window.iframeChild = {
-  getToolCount: () => navigator.modelContext.listTools().length,
-  getResourceCount: () => navigator.modelContext.listResources().length,
-  getPromptCount: () => navigator.modelContext.listPrompts().length,
+  getToolCount: () => modelContext.listTools().length,
+  getResourceCount: () => modelContext.listResources().length,
+  getPromptCount: () => modelContext.listPrompts().length,
 };
