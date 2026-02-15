@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["src/BaseApiTools.ts", "src/chrome-typecheck.d.ts"],
+  "exclude": ["node_modules", "dist"]
+}
