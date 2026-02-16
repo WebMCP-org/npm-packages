@@ -1,6 +1,5 @@
 import type { ModelContext } from '@mcp-b/global';
-import { createLogger } from '@mcp-b/global';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ResourceContents, WebMCPResourceConfig, WebMCPResourceReturn } from './types.js';
 
 /**
@@ -64,7 +63,6 @@ import type { ResourceContents, WebMCPResourceConfig, WebMCPResourceReturn } fro
  */
 export function useWebMCPResource(config: WebMCPResourceConfig): WebMCPResourceReturn {
   const { uri, name, description, mimeType, read } = config;
-  const logger = useMemo(() => createLogger('ReactWebMCP:useWebMCPResource'), []);
 
   const [isRegistered, setIsRegistered] = useState(false);
 
@@ -76,8 +74,8 @@ export function useWebMCPResource(config: WebMCPResourceConfig): WebMCPResourceR
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.navigator?.modelContext) {
-      logger.warn(
-        `window.navigator.modelContext is not available. Resource "${uri}" will not be registered.`
+      console.warn(
+        `[ReactWebMCP] window.navigator.modelContext is not available. Resource "${uri}" will not be registered.`
       );
       return;
     }
@@ -105,20 +103,18 @@ export function useWebMCPResource(config: WebMCPResourceConfig): WebMCPResourceR
     }
 
     if (!registration) {
-      logger.warn(`Resource "${uri}" did not return a registration handle.`);
+      console.warn(`[ReactWebMCP] Resource "${uri}" did not return a registration handle.`);
       setIsRegistered(false);
       return;
     }
 
-    logger.info(`Registered resource: ${uri}`);
     setIsRegistered(true);
 
     return () => {
       registration.unregister();
-      logger.info(`Unregistered resource: ${uri}`);
       setIsRegistered(false);
     };
-  }, [uri, name, description, mimeType, logger]);
+  }, [uri, name, description, mimeType]);
 
   return {
     isRegistered,

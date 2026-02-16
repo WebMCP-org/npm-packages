@@ -1,8 +1,12 @@
 import type { InputSchema, ModelContext } from '@mcp-b/global';
-import { createLogger, zodToJsonSchema } from '@mcp-b/global';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { z } from 'zod';
-import type { PromptMessage, WebMCPPromptConfig, WebMCPPromptReturn } from './types.js';
+import { useEffect, useRef, useState } from 'react';
+import type {
+  PromptMessage,
+  ReactWebMCPInputSchema,
+  WebMCPPromptConfig,
+  WebMCPPromptReturn,
+} from './types.js';
+import { isZodSchema, zodToJsonSchema } from './zod-utils.js';
 
 /**
  * React hook for registering Model Context Protocol (MCP) prompts.
@@ -46,9 +50,13 @@ import type { PromptMessage, WebMCPPromptConfig, WebMCPPromptReturn } from './ty
  *     name: 'review_code',
  *     description: 'Review code for best practices',
  *     argsSchema: {
- *       code: z.string().describe('The code to review'),
- *       language: z.string().optional().describe('Programming language'),
- *     },
+ *       type: 'object',
+ *       properties: {
+ *         code: { type: 'string', description: 'The code to review' },
+ *         language: { type: 'string', description: 'Programming language' },
+ *       },
+ *       required: ['code'],
+ *     } as const,
  *     get: async ({ code, language }) => ({
  *       messages: [{
  *         role: 'user',
@@ -64,20 +72,14 @@ import type { PromptMessage, WebMCPPromptConfig, WebMCPPromptReturn } from './ty
  * }
  * ```
  */
-export function useWebMCPPrompt<
-  TArgsSchema extends Record<string, z.ZodTypeAny> = Record<string, never>,
->(config: WebMCPPromptConfig<TArgsSchema>): WebMCPPromptReturn {
+export function useWebMCPPrompt<TArgsSchema extends ReactWebMCPInputSchema = InputSchema>(
+  config: WebMCPPromptConfig<TArgsSchema>
+): WebMCPPromptReturn {
   const { name, description, argsSchema, get } = config;
-  const logger = useMemo(() => createLogger('ReactWebMCP:useWebMCPPrompt'), []);
 
   const [isRegistered, setIsRegistered] = useState(false);
 
   const getRef = useRef(get);
-
-  const argsJsonSchema = useMemo(
-    () => (argsSchema ? zodToJsonSchema(argsSchema) : undefined),
-    [argsSchema]
-  );
 
   useEffect(() => {
     getRef.current = get;
@@ -85,8 +87,8 @@ export function useWebMCPPrompt<
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.navigator?.modelContext) {
-      logger.warn(
-        `window.navigator.modelContext is not available. Prompt "${name}" will not be registered.`
+      console.warn(
+        `[ReactWebMCP] window.navigator.modelContext is not available. Prompt "${name}" will not be registered.`
       );
       return;
     }
@@ -98,12 +100,18 @@ export function useWebMCPPrompt<
       return getRef.current(args as never);
     };
 
+    const resolvedArgsSchema = argsSchema
+      ? isZodSchema(argsSchema)
+        ? zodToJsonSchema(argsSchema)
+        : (argsSchema as InputSchema)
+      : undefined;
+
     let registration: { unregister: () => void } | undefined;
     try {
       registration = modelContext.registerPrompt({
         name,
         ...(description !== undefined && { description }),
-        ...(argsJsonSchema && { argsSchema: argsJsonSchema as InputSchema }),
+        ...(resolvedArgsSchema && { argsSchema: resolvedArgsSchema }),
         get: promptHandler,
       });
     } catch (error) {
@@ -112,20 +120,18 @@ export function useWebMCPPrompt<
     }
 
     if (!registration) {
-      logger.warn(`Prompt "${name}" did not return a registration handle.`);
+      console.warn(`[ReactWebMCP] Prompt "${name}" did not return a registration handle.`);
       setIsRegistered(false);
       return;
     }
 
-    logger.info(`Registered prompt: ${name}`);
     setIsRegistered(true);
 
     return () => {
       registration.unregister();
-      logger.info(`Unregistered prompt: ${name}`);
       setIsRegistered(false);
     };
-  }, [name, description, argsJsonSchema, logger]);
+  }, [name, description, argsSchema]);
 
   return {
     isRegistered,

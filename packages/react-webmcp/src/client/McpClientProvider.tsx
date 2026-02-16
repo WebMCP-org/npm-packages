@@ -1,4 +1,3 @@
-import { createLogger } from '@mcp-b/global';
 import {
   type Client,
   type Tool as McpTool,
@@ -16,7 +15,6 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -175,25 +173,17 @@ export function McpClientProvider({
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [capabilities, setCapabilities] = useState<ServerCapabilities | null>(null);
   const requestOpts = opts ?? EMPTY_REQUEST_OPTS;
-  const providerLogger = useMemo(() => createLogger('ReactWebMCP:McpClientProvider'), []);
-  const toolFlowLogger = useMemo(() => createLogger('ReactWebMCP:McpClientProvider:ToolFlow'), []);
 
   const connectionStateRef = useRef<'disconnected' | 'connecting' | 'connected'>('disconnected');
   const toolFlowSequenceRef = useRef(0);
-  const logToolFlow = useCallback(
-    (event: string, details: Record<string, unknown> = {}) => {
-      const sequence = ++toolFlowSequenceRef.current;
-      const message = `[${sequence}] ${event}`;
+  const logToolFlow = useCallback((event: string, details: Record<string, unknown> = {}) => {
+    const sequence = ++toolFlowSequenceRef.current;
+    const message = `[${sequence}] ${event}`;
 
-      if (isToolFlowTraceEnabled()) {
-        emitForcedToolFlowTrace(message, details);
-        return;
-      }
-
-      toolFlowLogger.debug(message, details);
-    },
-    [toolFlowLogger]
-  );
+    if (isToolFlowTraceEnabled()) {
+      emitForcedToolFlowTrace(message, details);
+    }
+  }, []);
 
   /**
    * Fetches available resources from the MCP server.
@@ -212,10 +202,10 @@ export function McpClientProvider({
       const response = await client.listResources();
       setResources(response.resources);
     } catch (e) {
-      providerLogger.error('Error fetching resources:', e);
+      console.error('[ReactWebMCP:McpClientProvider]', 'Error fetching resources:', e);
       throw e;
     }
-  }, [client, providerLogger]);
+  }, [client]);
 
   /**
    * Fetches available tools from the MCP server.
@@ -247,10 +237,10 @@ export function McpClientProvider({
         durationMs: Date.now() - startedAt,
         errorMessage: e instanceof Error ? e.message : String(e),
       });
-      providerLogger.error('Error fetching tools:', e);
+      console.error('[ReactWebMCP:McpClientProvider]', 'Error fetching tools:', e);
       throw e;
     }
-  }, [client, logToolFlow, providerLogger]);
+  }, [client, logToolFlow]);
 
   /**
    * Establishes connection to the MCP server.
@@ -299,14 +289,22 @@ export function McpClientProvider({
 
     const handleResourcesChanged = () => {
       fetchResourcesInternal().catch((error) => {
-        providerLogger.error('Failed to refresh resources after list_changed:', error);
+        console.error(
+          '[ReactWebMCP:McpClientProvider]',
+          'Failed to refresh resources after list_changed:',
+          error
+        );
       });
     };
 
     const handleToolsChanged = () => {
       logToolFlow('notification:tools/list_changed', {});
       fetchToolsInternal().catch((error) => {
-        providerLogger.error('Failed to refresh tools after list_changed:', error);
+        console.error(
+          '[ReactWebMCP:McpClientProvider]',
+          'Failed to refresh tools after list_changed:',
+          error
+        );
       });
     };
 
@@ -321,7 +319,11 @@ export function McpClientProvider({
     // Re-fetch after setting up handlers to catch any changes that occurred
     // during the gap between initial fetch and handler setup
     Promise.all([fetchResourcesInternal(), fetchToolsInternal()]).catch((error) => {
-      providerLogger.error('Failed to refresh tools/resources after handler registration:', error);
+      console.error(
+        '[ReactWebMCP:McpClientProvider]',
+        'Failed to refresh tools/resources after handler registration:',
+        error
+      );
     });
 
     return () => {
@@ -333,20 +335,13 @@ export function McpClientProvider({
         client.removeNotificationHandler('notifications/tools/list_changed');
       }
     };
-  }, [
-    client,
-    isConnected,
-    fetchResourcesInternal,
-    fetchToolsInternal,
-    logToolFlow,
-    providerLogger,
-  ]);
+  }, [client, isConnected, fetchResourcesInternal, fetchToolsInternal, logToolFlow]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentional - reconnect when client/transport props change
   useEffect(() => {
     // Initial connection - reconnect() has its own guard to prevent concurrent connections
     reconnect().catch((err) => {
-      providerLogger.error('Failed to connect MCP client:', err);
+      console.error('[ReactWebMCP:McpClientProvider]', 'Failed to connect MCP client:', err);
     });
 
     // Cleanup: mark as disconnected so next mount will reconnect
@@ -354,7 +349,7 @@ export function McpClientProvider({
       connectionStateRef.current = 'disconnected';
       setIsConnected(false);
     };
-  }, [client, transport, providerLogger, reconnect]);
+  }, [client, transport, reconnect]);
 
   return (
     <McpClientContext.Provider

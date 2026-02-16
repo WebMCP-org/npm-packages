@@ -20,7 +20,6 @@
     "cursor",
     "copilot",
     "gemini",
-    "zod",
     "typescript",
     "webmcp",
     "navigator-modelcontext",
@@ -74,7 +73,11 @@
   "dependencies": {
     "@mcp-b/global": "workspace:*",
     "@mcp-b/transports": "workspace:*",
-    "@mcp-b/webmcp-ts-sdk": "workspace:*"
+    "@mcp-b/webmcp-polyfill": "workspace:*",
+    "@mcp-b/webmcp-ts-sdk": "workspace:*",
+    "@mcp-b/webmcp-types": "workspace:*",
+    "zod": "catalog:",
+    "zod-to-json-schema": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
@@ -88,12 +91,10 @@
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
-    "vitest-browser-react": "^2.0.4",
-    "zod": "catalog:"
+    "vitest-browser-react": "^2.0.4"
   },
   "peerDependencies": {
-    "react": "^17.0.0 || ^18.0.0 || ^19.0.0",
-    "zod": ">=3.25.76 <4"
+    "react": "^17.0.0 || ^18.0.0 || ^19.0.0"
   },
   "publishConfig": {
     "access": "public",

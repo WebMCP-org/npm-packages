@@ -60,9 +60,13 @@ export type {
  */
 export type {
   InferOutput,
+  InferToolInput,
+  ReactWebMCPInputSchema,
   ToolExecutionState,
+  ToolInputSchema,
   WebMCPConfig,
   WebMCPReturn,
+  ZodSchemaObject,
 } from './types.js';
 /**
  * Main hook for registering MCP tools with full control over execution state,
