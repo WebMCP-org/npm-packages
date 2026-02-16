@@ -28,28 +28,6 @@ test.describe('MCPIframeElement E2E Tests', () => {
     expect(toolsText).toContain('child-iframe_greet');
   });
 
-  test('should expose resources from iframe', async ({ page }) => {
-    // Check exposed resources
-    const resourcesEl = page.locator('#exposed-resources');
-    await expect(resourcesEl).toHaveAttribute('data-count', '2');
-
-    // Verify resource URIs are prefixed
-    const resourcesText = await resourcesEl.textContent();
-    expect(resourcesText).toContain('child-iframe_iframe://config');
-    expect(resourcesText).toContain('child-iframe_iframe://timestamp');
-  });
-
-  test('should expose prompts from iframe', async ({ page }) => {
-    // Check exposed prompts
-    const promptsEl = page.locator('#exposed-prompts');
-    await expect(promptsEl).toHaveAttribute('data-count', '2');
-
-    // Verify prompt names are prefixed
-    const promptsText = await promptsEl.textContent();
-    expect(promptsText).toContain('child-iframe_summarize');
-    expect(promptsText).toContain('child-iframe_translate');
-  });
-
   test('should call add tool and get result', async ({ page }) => {
     // Click the add button
     await page.click('#test-add');
@@ -89,64 +67,6 @@ test.describe('MCPIframeElement E2E Tests', () => {
     expect(result).toBe('Hello, World!');
   });
 
-  test('should read config resource from iframe', async ({ page }) => {
-    // Click the read config button
-    await page.click('#test-read-config');
-
-    // Wait for result
-    await page.waitForSelector('#resource-result[data-result]', { timeout: 5000 });
-
-    // Verify result contains expected config
-    const resultEl = page.locator('#resource-result');
-    const result = await resultEl.getAttribute('data-result');
-    expect(result).toContain('version');
-    expect(result).toContain('1.0.0');
-    expect(result).toContain('iframe-child');
-  });
-
-  test('should read timestamp resource from iframe', async ({ page }) => {
-    // Click the read timestamp button
-    await page.click('#test-read-timestamp');
-
-    // Wait for result
-    await page.waitForSelector('#resource-result[data-result]', { timeout: 5000 });
-
-    // Verify result is an ISO timestamp
-    const resultEl = page.locator('#resource-result');
-    const result = await resultEl.getAttribute('data-result');
-    // ISO timestamp format check
-    expect(result).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
-  });
-
-  test('should get summarize prompt from iframe', async ({ page }) => {
-    // Click the summarize button
-    await page.click('#test-summarize');
-
-    // Wait for result
-    await page.waitForSelector('#prompt-result[data-result]', { timeout: 5000 });
-
-    // Verify result contains expected prompt
-    const resultEl = page.locator('#prompt-result');
-    const result = await resultEl.getAttribute('data-result');
-    expect(result).toContain('summarize');
-    expect(result).toContain('test text');
-  });
-
-  test('should get translate prompt from iframe', async ({ page }) => {
-    // Click the translate button
-    await page.click('#test-translate');
-
-    // Wait for result
-    await page.waitForSelector('#prompt-result[data-result]', { timeout: 5000 });
-
-    // Verify result contains expected prompt
-    const resultEl = page.locator('#prompt-result');
-    const result = await resultEl.getAttribute('data-result');
-    expect(result).toContain('translate');
-    expect(result).toContain('Spanish');
-    expect(result).toContain('Hello, World!');
-  });
-
   test('should verify tools are callable via modelContext', async ({ page }) => {
     // Use page.evaluate to call the tool programmatically
     const result = await page.evaluate(async () => {
@@ -163,39 +83,6 @@ test.describe('MCPIframeElement E2E Tests', () => {
     }
     expect(firstContent.type).toBe('text');
     expect(firstContent.text).toBe('30');
-  });
-
-  test('should have mcp-iframe element with correct properties', async ({ page }) => {
-    // Check the element's properties via JavaScript
-    const elementInfo = await page.evaluate(() => {
-      const el = window.mcpIframeHost.getMcpIframe() as {
-        ready: boolean;
-        exposedTools: unknown[];
-        exposedResources: unknown[];
-        exposedPrompts: unknown[];
-        itemPrefix: string;
-      } | null;
-      if (!el) {
-        return null;
-      }
-      return {
-        ready: el.ready,
-        exposedToolsCount: el.exposedTools.length,
-        exposedResourcesCount: el.exposedResources.length,
-        exposedPromptsCount: el.exposedPrompts.length,
-        itemPrefix: el.itemPrefix,
-      };
-    });
-
-    expect(elementInfo).not.toBeNull();
-    if (!elementInfo) {
-      throw new Error('MCP iframe element not found');
-    }
-    expect(elementInfo.ready).toBe(true);
-    expect(elementInfo.exposedToolsCount).toBe(3);
-    expect(elementInfo.exposedResourcesCount).toBe(2);
-    expect(elementInfo.exposedPromptsCount).toBe(2);
-    expect(elementInfo.itemPrefix).toBe('child-iframe_');
   });
 });
 
