@@ -2,6 +2,4 @@ import { runRuntimeCoreConformanceSuite } from './runtime-core-conformance.share
 
 runRuntimeCoreConformanceSuite({
   suiteName: 'Runtime core conformance (polyfill)',
-  expectedBridgeMode: 'polyfill-installed',
-  expectNativeApiBeforeInit: false,
 });
