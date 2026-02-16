@@ -1,9 +1,14 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import type { InputSchema } from './index.js';
 import {
   cleanupWebMCPPolyfill,
   initializeWebMCPPolyfill,
   initializeWebModelContextPolyfill,
 } from './index.js';
+
+function asPolyfillInputSchema(schema: unknown): InputSchema {
+  return schema as InputSchema;
+}
 
 describe('@mcp-b/webmcp-polyfill', () => {
   afterEach(() => {
@@ -202,6 +207,47 @@ describe('@mcp-b/webmcp-polyfill', () => {
       expect(navigator.modelContextTesting).toBeUndefined();
     });
 
+    it('does not override existing modelContextTesting by default', () => {
+      const existingTesting = {
+        existing: true,
+      } as unknown as Navigator['modelContextTesting'];
+      Object.defineProperty(navigator, 'modelContextTesting', {
+        configurable: true,
+        enumerable: true,
+        writable: true,
+        value: existingTesting,
+      });
+
+      initializeWebMCPPolyfill();
+
+      expect(navigator.modelContext).toBeDefined();
+      expect(navigator.modelContextTesting).toBe(existingTesting);
+
+      cleanupWebMCPPolyfill();
+      delete (navigator as unknown as Record<string, unknown>).modelContextTesting;
+    });
+
+    it('overrides existing modelContextTesting when installTestingShim is always', () => {
+      const existingTesting = {
+        existing: true,
+      } as unknown as Navigator['modelContextTesting'];
+      Object.defineProperty(navigator, 'modelContextTesting', {
+        configurable: true,
+        enumerable: true,
+        writable: true,
+        value: existingTesting,
+      });
+
+      initializeWebMCPPolyfill({ installTestingShim: 'always' });
+
+      expect(navigator.modelContext).toBeDefined();
+      expect(navigator.modelContextTesting).not.toBe(existingTesting);
+      expect(typeof navigator.modelContextTesting?.executeTool).toBe('function');
+
+      cleanupWebMCPPolyfill();
+      delete (navigator as unknown as Record<string, unknown>).modelContextTesting;
+    });
+
     it('is idempotent when already installed', () => {
       initializeWebMCPPolyfill();
       const first = navigator.modelContext;
@@ -350,6 +396,244 @@ describe('@mcp-b/webmcp-polyfill', () => {
       const schema = tools?.[0]?.inputSchema;
       expect(schema).toBeDefined();
       expect(JSON.parse(schema!)).toEqual({ type: 'object', properties: {} });
+    });
+
+    it('accepts Standard Schema validators for input validation', async () => {
+      initializeWebMCPPolyfill();
+
+      const standardSchema = {
+        '~standard': {
+          version: 1 as const,
+          vendor: 'test',
+          validate(value: unknown) {
+            if (!value || typeof value !== 'object' || Array.isArray(value)) {
+              return { issues: [{ message: 'arguments must be an object' }] };
+            }
+
+            const record = value as Record<string, unknown>;
+            if (typeof record.message !== 'string') {
+              return { issues: [{ message: 'message is required', path: ['message'] }] };
+            }
+
+            return { value: record };
+          },
+        },
+      };
+
+      navigator.modelContext.registerTool({
+        name: 'standard_validator_tool',
+        description: 'Standard validator tool',
+        inputSchema: asPolyfillInputSchema(standardSchema),
+        execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+      });
+
+      await expect(
+        navigator.modelContextTesting?.executeTool('standard_validator_tool', '{}')
+      ).rejects.toThrow('Input validation error: message is required');
+
+      await expect(
+        navigator.modelContextTesting?.executeTool('standard_validator_tool', '{"message":"hello"}')
+      ).resolves.toContain('ok');
+    });
+
+    it('converts Standard JSON Schema inputs for testing shim metadata', () => {
+      initializeWebMCPPolyfill();
+
+      const standardJsonSchema = {
+        '~standard': {
+          version: 1 as const,
+          vendor: 'test',
+          jsonSchema: {
+            input: () => ({
+              type: 'object',
+              properties: { count: { type: 'number' } },
+              required: ['count'],
+            }),
+            output: () => ({ type: 'object', properties: {} }),
+          },
+        },
+      };
+
+      navigator.modelContext.registerTool({
+        name: 'standard_json_tool',
+        description: 'Standard json schema tool',
+        inputSchema: asPolyfillInputSchema(standardJsonSchema),
+        execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+      });
+
+      const tools = navigator.modelContextTesting?.listTools();
+      const tool = tools?.find((entry) => entry.name === 'standard_json_tool');
+      expect(tool?.inputSchema).toBeDefined();
+      expect(JSON.parse(tool?.inputSchema ?? '{}')).toEqual({
+        type: 'object',
+        properties: { count: { type: 'number' } },
+        required: ['count'],
+      });
+    });
+
+    it('prefers converted JSON Schema validation when validate() and jsonSchema.input() both exist', async () => {
+      initializeWebMCPPolyfill();
+      let validateCallCount = 0;
+
+      const schemaWithBoth = {
+        '~standard': {
+          version: 1 as const,
+          vendor: 'test',
+          validate(_value: unknown) {
+            validateCallCount += 1;
+            return { issues: [{ message: 'query is required', path: ['query'] }] };
+          },
+          jsonSchema: {
+            input: () => ({
+              type: 'object',
+              properties: { count: { type: 'number' } },
+              required: ['count'],
+            }),
+            output: () => ({ type: 'object', properties: {} }),
+          },
+        },
+      };
+
+      navigator.modelContext.registerTool({
+        name: 'standard_both_tool',
+        description: 'Standard schema + json schema tool',
+        inputSchema: asPolyfillInputSchema(schemaWithBoth),
+        execute: async (args) => ({ content: [{ type: 'text', text: String(args.count ?? '') }] }),
+      });
+
+      await expect(
+        navigator.modelContextTesting?.executeTool('standard_both_tool', '{}')
+      ).rejects.toThrow('Instance does not have required property "count"');
+
+      await expect(
+        navigator.modelContextTesting?.executeTool('standard_both_tool', '{"count":3}')
+      ).resolves.toContain('3');
+
+      expect(validateCallCount).toBe(0);
+    });
+
+    it('matches missing-required errors for plain JSON Schema and Standard JSON Schema inputs', async () => {
+      initializeWebMCPPolyfill();
+
+      navigator.modelContext.registerTool({
+        name: 'plain_json_required_tool',
+        description: 'Plain JSON schema required field',
+        inputSchema: {
+          type: 'object',
+          properties: { count: { type: 'number' } },
+          required: ['count'],
+        },
+        execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+      });
+
+      const standardJsonSchema = {
+        '~standard': {
+          version: 1 as const,
+          vendor: 'test',
+          jsonSchema: {
+            input: () => ({
+              type: 'object',
+              properties: { count: { type: 'number' } },
+              required: ['count'],
+            }),
+            output: () => ({ type: 'object', properties: {} }),
+          },
+        },
+      };
+
+      navigator.modelContext.registerTool({
+        name: 'standard_json_required_tool',
+        description: 'Standard JSON schema required field',
+        inputSchema: asPolyfillInputSchema(standardJsonSchema),
+        execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+      });
+
+      await expect(
+        navigator.modelContextTesting?.executeTool('plain_json_required_tool', '{}')
+      ).rejects.toThrow('Instance does not have required property "count"');
+
+      await expect(
+        navigator.modelContextTesting?.executeTool('standard_json_required_tool', '{}')
+      ).rejects.toThrow('Instance does not have required property "count"');
+    });
+
+    it('matches type-mismatch errors for plain JSON Schema and Standard JSON Schema inputs', async () => {
+      initializeWebMCPPolyfill();
+
+      navigator.modelContext.registerTool({
+        name: 'plain_json_type_tool',
+        description: 'Plain JSON schema type mismatch',
+        inputSchema: {
+          type: 'object',
+          properties: { count: { type: 'number' } },
+        },
+        execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+      });
+
+      const standardJsonSchema = {
+        '~standard': {
+          version: 1 as const,
+          vendor: 'test',
+          jsonSchema: {
+            input: () => ({
+              type: 'object',
+              properties: { count: { type: 'number' } },
+            }),
+            output: () => ({ type: 'object', properties: {} }),
+          },
+        },
+      };
+
+      navigator.modelContext.registerTool({
+        name: 'standard_json_type_tool',
+        description: 'Standard JSON schema type mismatch',
+        inputSchema: asPolyfillInputSchema(standardJsonSchema),
+        execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+      });
+
+      await expect(
+        navigator.modelContextTesting?.executeTool(
+          'plain_json_type_tool',
+          '{"count":"not-a-number"}'
+        )
+      ).rejects.toThrow('Instance type "string" is invalid. Expected "number"');
+
+      await expect(
+        navigator.modelContextTesting?.executeTool(
+          'standard_json_type_tool',
+          '{"count":"not-a-number"}'
+        )
+      ).rejects.toThrow('Instance type "string" is invalid. Expected "number"');
+    });
+
+    it('throws a stable error when Standard JSON Schema conversion fails for all targets', () => {
+      initializeWebMCPPolyfill();
+      const attemptedTargets: string[] = [];
+
+      const unsupportedStandardJsonSchema = {
+        '~standard': {
+          version: 1 as const,
+          vendor: 'test',
+          jsonSchema: {
+            input: (options: { target: string }) => {
+              attemptedTargets.push(options.target);
+              throw new Error('unsupported target');
+            },
+            output: () => ({ type: 'object', properties: {} }),
+          },
+        },
+      };
+
+      expect(() =>
+        navigator.modelContext.registerTool({
+          name: 'unsupported_standard_json_tool',
+          description: 'Unsupported standard json schema tool',
+          inputSchema: asPolyfillInputSchema(unsupportedStandardJsonSchema),
+          execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+        })
+      ).toThrow('Failed to convert Standard JSON Schema inputSchema to a JSON Schema object');
+
+      expect(attemptedTargets).toEqual(['draft-2020-12', 'draft-07']);
     });
   });
 
@@ -835,7 +1119,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
       await expect(
         navigator.modelContextTesting?.executeTool('required_tool', '{}')
-      ).rejects.toThrow('missing required field "name"');
+      ).rejects.toThrow('Instance does not have required property "name"');
     });
 
     it('executeTool validates field types', async () => {
@@ -852,7 +1136,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
       await expect(
         navigator.modelContextTesting?.executeTool('typed_tool', '{"count":"not-a-number"}')
-      ).rejects.toThrow('field "count" must be of type "number"');
+      ).rejects.toThrow('Instance type "string" is invalid. Expected "number"');
     });
 
     it('executeTool throws when tool execution throws', async () => {
@@ -1025,7 +1309,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
       await expect(
         navigator.modelContextTesting?.executeTool('str_tool2', '{"val":42}')
-      ).rejects.toThrow('field "val" must be of type "string"');
+      ).rejects.toThrow('Instance type "number" is invalid. Expected "string"');
     });
 
     it('validates integer type', async () => {
@@ -1054,7 +1338,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
       await expect(
         navigator.modelContextTesting?.executeTool('int_tool2', '{"val":3.14}')
-      ).rejects.toThrow('field "val" must be of type "integer"');
+      ).rejects.toThrow('Instance type "number" is invalid. Expected "integer"');
     });
 
     it('validates boolean type', async () => {
@@ -1082,7 +1366,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
       await expect(
         navigator.modelContextTesting?.executeTool('bool_tool2', '{"val":"true"}')
-      ).rejects.toThrow('field "val" must be of type "boolean"');
+      ).rejects.toThrow('Instance type "string" is invalid. Expected "boolean"');
     });
 
     it('validates object type', async () => {
@@ -1110,7 +1394,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
       await expect(
         navigator.modelContextTesting?.executeTool('obj_tool2', '{"val":"not-object"}')
-      ).rejects.toThrow('field "val" must be of type "object"');
+      ).rejects.toThrow('Instance type "string" is invalid. Expected "object"');
     });
 
     it('validates array type', async () => {
@@ -1138,7 +1422,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
       await expect(
         navigator.modelContextTesting?.executeTool('arr_tool2', '{"val":"not-array"}')
-      ).rejects.toThrow('field "val" must be of type "array"');
+      ).rejects.toThrow('Instance type "string" is invalid. Expected "array"');
     });
 
     it('validates null type', async () => {
@@ -1166,10 +1450,10 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
       await expect(
         navigator.modelContextTesting?.executeTool('null_tool2', '{"val":"not-null"}')
-      ).rejects.toThrow('field "val" must be of type "null"');
+      ).rejects.toThrow('Instance type "string" is invalid. Expected "null"');
     });
 
-    it('accepts any value for unknown type (default case)', async () => {
+    it('rejects values for unknown type', async () => {
       initializeWebMCPPolyfill();
       navigator.modelContext.registerTool({
         name: 'custom_tool',
@@ -1180,7 +1464,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
       await expect(
         navigator.modelContextTesting?.executeTool('custom_tool', '{"val":"anything"}')
-      ).resolves.toBeDefined();
+      ).rejects.toThrow('Instance type "string" is invalid. Expected "custom_type"');
     });
 
     it('rejects NaN and Infinity for number type', async () => {
@@ -1646,7 +1930,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
       await expect(
         navigator.modelContextTesting?.executeTool('obj_arr_tool', '{"val":[1,2]}')
-      ).rejects.toThrow('field "val" must be of type "object"');
+      ).rejects.toThrow('Instance type "array" is invalid. Expected "object"');
     });
   });
 });

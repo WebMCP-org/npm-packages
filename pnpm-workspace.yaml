@@ -13,6 +13,7 @@ packages:
   - examples/frameworks/*
 
 catalog:
+  '@cfworker/json-schema': ^4.1.1
   '@cloudflare/vite-plugin': ^1.13.18
   '@composio/json-schema-to-zod': ^0.1.19
   '@hookform/resolvers': ^5.2.2
@@ -44,6 +45,7 @@ catalog:
   vitest: ^4.0.18
   wrangler: ^4.45.3
   zod: 3.25.76
+  zod-to-json-schema: ^3.24.5
 
 onlyBuiltDependencies:
   - '@axodotdev/oranda'
