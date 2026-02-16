@@ -257,7 +257,7 @@ export class BrowserMcpServer extends BaseMcpServer {
       .filter(([, prompt]) => prompt.enabled)
       .map(([name, prompt]) => ({
         name,
-        description: prompt.description,
+        ...(prompt.description !== undefined && { description: prompt.description }),
         ...(prompt.argsSchema
           ? {
               arguments: Object.entries((prompt.argsSchema as Record<string, unknown>) ?? {}).map(
