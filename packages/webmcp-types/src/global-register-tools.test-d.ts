@@ -50,7 +50,7 @@ test('global registerTool kitchen sink examples compile', () => {
   navigator.modelContext.registerTool({
     name: 'no_schema_defaults',
     description: 'Schema omitted to use runtime default',
-    execute(args) {
+    execute(args: Record<string, unknown>) {
       const fallbackArgs: Record<string, unknown> = args;
       void fallbackArgs;
       return {

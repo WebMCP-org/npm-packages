@@ -48,11 +48,16 @@
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
     "test": "vitest run && pnpm run test:conformance",
+    "test:browser": "vitest run --config vitest.browser.config.ts --browser.headless",
+    "test:browser:ui": "vitest --config vitest.browser.config.ts --browser",
     "test:conformance": "vitest run --config vitest.conformance.config.ts",
     "typecheck": "tsc --noEmit && vitest run --typecheck --silent"
   },
   "devDependencies": {
+    "@vitest/browser": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
     "@vitest/coverage-v8": "catalog:",
+    "playwright": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
