@@ -1,24 +1,56 @@
-import type { CallToolResult, InputSchema, ToolAnnotations } from '@mcp-b/webmcp-types';
-import type { z } from 'zod';
+import type { ToolInputSchema } from '@mcp-b/webmcp-polyfill';
+import type {
+  CallToolResult,
+  InferArgsFromInputSchema,
+  InferJsonSchema,
+  InputSchema,
+  JsonSchemaObject,
+  ToolAnnotations,
+} from '@mcp-b/webmcp-types';
 
 // Re-export types from @mcp-b/webmcp-types for convenience
-export type { CallToolResult, InputSchema, ToolAnnotations };
+export type {
+  CallToolResult,
+  InferArgsFromInputSchema,
+  InputSchema,
+  JsonSchemaObject,
+  ToolAnnotations,
+};
+export type { ToolInputSchema } from '@mcp-b/webmcp-polyfill';
 
 /**
- * Utility type to infer the output type from a Zod schema object.
+ * Infers handler input type from either a Standard Schema or JSON Schema.
  *
- * When `TOutputSchema` is a non-empty Zod schema object, this resolves to
- * `z.infer<z.ZodObject<TOutputSchema>>`. When it's empty (`Record<string, never>`),
+ * - **Standard Schema** (Zod v4, Valibot, ArkType): extracts `~standard.types.input`
+ * - **JSON Schema** (`as const`): uses `InferArgsFromInputSchema` for structural inference
+ * - **Fallback**: `Record<string, unknown>`
+ *
+ * @template T - The input schema type
+ * @internal
+ */
+export type InferToolInput<T> = T extends { readonly '~standard': { readonly types?: infer Types } }
+  ? Types extends { readonly input: infer I }
+    ? I
+    : Record<string, unknown>
+  : T extends InputSchema
+    ? InferArgsFromInputSchema<T>
+    : Record<string, unknown>;
+
+/**
+ * Utility type to infer the output type from a JSON Schema object.
+ *
+ * When `TOutputSchema` is a literal `JsonSchemaObject`, this resolves to
+ * `InferJsonSchema<TOutputSchema>`. When it's `undefined`,
  * it falls back to the provided `TFallback` type.
  *
- * @template TOutputSchema - Zod schema object for output validation
+ * @template TOutputSchema - JSON Schema object for output inference
  * @template TFallback - Fallback type when no schema is provided
  * @internal
  */
 export type InferOutput<
-  TOutputSchema extends Record<string, z.ZodTypeAny>,
+  TOutputSchema extends JsonSchemaObject | undefined = undefined,
   TFallback = unknown,
-> = TOutputSchema extends Record<string, never> ? TFallback : z.infer<z.ZodObject<TOutputSchema>>;
+> = TOutputSchema extends JsonSchemaObject ? InferJsonSchema<TOutputSchema> : TFallback;
 
 /**
  * Represents the current execution state of a tool, including loading status,
@@ -57,10 +89,10 @@ export interface ToolExecutionState<TOutput = unknown> {
  * Configuration options for the `useWebMCP` hook.
  *
  * Defines a tool's metadata, schema, handler, and lifecycle callbacks.
- * Supports full Zod type inference for both input and output schemas.
+ * Uses JSON Schema for type inference via `as const`.
  *
- * @template TInputSchema - Zod schema object defining input parameters
- * @template TOutputSchema - Zod schema object defining output structure (enables structuredContent)
+ * @template TInputSchema - JSON Schema defining input parameters
+ * @template TOutputSchema - JSON Schema object defining output structure (enables structuredContent)
  *
  * @public
  *
@@ -70,8 +102,10 @@ export interface ToolExecutionState<TOutput = unknown> {
  *   name: 'posts_like',
  *   description: 'Like a post by its ID',
  *   inputSchema: {
- *     postId: z.string().uuid(),
- *   },
+ *     type: 'object',
+ *     properties: { postId: { type: 'string' } },
+ *     required: ['postId'],
+ *   } as const,
  *   handler: async ({ postId }) => {
  *     await api.likePost(postId);
  *     return { success: true };
@@ -81,30 +115,31 @@ export interface ToolExecutionState<TOutput = unknown> {
  *
  * @example Tool with output schema (enables MCP structuredContent):
  * ```typescript
- * const config: WebMCPConfig<
- *   { postId: z.ZodString },
- *   { likes: z.ZodNumber; likedAt: z.ZodString }
- * > = {
+ * useWebMCP({
  *   name: 'posts_like',
  *   description: 'Like a post and return updated like count',
  *   inputSchema: {
- *     postId: z.string().uuid(),
- *   },
+ *     type: 'object',
+ *     properties: { postId: { type: 'string' } },
+ *     required: ['postId'],
+ *   } as const,
  *   outputSchema: {
- *     likes: z.number().describe('Updated like count'),
- *     likedAt: z.string().describe('ISO timestamp of the like'),
- *   },
- *   // Handler return type is inferred from outputSchema
+ *     type: 'object',
+ *     properties: {
+ *       likes: { type: 'number', description: 'Updated like count' },
+ *       likedAt: { type: 'string', description: 'ISO timestamp of the like' },
+ *     },
+ *   } as const,
  *   handler: async ({ postId }) => {
  *     const result = await api.likePost(postId);
  *     return { likes: result.likes, likedAt: new Date().toISOString() };
  *   },
- * };
+ * });
  * ```
  */
 export interface WebMCPConfig<
-  TInputSchema extends Record<string, z.ZodTypeAny> = Record<string, never>,
-  TOutputSchema extends Record<string, z.ZodTypeAny> = Record<string, never>,
+  TInputSchema extends ToolInputSchema = InputSchema,
+  TOutputSchema extends JsonSchemaObject | undefined = undefined,
 > {
   /**
    * Unique identifier for the tool (e.g., 'posts_like', 'graph_navigate').
@@ -119,21 +154,30 @@ export interface WebMCPConfig<
   description: string;
 
   /**
-   * Zod schema object defining the input parameters for the tool.
-   * Each key is a parameter name, and the value is a Zod type definition.
+   * Schema defining the input parameters for the tool.
+   * Accepts JSON Schema (with `as const`) or any Standard Schema v1
+   * library (Zod v4, Valibot, ArkType, etc.).
    *
-   * @example
+   * @example JSON Schema
    * ```typescript
    * inputSchema: {
-   *   postId: z.string().uuid().describe('The ID of the post to like'),
-   *   userId: z.string().optional(),
-   * }
+   *   type: 'object',
+   *   properties: {
+   *     postId: { type: 'string', description: 'The ID of the post to like' },
+   *   },
+   *   required: ['postId'],
+   * } as const
+   * ```
+   *
+   * @example Standard Schema (Zod v4)
+   * ```typescript
+   * inputSchema: z.object({ postId: z.string() })
    * ```
    */
   inputSchema?: TInputSchema;
 
   /**
-   * **Recommended:** Zod schema object defining the expected output structure.
+   * **Recommended:** JSON Schema object defining the expected output structure.
    *
    * When provided, this enables three key features:
    * 1. **Type Safety**: The handler's return type is inferred from this schema
@@ -141,20 +185,17 @@ export interface WebMCPConfig<
    *    containing the typed output per the MCP specification
    * 3. **AI Understanding**: AI models can better understand and use the tool's output
    *
-   * This is the recommended way to define tool outputs. The schema provides
-   * both compile-time type checking and runtime structure for MCP clients.
-   *
    * @see {@link https://spec.modelcontextprotocol.io/specification/server/tools/#output-schemas}
    *
    * @example
    * ```typescript
    * outputSchema: {
-   *   counter: z.number().describe('The current counter value'),
-   *   timestamp: z.string().describe('ISO timestamp'),
-   *   metadata: z.object({
-   *     updatedBy: z.string(),
-   *   }).describe('Additional metadata'),
-   * }
+   *   type: 'object',
+   *   properties: {
+   *     counter: { type: 'number', description: 'The current counter value' },
+   *     timestamp: { type: 'string', description: 'ISO timestamp' },
+   *   },
+   * } as const
    * ```
    */
   outputSchema?: TOutputSchema;
@@ -176,7 +217,7 @@ export interface WebMCPConfig<
    * @returns The result data or a Promise resolving to the result
    */
   handler: (
-    input: z.infer<z.ZodObject<TInputSchema>>
+    input: InferToolInput<TInputSchema>
   ) => Promise<InferOutput<TOutputSchema>> | InferOutput<TOutputSchema>;
 
   /**
@@ -214,12 +255,10 @@ export interface WebMCPConfig<
  * Return value from the `useWebMCP` hook.
  * Provides access to execution state and methods for manual tool control.
  *
- * @template TOutputSchema - Zod schema object defining output structure
+ * @template TOutputSchema - JSON Schema object defining output structure
  * @public
  */
-export interface WebMCPReturn<
-  TOutputSchema extends Record<string, z.ZodTypeAny> = Record<string, never>,
-> {
+export interface WebMCPReturn<TOutputSchema extends JsonSchemaObject | undefined = undefined> {
   /**
    * Current execution state including loading status, results, and errors.
    * See {@link ToolExecutionState} for details.

@@ -12,7 +12,6 @@
     "ai",
     "assistant",
     "tools",
-    "zod",
     "usewebmcp"
   ],
   "homepage": "https://github.com/WebMCP-org/npm-packages#readme",
@@ -52,8 +51,8 @@
     "typecheck": "tsc --noEmit && vitest run --typecheck --silent"
   },
   "dependencies": {
-    "@mcp-b/webmcp-types": "workspace:*",
-    "zod-to-json-schema": "^3.25.1"
+    "@mcp-b/webmcp-polyfill": "workspace:*",
+    "@mcp-b/webmcp-types": "workspace:*"
   },
   "devDependencies": {
     "@mcp-b/global": "workspace:*",
@@ -68,12 +67,10 @@
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
-    "vitest-browser-react": "^2.0.4",
-    "zod": "catalog:"
+    "vitest-browser-react": "^2.0.4"
   },
   "peerDependencies": {
-    "react": "^17.0.0 || ^18.0.0 || ^19.0.0",
-    "zod": "^3.25.0"
+    "react": "^17.0.0 || ^18.0.0 || ^19.0.0"
   },
   "publishConfig": {
     "access": "public",
