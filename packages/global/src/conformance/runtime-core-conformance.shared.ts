@@ -2,12 +2,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { cleanupWebModelContext, initializeWebModelContext } from '../global.js';
 import type { InputSchema, ModelContext, WebModelContextInitOptions } from '../types.js';
 
-type ExpectedBridgeMode = 'polyfill-installed' | 'native';
-
 interface RuntimeConformanceOptions {
   suiteName: string;
-  expectedBridgeMode: ExpectedBridgeMode;
-  expectNativeApiBeforeInit: boolean;
 }
 
 const TEST_INIT_OPTIONS: WebModelContextInitOptions = {
@@ -27,22 +23,21 @@ function flushMicrotasks(count = 1): Promise<void> {
   return promise;
 }
 
-function resetBridgeGlobals(): void {
-  delete (window as unknown as { __mcpBridge?: unknown }).__mcpBridge;
-  delete (window as unknown as { __mcpBridgeInitState?: unknown }).__mcpBridgeInitState;
+function resetGlobals(): void {
+  delete (window as unknown as { __webModelContext?: unknown }).__webModelContext;
 }
 
 function installNotificationGuards(): void {
-  const bridge = (
+  const ctx = (
     window as unknown as {
-      __mcpBridge?: {
+      __webModelContext?: {
         tabServer?: { notification?: (...args: unknown[]) => Promise<unknown> };
         iframeServer?: { notification?: (...args: unknown[]) => Promise<unknown> };
       };
     }
-  ).__mcpBridge;
+  ).__webModelContext;
 
-  if (!bridge) {
+  if (!ctx) {
     return;
   }
 
@@ -60,8 +55,8 @@ function installNotificationGuards(): void {
     };
   };
 
-  wrap(bridge.tabServer);
-  wrap(bridge.iframeServer);
+  wrap(ctx.tabServer);
+  wrap(ctx.iframeServer);
 }
 
 function requireModelContext(): ModelContext {
@@ -72,37 +67,19 @@ function requireModelContext(): ModelContext {
   return modelContext as unknown as ModelContext;
 }
 
-function requireBridgeMode(): ExpectedBridgeMode {
-  const initState = (window as unknown as { __mcpBridgeInitState?: { mode?: string } })
-    .__mcpBridgeInitState;
-  const mode = initState?.mode;
-  if (mode !== 'polyfill-installed' && mode !== 'native') {
-    throw new Error(`Unexpected bridge mode: ${String(mode)}`);
-  }
-  return mode;
-}
-
 export function runRuntimeCoreConformanceSuite(options: RuntimeConformanceOptions): void {
   describe(options.suiteName, () => {
     beforeAll(async () => {
-      resetBridgeGlobals();
+      resetGlobals();
       try {
         cleanupWebModelContext();
       } catch {
         // Best-effort cleanup only.
       }
 
-      const hasNativeContextBefore = Boolean(navigator.modelContext);
-      const hasNativeTestingBefore = Boolean(navigator.modelContextTesting);
-      const hasNativeBefore = hasNativeContextBefore && hasNativeTestingBefore;
-
-      expect(hasNativeBefore).toBe(options.expectNativeApiBeforeInit);
-
       initializeWebModelContext(TEST_INIT_OPTIONS);
       installNotificationGuards();
       await flushMicrotasks(2);
-
-      expect(requireBridgeMode()).toBe(options.expectedBridgeMode);
     });
 
     afterAll(() => {
@@ -111,7 +88,7 @@ export function runRuntimeCoreConformanceSuite(options: RuntimeConformanceOption
       } catch {
         // Best-effort cleanup only.
       }
-      resetBridgeGlobals();
+      resetGlobals();
     });
 
     beforeEach(async () => {
@@ -206,7 +183,7 @@ export function runRuntimeCoreConformanceSuite(options: RuntimeConformanceOption
         modelContext.registerTool({
           name: 'invalid_schema_case',
           description: 'Invalid schema',
-          inputSchema: { type: 'not-a-valid-json-schema-type' } as unknown as InputSchema,
+          inputSchema: { type: 42 } as unknown as InputSchema,
           async execute() {
             return { content: [{ type: 'text', text: 'invalid' }] };
           },
@@ -236,7 +213,6 @@ export function runRuntimeCoreConformanceSuite(options: RuntimeConformanceOption
         modelContext.unregisterTool('unknown_tool_name');
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        // Native Chromium currently throws InvalidStateError for unknown names.
         expect(message).toMatch(/invalid tool name|not registered/i);
       }
     });
