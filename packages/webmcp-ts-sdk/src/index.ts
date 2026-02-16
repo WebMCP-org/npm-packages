@@ -1,6 +1,14 @@
 // Export our browser-optimized MCP Server as the primary export
 // This replaces the standard McpServer with one that supports dynamic tool registration
 
+// Convenience re-exports from @mcp-b/webmcp-types
+export type {
+  ModelContextCore,
+  ModelContextOptions,
+  ToolDescriptor,
+  ToolListItem,
+  ToolResponse,
+} from '@mcp-b/webmcp-types';
 // Re-export Client class from official SDK
 export { Client } from '@modelcontextprotocol/sdk/client/index.js';
 // Re-export Server class from official SDK (for advanced usage)
@@ -87,5 +95,10 @@ export {
   SUPPORTED_PROTOCOL_VERSIONS,
   ToolListChangedNotificationSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-export { BrowserMcpServer as McpServer, BrowserMcpServer } from './browser-server.js';
+export {
+  BrowserMcpServer as McpServer,
+  BrowserMcpServer,
+  type BrowserMcpServerOptions,
+} from './browser-server.js';
 export { NoOpJsonSchemaValidator } from './no-op-validator.js';
+export { PolyfillJsonSchemaValidator } from './polyfill-validator.js';
