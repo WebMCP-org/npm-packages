@@ -210,7 +210,11 @@ export interface ModelContextCore {
   >(
     tool: ToolDescriptor<TArgs, TResult, TName> & {
       inputSchema: TInputSchema;
-    } & (string extends TInputSchema['type'] ? unknown : never)
+    } & (TInputSchema extends InputSchema
+        ? string extends TInputSchema['type']
+          ? unknown
+          : never
+        : unknown)
   ): void;
 
   /**

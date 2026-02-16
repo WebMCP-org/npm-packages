@@ -78,7 +78,7 @@ export type MaybePromise<T> = T | Promise<T>;
  * Tool descriptor for the Web Model Context API.
  *
  * Tools are functions that AI models can call to perform actions or retrieve
- * information. This interface uses JSON Schema for input validation.
+ * information. This interface uses JSON Schema for input/output typing.
  *
  * @template TArgs - Tool input arguments.
  * @template TResult - Tool execution result shape.
@@ -102,12 +102,12 @@ export interface ToolDescriptor<
   description: string;
 
   /**
-   * JSON Schema describing accepted input arguments.
+   * Schema describing accepted input arguments.
    */
   inputSchema?: InputSchema;
 
   /**
-   * Optional JSON Schema describing output payload shape.
+   * Optional schema describing output payload shape.
    */
   outputSchema?: InputSchema;
 

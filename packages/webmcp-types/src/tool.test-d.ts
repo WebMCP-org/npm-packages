@@ -112,11 +112,11 @@ test('ToolDescriptor supports literal tool names via generics', () => {
   >().toEqualTypeOf<'health'>();
 });
 
-test('ToolDescriptor.inputSchema is optional InputSchema', () => {
+test('ToolDescriptor.inputSchema supports InputSchema', () => {
   expectTypeOf<ToolDescriptor['inputSchema']>().toEqualTypeOf<InputSchema | undefined>();
 });
 
-test('ToolDescriptor.outputSchema is optional InputSchema', () => {
+test('ToolDescriptor.outputSchema supports InputSchema', () => {
   expectTypeOf<ToolDescriptor>().toHaveProperty('outputSchema');
   expectTypeOf<Required<ToolDescriptor>['outputSchema']>().toEqualTypeOf<InputSchema>();
 });
