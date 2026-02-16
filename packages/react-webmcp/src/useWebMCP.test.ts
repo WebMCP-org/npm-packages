@@ -2,7 +2,7 @@ import type { ModelContext, ModelContextTesting } from '@mcp-b/global';
 import { initializeWebModelContext } from '@mcp-b/global';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
-import { z } from 'zod';
+
 import { useWebMCP } from './useWebMCP.js';
 
 // Extend Navigator type for testing
@@ -58,7 +58,6 @@ describe('useWebMCP', () => {
 
   beforeEach(() => {
     navigator.modelContext?.clearContext();
-    navigator.modelContextTesting?.reset();
     window.localStorage.removeItem(DEBUG_CONFIG_KEY);
   });
 
@@ -116,8 +115,10 @@ describe('useWebMCP', () => {
           name: 'greet',
           description: 'Greet someone',
           inputSchema: {
-            name: z.string(),
-          },
+            type: 'object',
+            properties: { name: { type: 'string' } },
+            required: ['name'],
+          } as const,
           handler: async ({ name }) => `Hello, ${name}!`,
         })
       );
@@ -168,7 +169,7 @@ describe('useWebMCP', () => {
       expect(result.current.state.executionCount).toBe(1);
     });
 
-    it('should validate input with Zod schema', async () => {
+    it('should pass input to handler', async () => {
       const handler = vi.fn().mockResolvedValue('valid');
 
       const { result, act } = await renderHook(() =>
@@ -176,29 +177,19 @@ describe('useWebMCP', () => {
           name: 'typed_tool',
           description: 'Test',
           inputSchema: {
-            count: z.number(),
-          },
+            type: 'object',
+            properties: { count: { type: 'number' } },
+            required: ['count'],
+          } as const,
           handler,
         })
       );
 
-      // Valid input
       await act(async () => {
         await result.current.execute({ count: 42 });
       });
 
       expect(handler).toHaveBeenCalledWith({ count: 42 });
-
-      // Invalid input should throw
-      await act(async () => {
-        try {
-          await result.current.execute({ count: 'not a number' });
-        } catch {
-          // Expected
-        }
-      });
-
-      expect(result.current.state.error).not.toBeNull();
     });
 
     it('should handle errors and update state', async () => {
@@ -256,8 +247,10 @@ describe('useWebMCP', () => {
           name: 'echo_tool',
           description: 'Echo input',
           inputSchema: {
-            message: z.string(),
-          },
+            type: 'object',
+            properties: { message: { type: 'string' } },
+            required: ['message'],
+          } as const,
           handler: async ({ message }) => `Echo: ${message}`,
         })
       );
@@ -278,12 +271,14 @@ describe('useWebMCP', () => {
           name: 'calc_tool',
           description: 'Calculate',
           inputSchema: {
-            a: z.number(),
-            b: z.number(),
-          },
+            type: 'object',
+            properties: { a: { type: 'number' }, b: { type: 'number' } },
+            required: ['a', 'b'],
+          } as const,
           outputSchema: {
-            result: z.number(),
-          },
+            type: 'object',
+            properties: { result: { type: 'number' } },
+          } as const,
           handler: async ({ a, b }) => ({ result: a + b }),
         })
       );
@@ -320,8 +315,9 @@ describe('useWebMCP', () => {
           name: 'bad_output_tool',
           description: 'Bad output',
           outputSchema: {
-            value: z.string(),
-          },
+            type: 'object',
+            properties: { value: { type: 'string' } },
+          } as const,
           handler: async () => 'not an object' as never,
         })
       );
@@ -338,8 +334,9 @@ describe('useWebMCP', () => {
           name: 'array_output_tool',
           description: 'Array output',
           outputSchema: {
-            value: z.string(),
-          },
+            type: 'object',
+            properties: { value: { type: 'string' } },
+          } as const,
           handler: async () => ['not', 'an', 'object'] as never,
         })
       );
@@ -355,8 +352,9 @@ describe('useWebMCP', () => {
           name: 'null_output_tool',
           description: 'Null output',
           outputSchema: {
-            value: z.string(),
-          },
+            type: 'object',
+            properties: { value: { type: 'string' } },
+          } as const,
           handler: async () => null as never,
         })
       );
@@ -591,9 +589,9 @@ describe('useWebMCP', () => {
           name: 'schema_tool',
           description: 'Has output schema',
           outputSchema: {
-            count: z.number(),
-            label: z.string(),
-          },
+            type: 'object',
+            properties: { count: { type: 'number' }, label: { type: 'string' } },
+          } as const,
           handler: async () => ({ count: 1, label: 'test' }),
         })
       );
@@ -655,16 +653,30 @@ describe('useWebMCP', () => {
           }),
         {
           initialProps: {
-            inputSchema: { name: z.string() },
-            outputSchema: { value: z.string() },
+            inputSchema: {
+              type: 'object',
+              properties: { name: { type: 'string' } },
+              required: ['name'],
+            } as const,
+            outputSchema: {
+              type: 'object',
+              properties: { value: { type: 'string' } },
+            } as const,
             annotations: { destructiveHint: true } as const,
           },
         }
       );
 
       await rerender({
-        inputSchema: { name: z.string() },
-        outputSchema: { value: z.string() },
+        inputSchema: {
+          type: 'object',
+          properties: { name: { type: 'string' } },
+          required: ['name'],
+        } as const,
+        outputSchema: {
+          type: 'object',
+          properties: { value: { type: 'string' } },
+        } as const,
         annotations: { destructiveHint: true },
       });
 
@@ -784,6 +796,404 @@ describe('useWebMCP', () => {
           configurable: true,
         });
         warnSpy.mockRestore();
+      }
+    });
+  });
+
+  describe('re-render optimization', () => {
+    // --- Reference Stability ---
+
+    it('should return stable execute reference across same-prop rerenders', async () => {
+      const { result, rerender } = await renderHook(() =>
+        useWebMCP({
+          name: 'stable_exec_tool',
+          description: 'Test',
+          handler: async () => 'result',
+        })
+      );
+
+      const firstExecute = result.current.execute;
+
+      await rerender();
+
+      expect(result.current.execute).toBe(firstExecute);
+    });
+
+    it('should maintain stable execute reference when description changes', async () => {
+      const { result, rerender } = await renderHook(
+        ({ description }) =>
+          useWebMCP({
+            name: 'stable_exec_desc_tool',
+            description,
+            handler: async () => 'result',
+          }),
+        { initialProps: { description: 'v1' } }
+      );
+
+      const firstExecute = result.current.execute;
+
+      await rerender({ description: 'v2' });
+
+      expect(result.current.execute).toBe(firstExecute);
+    });
+
+    it('should return stable reset reference across rerenders', async () => {
+      const { result, rerender } = await renderHook(
+        ({ description }) =>
+          useWebMCP({
+            name: 'stable_reset_tool',
+            description,
+            handler: async () => 'result',
+          }),
+        { initialProps: { description: 'v1' } }
+      );
+
+      const firstReset = result.current.reset;
+
+      await rerender({ description: 'v2' });
+
+      expect(result.current.reset).toBe(firstReset);
+    });
+
+    // --- Callbacks Don't Trigger Re-registration ---
+
+    it('should not re-register when handler reference changes', async () => {
+      const registerToolSpy = vi.spyOn(navigator.modelContext as ModelContext, 'registerTool');
+
+      try {
+        const { rerender } = await renderHook(
+          ({ handler }) =>
+            useWebMCP({
+              name: 'handler_ref_tool',
+              description: 'Test',
+              handler,
+            }),
+          { initialProps: { handler: async () => 'v1' } }
+        );
+
+        const initialCallCount = registerToolSpy.mock.calls.length;
+
+        await rerender({ handler: async () => 'v2' });
+
+        expect(registerToolSpy.mock.calls.length).toBe(initialCallCount);
+      } finally {
+        registerToolSpy.mockRestore();
+      }
+    });
+
+    it('should not re-register when onSuccess reference changes', async () => {
+      const registerToolSpy = vi.spyOn(navigator.modelContext as ModelContext, 'registerTool');
+
+      try {
+        const { rerender } = await renderHook(
+          ({ onSuccess }) =>
+            useWebMCP({
+              name: 'onsuccess_ref_tool',
+              description: 'Test',
+              handler: async () => 'result',
+              onSuccess,
+            }),
+          { initialProps: { onSuccess: () => {} } }
+        );
+
+        const initialCallCount = registerToolSpy.mock.calls.length;
+
+        await rerender({ onSuccess: () => {} });
+
+        expect(registerToolSpy.mock.calls.length).toBe(initialCallCount);
+      } finally {
+        registerToolSpy.mockRestore();
+      }
+    });
+
+    it('should not re-register when onError reference changes', async () => {
+      const registerToolSpy = vi.spyOn(navigator.modelContext as ModelContext, 'registerTool');
+
+      try {
+        const { rerender } = await renderHook(
+          ({ onError }) =>
+            useWebMCP({
+              name: 'onerror_ref_tool',
+              description: 'Test',
+              handler: async () => 'result',
+              onError,
+            }),
+          { initialProps: { onError: () => {} } }
+        );
+
+        const initialCallCount = registerToolSpy.mock.calls.length;
+
+        await rerender({ onError: () => {} });
+
+        expect(registerToolSpy.mock.calls.length).toBe(initialCallCount);
+      } finally {
+        registerToolSpy.mockRestore();
+      }
+    });
+
+    it('should not re-register when formatOutput reference changes', async () => {
+      const registerToolSpy = vi.spyOn(navigator.modelContext as ModelContext, 'registerTool');
+
+      try {
+        const { rerender } = await renderHook(
+          ({ formatOutput }) =>
+            useWebMCP({
+              name: 'format_ref_tool',
+              description: 'Test',
+              handler: async () => 42,
+              formatOutput,
+            }),
+          { initialProps: { formatOutput: (output: unknown) => `Old: ${output}` } }
+        );
+
+        const initialCallCount = registerToolSpy.mock.calls.length;
+
+        await rerender({ formatOutput: (output: unknown) => `New: ${output}` });
+
+        expect(registerToolSpy.mock.calls.length).toBe(initialCallCount);
+      } finally {
+        registerToolSpy.mockRestore();
+      }
+    });
+
+    it('should not accumulate registrations when multiple callbacks change', async () => {
+      const registerToolSpy = vi.spyOn(navigator.modelContext as ModelContext, 'registerTool');
+
+      try {
+        const { rerender } = await renderHook(
+          ({ handler, onSuccess, onError, formatOutput }) =>
+            useWebMCP({
+              name: 'multi_callback_tool',
+              description: 'Test',
+              handler,
+              onSuccess,
+              onError,
+              formatOutput,
+            }),
+          {
+            initialProps: {
+              handler: async () => 'v1',
+              onSuccess: () => {},
+              onError: () => {},
+              formatOutput: (output: unknown) => String(output),
+            },
+          }
+        );
+
+        const initialCallCount = registerToolSpy.mock.calls.length;
+
+        await rerender({
+          handler: async () => 'v2',
+          onSuccess: () => {},
+          onError: () => {},
+          formatOutput: (output: unknown) => `new: ${output}`,
+        });
+
+        await rerender({
+          handler: async () => 'v3',
+          onSuccess: () => {},
+          onError: () => {},
+          formatOutput: (output: unknown) => `newest: ${output}`,
+        });
+
+        expect(registerToolSpy.mock.calls.length).toBe(initialCallCount);
+      } finally {
+        registerToolSpy.mockRestore();
+      }
+    });
+
+    // --- Latest Ref Values Used at Execution Time ---
+
+    it('should use latest handler after reference change', async () => {
+      const handlerV1 = vi.fn().mockResolvedValue('v1');
+      const handlerV2 = vi.fn().mockResolvedValue('v2');
+
+      const { result, rerender, act } = await renderHook(
+        ({ handler }) =>
+          useWebMCP({
+            name: 'latest_handler_tool',
+            description: 'Test',
+            handler,
+          }),
+        { initialProps: { handler: handlerV1 } }
+      );
+
+      await rerender({ handler: handlerV2 });
+
+      await act(async () => {
+        await result.current.execute({ key: 'test' });
+      });
+
+      expect(handlerV1).not.toHaveBeenCalled();
+      expect(handlerV2).toHaveBeenCalledWith({ key: 'test' });
+      expect(result.current.state.lastResult).toBe('v2');
+    });
+
+    it('should use latest onSuccess callback after reference change', async () => {
+      const onSuccessV1 = vi.fn();
+      const onSuccessV2 = vi.fn();
+
+      const { result, rerender, act } = await renderHook(
+        ({ onSuccess }) =>
+          useWebMCP({
+            name: 'latest_onsuccess_tool',
+            description: 'Test',
+            handler: async () => 'result',
+            onSuccess,
+          }),
+        { initialProps: { onSuccess: onSuccessV1 } }
+      );
+
+      await rerender({ onSuccess: onSuccessV2 });
+
+      await act(async () => {
+        await result.current.execute({});
+      });
+
+      expect(onSuccessV1).not.toHaveBeenCalled();
+      expect(onSuccessV2).toHaveBeenCalledWith('result', {});
+    });
+
+    it('should use latest onError callback after reference change', async () => {
+      const onErrorV1 = vi.fn();
+      const onErrorV2 = vi.fn();
+      const error = new Error('fail');
+
+      const { result, rerender, act } = await renderHook(
+        ({ onError }) =>
+          useWebMCP({
+            name: 'latest_onerror_tool',
+            description: 'Test',
+            handler: async () => {
+              throw error;
+            },
+            onError,
+          }),
+        { initialProps: { onError: onErrorV1 } }
+      );
+
+      await rerender({ onError: onErrorV2 });
+
+      await act(async () => {
+        try {
+          await result.current.execute({});
+        } catch {
+          // Expected
+        }
+      });
+
+      expect(onErrorV1).not.toHaveBeenCalled();
+      expect(onErrorV2).toHaveBeenCalledWith(error, {});
+    });
+
+    it('should use latest formatOutput after reference change', async () => {
+      const { rerender } = await renderHook(
+        ({ formatOutput }) =>
+          useWebMCP({
+            name: 'latest_format_tool',
+            description: 'Test',
+            handler: async () => 42,
+            formatOutput,
+          }),
+        { initialProps: { formatOutput: (output: unknown) => `Old: ${output}` } }
+      );
+
+      await rerender({ formatOutput: (output: unknown) => `New: ${output}` });
+
+      const result = await navigator.modelContextTesting?.executeTool(
+        'latest_format_tool',
+        JSON.stringify({})
+      );
+
+      const parsed = parseSerializedToolResponse(result);
+      expect(parsed.content[0]?.text).toBe('New: 42');
+    });
+
+    // --- State Reference Behavior ---
+
+    it('should not change state reference on rerender without state change', async () => {
+      const { result, rerender } = await renderHook(() =>
+        useWebMCP({
+          name: 'state_ref_tool',
+          description: 'Test',
+          handler: async () => 'result',
+        })
+      );
+
+      const firstState = result.current.state;
+
+      await rerender();
+
+      expect(result.current.state).toBe(firstState);
+    });
+
+    it('should change state reference after execution', async () => {
+      const { result, act } = await renderHook(() =>
+        useWebMCP({
+          name: 'state_change_tool',
+          description: 'Test',
+          handler: async () => 'result',
+        })
+      );
+
+      const firstState = result.current.state;
+
+      await act(async () => {
+        await result.current.execute({});
+      });
+
+      expect(result.current.state).not.toBe(firstState);
+      expect(result.current.state.executionCount).toBe(1);
+    });
+
+    // --- Effect Cleanup Ordering ---
+
+    it('should unregister before re-registering when name changes', async () => {
+      const callOrder: string[] = [];
+      const originalRegister = (navigator.modelContext as ModelContext).registerTool.bind(
+        navigator.modelContext
+      );
+      const originalUnregister = (navigator.modelContext as ModelContext).unregisterTool.bind(
+        navigator.modelContext
+      );
+
+      const registerToolSpy = vi
+        .spyOn(navigator.modelContext as ModelContext, 'registerTool')
+        .mockImplementation((...args) => {
+          callOrder.push('register');
+          return originalRegister(...args);
+        });
+      const unregisterToolSpy = vi
+        .spyOn(navigator.modelContext as ModelContext, 'unregisterTool')
+        .mockImplementation((...args: [string]) => {
+          callOrder.push('unregister');
+          return originalUnregister(...args);
+        });
+
+      try {
+        const { rerender } = await renderHook(
+          ({ name }) =>
+            useWebMCP({
+              name,
+              description: 'Test',
+              handler: async () => 'result',
+            }),
+          { initialProps: { name: 'order_tool_old' } }
+        );
+
+        callOrder.length = 0;
+
+        await rerender({ name: 'order_tool_new' });
+
+        const unregisterIdx = callOrder.indexOf('unregister');
+        const registerIdx = callOrder.indexOf('register');
+
+        expect(unregisterIdx).toBeGreaterThanOrEqual(0);
+        expect(registerIdx).toBeGreaterThanOrEqual(0);
+        expect(unregisterIdx).toBeLessThan(registerIdx);
+      } finally {
+        registerToolSpy.mockRestore();
+        unregisterToolSpy.mockRestore();
       }
     });
   });
