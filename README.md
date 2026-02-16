@@ -3,7 +3,7 @@
 # MCP-B NPM Packages
 
 **Official Model Context Protocol implementation for browsers**
-
+(![W3C WebMCP IDL](https://webmachinelearning.github.io/webmcp/))
 [![CI](https://github.com/WebMCP-org/npm-packages/actions/workflows/ci.yml/badge.svg)](https://github.com/WebMCP-org/npm-packages/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/WebMCP-org/npm-packages/graph/badge.svg)](https://codecov.io/gh/WebMCP-org/npm-packages)
 [![CodeQL](https://github.com/WebMCP-org/npm-packages/actions/workflows/codeql.yml/badge.svg)](https://github.com/WebMCP-org/npm-packages/actions/workflows/codeql.yml)
@@ -22,16 +22,30 @@
 
 ## Table of Contents
 
-- [Overview](#overview)
-- [Installation](#installation)
-- [Available Packages](#available-packages)
-- [Quick Start](#quick-start)
-- [Architecture](#architecture)
-- [Development](#development)
-- [Documentation](#documentation)
-- [Contributing](#contributing)
-- [License](#license)
-- [Links](#links)
+- [MCP-B NPM Packages](#mcp-b-npm-packages)
+  - [Table of Contents](#table-of-contents)
+  - [Overview](#overview)
+    - [Core Capabilities](#core-capabilities)
+  - [Installation](#installation)
+  - [Available Packages](#available-packages)
+    - [Deprecated Packages](#deprecated-packages)
+  - [Quick Start](#quick-start)
+    - [Using the Web Model Context API](#using-the-web-model-context-api)
+    - [Consuming Tools as a Client](#consuming-tools-as-a-client)
+  - [Architecture](#architecture)
+    - [Core Layer](#core-layer)
+    - [Transport Layer](#transport-layer)
+    - [Integration Layer](#integration-layer)
+    - [Tools \& Utilities](#tools--utilities)
+    - [Dependency Graph](#dependency-graph)
+  - [Development](#development)
+    - [Prerequisites](#prerequisites)
+    - [Getting Started](#getting-started)
+    - [Workspace Commands](#workspace-commands)
+  - [Documentation](#documentation)
+  - [Contributing](#contributing)
+  - [License](#license)
+  - [Links](#links)
 
 ## Overview
 
