@@ -30,11 +30,14 @@ initializeWebMCPPolyfill();
 
 ```ts
 initializeWebMCPPolyfill({
-  installTestingShim: true,
+  installTestingShim: 'if-missing',
 });
 ```
 
-- `installTestingShim`: install `navigator.modelContextTesting` parity helpers.
+- `installTestingShim`:
+  - `true` or `'if-missing'` (default): install parity helpers only when `navigator.modelContextTesting` is missing.
+  - `'always'`: replace any existing `navigator.modelContextTesting`.
+  - `false`: do not install `navigator.modelContextTesting`.
 
 ## Interop with `@mcp-b/global`
 
@@ -49,7 +52,7 @@ initializeWebMCPPolyfill({
 
 ## Testing Shim
 
-When `installTestingShim` is enabled (default), this package also installs a minimal
+When `installTestingShim` is enabled, this package can install a minimal
 `navigator.modelContextTesting` surface for parity-style tests:
 
 - `listTools()`
