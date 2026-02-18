@@ -2,34 +2,46 @@
 
 Strict TypeScript type definitions for the WebMCP core API (`navigator.modelContext`).
 
-Zero dependencies. Zero runtime. Just `.d.ts` declarations.
+Zero runtime. Zero side effects. Just `.d.ts` types.
 
-## What's included
+## Type Safety First
 
-- Global `Navigator` augmentation (`navigator.modelContext`)
-- Core descriptors: tools
-- Content and result payload types (`ContentBlock`, `CallToolResult`, `ResourceContents`)
-- MCPB extension API types (`ModelContextExtensions`, including `callTool`)
-- Tool execution client types (`ModelContextClient`, `ToolExecutionContext`)
-- Typed event surface (`ToolCallEvent`)
-- Pure JSON Schema inference helpers (`JsonSchemaForInference`, `InferArgsFromInputSchema`, `ToolDescriptorFromSchema`, `ToolResultFromOutputSchema`)
+This package is the type-safety source of truth for WebMCP.
+
+- Infer tool input args from literal `inputSchema`
+- Infer `structuredContent` from literal `outputSchema`
+- Keep safe fallbacks (`Record<string, unknown>`) when schemas are widened/runtime-defined
+- Provide name-aware typed registries with `TypedModelContext`
+
+## Why This Package
+
+- Global `Navigator` augmentation for `navigator.modelContext`
+- Strongly typed tool descriptors and tool responses
+- Literal JSON Schema inference for tool args and `structuredContent`
+- Name-aware helper types for typed tool registries
+- Runtime-agnostic: works with native implementations, polyfills, or adapters
+
+## Package Selection
+
+| Package | Use When |
+| --- | --- |
+| `@mcp-b/webmcp-types` | You only need compile-time types |
+| `@mcp-b/webmcp-polyfill` | You need strict WebMCP core runtime behavior |
+| `@mcp-b/global` | You want core + MCPB bridge extensions (`callTool`, prompts, resources, etc.) |
 
 ## Install
 
 ```bash
-npm install --save-dev @mcp-b/webmcp-types
-# or
 pnpm add -D @mcp-b/webmcp-types
+# or
+npm install --save-dev @mcp-b/webmcp-types
 ```
 
-If your published library exposes `@mcp-b/webmcp-types` in its own `.d.ts` surface, install it as a production dependency instead of a dev dependency.
+If your published library exposes these types in its public declarations, install as a production dependency instead of a dev dependency.
 
-## Usage
+## Activate Global Types
 
-### Enable global types
-
-TypeScript does not always include global declarations from regular npm packages automatically.
-Use one of the following activation methods:
+TypeScript may not automatically include global declarations from npm packages. Use one of these:
 
 1. Add to `tsconfig.json`:
 
@@ -43,145 +55,19 @@ Use one of the following activation methods:
 
 2. Add a triple-slash reference in a global `.d.ts` file:
 
-```typescript
+```ts
 /// <reference types="@mcp-b/webmcp-types" />
 ```
 
-3. Add a type-only import in your app/library entry:
+3. Add a type-only import:
 
-```typescript
+```ts
 import type {} from '@mcp-b/webmcp-types';
 ```
 
-### Global API example
+## Quick Start
 
-After activating the types, `navigator.modelContext` is available on `Navigator`:
-
-```typescript
-// No import needed - types are globally augmented
-navigator.modelContext.registerTool({
-  name: 'search',
-  description: 'Search the web',
-  inputSchema: {
-    type: 'object',
-    properties: { query: { type: 'string' } },
-    required: ['query'],
-  },
-  execute: async ({ query }) => ({
-    content: [{ type: 'text', text: `Results for: ${query}` }],
-  }),
-});
-```
-
-### Individual imports
-
-```typescript
-import type {
-  ElicitationParams,
-  ElicitationResult,
-  InferArgsFromInputSchema,
-  JsonSchemaForInference,
-  LooseContentBlock,
-  MaybePromise,
-  ModelContext,
-  ModelContextClient,
-  ModelContextExtensions,
-  ToolExecutionContext,
-  ToolDescriptor,
-  ToolDescriptorFromSchema,
-  ToolResultFromOutputSchema,
-  TypedModelContext,
-  CallToolResult,
-} from '@mcp-b/webmcp-types';
-```
-
-### Sync or async execute handlers
-
-`execute` can return a plain result or a `Promise`.
-
-```typescript
-import type { CallToolResult, ToolDescriptor } from '@mcp-b/webmcp-types';
-
-const syncTool: ToolDescriptor<{ message: string }, CallToolResult, 'sync_echo'> = {
-  name: 'sync_echo',
-  description: 'Synchronous echo',
-  inputSchema: {
-    type: 'object',
-    properties: { message: { type: 'string' } },
-    required: ['message'],
-  },
-  execute(args) {
-    return {
-      content: [{ type: 'text', text: args.message }],
-    };
-  },
-};
-```
-
-### Strict and loose content blocks
-
-`CallToolResult.content` accepts strict MCP content blocks and pragmatic loose objects.
-
-```typescript
-import type { CallToolResult } from '@mcp-b/webmcp-types';
-
-const result: CallToolResult = {
-  content: [
-    { type: 'text', text: 'strict block' },
-    { text: 'loose block', data: 'opaque payload' },
-  ],
-};
-```
-
-### Typed tool descriptors
-
-```typescript
-import type { ToolDescriptor } from '@mcp-b/webmcp-types';
-
-type SearchArgs = {
-  query: string;
-  limit?: number;
-};
-
-const searchTool: ToolDescriptor<SearchArgs> = {
-  name: 'search',
-  description: 'Search indexed docs',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      query: { type: 'string' },
-      limit: { type: 'number' },
-    },
-    required: ['query'],
-  },
-  execute: async ({ query, limit }, context) => {
-    const approval = await context.requestUserInteraction(async () => ({
-      confirmed: true,
-    }));
-
-    if (
-      typeof approval !== 'object' ||
-      !approval ||
-      !('confirmed' in approval) ||
-      !approval.confirmed
-    ) {
-      return {
-        content: [{ type: 'text', text: 'Search cancelled by user.' }],
-      };
-    }
-
-    return {
-      content: [{ type: 'text', text: `Searching for "${query}" (limit: ${limit ?? 10})` }],
-    };
-  },
-};
-```
-
-### Pure JSON Schema inference (input + output)
-
-Inference focuses on core keywords (`type`, `properties`, `required`, `items`, `enum`, `const`) and tolerates additional schema metadata.
-
-```typescript
+```ts
 import type { JsonSchemaForInference } from '@mcp-b/webmcp-types';
 
 const inputSchema = {
@@ -198,10 +84,7 @@ const outputSchema = {
   type: 'object',
   properties: {
     total: { type: 'integer' },
-    items: {
-      type: 'array',
-      items: { type: 'string' },
-    },
+    items: { type: 'array', items: { type: 'string' } },
   },
   required: ['total'],
   additionalProperties: false,
@@ -213,13 +96,11 @@ navigator.modelContext.registerTool({
   inputSchema,
   outputSchema,
   async execute(args) {
-    // args is inferred as:
-    // { query: string; limit?: number }
+    // args is inferred as: { query: string; limit?: number }
     return {
       content: [{ type: 'text', text: `Searching for ${args.query}` }],
-      // structuredContent is inferred from outputSchema as:
-      // { total: number; items?: string[] }
       structuredContent: {
+        // inferred from outputSchema
         total: 1,
         items: [args.query],
       },
@@ -228,79 +109,123 @@ navigator.modelContext.registerTool({
 });
 ```
 
-If your schema is not a literal (for example loaded from runtime config), inference safely falls back to `Record<string, unknown>`.
+## Strict Type Inference Deep Dive
 
-### Tool-scoped elicitation
+### 1. Inference works best with literal schemas
 
-```typescript
-import type { ModelContextExtensions } from '@mcp-b/webmcp-types';
+Use `as const satisfies JsonSchemaForInference` so TypeScript preserves literal schema information.
 
-const modelContext = navigator.modelContext as Navigator['modelContext'] & ModelContextExtensions;
+If schema types are widened (for example `InputSchema` loaded at runtime), inference intentionally falls back to:
 
-modelContext.registerTool({
-  name: 'deploy',
-  description: 'Deploy current build',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      environment: { type: 'string' },
-    },
-    required: ['environment'],
-  },
-  async execute({ environment }, context) {
-    const confirmation = await context.requestUserInteraction(async () => ({
-      action: 'accept',
-      content: { confirm: true },
-    }));
-
-    if (confirmation.action !== 'accept' || !confirmation.content?.confirm) {
-      return {
-        content: [{ type: 'text', text: 'Deployment cancelled.' }],
-      };
-    }
-
-    return {
-      content: [{ type: 'text', text: `Deployment started for ${environment}.` }],
-    };
-  },
-};
+```ts
+Record<string, unknown>
 ```
 
-### Name-aware typed context (advanced)
+### 2. Input inference rules
 
-```typescript
+`InferArgsFromInputSchema<T>` and schema-driven `registerTool(...)` inference use a focused subset:
+
+- `type`
+- `properties`
+- `required`
+- `items`
+- `enum`
+- `const`
+- `nullable`
+- `additionalProperties`
+
+Other schema keywords are accepted as metadata but do not add new inferred structure.
+
+### 3. `additionalProperties` behavior
+
+| Schema shape | Inferred extras |
+| --- | --- |
+| `additionalProperties: false` | No extra keys |
+| `additionalProperties` omitted/`true` | Extra keys allowed as `unknown` |
+| `additionalProperties: { ... }` with no named `properties` | Map-like `Record<string, ...>` |
+| `additionalProperties: { ... }` with named `properties` | Named properties inferred, extras remain `unknown` |
+
+### 4. Required keys depend on literal `required`
+
+If `required` is widened (for example a runtime `string[]`), fields are treated as optional by design.
+
+### 5. Output inference from `outputSchema`
+
+When `outputSchema` is a literal object schema, `structuredContent` is inferred automatically via `ToolResultFromOutputSchema`.
+
+This catches enum/type mismatches at compile time.
+
+### 6. Explicit typing is still available
+
+You can always provide explicit generic args/results with `ToolDescriptor<TArgs, TResult, TName>` when schema inference is not enough for your use case.
+
+## Name-Aware Typed Context (Advanced)
+
+`TypedModelContext<TTools>` gives literal-name-aware `callTool(...)` typing for known registries.
+
+```ts
 import type { CallToolResult, ToolDescriptor, TypedModelContext } from '@mcp-b/webmcp-types';
 
 type SearchTool = ToolDescriptor<
-  { query: string },
+  { query: string; limit?: number },
   CallToolResult & { structuredContent: { total: number } },
   'search'
 >;
 
 type PingTool = ToolDescriptor<Record<string, never>, CallToolResult, 'ping'>;
-
 type AppModelContext = TypedModelContext<readonly [SearchTool, PingTool]>;
+
 declare const modelContext: AppModelContext;
 
-const searchResult = await modelContext.callTool({
+await modelContext.callTool({
   name: 'search',
   arguments: { query: 'webmcp' },
 });
-// searchResult is inferred from the 'search' tool result type.
 
 await modelContext.callTool({ name: 'ping' });
-// 'ping' arguments are optional because the args type is Record<string, never>.
+// arguments are optional for Record<string, never> tools
 ```
 
-## Relationship to Runtime Packages
+## Core and Extension Surfaces
 
-| Package | Purpose |
-|---------|---------|
-| `@mcp-b/webmcp-types` | Type definitions only - for libraries that need to type-check against the API |
-| `@mcp-b/webmcp-polyfill` | Strict core runtime polyfill for `navigator.modelContext` |
-| `@mcp-b/global` | Full MCPB runtime (core + bridge extensions like `callTool`, prompts, resources) |
+`Navigator['modelContext']` is typed as strict core WebMCP methods only.
 
-Use `@mcp-b/webmcp-types` when you only need types (e.g., building a library that accepts `ToolDescriptor`). Use `@mcp-b/webmcp-polyfill` for strict core runtime behavior, or `@mcp-b/global` for extension-heavy bridge workflows.
+Extension methods are available via `ModelContextExtensions` and `ModelContextWithExtensions`:
+
+```ts
+import type { ModelContextExtensions } from '@mcp-b/webmcp-types';
+
+const modelContext = navigator.modelContext as Navigator['modelContext'] & ModelContextExtensions;
+const tools = modelContext.listTools();
+const result = await modelContext.callTool({
+  name: 'search',
+  arguments: { query: 'docs' },
+});
+
+void tools;
+void result;
+```
+
+## Commonly Used Exports
+
+| Export | Purpose |
+| --- | --- |
+| `ModelContext` | Strict core `navigator.modelContext` type |
+| `ToolDescriptor` | Explicitly typed tool descriptor |
+| `ToolDescriptorFromSchema` | Schema-driven descriptor with inferred args/result |
+| `JsonSchemaForInference` | Supported JSON Schema subset for inference |
+| `InferArgsFromInputSchema` | Derive args shape from a schema type |
+| `ToolResultFromOutputSchema` | Derive `structuredContent` type from output schema |
+| `TypedModelContext` | Name-aware typed `callTool`/`listTools` for known registries |
+| `CallToolResult` | Tool response type |
+| `ContentBlock` / `LooseContentBlock` | Strict and pragmatic content block typing |
+| `ModelContextClient` | Tool execution client (`requestUserInteraction`) |
+
+## Important Notes
+
+- This package does not install any runtime behavior.
+- Runtime validation/execution behavior depends on your WebMCP runtime package.
+- `navigator.modelContextTesting` is typed as optional for compatibility with Chromium preview/testing surfaces.
 
 ## License
 
