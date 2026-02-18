@@ -33,15 +33,25 @@
  */
 
 import { IframeParentTransport } from '@mcp-b/transports';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type {
-  CallToolResult,
   GetPromptResult,
   Prompt,
   ReadResourceResult,
   Resource,
   Tool,
-} from '@modelcontextprotocol/sdk/types.js';
+} from '@mcp-b/webmcp-ts-sdk';
+import {
+  type BrowserMcpServer,
+  Client,
+  type PromptDescriptor,
+  type ResourceDescriptor,
+} from '@mcp-b/webmcp-ts-sdk';
+import type {
+  CallToolResult,
+  InputSchema,
+  RegistrationHandle,
+  ToolDescriptor,
+} from '@mcp-b/webmcp-types';
 
 // ============================================================================
 // Configuration
@@ -100,42 +110,6 @@ const IFRAME_ATTRIBUTES = [
 // ============================================================================
 // Types
 // ============================================================================
-
-/** Registration handle returned by navigator.modelContext register methods */
-interface RegistrationHandle {
-  unregister: () => void;
-}
-
-/** Minimal ModelContext interface for registering tools, resources, and prompts */
-interface ModelContext {
-  registerTool(tool: {
-    name: string;
-    description: string;
-    inputSchema: Tool['inputSchema'];
-    execute: (args: Record<string, unknown>) => Promise<CallToolResult>;
-  }): void;
-  unregisterTool(name: string): void;
-
-  registerResource(resource: {
-    uri: string;
-    name: string;
-    description?: string;
-    mimeType?: string;
-    read: (uri: URL, params?: Record<string, string>) => Promise<ReadResourceResult>;
-  }): RegistrationHandle;
-
-  registerPrompt(prompt: {
-    name: string;
-    description?: string;
-    argsSchema?: Record<string, unknown>;
-    get: (args: Record<string, unknown>) => Promise<GetPromptResult>;
-  }): RegistrationHandle;
-}
-
-/** Navigator with optional modelContext */
-interface NavigatorWithModelContext extends Navigator {
-  modelContext?: ModelContext;
-}
 
 /** Custom event detail for mcp-iframe-ready */
 export interface MCPIframeReadyEventDetail {
@@ -471,18 +445,19 @@ export class MCPIframeElement extends HTMLElement {
   }
 
   #registerAllOnModelContext(): void {
-    const modelContext = (navigator as NavigatorWithModelContext).modelContext;
-    if (!modelContext) {
+    const mc = navigator.modelContext;
+    if (!mc) {
       console.warn('[MCPIframe] Model Context API not available on parent');
       return;
     }
+    const modelContext = mc as unknown as BrowserMcpServer;
 
     this.#registerToolsOnModelContext(modelContext);
     this.#registerResourcesOnModelContext(modelContext);
     this.#registerPromptsOnModelContext(modelContext);
   }
 
-  #registerToolsOnModelContext(modelContext: ModelContext): void {
+  #registerToolsOnModelContext(modelContext: BrowserMcpServer): void {
     for (const tool of this.#mcpTools) {
       const prefixedName = `${this.itemPrefix}${tool.name}`;
 
@@ -504,10 +479,10 @@ export class MCPIframeElement extends HTMLElement {
         continue;
       }
 
-      modelContext.registerTool({
+      (modelContext.registerTool as (tool: ToolDescriptor) => void)({
         name: prefixedName,
         description: tool.description ?? `Tool from iframe: ${tool.name}`,
-        inputSchema: tool.inputSchema,
+        ...(tool.inputSchema && { inputSchema: tool.inputSchema as InputSchema }),
         execute: (args) => this.#callIframeTool(tool.name, args),
       });
 
@@ -515,28 +490,24 @@ export class MCPIframeElement extends HTMLElement {
     }
   }
 
-  #registerResourcesOnModelContext(modelContext: ModelContext): void {
+  #registerResourcesOnModelContext(modelContext: BrowserMcpServer): void {
     for (const resource of this.#mcpResources) {
       const prefixedUri = `${this.itemPrefix}${resource.uri}`;
 
-      const resourceDescriptor: Parameters<ModelContext['registerResource']>[0] = {
+      const descriptor: ResourceDescriptor = {
         uri: prefixedUri,
         name: resource.name,
-        read: (_uri, _params) => this.#readIframeResource(resource.uri),
+        ...(resource.description !== undefined && { description: resource.description }),
+        ...(resource.mimeType !== undefined && { mimeType: resource.mimeType }),
+        read: (_uri, _params) =>
+          this.#readIframeResource(resource.uri) as ReturnType<ResourceDescriptor['read']>,
       };
-      if (resource.description !== undefined) {
-        resourceDescriptor.description = resource.description;
-      }
-      if (resource.mimeType !== undefined) {
-        resourceDescriptor.mimeType = resource.mimeType;
-      }
-
-      const registration = modelContext.registerResource(resourceDescriptor);
+      const registration = modelContext.registerResource(descriptor);
       this.#registeredResources.set(prefixedUri, registration);
     }
   }
 
-  #registerPromptsOnModelContext(modelContext: ModelContext): void {
+  #registerPromptsOnModelContext(modelContext: BrowserMcpServer): void {
     for (const prompt of this.#mcpPrompts) {
       const prefixedName = `${this.itemPrefix}${prompt.name}`;
 
@@ -558,34 +529,36 @@ export class MCPIframeElement extends HTMLElement {
         continue;
       }
 
-      const promptDescriptor: Parameters<ModelContext['registerPrompt']>[0] = {
+      const descriptor: PromptDescriptor = {
         name: prefixedName,
+        ...(prompt.description !== undefined && { description: prompt.description }),
+        ...(prompt.arguments &&
+          prompt.arguments.length > 0 && {
+            argsSchema: {
+              type: 'object',
+              properties: Object.fromEntries(
+                prompt.arguments.map((arg) => [
+                  arg.name,
+                  {
+                    type: 'string',
+                    ...(arg.description !== undefined && { description: arg.description }),
+                  },
+                ])
+              ),
+              required: prompt.arguments.filter((a) => a.required).map((a) => a.name),
+            } satisfies InputSchema,
+          }),
         get: (args) => this.#getIframePrompt(prompt.name, args),
       };
-      if (prompt.description !== undefined) {
-        promptDescriptor.description = prompt.description;
-      }
-      if (prompt.arguments && prompt.arguments.length > 0) {
-        promptDescriptor.argsSchema = {
-          type: 'object',
-          properties: Object.fromEntries(
-            prompt.arguments.map((arg) => [
-              arg.name,
-              { type: 'string', description: arg.description },
-            ])
-          ),
-          required: prompt.arguments.filter((a) => a.required).map((a) => a.name),
-        };
-      }
-
-      const registration = modelContext.registerPrompt(promptDescriptor);
+      const registration = modelContext.registerPrompt(descriptor);
       this.#registeredPrompts.set(prefixedName, registration);
     }
   }
 
   #unregisterAll(): void {
-    const modelContext = (navigator as NavigatorWithModelContext).modelContext;
-    if (modelContext) {
+    const mc = navigator.modelContext;
+    if (mc) {
+      const modelContext = mc as unknown as BrowserMcpServer;
       for (const toolName of this.#registeredTools.values()) {
         try {
           modelContext.unregisterTool(toolName);
