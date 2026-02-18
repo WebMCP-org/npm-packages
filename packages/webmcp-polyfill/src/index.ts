@@ -84,6 +84,13 @@ const installState: InstallState = {
 
 export interface WebMCPPolyfillInitOptions {
   /**
+   * Controls whether the polyfill auto-initializes when loaded.
+   * Set to false to prevent auto-initialization; then call initializeWebMCPPolyfill() manually.
+   * @default true
+   */
+  autoInitialize?: boolean;
+
+  /**
    * Controls installation of navigator.modelContextTesting when this polyfill provides modelContext.
    * - true or 'if-missing' (default): install only when modelContextTesting is missing.
    * - 'always': install even when modelContextTesting already exists.
@@ -726,14 +733,21 @@ export function cleanupWebMCPPolyfill(): void {
 
 export { initializeWebMCPPolyfill as initializeWebModelContextPolyfill };
 
-export type {
-  InputSchema,
-  ModelContext,
-  ModelContextClient,
-  ModelContextCore,
-  ModelContextOptions,
-  ToolAnnotations,
-  ToolDescriptor,
-  ToolResponse,
-} from '@mcp-b/webmcp-types';
-export type { StandardSchemaV1 } from '@standard-schema/spec';
+declare global {
+  interface Window {
+    __webMCPPolyfillOptions?: WebMCPPolyfillInitOptions;
+  }
+}
+
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  const options = window.__webMCPPolyfillOptions;
+  const shouldAutoInitialize = options?.autoInitialize !== false;
+
+  if (shouldAutoInitialize) {
+    try {
+      initializeWebMCPPolyfill(options);
+    } catch (error) {
+      console.error('[WebMCPPolyfill] Auto-initialization failed:', error);
+    }
+  }
+}
