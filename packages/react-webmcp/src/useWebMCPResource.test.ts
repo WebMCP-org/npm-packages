@@ -1,16 +1,8 @@
-import type { ModelContext, ModelContextTesting } from '@mcp-b/global';
 import { initializeWebModelContext } from '@mcp-b/global';
+import type { ModelContextTesting } from '@mcp-b/webmcp-types';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
 import { useWebMCPResource } from './useWebMCPResource.js';
-
-// Extend Navigator type for testing
-declare global {
-  interface Navigator {
-    modelContext?: ModelContext;
-    modelContextTesting?: ModelContextTesting;
-  }
-}
 
 const TEST_CHANNEL_ID = `useWebMCPResource-test-${Date.now()}`;
 const DEBUG_CONFIG_KEY = 'WEBMCP_DEBUG';
@@ -64,9 +56,10 @@ describe('useWebMCPResource', () => {
 
     it('should keep isRegistered as false when registration handle is missing', async () => {
       const registerResourceSpy = vi
-        .spyOn(navigator.modelContext as ModelContext, 'registerResource')
+        .spyOn(navigator.modelContext, 'registerResource')
         .mockImplementation(
-          () => undefined as unknown as ReturnType<ModelContext['registerResource']>
+          () =>
+            undefined as unknown as ReturnType<(typeof navigator.modelContext)['registerResource']>
         );
 
       try {
@@ -384,9 +377,10 @@ describe('useWebMCPResource', () => {
     it('should warn when no registration handle is returned', async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const registerResourceSpy = vi
-        .spyOn(navigator.modelContext as ModelContext, 'registerResource')
+        .spyOn(navigator.modelContext, 'registerResource')
         .mockImplementation(
-          () => undefined as unknown as ReturnType<ModelContext['registerResource']>
+          () =>
+            undefined as unknown as ReturnType<(typeof navigator.modelContext)['registerResource']>
         );
 
       try {
@@ -450,7 +444,7 @@ describe('useWebMCPResource', () => {
   describe('registration error handling', () => {
     it('should set isRegistered to false and rethrow when registerResource throws', async () => {
       const registerResourceSpy = vi
-        .spyOn(navigator.modelContext as ModelContext, 'registerResource')
+        .spyOn(navigator.modelContext, 'registerResource')
         .mockImplementation(() => {
           throw new Error('Resource registration failed');
         });

@@ -1,4 +1,4 @@
-import type { ElicitationParams, ElicitationResult, ModelContext } from '@mcp-b/global';
+import type { ElicitationParams, ElicitationResult } from '@mcp-b/webmcp-types';
 import { useCallback, useState } from 'react';
 
 /**
@@ -132,7 +132,7 @@ export function useElicitation(config: UseElicitationConfig = {}): UseElicitatio
       if (typeof window === 'undefined' || !window.navigator?.modelContext) {
         throw new Error('navigator.modelContext is not available');
       }
-      const modelContext = window.navigator.modelContext as ModelContext;
+      const mc = window.navigator.modelContext;
 
       setState((prev) => ({
         ...prev,
@@ -141,7 +141,7 @@ export function useElicitation(config: UseElicitationConfig = {}): UseElicitatio
       }));
 
       try {
-        const result = await modelContext.elicitInput(params);
+        const result: ElicitationResult = await mc.elicitInput(params);
 
         setState((prev) => ({
           isLoading: false,

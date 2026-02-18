@@ -1,4 +1,4 @@
-import type { ModelContext, SamplingRequestParams, SamplingResult } from '@mcp-b/global';
+import type { SamplingRequestParams, SamplingResult } from '@mcp-b/webmcp-ts-sdk';
 import { useCallback, useState } from 'react';
 
 /**
@@ -105,7 +105,7 @@ export function useSampling(config: UseSamplingConfig = {}): UseSamplingReturn {
       if (typeof window === 'undefined' || !window.navigator?.modelContext) {
         throw new Error('navigator.modelContext is not available');
       }
-      const modelContext = window.navigator.modelContext as ModelContext;
+      const modelContext = window.navigator.modelContext;
 
       setState((prev) => ({
         ...prev,

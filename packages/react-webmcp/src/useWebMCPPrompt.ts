@@ -1,4 +1,4 @@
-import type { InputSchema, ModelContext } from '@mcp-b/global';
+import type { InputSchema } from '@mcp-b/webmcp-types';
 import { useEffect, useRef, useState } from 'react';
 import type {
   PromptMessage,
@@ -92,7 +92,7 @@ export function useWebMCPPrompt<TArgsSchema extends ReactWebMCPInputSchema = Inp
       );
       return;
     }
-    const modelContext = window.navigator.modelContext as ModelContext;
+    const modelContext = window.navigator.modelContext;
 
     const promptHandler = async (
       args: Record<string, unknown>

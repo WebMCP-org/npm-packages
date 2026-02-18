@@ -16,27 +16,11 @@
  */
 
 /**
- * Re-export sampling and elicitation types from @mcp-b/global.
+ * Re-export types that are part of this package's own API surface
+ * (used in WebMCPConfig, WebMCPPromptConfig, WebMCPResourceConfig signatures).
  */
 export type {
   CallToolResult,
-  ElicitationFormParams,
-  ElicitationParams,
-  ElicitationResult,
-  ElicitationUrlParams,
-  SamplingRequestParams,
-  SamplingResult,
-} from '@mcp-b/global';
-/**
- * Re-export MCP SDK types for convenience.
- * These types come from @mcp-b/webmcp-ts-sdk which re-exports from @modelcontextprotocol/sdk.
- */
-export type { Resource, ServerCapabilities, Tool } from '@mcp-b/webmcp-ts-sdk';
-/**
- * Re-export shared types from @mcp-b packages.
- * React provider hooks should consume the MCP-B extension type surface from @mcp-b/global.
- */
-export type {
   ModelContextProtocol,
   PromptDescriptor,
   PromptMessage,

@@ -1,4 +1,3 @@
-import type { ModelContext } from '@mcp-b/global';
 import { useEffect, useRef, useState } from 'react';
 import type { ResourceContents, WebMCPResourceConfig, WebMCPResourceReturn } from './types.js';
 
@@ -79,7 +78,7 @@ export function useWebMCPResource(config: WebMCPResourceConfig): WebMCPResourceR
       );
       return;
     }
-    const modelContext = window.navigator.modelContext as ModelContext;
+    const modelContext = window.navigator.modelContext;
 
     const resourceHandler = async (
       resolvedUri: URL,

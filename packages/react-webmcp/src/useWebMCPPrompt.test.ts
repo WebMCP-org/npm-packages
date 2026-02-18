@@ -1,17 +1,9 @@
-import type { ModelContext, ModelContextTesting } from '@mcp-b/global';
 import { initializeWebModelContext } from '@mcp-b/global';
+import type { ModelContextTesting } from '@mcp-b/webmcp-types';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
 
 import { useWebMCPPrompt } from './useWebMCPPrompt.js';
-
-// Extend Navigator type for testing
-declare global {
-  interface Navigator {
-    modelContext?: ModelContext;
-    modelContextTesting?: ModelContextTesting;
-  }
-}
 
 const TEST_CHANNEL_ID = `useWebMCPPrompt-test-${Date.now()}`;
 const DEBUG_CONFIG_KEY = 'WEBMCP_DEBUG';
@@ -64,9 +56,10 @@ describe('useWebMCPPrompt', () => {
 
     it('should keep isRegistered as false when registration handle is missing', async () => {
       const registerPromptSpy = vi
-        .spyOn(navigator.modelContext as ModelContext, 'registerPrompt')
+        .spyOn(navigator.modelContext, 'registerPrompt')
         .mockImplementation(
-          () => undefined as unknown as ReturnType<ModelContext['registerPrompt']>
+          () =>
+            undefined as unknown as ReturnType<(typeof navigator.modelContext)['registerPrompt']>
         );
 
       try {
@@ -345,9 +338,10 @@ describe('useWebMCPPrompt', () => {
     it('should warn when no registration handle is returned', async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const registerPromptSpy = vi
-        .spyOn(navigator.modelContext as ModelContext, 'registerPrompt')
+        .spyOn(navigator.modelContext, 'registerPrompt')
         .mockImplementation(
-          () => undefined as unknown as ReturnType<ModelContext['registerPrompt']>
+          () =>
+            undefined as unknown as ReturnType<(typeof navigator.modelContext)['registerPrompt']>
         );
 
       try {
@@ -409,7 +403,7 @@ describe('useWebMCPPrompt', () => {
   describe('registration error handling', () => {
     it('should set isRegistered to false and rethrow when registerPrompt throws', async () => {
       const registerPromptSpy = vi
-        .spyOn(navigator.modelContext as ModelContext, 'registerPrompt')
+        .spyOn(navigator.modelContext, 'registerPrompt')
         .mockImplementation(() => {
           throw new Error('Registration failed');
         });
