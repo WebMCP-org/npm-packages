@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/webmcp-ts-sdk",
-  "version": "1.2.0",
+  "version": "0.0.0-beta-20260217171247",
   "description": "Browser-adapted MCP TypeScript SDK - Dynamic tool registration for W3C Web Model Context API and AI agent integration",
   "keywords": [
     "mcp",
@@ -68,13 +68,22 @@
   },
   "dependencies": {
     "@mcp-b/webmcp-polyfill": "workspace:*",
-    "@mcp-b/webmcp-types": "workspace:*",
-    "@modelcontextprotocol/sdk": "catalog:"
+    "@mcp-b/webmcp-types": "workspace:*"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "catalog:",
     "@types/node": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:"
+  },
+  "peerDependencies": {
+    "zod": "^3.25 || ^4.0",
+    "zod-to-json-schema": "^3.25.0"
+  },
+  "peerDependenciesMeta": {
+    "zod-to-json-schema": {
+      "optional": true
+    }
   },
   "engines": {
     "node": ">=18"

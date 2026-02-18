@@ -11,12 +11,37 @@ import type {
 } from '@mcp-b/webmcp-types';
 import type { ServerOptions } from '@modelcontextprotocol/sdk/server/index.js';
 import { McpServer as BaseMcpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import {
+  getParseErrorMessage,
+  normalizeObjectSchema,
+  safeParseAsync,
+} from '@modelcontextprotocol/sdk/server/zod-compat.js';
+import { toJsonSchemaCompat } from '@modelcontextprotocol/sdk/server/zod-json-schema-compat.js';
+import type { RequestOptions } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import { mergeCapabilities } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import type { Implementation, PromptMessage } from '@modelcontextprotocol/sdk/types.js';
+import type {
+  CreateMessageRequest,
+  CreateMessageResult,
+  ElicitRequest,
+  ElicitResult,
+  Implementation,
+  PromptMessage,
+} from '@modelcontextprotocol/sdk/types.js';
+import {
+  GetPromptRequestSchema,
+  ListPromptsRequestSchema,
+  ListToolsRequestSchema,
+} from '@modelcontextprotocol/sdk/types.js';
 import { PolyfillJsonSchemaValidator } from './polyfill-validator.js';
 
 const DEFAULT_INPUT_SCHEMA: InputSchema = { type: 'object', properties: {} };
+const DEFAULT_CLIENT_REQUEST_TIMEOUT = 10_000;
+
+function withDefaultTimeout(options?: RequestOptions): RequestOptions {
+  if (options?.signal) return options;
+  return { ...options, signal: AbortSignal.timeout(DEFAULT_CLIENT_REQUEST_TIMEOUT) };
+}
 
 interface ParentRegisteredTool {
   description?: string;
@@ -71,6 +96,7 @@ type ParentRegisterToolFn = (
  */
 export class BrowserMcpServer extends BaseMcpServer {
   private native: ModelContextCore | undefined;
+  private _promptSchemas = new Map<string, InputSchema>();
 
   constructor(serverInfo: Implementation, options?: BrowserMcpServerOptions) {
     const enhancedOptions: ServerOptions = {
@@ -101,10 +127,32 @@ export class BrowserMcpServer extends BaseMcpServer {
       ._registeredPrompts;
   }
 
+  private toTransportSchema(schema: unknown): InputSchema {
+    if (!schema || typeof schema !== 'object') return DEFAULT_INPUT_SCHEMA;
+
+    const normalized = normalizeObjectSchema(schema as any);
+    if (normalized) {
+      // Zod schema → convert to JSON Schema
+      return toJsonSchemaCompat(normalized, {
+        strictUnions: true,
+        pipeStrategy: 'input',
+      }) as unknown as InputSchema;
+    }
+
+    // Already plain JSON Schema
+    return schema as InputSchema;
+  }
+
+  private isZodSchema(schema: unknown): boolean {
+    if (!schema || typeof schema !== 'object') return false;
+    const s = schema as Record<string, unknown>;
+    return '_zod' in s || '_def' in s;
+  }
+
   // --- WebMCP standard API (primary surface) ---
 
   // @ts-expect-error -- WebMCP API: (ToolDescriptor) vs MCP SDK: (name, config, cb)
-  override registerTool(tool: ToolDescriptor): void {
+  override registerTool(tool: ToolDescriptor): { unregister: () => void } {
     // Mirror to native first — the polyfill validates the descriptor
     if (this.native) {
       (this.native.registerTool as (tool: ToolDescriptor) => void)(tool);
@@ -129,6 +177,9 @@ export class BrowserMcpServer extends BaseMcpServer {
           return tool.execute(args, client);
         }
       );
+      return {
+        unregister: () => this.unregisterTool(tool.name),
+      };
     } catch (error) {
       // Rollback native registration on server failure
       if (this.native) {
@@ -182,11 +233,17 @@ export class BrowserMcpServer extends BaseMcpServer {
     argsSchema?: InputSchema;
     get: (args: Record<string, unknown>) => Promise<{ messages: PromptMessage[] }>;
   }): { unregister: () => void } {
+    // Store argsSchema locally — the parent SDK's _createRegisteredPrompt corrupts
+    // plain JSON Schema objects via objectFromShape() which expects Zod schemas.
+    if (descriptor.argsSchema) {
+      this._promptSchemas.set(descriptor.name, descriptor.argsSchema);
+    }
+
     const registered = (super.registerPrompt as Function)(
       descriptor.name,
       {
         ...(descriptor.description !== undefined && { description: descriptor.description }),
-        ...(descriptor.argsSchema !== undefined && { argsSchema: descriptor.argsSchema }),
+        // Do NOT pass argsSchema to parent — it gets corrupted by Zod's objectFromShape
       },
       async (args: Record<string, unknown>) => ({
         messages: (await descriptor.get(args)).messages,
@@ -194,7 +251,10 @@ export class BrowserMcpServer extends BaseMcpServer {
     );
 
     return {
-      unregister: () => registered.remove(),
+      unregister: () => {
+        this._promptSchemas.delete(descriptor.name);
+        registered.remove();
+      },
     };
   }
 
@@ -216,6 +276,9 @@ export class BrowserMcpServer extends BaseMcpServer {
     for (const tool of Object.values(this._parentTools)) {
       tool.remove();
     }
+    // Note: _promptSchemas is NOT cleared here. clearContext() is a WebMCP standard
+    // method that only handles tools. Prompt schemas are cleaned up individually
+    // via the unregister() callback returned by registerPrompt().
 
     if (this.native) {
       this.native.clearContext();
@@ -255,17 +318,24 @@ export class BrowserMcpServer extends BaseMcpServer {
   }> {
     return Object.entries(this._parentPrompts)
       .filter(([, prompt]) => prompt.enabled)
-      .map(([name, prompt]) => ({
-        name,
-        ...(prompt.description !== undefined && { description: prompt.description }),
-        ...(prompt.argsSchema
-          ? {
-              arguments: Object.entries((prompt.argsSchema as Record<string, unknown>) ?? {}).map(
-                ([argName]) => ({ name: argName })
-              ),
-            }
-          : {}),
-      }));
+      .map(([name, prompt]) => {
+        const schema = this._promptSchemas.get(name);
+        return {
+          name,
+          ...(prompt.description !== undefined && { description: prompt.description }),
+          ...(schema?.properties
+            ? {
+                arguments: Object.entries(schema.properties).map(([argName, prop]) => ({
+                  name: argName,
+                  ...(typeof prop === 'object' && prop !== null && 'description' in prop
+                    ? { description: (prop as { description: string }).description }
+                    : {}),
+                  ...(schema.required?.includes(argName) ? { required: true } : {}),
+                })),
+              }
+            : {}),
+        };
+      });
   }
 
   async getPrompt(
@@ -275,6 +345,15 @@ export class BrowserMcpServer extends BaseMcpServer {
     const prompt = this._parentPrompts[name];
     if (!prompt) {
       throw new Error(`Prompt not found: ${name}`);
+    }
+
+    const schema = this._promptSchemas.get(name);
+    if (schema) {
+      const validator = new PolyfillJsonSchemaValidator().getValidator(schema);
+      const result = validator(args);
+      if (!result.valid) {
+        throw new Error(`Invalid arguments for prompt ${name}: ${result.errorMessage}`);
+      }
     }
 
     return prompt.callback(args, {});
@@ -287,13 +366,78 @@ export class BrowserMcpServer extends BaseMcpServer {
         const item: ToolListItem = {
           name,
           description: tool.description ?? '',
-          inputSchema: (tool.inputSchema as InputSchema) ?? DEFAULT_INPUT_SCHEMA,
+          inputSchema: this.toTransportSchema(tool.inputSchema ?? DEFAULT_INPUT_SCHEMA),
         };
-        if (tool.outputSchema) item.outputSchema = tool.outputSchema as InputSchema;
+        if (tool.outputSchema) item.outputSchema = this.toTransportSchema(tool.outputSchema);
         if (tool.annotations)
           item.annotations = tool.annotations as NonNullable<ToolListItem['annotations']>;
         return item;
       });
+  }
+
+  /**
+   * Override SDK's validateToolInput to handle both Zod schemas and plain JSON Schema.
+   * Zod schemas use the SDK's safeParseAsync; plain JSON Schema uses PolyfillJsonSchemaValidator.
+   */
+  override async validateToolInput(
+    tool: { inputSchema?: unknown },
+    args: Record<string, unknown> | undefined,
+    toolName: string
+  ): Promise<Record<string, unknown> | undefined> {
+    if (!tool.inputSchema) return undefined;
+
+    // Zod schemas → use SDK's safeParseAsync
+    if (this.isZodSchema(tool.inputSchema)) {
+      const result = await safeParseAsync(tool.inputSchema as any, args ?? {});
+      if (!result.success) {
+        throw new Error(
+          `Invalid arguments for tool ${toolName}: ${getParseErrorMessage(result.error)}`
+        );
+      }
+      return result.data as Record<string, unknown>;
+    }
+
+    // Plain JSON Schema → use PolyfillJsonSchemaValidator
+    const validator = new PolyfillJsonSchemaValidator().getValidator(tool.inputSchema);
+    const result = validator(args ?? {});
+    if (!result.valid) {
+      throw new Error(`Invalid arguments for tool ${toolName}: ${result.errorMessage}`);
+    }
+    return result.data as Record<string, unknown>;
+  }
+
+  /**
+   * Override SDK's validateToolOutput to handle both Zod schemas and plain JSON Schema.
+   */
+  override async validateToolOutput(
+    tool: { outputSchema?: unknown },
+    result: unknown,
+    toolName: string
+  ): Promise<void> {
+    if (!tool.outputSchema) return;
+
+    const r = result as Record<string, unknown>;
+    if (!('content' in r) || r.isError || !r.structuredContent) return;
+
+    // Zod schemas → use SDK's safeParseAsync
+    if (this.isZodSchema(tool.outputSchema)) {
+      const parseResult = await safeParseAsync(tool.outputSchema as any, r.structuredContent);
+      if (!parseResult.success) {
+        throw new Error(
+          `Output validation error: Invalid structured content for tool ${toolName}: ${getParseErrorMessage(parseResult.error)}`
+        );
+      }
+      return;
+    }
+
+    // Plain JSON Schema → use PolyfillJsonSchemaValidator
+    const validator = new PolyfillJsonSchemaValidator().getValidator(tool.outputSchema);
+    const validationResult = validator(r.structuredContent);
+    if (!validationResult.valid) {
+      throw new Error(
+        `Output validation error: Invalid structured content for tool ${toolName}: ${validationResult.errorMessage}`
+      );
+    }
   }
 
   async callTool(params: {
@@ -308,15 +452,95 @@ export class BrowserMcpServer extends BaseMcpServer {
     return tool.handler(params.arguments ?? {}, {});
   }
 
+  async executeTool(name: string, args: Record<string, unknown> = {}): Promise<ToolResponse> {
+    return this.callTool({ name, arguments: args });
+  }
+
   /**
    * Override connect to initialize request handlers BEFORE the transport connection.
    * This prevents "Cannot register capabilities after connecting to transport" errors
    * when tools are registered dynamically after connection.
+   *
+   * After the parent sets up its Zod-based handlers, we replace the ones that break
+   * with plain JSON Schema objects (ListTools, ListPrompts, GetPrompt).
    */
   override async connect(transport: Transport): Promise<void> {
+    // Let parent set up its handlers (including CallTool which uses our validateToolInput override)
     (this as unknown as { setToolRequestHandlers: () => void }).setToolRequestHandlers();
     (this as unknown as { setResourceRequestHandlers: () => void }).setResourceRequestHandlers();
     (this as unknown as { setPromptRequestHandlers: () => void }).setPromptRequestHandlers();
+
+    // Replace ListTools handler — parent tries toJsonSchemaCompat (Zod → JSON Schema) on
+    // inputSchema, but ours are already JSON Schema, so it falls back to empty {}.
+    this.server.setRequestHandler(ListToolsRequestSchema, () => ({
+      tools: this.listTools(),
+    }));
+
+    // Replace ListPrompts handler — parent calls promptArgumentsFromSchema which expects
+    // Zod shapes. We use _promptSchemas which has the real JSON Schema.
+    this.server.setRequestHandler(ListPromptsRequestSchema, () => ({
+      prompts: this.listPrompts(),
+    }));
+
+    // Replace GetPrompt handler — parent calls safeParseAsync on argsSchema.
+    // We validate with PolyfillJsonSchemaValidator instead.
+    this.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+      const prompt = this._parentPrompts[request.params.name];
+      if (!prompt) {
+        throw new Error(`Prompt ${request.params.name} not found`);
+      }
+      if (!prompt.enabled) {
+        throw new Error(`Prompt ${request.params.name} disabled`);
+      }
+
+      const schema = this._promptSchemas.get(request.params.name);
+      if (schema) {
+        const validator = new PolyfillJsonSchemaValidator().getValidator(schema);
+        const result = validator(request.params.arguments ?? {});
+        if (!result.valid) {
+          throw new Error(
+            `Invalid arguments for prompt ${request.params.name}: ${result.errorMessage}`
+          );
+        }
+        return prompt.callback(request.params.arguments as Record<string, unknown>, {});
+      }
+
+      return prompt.callback({}, {});
+    });
+
     return super.connect(transport);
   }
+
+  // --- Sampling & Elicitation (delegated to Server) ---
+
+  async createMessage(
+    params: CreateMessageRequest['params'],
+    options?: RequestOptions
+  ): Promise<CreateMessageResult> {
+    return this.server.createMessage(params, withDefaultTimeout(options));
+  }
+
+  async elicitInput(
+    params: ElicitRequest['params'],
+    options?: RequestOptions
+  ): Promise<ElicitResult> {
+    return this.server.elicitInput(params, withDefaultTimeout(options));
+  }
+}
+
+// --- Exported descriptor types for consumers ---
+
+export interface ResourceDescriptor {
+  uri: string;
+  name: string;
+  description?: string;
+  mimeType?: string;
+  read: (uri: URL, params?: Record<string, string>) => Promise<{ contents: ResourceContents[] }>;
+}
+
+export interface PromptDescriptor {
+  name: string;
+  description?: string;
+  argsSchema?: InputSchema;
+  get: (args: Record<string, unknown>) => Promise<{ messages: PromptMessage[] }>;
 }

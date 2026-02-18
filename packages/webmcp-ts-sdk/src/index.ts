@@ -1,18 +1,8 @@
 // Export our browser-optimized MCP Server as the primary export
 // This replaces the standard McpServer with one that supports dynamic tool registration
 
-// Convenience re-exports from @mcp-b/webmcp-types
-export type {
-  ModelContextCore,
-  ModelContextOptions,
-  ToolDescriptor,
-  ToolListItem,
-  ToolResponse,
-} from '@mcp-b/webmcp-types';
 // Re-export Client class from official SDK
 export { Client } from '@modelcontextprotocol/sdk/client/index.js';
-// Re-export Server class from official SDK (for advanced usage)
-export { Server } from '@modelcontextprotocol/sdk/server/index.js';
 export type { RequestOptions } from '@modelcontextprotocol/sdk/shared/protocol.js';
 // Re-export protocol utilities
 export { mergeCapabilities } from '@modelcontextprotocol/sdk/shared/protocol.js';
@@ -99,6 +89,19 @@ export {
   BrowserMcpServer as McpServer,
   BrowserMcpServer,
   type BrowserMcpServerOptions,
+  type PromptDescriptor,
+  type ResourceDescriptor,
 } from './browser-server.js';
 export { NoOpJsonSchemaValidator } from './no-op-validator.js';
 export { PolyfillJsonSchemaValidator } from './polyfill-validator.js';
+
+// Sampling type aliases (convenience wrappers around MCP SDK types)
+import type { CreateMessageRequest, CreateMessageResult } from '@modelcontextprotocol/sdk/types.js';
+export type SamplingRequestParams = CreateMessageRequest['params'];
+export type SamplingResult = CreateMessageResult;
+
+declare global {
+  interface Navigator {
+    modelContext: import('./browser-server.js').BrowserMcpServer;
+  }
+}
