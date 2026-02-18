@@ -209,6 +209,12 @@ importers:
       '@mcp-b/transports':
         specifier: workspace:*
         version: link:../../packages/transports
+      '@mcp-b/webmcp-ts-sdk':
+        specifier: workspace:*
+        version: link:../../packages/webmcp-ts-sdk
+      '@mcp-b/webmcp-types':
+        specifier: workspace:*
+        version: link:../../packages/webmcp-types
       '@modelcontextprotocol/sdk':
         specifier: 'catalog:'
         version: 1.25.2(@cfworker/json-schema@4.1.1)(hono@4.10.4)(zod@3.25.76)
@@ -228,6 +234,9 @@ importers:
       '@mcp-b/global':
         specifier: workspace:*
         version: link:../../packages/global
+      '@mcp-b/webmcp-ts-sdk':
+        specifier: workspace:*
+        version: link:../../packages/webmcp-ts-sdk
       zod:
         specifier: 3.25.76
         version: 3.25.76
@@ -527,9 +536,12 @@ importers:
       '@mcp-b/transports':
         specifier: workspace:*
         version: link:../transports
-      '@modelcontextprotocol/sdk':
-        specifier: ^1.15.0
-        version: 1.25.2(@cfworker/json-schema@4.1.1)(hono@4.10.4)(zod@4.3.5)
+      '@mcp-b/webmcp-ts-sdk':
+        specifier: workspace:*
+        version: link:../webmcp-ts-sdk
+      '@mcp-b/webmcp-types':
+        specifier: workspace:*
+        version: link:../webmcp-types
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -774,10 +786,16 @@ importers:
       '@mcp-b/webmcp-types':
         specifier: workspace:*
         version: link:../webmcp-types
+      zod:
+        specifier: ^3.25 || ^4.0
+        version: 3.25.76
+      zod-to-json-schema:
+        specifier: ^3.25.0
+        version: 3.25.1(zod@3.25.76)
+    devDependencies:
       '@modelcontextprotocol/sdk':
         specifier: 'catalog:'
-        version: 1.25.2(@cfworker/json-schema@4.1.1)(hono@4.10.4)(zod@4.3.5)
-    devDependencies:
+        version: 1.25.2(@cfworker/json-schema@4.1.1)(hono@4.10.4)(zod@3.25.76)
       '@types/node':
         specifier: 'catalog:'
         version: 22.17.2
