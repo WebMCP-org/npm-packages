@@ -665,15 +665,6 @@ navigator.modelContext.addEventListener("toolschanged", () => {
 });
 ```
 
-### Testing Helpers Module
-
-```javascript
-import { createTestHelper } from "@mcp-b/global/testing";
-
-const testing = createTestHelper();
-await testing.executeTool("greet", { name: "Alice" });
-```
-
 ### Chromium Core Testing API
 
 `navigator.modelContextTesting` exposes:
