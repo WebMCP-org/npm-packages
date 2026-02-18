@@ -4,7 +4,7 @@ import {
   TabServerTransport,
   type TabServerTransportOptions,
 } from '@mcp-b/transports';
-import { cleanupWebMCPPolyfill, initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
+import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
 import { BrowserMcpServer, type Transport } from '@mcp-b/webmcp-ts-sdk';
 import type { ModelContextCore } from '@mcp-b/webmcp-types';
 import type { WebModelContextInitOptions } from './types.js';
@@ -21,12 +21,42 @@ function isBrowserEnvironment(): boolean {
   return typeof window !== 'undefined' && typeof window.navigator !== 'undefined';
 }
 
-function isPolyfillModelContext(value: unknown): boolean {
-  return (
-    Boolean(value) &&
-    typeof value === 'object' &&
-    (value as Record<string, unknown>).__isWebMCPPolyfill === true
-  );
+/**
+ * Replace navigator.modelContext with the given value.
+ * Tries an own-property on the navigator instance first. If the native browser
+ * defines modelContext as a non-configurable property (common in Chromium), this
+ * will throw — in that case we fall back to redefining the getter on
+ * Navigator.prototype so that `navigator.modelContext` resolves to our value.
+ */
+function replaceModelContext(value: unknown): void {
+  try {
+    Object.defineProperty(navigator, 'modelContext', {
+      configurable: true,
+      enumerable: true,
+      writable: false,
+      value,
+    });
+  } catch {
+    // Native browser property is non-configurable on the instance.
+    // Shadow it with a getter on the prototype instead.
+    Object.defineProperty(Object.getPrototypeOf(navigator), 'modelContext', {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return value;
+      },
+    });
+  }
+
+  // Verify the replacement actually worked — the prototype getter cannot
+  // shadow a non-configurable own property on the navigator instance.
+  if (navigator.modelContext !== value) {
+    console.error(
+      '[WebModelContext] Failed to replace navigator.modelContext.',
+      'Descriptor:',
+      Object.getOwnPropertyDescriptor(navigator, 'modelContext')
+    );
+  }
 }
 
 function createTransport(config: WebModelContextInitOptions['transport']): Transport {
@@ -72,15 +102,6 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
     return;
   }
 
-  const existingContext = navigator.modelContext as unknown;
-  const hasNativeModelContext =
-    Boolean(existingContext) && !isPolyfillModelContext(existingContext);
-  const nativeModelContextBehavior = options?.nativeModelContextBehavior ?? 'preserve';
-
-  if (hasNativeModelContext && nativeModelContextBehavior === 'preserve') {
-    return;
-  }
-
   // 1. Install polyfill (provides modelContext + modelContextTesting)
   initializeWebMCPPolyfill({
     installTestingShim: options?.installTestingShim ?? 'if-missing',
@@ -96,13 +117,10 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
   const hostname = window.location.hostname || 'localhost';
   const server = new BrowserMcpServer({ name: `${hostname}-webmcp`, version: '1.0.0' }, { native });
 
-  // 4. Replace navigator.modelContext with the server
-  Object.defineProperty(navigator, 'modelContext', {
-    configurable: true,
-    enumerable: true,
-    writable: true,
-    value: server,
-  });
+  // 4. Replace navigator.modelContext with the server.
+  // Try own-property on the navigator instance first (works for polyfill and most cases).
+  // Fall back to a prototype getter if the native property is non-configurable.
+  replaceModelContext(server);
 
   // 5. Create transport and connect
   const transport = createTransport(options?.transport);
@@ -121,16 +139,11 @@ export function cleanupWebModelContext(): void {
   const { native, server, transport } = runtime;
   runtime = null;
 
-  // Restore the original context before polyfill cleanup
-  Object.defineProperty(navigator, 'modelContext', {
-    configurable: true,
-    enumerable: true,
-    writable: true,
-    value: native,
-  });
-
   void server.close();
   void transport.close();
 
-  cleanupWebMCPPolyfill();
+  // Restore the context that existed before we wrapped it with BrowserMcpServer.
+  // We intentionally do NOT call cleanupWebMCPPolyfill() here — the polyfill
+  // manages its own lifecycle (auto-init, testing shim) independently.
+  replaceModelContext(native);
 }
