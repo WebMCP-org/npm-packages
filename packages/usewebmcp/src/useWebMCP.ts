@@ -90,7 +90,7 @@ function isDev(): boolean {
  *       email: { type: 'string' },
  *     },
  *   } as const,
- *   handler: async ({ userId }) => {
+ *   execute: async ({ userId }) => {
  *     const user = await fetchUser(userId);
  *     return { id: user.id, name: user.name, email: user.email };
  *   },
@@ -101,7 +101,7 @@ function isDev(): boolean {
  *
  * This hook is optimized to minimize unnecessary tool re-registrations:
  *
- * - **Ref-based callbacks**: `handler`, `onSuccess`, `onError`, and `formatOutput`
+ * - **Ref-based callbacks**: `execute`/`handler`, `onSuccess`, `onError`, and `formatOutput`
  *   are stored in refs, so changing these functions won't trigger re-registration.
  *
  * **IMPORTANT**: If `inputSchema`, `outputSchema`, or `annotations` are defined inline
@@ -150,7 +150,7 @@ function isDev(): boolean {
  *         likeCount: { type: 'number' },
  *       },
  *     } as const,
- *     handler: async ({ postId }) => {
+ *     execute: async ({ postId }) => {
  *       const result = await api.posts.like(postId);
  *       return { success: true, likeCount: result.likes };
  *     },
@@ -175,11 +175,19 @@ export function useWebMCP<
     inputSchema,
     outputSchema,
     annotations,
-    handler,
+    execute: configExecute,
+    handler: legacyHandler,
     formatOutput = defaultFormatOutput,
     onSuccess,
     onError,
   } = config;
+  const toolExecute = configExecute ?? legacyHandler;
+
+  if (!toolExecute) {
+    throw new TypeError(
+      `[useWebMCP] Tool "${name}" must provide an implementation via config.execute or config.handler`
+    );
+  }
 
   const [state, setState] = useState<ToolExecutionState<TOutput>>({
     isExecuting: false,
@@ -188,7 +196,7 @@ export function useWebMCP<
     executionCount: 0,
   });
 
-  const handlerRef = useRef(handler);
+  const toolExecuteRef = useRef(toolExecute);
   const onSuccessRef = useRef(onSuccess);
   const onErrorRef = useRef(onError);
   const formatOutputRef = useRef(formatOutput);
@@ -203,11 +211,11 @@ export function useWebMCP<
   });
   // Update refs when callbacks change (doesn't trigger re-registration)
   useIsomorphicLayoutEffect(() => {
-    handlerRef.current = handler;
+    toolExecuteRef.current = toolExecute;
     onSuccessRef.current = onSuccess;
     onErrorRef.current = onError;
     formatOutputRef.current = formatOutput;
-  }, [handler, onSuccess, onError, formatOutput]);
+  }, [toolExecute, onSuccess, onError, formatOutput]);
 
   // Cleanup: mark component as unmounted
   useEffect(() => {
@@ -276,11 +284,11 @@ export function useWebMCP<
   }, [annotations, deps, description, inputSchema, name, outputSchema]);
 
   /**
-   * Executes the tool handler with input validation and state management.
+   * Executes the configured tool implementation with input validation and state management.
    *
-   * @param input - The input parameters to validate and pass to the handler
-   * @returns Promise resolving to the handler's output
-   * @throws Error if validation fails or the handler throws
+   * @param input - The input parameters to validate and pass to the tool implementation
+   * @returns Promise resolving to the tool output
+   * @throws Error if validation fails or the tool implementation throws
    */
   const execute = useCallback(async (input: unknown): Promise<TOutput> => {
     setState((prev) => ({
@@ -290,7 +298,7 @@ export function useWebMCP<
     }));
 
     try {
-      const result = await handlerRef.current(input as TInput);
+      const result = await toolExecuteRef.current(input as TInput);
 
       // Only update state if component is still mounted
       if (isMountedRef.current) {
@@ -358,7 +366,7 @@ export function useWebMCP<
     }
 
     /**
-     * Handles MCP tool execution by running the handler and formatting the response.
+     * Handles MCP tool execution by running the tool implementation and formatting the response.
      *
      * @param input - The input parameters from the MCP client
      * @returns CallToolResult with text content and optional structuredContent
@@ -381,7 +389,7 @@ export function useWebMCP<
           const structuredContent = toStructuredContent(result);
           if (!structuredContent) {
             throw new Error(
-              `Tool "${name}" outputSchema requires the handler to return a JSON object result`
+              `Tool "${name}" outputSchema requires the tool implementation to return a JSON object result`
             );
           }
           response.structuredContent = structuredContent;
