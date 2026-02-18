@@ -1,17 +1,9 @@
-import type { ModelContext, ModelContextTesting } from '@mcp-b/global';
 import { initializeWebModelContext } from '@mcp-b/global';
+import type { ModelContextTesting } from '@mcp-b/webmcp-types';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
 
 import { useWebMCP } from './useWebMCP.js';
-
-// Extend Navigator type for testing
-declare global {
-  interface Navigator {
-    modelContext?: ModelContext;
-    modelContextTesting?: ModelContextTesting;
-  }
-}
 
 const TEST_CHANNEL_ID = `useWebMCP-test-${Date.now()}`;
 
@@ -94,6 +86,21 @@ describe('useWebMCP', () => {
       expect(tools[0].description).toBe('My test tool');
     });
 
+    it('should register tool when config uses execute', async () => {
+      await renderHook(() =>
+        useWebMCP({
+          name: 'my_execute_tool',
+          description: 'Tool using execute config',
+          execute: async () => 'result',
+        })
+      );
+
+      const tools = navigator.modelContextTesting?.listTools();
+      expect(tools).toHaveLength(1);
+      expect(tools[0].name).toBe('my_execute_tool');
+      expect(tools[0].description).toBe('Tool using execute config');
+    });
+
     it('should register tool with input schema', async () => {
       await renderHook(() =>
         useWebMCP({
@@ -134,6 +141,26 @@ describe('useWebMCP', () => {
   });
 
   describe('execute', () => {
+    it('should execute config execute function and update state', async () => {
+      const toolExecute = vi.fn().mockResolvedValue('success');
+
+      const { result, act } = await renderHook(() =>
+        useWebMCP({
+          name: 'test_execute_tool',
+          description: 'Test',
+          execute: toolExecute,
+        })
+      );
+
+      await act(async () => {
+        await result.current.execute({ foo: 'bar' });
+      });
+
+      expect(toolExecute).toHaveBeenCalledWith({ foo: 'bar' });
+      expect(result.current.state.lastResult).toBe('success');
+      expect(result.current.state.executionCount).toBe(1);
+    });
+
     it('should execute handler and update state', async () => {
       const handler = vi.fn().mockResolvedValue('success');
 
@@ -152,6 +179,28 @@ describe('useWebMCP', () => {
       expect(handler).toHaveBeenCalledWith({ foo: 'bar' });
       expect(result.current.state.lastResult).toBe('success');
       expect(result.current.state.executionCount).toBe(1);
+    });
+
+    it('should prefer execute over handler when both are provided', async () => {
+      const toolExecute = vi.fn().mockResolvedValue('from_execute');
+      const handler = vi.fn().mockResolvedValue('from_handler');
+
+      const { result, act } = await renderHook(() =>
+        useWebMCP({
+          name: 'both_execute_and_handler_tool',
+          description: 'Test',
+          execute: toolExecute,
+          handler,
+        })
+      );
+
+      await act(async () => {
+        await result.current.execute({ value: 1 });
+      });
+
+      expect(toolExecute).toHaveBeenCalledWith({ value: 1 });
+      expect(handler).not.toHaveBeenCalled();
+      expect(result.current.state.lastResult).toBe('from_execute');
     });
 
     it('should pass input to handler', async () => {
@@ -334,7 +383,7 @@ describe('useWebMCP', () => {
 
   describe('re-registration behavior', () => {
     it('should not re-register when rerendered with unchanged config', async () => {
-      const registerToolSpy = vi.spyOn(navigator.modelContext as ModelContext, 'registerTool');
+      const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
       const stableHandler = async () => 'result';
 
       try {
@@ -635,7 +684,7 @@ describe('useWebMCP', () => {
 
   describe('deps parameter', () => {
     it('should re-register when deps change', async () => {
-      const registerToolSpy = vi.spyOn(navigator.modelContext as ModelContext, 'registerTool');
+      const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
 
       try {
         const { rerender } = await renderHook(
@@ -918,22 +967,20 @@ describe('useWebMCP', () => {
   describe('cleanup edge cases', () => {
     it('should skip unregister if tool owner token has been replaced', async () => {
       // Mock registerTool to allow duplicate registrations (bypass collision check)
-      const originalRegisterTool = (navigator.modelContext as ModelContext).registerTool.bind(
-        navigator.modelContext
-      );
+      const originalRegisterTool = navigator.modelContext.registerTool.bind(navigator.modelContext);
       const registerSpy = vi
-        .spyOn(navigator.modelContext as ModelContext, 'registerTool')
+        .spyOn(navigator.modelContext, 'registerTool')
         .mockImplementation((toolDef) => {
           // Silently unregister the existing tool first, then register the new one
           try {
-            (navigator.modelContext as ModelContext).unregisterTool(toolDef.name);
+            navigator.modelContext.unregisterTool(toolDef.name);
           } catch {
             // Tool may not exist, that's fine
           }
           return originalRegisterTool(toolDef);
         });
 
-      const unregisterSpy = vi.spyOn(navigator.modelContext as ModelContext, 'unregisterTool');
+      const unregisterSpy = vi.spyOn(navigator.modelContext, 'unregisterTool');
 
       try {
         // Register first tool
@@ -981,7 +1028,7 @@ describe('useWebMCP', () => {
       };
 
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const unregisterSpy = vi.spyOn(navigator.modelContext as ModelContext, 'unregisterTool');
+      const unregisterSpy = vi.spyOn(navigator.modelContext, 'unregisterTool');
 
       try {
         const { unmount } = await renderHook(() =>
@@ -1132,7 +1179,7 @@ describe('useWebMCP', () => {
     // --- Callbacks Don't Trigger Re-registration ---
 
     it('should not re-register when handler reference changes', async () => {
-      const registerToolSpy = vi.spyOn(navigator.modelContext as ModelContext, 'registerTool');
+      const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
 
       try {
         const { rerender } = await renderHook(
@@ -1155,8 +1202,32 @@ describe('useWebMCP', () => {
       }
     });
 
+    it('should not re-register when execute reference changes', async () => {
+      const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
+
+      try {
+        const { rerender } = await renderHook(
+          ({ execute }) =>
+            useWebMCP({
+              name: 'execute_ref_tool',
+              description: 'Test',
+              execute,
+            }),
+          { initialProps: { execute: async () => 'v1' } }
+        );
+
+        const initialCallCount = registerToolSpy.mock.calls.length;
+
+        await rerender({ execute: async () => 'v2' });
+
+        expect(registerToolSpy.mock.calls.length).toBe(initialCallCount);
+      } finally {
+        registerToolSpy.mockRestore();
+      }
+    });
+
     it('should not re-register when onSuccess reference changes', async () => {
-      const registerToolSpy = vi.spyOn(navigator.modelContext as ModelContext, 'registerTool');
+      const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
 
       try {
         const { rerender } = await renderHook(
@@ -1181,7 +1252,7 @@ describe('useWebMCP', () => {
     });
 
     it('should not re-register when onError reference changes', async () => {
-      const registerToolSpy = vi.spyOn(navigator.modelContext as ModelContext, 'registerTool');
+      const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
 
       try {
         const { rerender } = await renderHook(
@@ -1206,7 +1277,7 @@ describe('useWebMCP', () => {
     });
 
     it('should not re-register when formatOutput reference changes', async () => {
-      const registerToolSpy = vi.spyOn(navigator.modelContext as ModelContext, 'registerTool');
+      const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
 
       try {
         const { rerender } = await renderHook(
@@ -1231,7 +1302,7 @@ describe('useWebMCP', () => {
     });
 
     it('should not accumulate registrations when multiple callbacks change', async () => {
-      const registerToolSpy = vi.spyOn(navigator.modelContext as ModelContext, 'registerTool');
+      const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
 
       try {
         const { rerender } = await renderHook(
@@ -1277,6 +1348,31 @@ describe('useWebMCP', () => {
     });
 
     // --- Latest Ref Values Used at Execution Time ---
+
+    it('should use latest config execute function after reference change', async () => {
+      const executeV1 = vi.fn().mockResolvedValue('v1');
+      const executeV2 = vi.fn().mockResolvedValue('v2');
+
+      const { result, rerender, act } = await renderHook(
+        ({ execute }) =>
+          useWebMCP({
+            name: 'latest_execute_prop_tool',
+            description: 'Test',
+            execute,
+          }),
+        { initialProps: { execute: executeV1 } }
+      );
+
+      await rerender({ execute: executeV2 });
+
+      await act(async () => {
+        await result.current.execute({ key: 'test' });
+      });
+
+      expect(executeV1).not.toHaveBeenCalled();
+      expect(executeV2).toHaveBeenCalledWith({ key: 'test' });
+      expect(result.current.state.lastResult).toBe('v2');
+    });
 
     it('should use latest handler after reference change', async () => {
       const handlerV1 = vi.fn().mockResolvedValue('v1');
@@ -1424,21 +1520,17 @@ describe('useWebMCP', () => {
 
     it('should unregister before re-registering when name changes', async () => {
       const callOrder: string[] = [];
-      const originalRegister = (navigator.modelContext as ModelContext).registerTool.bind(
-        navigator.modelContext
-      );
-      const originalUnregister = (navigator.modelContext as ModelContext).unregisterTool.bind(
-        navigator.modelContext
-      );
+      const originalRegister = navigator.modelContext.registerTool.bind(navigator.modelContext);
+      const originalUnregister = navigator.modelContext.unregisterTool.bind(navigator.modelContext);
 
       const registerToolSpy = vi
-        .spyOn(navigator.modelContext as ModelContext, 'registerTool')
+        .spyOn(navigator.modelContext, 'registerTool')
         .mockImplementation((...args) => {
           callOrder.push('register');
           return originalRegister(...args);
         });
       const unregisterToolSpy = vi
-        .spyOn(navigator.modelContext as ModelContext, 'unregisterTool')
+        .spyOn(navigator.modelContext, 'unregisterTool')
         .mockImplementation((...args: [string]) => {
           callOrder.push('unregister');
           return originalUnregister(...args);

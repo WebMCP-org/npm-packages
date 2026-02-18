@@ -14,10 +14,9 @@
 // ============================================
 
 export type {
-  CallToolResult,
   InferOutput,
-  InputSchema,
-  ToolAnnotations,
+  InferToolInput,
+  ToolExecuteFunction,
   ToolExecutionState,
   WebMCPConfig,
   WebMCPReturn,
