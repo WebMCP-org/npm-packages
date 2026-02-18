@@ -1,6 +1,7 @@
 import type { Options } from 'tsdown';
 
-const config: Options = {
+// ESM build for npm package
+const esmConfig: Options = {
   entry: {
     index: 'src/index.ts',
   },
@@ -16,4 +17,29 @@ const config: Options = {
   outDir: 'dist',
 };
 
-export default config;
+// IIFE build for script tag usage - bundles everything for standalone use
+// Uses index.ts which auto-initializes on load
+const iifeConfig: Options = {
+  entry: {
+    index: 'src/index.ts',
+  },
+  format: ['iife'],
+  dts: false,
+  sourcemap: false,
+  clean: false, // Don't clean since ESM build runs first
+  treeshake: true,
+  minify: true,
+  target: 'esnext',
+  platform: 'browser',
+  external: [], // Bundle everything - no externals for standalone script
+  noExternal: [/.*/], // Explicitly bundle all dependencies
+  tsconfig: './tsconfig.json',
+  outDir: 'dist',
+  globalName: 'WebMCPPolyfill',
+  outExtensions: () => ({ js: '.js' }),
+  onSuccess: async () => {
+    console.log('✓ IIFE build complete - auto-initializes on load');
+  },
+};
+
+export default [esmConfig, iifeConfig];

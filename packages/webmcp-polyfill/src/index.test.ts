@@ -1,5 +1,5 @@
+import type { InputSchema } from '@mcp-b/webmcp-types';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { InputSchema } from './index.js';
 import {
   cleanupWebMCPPolyfill,
   initializeWebMCPPolyfill,
