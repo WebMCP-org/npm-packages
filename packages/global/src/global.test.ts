@@ -1,13 +1,13 @@
+import type { BrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanupWebModelContext, initializeWebModelContext } from './global.js';
-import type { ModelContext } from './types.js';
 
 afterEach(() => {
   cleanupWebModelContext();
 });
 
-function getModelContext(): ModelContext {
-  return navigator.modelContext as unknown as ModelContext;
+function getModelContext(): BrowserMcpServer {
+  return navigator.modelContext as unknown as BrowserMcpServer;
 }
 
 function createNativeModelContextStub(): Navigator['modelContext'] {
@@ -24,7 +24,7 @@ function createNativeModelContextStub(): Navigator['modelContext'] {
 }
 
 describe('global adapter', () => {
-  it('preserves native navigator.modelContext by default', () => {
+  it('wraps native navigator.modelContext with BrowserMcpServer by default', () => {
     const nativeContext = createNativeModelContextStub();
     Object.defineProperty(navigator, 'modelContext', {
       configurable: true,
@@ -34,7 +34,8 @@ describe('global adapter', () => {
     });
 
     initializeWebModelContext();
-    expect(navigator.modelContext).toBe(nativeContext);
+    // Server wraps native, adding registerPrompt/registerResource/etc.
+    expect(navigator.modelContext).not.toBe(nativeContext);
 
     cleanupWebModelContext();
     expect(navigator.modelContext).toBe(nativeContext);
