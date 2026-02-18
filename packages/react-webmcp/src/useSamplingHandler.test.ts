@@ -1,16 +1,8 @@
-import type { ModelContext, ModelContextTesting } from '@mcp-b/global';
 import { initializeWebModelContext } from '@mcp-b/global';
+import type { ModelContextTesting } from '@mcp-b/webmcp-types';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
 import { useSampling, useSamplingHandler } from './useSamplingHandler.js';
-
-// Extend Navigator type for testing
-declare global {
-  interface Navigator {
-    modelContext?: ModelContext;
-    modelContextTesting?: ModelContextTesting;
-  }
-}
 
 const TEST_CHANNEL_ID = `useSampling-test-${Date.now()}`;
 

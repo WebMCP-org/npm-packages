@@ -1,7 +1,11 @@
-import type { CallToolResult, InputSchema, ModelContext } from '@mcp-b/global';
-import type { JsonSchemaObject, ToolDescriptor } from '@mcp-b/webmcp-types';
+import type {
+  CallToolResult,
+  InputSchema,
+  JsonSchemaObject,
+  ToolDescriptor,
+} from '@mcp-b/webmcp-types';
 import type { DependencyList } from 'react';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type {
   InferOutput,
   InferToolInput,
@@ -157,7 +161,7 @@ export function useWebMCP<
   }, []);
 
   useEffect(() => {
-    const warnOnce = (key: string, message: string) => {
+    const warnOnce = (key: string) => {
       if (warnedRef.current.has(key)) {
         return;
       }
@@ -167,31 +171,19 @@ export function useWebMCP<
     const prev = prevConfigRef.current;
 
     if (inputSchema && prev.inputSchema && prev.inputSchema !== inputSchema) {
-      warnOnce(
-        'inputSchema',
-        `Tool "${name}" inputSchema reference changed; memoize or define it outside the component to avoid re-registration.`
-      );
+      warnOnce('inputSchema');
     }
 
     if (outputSchema && prev.outputSchema && prev.outputSchema !== outputSchema) {
-      warnOnce(
-        'outputSchema',
-        `Tool "${name}" outputSchema reference changed; memoize or define it outside the component to avoid re-registration.`
-      );
+      warnOnce('outputSchema');
     }
 
     if (annotations && prev.annotations && prev.annotations !== annotations) {
-      warnOnce(
-        'annotations',
-        `Tool "${name}" annotations reference changed; memoize or define it outside the component to avoid re-registration.`
-      );
+      warnOnce('annotations');
     }
 
     if (description !== prev.description) {
-      warnOnce(
-        'description',
-        `Tool "${name}" description changed; this re-registers the tool. Memoize the description if it does not need to update.`
-      );
+      warnOnce('description');
     }
 
     if (
@@ -199,14 +191,11 @@ export function useWebMCP<
         (value) => (typeof value === 'object' && value !== null) || typeof value === 'function'
       )
     ) {
-      warnOnce(
-        'deps',
-        `Tool "${name}" deps contains non-primitive values; prefer primitives or memoize objects/functions to reduce re-registration.`
-      );
+      warnOnce('deps');
     }
 
     prevConfigRef.current = { inputSchema, outputSchema, annotations, description, deps };
-  }, [annotations, deps, description, inputSchema, name, outputSchema]);
+  }, [annotations, deps, description, inputSchema, outputSchema]);
 
   /**
    * Executes the tool handler with input validation and state management.
@@ -285,11 +274,12 @@ export function useWebMCP<
   useEffect(() => {
     if (typeof window === 'undefined' || !window.navigator?.modelContext) {
       console.warn(
-        `window.navigator.modelContext is not available. Tool "${name}" will not be registered.`
+        '[ReactWebMCP:useWebMCP]',
+        `Tool "${name}" skipped: modelContext is not available`
       );
       return;
     }
-    const modelContext = window.navigator.modelContext as ModelContext;
+    const modelContext = window.navigator.modelContext;
 
     /**
      * Handles MCP tool execution by running the handler and formatting the response.
@@ -363,7 +353,9 @@ export function useWebMCP<
       TOOL_OWNER_BY_NAME.delete(name);
       try {
         modelContext.unregisterTool(name);
-      } catch (error) {}
+      } catch (error) {
+        console.warn('[ReactWebMCP:useWebMCP]', `Failed to unregister tool "${name}"`, error);
+      }
     };
     // Spread operator in dependencies: Allows users to provide additional dependencies
     // via the `deps` parameter. While unconventional, this pattern is intentional to support

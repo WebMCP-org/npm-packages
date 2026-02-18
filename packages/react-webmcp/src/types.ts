@@ -1,15 +1,12 @@
+import type { ToolInputSchema } from '@mcp-b/webmcp-polyfill';
+import type { PromptMessage, ResourceContents } from '@mcp-b/webmcp-ts-sdk';
 import type {
   CallToolResult,
-  PromptMessage,
-  ResourceContents,
-  ToolAnnotations,
-} from '@mcp-b/global';
-import type { ToolInputSchema } from '@mcp-b/webmcp-polyfill';
-import type {
   InferArgsFromInputSchema,
   InferJsonSchema,
   InputSchema,
   JsonSchemaObject,
+  ToolAnnotations,
 } from '@mcp-b/webmcp-types';
 import type { z } from 'zod';
 import type { ZodSchemaObject } from './zod-utils.js';
@@ -297,13 +294,13 @@ export interface WebMCPReturn<TOutputSchema extends JsonSchemaObject | undefined
   reset: () => void;
 }
 
-// Re-export types from @mcp-b/global
+// Re-export BrowserMcpServer aliased as ModelContextProtocol (API surface type)
 export type {
-  ModelContext as ModelContextProtocol,
+  BrowserMcpServer as ModelContextProtocol,
   PromptDescriptor,
   ResourceDescriptor,
-  ToolDescriptor,
-} from '@mcp-b/global';
+} from '@mcp-b/webmcp-ts-sdk';
+export type { ToolDescriptor } from '@mcp-b/webmcp-types';
 
 // ============================================================================
 // Prompt Hook Types
