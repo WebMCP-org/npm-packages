@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/mcp-iframe",
-  "version": "0.1.0",
+  "version": "0.0.0-beta-20260217171247",
   "description": "Custom element for exposing iframe MCP tools, resources, and prompts to parent page",
   "keywords": [
     "mcp",
@@ -52,20 +52,14 @@
     "version:patch": "pnpm version patch --no-git-tag-version"
   },
   "dependencies": {
-    "@mcp-b/transports": "workspace:*"
+    "@mcp-b/transports": "workspace:*",
+    "@mcp-b/webmcp-ts-sdk": "workspace:*",
+    "@mcp-b/webmcp-types": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:"
-  },
-  "peerDependencies": {
-    "@modelcontextprotocol/sdk": "^1.15.0"
-  },
-  "peerDependenciesMeta": {
-    "@modelcontextprotocol/sdk": {
-      "optional": false
-    }
   },
   "engines": {
     "node": ">=18"
