@@ -11,7 +11,6 @@ import '@mcp-b/global';
 // Import the MCPIframeElement (auto-registers as <mcp-iframe>)
 import '@mcp-b/mcp-iframe';
 
-import type { InternalModelContext } from '@mcp-b/global';
 import type { MCPIframeElement } from '@mcp-b/mcp-iframe';
 
 // DOM elements
@@ -23,7 +22,7 @@ const toolResultEl = document.getElementById('tool-result')!;
 const resourceResultEl = document.getElementById('resource-result')!;
 const promptResultEl = document.getElementById('prompt-result')!;
 const logEl = document.getElementById('log')!;
-const modelContext = navigator.modelContext as unknown as InternalModelContext;
+const modelContext = navigator.modelContext;
 
 // Get the mcp-iframe element
 const mcpIframe = document.getElementById('child-iframe') as MCPIframeElement;

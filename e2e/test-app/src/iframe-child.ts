@@ -7,9 +7,8 @@
 
 // Import the polyfill to create the MCP server
 import '@mcp-b/global';
-import type { InternalModelContext } from '@mcp-b/global';
 
-const modelContext = navigator.modelContext as unknown as InternalModelContext;
+const modelContext = navigator.modelContext;
 
 function provideExtendedContext(options: unknown): void {
   (modelContext as unknown as { provideContext: (value: unknown) => void }).provideContext(options);

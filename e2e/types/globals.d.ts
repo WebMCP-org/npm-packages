@@ -1,15 +1,14 @@
+/// <reference types="@mcp-b/webmcp-ts-sdk" />
 import type {
-  InternalModelContext,
   ModelContextTesting,
   ModelContextTestingPolyfillExtensions,
-} from '@mcp-b/global';
+} from '@mcp-b/webmcp-types';
 
 type ExtendedModelContextTesting = ModelContextTesting &
   Partial<ModelContextTestingPolyfillExtensions>;
 
 declare global {
   interface Navigator {
-    modelContext: InternalModelContext;
     modelContextTesting?: ExtendedModelContextTesting;
   }
 

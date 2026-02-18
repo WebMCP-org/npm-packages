@@ -1,6 +1,7 @@
-import type { InternalModelContext } from '@mcp-b/global';
 import { initializeWebModelContext } from '@mcp-b/global';
+import '@mcp-b/webmcp-ts-sdk';
 import { z } from 'zod';
+import type { JsonSchemaForInference } from '../../../packages/webmcp-types/dist/json-schema';
 
 const statusEl = document.getElementById('status')!;
 const resultsEl = document.getElementById('results')!;
@@ -55,7 +56,7 @@ async function runTests() {
   statusEl.className = 'success';
   statusEl.textContent = 'ESM + Zod 3 initialized - Running tests...';
 
-  const mc = window.navigator.modelContext as unknown as InternalModelContext;
+  const mc = window.navigator.modelContext;
   const registerTool = mc.registerTool as unknown as (tool: unknown) => void;
 
   try {
@@ -209,3 +210,19 @@ async function runTests() {
 
 // Run tests when page loads
 runTests();
+
+navigator.modelContext.registerTool({
+  name: 'echo',
+  description: 'Echo a message',
+  inputSchema: {
+    type: 'object',
+    properties: { message: { type: 'string' } },
+    required: ['message'],
+    additionalProperties: false,
+    // type saftey on the inputschema
+  } as const satisfies JsonSchemaForInference,
+  async execute(args) {
+    // args is inferred as: { message: string }
+    return { content: [{ type: 'text', text: args.message }] };
+  },
+});

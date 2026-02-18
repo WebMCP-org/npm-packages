@@ -4,10 +4,9 @@
 // Import the global package to initialize navigator.modelContext
 import '@mcp-b/global';
 import type {
-  InternalModelContext,
   ModelContextTesting,
   ModelContextTestingPolyfillExtensions,
-} from '@mcp-b/global';
+} from '@mcp-b/webmcp-types';
 
 type ExtendedModelContextTesting = ModelContextTesting & ModelContextTestingPolyfillExtensions;
 
@@ -19,7 +18,7 @@ function requireElement<T extends HTMLElement>(id: string): T {
   return element as T;
 }
 
-const modelContext = navigator.modelContext as unknown as InternalModelContext;
+const modelContext = navigator.modelContext;
 
 function getTestingAPI(): ExtendedModelContextTesting | undefined {
   return navigator.modelContextTesting as ExtendedModelContextTesting | undefined;

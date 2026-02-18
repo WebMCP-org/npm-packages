@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@mcp-b/global": "workspace:*",
+    "@mcp-b/webmcp-ts-sdk": "workspace:*",
     "zod": "3.25.76"
   },
   "devDependencies": {
