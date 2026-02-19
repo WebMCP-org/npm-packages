@@ -18,6 +18,9 @@ export default {
         'webmcp-ts-sdk',
         'webmcp-types',
 
+        // Examples
+        'examples',
+
         // Repository-wide scopes
         'root',
         'deps',

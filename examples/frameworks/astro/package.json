@@ -1,0 +1,16 @@
+{
+  "name": "@mcp-b/example-astro",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "astro": "astro",
+    "build": "astro build",
+    "dev": "astro dev",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "@mcp-b/webmcp-polyfill": "latest",
+    "astro": "^5.17.1"
+  }
+}

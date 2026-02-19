@@ -4,7 +4,7 @@
   "private": false,
   "type": "module",
   "scripts": {
-    "build": "turbo run build",
+    "build": "turbo run build --filter='!@mcp-b/example-*'",
     "changeset": "changeset",
     "changeset:publish": "pnpm build && changeset publish",
     "changeset:version": "changeset version",
@@ -20,6 +20,8 @@
     "prepare": "husky",
     "publish:all": "pnpm run build && pnpm publish -r --access public --no-git-checks",
     "publish:order": "echo 'Publish order: webmcp-types → webmcp-polyfill → webmcp-ts-sdk → transports → global → react-webmcp → chrome-devtools-mcp'",
+    "syncpack:fix": "syncpack fix-mismatches",
+    "syncpack:lint": "syncpack lint",
     "test": "pnpm test:unit && pnpm test:e2e",
     "test:e2e": "pnpm --filter mcp-e2e-tests test",
     "test:e2e:debug": "pnpm --filter mcp-e2e-tests test:debug",
@@ -28,7 +30,7 @@
     "test:e2e:ui": "pnpm --filter mcp-e2e-tests test:ui",
     "test:unit": "pnpm --filter @mcp-b/transports test && pnpm --filter @mcp-b/global test && pnpm --filter @mcp-b/react-webmcp test && pnpm --filter usewebmcp test && pnpm --filter @mcp-b/webmcp-types test && pnpm --filter @mcp-b/webmcp-polyfill test",
     "test:unit:coverage": "pnpm --filter @mcp-b/transports test --coverage && pnpm --filter @mcp-b/global test --coverage && pnpm --filter @mcp-b/react-webmcp test --coverage && pnpm --filter usewebmcp test --coverage && pnpm --filter @mcp-b/webmcp-types test --coverage && pnpm --filter @mcp-b/webmcp-polyfill test --coverage",
-    "typecheck": "turbo run typecheck",
+    "typecheck": "turbo run typecheck --filter='!@mcp-b/example-*'",
     "validate:publish": "node ./scripts/validate-publish.js"
   },
   "dependencies": {
@@ -43,7 +45,8 @@
     "@commitlint/config-conventional": "^19.8.1",
     "husky": "^9.1.7",
     "jiti": "^2.6.1",
-    "lint-staged": "^16.1.5"
+    "lint-staged": "^16.1.5",
+    "syncpack": "^13.0.0"
   },
   "packageManager": "pnpm@10.14.0",
   "engines": {
