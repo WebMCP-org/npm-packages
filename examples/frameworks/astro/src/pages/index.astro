@@ -1,0 +1,31 @@
+---
+
+---
+
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width" />
+		<title>WebMCP Astro Example</title>
+	</head>
+	<body>
+		<p>WebMCP tool "get_status" registered.</p>
+		<script>
+			import { initializeWebMCPPolyfill } from "@mcp-b/webmcp-polyfill";
+
+			initializeWebMCPPolyfill();
+
+			navigator.modelContext.registerTool({
+				name: "get_status",
+				description: "Returns app status",
+				inputSchema: {
+					type: "object",
+					properties: {},
+				},
+				execute: async () => ({
+					content: [{ type: "text", text: "Astro app is running" }],
+				}),
+			});
+		</script>
+	</body>
+</html>

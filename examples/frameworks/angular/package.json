@@ -1,0 +1,26 @@
+{
+  "name": "@mcp-b/example-angular",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "ng build",
+    "start": "ng serve"
+  },
+  "dependencies": {
+    "@angular/common": "^21.1.0",
+    "@angular/compiler": "^21.1.0",
+    "@angular/core": "^21.1.0",
+    "@angular/platform-browser": "^21.1.0",
+    "@mcp-b/webmcp-polyfill": "latest",
+    "rxjs": "^7.8.0",
+    "tslib": "^2.3.0"
+  },
+  "devDependencies": {
+    "@angular/build": "^21.1.4",
+    "@angular/cli": "^21.1.4",
+    "@angular/compiler-cli": "^21.1.0",
+    "@typescript-eslint/parser": "^8.53.1",
+    "baseline-browser-mapping": "^2.9.19",
+    "typescript": "~5.9.3"
+  }
+}

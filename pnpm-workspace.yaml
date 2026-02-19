@@ -10,6 +10,7 @@ packages:
   - e2e/vanilla-iife-zod3
   - e2e/vanilla-esm-zod3
   - e2e/react18-zod3
+  - examples/frameworks/*
 
 catalog:
   '@cloudflare/vite-plugin': ^1.13.18
