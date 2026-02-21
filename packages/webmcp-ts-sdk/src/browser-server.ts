@@ -3,6 +3,7 @@ import type {
   InputSchema,
   ModelContextClient,
   ModelContextCore,
+  ModelContextExtensions,
   ModelContextOptions,
   ResourceContents,
   ToolDescriptor,
@@ -83,6 +84,21 @@ type ParentRegisterToolFn = (
   cb: (args: Record<string, unknown>, extra: unknown) => Promise<CallToolResult>
 ) => void;
 
+type ParentRegisterResourceFn = (
+  name: string,
+  uri: string,
+  config: Record<string, unknown>,
+  cb: (uri: URL, extra: unknown) => Promise<{ contents: ResourceContents[] }>
+) => { remove: () => void };
+
+type ParentRegisterPromptFn = (
+  name: string,
+  config: Record<string, unknown>,
+  cb: (args: Record<string, unknown>, extra: unknown) => Promise<{ messages: PromptMessage[] }>
+) => { remove: () => void };
+
+type NativeToolsApi = ModelContextCore & Pick<ModelContextExtensions, 'listTools' | 'callTool'>;
+
 /**
  * Browser-optimized MCP Server that speaks WebMCP natively.
  *
@@ -97,19 +113,55 @@ type ParentRegisterToolFn = (
 export class BrowserMcpServer extends BaseMcpServer {
   private native: ModelContextCore | undefined;
   private _promptSchemas = new Map<string, InputSchema>();
+  private _jsonValidator: PolyfillJsonSchemaValidator;
+  private _publicMethodsBound = false;
 
   constructor(serverInfo: Implementation, options?: BrowserMcpServerOptions) {
+    const validator = new PolyfillJsonSchemaValidator();
     const enhancedOptions: ServerOptions = {
       capabilities: mergeCapabilities(options?.capabilities || {}, {
         tools: { listChanged: true },
         resources: { listChanged: true },
         prompts: { listChanged: true },
       }),
-      jsonSchemaValidator: options?.jsonSchemaValidator ?? new PolyfillJsonSchemaValidator(),
+      jsonSchemaValidator: options?.jsonSchemaValidator ?? validator,
     };
 
     super(serverInfo, enhancedOptions);
+    this._jsonValidator = validator;
     this.native = options?.native;
+    this.bindPublicApiMethods();
+  }
+
+  /**
+   * navigator.modelContext consumers may destructure methods (e.g. const { registerTool } = ...).
+   * Bind methods once so they remain callable outside instance-method invocation syntax.
+   */
+  private bindPublicApiMethods(): void {
+    if (this._publicMethodsBound) {
+      return;
+    }
+
+    this.registerTool = this.registerTool.bind(this);
+    this.unregisterTool = this.unregisterTool.bind(this);
+    this.provideContext = this.provideContext.bind(this);
+    this.clearContext = this.clearContext.bind(this);
+    this.listTools = this.listTools.bind(this);
+    this.callTool = this.callTool.bind(this);
+    this.executeTool = this.executeTool.bind(this);
+
+    this.registerResource = this.registerResource.bind(this);
+    this.listResources = this.listResources.bind(this);
+    this.readResource = this.readResource.bind(this);
+
+    this.registerPrompt = this.registerPrompt.bind(this);
+    this.listPrompts = this.listPrompts.bind(this);
+    this.getPrompt = this.getPrompt.bind(this);
+
+    this.createMessage = this.createMessage.bind(this);
+    this.elicitInput = this.elicitInput.bind(this);
+
+    this._publicMethodsBound = true;
   }
 
   private get _parentTools(): Record<string, ParentRegisteredTool> {
@@ -130,7 +182,7 @@ export class BrowserMcpServer extends BaseMcpServer {
   private toTransportSchema(schema: unknown): InputSchema {
     if (!schema || typeof schema !== 'object') return DEFAULT_INPUT_SCHEMA;
 
-    const normalized = normalizeObjectSchema(schema as any);
+    const normalized = normalizeObjectSchema(schema as Parameters<typeof normalizeObjectSchema>[0]);
     if (normalized) {
       // Zod schema → convert to JSON Schema
       return toJsonSchemaCompat(normalized, {
@@ -149,6 +201,76 @@ export class BrowserMcpServer extends BaseMcpServer {
     return '_zod' in s || '_def' in s;
   }
 
+  private getNativeToolsApi(): NativeToolsApi | undefined {
+    if (!this.native) {
+      return undefined;
+    }
+
+    const candidate = this.native as ModelContextCore &
+      Partial<Pick<ModelContextExtensions, 'listTools' | 'callTool'>>;
+    if (typeof candidate.listTools !== 'function' || typeof candidate.callTool !== 'function') {
+      return undefined;
+    }
+
+    return candidate as NativeToolsApi;
+  }
+
+  private registerToolInServer(tool: ToolDescriptor): { unregister: () => void } {
+    const inputSchema = tool.inputSchema ?? DEFAULT_INPUT_SCHEMA;
+
+    // Cast needed: parent expects Zod-compatible schemas, we pass JSON Schema objects.
+    (super.registerTool as unknown as ParentRegisterToolFn)(
+      tool.name,
+      {
+        description: tool.description,
+        inputSchema,
+        ...(tool.outputSchema ? { outputSchema: tool.outputSchema } : {}),
+        ...(tool.annotations ? { annotations: tool.annotations } : {}),
+      },
+      async (args: Record<string, unknown>) => {
+        const client: ModelContextClient = {
+          requestUserInteraction: async (cb: () => Promise<unknown>) => cb(),
+        };
+        return tool.execute(args, client);
+      }
+    );
+    return {
+      unregister: () => this.unregisterTool(tool.name),
+    };
+  }
+
+  backfillTools(
+    tools: readonly ToolListItem[],
+    execute: (name: string, args: Record<string, unknown>) => Promise<ToolResponse>
+  ): number {
+    let synced = 0;
+
+    for (const sourceTool of tools) {
+      if (!sourceTool?.name || this._parentTools[sourceTool.name]) {
+        continue;
+      }
+
+      const toolDescriptor: ToolDescriptor = {
+        name: sourceTool.name,
+        description: sourceTool.description ?? '',
+        inputSchema: sourceTool.inputSchema ?? DEFAULT_INPUT_SCHEMA,
+        execute: async (args: Record<string, unknown>) => execute(sourceTool.name, args),
+      };
+
+      if (sourceTool.outputSchema) {
+        toolDescriptor.outputSchema = sourceTool.outputSchema;
+      }
+      if (sourceTool.annotations) {
+        toolDescriptor.annotations = sourceTool.annotations;
+      }
+
+      this.registerToolInServer(toolDescriptor);
+      synced++;
+    }
+
+    return synced;
+  }
+
   // --- WebMCP standard API (primary surface) ---
 
   // @ts-expect-error -- WebMCP API: (ToolDescriptor) vs MCP SDK: (name, config, cb)
@@ -158,39 +280,43 @@ export class BrowserMcpServer extends BaseMcpServer {
       (this.native.registerTool as (tool: ToolDescriptor) => void)(tool);
     }
 
-    const inputSchema = tool.inputSchema ?? DEFAULT_INPUT_SCHEMA;
-
     try {
-      // Cast needed: parent expects Zod-compatible schemas, we pass JSON Schema objects
-      (super.registerTool as unknown as ParentRegisterToolFn)(
-        tool.name,
-        {
-          description: tool.description,
-          inputSchema,
-          ...(tool.outputSchema ? { outputSchema: tool.outputSchema } : {}),
-          ...(tool.annotations ? { annotations: tool.annotations } : {}),
-        },
-        async (args: Record<string, unknown>) => {
-          const client: ModelContextClient = {
-            requestUserInteraction: async (cb: () => Promise<unknown>) => cb(),
-          };
-          return tool.execute(args, client);
-        }
-      );
-      return {
-        unregister: () => this.unregisterTool(tool.name),
-      };
+      return this.registerToolInServer(tool);
     } catch (error) {
       // Rollback native registration on server failure
       if (this.native) {
         try {
           this.native.unregisterTool(tool.name);
-        } catch {
-          // best-effort rollback
+        } catch (rollbackError) {
+          console.error(
+            '[BrowserMcpServer] Rollback of native tool registration failed:',
+            rollbackError
+          );
         }
       }
       throw error;
     }
+  }
+
+  /**
+   * Backfill tools that were already registered on the native/polyfill context
+   * before this BrowserMcpServer wrapper was installed.
+   */
+  syncNativeTools(): number {
+    const nativeToolsApi = this.getNativeToolsApi();
+    if (!nativeToolsApi) {
+      return 0;
+    }
+
+    const nativeCallTool = nativeToolsApi.callTool.bind(nativeToolsApi);
+    return this.backfillTools(
+      nativeToolsApi.listTools(),
+      async (name: string, args: Record<string, unknown>) =>
+        nativeCallTool({
+          name,
+          arguments: args,
+        })
+    );
   }
 
   unregisterTool(name: string): void {
@@ -209,7 +335,7 @@ export class BrowserMcpServer extends BaseMcpServer {
     mimeType?: string;
     read: (uri: URL, params?: Record<string, string>) => Promise<{ contents: ResourceContents[] }>;
   }): { unregister: () => void } {
-    const registered = (super.registerResource as Function)(
+    const registered = (super.registerResource as unknown as ParentRegisterResourceFn)(
       descriptor.name,
       descriptor.uri,
       {
@@ -239,7 +365,7 @@ export class BrowserMcpServer extends BaseMcpServer {
       this._promptSchemas.set(descriptor.name, descriptor.argsSchema);
     }
 
-    const registered = (super.registerPrompt as Function)(
+    const registered = (super.registerPrompt as unknown as ParentRegisterPromptFn)(
       descriptor.name,
       {
         ...(descriptor.description !== undefined && { description: descriptor.description }),
@@ -349,7 +475,7 @@ export class BrowserMcpServer extends BaseMcpServer {
 
     const schema = this._promptSchemas.get(name);
     if (schema) {
-      const validator = new PolyfillJsonSchemaValidator().getValidator(schema);
+      const validator = this._jsonValidator.getValidator(schema);
       const result = validator(args);
       if (!result.valid) {
         throw new Error(`Invalid arguments for prompt ${name}: ${result.errorMessage}`);
@@ -388,7 +514,10 @@ export class BrowserMcpServer extends BaseMcpServer {
 
     // Zod schemas → use SDK's safeParseAsync
     if (this.isZodSchema(tool.inputSchema)) {
-      const result = await safeParseAsync(tool.inputSchema as any, args ?? {});
+      const result = await safeParseAsync(
+        tool.inputSchema as Parameters<typeof safeParseAsync>[0],
+        args ?? {}
+      );
       if (!result.success) {
         throw new Error(
           `Invalid arguments for tool ${toolName}: ${getParseErrorMessage(result.error)}`
@@ -398,7 +527,7 @@ export class BrowserMcpServer extends BaseMcpServer {
     }
 
     // Plain JSON Schema → use PolyfillJsonSchemaValidator
-    const validator = new PolyfillJsonSchemaValidator().getValidator(tool.inputSchema);
+    const validator = this._jsonValidator.getValidator(tool.inputSchema);
     const result = validator(args ?? {});
     if (!result.valid) {
       throw new Error(`Invalid arguments for tool ${toolName}: ${result.errorMessage}`);
@@ -421,7 +550,10 @@ export class BrowserMcpServer extends BaseMcpServer {
 
     // Zod schemas → use SDK's safeParseAsync
     if (this.isZodSchema(tool.outputSchema)) {
-      const parseResult = await safeParseAsync(tool.outputSchema as any, r.structuredContent);
+      const parseResult = await safeParseAsync(
+        tool.outputSchema as Parameters<typeof safeParseAsync>[0],
+        r.structuredContent
+      );
       if (!parseResult.success) {
         throw new Error(
           `Output validation error: Invalid structured content for tool ${toolName}: ${getParseErrorMessage(parseResult.error)}`
@@ -431,7 +563,7 @@ export class BrowserMcpServer extends BaseMcpServer {
     }
 
     // Plain JSON Schema → use PolyfillJsonSchemaValidator
-    const validator = new PolyfillJsonSchemaValidator().getValidator(tool.outputSchema);
+    const validator = this._jsonValidator.getValidator(tool.outputSchema);
     const validationResult = validator(r.structuredContent);
     if (!validationResult.valid) {
       throw new Error(
@@ -495,7 +627,7 @@ export class BrowserMcpServer extends BaseMcpServer {
 
       const schema = this._promptSchemas.get(request.params.name);
       if (schema) {
-        const validator = new PolyfillJsonSchemaValidator().getValidator(schema);
+        const validator = this._jsonValidator.getValidator(schema);
         const result = validator(request.params.arguments ?? {});
         if (!result.valid) {
           throw new Error(

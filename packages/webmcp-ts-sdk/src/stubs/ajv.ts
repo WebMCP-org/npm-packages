@@ -1,22 +1,24 @@
 /**
- * No-op ajv stub for browser environments.
+ * Throwing ajv stub for browser environments.
  *
  * The MCP SDK's Server class statically imports AjvJsonSchemaValidator as a
  * default fallback. BrowserMcpServer always passes PolyfillJsonSchemaValidator,
  * so ajv is never actually used — but the static import still resolves. This
  * stub satisfies that import without pulling in the real ajv (CJS-only, breaks
  * in browsers).
+ *
+ * If any code path unexpectedly reaches this stub, it throws immediately so the
+ * issue is surfaced rather than silently passing all validation.
  */
-
-type ValidateFunction = ((data: unknown) => boolean) & { errors: unknown };
 
 export class Ajv {
   constructor(_opts?: unknown) {}
 
-  compile(_schema: unknown): ValidateFunction {
-    const validate = ((_data: unknown) => true) as ValidateFunction;
-    validate.errors = null;
-    return validate;
+  compile(_schema: unknown): never {
+    throw new Error(
+      '[WebMCP] Ajv stub was invoked. This indicates the MCP SDK is bypassing ' +
+        'PolyfillJsonSchemaValidator. Please report this as a bug.'
+    );
   }
 
   getSchema(_id: string): undefined {
