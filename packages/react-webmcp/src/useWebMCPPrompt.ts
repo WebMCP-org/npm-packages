@@ -8,6 +8,15 @@ import type {
 } from './types.js';
 import { isZodSchema, zodToJsonSchema } from './zod-utils.js';
 
+type PromptModelContext = Navigator['modelContext'] & {
+  registerPrompt: (descriptor: {
+    name: string;
+    description?: string;
+    argsSchema?: InputSchema;
+    get: (args: Record<string, unknown>) => Promise<{ messages: PromptMessage[] }>;
+  }) => { unregister: () => void } | void;
+};
+
 /**
  * React hook for registering Model Context Protocol (MCP) prompts.
  *
@@ -92,7 +101,7 @@ export function useWebMCPPrompt<TArgsSchema extends ReactWebMCPInputSchema = Inp
       );
       return;
     }
-    const modelContext = window.navigator.modelContext;
+    const modelContext = window.navigator.modelContext as PromptModelContext;
 
     const promptHandler = async (
       args: Record<string, unknown>
@@ -106,7 +115,7 @@ export function useWebMCPPrompt<TArgsSchema extends ReactWebMCPInputSchema = Inp
         : (argsSchema as InputSchema)
       : undefined;
 
-    let registration: { unregister: () => void } | undefined;
+    let registration: { unregister: () => void } | void;
     try {
       registration = modelContext.registerPrompt({
         name,

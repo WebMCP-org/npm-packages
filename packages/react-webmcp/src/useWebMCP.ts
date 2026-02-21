@@ -161,11 +161,14 @@ export function useWebMCP<
   }, []);
 
   useEffect(() => {
-    const warnOnce = (key: string) => {
+    const warnOnce = (key: string, message?: string) => {
       if (warnedRef.current.has(key)) {
         return;
       }
       warnedRef.current.add(key);
+      console.warn(
+        `[useWebMCP] ${message ?? `"${key}" changed between renders. This may cause unnecessary re-registrations.`}`
+      );
     };
 
     const prev = prevConfigRef.current;
