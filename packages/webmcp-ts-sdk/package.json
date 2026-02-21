@@ -81,6 +81,9 @@
     "zod-to-json-schema": "^3.25.0"
   },
   "peerDependenciesMeta": {
+    "zod": {
+      "optional": true
+    },
     "zod-to-json-schema": {
       "optional": true
     }

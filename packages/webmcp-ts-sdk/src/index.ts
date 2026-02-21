@@ -99,9 +99,3 @@ export { PolyfillJsonSchemaValidator } from './polyfill-validator.js';
 import type { CreateMessageRequest, CreateMessageResult } from '@modelcontextprotocol/sdk/types.js';
 export type SamplingRequestParams = CreateMessageRequest['params'];
 export type SamplingResult = CreateMessageResult;
-
-declare global {
-  interface Navigator {
-    modelContext: import('./browser-server.js').BrowserMcpServer;
-  }
-}
