@@ -106,6 +106,33 @@ browserDescribe('Tab transports (browser)', () => {
       expect(onMessage).not.toHaveBeenCalled();
     });
 
+    it('accepts messages from any origin when targetOrigin is wildcard', async () => {
+      const wildcardTransport = new TabClientTransport({
+        targetOrigin: '*',
+        channelId,
+      });
+      const onMessage = vi.fn();
+      wildcardTransport.onmessage = onMessage;
+
+      await wildcardTransport.start();
+
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          origin: 'https://malicious.example',
+          data: {
+            channel: channelId,
+            type: 'mcp',
+            direction: 'server-to-client',
+            payload: { jsonrpc: '2.0', result: { ok: true }, id: 99 },
+          },
+        })
+      );
+
+      await delay();
+      expect(onMessage).toHaveBeenCalled();
+      await safeClose(wildcardTransport);
+    });
+
     it('ignores messages with wrong direction', async () => {
       const onMessage = vi.fn();
       clientTransport.onmessage = onMessage;
