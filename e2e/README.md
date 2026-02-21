@@ -101,6 +101,9 @@ pnpm test
 pnpm test:tab-transport
 pnpm test:react-webmcp
 pnpm test:native-showcase        # Native API tests
+pnpm test:native-parity          # Default Chromium + Chrome Beta parity check
+pnpm test:native-parity:default  # Default browser parity lane
+pnpm test:native-parity:beta     # Chrome Beta parity lane
 
 # Open Playwright UI
 pnpm test:ui
@@ -200,6 +203,11 @@ Failed tests automatically capture:
 Tests run automatically in GitHub Actions on:
 - Pull requests to `main`
 - Pushes to `main`
+
+The CI workflow also runs a **native parity matrix** for
+`e2e/tests/chrome-beta-webmcp.spec.ts` across:
+- Default Chromium
+- Chrome Beta (`--enable-experimental-web-platform-features --enable-features=WebMCPTesting`)
 
 See `.github/workflows/e2e.yml` for CI configuration.
 

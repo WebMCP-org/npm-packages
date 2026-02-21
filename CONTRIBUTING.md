@@ -29,6 +29,8 @@ These docs define review expectations for safety, contract synchronization, and 
   ```bash
   pnpm test:unit    # Unit tests must pass
   pnpm test:e2e     # E2E tests must pass (if applicable)
+  # For runtime/browser API changes:
+  pnpm --filter mcp-e2e-tests test:native-parity
   ```
 
 ### Code Quality Checks
@@ -43,6 +45,15 @@ These docs define review expectations for safety, contract synchronization, and 
 Run the full validation suite:
 ```bash
 pnpm build && pnpm typecheck && pnpm check && pnpm test:unit
+pnpm audit:ci:high      # informational high-severity report (prod deps; excluding e2e test-app paths)
+pnpm audit:ci:critical  # required pass gate (prod deps)
+```
+
+For changes touching browser runtime behavior (`@mcp-b/global`, `@mcp-b/webmcp-polyfill`,
+`@mcp-b/webmcp-ts-sdk`, `@mcp-b/transports`, or e2e runtime apps), also run:
+
+```bash
+pnpm --filter mcp-e2e-tests test:native-parity
 ```
 
 If any of these fail, your PR will not be merged.

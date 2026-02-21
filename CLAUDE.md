@@ -41,7 +41,7 @@ templates/          # Project templates
 - **Node**: >= 22.12 (see `.nvmrc`)
 - **Package manager**: pnpm (not npm/yarn)
 - **Linter**: Biome (not ESLint/Prettier)
-- **Zod version**: 3.25.76+ required (3.x only, not 4.x)
+- **Zod version**: Optional peer dep. Supports ^3.25 || ^4.0 when present
 - **Commit format**: `<type>(<scope>): <subject>` (enforced by hook)
 
 ### Commit Scopes

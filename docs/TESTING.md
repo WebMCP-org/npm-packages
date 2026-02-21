@@ -32,6 +32,9 @@ pnpm test:e2e
 # Run specific test suites
 pnpm --filter mcp-e2e-tests test                    # Tab transport tests
 pnpm --filter mcp-e2e-tests test:react-webmcp       # React WebMCP tests
+pnpm --filter mcp-e2e-tests test:native-parity      # Default Chromium + Chrome Beta parity check
+pnpm --filter mcp-e2e-tests test:native-parity:default # Default browser parity lane only
+pnpm --filter mcp-e2e-tests test:native-parity:beta # Chrome Beta parity lane only
 pnpm test:e2e:tarball:global                        # Install packed @mcp-b/global into test app and run tab-transport E2E
 
 # Run with Playwright UI (recommended for development)
@@ -139,6 +142,21 @@ The Playwright test suite validates:
 - ✅ Error state management
 - ✅ Execution count tracking
 
+### Native API Parity (`e2e/tests/chrome-beta-webmcp.spec.ts`)
+
+These tests validate that core `navigator.modelContextTesting` behavior remains stable across:
+
+- Default Playwright Chromium lane (`test:native-parity:default`)
+- Chrome Beta + WebMCP flags lane (`test:native-parity:beta`)
+
+This is the required parity gate for changes that affect:
+
+- `@mcp-b/global`
+- `@mcp-b/webmcp-polyfill`
+- `@mcp-b/webmcp-ts-sdk`
+- `@mcp-b/transports`
+- E2E runtime apps and bridge wiring
+
 ## CI/CD Integration
 
 Tests run automatically in GitHub Actions:
@@ -154,8 +172,11 @@ Tests run automatically in GitHub Actions:
 2. Build all packages
 3. Install Playwright browsers
 4. Run E2E tests
-5. Run tarball validation (`@mcp-b/global`) against the real test app
-6. Upload test reports and screenshots
+5. Run native API parity matrix:
+   - Default Chromium parity lane
+   - Chrome Beta parity lane
+6. Run tarball validation (`@mcp-b/global`) against the real test app
+7. Upload test reports and screenshots
 
 **Artifacts**:
 - Playwright HTML report (30 days retention)
@@ -323,6 +344,9 @@ Common CI issues:
 1. **Missing browsers**: Ensure `playwright install` runs before tests
 2. **Race conditions**: Use `expect().toHaveText()` instead of `waitForTimeout()`
 3. **Flaky tests**: Add retry logic or fix timing issues
+4. **Chrome Beta lane failures**: Verify `google-chrome-beta` can be installed and that the beta lane runs with:
+   - `--enable-experimental-web-platform-features`
+   - `--enable-features=WebMCPTesting`
 
 ## Resources
 
