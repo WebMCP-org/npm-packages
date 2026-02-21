@@ -215,8 +215,12 @@ class StrictWebMCPContext {
       const execution = tool.execute(args, client);
       const result = await withAbortSignal(Promise.resolve(execution), options?.signal);
       return toSerializedTestingResult(result);
-    } catch {
-      throw createUnknownError(TOOL_INVOCATION_FAILED_MESSAGE);
+    } catch (error) {
+      const detail =
+        error instanceof Error
+          ? `${TOOL_INVOCATION_FAILED_MESSAGE}: ${error.message}`
+          : TOOL_INVOCATION_FAILED_MESSAGE;
+      throw createUnknownError(detail);
     } finally {
       contextActive = false;
     }
@@ -230,8 +234,9 @@ class StrictWebMCPContext {
     queueMicrotask(() => {
       try {
         this.toolsChangedCallback?.();
-      } catch {
+      } catch (error) {
         // Callback errors are ignored to match browser event callback behavior.
+        console.warn('[WebMCPPolyfill] toolsChanged callback threw:', error);
       }
     });
   }
@@ -327,8 +332,11 @@ function convertStandardInputSchema(schema: StandardInputJsonSchema): InputSchem
       const converted = schema['~standard'].jsonSchema.input({ target });
       validateInputSchema(converted);
       return converted;
-    } catch {
-      // Try the next target.
+    } catch (error) {
+      console.warn(
+        `[WebMCPPolyfill] Standard JSON Schema conversion failed for target "${target}":`,
+        error
+      );
     }
   }
 
@@ -544,8 +552,10 @@ async function validateArgsWithStandardSchema(
 
   try {
     result = await Promise.resolve(schema['~standard'].validate(args));
-  } catch {
-    return 'Input validation error: schema validation failed';
+  } catch (error) {
+    const detail = error instanceof Error ? `: ${error.message}` : '';
+    console.error('[WebMCPPolyfill] Standard Schema validation threw unexpectedly:', error);
+    return `Input validation error: schema validation failed${detail}`;
   }
 
   if (!result.issues || result.issues.length === 0) {
