@@ -87,7 +87,7 @@
     "vite-plugin-monkey": "catalog:"
   },
   "peerDependencies": {
-    "@modelcontextprotocol/sdk": "^1.15.0"
+    "@modelcontextprotocol/sdk": "^1.26.0"
   },
   "peerDependenciesMeta": {
     "@modelcontextprotocol/sdk": {
