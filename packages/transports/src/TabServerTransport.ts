@@ -29,6 +29,10 @@ export class TabServerTransport implements Transport {
   onerror?: (error: Error) => void;
   onmessage?: (message: JSONRPCMessage) => void;
 
+  private _resolveTargetOrigin(origin?: string): string {
+    return origin && origin !== 'null' ? origin : '*';
+  }
+
   constructor(options: TabServerTransportOptions) {
     if (!options.allowedOrigins || options.allowedOrigins.length === 0) {
       throw new Error('At least one allowed origin must be specified');
@@ -69,7 +73,7 @@ export class TabServerTransport implements Transport {
             direction: 'server-to-client',
             payload: 'mcp-server-ready',
           },
-          this._clientOrigin
+          this._resolveTargetOrigin(this._clientOrigin)
         );
         return;
       }
@@ -144,7 +148,7 @@ export class TabServerTransport implements Transport {
 
     // If we have a known client origin, use it (for security)
     // Otherwise, use '*' for backwards compatibility with clients that don't do the handshake
-    const targetOrigin = this._clientOrigin || '*';
+    const targetOrigin = this._resolveTargetOrigin(this._clientOrigin);
 
     if (!this._clientOrigin) {
       console.debug(
@@ -205,7 +209,7 @@ export class TabServerTransport implements Transport {
             direction: 'server-to-client',
             payload: interruptedResponse,
           },
-          this._clientOrigin || '*'
+          this._resolveTargetOrigin(this._clientOrigin)
         );
       } catch (error) {
         // Best effort - may fail in rare cases

@@ -101,6 +101,15 @@ export const WEB_MCP_BRIDGE_SCRIPT = `
     return false;
   }
 
+  function getTargetOrigin() {
+    var origin = window.location && typeof window.location.origin === 'string'
+      ? window.location.origin
+      : '';
+    // about:blank, file://, and sandboxed contexts expose "null" origin.
+    // Use "*" so postMessage remains functional in those contexts.
+    return origin && origin !== 'null' ? origin : '*';
+  }
+
   // Initial check
   checkWebMCPAvailable();
 
@@ -126,7 +135,7 @@ export const WEB_MCP_BRIDGE_SCRIPT = `
           type: 'mcp',
           direction: 'client-to-server',
           payload: payload
-        }, window.location.origin);
+        }, getTargetOrigin());
 
         return true;
       } catch (err) {
@@ -170,7 +179,7 @@ export const WEB_MCP_BRIDGE_SCRIPT = `
         type: 'mcp',
         direction: 'client-to-server',
         payload: 'mcp-check-ready'
-      }, window.location.origin);
+      }, getTargetOrigin());
     },
 
     /**
