@@ -1,7 +1,6 @@
 import { initializeWebModelContext } from '@mcp-b/global';
-import '@mcp-b/webmcp-ts-sdk';
+import type { JsonSchemaForInference, ModelContextWithExtensions } from '@mcp-b/webmcp-types';
 import { z } from 'zod';
-import type { JsonSchemaForInference } from '../../../packages/webmcp-types/dist/json-schema';
 
 const statusEl = document.getElementById('status')!;
 const resultsEl = document.getElementById('results')!;
@@ -56,7 +55,7 @@ async function runTests() {
   statusEl.className = 'success';
   statusEl.textContent = 'ESM + Zod 3 initialized - Running tests...';
 
-  const mc = window.navigator.modelContext;
+  const mc = window.navigator.modelContext as ModelContextWithExtensions;
   const registerTool = mc.registerTool as unknown as (tool: unknown) => void;
 
   try {
@@ -92,7 +91,7 @@ async function runTests() {
     log('Tool "esm-zod3-validator" registered successfully', 'success');
 
     // Update tools list
-    const tools = await mc.listTools();
+    const tools = mc.listTools();
     toolsListEl.innerHTML = tools
       .map(
         (t: { name: string; description?: string }) =>
@@ -104,10 +103,13 @@ async function runTests() {
 
     // Test 1: Valid input
     log('Test 1: Valid input...', 'info');
-    const r1 = await mc.executeTool('esm-zod3-validator', {
-      name: 'John Doe',
-      email: 'john@example.com',
-      score: 85,
+    const r1 = await mc.callTool({
+      name: 'esm-zod3-validator',
+      arguments: {
+        name: 'John Doe',
+        email: 'john@example.com',
+        score: 85,
+      },
     });
     log(
       `Valid input: ${r1.isError ? 'FAILED' : 'PASSED'} - ${getFirstText(r1 as { content?: Array<{ type?: string; text?: string }> })}`,
@@ -116,12 +118,15 @@ async function runTests() {
 
     // Test 2: Valid with optional fields
     log('Test 2: Valid input with optional fields...', 'info');
-    const r2 = await mc.executeTool('esm-zod3-validator', {
-      name: 'Jane Doe',
-      email: 'jane@example.com',
-      score: 92,
-      active: true,
-      tags: ['premium', 'verified'],
+    const r2 = await mc.callTool({
+      name: 'esm-zod3-validator',
+      arguments: {
+        name: 'Jane Doe',
+        email: 'jane@example.com',
+        score: 92,
+        active: true,
+        tags: ['premium', 'verified'],
+      },
     });
     log(
       `With optionals: ${r2.isError ? 'FAILED' : 'PASSED'} - ${getFirstText(r2 as { content?: Array<{ type?: string; text?: string }> })}`,
@@ -130,9 +135,12 @@ async function runTests() {
 
     // Test 3: Missing required field
     log('Test 3: Missing required field (email)...', 'info');
-    const r3 = await mc.executeTool('esm-zod3-validator', {
-      name: 'Test User',
-      score: 50,
+    const r3 = await mc.callTool({
+      name: 'esm-zod3-validator',
+      arguments: {
+        name: 'Test User',
+        score: 50,
+      },
     });
     log(
       `Missing email: ${r3.isError ? 'PASSED (rejected)' : 'FAILED (should reject)'}`,
@@ -141,10 +149,13 @@ async function runTests() {
 
     // Test 4: Invalid type
     log('Test 4: Invalid type (score as string)...', 'info');
-    const r4 = await mc.executeTool('esm-zod3-validator', {
-      name: 'Test User',
-      email: 'test@example.com',
-      score: 'high',
+    const r4 = await mc.callTool({
+      name: 'esm-zod3-validator',
+      arguments: {
+        name: 'Test User',
+        email: 'test@example.com',
+        score: 'high',
+      },
     });
     log(
       `Invalid type: ${r4.isError ? 'PASSED (rejected)' : 'FAILED (should reject)'}`,
@@ -153,10 +164,13 @@ async function runTests() {
 
     // Test 5: Value out of range
     log('Test 5: Value out of range (score=150)...', 'info');
-    const r5 = await mc.executeTool('esm-zod3-validator', {
-      name: 'Test User',
-      email: 'test@example.com',
-      score: 150,
+    const r5 = await mc.callTool({
+      name: 'esm-zod3-validator',
+      arguments: {
+        name: 'Test User',
+        email: 'test@example.com',
+        score: 150,
+      },
     });
     log(
       `Score too high: ${r5.isError ? 'PASSED (rejected)' : 'FAILED (should reject)'}`,
@@ -165,10 +179,13 @@ async function runTests() {
 
     // Test 6: String too short
     log('Test 6: String too short (name="A")...', 'info');
-    const r6 = await mc.executeTool('esm-zod3-validator', {
-      name: 'A',
-      email: 'test@example.com',
-      score: 50,
+    const r6 = await mc.callTool({
+      name: 'esm-zod3-validator',
+      arguments: {
+        name: 'A',
+        email: 'test@example.com',
+        score: 50,
+      },
     });
     log(
       `Name too short: ${r6.isError ? 'PASSED (rejected)' : 'FAILED (should reject)'}`,
@@ -177,10 +194,13 @@ async function runTests() {
 
     // Test 7: Invalid email
     log('Test 7: Invalid email format...', 'info');
-    const r7 = await mc.executeTool('esm-zod3-validator', {
-      name: 'Test User',
-      email: 'not-an-email',
-      score: 50,
+    const r7 = await mc.callTool({
+      name: 'esm-zod3-validator',
+      arguments: {
+        name: 'Test User',
+        email: 'not-an-email',
+        score: 50,
+      },
     });
     log(
       `Invalid email: ${r7.isError ? 'PASSED (rejected)' : 'FAILED (should reject)'}`,
@@ -189,11 +209,14 @@ async function runTests() {
 
     // Test 8: Invalid boolean type
     log('Test 8: Invalid boolean type (active="yes")...', 'info');
-    const r8 = await mc.executeTool('esm-zod3-validator', {
-      name: 'Test User',
-      email: 'test@example.com',
-      score: 50,
-      active: 'yes',
+    const r8 = await mc.callTool({
+      name: 'esm-zod3-validator',
+      arguments: {
+        name: 'Test User',
+        email: 'test@example.com',
+        score: 50,
+        active: 'yes',
+      },
     });
     log(
       `Invalid boolean: ${r8.isError ? 'PASSED (rejected)' : 'FAILED (should reject)'}`,

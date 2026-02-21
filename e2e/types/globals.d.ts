@@ -1,17 +1,38 @@
-/// <reference types="@mcp-b/webmcp-ts-sdk" />
-import type {
-  ModelContextTesting,
-  ModelContextTestingPolyfillExtensions,
-} from '@mcp-b/webmcp-types';
+import type { ToolListItem, ToolResponse } from '@mcp-b/webmcp-types';
 
-type ExtendedModelContextTesting = ModelContextTesting &
-  Partial<ModelContextTestingPolyfillExtensions>;
-
-declare global {
-  interface Navigator {
-    modelContextTesting?: ExtendedModelContextTesting;
+declare module '@mcp-b/webmcp-types' {
+  interface ModelContextCore {
+    registerTool(tool: {
+      name: string;
+      description?: string;
+      inputSchema?: unknown;
+      outputSchema?: unknown;
+      annotations?: unknown;
+      execute: (args: Record<string, unknown>, client?: unknown) => unknown | Promise<unknown>;
+    }): { unregister: () => void };
+    listTools(): ToolListItem[];
+    callTool(params: { name: string; arguments?: Record<string, unknown> }): Promise<ToolResponse>;
+    executeTool(name: string, args?: Record<string, unknown>): Promise<ToolResponse>;
+    createMessage(params: unknown): Promise<unknown>;
+    elicitInput(params: unknown): Promise<unknown>;
   }
 
+  interface ModelContextTesting {
+    getToolCalls?(): Array<{
+      toolName: string;
+      arguments: Record<string, unknown>;
+      timestamp: number;
+    }>;
+    clearToolCalls?(): void;
+    setMockToolResponse?(toolName: string, response: ToolResponse): void;
+    clearMockToolResponse?(toolName: string): void;
+    clearAllMockToolResponses?(): void;
+    getRegisteredTools?(): ToolListItem[];
+    reset?(): void;
+  }
+}
+
+declare global {
   interface Window {
     mcpIframeHost: {
       callTool: (name: string, args: Record<string, unknown>) => Promise<unknown>;

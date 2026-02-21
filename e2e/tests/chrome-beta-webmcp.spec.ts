@@ -132,7 +132,10 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
     });
 
     expect(result.missingApi).toBe(false);
-    expect(result.afterRegister).toBeGreaterThanOrEqual(result.before + 1);
+    if (result.missingApi) {
+      throw new Error('modelContext/modelContextTesting not available');
+    }
+    expect(result.afterRegister).toBeGreaterThanOrEqual((result.before ?? 0) + 1);
     expect(result.hasToolAfterRegister).toBe(true);
     expect(result.hasToolAfterUnregister).toBe(false);
   });
@@ -456,6 +459,12 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
 
     if (result.missingApi) {
       throw new Error('modelContext/modelContextTesting not available');
+    }
+    if (!('didThrow' in result)) {
+      throw new Error('Unexpected executeTool result shape');
+    }
+    if (!('name' in result) || !('message' in result)) {
+      throw new Error('Expected executeTool to throw an error');
     }
     expect(result.missingApi).toBe(false);
     expect(result.didThrow).toBe(true);

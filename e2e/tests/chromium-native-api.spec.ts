@@ -468,7 +468,8 @@ test.describe('Chromium Native API - Integration Tests', () => {
 
       // Parse first tool's inputSchema
       const firstTool = tools[0];
-      const schema = JSON.parse(firstTool.inputSchema);
+      if (!firstTool) return { error: 'No tools' };
+      const schema = JSON.parse(firstTool.inputSchema ?? '{}');
 
       // Execute using executeTool
       const result = await testingAPI.executeTool(firstTool.name, '{}');
@@ -554,7 +555,7 @@ test.describe('Chromium Native API - Integration Tests', () => {
       ];
 
       for (const method of contextMethods) {
-        if (typeof (modelContext as Record<string, unknown>)[method] !== 'function') {
+        if (typeof (modelContext as unknown as Record<string, unknown>)[method] !== 'function') {
           return { valid: false, reason: `Missing modelContext.${method}` };
         }
       }
@@ -563,7 +564,9 @@ test.describe('Chromium Native API - Integration Tests', () => {
       const testingMethods = ['executeTool', 'listTools', 'registerToolsChangedCallback'];
 
       for (const method of testingMethods) {
-        if (typeof (modelContextTesting as Record<string, unknown>)[method] !== 'function') {
+        if (
+          typeof (modelContextTesting as unknown as Record<string, unknown>)[method] !== 'function'
+        ) {
           return { valid: false, reason: `Missing modelContextTesting.${method}` };
         }
       }

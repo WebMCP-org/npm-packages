@@ -85,8 +85,9 @@ test.describe('Notification Batching Tests', () => {
     const result = await page.evaluate(async () => {
       let notificationCount = 0;
 
-      if ('modelContextTesting' in navigator && navigator.modelContextTesting) {
-        navigator.modelContextTesting.registerToolsChangedCallback(() => {
+      const testing = navigator.modelContextTesting;
+      if (testing) {
+        testing.registerToolsChangedCallback(() => {
           notificationCount++;
         });
       }
@@ -131,8 +132,9 @@ test.describe('Notification Batching Tests', () => {
     const result = await page.evaluate(async () => {
       let notificationCount = 0;
 
-      if ('modelContextTesting' in navigator && navigator.modelContextTesting) {
-        navigator.modelContextTesting.registerToolsChangedCallback(() => {
+      const testing = navigator.modelContextTesting;
+      if (testing) {
+        testing.registerToolsChangedCallback(() => {
           notificationCount++;
         });
       }
@@ -194,8 +196,9 @@ test.describe('Notification Batching Tests', () => {
     const result = await page.evaluate(async () => {
       let notificationCount = 0;
 
-      if ('modelContextTesting' in navigator && navigator.modelContextTesting) {
-        navigator.modelContextTesting.registerToolsChangedCallback(() => {
+      const testing = navigator.modelContextTesting;
+      if (testing) {
+        testing.registerToolsChangedCallback(() => {
           notificationCount++;
         });
       }
@@ -250,8 +253,9 @@ test.describe('Notification Batching - Edge Cases', () => {
     const result = await page.evaluate(async () => {
       let notificationCount = 0;
 
-      if ('modelContextTesting' in navigator && navigator.modelContextTesting) {
-        navigator.modelContextTesting.registerToolsChangedCallback(() => {
+      const testing = navigator.modelContextTesting;
+      if (testing) {
+        testing.registerToolsChangedCallback(() => {
           notificationCount++;
         });
       }
@@ -298,8 +302,9 @@ test.describe('Notification Batching - Edge Cases', () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
 
       // Now start tracking
-      if ('modelContextTesting' in navigator && navigator.modelContextTesting) {
-        navigator.modelContextTesting.registerToolsChangedCallback(() => {
+      const testing = navigator.modelContextTesting;
+      if (testing) {
+        testing.registerToolsChangedCallback(() => {
           notificationCount++;
         });
       }

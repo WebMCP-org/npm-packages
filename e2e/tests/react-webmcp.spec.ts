@@ -549,11 +549,7 @@ test.describe('React WebMCP Combined Hook Tests', () => {
     await page.waitForSelector('[data-testid="app-status"]');
   });
 
-  // FIXME: MCP client via TabClientTransport is not receiving tools from the server.
-  // The tools registered via useWebMCP work (prompts/resources register fine), but
-  // useMcpClient() which fetches tools via client.listTools() never receives them.
-  // This indicates an issue with the client-server transport connection.
-  test.fixme('should register tools, prompts, and resources together', async ({ page }) => {
+  test('should register tools, prompts, and resources together', async ({ page }) => {
     // Check prompts are registered first (these load quickly)
     const helpStatus = page.locator('[data-testid="prompt-help-status"]');
     await expect(helpStatus).toHaveText('Registered', { timeout: 5000 });
@@ -614,37 +610,28 @@ test.describe('React WebMCP structuredContent Tests', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('http://localhost:8888');
     await page.waitForSelector('[data-testid="app-status"]');
-    // Wait for modelContextTesting to be available and tools to be registered
-    await page.waitForFunction(
-      () => {
-        const testing = navigator.modelContextTesting;
-        if (!testing) return false;
-        const tools = testing.listTools();
-        // Wait until counter_get tool is registered
-        return tools.some((t: { name: string }) => t.name === 'counter_get');
-      },
-      { timeout: 10000 }
-    );
+    // Wait for real MCP client tool discovery
+    await expect(page.locator('[data-testid="client-tools-list"]')).toContainText('counter_get', {
+      timeout: 10000,
+    });
   });
 
   test('should return structuredContent for tools with outputSchema', async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const testing = navigator.modelContextTesting;
-      if (!testing) {
-        throw new Error('modelContextTesting not available');
+      const w = window as unknown as {
+        mcpClient?: {
+          callTool: (request: { name: string; arguments?: Record<string, unknown> }) => Promise<{
+            structuredContent?: unknown;
+          }>;
+        };
+      };
+      if (!w.mcpClient || typeof w.mcpClient.callTool !== 'function') {
+        throw new Error('mcpClient not available');
       }
 
       try {
-        const serialized = await testing.executeTool('counter_get', '{}');
-        if (serialized === null) {
-          return {
-            success: false,
-            error: 'Expected non-null tool result',
-          };
-        }
-
-        const parsed = JSON.parse(serialized) as { structuredContent?: unknown };
-        const structuredContent = parsed.structuredContent as
+        const response = await w.mcpClient.callTool({ name: 'counter_get', arguments: {} });
+        const structuredContent = response.structuredContent as
           | { counter?: unknown; timestamp?: unknown }
           | undefined;
 
@@ -670,23 +657,29 @@ test.describe('React WebMCP structuredContent Tests', () => {
   });
 
   test('should return parsed text for tools without outputSchema', async ({ page }) => {
-    // Call the counter_increment tool via modelContextTesting (it does NOT have outputSchema)
-    // When no outputSchema is present, executeTool returns parsed text content
+    // Call the counter_increment tool via MCP client (it does NOT have outputSchema)
     const result = await page.evaluate(async () => {
-      const testing = navigator.modelContextTesting;
-      if (!testing) {
-        throw new Error('modelContextTesting not available');
+      const w = window as unknown as {
+        mcpClient?: {
+          callTool: (request: { name: string; arguments?: Record<string, unknown> }) => Promise<{
+            structuredContent?: unknown;
+            content?: Array<{ type: string; text?: string }>;
+          }>;
+        };
+      };
+      if (!w.mcpClient || typeof w.mcpClient.callTool !== 'function') {
+        throw new Error('mcpClient not available');
       }
 
       try {
-        const response = await testing.executeTool(
-          'counter_increment',
-          JSON.stringify({ amount: 1 })
-        );
+        const response = await w.mcpClient.callTool({
+          name: 'counter_increment',
+          arguments: { amount: 1 },
+        });
         return {
           success: true,
-          response,
-          typeOf: typeof response,
+          hasStructuredContent: response.structuredContent !== undefined,
+          hasContent: Array.isArray(response.content) && response.content.length > 0,
         };
       } catch (error) {
         return {
@@ -698,38 +691,32 @@ test.describe('React WebMCP structuredContent Tests', () => {
 
     // Verify the tool call was successful
     expect(result.success).toBe(true);
-
-    // For tools without outputSchema, executeTool parses the text content
-    // The response should be the parsed JSON from the text content
-    expect(result.response).toBeDefined();
+    expect(result.hasStructuredContent).toBe(false);
+    expect(result.hasContent).toBe(true);
   });
 
   test('should return correct counter value from structuredContent', async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const testing = navigator.modelContextTesting;
-      if (!testing) {
-        throw new Error('modelContextTesting not available');
-      }
-
-      const serialized = await testing.executeTool('counter_get', '{}');
-      if (serialized === null) {
-        return {
-          counter: undefined,
-          hasTimestamp: false,
-          timestampIsISO: false,
+      const w = window as unknown as {
+        mcpClient?: {
+          callTool: (request: { name: string; arguments?: Record<string, unknown> }) => Promise<{
+            structuredContent?: { counter?: number; timestamp?: string };
+          }>;
         };
+      };
+      if (!w.mcpClient || typeof w.mcpClient.callTool !== 'function') {
+        throw new Error('mcpClient not available');
       }
 
-      const parsed = JSON.parse(serialized) as {
-        structuredContent?: { counter?: number; timestamp?: string };
-      };
-      const response = parsed.structuredContent;
+      const response = await w.mcpClient.callTool({ name: 'counter_get', arguments: {} });
+      const structured = response.structuredContent;
 
       return {
-        counter: response?.counter,
-        hasTimestamp: typeof response?.timestamp === 'string',
+        counter: structured?.counter,
+        hasTimestamp: typeof structured?.timestamp === 'string',
         timestampIsISO:
-          typeof response?.timestamp === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(response.timestamp),
+          typeof structured?.timestamp === 'string' &&
+          /^\d{4}-\d{2}-\d{2}T/.test(structured.timestamp),
       };
     });
 
@@ -740,41 +727,25 @@ test.describe('React WebMCP structuredContent Tests', () => {
 
   test('should validate structuredContent reflects updated state', async ({ page }) => {
     const results = await page.evaluate(async () => {
-      const testing = navigator.modelContextTesting;
-      if (!testing) {
-        throw new Error('modelContextTesting not available');
+      const w = window as unknown as {
+        mcpClient?: {
+          callTool: (request: { name: string; arguments?: Record<string, unknown> }) => Promise<{
+            structuredContent?: { counter?: number; timestamp?: string };
+          }>;
+        };
+      };
+      if (!w.mcpClient || typeof w.mcpClient.callTool !== 'function') {
+        throw new Error('mcpClient not available');
       }
 
-      const first = await testing.executeTool('counter_get', '{}');
-      if (first === null) {
-        return {
-          initialCounter: undefined,
-          updatedCounter: undefined,
-          incrementedBy5: false,
-          hasValidTimestamp: false,
-        };
-      }
-      const parsedFirst = JSON.parse(first) as {
-        structuredContent?: { counter?: number; timestamp?: string };
-      };
-      const response1 = parsedFirst.structuredContent ?? {};
+      const first = await w.mcpClient.callTool({ name: 'counter_get', arguments: {} });
+      const response1 = first.structuredContent ?? {};
       const initialCounter = response1.counter;
 
-      await testing.executeTool('counter_increment', JSON.stringify({ amount: 5 }));
+      await w.mcpClient.callTool({ name: 'counter_increment', arguments: { amount: 5 } });
 
-      const second = await testing.executeTool('counter_get', '{}');
-      if (second === null) {
-        return {
-          initialCounter,
-          updatedCounter: undefined,
-          incrementedBy5: false,
-          hasValidTimestamp: typeof response1.timestamp === 'string',
-        };
-      }
-      const parsedSecond = JSON.parse(second) as {
-        structuredContent?: { counter?: number; timestamp?: string };
-      };
-      const response2 = parsedSecond.structuredContent ?? {};
+      const second = await w.mcpClient.callTool({ name: 'counter_get', arguments: {} });
+      const response2 = second.structuredContent ?? {};
       const updatedCounter = response2.counter;
       const hasBothCounters =
         typeof initialCounter === 'number' && typeof updatedCounter === 'number';
