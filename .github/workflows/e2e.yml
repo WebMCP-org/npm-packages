@@ -68,3 +68,71 @@ jobs:
           name: test-results
           path: e2e/test-results/
           retention-days: 7
+
+  native-parity:
+    name: Native API Parity (${{ matrix.mode }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        mode:
+          - default
+          - chrome-beta
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@c5ba7f7862a0f64c1b1a05fbac13e0b8e86ba08c # v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build packages
+        run: pnpm build
+
+      - name: Install Playwright Browsers
+        run: pnpm --filter mcp-e2e-tests exec playwright install --with-deps chromium
+
+      - name: Install Google Chrome Beta
+        if: matrix.mode == 'chrome-beta'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget gnupg
+          wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor | sudo tee /usr/share/keyrings/google-linux.gpg > /dev/null
+          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-linux.gpg] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-beta
+          google-chrome-beta --version
+
+      - name: Run Native Parity (Default Chromium)
+        if: matrix.mode == 'default'
+        run: pnpm --filter mcp-e2e-tests run test:native-parity:default
+
+      - name: Run Native Parity (Chrome Beta)
+        if: matrix.mode == 'chrome-beta'
+        run: pnpm --filter mcp-e2e-tests run test:native-parity:beta
+
+      - name: Upload Parity Playwright Report
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: playwright-report-native-parity-${{ matrix.mode }}
+          path: e2e/playwright-report/
+          retention-days: 14
+
+      - name: Upload Parity Test Results
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: test-results-native-parity-${{ matrix.mode }}
+          path: e2e/test-results/
+          retention-days: 7
