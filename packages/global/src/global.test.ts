@@ -1,3 +1,4 @@
+import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
 import type { BrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanupWebModelContext, initializeWebModelContext } from './global.js';
@@ -94,6 +95,65 @@ describe('global adapter', () => {
 
     const serialized = await navigator.modelContextTesting?.executeTool('web_tool', '{}');
     expect(serialized).toContain('web-ok');
+  });
+
+  it('supports calling destructured registerTool', async () => {
+    initializeWebModelContext();
+
+    const modelContext = getModelContext();
+    const registerTool = modelContext.registerTool;
+
+    registerTool({
+      name: 'destructured_register_tool',
+      description: 'Registered via destructured method',
+      inputSchema: { type: 'object', properties: {} },
+      async execute() {
+        return { content: [{ type: 'text', text: 'destructured-ok' }] };
+      },
+    });
+
+    const result = await modelContext.callTool({
+      name: 'destructured_register_tool',
+      arguments: {},
+    });
+    expect(result.content[0]?.type).toBe('text');
+    expect((result.content[0] as { text?: string }).text).toContain('destructured-ok');
+  });
+
+  it('backfills tools registered before initializeWebModelContext', async () => {
+    initializeWebMCPPolyfill();
+
+    const nativeContext = navigator.modelContext as unknown as {
+      registerTool: (tool: {
+        name: string;
+        description: string;
+        inputSchema: { type: 'object'; properties: Record<string, never> };
+        execute: () => Promise<{
+          content: Array<{ type: 'text'; text: string }>;
+        }>;
+      }) => void;
+    };
+
+    nativeContext.registerTool({
+      name: 'pre_registered_tool',
+      description: 'registered before wrapper init',
+      inputSchema: { type: 'object', properties: {} },
+      async execute() {
+        return { content: [{ type: 'text', text: 'pre-registered-ok' }] };
+      },
+    });
+
+    initializeWebModelContext();
+    const modelContext = getModelContext();
+    const names = modelContext.listTools().map((tool) => tool.name);
+    expect(names).toContain('pre_registered_tool');
+
+    const result = await modelContext.callTool({
+      name: 'pre_registered_tool',
+      arguments: {},
+    });
+    expect(result.content[0]?.type).toBe('text');
+    expect((result.content[0] as { text?: string }).text).toContain('pre-registered-ok');
   });
 
   it('provideContext replaces all tools on both sides', () => {

@@ -6,7 +6,14 @@ import {
 } from '@mcp-b/transports';
 import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
 import { BrowserMcpServer, type Transport } from '@mcp-b/webmcp-ts-sdk';
-import type { ModelContextCore } from '@mcp-b/webmcp-types';
+import type {
+  InputSchema,
+  ModelContextCore,
+  ModelContextTesting,
+  ModelContextTestingPolyfillExtensions,
+  ToolListItem,
+  ToolResponse,
+} from '@mcp-b/webmcp-types';
 import type { WebModelContextInitOptions } from './types.js';
 
 interface RuntimeState {
@@ -93,6 +100,95 @@ function createTransport(config: WebModelContextInitOptions['transport']): Trans
   });
 }
 
+function parseTestingInputSchema(inputSchema: string | undefined): InputSchema | undefined {
+  if (!inputSchema) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(inputSchema) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return undefined;
+    }
+    return parsed as InputSchema;
+  } catch (error) {
+    console.warn('[WebMCP] Failed to parse testing inputSchema JSON:', error);
+    return undefined;
+  }
+}
+
+function getTestingShimTools():
+  | {
+      testingShim: ModelContextTesting;
+      tools: ToolListItem[];
+    }
+  | undefined {
+  const testingShim = navigator.modelContextTesting as
+    | (ModelContextTesting & Partial<ModelContextTestingPolyfillExtensions>)
+    | undefined;
+  if (!testingShim) {
+    return undefined;
+  }
+
+  if (typeof testingShim.getRegisteredTools === 'function') {
+    return {
+      testingShim,
+      tools: testingShim.getRegisteredTools() as ToolListItem[],
+    };
+  }
+
+  if (typeof testingShim.listTools !== 'function') {
+    return undefined;
+  }
+
+  const tools = testingShim.listTools().map(
+    (tool): ToolListItem => ({
+      name: tool.name,
+      description: tool.description ?? '',
+      inputSchema: parseTestingInputSchema(tool.inputSchema) ?? {
+        type: 'object',
+        properties: {},
+      },
+    })
+  );
+
+  return {
+    testingShim,
+    tools,
+  };
+}
+
+function syncToolsFromTestingShim(server: BrowserMcpServer): number {
+  const shimState = getTestingShimTools();
+  if (!shimState) {
+    return 0;
+  }
+
+  const { testingShim, tools } = shimState;
+  return server.backfillTools(tools, async (name: string, args: Record<string, unknown>) => {
+    const serialized = await testingShim.executeTool(name, JSON.stringify(args ?? {}));
+    if (serialized === null) {
+      return {
+        content: [{ type: 'text', text: 'Tool execution interrupted by navigation' }],
+        isError: true,
+      } satisfies ToolResponse;
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(serialized);
+    } catch (parseError) {
+      throw new Error(
+        `Failed to parse serialized tool response for ${name}: ${parseError instanceof Error ? parseError.message : String(parseError)}`
+      );
+    }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error(`Invalid serialized tool response for ${name}`);
+    }
+    return parsed as ToolResponse;
+  });
+}
+
 export function initializeWebModelContext(options?: WebModelContextInitOptions): void {
   if (!isBrowserEnvironment()) {
     return;
@@ -116,6 +212,8 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
   // 3. Create server with native mirroring
   const hostname = window.location.hostname || 'localhost';
   const server = new BrowserMcpServer({ name: `${hostname}-webmcp`, version: '1.0.0' }, { native });
+  server.syncNativeTools();
+  syncToolsFromTestingShim(server);
 
   // 4. Replace navigator.modelContext with the server.
   // Try own-property on the navigator instance first (works for polyfill and most cases).
