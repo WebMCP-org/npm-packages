@@ -12,6 +12,9 @@
     "test:debug": "playwright test --debug",
     "test:headed": "playwright test --headed",
     "test:mcp-iframe": "playwright test tests/mcp-iframe-element.spec.ts",
+    "test:native-parity": "pnpm run test:native-parity:default && pnpm run test:native-parity:beta",
+    "test:native-parity:beta": "playwright test --config=playwright-chrome-beta-webmcp.config.ts",
+    "test:native-parity:default": "playwright test tests/chrome-beta-webmcp.spec.ts",
     "test:native-showcase": "playwright test --config=playwright-native-showcase.config.ts",
     "test:native-showcase:debug": "playwright test --config=playwright-native-showcase.config.ts --debug",
     "test:native-showcase:headed": "playwright test --config=playwright-native-showcase.config.ts --headed",
@@ -32,6 +35,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
+    "@mcp-b/webmcp-types": "workspace:*",
     "@playwright/test": "^1.58.0",
     "@types/node": "catalog:",
     "typescript": "catalog:"

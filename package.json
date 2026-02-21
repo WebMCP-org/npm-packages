@@ -4,6 +4,8 @@
   "private": false,
   "type": "module",
   "scripts": {
+    "audit:ci:critical": "node ./scripts/audit-filtered.mjs --level critical --prod --ignore-prefix e2e__",
+    "audit:ci:high": "node ./scripts/audit-filtered.mjs --level high --prod --ignore-prefix e2e__",
     "build": "turbo run build --filter='!@mcp-b/example-*'",
     "changeset": "changeset",
     "changeset:publish": "pnpm build && changeset publish",
