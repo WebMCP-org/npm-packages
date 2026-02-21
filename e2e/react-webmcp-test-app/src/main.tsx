@@ -29,10 +29,10 @@ const wrappedClient = testMiddleware.wrapClient(client);
 window.mcpClient = wrappedClient;
 
 // Use TabClientTransport to connect to the MCP server
-// The 'mcp' channel matches what TabServerTransport uses in @mcp-b/global
+// @mcp-b/global uses TabServerTransport's default channel: 'mcp-default'
 const transport = new TabClientTransport({
   targetOrigin: '*',
-  channelId: 'mcp',
+  channelId: 'mcp-default',
 });
 const providerClient = wrappedClient as unknown as McpClientProviderProps['client'];
 const providerTransport = transport as unknown as McpClientProviderProps['transport'];

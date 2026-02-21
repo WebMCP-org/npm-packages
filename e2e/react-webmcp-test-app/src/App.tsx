@@ -34,9 +34,13 @@ const RESET_ANNOTATIONS = {
 };
 
 const GET_COUNTER_OUTPUT_SCHEMA = {
-  counter: z.number().describe('The current counter value'),
-  timestamp: z.string().describe('ISO timestamp when the value was retrieved'),
-};
+  type: 'object',
+  properties: {
+    counter: { type: 'number', description: 'The current counter value' },
+    timestamp: { type: 'string', description: 'ISO timestamp when the value was retrieved' },
+  },
+  required: ['counter', 'timestamp'],
+} as const;
 
 const GET_COUNTER_ANNOTATIONS = {
   title: 'Get Counter',
@@ -193,8 +197,12 @@ function App() {
       };
     },
     formatOutput: (output) => {
-      const results = output.results as Array<{ title: string; likes: number }>;
-      return `Found ${output.count} posts:\n${results.map((r) => `• ${r.title} (${r.likes} likes)`).join('\n')}`;
+      const typedOutput = output as {
+        count: number;
+        results: Array<{ title: string; likes: number }>;
+      };
+      const results = typedOutput.results;
+      return `Found ${typedOutput.count} posts:\n${results.map((r) => `• ${r.title} (${r.likes} likes)`).join('\n')}`;
     },
   });
 

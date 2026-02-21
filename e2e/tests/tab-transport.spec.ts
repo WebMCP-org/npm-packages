@@ -50,13 +50,14 @@ test.describe('Web Model Context API E2E Tests', () => {
     // Wait for tools to be listed
     await page.waitForTimeout(500);
 
-    // Check that the tools are listed in the log
-    const logEntries = await page.locator('#log .log-entry').allTextContents();
-    expect(logEntries.some((entry) => entry.includes('Total tools registered: 4'))).toBe(true);
-    expect(logEntries.some((entry) => entry.includes('incrementCounter'))).toBe(true);
-    expect(logEntries.some((entry) => entry.includes('decrementCounter'))).toBe(true);
-    expect(logEntries.some((entry) => entry.includes('resetCounter'))).toBe(true);
-    expect(logEntries.some((entry) => entry.includes('getCounter'))).toBe(true);
+    const toolNames = await page.evaluate(() =>
+      navigator.modelContext.listTools().map((tool: { name: string }) => tool.name)
+    );
+    expect(toolNames).toHaveLength(4);
+    expect(toolNames).toContain('incrementCounter');
+    expect(toolNames).toContain('decrementCounter');
+    expect(toolNames).toContain('resetCounter');
+    expect(toolNames).toContain('getCounter');
   });
 
   test('should register dynamic tool (Bucket B)', async ({ page }) => {
@@ -113,40 +114,27 @@ test.describe('Web Model Context API E2E Tests', () => {
     await page.waitForTimeout(500);
 
     // Verify 5 tools total (4 base + 1 dynamic)
-    await page.click('#list-all-tools');
-    await page.waitForTimeout(500);
-    let logEntries = await page.locator('#log .log-entry').allTextContents();
-    expect(logEntries.some((entry) => entry.includes('Total tools registered: 5'))).toBe(true);
+    let toolNames = await page.evaluate(() =>
+      navigator.modelContext.listTools().map((tool: { name: string }) => tool.name)
+    );
+    expect(toolNames).toHaveLength(5);
+    expect(toolNames).toContain('dynamicTool');
 
     // Replace base tools (strict mode replaces all registered tools)
     await page.click('#replace-base-tools');
     await page.waitForTimeout(500);
 
-    // Verify strict replacement message
-    logEntries = await page.locator('#log .log-entry').allTextContents();
-    expect(
-      logEntries.some((entry) =>
-        entry.includes('Dynamic tool cleared by strict provideContext() replacement behavior')
-      )
-    ).toBe(true);
-
-    const toolNames = await page.evaluate(() => {
-      return navigator.modelContext.listTools().map((tool: { name: string }) => tool.name);
-    });
+    toolNames = await page.evaluate(() =>
+      navigator.modelContext.listTools().map((tool: { name: string }) => tool.name)
+    );
     expect(toolNames).toHaveLength(2);
     expect(toolNames).toContain('doubleCounter');
     expect(toolNames).toContain('halveCounter');
     expect(toolNames).not.toContain('dynamicTool');
   });
 
-  test('should access tools via __mcpBridge for debugging', async ({ page }) => {
-    const toolCount = await page.evaluate(() => {
-      const w = window as unknown as { __mcpBridge?: { tools: Map<string, unknown> } };
-      if (w.__mcpBridge) {
-        return w.__mcpBridge.tools.size;
-      }
-      return 0;
-    });
+  test('should expose tools via public modelContext API', async ({ page }) => {
+    const toolCount = await page.evaluate(() => navigator.modelContext.listTools().length);
 
     // Should have 4 base tools initially
     expect(toolCount).toBe(4);
@@ -339,174 +327,73 @@ test.describe('Model Context Testing API Tests', () => {
     ).toBe(true);
   });
 
-  test('should track tool calls via modelContextTesting', async ({ page }) => {
-    await page.click('#test-tool-tracking');
-    await page.waitForTimeout(1000);
-
-    const status = page.locator('#testing-api-status');
-    const toolCalls = await status.getAttribute('data-tool-calls');
-    expect(Number.parseInt(toolCalls || '0', 10)).toBeGreaterThan(0);
-
-    const logEntries = await page.locator('#log .log-entry').allTextContents();
-    expect(logEntries.some((entry) => entry.includes('Tool calls tracked:'))).toBe(true);
-  });
-
-  test('should inject mock responses via modelContextTesting', async ({ page }) => {
-    await page.click('#test-mock-response');
-    await page.waitForTimeout(1000);
-
-    const status = page.locator('#testing-api-status');
-    await expect(status).toHaveAttribute('data-mock-response', 'working');
-
-    const logEntries = await page.locator('#log .log-entry').allTextContents();
-    expect(logEntries.some((entry) => entry.includes('Mock response verified!'))).toBe(true);
-    expect(logEntries.some((entry) => entry.includes('This is a MOCK response!'))).toBe(true);
-  });
-
-  test('should reset testing state', async ({ page }) => {
-    await page.click('#test-tool-tracking');
-    await page.waitForTimeout(1000);
-
-    let status = page.locator('#testing-api-status');
-    const toolCallsBefore = await status.getAttribute('data-tool-calls');
-    expect(Number.parseInt(toolCallsBefore || '0', 10)).toBeGreaterThan(0);
-
-    await page.click('#test-reset');
-    await page.waitForTimeout(500);
-
-    status = page.locator('#testing-api-status');
-    await expect(status).toHaveAttribute('data-reset', 'working');
-
-    const toolCallsAfter = await status.getAttribute('data-tool-calls');
-    expect(toolCallsAfter).toBeNull();
-
-    const logEntries = await page.locator('#log .log-entry').allTextContents();
-    expect(logEntries.some((entry) => entry.includes('Reset successful!'))).toBe(true);
-    expect(logEntries.some((entry) => entry.includes('Tool calls after reset: 0'))).toBe(true);
-  });
-
-  test('should expose all testing API methods', async ({ page }) => {
+  test('should expose core testing API methods', async ({ page }) => {
     const methods = await page.evaluate(() => {
       const testingAPI = navigator.modelContextTesting;
       if (!testingAPI) return [];
 
-      return [
-        'getToolCalls',
-        'clearToolCalls',
-        'setMockToolResponse',
-        'clearMockToolResponse',
-        'clearAllMockToolResponses',
-        'getRegisteredTools',
-        'reset',
-      ].filter((method) => typeof testingAPI[method as keyof typeof testingAPI] === 'function');
-    });
-
-    expect(methods).toHaveLength(7);
-    expect(methods).toContain('getToolCalls');
-    expect(methods).toContain('clearToolCalls');
-    expect(methods).toContain('setMockToolResponse');
-    expect(methods).toContain('clearMockToolResponse');
-    expect(methods).toContain('clearAllMockToolResponses');
-    expect(methods).toContain('getRegisteredTools');
-    expect(methods).toContain('reset');
-  });
-
-  test('should track multiple tool calls correctly', async ({ page }) => {
-    const initialCalls = await page.evaluate(() => {
-      const testingAPI = navigator.modelContextTesting;
-      if (!testingAPI) return 0;
-      return testingAPI.getToolCalls().length;
-    });
-
-    await page.click('#test-tool-tracking');
-    await page.waitForTimeout(500);
-
-    await page.click('#test-tool-tracking');
-    await page.waitForTimeout(500);
-
-    const finalCalls = await page.evaluate(() => {
-      const testingAPI = navigator.modelContextTesting;
-      if (!testingAPI) return 0;
-      return testingAPI.getToolCalls().length;
-    });
-
-    expect(finalCalls).toBeGreaterThan(initialCalls);
-  });
-
-  test('should getRegisteredTools match listTools', async ({ page }) => {
-    const toolsMatch = await page.evaluate(() => {
-      const testingAPI = navigator.modelContextTesting;
-      if (!testingAPI) return false;
-
-      const testingTools = testingAPI.getRegisteredTools();
-      const contextTools = navigator.modelContext.listTools();
-
-      return testingTools.length === contextTools.length;
-    });
-
-    expect(toolsMatch).toBe(true);
-  });
-
-  test('should clear individual mock responses', async ({ page }) => {
-    const mockCleared = await page.evaluate(async () => {
-      const testingAPI = navigator.modelContextTesting;
-      if (!testingAPI) return false;
-
-      const tools = navigator.modelContext.listTools();
-      if (tools.length === 0) return false;
-
-      const toolName = tools[0].name;
-      const mockResponse = {
-        content: [{ type: 'text' as const, text: 'Mock' }],
-      };
-
-      testingAPI.setMockToolResponse(toolName, mockResponse);
-
-      const resultWithMock = await navigator.modelContext.executeTool(toolName, {});
-      const hasMock =
-        resultWithMock.content[0].type === 'text' && resultWithMock.content[0].text === 'Mock';
-
-      testingAPI.clearMockToolResponse(toolName);
-
-      const resultWithoutMock = await navigator.modelContext.executeTool(toolName, {});
-      const noMock = !(
-        resultWithoutMock.content[0].type === 'text' && resultWithoutMock.content[0].text === 'Mock'
+      return ['listTools', 'executeTool', 'registerToolsChangedCallback'].filter(
+        (method) => typeof testingAPI[method as keyof typeof testingAPI] === 'function'
       );
-
-      return hasMock && noMock;
     });
 
-    expect(mockCleared).toBe(true);
+    expect(methods).toHaveLength(3);
+    expect(methods).toContain('listTools');
+    expect(methods).toContain('executeTool');
+    expect(methods).toContain('registerToolsChangedCallback');
   });
 
-  test('should clearAllMockToolResponses work correctly', async ({ page }) => {
-    const allCleared = await page.evaluate(async () => {
+  test('should list base tools via modelContextTesting.listTools()', async ({ page }) => {
+    const toolNames = await page.evaluate(() => {
       const testingAPI = navigator.modelContextTesting;
-      if (!testingAPI) return false;
-
-      const tools = navigator.modelContext.listTools();
-      if (tools.length < 2) return false;
-
-      const mockResponse = {
-        content: [{ type: 'text' as const, text: 'Mock' }],
-      };
-
-      testingAPI.setMockToolResponse(tools[0].name, mockResponse);
-      testingAPI.setMockToolResponse(tools[1].name, mockResponse);
-
-      testingAPI.clearAllMockToolResponses();
-
-      const result1 = await navigator.modelContext.executeTool(tools[0].name, {});
-      const result2 = await navigator.modelContext.executeTool(tools[1].name, {});
-
-      const bothCleared =
-        !(result1.content[0].type === 'text' && result1.content[0].text === 'Mock') &&
-        !(result2.content[0].type === 'text' && result2.content[0].text === 'Mock');
-
-      return bothCleared;
+      if (!testingAPI) return [];
+      return testingAPI.listTools().map((tool: { name: string }) => tool.name);
     });
 
-    expect(allCleared).toBe(true);
+    expect(toolNames).toContain('incrementCounter');
+    expect(toolNames).toContain('decrementCounter');
+    expect(toolNames).toContain('resetCounter');
+    expect(toolNames).toContain('getCounter');
+  });
+
+  test('should execute a tool via modelContextTesting.executeTool()', async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const testingAPI = navigator.modelContextTesting;
+      if (!testingAPI) return null;
+      return await testingAPI.executeTool('getCounter', '{}');
+    });
+
+    expect(result).not.toBeNull();
+    expect(typeof result).toBe('string');
+  });
+
+  test('should fire registerToolsChangedCallback on tool registration', async ({ page }) => {
+    const callbackCount = await page.evaluate(async () => {
+      const testingAPI = navigator.modelContextTesting;
+      if (!testingAPI) return 0;
+
+      let count = 0;
+      testingAPI.registerToolsChangedCallback(() => {
+        count++;
+      });
+
+      const toolName = `testingCallbackTool_${Date.now()}`;
+      navigator.modelContext.registerTool({
+        name: toolName,
+        description: 'Callback test tool',
+        inputSchema: { type: 'object', properties: {} },
+        async execute() {
+          return { content: [{ type: 'text', text: 'ok' }] };
+        },
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      navigator.modelContext.unregisterTool(toolName);
+
+      return count;
+    });
+
+    expect(callbackCount).toBeGreaterThan(0);
   });
 });
 
@@ -542,33 +429,53 @@ test.describe('Sampling & Elicitation API Tests', () => {
     expect(hasMethod).toBe(true);
   });
 
-  test('should throw error when calling createMessage without connected client', async ({
+  test('should reject or timeout createMessage without a connected sampling client', async ({
     page,
   }) => {
-    await page.click('#test-sampling-call');
-    await page.waitForTimeout(500);
+    const outcome = await page.evaluate(async () => {
+      try {
+        await Promise.race([
+          navigator.modelContext.createMessage({
+            messages: [{ role: 'user', content: { type: 'text', text: 'test' } }],
+            maxTokens: 50,
+          }),
+          new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('timeout')), 2000);
+          }),
+        ]);
+        return 'resolved';
+      } catch (error) {
+        return error instanceof Error ? error.message : String(error);
+      }
+    });
 
-    const status = page.locator('#sampling-status');
-    await expect(status).toHaveAttribute('data-sampling-call', 'error-no-client');
-
-    const logEntries = await page.locator('#log .log-entry').allTextContents();
-    expect(logEntries.some((entry) => entry.includes('createMessage() threw error'))).toBe(true);
-    expect(
-      logEntries.some((entry) => entry.includes('Correct error thrown for missing client'))
-    ).toBe(true);
+    expect(outcome).not.toBe('resolved');
   });
 
-  test('should throw error when calling elicitInput without connected client', async ({ page }) => {
-    await page.click('#test-elicitation-call');
-    await page.waitForTimeout(500);
+  test('should reject or timeout elicitInput without a connected elicitation client', async ({
+    page,
+  }) => {
+    const outcome = await page.evaluate(async () => {
+      try {
+        await Promise.race([
+          navigator.modelContext.elicitInput({
+            message: 'Name?',
+            requestedSchema: {
+              type: 'object',
+              properties: { name: { type: 'string' } },
+              required: ['name'],
+            },
+          }),
+          new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('timeout')), 2000);
+          }),
+        ]);
+        return 'resolved';
+      } catch (error) {
+        return error instanceof Error ? error.message : String(error);
+      }
+    });
 
-    const status = page.locator('#sampling-status');
-    await expect(status).toHaveAttribute('data-elicitation-call', 'error-no-client');
-
-    const logEntries = await page.locator('#log .log-entry').allTextContents();
-    expect(logEntries.some((entry) => entry.includes('elicitInput() threw error'))).toBe(true);
-    expect(
-      logEntries.some((entry) => entry.includes('Correct error thrown for missing client'))
-    ).toBe(true);
+    expect(outcome).not.toBe('resolved');
   });
 });

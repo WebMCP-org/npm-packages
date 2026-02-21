@@ -17,7 +17,7 @@ const client = new Client({ name: 'React18Zod3TestClient', version: '1.0.0' });
 // Use TabClientTransport to connect to the MCP server
 const transport = new TabClientTransport({
   targetOrigin: '*',
-  channelId: 'mcp',
+  channelId: 'mcp-default',
 });
 const Provider = McpClientProvider as unknown as ComponentType<McpClientProviderProps>;
 const providerClient = client as unknown as McpClientProviderProps['client'];

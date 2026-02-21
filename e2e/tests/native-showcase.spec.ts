@@ -30,6 +30,18 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
+function getStructuredContent(value: unknown): unknown {
+  if (!isRecord(value)) {
+    return value;
+  }
+
+  if ('structuredContent' in value) {
+    return value.structuredContent;
+  }
+
+  return value;
+}
+
 function isCounterOutputResult(value: unknown): value is { counter: number; timestamp: string } {
   if (!isRecord(value)) {
     return false;
@@ -218,7 +230,7 @@ test.describe('Native API Semantics', () => {
         description: 'Temporary test tool',
         inputSchema: { type: 'object', properties: {} },
         async execute() {
-          return 'ok';
+          return { content: [{ type: 'text', text: 'ok' }] };
         },
       });
     }, toolName);
@@ -247,7 +259,7 @@ test.describe('Native API Semantics', () => {
             description: 'first',
             inputSchema: { type: 'object', properties: {} },
             async execute() {
-              return 'first';
+              return { content: [{ type: 'text', text: 'first' }] };
             },
           },
         ],
@@ -261,7 +273,7 @@ test.describe('Native API Semantics', () => {
             description: 'second',
             inputSchema: { type: 'object', properties: {} },
             async execute() {
-              return 'second';
+              return { content: [{ type: 'text', text: 'second' }] };
             },
           },
         ],
@@ -290,7 +302,7 @@ test.describe('Native API Semantics', () => {
             description: 'clear a',
             inputSchema: { type: 'object', properties: {} },
             async execute() {
-              return 'a';
+              return { content: [{ type: 'text', text: 'a' }] };
             },
           },
         ],
@@ -301,7 +313,7 @@ test.describe('Native API Semantics', () => {
         description: 'clear b',
         inputSchema: { type: 'object', properties: {} },
         async execute() {
-          return 'b';
+          return { content: [{ type: 'text', text: 'b' }] };
         },
       });
 
@@ -331,13 +343,13 @@ test.describe('Native API Semantics', () => {
           required: ['value'],
         },
         async execute(input: { value: number }) {
-          return `value:${input.value}`;
+          return { content: [{ type: 'text', text: `value:${input.value}` }] };
         },
       });
 
       try {
         const response = await testing.executeTool(toolName, JSON.stringify({ value: 42 }));
-        const calls = hasGetToolCalls ? testing.getToolCalls() : [];
+        const calls = hasGetToolCalls ? (testing.getToolCalls?.() ?? []) : [];
         return { missingApi: false, response, hasGetToolCalls, calls };
       } finally {
         context.unregisterTool(toolName);
@@ -376,7 +388,11 @@ test.describe('Native API Semantics', () => {
               required: ['counter', 'timestamp'],
             },
             async execute() {
-              return { counter: 0, timestamp: new Date().toISOString() };
+              const structuredContent = { counter: 0, timestamp: new Date().toISOString() };
+              return {
+                content: [{ type: 'text', text: JSON.stringify(structuredContent) }],
+                structuredContent,
+              };
             },
           },
         ],
@@ -388,8 +404,9 @@ test.describe('Native API Semantics', () => {
 
     expect(result.missingApi).toBe(false);
     const parsed = parseJsonIfPossible(result.response);
-    expect(result.type === 'object' || typeof parsed === 'object').toBe(true);
-    expect(isCounterOutputResult(parsed)).toBe(true);
+    const structured = getStructuredContent(parsed);
+    expect(result.type === 'object' || typeof structured === 'object').toBe(true);
+    expect(isCounterOutputResult(structured)).toBe(true);
   });
 
   test('output-schema template registers structured tool', async ({ page }) => {
@@ -407,15 +424,16 @@ test.describe('Native API Semantics', () => {
 
     expect(response).toBeTruthy();
     const parsed = parseJsonIfPossible(response);
-    expect(isStructuredCounterResult(parsed)).toBe(true);
+    const structured = getStructuredContent(parsed);
+    expect(isStructuredCounterResult(structured)).toBe(true);
 
-    if (!isStructuredCounterResult(parsed)) {
+    if (!isStructuredCounterResult(structured)) {
       return;
     }
 
-    expect(parsed.counter).toBe(3);
-    expect(parsed.previousValue).toBe(0);
-    expect(parsed.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(structured.counter).toBe(3);
+    expect(structured.previousValue).toBe(0);
+    expect(structured.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 });
 
