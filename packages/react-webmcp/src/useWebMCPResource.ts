@@ -1,6 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ResourceContents, WebMCPResourceConfig, WebMCPResourceReturn } from './types.js';
 
+type ResourceModelContext = Navigator['modelContext'] & {
+  registerResource: (descriptor: {
+    uri: string;
+    name: string;
+    description?: string;
+    mimeType?: string;
+    read: (uri: URL, params?: Record<string, string>) => Promise<{ contents: ResourceContents[] }>;
+  }) => { unregister: () => void } | void;
+};
+
 /**
  * React hook for registering Model Context Protocol (MCP) resources.
  *
@@ -78,7 +88,7 @@ export function useWebMCPResource(config: WebMCPResourceConfig): WebMCPResourceR
       );
       return;
     }
-    const modelContext = window.navigator.modelContext;
+    const modelContext = window.navigator.modelContext as ResourceModelContext;
 
     const resourceHandler = async (
       resolvedUri: URL,
@@ -87,7 +97,7 @@ export function useWebMCPResource(config: WebMCPResourceConfig): WebMCPResourceR
       return readRef.current(resolvedUri, params);
     };
 
-    let registration: { unregister: () => void } | undefined;
+    let registration: { unregister: () => void } | void;
     try {
       registration = modelContext.registerResource({
         uri,
