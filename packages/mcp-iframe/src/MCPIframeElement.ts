@@ -415,8 +415,14 @@ export class MCPIframeElement extends HTMLElement {
     // Fetch tools, resources, and prompts in parallel
     const [toolsResult, resourcesResult, promptsResult] = await Promise.all([
       this.#client.listTools(),
-      this.#client.listResources().catch(() => ({ resources: [] })),
-      this.#client.listPrompts().catch(() => ({ prompts: [] })),
+      this.#client.listResources().catch((err) => {
+        console.warn('[MCPIframeElement] listResources failed, defaulting to empty:', err);
+        return { resources: [] };
+      }),
+      this.#client.listPrompts().catch((err) => {
+        console.warn('[MCPIframeElement] listPrompts failed, defaulting to empty:', err);
+        return { prompts: [] };
+      }),
     ]);
 
     this.#mcpTools = toolsResult.tools;
@@ -435,8 +441,8 @@ export class MCPIframeElement extends HTMLElement {
     if (src) {
       try {
         return new URL(src, window.location.href).origin;
-      } catch {
-        // Invalid URL
+      } catch (error) {
+        console.warn('[MCPIframeElement] Invalid src URL for origin detection:', src, error);
       }
     }
 
@@ -562,8 +568,11 @@ export class MCPIframeElement extends HTMLElement {
       for (const toolName of this.#registeredTools.values()) {
         try {
           modelContext.unregisterTool(toolName);
-        } catch {
-          // Ignore unregister errors during cleanup/reconnect.
+        } catch (error) {
+          console.warn(
+            `[MCPIframeElement] Failed to unregister tool "${toolName}" during cleanup:`,
+            error
+          );
         }
       }
     }
@@ -650,8 +659,8 @@ export class MCPIframeElement extends HTMLElement {
     if (this.#client) {
       try {
         await this.#client.close();
-      } catch {
-        // Ignore
+      } catch (error) {
+        console.warn('[MCPIframeElement] Error closing client during disconnect:', error);
       }
       this.#client = null;
     }
@@ -659,8 +668,8 @@ export class MCPIframeElement extends HTMLElement {
     if (this.#transport) {
       try {
         await this.#transport.close();
-      } catch {
-        // Ignore
+      } catch (error) {
+        console.warn('[MCPIframeElement] Error closing transport during disconnect:', error);
       }
       this.#transport = null;
     }
