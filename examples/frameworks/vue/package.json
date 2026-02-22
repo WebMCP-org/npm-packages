@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@mcp-b/webmcp-polyfill": "latest",
+    "@mcp-b/webmcp-polyfill": "workspace:*",
     "vue": "^3.5.25"
   },
   "devDependencies": {

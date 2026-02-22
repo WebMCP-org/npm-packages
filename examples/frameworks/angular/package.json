@@ -11,7 +11,7 @@
     "@angular/compiler": "^21.1.0",
     "@angular/core": "^21.1.0",
     "@angular/platform-browser": "^21.1.0",
-    "@mcp-b/webmcp-polyfill": "latest",
+    "@mcp-b/webmcp-polyfill": "workspace:*",
     "rxjs": "^7.8.0",
     "tslib": "^2.3.0"
   },

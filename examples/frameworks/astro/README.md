@@ -9,6 +9,14 @@ pnpm install
 pnpm dev
 ```
 
+## Standalone Usage
+
+This example uses `workspace:*` dependencies to link against the local monorepo packages. To use it outside the monorepo, replace the workspace reference in `package.json`:
+
+```json
+"@mcp-b/webmcp-polyfill": "latest"
+```
+
 ## Key File
 
 - [`src/pages/index.astro`](src/pages/index.astro) — tool registration in a client-side `<script>`
