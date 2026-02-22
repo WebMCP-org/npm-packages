@@ -56,7 +56,7 @@ jobs:
         run: pnpm build
 
       - name: Setup Chrome
-        uses: browser-actions/setup-chrome@b94431e051d1c52dcbe9a7092a4f10f827795416 # latest
+        uses: browser-actions/setup-chrome@4f8e94349a351df0f048634f25fec36c3c91eded # latest
         id: setup-chrome
         with:
           chrome-version: stable
