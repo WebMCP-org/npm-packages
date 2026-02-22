@@ -177,6 +177,12 @@ export const cliOptions = {
     default: true,
     describe: 'Set to false to exclude tools related to network.',
   },
+  includeExtensionPages: {
+    type: 'boolean',
+    describe:
+      'Include chrome-extension:// pages in page listing and tool discovery.',
+    default: false,
+  },
 } satisfies Record<string, YargsOptions>;
 
 export function parseArguments(version: string, argv = process.argv) {
