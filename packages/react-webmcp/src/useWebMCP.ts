@@ -136,14 +136,6 @@ export function useWebMCP<
   const onErrorRef = useRef(onError);
   const formatOutputRef = useRef(formatOutput);
   const isMountedRef = useRef(true);
-  const warnedRef = useRef(new Set<string>());
-  const prevConfigRef = useRef({
-    inputSchema,
-    outputSchema,
-    annotations,
-    description,
-    deps,
-  });
   // Update refs when callbacks change (doesn't trigger re-registration)
   useIsomorphicLayoutEffect(() => {
     handlerRef.current = handler;
@@ -159,46 +151,6 @@ export function useWebMCP<
       isMountedRef.current = false;
     };
   }, []);
-
-  useEffect(() => {
-    const warnOnce = (key: string, message?: string) => {
-      if (warnedRef.current.has(key)) {
-        return;
-      }
-      warnedRef.current.add(key);
-      console.warn(
-        `[useWebMCP] ${message ?? `"${key}" changed between renders. This may cause unnecessary re-registrations.`}`
-      );
-    };
-
-    const prev = prevConfigRef.current;
-
-    if (inputSchema && prev.inputSchema && prev.inputSchema !== inputSchema) {
-      warnOnce('inputSchema');
-    }
-
-    if (outputSchema && prev.outputSchema && prev.outputSchema !== outputSchema) {
-      warnOnce('outputSchema');
-    }
-
-    if (annotations && prev.annotations && prev.annotations !== annotations) {
-      warnOnce('annotations');
-    }
-
-    if (description !== prev.description) {
-      warnOnce('description');
-    }
-
-    if (
-      deps?.some(
-        (value) => (typeof value === 'object' && value !== null) || typeof value === 'function'
-      )
-    ) {
-      warnOnce('deps');
-    }
-
-    prevConfigRef.current = { inputSchema, outputSchema, annotations, description, deps };
-  }, [annotations, deps, description, inputSchema, outputSchema]);
 
   /**
    * Executes the tool handler with input validation and state management.
@@ -360,10 +312,8 @@ export function useWebMCP<
         console.warn('[ReactWebMCP:useWebMCP]', `Failed to unregister tool "${name}"`, error);
       }
     };
-    // Spread operator in dependencies: Allows users to provide additional dependencies
-    // via the `deps` parameter. While unconventional, this pattern is intentional to support
-    // dynamic dependency injection. The spread is safe because deps is validated and warned
-    // about non-primitive values earlier in this hook.
+    // Spread operator in dependencies intentionally allows consumers to trigger
+    // re-registration with custom reactive inputs.
   }, [name, description, inputSchema, outputSchema, annotations, ...(deps ?? [])]);
 
   return {
