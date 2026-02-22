@@ -141,6 +141,53 @@ describe('McpClientProvider', () => {
 
       expect(mockListResources).not.toHaveBeenCalled();
     });
+
+    it('emits tool-flow trace logs when WEBMCP_TRACE_TOOL_FLOW=1', async () => {
+      const originalDebug = console.debug;
+      const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      window.localStorage.setItem('WEBMCP_TRACE_TOOL_FLOW', '1');
+      // Force capability-missing path that emits a tool-flow event.
+      mockGetServerCapabilities.mockReturnValue({
+        resources: { listChanged: true },
+      });
+
+      try {
+        // Ensure fallback path is also safe if debug is unavailable.
+        Object.defineProperty(console, 'debug', {
+          configurable: true,
+          writable: true,
+          value: undefined,
+        });
+
+        await render(
+          <McpClientProvider {...providerProps}>
+            <div>Test</div>
+          </McpClientProvider>
+        );
+
+        await vi.waitFor(() => {
+          expect(mockConnect).toHaveBeenCalled();
+        });
+
+        await vi.waitFor(() => {
+          expect(logSpy).toHaveBeenCalledWith(
+            '[ReactWebMCP:McpClientProvider:ToolFlow]',
+            expect.stringContaining('listTools:capability_missing'),
+            expect.any(Object)
+          );
+        });
+      } finally {
+        Object.defineProperty(console, 'debug', {
+          configurable: true,
+          writable: true,
+          value: originalDebug,
+        });
+        window.localStorage.removeItem('WEBMCP_TRACE_TOOL_FLOW');
+        debugSpy.mockRestore();
+        logSpy.mockRestore();
+      }
+    });
   });
 
   describe('useMcpClient hook', () => {
@@ -256,6 +303,60 @@ describe('McpClientProvider', () => {
 
       consoleSpy.mockRestore();
     });
+
+    it('surfaces listResources fetch failures with provider logging', async () => {
+      const resourcesError = new Error('Resources unavailable');
+      mockListResources.mockRejectedValue(resourcesError);
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const wrapper = ({ children }: { children: ReactNode }) => (
+        <McpClientProvider {...providerProps}>{children}</McpClientProvider>
+      );
+
+      try {
+        const { result } = await renderHook(() => useMcpClient(), { wrapper });
+
+        await vi.waitFor(() => {
+          expect(result.current.error?.message).toBe('Resources unavailable');
+        });
+
+        expect(result.current.isConnected).toBe(true);
+        expect(consoleSpy).toHaveBeenCalledWith(
+          '[ReactWebMCP:McpClientProvider]',
+          'Error fetching resources:',
+          resourcesError
+        );
+      } finally {
+        consoleSpy.mockRestore();
+      }
+    });
+
+    it('surfaces listTools fetch failures with provider logging', async () => {
+      const toolsError = new Error('Tools unavailable');
+      mockListTools.mockRejectedValue(toolsError);
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const wrapper = ({ children }: { children: ReactNode }) => (
+        <McpClientProvider {...providerProps}>{children}</McpClientProvider>
+      );
+
+      try {
+        const { result } = await renderHook(() => useMcpClient(), { wrapper });
+
+        await vi.waitFor(() => {
+          expect(result.current.error?.message).toBe('Tools unavailable');
+        });
+
+        expect(result.current.isConnected).toBe(true);
+        expect(consoleSpy).toHaveBeenCalledWith(
+          '[ReactWebMCP:McpClientProvider]',
+          'Error fetching tools:',
+          toolsError
+        );
+      } finally {
+        consoleSpy.mockRestore();
+      }
+    });
   });
 
   describe('notification handlers', () => {
@@ -281,6 +382,72 @@ describe('McpClientProvider', () => {
       await vi.waitFor(() => {
         expect(mockSetNotificationHandler).toHaveBeenCalled();
       });
+    });
+
+    it('logs refresh errors when list_changed notifications trigger failing fetches', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      try {
+        await render(
+          <McpClientProvider {...providerProps}>
+            <div>Test</div>
+          </McpClientProvider>
+        );
+
+        await vi.waitFor(() => {
+          expect(mockSetNotificationHandler).toHaveBeenCalledTimes(2);
+        });
+
+        const resourceHandler = mockSetNotificationHandler.mock.calls[0]?.[1] as () => void;
+        const toolsHandler = mockSetNotificationHandler.mock.calls[1]?.[1] as () => void;
+        mockListResources.mockRejectedValueOnce(new Error('resource refresh failed'));
+        mockListTools.mockRejectedValueOnce(new Error('tool refresh failed'));
+
+        resourceHandler();
+        toolsHandler();
+
+        await vi.waitFor(() => {
+          expect(consoleSpy).toHaveBeenCalledWith(
+            '[ReactWebMCP:McpClientProvider]',
+            'Failed to refresh resources after list_changed:',
+            expect.any(Error)
+          );
+        });
+        await vi.waitFor(() => {
+          expect(consoleSpy).toHaveBeenCalledWith(
+            '[ReactWebMCP:McpClientProvider]',
+            'Failed to refresh tools after list_changed:',
+            expect.any(Error)
+          );
+        });
+      } finally {
+        consoleSpy.mockRestore();
+      }
+    });
+
+    it('logs post-handler refresh failures after notification handlers are registered', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      mockListTools
+        .mockResolvedValueOnce({ tools: [] })
+        .mockRejectedValueOnce(new Error('post-handler refresh failed'));
+
+      try {
+        await render(
+          <McpClientProvider {...providerProps}>
+            <div>Test</div>
+          </McpClientProvider>
+        );
+
+        await vi.waitFor(() => {
+          expect(consoleSpy).toHaveBeenCalledWith(
+            '[ReactWebMCP:McpClientProvider]',
+            'Failed to refresh tools/resources after handler registration:',
+            expect.any(Error)
+          );
+        });
+      } finally {
+        consoleSpy.mockRestore();
+      }
     });
   });
 

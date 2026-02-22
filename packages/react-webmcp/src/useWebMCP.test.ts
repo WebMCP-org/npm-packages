@@ -2,6 +2,7 @@ import { initializeWebModelContext } from '@mcp-b/global';
 import type { ModelContextTesting } from '@mcp-b/webmcp-types';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
+import { z } from 'zod';
 
 import { useWebMCP } from './useWebMCP.js';
 
@@ -121,6 +122,37 @@ describe('useWebMCP', () => {
       // The testing API returns inputSchema as a JSON string
       const inputSchema = JSON.parse(tools[0].inputSchema);
       expect(inputSchema.properties).toHaveProperty('name');
+    });
+
+    it('converts zod-like inputSchema before registration', async () => {
+      const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
+
+      try {
+        const zodSchema = { username: z.string() };
+        await renderHook(() =>
+          useWebMCP({
+            name: 'zod_like_tool',
+            description: 'Tool using zod-like schema',
+            inputSchema: zodSchema as never,
+            handler: async () => 'ok',
+          })
+        );
+
+        const descriptor = registerToolSpy.mock.calls.at(-1)?.[0] as {
+          name: string;
+          inputSchema?: {
+            type?: string;
+            properties?: Record<string, { type?: string }>;
+            required?: string[];
+          };
+        };
+        expect(descriptor.name).toBe('zod_like_tool');
+        expect(descriptor.inputSchema?.type).toBe('object');
+        expect(descriptor.inputSchema?.properties).toHaveProperty('username');
+        expect(descriptor.inputSchema?.required).toContain('username');
+      } finally {
+        registerToolSpy.mockRestore();
+      }
     });
 
     it('should unregister tool on unmount', async () => {

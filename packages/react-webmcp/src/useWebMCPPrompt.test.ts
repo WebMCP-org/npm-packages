@@ -2,6 +2,7 @@ import { initializeWebModelContext } from '@mcp-b/global';
 import type { ModelContextTesting } from '@mcp-b/webmcp-types';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
+import { z } from 'zod';
 
 import { useWebMCPPrompt } from './useWebMCPPrompt.js';
 
@@ -139,6 +140,36 @@ describe('useWebMCPPrompt', () => {
       expect(prompts[0].name).toBe('code_review');
       // Check that arguments were registered
       expect(prompts[0].arguments).toBeDefined();
+    });
+
+    it('converts zod-like argsSchema before prompt registration', async () => {
+      const registerPromptSpy = vi.spyOn(navigator.modelContext, 'registerPrompt');
+
+      try {
+        const zodSchema = { code: z.string() };
+        await renderHook(() =>
+          useWebMCPPrompt({
+            name: 'zod_args_prompt',
+            argsSchema: zodSchema as never,
+            get: async () => ({
+              messages: [{ role: 'user', content: { type: 'text', text: 'ok' } }],
+            }),
+          })
+        );
+
+        const descriptor = registerPromptSpy.mock.calls.at(-1)?.[0] as {
+          argsSchema?: {
+            type?: string;
+            properties?: Record<string, { type?: string }>;
+            required?: string[];
+          };
+        };
+        expect(descriptor.argsSchema?.type).toBe('object');
+        expect(descriptor.argsSchema?.properties).toHaveProperty('code');
+        expect(descriptor.argsSchema?.required).toContain('code');
+      } finally {
+        registerPromptSpy.mockRestore();
+      }
     });
 
     it('should unregister prompt on unmount', async () => {
