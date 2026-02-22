@@ -102,7 +102,7 @@
     "prettier": "^3.8.1",
     "puppeteer": "24.37.2",
     "puppeteer-core": "24.37.2",
-    "rollup": "4.57.1",
+    "rollup": "4.59.0",
     "rollup-plugin-cleanup": "^3.2.1",
     "rollup-plugin-license": "^3.6.0",
     "sinon": "^21.0.1",
