@@ -199,7 +199,7 @@ export function parseArguments(version: string, argv = process.argv) {
         args.wsEndpoint === undefined &&
         args.executablePath === undefined
       ) {
-        args.channel = 'dev';
+        args.channel = 'stable';
       }
       return true;
     })

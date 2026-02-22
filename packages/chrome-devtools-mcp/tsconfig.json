@@ -25,6 +25,7 @@
   },
   "include": [
     "src/**/*.ts",
+    "tests/**/*.ts",
     "node_modules/chrome-devtools-frontend/front_end/core/common",
     "node_modules/chrome-devtools-frontend/front_end/core/host",
     "node_modules/chrome-devtools-frontend/front_end/core/i18n",
@@ -67,5 +68,5 @@
     "node_modules/chrome-devtools-frontend/front_end/third_party/third-party-web",
     "node_modules/chrome-devtools-frontend/mcp"
   ],
-  "exclude": ["node_modules/chrome-devtools-frontend/**/*.test.ts", "tests/**/*"]
+  "exclude": ["node_modules/chrome-devtools-frontend/**/*.test.ts"]
 }
