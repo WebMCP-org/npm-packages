@@ -19,6 +19,8 @@ describe('cli args parsing', () => {
     categoryPerformance: true,
     'category-network': true,
     categoryNetwork: true,
+    includeExtensionPages: false,
+    'include-extension-pages': false,
   };
 
   it('parses with default args', async () => {
@@ -28,7 +30,7 @@ describe('cli args parsing', () => {
       _: [],
       headless: false,
       $0: 'npx chrome-devtools-mcp@latest',
-      channel: 'dev',
+      channel: 'stable',
     });
   });
 
@@ -62,7 +64,7 @@ describe('cli args parsing', () => {
       _: [],
       headless: false,
       $0: 'npx chrome-devtools-mcp@latest',
-      channel: 'dev',
+      channel: 'stable',
       'user-data-dir': '/tmp/chrome-profile',
       userDataDir: '/tmp/chrome-profile',
     });
@@ -83,7 +85,7 @@ describe('cli args parsing', () => {
       'browser-url': undefined,
       browserUrl: undefined,
       u: undefined,
-      channel: 'dev',
+      channel: 'stable',
     });
   });
 
@@ -117,7 +119,7 @@ describe('cli args parsing', () => {
       _: [],
       headless: false,
       $0: 'npx chrome-devtools-mcp@latest',
-      channel: 'dev',
+      channel: 'stable',
       viewport: {
         width: 888,
         height: 777,
@@ -137,7 +139,7 @@ describe('cli args parsing', () => {
       _: [],
       headless: false,
       $0: 'npx chrome-devtools-mcp@latest',
-      channel: 'dev',
+      channel: 'stable',
       'chrome-arg': ['--no-sandbox', '--disable-setuid-sandbox'],
       chromeArg: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
@@ -205,7 +207,7 @@ describe('cli args parsing', () => {
       _: [],
       headless: false,
       $0: 'npx chrome-devtools-mcp@latest',
-      channel: 'dev',
+      channel: 'stable',
       'category-emulation': false,
       categoryEmulation: false,
     });

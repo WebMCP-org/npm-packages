@@ -117,6 +117,10 @@ async function selectOption(
   }
 }
 
+function hasOptionChildren(aXNode: TextSnapshotNode) {
+  return aXNode.children.some(child => child.role === 'option');
+}
+
 async function fillFormElement(
   uid: string,
   value: string,
@@ -125,7 +129,9 @@ async function fillFormElement(
   const handle = await context.getElementByUid(uid);
   try {
     const aXNode = context.getAXNodeByUid(uid);
-    if (aXNode && aXNode.role === 'combobox') {
+    // We assume that combobox needs to be handled as select if it has
+    // role='combobox' and option children.
+    if (aXNode && aXNode.role === 'combobox' && hasOptionChildren(aXNode)) {
       await selectOption(handle, aXNode, value);
     } else {
       await handle.asLocator().fill(value);
