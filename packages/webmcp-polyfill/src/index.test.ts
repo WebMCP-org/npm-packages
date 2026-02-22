@@ -1,5 +1,5 @@
 import type { InputSchema } from '@mcp-b/webmcp-types';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   cleanupWebMCPPolyfill,
   initializeWebMCPPolyfill,
@@ -1152,6 +1152,122 @@ describe('@mcp-b/webmcp-polyfill', () => {
       await expect(
         navigator.modelContextTesting?.executeTool('throwing_tool', '{}')
       ).rejects.toThrow('Tool was executed but the invocation failed');
+    });
+
+    it('includes thrown Standard Schema validator error details', async () => {
+      initializeWebMCPPolyfill();
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      try {
+        navigator.modelContext.registerTool({
+          name: 'throwing_standard_validator_tool',
+          description: 'Throws from Standard Schema validate()',
+          inputSchema: asPolyfillInputSchema({
+            '~standard': {
+              version: 1 as const,
+              vendor: 'test',
+              validate() {
+                throw new Error('validator exploded');
+              },
+            },
+          }),
+          execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+        });
+
+        await expect(
+          navigator.modelContextTesting?.executeTool('throwing_standard_validator_tool', '{}')
+        ).rejects.toThrow('schema validation failed: validator exploded');
+
+        expect(errorSpy).toHaveBeenCalledWith(
+          '[WebMCPPolyfill] Standard Schema validation threw unexpectedly:',
+          expect.any(Error)
+        );
+      } finally {
+        errorSpy.mockRestore();
+      }
+    });
+
+    it('formats Standard Schema issue paths with object key segments', async () => {
+      initializeWebMCPPolyfill();
+
+      navigator.modelContext.registerTool({
+        name: 'standard_validator_path_tool',
+        description: 'Returns issue path in object-segment format',
+        inputSchema: asPolyfillInputSchema({
+          '~standard': {
+            version: 1 as const,
+            vendor: 'test',
+            validate() {
+              return {
+                issues: [{ message: 'invalid value', path: [{ key: 'profile' }, 'email'] }],
+              };
+            },
+          },
+        }),
+        execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+      });
+
+      await expect(
+        navigator.modelContextTesting?.executeTool('standard_validator_path_tool', '{}')
+      ).rejects.toThrow('invalid value at profile.email');
+    });
+
+    it('falls back to generic input validation error when first issue is missing', async () => {
+      initializeWebMCPPolyfill();
+
+      navigator.modelContext.registerTool({
+        name: 'standard_validator_missing_issue_tool',
+        description: 'Returns malformed issues payload',
+        inputSchema: asPolyfillInputSchema({
+          '~standard': {
+            version: 1 as const,
+            vendor: 'test',
+            validate() {
+              return {
+                issues: [undefined],
+              };
+            },
+          },
+        }),
+        execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+      });
+
+      await expect(
+        navigator.modelContextTesting?.executeTool('standard_validator_missing_issue_tool', '{}')
+      ).rejects.toThrow('Input validation error');
+    });
+
+    it('omits issue path suffix when path segments resolve to empty strings', async () => {
+      initializeWebMCPPolyfill();
+
+      navigator.modelContext.registerTool({
+        name: 'standard_validator_empty_path_tool',
+        description: 'Returns empty issue path segments',
+        inputSchema: asPolyfillInputSchema({
+          '~standard': {
+            version: 1 as const,
+            vendor: 'test',
+            validate() {
+              return {
+                issues: [{ message: 'empty path issue', path: [''] }],
+              };
+            },
+          },
+        }),
+        execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+      });
+
+      try {
+        await navigator.modelContextTesting?.executeTool(
+          'standard_validator_empty_path_tool',
+          '{}'
+        );
+        throw new Error('Expected standard_validator_empty_path_tool to fail validation');
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        expect(message).toContain('empty path issue');
+        expect(message).not.toContain(' at ');
+      }
     });
 
     it('executeTool handles tool returning isError=true with text content', async () => {

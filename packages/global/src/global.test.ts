@@ -1,6 +1,6 @@
 import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
 import type { BrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanupWebModelContext, initializeWebModelContext } from './global.js';
 
 afterEach(() => {
@@ -22,6 +22,30 @@ function createNativeModelContextStub(): Navigator['modelContext'] {
     removeEventListener: () => {},
     dispatchEvent: () => true,
   } as unknown as Navigator['modelContext'];
+}
+
+function setTestingShim(value: unknown): void {
+  testingShimDescriptorStack.push(
+    Object.getOwnPropertyDescriptor(navigator, 'modelContextTesting')
+  );
+  Object.defineProperty(navigator, 'modelContextTesting', {
+    configurable: true,
+    enumerable: true,
+    writable: true,
+    value,
+  });
+}
+
+const testingShimDescriptorStack: Array<PropertyDescriptor | undefined> = [];
+
+function clearTestingShim(): void {
+  const previousDescriptor = testingShimDescriptorStack.pop();
+  if (previousDescriptor) {
+    Object.defineProperty(navigator, 'modelContextTesting', previousDescriptor);
+    return;
+  }
+
+  delete (navigator as unknown as Record<string, unknown>).modelContextTesting;
 }
 
 describe('global adapter', () => {
@@ -154,6 +178,152 @@ describe('global adapter', () => {
     });
     expect(result.content[0]?.type).toBe('text');
     expect((result.content[0] as { text?: string }).text).toContain('pre-registered-ok');
+  });
+
+  it('backfills tools from testing shim listTools() and tolerates invalid inputSchema JSON', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const executeTool = vi.fn(async () =>
+      JSON.stringify({
+        content: [{ type: 'text', text: 'shim-ok' }],
+      })
+    );
+
+    setTestingShim({
+      listTools: () => [
+        {
+          name: 'shim_list_tool',
+          description: 'Tool sourced from listTools',
+          inputSchema: 'not-json',
+        },
+      ],
+      executeTool,
+    });
+
+    try {
+      initializeWebModelContext();
+      const modelContext = getModelContext();
+
+      expect(modelContext.listTools().map((tool) => tool.name)).toContain('shim_list_tool');
+
+      const result = await modelContext.callTool({
+        name: 'shim_list_tool',
+        arguments: { sample: true },
+      });
+      expect(result.isError).toBeFalsy();
+      expect((result.content[0] as { text?: string }).text).toContain('shim-ok');
+      expect(executeTool).toHaveBeenCalledWith('shim_list_tool', JSON.stringify({ sample: true }));
+      expect(warnSpy).toHaveBeenCalledWith(
+        '[WebMCP] Failed to parse testing inputSchema JSON:',
+        expect.any(Error)
+      );
+    } finally {
+      warnSpy.mockRestore();
+      cleanupWebModelContext();
+      clearTestingShim();
+    }
+  });
+
+  it('returns navigation interruption error when testing shim executeTool resolves null', async () => {
+    setTestingShim({
+      getRegisteredTools: () => [
+        {
+          name: 'shim_nav_tool',
+          description: 'Navigation test',
+          inputSchema: { type: 'object', properties: {} },
+        },
+      ],
+      executeTool: async () => null,
+    });
+
+    try {
+      initializeWebModelContext();
+      const modelContext = getModelContext();
+
+      const result = await modelContext.callTool({
+        name: 'shim_nav_tool',
+        arguments: {},
+      });
+
+      expect(result.isError).toBe(true);
+      expect((result.content[0] as { text?: string }).text).toContain('interrupted by navigation');
+    } finally {
+      cleanupWebModelContext();
+      clearTestingShim();
+    }
+  });
+
+  it('throws when testing shim returns invalid serialized JSON', async () => {
+    setTestingShim({
+      getRegisteredTools: () => [
+        {
+          name: 'shim_invalid_json_tool',
+          description: 'Bad JSON serialization',
+          inputSchema: { type: 'object', properties: {} },
+        },
+      ],
+      executeTool: async () => 'not-json',
+    });
+
+    try {
+      initializeWebModelContext();
+      const modelContext = getModelContext();
+
+      await expect(
+        modelContext.callTool({
+          name: 'shim_invalid_json_tool',
+          arguments: {},
+        })
+      ).rejects.toThrow('Failed to parse serialized tool response for shim_invalid_json_tool');
+    } finally {
+      cleanupWebModelContext();
+      clearTestingShim();
+    }
+  });
+
+  it('throws when testing shim returns serialized non-object payload', async () => {
+    setTestingShim({
+      getRegisteredTools: () => [
+        {
+          name: 'shim_invalid_shape_tool',
+          description: 'Bad response shape',
+          inputSchema: { type: 'object', properties: {} },
+        },
+      ],
+      executeTool: async () => JSON.stringify('not-an-object'),
+    });
+
+    try {
+      initializeWebModelContext();
+      const modelContext = getModelContext();
+
+      await expect(
+        modelContext.callTool({
+          name: 'shim_invalid_shape_tool',
+          arguments: {},
+        })
+      ).rejects.toThrow('Invalid serialized tool response for shim_invalid_shape_tool');
+    } finally {
+      cleanupWebModelContext();
+      clearTestingShim();
+    }
+  });
+
+  it('ignores testing shims without listTools/getRegisteredTools methods', () => {
+    setTestingShim({
+      executeTool: async () =>
+        JSON.stringify({
+          content: [{ type: 'text', text: 'unused' }],
+        }),
+    });
+
+    try {
+      initializeWebModelContext();
+      const modelContext = getModelContext();
+      expect(modelContext.listTools()).toEqual([]);
+    } finally {
+      cleanupWebModelContext();
+      clearTestingShim();
+    }
   });
 
   it('provideContext replaces all tools on both sides', () => {

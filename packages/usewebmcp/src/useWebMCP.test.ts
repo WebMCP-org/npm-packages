@@ -68,6 +68,26 @@ describe('useWebMCP', () => {
       expect(typeof result.current.execute).toBe('function');
       expect(typeof result.current.reset).toBe('function');
     });
+
+    it('throws when neither execute nor handler is provided', async () => {
+      let thrownError: Error | null = null;
+
+      try {
+        await renderHook(() =>
+          useWebMCP({
+            name: 'missing_impl_tool',
+            description: 'Missing implementation',
+          } as never)
+        );
+      } catch (error) {
+        thrownError = error as Error;
+      }
+
+      expect(thrownError).toBeInstanceOf(Error);
+      expect(thrownError?.message).toContain(
+        'must provide an implementation via config.execute or config.handler'
+      );
+    });
   });
 
   describe('tool registration', () => {
