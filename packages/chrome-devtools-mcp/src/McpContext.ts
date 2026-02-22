@@ -79,6 +79,18 @@ interface McpContextOptions {
   experimentalDevToolsDebugging: boolean;
   /** Whether to expose all page-like targets (including service workers). */
   experimentalIncludeAllPages?: boolean;
+  /** Whether to include chrome-extension:// pages in page listing and tool discovery. */
+  includeExtensionPages?: boolean;
+  /** Callback invoked by reconnectBrowser() to swap the browser at runtime. */
+  onReconnect?: (options: {
+    browserURL?: string;
+    wsEndpoint?: string;
+    wsHeaders?: Record<string, string>;
+    timeout?: number;
+  }) => Promise<{
+    pages: Array<{index: number; url: string; selected: boolean}>;
+    wsEndpoint: string;
+  }>;
 }
 
 /**
@@ -263,7 +275,7 @@ export class McpContext implements Context {
           const url = page.url();
           if (
             url.startsWith('chrome://') ||
-            url.startsWith('chrome-extension://') ||
+            (!this.#options.includeExtensionPages && url.startsWith('chrome-extension://')) ||
             url.startsWith('devtools://') ||
             url === 'about:blank'
           ) {
@@ -418,7 +430,7 @@ export class McpContext implements Context {
     const url = page.url();
     if (
       url.startsWith('chrome://') ||
-      url.startsWith('chrome-extension://') ||
+      (!this.#options.includeExtensionPages && url.startsWith('chrome-extension://')) ||
       url.startsWith('devtools://')
     ) {
       return;
@@ -438,7 +450,7 @@ export class McpContext implements Context {
       const newUrl = page.url();
       if (
         newUrl.startsWith('chrome://') ||
-        newUrl.startsWith('chrome-extension://') ||
+        (!this.#options.includeExtensionPages && newUrl.startsWith('chrome-extension://')) ||
         newUrl.startsWith('devtools://') ||
         newUrl === 'about:blank'
       ) {
@@ -1331,6 +1343,69 @@ export class McpContext implements Context {
         error: `Failed to connect: ${err instanceof Error ? err.message : String(err)}`,
       };
     }
+  }
+
+  /**
+   * Evaluate a JavaScript expression in a Chrome extension's background context.
+   *
+   * Supports both MV3 service workers (type "service_worker") and MV2/dev-mode
+   * background pages (type "background_page"). Uses waitForTarget to handle
+   * cases where the worker hasn't been discovered yet.
+   *
+   * @param expression - JavaScript expression to evaluate.
+   * @param extensionId - Optional extension ID. If omitted, uses the first found.
+   * @returns The result of the evaluation.
+   */
+  async evaluateInExtensionWorker(expression: string, extensionId?: string): Promise<unknown> {
+    const isExtensionBackground = (t: {type(): string; url(): string}) =>
+      (t.type() === 'service_worker' || t.type() === 'background_page') &&
+      t.url().startsWith('chrome-extension://') &&
+      (!extensionId || t.url().includes(extensionId));
+
+    // First check already-known targets
+    let target = this.browser.targets().find(isExtensionBackground);
+
+    // If not found, wait briefly for the target to appear (handles startup timing)
+    if (!target) {
+      try {
+        target = await this.browser.waitForTarget(isExtensionBackground, {timeout: 5000});
+      } catch {
+        throw new Error(
+          'No extension background target found. Ensure the extension is loaded in the browser. ' +
+            'If connecting to an existing browser, verify the extension is installed and active.',
+        );
+      }
+    }
+
+    if (target.type() === 'service_worker') {
+      const worker = await target.worker();
+      if (!worker) {
+        throw new Error('Could not attach to service worker');
+      }
+      return worker.evaluate(expression);
+    }
+
+    // background_page — get a Page handle instead
+    const page = await target.page();
+    if (!page) {
+      throw new Error('Could not attach to extension background page');
+    }
+    return page.evaluate(expression);
+  }
+
+  async reconnectBrowser(options: {
+    browserURL?: string;
+    wsEndpoint?: string;
+    wsHeaders?: Record<string, string>;
+    timeout?: number;
+  }): Promise<{
+    pages: Array<{index: number; url: string; selected: boolean}>;
+    wsEndpoint: string;
+  }> {
+    if (!this.#options.onReconnect) {
+      throw new Error('Browser reconnection is not supported in this configuration');
+    }
+    return this.#options.onReconnect(options);
   }
 
   /**

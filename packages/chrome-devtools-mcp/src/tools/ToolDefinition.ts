@@ -141,6 +141,25 @@ export type Context = Readonly<{
    *          The returned array is a new copy and can be safely modified.
    */
   getPages(): Page[];
+  /**
+   * Evaluate a JavaScript expression in a Chrome extension's background service worker.
+   * @param expression - JavaScript expression to evaluate.
+   * @param extensionId - Optional extension ID. If omitted, uses the first found.
+   */
+  evaluateInExtensionWorker(expression: string, extensionId?: string): Promise<unknown>;
+  /**
+   * Disconnect from the current browser and connect to a new one at runtime.
+   * Rebuilds the full context (McpContext, WebMCPToolHub, session window).
+   */
+  reconnectBrowser(options: {
+    browserURL?: string;
+    wsEndpoint?: string;
+    wsHeaders?: Record<string, string>;
+    timeout?: number;
+  }): Promise<{
+    pages: Array<{index: number; url: string; selected: boolean}>;
+    wsEndpoint: string;
+  }>;
 }>;
 
 export function defineTool<Schema extends zod.ZodRawShape>(

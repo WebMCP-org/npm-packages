@@ -28,10 +28,10 @@ let browser: Browser | undefined;
  *
  * @returns A filter function for Puppeteer's targetFilter option.
  */
-function makeTargetFilter(): (target: Target) => boolean {
+function makeTargetFilter(includeExtensionPages = false): (target: Target) => boolean {
   const ignoredPrefixes = new Set([
     'chrome://',
-    'chrome-extension://',
+    ...(includeExtensionPages ? [] : ['chrome-extension://']),
     'chrome-untrusted://',
   ]);
 
@@ -71,16 +71,22 @@ export async function ensureBrowserConnected(options: {
   devtools: boolean;
   channel?: Channel;
   userDataDir?: string;
+  includeExtensionPages?: boolean;
 }): Promise<Browser> {
-  const {channel} = options;
+  const {channel, includeExtensionPages} = options;
   if (browser?.connected) {
     return browser;
   }
 
   const connectOptions: Parameters<typeof puppeteer.connect>[0] = {
-    targetFilter: makeTargetFilter(),
+    targetFilter: makeTargetFilter(includeExtensionPages),
     defaultViewport: null,
     handleDevToolsAsPage: true,
+    ...(includeExtensionPages && {
+      isPageTargetCallback: (target: Target) =>
+        target.type() === 'page' ||
+        target.url().startsWith('chrome-extension://'),
+    }),
   };
 
   if (options.wsEndpoint) {
@@ -209,6 +215,8 @@ interface McpLaunchOptions {
   args?: string[];
   /** Whether to auto-open DevTools for each tab. */
   devtools: boolean;
+  /** Whether to include chrome-extension:// pages in target filtering. */
+  includeExtensionPages?: boolean;
 }
 
 /**
@@ -280,7 +288,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   try {
     const browser = await puppeteer.launch({
       channel: puppeteerChannel,
-      targetFilter: makeTargetFilter(),
+      targetFilter: makeTargetFilter(options.includeExtensionPages),
       executablePath,
       defaultViewport: null,
       userDataDir,
@@ -289,6 +297,12 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
       args,
       acceptInsecureCerts: options.acceptInsecureCerts,
       handleDevToolsAsPage: true,
+      ...(options.includeExtensionPages && {
+        enableExtensions: true,
+        isPageTargetCallback: (target: {type: string; url?: string}) =>
+          target.type === 'page' ||
+          target.url?.startsWith('chrome-extension://') === true,
+      }),
     });
     if (options.logFile) {
       // FIXME: we are probably subscribing too late to catch startup logs. We
@@ -333,6 +347,61 @@ export async function ensureBrowserLaunched(
     return browser;
   }
   browser = await launch(options);
+  return browser;
+}
+
+/**
+ * Disconnect from the current browser without killing the process.
+ * Clears the cached browser reference so future calls can connect to a new instance.
+ */
+export function disconnectBrowser(): void {
+  if (browser) {
+    try {
+      browser.disconnect();
+    } catch {
+      // Ignore disconnect errors — browser may already be gone
+    }
+    browser = undefined;
+  }
+}
+
+/**
+ * Connect to a new browser instance, replacing the cached reference.
+ *
+ * @param options - Connection options (browserURL or wsEndpoint).
+ * @returns Connected browser instance.
+ */
+export async function connectToNewBrowser(options: {
+  browserURL?: string;
+  wsEndpoint?: string;
+  wsHeaders?: Record<string, string>;
+  includeExtensionPages?: boolean;
+}): Promise<Browser> {
+  const connectOptions: Parameters<typeof puppeteer.connect>[0] = {
+    targetFilter: makeTargetFilter(options.includeExtensionPages),
+    defaultViewport: null,
+    handleDevToolsAsPage: true,
+    ...(options.includeExtensionPages && {
+      isPageTargetCallback: (target: Target) =>
+        target.type() === 'page' ||
+        target.url().startsWith('chrome-extension://'),
+    }),
+  };
+
+  if (options.wsEndpoint) {
+    connectOptions.browserWSEndpoint = options.wsEndpoint;
+    if (options.wsHeaders) {
+      connectOptions.headers = options.wsHeaders;
+    }
+  } else if (options.browserURL) {
+    connectOptions.browserURL = options.browserURL;
+  } else {
+    throw new Error('Either browserURL or wsEndpoint must be provided');
+  }
+
+  logger('Connecting Puppeteer to new browser:', JSON.stringify(connectOptions));
+  browser = await puppeteer.connect(connectOptions);
+  logger('Connected to new browser');
   return browser;
 }
 

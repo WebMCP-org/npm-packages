@@ -9,7 +9,7 @@ import process from 'node:process';
 import './polyfill.js';
 
 import type {Channel} from './browser.js';
-import {ensureBrowserConnected, ensureBrowserLaunched} from './browser.js';
+import {connectToNewBrowser, disconnectBrowser, ensureBrowserConnected, ensureBrowserLaunched} from './browser.js';
 import {parseArguments} from './cli.js';
 import {loadIssueDescriptions} from './issue-descriptions.js';
 import {logger, saveLogsToFile} from './logger.js';
@@ -131,6 +131,7 @@ async function getContext(): Promise<McpContext> {
       devtools,
       channel: undefined,
       userDataDir: args.userDataDir,
+      includeExtensionPages: args.includeExtensionPages,
     });
   }
   // If autoConnect is true, try connecting first, then fall back to launching
@@ -144,6 +145,7 @@ async function getContext(): Promise<McpContext> {
         devtools,
         channel: args.channel as Channel,
         userDataDir: args.userDataDir,
+        includeExtensionPages: args.includeExtensionPages,
       });
       logger('Successfully connected to running browser instance');
     } catch (err) {
@@ -159,6 +161,7 @@ async function getContext(): Promise<McpContext> {
         args: extraArgs,
         acceptInsecureCerts: args.acceptInsecureCerts,
         devtools,
+        includeExtensionPages: args.includeExtensionPages,
       });
       wasLaunched = true;
     }
@@ -176,6 +179,7 @@ async function getContext(): Promise<McpContext> {
       args: extraArgs,
       acceptInsecureCerts: args.acceptInsecureCerts,
       devtools,
+      includeExtensionPages: args.includeExtensionPages,
     });
     wasLaunched = true;
   }
@@ -184,6 +188,8 @@ async function getContext(): Promise<McpContext> {
     context = await McpContext.from(browser, logger, {
       experimentalDevToolsDebugging: devtools,
       experimentalIncludeAllPages: args.experimentalIncludeAllPages,
+      includeExtensionPages: args.includeExtensionPages,
+      onReconnect,
     });
 
     if (wasLaunched) {
@@ -231,6 +237,96 @@ async function getContext(): Promise<McpContext> {
     logger('WebMCPToolHub initialized for dynamic tool registration');
   }
   return context;
+}
+
+/**
+ * Reconnect callback invoked by the connect_to_browser tool.
+ *
+ * Tears down the current browser session and connects to a new browser,
+ * rebuilding all infrastructure (McpContext, WebMCPToolHub, session window).
+ * Retries connection with exponential backoff for browsers that are still starting.
+ */
+async function onReconnect(options: {
+  browserURL?: string;
+  wsEndpoint?: string;
+  wsHeaders?: Record<string, string>;
+  timeout?: number;
+}): Promise<{
+  pages: Array<{index: number; url: string; selected: boolean}>;
+  wsEndpoint: string;
+}> {
+  const timeout = options.timeout ?? 30_000;
+  const retryInterval = 2_000;
+  const devtools = args.experimentalDevtools ?? false;
+
+  // 1. Tear down old session
+  if (context) {
+    try {
+      await context.closeSessionWindow();
+    } catch (err) {
+      logger('Error closing session window during reconnect:', err);
+    }
+    context.dispose();
+  }
+  disconnectBrowser();
+
+  // 2. Retry loop to connect to new browser
+  const deadline = Date.now() + timeout;
+  let lastError: Error | undefined;
+
+  while (Date.now() < deadline) {
+    try {
+      const newBrowser = await connectToNewBrowser({
+        browserURL: options.browserURL,
+        wsEndpoint: options.wsEndpoint,
+        wsHeaders: options.wsHeaders,
+        includeExtensionPages: args.includeExtensionPages,
+      });
+
+      // 3. Rebuild context
+      context = await McpContext.from(newBrowser, logger, {
+        experimentalDevToolsDebugging: devtools,
+        experimentalIncludeAllPages: args.experimentalIncludeAllPages,
+        includeExtensionPages: args.includeExtensionPages,
+        onReconnect,
+      });
+
+      // 4. Create session window
+      const {windowId} = await context.newWindow();
+      context.setSessionWindowId(windowId);
+      logger(`Reconnect: new session window ${windowId}`);
+
+      // 5. Rebuild tool hub
+      const toolHub = new WebMCPToolHub(server, context);
+      context.setToolHub(toolHub);
+      logger('Reconnect: WebMCPToolHub rebuilt');
+
+      // 6. Build response
+      const pages = context.getPages().map((page, index) => ({
+        index,
+        url: page.url(),
+        selected: context.isPageSelected(page),
+      }));
+
+      const wsEndpoint = newBrowser.wsEndpoint();
+
+      return {pages, wsEndpoint};
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      logger(`Reconnect attempt failed: ${lastError.message}`);
+
+      const remaining = deadline - Date.now();
+      if (remaining > retryInterval) {
+        await new Promise(resolve => setTimeout(resolve, retryInterval));
+      } else {
+        break;
+      }
+    }
+  }
+
+  throw new Error(
+    `Failed to connect to browser after ${timeout}ms: ${lastError?.message ?? 'unknown error'}`,
+  );
 }
 
 /**
@@ -300,7 +396,11 @@ function registerTool(tool: ToolDefinition): void {
           response,
           context,
         );
-        const content = await response.handle(tool.name, context);
+        // Re-fetch context in case the handler swapped it (e.g. connect_to_browser).
+        // The local `const context` shadows the module-level `let context`, so we
+        // must call getContext() to pick up any reassignment by onReconnect.
+        const activeContext = await getContext();
+        const content = await response.handle(tool.name, activeContext);
         const result: CallToolResult = {
           content,
         };
