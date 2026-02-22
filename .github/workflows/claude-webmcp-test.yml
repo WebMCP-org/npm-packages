@@ -82,24 +82,24 @@ jobs:
 
       - name: Create MCP Config
         run: |
-          cat > /tmp/chrome-devtools-mcp-config.json << EOF
-          {
-            "mcpServers": {
-              "chrome-devtools": {
-                "command": "node",
-                "args": [
-                  "${{ github.workspace }}/packages/chrome-devtools-mcp/build/src/index.js",
-                  "--executable-path",
-                  "${{ steps.setup-chrome.outputs.chrome-path }}",
-                  "--no-auto-connect",
-                  "--headless",
-                  "--isolated",
-                  "--viewport=1280x720"
-                ]
+          node -e "
+            const config = {
+              mcpServers: {
+                'chrome-devtools': {
+                  command: 'node',
+                  args: [
+                    '${{ github.workspace }}/packages/chrome-devtools-mcp/build/src/index.js',
+                    '--executable-path',
+                    '${{ steps.setup-chrome.outputs.chrome-path }}',
+                    '--headless',
+                    '--isolated',
+                    '--viewport=1280x720'
+                  ]
+                }
               }
-            }
-          }
-          EOF
+            };
+            require('fs').writeFileSync('/tmp/chrome-devtools-mcp-config.json', JSON.stringify(config, null, 2));
+          "
           echo "Generated MCP config:"
           cat /tmp/chrome-devtools-mcp-config.json
           echo ""

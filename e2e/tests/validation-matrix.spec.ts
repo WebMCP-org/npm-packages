@@ -77,6 +77,118 @@ for (const app of apps) {
           await expect(logsOrTools.first()).toBeVisible({ timeout: 10000 });
         }
       });
+
+      if (app.name === 'react18-zod3') {
+        test('should execute realistic Zod validation flows through UI', async ({ page }) => {
+          await page.getByRole('button', { name: 'Valid User' }).click();
+          await expect(page.locator('.log')).toContainText('Validated: testuser');
+
+          await page.getByRole('button', { name: 'Test Invalid Email' }).click();
+          await expect(page.locator('.log')).toContainText(
+            /not-an-email|Invalid email rejected as expected/
+          );
+
+          await page.getByRole('button', { name: 'Test Age Too Low' }).click();
+          await expect(page.locator('.log')).toContainText(
+            /age=15|Age too low rejected as expected/
+          );
+        });
+      }
+
+      if (app.name === 'react-webmcp-test-app') {
+        test('should execute real MCP client tool calls and surface validation errors', async ({
+          page,
+        }) => {
+          await expect
+            .poll(async () => {
+              return page.evaluate(() => Boolean((window as { mcpClient?: unknown }).mcpClient));
+            })
+            .toBe(true);
+
+          const validCall = await page.evaluate(async () => {
+            const client = (
+              window as Window & { mcpClient?: { callTool: (req: unknown) => Promise<unknown> } }
+            ).mcpClient;
+            if (!client) {
+              throw new Error('mcpClient missing');
+            }
+            const response = (await client.callTool({
+              name: 'counter_increment',
+              arguments: { amount: 2 },
+            })) as {
+              isError?: boolean;
+              content?: Array<{ type?: string; text?: string }>;
+            };
+
+            const text =
+              response.content?.find(
+                (item) => item.type === 'text' && typeof item.text === 'string'
+              )?.text ?? '';
+            return {
+              isError: Boolean(response.isError),
+              text,
+            };
+          });
+
+          expect(validCall.isError).toBe(false);
+          expect(validCall.text).toContain('"counter": 2');
+          await expect(page.locator('[data-testid="counter-display"]')).toContainText('2');
+
+          const invalidCall = await page.evaluate(async () => {
+            const client = (
+              window as Window & { mcpClient?: { callTool: (req: unknown) => Promise<unknown> } }
+            ).mcpClient;
+            if (!client) {
+              return {
+                threw: true,
+                isError: true,
+                message: 'mcpClient missing',
+              };
+            }
+
+            try {
+              const response = (await client.callTool({
+                name: 'counter_increment',
+                arguments: { amount: 'bad-input' },
+              })) as {
+                isError?: boolean;
+                content?: Array<{ type?: string; text?: string }>;
+              };
+
+              return {
+                threw: false,
+                isError: Boolean(response.isError),
+                message:
+                  response.content?.find(
+                    (item) => item.type === 'text' && typeof item.text === 'string'
+                  )?.text ?? '',
+              };
+            } catch (error) {
+              return {
+                threw: true,
+                isError: true,
+                message: error instanceof Error ? error.message : String(error),
+              };
+            }
+          });
+
+          expect(invalidCall.threw || invalidCall.isError).toBe(true);
+          if (invalidCall.message) {
+            expect(invalidCall.message.toLowerCase()).toMatch(/invalid|number|error/);
+          }
+
+          const eventTypes = await page.evaluate(() => {
+            const log = (window as { mcpEventLog?: { getEvents: () => Array<{ type: string }> } })
+              .mcpEventLog;
+            return (log?.getEvents() ?? []).map((event) => event.type);
+          });
+
+          expect(eventTypes).toContain('tool_call');
+          expect(eventTypes.some((type) => type === 'tool_result' || type === 'tool_error')).toBe(
+            true
+          );
+        });
+      }
     } else {
       // Vanilla JS apps (IIFE and ESM)
       test('should show modelContext available', async ({ page }) => {
@@ -154,6 +266,17 @@ for (const app of apps) {
 
         // Final status should indicate completion
         await expect(status).toContainText('completed', { timeout: 15000 });
+      });
+
+      test('should keep explicit invalid-input outcome markers', async ({ page }) => {
+        await page.waitForSelector('#results', { timeout: 10000 });
+        const resultsText = await page.locator('#results').textContent();
+
+        const hasInvalidOutcomeMarker =
+          resultsText?.includes('FAILED (should reject)') ||
+          resultsText?.includes('PASSED (rejected)');
+        expect(hasInvalidOutcomeMarker).toBe(true);
+        expect(resultsText).not.toContain('Valid input: FAILED');
       });
     }
   });
