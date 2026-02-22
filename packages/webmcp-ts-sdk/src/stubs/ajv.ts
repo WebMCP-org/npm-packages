@@ -12,8 +12,6 @@
  */
 
 export class Ajv {
-  constructor(_opts?: unknown) {}
-
   compile(_schema: unknown): never {
     throw new Error(
       '[WebMCP] Ajv stub was invoked. This indicates the MCP SDK is bypassing ' +
