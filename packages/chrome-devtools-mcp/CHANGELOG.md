@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.2
+
+### Patch Changes
+
+- ada35ea: Auto-connect now checks Chrome's default profile directory for DevToolsActivePort before the MCP cache directory. This enables connecting to a user's existing Chrome instance when remote debugging is enabled via chrome://inspect/#remote-debugging (Chrome 144+), with no extra CLI flags needed.
+
 ## 2.0.0
 
 ### Major Changes
