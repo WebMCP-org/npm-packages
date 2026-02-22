@@ -21,6 +21,73 @@ import {puppeteer} from './third_party/index.js';
 let browser: Browser | undefined;
 
 /**
+ * Get Chrome's default user data directory for the given platform and channel.
+ *
+ * @returns The platform-specific path to Chrome's user data directory.
+ */
+function getChromeDefaultUserDataDir(channel: Channel = 'stable'): string {
+  const platform = os.platform();
+  if (platform === 'darwin') {
+    const suffix =
+      channel === 'stable'
+        ? ''
+        : ` ${channel.charAt(0).toUpperCase() + channel.slice(1)}`;
+    return path.join(
+      os.homedir(),
+      'Library',
+      'Application Support',
+      'Google',
+      `Chrome${suffix}`,
+    );
+  }
+  if (platform === 'win32') {
+    const appData = process.env.LOCALAPPDATA ?? path.join(os.homedir(), 'AppData', 'Local');
+    const suffix =
+      channel === 'stable'
+        ? ''
+        : ` ${channel.charAt(0).toUpperCase() + channel.slice(1)}`;
+    return path.join(appData, 'Google', `Chrome${suffix}`, 'User Data');
+  }
+  // Linux
+  const channelSuffix =
+    channel === 'stable'
+      ? ''
+      : channel === 'beta'
+        ? '-beta'
+        : '-unstable';
+  return path.join(os.homedir(), '.config', `google-chrome${channelSuffix}`);
+}
+
+/**
+ * Try to read a WebSocket endpoint from a DevToolsActivePort file.
+ *
+ * @param userDataDir - Directory containing the DevToolsActivePort file.
+ * @returns The WebSocket endpoint URL, or undefined if the file doesn't exist or is invalid.
+ */
+function readDevToolsActivePort(
+  userDataDir: string,
+): string | undefined {
+  const portPath = path.join(userDataDir, 'DevToolsActivePort');
+  try {
+    const fileContent = fs.readFileSync(portPath, 'utf8');
+    const [rawPort, rawPath] = fileContent
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => !!line);
+    if (!rawPort || !rawPath) {
+      return undefined;
+    }
+    const port = parseInt(rawPort, 10);
+    if (isNaN(port) || port <= 0 || port > 65535) {
+      return undefined;
+    }
+    return `ws://127.0.0.1:${port}${rawPath}`;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Create a target filter for Puppeteer that excludes internal Chrome pages.
  *
  * Includes new tab and inspect pages (may be the only user-accessible page),
@@ -99,73 +166,76 @@ export async function ensureBrowserConnected(options: {
   } else if (channel || options.userDataDir) {
     const userDataDir = options.userDataDir;
     if (userDataDir) {
-      // TODO: re-expose this logic via Puppeteer.
-      const portPath = path.join(userDataDir, 'DevToolsActivePort');
-      try {
-        const fileContent = await fs.promises.readFile(portPath, 'utf8');
-        const [rawPort, rawPath] = fileContent
-          .split('\n')
-          .map(line => {
-            return line.trim();
-          })
-          .filter(line => {
-            return !!line;
-          });
-        if (!rawPort || !rawPath) {
-          throw new Error(`Invalid DevToolsActivePort '${fileContent}' found`);
-        }
-        const port = parseInt(rawPort, 10);
-        if (isNaN(port) || port <= 0 || port > 65535) {
-          throw new Error(`Invalid port '${rawPort}' found`);
-        }
-        const browserWSEndpoint = `ws://127.0.0.1:${port}${rawPath}`;
-        connectOptions.browserWSEndpoint = browserWSEndpoint;
-      } catch (error) {
+      // Explicit user data dir provided
+      const wsEndpoint = readDevToolsActivePort(userDataDir);
+      if (wsEndpoint) {
+        connectOptions.browserWSEndpoint = wsEndpoint;
+      } else {
         throw new Error(
           `Could not connect to Chrome in ${userDataDir}. Check if Chrome is running and remote debugging is enabled.`,
-          {
-            cause: error,
-          },
         );
       }
     } else {
       if (!channel) {
         throw new Error('Channel must be provided if userDataDir is missing');
       }
-      // Derive the default userDataDir from the channel (same as launch does)
+      // Collect candidate WebSocket endpoints from multiple directories.
+      // Try each one in order — stale DevToolsActivePort files are common,
+      // so we attempt the actual connection before moving to the next.
       const profileDirName =
         channel && channel !== 'stable'
           ? `chrome-profile-${channel}`
           : 'chrome-profile';
-      const derivedUserDataDir = path.join(
+      const mcpUserDataDir = path.join(
         os.homedir(),
         '.cache',
         'chrome-devtools-mcp',
         profileDirName,
       );
-      // Try to read DevToolsActivePort from the derived userDataDir
-      const portPath = path.join(derivedUserDataDir, 'DevToolsActivePort');
-      try {
-        const fileContent = await fs.promises.readFile(portPath, 'utf8');
-        const [rawPort, rawPath] = fileContent
-          .split('\n')
-          .map(line => line.trim())
-          .filter(line => !!line);
-        if (!rawPort || !rawPath) {
-          throw new Error(`Invalid DevToolsActivePort '${fileContent}' found`);
-        }
-        const port = parseInt(rawPort, 10);
-        if (isNaN(port) || port <= 0 || port > 65535) {
-          throw new Error(`Invalid port '${rawPort}' found`);
-        }
-        const browserWSEndpoint = `ws://127.0.0.1:${port}${rawPath}`;
-        connectOptions.browserWSEndpoint = browserWSEndpoint;
-      } catch (error) {
+      const chromeUserDataDir = getChromeDefaultUserDataDir(channel);
+
+      // Chrome's default profile is checked first — this is the user's
+      // real browser with remote debugging enabled via chrome://inspect.
+      // The MCP cache dir is checked second as a fallback for instances
+      // launched by the MCP server itself.
+      const candidates: Array<{dir: string; wsEndpoint: string}> = [];
+      const chromeWsEndpoint = readDevToolsActivePort(chromeUserDataDir);
+      if (chromeWsEndpoint) {
+        candidates.push({dir: chromeUserDataDir, wsEndpoint: chromeWsEndpoint});
+      }
+      const mcpWsEndpoint = readDevToolsActivePort(mcpUserDataDir);
+      if (mcpWsEndpoint) {
+        candidates.push({dir: mcpUserDataDir, wsEndpoint: mcpWsEndpoint});
+      }
+
+      if (candidates.length === 0) {
         throw new Error(
-          `Could not connect to Chrome ${channel} channel in ${derivedUserDataDir}. Check if Chrome is running and was launched with remote debugging enabled.`,
-          {cause: error},
+          `Could not connect to Chrome ${channel} channel. Checked ${mcpUserDataDir} and ${chromeUserDataDir}. Ensure Chrome is running with remote debugging enabled (chrome://inspect/#remote-debugging).`,
         );
       }
+
+      // Try each candidate endpoint, returning the first that connects
+      for (const candidate of candidates) {
+        try {
+          logger(
+            `Trying DevToolsActivePort from ${candidate.dir}: ${candidate.wsEndpoint}`,
+          );
+          browser = await puppeteer.connect({
+            ...connectOptions,
+            browserWSEndpoint: candidate.wsEndpoint,
+          });
+          logger(`Connected via ${candidate.dir}`);
+          return browser;
+        } catch (err) {
+          logger(
+            `Failed to connect via ${candidate.dir}: ${(err as Error).message}`,
+          );
+        }
+      }
+
+      throw new Error(
+        `Could not connect to Chrome ${channel} channel. Tried ${candidates.map(c => c.dir).join(' and ')}. Ensure Chrome is running with remote debugging enabled (chrome://inspect/#remote-debugging).`,
+      );
     }
   } else {
     throw new Error(
