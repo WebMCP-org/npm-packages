@@ -1,6 +1,6 @@
 {
   "name": "usewebmcp",
-  "version": "0.1.1",
+  "version": "0.4.0",
   "description": "Standalone React hooks for strict core WebMCP tool registration with navigator.modelContext",
   "keywords": [
     "mcp",
