@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {readFile} from 'node:fs/promises';
+
 import {zod} from '../third_party/index.js';
 import type {Frame, JSHandle, Page} from '../third_party/index.js';
 
@@ -12,15 +14,21 @@ import {defineTool} from './ToolDefinition.js';
 
 export const evaluateScript = defineTool({
   name: 'evaluate_script',
-  description: `Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON
-so returned values have to JSON-serializable.`,
+  description: `Evaluate a JavaScript function or inject a script file into the currently selected page.
+
+When \`function\` is provided, evaluates it and returns the result as JSON (values must be JSON-serializable).
+When \`filePath\` is provided, reads the file from disk and injects it as a <script> tag (useful for large scripts like polyfills that are too big to pass inline).
+Exactly one of \`function\` or \`filePath\` must be provided.`,
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
   },
   schema: {
-    function: zod.string().describe(
-      `A JavaScript function declaration to be executed by the tool in the currently selected page.
+    function: zod
+      .string()
+      .optional()
+      .describe(
+        `A JavaScript function declaration to be executed by the tool in the currently selected page.
 Example without arguments: \`() => {
   return document.title
 }\` or \`async () => {
@@ -30,7 +38,13 @@ Example with arguments: \`(el) => {
   return el.innerText;
 }\`
 `,
-    ),
+      ),
+    filePath: zod
+      .string()
+      .optional()
+      .describe(
+        'Absolute path to a local JavaScript file to inject into the page via <script> tag. The file is read server-side so there are no size limits or CSP/mixed-content restrictions. Use this for large scripts (polyfills, bundled tools, etc).',
+      ),
     args: zod
       .array(
         zod.object({
@@ -42,9 +56,34 @@ Example with arguments: \`(el) => {
         }),
       )
       .optional()
-      .describe(`An optional list of arguments to pass to the function.`),
+      .describe(
+        `An optional list of arguments to pass to the function. Only used with \`function\`, not \`filePath\`.`,
+      ),
   },
   handler: async (request, response, context) => {
+    const {filePath} = request.params;
+
+    // File injection mode
+    if (filePath) {
+      if (request.params.function) {
+        throw new Error(
+          'Provide either `function` or `filePath`, not both.',
+        );
+      }
+      const content = await readFile(filePath, 'utf-8');
+      const page = context.getSelectedPage();
+      await page.addScriptTag({content});
+      response.appendResponseLine(
+        `Injected script from \`${filePath}\` (${content.length} bytes) into page.`,
+      );
+      return;
+    }
+
+    // Function evaluation mode (original behavior)
+    if (!request.params.function) {
+      throw new Error('Either `function` or `filePath` must be provided.');
+    }
+
     const args: Array<JSHandle<unknown>> = [];
     try {
       const frames = new Set<Frame>();
