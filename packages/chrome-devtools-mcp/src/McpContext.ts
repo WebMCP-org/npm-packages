@@ -188,6 +188,7 @@ export class McpContext implements Context {
   #networkConditionsMap = new WeakMap<Page, string>();
   #cpuThrottlingRateMap = new WeakMap<Page, number>();
   #geolocationMap = new WeakMap<Page, GeolocationOptions>();
+  #bypassCSPMap = new WeakMap<Page, boolean>();
   #dialog?: Dialog;
 
   #nextSnapshotId = 1;
@@ -788,6 +789,21 @@ export class McpContext implements Context {
   getGeolocation(): GeolocationOptions | null {
     const page = this.getSelectedPage();
     return this.#geolocationMap.get(page) ?? null;
+  }
+
+  async setBypassCSP(enabled: boolean): Promise<void> {
+    const page = this.getSelectedPage();
+    await page.setBypassCSP(enabled);
+    if (enabled) {
+      this.#bypassCSPMap.set(page, true);
+    } else {
+      this.#bypassCSPMap.delete(page);
+    }
+  }
+
+  getBypassCSP(): boolean {
+    const page = this.getSelectedPage();
+    return this.#bypassCSPMap.get(page) ?? false;
   }
 
   setIsRunningPerformanceTrace(x: boolean): void {

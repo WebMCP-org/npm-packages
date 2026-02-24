@@ -105,6 +105,7 @@ export type Context = Readonly<{
   setNetworkConditions(conditions: string | null): void;
   setCpuThrottlingRate(rate: number): void;
   setGeolocation(geolocation: GeolocationOptions | null): void;
+  setBypassCSP(enabled: boolean): Promise<void>;
   saveTemporaryFile(
     data: Uint8Array<ArrayBufferLike>,
     mimeType: 'image/png' | 'image/jpeg' | 'image/webp',

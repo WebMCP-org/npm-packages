@@ -123,6 +123,12 @@ export const navigatePage = defineTool({
       .boolean()
       .optional()
       .describe('Whether to ignore cache on reload.'),
+    bypassCSP: zod
+      .boolean()
+      .optional()
+      .describe(
+        'Bypass Content-Security-Policy on the page. Useful for injecting scripts into third-party sites during development.',
+      ),
     ...timeoutSchema,
   },
   handler: async (request, response, context) => {
@@ -130,6 +136,10 @@ export const navigatePage = defineTool({
     const options = {
       timeout: request.params.timeout,
     };
+
+    if (request.params.bypassCSP !== undefined) {
+      await context.setBypassCSP(request.params.bypassCSP);
+    }
 
     if (!request.params.type && !request.params.url) {
       throw new Error('Either URL or a type is required.');
