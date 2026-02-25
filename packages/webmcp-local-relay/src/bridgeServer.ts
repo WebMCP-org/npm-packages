@@ -170,7 +170,11 @@ export class RelayBridgeServer extends EventEmitter {
     for (const socket of this.socketByConnectionId.values()) {
       try {
         socket.close(1001, 'Relay shutting down');
-      } catch {}
+      } catch (err) {
+        process.stderr.write(
+          `[webmcp-local-relay] warn: error closing socket during shutdown: ${err instanceof Error ? err.message : String(err)}\n`
+        );
+      }
     }
 
     this.socketByConnectionId.clear();

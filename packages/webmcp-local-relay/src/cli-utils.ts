@@ -41,13 +41,10 @@ export function parseCliOptions(argv: string[]): CliOptions {
       const raw = readFlagValue(token, i);
       i += 1;
       const value = Number.parseInt(raw, 10);
-      if (Number.isFinite(value) && value > 0 && value <= 65535) {
-        options.port = value;
-      } else {
-        process.stderr.write(
-          `[webmcp-local-relay] warn: invalid port "${raw}", using default ${options.port}\n`
-        );
+      if (!Number.isFinite(value) || value <= 0 || value > 65535) {
+        throw new Error(`Invalid port "${raw}". Port must be a number between 1 and 65535.`);
       }
+      options.port = value;
       continue;
     }
 

@@ -29,27 +29,16 @@ describe('parseCliOptions', () => {
     expect(options.port).toBe(4000);
   });
 
-  it('warns and keeps default for invalid port', () => {
-    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
-    const options = parseCliOptions(['--port', 'abc']);
-    expect(options.port).toBe(9333);
-    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining('invalid port'));
-    stderrSpy.mockRestore();
+  it('throws for invalid port', () => {
+    expect(() => parseCliOptions(['--port', 'abc'])).toThrow('Invalid port "abc"');
   });
 
-  it('warns and keeps default for out-of-range port', () => {
-    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
-    const options = parseCliOptions(['--port', '99999']);
-    expect(options.port).toBe(9333);
-    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining('invalid port'));
-    stderrSpy.mockRestore();
+  it('throws for out-of-range port', () => {
+    expect(() => parseCliOptions(['--port', '99999'])).toThrow('Invalid port "99999"');
   });
 
-  it('warns and keeps default for zero port', () => {
-    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
-    const options = parseCliOptions(['--port', '0']);
-    expect(options.port).toBe(9333);
-    stderrSpy.mockRestore();
+  it('throws for zero port', () => {
+    expect(() => parseCliOptions(['--port', '0'])).toThrow('Invalid port "0"');
   });
 
   it('throws when negative port value looks like a flag', () => {
