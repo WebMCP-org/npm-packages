@@ -26,6 +26,7 @@ pnpm publish --access public --no-git-checks
 | `@mcp-b/react-webmcp` | React hooks for MCP |
 | `@mcp-b/chrome-devtools-mcp` | Chrome DevTools MCP server |
 | `@mcp-b/extension-tools` | Chrome Extension API tools |
+| `@mcp-b/webmcp-local-relay` | Local MCP relay for browser WebMCP tools |
 | `usewebmcp` | Alias for @mcp-b/react-webmcp |
 
 ## NPM Authentication
@@ -165,6 +166,56 @@ npm view @mcp-b/<package>@<version> dist.tarball | xargs curl -sL | tar -tzf - |
 # Test the package works
 npx @mcp-b/chrome-devtools-mcp@latest --help
 ```
+
+## MCPB Bundles (Claude Desktop Extensions)
+
+Some packages ship as `.mcpb` bundles for one-click Claude Desktop installation. These are ZIP archives built with `@anthropic-ai/mcpb`.
+
+### Which packages have MCPB bundles?
+
+| Package | Bundle |
+|---------|--------|
+| `@mcp-b/webmcp-local-relay` | `webmcp-local-relay-<version>.mcpb` |
+
+### Automated (CI)
+
+MCPB bundles are built and uploaded automatically in the Release workflow (`.github/workflows/changesets.yml`). When changesets publishes a package that has `build:mcpb` script, CI:
+
+1. Runs `pnpm run build:mcpb` in the package directory
+2. Uploads the `.mcpb` file to the GitHub release created by changesets
+
+Users download from the [Releases](https://github.com/WebMCP-org/npm-packages/releases) page.
+
+### Manual (Local)
+
+```bash
+cd packages/webmcp-local-relay
+pnpm run build:mcpb
+# Output: webmcp-local-relay-<version>.mcpb
+
+# Upload to an existing release
+gh release upload "@mcp-b/webmcp-local-relay@<version>" webmcp-local-relay-<version>.mcpb
+```
+
+### Adding MCPB to a new package
+
+1. Create `manifest.json` (see `packages/webmcp-local-relay/manifest.json` for reference)
+2. Create `scripts/build-mcpb.sh` build script
+3. Create `.mcpbignore` to exclude dev files
+4. Add `"build:mcpb": "bash scripts/build-mcpb.sh"` to package.json scripts
+5. Add the package name to the `MCPB_PACKAGES` array in `.github/workflows/changesets.yml`
+
+### Key files
+
+| File | Purpose |
+|------|---------|
+| `manifest.json` | MCPB extension metadata, server config, user-facing settings |
+| `scripts/build-mcpb.sh` | Stages files, resolves catalog deps, packs with `mcpb` CLI |
+| `.mcpbignore` | Excludes dev files from bundle (like `.npmignore`) |
+
+### Catalog dependency resolution
+
+The MCPB build resolves pnpm `catalog:` references to real versions before `npm install` in the staging directory. If you add a new `catalog:` dependency, update the catalog map in `scripts/build-mcpb.sh`.
 
 ## Troubleshooting Checklist
 

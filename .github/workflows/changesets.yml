@@ -80,6 +80,48 @@ jobs:
           path: ./sbom.spdx.json
           retention-days: 90
 
+      - name: Build and upload MCPB bundles
+        if: steps.changesets.outputs.published == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PACKAGES='${{ steps.changesets.outputs.publishedPackages }}'
+
+          # List of packages that produce .mcpb bundles
+          MCPB_PACKAGES=("@mcp-b/webmcp-local-relay")
+
+          echo "$PACKAGES" | jq -c '.[]' | while read -r pkg; do
+            PKG_NAME=$(echo "$pkg" | jq -r '.name')
+            PKG_VERSION=$(echo "$pkg" | jq -r '.version')
+
+            # Check if this package has an MCPB build
+            for MCPB_PKG in "${MCPB_PACKAGES[@]}"; do
+              if [ "$PKG_NAME" = "$MCPB_PKG" ]; then
+                # Derive the package directory from the scoped name
+                PKG_DIR="packages/${PKG_NAME#@mcp-b/}"
+                echo "Building MCPB bundle for $PKG_NAME@$PKG_VERSION"
+
+                cd "$PKG_DIR"
+                pnpm run build:mcpb
+
+                # Derive expected filename from the package name (strip scope)
+                BUNDLE_NAME="${PKG_NAME#@mcp-b/}"
+                MCPB_FILE="${BUNDLE_NAME}-${PKG_VERSION}.mcpb"
+
+                if [ -f "$MCPB_FILE" ]; then
+                  TAG="${PKG_NAME}@${PKG_VERSION}"
+                  gh release upload "$TAG" "$MCPB_FILE" --clobber
+                  echo "✓ Uploaded $MCPB_FILE to release $TAG"
+                else
+                  echo "⚠ Expected $MCPB_FILE but file not found after build"
+                  ls -la *.mcpb 2>/dev/null || echo "  No .mcpb files in directory"
+                fi
+
+                cd "$GITHUB_WORKSPACE"
+              fi
+            done
+          done
+
       - name: Sign release artifacts with sigstore
         if: steps.changesets.outputs.published == 'true'
         env:
