@@ -266,6 +266,47 @@ describe('RelayRegistry', () => {
     expect(registry.listTools()).toHaveLength(0);
   });
 
+  it('sorts listSources by most recently seen first', () => {
+    let time = 1000;
+    const registry = new RelayRegistry(() => time);
+
+    registry.upsertSource('conn-1', hello('tab-1', 'https://a.example.com'));
+    registry.registerTools('conn-1', [{ name: 'tool_a' }]);
+
+    time = 2000;
+    registry.upsertSource('conn-2', hello('tab-2', 'https://b.example.com'));
+    registry.registerTools('conn-2', [{ name: 'tool_b' }]);
+
+    const sources = registry.listSources();
+    expect(sources).toHaveLength(2);
+    expect(sources[0]?.sourceId).toBe('conn-2');
+    expect(sources[1]?.sourceId).toBe('conn-1');
+
+    // Touch conn-1 to make it more recent
+    time = 3000;
+    registry.touchConnection('conn-1');
+
+    const sourcesAfter = registry.listSources();
+    expect(sourcesAfter[0]?.sourceId).toBe('conn-1');
+    expect(sourcesAfter[1]?.sourceId).toBe('conn-2');
+  });
+
+  it('sorts listSources by sourceId when lastSeenAt is equal', () => {
+    const registry = new RelayRegistry(() => 1000);
+
+    registry.upsertSource('conn-b', hello('tab-b', 'https://example.com'));
+    registry.registerTools('conn-b', [{ name: 'tool_b' }]);
+
+    registry.upsertSource('conn-a', hello('tab-a', 'https://example.com'));
+    registry.registerTools('conn-a', [{ name: 'tool_a' }]);
+
+    const sources = registry.listSources();
+    expect(sources).toHaveLength(2);
+    // Same timestamp — compareRecency(b, a, bId, aId) descending by id
+    expect(sources[0]?.sourceId).toBe('conn-b');
+    expect(sources[1]?.sourceId).toBe('conn-a');
+  });
+
   it('filters out sources with zero tools from listSources', () => {
     const registry = new RelayRegistry();
 

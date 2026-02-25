@@ -453,6 +453,204 @@ describe('RelayBridgeServer', () => {
     }
   });
 
+  it('rejects start() when the port is already in use', async () => {
+    const bridge1 = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+    });
+
+    await bridge1.start();
+    const usedPort = bridge1.port;
+
+    const bridge2 = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: usedPort,
+      allowedOrigins: ['*'],
+    });
+
+    await expect(bridge2.start()).rejects.toThrow(/EADDRINUSE/);
+
+    await bridge1.stop();
+  });
+
+  it('invokes tool with explicit sourceId option', async () => {
+    const bridge = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+      invokeTimeoutMs: 500,
+    });
+
+    try {
+      await bridge.start();
+
+      const ws = await connectAndRegister(bridge, {
+        tabId: 'tab-1',
+        url: 'https://example.com',
+        tools: [{ name: 'echo', description: 'Echo' }],
+      });
+
+      ws.on('message', (raw) => {
+        const msg = JSON.parse(String(raw));
+        if (msg.type !== 'invoke') return;
+        ws.send(
+          JSON.stringify({
+            type: 'result',
+            callId: msg.callId,
+            result: { content: [{ type: 'text', text: 'ok-src' }] },
+          })
+        );
+      });
+
+      const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
+      const source = bridge.registry.listSources()[0];
+
+      const result = await bridge.invokeTool(toolName, {}, { sourceId: source?.sourceId });
+      const text = (result.content?.[0] as { text?: string } | undefined)?.text;
+      expect(text).toBe('ok-src');
+
+      ws.close();
+    } finally {
+      await bridge.stop();
+    }
+  });
+
+  it('invokes tool with explicit requestTabId option', async () => {
+    const bridge = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+      invokeTimeoutMs: 500,
+    });
+
+    try {
+      await bridge.start();
+
+      const ws = await connectAndRegister(bridge, {
+        tabId: 'tab-rt',
+        url: 'https://example.com',
+        tools: [{ name: 'echo', description: 'Echo' }],
+      });
+
+      ws.on('message', (raw) => {
+        const msg = JSON.parse(String(raw));
+        if (msg.type !== 'invoke') return;
+        ws.send(
+          JSON.stringify({
+            type: 'result',
+            callId: msg.callId,
+            result: { content: [{ type: 'text', text: 'ok-tab' }] },
+          })
+        );
+      });
+
+      const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
+
+      const result = await bridge.invokeTool(toolName, {}, { requestTabId: 'tab-rt' });
+      const text = (result.content?.[0] as { text?: string } | undefined)?.text;
+      expect(text).toBe('ok-tab');
+
+      ws.close();
+    } finally {
+      await bridge.stop();
+    }
+  });
+
+  it('throws when socket is closed before invokeTool executes', async () => {
+    const bridge = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+      invokeTimeoutMs: 500,
+    });
+
+    try {
+      await bridge.start();
+
+      const ws = await connectAndRegister(bridge, {
+        tabId: 'tab-1',
+        url: 'https://example.com',
+        tools: [{ name: 'fragile_tool' }],
+      });
+
+      const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
+
+      // Close the socket but don't wait for the registry cleanup
+      ws.close();
+      // Wait a tick for close to propagate
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // The tool should still be resolvable in registry but socket is gone
+      await expect(bridge.invokeTool(toolName, {})).rejects.toThrow(
+        /disconnected|No active browser/
+      );
+    } finally {
+      await bridge.stop();
+    }
+  });
+
+  it('does not reject pending invocations from a different connection when one disconnects', async () => {
+    const bridge = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+      invokeTimeoutMs: 2000,
+    });
+
+    try {
+      await bridge.start();
+
+      // Connect two browser sources with different tools
+      const ws1 = await connectAndRegister(bridge, {
+        tabId: 'tab-a',
+        url: 'https://a.example.com',
+        tools: [{ name: 'tool_a', description: 'From A' }],
+      });
+      const ws2 = await connectAndRegister(bridge, {
+        tabId: 'tab-b',
+        url: 'https://b.example.com',
+        tools: [{ name: 'tool_b', description: 'From B' }],
+      });
+
+      // Set up ws1 to respond to invocations after a short delay
+      ws1.on('message', (raw) => {
+        const msg = JSON.parse(String(raw));
+        if (msg.type !== 'invoke') return;
+        setTimeout(() => {
+          ws1.send(
+            JSON.stringify({
+              type: 'result',
+              callId: msg.callId,
+              result: { content: [{ type: 'text', text: 'ok-a' }] },
+            })
+          );
+        }, 100);
+      });
+
+      const toolAName = await waitFor(() => {
+        const tools = bridge.registry.listTools();
+        return tools.find((t) => t.originalName === 'tool_a')?.name;
+      });
+
+      // Start invocation on ws1's tool
+      const invokePromise = bridge.invokeTool(toolAName, {});
+
+      // Disconnect ws2 while ws1's invocation is pending
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      ws2.close();
+
+      // ws1's invocation should still complete successfully
+      const result = await invokePromise;
+      const text = (result.content?.[0] as { text?: string } | undefined)?.text;
+      expect(text).toBe('ok-a');
+
+      ws1.close();
+    } finally {
+      await bridge.stop();
+    }
+  });
+
   it('survives malformed JSON messages without dropping the connection', async () => {
     const bridge = new RelayBridgeServer({
       host: '127.0.0.1',
