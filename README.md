@@ -3,7 +3,7 @@
 # MCP-B NPM Packages
 
 **Official Model Context Protocol implementation for browsers**
-(![W3C WebMCP IDL](https://webmachinelearning.github.io/webmcp/))
+[![W3C WebMCP IDL](https://img.shields.io/badge/W3C-WebMCP%20IDL-005A9C?style=flat-square)](https://webmachinelearning.github.io/webmcp/)
 [![CI](https://github.com/WebMCP-org/npm-packages/actions/workflows/ci.yml/badge.svg)](https://github.com/WebMCP-org/npm-packages/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/WebMCP-org/npm-packages/graph/badge.svg)](https://codecov.io/gh/WebMCP-org/npm-packages)
 [![CodeQL](https://github.com/WebMCP-org/npm-packages/actions/workflows/codeql.yml/badge.svg)](https://github.com/WebMCP-org/npm-packages/actions/workflows/codeql.yml)
