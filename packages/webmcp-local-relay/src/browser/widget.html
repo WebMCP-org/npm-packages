@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>WebMCP Relay Widget</title>
+  </head>
+  <body>
+    <!--
+      WebMCP Local Relay — Widget Page
+
+      This page runs inside a hidden iframe injected by embed.js.
+      It bridges between the host page (via postMessage) and the
+      local relay server (via WebSocket on 127.0.0.1).
+
+      URL parameters (set by embed.js):
+        tabId       — stable tab identity
+        hostOrigin  — the host page's origin (for postMessage validation)
+        hostUrl     — the host page's full URL
+        hostTitle   — the host page's document title
+        relayHost   — relay hostname (default: 127.0.0.1)
+        relayPort   — relay port    (default: 9333)
+    -->
+    <script>
+      (function () {
+        "use strict";
+
+        var params = new URLSearchParams(window.location.search);
+        var hostOrigin = params.get("hostOrigin");
+        var hostUrl = params.get("hostUrl") || hostOrigin || "";
+        var hostTitle = params.get("hostTitle") || "";
+        var tabId =
+          params.get("tabId") ||
+          (typeof crypto !== "undefined" && crypto.randomUUID
+            ? crypto.randomUUID()
+            : String(Date.now()));
+        var relayHost = params.get("relayHost") || "127.0.0.1";
+        var relayPort = params.get("relayPort") || "9333";
+
+        if (!hostOrigin) return;
+
+        var wsUrl = "ws://" + relayHost + ":" + relayPort;
+
+        // -----------------------------------------------------------------
+        // postMessage request/response correlation
+        // -----------------------------------------------------------------
+
+        var pending = new Map();
+
+        window.addEventListener("message", function (event) {
+          if (event.origin !== hostOrigin) return;
+
+          var data = event.data;
+          if (!data || typeof data !== "object" || typeof data.requestId !== "string") return;
+
+          var state = pending.get(data.requestId);
+          if (!state) return;
+
+          if (data.type === state.responseType) {
+            clearTimeout(state.timeoutId);
+            pending.delete(data.requestId);
+            state.resolve(data);
+            return;
+          }
+
+          if (data.type === state.errorType) {
+            clearTimeout(state.timeoutId);
+            pending.delete(data.requestId);
+            state.reject(new Error(String(data.error || "Unknown host error")));
+          }
+        });
+
+        function requestHost(baseType, payload) {
+          var requestId =
+            typeof crypto !== "undefined" && crypto.randomUUID
+              ? crypto.randomUUID()
+              : String(Date.now() + Math.random());
+
+          return new Promise(function (resolve, reject) {
+            var timeoutId = setTimeout(function () {
+              pending.delete(requestId);
+              reject(new Error("Host response timeout: " + baseType));
+            }, 10000);
+
+            pending.set(requestId, {
+              resolve: resolve,
+              reject: reject,
+              timeoutId: timeoutId,
+              responseType: baseType + ".response",
+              errorType: baseType + ".error",
+            });
+
+            window.parent.postMessage(
+              Object.assign({ type: baseType + ".request", requestId: requestId }, payload),
+              hostOrigin,
+            );
+          });
+        }
+
+        // -----------------------------------------------------------------
+        // WebSocket connection to local relay with exponential backoff
+        // -----------------------------------------------------------------
+
+        var INITIAL_DELAY = 500;
+        var MAX_DELAY = 8000;
+        var currentDelay = INITIAL_DELAY;
+
+        function connect() {
+          var ws = new WebSocket(wsUrl);
+
+          ws.addEventListener("open", function () {
+            currentDelay = INITIAL_DELAY;
+
+            requestHost("webmcp.tools.list", {})
+              .then(function (listResponse) {
+                var tools = Array.isArray(listResponse.tools) ? listResponse.tools : [];
+
+                ws.send(
+                  JSON.stringify({
+                    type: "hello",
+                    tabId: tabId,
+                    origin: hostOrigin,
+                    url: hostUrl,
+                    title: hostTitle || document.referrer || "Unknown page",
+                  }),
+                );
+                ws.send(JSON.stringify({ type: "tools/list", tools: tools }));
+              })
+              .catch(function () {
+                ws.close();
+              });
+          });
+
+          ws.addEventListener("message", function (event) {
+            var message;
+            try {
+              message = JSON.parse(event.data);
+            } catch (_e) {
+              return;
+            }
+
+            if (message.type === "ping") {
+              ws.send(JSON.stringify({ type: "pong" }));
+              return;
+            }
+
+            if (message.type !== "invoke") return;
+
+            requestHost("webmcp.tools.invoke", {
+              toolName: message.toolName,
+              args: message.args || {},
+            })
+              .then(function (response) {
+                ws.send(
+                  JSON.stringify({
+                    type: "result",
+                    callId: message.callId,
+                    result: response.result,
+                  }),
+                );
+              })
+              .catch(function (error) {
+                ws.send(
+                  JSON.stringify({
+                    type: "result",
+                    callId: message.callId,
+                    result: {
+                      isError: true,
+                      content: [
+                        {
+                          type: "text",
+                          text: String(error && error.message ? error.message : error),
+                        },
+                      ],
+                    },
+                  }),
+                );
+              });
+          });
+
+          ws.addEventListener("close", function () {
+            setTimeout(connect, currentDelay);
+            currentDelay = Math.min(currentDelay * 1.5, MAX_DELAY);
+          });
+
+          ws.addEventListener("error", function () {
+            try {
+              ws.close();
+            } catch (_e) {
+              /* no-op */
+            }
+          });
+        }
+
+        connect();
+      })();
+    </script>
+  </body>
+</html>

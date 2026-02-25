@@ -1,0 +1,71 @@
+{
+  "manifest_version": "0.3",
+  "name": "webmcp-local-relay",
+  "display_name": "WebMCP Local Relay",
+  "version": "0.1.0",
+  "description": "Relay browser-registered WebMCP tools to any MCP client via localhost WebSocket bridge",
+  "long_description": "WebMCP Local Relay connects your browser tabs to AI agents like Claude. Websites that register WebMCP tools (via navigator.modelContext) are automatically discovered and relayed through a local WebSocket bridge, making them available as standard MCP tools. Tools are dynamically added and removed as you navigate between pages.",
+  "author": {
+    "name": "WebMCP",
+    "url": "https://github.com/WebMCP-org"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/WebMCP-org/npm-packages"
+  },
+  "homepage": "https://github.com/WebMCP-org/npm-packages/tree/main/packages/webmcp-local-relay",
+  "support": "https://github.com/WebMCP-org/npm-packages/issues",
+  "server": {
+    "type": "node",
+    "entry_point": "server/cli.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/server/cli.js",
+        "--port",
+        "${user_config.port}",
+        "--widget-origin",
+        "${user_config.allowed_origins}"
+      ],
+      "env": {}
+    }
+  },
+  "tools": [
+    {
+      "name": "webmcp_list_sources",
+      "description": "List connected browser tool sources and their metadata"
+    },
+    {
+      "name": "webmcp_list_tools",
+      "description": "List relayed tools available from connected browser sources"
+    }
+  ],
+  "tools_generated": true,
+  "keywords": ["webmcp", "mcp", "relay", "browser", "tools", "model-context-protocol", "ai-agents"],
+  "license": "MIT",
+  "user_config": {
+    "port": {
+      "type": "number",
+      "title": "WebSocket Port",
+      "description": "Local port for the WebSocket bridge that browser tabs connect to",
+      "default": 9333,
+      "min": 1024,
+      "max": 65535,
+      "required": false
+    },
+    "allowed_origins": {
+      "type": "string",
+      "title": "Allowed Origins",
+      "description": "Comma-separated list of allowed browser origins, or * to allow all",
+      "default": "*",
+      "required": false
+    }
+  },
+  "compatibility": {
+    "claude_desktop": ">=0.10.0",
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {
+      "node": ">=22.0.0"
+    }
+  }
+}

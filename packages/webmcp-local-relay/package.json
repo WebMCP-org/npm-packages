@@ -1,0 +1,78 @@
+{
+  "name": "@mcp-b/webmcp-local-relay",
+  "version": "0.0.0-beta-20260225101008",
+  "description": "Local MCP relay for browser WebMCP tools via embed iframe and localhost WebSocket",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "webmcp",
+    "relay",
+    "localhost",
+    "iframe",
+    "stdio",
+    "ai-agents"
+  ],
+  "homepage": "https://github.com/WebMCP-org/npm-packages#readme",
+  "bugs": {
+    "url": "https://github.com/WebMCP-org/npm-packages/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WebMCP-org/npm-packages.git",
+    "directory": "packages/webmcp-local-relay"
+  },
+  "license": "MIT",
+  "author": "Alex Nahas",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "webmcp-local-relay": "./dist/cli.js"
+  },
+  "files": [
+    ".claude-plugin",
+    ".mcp.json",
+    "dist",
+    "skills"
+  ],
+  "scripts": {
+    "build": "tsdown && mkdir -p dist/browser && cp src/browser/embed.js dist/browser/embed.js && cp src/browser/widget.html dist/browser/widget.html",
+    "build:mcpb": "bash scripts/build-mcpb.sh",
+    "check": "biome check --write .",
+    "clean": "rm -rf dist .turbo",
+    "format": "biome format --write .",
+    "lint": "biome lint --write .",
+    "prepublishOnly": "node ../../scripts/validate-publish.js && pnpm run build",
+    "test": "vitest run",
+    "test:e2e": "pnpm --filter @mcp-b/webmcp-polyfill build && pnpm --filter @mcp-b/global build && pnpm run build && vitest run --config vitest.e2e.config.ts",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "catalog:",
+    "ws": "^8.18.0",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/ws": "^8.5.14",
+    "playwright": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}
