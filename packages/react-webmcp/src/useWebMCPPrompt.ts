@@ -14,7 +14,7 @@ type PromptModelContext = Navigator['modelContext'] & {
     description?: string;
     argsSchema?: InputSchema;
     get: (args: Record<string, unknown>) => Promise<{ messages: PromptMessage[] }>;
-  }) => { unregister: () => void } | void;
+  }) => { unregister: () => void } | undefined;
 };
 
 /**
@@ -115,7 +115,7 @@ export function useWebMCPPrompt<TArgsSchema extends ReactWebMCPInputSchema = Inp
         : (argsSchema as InputSchema)
       : undefined;
 
-    let registration: { unregister: () => void } | void;
+    let registration: { unregister: () => void } | undefined;
     try {
       registration = modelContext.registerPrompt({
         name,

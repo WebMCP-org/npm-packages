@@ -395,7 +395,10 @@ describe('@mcp-b/webmcp-polyfill', () => {
       expect(tools).toHaveLength(1);
       const schema = tools?.[0]?.inputSchema;
       expect(schema).toBeDefined();
-      expect(JSON.parse(schema!)).toEqual({ type: 'object', properties: {} });
+      if (!schema) {
+        throw new Error('Expected no_schema tool to include an input schema');
+      }
+      expect(JSON.parse(schema)).toEqual({ type: 'object', properties: {} });
     });
 
     it('accepts Standard Schema validators for input validation', async () => {
@@ -1348,7 +1351,10 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
       const result = await navigator.modelContextTesting?.executeTool('normal_tool', '{}');
       expect(result).toBeDefined();
-      const parsed = JSON.parse(result!);
+      if (!result) {
+        throw new Error('Expected normal_tool to return a serialized result');
+      }
+      const parsed = JSON.parse(result);
       expect(parsed.content[0].text).toBe('hello');
     });
 

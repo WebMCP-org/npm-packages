@@ -8,6 +8,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
+type ZodDefinitionCarrier = {
+  _def: {
+    typeName: unknown;
+  };
+};
+
+function hasZodTypeName(schema: unknown): schema is ZodDefinitionCarrier {
+  if (!isRecord(schema)) {
+    return false;
+  }
+
+  const definition = schema._def;
+  return isRecord(definition) && 'typeName' in definition;
+}
+
 export function isZodSchema(schema: unknown): schema is ZodSchemaObject {
   if (!isRecord(schema)) return false;
   if ('type' in schema && typeof schema.type === 'string') return false;
@@ -17,13 +32,17 @@ export function isZodSchema(schema: unknown): schema is ZodSchemaObject {
 }
 
 function isOptionalSchema(schema: unknown): boolean {
-  if (!isRecord(schema) || !isRecord((schema as any)._def)) return false;
-  const typeName = (schema as any)._def.typeName;
+  if (!hasZodTypeName(schema)) {
+    return false;
+  }
+
+  const { typeName } = schema._def;
   return typeName === 'ZodOptional' || typeName === 'ZodDefault';
 }
 
 function stripSchemaMeta(schema: InputSchema): InputSchema {
-  const { $schema, ...rest } = schema as InputSchema & { $schema?: string };
+  const rest = { ...schema } as InputSchema & { $schema?: string };
+  delete rest.$schema;
   if (rest.properties) {
     const props: Record<string, InputSchema> = {};
     for (const [k, v] of Object.entries(rest.properties)) {
