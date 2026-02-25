@@ -51,12 +51,19 @@
       if (storedTabId) {
         return storedTabId;
       }
-    } catch {}
+    } catch (err) {
+      console.warn(
+        '[webmcp-relay-embed] sessionStorage read failed, tab ID will not persist:',
+        err
+      );
+    }
 
     const tabId = createTabId();
     try {
       sessionStorage.setItem(TAB_ID_STORAGE_KEY, tabId);
-    } catch {}
+    } catch (err) {
+      console.warn('[webmcp-relay-embed] sessionStorage write failed:', err);
+    }
 
     return tabId;
   }
@@ -69,7 +76,12 @@
     if (script?.src) {
       try {
         return new URL('widget.html', script.src).href;
-      } catch {}
+      } catch (err) {
+        console.warn(
+          '[webmcp-relay-embed] Failed to resolve widget URL from script src, falling back to CDN:',
+          err
+        );
+      }
     }
     return FALLBACK_WIDGET_URL;
   }
@@ -100,7 +112,11 @@
     try {
       const parsed = JSON.parse(rawSchema);
       return isJsonObject(parsed) ? parsed : { type: 'object', properties: {} };
-    } catch {
+    } catch (err) {
+      console.warn(
+        '[webmcp-relay-embed] Failed to parse tool inputSchema, using permissive default:',
+        err
+      );
       return { type: 'object', properties: {} };
     }
   }
@@ -228,7 +244,8 @@
           tools: Array.isArray(tools) ? tools : [],
         });
       })
-      .catch(() => {
+      .catch((error) => {
+        console.warn('[webmcp-relay-embed] Failed to list tools:', error);
         respondToSource(event.source, event.origin, {
           type: 'webmcp.tools.list.response',
           requestId: request.requestId,

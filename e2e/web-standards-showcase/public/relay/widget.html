@@ -85,6 +85,7 @@
 
         var config = parseConfig();
         if (!config) {
+          console.warn('[webmcp-relay-widget] Missing required hostOrigin parameter. Widget will not start.');
           return;
         }
 
@@ -168,7 +169,8 @@
               );
               socket.send(JSON.stringify({ type: 'tools/list', tools: tools }));
             })
-            .catch(function onHelloError() {
+            .catch(function onHelloError(error) {
+              console.warn('[webmcp-relay-widget] Hello handshake failed:', error);
               socket.close();
             });
         }
@@ -181,7 +183,8 @@
           var relayMessage;
           try {
             relayMessage = JSON.parse(String(rawMessage));
-          } catch {
+          } catch (parseError) {
+            console.warn('[webmcp-relay-widget] Failed to parse relay message:', parseError);
             return;
           }
 
@@ -247,10 +250,13 @@
             reconnectDelayMs = Math.min(reconnectDelayMs * 1.5, RECONNECT_MAX_DELAY_MS);
           });
 
-          socket.addEventListener('error', function onError() {
+          socket.addEventListener('error', function onError(event) {
+            console.warn('[webmcp-relay-widget] WebSocket error:', event);
             try {
               socket.close();
-            } catch {}
+            } catch (closeErr) {
+              console.warn('[webmcp-relay-widget] Error closing socket after error:', closeErr);
+            }
           });
         }
 
