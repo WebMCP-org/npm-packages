@@ -202,9 +202,9 @@ class SmartDomReaderServer {
             .describe(
               'Run without a visible window. Set false to watch interactions. Default: false.'
             ),
-        } as any,
+        } as unknown as z.ZodRawShape,
       },
-      async (args: any) => this.connectBrowser(args as ConnectBrowserArgs)
+      async (args: unknown) => this.connectBrowser(args as ConnectBrowserArgs)
     );
 
     this.server.registerTool(
@@ -218,9 +218,9 @@ class SmartDomReaderServer {
             .string()
             .url('url must be a valid absolute URL')
             .describe('Absolute URL to navigate to (e.g., https://example.com).'),
-        } as any,
+        } as unknown as z.ZodRawShape,
       },
-      async (args: any) => this.navigate(args as NavigateArgs)
+      async (args: unknown) => this.navigate(args as NavigateArgs)
     );
 
     this.server.registerTool(
@@ -253,9 +253,9 @@ class SmartDomReaderServer {
             .min(0)
             .describe('Limit number of listed items per group (buttons, links, etc.).')
             .optional(),
-        } as any,
+        } as unknown as z.ZodRawShape,
       },
-      async (args: any) => this.extractStructure(args as OptionalSelectorArgs)
+      async (args: unknown) => this.extractStructure(args as OptionalSelectorArgs)
     );
 
     this.server.registerTool(
@@ -309,9 +309,9 @@ class SmartDomReaderServer {
                 .optional(),
             })
             .optional(),
-        } as any,
+        } as unknown as z.ZodRawShape,
       },
-      async (args: any) => this.extractRegion(args as RegionArgs)
+      async (args: unknown) => this.extractRegion(args as RegionArgs)
     );
 
     this.server.registerTool(
@@ -359,9 +359,9 @@ class SmartDomReaderServer {
                 .optional(),
             })
             .optional(),
-        } as any,
+        } as unknown as z.ZodRawShape,
       },
-      async (args: any) => this.extractContent(args as ContentArgs)
+      async (args: unknown) => this.extractContent(args as ContentArgs)
     );
 
     this.server.registerTool(
@@ -410,9 +410,9 @@ class SmartDomReaderServer {
                 .optional(),
             })
             .optional(),
-        } as any,
+        } as unknown as z.ZodRawShape,
       },
-      async (args: any) => this.extractInteractive(args as InteractiveArgs)
+      async (args: unknown) => this.extractInteractive(args as InteractiveArgs)
     );
 
     this.server.registerTool(
@@ -434,9 +434,9 @@ class SmartDomReaderServer {
             .boolean()
             .default(false)
             .describe('Capture the full scrollable page. Default: false.'),
-        } as any,
+        } as unknown as z.ZodRawShape,
       },
-      async (args: any) => this.captureScreenshot(args as ScreenshotArgs)
+      async (args: unknown) => this.captureScreenshot(args as ScreenshotArgs)
     );
 
     this.server.registerTool(

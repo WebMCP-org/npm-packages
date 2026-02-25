@@ -8,7 +8,7 @@ type ResourceModelContext = Navigator['modelContext'] & {
     description?: string;
     mimeType?: string;
     read: (uri: URL, params?: Record<string, string>) => Promise<{ contents: ResourceContents[] }>;
-  }) => { unregister: () => void } | void;
+  }) => { unregister: () => void } | undefined;
 };
 
 /**
@@ -97,7 +97,7 @@ export function useWebMCPResource(config: WebMCPResourceConfig): WebMCPResourceR
       return readRef.current(resolvedUri, params);
     };
 
-    let registration: { unregister: () => void } | void;
+    let registration: { unregister: () => void } | undefined;
     try {
       registration = modelContext.registerResource({
         uri,

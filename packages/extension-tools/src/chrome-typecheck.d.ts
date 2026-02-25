@@ -1,1 +1,1 @@
-declare const chrome: any;
+declare const chrome: Record<string, unknown>;
