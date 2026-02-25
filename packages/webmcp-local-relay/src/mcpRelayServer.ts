@@ -351,7 +351,20 @@ export class LocalRelayMcpServer {
       tool.name,
       config,
       async (args: Record<string, unknown>) => {
-        return this.bridge.invokeTool(tool.name, args);
+        try {
+          return await this.bridge.invokeTool(tool.name, args);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: `Failed to invoke relayed tool "${tool.name}": ${message}`,
+              },
+            ],
+            isError: true,
+          };
+        }
       }
     );
 
@@ -385,7 +398,14 @@ export class LocalRelayMcpServer {
     }
 
     const parsed = ToolAnnotationsSchema.safeParse(value);
-    return parsed.success ? parsed.data : undefined;
+    if (parsed.success) {
+      return parsed.data;
+    }
+
+    process.stderr.write(
+      `[webmcp-local-relay] warn: dropping invalid tool annotations: ${parsed.error.message}\n`
+    );
+    return undefined;
   }
 
   /**

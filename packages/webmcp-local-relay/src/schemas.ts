@@ -37,7 +37,10 @@ export const BrowserToolsListMessageSchema = z.object({
 });
 
 /**
- * Schema for incremental tool-list update message.
+ * Schema for tool-set replacement notification message.
+ *
+ * Semantically identical to `tools/list` — the full tool set replaces any
+ * previously registered tools for the connection.
  */
 export const BrowserToolsChangedMessageSchema = z.object({
   type: z.literal('tools/changed'),
