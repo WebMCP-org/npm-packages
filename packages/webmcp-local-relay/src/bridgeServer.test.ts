@@ -3,6 +3,9 @@ import WebSocket from 'ws';
 
 import { RelayBridgeServer } from './bridgeServer.js';
 
+/**
+ * Polls until a value is available or times out.
+ */
 function waitFor<T>(fn: () => T | undefined, timeoutMs = 2000): Promise<T> {
   const started = Date.now();
   return new Promise((resolve, reject) => {
@@ -21,6 +24,9 @@ function waitFor<T>(fn: () => T | undefined, timeoutMs = 2000): Promise<T> {
   });
 }
 
+/**
+ * Connects a browser socket and registers hello + initial tools.
+ */
 function connectAndRegister(
   bridge: RelayBridgeServer,
   options: {
@@ -208,10 +214,8 @@ describe('RelayBridgeServer', () => {
 
       const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
 
-      // Start invocation but close socket before responding
       const invokePromise = bridge.invokeTool(toolName, {});
 
-      // Give the invoke message time to be sent, then disconnect
       await new Promise((resolve) => setTimeout(resolve, 50));
       ws.close();
 
@@ -295,6 +299,160 @@ describe('RelayBridgeServer', () => {
     }
   });
 
+  it('is idempotent when start() is called twice', async () => {
+    const bridge = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+    });
+
+    try {
+      await bridge.start();
+      const port = bridge.port;
+      await bridge.start(); // second call should be a no-op
+      expect(bridge.port).toBe(port);
+    } finally {
+      await bridge.stop();
+    }
+  });
+
+  it('stop is safe to call when not started', async () => {
+    const bridge = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+    });
+
+    await bridge.stop(); // should not throw
+  });
+
+  it('rejects connections with no origin when origins are restricted', async () => {
+    const bridge = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['https://trusted.example.com'],
+    });
+
+    try {
+      await bridge.start();
+
+      const ws = new WebSocket(`ws://127.0.0.1:${bridge.port}`);
+
+      const closeCode = await new Promise<number>((resolve) => {
+        ws.on('close', (code) => resolve(code));
+      });
+
+      expect(closeCode).toBe(1008);
+    } finally {
+      await bridge.stop();
+    }
+  });
+
+  it('handles tools before hello as warning without crash', async () => {
+    const bridge = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+    });
+
+    try {
+      await bridge.start();
+
+      const ws = new WebSocket(`ws://127.0.0.1:${bridge.port}`);
+      await new Promise<void>((resolve, reject) => {
+        ws.once('open', () => resolve());
+        ws.once('error', reject);
+      });
+
+      ws.send(JSON.stringify({ type: 'tools/list', tools: [{ name: 'tool_a' }] }));
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(ws.readyState).toBe(WebSocket.OPEN);
+
+      ws.close();
+    } finally {
+      await bridge.stop();
+    }
+  });
+
+  it('handles result for unknown callId gracefully', async () => {
+    const bridge = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+    });
+
+    try {
+      await bridge.start();
+
+      const ws = new WebSocket(`ws://127.0.0.1:${bridge.port}`);
+      await new Promise<void>((resolve, reject) => {
+        ws.once('open', () => resolve());
+        ws.once('error', reject);
+      });
+
+      ws.send(
+        JSON.stringify({
+          type: 'hello',
+          tabId: 'tab-1',
+          url: 'https://example.com',
+          origin: 'https://example.com',
+        })
+      );
+
+      ws.send(
+        JSON.stringify({
+          type: 'result',
+          callId: 'nonexistent-call-id',
+          result: { content: [{ type: 'text', text: 'orphan result' }] },
+        })
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(ws.readyState).toBe(WebSocket.OPEN);
+
+      ws.close();
+    } finally {
+      await bridge.stop();
+    }
+  });
+
+  it('handles pong messages without error', async () => {
+    const bridge = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+    });
+
+    try {
+      await bridge.start();
+
+      const ws = new WebSocket(`ws://127.0.0.1:${bridge.port}`);
+      await new Promise<void>((resolve, reject) => {
+        ws.once('open', () => resolve());
+        ws.once('error', reject);
+      });
+
+      ws.send(
+        JSON.stringify({
+          type: 'hello',
+          tabId: 'tab-1',
+          url: 'https://example.com',
+          origin: 'https://example.com',
+        })
+      );
+
+      ws.send(JSON.stringify({ type: 'pong' }));
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(ws.readyState).toBe(WebSocket.OPEN);
+
+      ws.close();
+    } finally {
+      await bridge.stop();
+    }
+  });
+
   it('survives malformed JSON messages without dropping the connection', async () => {
     const bridge = new RelayBridgeServer({
       host: '127.0.0.1',
@@ -312,7 +470,6 @@ describe('RelayBridgeServer', () => {
         ws.once('error', reject);
       });
 
-      // Send garbage, then valid messages
       ws.send('not json at all');
       ws.send(JSON.stringify({ type: 'invalid_type', foo: 'bar' }));
 

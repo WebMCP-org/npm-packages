@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { HelloRequiredError, RelayRegistry } from './registry.js';
 import type { BrowserToRelayMessage } from './schemas.js';
 
+/**
+ * Builds a valid browser `hello` message fixture.
+ */
 function hello(tabId: string, url: string): Extract<BrowserToRelayMessage, { type: 'hello' }> {
   return {
     type: 'hello',
@@ -13,21 +16,54 @@ function hello(tabId: string, url: string): Extract<BrowserToRelayMessage, { typ
 }
 
 describe('RelayRegistry', () => {
-  it('registers tools with deterministic namespaced tool IDs', () => {
+  it('uses just the original tool name when there are no collisions', () => {
     const registry = new RelayRegistry();
 
     registry.upsertSource('conn-1', hello('tab-1', 'https://docs.example.com/path'));
     registry.registerTools('conn-1', [
       {
-        name: 'get-user_profile',
+        name: 'get_user_profile',
         description: 'Read user profile',
       },
     ]);
 
     const tools = registry.listTools();
     expect(tools).toHaveLength(1);
-    expect(tools[0]?.name).toBe('webmcp_docs_example_com_tabtab_1_get_user_profile');
+    expect(tools[0]?.name).toBe('get_user_profile');
     expect(tools[0]?.sources[0]?.sourceId).toBe('conn-1');
+  });
+
+  it('disambiguates with first 4 chars of tabId on collision from different tabs', () => {
+    const registry = new RelayRegistry();
+
+    registry.upsertSource('conn-1', hello('aaaa-1234', 'https://foo.example.com'));
+    registry.upsertSource('conn-2', hello('bbbb-5678', 'https://foo.example.com'));
+    registry.registerTools('conn-1', [{ name: 'search', description: 'tab a' }]);
+    registry.registerTools('conn-2', [{ name: 'search', description: 'tab b' }]);
+
+    const tools = registry.listTools();
+    expect(tools).toHaveLength(2);
+
+    const names = tools.map((t) => t.name).sort();
+    expect(names).toEqual(['search_aaaa', 'search_bbbb']);
+  });
+
+  it('reverts to short name when collision resolves after disconnect', () => {
+    const registry = new RelayRegistry();
+
+    registry.upsertSource('conn-1', hello('aaaa-1234', 'https://example.com'));
+    registry.upsertSource('conn-2', hello('bbbb-5678', 'https://example.com'));
+    registry.registerTools('conn-1', [{ name: 'action' }]);
+    registry.registerTools('conn-2', [{ name: 'action' }]);
+
+    expect(registry.listTools()).toHaveLength(2);
+    expect(registry.listTools().every((t) => t.name !== 'action')).toBe(true);
+
+    registry.removeConnection('conn-2');
+
+    const tools = registry.listTools();
+    expect(tools).toHaveLength(1);
+    expect(tools[0]?.name).toBe('action');
   });
 
   it('keeps the newest provider for the same tab-scoped tool name', () => {
@@ -44,6 +80,7 @@ describe('RelayRegistry', () => {
 
     const tools = registry.listTools();
     expect(tools).toHaveLength(1);
+    expect(tools[0]?.name).toBe('open_issue');
     expect(tools[0]?.description).toBe('v2');
     expect(tools[0]?.sources.map((s) => s.sourceId)).toEqual(['conn-2', 'conn-1']);
   });
@@ -56,16 +93,14 @@ describe('RelayRegistry', () => {
     registry.registerTools('conn-1', [{ name: 'search', description: 'tab a' }]);
     registry.registerTools('conn-2', [{ name: 'search', description: 'tab b' }]);
 
-    const toolName = registry
-      .listTools()
-      .find((tool) => tool.name.includes('tabtab_b_search'))?.name;
-    expect(toolName).toBeTruthy();
-    if (!toolName) {
-      throw new Error('Expected toolName to be resolved');
+    const toolForB = registry.listTools().find((t) => t.sources[0]?.tabId === 'tab-b');
+    expect(toolForB).toBeTruthy();
+    if (!toolForB) {
+      throw new Error('Expected a tool for tab-b');
     }
 
     const resolved = registry.resolveInvocation({
-      toolName,
+      toolName: toolForB.name,
       requestTabId: 'tab-b',
     });
 
@@ -95,21 +130,21 @@ describe('RelayRegistry', () => {
     let time = 1000;
     const registry = new RelayRegistry(() => time);
 
-    registry.upsertSource('conn-1', hello('tab-a', 'https://example.com'));
+    registry.upsertSource('conn-1', hello('aaaa-1234', 'https://example.com'));
     registry.registerTools('conn-1', [{ name: 'action', description: 'v1' }]);
 
     time = 2000;
-    registry.upsertSource('conn-2', hello('tab-b', 'https://example.com'));
+    registry.upsertSource('conn-2', hello('bbbb-5678', 'https://example.com'));
     registry.registerTools('conn-2', [{ name: 'action', description: 'v2' }]);
 
-    const tools = registry.listTools();
-    const toolForTabA = tools.find((t) => t.name.includes('tabtab_a'));
-    if (!toolForTabA) {
-      throw new Error('Expected toolForTabA to be found');
+    const toolForA = registry.listTools().find((t) => t.sources[0]?.tabId === 'aaaa-1234');
+    expect(toolForA).toBeTruthy();
+    if (!toolForA) {
+      throw new Error('Expected a tool for tab aaaa-1234');
     }
 
     const resolved = registry.resolveInvocation({
-      toolName: toolForTabA.name,
+      toolName: toolForA.name,
       sourceId: 'conn-1',
     });
 
@@ -129,12 +164,10 @@ describe('RelayRegistry', () => {
 
     const tools = registry.listTools();
     expect(tools).toHaveLength(1);
-
-    const toolName = tools[0]?.name;
-    expect(toolName).toBeTruthy();
+    expect(tools[0]?.name).toBe('do_thing');
 
     const resolved = registry.resolveInvocation({
-      toolName: toolName as string,
+      toolName: 'do_thing',
     });
 
     expect(resolved?.connectionId).toBe('conn-2');
@@ -148,7 +181,7 @@ describe('RelayRegistry', () => {
 
     const tools = registry.listTools();
     const toolName = tools[0]?.name;
-    expect(toolName).toBeTruthy();
+    expect(toolName).toBe('tool_a');
 
     const resolved = registry.resolveInvocation({
       toolName: toolName as string,
@@ -158,11 +191,85 @@ describe('RelayRegistry', () => {
     expect(resolved).toBeNull();
   });
 
+  it('touchConnection is a no-op for non-existent connections', () => {
+    const registry = new RelayRegistry();
+    registry.touchConnection('nonexistent-connection');
+    expect(registry.listSources()).toHaveLength(0);
+  });
+
+  it('resolves invocation by sourceId falling back to tabId match', () => {
+    const registry = new RelayRegistry();
+
+    registry.upsertSource('conn-1', hello('shared-tab', 'https://example.com'));
+    registry.registerTools('conn-1', [{ name: 'action', description: 'do something' }]);
+
+    const resolved = registry.resolveInvocation({
+      toolName: 'action',
+      sourceId: 'shared-tab',
+    });
+
+    expect(resolved?.connectionId).toBe('conn-1');
+  });
+
+  it('returns null for resolveInvocation with non-matching requestTabId', () => {
+    const registry = new RelayRegistry();
+
+    registry.upsertSource('conn-1', hello('tab-1', 'https://example.com'));
+    registry.registerTools('conn-1', [{ name: 'tool_a' }]);
+
+    const resolved = registry.resolveInvocation({
+      toolName: 'tool_a',
+      requestTabId: 'nonexistent-tab',
+    });
+
+    expect(resolved).toBeNull();
+  });
+
+  it('returns null for resolveInvocation with non-existent tool name', () => {
+    const registry = new RelayRegistry();
+
+    registry.upsertSource('conn-1', hello('tab-1', 'https://example.com'));
+    registry.registerTools('conn-1', [{ name: 'tool_a' }]);
+
+    const resolved = registry.resolveInvocation({
+      toolName: 'nonexistent_tool',
+    });
+
+    expect(resolved).toBeNull();
+  });
+
+  it('upsertSource preserves existing metadata when new hello has partial data', () => {
+    const registry = new RelayRegistry();
+
+    registry.upsertSource('conn-1', {
+      type: 'hello',
+      tabId: 'tab-1',
+      url: 'https://example.com/page',
+      origin: 'https://example.com',
+      title: 'Original Title',
+    });
+
+    registry.upsertSource('conn-1', {
+      type: 'hello',
+      tabId: 'tab-1',
+    });
+
+    registry.registerTools('conn-1', [{ name: 'tool_a' }]);
+    const sources = registry.listSources();
+    expect(sources[0]?.title).toBe('Original Title');
+    expect(sources[0]?.origin).toBe('https://example.com');
+  });
+
+  it('removeConnection is safe for non-existent connections', () => {
+    const registry = new RelayRegistry();
+    registry.removeConnection('nonexistent');
+    expect(registry.listTools()).toHaveLength(0);
+  });
+
   it('filters out sources with zero tools from listSources', () => {
     const registry = new RelayRegistry();
 
     registry.upsertSource('conn-1', hello('tab-1', 'https://example.com'));
-    // No tools registered
 
     expect(registry.listSources()).toHaveLength(0);
 

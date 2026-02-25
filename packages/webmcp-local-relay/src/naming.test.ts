@@ -28,6 +28,10 @@ describe('extractSanitizedDomain', () => {
     expect(extractSanitizedDomain(undefined)).toBe('unknown');
   });
 
+  it('returns "unknown" for empty string input', () => {
+    expect(extractSanitizedDomain('')).toBe('unknown');
+  });
+
   it('returns "unknown" for non-URL input', () => {
     expect(extractSanitizedDomain('not-a-url')).toBe('unknown');
   });
@@ -60,51 +64,65 @@ describe('extractSanitizedDomain', () => {
 });
 
 describe('buildPublicToolName', () => {
-  it('produces a deterministic namespaced tool name', () => {
-    const result = buildPublicToolName({
-      domain: 'example_com',
-      tabId: 'tab_1',
-      originalToolName: 'get_users',
-    });
-    expect(result).toBe('webmcp_example_com_tabtab_1_get_users');
+  it('returns just the sanitized tool name by default', () => {
+    const result = buildPublicToolName({ originalToolName: 'get_users' });
+    expect(result).toBe('get_users');
   });
 
-  it('sanitizes all components', () => {
-    const result = buildPublicToolName({
-      domain: 'my-domain.com',
-      tabId: 'tab-abc',
-      originalToolName: 'get-user.profile',
-    });
-    expect(result).toBe('webmcp_my_domain_com_tabtab_abc_get_user_profile');
+  it('sanitizes the tool name', () => {
+    const result = buildPublicToolName({ originalToolName: 'get-user.profile' });
+    expect(result).toBe('get_user_profile');
   });
 
-  it('stays within 128 character limit for normal-length names', () => {
+  it('returns just the tool name when disambiguate is false', () => {
     const result = buildPublicToolName({
-      domain: 'example_com',
-      tabId: 'tab123',
       originalToolName: 'search',
+      tabId: 'ed935ee3-2432-497a-9087-4e856ddcbd6a',
+      disambiguate: false,
     });
-    expect(result.length).toBeLessThanOrEqual(128);
-    expect(result).toMatch(/^webmcp_/);
+    expect(result).toBe('search');
   });
 
-  it('truncates with hash suffix when name exceeds 128 characters', () => {
+  it('appends first 4 chars of tabId when disambiguating', () => {
     const result = buildPublicToolName({
-      domain: 'a'.repeat(60),
-      tabId: 'b'.repeat(30),
-      originalToolName: 'c'.repeat(40),
+      originalToolName: 'search',
+      tabId: 'ed935ee3-2432-497a-9087-4e856ddcbd6a',
+      disambiguate: true,
+    });
+    expect(result).toBe('search_ed93');
+  });
+
+  it('sanitizes the tabId segment', () => {
+    const result = buildPublicToolName({
+      originalToolName: 'search',
+      tabId: 'ab-cd-ef',
+      disambiguate: true,
+    });
+    expect(result).toBe('search_ab_c');
+  });
+
+  it('stays within 128 character limit', () => {
+    const result = buildPublicToolName({
+      originalToolName: 'a'.repeat(200),
+      tabId: 'tab123',
+      disambiguate: true,
     });
     expect(result.length).toBeLessThanOrEqual(128);
-    expect(result).toMatch(/^webmcp_/);
-    // Hash suffix is _<10 hex chars>
-    expect(result).toMatch(/_[a-f0-9]{10}$/);
+    expect(result).toMatch(/_tab1$/);
+  });
+
+  it('stays within 128 character limit without disambiguation', () => {
+    const result = buildPublicToolName({
+      originalToolName: 'a'.repeat(200),
+    });
+    expect(result.length).toBeLessThanOrEqual(128);
   });
 
   it('produces deterministic output for the same input', () => {
     const opts = {
-      domain: 'a'.repeat(60),
-      tabId: 'b'.repeat(30),
-      originalToolName: 'c'.repeat(40),
+      originalToolName: 'my_tool',
+      tabId: 'some-tab-id',
+      disambiguate: true,
     };
     expect(buildPublicToolName(opts)).toBe(buildPublicToolName(opts));
   });
