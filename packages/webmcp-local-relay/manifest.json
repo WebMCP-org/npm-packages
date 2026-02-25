@@ -38,6 +38,10 @@
     {
       "name": "webmcp_list_tools",
       "description": "List relayed tools available from connected browser sources"
+    },
+    {
+      "name": "webmcp_call_tool",
+      "description": "Call a browser-relayed tool by name with JSON arguments"
     }
   ],
   "tools_generated": true,

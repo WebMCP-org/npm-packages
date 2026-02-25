@@ -1,25 +1,68 @@
 # @mcp-b/webmcp-local-relay
 
-Use tools from websites you have open in your browser, directly inside Claude, Cursor, or any MCP client.
+[![npm version](https://img.shields.io/npm/v/@mcp-b/webmcp-local-relay?style=flat-square)](https://www.npmjs.com/package/@mcp-b/webmcp-local-relay)
+[![npm downloads](https://img.shields.io/npm/dm/@mcp-b/webmcp-local-relay?style=flat-square)](https://www.npmjs.com/package/@mcp-b/webmcp-local-relay)
 
-Websites that support [WebMCP](https://github.com/WebMCP-org) register tools on the page. This relay discovers them automatically and makes them available as standard MCP tools.
+Use tools from websites you already have open in your browser, directly inside Claude, Cursor, or any MCP client.
 
-## Install
+Websites register tools on `navigator.modelContext`. This relay discovers those tools and exposes them as standard MCP tools over stdio.
 
-### Claude Desktop
+## At A Glance
 
-Download the `.mcpb` file from [Releases](https://github.com/WebMCP-org/npm-packages/releases) and double-click to install. No Node.js or CLI setup required.
+```text
+Website (WebMCP tools on page)
+    |  hidden iframe + postMessage
+    v
+embed.js / widget.html
+    |  ws://127.0.0.1:9333
+    v
+webmcp-local-relay (this package)
+    |  stdio MCP server
+    v
+Claude / Cursor / any MCP client
+```
 
-Two optional settings appear in the Claude Desktop extension UI:
+## Quick Start By Role
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| WebSocket Port | `9333` | Local port the bridge listens on |
-| Allowed Origins | `*` | Comma-separated browser origins, or `*` for all |
+### Website Owners
 
-### Claude Code / Cursor / Any MCP Client
+If your site already has WebMCP runtime and registered tools, add one script tag:
 
-Add the server to your MCP config:
+```html
+<script src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@latest/dist/browser/embed.js"></script>
+```
+
+If your site does not already have WebMCP runtime, add runtime + tool registration + embed script:
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/@mcp-b/global@latest/dist/index.iife.js"></script>
+<script>
+  navigator.modelContext.registerTool({
+    name: 'get_page_title',
+    description: 'Get the current page title',
+    inputSchema: { type: 'object', properties: {} },
+    execute: async () => ({ content: [{ type: 'text', text: document.title }] }),
+  });
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@latest/dist/browser/embed.js"></script>
+```
+
+Optional custom relay port:
+
+```html
+<script
+  src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@latest/dist/browser/embed.js"
+  data-relay-port="9444"
+></script>
+```
+
+### Users (Pick One Install Path)
+
+#### Option 1: Claude Desktop (MCPB bundle)
+
+Download the `.mcpb` bundle from [GitHub Releases](https://github.com/WebMCP-org/npm-packages/releases) and open it in Claude Desktop.
+
+#### Option 2: Any MCP client via `npx`
 
 ```json
 {
@@ -32,44 +75,53 @@ Add the server to your MCP config:
 }
 ```
 
-### Claude Code Plugin
-
-Add the marketplace and install:
+#### Option 3: Claude Code plugin
 
 ```text
-/plugin marketplace add https://github.com/WebMCP-org/npm-packages/tree/main/packages/webmcp-local-relay
+/plugin marketplace add /Users/alexmnahas/personalRepos/WebMCP-org/npm-packages/packages/webmcp-local-relay
 /plugin install webmcp-local-relay@webmcp-org
 ```
 
-Or type `/plugin` and browse the Discover tab.
-
-### Standalone Skill
+#### Option 4: Standalone skill (Skills CLI)
 
 ```bash
-npx skills add https://github.com/WebMCP-org/npm-packages/tree/main/packages/webmcp-local-relay --skill webmcp-local-relay -g -y
+npx skills add /Users/alexmnahas/personalRepos/WebMCP-org/npm-packages/packages/webmcp-local-relay --skill webmcp-local-relay -g -y
 ```
 
-## Usage
+## Use It In Your Agent
 
-Once installed, open a website that has WebMCP tools. The relay picks them up automatically.
+1. Call `webmcp_list_sources` to see connected tabs.
+2. Call `webmcp_list_tools` to see relayed tools.
+3. Call tools directly (e.g., `get_issue`) or use `webmcp_call_tool` to invoke by name — useful for clients that don't support dynamic tool updates.
 
-**Step 1 — Check what's connected:**
+Tools are added and removed dynamically as tabs connect, reload, and disconnect.
 
-Ask your AI agent to call `webmcp_list_sources`. This shows every browser tab currently connected, with its URL, title, and how many tools it exposes.
+## What This Server Exposes
 
-**Step 2 — See available tools:**
+Static tools:
 
-Call `webmcp_list_tools` to get the full list of relayed tools and which tab they came from.
+- `webmcp_list_sources` — lists connected browser tabs with metadata
+- `webmcp_list_tools` — lists all relayed tools with source info
+- `webmcp_call_tool` — invokes a relayed tool by name with JSON arguments
 
-**Step 3 — Call tools:**
+Dynamic tools use the original tool name (sanitized to `[a-zA-Z0-9_]`). When tools from different tabs share a name, a short tab-ID suffix is appended for disambiguation:
 
-Tools appear with namespaced names like `webmcp_github_com_tab123_get_issue`. Call them like any other MCP tool. The relay forwards the call to the right browser tab and returns the result.
+- Single provider: `get_issue`
+- Disambiguated: `search_ed93`, `search_a1b2`
 
-Tools are added and removed dynamically as you navigate between pages — no restart needed.
+## Security
 
-## CLI Options
+- Binds to `127.0.0.1` by default (loopback only, not accessible from your network).
+- The default `allowedOrigins` is `*`, which permits any browser page to connect and register tools. This is convenient for development but means any website open in your browser can expose tools to the relay.
+- **Recommended:** Use `--widget-origin` to restrict connections to only the origins you trust:
+  ```bash
+  webmcp-local-relay --widget-origin https://your-app.example.com,https://another-app.example.com
+  ```
+- Only the WebSocket `Origin` header is checked — any local process can connect regardless of origin restrictions.
 
-```
+## CLI
+
+```text
 webmcp-local-relay [options]
 
   --host, -H               Bind host (default: 127.0.0.1)
@@ -79,73 +131,71 @@ webmcp-local-relay [options]
   --help, -h               Show help
 ```
 
-## Security
+Run locally:
 
-- Binds to `127.0.0.1` by default (loopback only, not accessible from your network).
-- Use `--widget-origin` to restrict which browser origins can connect.
-- In production, always set explicit allowed origins instead of `*`.
-
----
-
-## How It Works
-
+```bash
+node packages/webmcp-local-relay/dist/cli.js
 ```
+
+Run with strict origin policy:
+
+```bash
+node packages/webmcp-local-relay/dist/cli.js --widget-origin https://cdn.jsdelivr.net
+```
+
+## Runtime Compatibility
+
+Supported page runtimes:
+
+1. `@mcp-b/global` (recommended)
+2. `@mcp-b/webmcp-polyfill` with `navigator.modelContextTesting`
+
+Runtime dispatch behavior in the browser embed/widget layer:
+
+- Uses `navigator.modelContext.listTools` + `callTool` when present.
+- Falls back to `navigator.modelContextTesting.listTools` + `executeTool`.
+
+## Architecture
+
+```text
 MCP Client (Claude, Cursor, etc.)
-    │ stdio (JSON-RPC)
-    ▼
-LocalRelayMcpServer ─── static tools: webmcp_list_sources, webmcp_list_tools
-    │                └── dynamic tools: webmcp_{domain}_{tabId}_{toolName}
-    │ WebSocket (ws://127.0.0.1:9333)
-    ▼
-RelayBridgeServer
-    │
-    ├── Browser Tab 1 (github.com)     → get_issue, list_repos
-    ├── Browser Tab 2 (notion.so)      → search_pages, create_page
-    └── Browser Tab 3 (docs.mcp-b.ai)  → custom_tool
+    | stdio (JSON-RPC)
+    v
+LocalRelayMcpServer
+    | static + dynamic MCP tools
+    v
+RelayBridgeServer (ws://127.0.0.1:9333)
+    | ws messages
+    v
+Widget iframe (embed.js -> widget.html)
+    | postMessage bridge
+    v
+Host page WebMCP runtime (navigator.modelContext)
 ```
 
-1. The relay starts a WebSocket server on `127.0.0.1:9333`.
-2. Browser pages with WebMCP tools connect via a widget iframe.
-3. Each page sends a `hello` message with metadata, then its tool list.
-4. The relay registers those tools as MCP tools over stdio.
-5. When the MCP client calls a tool, the relay forwards the invocation to the correct browser tab and returns the result.
-6. Tools are added/removed dynamically as tabs connect and disconnect.
+## Troubleshooting
 
-### Tool Naming
-
-Dynamic tools are namespaced to avoid collisions across tabs:
-
-```
-webmcp_{sanitized_domain}_{tabId}_{original_tool_name}
-```
-
-When multiple tabs expose the same tool name, each gets its own namespaced entry.
-
-### Static Tools
-
-| Tool | Description |
-|------|-------------|
-| `webmcp_list_sources` | Lists all connected browser tabs with metadata (URL, title, tool count) |
-| `webmcp_list_tools` | Lists all relayed tools with their source tab info |
-
----
+- `No sources connected`: ensure the page loaded `embed.js` and relay process is running.
+- `No tools listed`: ensure page tools are registered on WebMCP runtime.
+- `Tool not found`: tab reloaded or disconnected; call `webmcp_list_tools` again.
+- Connection blocked: verify `--widget-origin` and relay port match your embed config.
 
 ## Contributing
 
-### Source Code
+Project layout:
 
-```
+```text
 src/
-├── cli.ts                 CLI entry point, parses args, starts the server
-├── mcpRelayServer.ts      MCP server: static tools + dynamic tool sync
-├── bridgeServer.ts        WebSocket server: manages browser connections
-├── registry.ts            Multi-source tool aggregation and provider ranking
+├── cli.ts                 CLI entry point
+├── mcpRelayServer.ts      MCP server (stdio + dynamic tool sync)
+├── bridgeServer.ts        WebSocket relay server
+├── registry.ts            Multi-source aggregation and deduplication
 ├── naming.ts              Tool name sanitization and namespacing
-├── schemas.ts             Zod schemas for the browser ↔ relay protocol
+├── schemas.ts             Browser <-> relay protocol schemas
+├── browser/embed.js       Script-tag loader for website owners
+├── browser/widget.html    Hidden iframe bridge runtime
 └── index.ts               Public API exports
 ```
-
-### Development
 
 From repository root:
 
@@ -156,83 +206,31 @@ pnpm --filter @mcp-b/webmcp-local-relay test
 pnpm --filter @mcp-b/webmcp-local-relay test:e2e
 ```
 
-Run the relay locally:
+### Build MCPB Bundle
 
 ```bash
-node packages/webmcp-local-relay/dist/cli.js
+pnpm --filter @mcp-b/webmcp-local-relay build:mcpb
 ```
 
-With origin restriction:
+Output:
 
-```bash
-node packages/webmcp-local-relay/dist/cli.js --widget-origin https://cdn.jsdelivr.net
-```
+- `webmcp-local-relay-<version>.mcpb`
 
-### Scripts
+### Plugin + Skill Files
 
-| Script | Description |
-|--------|-------------|
-| `pnpm build` | Build with tsdown |
-| `pnpm build:mcpb` | Build MCPB Desktop Extension bundle |
-| `pnpm test` | Run unit tests |
-| `pnpm test:e2e` | Run end-to-end tests |
-| `pnpm typecheck` | Type check with tsc |
-| `pnpm check` | Lint and format with Biome |
+- `.claude-plugin/plugin.json`
+- `.claude-plugin/marketplace.json`
+- `.mcp.json`
+- `skills/webmcp-local-relay/SKILL.md`
+- `.claude/skills/webmcp-local-relay/SKILL.md` (project-local development skill)
 
-### Building the MCPB Bundle
+## References
 
-The MCPB (Desktop Extension) bundle packages the relay as a one-click install for Claude Desktop.
-
-```bash
-pnpm run build:mcpb
-```
-
-This runs `scripts/build-mcpb.sh`, which:
-
-1. Builds the project with tsdown (same as `pnpm build`).
-2. Copies the compiled JS into a `server/` staging directory.
-3. Writes `manifest.json` with the current package version.
-4. Runs `npm install --production` to create a standalone `node_modules`.
-5. Packs everything into a `.mcpb` file using `@anthropic-ai/mcpb`.
-
-Output: `webmcp-local-relay-<version>.mcpb` in the package root.
-
-**Key files for the MCPB build:**
-
-| File | Purpose |
-|------|---------|
-| `manifest.json` | MCPB manifest — extension metadata, server config, user settings |
-| `scripts/build-mcpb.sh` | Build script that stages and packs the bundle |
-| `.mcpbignore` | Excludes dev files (src, tests, configs) from the bundle |
-
-**Bundle structure** (what's inside the `.mcpb` ZIP):
-
-```
-webmcp-local-relay-<version>.mcpb
-├── manifest.json           Extension manifest
-├── package.json            Dependency declarations
-├── server/
-│   ├── cli.js              Entry point
-│   ├── index.js            Public API
-│   └── mcpRelayServer-*.js Shared chunk (server + bridge + registry)
-└── node_modules/           Production dependencies
-```
-
-The `manifest.json` declares `"type": "node"`, so Claude Desktop uses its bundled Node.js runtime — users don't need Node.js installed.
-
-### Catalog Dependency Resolution
-
-This monorepo uses pnpm `catalog:` version references. The MCPB build script resolves these to real versions before running `npm install` in the staging directory. If you add a new dependency that uses `catalog:`, update the catalog map in `scripts/build-mcpb.sh`.
-
-### Plugin Components
-
-| File | Purpose |
-|------|---------|
-| `.claude-plugin/plugin.json` | Plugin manifest for Claude Code |
-| `.claude-plugin/marketplace.json` | Marketplace discovery metadata |
-| `.mcp.json` | MCP server registration for plugin installs |
-| `skills/webmcp-local-relay/SKILL.md` | Plugin-bundled skill |
-| `manifest.json` | MCPB Desktop Extension manifest |
+- [MCP Bundle (MCPB) project](https://github.com/modelcontextprotocol/mcpb)
+- [Claude Code plugins](https://docs.claude.com/en/docs/claude-code/plugins/build-a-plugin)
+- [Claude Code plugin distribution](https://docs.claude.com/en/docs/claude-code/plugins/distributing-plugins)
+- [Claude Code skills](https://docs.claude.com/en/docs/claude-code/skills)
+- [Vercel Agent Skills repo](https://github.com/vercel-labs/agent-skills)
 
 ## License
 
