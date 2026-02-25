@@ -10,11 +10,11 @@ Use this skill when the task depends on tools coming from live browser tabs rath
 ## What This Server Provides
 
 - A local MCP server (`@mcp-b/webmcp-local-relay`) that forwards tool calls to connected browser pages.
-- Source discovery tools:
-  - `webmcp_list_sources`
-  - `webmcp_list_tools`
-- Dynamic relayed tools with names shaped like:
-  - `webmcp_{domain}_tab{tabId}_{toolName}`
+- Source discovery and invocation tools:
+  - `webmcp_list_sources` — lists connected browser tabs with metadata
+  - `webmcp_list_tools` — lists all relayed tools with source info
+  - `webmcp_call_tool` — invokes a relayed tool by name (useful for clients without dynamic tool support)
+- Dynamic relayed tools registered with the original tool name (e.g., `get_issue`). When multiple tabs expose the same name, a short tab-ID suffix is appended for disambiguation (e.g., `search_ed93`).
 
 ## Runtime Requirement
 
