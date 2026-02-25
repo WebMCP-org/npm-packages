@@ -1,7 +1,11 @@
+/**
+ * Public package exports for WebMCP Local Relay.
+ */
 export {
   RelayBridgeServer,
   type RelayBridgeServerOptions,
 } from './bridgeServer.js';
+export { type CliOptions, parseCliOptions, printHelp } from './cli-utils.js';
 export { LocalRelayMcpServer, type LocalRelayMcpServerOptions } from './mcpRelayServer.js';
 export {
   buildPublicToolName,

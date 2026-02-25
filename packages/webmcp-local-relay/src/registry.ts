@@ -1,6 +1,9 @@
-import { buildPublicToolName, extractSanitizedDomain } from './naming.js';
+import { buildPublicToolName } from './naming.js';
 import type { BrowserHelloMessage, BrowserTool } from './schemas.js';
 
+/**
+ * Internal metadata tracked for each active browser source.
+ */
 interface SourceMetadata {
   sourceId: string;
   tabId: string;
@@ -12,10 +15,16 @@ interface SourceMetadata {
   lastSeenAt: number;
 }
 
+/**
+ * Public source metadata exposed by registry APIs.
+ */
 export interface SourceInfo extends SourceMetadata {
   toolCount: number;
 }
 
+/**
+ * Aggregated relayed tool metadata across one or more sources.
+ */
 export interface AggregatedTool {
   name: string;
   originalName: string;
@@ -26,6 +35,9 @@ export interface AggregatedTool {
   sources: SourceInfo[];
 }
 
+/**
+ * Internal record linking a source to a concrete tool implementation.
+ */
 interface ToolProvider {
   sourceId: string;
   tabId: string;
@@ -33,12 +45,18 @@ interface ToolProvider {
   publicToolName: string;
 }
 
+/**
+ * Invocation target selected by the registry.
+ */
 export interface ResolvedInvocation {
   connectionId: string;
   tool: BrowserTool;
   publicToolName: string;
 }
 
+/**
+ * Error thrown when a source attempts to register tools before `hello`.
+ */
 export class HelloRequiredError extends Error {
   readonly connectionId: string;
 
@@ -49,15 +67,25 @@ export class HelloRequiredError extends Error {
   }
 }
 
+/**
+ * In-memory source and tool registry used by the relay bridge.
+ */
 export class RelayRegistry {
   private readonly sourceByConnectionId = new Map<string, SourceMetadata>();
   private readonly toolsByConnectionId = new Map<string, ToolProvider[]>();
   private readonly providersByPublicToolName = new Map<string, ToolProvider[]>();
 
+  /**
+   * @param now Time provider used for recency ordering.
+   */
   constructor(private readonly now: () => number = () => Date.now()) {}
 
-  // sourceId is currently identical to connectionId; kept as a separate concept
-  // for future stable-identity support (e.g., reconnecting the same logical source).
+  /**
+   * Upserts source metadata from a browser `hello` message.
+   *
+   * `sourceId` currently matches `connectionId`, but remains conceptually distinct
+   * so stable source identity can be introduced in the future.
+   */
   upsertSource(connectionId: string, hello: BrowserHelloMessage): void {
     const now = this.now();
     const existing = this.sourceByConnectionId.get(connectionId);
@@ -74,6 +102,9 @@ export class RelayRegistry {
     });
   }
 
+  /**
+   * Replaces the full tool set for a source connection.
+   */
   registerTools(connectionId: string, tools: BrowserTool[]): void {
     const source = this.sourceByConnectionId.get(connectionId);
     if (!source) {
@@ -83,35 +114,29 @@ export class RelayRegistry {
     this.touchConnection(connectionId);
     this.removeConnectionTools(connectionId);
 
-    const domain = extractSanitizedDomain(source.origin ?? source.url);
     const providers: ToolProvider[] = tools.map((tool) => ({
       sourceId: connectionId,
       tabId: source.tabId,
       tool,
-      publicToolName: buildPublicToolName({
-        domain,
-        tabId: source.tabId,
-        originalToolName: tool.name,
-      }),
+      publicToolName: '',
     }));
 
     this.toolsByConnectionId.set(connectionId, providers);
-
-    for (const provider of providers) {
-      const existing = this.providersByPublicToolName.get(provider.publicToolName) ?? [];
-      existing.push(provider);
-      this.providersByPublicToolName.set(
-        provider.publicToolName,
-        this.sortProvidersByRecency(existing)
-      );
-    }
+    this.rebuildPublicNames();
   }
 
+  /**
+   * Removes a source and all of its tool registrations.
+   */
   removeConnection(connectionId: string): void {
     this.removeConnectionTools(connectionId);
     this.sourceByConnectionId.delete(connectionId);
+    this.rebuildPublicNames();
   }
 
+  /**
+   * Marks a source as recently seen without mutating identity metadata.
+   */
   touchConnection(connectionId: string): void {
     const source = this.sourceByConnectionId.get(connectionId);
     if (!source) {
@@ -121,6 +146,9 @@ export class RelayRegistry {
     source.lastSeenAt = this.now();
   }
 
+  /**
+   * Lists active sources that currently publish at least one tool.
+   */
   listSources(): SourceInfo[] {
     return Array.from(this.sourceByConnectionId.values())
       .map((source) => this.toSourceInfo(source))
@@ -128,6 +156,9 @@ export class RelayRegistry {
       .sort((a, b) => this.compareRecency(b.lastSeenAt, a.lastSeenAt, b.sourceId, a.sourceId));
   }
 
+  /**
+   * Lists aggregated tools ordered by public tool name.
+   */
   listTools(): AggregatedTool[] {
     const result: AggregatedTool[] = [];
 
@@ -159,10 +190,14 @@ export class RelayRegistry {
     return result.sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  // Resolution priority:
-  // 1. Explicit sourceId — match by connectionId, then by tabId
-  // 2. requestTabId — strict tab match, returns null if no match (no fallback)
-  // 3. Default — most-recent provider
+  /**
+   * Resolves a tool invocation to a concrete source provider.
+   *
+   * Resolution order:
+   * 1. `sourceId`: exact source id, then fallback to tab id.
+   * 2. `requestTabId`: strict tab id match with no fallback.
+   * 3. Default: most recently seen provider.
+   */
   resolveInvocation(options: {
     toolName: string;
     sourceId?: string;
@@ -226,6 +261,9 @@ export class RelayRegistry {
     };
   }
 
+  /**
+   * Converts internal source metadata to public source info.
+   */
   private toSourceInfo(source: SourceMetadata): SourceInfo {
     return {
       ...source,
@@ -233,26 +271,56 @@ export class RelayRegistry {
     };
   }
 
+  /**
+   * Removes all tool providers for a connection.
+   */
   private removeConnectionTools(connectionId: string): void {
-    const providers = this.toolsByConnectionId.get(connectionId) ?? [];
     this.toolsByConnectionId.delete(connectionId);
+  }
 
-    for (const provider of providers) {
-      const existing = this.providersByPublicToolName.get(provider.publicToolName) ?? [];
-      const filtered = existing.filter((entry) => entry.sourceId !== connectionId);
-
-      if (filtered.length === 0) {
-        this.providersByPublicToolName.delete(provider.publicToolName);
-        continue;
+  /**
+   * Rebuilds public tool names after source set changes.
+   *
+   * When the same original tool name appears in multiple tabs, names are
+   * disambiguated with a short tab suffix.
+   */
+  private rebuildPublicNames(): void {
+    const byOriginalName = new Map<string, ToolProvider[]>();
+    for (const providers of this.toolsByConnectionId.values()) {
+      for (const provider of providers) {
+        const key = provider.tool.name;
+        const group = byOriginalName.get(key) ?? [];
+        group.push(provider);
+        byOriginalName.set(key, group);
       }
+    }
 
-      this.providersByPublicToolName.set(
-        provider.publicToolName,
-        this.sortProvidersByRecency(filtered)
-      );
+    this.providersByPublicToolName.clear();
+
+    for (const [, providers] of byOriginalName) {
+      const uniqueTabIds = new Set(providers.map((p) => p.tabId));
+      const disambiguate = uniqueTabIds.size > 1;
+
+      for (const provider of providers) {
+        provider.publicToolName = buildPublicToolName({
+          originalToolName: provider.tool.name,
+          tabId: provider.tabId,
+          disambiguate,
+        });
+
+        const existing = this.providersByPublicToolName.get(provider.publicToolName) ?? [];
+        existing.push(provider);
+        this.providersByPublicToolName.set(
+          provider.publicToolName,
+          this.sortProvidersByRecency(existing)
+        );
+      }
     }
   }
 
+  /**
+   * Returns providers sorted by source recency.
+   */
   private sortProvidersByRecency(providers: ToolProvider[]): ToolProvider[] {
     return providers.slice().sort((a, b) => {
       const aSource = this.sourceByConnectionId.get(a.sourceId);
@@ -264,6 +332,9 @@ export class RelayRegistry {
     });
   }
 
+  /**
+   * Compares two source recency tuples and stabilizes order by source id.
+   */
   private compareRecency(
     leftLastSeen: number,
     rightLastSeen: number,
