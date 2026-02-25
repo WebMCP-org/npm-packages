@@ -54,3 +54,7 @@ docs/plans/WEBMCP_SPEC.md
 .codex
 .agents
 .reference
+
+# MCPB build artifacts
+.mcpb-staging
+*.mcpb
