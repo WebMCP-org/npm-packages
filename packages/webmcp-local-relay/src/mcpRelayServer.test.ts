@@ -6,6 +6,9 @@ import WebSocket from 'ws';
 import { RelayBridgeServer } from './bridgeServer.js';
 import { LocalRelayMcpServer } from './mcpRelayServer.js';
 
+/**
+ * Polls until `fn` returns a defined value.
+ */
 async function waitFor<T>(
   fn: () => T | undefined | Promise<T | undefined>,
   timeoutMs = 2500
@@ -21,6 +24,9 @@ async function waitFor<T>(
   throw new Error('Timed out waiting for condition');
 }
 
+/**
+ * Creates a running relay + in-memory MCP client pair.
+ */
 async function createConnectedRelay(options?: { invokeTimeoutMs?: number }): Promise<{
   relay: LocalRelayMcpServer;
   bridge: RelayBridgeServer;
@@ -52,6 +58,9 @@ async function createConnectedRelay(options?: { invokeTimeoutMs?: number }): Pro
   };
 }
 
+/**
+ * Connects a browser websocket fixture and optionally handles invoke calls.
+ */
 async function connectBrowser(
   bridge: RelayBridgeServer,
   options: {
@@ -288,6 +297,82 @@ describe('LocalRelayMcpServer', () => {
     await client.close();
     ws.close();
     await relay.stop();
+  });
+
+  it('throws when connect() is called twice', async () => {
+    const { relay, cleanup } = await createConnectedRelay();
+
+    const [clientTransport2] = InMemoryTransport.createLinkedPair();
+    await expect(relay.connect(clientTransport2)).rejects.toThrow(
+      /MCP server transport already connected/
+    );
+
+    await cleanup();
+  });
+
+  it('stop handles mcpServer.close() errors gracefully', async () => {
+    const bridge = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+    });
+    const relay = new LocalRelayMcpServer({ bridge });
+    await relay.start();
+
+    // stop without connect — mcpServer.close() may fail but stop should not throw
+    await relay.stop();
+  });
+
+  describe('webmcp_list_sources', () => {
+    it('returns connected sources with metadata', async () => {
+      const { bridge, client, cleanup } = await createConnectedRelay();
+
+      const ws = await connectBrowser(bridge, {
+        tabId: 'tab-src',
+        url: 'https://example.com/page',
+        tools: [{ name: 'tool_a' }],
+      });
+
+      await waitFor(() => bridge.registry.listTools()[0]?.name);
+
+      const result = await client.callTool({
+        name: 'webmcp_list_sources',
+        arguments: {},
+      });
+
+      const text = (result.content as { type: string; text: string }[])[0].text;
+      expect(text).toContain('tab-src');
+      expect(text).toContain('"count": 1');
+
+      ws.close();
+      await cleanup();
+    });
+  });
+
+  describe('webmcp_list_tools', () => {
+    it('returns available tools with descriptions', async () => {
+      const { bridge, client, cleanup } = await createConnectedRelay();
+
+      const ws = await connectBrowser(bridge, {
+        tabId: 'tab-tools',
+        url: 'https://example.com/page',
+        tools: [{ name: 'search', description: 'Search things' }],
+      });
+
+      await waitFor(() => bridge.registry.listTools()[0]?.name);
+
+      const result = await client.callTool({
+        name: 'webmcp_list_tools',
+        arguments: {},
+      });
+
+      const text = (result.content as { type: string; text: string }[])[0].text;
+      expect(text).toContain('search');
+      expect(text).toContain('Search things');
+
+      ws.close();
+      await cleanup();
+    });
   });
 
   describe('webmcp_call_tool', () => {
