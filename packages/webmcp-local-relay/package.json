@@ -63,6 +63,7 @@
   "devDependencies": {
     "@types/node": "catalog:",
     "@types/ws": "^8.5.14",
+    "@vitest/coverage-v8": "catalog:",
     "playwright": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
