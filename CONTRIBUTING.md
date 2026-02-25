@@ -148,6 +148,7 @@ Package scopes (all in `packages/` directory):
 - `smart-dom-reader` - @mcp-b/smart-dom-reader
 - `transports` - @mcp-b/transports
 - `usewebmcp` - usewebmcp (strict core WebMCP React hooks)
+- `webmcp-local-relay` - @mcp-b/webmcp-local-relay
 - `webmcp-polyfill` - @mcp-b/webmcp-polyfill
 - `webmcp-ts-sdk` - @mcp-b/webmcp-ts-sdk
 - `webmcp-types` - @mcp-b/webmcp-types

@@ -14,6 +14,7 @@ export default {
         'smart-dom-reader',
         'transports',
         'usewebmcp',
+        'webmcp-local-relay',
         'webmcp-polyfill',
         'webmcp-ts-sdk',
         'webmcp-types',
