@@ -7,7 +7,6 @@
   <link rel="stylesheet" href="/src/styles/main.css">
 </head>
 <body class="flex min-h-screen flex-col">
-  <!-- Detection Banner -->
   <div id="detection-banner" class="sticky top-0 z-50 bg-gray-900 text-white shadow-lg">
     <div class="container mx-auto max-w-7xl px-6">
       <div id="detection-status" class="flex items-center gap-4 py-3 text-sm">
@@ -17,7 +16,6 @@
     </div>
   </div>
 
-  <!-- Header -->
   <header class="border-b-2 border-border bg-card px-6 py-8">
     <div class="container mx-auto max-w-7xl">
       <h1 class="text-3xl font-bold text-foreground">Web Model Context API Showcase</h1>
@@ -25,11 +23,9 @@
     </div>
   </header>
 
-  <!-- Main Content -->
   <main class="flex-1 px-6 py-8">
     <div class="container mx-auto max-w-7xl">
 
-      <!-- CodePen-style Editor Section -->
       <section class="mb-8 rounded-xl border border-border bg-card p-6 shadow-sm">
         <div class="mb-6 flex items-center justify-between border-b-2 border-border pb-4">
           <h2 class="text-2xl font-semibold text-foreground">Live Tool Editor</h2>
@@ -49,7 +45,6 @@
         </div>
 
         <div class="mb-6 grid gap-6 lg:grid-cols-2">
-          <!-- Code Editor -->
           <div class="flex flex-col overflow-hidden rounded-lg border border-border bg-muted">
             <div class="flex items-center justify-between bg-gray-900 px-4 py-3 text-sm text-white">
               <span class="font-semibold">Tool Definition</span>
@@ -62,7 +57,6 @@
               placeholder="// Define your tool here&#10;// Example:&#10;const tool = {&#10;  name: 'my_tool',&#10;  description: 'My custom tool',&#10;  inputSchema: {&#10;    type: 'object',&#10;    properties: {}&#10;  },&#10;  async execute(input) {&#10;    return {&#10;      content: [{&#10;        type: 'text',&#10;        text: 'Hello from my tool!'&#10;      }]&#10;    };&#10;  }&#10;};"></textarea>
           </div>
 
-          <!-- Interactive Tool Executor -->
           <div class="flex flex-col overflow-hidden rounded-lg border border-border bg-card">
             <div class="flex items-center justify-between bg-gray-900 px-4 py-3 text-sm text-white">
               <span class="font-semibold">Interactive Tool Executor</span>
@@ -74,11 +68,9 @@
           </div>
         </div>
 
-        <!-- Error Display -->
         <div id="editor-error" class="mt-4 hidden rounded-lg border border-red-200 bg-red-50 p-4 font-mono text-sm text-red-600"></div>
       </section>
 
-      <!-- Event Log -->
       <section class="mb-8">
         <div class="mb-4 flex items-center justify-between border-b-2 border-border pb-4">
           <h2 class="text-2xl font-semibold text-foreground">Event Log</h2>
@@ -87,16 +79,13 @@
         <div id="event-log" class="scrollbar-thin max-h-96 overflow-y-auto rounded-lg bg-gray-900 p-6 font-mono text-sm leading-loose text-gray-100"></div>
       </section>
 
-      <!-- Iframe Context Propagation Sandbox -->
       <section class="mb-8 rounded-xl border border-border bg-card p-6 shadow-sm">
         <div class="mb-6 border-b-2 border-border pb-4">
           <h2 class="text-2xl font-semibold text-foreground">Iframe Context Propagation</h2>
           <p class="mt-1 text-sm text-muted-foreground">Test how tools propagate across iframe boundaries with the native Web Model Context API</p>
         </div>
 
-        <!-- Iframe Controls -->
         <div class="mb-6 grid gap-6 lg:grid-cols-2">
-          <!-- Parent Context Controls -->
           <div class="rounded-lg border border-border bg-background p-4">
             <h3 class="mb-3 text-lg font-medium text-foreground">Parent Context</h3>
             <div class="space-y-3">
@@ -117,7 +106,6 @@
                 </button>
               </div>
             </div>
-            <!-- Parent Tool List -->
             <div class="mt-4">
               <div class="mb-2 text-sm font-medium text-foreground">Parent Tools:</div>
               <div id="iframe-parent-tools" class="rounded-lg border border-border bg-muted p-3 text-sm">
@@ -126,7 +114,6 @@
             </div>
           </div>
 
-          <!-- Iframe Controls -->
           <div class="rounded-lg border border-border bg-background p-4">
             <h3 class="mb-3 text-lg font-medium text-foreground">Iframe Context</h3>
             <div class="space-y-3">
@@ -147,7 +134,6 @@
                 </button>
               </div>
             </div>
-            <!-- Iframe Tool List -->
             <div class="mt-4">
               <div class="mb-2 text-sm font-medium text-foreground">Iframe Tools:</div>
               <div id="iframe-child-tools" class="rounded-lg border border-border bg-muted p-3 text-sm">
@@ -157,11 +143,9 @@
           </div>
         </div>
 
-        <!-- Context Comparison -->
         <div class="mb-6">
           <h3 class="mb-3 text-lg font-medium text-foreground">Context Comparison</h3>
           <div class="grid gap-4 lg:grid-cols-3">
-            <!-- Parent Only -->
             <div class="rounded-lg border border-border bg-background p-4">
               <div class="mb-2 flex items-center gap-2">
                 <div class="h-3 w-3 rounded-full bg-blue-500"></div>
@@ -169,7 +153,6 @@
               </div>
               <div id="iframe-compare-parent" class="text-sm text-muted-foreground">-</div>
             </div>
-            <!-- Iframe Only -->
             <div class="rounded-lg border border-border bg-background p-4">
               <div class="mb-2 flex items-center gap-2">
                 <div class="h-3 w-3 rounded-full bg-purple-500"></div>
@@ -177,7 +160,6 @@
               </div>
               <div id="iframe-compare-child" class="text-sm text-muted-foreground">-</div>
             </div>
-            <!-- Shared -->
             <div class="rounded-lg border border-border bg-background p-4">
               <div class="mb-2 flex items-center gap-2">
                 <div class="h-3 w-3 rounded-full bg-green-500"></div>
@@ -188,7 +170,6 @@
           </div>
         </div>
 
-        <!-- Iframe Sandbox -->
         <div class="rounded-lg border border-border bg-muted p-4">
           <div class="mb-3 flex items-center justify-between">
             <h3 class="text-lg font-medium text-foreground">Embedded Iframe</h3>
@@ -212,7 +193,6 @@
           </div>
         </div>
 
-        <!-- Iframe Event Log -->
         <div class="mt-6">
           <div class="mb-3 flex items-center justify-between">
             <h3 class="text-lg font-medium text-foreground">Cross-Frame Events</h3>
@@ -225,7 +205,6 @@
     </div>
   </main>
 
-  <!-- Footer -->
   <footer class="mt-auto bg-gray-900 px-6 py-6 text-center text-sm text-white">
     <div class="container mx-auto max-w-7xl">
       <p>
@@ -237,5 +216,6 @@
   </footer>
 
   <script type="module" src="/src/main.ts"></script>
+  <script src="/relay/embed.js"></script>
 </body>
 </html>
