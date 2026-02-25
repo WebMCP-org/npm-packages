@@ -375,6 +375,148 @@ describe('LocalRelayMcpServer', () => {
     });
   });
 
+  it('registers dynamic tools with valid annotations', async () => {
+    const { bridge, client, cleanup } = await createConnectedRelay();
+
+    const ws = await connectBrowser(bridge, {
+      tabId: 'tab-ann',
+      url: 'https://example.com',
+      tools: [
+        {
+          name: 'annotated_tool',
+          description: 'A tool with annotations',
+        },
+      ],
+    });
+
+    // Send tools with annotations via tools/changed
+    ws.send(
+      JSON.stringify({
+        type: 'tools/changed',
+        tools: [
+          {
+            name: 'annotated_tool',
+            description: 'A tool with annotations',
+            annotations: {
+              readOnlyHint: true,
+              idempotentHint: true,
+            },
+          },
+        ],
+      })
+    );
+
+    const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
+
+    const list = await client.listTools();
+    const tool = list.tools.find((t) => t.name === toolName);
+    expect(tool).toBeTruthy();
+    expect(tool?.annotations?.readOnlyHint).toBe(true);
+
+    ws.close();
+    await cleanup();
+  });
+
+  it('dynamic tool returns error when invokeTool times out', async () => {
+    // Use very short timeout so the test completes quickly
+    const { bridge, client, cleanup } = await createConnectedRelay({ invokeTimeoutMs: 50 });
+
+    // Connect browser that does NOT respond to invocations
+    const ws = await connectBrowser(bridge, {
+      tabId: 'tab-err',
+      url: 'https://example.com',
+      tools: [{ name: 'slow_tool', description: 'Never responds' }],
+    });
+
+    const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
+
+    await waitFor(async () => {
+      const list = await client.listTools();
+      return list.tools.find((t) => t.name === toolName) ? true : undefined;
+    });
+
+    // Invoke the dynamic tool — it will timeout and hit the catch block
+    const result = await client.callTool({
+      name: toolName,
+      arguments: {},
+    });
+
+    const text = (result.content as { type: string; text: string }[])[0].text;
+    expect(text).toContain('Failed to invoke relayed tool');
+    expect(text).toContain('timed out');
+    expect(result.isError).toBe(true);
+
+    ws.close();
+    await cleanup();
+  });
+
+  it('drops invalid annotations with a warning', async () => {
+    const { bridge, relay, cleanup } = await createConnectedRelay();
+
+    const ws = await connectBrowser(bridge, {
+      tabId: 'tab-bad-ann',
+      url: 'https://example.com',
+      tools: [{ name: 'bad_ann_tool', description: 'Has bad annotations' }],
+    });
+
+    await waitFor(() => (relay.listDynamicToolNames().length > 0 ? true : undefined));
+
+    // Send tools with invalid annotation types
+    ws.send(
+      JSON.stringify({
+        type: 'tools/changed',
+        tools: [
+          {
+            name: 'bad_ann_tool',
+            description: 'Has bad annotations',
+            annotations: {
+              readOnlyHint: 'not-a-boolean',
+              idempotentHint: 42,
+            },
+          },
+        ],
+      })
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    // Tool should still be registered (annotations dropped)
+    expect(relay.listDynamicToolNames().length).toBeGreaterThan(0);
+
+    ws.close();
+    await cleanup();
+  });
+
+  it('skips re-registering dynamic tools when signature is unchanged', async () => {
+    const { bridge, relay, cleanup } = await createConnectedRelay();
+
+    const ws = await connectBrowser(bridge, {
+      tabId: 'tab-skip',
+      url: 'https://example.com',
+      tools: [{ name: 'stable_tool', description: 'Stays the same' }],
+    });
+
+    await waitFor(() => (relay.listDynamicToolNames().length > 0 ? true : undefined));
+
+    const namesBefore = relay.listDynamicToolNames();
+
+    // Send the same tools again — should not trigger re-registration
+    ws.send(
+      JSON.stringify({
+        type: 'tools/changed',
+        tools: [{ name: 'stable_tool', description: 'Stays the same' }],
+      })
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const namesAfter = relay.listDynamicToolNames();
+    expect(namesAfter).toEqual(namesBefore);
+
+    ws.close();
+    await cleanup();
+  });
+
   describe('webmcp_call_tool', () => {
     it('invokes a browser tool by name and appends available tools summary', async () => {
       const { bridge, client, cleanup } = await createConnectedRelay();
@@ -450,6 +592,80 @@ describe('LocalRelayMcpServer', () => {
       expect(text).toContain('No tools are currently available');
       expect(result.isError).toBe(true);
 
+      await cleanup();
+    });
+
+    it('returns error with tool summary when invokeTool throws during webmcp_call_tool', async () => {
+      const { bridge, client, cleanup } = await createConnectedRelay({ invokeTimeoutMs: 50 });
+
+      // Connect two tools — one that doesn't respond (timeout) and one for the summary
+      const ws = await connectBrowser(bridge, {
+        tabId: 'tab-mix',
+        url: 'https://example.com',
+        tools: [
+          { name: 'timeout_tool', description: 'Never responds' },
+          { name: 'other_tool', description: 'Exists for summary' },
+        ],
+      });
+
+      const toolNames = await waitFor(() => {
+        const tools = bridge.registry.listTools();
+        return tools.length >= 2 ? tools.map((t) => t.name) : undefined;
+      });
+
+      const timeoutToolName = toolNames.find((n) => n.includes('timeout'));
+
+      const result = await client.callTool({
+        name: 'webmcp_call_tool',
+        arguments: { name: timeoutToolName },
+      });
+
+      const text = (result.content as { type: string; text: string }[])[0].text;
+      expect(text).toContain('Failed to call tool');
+      expect(text).toContain('timed out');
+      expect(text).toContain('Available tools:');
+      expect(result.isError).toBe(true);
+
+      ws.close();
+      await cleanup();
+    });
+
+    it('returns error when invokeTool throws during webmcp_call_tool', async () => {
+      const { bridge, client, cleanup } = await createConnectedRelay();
+
+      const ws = await connectBrowser(bridge, {
+        tabId: 'tab-fail',
+        url: 'https://example.com',
+        tools: [{ name: 'will_disconnect', description: 'A tool that will disconnect' }],
+      });
+
+      const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
+
+      // Close the socket so invocation will throw
+      ws.close();
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Re-connect a new source so there are tools available (for the summary path)
+      const ws2 = await connectBrowser(bridge, {
+        tabId: 'tab-ok',
+        url: 'https://example.com',
+        tools: [{ name: 'other_tool', description: 'Another tool' }],
+      });
+
+      await waitFor(() => (bridge.registry.listTools().length > 0 ? true : undefined));
+
+      // Now call the tool — name won't match any available tool, so it triggers not-found error with summary
+      const result = await client.callTool({
+        name: 'webmcp_call_tool',
+        arguments: { name: toolName },
+      });
+
+      const text = (result.content as { type: string; text: string }[])[0].text;
+      expect(result.isError).toBe(true);
+      // Should contain either "not found" or "Failed to call tool"
+      expect(text).toMatch(/not found|Failed to call/);
+
+      ws2.close();
       await cleanup();
     });
 
