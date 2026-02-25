@@ -7,6 +7,9 @@ import WebSocket, { WebSocketServer } from 'ws';
 import { HelloRequiredError, RelayRegistry } from './registry.js';
 import { BrowserToRelayMessageSchema, type RelayToBrowserMessage } from './schemas.js';
 
+/**
+ * In-flight relay invocation waiting for a browser `result` message.
+ */
 interface PendingInvocation {
   callId: string;
   connectionId: string;
@@ -15,15 +18,48 @@ interface PendingInvocation {
   reject: (error: Error) => void;
 }
 
+/**
+ * Runtime options for {@link RelayBridgeServer}.
+ */
 export interface RelayBridgeServerOptions {
+  /**
+   * Network interface used by the local WebSocket server.
+   * @defaultValue `"127.0.0.1"`
+   */
   host?: string;
+  /**
+   * Preferred WebSocket port for browser widget connections.
+   * @defaultValue `9333`
+   */
   port?: number;
+  /**
+   * Allowed `Origin` header values for incoming browser connections.
+   * Use `["*"]` to allow all origins.
+   * @defaultValue `["*"]`
+   */
   allowedOrigins?: string[];
+  /**
+   * Maximum WebSocket payload size in bytes.
+   * @defaultValue `1000000`
+   */
   maxPayloadBytes?: number;
+  /**
+   * Timeout used for browser tool invocations.
+   * @defaultValue `25000`
+   */
   invokeTimeoutMs?: number;
 }
 
+/**
+ * WebSocket relay between browser widget frames and MCP server calls.
+ *
+ * This class accepts browser connections, tracks available browser tools,
+ * and forwards MCP tool calls to the selected browser source.
+ */
 export class RelayBridgeServer extends EventEmitter {
+  /**
+   * Registry for connected sources and aggregated tool definitions.
+   */
   readonly registry: RelayRegistry;
 
   private readonly host: string;
@@ -37,6 +73,9 @@ export class RelayBridgeServer extends EventEmitter {
   private readonly connectionIdBySocket = new WeakMap<WebSocket, string>();
   private readonly pendingInvocations = new Map<string, PendingInvocation>();
 
+  /**
+   * Creates a relay bridge server instance.
+   */
   constructor(options: RelayBridgeServerOptions = {}, registry?: RelayRegistry) {
     super();
     this.registry = registry ?? new RelayRegistry();
@@ -48,10 +87,20 @@ export class RelayBridgeServer extends EventEmitter {
     this.invokeTimeoutMs = options.invokeTimeoutMs ?? 25_000;
   }
 
+  /**
+   * Resolved listening port. This may differ from the requested port when `0` is used.
+   */
   get port(): number {
     return this.desiredPort;
   }
 
+  /**
+   * Starts the WebSocket listener and begins accepting browser widget connections.
+   *
+   * Emits:
+   * - `stateChanged` when source/tool state changes.
+   * - `error` when the underlying WebSocket server emits an error.
+   */
   async start(): Promise<void> {
     if (this.wss) {
       return;
@@ -121,9 +170,7 @@ export class RelayBridgeServer extends EventEmitter {
     for (const socket of this.socketByConnectionId.values()) {
       try {
         socket.close(1001, 'Relay shutting down');
-      } catch {
-        // ignore close errors during shutdown
-      }
+      } catch {}
     }
 
     this.socketByConnectionId.clear();
@@ -218,6 +265,9 @@ export class RelayBridgeServer extends EventEmitter {
     return result;
   }
 
+  /**
+   * Handles a raw WebSocket message from a connected browser source.
+   */
   private onSocketMessage(connectionId: string, raw: WebSocket.RawData): void {
     this.registry.touchConnection(connectionId);
 
@@ -294,6 +344,9 @@ export class RelayBridgeServer extends EventEmitter {
     }
   }
 
+  /**
+   * Handles source disconnection and rejects in-flight calls owned by that source.
+   */
   private onSocketClose(connectionId: string): void {
     this.registry.removeConnection(connectionId);
     this.socketByConnectionId.delete(connectionId);
@@ -310,6 +363,9 @@ export class RelayBridgeServer extends EventEmitter {
     }
   }
 
+  /**
+   * Returns whether a browser `Origin` header is allowed to connect.
+   */
   private isOriginAllowed(origin: string | undefined): boolean {
     if (this.allowedOrigins.includes('*')) {
       return true;
@@ -322,6 +378,11 @@ export class RelayBridgeServer extends EventEmitter {
     return this.allowedOrigins.includes(origin);
   }
 
+  /**
+   * Ensures browser responses match MCP `CallToolResult`.
+   *
+   * Invalid payloads are converted to a safe `isError` result with diagnostics.
+   */
   private normalizeCallToolResult(result: unknown): CallToolResult {
     const parsed = CallToolResultSchema.safeParse(result);
     if (parsed.success) {
@@ -344,6 +405,9 @@ export class RelayBridgeServer extends EventEmitter {
     };
   }
 
+  /**
+   * Converts WebSocket raw data variants to a UTF-8 string payload.
+   */
   private rawDataToUtf8(raw: WebSocket.RawData): string {
     if (typeof raw === 'string') {
       return raw;

@@ -7,18 +7,42 @@ import { z } from 'zod';
 import { RelayBridgeServer, type RelayBridgeServerOptions } from './bridgeServer.js';
 import type { AggregatedTool } from './registry.js';
 
+/**
+ * Handle returned by MCP tool registration.
+ */
 interface RegisteredToolHandle {
   remove: () => void;
 }
 
+/**
+ * Construction options for {@link LocalRelayMcpServer}.
+ */
 export interface LocalRelayMcpServerOptions {
+  /**
+   * Existing bridge instance to reuse.
+   */
   bridge?: RelayBridgeServer;
+  /**
+   * Bridge options used when creating an internal bridge.
+   */
   bridgeOptions?: RelayBridgeServerOptions;
+  /**
+   * MCP server name reported during initialization.
+   */
   serverName?: string;
+  /**
+   * MCP server version reported during initialization.
+   */
   serverVersion?: string;
 }
 
+/**
+ * MCP server facade that exposes browser-relayed tools over MCP transport.
+ */
 export class LocalRelayMcpServer {
+  /**
+   * Underlying WebSocket bridge used for browser communication.
+   */
   readonly bridge: RelayBridgeServer;
 
   private readonly mcpServer: McpServer;
@@ -29,6 +53,9 @@ export class LocalRelayMcpServer {
   private syncRequested = false;
   private connected = false;
 
+  /**
+   * Creates a local relay MCP server with static and dynamic tool registration.
+   */
   constructor(options: LocalRelayMcpServerOptions = {}) {
     this.bridge = options.bridge ?? new RelayBridgeServer(options.bridgeOptions);
 
@@ -46,6 +73,9 @@ export class LocalRelayMcpServer {
     this.registerStaticTools();
   }
 
+  /**
+   * Starts the browser bridge and synchronizes dynamic MCP tools.
+   */
   async start(): Promise<void> {
     await this.bridge.start();
     await this.syncDynamicTools();
@@ -60,6 +90,9 @@ export class LocalRelayMcpServer {
     this.connected = true;
   }
 
+  /**
+   * Convenience helper that connects the server over stdio transport.
+   */
   async startStdio(): Promise<void> {
     await this.connect(new StdioServerTransport());
   }
@@ -76,10 +109,16 @@ export class LocalRelayMcpServer {
     await this.bridge.stop();
   }
 
+  /**
+   * Returns dynamic tool names currently registered in MCP.
+   */
   listDynamicToolNames(): string[] {
     return Array.from(this.dynamicToolHandles.keys()).sort();
   }
 
+  /**
+   * Registers built-in management tools exposed by the relay.
+   */
   private registerStaticTools(): void {
     this.mcpServer.registerTool(
       'webmcp_list_sources',
@@ -141,9 +180,7 @@ export class LocalRelayMcpServer {
         inputSchema: {
           name: z
             .string()
-            .describe(
-              'The tool name to call. Use the full namespaced name from webmcp_list_tools (e.g. "webmcp_localhost_3000_tab1_my_tool").'
-            ),
+            .describe('The tool name to call. Use webmcp_list_tools to see available tool names.'),
           arguments: z
             .record(z.string(), z.unknown())
             .optional()
@@ -179,7 +216,6 @@ export class LocalRelayMcpServer {
         try {
           const result = await this.bridge.invokeTool(name, args ?? {});
 
-          // Append available tools summary after successful calls
           if (toolSummary) {
             const updatedTools = this.bridge.registry.listTools();
             const updatedSummary = this.buildToolSummary(updatedTools);
@@ -207,6 +243,9 @@ export class LocalRelayMcpServer {
     );
   }
 
+  /**
+   * Builds a concise plain-text list of available tools.
+   */
   private buildToolSummary(tools: AggregatedTool[]): string | null {
     if (tools.length === 0) {
       return null;
@@ -220,6 +259,9 @@ export class LocalRelayMcpServer {
       .join('\n');
   }
 
+  /**
+   * Coalesces concurrent sync requests into a single serialized sync loop.
+   */
   private async syncDynamicTools(): Promise<void> {
     if (this.syncing) {
       this.syncRequested = true;
@@ -245,6 +287,9 @@ export class LocalRelayMcpServer {
     }
   }
 
+  /**
+   * Applies registry tool state to MCP dynamic registrations.
+   */
   private applyDynamicTools(tools: AggregatedTool[]): void {
     const nextNames = new Set(tools.map((tool) => tool.name));
     let changed = false;
@@ -285,6 +330,9 @@ export class LocalRelayMcpServer {
     }
   }
 
+  /**
+   * Registers a single dynamic tool and returns a removal handle.
+   */
   private registerDynamicTool(tool: AggregatedTool): RegisteredToolHandle {
     const annotations = this.normalizeAnnotations(tool.annotations);
     const config: {
@@ -314,6 +362,9 @@ export class LocalRelayMcpServer {
     };
   }
 
+  /**
+   * Builds a display description for relayed tools including source context.
+   */
   private dynamicToolDescription(tool: AggregatedTool): string {
     const source = tool.sources[0];
     const sourceLabel = source
@@ -323,6 +374,9 @@ export class LocalRelayMcpServer {
     return `${sourceLabel} ${tool.description ?? `Relayed tool ${tool.originalName}`}`;
   }
 
+  /**
+   * Converts unknown annotation payloads into MCP tool annotations when valid.
+   */
   private normalizeAnnotations(
     value: Record<string, unknown> | undefined
   ): ToolAnnotations | undefined {
@@ -334,6 +388,9 @@ export class LocalRelayMcpServer {
     return parsed.success ? parsed.data : undefined;
   }
 
+  /**
+   * Produces a stable signature for change detection of dynamic tool metadata.
+   */
   private toolSignature(tool: AggregatedTool): string {
     return JSON.stringify({
       name: tool.name,
@@ -349,6 +406,9 @@ export class LocalRelayMcpServer {
     });
   }
 
+  /**
+   * Logs tool sync errors with full detail.
+   */
   private logSyncError(err: unknown): void {
     const details = err instanceof Error ? (err.stack ?? err.message) : String(err);
     process.stderr.write(`[webmcp-local-relay] error: failed to sync dynamic tools: ${details}\n`);
