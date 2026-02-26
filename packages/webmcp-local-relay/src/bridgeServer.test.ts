@@ -1482,7 +1482,7 @@ describe('RelayBridgeServer client mode', () => {
 
       await client.stop();
     } finally {
-      await server.stop().catch(() => {});
+      await server.stop().catch((e) => console.warn('[test cleanup] server.stop():', e));
     }
   });
 
@@ -1547,7 +1547,7 @@ describe('RelayBridgeServer client mode', () => {
       ws.close();
       await client.stop();
     } finally {
-      await server.stop().catch(() => {});
+      await server.stop().catch((e) => console.warn('[test cleanup] server.stop():', e));
     }
   });
 

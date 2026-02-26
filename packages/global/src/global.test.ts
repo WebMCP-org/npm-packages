@@ -418,10 +418,31 @@ describe('global adapter', () => {
     const tools = modelContext.listTools();
     const tool = tools.find((t) => t.name === 'no_args_tool');
     expect(tool).toBeDefined();
-    expect(tool?.inputSchema).toMatchObject({ type: 'object' });
+    expect(tool?.inputSchema).toEqual({ type: 'object', properties: {} });
   });
 
-  it('listTools normalizes outputSchema missing type to object schema', async () => {
+  it('listTools does not prepend type:"object" to non-object outputSchema', () => {
+    initializeWebModelContext();
+    const modelContext = getModelContext();
+
+    modelContext.registerTool({
+      name: 'string_output_tool',
+      description: 'Tool with string output schema',
+      inputSchema: { type: 'object', properties: {} },
+      outputSchema: { type: 'string' },
+      async execute() {
+        return { content: [{ type: 'text', text: 'ok' }] };
+      },
+    });
+
+    const tools = modelContext.listTools();
+    const tool = tools.find((t) => t.name === 'string_output_tool');
+    expect(tool).toBeDefined();
+    // outputSchema should NOT get type:"object" — non-object types must be preserved
+    expect(tool?.outputSchema).toMatchObject({ type: 'string' });
+  });
+
+  it('listTools preserves outputSchema without applying object-type normalization', async () => {
     initializeWebModelContext();
     const modelContext = getModelContext();
 
@@ -446,8 +467,8 @@ describe('global adapter', () => {
     const tools = modelContext.listTools();
     const tool = tools.find((t) => t.name === 'output_no_type_tool');
     expect(tool).toBeDefined();
-    expect(tool?.outputSchema).toMatchObject({
-      type: 'object',
+    // outputSchema should NOT get type:"object" prepended — only inputSchema requires that
+    expect(tool?.outputSchema).toEqual({
       properties: { value: { type: 'string' } },
       required: ['value'],
     });

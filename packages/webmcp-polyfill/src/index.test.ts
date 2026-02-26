@@ -1046,7 +1046,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
       expect(tools).toHaveLength(1);
       expect(tools?.[0]?.inputSchema).toBeDefined();
       const parsed = JSON.parse(tools?.[0]?.inputSchema ?? '');
-      expect(parsed.type).toBe('object');
+      expect(parsed).toEqual({ type: 'object', properties: {} });
     });
 
     it('listTools omits inputSchema when serialization fails', () => {

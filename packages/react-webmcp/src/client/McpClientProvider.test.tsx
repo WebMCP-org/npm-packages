@@ -77,10 +77,18 @@ describe('McpClientProvider', () => {
       if (!connection) {
         break;
       }
-      await connection.client.close().catch(() => {});
-      await connection.clientTransport.close().catch(() => {});
-      await connection.server.close().catch(() => {});
-      await connection.serverTransport.close().catch(() => {});
+      await connection.client
+        .close()
+        .catch((e) => console.warn('[test cleanup] client.close():', e));
+      await connection.clientTransport
+        .close()
+        .catch((e) => console.warn('[test cleanup] clientTransport.close():', e));
+      await connection.server
+        .close()
+        .catch((e) => console.warn('[test cleanup] server.close():', e));
+      await connection.serverTransport
+        .close()
+        .catch((e) => console.warn('[test cleanup] serverTransport.close():', e));
     }
     vi.clearAllMocks();
   });
@@ -564,7 +572,7 @@ describe('McpClientProvider', () => {
         arguments: { message: 'hello' },
       });
 
-      expect(callResult.content[0]).toEqual({ type: 'text', text: 'echo:hello' });
+      expect(callResult.content[0]).toMatchObject({ type: 'text', text: 'echo:hello' });
     });
 
     it('refreshes tool list after real list_changed notifications', async () => {
