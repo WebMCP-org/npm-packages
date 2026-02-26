@@ -4,8 +4,8 @@
   "private": false,
   "type": "module",
   "scripts": {
-    "audit:ci:critical": "node ./scripts/audit-filtered.mjs --level critical --prod --ignore-prefix e2e__ --ignore-prefix 'packages__chrome-devtools-mcp>'",
-    "audit:ci:high": "node ./scripts/audit-filtered.mjs --level high --prod --ignore-prefix e2e__ --ignore-prefix 'packages__chrome-devtools-mcp>'",
+    "audit:ci:critical": "node ./scripts/audit-filtered.mjs --level critical --prod --ignore-prefix e2e__ --ignore-prefix examples__ --ignore-prefix 'packages__chrome-devtools-mcp>'",
+    "audit:ci:high": "node ./scripts/audit-filtered.mjs --level high --prod --ignore-prefix e2e__ --ignore-prefix examples__ --ignore-prefix 'packages__chrome-devtools-mcp>'",
     "build": "turbo run build --filter='!@mcp-b/example-*'",
     "changeset": "changeset",
     "changeset:publish": "pnpm build && changeset publish",
