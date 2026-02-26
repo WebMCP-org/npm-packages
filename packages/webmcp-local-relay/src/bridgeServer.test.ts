@@ -651,6 +651,53 @@ describe('RelayBridgeServer', () => {
     }
   });
 
+  it('updates registry when tools/changed replaces initial tools', async () => {
+    const bridge = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+    });
+
+    try {
+      await bridge.start();
+
+      const ws = await connectAndRegister(bridge, {
+        tabId: 'tab-1',
+        url: 'https://example.com',
+        tools: [{ name: 'tool_a', description: 'Initial tool' }],
+      });
+
+      // Wait for tool_a to appear in registry
+      const toolAName = await waitFor(() => bridge.registry.listTools()[0]?.name);
+      expect(toolAName).toBeTruthy();
+
+      // Send tools/changed replacing tool_a with tool_b
+      ws.send(
+        JSON.stringify({
+          type: 'tools/changed',
+          tools: [{ name: 'tool_b', description: 'Replacement tool' }],
+        })
+      );
+
+      // Wait for tool_b to appear and tool_a to disappear
+      const toolBName = await waitFor(() => {
+        const tools = bridge.registry.listTools();
+        const hasA = tools.some((t) => t.originalName === 'tool_a');
+        const toolB = tools.find((t) => t.originalName === 'tool_b');
+        return !hasA && toolB ? toolB.name : undefined;
+      });
+
+      expect(toolBName).toBeTruthy();
+      const allTools = bridge.registry.listTools();
+      expect(allTools.some((t) => t.originalName === 'tool_a')).toBe(false);
+      expect(allTools.some((t) => t.originalName === 'tool_b')).toBe(true);
+
+      ws.close();
+    } finally {
+      await bridge.stop();
+    }
+  });
+
   it('survives malformed JSON messages without dropping the connection', async () => {
     const bridge = new RelayBridgeServer({
       host: '127.0.0.1',

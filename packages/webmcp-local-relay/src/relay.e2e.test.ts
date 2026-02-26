@@ -381,6 +381,36 @@ function buildHostPageHtml(options: {
             );
           }
         });
+
+        // Subscribe to tool changes and push updates to widget iframe
+        let pushTimerId = 0;
+        function pushToolChangesToWidget() {
+          clearTimeout(pushTimerId);
+          pushTimerId = setTimeout(() => {
+            const widgetIframe = document.querySelector('[data-webmcp-relay]');
+            if (!widgetIframe || !widgetIframe.contentWindow) return;
+            try {
+              const toolBridge = getToolBridge();
+              toolBridge.listTools().then((tools) => {
+                widgetIframe.contentWindow.postMessage({
+                  type: 'webmcp.tools.changed',
+                  tools,
+                }, widgetOrigin);
+              }).catch(() => {});
+            } catch {}
+          }, 150);
+        }
+
+        const mc = navigator.modelContext;
+        if (mc && typeof mc.addEventListener === 'function') {
+          try { mc.addEventListener('toolschanged', pushToolChangesToWidget); }
+          catch { /* fall through */ }
+        }
+        const testing = navigator.modelContextTesting;
+        if (testing && typeof testing.registerToolsChangedCallback === 'function') {
+          try { testing.registerToolsChangedCallback(pushToolChangesToWidget); }
+          catch {}
+        }
       })();
     </script>
   </body>
@@ -432,6 +462,8 @@ function buildWidgetPageHtml(): string {
         }
 
         const pending = new Map();
+        let activeSocket = null;
+        let helloSent = false;
 
         window.addEventListener('message', (event) => {
           if (event.origin !== hostOrigin) {
@@ -439,6 +471,18 @@ function buildWidgetPageHtml(): string {
           }
 
           const data = event.data;
+
+          // Handle tool change push from host embed
+          if (data && typeof data === 'object' && data.type === 'webmcp.tools.changed') {
+            if (activeSocket && activeSocket.readyState === WebSocket.OPEN && helloSent) {
+              activeSocket.send(JSON.stringify({
+                type: 'tools/changed',
+                tools: Array.isArray(data.tools) ? data.tools : [],
+              }));
+            }
+            return;
+          }
+
           if (!data || typeof data !== 'object' || typeof data.requestId !== 'string') {
             return;
           }
@@ -494,6 +538,7 @@ function buildWidgetPageHtml(): string {
 
         function connect() {
           const ws = new WebSocket(wsUrl);
+          activeSocket = ws;
 
           ws.addEventListener('open', async () => {
             try {
@@ -510,6 +555,7 @@ function buildWidgetPageHtml(): string {
                 }),
               );
               ws.send(JSON.stringify({ type: 'tools/list', tools }));
+              helloSent = true;
             } catch {
               ws.close();
             }
@@ -565,6 +611,8 @@ function buildWidgetPageHtml(): string {
           });
 
           ws.addEventListener('close', () => {
+            helloSent = false;
+            activeSocket = null;
             setTimeout(connect, 350);
           });
 
@@ -771,6 +819,78 @@ describe('relay e2e', () => {
         expect(text).toContain('path=/');
       } catch (error) {
         throw formatE2EError(runtimeCase.mode, error, harness);
+      } finally {
+        await harness?.cleanup();
+      }
+    });
+
+    it(`propagates dynamic tool registration and unregistration (${runtimeCase.mode})`, async () => {
+      let harness: E2EHarness | null = null;
+
+      try {
+        harness = await setupE2EHarness(runtimeCase);
+
+        // Verify the initial tool exists
+        const initialTools = await harness.client.listTools();
+        expect(initialTools.tools.some((t) => t.name === harness?.expectedToolName)).toBe(true);
+
+        // Dynamically register a new tool on the page
+        await harness.page.evaluate(() => {
+          const mc = (
+            navigator as unknown as { modelContext: { registerTool: (t: unknown) => void } }
+          ).modelContext;
+          mc.registerTool({
+            name: 'dynamic_e2e_tool',
+            description: 'Dynamically registered tool',
+            inputSchema: { type: 'object', properties: { msg: { type: 'string' } } },
+            execute: async (args: Record<string, unknown>) => ({
+              content: [{ type: 'text' as const, text: `dynamic:${String(args?.msg ?? '')}` }],
+            }),
+          });
+        });
+
+        // Poll until the new tool appears in the MCP client
+        const dynamicToolName = await waitForValue(async () => {
+          const toolList = await harness?.client.listTools();
+          const found = toolList?.tools.find((t) => t.name === sanitizeName('dynamic_e2e_tool'));
+          return found ? found.name : undefined;
+        }, 15_000);
+
+        expect(dynamicToolName).toBe(sanitizeName('dynamic_e2e_tool'));
+
+        // Invoke the dynamic tool
+        const result = await harness.client.callTool({
+          name: dynamicToolName,
+          arguments: { msg: 'hello' },
+        });
+        const text = (result.content?.[0] as { text?: string } | undefined)?.text ?? '';
+        expect(text).toContain('dynamic:hello');
+
+        // Unregister the dynamic tool
+        await harness.page.evaluate(() => {
+          const mc = (
+            navigator as unknown as { modelContext: { unregisterTool: (name: string) => void } }
+          ).modelContext;
+          mc.unregisterTool('dynamic_e2e_tool');
+        });
+
+        // Poll until the dynamic tool disappears
+        await waitForValue(async () => {
+          const toolList = await harness?.client.listTools();
+          const stillThere = toolList?.tools.some(
+            (t) => t.name === sanitizeName('dynamic_e2e_tool')
+          );
+          return stillThere ? undefined : true;
+        }, 15_000);
+
+        // Original tool should still exist
+        const finalTools = await harness.client.listTools();
+        expect(finalTools.tools.some((t) => t.name === harness?.expectedToolName)).toBe(true);
+        expect(finalTools.tools.some((t) => t.name === sanitizeName('dynamic_e2e_tool'))).toBe(
+          false
+        );
+      } catch (error) {
+        throw formatE2EError(`${runtimeCase.mode} dynamic-tools`, error, harness);
       } finally {
         await harness?.cleanup();
       }

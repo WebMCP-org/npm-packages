@@ -92,13 +92,29 @@
         /** @type {Map<string, PendingRequest>} */
         var pendingRequests = new Map();
         var reconnectDelayMs = RECONNECT_INITIAL_DELAY_MS;
+        /** @type {WebSocket | null} */
+        var activeSocket = null;
+        var helloSent = false;
 
         window.addEventListener('message', function onHostMessage(event) {
           if (event.origin !== config.hostOrigin) {
             return;
           }
 
-          var message = parseHostMessage(event.data);
+          var data = event.data;
+          if (isJsonObject(data) && data.type === 'webmcp.tools.changed') {
+            if (activeSocket && activeSocket.readyState === WebSocket.OPEN && helloSent) {
+              activeSocket.send(
+                JSON.stringify({
+                  type: 'tools/changed',
+                  tools: Array.isArray(data.tools) ? data.tools : [],
+                })
+              );
+            }
+            return;
+          }
+
+          var message = parseHostMessage(data);
           if (!message) {
             return;
           }
@@ -168,6 +184,7 @@
                 })
               );
               socket.send(JSON.stringify({ type: 'tools/list', tools: tools }));
+              helloSent = true;
             })
             .catch(function onHelloError(error) {
               console.warn('[webmcp-relay-widget] Hello handshake failed:', error);
@@ -235,6 +252,7 @@
 
         function connect() {
           var socket = new WebSocket(config.wsUrl);
+          activeSocket = socket;
 
           socket.addEventListener('open', function onOpen() {
             reconnectDelayMs = RECONNECT_INITIAL_DELAY_MS;
@@ -246,6 +264,8 @@
           });
 
           socket.addEventListener('close', function onClose() {
+            helloSent = false;
+            activeSocket = null;
             setTimeout(connect, reconnectDelayMs);
             reconnectDelayMs = Math.min(reconnectDelayMs * 1.5, RECONNECT_MAX_DELAY_MS);
           });
