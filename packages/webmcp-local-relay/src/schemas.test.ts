@@ -18,6 +18,7 @@ import {
   RelayServerToClientMessageSchema,
   RelayServerToolsChangedSchema,
   RelayServerToolsSchema,
+  RelaySourceInfoSchema,
   RelayToBrowserMessageSchema,
 } from './schemas.js';
 
@@ -327,6 +328,58 @@ describe('RelayToBrowserMessageSchema', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Relay source metadata
+// ---------------------------------------------------------------------------
+
+describe('RelaySourceInfoSchema', () => {
+  it('accepts valid source info with all fields', () => {
+    const result = RelaySourceInfoSchema.safeParse({
+      sourceId: 'conn-1',
+      tabId: 'tab-1',
+      origin: 'https://example.com',
+      url: 'https://example.com/page',
+      title: 'Test Page',
+      iconUrl: 'https://example.com/icon.png',
+      connectedAt: 1000,
+      lastSeenAt: 2000,
+      toolCount: 3,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts source info with only required fields', () => {
+    const result = RelaySourceInfoSchema.safeParse({
+      sourceId: 'conn-1',
+      tabId: 'tab-1',
+      connectedAt: 1000,
+      lastSeenAt: 2000,
+      toolCount: 0,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects source info missing sourceId', () => {
+    const result = RelaySourceInfoSchema.safeParse({
+      tabId: 'tab-1',
+      connectedAt: 1000,
+      lastSeenAt: 2000,
+      toolCount: 0,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects source info missing toolCount', () => {
+    const result = RelaySourceInfoSchema.safeParse({
+      sourceId: 'conn-1',
+      tabId: 'tab-1',
+      connectedAt: 1000,
+      lastSeenAt: 2000,
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Relay-to-relay protocol schemas (client mode ↔ server mode)
 // ---------------------------------------------------------------------------
 
@@ -439,7 +492,7 @@ describe('RelayClientToServerMessageSchema', () => {
 });
 
 describe('RelayServerToolsSchema', () => {
-  it('accepts a relay/tools with tools array', () => {
+  it('accepts a relay/tools with tools, sources, and toolSourceMap', () => {
     const result = RelayServerToolsSchema.safeParse({
       type: 'relay/tools',
       tools: [
@@ -449,20 +502,46 @@ describe('RelayServerToolsSchema', () => {
           inputSchema: { type: 'object', properties: {} },
         },
       ],
+      sources: [
+        {
+          sourceId: 'conn-1',
+          tabId: 'tab-1',
+          origin: 'https://example.com',
+          connectedAt: 1000,
+          lastSeenAt: 2000,
+          toolCount: 1,
+        },
+      ],
+      toolSourceMap: { search: ['conn-1'] },
     });
     expect(result.success).toBe(true);
   });
 
-  it('accepts a relay/tools with empty tools array', () => {
+  it('accepts a relay/tools with empty arrays', () => {
     const result = RelayServerToolsSchema.safeParse({
       type: 'relay/tools',
       tools: [],
+      sources: [],
+      toolSourceMap: {},
     });
     expect(result.success).toBe(true);
   });
 
   it('rejects relay/tools without tools array', () => {
-    const result = RelayServerToolsSchema.safeParse({ type: 'relay/tools' });
+    const result = RelayServerToolsSchema.safeParse({
+      type: 'relay/tools',
+      sources: [],
+      toolSourceMap: {},
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects relay/tools without sources', () => {
+    const result = RelayServerToolsSchema.safeParse({
+      type: 'relay/tools',
+      tools: [],
+      toolSourceMap: {},
+    });
     expect(result.success).toBe(false);
   });
 
@@ -470,6 +549,8 @@ describe('RelayServerToolsSchema', () => {
     const result = RelayServerToolsSchema.safeParse({
       type: 'relay/tools',
       tools: [{ name: '' }],
+      sources: [],
+      toolSourceMap: {},
     });
     expect(result.success).toBe(false);
   });
@@ -513,18 +594,30 @@ describe('RelayServerResultSchema', () => {
 });
 
 describe('RelayServerToolsChangedSchema', () => {
-  it('accepts a relay/tools-changed with tools', () => {
+  it('accepts a relay/tools-changed with tools, sources, and toolSourceMap', () => {
     const result = RelayServerToolsChangedSchema.safeParse({
       type: 'relay/tools-changed',
       tools: [{ name: 'updated_tool', inputSchema: { type: 'object', properties: {} } }],
+      sources: [
+        {
+          sourceId: 'conn-1',
+          tabId: 'tab-1',
+          connectedAt: 1000,
+          lastSeenAt: 2000,
+          toolCount: 1,
+        },
+      ],
+      toolSourceMap: { updated_tool: ['conn-1'] },
     });
     expect(result.success).toBe(true);
   });
 
-  it('accepts a relay/tools-changed with empty tools', () => {
+  it('accepts a relay/tools-changed with empty arrays', () => {
     const result = RelayServerToolsChangedSchema.safeParse({
       type: 'relay/tools-changed',
       tools: [],
+      sources: [],
+      toolSourceMap: {},
     });
     expect(result.success).toBe(true);
   });
@@ -532,6 +625,8 @@ describe('RelayServerToolsChangedSchema', () => {
   it('rejects relay/tools-changed without tools', () => {
     const result = RelayServerToolsChangedSchema.safeParse({
       type: 'relay/tools-changed',
+      sources: [],
+      toolSourceMap: {},
     });
     expect(result.success).toBe(false);
   });
@@ -542,6 +637,8 @@ describe('RelayServerToClientMessageSchema', () => {
     const result = RelayServerToClientMessageSchema.safeParse({
       type: 'relay/tools',
       tools: [{ name: 'search', inputSchema: { type: 'object', properties: {} } }],
+      sources: [],
+      toolSourceMap: {},
     });
     expect(result.success).toBe(true);
     expect(result.data?.type).toBe('relay/tools');
@@ -561,6 +658,8 @@ describe('RelayServerToClientMessageSchema', () => {
     const result = RelayServerToClientMessageSchema.safeParse({
       type: 'relay/tools-changed',
       tools: [],
+      sources: [],
+      toolSourceMap: {},
     });
     expect(result.success).toBe(true);
     expect(result.data?.type).toBe('relay/tools-changed');

@@ -1395,7 +1395,98 @@ describe('RelayBridgeServer client mode', () => {
     }
   });
 
-  it('returns empty tools from listToolsFromRelay when in server mode', async () => {
+  it('receives source metadata from the server relay', async () => {
+    const server = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+    });
+
+    try {
+      await server.start();
+
+      const ws = await connectAndRegister(server, {
+        tabId: 'tab-src',
+        url: 'https://example.com/page',
+        tools: [{ name: 'echo', description: 'Echo tool' }],
+      });
+
+      await waitFor(() => (server.registry.listTools().length >= 1 ? true : undefined));
+
+      const client = new RelayBridgeServer({
+        host: '127.0.0.1',
+        port: server.port,
+        allowedOrigins: ['*'],
+      });
+
+      await client.start();
+      expect(client.mode).toBe('client');
+
+      const clientSources = await waitFor(() => {
+        const sources = client.listSourcesFromRelay();
+        return sources.length > 0 ? sources : undefined;
+      });
+
+      expect(clientSources[0]?.tabId).toBe('tab-src');
+      expect(clientSources[0]?.url).toBe('https://example.com/page');
+      expect(clientSources[0]?.toolCount).toBe(1);
+
+      const sourceMap = client.getToolSourceMapFromRelay();
+      const mapValues = Object.values(sourceMap);
+      expect(mapValues.length).toBeGreaterThan(0);
+      expect(mapValues[0]?.length).toBeGreaterThan(0);
+
+      ws.close();
+      await client.stop();
+    } finally {
+      await server.stop();
+    }
+  });
+
+  it('clears source metadata on disconnect', async () => {
+    const server = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+    });
+
+    try {
+      await server.start();
+
+      await connectAndRegister(server, {
+        tabId: 'tab-1',
+        url: 'https://example.com',
+        tools: [{ name: 'tool_a' }],
+      });
+
+      await waitFor(() => (server.registry.listTools().length >= 1 ? true : undefined));
+
+      const client = new RelayBridgeServer({
+        host: '127.0.0.1',
+        port: server.port,
+        allowedOrigins: ['*'],
+      });
+
+      await client.start();
+      await waitFor(() => {
+        const sources = client.listSourcesFromRelay();
+        return sources.length > 0 ? sources : undefined;
+      });
+
+      // Stop the server — client should clear source data
+      await server.stop();
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      expect(client.listSourcesFromRelay()).toEqual([]);
+      expect(client.getToolSourceMapFromRelay()).toEqual({});
+
+      await client.stop();
+    } finally {
+      await server.stop().catch(() => {});
+    }
+  });
+
+  it('returns empty from listToolsFromRelay and source accessors when in server mode', async () => {
     const bridge = new RelayBridgeServer({
       host: '127.0.0.1',
       port: 0,
@@ -1406,6 +1497,8 @@ describe('RelayBridgeServer client mode', () => {
       await bridge.start();
       expect(bridge.mode).toBe('server');
       expect(bridge.listToolsFromRelay()).toEqual([]);
+      expect(bridge.listSourcesFromRelay()).toEqual([]);
+      expect(bridge.getToolSourceMapFromRelay()).toEqual({});
     } finally {
       await bridge.stop();
     }

@@ -665,7 +665,10 @@ describe('relay e2e (real browser assets)', () => {
         name: 'webmcp_list_sources',
         arguments: {},
       });
-      expect(firstContentText(listSourcesResult)).toContain('"mode": "client"');
+      const sourcesText = firstContentText(listSourcesResult);
+      expect(sourcesText).toContain('"mode": "client"');
+      expect(sourcesText).not.toContain('"count": 0');
+      expect(sourcesText).toContain('"toolCount"');
 
       const result = await harness.client.callTool({
         name: harness.expectedToolName,
