@@ -121,6 +121,10 @@ jobs:
         if: matrix.mode == 'chrome-beta'
         run: pnpm --filter mcp-e2e-tests run test:native-parity:beta
 
+      - name: Run Native Showcase (Chrome Beta)
+        if: matrix.mode == 'chrome-beta'
+        run: pnpm --filter mcp-e2e-tests run test:native-showcase
+
       - name: Upload Parity Playwright Report
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         if: always()
