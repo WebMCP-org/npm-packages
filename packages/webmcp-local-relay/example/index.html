@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WebMCP Local Relay - Example</title>
+  </head>
+  <body>
+    <h1>WebMCP Local Relay Example</h1>
+    <p>This page registers a sample tool and connects to the local relay.</p>
+    <pre id="log"></pre>
+
+    <!-- WebMCP polyfill -->
+    <script src="https://cdn.jsdelivr.net/npm/@mcp-b/global@latest/dist/index.iife.js"></script>
+
+    <script>
+      const log = document.getElementById('log');
+      function addLog(msg) {
+        log.textContent += msg + '\n';
+        console.log(msg);
+      }
+
+      addLog('[example] Registering sample tool...');
+      navigator.modelContext.registerTool({
+        name: 'get_page_title',
+        description: 'Returns the current page title',
+        inputSchema: { type: 'object', properties: {} },
+        execute: async () => {
+          addLog('[example] get_page_title was called!');
+          return { content: [{ type: 'text', text: document.title }] };
+        },
+      });
+
+      navigator.modelContext.registerTool({
+        name: 'greet_user',
+        description: 'Greets a user by name',
+        inputSchema: {
+          type: 'object',
+          properties: { name: { type: 'string', description: 'Name to greet' } },
+          required: ['name'],
+        },
+        execute: async (args) => {
+          const msg = `Hello, ${args.name}! 👋`;
+          addLog(`[example] greet_user called with: ${JSON.stringify(args)}`);
+          return { content: [{ type: 'text', text: msg }] };
+        },
+      });
+
+      addLog('[example] Tools registered. Loading embed...');
+    </script>
+
+    <!-- Local relay embed (served from same directory) -->
+    <script src="embed.js" data-relay-host="127.0.0.1" data-relay-port="9333"></script>
+  </body>
+</html>
