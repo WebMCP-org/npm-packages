@@ -93,20 +93,20 @@ pnpm add @mcp-b/smart-dom-reader
 
 ## Available Packages
 
-| Package | Version | Description |
-|---------|---------|-------------|
-| [@mcp-b/webmcp-polyfill](./packages/webmcp-polyfill) | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-polyfill)](https://www.npmjs.com/package/@mcp-b/webmcp-polyfill) | Strict `navigator.modelContext` WebMCP core polyfill |
-| [@mcp-b/webmcp-types](./packages/webmcp-types) | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-types)](https://www.npmjs.com/package/@mcp-b/webmcp-types) | Strict WebMCP core TypeScript definitions |
-| [@mcp-b/global](./packages/global) | [![npm](https://img.shields.io/npm/v/@mcp-b/global)](https://www.npmjs.com/package/@mcp-b/global) | Full MCPB runtime (WebMCP core + MCP bridge extensions) |
-| [@mcp-b/webmcp-ts-sdk](./packages/webmcp-ts-sdk) | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-ts-sdk)](https://www.npmjs.com/package/@mcp-b/webmcp-ts-sdk) | TypeScript SDK adapter for MCP with browser-specific features |
-| [@mcp-b/transports](./packages/transports) | [![npm](https://img.shields.io/npm/v/@mcp-b/transports)](https://www.npmjs.com/package/@mcp-b/transports) | Browser transport implementations (Tab, Chrome Extension) |
-| [@mcp-b/react-webmcp](./packages/react-webmcp) | [![npm](https://img.shields.io/npm/v/@mcp-b/react-webmcp)](https://www.npmjs.com/package/@mcp-b/react-webmcp) | React hooks for full MCP-B runtime (core + extensions) |
-| [usewebmcp](./packages/usewebmcp) | [![npm](https://img.shields.io/npm/v/usewebmcp)](https://www.npmjs.com/package/usewebmcp) | React hooks for strict WebMCP core API only |
-| [@mcp-b/extension-tools](./packages/extension-tools) | [![npm](https://img.shields.io/npm/v/@mcp-b/extension-tools)](https://www.npmjs.com/package/@mcp-b/extension-tools) | Auto-generated MCP tools for Chrome Extension APIs |
-| [@mcp-b/smart-dom-reader](./packages/smart-dom-reader) | [![npm](https://img.shields.io/npm/v/@mcp-b/smart-dom-reader)](https://www.npmjs.com/package/@mcp-b/smart-dom-reader) | Token-efficient DOM extraction for AI agents |
-| [@mcp-b/chrome-devtools-mcp](./packages/chrome-devtools-mcp) | [![npm](https://img.shields.io/npm/v/@mcp-b/chrome-devtools-mcp)](https://www.npmjs.com/package/@mcp-b/chrome-devtools-mcp) | MCP server for Chrome DevTools with WebMCP integration |
-| [@mcp-b/mcp-iframe](./packages/mcp-iframe) | [![npm](https://img.shields.io/npm/v/@mcp-b/mcp-iframe)](https://www.npmjs.com/package/@mcp-b/mcp-iframe) | Custom element for exposing iframe MCP tools to parent page |
-| [@mcp-b/webmcp-local-relay](./packages/webmcp-local-relay) | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-local-relay)](https://www.npmjs.com/package/@mcp-b/webmcp-local-relay) | Localhost MCP relay that forwards website WebMCP tools to local coding agents |
+| Package | Version | Install | Description |
+|---------|---------|---------|-------------|
+| [@mcp-b/webmcp-polyfill](./packages/webmcp-polyfill) | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-polyfill)](https://www.npmjs.com/package/@mcp-b/webmcp-polyfill) | | Strict `navigator.modelContext` WebMCP core polyfill |
+| [@mcp-b/webmcp-types](./packages/webmcp-types) | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-types)](https://www.npmjs.com/package/@mcp-b/webmcp-types) | | Strict WebMCP core TypeScript definitions |
+| [@mcp-b/global](./packages/global) | [![npm](https://img.shields.io/npm/v/@mcp-b/global)](https://www.npmjs.com/package/@mcp-b/global) | | Full MCPB runtime (WebMCP core + MCP bridge extensions) |
+| [@mcp-b/webmcp-ts-sdk](./packages/webmcp-ts-sdk) | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-ts-sdk)](https://www.npmjs.com/package/@mcp-b/webmcp-ts-sdk) | | TypeScript SDK adapter for MCP with browser-specific features |
+| [@mcp-b/transports](./packages/transports) | [![npm](https://img.shields.io/npm/v/@mcp-b/transports)](https://www.npmjs.com/package/@mcp-b/transports) | | Browser transport implementations (Tab, Chrome Extension) |
+| [@mcp-b/react-webmcp](./packages/react-webmcp) | [![npm](https://img.shields.io/npm/v/@mcp-b/react-webmcp)](https://www.npmjs.com/package/@mcp-b/react-webmcp) | | React hooks for full MCP-B runtime (core + extensions) |
+| [usewebmcp](./packages/usewebmcp) | [![npm](https://img.shields.io/npm/v/usewebmcp)](https://www.npmjs.com/package/usewebmcp) | | React hooks for strict WebMCP core API only |
+| [@mcp-b/extension-tools](./packages/extension-tools) | [![npm](https://img.shields.io/npm/v/@mcp-b/extension-tools)](https://www.npmjs.com/package/@mcp-b/extension-tools) | | Auto-generated MCP tools for Chrome Extension APIs |
+| [@mcp-b/smart-dom-reader](./packages/smart-dom-reader) | [![npm](https://img.shields.io/npm/v/@mcp-b/smart-dom-reader)](https://www.npmjs.com/package/@mcp-b/smart-dom-reader) | | Token-efficient DOM extraction for AI agents |
+| [@mcp-b/chrome-devtools-mcp](./packages/chrome-devtools-mcp) | [![npm](https://img.shields.io/npm/v/@mcp-b/chrome-devtools-mcp)](https://www.npmjs.com/package/@mcp-b/chrome-devtools-mcp) | | MCP server for Chrome DevTools with WebMCP integration |
+| [@mcp-b/mcp-iframe](./packages/mcp-iframe) | [![npm](https://img.shields.io/npm/v/@mcp-b/mcp-iframe)](https://www.npmjs.com/package/@mcp-b/mcp-iframe) | | Custom element for exposing iframe MCP tools to parent page |
+| [@mcp-b/webmcp-local-relay](./packages/webmcp-local-relay) | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-local-relay)](https://www.npmjs.com/package/@mcp-b/webmcp-local-relay) | [Install .mcpb](https://github.com/WebMCP-org/npm-packages/releases) | Localhost MCP relay that forwards website WebMCP tools to local coding agents |
 
 ### Deprecated Packages
 
