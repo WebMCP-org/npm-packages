@@ -99,7 +99,7 @@ export class ExtensionServerTransport implements Transport {
 
     // Set up disconnect handler
     this._disconnectHandler = () => {
-      console.log(
+      console.debug(
         `[ExtensionServerTransport] Client disconnected after ${Date.now() - this._connectionInfo.connectedAt}ms, processed ${this._connectionInfo.messageCount} messages`
       );
       this._cleanup();
@@ -114,7 +114,7 @@ export class ExtensionServerTransport implements Transport {
       this._startKeepAlive();
     }
 
-    console.log(
+    console.debug(
       `[ExtensionServerTransport] Started with client: ${this._port.sender?.id || 'unknown'}`
     );
   }
@@ -190,7 +190,7 @@ export class ExtensionServerTransport implements Transport {
       return;
     }
 
-    console.log(
+    console.debug(
       `[ExtensionServerTransport] Starting keep-alive with ${this._options.keepAliveInterval}ms interval`
     );
 
