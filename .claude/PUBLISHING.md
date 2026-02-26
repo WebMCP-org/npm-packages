@@ -27,7 +27,7 @@ pnpm publish --access public --no-git-checks
 | `@mcp-b/chrome-devtools-mcp` | Chrome DevTools MCP server |
 | `@mcp-b/extension-tools` | Chrome Extension API tools |
 | `@mcp-b/webmcp-local-relay` | Local MCP relay for browser WebMCP tools |
-| `usewebmcp` | Alias for @mcp-b/react-webmcp |
+| `usewebmcp` | Standalone React hooks for navigator.modelContext (depends on polyfill) |
 
 ## NPM Authentication
 
@@ -137,7 +137,7 @@ Provides both ESM and IIFE builds:
 
 ### usewebmcp
 
-This is just an alias package that re-exports from `@mcp-b/react-webmcp`. When publishing, ensure the underlying package is published first.
+Standalone React hooks package for the Web Model Context Protocol. Registers tools with `navigator.modelContext` directly via the polyfill. This is NOT an alias for `@mcp-b/react-webmcp` — it's its own package with its own hooks (`useWebMCP`) that depends on `@mcp-b/webmcp-polyfill`.
 
 ## Changesets (Preferred Method)
 
