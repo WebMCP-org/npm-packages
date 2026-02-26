@@ -244,16 +244,15 @@
   }
 
   /**
-   * Subscribes to modelContext tool change events.
-   * Tries addEventListener first (future native EventTarget support),
-   * falls back to registerToolsChangedCallback on modelContextTesting.
+   * Attempts to subscribe to tool change events on the current APIs.
+   * @returns {boolean} true if subscription succeeded
    */
-  function subscribeToToolChanges() {
+  function trySubscribe() {
     const mc = navigator.modelContext;
     if (mc && typeof mc.addEventListener === 'function') {
       try {
         mc.addEventListener('toolschanged', onToolsChanged);
-        return;
+        return true;
       } catch (error) {
         if (!(error instanceof TypeError)) {
           console.warn(
@@ -267,7 +266,7 @@
     if (testing && typeof testing.registerToolsChangedCallback === 'function') {
       try {
         testing.registerToolsChangedCallback(onToolsChanged);
-        return;
+        return true;
       } catch (error) {
         console.warn(
           '[webmcp-relay-embed] Failed to subscribe via registerToolsChangedCallback:',
@@ -275,9 +274,41 @@
         );
       }
     }
-    console.warn(
-      '[webmcp-relay-embed] Could not subscribe to tool changes. Dynamic tool updates will not be relayed.'
-    );
+    return false;
+  }
+
+  /**
+   * Subscribes to modelContext tool change events.
+   * Tries addEventListener first (future native EventTarget support),
+   * falls back to registerToolsChangedCallback on modelContextTesting.
+   *
+   * When embed.js loads as a classic script before the app's module entry
+   * point, the WebMCP APIs may not exist yet. In that case we retry on a
+   * short interval (up to ~5 s) to catch late initialization.
+   */
+  function subscribeToToolChanges() {
+    if (trySubscribe()) {
+      return;
+    }
+
+    let retries = 0;
+    const MAX_RETRIES = 50;
+    const RETRY_INTERVAL_MS = 100;
+    const retryTimer = setInterval(() => {
+      retries++;
+      if (trySubscribe()) {
+        clearInterval(retryTimer);
+        return;
+      }
+      if (retries >= MAX_RETRIES) {
+        clearInterval(retryTimer);
+        console.warn(
+          '[webmcp-relay-embed] Could not subscribe to tool changes after ' +
+            MAX_RETRIES +
+            ' retries. Dynamic tool updates will not be relayed.'
+        );
+      }
+    }, RETRY_INTERVAL_MS);
   }
 
   /**
