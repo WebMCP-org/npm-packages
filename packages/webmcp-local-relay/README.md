@@ -5,15 +5,22 @@
 Use WebMCP tools from any website, right inside your AI client.
 
 ```text
- Browser                        Your machine
-┌─────────────────┐            ┌─────────────────┐
-│  Website with    │            │  webmcp-local-  │
-│  WebMCP tools    │───────────│  relay           │
-│                  │  localhost │                  │
-└─────────────────┘            └────────┬────────┘
-                                        │ stdio
-                                        ▼
-                               Claude / Cursor / etc.
+ Browser Tab                          Local Machine
+┌──────────────────────┐             ┌──────────────────────┐
+│                      │  WebSocket  │                      │
+│   Website with       ├────────────▶  webmcp-local-relay   │
+│   WebMCP tools       │  localhost  │   (MCP server)       │
+│                      │             │                      │
+└──────────────────────┘             └──────────┬───────────┘
+                                                │
+                                          stdio │ JSON-RPC
+                                                │
+                                     ┌──────────▼───────────┐
+                                     │                      │
+                                     │   Claude / Cursor /  │
+                                     │   any MCP client     │
+                                     │                      │
+                                     └──────────────────────┘
 ```
 
 Open a website that has WebMCP tools. Run the relay. The tools show up in your MCP client.
@@ -151,19 +158,33 @@ npx @mcp-b/webmcp-local-relay --widget-origin https://your-app.example.com,https
 ### Architecture
 
 ```text
-MCP Client (Claude, Cursor, etc.)
-    | stdio (JSON-RPC)
-    v
-LocalRelayMcpServer
-    | static + dynamic MCP tools
-    v
-RelayBridgeServer (ws://127.0.0.1:9333)
-    | ws messages
-    v
-Widget iframe (embed.js -> widget.html)
-    | postMessage bridge
-    v
-Host page WebMCP runtime (navigator.modelContext)
+┌──────────────────────────────────────┐
+│        MCP Client                    │
+│   (Claude, Cursor, Windsurf, etc.)   │
+└──────────────────┬───────────────────┘
+                   │ stdio / JSON-RPC
+┌──────────────────▼───────────────────┐
+│        LocalRelayMcpServer           │
+│   webmcp_list_sources                │
+│   webmcp_list_tools                  │
+│   webmcp_call_tool                   │
+│   + dynamic tools from browser       │
+└──────────────────┬───────────────────┘
+                   │ WebSocket (ws://127.0.0.1:9333)
+┌──────────────────▼───────────────────┐
+│        RelayBridgeServer             │
+│   Manages connections, routes calls  │
+└──────────────────┬───────────────────┘
+                   │ postMessage
+┌──────────────────▼───────────────────┐
+│        Widget iframe                 │
+│   embed.js injects widget.html       │
+└──────────────────┬───────────────────┘
+                   │ navigator.modelContext
+┌──────────────────▼───────────────────┐
+│        Host page                     │
+│   WebMCP runtime + registered tools  │
+└──────────────────────────────────────┘
 ```
 
 **How it connects:** The embed script injects a hidden iframe into the host page. The iframe opens a WebSocket to the relay on `localhost`. Tools are discovered via `navigator.modelContext` (or `navigator.modelContextTesting` as fallback) and forwarded to the relay, which registers them as standard MCP tools over stdio.
