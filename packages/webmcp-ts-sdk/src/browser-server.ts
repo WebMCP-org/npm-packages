@@ -247,29 +247,46 @@ export class BrowserMcpServer extends BaseMcpServer {
       ._registeredPrompts;
   }
 
-  private toTransportSchema(schema: unknown): InputSchema {
-    if (!schema || typeof schema !== 'object') return DEFAULT_INPUT_SCHEMA;
-
-    const normalized = normalizeObjectSchema(schema as Parameters<typeof normalizeObjectSchema>[0]);
-    const transportSchema = normalized
-      ? // Zod schema → convert to JSON Schema
-        (toJsonSchemaCompat(normalized, {
-          strictUnions: true,
-          pipeStrategy: 'input',
-        }) as unknown as InputSchema)
-      : (schema as InputSchema);
-
-    const jsonSchema = transportSchema as Record<string, unknown>;
-
-    // Already plain JSON Schema.
-    // Normalize an empty schema {} to the standard default.
-    // An empty {} is semantically valid JSON Schema but lacks type:"object", which MCP requires.
-    if (Object.keys(jsonSchema).length === 0) {
-      return DEFAULT_INPUT_SCHEMA;
+  /**
+   * Converts a schema (Zod or plain JSON Schema) to a transport-ready JSON Schema.
+   * When `requireObjectType` is true (the default, for inputSchema), empty `{}` schemas
+   * are normalized to `{ type: "object", properties: {} }` and schemas missing a root
+   * `type` get `type: "object"` prepended — per MCP spec requirements.
+   * When false (for outputSchema), no object-type normalization is applied.
+   */
+  private toTransportSchema(schema: unknown, requireObjectType = true): InputSchema {
+    if (!schema || typeof schema !== 'object') {
+      if (requireObjectType) {
+        console.warn(
+          `[BrowserMcpServer] toTransportSchema received non-object schema (${typeof schema}), using default`
+        );
+        return DEFAULT_INPUT_SCHEMA;
+      }
+      return {} as InputSchema;
     }
 
-    // Normalize schemas missing a root type to object for MCP-B transport compatibility.
-    if (jsonSchema.type === undefined) {
+    const normalized = normalizeObjectSchema(schema as Parameters<typeof normalizeObjectSchema>[0]);
+    const jsonSchema = normalized
+      ? (toJsonSchemaCompat(normalized, {
+          strictUnions: true,
+          pipeStrategy: 'input',
+        }) as unknown as Record<string, unknown>)
+      : (schema as Record<string, unknown>);
+
+    if (Object.keys(jsonSchema).length === 0) {
+      if (requireObjectType) {
+        console.warn(
+          '[BrowserMcpServer] toTransportSchema received empty {} schema, normalizing to default object schema'
+        );
+        return DEFAULT_INPUT_SCHEMA;
+      }
+      return jsonSchema as InputSchema;
+    }
+
+    if (requireObjectType && jsonSchema.type === undefined) {
+      console.warn(
+        '[BrowserMcpServer] toTransportSchema received schema without root type, prepending type:"object"'
+      );
       return { type: 'object', ...jsonSchema } as InputSchema;
     }
 
@@ -297,11 +314,7 @@ export class BrowserMcpServer extends BaseMcpServer {
   }
 
   private registerToolInServer(tool: ToolDescriptor): { unregister: () => void } {
-    const inputSchema = tool.inputSchema
-      ? tool.inputSchema.type === undefined
-        ? ({ type: 'object', ...tool.inputSchema } as InputSchema)
-        : tool.inputSchema
-      : DEFAULT_INPUT_SCHEMA;
+    const inputSchema = this.toTransportSchema(tool.inputSchema);
 
     // Cast needed: parent expects Zod-compatible schemas, we pass JSON Schema objects.
     (super.registerTool as unknown as ParentRegisterToolFn)(
@@ -579,7 +592,7 @@ export class BrowserMcpServer extends BaseMcpServer {
           description: tool.description ?? '',
           inputSchema: this.toTransportSchema(tool.inputSchema ?? DEFAULT_INPUT_SCHEMA),
         };
-        if (tool.outputSchema) item.outputSchema = this.toTransportSchema(tool.outputSchema);
+        if (tool.outputSchema) item.outputSchema = this.toTransportSchema(tool.outputSchema, false);
         if (tool.annotations)
           item.annotations = tool.annotations as NonNullable<ToolListItem['annotations']>;
         return item;
