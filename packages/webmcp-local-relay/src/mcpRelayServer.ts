@@ -520,9 +520,17 @@ export class LocalRelayMcpServer {
       .listToolsFromRelay()
       .map((tool) => {
         const sourceIds = toolSourceMap[tool.name] ?? [];
-        const sources = sourceIds
-          .map((id) => sourceById.get(id))
-          .filter((s): s is SourceInfo => s !== undefined);
+        const sources: SourceInfo[] = [];
+        for (const id of sourceIds) {
+          const source = sourceById.get(id);
+          if (source) {
+            sources.push(source as SourceInfo);
+          } else {
+            process.stderr.write(
+              `[webmcp-local-relay] warn: tool "${tool.name}" references unknown sourceId "${id}"\n`
+            );
+          }
+        }
 
         return {
           ...tool,

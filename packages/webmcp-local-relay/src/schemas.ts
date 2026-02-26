@@ -186,14 +186,18 @@ export const RelayClientToServerMessageSchema = z.discriminatedUnion('type', [
  */
 export type RelayClientToServerMessage = z.infer<typeof RelayClientToServerMessageSchema>;
 
+const RelayToolsPayloadFields = {
+  tools: z.array(NormalizedToolSchema),
+  sources: z.array(RelaySourceInfoSchema),
+  toolSourceMap: z.record(z.string(), z.array(z.string())),
+};
+
 /**
  * Schema for relay server tool list response.
  */
 export const RelayServerToolsSchema = z.object({
   type: z.literal('relay/tools'),
-  tools: z.array(NormalizedToolSchema),
-  sources: z.array(RelaySourceInfoSchema),
-  toolSourceMap: z.record(z.string(), z.array(z.string())),
+  ...RelayToolsPayloadFields,
 });
 
 /**
@@ -210,9 +214,7 @@ export const RelayServerResultSchema = z.object({
  */
 export const RelayServerToolsChangedSchema = z.object({
   type: z.literal('relay/tools-changed'),
-  tools: z.array(NormalizedToolSchema),
-  sources: z.array(RelaySourceInfoSchema),
-  toolSourceMap: z.record(z.string(), z.array(z.string())),
+  ...RelayToolsPayloadFields,
 });
 
 /**
