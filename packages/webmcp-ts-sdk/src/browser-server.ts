@@ -251,20 +251,29 @@ export class BrowserMcpServer extends BaseMcpServer {
     if (!schema || typeof schema !== 'object') return DEFAULT_INPUT_SCHEMA;
 
     const normalized = normalizeObjectSchema(schema as Parameters<typeof normalizeObjectSchema>[0]);
-    if (normalized) {
-      // Zod schema → convert to JSON Schema
-      return toJsonSchemaCompat(normalized, {
-        strictUnions: true,
-        pipeStrategy: 'input',
-      }) as unknown as InputSchema;
-    }
+    const transportSchema = normalized
+      ? // Zod schema → convert to JSON Schema
+        (toJsonSchemaCompat(normalized, {
+          strictUnions: true,
+          pipeStrategy: 'input',
+        }) as unknown as InputSchema)
+      : (schema as InputSchema);
 
-    // Already plain JSON Schema - normalize an empty schema {} to the standard default.
+    const jsonSchema = transportSchema as Record<string, unknown>;
+
+    // Already plain JSON Schema.
+    // Normalize an empty schema {} to the standard default.
     // An empty {} is semantically valid JSON Schema but lacks type:"object", which MCP requires.
-    if (Object.keys(schema as Record<string, unknown>).length === 0) {
+    if (Object.keys(jsonSchema).length === 0) {
       return DEFAULT_INPUT_SCHEMA;
     }
-    return schema as InputSchema;
+
+    // Normalize schemas missing a root type to object for MCP-B transport compatibility.
+    if (jsonSchema.type === undefined) {
+      return { type: 'object', ...jsonSchema } as InputSchema;
+    }
+
+    return jsonSchema as InputSchema;
   }
 
   private isZodSchema(schema: unknown): boolean {

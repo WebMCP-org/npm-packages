@@ -420,4 +420,77 @@ describe('global adapter', () => {
     expect(tool).toBeDefined();
     expect(tool?.inputSchema).toMatchObject({ type: 'object' });
   });
+
+  it('listTools normalizes outputSchema missing type to object schema', async () => {
+    initializeWebModelContext();
+    const modelContext = getModelContext();
+
+    modelContext.registerTool({
+      name: 'output_no_type_tool',
+      description: 'Tool with output schema missing root type',
+      inputSchema: {},
+      outputSchema: {
+        properties: {
+          value: { type: 'string' },
+        },
+        required: ['value'],
+      },
+      async execute() {
+        return {
+          content: [{ type: 'text', text: 'ok' }],
+          structuredContent: { value: 'ok' },
+        };
+      },
+    });
+
+    const tools = modelContext.listTools();
+    const tool = tools.find((t) => t.name === 'output_no_type_tool');
+    expect(tool).toBeDefined();
+    expect(tool?.outputSchema).toMatchObject({
+      type: 'object',
+      properties: { value: { type: 'string' } },
+      required: ['value'],
+    });
+
+    const result = await modelContext.callTool({ name: 'output_no_type_tool', arguments: {} });
+    expect(result.isError).toBeFalsy();
+    expect(result.structuredContent).toMatchObject({ value: 'ok' });
+  });
+
+  it('listTools normalizes inputSchema missing type to object schema', async () => {
+    initializeWebModelContext();
+    const modelContext = getModelContext();
+
+    modelContext.registerTool({
+      name: 'input_no_type_tool',
+      description: 'Tool with input schema missing root type',
+      inputSchema: {
+        properties: {
+          message: { type: 'string' },
+        },
+        required: ['message'],
+      },
+      async execute(args) {
+        return {
+          content: [{ type: 'text', text: `echo:${String(args.message ?? '')}` }],
+        };
+      },
+    });
+
+    const tools = modelContext.listTools();
+    const tool = tools.find((t) => t.name === 'input_no_type_tool');
+    expect(tool).toBeDefined();
+    expect(tool?.inputSchema).toMatchObject({
+      type: 'object',
+      properties: { message: { type: 'string' } },
+      required: ['message'],
+    });
+
+    const result = await modelContext.callTool({
+      name: 'input_no_type_tool',
+      arguments: { message: 'hi' },
+    });
+    expect(result.isError).toBeFalsy();
+    expect(result.content[0]).toMatchObject({ type: 'text', text: 'echo:hi' });
+  });
 });
