@@ -1,6 +1,12 @@
 /**
  * Public package exports for WebMCP Local Relay.
  */
+
+export type {
+  CallToolResult,
+  Tool,
+  ToolAnnotations,
+} from '@modelcontextprotocol/sdk/types.js';
 export {
   RelayBridgeServer,
   type RelayBridgeServerOptions,
@@ -13,6 +19,21 @@ export {
   sanitizeName,
 } from './naming.js';
 export {
+  CallToolRequestParamsSchema,
+  CallToolResultSchema,
+  DEFAULT_TOOL_INPUT_SCHEMA,
+  InboundToolSchema,
+  NormalizedToolSchema,
+  normalizeInboundTool,
+  type RelayCallToolResult,
+  type RelayInvokeArgs,
+  RelayInvokeArgsSchema,
+  type RelayTool,
+  type RelayToolAnnotations,
+  ToolAnnotationsSchema,
+  ToolSchema,
+} from './protocol.js';
+export {
   type AggregatedTool,
   HelloRequiredError,
   RelayRegistry,
@@ -20,9 +41,12 @@ export {
   type SourceInfo,
 } from './registry.js';
 export {
-  type BrowserTool,
   type BrowserToRelayMessage,
   BrowserToRelayMessageSchema,
+  type RelayClientToServerMessage,
+  RelayClientToServerMessageSchema,
+  type RelayServerToClientMessage,
+  RelayServerToClientMessageSchema,
   type RelayToBrowserMessage,
   RelayToBrowserMessageSchema,
 } from './schemas.js';

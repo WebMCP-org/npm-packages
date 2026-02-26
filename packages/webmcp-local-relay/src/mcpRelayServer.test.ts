@@ -25,6 +25,35 @@ async function waitFor<T>(
 }
 
 /**
+ * Extracts text items from MCP call tool result content.
+ */
+function contentTextItems(result: unknown): string[] {
+  const content =
+    typeof result === 'object' && result !== null && 'content' in result
+      ? (result as { content?: unknown }).content
+      : undefined;
+  if (!Array.isArray(content)) {
+    return [];
+  }
+  return content
+    .map((item) => {
+      if (!item || typeof item !== 'object') {
+        return undefined;
+      }
+      const text = (item as { text?: unknown }).text;
+      return typeof text === 'string' ? text : undefined;
+    })
+    .filter((text): text is string => typeof text === 'string');
+}
+
+/**
+ * Returns the first text content item when present.
+ */
+function firstContentText(result: unknown): string {
+  return contentTextItems(result)[0] ?? '';
+}
+
+/**
  * Creates a running relay + in-memory MCP client pair.
  */
 async function createConnectedRelay(options?: { invokeTimeoutMs?: number }): Promise<{
@@ -291,7 +320,7 @@ describe('LocalRelayMcpServer', () => {
       arguments: { query: 'webmcp' },
     });
 
-    const text = (result.content?.[0] as { text?: string } | undefined)?.text;
+    const text = firstContentText(result);
     expect(text).toBe('OK:webmcp');
 
     await client.close();
@@ -340,7 +369,7 @@ describe('LocalRelayMcpServer', () => {
         arguments: {},
       });
 
-      const text = (result.content as { type: string; text: string }[])[0].text;
+      const text = firstContentText(result);
       expect(text).toContain('tab-src');
       expect(text).toContain('"count": 1');
 
@@ -366,7 +395,7 @@ describe('LocalRelayMcpServer', () => {
         arguments: {},
       });
 
-      const text = (result.content as { type: string; text: string }[])[0].text;
+      const text = firstContentText(result);
       expect(text).toContain('search');
       expect(text).toContain('Search things');
 
@@ -441,7 +470,7 @@ describe('LocalRelayMcpServer', () => {
       arguments: {},
     });
 
-    const text = (result.content as { type: string; text: string }[])[0].text;
+    const text = firstContentText(result);
     expect(text).toContain('Failed to invoke relayed tool');
     expect(text).toContain('timed out');
     expect(result.isError).toBe(true);
@@ -541,7 +570,7 @@ describe('LocalRelayMcpServer', () => {
         arguments: { name: toolName, arguments: { name: 'Alice' } },
       });
 
-      const texts = (result.content as { type: string; text: string }[]).map((c) => c.text);
+      const texts = contentTextItems(result);
       const combined = texts.join('\n');
 
       expect(combined).toContain('Hello Alice');
@@ -569,7 +598,7 @@ describe('LocalRelayMcpServer', () => {
         arguments: { name: 'nonexistent_tool' },
       });
 
-      const text = (result.content as { type: string; text: string }[])[0].text;
+      const text = firstContentText(result);
       expect(text).toContain('Tool "nonexistent_tool" not found');
       expect(text).toContain('Available tools:');
       expect(text).toContain('real_tool');
@@ -587,7 +616,7 @@ describe('LocalRelayMcpServer', () => {
         arguments: { name: 'some_tool' },
       });
 
-      const text = (result.content as { type: string; text: string }[])[0].text;
+      const text = firstContentText(result);
       expect(text).toContain('Tool "some_tool" not found');
       expect(text).toContain('No tools are currently available');
       expect(result.isError).toBe(true);
@@ -620,7 +649,7 @@ describe('LocalRelayMcpServer', () => {
         arguments: { name: timeoutToolName },
       });
 
-      const text = (result.content as { type: string; text: string }[])[0].text;
+      const text = firstContentText(result);
       expect(text).toContain('Failed to call tool');
       expect(text).toContain('timed out');
       expect(text).toContain('Available tools:');
@@ -660,7 +689,7 @@ describe('LocalRelayMcpServer', () => {
         arguments: { name: toolName },
       });
 
-      const text = (result.content as { type: string; text: string }[])[0].text;
+      const text = firstContentText(result);
       expect(result.isError).toBe(true);
       // Should contain either "not found" or "Failed to call tool"
       expect(text).toMatch(/not found|Failed to call/);

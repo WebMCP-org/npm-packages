@@ -14,6 +14,8 @@ export function parseCliOptions(argv: string[]): CliOptions {
   const options: CliOptions = {
     host: '127.0.0.1',
     port: 9333,
+    // Permissive by default for zero-config local development — any browser page can connect.
+    // Use --widget-origin to restrict to trusted origins on shared machines or in production.
     allowedOrigins: ['*'],
   };
 
