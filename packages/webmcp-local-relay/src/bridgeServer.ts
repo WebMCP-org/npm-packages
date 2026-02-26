@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
-import type { IncomingMessage } from 'node:http';
 
 import WebSocket, { WebSocketServer } from 'ws';
 import {
@@ -45,12 +44,12 @@ export interface RelayBridgeServerOptions {
    */
   port?: number;
   /**
-   * Allowed `Origin` header values for incoming browser connections.
+   * Allowed host page origins reported by browser `hello` messages.
    * Use `["*"]` to allow all origins.
    *
    * Permissive by default for zero-config developer experience — any browser
-   * page can connect and register tools without additional setup. For
-   * production or shared machines, restrict to trusted origins via the
+   * page can connect and register tools without additional setup. For production
+   * or shared machines, restrict to trusted host origins via the
    * `--widget-origin` CLI flag or by passing explicit origins here.
    *
    * @defaultValue `["*"]`
@@ -325,13 +324,7 @@ export class RelayBridgeServer extends EventEmitter {
       server.once('error', onError);
     });
 
-    wss.on('connection', (socket: WebSocket, request: IncomingMessage) => {
-      const origin = request.headers.origin;
-      if (!this.isOriginAllowed(origin)) {
-        socket.close(1008, 'Origin not allowed');
-        return;
-      }
-
+    wss.on('connection', (socket: WebSocket) => {
       const connectionId = randomUUID();
       this.socketByConnectionId.set(connectionId, socket);
 
@@ -486,6 +479,14 @@ export class RelayBridgeServer extends EventEmitter {
     switch (message.type) {
       case 'hello':
         try {
+          if (!this.isHostOriginAllowed(message.origin)) {
+            process.stderr.write(
+              `[webmcp-local-relay] warn: rejecting source ${connectionId} with disallowed host origin: ${message.origin ?? 'missing'}\n`
+            );
+            const socket = this.socketByConnectionId.get(connectionId);
+            socket?.close(1008, 'Host origin not allowed');
+            break;
+          }
           this.registry.upsertSource(connectionId, message);
           this.emit('stateChanged');
         } catch (err) {
@@ -961,7 +962,7 @@ export class RelayBridgeServer extends EventEmitter {
     return tools.map(({ originalName: _originalName, sources: _sources, ...tool }) => tool);
   }
 
-  private isOriginAllowed(origin: string | undefined): boolean {
+  private isHostOriginAllowed(origin: string | undefined): boolean {
     if (this.allowedOrigins.includes('*')) {
       return true;
     }
