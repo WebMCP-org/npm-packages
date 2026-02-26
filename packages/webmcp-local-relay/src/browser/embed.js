@@ -4,6 +4,9 @@
  * Usage:
  * `<script src=".../embed.js" data-relay-host="127.0.0.1" data-relay-port="9333"></script>`
  *
+ * Add `data-debug` to enable diagnostic logging:
+ * `<script src=".../embed.js" data-debug></script>`
+ *
  * @typedef {{ [key: string]: unknown }} JsonObject
  * @typedef {{ name: string; description?: string; inputSchema?: JsonObject }} ToolDescriptor
  * @typedef {{ isError?: boolean; content?: Array<{ type: string; text: string }>; [key: string]: unknown }} ToolInvokeResult
@@ -23,6 +26,14 @@
   /** @returns {HTMLScriptElement | null} */
   function getCurrentScriptElement() {
     return document.currentScript instanceof HTMLScriptElement ? document.currentScript : null;
+  }
+
+  const scriptEl = getCurrentScriptElement();
+  const DEBUG = scriptEl ? scriptEl.hasAttribute('data-debug') : false;
+
+  /** @param {unknown[]} args */
+  function debugWarn(...args) {
+    if (DEBUG) console.warn('[webmcp-relay-embed]', ...args);
   }
 
   /**
@@ -49,17 +60,14 @@
         return storedTabId;
       }
     } catch (err) {
-      console.warn(
-        '[webmcp-relay-embed] sessionStorage read failed, tab ID will not persist:',
-        err
-      );
+      debugWarn('sessionStorage read failed, tab ID will not persist:', err);
     }
 
     const tabId = createTabId();
     try {
       sessionStorage.setItem(TAB_ID_STORAGE_KEY, tabId);
     } catch (err) {
-      console.warn('[webmcp-relay-embed] sessionStorage write failed:', err);
+      debugWarn('sessionStorage write failed:', err);
     }
 
     return tabId;
@@ -74,17 +82,10 @@
       try {
         return new URL('widget.html', script.src).href;
       } catch (err) {
-        console.warn(
-          '[webmcp-relay-embed] Failed to resolve widget URL from script src, falling back to CDN.',
-          'This may cause version mismatches with your local relay server.',
-          err
-        );
+        debugWarn('Failed to resolve widget URL from script src, falling back to CDN:', err);
       }
     } else {
-      console.warn(
-        '[webmcp-relay-embed] Script element has no src attribute, falling back to CDN widget URL.',
-        'This may cause version mismatches with your local relay server.'
-      );
+      debugWarn('Script element has no src attribute, falling back to CDN widget URL.');
     }
     return FALLBACK_WIDGET_URL;
   }
@@ -116,10 +117,8 @@
       const parsed = JSON.parse(rawSchema);
       return isJsonObject(parsed) ? parsed : { type: 'object', properties: {} };
     } catch (err) {
-      console.warn(
-        '[webmcp-relay-embed] Tool inputSchema is not valid JSON.',
-        'The tool will accept any arguments, which may cause invocation errors.',
-        'Raw schema:',
+      debugWarn(
+        'Tool inputSchema is not valid JSON:',
         typeof rawSchema === 'string' ? rawSchema.slice(0, 200) : rawSchema,
         err
       );
@@ -134,11 +133,7 @@
   function toInvokeArgs(value) {
     if (isJsonObject(value)) return value;
     if (value !== undefined && value !== null) {
-      console.warn(
-        '[webmcp-relay-embed] Tool invocation args must be an object, got',
-        typeof value,
-        '-- invocation will proceed with empty arguments'
-      );
+      debugWarn('Tool invocation args must be an object, got', typeof value);
     }
     return {};
   }
@@ -205,10 +200,7 @@
       };
     }
 
-    console.warn(
-      '[webmcp-relay-embed] No WebMCP runtime found (navigator.modelContext or',
-      'navigator.modelContextTesting). Tools will not be relayed.'
-    );
+    debugWarn('No WebMCP runtime found (navigator.modelContext or navigator.modelContextTesting).');
     return null;
   }
 
@@ -238,7 +230,7 @@
           );
         })
         .catch((err) => {
-          console.warn('[webmcp-relay-embed] Failed to push tool changes:', err);
+          debugWarn('Failed to push tool changes:', err);
         });
     }, 0);
   }
@@ -254,12 +246,7 @@
         mc.addEventListener('toolschanged', onToolsChanged);
         return true;
       } catch (error) {
-        if (!(error instanceof TypeError)) {
-          console.warn(
-            '[webmcp-relay-embed] Unexpected error subscribing via addEventListener:',
-            error
-          );
-        }
+        debugWarn('addEventListener threw:', error);
       }
     }
     const testing = navigator.modelContextTesting;
@@ -268,10 +255,7 @@
         testing.registerToolsChangedCallback(onToolsChanged);
         return true;
       } catch (error) {
-        console.warn(
-          '[webmcp-relay-embed] Failed to subscribe via registerToolsChangedCallback:',
-          error
-        );
+        debugWarn('Failed to subscribe via registerToolsChangedCallback:', error);
       }
     }
     return false;
@@ -302,8 +286,8 @@
       }
       if (retries >= MAX_RETRIES) {
         clearInterval(retryTimer);
-        console.warn(
-          '[webmcp-relay-embed] Could not subscribe to tool changes after ' +
+        debugWarn(
+          'Could not subscribe to tool changes after ' +
             MAX_RETRIES +
             ' retries. Dynamic tool updates will not be relayed.'
         );
@@ -367,7 +351,7 @@
         });
       })
       .catch((error) => {
-        console.warn('[webmcp-relay-embed] Failed to list tools:', error);
+        debugWarn('Failed to list tools:', error);
         respondToSource(event.source, event.origin, {
           type: 'webmcp.tools.list.response',
           requestId: request.requestId,
@@ -451,7 +435,7 @@
 
   let config;
   try {
-    config = buildRelayConfig(getCurrentScriptElement());
+    config = buildRelayConfig(scriptEl);
   } catch (err) {
     console.error('[webmcp-relay-embed] Failed to initialize relay configuration:', err);
     return;
