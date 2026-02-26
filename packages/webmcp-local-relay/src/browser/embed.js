@@ -75,13 +75,15 @@
         return new URL('widget.html', script.src).href;
       } catch (err) {
         console.warn(
-          '[webmcp-relay-embed] Failed to resolve widget URL from script src, falling back to CDN:',
+          '[webmcp-relay-embed] Failed to resolve widget URL from script src, falling back to CDN.',
+          'This may cause version mismatches with your local relay server.',
           err
         );
       }
     } else {
       console.warn(
-        '[webmcp-relay-embed] Script element has no src attribute, falling back to CDN widget URL'
+        '[webmcp-relay-embed] Script element has no src attribute, falling back to CDN widget URL.',
+        'This may cause version mismatches with your local relay server.'
       );
     }
     return FALLBACK_WIDGET_URL;
@@ -115,7 +117,10 @@
       return isJsonObject(parsed) ? parsed : { type: 'object', properties: {} };
     } catch (err) {
       console.warn(
-        '[webmcp-relay-embed] Failed to parse tool inputSchema, using permissive default:',
+        '[webmcp-relay-embed] Tool inputSchema is not valid JSON.',
+        'The tool will accept any arguments, which may cause invocation errors.',
+        'Raw schema:',
+        typeof rawSchema === 'string' ? rawSchema.slice(0, 200) : rawSchema,
         err
       );
       return { type: 'object', properties: {} };
@@ -130,8 +135,9 @@
     if (isJsonObject(value)) return value;
     if (value !== undefined && value !== null) {
       console.warn(
-        '[webmcp-relay-embed] Tool invocation args was not an object, defaulting to {}:',
-        typeof value
+        '[webmcp-relay-embed] Tool invocation args must be an object, got',
+        typeof value,
+        '-- invocation will proceed with empty arguments'
       );
     }
     return {};
@@ -199,6 +205,10 @@
       };
     }
 
+    console.warn(
+      '[webmcp-relay-embed] No WebMCP runtime found (navigator.modelContext or',
+      'navigator.modelContextTesting). Tools will not be relayed.'
+    );
     return null;
   }
 
@@ -395,7 +405,11 @@
       widgetWindow = iframe.contentWindow;
     });
     iframe.addEventListener('error', () => {
-      console.error('[webmcp-relay-embed] Failed to load relay widget iframe from:', iframe.src);
+      console.error(
+        '[webmcp-relay-embed] Failed to load relay widget iframe from:',
+        iframe.src,
+        '-- WebMCP tools will NOT be relayed. Check network connectivity and widget URL.'
+      );
     });
   }
 
