@@ -50,7 +50,7 @@ export function parseCliOptions(argv: string[]): CliOptions {
       continue;
     }
 
-    if (token === '--widget-origin' || token === '--allowed-origin') {
+    if (token === '--widget-origin' || token === '--allowed-origin' || token === '--ws-origin') {
       const raw = readFlagValue(token, i);
       i += 1;
       const split = raw
@@ -90,13 +90,14 @@ export function printHelp(): void {
       'webmcp-local-relay',
       '',
       'Usage:',
-      '  webmcp-local-relay [--host 127.0.0.1] [--port 9333] [--widget-origin https://yourdomain.com]',
+      '  webmcp-local-relay [--host 127.0.0.1] [--port 9333] [--widget-origin https://myapp.example.com]',
       '',
       'Options:',
       '  --host, -H               Bind host for local websocket relay (default: 127.0.0.1)',
       '  --port, -p               Bind port for local websocket relay (default: 9333)',
-      '  --widget-origin          Allowed browser origin(s), comma-separated (default: *)',
+      '  --widget-origin          Allowed host page origin(s), comma-separated (default: *)',
       '  --allowed-origin         Alias for --widget-origin',
+      '  --ws-origin              Alias for --widget-origin',
       '  --help, -h               Show help',
       '',
     ].join('\n')

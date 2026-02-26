@@ -15,7 +15,7 @@ try {
 
 if (options.allowedOrigins.includes('*')) {
   process.stderr.write(
-    '[webmcp-local-relay] WARNING: accepting connections from ALL origins. Use --widget-origin to restrict.\n'
+    '[webmcp-local-relay] WARNING: accepting connections from ALL host page origins. Use --widget-origin to restrict.\n'
   );
 }
 
