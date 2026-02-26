@@ -707,7 +707,129 @@ describe('LocalRelayMcpServer', () => {
       expect(names).toContain('webmcp_call_tool');
       expect(names).toContain('webmcp_list_tools');
       expect(names).toContain('webmcp_list_sources');
+      expect(names).toContain('webmcp_open_page');
 
+      await cleanup();
+    });
+  });
+
+  describe('webmcp_open_page', () => {
+    it('returns error for an invalid URL', async () => {
+      const { client, cleanup } = await createConnectedRelay();
+
+      const result = await client.callTool({
+        name: 'webmcp_open_page',
+        arguments: { url: 'not a url' },
+      });
+
+      const text = firstContentText(result);
+      expect(text).toContain('Invalid URL');
+      expect(result.isError).toBe(true);
+
+      await cleanup();
+    });
+
+    it('rejects non-http/https protocols', async () => {
+      const { client, cleanup } = await createConnectedRelay();
+
+      const result = await client.callTool({
+        name: 'webmcp_open_page',
+        arguments: { url: 'file:///etc/passwd' },
+      });
+
+      const text = firstContentText(result);
+      expect(text).toContain('Only http: and https:');
+      expect(result.isError).toBe(true);
+
+      await cleanup();
+    });
+
+    it('returns error when refresh is requested in client mode', async () => {
+      // Start a server relay first
+      const serverBridge = new RelayBridgeServer({
+        host: '127.0.0.1',
+        port: 0,
+        allowedOrigins: ['*'],
+      });
+      await serverBridge.start();
+
+      // Start a client relay that connects to the server
+      const clientBridge = new RelayBridgeServer({
+        host: '127.0.0.1',
+        port: serverBridge.port,
+        allowedOrigins: ['*'],
+      });
+      await clientBridge.start();
+
+      expect(clientBridge.mode).toBe('client');
+
+      const relay = new LocalRelayMcpServer({ bridge: clientBridge });
+      const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+      const client = new Client({ name: 'test-client', version: '1.0.0' });
+      await relay.connect(serverTransport);
+      await client.connect(clientTransport);
+
+      const result = await client.callTool({
+        name: 'webmcp_open_page',
+        arguments: { url: 'https://example.com', refresh: true },
+      });
+
+      const text = firstContentText(result);
+      expect(text).toContain('not supported in client mode');
+      expect(result.isError).toBe(true);
+
+      await client.close();
+      await relay.stop();
+      await serverBridge.stop();
+    });
+
+    it('returns error when refresh target has no matching source', async () => {
+      const { client, cleanup } = await createConnectedRelay();
+
+      const result = await client.callTool({
+        name: 'webmcp_open_page',
+        arguments: { url: 'https://no-such-origin.example.com', refresh: true },
+      });
+
+      const text = firstContentText(result);
+      expect(text).toContain('No connected source matches origin');
+      expect(result.isError).toBe(true);
+
+      await cleanup();
+    });
+
+    it('sends reload to matching source on refresh', async () => {
+      const { bridge, client, cleanup } = await createConnectedRelay();
+
+      let reloadReceived = false;
+      const ws = await connectBrowser(bridge, {
+        tabId: 'tab-reload',
+        url: 'https://example.com/page',
+        tools: [{ name: 'some_tool' }],
+      });
+
+      ws.on('message', (raw) => {
+        const msg = JSON.parse(String(raw));
+        if (msg.type === 'reload') {
+          reloadReceived = true;
+        }
+      });
+
+      await waitFor(() => bridge.registry.listTools()[0]?.name);
+
+      const result = await client.callTool({
+        name: 'webmcp_open_page',
+        arguments: { url: 'https://example.com/other-page', refresh: true },
+      });
+
+      const text = firstContentText(result);
+      expect(text).toContain('Reload sent');
+      expect(result.isError).toBeFalsy();
+
+      await waitFor(() => (reloadReceived ? true : undefined));
+      expect(reloadReceived).toBe(true);
+
+      ws.close();
       await cleanup();
     });
   });

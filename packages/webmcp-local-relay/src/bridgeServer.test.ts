@@ -1091,6 +1091,111 @@ describe('RelayBridgeServer client mode', () => {
     }
   });
 
+  it('rejects invalid constructor options', () => {
+    expect(() => new RelayBridgeServer({ port: -1 })).toThrow(/Invalid port/);
+    expect(() => new RelayBridgeServer({ port: 70000 })).toThrow(/Invalid port/);
+    expect(() => new RelayBridgeServer({ maxPayloadBytes: 0 })).toThrow(/Invalid maxPayloadBytes/);
+    expect(() => new RelayBridgeServer({ maxPayloadBytes: -5 })).toThrow(/Invalid maxPayloadBytes/);
+    expect(() => new RelayBridgeServer({ invokeTimeoutMs: 0 })).toThrow(/Invalid invokeTimeoutMs/);
+    expect(() => new RelayBridgeServer({ invokeTimeoutMs: -100 })).toThrow(
+      /Invalid invokeTimeoutMs/
+    );
+  });
+
+  it('allows port 0 for auto-assignment', async () => {
+    const bridge = new RelayBridgeServer({ port: 0 });
+    try {
+      await bridge.start();
+      expect(bridge.port).toBeGreaterThan(0);
+    } finally {
+      await bridge.stop();
+    }
+  });
+
+  it('wraps null tool results as MCP errors', async () => {
+    const bridge = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+      invokeTimeoutMs: 500,
+    });
+
+    try {
+      await bridge.start();
+
+      const ws = await connectAndRegister(bridge, {
+        tabId: 'tab-null',
+        url: 'https://example.com',
+        tools: [{ name: 'null_result_tool' }],
+      });
+
+      ws.on('message', (raw) => {
+        const msg = JSON.parse(String(raw));
+        if (msg.type !== 'invoke') return;
+        ws.send(
+          JSON.stringify({
+            type: 'result',
+            callId: msg.callId,
+            result: null,
+          })
+        );
+      });
+
+      const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
+      const result = await bridge.invokeTool(toolName, {});
+
+      expect(result.isError).toBe(true);
+      const text = (result.content?.[0] as { text?: string } | undefined)?.text ?? '';
+      expect(text).toMatch(/Tool returned an invalid result/i);
+
+      ws.close();
+    } finally {
+      await bridge.stop();
+    }
+  });
+
+  it('wraps string tool results as MCP errors', async () => {
+    const bridge = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+      invokeTimeoutMs: 500,
+    });
+
+    try {
+      await bridge.start();
+
+      const ws = await connectAndRegister(bridge, {
+        tabId: 'tab-str',
+        url: 'https://example.com',
+        tools: [{ name: 'string_result_tool' }],
+      });
+
+      ws.on('message', (raw) => {
+        const msg = JSON.parse(String(raw));
+        if (msg.type !== 'invoke') return;
+        ws.send(
+          JSON.stringify({
+            type: 'result',
+            callId: msg.callId,
+            result: 'just a string',
+          })
+        );
+      });
+
+      const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
+      const result = await bridge.invokeTool(toolName, {});
+
+      expect(result.isError).toBe(true);
+      const text = (result.content?.[0] as { text?: string } | undefined)?.text ?? '';
+      expect(text).toMatch(/Tool returned an invalid result/i);
+
+      ws.close();
+    } finally {
+      await bridge.stop();
+    }
+  });
+
   it('cleans up pending client invocations on stop', async () => {
     const server = new RelayBridgeServer({
       host: '127.0.0.1',
