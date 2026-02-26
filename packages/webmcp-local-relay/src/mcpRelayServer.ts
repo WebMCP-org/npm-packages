@@ -3,7 +3,7 @@ import { execFile } from 'node:child_process';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import { z } from 'zod';
+import { z } from 'zod/v4';
 
 import { RelayBridgeServer, type RelayBridgeServerOptions } from './bridgeServer.js';
 import type { AggregatedTool } from './registry.js';
@@ -16,17 +16,9 @@ interface RegisteredToolHandle {
 }
 
 /**
- * Construction options for {@link LocalRelayMcpServer}.
+ * Base options shared by all {@link LocalRelayMcpServer} configurations.
  */
-export interface LocalRelayMcpServerOptions {
-  /**
-   * Existing bridge instance to reuse.
-   */
-  bridge?: RelayBridgeServer;
-  /**
-   * Bridge options used when creating an internal bridge.
-   */
-  bridgeOptions?: RelayBridgeServerOptions;
+interface LocalRelayMcpServerBaseOptions {
   /**
    * MCP server name reported during initialization.
    */
@@ -36,6 +28,18 @@ export interface LocalRelayMcpServerOptions {
    */
   serverVersion?: string;
 }
+
+/**
+ * Construction options for {@link LocalRelayMcpServer}.
+ *
+ * Provide either an existing `bridge` instance OR `bridgeOptions` to create
+ * one internally — not both.
+ */
+export type LocalRelayMcpServerOptions = LocalRelayMcpServerBaseOptions &
+  (
+    | { bridge: RelayBridgeServer; bridgeOptions?: never }
+    | { bridge?: never; bridgeOptions?: RelayBridgeServerOptions }
+  );
 
 /**
  * MCP server facade that exposes browser-relayed tools over MCP transport.
@@ -108,14 +112,21 @@ export class LocalRelayMcpServer {
    */
   async stop(): Promise<void> {
     this.connected = false;
+    let mcpCloseError: unknown;
     try {
       await this.mcpServer.close();
     } catch (err) {
+      mcpCloseError = err;
       process.stderr.write(
         `[webmcp-local-relay] error: failed to close MCP server: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`
       );
     }
     await this.bridge.stop();
+    if (mcpCloseError) {
+      process.stderr.write(
+        '[webmcp-local-relay] warn: shutdown completed with errors (MCP server close failed)\n'
+      );
+    }
   }
 
   /**
@@ -323,6 +334,9 @@ export class LocalRelayMcpServer {
             try {
               return new URL(s.url).origin === parsed.origin;
             } catch {
+              process.stderr.write(
+                `[webmcp-local-relay] warn: source ${s.sourceId} has unparseable URL: ${s.url}\n`
+              );
               return false;
             }
           });
@@ -383,6 +397,9 @@ export class LocalRelayMcpServer {
             try {
               return new URL(s.url).origin === parsed.origin;
             } catch {
+              process.stderr.write(
+                `[webmcp-local-relay] warn: source ${s.sourceId} has unparseable URL: ${s.url}\n`
+              );
               return false;
             }
           });
@@ -424,21 +441,26 @@ export class LocalRelayMcpServer {
 
   /**
    * Opens a URL in the user's default browser using the platform open command.
+   *
+   * Uses the re-serialized `URL.href` to prevent injection of shell metacharacters.
+   * On Windows, PowerShell `Start-Process` is used instead of `cmd /c start`
+   * because cmd.exe interprets `&`, `|`, and other metacharacters in URLs.
    */
   private openInBrowser(url: string): Promise<void> {
+    const safeUrl = new URL(url).href;
     return new Promise((resolve, reject) => {
       const platform = process.platform;
       let command: string;
       let args: string[];
       if (platform === 'darwin') {
         command = 'open';
-        args = [url];
+        args = [safeUrl];
       } else if (platform === 'win32') {
-        command = 'cmd';
-        args = ['/c', 'start', '', url];
+        command = 'powershell.exe';
+        args = ['-NoProfile', '-Command', `Start-Process "${safeUrl}"`];
       } else {
         command = 'xdg-open';
-        args = [url];
+        args = [safeUrl];
       }
       execFile(command, args, (err) => {
         if (err) reject(err);
@@ -493,16 +515,8 @@ export class LocalRelayMcpServer {
     return this.bridge
       .listToolsFromRelay()
       .map((tool) => ({
-        name: tool.name,
+        ...tool,
         originalName: tool.name,
-        title: tool.title,
-        description: tool.description,
-        inputSchema: tool.inputSchema,
-        outputSchema: tool.outputSchema,
-        annotations: tool.annotations,
-        execution: tool.execution,
-        _meta: tool._meta,
-        icons: tool.icons,
         sources: [],
       }))
       .sort((left, right) => left.name.localeCompare(right.name));
@@ -547,7 +561,13 @@ export class LocalRelayMcpServer {
     }
 
     if (changed && this.connected) {
-      this.mcpServer.sendToolListChanged();
+      try {
+        this.mcpServer.sendToolListChanged();
+      } catch (err) {
+        process.stderr.write(
+          `[webmcp-local-relay] warn: failed to send tool list changed notification: ${err instanceof Error ? err.message : String(err)}\n`
+        );
+      }
     }
   }
 
@@ -555,12 +575,10 @@ export class LocalRelayMcpServer {
    * Registers a single dynamic tool and returns a removal handle.
    */
   private registerDynamicTool(tool: AggregatedTool): RegisteredToolHandle {
-    const config: {
-      description: string;
-      inputSchema: z.ZodObject<z.ZodRawShape, 'passthrough'>;
-    } = {
+    const inputSchema = z.object({}).passthrough();
+    const config = {
       description: this.dynamicToolDescription(tool),
-      inputSchema: z.object({}).passthrough(),
+      inputSchema,
     };
 
     const handle = this.mcpServer.registerTool(

@@ -25,18 +25,12 @@ export interface SourceInfo extends SourceMetadata {
 
 /**
  * Aggregated relayed tool metadata across one or more sources.
+ *
+ * Extends {@link RelayTool} with relay-specific fields so new SDK tool
+ * properties are automatically inherited without manual duplication.
  */
-export interface AggregatedTool {
-  name: string;
+export interface AggregatedTool extends RelayTool {
   originalName: string;
-  title: RelayTool['title'];
-  description: RelayTool['description'];
-  inputSchema: RelayTool['inputSchema'];
-  outputSchema: RelayTool['outputSchema'];
-  annotations: RelayTool['annotations'];
-  execution: RelayTool['execution'];
-  _meta: RelayTool['_meta'];
-  icons: RelayTool['icons'];
   sources: SourceInfo[];
 }
 
@@ -182,16 +176,9 @@ export class RelayRegistry {
         .filter((source): source is SourceInfo => Boolean(source));
 
       result.push({
+        ...primaryProvider.tool,
         name: publicToolName,
         originalName: primaryProvider.tool.name,
-        title: primaryProvider.tool.title,
-        description: primaryProvider.tool.description,
-        inputSchema: primaryProvider.tool.inputSchema,
-        outputSchema: primaryProvider.tool.outputSchema,
-        annotations: primaryProvider.tool.annotations,
-        execution: primaryProvider.tool.execution,
-        _meta: primaryProvider.tool._meta,
-        icons: primaryProvider.tool.icons,
         sources,
       });
     }
