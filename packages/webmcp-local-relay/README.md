@@ -128,8 +128,9 @@ webmcp-local-relay [options]
 
   --host, -H               Bind host (default: 127.0.0.1)
   --port, -p               WebSocket port (default: 9333)
-  --widget-origin          Allowed browser origins, comma-separated (default: *)
+  --widget-origin          Allowed host page origin(s), comma-separated (default: *)
   --allowed-origin         Alias for --widget-origin
+  --ws-origin              Alias for --widget-origin
   --help, -h               Show help
 ```
 
@@ -142,19 +143,24 @@ npx @mcp-b/webmcp-local-relay
 # Custom port
 npx @mcp-b/webmcp-local-relay --port 9444
 
-# Restrict to trusted origins only
-npx @mcp-b/webmcp-local-relay --widget-origin https://your-app.example.com,https://another-app.example.com
+# Restrict to tools from trusted host pages
+npx @mcp-b/webmcp-local-relay --widget-origin https://myapp.com
 ```
 
 ### Security
 
 - Binds to `127.0.0.1` by default (loopback only, not accessible from your network).
 - The default `allowedOrigins` is `*`, which permits any browser page to connect and register tools. This is convenient for development but means any website open in your browser can expose tools to the relay.
-- **Recommended:** Use `--widget-origin` to restrict connections to only the origins you trust:
+- `--widget-origin` validates the **host page origin** reported in the browser `hello` message. This is the origin of the page that loaded `embed.js` (e.g., `https://myapp.com`), regardless of whether the widget iframe is served from CDN or self-hosted.
+- **Recommended:** Use `--widget-origin` to restrict which websites can register tools:
   ```bash
-  webmcp-local-relay --widget-origin https://your-app.example.com,https://another-app.example.com
+  # Only allow tools from myapp.com
+  webmcp-local-relay --widget-origin https://myapp.com
+
+  # Allow multiple origins
+  webmcp-local-relay --widget-origin https://app1.com,https://app2.com
   ```
-- Only the WebSocket `Origin` header is checked — any local process can connect regardless of origin restrictions.
+- Only the host page origin is checked — any local process can connect regardless of origin restrictions.
 
 ### Architecture
 
@@ -226,7 +232,7 @@ For Chromium/Chrome Canary native preview testing:
 | `No sources connected` | Ensure the page loaded `embed.js` and the relay process is running |
 | `No tools listed` | Ensure tools are registered on the page's WebMCP runtime. If tools register after load, confirm your runtime emits tool-change notifications (`toolschanged` or `registerToolsChangedCallback`) |
 | `Tool not found` | Tab reloaded or disconnected — call `webmcp_list_tools` again to refresh |
-| Connection blocked | Verify `--widget-origin` matches your page's origin, and relay port matches `data-relay-port` |
+| Connection blocked | Verify `--widget-origin` matches your host page's origin (e.g., `https://myapp.com`), and relay port matches `data-relay-port` |
 
 ---
 
