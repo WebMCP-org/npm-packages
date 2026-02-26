@@ -417,7 +417,7 @@ async function setupE2EHarness(options: {
         '--port',
         String(relayPort),
         '--widget-origin',
-        widgetOrigin,
+        host.origin,
       ],
       cwd: PACKAGE_DIR,
       stderr: 'pipe',
