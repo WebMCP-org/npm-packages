@@ -1,7 +1,8 @@
+import { execFile } from 'node:child_process';
+
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import { type ToolAnnotations, ToolAnnotationsSchema } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 
 import { RelayBridgeServer, type RelayBridgeServerOptions } from './bridgeServer.js';
@@ -81,6 +82,11 @@ export class LocalRelayMcpServer {
     await this.syncDynamicTools();
   }
 
+  /**
+   * Connects the MCP server to a transport.
+   *
+   * This may be called exactly once per instance lifecycle.
+   */
   async connect(transport: Transport): Promise<void> {
     if (this.connected) {
       throw new Error('MCP server transport already connected');
@@ -97,6 +103,9 @@ export class LocalRelayMcpServer {
     await this.connect(new StdioServerTransport());
   }
 
+  /**
+   * Stops MCP transport and bridge resources.
+   */
   async stop(): Promise<void> {
     this.connected = false;
     try {
@@ -131,6 +140,18 @@ export class LocalRelayMcpServer {
         },
       },
       async () => {
+        if (this.bridge.mode === 'client') {
+          const info = {
+            mode: 'client' as const,
+            message: 'Proxying through an existing relay server.',
+            count: 0,
+            sources: [],
+          };
+          return {
+            content: [{ type: 'text', text: JSON.stringify(info, null, 2) }],
+            structuredContent: info,
+          };
+        }
         const sources = this.bridge.registry.listSources();
         return {
           content: [
@@ -158,7 +179,7 @@ export class LocalRelayMcpServer {
         },
       },
       async () => {
-        const tools = this.bridge.registry.listTools();
+        const tools = this.listAggregatedTools();
         return {
           content: [
             { type: 'text', text: JSON.stringify({ count: tools.length, tools }, null, 2) },
@@ -193,7 +214,7 @@ export class LocalRelayMcpServer {
         },
       },
       async ({ name, arguments: args }) => {
-        const tools = this.bridge.registry.listTools();
+        const tools = this.listAggregatedTools();
         const toolSummary = this.buildToolSummary(tools);
 
         const matched = tools.find((t) => t.name === name);
@@ -216,15 +237,16 @@ export class LocalRelayMcpServer {
         try {
           const result = await this.bridge.invokeTool(name, args ?? {});
 
-          if (toolSummary) {
-            const updatedTools = this.bridge.registry.listTools();
-            const updatedSummary = this.buildToolSummary(updatedTools);
-            if (updatedSummary) {
-              result.content = [
-                ...result.content,
-                { type: 'text' as const, text: `\n---\nAvailable tools:\n${updatedSummary}` },
-              ];
-            }
+          const updatedTools =
+            this.bridge.mode === 'client'
+              ? this.buildAggregatedToolsFromRelay()
+              : this.bridge.registry.listTools();
+          const updatedSummary = this.buildToolSummary(updatedTools);
+          if (updatedSummary) {
+            result.content = [
+              ...result.content,
+              { type: 'text' as const, text: `\n---\nAvailable tools:\n${updatedSummary}` },
+            ];
           }
 
           return result;
@@ -239,6 +261,147 @@ export class LocalRelayMcpServer {
             isError: true,
           };
         }
+      }
+    );
+
+    this.mcpServer.registerTool(
+      'webmcp_open_page',
+      {
+        description:
+          "Open a URL in the user's default browser, or refresh a connected source page. " +
+          'Use to launch WebMCP-enabled pages or reload stale connections.',
+        inputSchema: {
+          url: z.string().describe('URL to open or match for refresh.'),
+          refresh: z
+            .boolean()
+            .optional()
+            .describe(
+              'If true, refresh the connected source matching this URL instead of opening a new tab.'
+            ),
+        },
+        annotations: { readOnlyHint: false },
+      },
+      async ({ url, refresh }) => {
+        let parsed: URL;
+        try {
+          parsed = new URL(url);
+        } catch {
+          return {
+            content: [{ type: 'text' as const, text: `Invalid URL: ${url}` }],
+            isError: true,
+          };
+        }
+
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: `Only http: and https: URLs are allowed. Got: ${parsed.protocol}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        if (refresh) {
+          if (this.bridge.mode === 'client') {
+            return {
+              content: [
+                {
+                  type: 'text' as const,
+                  text: 'Refresh is not supported in client mode. Only the server relay can reload sources.',
+                },
+              ],
+              isError: true,
+            };
+          }
+
+          const sources = this.bridge.registry.listSources();
+          const matched = sources.find((s) => {
+            if (!s.url) return false;
+            try {
+              return new URL(s.url).origin === parsed.origin;
+            } catch {
+              return false;
+            }
+          });
+
+          if (!matched) {
+            return {
+              content: [
+                {
+                  type: 'text' as const,
+                  text: `No connected source matches origin ${parsed.origin}. The page may not be open or connected.`,
+                },
+              ],
+              isError: true,
+            };
+          }
+
+          try {
+            this.bridge.reloadSource(matched.sourceId);
+            return {
+              content: [
+                {
+                  type: 'text' as const,
+                  text: `Reload sent to source ${matched.sourceId} (${matched.url ?? matched.origin}).`,
+                },
+              ],
+            };
+          } catch (err) {
+            return {
+              content: [
+                {
+                  type: 'text' as const,
+                  text: `Failed to reload source: ${err instanceof Error ? err.message : String(err)}`,
+                },
+              ],
+              isError: true,
+            };
+          }
+        }
+
+        try {
+          await this.openInBrowser(url);
+        } catch (err) {
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: `Failed to open browser: ${err instanceof Error ? err.message : String(err)}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        if (this.bridge.mode === 'server') {
+          const sources = this.bridge.registry.listSources();
+          const existing = sources.find((s) => {
+            if (!s.url) return false;
+            try {
+              return new URL(s.url).origin === parsed.origin;
+            } catch {
+              return false;
+            }
+          });
+
+          if (existing) {
+            return {
+              content: [
+                {
+                  type: 'text' as const,
+                  text: `Opened ${url} in the default browser. Note: a source from ${existing.url ?? existing.origin} is already connected.`,
+                },
+              ],
+            };
+          }
+        }
+
+        return {
+          content: [{ type: 'text' as const, text: `Opened ${url} in the default browser.` }],
+        };
       }
     );
   }
@@ -260,6 +423,31 @@ export class LocalRelayMcpServer {
   }
 
   /**
+   * Opens a URL in the user's default browser using the platform open command.
+   */
+  private openInBrowser(url: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const platform = process.platform;
+      let command: string;
+      let args: string[];
+      if (platform === 'darwin') {
+        command = 'open';
+        args = [url];
+      } else if (platform === 'win32') {
+        command = 'cmd';
+        args = ['/c', 'start', '', url];
+      } else {
+        command = 'xdg-open';
+        args = [url];
+      }
+      execFile(command, args, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+  }
+
+  /**
    * Coalesces concurrent sync requests into a single serialized sync loop.
    */
   private async syncDynamicTools(): Promise<void> {
@@ -273,7 +461,8 @@ export class LocalRelayMcpServer {
     try {
       do {
         this.syncRequested = false;
-        this.applyDynamicTools(this.bridge.registry.listTools());
+        const tools = this.listAggregatedTools();
+        this.applyDynamicTools(tools);
       } while (this.syncRequested);
     } finally {
       const retryRequested = this.syncRequested;
@@ -285,6 +474,38 @@ export class LocalRelayMcpServer {
         });
       }
     }
+  }
+
+  /**
+   * Returns the current aggregated tool list, dispatching based on bridge mode.
+   */
+  private listAggregatedTools(): AggregatedTool[] {
+    return this.bridge.mode === 'client'
+      ? this.buildAggregatedToolsFromRelay()
+      : this.bridge.registry.listTools();
+  }
+
+  /**
+   * Converts relay client tool descriptors to aggregated tool shape.
+   * In client mode, source metadata is unavailable so tools are given empty sources.
+   */
+  private buildAggregatedToolsFromRelay(): AggregatedTool[] {
+    return this.bridge
+      .listToolsFromRelay()
+      .map((tool) => ({
+        name: tool.name,
+        originalName: tool.name,
+        title: tool.title,
+        description: tool.description,
+        inputSchema: tool.inputSchema,
+        outputSchema: tool.outputSchema,
+        annotations: tool.annotations,
+        execution: tool.execution,
+        _meta: tool._meta,
+        icons: tool.icons,
+        sources: [],
+      }))
+      .sort((left, right) => left.name.localeCompare(right.name));
   }
 
   /**
@@ -334,27 +555,26 @@ export class LocalRelayMcpServer {
    * Registers a single dynamic tool and returns a removal handle.
    */
   private registerDynamicTool(tool: AggregatedTool): RegisteredToolHandle {
-    const annotations = this.normalizeAnnotations(tool.annotations);
     const config: {
       description: string;
       inputSchema: z.ZodObject<z.ZodRawShape, 'passthrough'>;
-      annotations?: ToolAnnotations;
     } = {
       description: this.dynamicToolDescription(tool),
       inputSchema: z.object({}).passthrough(),
     };
-    if (annotations) {
-      config.annotations = annotations;
-    }
 
     const handle = this.mcpServer.registerTool(
       tool.name,
-      config,
+      tool.annotations ? { ...config, annotations: tool.annotations } : config,
       async (args: Record<string, unknown>) => {
         try {
           return await this.bridge.invokeTool(tool.name, args);
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
+          const details = err instanceof Error ? (err.stack ?? err.message) : String(err);
+          process.stderr.write(
+            `[webmcp-local-relay] error: dynamic tool "${tool.name}" invocation failed: ${details}\n`
+          );
           return {
             content: [
               {
@@ -377,35 +597,15 @@ export class LocalRelayMcpServer {
 
   /**
    * Builds a display description for relayed tools including source context.
+   * In client mode, source metadata is unavailable, so tools are labeled `[WebMCP relay]`.
    */
   private dynamicToolDescription(tool: AggregatedTool): string {
     const source = tool.sources[0];
     const sourceLabel = source
       ? `[WebMCP ${source.tabId}${source.title ? ` • ${source.title}` : ''}]`
-      : '[WebMCP]';
+      : '[WebMCP relay]';
 
     return `${sourceLabel} ${tool.description ?? `Relayed tool ${tool.originalName}`}`;
-  }
-
-  /**
-   * Converts unknown annotation payloads into MCP tool annotations when valid.
-   */
-  private normalizeAnnotations(
-    value: Record<string, unknown> | undefined
-  ): ToolAnnotations | undefined {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) {
-      return undefined;
-    }
-
-    const parsed = ToolAnnotationsSchema.safeParse(value);
-    if (parsed.success) {
-      return parsed.data;
-    }
-
-    process.stderr.write(
-      `[webmcp-local-relay] warn: dropping invalid tool annotations: ${parsed.error.message}\n`
-    );
-    return undefined;
   }
 
   /**
@@ -415,10 +615,14 @@ export class LocalRelayMcpServer {
     return JSON.stringify({
       name: tool.name,
       originalName: tool.originalName,
+      title: tool.title,
       description: tool.description,
       inputSchema: tool.inputSchema,
       outputSchema: tool.outputSchema,
       annotations: tool.annotations,
+      execution: tool.execution,
+      _meta: tool._meta,
+      icons: tool.icons,
       sources: tool.sources.map((source) => ({
         sourceId: source.sourceId,
         tabId: source.tabId,

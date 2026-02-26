@@ -31,11 +31,7 @@ try {
   await relay.start();
 } catch (err) {
   const message = err instanceof Error ? err.message : String(err);
-  if (message.includes('EADDRINUSE')) {
-    process.stderr.write(
-      `[webmcp-local-relay] error: port ${options.port} is already in use. Use --port to specify a different port.\n`
-    );
-  } else if (message.includes('EACCES')) {
+  if (message.includes('EACCES')) {
     process.stderr.write(
       `[webmcp-local-relay] error: insufficient permissions to bind to ${options.host}:${options.port}.\n`
     );
@@ -53,9 +49,15 @@ try {
   process.exit(1);
 }
 
-process.stderr.write(
-  `[webmcp-local-relay] listening on ws://${options.host}:${relay.bridge.port} (allowed origins: ${options.allowedOrigins.join(', ')})\n`
-);
+if (relay.bridge.mode === 'server') {
+  process.stderr.write(
+    `[webmcp-local-relay] server mode: listening on ws://${options.host}:${relay.bridge.port} (allowed origins: ${options.allowedOrigins.join(', ')})\n`
+  );
+} else {
+  process.stderr.write(
+    `[webmcp-local-relay] client mode: proxying through existing relay at ws://${options.host}:${options.port}\n`
+  );
+}
 
 /**
  * Gracefully shuts down bridge and MCP server for process termination signals.
