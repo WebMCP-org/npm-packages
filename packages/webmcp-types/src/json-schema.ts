@@ -222,11 +222,17 @@ type InferObject<TSchema> = Simplify<
     AdditionalPropsOf<TSchema>
 >;
 
-type TypeKeywordOf<TSchema> = TSchema extends { type: infer TType } ? TType : never;
+type TypeKeywordOf<TSchema> = TSchema extends { type?: infer TType }
+  ? 'type' extends keyof TSchema
+    ? TType
+    : undefined
+  : undefined;
 
-type TypeOptionsOf<TSchema> = TypeKeywordOf<TSchema> extends readonly unknown[]
-  ? Extract<TypeKeywordOf<TSchema>[number], JsonSchemaType>
-  : Extract<TypeKeywordOf<TSchema>, JsonSchemaType>;
+type TypeOptionsOf<TSchema> = [TypeKeywordOf<TSchema>] extends [undefined]
+  ? 'object'
+  : TypeKeywordOf<TSchema> extends readonly unknown[]
+    ? Extract<TypeKeywordOf<TSchema>[number], JsonSchemaType>
+    : Extract<TypeKeywordOf<TSchema>, JsonSchemaType>;
 
 type InferFromTypeOption<TSchema, TType extends JsonSchemaType> = TType extends 'object'
   ? InferObject<TSchema>
@@ -282,9 +288,10 @@ type IncludesObjectType<TSchema> = TypeOptionsOf<TSchema> extends never
  * `InputSchema` loaded at runtime), this intentionally falls back to
  * `Record<string, unknown>`.
  */
-export type InferArgsFromInputSchema<TSchema extends { type: string | readonly string[] }> =
-  IsWidenedTypeKeyword<TSchema['type']> extends true
-    ? Record<string, unknown>
-    : IncludesObjectType<TSchema> extends true
-      ? InferObject<TSchema>
-      : Record<string, unknown>;
+export type InferArgsFromInputSchema<TSchema> = IsWidenedTypeKeyword<
+  TypeKeywordOf<TSchema>
+> extends true
+  ? Record<string, unknown>
+  : IncludesObjectType<TSchema> extends true
+    ? InferObject<TSchema>
+    : Record<string, unknown>;

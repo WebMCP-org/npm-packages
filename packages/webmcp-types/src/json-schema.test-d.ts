@@ -153,6 +153,21 @@ test('InferArgsFromInputSchema keeps extras unknown when named properties are pr
   expectTypeOf(args.limit).toEqualTypeOf<unknown>();
 });
 
+test('InferArgsFromInputSchema infers object properties when type is omitted', () => {
+  const schema = {
+    properties: {
+      query: { type: 'string' },
+      limit: { type: 'integer' },
+    },
+    required: ['query'],
+  } as const;
+
+  type Args = InferArgsFromInputSchema<typeof schema>;
+  const args: Args = { query: 'webmcp' };
+  expectTypeOf(args.query).toEqualTypeOf<string>();
+  expectTypeOf(args.limit).toEqualTypeOf<number | undefined>();
+});
+
 test('InferArgsFromInputSchema supports object type unions for argument inference', () => {
   type Args = InferArgsFromInputSchema<typeof schemaWithObjectTypeUnion>;
   const args: Args = { query: 'webmcp' };
@@ -174,25 +189,19 @@ test('ToolDescriptorFromSchema execute args reject missing required keys', () =>
   void args;
 });
 
-test('ToolDescriptorFromSchema infers structuredContent from outputSchema', () => {
+test('ToolDescriptorFromSchema infers raw return type from outputSchema', () => {
   type ExecuteResult = Awaited<
     ReturnType<ToolDescriptorFromSchema<typeof closedSchema, typeof outputSchema>['execute']>
   >;
-  type StructuredContent = ExecuteResult['structuredContent'];
 
-  const structuredContent: NonNullable<StructuredContent> = {
-    total: 1,
-    items: ['a'],
+  const rawResult: ExecuteResult = { total: 1, items: ['a'] };
+  const wrappedResult: ExecuteResult = {
+    content: [{ type: 'text', text: 'ok' }],
+    structuredContent: { total: 1, items: ['a'] },
   };
-  expectTypeOf(structuredContent.total).toEqualTypeOf<number>();
-  expectTypeOf(structuredContent.items).toEqualTypeOf<string[] | undefined>();
-  expectTypeOf<StructuredContent>().toMatchTypeOf<
-    | {
-        total: number;
-        items?: string[];
-      }
-    | undefined
-  >();
+
+  void rawResult;
+  void wrappedResult;
 });
 
 test('ModelContext.registerTool infers execute args from literal schema', () => {
@@ -322,7 +331,7 @@ test('ModelContext.registerTool accepts async output schema handlers with loose 
 
 test('ModelContext.registerTool rejects invalid structuredContent for inferred outputSchema', () => {
   if (shouldInvokeRegisterTool) {
-    // @ts-expect-error - structuredContent must satisfy outputSchema (missing total, extra test)
+    // @ts-expect-error - raw return must satisfy outputSchema (missing total, extra test)
     registerTool({
       name: 'search_summary',
       description: 'Async tool with inferred structured output',
@@ -347,12 +356,9 @@ test('ModelContext.registerTool rejects invalid structuredContent for inferred o
       } as const satisfies JsonSchemaForInference,
       async execute(args) {
         return {
-          content: [{ text: `summary for ${args.query}`, data: 'opaque' }],
-          structuredContent: {
-            test: 'test',
-            tags: [args.query],
-            mode: 'compact',
-          },
+          test: 'test',
+          tags: [args.query],
+          mode: 'compact',
         };
       },
     });
@@ -361,7 +367,7 @@ test('ModelContext.registerTool rejects invalid structuredContent for inferred o
 
 test('ModelContext.registerTool rejects structuredContent enum/type mismatches', () => {
   if (shouldInvokeRegisterTool) {
-    // @ts-expect-error - total must be number and mode must match enum literals
+    // @ts-expect-error - raw output mode must match enum literals
     registerTool({
       name: 'search_summary_mismatch',
       description: 'Invalid structured output',
@@ -375,13 +381,10 @@ test('ModelContext.registerTool rejects structuredContent enum/type mismatches',
         required: ['total'],
         additionalProperties: false,
       } as const satisfies JsonSchemaForInference,
-      execute(args) {
+      execute(_args) {
         return {
-          content: [{ type: 'text', text: args.query }],
-          structuredContent: {
-            total: '1',
-            mode: 'verbose',
-          },
+          total: 1,
+          mode: 'verbose',
         };
       },
     });

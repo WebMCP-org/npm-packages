@@ -69,8 +69,10 @@ export type {
   ToolAnnotations,
   ToolDescriptor,
   ToolDescriptorFromSchema,
+  ToolExecuteResult,
   ToolExecutionContext,
   ToolListItem,
+  ToolRawResult,
   ToolResultFromOutputSchema,
 } from './tool.js';
 

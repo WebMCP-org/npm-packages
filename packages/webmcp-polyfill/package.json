@@ -63,6 +63,7 @@
     "@vitest/browser": "catalog:",
     "@vitest/browser-playwright": "catalog:",
     "@vitest/coverage-v8": "catalog:",
+    "happy-dom": "^15.11.7",
     "playwright": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",

@@ -24,23 +24,35 @@ export interface ToolAnnotations {
   /**
    * Indicates the tool is read-only.
    */
-  readOnlyHint?: boolean;
+  readOnlyHint?: boolean | 'true' | 'false';
 
   /**
    * Indicates the tool may perform destructive actions.
    */
-  destructiveHint?: boolean;
+  destructiveHint?: boolean | 'true' | 'false';
 
   /**
    * Indicates the tool can be called repeatedly without changing outcome.
    */
-  idempotentHint?: boolean;
+  idempotentHint?: boolean | 'true' | 'false';
 
   /**
    * Indicates the tool may reach beyond local context (network, external systems, etc.).
    */
-  openWorldHint?: boolean;
+  openWorldHint?: boolean | 'true' | 'false';
 }
+
+/**
+ * Raw tool result values accepted by execute handlers before runtime normalization.
+ */
+export type ToolRawResult = unknown;
+
+/**
+ * Tool execute return value accepted by WebMCP descriptor types.
+ */
+export type ToolExecuteResult<TResult = ToolRawResult> = TResult extends CallToolResult
+  ? TResult
+  : CallToolResult | TResult;
 
 // ============================================================================
 // Tool Descriptor
@@ -81,14 +93,14 @@ export type MaybePromise<T> = T | Promise<T>;
  * information. This interface uses JSON Schema for input/output typing.
  *
  * @template TArgs - Tool input arguments.
- * @template TResult - Tool execution result shape.
+ * @template TResult - Tool execution raw result shape (or full CallToolResult).
  * @template TName - Tool name literal type.
  *
  * @see {@link https://spec.modelcontextprotocol.io/specification/server/tools/}
  */
 export interface ToolDescriptor<
   TArgs extends Record<string, unknown> = Record<string, unknown>,
-  TResult extends CallToolResult = CallToolResult,
+  TResult = ToolRawResult,
   TName extends string = string,
 > {
   /**
@@ -119,15 +131,14 @@ export interface ToolDescriptor<
   /**
    * Tool execution function.
    */
-  execute: (args: TArgs, client: ModelContextClient) => MaybePromise<TResult>;
+  execute: (args: TArgs, client: ModelContextClient) => MaybePromise<ToolExecuteResult<TResult>>;
 }
 
 /**
  * Tool response shape inferred from an `outputSchema`.
  *
  * When a literal object output schema is provided, `structuredContent` is
- * narrowed to the inferred schema type. Otherwise, this resolves to the
- * base `CallToolResult`.
+ * narrowed to the inferred schema type for wrapped MCP responses.
  *
  * @template TOutputSchema - Optional literal JSON object schema.
  */
@@ -136,6 +147,15 @@ export type ToolResultFromOutputSchema<
 > = TOutputSchema extends JsonSchemaObject
   ? CallToolResult & { structuredContent?: InferJsonSchema<TOutputSchema> }
   : CallToolResult;
+
+/**
+ * Execute result typing derived from an optional output schema.
+ */
+export type ToolExecuteResultFromOutputSchema<
+  TOutputSchema extends JsonSchemaObject | undefined = undefined,
+> = TOutputSchema extends JsonSchemaObject
+  ? InferJsonSchema<TOutputSchema> | ToolResultFromOutputSchema<TOutputSchema>
+  : ToolExecuteResult;
 
 /**
  * Tool descriptor whose `execute` args are inferred from a JSON Schema.
@@ -149,13 +169,13 @@ export type ToolResultFromOutputSchema<
  * @template TResult - Optional result type override constrained by inferred output schema.
  */
 export type ToolDescriptorFromSchema<
-  TInputSchema extends { type: string | readonly string[] },
+  TInputSchema extends { type?: string | readonly string[] },
   TOutputSchema extends JsonSchemaObject | undefined = undefined,
   TName extends string = string,
 > = Omit<
   ToolDescriptor<
     InferArgsFromInputSchema<TInputSchema>,
-    ToolResultFromOutputSchema<TOutputSchema>,
+    ToolExecuteResultFromOutputSchema<TOutputSchema>,
     TName
   >,
   'inputSchema' | 'outputSchema'
