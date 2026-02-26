@@ -1033,6 +1033,22 @@ describe('@mcp-b/webmcp-polyfill', () => {
       expect(parsed.type).toBe('object');
     });
 
+    it('listTools normalizes empty inputSchema {} to default object schema', () => {
+      initializeWebMCPPolyfill();
+      navigator.modelContext.registerTool({
+        name: 'no_args_tool',
+        description: 'Tool with no arguments',
+        inputSchema: {},
+        execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+      });
+
+      const tools = navigator.modelContextTesting?.listTools();
+      expect(tools).toHaveLength(1);
+      expect(tools?.[0]?.inputSchema).toBeDefined();
+      const parsed = JSON.parse(tools?.[0]?.inputSchema ?? '');
+      expect(parsed.type).toBe('object');
+    });
+
     it('listTools omits inputSchema when serialization fails', () => {
       initializeWebMCPPolyfill();
 

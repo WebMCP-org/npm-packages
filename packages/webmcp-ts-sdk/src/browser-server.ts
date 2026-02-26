@@ -259,7 +259,11 @@ export class BrowserMcpServer extends BaseMcpServer {
       }) as unknown as InputSchema;
     }
 
-    // Already plain JSON Schema
+    // Already plain JSON Schema - normalize an empty schema {} to the standard default.
+    // An empty {} is semantically valid JSON Schema but lacks type:"object", which MCP requires.
+    if (Object.keys(schema as Record<string, unknown>).length === 0) {
+      return DEFAULT_INPUT_SCHEMA;
+    }
     return schema as InputSchema;
   }
 

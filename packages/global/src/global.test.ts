@@ -401,4 +401,23 @@ describe('global adapter', () => {
     initializeWebModelContext();
     expect(typeof getModelContext().listTools).toBe('function');
   });
+
+  it('listTools normalizes empty inputSchema {} to default object schema', () => {
+    initializeWebModelContext();
+    const modelContext = getModelContext();
+
+    modelContext.registerTool({
+      name: 'no_args_tool',
+      description: 'Tool with no arguments',
+      inputSchema: {},
+      async execute() {
+        return { content: [{ type: 'text', text: 'ok' }] };
+      },
+    });
+
+    const tools = modelContext.listTools();
+    const tool = tools.find((t) => t.name === 'no_args_tool');
+    expect(tool).toBeDefined();
+    expect(tool?.inputSchema).toMatchObject({ type: 'object' });
+  });
 });
