@@ -11,8 +11,7 @@ on:
         type: string
 
 permissions:
-  contents: write # For creating GitHub releases
-  id-token: write # For OIDC and sigstore signing
+  contents: read
 
 env:
   CI: true
@@ -24,6 +23,9 @@ jobs:
     if: github.repository == 'WebMCP-org/npm-packages'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: write # For creating GitHub releases
+      id-token: write # For OIDC and sigstore signing
 
     steps:
       - name: Checkout code
