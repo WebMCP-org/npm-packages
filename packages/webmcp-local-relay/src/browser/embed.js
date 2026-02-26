@@ -11,18 +11,16 @@
  * @typedef {{ requestId: string; type: string; toolName?: unknown; args?: unknown }} WidgetRequestMessage
  * @typedef {{ relayHost: string; relayPort: string; tabId: string; widgetUrl: string; widgetOrigin: string }} RelayConfig
  */
-(function initializeWebMcpRelayEmbed() {
+(() => {
   const RELAY_IFRAME_SELECTOR = '[data-webmcp-relay]';
   const TAB_ID_STORAGE_KEY = '__webmcp_relay_tab_id';
   const FALLBACK_WIDGET_URL =
     'https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay/dist/browser/widget.html';
 
   /** @type {Window | null} */
-  var widgetWindow = null;
+  let widgetWindow = null;
 
-  /**
-   * @returns {HTMLScriptElement | null}
-   */
+  /** @returns {HTMLScriptElement | null} */
   function getCurrentScriptElement() {
     return document.currentScript instanceof HTMLScriptElement ? document.currentScript : null;
   }
@@ -35,9 +33,7 @@
     return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
   }
 
-  /**
-   * @returns {string}
-   */
+  /** @returns {string} */
   function createTabId() {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
       return crypto.randomUUID();
@@ -45,9 +41,7 @@
     return `${String(Date.now())}_${String(Math.random()).slice(2, 10)}`;
   }
 
-  /**
-   * @returns {string}
-   */
+  /** @returns {string} */
   function readOrCreateTabId() {
     try {
       const storedTabId = sessionStorage.getItem(TAB_ID_STORAGE_KEY);
@@ -85,6 +79,10 @@
           err
         );
       }
+    } else {
+      console.warn(
+        '[webmcp-relay-embed] Script element has no src attribute, falling back to CDN widget URL'
+      );
     }
     return FALLBACK_WIDGET_URL;
   }
@@ -129,12 +127,17 @@
    * @returns {JsonObject}
    */
   function toInvokeArgs(value) {
-    return isJsonObject(value) ? value : {};
+    if (isJsonObject(value)) return value;
+    if (value !== undefined && value !== null) {
+      console.warn(
+        '[webmcp-relay-embed] Tool invocation args was not an object, defaulting to {}:',
+        typeof value
+      );
+    }
+    return {};
   }
 
-  /**
-   * @returns {ToolBridge | null}
-   */
+  /** @returns {ToolBridge | null} */
   function getToolBridge() {
     const modelContext = navigator.modelContext;
     if (
@@ -180,7 +183,14 @@
               content: [{ type: 'text', text: 'Tool execution interrupted by navigation' }],
             };
           }
-          const parsed = JSON.parse(serialized);
+          let parsed;
+          try {
+            parsed = JSON.parse(serialized);
+          } catch {
+            throw new Error(
+              `Testing tool returned invalid JSON: ${String(serialized).slice(0, 200)}`
+            );
+          }
           if (!isJsonObject(parsed)) {
             throw new Error('Testing tool response was not an object');
           }
@@ -192,7 +202,7 @@
     return null;
   }
 
-  var pushScheduled = false;
+  let pushScheduled = false;
 
   /**
    * Coalesced handler for tool change events.
@@ -201,11 +211,11 @@
   function onToolsChanged() {
     if (pushScheduled || !widgetWindow) return;
     pushScheduled = true;
-    setTimeout(function pushToolsChangedToWidget() {
+    setTimeout(() => {
       pushScheduled = false;
       if (!widgetWindow) return;
-      var bridge = getToolBridge();
-      var toolsPromise = bridge ? Promise.resolve(bridge.listTools()) : Promise.resolve([]);
+      const bridge = getToolBridge();
+      const toolsPromise = bridge ? Promise.resolve(bridge.listTools()) : Promise.resolve([]);
       toolsPromise
         .then((tools) => {
           if (!widgetWindow) return;
@@ -229,23 +239,35 @@
    * falls back to registerToolsChangedCallback on modelContextTesting.
    */
   function subscribeToToolChanges() {
-    var mc = navigator.modelContext;
+    const mc = navigator.modelContext;
     if (mc && typeof mc.addEventListener === 'function') {
       try {
         mc.addEventListener('toolschanged', onToolsChanged);
         return;
-      } catch (_e) {
-        /* BrowserMcpServer doesn't extend EventTarget — fall through */
+      } catch (error) {
+        if (!(error instanceof TypeError)) {
+          console.warn(
+            '[webmcp-relay-embed] Unexpected error subscribing via addEventListener:',
+            error
+          );
+        }
       }
     }
-    var testing = navigator.modelContextTesting;
+    const testing = navigator.modelContextTesting;
     if (testing && typeof testing.registerToolsChangedCallback === 'function') {
       try {
         testing.registerToolsChangedCallback(onToolsChanged);
-      } catch (e) {
-        console.warn('[webmcp-relay-embed] Failed to subscribe to tool changes:', e);
+        return;
+      } catch (error) {
+        console.warn(
+          '[webmcp-relay-embed] Failed to subscribe via registerToolsChangedCallback:',
+          error
+        );
       }
     }
+    console.warn(
+      '[webmcp-relay-embed] Could not subscribe to tool changes. Dynamic tool updates will not be relayed.'
+    );
   }
 
   /**
@@ -258,7 +280,7 @@
       return;
     }
 
-    const postMessage = source.postMessage;
+    const { postMessage } = source;
     if (typeof postMessage !== 'function') {
       return;
     }
@@ -309,6 +331,7 @@
           type: 'webmcp.tools.list.response',
           requestId: request.requestId,
           tools: [],
+          error: `Failed to list tools: ${error instanceof Error ? error.message : String(error)}`,
         });
       });
   }
@@ -345,9 +368,7 @@
       });
   }
 
-  /**
-   * @param {RelayConfig} config
-   */
+  /** @param {RelayConfig} config */
   function injectRelayWidget(config) {
     if (document.querySelector(RELAY_IFRAME_SELECTOR)) {
       return;
@@ -356,7 +377,10 @@
     const searchParams = new URLSearchParams();
     searchParams.set('tabId', config.tabId);
     searchParams.set('hostOrigin', window.location.origin);
-    searchParams.set('hostUrl', window.location.href);
+    const cleanUrl = new URL(window.location.href);
+    cleanUrl.search = '';
+    cleanUrl.hash = '';
+    searchParams.set('hostUrl', cleanUrl.href);
     searchParams.set('hostTitle', document.title || '');
     searchParams.set('relayHost', config.relayHost);
     searchParams.set('relayPort', config.relayPort);
@@ -370,16 +394,31 @@
     iframe.addEventListener('load', () => {
       widgetWindow = iframe.contentWindow;
     });
+    iframe.addEventListener('error', () => {
+      console.error('[webmcp-relay-embed] Failed to load relay widget iframe from:', iframe.src);
+    });
   }
 
   if (document.querySelector(RELAY_IFRAME_SELECTOR)) {
     return;
   }
 
-  const config = buildRelayConfig(getCurrentScriptElement());
+  let config;
+  try {
+    config = buildRelayConfig(getCurrentScriptElement());
+  } catch (err) {
+    console.error('[webmcp-relay-embed] Failed to initialize relay configuration:', err);
+    return;
+  }
 
   window.addEventListener('message', (event) => {
     if (event.origin !== config.widgetOrigin) {
+      return;
+    }
+
+    const data = event.data;
+    if (isJsonObject(data) && data.type === 'webmcp.reload') {
+      window.location.reload();
       return;
     }
 
