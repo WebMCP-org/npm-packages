@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { RelayTool } from './protocol.js';
 import { HelloRequiredError, RelayRegistry } from './registry.js';
 import type { BrowserToRelayMessage } from './schemas.js';
 
@@ -15,16 +16,26 @@ function hello(tabId: string, url: string): Extract<BrowserToRelayMessage, { typ
   };
 }
 
+/**
+ * Builds a minimal valid relay tool fixture.
+ */
+function tool(definition: { name: string; description?: string }): RelayTool {
+  return {
+    ...definition,
+    inputSchema: { type: 'object', properties: {} },
+  };
+}
+
 describe('RelayRegistry', () => {
   it('uses just the original tool name when there are no collisions', () => {
     const registry = new RelayRegistry();
 
     registry.upsertSource('conn-1', hello('tab-1', 'https://docs.example.com/path'));
     registry.registerTools('conn-1', [
-      {
+      tool({
         name: 'get_user_profile',
         description: 'Read user profile',
-      },
+      }),
     ]);
 
     const tools = registry.listTools();
@@ -38,8 +49,8 @@ describe('RelayRegistry', () => {
 
     registry.upsertSource('conn-1', hello('aaaa-1234', 'https://foo.example.com'));
     registry.upsertSource('conn-2', hello('bbbb-5678', 'https://foo.example.com'));
-    registry.registerTools('conn-1', [{ name: 'search', description: 'tab a' }]);
-    registry.registerTools('conn-2', [{ name: 'search', description: 'tab b' }]);
+    registry.registerTools('conn-1', [tool({ name: 'search', description: 'tab a' })]);
+    registry.registerTools('conn-2', [tool({ name: 'search', description: 'tab b' })]);
 
     const tools = registry.listTools();
     expect(tools).toHaveLength(2);
@@ -53,8 +64,8 @@ describe('RelayRegistry', () => {
 
     registry.upsertSource('conn-1', hello('aaaa-1234', 'https://example.com'));
     registry.upsertSource('conn-2', hello('bbbb-5678', 'https://example.com'));
-    registry.registerTools('conn-1', [{ name: 'action' }]);
-    registry.registerTools('conn-2', [{ name: 'action' }]);
+    registry.registerTools('conn-1', [tool({ name: 'action' })]);
+    registry.registerTools('conn-2', [tool({ name: 'action' })]);
 
     expect(registry.listTools()).toHaveLength(2);
     expect(registry.listTools().every((t) => t.name !== 'action')).toBe(true);
@@ -71,12 +82,12 @@ describe('RelayRegistry', () => {
     const registry = new RelayRegistry(() => time);
 
     registry.upsertSource('conn-1', hello('tab-stable', 'https://github.com/a'));
-    registry.registerTools('conn-1', [{ name: 'open_issue', description: 'v1' }]);
+    registry.registerTools('conn-1', [tool({ name: 'open_issue', description: 'v1' })]);
 
     time = 2000;
 
     registry.upsertSource('conn-2', hello('tab-stable', 'https://github.com/a'));
-    registry.registerTools('conn-2', [{ name: 'open_issue', description: 'v2' }]);
+    registry.registerTools('conn-2', [tool({ name: 'open_issue', description: 'v2' })]);
 
     const tools = registry.listTools();
     expect(tools).toHaveLength(1);
@@ -90,8 +101,8 @@ describe('RelayRegistry', () => {
 
     registry.upsertSource('conn-1', hello('tab-a', 'https://foo.example.com'));
     registry.upsertSource('conn-2', hello('tab-b', 'https://foo.example.com'));
-    registry.registerTools('conn-1', [{ name: 'search', description: 'tab a' }]);
-    registry.registerTools('conn-2', [{ name: 'search', description: 'tab b' }]);
+    registry.registerTools('conn-1', [tool({ name: 'search', description: 'tab a' })]);
+    registry.registerTools('conn-2', [tool({ name: 'search', description: 'tab b' })]);
 
     const toolForB = registry.listTools().find((t) => t.sources[0]?.tabId === 'tab-b');
     expect(toolForB).toBeTruthy();
@@ -111,7 +122,7 @@ describe('RelayRegistry', () => {
     const registry = new RelayRegistry();
 
     registry.upsertSource('conn-1', hello('tab-1', 'https://example.com'));
-    registry.registerTools('conn-1', [{ name: 'echo', description: 'Echo' }]);
+    registry.registerTools('conn-1', [tool({ name: 'echo', description: 'Echo' })]);
     expect(registry.listTools()).toHaveLength(1);
 
     registry.removeConnection('conn-1');
@@ -121,7 +132,7 @@ describe('RelayRegistry', () => {
 
   it('throws when registering tools before hello', () => {
     const registry = new RelayRegistry();
-    expect(() => registry.registerTools('conn-unknown', [{ name: 'foo' }])).toThrow(
+    expect(() => registry.registerTools('conn-unknown', [tool({ name: 'foo' })])).toThrow(
       HelloRequiredError
     );
   });
@@ -131,11 +142,11 @@ describe('RelayRegistry', () => {
     const registry = new RelayRegistry(() => time);
 
     registry.upsertSource('conn-1', hello('aaaa-1234', 'https://example.com'));
-    registry.registerTools('conn-1', [{ name: 'action', description: 'v1' }]);
+    registry.registerTools('conn-1', [tool({ name: 'action', description: 'v1' })]);
 
     time = 2000;
     registry.upsertSource('conn-2', hello('bbbb-5678', 'https://example.com'));
-    registry.registerTools('conn-2', [{ name: 'action', description: 'v2' }]);
+    registry.registerTools('conn-2', [tool({ name: 'action', description: 'v2' })]);
 
     const toolForA = registry.listTools().find((t) => t.sources[0]?.tabId === 'aaaa-1234');
     expect(toolForA).toBeTruthy();
@@ -156,11 +167,11 @@ describe('RelayRegistry', () => {
     const registry = new RelayRegistry(() => time);
 
     registry.upsertSource('conn-1', hello('tab-x', 'https://same.example.com'));
-    registry.registerTools('conn-1', [{ name: 'do_thing' }]);
+    registry.registerTools('conn-1', [tool({ name: 'do_thing' })]);
 
     time = 2000;
     registry.upsertSource('conn-2', hello('tab-x', 'https://same.example.com'));
-    registry.registerTools('conn-2', [{ name: 'do_thing' }]);
+    registry.registerTools('conn-2', [tool({ name: 'do_thing' })]);
 
     const tools = registry.listTools();
     expect(tools).toHaveLength(1);
@@ -177,7 +188,7 @@ describe('RelayRegistry', () => {
     const registry = new RelayRegistry();
 
     registry.upsertSource('conn-1', hello('tab-1', 'https://example.com'));
-    registry.registerTools('conn-1', [{ name: 'tool_a' }]);
+    registry.registerTools('conn-1', [tool({ name: 'tool_a' })]);
 
     const tools = registry.listTools();
     const toolName = tools[0]?.name;
@@ -201,7 +212,7 @@ describe('RelayRegistry', () => {
     const registry = new RelayRegistry();
 
     registry.upsertSource('conn-1', hello('shared-tab', 'https://example.com'));
-    registry.registerTools('conn-1', [{ name: 'action', description: 'do something' }]);
+    registry.registerTools('conn-1', [tool({ name: 'action', description: 'do something' })]);
 
     const resolved = registry.resolveInvocation({
       toolName: 'action',
@@ -215,7 +226,7 @@ describe('RelayRegistry', () => {
     const registry = new RelayRegistry();
 
     registry.upsertSource('conn-1', hello('tab-1', 'https://example.com'));
-    registry.registerTools('conn-1', [{ name: 'tool_a' }]);
+    registry.registerTools('conn-1', [tool({ name: 'tool_a' })]);
 
     const resolved = registry.resolveInvocation({
       toolName: 'tool_a',
@@ -229,7 +240,7 @@ describe('RelayRegistry', () => {
     const registry = new RelayRegistry();
 
     registry.upsertSource('conn-1', hello('tab-1', 'https://example.com'));
-    registry.registerTools('conn-1', [{ name: 'tool_a' }]);
+    registry.registerTools('conn-1', [tool({ name: 'tool_a' })]);
 
     const resolved = registry.resolveInvocation({
       toolName: 'nonexistent_tool',
@@ -254,7 +265,7 @@ describe('RelayRegistry', () => {
       tabId: 'tab-1',
     });
 
-    registry.registerTools('conn-1', [{ name: 'tool_a' }]);
+    registry.registerTools('conn-1', [tool({ name: 'tool_a' })]);
     const sources = registry.listSources();
     expect(sources[0]?.title).toBe('Original Title');
     expect(sources[0]?.origin).toBe('https://example.com');
@@ -271,11 +282,11 @@ describe('RelayRegistry', () => {
     const registry = new RelayRegistry(() => time);
 
     registry.upsertSource('conn-1', hello('tab-1', 'https://a.example.com'));
-    registry.registerTools('conn-1', [{ name: 'tool_a' }]);
+    registry.registerTools('conn-1', [tool({ name: 'tool_a' })]);
 
     time = 2000;
     registry.upsertSource('conn-2', hello('tab-2', 'https://b.example.com'));
-    registry.registerTools('conn-2', [{ name: 'tool_b' }]);
+    registry.registerTools('conn-2', [tool({ name: 'tool_b' })]);
 
     const sources = registry.listSources();
     expect(sources).toHaveLength(2);
@@ -295,10 +306,10 @@ describe('RelayRegistry', () => {
     const registry = new RelayRegistry(() => 1000);
 
     registry.upsertSource('conn-b', hello('tab-b', 'https://example.com'));
-    registry.registerTools('conn-b', [{ name: 'tool_b' }]);
+    registry.registerTools('conn-b', [tool({ name: 'tool_b' })]);
 
     registry.upsertSource('conn-a', hello('tab-a', 'https://example.com'));
-    registry.registerTools('conn-a', [{ name: 'tool_a' }]);
+    registry.registerTools('conn-a', [tool({ name: 'tool_a' })]);
 
     const sources = registry.listSources();
     expect(sources).toHaveLength(2);
@@ -314,7 +325,7 @@ describe('RelayRegistry', () => {
 
     expect(registry.listSources()).toHaveLength(0);
 
-    registry.registerTools('conn-1', [{ name: 'tool_a' }]);
+    registry.registerTools('conn-1', [tool({ name: 'tool_a' })]);
     expect(registry.listSources()).toHaveLength(1);
   });
 });

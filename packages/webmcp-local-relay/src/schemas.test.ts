@@ -1,26 +1,36 @@
 import { describe, expect, it } from 'vitest';
+import { InboundToolSchema, NormalizedToolSchema, normalizeInboundTool } from './protocol.js';
 import {
   BrowserHelloMessageSchema,
   BrowserPongMessageSchema,
   BrowserToolResultMessageSchema,
-  BrowserToolSchema,
   BrowserToolsChangedMessageSchema,
   BrowserToolsListMessageSchema,
   BrowserToRelayMessageSchema,
+  RelayClientHelloSchema,
+  RelayClientInvokeSchema,
+  RelayClientListToolsSchema,
+  RelayClientToServerMessageSchema,
   RelayInvokeMessageSchema,
   RelayPingMessageSchema,
+  RelayReloadMessageSchema,
+  RelayServerResultSchema,
+  RelayServerToClientMessageSchema,
+  RelayServerToolsChangedSchema,
+  RelayServerToolsSchema,
   RelayToBrowserMessageSchema,
 } from './schemas.js';
 
-describe('BrowserToolSchema', () => {
+describe('InboundToolSchema', () => {
   it('accepts a valid tool with name only', () => {
-    const result = BrowserToolSchema.safeParse({ name: 'search' });
+    const result = InboundToolSchema.safeParse({ name: 'search' });
     expect(result.success).toBe(true);
   });
 
-  it('accepts a tool with all optional fields', () => {
-    const result = BrowserToolSchema.safeParse({
+  it('accepts a tool with SDK-compatible fields', () => {
+    const result = InboundToolSchema.safeParse({
       name: 'search',
+      title: 'Search',
       description: 'Search for items',
       inputSchema: { type: 'object', properties: { q: { type: 'string' } } },
       outputSchema: { type: 'object' },
@@ -30,13 +40,32 @@ describe('BrowserToolSchema', () => {
   });
 
   it('rejects a tool with empty name', () => {
-    const result = BrowserToolSchema.safeParse({ name: '' });
+    const result = InboundToolSchema.safeParse({ name: '' });
     expect(result.success).toBe(false);
   });
 
   it('rejects a tool with missing name', () => {
-    const result = BrowserToolSchema.safeParse({ description: 'no name' });
+    const result = InboundToolSchema.safeParse({ description: 'no name' });
     expect(result.success).toBe(false);
+  });
+});
+
+describe('normalizeInboundTool', () => {
+  it('normalizes to SDK Tool shape with default inputSchema', () => {
+    const normalized = normalizeInboundTool({ name: 'search' });
+    const parsed = NormalizedToolSchema.safeParse(normalized);
+    expect(parsed.success).toBe(true);
+    expect(parsed.data?.inputSchema).toEqual({ type: 'object', properties: {} });
+  });
+
+  it('drops invalid optional metadata', () => {
+    const normalized = normalizeInboundTool({
+      name: 'bad',
+      annotations: { readOnlyHint: 'nope' },
+      outputSchema: { type: 'string' },
+    });
+    expect(normalized.annotations).toBeUndefined();
+    expect(normalized.outputSchema).toBeUndefined();
   });
 });
 
@@ -122,6 +151,9 @@ describe('BrowserToRelayMessageSchema', () => {
     });
     expect(result.success).toBe(true);
     expect(result.data?.type).toBe('tools/list');
+    if (result.success && result.data.type === 'tools/list') {
+      expect(result.data.tools[0]?.inputSchema).toEqual({ type: 'object', properties: {} });
+    }
   });
 
   it('parses a tools/changed message', () => {
@@ -251,6 +283,18 @@ describe('RelayPingMessageSchema', () => {
   });
 });
 
+describe('RelayReloadMessageSchema', () => {
+  it('accepts a reload message', () => {
+    const result = RelayReloadMessageSchema.safeParse({ type: 'reload' });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects wrong type', () => {
+    const result = RelayReloadMessageSchema.safeParse({ type: 'ping' });
+    expect(result.success).toBe(false);
+  });
+});
+
 describe('RelayToBrowserMessageSchema', () => {
   it('parses an invoke message', () => {
     const result = RelayToBrowserMessageSchema.safeParse({
@@ -268,9 +312,269 @@ describe('RelayToBrowserMessageSchema', () => {
     expect(result.data?.type).toBe('ping');
   });
 
+  it('parses a reload message', () => {
+    const result = RelayToBrowserMessageSchema.safeParse({ type: 'reload' });
+    expect(result.success).toBe(true);
+    expect(result.data?.type).toBe('reload');
+  });
+
   it('rejects an unknown relay message type', () => {
     const result = RelayToBrowserMessageSchema.safeParse({
       type: 'unknown',
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Relay-to-relay protocol schemas (client mode ↔ server mode)
+// ---------------------------------------------------------------------------
+
+describe('RelayClientHelloSchema', () => {
+  it('accepts a relay/hello message', () => {
+    const result = RelayClientHelloSchema.safeParse({ type: 'relay/hello' });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a message with wrong type', () => {
+    const result = RelayClientHelloSchema.safeParse({ type: 'hello' });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('RelayClientListToolsSchema', () => {
+  it('accepts a relay/list-tools message', () => {
+    const result = RelayClientListToolsSchema.safeParse({ type: 'relay/list-tools' });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a message with wrong type', () => {
+    const result = RelayClientListToolsSchema.safeParse({ type: 'list-tools' });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('RelayClientInvokeSchema', () => {
+  it('accepts a relay/invoke with required fields', () => {
+    const result = RelayClientInvokeSchema.safeParse({
+      type: 'relay/invoke',
+      callId: 'call-1',
+      toolName: 'search',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts a relay/invoke with args', () => {
+    const result = RelayClientInvokeSchema.safeParse({
+      type: 'relay/invoke',
+      callId: 'call-1',
+      toolName: 'search',
+      args: { query: 'test' },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a relay/invoke with empty callId', () => {
+    const result = RelayClientInvokeSchema.safeParse({
+      type: 'relay/invoke',
+      callId: '',
+      toolName: 'search',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a relay/invoke with empty toolName', () => {
+    const result = RelayClientInvokeSchema.safeParse({
+      type: 'relay/invoke',
+      callId: 'call-1',
+      toolName: '',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a relay/invoke without callId', () => {
+    const result = RelayClientInvokeSchema.safeParse({
+      type: 'relay/invoke',
+      toolName: 'search',
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('RelayClientToServerMessageSchema', () => {
+  it('parses a relay/hello message', () => {
+    const result = RelayClientToServerMessageSchema.safeParse({ type: 'relay/hello' });
+    expect(result.success).toBe(true);
+    expect(result.data?.type).toBe('relay/hello');
+  });
+
+  it('parses a relay/list-tools message', () => {
+    const result = RelayClientToServerMessageSchema.safeParse({ type: 'relay/list-tools' });
+    expect(result.success).toBe(true);
+    expect(result.data?.type).toBe('relay/list-tools');
+  });
+
+  it('parses a relay/invoke message', () => {
+    const result = RelayClientToServerMessageSchema.safeParse({
+      type: 'relay/invoke',
+      callId: 'c-1',
+      toolName: 'search',
+    });
+    expect(result.success).toBe(true);
+    expect(result.data?.type).toBe('relay/invoke');
+  });
+
+  it('rejects an unknown relay client message type', () => {
+    const result = RelayClientToServerMessageSchema.safeParse({ type: 'relay/unknown' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a browser-protocol message', () => {
+    const result = RelayClientToServerMessageSchema.safeParse({
+      type: 'hello',
+      tabId: 'tab-1',
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('RelayServerToolsSchema', () => {
+  it('accepts a relay/tools with tools array', () => {
+    const result = RelayServerToolsSchema.safeParse({
+      type: 'relay/tools',
+      tools: [
+        {
+          name: 'search',
+          description: 'Search tool',
+          inputSchema: { type: 'object', properties: {} },
+        },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts a relay/tools with empty tools array', () => {
+    const result = RelayServerToolsSchema.safeParse({
+      type: 'relay/tools',
+      tools: [],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects relay/tools without tools array', () => {
+    const result = RelayServerToolsSchema.safeParse({ type: 'relay/tools' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects relay/tools with invalid tool entries', () => {
+    const result = RelayServerToolsSchema.safeParse({
+      type: 'relay/tools',
+      tools: [{ name: '' }],
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('RelayServerResultSchema', () => {
+  it('accepts a relay/result with callId and result', () => {
+    const result = RelayServerResultSchema.safeParse({
+      type: 'relay/result',
+      callId: 'call-1',
+      result: { content: [{ type: 'text', text: 'done' }] },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a relay/result with null result', () => {
+    const result = RelayServerResultSchema.safeParse({
+      type: 'relay/result',
+      callId: 'call-1',
+      result: null,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a relay/result with empty callId', () => {
+    const result = RelayServerResultSchema.safeParse({
+      type: 'relay/result',
+      callId: '',
+      result: {},
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a relay/result without callId', () => {
+    const result = RelayServerResultSchema.safeParse({
+      type: 'relay/result',
+      result: {},
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('RelayServerToolsChangedSchema', () => {
+  it('accepts a relay/tools-changed with tools', () => {
+    const result = RelayServerToolsChangedSchema.safeParse({
+      type: 'relay/tools-changed',
+      tools: [{ name: 'updated_tool', inputSchema: { type: 'object', properties: {} } }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts a relay/tools-changed with empty tools', () => {
+    const result = RelayServerToolsChangedSchema.safeParse({
+      type: 'relay/tools-changed',
+      tools: [],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects relay/tools-changed without tools', () => {
+    const result = RelayServerToolsChangedSchema.safeParse({
+      type: 'relay/tools-changed',
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('RelayServerToClientMessageSchema', () => {
+  it('parses a relay/tools message', () => {
+    const result = RelayServerToClientMessageSchema.safeParse({
+      type: 'relay/tools',
+      tools: [{ name: 'search', inputSchema: { type: 'object', properties: {} } }],
+    });
+    expect(result.success).toBe(true);
+    expect(result.data?.type).toBe('relay/tools');
+  });
+
+  it('parses a relay/result message', () => {
+    const result = RelayServerToClientMessageSchema.safeParse({
+      type: 'relay/result',
+      callId: 'c-1',
+      result: { content: [] },
+    });
+    expect(result.success).toBe(true);
+    expect(result.data?.type).toBe('relay/result');
+  });
+
+  it('parses a relay/tools-changed message', () => {
+    const result = RelayServerToClientMessageSchema.safeParse({
+      type: 'relay/tools-changed',
+      tools: [],
+    });
+    expect(result.success).toBe(true);
+    expect(result.data?.type).toBe('relay/tools-changed');
+  });
+
+  it('rejects an unknown relay server message type', () => {
+    const result = RelayServerToClientMessageSchema.safeParse({ type: 'relay/unknown' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a browser-protocol message', () => {
+    const result = RelayServerToClientMessageSchema.safeParse({
+      type: 'tools/list',
+      tools: [],
     });
     expect(result.success).toBe(false);
   });

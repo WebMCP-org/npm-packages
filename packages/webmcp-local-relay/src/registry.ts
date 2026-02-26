@@ -1,5 +1,6 @@
 import { buildPublicToolName } from './naming.js';
-import type { BrowserHelloMessage, BrowserTool } from './schemas.js';
+import type { RelayTool } from './protocol.js';
+import type { BrowserHelloMessage } from './schemas.js';
 
 /**
  * Internal metadata tracked for each active browser source.
@@ -28,10 +29,14 @@ export interface SourceInfo extends SourceMetadata {
 export interface AggregatedTool {
   name: string;
   originalName: string;
-  description: string | undefined;
-  inputSchema: Record<string, unknown> | undefined;
-  outputSchema: Record<string, unknown> | undefined;
-  annotations: Record<string, unknown> | undefined;
+  title: RelayTool['title'];
+  description: RelayTool['description'];
+  inputSchema: RelayTool['inputSchema'];
+  outputSchema: RelayTool['outputSchema'];
+  annotations: RelayTool['annotations'];
+  execution: RelayTool['execution'];
+  _meta: RelayTool['_meta'];
+  icons: RelayTool['icons'];
   sources: SourceInfo[];
 }
 
@@ -41,7 +46,7 @@ export interface AggregatedTool {
 interface ToolProvider {
   sourceId: string;
   tabId: string;
-  tool: BrowserTool;
+  tool: RelayTool;
   publicToolName: string;
 }
 
@@ -50,7 +55,7 @@ interface ToolProvider {
  */
 export interface ResolvedInvocation {
   connectionId: string;
-  tool: BrowserTool;
+  tool: RelayTool;
   publicToolName: string;
 }
 
@@ -105,7 +110,7 @@ export class RelayRegistry {
   /**
    * Replaces the full tool set for a source connection.
    */
-  registerTools(connectionId: string, tools: BrowserTool[]): void {
+  registerTools(connectionId: string, tools: RelayTool[]): void {
     const source = this.sourceByConnectionId.get(connectionId);
     if (!source) {
       throw new HelloRequiredError(connectionId);
@@ -179,10 +184,14 @@ export class RelayRegistry {
       result.push({
         name: publicToolName,
         originalName: primaryProvider.tool.name,
+        title: primaryProvider.tool.title,
         description: primaryProvider.tool.description,
         inputSchema: primaryProvider.tool.inputSchema,
         outputSchema: primaryProvider.tool.outputSchema,
         annotations: primaryProvider.tool.annotations,
+        execution: primaryProvider.tool.execution,
+        _meta: primaryProvider.tool._meta,
+        icons: primaryProvider.tool.icons,
         sources,
       });
     }
