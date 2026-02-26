@@ -1,3 +1,4 @@
+import { type ChildProcess, spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -6,18 +7,11 @@ import { fileURLToPath } from 'node:url';
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { chromium, type Page } from 'playwright';
+import { type Browser, chromium, type Page } from 'playwright';
 import { describe, expect, it } from 'vitest';
 
 import { sanitizeName } from './naming.js';
 
-/**
- * Stable tab identifier used by the relay handshake in this suite.
- */
-const TEST_TAB_ID = 'host_tab_1';
-/**
- * Tool registered by the host page and invoked through relay pathways.
- */
 const TEST_TOOL_NAME = 'page_sum';
 const PACKAGE_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const REPO_ROOT = resolve(PACKAGE_DIR, '../..');
@@ -25,27 +19,36 @@ const CLI_ENTRY_PATH = resolve(PACKAGE_DIR, 'dist/cli.js');
 
 const GLOBAL_RUNTIME_PATH = resolve(REPO_ROOT, 'packages/global/dist/index.iife.js');
 const POLYFILL_RUNTIME_PATH = resolve(REPO_ROOT, 'packages/webmcp-polyfill/dist/index.iife.js');
+const REAL_EMBED_PATH = resolve(PACKAGE_DIR, 'dist/browser/embed.js');
+const REAL_WIDGET_PATH = resolve(PACKAGE_DIR, 'dist/browser/widget.html');
 
-/**
- * Browser runtime variant under test.
- */
 type RuntimeMode = 'global' | 'polyfill-testing';
 
-/**
- * Runtime fixture describing which script is served for a test case.
- */
 interface RuntimeCase {
   mode: RuntimeMode;
   scriptRoute: string;
   scriptPath: string;
 }
 
-/**
- * Result returned by {@link startHttpServer}.
- */
 interface StartedHttpServer {
   server: Server;
   origin: string;
+}
+
+interface SpawnedRelay {
+  child: ChildProcess;
+  logs: string[];
+  stop: () => Promise<void>;
+}
+
+interface E2EHarness {
+  client: Client;
+  page: Page;
+  expectedToolName: string;
+  relayLogs: string[];
+  pageErrors: string[];
+  pageConsole: string[];
+  cleanup: () => Promise<void>;
 }
 
 const RUNTIME_CASES: RuntimeCase[] = [
@@ -61,47 +64,36 @@ const RUNTIME_CASES: RuntimeCase[] = [
   },
 ];
 
-/**
- * Serializes values for safe embedding in inline script blocks.
- */
 function jsonForInlineScript(value: unknown): string {
   return JSON.stringify(value).replaceAll('<', '\\u003c');
 }
 
-/**
- * Sends an HTML response with UTF-8 content type.
- */
 function sendHtml(response: ServerResponse, html: string): void {
   response.statusCode = 200;
   response.setHeader('content-type', 'text/html; charset=utf-8');
   response.end(html);
 }
 
-/**
- * Sends a JavaScript response with UTF-8 content type.
- */
 function sendJavaScript(response: ServerResponse, script: string): void {
   response.statusCode = 200;
   response.setHeader('content-type', 'application/javascript; charset=utf-8');
   response.end(script);
 }
 
-/**
- * Reads a prebuilt runtime bundle or throws a build hint.
- */
-function readRuntimeScriptOrThrow(filePath: string): string {
+function readRequiredFile(filePath: string, label: string): string {
   try {
     return readFileSync(filePath, 'utf8');
   } catch {
     throw new Error(
-      `Missing runtime bundle at ${filePath}. Build required runtime packages before test:e2e.`
+      `Missing ${label} at ${filePath}. Build required runtime/browser assets first.`
     );
   }
 }
 
-/**
- * Starts an ephemeral HTTP server and returns its local origin.
- */
+function readRuntimeScriptOrThrow(filePath: string): string {
+  return readRequiredFile(filePath, 'runtime bundle');
+}
+
 async function startHttpServer(
   handler: (request: IncomingMessage, response: ServerResponse) => void
 ): Promise<StartedHttpServer> {
@@ -122,9 +114,6 @@ async function startHttpServer(
   };
 }
 
-/**
- * Closes an HTTP server instance when present.
- */
 async function stopHttpServer(server: Server | null): Promise<void> {
   if (!server) {
     return;
@@ -135,9 +124,6 @@ async function stopHttpServer(server: Server | null): Promise<void> {
   });
 }
 
-/**
- * Reserves and releases an ephemeral localhost port.
- */
 async function getOpenPort(): Promise<number> {
   const holder = createServer();
   await new Promise<void>((resolvePromise, rejectPromise) => {
@@ -149,8 +135,8 @@ async function getOpenPort(): Promise<number> {
   if (!address || typeof address === 'string') {
     throw new Error('Expected holder server to bind to an IP address');
   }
-  const port = (address as AddressInfo).port;
 
+  const port = (address as AddressInfo).port;
   await new Promise<void>((resolvePromise) => {
     holder.close(() => resolvePromise());
   });
@@ -158,9 +144,6 @@ async function getOpenPort(): Promise<number> {
   return port;
 }
 
-/**
- * Polls until `fn` returns a defined value or timeout elapses.
- */
 async function waitForValue<T>(
   fn: () => Promise<T | undefined> | T | undefined,
   timeoutMs = 15_000,
@@ -178,9 +161,6 @@ async function waitForValue<T>(
   throw new Error(`Timed out after ${timeoutMs}ms`);
 }
 
-/**
- * Extracts text items from MCP call tool result content.
- */
 function contentTextItems(result: unknown): string[] {
   const content =
     typeof result === 'object' && result !== null && 'content' in result
@@ -200,22 +180,17 @@ function contentTextItems(result: unknown): string[] {
     .filter((text): text is string => typeof text === 'string');
 }
 
-/**
- * Returns the first text content item when present.
- */
 function firstContentText(result: unknown): string {
   return contentTextItems(result)[0] ?? '';
 }
 
-/**
- * Builds the host test page that registers a tool and bridges widget messages.
- */
 function buildHostPageHtml(options: {
   widgetOrigin: string;
+  relayPort: number;
   runtimeScriptRoute: string;
   runtimeMode: RuntimeMode;
 }): string {
-  const { widgetOrigin, runtimeScriptRoute, runtimeMode } = options;
+  const { widgetOrigin, relayPort, runtimeScriptRoute, runtimeMode } = options;
 
   return `<!doctype html>
 <html lang="en">
@@ -227,92 +202,10 @@ function buildHostPageHtml(options: {
     <h1>WebMCP Relay E2E Host</h1>
     <div id="status" data-state="booting">booting</div>
     <script src="${runtimeScriptRoute}"></script>
-    <script src="${widgetOrigin}/embed.js"></script>
     <script>
       (() => {
-        const widgetOrigin = ${jsonForInlineScript(widgetOrigin)};
-        const runtimeMode = ${jsonForInlineScript(runtimeMode)};
         const statusEl = document.getElementById('status');
-
-        function parseTestingInputSchema(rawInputSchema) {
-          if (!rawInputSchema) {
-            return { type: 'object', properties: {} };
-          }
-
-          try {
-            const parsed = JSON.parse(rawInputSchema);
-            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-              return parsed;
-            }
-          } catch {
-          }
-
-          return { type: 'object', properties: {} };
-        }
-
-        function getToolBridge() {
-          const modelContext = navigator.modelContext;
-          if (
-            modelContext &&
-            typeof modelContext.listTools === 'function' &&
-            typeof modelContext.callTool === 'function'
-          ) {
-            return {
-              mode: 'modelContextExtensions',
-              listTools: async () => {
-                return modelContext.listTools().map((tool) => ({
-                  name: tool.name,
-                  description: tool.description,
-                  inputSchema: tool.inputSchema ?? { type: 'object', properties: {} },
-                }));
-              },
-              invoke: async (toolName, args) => {
-                return modelContext.callTool({
-                  name: toolName,
-                  arguments: args ?? {},
-                });
-              },
-            };
-          }
-
-          const testing = navigator.modelContextTesting;
-          if (
-            testing &&
-            typeof testing.listTools === 'function' &&
-            typeof testing.executeTool === 'function'
-          ) {
-            return {
-              mode: 'modelContextTesting',
-              listTools: async () => {
-                return testing.listTools().map((tool) => ({
-                  name: tool.name,
-                  description: tool.description,
-                  inputSchema: parseTestingInputSchema(tool.inputSchema),
-                }));
-              },
-              invoke: async (toolName, args) => {
-                const serialized = await testing.executeTool(toolName, JSON.stringify(args ?? {}));
-                if (serialized === null) {
-                  return {
-                    isError: true,
-                    content: [{ type: 'text', text: 'Tool execution interrupted by navigation' }],
-                  };
-                }
-
-                const parsed = JSON.parse(serialized);
-                if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-                  throw new Error('Testing tool response was not an object');
-                }
-
-                return parsed;
-              },
-            };
-          }
-
-          throw new Error(
-            'No supported WebMCP runtime found. Install @mcp-b/global or @mcp-b/webmcp-polyfill.',
-          );
-        }
+        const runtimeMode = ${jsonForInlineScript(runtimeMode)};
 
         try {
           navigator.modelContext.registerTool({
@@ -354,457 +247,22 @@ function buildHostPageHtml(options: {
           statusEl.textContent = String(error instanceof Error ? error.message : error);
           throw error;
         }
-
-        window.addEventListener('message', async (event) => {
-          if (event.origin !== widgetOrigin) {
-            return;
-          }
-
-          const data = event.data;
-          if (!data || typeof data !== 'object') {
-            return;
-          }
-
-          try {
-            const toolBridge = getToolBridge();
-
-            if (data.type === 'webmcp.tools.list.request') {
-              const tools = await toolBridge.listTools();
-              statusEl.dataset.state = 'tool_list_requested';
-              statusEl.textContent = 'tool list requested';
-
-              event.source?.postMessage(
-                {
-                  type: 'webmcp.tools.list.response',
-                  requestId: data.requestId,
-                  mode: toolBridge.mode,
-                  tools,
-                },
-                event.origin,
-              );
-              return;
-            }
-
-            if (data.type !== 'webmcp.tools.invoke.request') {
-              return;
-            }
-
-            const result = await toolBridge.invoke(String(data.toolName ?? ''), data.args ?? {});
-            event.source?.postMessage(
-              {
-                type: 'webmcp.tools.invoke.response',
-                requestId: data.requestId,
-                mode: toolBridge.mode,
-                result,
-              },
-              event.origin,
-            );
-          } catch (error) {
-            event.source?.postMessage(
-              {
-                type: 'webmcp.tools.invoke.error',
-                requestId: data.requestId,
-                error: String(error instanceof Error ? error.message : error),
-              },
-              event.origin,
-            );
-          }
-        });
-
-        // Subscribe to tool changes and push updates to widget iframe
-        let pushTimerId = 0;
-        function pushToolChangesToWidget() {
-          clearTimeout(pushTimerId);
-          pushTimerId = setTimeout(() => {
-            const widgetIframe = document.querySelector('[data-webmcp-relay]');
-            if (!widgetIframe || !widgetIframe.contentWindow) return;
-            try {
-              const toolBridge = getToolBridge();
-              toolBridge.listTools().then((tools) => {
-                widgetIframe.contentWindow.postMessage({
-                  type: 'webmcp.tools.changed',
-                  tools,
-                }, widgetOrigin);
-              }).catch(() => {});
-            } catch {}
-          }, 150);
-        }
-
-        const mc = navigator.modelContext;
-        if (mc && typeof mc.addEventListener === 'function') {
-          try { mc.addEventListener('toolschanged', pushToolChangesToWidget); }
-          catch { /* fall through */ }
-        }
-        const testing = navigator.modelContextTesting;
-        if (testing && typeof testing.registerToolsChangedCallback === 'function') {
-          try { testing.registerToolsChangedCallback(pushToolChangesToWidget); }
-          catch {}
-        }
       })();
     </script>
+    <script
+      src="${widgetOrigin}/embed.js"
+      data-relay-host="127.0.0.1"
+      data-relay-port="${String(relayPort)}"
+    ></script>
   </body>
 </html>`;
 }
 
-/**
- * Builds the embed script served by the widget test server.
- */
-function buildEmbedScript(widgetOrigin: string, relayPort: number): string {
-  return `(() => {
-  const iframe = document.createElement('iframe');
-  const params = new URLSearchParams();
-  params.set('relayPort', ${JSON.stringify(String(relayPort))});
-  params.set('tabId', ${jsonForInlineScript(TEST_TAB_ID)});
-  params.set('hostOrigin', window.location.origin);
-  params.set('hostUrl', window.location.href);
-
-  iframe.src = ${jsonForInlineScript(`${widgetOrigin}/widget.html`)} + '?' + params.toString();
-  iframe.style.display = 'none';
-  iframe.setAttribute('aria-hidden', 'true');
-  iframe.setAttribute('data-webmcp-relay', '1');
-
-  document.body.appendChild(iframe);
-})();`;
-}
-
-/**
- * Builds a widget page that connects host postMessage and relay WebSocket.
- */
-function buildWidgetPageHtml(): string {
-  return `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <title>WebMCP Relay E2E Widget</title>
-  </head>
-  <body>
-    <script>
-      (() => {
-        const params = new URLSearchParams(window.location.search);
-        const relayPort = Number(params.get('relayPort'));
-        const hostOrigin = params.get('hostOrigin');
-        const hostUrl = params.get('hostUrl') || hostOrigin || '';
-        const tabId = params.get('tabId') || ${jsonForInlineScript(TEST_TAB_ID)};
-
-        if (!relayPort || !hostOrigin) {
-          return;
-        }
-
-        const pending = new Map();
-        let activeSocket = null;
-        let helloSent = false;
-
-        window.addEventListener('message', (event) => {
-          if (event.origin !== hostOrigin) {
-            return;
-          }
-
-          const data = event.data;
-
-          // Handle tool change push from host embed
-          if (data && typeof data === 'object' && data.type === 'webmcp.tools.changed') {
-            if (activeSocket && activeSocket.readyState === WebSocket.OPEN && helloSent) {
-              activeSocket.send(JSON.stringify({
-                type: 'tools/changed',
-                tools: Array.isArray(data.tools) ? data.tools : [],
-              }));
-            }
-            return;
-          }
-
-          if (!data || typeof data !== 'object' || typeof data.requestId !== 'string') {
-            return;
-          }
-
-          const requestState = pending.get(data.requestId);
-          if (!requestState) {
-            return;
-          }
-
-          if (data.type === requestState.responseType) {
-            clearTimeout(requestState.timeoutId);
-            pending.delete(data.requestId);
-            requestState.resolve(data);
-            return;
-          }
-
-          if (data.type === requestState.errorType) {
-            clearTimeout(requestState.timeoutId);
-            pending.delete(data.requestId);
-            requestState.reject(new Error(String(data.error ?? 'Unknown host error')));
-          }
-        });
-
-        function requestHost(baseType, payload) {
-          const requestId = crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random());
-
-          return new Promise((resolve, reject) => {
-            const timeoutId = setTimeout(() => {
-              pending.delete(requestId);
-              reject(new Error('Timed out waiting for host response: ' + baseType));
-            }, 5000);
-
-            pending.set(requestId, {
-              resolve,
-              reject,
-              timeoutId,
-              responseType: baseType + '.response',
-              errorType: baseType + '.error',
-            });
-
-            window.parent.postMessage(
-              {
-                type: baseType + '.request',
-                requestId,
-                ...payload,
-              },
-              hostOrigin,
-            );
-          });
-        }
-
-        const wsUrl = 'ws://127.0.0.1:' + relayPort;
-
-        function connect() {
-          const ws = new WebSocket(wsUrl);
-          activeSocket = ws;
-
-          ws.addEventListener('open', async () => {
-            try {
-              const listResponse = await requestHost('webmcp.tools.list', {});
-              const tools = Array.isArray(listResponse.tools) ? listResponse.tools : [];
-
-              ws.send(
-                JSON.stringify({
-                  type: 'hello',
-                  tabId,
-                  origin: hostOrigin,
-                  url: hostUrl,
-                  title: 'Host relay widget',
-                }),
-              );
-              ws.send(JSON.stringify({ type: 'tools/list', tools }));
-              helloSent = true;
-            } catch {
-              ws.close();
-            }
-          });
-
-          ws.addEventListener('message', async (event) => {
-            let message;
-            try {
-              message = JSON.parse(event.data);
-            } catch {
-              return;
-            }
-
-            if (message.type === 'ping') {
-              ws.send(JSON.stringify({ type: 'pong' }));
-              return;
-            }
-
-            if (message.type !== 'invoke') {
-              return;
-            }
-
-            try {
-              const invokeResponse = await requestHost('webmcp.tools.invoke', {
-                toolName: message.toolName,
-                args: message.args ?? {},
-              });
-
-              ws.send(
-                JSON.stringify({
-                  type: 'result',
-                  callId: message.callId,
-                  result: invokeResponse.result,
-                }),
-              );
-            } catch (error) {
-              ws.send(
-                JSON.stringify({
-                  type: 'result',
-                  callId: message.callId,
-                  result: {
-                    isError: true,
-                    content: [
-                      {
-                        type: 'text',
-                        text: String(error instanceof Error ? error.message : error),
-                      },
-                    ],
-                  },
-                }),
-              );
-            }
-          });
-
-          ws.addEventListener('close', () => {
-            helloSent = false;
-            activeSocket = null;
-            setTimeout(connect, 350);
-          });
-
-          ws.addEventListener('error', () => {
-            try {
-              ws.close();
-            } catch {
-            }
-          });
-        }
-
-        connect();
-      })();
-    </script>
-  </body>
-</html>`;
-}
-
-/**
- * Allocated resources and diagnostics for a single E2E run.
- */
-interface E2EHarness {
-  client: Client;
-  page: Page;
-  expectedToolName: string;
-  hostOrigin: string;
-  relayLogs: string[];
-  pageErrors: string[];
-  pageConsole: string[];
-  cleanup: () => Promise<void>;
-}
-
-/**
- * Bootstraps servers, browser page, relay client, and expected dynamic tool state.
- */
-async function setupE2EHarness(runtimeCase: RuntimeCase): Promise<E2EHarness> {
-  const relayPort = await getOpenPort();
-  const runtimeScript = readRuntimeScriptOrThrow(runtimeCase.scriptPath);
-
-  const relayLogs: string[] = [];
-  const pageErrors: string[] = [];
-  const pageConsole: string[] = [];
-
-  const widget = await startHttpServer((request, response) => {
-    const url = request.url ?? '/';
-    if (url.startsWith('/embed.js')) {
-      sendJavaScript(response, buildEmbedScript(widget.origin, relayPort));
-      return;
-    }
-    if (url.startsWith('/widget.html')) {
-      sendHtml(response, buildWidgetPageHtml());
-      return;
-    }
-
-    response.statusCode = 404;
-    response.end('not found');
-  });
-
-  const host = await startHttpServer((request, response) => {
-    const url = request.url ?? '/';
-    if (url === runtimeCase.scriptRoute) {
-      sendJavaScript(response, runtimeScript);
-      return;
-    }
-    if (url === '/' || url.startsWith('/index.html')) {
-      sendHtml(
-        response,
-        buildHostPageHtml({
-          widgetOrigin: widget.origin,
-          runtimeScriptRoute: runtimeCase.scriptRoute,
-          runtimeMode: runtimeCase.mode,
-        })
-      );
-      return;
-    }
-
-    response.statusCode = 404;
-    response.end('not found');
-  });
-
-  const stdioTransport = new StdioClientTransport({
-    command: process.execPath,
-    args: [
-      CLI_ENTRY_PATH,
-      '--host',
-      '127.0.0.1',
-      '--port',
-      String(relayPort),
-      '--widget-origin',
-      widget.origin,
-    ],
-    cwd: PACKAGE_DIR,
-    stderr: 'pipe',
-  });
-  stdioTransport.stderr?.on('data', (chunk) => {
-    relayLogs.push(String(chunk));
-  });
-
-  const client = new Client(
-    {
-      name: 'webmcp-local-relay-e2e-client',
-      version: '1.0.0',
-    },
-    {
-      capabilities: {},
-    }
-  );
-  await client.connect(stdioTransport);
-
-  const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage();
-  page.on('pageerror', (runtimeError) => {
-    pageErrors.push(runtimeError.message);
-  });
-  page.on('console', (message) => {
-    pageConsole.push(`${message.type()}: ${message.text()}`);
-  });
-  await page.goto(`${host.origin}/`, { waitUntil: 'domcontentloaded' });
-  await page.waitForFunction(
-    () => {
-      const state = document.querySelector('#status')?.getAttribute('data-state');
-      return state === 'runtime_ready' || state === 'tool_list_requested';
-    },
-    undefined,
-    {
-      timeout: 20_000,
-    }
-  );
-  await page.waitForSelector('#status[data-state="tool_list_requested"]', {
-    timeout: 20_000,
-  });
-
-  const expectedToolName = sanitizeName(TEST_TOOL_NAME);
-
-  await waitForValue(async () => {
-    const toolList = await client.listTools();
-    return toolList.tools.some((tool) => tool.name === expectedToolName) ? true : undefined;
-  }, 20_000);
-
-  return {
-    client,
-    page,
-    expectedToolName,
-    hostOrigin: host.origin,
-    relayLogs,
-    pageErrors,
-    pageConsole,
-    cleanup: async () => {
-      await client.close();
-      await browser.close();
-      await stopHttpServer(host.server);
-      await stopHttpServer(widget.server);
-    },
-  };
-}
-
-/**
- * Creates a diagnostic-rich error with browser and relay logs.
- */
 function formatE2EError(
   label: string,
   error: unknown,
-  harness: Pick<E2EHarness, 'page' | 'pageErrors' | 'pageConsole' | 'relayLogs'> | null
+  harness: Pick<E2EHarness, 'pageErrors' | 'pageConsole' | 'relayLogs'> | null,
+  extraLogs: string[] = []
 ): Error {
   const errorMsg = String(error instanceof Error ? error.message : error);
 
@@ -817,24 +275,224 @@ function formatE2EError(
       `E2E failure (${label}): ${errorMsg}`,
       '',
       '[page errors]',
-      harness.pageErrors.join('\n'),
+      harness.pageErrors.join('\\n'),
       '',
       '[page console]',
-      harness.pageConsole.join('\n'),
+      harness.pageConsole.join('\\n'),
       '',
       '[relay stderr]',
       harness.relayLogs.join(''),
-    ].join('\n')
+      '',
+      '[extra relay logs]',
+      extraLogs.join(''),
+    ].join('\\n')
   );
 }
 
-describe('relay e2e', () => {
+async function stopChildProcess(child: ChildProcess): Promise<void> {
+  if (child.exitCode !== null) {
+    return;
+  }
+
+  child.kill('SIGTERM');
+  const exited = await waitForValue(
+    () => (child.exitCode !== null ? true : undefined),
+    5_000,
+    50
+  ).catch(() => false);
+  if (exited) {
+    return;
+  }
+
+  child.kill('SIGKILL');
+  await waitForValue(() => (child.exitCode !== null ? true : undefined), 5_000, 50).catch(
+    () => undefined
+  );
+}
+
+async function startRelayProcess(relayPort: number): Promise<SpawnedRelay> {
+  const logs: string[] = [];
+  const child = spawn(
+    process.execPath,
+    [CLI_ENTRY_PATH, '--host', '127.0.0.1', '--port', String(relayPort)],
+    {
+      cwd: PACKAGE_DIR,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }
+  );
+
+  child.stderr?.on('data', (chunk) => {
+    logs.push(String(chunk));
+  });
+  child.stdout?.on('data', (chunk) => {
+    logs.push(String(chunk));
+  });
+
+  await waitForValue(() => {
+    const merged = logs.join('');
+    if (merged.includes('server mode: listening')) {
+      return true;
+    }
+    if (child.exitCode !== null) {
+      throw new Error(`Relay owner process exited early (${child.exitCode})`);
+    }
+    return undefined;
+  }, 15_000);
+
+  return {
+    child,
+    logs,
+    stop: async () => {
+      await stopChildProcess(child);
+    },
+  };
+}
+
+async function startWidgetAssetServer(): Promise<StartedHttpServer> {
+  const embedScript = readRequiredFile(REAL_EMBED_PATH, 'packaged embed.js');
+  const widgetHtml = readRequiredFile(REAL_WIDGET_PATH, 'packaged widget.html');
+
+  return startHttpServer((request, response) => {
+    const url = request.url ?? '/';
+    if (url.startsWith('/embed.js')) {
+      sendJavaScript(response, embedScript);
+      return;
+    }
+    if (url.startsWith('/widget.html')) {
+      sendHtml(response, widgetHtml);
+      return;
+    }
+    response.statusCode = 404;
+    response.end('not found');
+  });
+}
+
+async function setupE2EHarness(options: {
+  runtimeCase: RuntimeCase;
+  relayPort: number;
+  widgetOrigin: string;
+  clientName: string;
+}): Promise<E2EHarness> {
+  const { runtimeCase, relayPort, widgetOrigin, clientName } = options;
+  const runtimeScript = readRuntimeScriptOrThrow(runtimeCase.scriptPath);
+
+  let host: StartedHttpServer | null = null;
+  let client: Client | null = null;
+  let browser: Browser | null = null;
+  let page: Page | null = null;
+  const relayLogs: string[] = [];
+  const pageErrors: string[] = [];
+  const pageConsole: string[] = [];
+
+  try {
+    host = await startHttpServer((request, response) => {
+      const url = request.url ?? '/';
+      if (url === runtimeCase.scriptRoute) {
+        sendJavaScript(response, runtimeScript);
+        return;
+      }
+      if (url === '/' || url.startsWith('/index.html')) {
+        sendHtml(
+          response,
+          buildHostPageHtml({
+            widgetOrigin,
+            relayPort,
+            runtimeScriptRoute: runtimeCase.scriptRoute,
+            runtimeMode: runtimeCase.mode,
+          })
+        );
+        return;
+      }
+
+      response.statusCode = 404;
+      response.end('not found');
+    });
+
+    const stdioTransport = new StdioClientTransport({
+      command: process.execPath,
+      args: [
+        CLI_ENTRY_PATH,
+        '--host',
+        '127.0.0.1',
+        '--port',
+        String(relayPort),
+        '--widget-origin',
+        widgetOrigin,
+      ],
+      cwd: PACKAGE_DIR,
+      stderr: 'pipe',
+    });
+    stdioTransport.stderr?.on('data', (chunk) => {
+      relayLogs.push(String(chunk));
+    });
+
+    client = new Client(
+      {
+        name: clientName,
+        version: '1.0.0',
+      },
+      {
+        capabilities: {},
+      }
+    );
+    await client.connect(stdioTransport);
+
+    browser = await chromium.launch({ headless: true });
+    page = await browser.newPage();
+    page.on('pageerror', (runtimeError) => {
+      pageErrors.push(runtimeError.message);
+    });
+    page.on('console', (message) => {
+      pageConsole.push(`${message.type()}: ${message.text()}`);
+    });
+    await page.goto(`${host.origin}/`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('#status[data-state="runtime_ready"]', {
+      timeout: 20_000,
+    });
+
+    const expectedToolName = sanitizeName(TEST_TOOL_NAME);
+
+    await waitForValue(async () => {
+      const toolList = await client?.listTools();
+      return toolList?.tools.some((tool) => tool.name === expectedToolName) ? true : undefined;
+    }, 20_000);
+
+    return {
+      client,
+      page,
+      expectedToolName,
+      relayLogs,
+      pageErrors,
+      pageConsole,
+      cleanup: async () => {
+        await client?.close();
+        await browser?.close();
+        await stopHttpServer(host?.server ?? null);
+      },
+    };
+  } catch (error) {
+    await client?.close().catch(() => undefined);
+    await browser?.close().catch(() => undefined);
+    await stopHttpServer(host?.server ?? null);
+    throw error;
+  }
+}
+
+describe('relay e2e (real browser assets)', () => {
   for (const runtimeCase of RUNTIME_CASES) {
     it(`executes page-registered WebMCP tools through dynamic tool (${runtimeCase.mode})`, async () => {
+      let widgetServer: StartedHttpServer | null = null;
       let harness: E2EHarness | null = null;
 
       try {
-        harness = await setupE2EHarness(runtimeCase);
+        const relayPort = await getOpenPort();
+        widgetServer = await startWidgetAssetServer();
+        harness = await setupE2EHarness({
+          runtimeCase,
+          relayPort,
+          widgetOrigin: widgetServer.origin,
+          clientName: `webmcp-local-relay-e2e-client-${runtimeCase.mode}-dynamic`,
+        });
 
         const result = await harness.client.callTool({
           name: harness.expectedToolName,
@@ -850,20 +508,27 @@ describe('relay e2e', () => {
         throw formatE2EError(runtimeCase.mode, error, harness);
       } finally {
         await harness?.cleanup();
+        await stopHttpServer(widgetServer?.server ?? null);
       }
     });
 
     it(`propagates dynamic tool registration and unregistration (${runtimeCase.mode})`, async () => {
+      let widgetServer: StartedHttpServer | null = null;
       let harness: E2EHarness | null = null;
 
       try {
-        harness = await setupE2EHarness(runtimeCase);
+        const relayPort = await getOpenPort();
+        widgetServer = await startWidgetAssetServer();
+        harness = await setupE2EHarness({
+          runtimeCase,
+          relayPort,
+          widgetOrigin: widgetServer.origin,
+          clientName: `webmcp-local-relay-e2e-client-${runtimeCase.mode}-dynamic-reg`,
+        });
 
-        // Verify the initial tool exists
         const initialTools = await harness.client.listTools();
         expect(initialTools.tools.some((t) => t.name === harness?.expectedToolName)).toBe(true);
 
-        // Dynamically register a new tool on the page
         await harness.page.evaluate(() => {
           const mc = (
             navigator as unknown as { modelContext: { registerTool: (t: unknown) => void } }
@@ -878,7 +543,6 @@ describe('relay e2e', () => {
           });
         });
 
-        // Poll until the new tool appears in the MCP client
         const dynamicToolName = await waitForValue(async () => {
           const toolList = await harness?.client.listTools();
           const found = toolList?.tools.find((t) => t.name === sanitizeName('dynamic_e2e_tool'));
@@ -887,7 +551,6 @@ describe('relay e2e', () => {
 
         expect(dynamicToolName).toBe(sanitizeName('dynamic_e2e_tool'));
 
-        // Invoke the dynamic tool
         const result = await harness.client.callTool({
           name: dynamicToolName,
           arguments: { msg: 'hello' },
@@ -895,7 +558,6 @@ describe('relay e2e', () => {
         const text = firstContentText(result);
         expect(text).toContain('dynamic:hello');
 
-        // Unregister the dynamic tool
         await harness.page.evaluate(() => {
           const mc = (
             navigator as unknown as { modelContext: { unregisterTool: (name: string) => void } }
@@ -903,7 +565,6 @@ describe('relay e2e', () => {
           mc.unregisterTool('dynamic_e2e_tool');
         });
 
-        // Poll until the dynamic tool disappears
         await waitForValue(async () => {
           const toolList = await harness?.client.listTools();
           const stillThere = toolList?.tools.some(
@@ -912,7 +573,6 @@ describe('relay e2e', () => {
           return stillThere ? undefined : true;
         }, 15_000);
 
-        // Original tool should still exist
         const finalTools = await harness.client.listTools();
         expect(finalTools.tools.some((t) => t.name === harness?.expectedToolName)).toBe(true);
         expect(finalTools.tools.some((t) => t.name === sanitizeName('dynamic_e2e_tool'))).toBe(
@@ -922,14 +582,23 @@ describe('relay e2e', () => {
         throw formatE2EError(`${runtimeCase.mode} dynamic-tools`, error, harness);
       } finally {
         await harness?.cleanup();
+        await stopHttpServer(widgetServer?.server ?? null);
       }
     });
 
     it(`executes page-registered WebMCP tools through webmcp_call_tool (${runtimeCase.mode})`, async () => {
+      let widgetServer: StartedHttpServer | null = null;
       let harness: E2EHarness | null = null;
 
       try {
-        harness = await setupE2EHarness(runtimeCase);
+        const relayPort = await getOpenPort();
+        widgetServer = await startWidgetAssetServer();
+        harness = await setupE2EHarness({
+          runtimeCase,
+          relayPort,
+          widgetOrigin: widgetServer.origin,
+          clientName: `webmcp-local-relay-e2e-client-${runtimeCase.mode}-call-tool`,
+        });
 
         const listResult = await harness.client.callTool({
           name: 'webmcp_list_tools',
@@ -970,7 +639,47 @@ describe('relay e2e', () => {
         throw formatE2EError(`${runtimeCase.mode} webmcp_call_tool`, error, harness);
       } finally {
         await harness?.cleanup();
+        await stopHttpServer(widgetServer?.server ?? null);
       }
     });
   }
+
+  it('works through a second relay in client mode when port owner already exists', async () => {
+    let widgetServer: StartedHttpServer | null = null;
+    let ownerRelay: SpawnedRelay | null = null;
+    let harness: E2EHarness | null = null;
+
+    try {
+      const relayPort = await getOpenPort();
+      widgetServer = await startWidgetAssetServer();
+      ownerRelay = await startRelayProcess(relayPort);
+
+      harness = await setupE2EHarness({
+        runtimeCase: RUNTIME_CASES[0],
+        relayPort,
+        widgetOrigin: widgetServer.origin,
+        clientName: 'webmcp-local-relay-e2e-client-client-mode',
+      });
+
+      const listSourcesResult = await harness.client.callTool({
+        name: 'webmcp_list_sources',
+        arguments: {},
+      });
+      expect(firstContentText(listSourcesResult)).toContain('"mode": "client"');
+
+      const result = await harness.client.callTool({
+        name: harness.expectedToolName,
+        arguments: { a: 9, b: 3 },
+      });
+      const text = firstContentText(result);
+      expect(text).toContain('sum=12');
+      expect(text).toContain('runtime=global');
+    } catch (error) {
+      throw formatE2EError('client-mode-port-owner', error, harness, ownerRelay?.logs ?? []);
+    } finally {
+      await harness?.cleanup();
+      await ownerRelay?.stop();
+      await stopHttpServer(widgetServer?.server ?? null);
+    }
+  });
 });
