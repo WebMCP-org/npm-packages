@@ -1,6 +1,6 @@
 # Release Skill for @mcp-b Packages
 
-Publish packages from this monorepo to npm. Covers manual publishing, changesets, beta releases, and the critical dependency ordering that prevents transitive version mismatches.
+Publish packages from this monorepo to npm. Uses `pnpm publish -r` for automatic topological ordering so dependencies are always published before dependents.
 
 ## When to Use This Skill
 
@@ -9,17 +9,92 @@ Publish packages from this monorepo to npm. Covers manual publishing, changesets
 - Beta/canary/preview releases
 - Troubleshooting failed publishes or dependency chain issues
 
-## CRITICAL: Understanding workspace:* Resolution
+## How Publishing Works in This Monorepo
 
-**This is the #1 source of publishing bugs in this repo.**
+All internal dependencies use `"workspace:*"` in package.json. When `pnpm publish` runs, it resolves `workspace:*` to the **current local version** of that dependency. This means:
 
-All internal dependencies use `"workspace:*"` in package.json. When `pnpm publish` runs, it resolves `workspace:*` to the **current local version** of that dependency at publish time. This means:
+- Versions must be bumped locally BEFORE publishing
+- `pnpm publish -r` publishes in **topological order** automatically (dependencies before dependents)
+- Since all local versions are already bumped, every `workspace:*` resolves to the correct new version
 
-- If `@mcp-b/transports` depends on `@mcp-b/webmcp-ts-sdk: "workspace:*"`, and ts-sdk is locally at version `2.0.2`, pnpm resolves it to `"@mcp-b/webmcp-ts-sdk": "2.0.2"` in the published package.
-- **If you publish transports BEFORE publishing ts-sdk's new version**, transports will reference the OLD ts-sdk version on npm. Consumers will get a stale dependency chain.
-- **This cannot be fixed retroactively** — you must republish the downstream package to update the resolved version.
+**The key insight**: Changesets bumps all versions locally, then `pnpm publish -r` handles the correct publish order. These two tools are designed to work together.
 
-**Rule: Always publish dependencies before dependents. Verify after each publish.**
+**Never use `npm publish`** — only pnpm resolves `workspace:*` and `catalog:` protocols.
+
+## Standard Release Workflow (Recommended)
+
+### Option A: Changesets + Recursive Publish (Preferred)
+
+```bash
+# 1. Validate everything passes
+pnpm build && pnpm typecheck && pnpm check && pnpm test:unit
+
+# 2. Create changesets (interactive — select packages, bump type, description)
+pnpm changeset
+
+# 3. Apply version bumps to all affected packages (including dependents)
+pnpm changeset version
+
+# 4. Review what changed
+git diff packages/*/package.json
+
+# 5. Ensure npm auth is available
+npm whoami  # Must be logged in
+export $(grep -v '^#' .env | xargs)  # Load NPM_TOKEN
+
+# 6. Publish ALL changed packages in topological order
+pnpm publish -r --access public --no-git-checks
+
+# 7. Verify the dependency chain
+pnpm run verify:published  # Or use manual verification commands below
+
+# 8. Commit and push
+git add .
+git commit -m "chore(release): publish packages"
+git push origin main
+```
+
+### Option B: CI-Driven (Fully Automated)
+
+1. `pnpm changeset` — create changeset locally
+2. `git add .changeset/ && git commit && git push`
+3. CI creates a "Version Packages" PR with bumped versions and changelogs
+4. Merge the PR — CI runs `pnpm publish -r` automatically
+
+### Option C: Manual Version Bump + Recursive Publish
+
+When you need to bypass changesets (hotfix, emergency release):
+
+```bash
+# 1. Validate
+pnpm build && pnpm typecheck && pnpm check && pnpm test:unit
+
+# 2. Bump versions manually (edit package.json files directly)
+# Bump ALL packages that changed, PLUS any downstream dependents
+
+# 3. Auth
+npm whoami
+export $(grep -v '^#' .env | xargs)
+
+# 4. Publish in topological order
+pnpm publish -r --access public --no-git-checks
+
+# 5. Verify and commit
+git add packages/*/package.json
+git commit -m "chore(release): publish <packages>"
+git push origin main
+```
+
+## Publishing a Single Package
+
+If only ONE package changed and it has NO downstream dependents that need updating:
+
+```bash
+export $(grep -v '^#' .env | xargs)
+pnpm publish --filter @mcp-b/<package-name> --access public --no-git-checks
+```
+
+**WARNING**: If the package is a dependency of other packages (check the dependency graph below), you MUST also republish the dependents or their `workspace:*` references will be stale. In most cases, just use `pnpm publish -r` instead — it only publishes packages whose versions aren't yet on npm.
 
 ## Complete Dependency Graph
 
@@ -41,159 +116,44 @@ usewebmcp                    → webmcp-polyfill, webmcp-types
 
 **Important**: `usewebmcp` is a standalone package with its own `useWebMCP` hook. It depends on the polyfill directly. It is NOT an alias for `@mcp-b/react-webmcp`.
 
-## Mandatory Publish Order
+### Topological Publish Order (for reference)
 
-Publish in exactly this order. **Do not skip steps. Do not reorder.**
+`pnpm publish -r` handles this automatically. This is documented here only so you understand the order and can debug issues.
 
 ```
-Tier 0 (no internal deps — can publish in parallel):
-  1. @mcp-b/webmcp-types
-  2. @mcp-b/smart-dom-reader
+Tier 0 (no internal deps):
+  @mcp-b/webmcp-types, @mcp-b/smart-dom-reader
 
-Tier 1 (depends on Tier 0):
-  3. @mcp-b/webmcp-polyfill       (← webmcp-types)
+Tier 1 (← Tier 0):
+  @mcp-b/webmcp-polyfill
 
-Tier 2 (depends on Tier 1):
-  4. @mcp-b/webmcp-ts-sdk         (← webmcp-polyfill, webmcp-types)
+Tier 2 (← Tier 1):
+  @mcp-b/webmcp-ts-sdk
 
-Tier 3 (depends on Tier 2):
-  5. @mcp-b/transports            (← webmcp-ts-sdk)
+Tier 3 (← Tier 2):
+  @mcp-b/transports
 
-Tier 4 (depends on Tier 3):
-  6. @mcp-b/extension-tools       (← smart-dom-reader, webmcp-ts-sdk)
-  7. @mcp-b/mcp-iframe            (← transports, webmcp-ts-sdk, webmcp-types)
-  8. @mcp-b/global                (← transports, webmcp-polyfill, webmcp-ts-sdk, webmcp-types)
+Tier 4 (← Tier 3):
+  @mcp-b/extension-tools, @mcp-b/mcp-iframe, @mcp-b/global
 
-Tier 5 (depends on Tier 4):
-  9. @mcp-b/react-webmcp          (← global, transports, webmcp-polyfill, webmcp-ts-sdk, webmcp-types)
- 10. usewebmcp                    (← webmcp-polyfill, webmcp-types)
+Tier 5 (← Tier 4):
+  @mcp-b/react-webmcp, usewebmcp
 
-Independent (publish anytime):
- 11. @mcp-b/webmcp-local-relay    (no internal deps)
- 12. @mcp-b/chrome-devtools-mcp   (no internal deps)
+Independent (no internal deps):
+  @mcp-b/webmcp-local-relay, @mcp-b/chrome-devtools-mcp
 ```
 
-Packages within the same tier can be published in parallel if desired.
+## Why `pnpm publish -r` Prevents Stale Chains
 
-## Manual Publishing Workflow
+When publishing manually one-by-one with `--filter`, you risk publishing a dependent before its dependency's new version is live. The dependent's `workspace:*` resolves to the LOCAL version (which is correct), but if an earlier package in the chain wasn't published yet, consumers pulling from npm get a mix of old and new versions.
 
-### Step 1: Pre-Publish Validation
+`pnpm publish -r` solves this because:
+1. It topologically sorts packages by dependency graph
+2. It publishes dependencies before dependents
+3. `workspace:*` resolves to local versions, which are already bumped by changesets
+4. It skips packages whose current version already exists on npm
 
-```bash
-pnpm build && pnpm typecheck && pnpm check && pnpm test:unit
-```
-
-All four must pass. Do not publish if any fail.
-
-### Step 2: Verify npm Login
-
-```bash
-npm whoami
-```
-
-If not logged in, run `npm login` (requires interactive terminal — the human must do this).
-
-### Step 3: Load NPM Token
-
-```bash
-export $(grep -v '^#' /Users/alexmnahas/personalRepos/WebMCP-org/npm-packages/.env | xargs)
-```
-
-The `.env` file at the repo root contains `NPM_TOKEN=npm_...`. This must be exported for `pnpm publish` to authenticate.
-
-### Step 4: Bump Versions
-
-For each package being released, bump the version:
-
-```bash
-# From repo root — use absolute paths, never cd into package dirs
-# (cd changes shell state and causes errors in subsequent commands)
-
-# Patch bump (most common)
-npm version patch --no-git-tag-version --prefix packages/<package-name>
-
-# Or edit package.json directly
-```
-
-**Convention**: For packages in rapid development (0.x.x), bump patch. For stable packages (1.x+), follow semver properly.
-
-### Step 5: Publish in Order
-
-Publish each package using absolute paths from the repo root:
-
-```bash
-# Template for each package:
-pnpm publish --filter @mcp-b/<package-name> --access public --no-git-checks
-```
-
-**IMPORTANT**: Always use `pnpm publish`, never `npm publish`. npm does not resolve `workspace:*` or `catalog:` protocols.
-
-Follow the tier order from the Mandatory Publish Order section above. After EACH tier, verify the resolved dependencies before moving to the next tier.
-
-### Step 6: Verify After Each Tier
-
-After publishing each tier of packages, verify the dependency chain:
-
-```bash
-# Check that the package was published
-npm view @mcp-b/<package> version
-
-# Check that workspace:* resolved correctly
-npm view @mcp-b/<package>@<new-version> dependencies --json
-```
-
-**Look for**: All internal dependency versions should reference the versions you JUST published in earlier tiers. If you see an old version number, STOP — you published out of order and need to republish.
-
-### Step 7: Commit and Push
-
-```bash
-git add packages/*/package.json
-git commit -m "chore(release): publish <packages>"
-git push origin main
-```
-
-## Full Release Script (All Packages)
-
-When releasing all packages at once, use this sequential script. Run each tier and verify before proceeding.
-
-```bash
-# Setup
-export $(grep -v '^#' .env | xargs)
-
-# Tier 0
-pnpm publish --filter @mcp-b/webmcp-types --access public --no-git-checks
-pnpm publish --filter @mcp-b/smart-dom-reader --access public --no-git-checks
-# Verify: npm view @mcp-b/webmcp-types version && npm view @mcp-b/smart-dom-reader version
-
-# Tier 1
-pnpm publish --filter @mcp-b/webmcp-polyfill --access public --no-git-checks
-# Verify: npm view @mcp-b/webmcp-polyfill dependencies --json (should show new types version)
-
-# Tier 2
-pnpm publish --filter @mcp-b/webmcp-ts-sdk --access public --no-git-checks
-# Verify: npm view @mcp-b/webmcp-ts-sdk dependencies --json
-
-# Tier 3
-pnpm publish --filter @mcp-b/transports --access public --no-git-checks
-# Verify: npm view @mcp-b/transports dependencies --json (should show new ts-sdk version)
-
-# Tier 4 (can be parallel)
-pnpm publish --filter @mcp-b/extension-tools --access public --no-git-checks
-pnpm publish --filter @mcp-b/mcp-iframe --access public --no-git-checks
-pnpm publish --filter @mcp-b/global --access public --no-git-checks
-# Verify: npm view @mcp-b/global dependencies --json (should show new transports version)
-
-# Tier 5 (can be parallel)
-pnpm publish --filter @mcp-b/react-webmcp --access public --no-git-checks
-pnpm publish --filter usewebmcp --access public --no-git-checks
-# Verify: npm view @mcp-b/react-webmcp dependencies --json
-
-# Independent (anytime)
-pnpm publish --filter @mcp-b/webmcp-local-relay --access public --no-git-checks
-pnpm publish --filter @mcp-b/chrome-devtools-mcp --access public --no-git-checks
-```
-
-**Note**: npm registry propagation can take 15-60 seconds. If `npm view` shows an old version immediately after publish, wait and retry. Do NOT republish — that will fail with "version already exists".
+The combination means every package publishes with the correct resolved dependency versions, in the correct order, automatically.
 
 ## Beta / Preview Releases
 
@@ -203,13 +163,14 @@ For testing unreleased changes without affecting the `latest` tag:
 # Generate timestamp-based version
 TIMESTAMP=$(date +%Y%m%d%H%M%S)
 
-# Bump to beta version (in package dir)
+# Bump to beta version
 npm version 0.0.0-beta-$TIMESTAMP --no-git-tag-version --prefix packages/<package-name>
 
 # Build
 pnpm --filter @mcp-b/<package-name> build
 
 # Publish with beta tag
+export $(grep -v '^#' .env | xargs)
 pnpm publish --filter @mcp-b/<package-name> --access public --no-git-checks --tag beta
 ```
 
@@ -227,100 +188,81 @@ pnpm changeset version --snapshot canary
 pnpm publish -r --access public --tag canary --no-git-checks
 ```
 
-## Changeset Workflow (CI-Driven)
+## Post-Publish Verification
 
-For coordinated releases via CI:
+After any publish, verify the dependency chain is correct:
 
-1. **Create changeset**: `pnpm changeset` (interactive — select packages, bump type, description)
-2. **Commit**: `git add .changeset/ && git commit -m "chore(release): add changeset"`
-3. **Push**: CI creates a "Version Packages" PR automatically
-4. **Merge**: Merging the PR triggers CI publish in correct order
+```bash
+# Check a specific package's resolved deps
+npm view @mcp-b/<package>@<version> dependencies --json
+
+# Quick check: all published versions
+for pkg in webmcp-types webmcp-polyfill webmcp-ts-sdk transports global mcp-iframe extension-tools react-webmcp smart-dom-reader webmcp-local-relay chrome-devtools-mcp; do
+  LOCAL=$(node -p "require('./packages/$pkg/package.json').version" 2>/dev/null)
+  NPM=$(npm view @mcp-b/$pkg version 2>/dev/null)
+  echo "@mcp-b/$pkg: local=$LOCAL npm=$NPM"
+done
+echo "usewebmcp: local=$(node -p "require('./packages/usewebmcp/package.json').version") npm=$(npm view usewebmcp version 2>/dev/null)"
+
+# Deep chain verification (most critical path)
+echo "--- Verifying global → transports → ts-sdk chain ---"
+GLOBAL_V=$(npm view @mcp-b/global version)
+GLOBAL_TRANSPORTS=$(npm view @mcp-b/global@$GLOBAL_V dependencies --json 2>/dev/null | node -p "JSON.parse(require('fs').readFileSync(0,'utf8'))['@mcp-b/transports']")
+TRANSPORTS_SDK=$(npm view @mcp-b/transports@$GLOBAL_TRANSPORTS dependencies --json 2>/dev/null | node -p "JSON.parse(require('fs').readFileSync(0,'utf8'))['@mcp-b/webmcp-ts-sdk']")
+echo "global@$GLOBAL_V → transports@$GLOBAL_TRANSPORTS → ts-sdk@$TRANSPORTS_SDK"
+```
+
+**What to look for**: All internal dep versions in the `dependencies --json` output should match the versions you just published. If any are stale, see "Fixing a Stale Chain" below.
+
+## Fixing a Stale Dependency Chain
+
+If you discover a stale dependency after publishing (e.g., global@1.6.2 points to transports@2.0.2 which points to ts-sdk@1.6.1):
+
+1. You cannot unpublish — npm prevents this after 72 hours
+2. Bump the version of the broken downstream package (e.g., global 1.6.2 → 1.6.3)
+3. Run `pnpm publish -r --access public --no-git-checks` — it will only publish the bumped package
+4. Verify the resolved chain is now correct
+5. Consumers must update to the new version
+
+**Prevention**: Always use `pnpm publish -r` instead of publishing individual packages with `--filter`. The recursive publish handles topological ordering automatically.
 
 ## Package-Specific Notes
 
 ### @mcp-b/webmcp-types
-Foundational types package. Almost everything depends on this. Publish first.
+Foundational types package. Almost everything depends on this.
 
 ### @mcp-b/webmcp-polyfill
-Provides `navigator.modelContext` + `navigator.modelContextTesting` when the browser lacks native support. Depends only on types.
+Provides `navigator.modelContext` + `navigator.modelContextTesting` when the browser lacks native support.
 
 ### @mcp-b/webmcp-ts-sdk
 The `BrowserMcpServer` class. Wraps modelContext with MCP extensions. Core package that most others depend on.
 
 ### @mcp-b/transports
-Browser MCP transports (Tab, Iframe, Extension). Depends on ts-sdk.
+Browser MCP transports (Tab, Iframe, Extension).
 
 ### @mcp-b/global
-**Dual build output**: ESM (`dist/index.js`) + IIFE (`dist/index.iife.js`) for `<script>` tags. Has the MOST internal dependencies (transports, polyfill, ts-sdk, types). **Most vulnerable to transitive chain issues** — if any upstream dep is stale, consumers of global get broken chains.
+**Dual build output**: ESM (`dist/index.js`) + IIFE (`dist/index.iife.js`). Has the MOST internal dependencies. Most vulnerable to transitive chain issues.
 
 ### @mcp-b/extension-tools
-Chrome Extension API tools. Depends on smart-dom-reader and ts-sdk.
+Chrome Extension API tools.
 
 ### @mcp-b/mcp-iframe
-Custom element for iframe MCP tools. Depends on transports, ts-sdk, types.
+Custom element for iframe MCP tools.
 
 ### @mcp-b/react-webmcp
-React hooks for MCP. The heaviest downstream package — depends on global, transports, polyfill, ts-sdk, types. Zod is an optional peer dependency (`^3.25 || ^4.0`).
+React hooks for MCP. Zod is an optional peer dependency (`^3.25 || ^4.0`).
 
 ### usewebmcp
-**Standalone** React hooks package for direct `navigator.modelContext` tool registration. Depends on polyfill and types. **NOT an alias for react-webmcp** — it is its own package with its own `useWebMCP` hook.
+**Standalone** React hooks package for direct `navigator.modelContext` tool registration. **NOT an alias for react-webmcp.**
 
 ### @mcp-b/webmcp-local-relay
 No internal dependencies. Can be published independently at any time.
 
 ### @mcp-b/chrome-devtools-mcp
-No internal dependencies. Complex build process — always clean build:
+No internal dependencies. Complex build — always clean build first:
 ```bash
 cd packages/chrome-devtools-mcp && rm -rf build/ && pnpm build
 ```
-Post-build renames `build/node_modules` → `build/vendor` (pnpm strips node_modules during publish).
-
-## Transitive Dependency Chain: What Can Go Wrong
-
-### The Problem
-
-```
-Scenario: You need to publish ts-sdk@2.0.2 and transports@2.0.3
-
-WRONG ORDER:
-1. Publish transports@2.0.3 (workspace:* resolves ts-sdk to OLD 2.0.1)
-2. Publish ts-sdk@2.0.2
-
-Result: transports@2.0.3 on npm depends on ts-sdk@2.0.1 (stale!)
-Consumers install transports → get ts-sdk@2.0.1 → missing the fix they need.
-
-CORRECT ORDER:
-1. Publish ts-sdk@2.0.2 first
-2. Publish transports@2.0.3 (workspace:* resolves ts-sdk to NEW 2.0.2)
-
-Result: transports@2.0.3 on npm depends on ts-sdk@2.0.2 ✓
-```
-
-### Deep Chain Example
-
-The most dangerous chain in this repo:
-
-```
-@mcp-b/global → @mcp-b/transports → @mcp-b/webmcp-ts-sdk → @mcp-b/webmcp-polyfill → @mcp-b/webmcp-types
-```
-
-If you publish `global` before `transports` has been updated, `global` will reference the old `transports` version, which references the old `ts-sdk`, and so on. **The entire chain becomes stale.**
-
-### How to Fix a Stale Chain
-
-If you discover a stale dependency after publishing:
-
-1. **You cannot unpublish** (npm prevents unpublish after 72 hours, and consumers may already have cached it)
-2. **Bump the version** of the downstream package (e.g., global 1.6.2 → 1.6.3)
-3. **Republish** — the new version will resolve `workspace:*` to the correct upstream versions
-4. **Consumers must update** to the new version to get the fix
-
-### Prevention Checklist
-
-Before publishing any package, verify:
-- [ ] All upstream dependencies in the chain have been published FIRST
-- [ ] `npm view @mcp-b/<upstream-dep> version` shows the expected new version
-- [ ] After publishing, run `npm view @mcp-b/<this-package>@<new-version> dependencies --json` and confirm all internal dep versions are correct
 
 ## NPM Authentication
 
@@ -330,51 +272,41 @@ Before publishing any package, verify:
 NPM_TOKEN=npm_YOUR_TOKEN_HERE
 ```
 
+Load before publishing:
+```bash
+export $(grep -v '^#' .env | xargs)
+```
+
 ### CI (GitHub Secret)
 ```bash
 gh secret set NPM_TOKEN --body "npm_YOUR_TOKEN_HERE"
 ```
 
-### Generate New Token
-1. Go to npmjs.com → Settings → Access Tokens
-2. Create "Automation" token with publish access to `@mcp-b` scope
+## Common Issues
 
-## Verification Commands
+### "Cannot publish with pnpm protocols"
+Used `npm publish` instead of `pnpm publish`. Always use pnpm.
 
-```bash
-# Check what version is live on npm
-npm view @mcp-b/<package> version
+### "Unclean working tree"
+Add `--no-git-checks` flag.
 
-# Check resolved dependencies of a published version
-npm view @mcp-b/<package>@<version> dependencies --json
+### Package missing build files after publish
+Check `prepublishOnly` script includes build step. Check `files` field in package.json.
 
-# Check tarball contents
-npm view @mcp-b/<package>@<version> dist.tarball | xargs curl -sL | tar -tzf -
+### Version already exists on npm
+The package was already published at this version. Bump to the next patch.
 
-# Check all local package versions
-pnpm -r exec -- node -p "require('./package.json').name + '@' + require('./package.json').version"
-
-# Compare local vs npm versions
-for pkg in webmcp-types webmcp-polyfill webmcp-ts-sdk transports global mcp-iframe extension-tools react-webmcp smart-dom-reader webmcp-local-relay chrome-devtools-mcp; do
-  LOCAL=$(node -p "require('./packages/$pkg/package.json').version" 2>/dev/null)
-  NPM=$(npm view @mcp-b/$pkg version 2>/dev/null)
-  echo "@mcp-b/$pkg: local=$LOCAL npm=$NPM"
-done
-# Also check usewebmcp (unscoped)
-echo "usewebmcp: local=$(node -p "require('./packages/usewebmcp/package.json').version") npm=$(npm view usewebmcp version 2>/dev/null)"
-```
+### npm view shows old version after publish
+Registry propagation takes 15-60 seconds. Wait and retry. Do NOT republish.
 
 ## Pre-Release Checklist
 
-1. [ ] All tests pass: `pnpm test:unit`
-2. [ ] Build succeeds: `pnpm build`
-3. [ ] Types check: `pnpm typecheck`
-4. [ ] Lint passes: `pnpm check`
-5. [ ] npm login valid: `npm whoami`
-6. [ ] NPM_TOKEN exported: `echo $NPM_TOKEN | head -c 10`
-7. [ ] Versions bumped in correct packages
-8. [ ] Publishing order follows the tier system above
-9. [ ] After each tier: verified resolved dependencies on npm
+1. [ ] All checks pass: `pnpm build && pnpm typecheck && pnpm check && pnpm test:unit`
+2. [ ] npm login valid: `npm whoami`
+3. [ ] NPM_TOKEN exported
+4. [ ] Versions bumped (via `pnpm changeset version` or manually)
+5. [ ] Using `pnpm publish -r` (not individual `--filter` publishes)
+6. [ ] After publish: verified dependency chain with `npm view ... dependencies --json`
 
 ## Files Reference
 
