@@ -1,3 +1,5 @@
+import { TabClientTransport, TabServerTransport } from '@mcp-b/transports';
+import { BrowserMcpServer, Client } from '@mcp-b/webmcp-ts-sdk';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, renderHook } from 'vitest-browser-react';
@@ -30,6 +32,15 @@ const createMockTransport = () => ({
   send: vi.fn(),
 });
 
+type LiveConnection = {
+  client: Client;
+  clientTransport: TabClientTransport;
+  server: BrowserMcpServer;
+  serverTransport: TabServerTransport;
+};
+
+const liveConnections: LiveConnection[] = [];
+
 function toProviderProps(
   client: ReturnType<typeof createMockClient>,
   transport: ReturnType<typeof createMockTransport>
@@ -60,7 +71,17 @@ describe('McpClientProvider', () => {
     mockListResources.mockResolvedValue({ resources: [] });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    while (liveConnections.length > 0) {
+      const connection = liveConnections.pop();
+      if (!connection) {
+        break;
+      }
+      await connection.client.close().catch(() => {});
+      await connection.clientTransport.close().catch(() => {});
+      await connection.server.close().catch(() => {});
+      await connection.serverTransport.close().catch(() => {});
+    }
     vi.clearAllMocks();
   });
 
@@ -467,6 +488,113 @@ describe('McpClientProvider', () => {
 
       // Notification handlers should be removed
       // Note: The exact cleanup behavior depends on the implementation
+    });
+  });
+
+  describe('real transport integration', () => {
+    function uniqueChannelId(prefix: string): string {
+      return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    }
+
+    async function createLiveProvider(): Promise<{
+      server: BrowserMcpServer;
+      providerProps: Pick<McpClientProviderProps, 'client' | 'transport'>;
+    }> {
+      const channelId = uniqueChannelId('mcp-client-provider-live');
+      const server = new BrowserMcpServer({
+        name: 'react-webmcp-test-server',
+        version: '1.0.0',
+      });
+      const serverTransport = new TabServerTransport({
+        channelId,
+        allowedOrigins: [window.location.origin],
+      });
+      await server.connect(serverTransport);
+
+      const client = new Client({ name: 'react-webmcp-test-client', version: '1.0.0' });
+      const clientTransport = new TabClientTransport({
+        targetOrigin: window.location.origin,
+        channelId,
+      });
+      liveConnections.push({ client, clientTransport, server, serverTransport });
+
+      return {
+        server,
+        providerProps: {
+          client: client as unknown as McpClientProviderProps['client'],
+          transport: clientTransport as unknown as McpClientProviderProps['transport'],
+        },
+      };
+    }
+
+    it('connects through real transport and loads tools from server', async () => {
+      const { server, providerProps: liveProviderProps } = await createLiveProvider();
+
+      server.registerTool({
+        name: 'live_echo',
+        description: 'Echoes message',
+        inputSchema: {
+          type: 'object',
+          properties: { message: { type: 'string' } },
+          required: ['message'],
+        },
+        async execute(args) {
+          return {
+            content: [{ type: 'text', text: `echo:${String(args.message ?? '')}` }],
+          };
+        },
+      });
+
+      const wrapper = ({ children }: { children: ReactNode }) => (
+        <McpClientProvider {...liveProviderProps}>{children}</McpClientProvider>
+      );
+
+      const { result } = await renderHook(() => useMcpClient(), { wrapper });
+
+      await vi.waitFor(() => {
+        expect(result.current.isConnected).toBe(true);
+      });
+
+      await vi.waitFor(() => {
+        expect(result.current.tools.some((tool) => tool.name === 'live_echo')).toBe(true);
+      });
+
+      const callResult = await result.current.client.callTool({
+        name: 'live_echo',
+        arguments: { message: 'hello' },
+      });
+
+      expect(callResult.content[0]).toEqual({ type: 'text', text: 'echo:hello' });
+    });
+
+    it('refreshes tool list after real list_changed notifications', async () => {
+      const { server, providerProps: liveProviderProps } = await createLiveProvider();
+      const wrapper = ({ children }: { children: ReactNode }) => (
+        <McpClientProvider {...liveProviderProps}>{children}</McpClientProvider>
+      );
+
+      const { result } = await renderHook(() => useMcpClient(), { wrapper });
+
+      await vi.waitFor(() => {
+        expect(result.current.isConnected).toBe(true);
+      });
+
+      await vi.waitFor(() => {
+        expect(result.current.tools).toEqual([]);
+      });
+
+      server.registerTool({
+        name: 'list_changed_tool',
+        description: 'Added after provider connection',
+        inputSchema: {},
+        async execute() {
+          return { content: [{ type: 'text', text: 'ok' }] };
+        },
+      });
+
+      await vi.waitFor(() => {
+        expect(result.current.tools.some((tool) => tool.name === 'list_changed_tool')).toBe(true);
+      });
     });
   });
 });
