@@ -71,6 +71,10 @@ export function parseCliOptions(argv: string[]): CliOptions {
 
     if (token.startsWith('-')) {
       process.stderr.write(`[webmcp-local-relay] warn: unrecognized argument "${token}"\n`);
+    } else {
+      process.stderr.write(
+        `[webmcp-local-relay] warn: unrecognized argument "${token}" (positional arguments are not supported)\n`
+      );
     }
   }
 

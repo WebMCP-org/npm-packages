@@ -74,6 +74,7 @@ const shutdown = async (signal: string) => {
     process.stderr.write(
       `[webmcp-local-relay] error during shutdown: ${err instanceof Error ? err.message : err}\n`
     );
+    process.exit(1);
   }
   process.exit(0);
 };
