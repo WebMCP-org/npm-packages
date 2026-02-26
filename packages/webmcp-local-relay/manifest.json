@@ -36,6 +36,10 @@
     {
       "name": "webmcp_call_tool",
       "description": "Call a browser-relayed tool by name with JSON arguments"
+    },
+    {
+      "name": "webmcp_open_page",
+      "description": "Open a URL in the default browser, or refresh a connected source by origin"
     }
   ],
   "tools_generated": true,

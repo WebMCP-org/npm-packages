@@ -401,6 +401,7 @@
     iframe.setAttribute('aria-hidden', 'true');
     iframe.setAttribute('data-webmcp-relay', '1');
     document.body.appendChild(iframe);
+    widgetWindow = iframe.contentWindow;
     iframe.addEventListener('load', () => {
       widgetWindow = iframe.contentWindow;
     });
@@ -427,6 +428,9 @@
 
   window.addEventListener('message', (event) => {
     if (event.origin !== config.widgetOrigin) {
+      return;
+    }
+    if (!widgetWindow || event.source !== widgetWindow) {
       return;
     }
 
