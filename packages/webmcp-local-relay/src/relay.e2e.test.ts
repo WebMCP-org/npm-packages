@@ -179,6 +179,35 @@ async function waitForValue<T>(
 }
 
 /**
+ * Extracts text items from MCP call tool result content.
+ */
+function contentTextItems(result: unknown): string[] {
+  const content =
+    typeof result === 'object' && result !== null && 'content' in result
+      ? (result as { content?: unknown }).content
+      : undefined;
+  if (!Array.isArray(content)) {
+    return [];
+  }
+  return content
+    .map((item) => {
+      if (!item || typeof item !== 'object') {
+        return undefined;
+      }
+      const text = (item as { text?: unknown }).text;
+      return typeof text === 'string' ? text : undefined;
+    })
+    .filter((text): text is string => typeof text === 'string');
+}
+
+/**
+ * Returns the first text content item when present.
+ */
+function firstContentText(result: unknown): string {
+  return contentTextItems(result)[0] ?? '';
+}
+
+/**
  * Builds the host test page that registers a tool and bridges widget messages.
  */
 function buildHostPageHtml(options: {
@@ -812,7 +841,7 @@ describe('relay e2e', () => {
           arguments: { a: 2, b: 5 },
         });
 
-        const text = (result.content?.[0] as { text?: string } | undefined)?.text ?? '';
+        const text = firstContentText(result);
         expect(text).toContain('sum=7');
         expect(text).toContain(`runtime=${runtimeCase.mode}`);
         expect(text).toContain('title=WebMCP Relay E2E Host');
@@ -863,7 +892,7 @@ describe('relay e2e', () => {
           name: dynamicToolName,
           arguments: { msg: 'hello' },
         });
-        const text = (result.content?.[0] as { text?: string } | undefined)?.text ?? '';
+        const text = firstContentText(result);
         expect(text).toContain('dynamic:hello');
 
         // Unregister the dynamic tool
@@ -906,7 +935,7 @@ describe('relay e2e', () => {
           name: 'webmcp_list_tools',
           arguments: {},
         });
-        const listText = (listResult.content?.[0] as { text?: string } | undefined)?.text ?? '';
+        const listText = firstContentText(listResult);
         expect(listText).toContain(harness.expectedToolName);
         expect(listText).toContain(TEST_TOOL_NAME);
 
@@ -918,7 +947,7 @@ describe('relay e2e', () => {
           },
         });
 
-        const texts = (result.content as { type: string; text: string }[]).map((c) => c.text);
+        const texts = contentTextItems(result);
         const combined = texts.join('\n');
 
         expect(combined).toContain('sum=13');
@@ -932,7 +961,7 @@ describe('relay e2e', () => {
           arguments: { name: 'nonexistent_tool_xyz' },
         });
 
-        const errorText = (errorResult.content?.[0] as { text?: string } | undefined)?.text ?? '';
+        const errorText = firstContentText(errorResult);
         expect(errorText).toContain('Tool "nonexistent_tool_xyz" not found');
         expect(errorText).toContain('Available tools:');
         expect(errorText).toContain(harness.expectedToolName);

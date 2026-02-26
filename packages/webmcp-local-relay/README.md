@@ -188,6 +188,7 @@ npx @mcp-b/webmcp-local-relay --widget-origin https://your-app.example.com,https
 ```
 
 **How it connects:** The embed script injects a hidden iframe into the host page. The iframe opens a WebSocket to the relay on `localhost`. Tools are discovered via `navigator.modelContext` (or `navigator.modelContextTesting` as fallback) and forwarded to the relay, which registers them as standard MCP tools over stdio.
+If the relay is temporarily unavailable, the widget reconnects automatically using exponential backoff from `500ms` up to `3000ms`.
 
 ### Runtime Compatibility
 
@@ -220,7 +221,7 @@ For Chromium/Chrome Canary native preview testing:
 | Problem | Fix |
 |---------|-----|
 | `No sources connected` | Ensure the page loaded `embed.js` and the relay process is running |
-| `No tools listed` | Ensure page tools are registered on the WebMCP runtime before `embed.js` loads |
+| `No tools listed` | Ensure tools are registered on the page's WebMCP runtime. If tools register after load, confirm your runtime emits tool-change notifications (`toolschanged` or `registerToolsChangedCallback`) |
 | `Tool not found` | Tab reloaded or disconnected — call `webmcp_list_tools` again to refresh |
 | Connection blocked | Verify `--widget-origin` matches your page's origin, and relay port matches `data-relay-port` |
 

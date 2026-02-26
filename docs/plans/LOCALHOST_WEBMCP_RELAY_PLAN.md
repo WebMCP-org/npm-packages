@@ -1,6 +1,10 @@
 # Localhost WebMCP Relay Plan
 
-> Status: Phase 2 implemented (local MCP relay server MVP)
+> **Archived.** This document was the original design plan. The implementation has diverged significantly — see the [README](../../packages/webmcp-local-relay/README.md) for current architecture and behavior.
+
+> Original status: Phase 2 implemented (local MCP relay server MVP)
+
+> ~~Status: Phase 2 implemented (local MCP relay server MVP)~~
 > Scope: MVP architecture and implementation sequence for "one script tag + one local MCP command"
 > Target repo: `WebMCP-org/npm-packages`
 
