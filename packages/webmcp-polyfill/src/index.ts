@@ -1,6 +1,7 @@
 import { type Schema, Validator } from '@cfworker/json-schema';
 import type {
   InputSchema,
+  JsonObject,
   ModelContext,
   ModelContextClient,
   ModelContextOptions,
@@ -59,8 +60,7 @@ interface PolyfillModelContext extends ModelContext {
   [POLYFILL_MARKER_PROPERTY]: true;
 }
 
-interface PolyfillToolDescriptor
-  extends ToolDescriptor<Record<string, unknown>, ToolResponse, string> {
+interface PolyfillToolDescriptor extends ToolDescriptor<Record<string, unknown>, unknown, string> {
   inputSchema: InputSchema;
   [STANDARD_VALIDATOR_SYMBOL]: StandardInputValidatorSchema;
 }
@@ -213,8 +213,8 @@ class StrictWebMCPContext {
 
     try {
       const execution = tool.execute(args, client);
-      const result = await withAbortSignal(Promise.resolve(execution), options?.signal);
-      return toSerializedTestingResult(result);
+      const rawResult = await withAbortSignal(Promise.resolve(execution), options?.signal);
+      return toSerializedTestingResult(normalizeToolResponse(rawResult));
     } catch (error) {
       const detail =
         error instanceof Error
@@ -369,9 +369,13 @@ function normalizeInputSchema(inputSchema: ToolInputSchema | undefined): Normali
   }
 
   validateInputSchema(inputSchema);
+  const normalizedSchema =
+    inputSchema.type === undefined
+      ? ({ type: 'object', ...inputSchema } as InputSchema)
+      : inputSchema;
   return {
-    inputSchema,
-    standardValidator: createStandardValidatorFromJsonSchema(inputSchema),
+    inputSchema: normalizedSchema,
+    standardValidator: createStandardValidatorFromJsonSchema(normalizedSchema),
   };
 }
 
@@ -495,8 +499,36 @@ function normalizeToolDescriptor(
 
   const normalizedInputSchema = normalizeInputSchema(tool.inputSchema);
 
+  const annotations = tool.annotations;
+  const normalizedAnnotations = annotations
+    ? {
+        ...annotations,
+        ...(annotations.readOnlyHint === 'true'
+          ? { readOnlyHint: true }
+          : annotations.readOnlyHint === 'false'
+            ? { readOnlyHint: false }
+            : {}),
+        ...(annotations.destructiveHint === 'true'
+          ? { destructiveHint: true }
+          : annotations.destructiveHint === 'false'
+            ? { destructiveHint: false }
+            : {}),
+        ...(annotations.idempotentHint === 'true'
+          ? { idempotentHint: true }
+          : annotations.idempotentHint === 'false'
+            ? { idempotentHint: false }
+            : {}),
+        ...(annotations.openWorldHint === 'true'
+          ? { openWorldHint: true }
+          : annotations.openWorldHint === 'false'
+            ? { openWorldHint: false }
+            : {}),
+      }
+    : undefined;
+
   return {
     ...tool,
+    ...(normalizedAnnotations ? { annotations: normalizedAnnotations } : {}),
     inputSchema: normalizedInputSchema.inputSchema,
     [STANDARD_VALIDATOR_SYMBOL]: normalizedInputSchema.standardValidator,
   };
@@ -580,6 +612,75 @@ async function validateArgsForTool(
   tool: PolyfillToolDescriptor
 ): Promise<string | null> {
   return validateArgsWithStandardSchema(args, tool[STANDARD_VALIDATOR_SYMBOL]);
+}
+
+function isCallToolResult(value: unknown): value is ToolResponse {
+  return isPlainObject(value) && Array.isArray(value.content);
+}
+
+function isJsonPrimitive(value: unknown): value is string | number | boolean | null {
+  return (
+    value === null ||
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  );
+}
+
+function isJsonValue(value: unknown): boolean {
+  if (isJsonPrimitive(value)) {
+    return Number.isFinite(value as number) || typeof value !== 'number';
+  }
+
+  if (Array.isArray(value)) {
+    return value.every((entry) => isJsonValue(entry));
+  }
+
+  if (!isPlainObject(value)) {
+    return false;
+  }
+
+  return Object.values(value).every((entry) => isJsonValue(entry));
+}
+
+function toStructuredContent(value: unknown): JsonObject | undefined {
+  if (!isPlainObject(value) || !isJsonValue(value)) {
+    return undefined;
+  }
+
+  return value as JsonObject;
+}
+
+function serializeTextContent(value: unknown): string {
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  try {
+    const candidate = JSON.stringify(value);
+    return candidate ?? String(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function normalizeToolResponse(value: unknown): ToolResponse {
+  if (isCallToolResult(value)) {
+    return value;
+  }
+
+  const structuredContent = toStructuredContent(value);
+
+  return {
+    content: [
+      {
+        type: 'text',
+        text: serializeTextContent(value),
+      },
+    ],
+    ...(structuredContent ? { structuredContent } : {}),
+    isError: false,
+  };
 }
 
 function getFirstTextBlock(result: ToolResponse): string | null {

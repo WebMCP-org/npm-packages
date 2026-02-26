@@ -1,6 +1,6 @@
 import type {
-  CallToolResult,
   InputSchema,
+  JsonObject,
   ModelContextClient,
   ModelContextCore,
   ModelContextExtensions,
@@ -39,6 +39,74 @@ import { PolyfillJsonSchemaValidator } from './polyfill-validator.js';
 const DEFAULT_INPUT_SCHEMA: InputSchema = { type: 'object', properties: {} };
 const DEFAULT_CLIENT_REQUEST_TIMEOUT = 10_000;
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isCallToolResult(value: unknown): value is ToolResponse {
+  return isPlainObject(value) && Array.isArray(value.content);
+}
+
+function isJsonPrimitive(value: unknown): value is string | number | boolean | null {
+  return (
+    value === null ||
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  );
+}
+
+function isJsonValue(value: unknown): boolean {
+  if (isJsonPrimitive(value)) {
+    return Number.isFinite(value as number) || typeof value !== 'number';
+  }
+
+  if (Array.isArray(value)) {
+    return value.every((entry) => isJsonValue(entry));
+  }
+
+  if (!isPlainObject(value)) {
+    return false;
+  }
+
+  return Object.values(value).every((entry) => isJsonValue(entry));
+}
+
+function toStructuredContent(value: unknown): JsonObject | undefined {
+  if (!isPlainObject(value) || !isJsonValue(value)) {
+    return undefined;
+  }
+
+  return value as JsonObject;
+}
+
+function serializeTextContent(value: unknown): string {
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  try {
+    const candidate = JSON.stringify(value);
+    return candidate ?? String(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function normalizeToolResponse(value: unknown): ToolResponse {
+  if (isCallToolResult(value)) {
+    return value;
+  }
+
+  const structuredContent = toStructuredContent(value);
+
+  return {
+    content: [{ type: 'text', text: serializeTextContent(value) }],
+    ...(structuredContent ? { structuredContent } : {}),
+    isError: false,
+  };
+}
+
 function withDefaultTimeout(options?: RequestOptions): RequestOptions {
   if (options?.signal) return options;
   return { ...options, signal: AbortSignal.timeout(DEFAULT_CLIENT_REQUEST_TIMEOUT) };
@@ -49,7 +117,7 @@ interface ParentRegisteredTool {
   inputSchema?: unknown;
   outputSchema?: unknown;
   annotations?: unknown;
-  handler: (args: Record<string, unknown>, extra: unknown) => Promise<CallToolResult>;
+  handler: (args: Record<string, unknown>, extra: unknown) => Promise<ToolResponse>;
   enabled: boolean;
   remove: () => void;
 }
@@ -81,7 +149,7 @@ export interface BrowserMcpServerOptions extends ServerOptions {
 type ParentRegisterToolFn = (
   name: string,
   config: Record<string, unknown>,
-  cb: (args: Record<string, unknown>, extra: unknown) => Promise<CallToolResult>
+  cb: (args: Record<string, unknown>, extra: unknown) => Promise<ToolResponse>
 ) => void;
 
 type ParentRegisterResourceFn = (
@@ -216,7 +284,11 @@ export class BrowserMcpServer extends BaseMcpServer {
   }
 
   private registerToolInServer(tool: ToolDescriptor): { unregister: () => void } {
-    const inputSchema = tool.inputSchema ?? DEFAULT_INPUT_SCHEMA;
+    const inputSchema = tool.inputSchema
+      ? tool.inputSchema.type === undefined
+        ? ({ type: 'object', ...tool.inputSchema } as InputSchema)
+        : tool.inputSchema
+      : DEFAULT_INPUT_SCHEMA;
 
     // Cast needed: parent expects Zod-compatible schemas, we pass JSON Schema objects.
     (super.registerTool as unknown as ParentRegisterToolFn)(
@@ -231,7 +303,7 @@ export class BrowserMcpServer extends BaseMcpServer {
         const client: ModelContextClient = {
           requestUserInteraction: async (cb: () => Promise<unknown>) => cb(),
         };
-        return tool.execute(args, client);
+        return normalizeToolResponse(await tool.execute(args, client));
       }
     );
     return {

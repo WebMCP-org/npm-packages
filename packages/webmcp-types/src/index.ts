@@ -68,6 +68,8 @@ export type {
   ModelContextClient,
   ToolAnnotations,
   ToolDescriptor,
+  ToolExecuteResult,
+  ToolRawResult,
   ToolDescriptorFromSchema,
   ToolExecutionContext,
   ToolListItem,

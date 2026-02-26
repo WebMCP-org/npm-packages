@@ -1,4 +1,4 @@
-import type { CallToolResult, InputSchema, ToolResponse } from './common.js';
+import type { InputSchema, ToolResponse } from './common.js';
 import type { JsonSchemaForInference, JsonSchemaObject } from './json-schema.js';
 import type { ToolDescriptor, ToolDescriptorFromSchema, ToolListItem } from './tool.js';
 
@@ -81,7 +81,7 @@ export interface ModelContextTestingPolyfillExtensions {
  *
  * Uses `never` for args so descriptors with stricter argument objects remain assignable.
  */
-export type AnyToolDescriptor = ToolDescriptor<never, CallToolResult, string>;
+export type AnyToolDescriptor = ToolDescriptor<never, unknown, string>;
 
 /**
  * Infers argument shape from a tool descriptor.
@@ -205,7 +205,7 @@ export interface ModelContextCore {
   registerTool<
     TInputSchema extends InputSchema,
     TArgs extends Record<string, unknown> = Record<string, unknown>,
-    TResult extends CallToolResult = CallToolResult,
+    TResult = unknown,
     TName extends string = string,
   >(
     tool: ToolDescriptor<TArgs, TResult, TName> & {
@@ -223,7 +223,7 @@ export interface ModelContextCore {
    */
   registerTool<
     TArgs extends Record<string, unknown> = Record<string, unknown>,
-    TResult extends CallToolResult = CallToolResult,
+    TResult = unknown,
     TName extends string = string,
   >(
     tool: Omit<ToolDescriptor<TArgs, TResult, TName>, 'inputSchema'> & {
