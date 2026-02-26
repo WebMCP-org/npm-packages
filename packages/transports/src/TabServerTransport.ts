@@ -150,12 +150,6 @@ export class TabServerTransport implements Transport {
     // Otherwise, use '*' for backwards compatibility with clients that don't do the handshake
     const targetOrigin = this._resolveTargetOrigin(this._clientOrigin);
 
-    if (!this._clientOrigin) {
-      console.debug(
-        '[TabServerTransport] Sending to unknown client origin (backwards compatibility mode)'
-      );
-    }
-
     window.postMessage(
       {
         channel: this._channelId,

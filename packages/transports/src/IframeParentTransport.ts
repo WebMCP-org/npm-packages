@@ -91,7 +91,6 @@ export class IframeParentTransport implements Transport {
       }
 
       if (typeof payload === 'string' && payload === 'mcp-server-stopped') {
-        console.log('[IframeParentTransport] Received mcp-server-stopped event, closing transport');
         this.close();
         return;
       }

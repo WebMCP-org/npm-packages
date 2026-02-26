@@ -267,7 +267,7 @@ export class ExtensionClientTransport implements Transport {
 
     // Check if we've exceeded max attempts
     if (this._reconnectAttempts >= this._maxReconnectAttempts) {
-      console.error('Maximum reconnection attempts reached');
+      console.warn('[ExtensionClientTransport] Maximum reconnection attempts reached');
       this._isReconnecting = false;
       this.onerror?.(new Error('Maximum reconnection attempts reached'));
       this.onclose?.();
@@ -276,8 +276,8 @@ export class ExtensionClientTransport implements Transport {
 
     this._reconnectAttempts++;
 
-    console.log(
-      `Scheduling reconnection attempt ${this._reconnectAttempts}/${this._maxReconnectAttempts} in ${this._currentReconnectDelay}ms`
+    console.debug(
+      `[ExtensionClientTransport] Scheduling reconnection attempt ${this._reconnectAttempts}/${this._maxReconnectAttempts} in ${this._currentReconnectDelay}ms`
     );
 
     this._reconnectTimer = setTimeout(() => {
@@ -312,10 +312,10 @@ export class ExtensionClientTransport implements Transport {
       // Attempt to connect
       await this._connect();
 
-      console.log('Reconnection successful');
+      console.debug('[ExtensionClientTransport] Reconnection successful');
       this._isReconnecting = false;
     } catch (error) {
-      console.error('Reconnection failed:', error);
+      console.warn('[ExtensionClientTransport] Reconnection failed, retrying', error);
 
       // Schedule another attempt
       this._scheduleReconnect();
