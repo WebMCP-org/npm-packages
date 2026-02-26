@@ -453,7 +453,7 @@ describe('RelayBridgeServer', () => {
     }
   });
 
-  it('rejects start() when the port is already in use', async () => {
+  it('switches to client mode when the port is already in use', async () => {
     const bridge1 = new RelayBridgeServer({
       host: '127.0.0.1',
       port: 0,
@@ -461,6 +461,7 @@ describe('RelayBridgeServer', () => {
     });
 
     await bridge1.start();
+    expect(bridge1.mode).toBe('server');
     const usedPort = bridge1.port;
 
     const bridge2 = new RelayBridgeServer({
@@ -469,8 +470,10 @@ describe('RelayBridgeServer', () => {
       allowedOrigins: ['*'],
     });
 
-    await expect(bridge2.start()).rejects.toThrow(/EADDRINUSE/);
+    await bridge2.start();
+    expect(bridge2.mode).toBe('client');
 
+    await bridge2.stop();
     await bridge1.stop();
   });
 
@@ -505,8 +508,11 @@ describe('RelayBridgeServer', () => {
 
       const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
       const source = bridge.registry.listSources()[0];
+      if (!source) {
+        throw new Error('Expected source to be registered');
+      }
 
-      const result = await bridge.invokeTool(toolName, {}, { sourceId: source?.sourceId });
+      const result = await bridge.invokeTool(toolName, {}, { sourceId: source.sourceId });
       const text = (result.content?.[0] as { text?: string } | undefined)?.text;
       expect(text).toBe('ok-src');
 
@@ -651,6 +657,71 @@ describe('RelayBridgeServer', () => {
     }
   });
 
+  it('sends reload to the correct browser source', async () => {
+    const bridge = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+    });
+
+    try {
+      await bridge.start();
+
+      const ws = await connectAndRegister(bridge, {
+        tabId: 'tab-1',
+        url: 'https://example.com',
+        tools: [{ name: 'echo', description: 'Echo tool' }],
+      });
+
+      const source = await waitFor(() => bridge.registry.listSources()[0]);
+
+      const received = new Promise<{ type: string }>((resolve) => {
+        ws.on('message', (raw) => {
+          const msg = JSON.parse(String(raw));
+          if (msg.type === 'reload') {
+            resolve(msg);
+          }
+        });
+      });
+
+      bridge.reloadSource(source.sourceId);
+
+      const msg = await received;
+      expect(msg.type).toBe('reload');
+
+      ws.close();
+    } finally {
+      await bridge.stop();
+    }
+  });
+
+  it('throws when reloading a disconnected source', async () => {
+    const bridge = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+    });
+
+    try {
+      await bridge.start();
+
+      const ws = await connectAndRegister(bridge, {
+        tabId: 'tab-1',
+        url: 'https://example.com',
+        tools: [{ name: 'echo' }],
+      });
+
+      const source = await waitFor(() => bridge.registry.listSources()[0]);
+
+      ws.close();
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(() => bridge.reloadSource(source.sourceId)).toThrow(/not connected/i);
+    } finally {
+      await bridge.stop();
+    }
+  });
+
   it('updates registry when tools/changed replaces initial tools', async () => {
     const bridge = new RelayBridgeServer({
       host: '127.0.0.1',
@@ -734,6 +805,339 @@ describe('RelayBridgeServer', () => {
       ws.close();
     } finally {
       await bridge.stop();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Client mode (relay-to-relay) integration tests
+// ---------------------------------------------------------------------------
+
+describe('RelayBridgeServer client mode', () => {
+  it('receives tools from the server relay via relay/tools', async () => {
+    const server = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+    });
+
+    try {
+      await server.start();
+      expect(server.mode).toBe('server');
+
+      // Connect a browser source with tools to the server
+      const ws = await connectAndRegister(server, {
+        tabId: 'tab-1',
+        url: 'https://example.com',
+        tools: [
+          { name: 'echo', description: 'Echo tool' },
+          { name: 'greet', description: 'Greeting tool' },
+        ],
+      });
+
+      // Wait for tools to appear in the registry
+      await waitFor(() => (server.registry.listTools().length >= 2 ? true : undefined));
+
+      // Start a client relay pointing at the server's port
+      const client = new RelayBridgeServer({
+        host: '127.0.0.1',
+        port: server.port,
+        allowedOrigins: ['*'],
+      });
+
+      await client.start();
+      expect(client.mode).toBe('client');
+
+      // Wait for the client to receive tool data
+      const clientTools = await waitFor(() => {
+        const tools = client.listToolsFromRelay();
+        return tools.length >= 2 ? tools : undefined;
+      });
+
+      expect(clientTools.some((t) => t.name.includes('echo'))).toBe(true);
+      expect(clientTools.some((t) => t.name.includes('greet'))).toBe(true);
+
+      ws.close();
+      await client.stop();
+    } finally {
+      await server.stop();
+    }
+  });
+
+  it('proxies tool invocations through the server relay', async () => {
+    const server = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+      invokeTimeoutMs: 2000,
+    });
+
+    try {
+      await server.start();
+
+      // Connect a browser source with a tool
+      const ws = await connectAndRegister(server, {
+        tabId: 'tab-1',
+        url: 'https://example.com',
+        tools: [{ name: 'echo', description: 'Echo tool' }],
+      });
+
+      // Set up browser source to respond to invocations
+      ws.on('message', (raw) => {
+        const msg = JSON.parse(String(raw));
+        if (msg.type !== 'invoke') return;
+        ws.send(
+          JSON.stringify({
+            type: 'result',
+            callId: msg.callId,
+            result: {
+              content: [{ type: 'text', text: `Echo:${msg.args?.message ?? ''}` }],
+            },
+          })
+        );
+      });
+
+      await waitFor(() => (server.registry.listTools().length >= 1 ? true : undefined));
+
+      // Start client relay
+      const client = new RelayBridgeServer({
+        host: '127.0.0.1',
+        port: server.port,
+        allowedOrigins: ['*'],
+        invokeTimeoutMs: 2000,
+      });
+
+      await client.start();
+      expect(client.mode).toBe('client');
+
+      // Wait for tools to arrive at the client
+      const clientTools = await waitFor(() => {
+        const tools = client.listToolsFromRelay();
+        return tools.length >= 1 ? tools : undefined;
+      });
+      const firstClientTool = clientTools[0];
+      if (!firstClientTool) {
+        throw new Error('Expected at least one relayed tool');
+      }
+
+      // Invoke the tool through the client relay
+      const toolName = firstClientTool.name;
+      const result = await client.invokeTool(toolName, { message: 'hello' });
+      const text = (result.content?.[0] as { text?: string } | undefined)?.text;
+      expect(text).toBe('Echo:hello');
+
+      ws.close();
+      await client.stop();
+    } finally {
+      await server.stop();
+    }
+  });
+
+  it('receives tools-changed pushes from the server relay', async () => {
+    const server = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+    });
+
+    try {
+      await server.start();
+
+      // Connect browser source with initial tools
+      const ws = await connectAndRegister(server, {
+        tabId: 'tab-1',
+        url: 'https://example.com',
+        tools: [{ name: 'tool_a', description: 'Tool A' }],
+      });
+
+      await waitFor(() => (server.registry.listTools().length >= 1 ? true : undefined));
+
+      // Start client relay
+      const client = new RelayBridgeServer({
+        host: '127.0.0.1',
+        port: server.port,
+        allowedOrigins: ['*'],
+      });
+
+      await client.start();
+      expect(client.mode).toBe('client');
+
+      // Wait for initial tool list
+      await waitFor(() => {
+        const tools = client.listToolsFromRelay();
+        return tools.length >= 1 ? true : undefined;
+      });
+
+      // Send tools/changed from browser, replacing tool_a with tool_b
+      ws.send(
+        JSON.stringify({
+          type: 'tools/changed',
+          tools: [{ name: 'tool_b', description: 'Tool B' }],
+        })
+      );
+
+      // Wait for client to receive the updated tools
+      const updatedTools = await waitFor(() => {
+        const tools = client.listToolsFromRelay();
+        const hasB = tools.some((t) => t.name.includes('tool_b'));
+        return hasB ? tools : undefined;
+      });
+
+      expect(updatedTools.some((t) => t.name.includes('tool_a'))).toBe(false);
+      expect(updatedTools.some((t) => t.name.includes('tool_b'))).toBe(true);
+
+      ws.close();
+      await client.stop();
+    } finally {
+      await server.stop();
+    }
+  });
+
+  it('rejects invocations when not connected to the server relay', async () => {
+    const server = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+    });
+
+    try {
+      await server.start();
+
+      const client = new RelayBridgeServer({
+        host: '127.0.0.1',
+        port: server.port,
+        allowedOrigins: ['*'],
+        invokeTimeoutMs: 500,
+      });
+
+      await client.start();
+      expect(client.mode).toBe('client');
+
+      // Stop the server to break the connection
+      await server.stop();
+      // Wait for the client's close event to fire
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      await expect(client.invokeTool('some_tool', {})).rejects.toThrow(
+        /Not connected to relay server/
+      );
+
+      await client.stop();
+    } finally {
+      // server already stopped
+    }
+  });
+
+  it('returns empty tools from listToolsFromRelay when in server mode', async () => {
+    const bridge = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+    });
+
+    try {
+      await bridge.start();
+      expect(bridge.mode).toBe('server');
+      expect(bridge.listToolsFromRelay()).toEqual([]);
+    } finally {
+      await bridge.stop();
+    }
+  });
+
+  it('promotes from client to server mode when the server disappears', async () => {
+    const server = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+    });
+
+    try {
+      await server.start();
+      expect(server.mode).toBe('server');
+      const port = server.port;
+
+      // Start client pointing at the server
+      const client = new RelayBridgeServer({
+        host: '127.0.0.1',
+        port,
+        allowedOrigins: ['*'],
+      });
+
+      await client.start();
+      expect(client.mode).toBe('client');
+
+      // Kill the server — client should eventually promote to server
+      await server.stop();
+
+      // Wait for the client to become a server
+      await waitFor(() => (client.mode === 'server' ? true : undefined), 5000);
+      expect(client.mode).toBe('server');
+      expect(client.port).toBe(port);
+
+      // Verify the promoted server accepts browser connections
+      const ws = await connectAndRegister(client, {
+        tabId: 'promoted-tab',
+        url: 'https://example.com',
+        tools: [{ name: 'promoted_tool', description: 'Tool after promotion' }],
+      });
+
+      await waitFor(() => (client.registry.listTools().length >= 1 ? true : undefined));
+      expect(client.registry.listTools().some((t) => t.name === 'promoted_tool')).toBe(true);
+
+      ws.close();
+      await client.stop();
+    } finally {
+      await server.stop().catch(() => {});
+    }
+  });
+
+  it('cleans up pending client invocations on stop', async () => {
+    const server = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+    });
+
+    try {
+      await server.start();
+
+      // Connect a browser source that never responds
+      await connectAndRegister(server, {
+        tabId: 'tab-1',
+        url: 'https://example.com',
+        tools: [{ name: 'hang_tool' }],
+      });
+
+      await waitFor(() => (server.registry.listTools().length >= 1 ? true : undefined));
+
+      const client = new RelayBridgeServer({
+        host: '127.0.0.1',
+        port: server.port,
+        allowedOrigins: ['*'],
+        invokeTimeoutMs: 5000,
+      });
+
+      await client.start();
+      expect(client.mode).toBe('client');
+
+      const clientTools = await waitFor(() => {
+        const tools = client.listToolsFromRelay();
+        return tools.length >= 1 ? tools : undefined;
+      });
+      const firstClientTool = clientTools[0];
+      if (!firstClientTool) {
+        throw new Error('Expected at least one relayed tool');
+      }
+
+      // Start an invocation that will never complete
+      const invokePromise = client.invokeTool(firstClientTool.name, {});
+
+      // Stop the client — should reject the pending invocation
+      await client.stop();
+
+      await expect(invokePromise).rejects.toThrow(/Relay client stopped/);
+    } finally {
+      await server.stop();
     }
   });
 });
