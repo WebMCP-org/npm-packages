@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 import type { InputSchema } from '@mcp-b/webmcp-types';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -395,10 +396,53 @@ describe('@mcp-b/webmcp-polyfill', () => {
       expect(tools).toHaveLength(1);
       const schema = tools?.[0]?.inputSchema;
       expect(schema).toBeDefined();
-      if (!schema) {
-        throw new Error('Expected no_schema tool to include an input schema');
-      }
-      expect(JSON.parse(schema)).toEqual({ type: 'object', properties: {} });
+      expect(JSON.parse(schema ?? '{}')).toEqual({ type: 'object', properties: {} });
+    });
+
+    it('defaults inputSchema.type to object when schema omits root type', async () => {
+      initializeWebMCPPolyfill();
+      navigator.modelContext.registerTool({
+        name: 'implicit_object_schema',
+        description: 'Implicit object schema tool',
+        inputSchema: {
+          properties: {
+            query: { type: 'string' },
+          },
+          required: ['query'],
+        },
+        execute: async ({ query }) => ({ content: [{ type: 'text', text: String(query) }] }),
+      });
+
+      const tools = navigator.modelContextTesting?.listTools();
+      expect(tools).toHaveLength(1);
+      expect(JSON.parse(tools?.[0]?.inputSchema ?? '{}')).toEqual({
+        type: 'object',
+        properties: { query: { type: 'string' } },
+        required: ['query'],
+      });
+
+      await expect(
+        navigator.modelContextTesting?.executeTool('implicit_object_schema', '{}')
+      ).rejects.toThrow('Instance does not have required property "query"');
+    });
+
+    it('accepts annotation boolean strings during tool registration', async () => {
+      initializeWebMCPPolyfill();
+      navigator.modelContext.registerTool({
+        name: 'annotation_coercion',
+        description: 'Annotation coercion tool',
+        annotations: {
+          readOnlyHint: 'true',
+          destructiveHint: 'false',
+          openWorldHint: 'true',
+          idempotentHint: 'false',
+        },
+        execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+      });
+
+      await expect(
+        navigator.modelContextTesting?.executeTool('annotation_coercion', '{}')
+      ).resolves.toContain('ok');
     });
 
     it('accepts Standard Schema validators for input validation', async () => {
@@ -1351,11 +1395,40 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
       const result = await navigator.modelContextTesting?.executeTool('normal_tool', '{}');
       expect(result).toBeDefined();
-      if (!result) {
-        throw new Error('Expected normal_tool to return a serialized result');
-      }
-      const parsed = JSON.parse(result);
+      const parsed = JSON.parse(result ?? '{}');
       expect(parsed.content[0].text).toBe('hello');
+    });
+
+    it('executeTool wraps raw object returns into content and structuredContent', async () => {
+      initializeWebMCPPolyfill();
+      navigator.modelContext.registerTool({
+        name: 'raw_object_tool',
+        description: 'Raw object tool',
+        execute: async () => ({ ok: true, nested: { count: 2 } }),
+      });
+
+      const result = await navigator.modelContextTesting?.executeTool('raw_object_tool', '{}');
+      const parsed = JSON.parse(result ?? '{}');
+      expect(parsed.isError).toBe(false);
+      expect(parsed.content?.[0]?.type).toBe('text');
+      expect(parsed.structuredContent).toEqual({ ok: true, nested: { count: 2 } });
+    });
+
+    it('executeTool does not set structuredContent for non-json-safe objects', async () => {
+      initializeWebMCPPolyfill();
+      navigator.modelContext.registerTool({
+        name: 'non_json_structured_content_tool',
+        description: 'Non JSON structured content tool',
+        execute: async () => ({ value: Number.NaN }),
+      });
+
+      const result = await navigator.modelContextTesting?.executeTool(
+        'non_json_structured_content_tool',
+        '{}'
+      );
+      const parsed = JSON.parse(result ?? '{}');
+      expect(parsed.content?.[0]?.type).toBe('text');
+      expect(parsed.structuredContent).toBeUndefined();
     });
 
     it('registerToolsChangedCallback throws when callback is not a function', () => {
@@ -1836,7 +1909,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
       ).rejects.toThrow('Tool was executed but the invocation failed');
     });
 
-    it('handles isError=true with no content array', async () => {
+    it('treats malformed isError payloads as raw return values', async () => {
       initializeWebMCPPolyfill();
       navigator.modelContext.registerTool({
         name: 'no_content_error_tool',
@@ -1847,9 +1920,14 @@ describe('@mcp-b/webmcp-polyfill', () => {
         }),
       });
 
-      await expect(
-        navigator.modelContextTesting?.executeTool('no_content_error_tool', '{}')
-      ).rejects.toThrow('Tool was executed but the invocation failed');
+      const result = await navigator.modelContextTesting?.executeTool(
+        'no_content_error_tool',
+        '{}'
+      );
+      const parsed = JSON.parse(result ?? '{}');
+      expect(parsed.isError).toBe(false);
+      expect(parsed.content?.[0]?.type).toBe('text');
+      expect(parsed.structuredContent).toBeUndefined();
     });
 
     it('handles metadata.willNavigate=false (does not return null)', async () => {

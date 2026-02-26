@@ -1,5 +1,4 @@
 import { initializeWebModelContext } from '@mcp-b/global';
-import type { ModelContextTesting } from '@mcp-b/webmcp-types';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
 import { useElicitation, useElicitationHandler } from './useElicitationHandler.js';

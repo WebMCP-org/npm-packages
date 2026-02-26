@@ -24,10 +24,10 @@ test('ToolDescriptor has required fields', () => {
   expectTypeOf<ToolDescriptor>().toHaveProperty('execute');
 });
 
-test('ToolDescriptor.execute accepts Record and returns MaybePromise<CallToolResult>', () => {
+test('ToolDescriptor.execute accepts Record and returns MaybePromise<unknown> by default', () => {
   expectTypeOf<ToolDescriptor['execute']>().parameter(0).toEqualTypeOf<Record<string, unknown>>();
   expectTypeOf<ToolDescriptor['execute']>().parameter(1).toEqualTypeOf<ModelContextClient>();
-  expectTypeOf<ToolDescriptor['execute']>().returns.toEqualTypeOf<MaybePromise<CallToolResult>>();
+  expectTypeOf<ToolDescriptor['execute']>().returns.toEqualTypeOf<MaybePromise<unknown>>();
 });
 
 test('ToolExecutionContext.elicitInput accepts ElicitationParams and returns ElicitationResult', () => {
@@ -157,8 +157,10 @@ test('ToolDescriptor.annotations is optional ToolAnnotations', () => {
 test('ToolAnnotations has optional behavioral hints', () => {
   expectTypeOf<ToolAnnotations>().toMatchTypeOf<{
     title?: string;
-    destructiveHint?: boolean;
-    readOnlyHint?: boolean;
+    destructiveHint?: boolean | 'true' | 'false';
+    readOnlyHint?: boolean | 'true' | 'false';
+    idempotentHint?: boolean | 'true' | 'false';
+    openWorldHint?: boolean | 'true' | 'false';
   }>();
 });
 

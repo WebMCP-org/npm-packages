@@ -28,7 +28,7 @@ export interface InputSchemaProperty {
   /**
    * JSON Schema type for this property.
    */
-  type: string;
+  type?: string;
 
   /**
    * Human-readable description of the property.
@@ -50,7 +50,7 @@ export interface InputSchema {
   /**
    * JSON Schema type for the root value (usually `'object'` for tool args).
    */
-  type: string;
+  type?: string;
 
   /**
    * Property definitions for object schemas.
