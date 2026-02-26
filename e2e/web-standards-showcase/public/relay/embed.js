@@ -17,6 +17,9 @@
   const FALLBACK_WIDGET_URL =
     'https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay/dist/browser/widget.html';
 
+  /** @type {Window | null} */
+  var widgetWindow = null;
+
   /**
    * @returns {HTMLScriptElement | null}
    */
@@ -189,6 +192,62 @@
     return null;
   }
 
+  var pushScheduled = false;
+
+  /**
+   * Coalesced handler for tool change events.
+   * Uses flag + setTimeout(0) to batch rapid registrations into a single push.
+   */
+  function onToolsChanged() {
+    if (pushScheduled || !widgetWindow) return;
+    pushScheduled = true;
+    setTimeout(function pushToolsChangedToWidget() {
+      pushScheduled = false;
+      if (!widgetWindow) return;
+      var bridge = getToolBridge();
+      var toolsPromise = bridge ? Promise.resolve(bridge.listTools()) : Promise.resolve([]);
+      toolsPromise
+        .then((tools) => {
+          if (!widgetWindow) return;
+          widgetWindow.postMessage(
+            {
+              type: 'webmcp.tools.changed',
+              tools: Array.isArray(tools) ? tools : [],
+            },
+            config.widgetOrigin
+          );
+        })
+        .catch((err) => {
+          console.warn('[webmcp-relay-embed] Failed to push tool changes:', err);
+        });
+    }, 0);
+  }
+
+  /**
+   * Subscribes to modelContext tool change events.
+   * Tries addEventListener first (future native EventTarget support),
+   * falls back to registerToolsChangedCallback on modelContextTesting.
+   */
+  function subscribeToToolChanges() {
+    var mc = navigator.modelContext;
+    if (mc && typeof mc.addEventListener === 'function') {
+      try {
+        mc.addEventListener('toolschanged', onToolsChanged);
+        return;
+      } catch (_e) {
+        /* BrowserMcpServer doesn't extend EventTarget — fall through */
+      }
+    }
+    var testing = navigator.modelContextTesting;
+    if (testing && typeof testing.registerToolsChangedCallback === 'function') {
+      try {
+        testing.registerToolsChangedCallback(onToolsChanged);
+      } catch (e) {
+        console.warn('[webmcp-relay-embed] Failed to subscribe to tool changes:', e);
+      }
+    }
+  }
+
   /**
    * @param {MessageEventSource | null} source
    * @param {string} origin
@@ -308,6 +367,9 @@
     iframe.setAttribute('aria-hidden', 'true');
     iframe.setAttribute('data-webmcp-relay', '1');
     document.body.appendChild(iframe);
+    iframe.addEventListener('load', () => {
+      widgetWindow = iframe.contentWindow;
+    });
   }
 
   if (document.querySelector(RELAY_IFRAME_SELECTOR)) {
@@ -341,4 +403,6 @@
   } else {
     document.addEventListener('DOMContentLoaded', () => injectRelayWidget(config), { once: true });
   }
+
+  subscribeToToolChanges();
 })();
