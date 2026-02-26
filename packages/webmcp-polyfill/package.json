@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/webmcp-polyfill",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Strict WebMCP core runtime polyfill for navigator.modelContext",
   "keywords": [
     "webmcp",
