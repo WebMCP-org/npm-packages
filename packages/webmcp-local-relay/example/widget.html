@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>WebMCP Relay Widget</title>
+  </head>
+  <body>
+    <script>
+      /**
+       * Relay widget runtime. Runs inside a hidden iframe and proxies tool messages
+       * between the host page (`postMessage`) and the local relay socket.
+       *
+       * Security: The iframe boundary provides origin isolation. All postMessage
+       * exchanges validate `event.origin` against the host page's origin to prevent
+       * cross-origin message injection.
+       *
+       * @typedef {{ [key: string]: unknown }} JsonObject
+       * @typedef {{ requestId: string; type: string; tools?: unknown; result?: unknown; error?: unknown }} HostMessage
+       * @typedef {{ resolve: (value: HostMessage) => void; reject: (reason: Error) => void; timeoutId: number; responseType: string; errorType: string }} PendingRequest
+       * @typedef {{ hostOrigin: string; hostUrl: string; hostTitle: string; tabId: string; wsUrl: string }} WidgetConfig
+       */
+      (() => {
+        'use strict';
+
+        const RECONNECT_INITIAL_DELAY_MS = 500;
+        const RECONNECT_MAX_DELAY_MS = 8000;
+        const REQUEST_TIMEOUT_MS = 10000;
+        const params = new URLSearchParams(window.location.search);
+
+        /** @returns {string} */
+        function createRequestId() {
+          if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+            return crypto.randomUUID();
+          }
+          return String(Date.now() + Math.random());
+        }
+
+        /**
+         * @param {unknown} value
+         * @returns {value is JsonObject}
+         */
+        function isJsonObject(value) {
+          return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+        }
+
+        /**
+         * @param {string} host
+         * @returns {boolean}
+         */
+        function isLoopback(host) {
+          return host === '127.0.0.1' || host === 'localhost' || host === '::1' || host === '[::1]';
+        }
+
+        /** @returns {WidgetConfig | null} */
+        function parseConfig() {
+          const hostOrigin = params.get('hostOrigin');
+          if (!hostOrigin) {
+            return null;
+          }
+
+          const hostUrl = params.get('hostUrl') || hostOrigin;
+          const hostTitle = params.get('hostTitle') || '';
+          const tabId = params.get('tabId') || createRequestId();
+          const relayHost = params.get('relayHost') || '127.0.0.1';
+          const relayPort = params.get('relayPort') || '9333';
+
+          if (!isLoopback(relayHost)) {
+            console.error('[webmcp-relay-widget] relayHost must be a loopback address, got:', relayHost);
+            return null;
+          }
+
+          return { hostOrigin, hostUrl, hostTitle, tabId, wsUrl: `ws://${relayHost}:${relayPort}` };
+        }
+
+        /**
+         * @param {unknown} value
+         * @returns {HostMessage | null}
+         */
+        function parseHostMessage(value) {
+          if (!isJsonObject(value) || typeof value.requestId !== 'string' || typeof value.type !== 'string') {
+            return null;
+          }
+          return {
+            requestId: value.requestId,
+            type: value.type,
+            tools: value.tools,
+            result: value.result,
+            error: value.error,
+          };
+        }
+
+        /**
+         * Sends data through a WebSocket, catching errors from closed/closing states.
+         * @param {WebSocket} ws
+         * @param {string} data
+         */
+        function safeSend(ws, data) {
+          try {
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(data);
+            }
+          } catch (err) {
+            console.warn('[webmcp-relay-widget] Failed to send message:', err);
+          }
+        }
+
+        const config = parseConfig();
+        if (!config) {
+          console.warn('[webmcp-relay-widget] Missing required hostOrigin parameter. Widget will not start.');
+          return;
+        }
+
+        /** @type {Map<string, PendingRequest>} */
+        const pendingRequests = new Map();
+        let reconnectDelayMs = RECONNECT_INITIAL_DELAY_MS;
+        let reconnectAttempts = 0;
+        /** @type {WebSocket | null} */
+        let activeSocket = null;
+        let helloSent = false;
+
+        window.addEventListener('message', (event) => {
+          if (event.origin !== config.hostOrigin) {
+            return;
+          }
+
+          const data = event.data;
+          if (isJsonObject(data) && data.type === 'webmcp.tools.changed') {
+            if (activeSocket && helloSent) {
+              safeSend(
+                activeSocket,
+                JSON.stringify({
+                  type: 'tools/changed',
+                  tools: Array.isArray(data.tools) ? data.tools : [],
+                })
+              );
+            }
+            return;
+          }
+
+          const message = parseHostMessage(data);
+          if (!message) {
+            return;
+          }
+
+          const pending = pendingRequests.get(message.requestId);
+          if (!pending) {
+            return;
+          }
+
+          if (message.type === pending.responseType) {
+            clearTimeout(pending.timeoutId);
+            pendingRequests.delete(message.requestId);
+            pending.resolve(message);
+            return;
+          }
+
+          if (message.type === pending.errorType) {
+            clearTimeout(pending.timeoutId);
+            pendingRequests.delete(message.requestId);
+            pending.reject(new Error(String(message.error || 'Unknown host error')));
+          }
+        });
+
+        /**
+         * @param {string} baseType
+         * @param {JsonObject} payload
+         * @returns {Promise<HostMessage>}
+         */
+        function requestHost(baseType, payload) {
+          const requestId = createRequestId();
+
+          return new Promise((resolve, reject) => {
+            const timeoutId = setTimeout(() => {
+              pendingRequests.delete(requestId);
+              reject(new Error(`Host response timeout: ${baseType}`));
+            }, REQUEST_TIMEOUT_MS);
+
+            pendingRequests.set(requestId, {
+              resolve,
+              reject,
+              timeoutId,
+              responseType: `${baseType}.response`,
+              errorType: `${baseType}.error`,
+            });
+
+            window.parent.postMessage(
+              { type: `${baseType}.request`, requestId, ...payload },
+              config.hostOrigin
+            );
+          });
+        }
+
+        /** @param {WebSocket} socket */
+        function sendHelloAndTools(socket) {
+          requestHost('webmcp.tools.list', {})
+            .then((message) => {
+              const tools = Array.isArray(message.tools) ? message.tools : [];
+              safeSend(
+                socket,
+                JSON.stringify({
+                  type: 'hello',
+                  tabId: config.tabId,
+                  origin: config.hostOrigin,
+                  url: config.hostUrl,
+                  title: config.hostTitle || document.referrer || 'Unknown page',
+                })
+              );
+              safeSend(socket, JSON.stringify({ type: 'tools/list', tools }));
+              helloSent = true;
+            })
+            .catch((error) => {
+              console.warn('[webmcp-relay-widget] Hello handshake failed:', error);
+              socket.close();
+            });
+        }
+
+        /**
+         * @param {WebSocket} socket
+         * @param {unknown} rawMessage
+         */
+        function handleRelayMessage(socket, rawMessage) {
+          let relayMessage;
+          try {
+            relayMessage = JSON.parse(String(rawMessage));
+          } catch (parseError) {
+            console.warn('[webmcp-relay-widget] Failed to parse relay message:', parseError);
+            return;
+          }
+
+          if (!isJsonObject(relayMessage) || typeof relayMessage.type !== 'string') {
+            console.debug('[webmcp-relay-widget] Ignoring non-object or untyped relay message');
+            return;
+          }
+
+          if (relayMessage.type === 'ping') {
+            safeSend(socket, JSON.stringify({ type: 'pong' }));
+            return;
+          }
+
+          if (relayMessage.type === 'reload') {
+            window.parent.postMessage({ type: 'webmcp.reload' }, config.hostOrigin);
+            return;
+          }
+
+          if (relayMessage.type !== 'invoke') {
+            console.debug('[webmcp-relay-widget] Ignoring unrecognized message type:', relayMessage.type);
+            return;
+          }
+
+          requestHost('webmcp.tools.invoke', {
+            toolName: relayMessage.toolName,
+            args: isJsonObject(relayMessage.args) ? relayMessage.args : {},
+          })
+            .then((hostResponse) => {
+              safeSend(
+                socket,
+                JSON.stringify({
+                  type: 'result',
+                  callId: relayMessage.callId,
+                  result: hostResponse.result,
+                })
+              );
+            })
+            .catch((error) => {
+              safeSend(
+                socket,
+                JSON.stringify({
+                  type: 'result',
+                  callId: relayMessage.callId,
+                  result: {
+                    isError: true,
+                    content: [
+                      {
+                        type: 'text',
+                        text: String(error instanceof Error ? error.message : error),
+                      },
+                    ],
+                  },
+                })
+              );
+            });
+        }
+
+        function connect() {
+          const socket = new WebSocket(config.wsUrl);
+          activeSocket = socket;
+
+          socket.addEventListener('open', () => {
+            reconnectDelayMs = RECONNECT_INITIAL_DELAY_MS;
+            reconnectAttempts = 0;
+            sendHelloAndTools(socket);
+          });
+
+          socket.addEventListener('message', (event) => {
+            handleRelayMessage(socket, event.data);
+          });
+
+          socket.addEventListener('close', () => {
+            helloSent = false;
+            activeSocket = null;
+
+            for (const [requestId, pending] of pendingRequests) {
+              clearTimeout(pending.timeoutId);
+              pendingRequests.delete(requestId);
+              pending.reject(new Error('WebSocket connection lost'));
+            }
+
+            reconnectAttempts++;
+            if (reconnectAttempts % 10 === 0) {
+              console.warn(
+                `[webmcp-relay-widget] Still reconnecting after ${reconnectAttempts} attempts (delay: ${reconnectDelayMs}ms)`
+              );
+            }
+            setTimeout(connect, reconnectDelayMs);
+            reconnectDelayMs = Math.min(reconnectDelayMs * 1.5, RECONNECT_MAX_DELAY_MS);
+          });
+
+          socket.addEventListener('error', (event) => {
+            console.warn('[webmcp-relay-widget] WebSocket error:', event);
+            try {
+              socket.close();
+            } catch (closeErr) {
+              console.warn('[webmcp-relay-widget] Error closing socket after error:', closeErr);
+            }
+          });
+        }
+
+        connect();
+      })();
+    </script>
+  </body>
+</html>
