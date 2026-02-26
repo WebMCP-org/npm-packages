@@ -106,6 +106,8 @@ export class RelayBridgeServer extends EventEmitter {
    * Maximum delay for relay-to-relay reconnection backoff in client mode.
    */
   private readonly clientMaxReconnectDelay = 3_000;
+  private readonly clientMaxReconnectAttempts = 100;
+  private clientReconnectAttempts = 0;
   private readonly clientPendingInvocations = new Map<string, PendingInvocation>();
   private clientTools: RelayTool[] = [];
   private stopping = false;
@@ -122,6 +124,18 @@ export class RelayBridgeServer extends EventEmitter {
     this.allowedOrigins = options.allowedOrigins ?? ['*'];
     this.maxPayloadBytes = options.maxPayloadBytes ?? 1_000_000;
     this.invokeTimeoutMs = options.invokeTimeoutMs ?? 25_000;
+
+    if (this.desiredPort !== 0 && (this.desiredPort < 1 || this.desiredPort > 65535)) {
+      throw new Error(
+        `Invalid port ${this.desiredPort}. Port must be 0 (auto-assign) or between 1 and 65535.`
+      );
+    }
+    if (this.maxPayloadBytes <= 0) {
+      throw new Error(`Invalid maxPayloadBytes ${this.maxPayloadBytes}. Must be greater than 0.`);
+    }
+    if (this.invokeTimeoutMs <= 0) {
+      throw new Error(`Invalid invokeTimeoutMs ${this.invokeTimeoutMs}. Must be greater than 0.`);
+    }
   }
 
   /**
@@ -432,10 +446,10 @@ export class RelayBridgeServer extends EventEmitter {
     let parsedJson: unknown;
     try {
       parsedJson = JSON.parse(text);
-    } catch {
+    } catch (err) {
       const preview = text.length > 200 ? `${text.slice(0, 200)}...` : text;
       process.stderr.write(
-        `[webmcp-local-relay] warn: invalid JSON from connection ${connectionId}: ${preview}\n`
+        `[webmcp-local-relay] warn: invalid JSON from connection ${connectionId} (${err instanceof Error ? err.message : 'parse error'}): ${preview}\n`
       );
       return;
     }
@@ -471,8 +485,14 @@ export class RelayBridgeServer extends EventEmitter {
 
     switch (message.type) {
       case 'hello':
-        this.registry.upsertSource(connectionId, message);
-        this.emit('stateChanged');
+        try {
+          this.registry.upsertSource(connectionId, message);
+          this.emit('stateChanged');
+        } catch (err) {
+          process.stderr.write(
+            `[webmcp-local-relay] error: failed to process hello from connection ${connectionId}: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`
+          );
+        }
         break;
 
       case 'tools/list':
@@ -700,10 +720,10 @@ export class RelayBridgeServer extends EventEmitter {
       let parsed: unknown;
       try {
         parsed = JSON.parse(text);
-      } catch {
+      } catch (err) {
         const preview = text.length > 200 ? `${text.slice(0, 200)}...` : text;
         process.stderr.write(
-          `[webmcp-local-relay] warn: invalid JSON from relay server: ${preview}\n`
+          `[webmcp-local-relay] warn: invalid JSON from relay server (${err instanceof Error ? err.message : 'parse error'}): ${preview}\n`
         );
         return;
       }
@@ -772,6 +792,14 @@ export class RelayBridgeServer extends EventEmitter {
       return;
     }
 
+    this.clientReconnectAttempts++;
+    if (this.clientReconnectAttempts >= this.clientMaxReconnectAttempts) {
+      process.stderr.write(
+        `[webmcp-local-relay] error: giving up reconnection after ${this.clientReconnectAttempts} attempts\n`
+      );
+      return;
+    }
+
     const delay = this.clientReconnectDelay;
     this.clientReconnectDelay = Math.min(
       this.clientReconnectDelay * 1.5,
@@ -784,7 +812,14 @@ export class RelayBridgeServer extends EventEmitter {
         return;
       }
 
-      void this.reconnectWithModePromotion();
+      void this.reconnectWithModePromotion().catch((err) => {
+        process.stderr.write(
+          `[webmcp-local-relay] error: unexpected failure during reconnection: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`
+        );
+        if (!this.stopping) {
+          this.scheduleReconnect();
+        }
+      });
     }, delay);
   }
 
@@ -797,6 +832,7 @@ export class RelayBridgeServer extends EventEmitter {
       await this.startAsServer();
       this._mode = 'server';
       this.clientReconnectDelay = 500;
+      this.clientReconnectAttempts = 0;
       process.stderr.write('[webmcp-local-relay] info: promoted from client to server mode\n');
       this.emit('stateChanged');
     } catch (err) {
@@ -824,40 +860,50 @@ export class RelayBridgeServer extends EventEmitter {
    * Reconnects as a client to an existing relay server.
    */
   private reconnectAsClient(): void {
-    const wsUrl = `ws://${this.host}:${this.desiredPort}`;
-    const ws = new WebSocket(wsUrl);
+    try {
+      const wsUrl = `ws://${this.host}:${this.desiredPort}`;
+      const ws = new WebSocket(wsUrl);
 
-    const onReconnectError = (err: Error) => {
+      const onReconnectError = (err: Error) => {
+        process.stderr.write(
+          `[webmcp-local-relay] warn: relay client reconnection failed: ${err.message}\n`
+        );
+        if (!this.stopping) {
+          this.scheduleReconnect();
+        }
+      };
+
+      ws.once('open', () => {
+        ws.off('error', onReconnectError);
+        this.clientSocket = ws;
+        this.clientReconnectDelay = 500;
+        this.clientReconnectAttempts = 0;
+
+        try {
+          ws.send(JSON.stringify({ type: 'relay/hello' }));
+          ws.send(JSON.stringify({ type: 'relay/list-tools' }));
+        } catch (err) {
+          process.stderr.write(
+            `[webmcp-local-relay] error: failed to send handshake during reconnection: ${err instanceof Error ? err.message : String(err)}\n`
+          );
+          this.clientSocket = null;
+          ws.close();
+          this.scheduleReconnect();
+          return;
+        }
+
+        this.setupClientHandlers(ws);
+      });
+
+      ws.once('error', onReconnectError);
+    } catch (err) {
       process.stderr.write(
-        `[webmcp-local-relay] warn: relay client reconnection failed: ${err.message}\n`
+        `[webmcp-local-relay] error: failed to create reconnection socket: ${err instanceof Error ? err.message : String(err)}\n`
       );
       if (!this.stopping) {
         this.scheduleReconnect();
       }
-    };
-
-    ws.once('open', () => {
-      ws.off('error', onReconnectError);
-      this.clientSocket = ws;
-      this.clientReconnectDelay = 500;
-
-      try {
-        ws.send(JSON.stringify({ type: 'relay/hello' }));
-        ws.send(JSON.stringify({ type: 'relay/list-tools' }));
-      } catch (err) {
-        process.stderr.write(
-          `[webmcp-local-relay] error: failed to send handshake during reconnection: ${err instanceof Error ? err.message : String(err)}\n`
-        );
-        this.clientSocket = null;
-        ws.close();
-        this.scheduleReconnect();
-        return;
-      }
-
-      this.setupClientHandlers(ws);
-    });
-
-    ws.once('error', onReconnectError);
+    }
   }
 
   private invokeToolViaRelay(
