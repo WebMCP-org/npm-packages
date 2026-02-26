@@ -37,9 +37,7 @@ function connectAndRegister(
   }
 ): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket(`ws://127.0.0.1:${bridge.port}`, {
-      headers: { origin: options.origin ?? new URL(options.url).origin },
-    });
+    const ws = new WebSocket(`ws://127.0.0.1:${bridge.port}`);
     ws.once('open', () => {
       ws.send(
         JSON.stringify({
@@ -146,7 +144,7 @@ describe('RelayBridgeServer', () => {
     }
   });
 
-  it('rejects connections from disallowed origins', async () => {
+  it('rejects hello with disallowed host page origin', async () => {
     const bridge = new RelayBridgeServer({
       host: '127.0.0.1',
       port: 0,
@@ -156,9 +154,19 @@ describe('RelayBridgeServer', () => {
     try {
       await bridge.start();
 
-      const ws = new WebSocket(`ws://127.0.0.1:${bridge.port}`, {
-        headers: { origin: 'https://evil.example.com' },
+      const ws = new WebSocket(`ws://127.0.0.1:${bridge.port}`);
+      await new Promise<void>((resolve, reject) => {
+        ws.once('open', () => resolve());
+        ws.once('error', reject);
       });
+
+      ws.send(
+        JSON.stringify({
+          type: 'hello',
+          tabId: 'tab-1',
+          origin: 'https://evil.example.com',
+        })
+      );
 
       const closeCode = await new Promise<number>((resolve) => {
         ws.on('close', (code) => resolve(code));
@@ -170,7 +178,7 @@ describe('RelayBridgeServer', () => {
     }
   });
 
-  it('allows connections from explicitly allowed origins', async () => {
+  it('allows hello with explicitly allowed host page origin', async () => {
     const bridge = new RelayBridgeServer({
       host: '127.0.0.1',
       port: 0,
@@ -180,14 +188,15 @@ describe('RelayBridgeServer', () => {
     try {
       await bridge.start();
 
-      const ws = new WebSocket(`ws://127.0.0.1:${bridge.port}`, {
-        headers: { origin: 'https://trusted.example.com' },
+      const ws = await connectAndRegister(bridge, {
+        tabId: 'tab-1',
+        url: 'https://trusted.example.com/page',
+        origin: 'https://trusted.example.com',
+        tools: [{ name: 'test_tool' }],
       });
 
-      await new Promise<void>((resolve, reject) => {
-        ws.once('open', () => resolve());
-        ws.once('error', reject);
-      });
+      const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
+      expect(toolName).toBeDefined();
 
       ws.close();
     } finally {
@@ -326,7 +335,7 @@ describe('RelayBridgeServer', () => {
     await bridge.stop(); // should not throw
   });
 
-  it('rejects connections with no origin when origins are restricted', async () => {
+  it('rejects hello with no origin when origins are restricted', async () => {
     const bridge = new RelayBridgeServer({
       host: '127.0.0.1',
       port: 0,
@@ -337,12 +346,65 @@ describe('RelayBridgeServer', () => {
       await bridge.start();
 
       const ws = new WebSocket(`ws://127.0.0.1:${bridge.port}`);
+      await new Promise<void>((resolve, reject) => {
+        ws.once('open', () => resolve());
+        ws.once('error', reject);
+      });
+
+      ws.send(
+        JSON.stringify({
+          type: 'hello',
+          tabId: 'tab-1',
+        })
+      );
 
       const closeCode = await new Promise<number>((resolve) => {
         ws.on('close', (code) => resolve(code));
       });
 
       expect(closeCode).toBe(1008);
+    } finally {
+      await bridge.stop();
+    }
+  });
+
+  it('allows hello when host origin matches even if WS header differs', async () => {
+    const bridge = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['https://myapp.com'],
+    });
+
+    try {
+      await bridge.start();
+
+      const ws = new WebSocket(`ws://127.0.0.1:${bridge.port}`, {
+        headers: { origin: 'https://cdn.jsdelivr.net' },
+      });
+      await new Promise<void>((resolve, reject) => {
+        ws.once('open', () => resolve());
+        ws.once('error', reject);
+      });
+
+      ws.send(
+        JSON.stringify({
+          type: 'hello',
+          tabId: 'tab-1',
+          origin: 'https://myapp.com',
+          url: 'https://myapp.com/page',
+        })
+      );
+      ws.send(
+        JSON.stringify({
+          type: 'tools/list',
+          tools: [{ name: 'cdn_tool' }],
+        })
+      );
+
+      const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
+      expect(toolName).toBeDefined();
+
+      ws.close();
     } finally {
       await bridge.stop();
     }
@@ -786,8 +848,9 @@ describe('RelayBridgeServer', () => {
         ws.once('error', reject);
       });
 
-      ws.send('not json at all');
+      ws.send(`{"x":"${'a'.repeat(400)}`); // intentionally invalid JSON > 200 chars
       ws.send(JSON.stringify({ type: 'invalid_type', foo: 'bar' }));
+      ws.send(JSON.stringify(42)); // valid JSON but invalid envelope shape
 
       ws.send(
         JSON.stringify({
@@ -806,6 +869,234 @@ describe('RelayBridgeServer', () => {
     } finally {
       await bridge.stop();
     }
+  });
+
+  it('normalizes undefined tool results as MCP errors', async () => {
+    const bridge = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+    });
+
+    const normalized = (
+      bridge as unknown as { normalizeCallToolResult: (result: unknown) => unknown }
+    ).normalizeCallToolResult(undefined) as {
+      isError?: boolean;
+      content?: Array<{ text?: string }>;
+    };
+
+    expect(normalized.isError).toBe(true);
+    const text = normalized.content?.[0]?.text ?? '';
+    expect(text).toContain('invalid result');
+    expect(text).toContain('undefined');
+  });
+
+  it('converts ArrayBuffer and Buffer-array raw data payloads to UTF-8', async () => {
+    const bridge = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+    });
+
+    const rawDataToUtf8 = (
+      bridge as unknown as {
+        rawDataToUtf8: (raw: unknown) => string;
+      }
+    ).rawDataToUtf8;
+
+    const arrayBuffer = Uint8Array.from(Buffer.from('hello-array-buffer', 'utf8')).buffer;
+    const chunked = [Buffer.from('hello-'), Buffer.from('buffer-array')];
+
+    expect(rawDataToUtf8(arrayBuffer)).toBe('hello-array-buffer');
+    expect(rawDataToUtf8(chunked)).toBe('hello-buffer-array');
+  });
+
+  it('converts string and fallback raw data payloads to UTF-8', async () => {
+    const bridge = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+    });
+
+    const rawDataToUtf8 = (
+      bridge as unknown as {
+        rawDataToUtf8: (raw: unknown) => string;
+      }
+    ).rawDataToUtf8;
+
+    expect(rawDataToUtf8('hello-string')).toBe('hello-string');
+    expect(rawDataToUtf8(123)).toBe('123');
+  });
+
+  it('throws from start() when bind fails with non-EADDRINUSE errors', async () => {
+    const bridge = new RelayBridgeServer({
+      host: '256.256.256.256',
+      port: 9333,
+      allowedOrigins: ['*'],
+    });
+
+    await expect(bridge.start()).rejects.toThrow();
+  });
+
+  it('handles relay/list-tools send failures without crashing', async () => {
+    const bridge = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+    });
+
+    const fakeSocket = {
+      readyState: WebSocket.OPEN,
+      send: () => {
+        throw new Error('send failed');
+      },
+    };
+
+    const internals = bridge as unknown as {
+      socketByConnectionId: Map<string, { readyState: number; send: (payload: string) => void }>;
+      onRelayClientMessage: (connectionId: string, message: unknown) => void;
+    };
+
+    internals.socketByConnectionId.set('relay-client-1', fakeSocket);
+    expect(() =>
+      internals.onRelayClientMessage('relay-client-1', { type: 'relay/list-tools' })
+    ).not.toThrow();
+  });
+
+  it('handles relay/invoke errors even when relay client disconnects before response', async () => {
+    const bridge = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+    });
+
+    const fakeSocket = {
+      readyState: WebSocket.CLOSED,
+      send: () => {
+        // no-op
+      },
+    };
+
+    const internals = bridge as unknown as {
+      socketByConnectionId: Map<string, { readyState: number; send: (payload: string) => void }>;
+      onRelayClientMessage: (connectionId: string, message: unknown) => void;
+      invokeToolLocally: () => Promise<never>;
+    };
+
+    internals.socketByConnectionId.set('relay-client-2', fakeSocket);
+    internals.invokeToolLocally = async () => {
+      throw new Error('invoke failed');
+    };
+
+    expect(() =>
+      internals.onRelayClientMessage('relay-client-2', {
+        type: 'relay/invoke',
+        callId: 'c-1',
+        toolName: 'does_not_exist',
+        args: {},
+      })
+    ).not.toThrow();
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  });
+
+  it('returns only wire-safe fields from toWireTools', async () => {
+    const bridge = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+    });
+
+    const toWireTools = (
+      bridge as unknown as {
+        toWireTools: (tools: Array<Record<string, unknown>>) => Array<Record<string, unknown>>;
+      }
+    ).toWireTools;
+
+    const wireTools = toWireTools([
+      {
+        name: 'tool_a',
+        originalName: 'tool_a',
+        description: 'desc',
+        inputSchema: { type: 'object', properties: {} },
+        sources: [{ sourceId: 'conn-1' }],
+      },
+    ]);
+
+    expect(wireTools[0]?.name).toBe('tool_a');
+    expect(wireTools[0]?.originalName).toBeUndefined();
+    expect(wireTools[0]?.sources).toBeUndefined();
+  });
+
+  it('throws when reloading a source while bridge is in client mode', async () => {
+    const bridge = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+    });
+
+    (bridge as unknown as { _mode: 'server' | 'client' })._mode = 'client';
+    expect(() => bridge.reloadSource('any')).toThrow(/only supported in server mode/i);
+  });
+
+  it('reconnectWithModePromotion falls back to reconnectAsClient on EADDRINUSE', async () => {
+    const owner = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+    });
+
+    await owner.start();
+
+    const candidate = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: owner.port,
+      allowedOrigins: ['*'],
+    });
+
+    (candidate as unknown as { _mode: 'server' | 'client' })._mode = 'client';
+    await (
+      candidate as unknown as { reconnectWithModePromotion: () => Promise<void> }
+    ).reconnectWithModePromotion();
+
+    await waitFor(() => {
+      const socket = (
+        candidate as unknown as {
+          clientSocket: WebSocket | null;
+        }
+      ).clientSocket;
+      return socket && socket.readyState === WebSocket.OPEN ? true : undefined;
+    }, 3000);
+
+    await candidate.stop();
+    await owner.stop();
+  });
+
+  it('invokeToolViaRelay handles send failures', async () => {
+    const bridge = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+    });
+
+    const fakeSocket = {
+      readyState: WebSocket.OPEN,
+      send: () => {
+        throw new Error('send failed');
+      },
+    };
+
+    const internals = bridge as unknown as {
+      _mode: 'server' | 'client';
+      clientSocket: { readyState: number; send: (payload: string) => void };
+    };
+
+    internals._mode = 'client';
+    internals.clientSocket = fakeSocket;
+
+    await expect(bridge.invokeTool('tool_a', {})).rejects.toThrow(
+      /Failed to send relay invocation/i
+    );
   });
 });
 
@@ -928,6 +1219,82 @@ describe('RelayBridgeServer client mode', () => {
 
       ws.close();
       await client.stop();
+    } finally {
+      await server.stop();
+    }
+  });
+
+  it('defaults relay/invoke args to {} when omitted', async () => {
+    const server = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+      invokeTimeoutMs: 2000,
+    });
+
+    try {
+      await server.start();
+
+      const ws = await connectAndRegister(server, {
+        tabId: 'tab-1',
+        url: 'https://example.com',
+        tools: [{ name: 'echo', description: 'Echo tool' }],
+      });
+
+      ws.on('message', (raw) => {
+        const msg = JSON.parse(String(raw));
+        if (msg.type !== 'invoke') return;
+        ws.send(
+          JSON.stringify({
+            type: 'result',
+            callId: msg.callId,
+            result: {
+              content: [{ type: 'text', text: `keys:${Object.keys(msg.args ?? {}).length}` }],
+            },
+          })
+        );
+      });
+
+      const toolName = await waitFor(() => server.registry.listTools()[0]?.name);
+      if (!toolName) {
+        throw new Error('Expected server tool name');
+      }
+
+      const relayClient = new WebSocket(`ws://127.0.0.1:${server.port}`);
+      await new Promise<void>((resolve, reject) => {
+        relayClient.once('open', () => resolve());
+        relayClient.once('error', reject);
+      });
+
+      relayClient.send(JSON.stringify({ type: 'relay/hello' }));
+
+      const resultPromise = new Promise<{
+        type: string;
+        callId: string;
+        result: { content?: unknown[] };
+      }>((resolve) => {
+        relayClient.on('message', (raw) => {
+          const msg = JSON.parse(String(raw));
+          if (msg.type === 'relay/result' && msg.callId === 'call-1') {
+            resolve(msg);
+          }
+        });
+      });
+
+      relayClient.send(
+        JSON.stringify({
+          type: 'relay/invoke',
+          callId: 'call-1',
+          toolName,
+        })
+      );
+
+      const relayResult = await resultPromise;
+      const text = (relayResult.result.content?.[0] as { text?: string } | undefined)?.text ?? '';
+      expect(text).toBe('keys:0');
+
+      relayClient.close();
+      ws.close();
     } finally {
       await server.stop();
     }

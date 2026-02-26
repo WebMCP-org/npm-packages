@@ -55,6 +55,11 @@ describe('parseCliOptions', () => {
     expect(options.allowedOrigins).toEqual(['https://example.com']);
   });
 
+  it('parses --ws-origin alias', () => {
+    const options = parseCliOptions(['--ws-origin', 'https://example.com']);
+    expect(options.allowedOrigins).toEqual(['https://example.com']);
+  });
+
   it('parses comma-separated origins', () => {
     const options = parseCliOptions([
       '--widget-origin',
