@@ -47,6 +47,8 @@ export {
   RelayClientToServerMessageSchema,
   type RelayServerToClientMessage,
   RelayServerToClientMessageSchema,
+  type RelaySourceInfo,
+  RelaySourceInfoSchema,
   type RelayToBrowserMessage,
   RelayToBrowserMessageSchema,
 } from './schemas.js';

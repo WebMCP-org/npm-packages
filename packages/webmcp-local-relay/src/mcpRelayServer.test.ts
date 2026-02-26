@@ -376,6 +376,57 @@ describe('LocalRelayMcpServer', () => {
       ws.close();
       await cleanup();
     });
+
+    it('returns source metadata in client mode', async () => {
+      const serverBridge = new RelayBridgeServer({
+        host: '127.0.0.1',
+        port: 0,
+        allowedOrigins: ['*'],
+      });
+      await serverBridge.start();
+
+      const ws = await connectBrowser(serverBridge, {
+        tabId: 'tab-client-src',
+        url: 'https://example.com/app',
+        tools: [{ name: 'my_tool' }],
+      });
+
+      await waitFor(() => serverBridge.registry.listTools()[0]?.name);
+
+      const clientBridge = new RelayBridgeServer({
+        host: '127.0.0.1',
+        port: serverBridge.port,
+        allowedOrigins: ['*'],
+      });
+      await clientBridge.start();
+      expect(clientBridge.mode).toBe('client');
+
+      const relay = new LocalRelayMcpServer({ bridge: clientBridge });
+      const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+      const client = new Client({ name: 'test-client', version: '1.0.0' });
+      await relay.connect(serverTransport);
+      await client.connect(clientTransport);
+
+      await waitFor(() => {
+        const tools = clientBridge.listToolsFromRelay();
+        return tools.length > 0 ? tools : undefined;
+      });
+
+      const result = await client.callTool({
+        name: 'webmcp_list_sources',
+        arguments: {},
+      });
+
+      const text = firstContentText(result);
+      expect(text).toContain('"mode": "client"');
+      expect(text).toContain('tab-client-src');
+      expect(text).toContain('"count": 1');
+
+      ws.close();
+      await client.close();
+      await relay.stop();
+      await serverBridge.stop();
+    });
   });
 
   describe('webmcp_list_tools', () => {

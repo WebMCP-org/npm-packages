@@ -10,13 +10,15 @@ on:
     - cron: '0 0 * * 1'
 
 permissions:
-  security-events: write
   contents: read
 
 jobs:
   analyze:
     name: Analyze
     runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
 
     steps:
       - name: Checkout repository

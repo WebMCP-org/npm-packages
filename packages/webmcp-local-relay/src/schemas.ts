@@ -129,6 +129,26 @@ export type RelayToBrowserMessage = z.infer<typeof RelayToBrowserMessageSchema>;
  */
 
 /**
+ * Schema for source metadata transmitted in relay-to-relay messages.
+ */
+export const RelaySourceInfoSchema = z.object({
+  sourceId: z.string(),
+  tabId: z.string(),
+  origin: z.string().optional(),
+  url: z.string().optional(),
+  title: z.string().optional(),
+  iconUrl: z.string().optional(),
+  connectedAt: z.number(),
+  lastSeenAt: z.number(),
+  toolCount: z.number(),
+});
+
+/**
+ * Source metadata transmitted in relay-to-relay messages.
+ */
+export type RelaySourceInfo = z.infer<typeof RelaySourceInfoSchema>;
+
+/**
  * Schema for relay client identification message.
  */
 export const RelayClientHelloSchema = z.object({
@@ -166,12 +186,18 @@ export const RelayClientToServerMessageSchema = z.discriminatedUnion('type', [
  */
 export type RelayClientToServerMessage = z.infer<typeof RelayClientToServerMessageSchema>;
 
+const RelayToolsPayloadFields = {
+  tools: z.array(NormalizedToolSchema),
+  sources: z.array(RelaySourceInfoSchema),
+  toolSourceMap: z.record(z.string(), z.array(z.string())),
+};
+
 /**
  * Schema for relay server tool list response.
  */
 export const RelayServerToolsSchema = z.object({
   type: z.literal('relay/tools'),
-  tools: z.array(NormalizedToolSchema),
+  ...RelayToolsPayloadFields,
 });
 
 /**
@@ -188,7 +214,7 @@ export const RelayServerResultSchema = z.object({
  */
 export const RelayServerToolsChangedSchema = z.object({
   type: z.literal('relay/tools-changed'),
-  tools: z.array(NormalizedToolSchema),
+  ...RelayToolsPayloadFields,
 });
 
 /**

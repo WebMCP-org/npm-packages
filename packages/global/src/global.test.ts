@@ -401,4 +401,117 @@ describe('global adapter', () => {
     initializeWebModelContext();
     expect(typeof getModelContext().listTools).toBe('function');
   });
+
+  it('listTools normalizes empty inputSchema {} to default object schema', () => {
+    initializeWebModelContext();
+    const modelContext = getModelContext();
+
+    modelContext.registerTool({
+      name: 'no_args_tool',
+      description: 'Tool with no arguments',
+      inputSchema: {},
+      async execute() {
+        return { content: [{ type: 'text', text: 'ok' }] };
+      },
+    });
+
+    const tools = modelContext.listTools();
+    const tool = tools.find((t) => t.name === 'no_args_tool');
+    expect(tool).toBeDefined();
+    expect(tool?.inputSchema).toEqual({ type: 'object', properties: {} });
+  });
+
+  it('listTools does not prepend type:"object" to non-object outputSchema', () => {
+    initializeWebModelContext();
+    const modelContext = getModelContext();
+
+    modelContext.registerTool({
+      name: 'string_output_tool',
+      description: 'Tool with string output schema',
+      inputSchema: { type: 'object', properties: {} },
+      outputSchema: { type: 'string' },
+      async execute() {
+        return { content: [{ type: 'text', text: 'ok' }] };
+      },
+    });
+
+    const tools = modelContext.listTools();
+    const tool = tools.find((t) => t.name === 'string_output_tool');
+    expect(tool).toBeDefined();
+    // outputSchema should NOT get type:"object" — non-object types must be preserved
+    expect(tool?.outputSchema).toMatchObject({ type: 'string' });
+  });
+
+  it('listTools preserves outputSchema without applying object-type normalization', async () => {
+    initializeWebModelContext();
+    const modelContext = getModelContext();
+
+    modelContext.registerTool({
+      name: 'output_no_type_tool',
+      description: 'Tool with output schema missing root type',
+      inputSchema: {},
+      outputSchema: {
+        properties: {
+          value: { type: 'string' },
+        },
+        required: ['value'],
+      },
+      async execute() {
+        return {
+          content: [{ type: 'text', text: 'ok' }],
+          structuredContent: { value: 'ok' },
+        };
+      },
+    });
+
+    const tools = modelContext.listTools();
+    const tool = tools.find((t) => t.name === 'output_no_type_tool');
+    expect(tool).toBeDefined();
+    // outputSchema should NOT get type:"object" prepended — only inputSchema requires that
+    expect(tool?.outputSchema).toEqual({
+      properties: { value: { type: 'string' } },
+      required: ['value'],
+    });
+
+    const result = await modelContext.callTool({ name: 'output_no_type_tool', arguments: {} });
+    expect(result.isError).toBeFalsy();
+    expect(result.structuredContent).toMatchObject({ value: 'ok' });
+  });
+
+  it('listTools normalizes inputSchema missing type to object schema', async () => {
+    initializeWebModelContext();
+    const modelContext = getModelContext();
+
+    modelContext.registerTool({
+      name: 'input_no_type_tool',
+      description: 'Tool with input schema missing root type',
+      inputSchema: {
+        properties: {
+          message: { type: 'string' },
+        },
+        required: ['message'],
+      },
+      async execute(args) {
+        return {
+          content: [{ type: 'text', text: `echo:${String(args.message ?? '')}` }],
+        };
+      },
+    });
+
+    const tools = modelContext.listTools();
+    const tool = tools.find((t) => t.name === 'input_no_type_tool');
+    expect(tool).toBeDefined();
+    expect(tool?.inputSchema).toMatchObject({
+      type: 'object',
+      properties: { message: { type: 'string' } },
+      required: ['message'],
+    });
+
+    const result = await modelContext.callTool({
+      name: 'input_no_type_tool',
+      arguments: { message: 'hi' },
+    });
+    expect(result.isError).toBeFalsy();
+    expect(result.content[0]).toMatchObject({ type: 'text', text: 'echo:hi' });
+  });
 });

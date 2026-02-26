@@ -369,6 +369,15 @@ function normalizeInputSchema(inputSchema: ToolInputSchema | undefined): Normali
   }
 
   validateInputSchema(inputSchema);
+
+  // Empty {} is valid JSON Schema but lacks type:"object" required by MCP.
+  if (Object.keys(inputSchema as Record<string, unknown>).length === 0) {
+    return {
+      inputSchema: DEFAULT_INPUT_SCHEMA,
+      standardValidator: createStandardValidatorFromJsonSchema(DEFAULT_INPUT_SCHEMA),
+    };
+  }
+
   const normalizedSchema =
     inputSchema.type === undefined
       ? ({ type: 'object', ...inputSchema } as InputSchema)

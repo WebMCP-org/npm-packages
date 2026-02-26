@@ -15,6 +15,7 @@ import {
   RelayClientToServerMessageSchema,
   type RelayServerToClientMessage,
   RelayServerToClientMessageSchema,
+  type RelaySourceInfo,
   type RelayToBrowserMessage,
 } from './schemas.js';
 
@@ -109,6 +110,8 @@ export class RelayBridgeServer extends EventEmitter {
   private clientReconnectAttempts = 0;
   private readonly clientPendingInvocations = new Map<string, PendingInvocation>();
   private clientTools: RelayTool[] = [];
+  private clientSources: RelaySourceInfo[] = [];
+  private clientToolSourceMap: Record<string, string[]> = {};
   private stopping = false;
 
   /**
@@ -158,6 +161,23 @@ export class RelayBridgeServer extends EventEmitter {
    */
   listToolsFromRelay(): RelayTool[] {
     return this._mode === 'client' ? [...this.clientTools] : [];
+  }
+
+  /**
+   * Source metadata received from the server relay (client mode only).
+   * Returns an empty array in server mode.
+   */
+  listSourcesFromRelay(): RelaySourceInfo[] {
+    return this._mode === 'client' ? [...this.clientSources] : [];
+  }
+
+  /**
+   * Tool-to-source mapping received from the server relay (client mode only).
+   * Maps public tool names to arrays of source IDs.
+   * Returns an empty record in server mode.
+   */
+  getToolSourceMapFromRelay(): Record<string, string[]> {
+    return this._mode === 'client' ? { ...this.clientToolSourceMap } : {};
   }
 
   /**
@@ -546,11 +566,7 @@ export class RelayBridgeServer extends EventEmitter {
         break;
 
       case 'relay/list-tools': {
-        const tools = this.registry.listTools();
-        const response: RelayServerToClientMessage = {
-          type: 'relay/tools',
-          tools: this.toWireTools(tools),
-        };
+        const response = this.buildRelayToolsPayload('relay/tools');
         const socket = this.socketByConnectionId.get(connectionId);
         if (socket?.readyState === WebSocket.OPEN) {
           try {
@@ -631,11 +647,7 @@ export class RelayBridgeServer extends EventEmitter {
       return;
     }
 
-    const tools = this.registry.listTools();
-    const message: RelayServerToClientMessage = {
-      type: 'relay/tools-changed',
-      tools: this.toWireTools(tools),
-    };
+    const message = this.buildRelayToolsPayload('relay/tools-changed');
     const payload = JSON.stringify(message);
 
     for (const connectionId of this.relayClientConnectionIds) {
@@ -745,6 +757,8 @@ export class RelayBridgeServer extends EventEmitter {
         case 'relay/tools':
         case 'relay/tools-changed':
           this.clientTools = msg.data.tools;
+          this.clientSources = msg.data.sources;
+          this.clientToolSourceMap = msg.data.toolSourceMap;
           this.emit('stateChanged');
           break;
 
@@ -774,6 +788,8 @@ export class RelayBridgeServer extends EventEmitter {
       }
 
       this.clientTools = [];
+      this.clientSources = [];
+      this.clientToolSourceMap = {};
       this.emit('stateChanged');
 
       if (!this.stopping) {
@@ -953,6 +969,28 @@ export class RelayBridgeServer extends EventEmitter {
         );
       }
     });
+  }
+
+  /**
+   * Builds the complete relay response payload including tools and source metadata.
+   */
+  private buildRelayToolsPayload(
+    type: 'relay/tools' | 'relay/tools-changed'
+  ): RelayServerToClientMessage {
+    const tools = this.registry.listTools();
+    const sources = this.registry.listSources();
+    const toolSourceMap: Record<string, string[]> = {};
+
+    for (const tool of tools) {
+      toolSourceMap[tool.name] = tool.sources.map((s) => s.sourceId);
+    }
+
+    return {
+      type,
+      tools: this.toWireTools(tools),
+      sources,
+      toolSourceMap,
+    };
   }
 
   /**

@@ -6,7 +6,7 @@ import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { z } from 'zod/v4';
 
 import { RelayBridgeServer, type RelayBridgeServerOptions } from './bridgeServer.js';
-import type { AggregatedTool } from './registry.js';
+import type { AggregatedTool, SourceInfo } from './registry.js';
 
 /**
  * Handle returned by MCP tool registration.
@@ -152,11 +152,11 @@ export class LocalRelayMcpServer {
       },
       async () => {
         if (this.bridge.mode === 'client') {
+          const sources = this.bridge.listSourcesFromRelay();
           const info = {
             mode: 'client' as const,
-            message: 'Proxying through an existing relay server.',
-            count: 0,
-            sources: [],
+            count: sources.length,
+            sources,
           };
           return {
             content: [{ type: 'text', text: JSON.stringify(info, null, 2) }],
@@ -509,16 +509,35 @@ export class LocalRelayMcpServer {
 
   /**
    * Converts relay client tool descriptors to aggregated tool shape.
-   * In client mode, source metadata is unavailable so tools are given empty sources.
+   * Populates per-tool source metadata from the relay's tool-source mapping.
    */
   private buildAggregatedToolsFromRelay(): AggregatedTool[] {
+    const toolSourceMap = this.bridge.getToolSourceMapFromRelay();
+    const allSources = this.bridge.listSourcesFromRelay();
+    const sourceById = new Map(allSources.map((s) => [s.sourceId, s]));
+
     return this.bridge
       .listToolsFromRelay()
-      .map((tool) => ({
-        ...tool,
-        originalName: tool.name,
-        sources: [],
-      }))
+      .map((tool) => {
+        const sourceIds = toolSourceMap[tool.name] ?? [];
+        const sources: SourceInfo[] = [];
+        for (const id of sourceIds) {
+          const source = sourceById.get(id);
+          if (source) {
+            sources.push(source as SourceInfo);
+          } else {
+            process.stderr.write(
+              `[webmcp-local-relay] warn: tool "${tool.name}" references unknown sourceId "${id}"\n`
+            );
+          }
+        }
+
+        return {
+          ...tool,
+          originalName: tool.name,
+          sources,
+        };
+      })
       .sort((left, right) => left.name.localeCompare(right.name));
   }
 

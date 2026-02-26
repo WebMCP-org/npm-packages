@@ -40,7 +40,7 @@ catalog:
   tsdown: ^0.15.10
   tsx: ^4.20.0
   typescript: ^5.8.3
-  vite: ^7.1.2
+  vite: ^7.1.11
   vite-plugin-monkey: ^6.0.1
   vitest: ^4.0.18
   wrangler: ^4.45.3
