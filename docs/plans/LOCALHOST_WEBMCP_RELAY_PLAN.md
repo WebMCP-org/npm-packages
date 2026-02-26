@@ -352,11 +352,13 @@ That keeps one codebase for:
 1. Should ambiguous tools be hidden unless selected source exists, or always exposed with required selector?
 2. Should the default port be strictly single-port (`9333`) or small probe range (`9333-9335`)?
 3. ~~Should we expose a `list_sources` tool in MVP, or defer to v1.1?~~ **Resolved:** Yes, `webmcp_list_sources` is included in MVP.
-4. ~~Do we want namespaced tool IDs by default, or legacy raw names + selector strategy?~~ **Resolved:** Namespaced tool IDs by default (`webmcp_{domain}_tab{tabId}_{toolName}`).
+4. ~~Do we want namespaced tool IDs by default, or legacy raw names + selector strategy?~~ **Resolved:** Sanitized tool names by default (`{sanitized_name}`), with a short 4-character tab-ID suffix when disambiguation is needed (`{sanitized_name}_{tabId_suffix}`).
 
 ## 14) Proposed Immediate Next Work Items
 
-1. Create `@mcp-b/webmcp-local-relay` package scaffold with `bin` entrypoint and static `embed.js`/widget build outputs.
-2. Port Char inverse iframe-client transport pattern into this package (or `@mcp-b/transports` behind experimental export).
-3. Implement local source registry and deterministic routing policy before adding advanced UX features.
-4. Add a small integration harness page under `examples/` to validate "script tag + npx" end-to-end.
+All items below have been completed in the initial implementation:
+
+1. ~~Create `@mcp-b/webmcp-local-relay` package scaffold with `bin` entrypoint and static `embed.js`/widget build outputs.~~
+2. ~~Port Char inverse iframe-client transport pattern into this package (or `@mcp-b/transports` behind experimental export).~~
+3. ~~Implement local source registry and deterministic routing policy before adding advanced UX features.~~
+4. ~~Add a small integration harness page under `examples/` to validate "script tag + npx" end-to-end.~~
