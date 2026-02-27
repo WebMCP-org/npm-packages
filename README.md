@@ -44,35 +44,23 @@ MCP-b **polyfills** that API for all browsers today, and **bridges** it to the f
 
 If you're running Chrome with [`--enable-experimental-web-platform-features`](./e2e/web-standards-showcase/CHROMIUM_FLAGS.md), `navigator.modelContext` is already there. Just use it:
 
-```ts
-// No imports needed — it's a browser API
-navigator.modelContext.registerTool({
-  name: 'get_page_title',
-  description: 'Returns the current page title',
-  inputSchema: { type: 'object', properties: {} },
-  execute: async () => ({
-    content: [{ type: 'text', text: document.title }],
-  }),
-});
-```
-
-For TypeScript, add `@mcp-b/webmcp-types` (`pnpm add -D @mcp-b/webmcp-types`) to get full inference on your input and output schemas — `args` in `execute` is typed automatically from `inputSchema`:
+Add `@mcp-b/webmcp-types` (`pnpm add -D @mcp-b/webmcp-types`) for full input/output schema inference:
 
 ```ts
 navigator.modelContext.registerTool({
   name: 'add_todo',
+  description: 'Add a new todo item',
   inputSchema: {
     type: 'object',
-    properties: {
-      title: { type: 'string' },
-      done: { type: 'boolean' },
-    },
+    properties: { title: { type: 'string' }, done: { type: 'boolean' } },
     required: ['title'],
-  } as const,  // <-- as const enables inference
-  execute: async (args) => {
-    // args is typed: { title: string; done?: boolean }
-    return { content: [{ type: 'text', text: args.title }] };
-  },
+  } as const,                             // ← args inferred: { title: string; done?: boolean }
+  outputSchema: {                         // ← optional — infers return type
+    type: 'object',
+    properties: { id: { type: 'number' }, title: { type: 'string' } },
+    required: ['id', 'title'],
+  } as const,
+  execute: async (args) => ({ id: Date.now(), title: args.title }),
 });
 ```
 
