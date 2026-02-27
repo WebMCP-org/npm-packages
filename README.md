@@ -24,7 +24,7 @@
 
 ## The Web Standard
 
-The [Web Model Context API](https://webmachinelearning.github.io/webmcp/) is a [W3C Community Group](https://www.w3.org/community/webmachinelearning/) draft spec. It turns every browser tab into an MCP server:
+The [Web Model Context API](https://webmachinelearning.github.io/webmcp/) is a [W3C Community Group](https://www.w3.org/community/webmachinelearning/) draft spec. It makes every browser tab a **tool source** — web pages register tools that AI agents can discover and call:
 
 ```
 navigator.modelContext
@@ -34,9 +34,9 @@ navigator.modelContext
 └── .clearContext()            Remove all tools
 ```
 
-This project **polyfills** that API for all browsers today, and **bridges** it to the full [Model Context Protocol](https://modelcontextprotocol.io/) (prompts, resources, sampling, transports).
+MCP-b **polyfills** that API for all browsers today, and **bridges** it to the full [Model Context Protocol](https://modelcontextprotocol.io/) — turning that tool source into a complete MCP server with prompts, resources, sampling, and transports.
 
-> Built by [MCPB](https://docs.mcp-b.ai). Not an official W3C or MCP project.
+> Built by [MCP-b](https://docs.mcp-b.ai). Not an official W3C or MCP project.
 
 ## Register a Tool
 
@@ -116,7 +116,7 @@ Three ways for AI agents to discover and call your tools:
     browser             built-in agent       Cursor, VS Code
 ```
 
-**MCP-B Extension** — Install from [docs.mcp-b.ai/extension](https://docs.mcp-b.ai/extension). Discovers tools on any page.
+**MCP-b Extension** — Install from [docs.mcp-b.ai/extension](https://docs.mcp-b.ai/extension). Discovers tools on any page.
 
 **Chrome Native** — Enable at `chrome://flags` → *Experimental Web Platform features*, or:
 
@@ -312,8 +312,8 @@ Contributions welcome — see [CONTRIBUTING.md](./CONTRIBUTING.md) for guideline
 
 ## Links
 
-- [MCPB Documentation](https://docs.mcp-b.ai)
-- [MCP-B Browser Extension](https://docs.mcp-b.ai/extension)
+- [MCP-b Documentation](https://docs.mcp-b.ai)
+- [MCP-b Browser Extension](https://docs.mcp-b.ai/extension)
 - [W3C WebMCP Spec](https://webmachinelearning.github.io/webmcp/)
 - [W3C Web Machine Learning Community Group](https://www.w3.org/community/webmachinelearning/)
 - [Model Context Protocol Specification](https://modelcontextprotocol.io/)
