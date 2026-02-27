@@ -56,7 +56,25 @@ navigator.modelContext.registerTool({
 });
 ```
 
-For TypeScript, add the type definitions: `pnpm add -D @mcp-b/webmcp-types`
+For TypeScript, add `@mcp-b/webmcp-types` (`pnpm add -D @mcp-b/webmcp-types`) to get full inference on your input and output schemas — `args` in `execute` is typed automatically from `inputSchema`:
+
+```ts
+navigator.modelContext.registerTool({
+  name: 'add_todo',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      title: { type: 'string' },
+      done: { type: 'boolean' },
+    },
+    required: ['title'],
+  } as const,  // <-- as const enables inference
+  execute: async (args) => {
+    // args is typed: { title: string; done?: boolean }
+    return { content: [{ type: 'text', text: args.title }] };
+  },
+});
+```
 
 ### 2. Polyfill it
 
