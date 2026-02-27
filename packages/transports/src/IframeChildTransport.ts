@@ -135,7 +135,7 @@ export class IframeChildTransport implements Transport {
     }
 
     if (!this._clientOrigin) {
-      console.warn('[IframeChildTransport] No client connected, message not sent');
+      console.debug('[IframeChildTransport] No client connected, message not sent');
       return;
     }
 
@@ -150,7 +150,7 @@ export class IframeChildTransport implements Transport {
         this._clientOrigin
       );
     } else {
-      console.warn('[IframeChildTransport] Not running in an iframe, message not sent');
+      console.debug('[IframeChildTransport] Not running in an iframe, message not sent');
     }
   }
 
