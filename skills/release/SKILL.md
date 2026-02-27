@@ -9,7 +9,19 @@ Publish packages from this monorepo to npm. Uses `pnpm publish -r` for automatic
 - Beta/canary/preview releases
 - Troubleshooting failed publishes or dependency chain issues
 
-## How Publishing Works in This Monorepo
+## Fixed Versioning Strategy
+
+**All packages in this monorepo share the same version number.** When any package changes, ALL packages bump to the same new version together. This is enforced by the `"fixed"` setting in `.changeset/config.json`.
+
+This is the same strategy used by Angular, Babel, Jest, and Nx. Benefits:
+
+- **No stale transitive chains** — every package depends on the same version of its siblings
+- **Instant mismatch detection** — if `global@2.0.5` depends on `transports@2.0.4`, something's wrong
+- **Simple for consumers** — "I'm on WebMCP 2.0.5" instead of juggling 12 different version numbers
+
+When creating a changeset, you only need to select the packages that actually changed. Changesets will automatically bump ALL packages in the fixed group to the same new version.
+
+## How Publishing Works
 
 All internal dependencies use `"workspace:*"` in package.json. When `pnpm publish` runs, it resolves `workspace:*` to the **current local version** of that dependency. This means:
 
@@ -17,7 +29,7 @@ All internal dependencies use `"workspace:*"` in package.json. When `pnpm publis
 - `pnpm publish -r` publishes in **topological order** automatically (dependencies before dependents)
 - Since all local versions are already bumped, every `workspace:*` resolves to the correct new version
 
-**The key insight**: Changesets bumps all versions locally, then `pnpm publish -r` handles the correct publish order. These two tools are designed to work together.
+**The key insight**: Changesets bumps all versions locally (all to the same version), then `pnpm publish -r` handles the correct publish order. These two tools are designed to work together.
 
 **Never use `npm publish`** — only pnpm resolves `workspace:*` and `catalog:` protocols.
 
@@ -212,7 +224,7 @@ TRANSPORTS_SDK=$(npm view @mcp-b/transports@$GLOBAL_TRANSPORTS dependencies --js
 echo "global@$GLOBAL_V → transports@$GLOBAL_TRANSPORTS → ts-sdk@$TRANSPORTS_SDK"
 ```
 
-**What to look for**: All internal dep versions in the `dependencies --json` output should match the versions you just published. If any are stale, see "Fixing a Stale Chain" below.
+**What to look for**: With fixed versioning, ALL internal dep versions should be the SAME version number as the package itself (e.g., `global@2.0.5` should depend on `transports@2.0.5`, `ts-sdk@2.0.5`, etc.). If any version differs, something went wrong.
 
 ## Fixing a Stale Dependency Chain
 

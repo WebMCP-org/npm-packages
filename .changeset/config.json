@@ -2,7 +2,22 @@
   "$schema": "https://unpkg.com/@changesets/config@3.0.0/schema.json",
   "changelog": "@changesets/cli/changelog",
   "commit": false,
-  "fixed": [],
+  "fixed": [
+    [
+      "@mcp-b/webmcp-types",
+      "@mcp-b/smart-dom-reader",
+      "@mcp-b/webmcp-polyfill",
+      "@mcp-b/webmcp-ts-sdk",
+      "@mcp-b/transports",
+      "@mcp-b/extension-tools",
+      "@mcp-b/mcp-iframe",
+      "@mcp-b/global",
+      "@mcp-b/react-webmcp",
+      "usewebmcp",
+      "@mcp-b/webmcp-local-relay",
+      "@mcp-b/chrome-devtools-mcp"
+    ]
+  ],
   "linked": [],
   "access": "public",
   "baseBranch": "main",
