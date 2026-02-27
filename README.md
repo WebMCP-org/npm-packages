@@ -38,27 +38,68 @@ MCP-b **polyfills** that API for all browsers today, and **bridges** it to the f
 
 > Built by [MCP-b](https://docs.mcp-b.ai). Not an official W3C or MCP project.
 
-## Register a Tool
+## Getting Started
 
-```html
-<script src="https://unpkg.com/@mcp-b/global/dist/index.iife.js"></script>
-<script>
-  navigator.modelContext.registerTool({
-    name: 'get_page_title',
-    description: 'Returns the current page title',
-    inputSchema: { type: 'object', properties: {} },
-    execute: async () => ({
-      content: [{ type: 'text', text: document.title }],
-    }),
-  });
-</script>
-```
+### 1. Use the web standard directly
 
-Or with npm (`pnpm add @mcp-b/global`):
+If you're running Chrome with [`--enable-experimental-web-platform-features`](./e2e/web-standards-showcase/CHROMIUM_FLAGS.md), `navigator.modelContext` is already there. Just use it:
 
 ```ts
-import '@mcp-b/global';
+// No imports needed — it's a browser API
+navigator.modelContext.registerTool({
+  name: 'get_page_title',
+  description: 'Returns the current page title',
+  inputSchema: { type: 'object', properties: {} },
+  execute: async () => ({
+    content: [{ type: 'text', text: document.title }],
+  }),
+});
+```
 
+For TypeScript, add the type definitions: `pnpm add -D @mcp-b/webmcp-types`
+
+### 2. Polyfill it
+
+Want it to work in **any browser** without the Chrome flag? Add the polyfill — same API, same code:
+
+```ts
+import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill'; // pnpm add @mcp-b/webmcp-polyfill
+
+initializeWebMCPPolyfill(); // no-op if native support exists
+
+navigator.modelContext.registerTool({
+  name: 'get_page_title',
+  description: 'Returns the current page title',
+  inputSchema: { type: 'object', properties: {} },
+  execute: async () => ({
+    content: [{ type: 'text', text: document.title }],
+  }),
+});
+```
+
+Or with React: `pnpm add usewebmcp`
+
+```tsx
+import { useWebMCP } from 'usewebmcp';
+
+function PageTitle() {
+  useWebMCP({
+    name: 'get_page_title',
+    description: 'Returns the current page title',
+    execute: async () => ({ title: document.title }),
+  });
+  // ...
+}
+```
+
+### 3. Full MCP server
+
+Need the full [Model Context Protocol](https://modelcontextprotocol.io/) — prompts, resources, sampling, transports, interop with Claude Desktop / Cursor / any MCP client? Use `@mcp-b/global`:
+
+```ts
+import '@mcp-b/global'; // pnpm add @mcp-b/global
+
+// Same registerTool API — now backed by a full MCP server
 navigator.modelContext.registerTool({
   name: 'add_todo',
   description: 'Add a new todo item',
@@ -76,7 +117,16 @@ navigator.modelContext.registerTool({
 });
 ```
 
-Or with React (`pnpm add @mcp-b/react-webmcp`):
+Or as a script tag (zero build step):
+
+```html
+<script src="https://unpkg.com/@mcp-b/global/dist/index.iife.js"></script>
+<script>
+  navigator.modelContext.registerTool({ /* ... */ });
+</script>
+```
+
+Or with React: `pnpm add @mcp-b/react-webmcp`
 
 ```tsx
 import { useWebMCP } from '@mcp-b/react-webmcp';
