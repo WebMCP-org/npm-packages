@@ -1,6 +1,11 @@
 import type { InputSchema, ToolResponse } from './common.js';
 import type { JsonSchemaForInference, JsonSchemaObject } from './json-schema.js';
-import type { ToolDescriptor, ToolDescriptorFromSchema, ToolListItem } from './tool.js';
+import type {
+  ToolDescriptor,
+  ToolDescriptorFromSchema,
+  ToolListItem,
+  ToolRawResult,
+} from './tool.js';
 
 // ============================================================================
 // Model Context Input
@@ -205,10 +210,9 @@ export interface ModelContextCore {
   registerTool<
     TInputSchema extends InputSchema,
     TArgs extends Record<string, unknown> = Record<string, unknown>,
-    TResult = unknown,
     TName extends string = string,
   >(
-    tool: ToolDescriptor<TArgs, TResult, TName> & {
+    tool: ToolDescriptor<TArgs, ToolRawResult, TName> & {
       inputSchema: TInputSchema;
     } & (TInputSchema extends InputSchema
         ? string extends TInputSchema['type']
@@ -223,10 +227,9 @@ export interface ModelContextCore {
    */
   registerTool<
     TArgs extends Record<string, unknown> = Record<string, unknown>,
-    TResult = unknown,
     TName extends string = string,
   >(
-    tool: Omit<ToolDescriptor<TArgs, TResult, TName>, 'inputSchema'> & {
+    tool: Omit<ToolDescriptor<TArgs, ToolRawResult, TName>, 'inputSchema'> & {
       inputSchema?: undefined;
     }
   ): void;
