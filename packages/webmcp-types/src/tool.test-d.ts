@@ -12,6 +12,7 @@ import type {
   ModelContextClient,
   ToolAnnotations,
   ToolDescriptor,
+  ToolExecuteResultFromOutputSchema,
   ToolExecutionContext,
   ToolListItem,
   ToolResultFromOutputSchema,
@@ -173,4 +174,60 @@ test('ToolListItem mirrors ToolDescriptor metadata without execute', () => {
 
 test('ToolListItem supports literal tool names via generics', () => {
   expectTypeOf<ToolListItem<'search'>['name']>().toEqualTypeOf<'search'>();
+});
+
+// ============================================================================
+// Non-object outputSchema support
+// ============================================================================
+
+test('ToolResultFromOutputSchema returns plain CallToolResult for string schema', () => {
+  type StringSchema = { type: 'string' };
+  type Result = ToolResultFromOutputSchema<StringSchema>;
+  expectTypeOf<Result>().toEqualTypeOf<CallToolResult>();
+});
+
+test('ToolResultFromOutputSchema returns plain CallToolResult for array schema', () => {
+  type ArraySchema = { type: 'array'; items: { type: 'number' } };
+  type Result = ToolResultFromOutputSchema<ArraySchema>;
+  expectTypeOf<Result>().toEqualTypeOf<CallToolResult>();
+});
+
+test('ToolResultFromOutputSchema returns plain CallToolResult for number schema', () => {
+  type NumberSchema = { type: 'number' };
+  type Result = ToolResultFromOutputSchema<NumberSchema>;
+  expectTypeOf<Result>().toEqualTypeOf<CallToolResult>();
+});
+
+test('ToolResultFromOutputSchema returns plain CallToolResult for boolean schema', () => {
+  type BooleanSchema = { type: 'boolean' };
+  type Result = ToolResultFromOutputSchema<BooleanSchema>;
+  expectTypeOf<Result>().toEqualTypeOf<CallToolResult>();
+});
+
+test('ToolExecuteResultFromOutputSchema allows string return for string schema', () => {
+  type StringSchema = { type: 'string' };
+  type Result = ToolExecuteResultFromOutputSchema<StringSchema>;
+  expectTypeOf<string>().toMatchTypeOf<Result>();
+  expectTypeOf<CallToolResult>().toMatchTypeOf<Result>();
+});
+
+test('ToolExecuteResultFromOutputSchema allows number return for number schema', () => {
+  type NumberSchema = { type: 'number' };
+  type Result = ToolExecuteResultFromOutputSchema<NumberSchema>;
+  expectTypeOf<number>().toMatchTypeOf<Result>();
+  expectTypeOf<CallToolResult>().toMatchTypeOf<Result>();
+});
+
+test('ToolExecuteResultFromOutputSchema allows boolean return for boolean schema', () => {
+  type BooleanSchema = { type: 'boolean' };
+  type Result = ToolExecuteResultFromOutputSchema<BooleanSchema>;
+  expectTypeOf<boolean>().toMatchTypeOf<Result>();
+  expectTypeOf<CallToolResult>().toMatchTypeOf<Result>();
+});
+
+test('ToolExecuteResultFromOutputSchema allows array return for array schema', () => {
+  type ArraySchema = { type: 'array'; items: { type: 'number' } };
+  type Result = ToolExecuteResultFromOutputSchema<ArraySchema>;
+  expectTypeOf<number[]>().toMatchTypeOf<Result>();
+  expectTypeOf<CallToolResult>().toMatchTypeOf<Result>();
 });

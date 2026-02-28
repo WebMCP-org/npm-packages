@@ -1,5 +1,5 @@
 import type { InputSchema, ToolResponse } from './common.js';
-import type { JsonSchemaForInference, JsonSchemaObject } from './json-schema.js';
+import type { JsonSchemaForInference } from './json-schema.js';
 import type {
   ToolDescriptor,
   ToolDescriptorFromSchema,
@@ -200,7 +200,7 @@ export interface ModelContextCore {
    */
   registerTool<
     TInputSchema extends JsonSchemaForInference,
-    TOutputSchema extends JsonSchemaObject | undefined = undefined,
+    TOutputSchema extends JsonSchemaForInference | undefined = undefined,
     TName extends string = string,
   >(tool: ToolDescriptorFromSchema<TInputSchema, TOutputSchema, TName>): void;
 
