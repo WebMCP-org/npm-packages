@@ -1291,6 +1291,62 @@ mcp__docs__SearchWebMcpDocumentation("tool annotations destructiveHint")
 - Debugging (use Chrome DevTools MCP)
 - Implementation details (use WebMCP Docs MCP)
 
+## Writing Skill Content (`<script type="agent-context">`)
+
+Skills provide domain knowledge that tools can't structurally express — workflow guidance, lookup tables, inference rules, and constraints. Add skill content to your HTML using `<script type="agent-context">` tags.
+
+### Reference Tool Names Directly
+
+Skills should reference tool names explicitly. This helps models map domain knowledge to the correct tool calls:
+
+```html
+<script type="agent-context">
+---
+name: my-app
+description: Manage tasks in my app.
+tools:
+  - create_task
+  - list_tasks
+  - update_task
+---
+Create and manage tasks. Use `create_task` for new items
+and `list_tasks` to browse existing ones.
+
+Resources:
+- [workflow](references/workflow) — Step-by-step tool sequence for common tasks.
+</script>
+```
+
+### Skill Content Guidelines
+
+- **`tools` array in frontmatter** — List every tool the skill relates to. This creates an explicit coupling between the skill and its tools.
+- **Reference tools in resource content** — When describing workflows, parameters, or mappings, name the specific tool (e.g., "Pass the emoji to `add_topping`" not "Add the emoji as a topping").
+- **Don't duplicate tool descriptions** — The tool already describes *what* it does and *how* to call it. The skill describes *when* to use it, *why*, and domain knowledge the tool can't carry (lookup tables, business rules, workflow order).
+- **Resources for progressive disclosure** — Put detailed reference data (code tables, conversion tables, constraint lists) in separate `<script type="agent-context/reference">` tags. This lets smaller models fetch knowledge on demand instead of loading everything upfront.
+
+### Example: Tool Reference in a Resource
+
+```html
+<script type="agent-context/reference" data-skill="my-app" data-name="workflow">
+## Build Order
+
+1. `set_size` — Choose the size first
+2. `set_style` — Pick a style
+3. `add_item` — Add items on top
+4. `share` — Share when done
+
+## Size Inference
+
+When the user mentions a group size, infer the right value for `set_size`:
+
+| Group size | Value       |
+|------------|-------------|
+| 1-2 people | Small       |
+| 3-4 people | Medium      |
+| 5+ people  | Large       |
+</script>
+```
+
 ## Workflow Summary
 
 1. **Understand the app** - What can humans do?

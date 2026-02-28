@@ -4,7 +4,12 @@ import type {
   ElicitationResult,
   InputSchema,
 } from './common.js';
-import type { InferArgsFromInputSchema, InferJsonSchema, JsonSchemaObject } from './json-schema.js';
+import type {
+  InferArgsFromInputSchema,
+  InferJsonSchema,
+  JsonSchemaForInference,
+  JsonSchemaObject,
+} from './json-schema.js';
 
 // ============================================================================
 // Tool Annotations
@@ -143,7 +148,7 @@ export interface ToolDescriptor<
  * @template TOutputSchema - Optional literal JSON object schema.
  */
 export type ToolResultFromOutputSchema<
-  TOutputSchema extends JsonSchemaObject | undefined = undefined,
+  TOutputSchema extends JsonSchemaForInference | undefined = undefined,
 > = TOutputSchema extends JsonSchemaObject
   ? CallToolResult & { structuredContent?: InferJsonSchema<TOutputSchema> }
   : CallToolResult;
@@ -152,10 +157,12 @@ export type ToolResultFromOutputSchema<
  * Execute result typing derived from an optional output schema.
  */
 export type ToolExecuteResultFromOutputSchema<
-  TOutputSchema extends JsonSchemaObject | undefined = undefined,
+  TOutputSchema extends JsonSchemaForInference | undefined = undefined,
 > = TOutputSchema extends JsonSchemaObject
   ? InferJsonSchema<TOutputSchema> | ToolResultFromOutputSchema<TOutputSchema>
-  : ToolExecuteResult;
+  : TOutputSchema extends JsonSchemaForInference
+    ? InferJsonSchema<TOutputSchema> | CallToolResult
+    : ToolExecuteResult;
 
 /**
  * Tool descriptor whose `execute` args are inferred from a JSON Schema.
@@ -170,7 +177,7 @@ export type ToolExecuteResultFromOutputSchema<
  */
 export type ToolDescriptorFromSchema<
   TInputSchema extends { type?: string | readonly string[] },
-  TOutputSchema extends JsonSchemaObject | undefined = undefined,
+  TOutputSchema extends JsonSchemaForInference | undefined = undefined,
   TName extends string = string,
 > = Omit<
   ToolDescriptor<
@@ -181,7 +188,7 @@ export type ToolDescriptorFromSchema<
   'inputSchema' | 'outputSchema'
 > & {
   inputSchema: TInputSchema;
-} & (TOutputSchema extends JsonSchemaObject
+} & (TOutputSchema extends JsonSchemaForInference
     ? {
         outputSchema: TOutputSchema;
       }

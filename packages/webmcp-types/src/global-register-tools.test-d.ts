@@ -336,3 +336,263 @@ test('global registerTool accepts widened-schema tools returning raw values', ()
     },
   });
 });
+
+// ============================================================================
+// Non-object outputSchema integration tests
+// ============================================================================
+
+test('global registerTool accepts string outputSchema with raw string return', () => {
+  if (!shouldInvokeRegisterTool) {
+    return;
+  }
+
+  navigator.modelContext.registerTool({
+    name: 'string_output_raw',
+    description: 'Tool with string outputSchema returning raw string',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string' },
+      },
+      required: ['message'],
+    } as const satisfies JsonSchemaForInference,
+    outputSchema: {
+      type: 'string',
+      description: 'A status message',
+    } as const satisfies JsonSchemaForInference,
+    execute(args) {
+      return `Processed: ${args.message}`;
+    },
+  });
+});
+
+test('global registerTool accepts string outputSchema with CallToolResult return', () => {
+  if (!shouldInvokeRegisterTool) {
+    return;
+  }
+
+  navigator.modelContext.registerTool({
+    name: 'string_output_wrapped',
+    description: 'Tool with string outputSchema returning CallToolResult',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string' },
+      },
+      required: ['message'],
+    } as const satisfies JsonSchemaForInference,
+    outputSchema: {
+      type: 'string',
+      description: 'A status message',
+    } as const satisfies JsonSchemaForInference,
+    execute(args) {
+      return {
+        content: [{ type: 'text', text: args.message }],
+      };
+    },
+  });
+});
+
+test('global registerTool accepts array outputSchema', () => {
+  if (!shouldInvokeRegisterTool) {
+    return;
+  }
+
+  navigator.modelContext.registerTool({
+    name: 'array_output',
+    description: 'Tool with array outputSchema',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    } as const satisfies JsonSchemaForInference,
+    outputSchema: {
+      type: 'array',
+      items: { type: 'string' },
+    } as const satisfies JsonSchemaForInference,
+    execute() {
+      return ['item1', 'item2'];
+    },
+  });
+});
+
+test('global registerTool accepts number outputSchema', () => {
+  if (!shouldInvokeRegisterTool) {
+    return;
+  }
+
+  navigator.modelContext.registerTool({
+    name: 'number_output',
+    description: 'Tool with number outputSchema',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        a: { type: 'number' },
+        b: { type: 'number' },
+      },
+      required: ['a', 'b'],
+    } as const satisfies JsonSchemaForInference,
+    outputSchema: {
+      type: 'number',
+    } as const satisfies JsonSchemaForInference,
+    execute(args) {
+      return args.a + args.b;
+    },
+  });
+});
+
+test('global registerTool accepts boolean outputSchema', () => {
+  if (!shouldInvokeRegisterTool) {
+    return;
+  }
+
+  navigator.modelContext.registerTool({
+    name: 'boolean_output',
+    description: 'Tool with boolean outputSchema',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        value: { type: 'string' },
+      },
+      required: ['value'],
+    } as const satisfies JsonSchemaForInference,
+    outputSchema: {
+      type: 'boolean',
+    } as const satisfies JsonSchemaForInference,
+    execute(args) {
+      return args.value.length > 0;
+    },
+  });
+});
+
+test('global registerTool rejects mismatched return for string outputSchema', () => {
+  if (!shouldInvokeRegisterTool) {
+    return;
+  }
+
+  // @ts-expect-error - execute returns number but outputSchema expects string
+  navigator.modelContext.registerTool({
+    name: 'string_output_mismatch',
+    description: 'Mismatched return type for string outputSchema',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    } as const satisfies JsonSchemaForInference,
+    outputSchema: {
+      type: 'string',
+    } as const satisfies JsonSchemaForInference,
+    execute() {
+      return 42;
+    },
+  });
+});
+
+test('global registerTool rejects mismatched return for number outputSchema', () => {
+  if (!shouldInvokeRegisterTool) {
+    return;
+  }
+
+  // @ts-expect-error - execute returns string but outputSchema expects number
+  navigator.modelContext.registerTool({
+    name: 'number_output_mismatch',
+    description: 'Mismatched return type for number outputSchema',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    } as const satisfies JsonSchemaForInference,
+    outputSchema: {
+      type: 'number',
+    } as const satisfies JsonSchemaForInference,
+    execute() {
+      return 'not a number';
+    },
+  });
+});
+
+// ============================================================================
+// Real-world usage patterns — "don't fight users" contract
+//
+// These tests codify patterns seen in the wild (e.g. Google's react-flightsearch
+// demo) that must always compile. Type inference via `as const satisfies` is an
+// opt-in bonus, not a requirement. The type system should never fight what
+// developers are already doing.
+// ============================================================================
+
+test('global registerTool accepts empty inputSchema {}', () => {
+  if (!shouldInvokeRegisterTool) {
+    return;
+  }
+
+  // inputSchema: {} is common for no-arg tools — must compile
+  navigator.modelContext.registerTool({
+    name: 'empty_schema_tool',
+    description: 'Tool with empty inputSchema object',
+    inputSchema: {},
+    execute() {
+      return { content: [{ type: 'text', text: 'done' }] };
+    },
+  });
+});
+
+test('global registerTool accepts widened primitive outputSchema with raw return', () => {
+  if (!shouldInvokeRegisterTool) {
+    return;
+  }
+
+  // Primitive outputSchema WITHOUT as const satisfies + raw return
+  navigator.modelContext.registerTool({
+    name: 'primitive_output_raw',
+    description: 'Widened primitive outputSchema with raw string return',
+    inputSchema: { type: 'object', properties: {} },
+    outputSchema: { type: 'string' },
+    execute() {
+      return 'done';
+    },
+  });
+});
+
+test('global registerTool accepts full literal schemas with as const satisfies', () => {
+  if (!shouldInvokeRegisterTool) {
+    return;
+  }
+
+  // Full inference path — inputSchema + outputSchema with as const satisfies
+  navigator.modelContext.registerTool({
+    name: 'full_inference',
+    description: 'Fully inferred tool',
+    inputSchema: {
+      type: 'object',
+      properties: { query: { type: 'string' } },
+      required: ['query'],
+    } as const satisfies JsonSchemaForInference,
+    outputSchema: {
+      type: 'object',
+      properties: { count: { type: 'integer' } },
+      required: ['count'],
+    } as const satisfies JsonSchemaForInference,
+    execute(args) {
+      const q: string = args.query;
+      void q;
+      return { count: 42 };
+    },
+  });
+});
+
+test('global registerTool accepts literal inputSchema with raw return and no outputSchema', () => {
+  if (!shouldInvokeRegisterTool) {
+    return;
+  }
+
+  // Literal inputSchema for arg inference, but raw return (no outputSchema)
+  navigator.modelContext.registerTool({
+    name: 'inferred_args_raw_return',
+    description: 'Inferred args with raw return',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string' } },
+      required: ['id'],
+    } as const satisfies JsonSchemaForInference,
+    async execute(args) {
+      return `Found: ${args.id}`;
+    },
+  });
+});

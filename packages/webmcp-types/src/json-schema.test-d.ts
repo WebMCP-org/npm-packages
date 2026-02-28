@@ -428,3 +428,121 @@ test('ModelContext.registerTool keeps execute args unknown for runtime schemas',
     });
   }
 });
+
+// ============================================================================
+// Non-object outputSchema support for ToolDescriptorFromSchema
+// ============================================================================
+
+const stringOutputSchema = {
+  type: 'string',
+  description: 'A status message',
+} as const satisfies JsonSchemaForInference;
+
+const arrayOutputSchema = {
+  type: 'array',
+  items: { type: 'number' },
+} as const satisfies JsonSchemaForInference;
+
+const numberOutputSchema = {
+  type: 'number',
+} as const satisfies JsonSchemaForInference;
+
+test('ToolDescriptorFromSchema infers string return type from string outputSchema', () => {
+  type ExecuteResult = Awaited<
+    ReturnType<ToolDescriptorFromSchema<typeof closedSchema, typeof stringOutputSchema>['execute']>
+  >;
+
+  const rawResult: ExecuteResult = 'success';
+  void rawResult;
+});
+
+test('ToolDescriptorFromSchema infers array return type from array outputSchema', () => {
+  type ExecuteResult = Awaited<
+    ReturnType<ToolDescriptorFromSchema<typeof closedSchema, typeof arrayOutputSchema>['execute']>
+  >;
+
+  const rawResult: ExecuteResult = [1, 2, 3];
+  void rawResult;
+});
+
+test('ToolDescriptorFromSchema infers number return type from number outputSchema', () => {
+  type ExecuteResult = Awaited<
+    ReturnType<ToolDescriptorFromSchema<typeof closedSchema, typeof numberOutputSchema>['execute']>
+  >;
+
+  const rawResult: ExecuteResult = 42;
+  void rawResult;
+});
+
+test('ToolDescriptorFromSchema requires outputSchema when string output generic is provided', () => {
+  // @ts-expect-error - outputSchema is required when output generic parameter is set
+  const tool: ToolDescriptorFromSchema<typeof closedSchema, typeof stringOutputSchema> = {
+    name: 'missing_string_output_schema',
+    description: 'Missing string output schema should fail',
+    inputSchema: closedSchema,
+    execute() {
+      return 'result';
+    },
+  };
+  void tool;
+});
+
+test('ToolDescriptorFromSchema with object outputSchema preserves structuredContent', () => {
+  type ExecuteResult = Awaited<
+    ReturnType<ToolDescriptorFromSchema<typeof closedSchema, typeof outputSchema>['execute']>
+  >;
+
+  // Object outputSchema should allow structuredContent
+  const wrappedResult: ExecuteResult = {
+    content: [{ type: 'text', text: 'ok' }],
+    structuredContent: { total: 1, items: ['a'] },
+  };
+
+  // Object outputSchema should also allow raw return
+  const rawResult: ExecuteResult = { total: 1, items: ['a'] };
+
+  void wrappedResult;
+  void rawResult;
+});
+
+test('ModelContext.registerTool accepts string outputSchema', () => {
+  if (shouldInvokeRegisterTool) {
+    registerTool({
+      name: 'string_output_tool',
+      description: 'Tool with string output schema',
+      inputSchema: closedSchema,
+      outputSchema: stringOutputSchema,
+      execute(args) {
+        return `Results for ${args.query}`;
+      },
+    });
+  }
+});
+
+test('ModelContext.registerTool accepts array outputSchema', () => {
+  if (shouldInvokeRegisterTool) {
+    registerTool({
+      name: 'array_output_tool',
+      description: 'Tool with array output schema',
+      inputSchema: closedSchema,
+      outputSchema: arrayOutputSchema,
+      execute() {
+        return [1, 2, 3];
+      },
+    });
+  }
+});
+
+test('ModelContext.registerTool accepts number outputSchema', () => {
+  if (shouldInvokeRegisterTool) {
+    registerTool({
+      name: 'number_output_tool',
+      description: 'Tool with number output schema',
+      inputSchema: closedSchema,
+      outputSchema: numberOutputSchema,
+      execute() {
+        return 42;
+      },
+    });
+  }
+});
