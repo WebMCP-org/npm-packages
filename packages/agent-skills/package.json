@@ -1,0 +1,55 @@
+{
+  "name": "@mcp-b/agent-skills",
+  "version": "2.0.5",
+  "private": false,
+  "description": "TypeScript parser, validator, prompt, and patch utilities for the AgentSkills specification",
+  "homepage": "https://docs.mcp-b.ai",
+  "bugs": {
+    "url": "https://github.com/WebMCP-org/npm-packages/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WebMCP-org/npm-packages.git",
+    "directory": "packages/agent-skills"
+  },
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "check:types": "tsc --noEmit",
+    "clean": "rm -rf dist coverage",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "yaml": "^2.8.2"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=22.12"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}
