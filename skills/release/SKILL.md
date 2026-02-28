@@ -5,137 +5,187 @@ description: This skill should be used when the user wants to publish a package 
 
 # Release Skill for @mcp-b Packages
 
-Publish packages from this monorepo to npm. Uses `pnpm publish -r` for automatic topological ordering so dependencies are always published before dependents.
+Publish packages from this monorepo to npm using **changesets** and `pnpm publish -r`.
 
-## When to Use This Skill
+## CRITICAL: Always Use Changesets
 
-- Publishing new package versions to npm
-- Creating changesets for version bumps
-- Beta/canary/preview releases
-- Troubleshooting failed publishes or dependency chain issues
+**NEVER manually edit package.json versions.** Manual bumps skip CHANGELOG generation,
+which means published versions have no record of what changed. This has happened before
+and must not happen again.
+
+The ONLY exception is beta/canary releases (see below), which use throwaway versions.
+
+## Release Flow (Step by Step)
+
+Follow these steps in order. Do not skip steps.
+
+### Step 1: Validate
+
+```bash
+pnpm build && pnpm typecheck && pnpm check && pnpm test:unit
+```
+
+Stop if anything fails. Fix it first.
+
+### Step 2: Create Changeset
+
+```bash
+pnpm changeset
+```
+
+This is interactive. It will ask:
+1. Which packages changed? Select only the ones with actual code changes.
+2. What kind of bump? (patch / minor / major)
+3. Summary of changes? Write a clear description.
+
+This creates a `.changeset/<random-name>.md` file. You can create multiple changesets
+for different changes before releasing.
+
+**Fixed versioning note:** You only select packages that actually changed. Changesets
+automatically bumps ALL packages in the fixed group to the same new version. This is
+configured in `.changeset/config.json`.
+
+### Step 3: Apply Version Bumps
+
+```bash
+pnpm changeset version
+```
+
+This does three things:
+1. Bumps `version` in all `package.json` files (fixed — all get the same version)
+2. Generates `CHANGELOG.md` entries from the changeset summaries
+3. Deletes the consumed `.changeset/*.md` files
+
+### Step 4: Review
+
+```bash
+# Check version bumps
+git diff packages/*/package.json
+
+# Check generated changelogs
+git diff packages/*/CHANGELOG.md
+```
+
+Verify the CHANGELOGs look correct before proceeding.
+
+### Step 5: Load NPM Auth
+
+```bash
+export $(grep -v '^#' .env | xargs)
+```
+
+The NPM_TOKEN is stored in `.env` at the repo root (gitignored). If you see
+"Access token expired or revoked", the user needs to regenerate their npm token
+at https://www.npmjs.com/settings/tokens.
+
+### Step 6: Publish
+
+```bash
+pnpm publish -r --access public --no-git-checks
+```
+
+This publishes ALL packages whose local version doesn't yet exist on npm, in
+topological order (dependencies before dependents).
+
+**Never use `npm publish`** — only pnpm resolves `workspace:*` and `catalog:` protocols.
+
+### Step 7: Verify
+
+```bash
+# Quick check: all published versions match local
+for pkg in webmcp-types webmcp-polyfill webmcp-ts-sdk transports global mcp-iframe extension-tools react-webmcp smart-dom-reader webmcp-local-relay chrome-devtools-mcp agent-skills; do
+  LOCAL=$(node -p "require('./packages/$pkg/package.json').version" 2>/dev/null)
+  NPM=$(npm view @mcp-b/$pkg version 2>/dev/null)
+  echo "@mcp-b/$pkg: local=$LOCAL npm=$NPM"
+done
+echo "usewebmcp: local=$(node -p "require('./packages/usewebmcp/package.json').version") npm=$(npm view usewebmcp version 2>/dev/null)"
+echo "agent-skills-ts-sdk: local=$(node -p "require('./packages/agent-skills/package.json').version") npm=$(npm view agent-skills-ts-sdk version 2>/dev/null)"
+```
+
+With fixed versioning, ALL versions should be the SAME number.
+
+### Step 8: Commit and Push
+
+```bash
+git add .
+git commit -m "chore(release): version packages"
+git push origin main
+```
+
+### Step 9: Create GitHub Release (Optional)
+
+```bash
+VERSION=$(node -p "require('./packages/global/package.json').version")
+gh release create "v$VERSION" --title "v$VERSION" --generate-notes --target main
+```
+
+To attach an MCPB bundle for webmcp-local-relay:
+
+```bash
+cd packages/webmcp-local-relay && pnpm run build:mcpb && cd ../..
+gh release upload "v$VERSION" packages/webmcp-local-relay/webmcp-local-relay-$VERSION.mcpb
+```
+
+## Alternative: CI-Driven Release (Fully Automated)
+
+Instead of publishing locally, let CI handle it:
+
+1. `pnpm changeset` — create changeset locally
+2. `git add .changeset/ && git commit -m "chore: add changeset" && git push`
+3. CI creates a "Version Packages" PR with bumped versions and changelogs
+4. Merge the PR — CI runs `pnpm ci:publish` (`pnpm publish -r --access public`) automatically
+5. CI also builds MCPB bundles, creates GitHub releases, and signs with sigstore
+
+## Beta / Preview Releases
+
+Beta releases use throwaway versions and do NOT go through changesets. Do NOT commit
+the version change — revert it after publishing.
+
+```bash
+# 1. Generate timestamp version
+TIMESTAMP=$(date +%Y%m%d%H%M%S)
+
+# 2. Bump to beta version (do NOT commit this)
+npm version 0.0.0-beta-$TIMESTAMP --no-git-tag-version --prefix packages/<package-name>
+
+# 3. Build
+pnpm --filter @mcp-b/<package-name> build
+
+# 4. Publish with beta tag
+export $(grep -v '^#' .env | xargs)
+pnpm publish --filter @mcp-b/<package-name> --access public --no-git-checks --tag beta
+
+# 5. REVERT the version change
+git checkout packages/<package-name>/package.json
+```
+
+Install beta versions: `pnpm add @mcp-b/<package-name>@beta`
+
+## Canary Releases (via Changesets Snapshots)
+
+```bash
+pnpm changeset version --snapshot canary
+pnpm publish -r --access public --tag canary --no-git-checks
+# Revert: git checkout .
+```
 
 ## Fixed Versioning Strategy
 
-**All packages in this monorepo share the same version number.** When any package changes, ALL packages bump to the same new version together. This is enforced by the `"fixed"` setting in `.changeset/config.json`.
+**All packages share the same version number.** This is enforced by the `"fixed"` setting
+in `.changeset/config.json`. When any package changes, ALL packages bump together.
 
-This is the same strategy used by Angular, Babel, Jest, and Nx. Benefits:
-
+Benefits:
 - **No stale transitive chains** — every package depends on the same version of its siblings
 - **Instant mismatch detection** — if `global@2.0.5` depends on `transports@2.0.4`, something's wrong
 - **Simple for consumers** — "I'm on WebMCP 2.0.5" instead of juggling 12 different version numbers
 
-When creating a changeset, you only need to select the packages that actually changed. Changesets will automatically bump ALL packages in the fixed group to the same new version.
+## How `pnpm publish -r` Works
 
-## How Publishing Works
+All internal dependencies use `"workspace:*"` in package.json. When `pnpm publish` runs,
+it resolves `workspace:*` to the current local version. `pnpm publish -r` publishes in
+topological order automatically and skips versions that already exist on npm.
 
-All internal dependencies use `"workspace:*"` in package.json. When `pnpm publish` runs, it resolves `workspace:*` to the **current local version** of that dependency. This means:
-
-- Versions must be bumped locally BEFORE publishing
-- `pnpm publish -r` publishes in **topological order** automatically (dependencies before dependents)
-- Since all local versions are already bumped, every `workspace:*` resolves to the correct new version
-
-**The key insight**: Changesets bumps all versions locally (all to the same version), then `pnpm publish -r` handles the correct publish order. These two tools are designed to work together.
-
-**Never use `npm publish`** — only pnpm resolves `workspace:*` and `catalog:` protocols.
-
-## Standard Release Workflow (Recommended)
-
-### Option A: Changesets + Recursive Publish (Preferred)
-
-```bash
-# 1. Validate everything passes
-pnpm build && pnpm typecheck && pnpm check && pnpm test:unit
-
-# 2. Create changesets (interactive — select packages, bump type, description)
-pnpm changeset
-
-# 3. Apply version bumps to all affected packages (including dependents)
-pnpm changeset version
-
-# 4. Review what changed
-git diff packages/*/package.json
-
-# 5. Ensure npm auth is available
-npm whoami  # Must be logged in
-export $(grep -v '^#' .env | xargs)  # Load NPM_TOKEN
-
-# 6. Publish ALL changed packages in topological order
-pnpm publish -r --access public --no-git-checks
-
-# 7. Verify the dependency chain
-pnpm run verify:published  # Or use manual verification commands below
-
-# 8. Commit and push
-git add .
-git commit -m "chore(release): publish packages"
-git push origin main
-```
-
-### Option B: CI-Driven (Fully Automated)
-
-1. `pnpm changeset` — create changeset locally
-2. `git add .changeset/ && git commit && git push`
-3. CI creates a "Version Packages" PR with bumped versions and changelogs
-4. Merge the PR — CI runs `pnpm publish -r` automatically
-
-### Option C: Manual Version Bump + Recursive Publish
-
-When you need to bypass changesets (hotfix, emergency release):
-
-```bash
-# 1. Validate
-pnpm build && pnpm typecheck && pnpm check && pnpm test:unit
-
-# 2. Bump versions manually (edit package.json files directly)
-# Bump ALL packages that changed, PLUS any downstream dependents
-
-# 3. Auth
-npm whoami
-export $(grep -v '^#' .env | xargs)
-
-# 4. Publish in topological order
-pnpm publish -r --access public --no-git-checks
-
-# 5. Verify and commit
-git add packages/*/package.json
-git commit -m "chore(release): publish <packages>"
-git push origin main
-```
-
-## Publishing a Single Package
-
-If only ONE package changed and it has NO downstream dependents that need updating:
-
-```bash
-export $(grep -v '^#' .env | xargs)
-pnpm publish --filter @mcp-b/<package-name> --access public --no-git-checks
-```
-
-**WARNING**: If the package is a dependency of other packages (check the dependency graph below), you MUST also republish the dependents or their `workspace:*` references will be stale. In most cases, just use `pnpm publish -r` instead — it only publishes packages whose versions aren't yet on npm.
-
-## Complete Dependency Graph
-
-```
-@mcp-b/webmcp-types          (no internal deps)
-@mcp-b/smart-dom-reader      (no internal deps)
-@mcp-b/webmcp-local-relay    (no internal deps)
-@mcp-b/chrome-devtools-mcp   (no internal deps)
-
-@mcp-b/webmcp-polyfill       → webmcp-types
-@mcp-b/webmcp-ts-sdk         → webmcp-polyfill, webmcp-types
-@mcp-b/transports            → webmcp-ts-sdk
-@mcp-b/extension-tools       → smart-dom-reader, webmcp-ts-sdk
-@mcp-b/mcp-iframe            → transports, webmcp-ts-sdk, webmcp-types
-@mcp-b/global                → transports, webmcp-polyfill, webmcp-ts-sdk, webmcp-types
-@mcp-b/react-webmcp          → global, transports, webmcp-polyfill, webmcp-ts-sdk, webmcp-types
-usewebmcp                    → webmcp-polyfill, webmcp-types
-```
-
-**Important**: `usewebmcp` is a standalone package with its own `useWebMCP` hook. It depends on the polyfill directly. It is NOT an alias for `@mcp-b/react-webmcp`.
-
-### Topological Publish Order (for reference)
-
-`pnpm publish -r` handles this automatically. This is documented here only so you understand the order and can debug issues.
+### Topological Publish Order
 
 ```
 Tier 0 (no internal deps):
@@ -157,129 +207,47 @@ Tier 5 (← Tier 4):
   @mcp-b/react-webmcp, usewebmcp
 
 Independent (no internal deps):
-  @mcp-b/webmcp-local-relay, @mcp-b/chrome-devtools-mcp
+  @mcp-b/webmcp-local-relay, @mcp-b/chrome-devtools-mcp, agent-skills-ts-sdk
 ```
 
-## Why `pnpm publish -r` Prevents Stale Chains
+## Complete Dependency Graph
 
-When publishing manually one-by-one with `--filter`, you risk publishing a dependent before its dependency's new version is live. The dependent's `workspace:*` resolves to the LOCAL version (which is correct), but if an earlier package in the chain wasn't published yet, consumers pulling from npm get a mix of old and new versions.
-
-`pnpm publish -r` solves this because:
-1. It topologically sorts packages by dependency graph
-2. It publishes dependencies before dependents
-3. `workspace:*` resolves to local versions, which are already bumped by changesets
-4. It skips packages whose current version already exists on npm
-
-The combination means every package publishes with the correct resolved dependency versions, in the correct order, automatically.
-
-## Beta / Preview Releases
-
-For testing unreleased changes without affecting the `latest` tag:
-
-```bash
-# Generate timestamp-based version
-TIMESTAMP=$(date +%Y%m%d%H%M%S)
-
-# Bump to beta version
-npm version 0.0.0-beta-$TIMESTAMP --no-git-tag-version --prefix packages/<package-name>
-
-# Build
-pnpm --filter @mcp-b/<package-name> build
-
-# Publish with beta tag
-export $(grep -v '^#' .env | xargs)
-pnpm publish --filter @mcp-b/<package-name> --access public --no-git-checks --tag beta
 ```
+@mcp-b/webmcp-types          (no internal deps)
+@mcp-b/smart-dom-reader      (no internal deps)
+@mcp-b/webmcp-local-relay    (no internal deps)
+@mcp-b/chrome-devtools-mcp   (no internal deps)
+agent-skills-ts-sdk           (no internal deps)
 
-Install beta versions:
-```bash
-pnpm add @mcp-b/<package-name>@beta
+@mcp-b/webmcp-polyfill       → webmcp-types
+@mcp-b/webmcp-ts-sdk         → webmcp-polyfill, webmcp-types
+@mcp-b/transports            → webmcp-ts-sdk
+@mcp-b/extension-tools       → smart-dom-reader, webmcp-ts-sdk
+@mcp-b/mcp-iframe            → transports, webmcp-ts-sdk, webmcp-types
+@mcp-b/global                → transports, webmcp-polyfill, webmcp-ts-sdk, webmcp-types
+@mcp-b/react-webmcp          → global, transports, webmcp-polyfill, webmcp-ts-sdk, webmcp-types
+usewebmcp                    → webmcp-polyfill, webmcp-types
 ```
-
-The `--tag beta` flag ensures `pnpm add @mcp-b/<package>` (without tag) still installs the stable version.
-
-## Canary Releases (via Changesets)
-
-```bash
-pnpm changeset version --snapshot canary
-pnpm publish -r --access public --tag canary --no-git-checks
-```
-
-## Post-Publish Verification
-
-After any publish, verify the dependency chain is correct:
-
-```bash
-# Check a specific package's resolved deps
-npm view @mcp-b/<package>@<version> dependencies --json
-
-# Quick check: all published versions
-for pkg in webmcp-types webmcp-polyfill webmcp-ts-sdk transports global mcp-iframe extension-tools react-webmcp smart-dom-reader webmcp-local-relay chrome-devtools-mcp; do
-  LOCAL=$(node -p "require('./packages/$pkg/package.json').version" 2>/dev/null)
-  NPM=$(npm view @mcp-b/$pkg version 2>/dev/null)
-  echo "@mcp-b/$pkg: local=$LOCAL npm=$NPM"
-done
-echo "usewebmcp: local=$(node -p "require('./packages/usewebmcp/package.json').version") npm=$(npm view usewebmcp version 2>/dev/null)"
-
-# Deep chain verification (most critical path)
-echo "--- Verifying global → transports → ts-sdk chain ---"
-GLOBAL_V=$(npm view @mcp-b/global version)
-GLOBAL_TRANSPORTS=$(npm view @mcp-b/global@$GLOBAL_V dependencies --json 2>/dev/null | node -p "JSON.parse(require('fs').readFileSync(0,'utf8'))['@mcp-b/transports']")
-TRANSPORTS_SDK=$(npm view @mcp-b/transports@$GLOBAL_TRANSPORTS dependencies --json 2>/dev/null | node -p "JSON.parse(require('fs').readFileSync(0,'utf8'))['@mcp-b/webmcp-ts-sdk']")
-echo "global@$GLOBAL_V → transports@$GLOBAL_TRANSPORTS → ts-sdk@$TRANSPORTS_SDK"
-```
-
-**What to look for**: With fixed versioning, ALL internal dep versions should be the SAME version number as the package itself (e.g., `global@2.0.5` should depend on `transports@2.0.5`, `ts-sdk@2.0.5`, etc.). If any version differs, something went wrong.
 
 ## Fixing a Stale Dependency Chain
 
-If you discover a stale dependency after publishing (e.g., global@1.6.2 points to transports@2.0.2 which points to ts-sdk@1.6.1):
+If you discover a stale dependency after publishing:
 
 1. You cannot unpublish — npm prevents this after 72 hours
-2. Bump the version of the broken downstream package (e.g., global 1.6.2 → 1.6.3)
-3. Run `pnpm publish -r --access public --no-git-checks` — it will only publish the bumped package
-4. Verify the resolved chain is now correct
-5. Consumers must update to the new version
+2. Create a changeset for the broken package: `pnpm changeset`
+3. `pnpm changeset version` to bump
+4. `pnpm publish -r --access public --no-git-checks`
+5. Verify the resolved chain is now correct
 
-**Prevention**: Always use `pnpm publish -r` instead of publishing individual packages with `--filter`. The recursive publish handles topological ordering automatically.
+## Package Notes
 
-## Package-Specific Notes
-
-### @mcp-b/webmcp-types
-Foundational types package. Almost everything depends on this.
-
-### @mcp-b/webmcp-polyfill
-Provides `navigator.modelContext` + `navigator.modelContextTesting` when the browser lacks native support.
-
-### @mcp-b/webmcp-ts-sdk
-The `BrowserMcpServer` class. Wraps modelContext with MCP extensions. Core package that most others depend on.
-
-### @mcp-b/transports
-Browser MCP transports (Tab, Iframe, Extension).
-
-### @mcp-b/global
-**Dual build output**: ESM (`dist/index.js`) + IIFE (`dist/index.iife.js`). Has the MOST internal dependencies. Most vulnerable to transitive chain issues.
-
-### @mcp-b/extension-tools
-Chrome Extension API tools.
-
-### @mcp-b/mcp-iframe
-Custom element for iframe MCP tools.
-
-### @mcp-b/react-webmcp
-React hooks for MCP. Zod is an optional peer dependency (`^3.25 || ^4.0`).
-
-### usewebmcp
-**Standalone** React hooks package for direct `navigator.modelContext` tool registration. **NOT an alias for react-webmcp.**
-
-### @mcp-b/webmcp-local-relay
-No internal dependencies. Can be published independently at any time.
-
-### @mcp-b/chrome-devtools-mcp
-No internal dependencies. Complex build — always clean build first:
-```bash
-cd packages/chrome-devtools-mcp && rm -rf build/ && pnpm build
-```
+| Package | Notes |
+|---------|-------|
+| `@mcp-b/webmcp-types` | Foundational types. Almost everything depends on this. |
+| `@mcp-b/global` | Dual build (ESM + IIFE). Most internal deps. Most vulnerable to chain issues. |
+| `@mcp-b/chrome-devtools-mcp` | Complex build — always `rm -rf build/` before building. |
+| `usewebmcp` | Standalone package. NOT an alias for react-webmcp. |
+| `agent-skills-ts-sdk` | Published as `agent-skills-ts-sdk` (NOT `@mcp-b/agent-skills`). |
 
 ## NPM Authentication
 
@@ -295,42 +263,26 @@ export $(grep -v '^#' .env | xargs)
 ```
 
 ### CI (GitHub Secret)
-```bash
-gh secret set NPM_TOKEN --body "npm_YOUR_TOKEN_HERE"
-```
+Set via `gh secret set NPM_TOKEN`.
 
 ## Common Issues
 
-### "Cannot publish with pnpm protocols"
-Used `npm publish` instead of `pnpm publish`. Always use pnpm.
-
-### "Unclean working tree"
-Add `--no-git-checks` flag.
-
-### Package missing build files after publish
-Check `prepublishOnly` script includes build step. Check `files` field in package.json.
-
-### Version already exists on npm
-The package was already published at this version. Bump to the next patch.
-
-### npm view shows old version after publish
-Registry propagation takes 15-60 seconds. Wait and retry. Do NOT republish.
-
-## Pre-Release Checklist
-
-1. [ ] All checks pass: `pnpm build && pnpm typecheck && pnpm check && pnpm test:unit`
-2. [ ] npm login valid: `npm whoami`
-3. [ ] NPM_TOKEN exported
-4. [ ] Versions bumped (via `pnpm changeset version` or manually)
-5. [ ] Using `pnpm publish -r` (not individual `--filter` publishes)
-6. [ ] After publish: verified dependency chain with `npm view ... dependencies --json`
+| Issue | Fix |
+|-------|-----|
+| `workspace:*` or `catalog:` in published package.json | Use `pnpm publish`, not `npm publish` |
+| `ERR_PNPM_GIT_UNCLEAN` | Add `--no-git-checks` flag |
+| Build files missing from tarball | Check `prepublishOnly` includes build step |
+| Version already exists on npm | Bump to the next patch via `pnpm changeset` |
+| npm view shows old version | Wait 30-60 seconds for propagation |
+| No CHANGELOG entries for a version | Version was bumped manually — use changesets next time |
 
 ## Files Reference
 
 | File | Purpose |
 |------|---------|
-| `.changeset/config.json` | Changesets configuration |
+| `.changeset/config.json` | Changesets config (includes fixed versioning groups) |
 | `.npmrc` | pnpm registry & auth config |
 | `.env` | Local NPM_TOKEN (gitignored) |
 | `scripts/validate-publish.js` | Prevents accidental npm (non-pnpm) publish |
 | `.github/workflows/changesets.yml` | CI release workflow |
+| `.github/workflows/release-canary.yml` | CI canary release workflow |

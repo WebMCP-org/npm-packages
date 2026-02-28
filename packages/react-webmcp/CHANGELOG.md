@@ -1,5 +1,16 @@
 # @mcp-b/react-webmcp
 
+## 2.0.7
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-b/webmcp-types@2.0.7
+  - @mcp-b/global@2.0.7
+  - @mcp-b/webmcp-polyfill@2.0.7
+  - @mcp-b/webmcp-ts-sdk@2.0.7
+  - @mcp-b/transports@2.0.7
+
 ## 1.0.0
 
 ### Major Changes

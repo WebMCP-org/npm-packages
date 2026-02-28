@@ -1,5 +1,13 @@
 # @mcp-b/webmcp-ts-sdk
 
+## 2.0.7
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-b/webmcp-types@2.0.7
+  - @mcp-b/webmcp-polyfill@2.0.7
+
 ## 1.1.0
 
 ### Minor Changes
