@@ -1,5 +1,11 @@
 # @mcp-b/webmcp-types
 
+## 2.0.8
+
+### Patch Changes
+
+- Support non-object outputSchema types (string, number, boolean, array) in registerTool overload 1. Widen TOutputSchema constraint from JsonSchemaObject to JsonSchemaForInference so primitive outputSchemas work with full type inference. Add comprehensive type tests codifying real-world usage patterns.
+
 ## 2.0.7
 
 ### Patch Changes
