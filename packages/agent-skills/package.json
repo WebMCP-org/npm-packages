@@ -1,5 +1,5 @@
 {
-  "name": "@mcp-b/agent-skills",
+  "name": "agent-skills-ts-sdk",
   "version": "2.0.5",
   "private": false,
   "description": "TypeScript parser, validator, prompt, and patch utilities for the AgentSkills specification",
@@ -28,7 +28,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsdown",
     "check:types": "tsc --noEmit",
     "clean": "rm -rf dist coverage",
     "test": "vitest run",
@@ -42,6 +42,7 @@
   "devDependencies": {
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
+    "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },

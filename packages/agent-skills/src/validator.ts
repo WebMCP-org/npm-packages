@@ -6,7 +6,7 @@
  */
 
 import { ParseError, ValidationError } from './errors.js';
-import type { SkillContentEntry, SkillProperties } from './models.js';
+import type { SkillContent, SkillContentEntry, SkillProperties } from './models.js';
 import { SKILL_FRONTMATTER_KEYS } from './models.js';
 import { findSkillMdFile, frontmatterToProperties, parseFrontmatter } from './parser.js';
 import { normalizeNFKC } from './utils/unicode.js';
@@ -110,7 +110,7 @@ const validateFrontmatterFields = (metadata: object): string[] => {
  * - Cannot contain consecutive hyphens
  * - NFKC normalized
  */
-function validateName(name: string): string[] {
+function validateName(name: SkillProperties['name']): string[] {
   const errors: string[] = [];
 
   if (!name || typeof name !== 'string' || !name.trim()) {
@@ -158,7 +158,7 @@ function validateName(name: string): string[] {
  * - Max 1024 characters
  * - Non-empty
  */
-function validateDescription(description: string): string[] {
+function validateDescription(description: SkillProperties['description']): string[] {
   const errors: string[] = [];
 
   if (!description || typeof description !== 'string' || !description.trim()) {
@@ -199,7 +199,7 @@ function validateCompatibility(compatibility: string): string[] {
   return errors;
 }
 
-const normalizeSkillName = (name: string): string => normalizeNFKC(name.trim());
+const normalizeSkillName = (name: SkillProperties['name']): string => normalizeNFKC(name.trim());
 
 /**
  * Formats unexpected errors in a stable, human-readable way.
@@ -213,6 +213,14 @@ const formatUnexpectedError = (error: unknown): string => {
   }
   return String(error);
 };
+
+/**
+ * Optional host-level constraints for `validateSkillProperties`.
+ */
+export interface ValidateSkillPropertiesOptions {
+  /** Expected skill name (for example, directory or slug match). */
+  expectedName?: SkillProperties['name'];
+}
 
 /**
  * Validate skill properties.
@@ -237,7 +245,7 @@ const formatUnexpectedError = (error: unknown): string => {
  */
 export function validateSkillProperties(
   properties: SkillProperties,
-  options: { expectedName?: string } = {}
+  options: ValidateSkillPropertiesOptions = {}
 ): string[] {
   const errors: string[] = [];
 
@@ -283,7 +291,7 @@ export function validateSkillProperties(
  *
  * Spec: https://agentskills.io/specification
  */
-export function validateSkillContent(content: string): string[] {
+export function validateSkillContent(content: SkillContent): string[] {
   try {
     const { metadata } = parseFrontmatter(content);
     const errors = validateFrontmatterFields(metadata);
@@ -314,9 +322,13 @@ export function validateSkillContent(content: string): string[] {
  * @see https://github.com/agentskills/agentskills/blob/main/skills-ref/src/skills_ref/validator.py
  */
 export interface SkillValidationOptions {
+  /** Optional location label included in error messages. */
   location?: string;
-  expectedName?: string;
+  /** Expected skill name (for example, directory or slug match). */
+  expectedName?: ValidateSkillPropertiesOptions['expectedName'];
+  /** Whether the host path exists. */
   exists?: boolean;
+  /** Whether the host path is a directory. */
   isDirectory?: boolean;
 }
 

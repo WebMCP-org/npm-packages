@@ -7,7 +7,13 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import type { SkillFile, SkillMetadata, SkillProperties } from '../src/models';
+import type {
+  ResolvedSkill,
+  SkillFile,
+  SkillMetadata,
+  SkillProperties,
+  SkillResource,
+} from '../src/models';
 import { skillPropertiesToDict } from '../src/models';
 
 describe('SkillProperties', () => {
@@ -208,5 +214,41 @@ describe('SkillMetadata', () => {
     expect(metadata.compatibility).toBe('Node.js 18+');
     expect(metadata.allowedTools).toBe('Bash(git:*)');
     expect(metadata.metadata?.author).toBe('Test');
+  });
+});
+
+describe('SkillResource', () => {
+  it('should represent a single tier-3 resource', () => {
+    const resource: SkillResource = {
+      name: 'build-pizza',
+      path: 'references/build-pizza',
+      content: 'Step 1',
+    };
+
+    expect(resource.name).toBe('build-pizza');
+    expect(resource.path).toBe('references/build-pizza');
+    expect(resource.content).toBe('Step 1');
+  });
+});
+
+describe('ResolvedSkill', () => {
+  it('should represent a fully resolved skill with resources', () => {
+    const skill: ResolvedSkill = {
+      name: 'pizza-maker',
+      description: 'Interactive pizza builder',
+      body: 'Use build-pizza',
+      resources: [
+        {
+          name: 'build-pizza',
+          path: 'references/build-pizza',
+          content: 'Step 1',
+        },
+      ],
+      location: '/skills/pizza-maker/SKILL.md',
+    };
+
+    expect(skill.name).toBe('pizza-maker');
+    expect(skill.resources).toHaveLength(1);
+    expect(skill.resources[0]?.path).toBe('references/build-pizza');
   });
 });

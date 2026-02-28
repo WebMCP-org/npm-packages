@@ -1,4 +1,4 @@
-# @mcp-b/agent-skills
+# agent-skills-ts-sdk
 
 TypeScript implementation of the [AgentSkills specification](https://agentskills.io/specification).
 
@@ -18,7 +18,7 @@ Agent Skills are folders of instructions, scripts, and resources that agents can
 ## Installation
 
 ```bash
-pnpm add @mcp-b/agent-skills
+pnpm add agent-skills-ts-sdk
 ```
 
 ## Usage
@@ -26,7 +26,7 @@ pnpm add @mcp-b/agent-skills
 ### Parsing SKILL.md
 
 ```typescript
-import { parseSkillContent, validateSkillContent } from "@mcp-b/agent-skills"
+import { parseSkillContent, validateSkillContent } from "agent-skills-ts-sdk"
 
 const content = `---
 name: my-skill
@@ -44,10 +44,19 @@ if (errors.length > 0) {
 }
 ```
 
+For embedded/web-extracted content (for example `<script>` text with a leading
+newline), opt in explicitly:
+
+```typescript
+const { properties, body } = parseSkillContent(contentFromDom, {
+  inputMode: "embedded"
+})
+```
+
 ### Validation
 
 ```typescript
-import { validateSkillProperties } from "@mcp-b/agent-skills"
+import { validateSkillProperties } from "agent-skills-ts-sdk"
 
 const properties = {
   name: "my-skill",
@@ -64,7 +73,7 @@ import {
   findSkillMdFile,
   readSkillProperties,
   validateSkillEntries
-} from "@mcp-b/agent-skills"
+} from "agent-skills-ts-sdk"
 
 const files = [
   { name: "SKILL.md", content: skillMarkdown }
@@ -78,17 +87,36 @@ const errors = validateSkillEntries(files, { expectedName: properties.name })
 ### Prompt generation
 
 ```typescript
-import { toPrompt } from "@mcp-b/agent-skills"
+import { toPrompt } from "agent-skills-ts-sdk"
 
 const promptBlock = toPrompt([
   { content: skillMarkdown, location: "skills/my-skill/SKILL.md" }
 ])
 ```
 
+### Progressive disclosure helpers
+
+```typescript
+import {
+  handleSkillRead,
+  toDisclosureInstructions,
+  toDisclosurePrompt,
+  toReadToolSchema
+} from "agent-skills-ts-sdk"
+
+const instructions = toDisclosureInstructions({ toolName: "read_site_context" })
+const skillsXml = toDisclosurePrompt([
+  { name: "pizza-maker", description: "Interactive pizza builder", resources: ["build-pizza"] }
+])
+const readTool = toReadToolSchema([{ name: "pizza-maker" }], {
+  toolName: "read_site_context"
+})
+```
+
 ### Diff + patch
 
 ```typescript
-import { createSkillPatch, applySkillPatch } from "@mcp-b/agent-skills"
+import { createSkillPatch, applySkillPatch } from "agent-skills-ts-sdk"
 
 const patch = createSkillPatch(oldContent, newContent)
 const result = applySkillPatch(oldContent, patch)
@@ -116,6 +144,10 @@ if (!result.ok) {
 
 ### Prompt utilities
 - `toPrompt` builds the `<available_skills>` XML block from parsed entries or raw SKILL.md content.
+- `toDisclosurePrompt` optionally includes resource names for tier-3 hints.
+- `toDisclosureInstructions` generates canonical read-protocol instruction text.
+- `toReadToolSchema` builds a strict JSON-schema declaration for a read tool.
+- `handleSkillRead` handles 2-level read requests in memory (overview vs specific resource).
 
 ### Diff + patch
 - `diffSkillContent` returns a line-based diff for display or patch construction.

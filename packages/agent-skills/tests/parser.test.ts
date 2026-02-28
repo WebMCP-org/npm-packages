@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest';
 import { ParseError, ValidationError } from '../src/errors';
 import {
   extractBody,
+  extractResourceLinks,
   findSkillMdFile,
   parseFrontmatter,
   parseSkillContent,
@@ -35,6 +36,52 @@ Instructions here.`;
 
   it('should throw ParseError if frontmatter missing', () => {
     const content = '# No frontmatter here';
+    expect(() => parseFrontmatter(content)).toThrow(ParseError);
+    expect(() => parseFrontmatter(content)).toThrow('must start with YAML frontmatter');
+  });
+
+  it('should keep strict mode by default (leading whitespace rejected)', () => {
+    const content = `\n---
+name: my-skill
+description: A test skill
+---
+Body`;
+
+    expect(() => parseFrontmatter(content)).toThrow(ParseError);
+    expect(() => parseFrontmatter(content)).toThrow('must start with YAML frontmatter');
+  });
+
+  it('should parse in embedded mode when leading whitespace is present', () => {
+    const content = `\n---
+name: my-skill
+description: A test skill
+---
+Body`;
+
+    const { metadata, body } = parseFrontmatter(content, { inputMode: 'embedded' });
+    expect(metadata.name).toBe('my-skill');
+    expect(body).toBe('Body');
+  });
+
+  it('should parse in embedded mode when BOM is present', () => {
+    const content = `\uFEFF---
+name: my-skill
+description: A test skill
+---
+Body`;
+
+    const { metadata, body } = parseFrontmatter(content, { inputMode: 'embedded' });
+    expect(metadata.name).toBe('my-skill');
+    expect(body).toBe('Body');
+  });
+
+  it('should reject BOM-prefixed input in strict mode', () => {
+    const content = `\uFEFF---
+name: my-skill
+description: A test skill
+---
+Body`;
+
     expect(() => parseFrontmatter(content)).toThrow(ParseError);
     expect(() => parseFrontmatter(content)).toThrow('must start with YAML frontmatter');
   });
@@ -465,6 +512,18 @@ Body`;
     expect(properties.allowedTools).toBe('Bash(git:*)');
   });
 
+  it('should pass parsing options to parseFrontmatter', () => {
+    const content = `\n---
+name: my-skill
+description: A test skill
+---
+Body`;
+
+    const { properties, body } = parseSkillContent(content, { inputMode: 'embedded' });
+    expect(properties.name).toBe('my-skill');
+    expect(body).toBe('Body');
+  });
+
   it('should handle all optional fields', () => {
     const content = `---
 name: my-skill
@@ -509,6 +568,110 @@ describe('findSkillMdFile', () => {
     const files = [{ name: 'README.md', content: 'no skill file' }];
     const result = findSkillMdFile(files);
     expect(result).toBeNull();
+  });
+});
+
+describe('extractResourceLinks', () => {
+  it('should extract valid resource links from allowed directories', () => {
+    const body = `Resources:
+- [build-pizza](references/build-pizza)
+- [render](scripts/render.sh)
+- [theme](assets/theme.json)`;
+
+    expect(extractResourceLinks(body)).toEqual([
+      { name: 'build-pizza', path: 'references/build-pizza' },
+      { name: 'render', path: 'scripts/render.sh' },
+      { name: 'theme', path: 'assets/theme.json' },
+    ]);
+  });
+
+  it('should normalize leading ./ from valid resource links', () => {
+    const body = `Resources:
+- [build-pizza](./references/build-pizza)
+- [render](./scripts/render.sh)
+- [theme](./assets/theme.json)`;
+
+    expect(extractResourceLinks(body)).toEqual([
+      { name: 'build-pizza', path: 'references/build-pizza' },
+      { name: 'render', path: 'scripts/render.sh' },
+      { name: 'theme', path: 'assets/theme.json' },
+    ]);
+  });
+
+  it('should ignore external links and anchors', () => {
+    const body = `Resources:
+- [website](https://example.com/reference)
+- [anchor](#section)
+- [mail](mailto:test@example.com)
+- [ok](references/local-ref)`;
+
+    expect(extractResourceLinks(body)).toEqual([{ name: 'ok', path: 'references/local-ref' }]);
+  });
+
+  it('should ignore path traversal and absolute paths', () => {
+    const body = `Resources:
+- [bad1](../references/secret)
+- [bad2](/references/secret)
+- [bad3](references/../secret)
+- [ok](references/pizza-guide)`;
+
+    expect(extractResourceLinks(body)).toEqual([{ name: 'ok', path: 'references/pizza-guide' }]);
+  });
+
+  it('should de-duplicate by name and path pair', () => {
+    const body = `Resources:
+- [build-pizza](references/build-pizza)
+- [build-pizza](references/build-pizza)
+- [build-pizza-duplicate-name](references/build-pizza)
+- [build-pizza](references/build-pizza-v2)`;
+
+    expect(extractResourceLinks(body)).toEqual([
+      { name: 'build-pizza', path: 'references/build-pizza' },
+      { name: 'build-pizza-duplicate-name', path: 'references/build-pizza' },
+      { name: 'build-pizza', path: 'references/build-pizza-v2' },
+    ]);
+  });
+
+  it('should strip markdown link title suffix from path', () => {
+    const body = `- [build-pizza](references/build-pizza "Pizza build guide")`;
+
+    expect(extractResourceLinks(body)).toEqual([
+      { name: 'build-pizza', path: 'references/build-pizza' },
+    ]);
+  });
+
+  it('should robustly handle a mixed malformed-link corpus', () => {
+    const body = `Resources:
+- [valid-a](references/a)
+- [valid-a](references/a#section)
+- [valid-b](references/b?mode=1)
+- [valid-c](././assets/c.json)
+- [title](scripts/run.sh 'Run script')
+- [spaced](   references/space-path   )
+- [invalid-abs](/references/nope)
+- [invalid-traversal1](../references/nope)
+- [invalid-traversal2](references/../nope)
+- [invalid-backslash](references\\nope)
+- [invalid-dir](docs/nope)
+- [invalid-url](https://example.com/ref)
+- [invalid-anchor](#local)
+- [broken](references/missing
+- no-link-line
+`;
+
+    expect(extractResourceLinks(body)).toEqual([
+      { name: 'valid-a', path: 'references/a' },
+      { name: 'valid-b', path: 'references/b' },
+      { name: 'valid-c', path: 'assets/c.json' },
+      { name: 'title', path: 'scripts/run.sh' },
+      { name: 'spaced', path: 'references/space-path' },
+    ]);
+  });
+
+  it('should handle pathological bracket-heavy input without extracting invalid links', () => {
+    const body = `${'['.repeat(4000)}\n${'[(('.repeat(2000)}\n[ok](references/final)`;
+
+    expect(extractResourceLinks(body)).toEqual([{ name: 'ok', path: 'references/final' }]);
   });
 });
 

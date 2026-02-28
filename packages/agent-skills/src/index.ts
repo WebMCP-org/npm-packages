@@ -1,5 +1,5 @@
 /**
- * @mcp-b/agent-skills
+ * agent-skills-ts-sdk
  *
  * TypeScript implementation of the AgentSkills specification.
  *
@@ -7,9 +7,19 @@
  * Reference Implementation: https://github.com/agentskills/agentskills/tree/main/skills-ref
  */
 
+export type {
+  ReadToolSchema,
+  ReadToolSchemaOptions,
+  SkillReadArgs,
+  SkillReadError,
+  SkillReadErrorCode,
+  SkillReadResult,
+} from './disclosure.js';
+export { handleSkillRead, toReadToolSchema } from './disclosure.js';
 export { ParseError, ValidationError } from './errors.js';
 export type {
   ByteCount,
+  ResolvedSkill,
   SkillAllowedTools,
   SkillBody,
   SkillContent,
@@ -23,12 +33,20 @@ export type {
   SkillMetadataMap,
   SkillParseResult,
   SkillProperties,
+  SkillResource,
   SkillTokenCount,
   UnixMillis,
 } from './models.js';
 export { SKILL_FRONTMATTER_KEYS, skillPropertiesToDict } from './models.js';
+export type {
+  ParseFrontmatterInputMode,
+  ParseFrontmatterOptions,
+  ReadSkillPropertiesOptions,
+  ResourceLink,
+} from './parser.js';
 export {
   extractBody,
+  extractResourceLinks,
   findSkillMdFile,
   frontmatterToProperties,
   parseFrontmatter,
@@ -56,11 +74,16 @@ export {
   diffSkillContent,
   validateSkillPatch,
 } from './patch.js';
-export type { SkillPromptEntry, SkillPromptSource } from './prompt.js';
-export { toPrompt } from './prompt.js';
+export type {
+  DisclosureInstructionOptions,
+  DisclosurePromptEntry,
+  SkillPromptEntry,
+  SkillPromptSource,
+} from './prompt.js';
+export { toDisclosureInstructions, toDisclosurePrompt, toPrompt } from './prompt.js';
 export { estimateTokens } from './utils/token-estimator.js';
 export { normalizeNFKC } from './utils/unicode.js';
-export type { SkillValidationOptions } from './validator.js';
+export type { SkillValidationOptions, ValidateSkillPropertiesOptions } from './validator.js';
 export {
   ALLOWED_FIELDS,
   MAX_COMPATIBILITY_LENGTH,

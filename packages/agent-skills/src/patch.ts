@@ -7,7 +7,10 @@
 
 import type { SkillContent } from './models.js';
 import { frontmatterToProperties, parseFrontmatter } from './parser.js';
+import type { ValidateSkillPropertiesOptions } from './validator.js';
 import { validateSkillContent, validateSkillProperties } from './validator.js';
+
+type SkillNameExpectation = NonNullable<ValidateSkillPropertiesOptions['expectedName']>;
 
 /**
  * Supported patch operation types.
@@ -176,7 +179,7 @@ export interface SkillPatchValidationResult {
  */
 export interface SkillPatchApplyOptions {
   expectedMatches?: number;
-  validate?: boolean | { expectedName?: string };
+  validate?: boolean | ValidateSkillPropertiesOptions;
 }
 
 /**
@@ -564,7 +567,7 @@ export function validateSkillPatch(patch: unknown): SkillPatchValidationResult {
   };
 }
 
-const findMatches = (content: string, target: string): number[] => {
+const findMatches = (content: SkillContent, target: string): number[] => {
   const matches: number[] = [];
   let index = content.indexOf(target);
   while (index !== -1) {
@@ -625,13 +628,13 @@ const resolveMatchIssue = (
 };
 
 const applyReplace = (
-  content: string,
+  content: SkillContent,
   before: string,
   after: string,
   operationIndex: number,
   expectedMatches: number,
   expectedProvided: boolean
-): { content: string; matchCount: number } | SkillPatchIssue => {
+): { content: SkillContent; matchCount: number } | SkillPatchIssue => {
   if (before.length === 0) {
     if (content.length === 0) {
       if (expectedProvided && expectedMatches !== 1) {
@@ -680,12 +683,12 @@ const applyReplace = (
 };
 
 const applyDelete = (
-  content: string,
+  content: SkillContent,
   before: string,
   operationIndex: number,
   expectedMatches: number,
   expectedProvided: boolean
-): { content: string; matchCount: number } | SkillPatchIssue => {
+): { content: SkillContent; matchCount: number } | SkillPatchIssue => {
   const matches = findMatches(content, before);
   const snippet = renderSnippet(before);
   const issue = resolveMatchIssue(
@@ -711,14 +714,14 @@ const applyDelete = (
 };
 
 const applyInsert = (
-  content: string,
+  content: SkillContent,
   anchor: string,
   text: string,
   position: 'before' | 'after',
   operationIndex: number,
   expectedMatches: number,
   expectedProvided: boolean
-): { content: string; matchCount: number } | SkillPatchIssue => {
+): { content: SkillContent; matchCount: number } | SkillPatchIssue => {
   const matches = findMatches(content, anchor);
   const snippet = renderSnippet(anchor);
   const issue = resolveMatchIssue(
@@ -746,7 +749,7 @@ const applyInsert = (
 
 const collectSkillValidationIssues = (
   content: SkillContent,
-  expectedName?: string
+  expectedName?: SkillNameExpectation
 ): SkillPatchIssue[] => {
   const errors = validateSkillContent(content);
   const issues = errors.map((message) =>
