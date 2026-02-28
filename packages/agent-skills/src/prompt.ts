@@ -10,6 +10,14 @@ const XML_TAG_DESCRIPTION = 'description';
 const XML_TAG_LOCATION = 'location';
 const XML_TAG_RESOURCES = 'resources';
 const DISCLOSURE_INSTRUCTION_LINE_1 = 'Skills provide context for using tools effectively.';
+const XML_ESCAPE_PATTERN = /[&<>"']/g;
+const XML_ESCAPE_MAP: Record<string, string> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#x27;',
+};
 
 /**
  * Prompt-ready skill metadata.
@@ -59,12 +67,7 @@ const pushXmlNode = (lines: string[], tag: string, value: string): void => {
 };
 
 const escapeXml = (value: string): string => {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;');
+  return value.replace(XML_ESCAPE_PATTERN, (char) => XML_ESCAPE_MAP[char] ?? char);
 };
 
 const appendSkill = (

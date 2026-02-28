@@ -64,6 +64,7 @@ export const MAX_COMPATIBILITY_LENGTH = 500;
  * @see https://github.com/agentskills/agentskills/blob/main/skills-ref/src/skills_ref/validator.py
  */
 export const ALLOWED_FIELDS = new Set<string>(SKILL_FRONTMATTER_KEYS);
+const SKILL_NAME_CHARACTER_PATTERN = /^[\p{L}\p{N}-]+$/u;
 
 /**
  * Renders a deterministic list of frontmatter fields for error messages.
@@ -75,6 +76,7 @@ const formatFieldList = (fields: Iterable<string>): string => {
   const items = [...fields].sort();
   return `[${items.map((field) => `'${field}'`).join(', ')}]`;
 };
+const ALLOWED_FIELDS_RENDERED_LIST = formatFieldList(ALLOWED_FIELDS);
 
 /**
  * Validates frontmatter keys against the spec allowlist.
@@ -89,7 +91,7 @@ const validateFrontmatterFields = (metadata: object): string[] => {
   if (extraFields.length > 0) {
     errors.push(
       `Unexpected fields in frontmatter: ${extraFields.sort().join(', ')}. ` +
-        `Only ${formatFieldList(ALLOWED_FIELDS)} are allowed.`
+        `Only ${ALLOWED_FIELDS_RENDERED_LIST} are allowed.`
     );
   }
 
@@ -138,11 +140,7 @@ function validateName(name: SkillProperties['name']): string[] {
     errors.push('Skill name cannot contain consecutive hyphens');
   }
 
-  const isValid = [...normalized].every((c) => {
-    return /[\p{L}\p{N}-]/u.test(c);
-  });
-
-  if (!isValid) {
+  if (!SKILL_NAME_CHARACTER_PATTERN.test(normalized)) {
     errors.push(
       `Skill name '${normalized}' contains invalid characters. Only letters, digits, and hyphens are allowed.`
     );
