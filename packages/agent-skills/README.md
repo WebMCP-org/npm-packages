@@ -44,6 +44,15 @@ if (errors.length > 0) {
 }
 ```
 
+For embedded/web-extracted content (for example `<script>` text with a leading
+newline), opt in explicitly:
+
+```typescript
+const { properties, body } = parseSkillContent(contentFromDom, {
+  inputMode: "embedded"
+})
+```
+
 ### Validation
 
 ```typescript
@@ -85,6 +94,25 @@ const promptBlock = toPrompt([
 ])
 ```
 
+### Progressive disclosure helpers
+
+```typescript
+import {
+  handleSkillRead,
+  toDisclosureInstructions,
+  toDisclosurePrompt,
+  toReadToolSchema
+} from "@mcp-b/agent-skills"
+
+const instructions = toDisclosureInstructions({ toolName: "read_site_context" })
+const skillsXml = toDisclosurePrompt([
+  { name: "pizza-maker", description: "Interactive pizza builder", resources: ["build-pizza"] }
+])
+const readTool = toReadToolSchema([{ name: "pizza-maker" }], {
+  toolName: "read_site_context"
+})
+```
+
 ### Diff + patch
 
 ```typescript
@@ -116,6 +144,10 @@ if (!result.ok) {
 
 ### Prompt utilities
 - `toPrompt` builds the `<available_skills>` XML block from parsed entries or raw SKILL.md content.
+- `toDisclosurePrompt` optionally includes resource names for tier-3 hints.
+- `toDisclosureInstructions` generates canonical read-protocol instruction text.
+- `toReadToolSchema` builds a strict JSON-schema declaration for a read tool.
+- `handleSkillRead` handles 2-level read requests in memory (overview vs specific resource).
 
 ### Diff + patch
 - `diffSkillContent` returns a line-based diff for display or patch construction.

@@ -17,12 +17,23 @@ import type {
   SkillMetadataMap,
   SkillParseResult,
   SkillProperties,
+  SkillResource,
 } from './models.js';
 import { entriesToRecord } from './utils/objects.js';
 
 const FRONTMATTER_DELIMITER = '---';
+const FRONTMATTER_DELIMITER_LENGTH = FRONTMATTER_DELIMITER.length;
 const FIELD_NAME = 'name';
 const FIELD_DESCRIPTION = 'description';
+const FIELD_METADATA = 'metadata';
+const UTF8_BOM = '\uFEFF';
+const INPUT_MODE_STRICT = 'strict';
+const INPUT_MODE_EMBEDDED = 'embedded';
+const RESOURCE_DEDUPE_SEPARATOR = '\u0000';
+const RESOURCE_PATH_SEGMENTS = new Set(['scripts', 'references', 'assets']);
+const RESOURCE_LINK_PATTERN = /\[([^\]\n]+)\]\(([^)\n]+)\)/g;
+const URL_SCHEME_PATTERN = /^[a-zA-Z][a-zA-Z\d+\-.]*:/;
+const RESOURCE_URL_PARTS_SPLIT_LIMIT = 1;
 
 /**
  * Checks whether a value is a non-array object record.
@@ -86,6 +97,81 @@ const optionalString = (value: unknown): string | undefined => {
 };
 
 /**
+ * Parses markdown link URLs that may include optional quoted title text.
+ *
+ * @param rawPath - Raw link target from markdown.
+ * @returns Path component without optional title text.
+ */
+const stripMarkdownLinkTitle = (rawPath: string): string => {
+  const trimmed = rawPath.trim();
+  const spaceIndex = trimmed.search(/\s/);
+  return spaceIndex === -1 ? trimmed : trimmed.slice(0, spaceIndex);
+};
+
+/**
+ * Normalizes and validates a markdown link path as a skill resource path.
+ *
+ * @param path - Candidate path from markdown link.
+ * @returns Canonical resource path or `null` when invalid.
+ */
+const normalizeResourcePath = (path: string): string | null => {
+  if (!path || path.startsWith('/')) {
+    return null;
+  }
+
+  if (path.startsWith('#')) {
+    return null;
+  }
+
+  if (URL_SCHEME_PATTERN.test(path)) {
+    return null;
+  }
+
+  const normalized = path.split(/[?#]/, RESOURCE_URL_PARTS_SPLIT_LIMIT)[0].replace(/^(\.\/)+/, '');
+  if (!normalized || normalized.includes('\\')) {
+    return null;
+  }
+
+  if (normalized.startsWith('../')) {
+    return null;
+  }
+
+  const segments = normalized.split('/').filter(Boolean);
+  if (segments.length === 0) {
+    return null;
+  }
+
+  if (!RESOURCE_PATH_SEGMENTS.has(segments[0] ?? '')) {
+    return null;
+  }
+
+  if (!segments.every((segment) => segment !== '.' && segment !== '..')) {
+    return null;
+  }
+
+  return segments.join('/');
+};
+
+/**
+ * Applies explicit input normalization for embedded/web extraction mode.
+ *
+ * @param content - Raw SKILL.md content candidate.
+ * @param mode - Parser input mode.
+ * @returns Normalized content according to the selected mode.
+ */
+const normalizeContentForMode = (
+  content: SkillContent,
+  mode: ParseFrontmatterInputMode
+): SkillContent => {
+  if (mode !== INPUT_MODE_EMBEDDED) {
+    return content;
+  }
+
+  const withoutBom = content.startsWith(UTF8_BOM) ? content.slice(1) : content;
+  return withoutBom.trimStart();
+};
+
+/**
  * Validates a required trimmed string field.
  *
  * @param metadata - Parsed frontmatter object.
@@ -95,7 +181,7 @@ const optionalString = (value: unknown): string | undefined => {
  */
 const readRequiredTrimmedString = (
   metadata: Record<string, unknown>,
-  field: typeof FIELD_NAME | typeof FIELD_DESCRIPTION
+  field: keyof Pick<SkillFrontmatter, 'name' | 'description'>
 ): string => {
   if (!(field in metadata)) {
     throw new ValidationError(`Missing required field in frontmatter: ${field}`);
@@ -190,7 +276,7 @@ const extractMetadataStringMap = (document: Document.Parsed): SkillMetadataMap |
   }
 
   const metadataPair = root.items.find((pair) => {
-    return isScalarNode(pair.key) && pair.key.value === 'metadata';
+    return isScalarNode(pair.key) && pair.key.value === FIELD_METADATA;
   });
 
   if (!metadataPair || !isMapNode(metadataPair.value)) {
@@ -236,7 +322,9 @@ const extractMetadataStringMap = (document: Document.Parsed): SkillMetadataMap |
  * @see https://agentskills.io/specification
  * @see https://github.com/agentskills/agentskills/blob/main/skills-ref/src/skills_ref/parser.py
  */
-export function findSkillMdFile<T extends { name: string }>(files: Iterable<T>): T | null {
+export function findSkillMdFile<T extends Pick<SkillContentEntry, 'name'>>(
+  files: Iterable<T>
+): T | null {
   let lowercaseMatch: T | null = null;
 
   for (const file of files) {
@@ -249,6 +337,14 @@ export function findSkillMdFile<T extends { name: string }>(files: Iterable<T>):
   }
 
   return lowercaseMatch;
+}
+
+/**
+ * Options for `readSkillProperties`.
+ */
+export interface ReadSkillPropertiesOptions {
+  /** Optional label used in parse errors when `SKILL.md` is missing. */
+  location?: string;
 }
 
 /**
@@ -269,17 +365,17 @@ export function findSkillMdFile<T extends { name: string }>(files: Iterable<T>):
  * @see https://agentskills.io/specification
  * @see https://github.com/agentskills/agentskills/blob/main/skills-ref/src/skills_ref/parser.py
  */
-export function readSkillProperties<T extends SkillContentEntry>(
-  files: Iterable<T>,
-  options: { location?: string } = {}
-): SkillProperties {
+export function readSkillProperties<
+  T extends SkillContentEntry,
+  TMetadata extends SkillMetadataMap = SkillMetadataMap,
+>(files: Iterable<T>, options: ReadSkillPropertiesOptions = {}): SkillProperties<TMetadata> {
   const skillFile = findSkillMdFile(files);
   if (!skillFile) {
     const locationLabel = options.location ? ` in ${options.location}` : '';
     throw new ParseError(`SKILL.md not found${locationLabel}`);
   }
 
-  const { properties } = parseSkillContent(skillFile.content);
+  const { properties } = parseSkillContent<TMetadata>(skillFile.content);
   return properties;
 }
 
@@ -313,9 +409,81 @@ export function frontmatterToProperties<TMetadata extends SkillMetadataMap = Ski
 }
 
 /**
+ * Frontmatter parser options.
+ *
+ * `strict` follows the specification and reference parser behavior exactly:
+ * content must start with `---`.
+ *
+ * `embedded` is an explicit host opt-in for web extraction contexts where
+ * content may have a leading BOM or whitespace before frontmatter.
+ */
+export interface ParseFrontmatterOptions {
+  /**
+   * Input handling mode.
+   * - `strict` (default): parse exactly as provided.
+   * - `embedded`: remove UTF-8 BOM and leading whitespace before strict parse.
+   */
+  inputMode?: ParseFrontmatterInputMode;
+}
+
+/**
+ * Supported parse modes for frontmatter input handling.
+ */
+export type ParseFrontmatterInputMode = typeof INPUT_MODE_STRICT | typeof INPUT_MODE_EMBEDDED;
+
+/**
+ * Parsed resource reference discovered in a skill body markdown link.
+ */
+export interface ResourceLink {
+  /** Display identifier from markdown link text. */
+  name: SkillResource['name'];
+  /** Canonical resource path under scripts/, references/, or assets/. */
+  path: SkillResource['path'];
+}
+
+/**
+ * Extracts tier-3 resource links from skill body markdown.
+ *
+ * Only links to `scripts/*`, `references/*`, and `assets/*` are returned.
+ * External URLs, anchors, and path traversal references are ignored.
+ * Leading `./` is accepted and normalized away.
+ *
+ * @param body - Skill markdown body (without frontmatter).
+ * @returns De-duplicated list of resource links.
+ */
+export function extractResourceLinks(body: SkillBody): ResourceLink[] {
+  const links: ResourceLink[] = [];
+  const dedupe = new Set<string>();
+
+  for (const match of body.matchAll(RESOURCE_LINK_PATTERN)) {
+    const rawName = match[1]?.trim();
+    const rawPath = match[2];
+    if (!rawName || !rawPath) {
+      continue;
+    }
+
+    const normalizedPath = normalizeResourcePath(stripMarkdownLinkTitle(rawPath));
+    if (!normalizedPath) {
+      continue;
+    }
+
+    const dedupeKey = `${rawName}${RESOURCE_DEDUPE_SEPARATOR}${normalizedPath}`;
+    if (dedupe.has(dedupeKey)) {
+      continue;
+    }
+
+    dedupe.add(dedupeKey);
+    links.push({ name: rawName, path: normalizedPath });
+  }
+
+  return links;
+}
+
+/**
  * Parse YAML frontmatter from SKILL.md content.
  *
  * @param content - Raw content of SKILL.md file
+ * @param options - Optional parsing mode. Defaults to strict spec behavior.
  * @returns Parsed frontmatter metadata and trimmed markdown body.
  * @throws {ParseError} If frontmatter is missing or invalid
  * @throws {ValidationError} If required fields are missing or invalid
@@ -338,21 +506,33 @@ export function frontmatterToProperties<TMetadata extends SkillMetadataMap = Ski
  * - Required fields must be non-empty strings
  */
 export function parseFrontmatter<TMetadata extends SkillMetadataMap = SkillMetadataMap>(
-  content: SkillContent
+  content: SkillContent,
+  options: ParseFrontmatterOptions = {}
 ): SkillFrontmatterParseResult<TMetadata> {
-  if (!content.startsWith(FRONTMATTER_DELIMITER)) {
+  const normalizedContent = normalizeContentForMode(
+    content,
+    options.inputMode ?? INPUT_MODE_STRICT
+  );
+
+  if (!normalizedContent.startsWith(FRONTMATTER_DELIMITER)) {
     throw new ParseError('SKILL.md must start with YAML frontmatter (---)');
   }
 
-  const firstDelimiter = content.indexOf(FRONTMATTER_DELIMITER);
-  const secondDelimiter = content.indexOf(FRONTMATTER_DELIMITER, firstDelimiter + 3);
+  const firstDelimiter = normalizedContent.indexOf(FRONTMATTER_DELIMITER);
+  const secondDelimiter = normalizedContent.indexOf(
+    FRONTMATTER_DELIMITER,
+    firstDelimiter + FRONTMATTER_DELIMITER_LENGTH
+  );
 
   if (secondDelimiter === -1) {
     throw new ParseError('SKILL.md frontmatter not properly closed with ---');
   }
 
-  const frontmatterStr = content.substring(firstDelimiter + 3, secondDelimiter);
-  const body = content.substring(secondDelimiter + 3).trim();
+  const frontmatterStr = normalizedContent.substring(
+    firstDelimiter + FRONTMATTER_DELIMITER_LENGTH,
+    secondDelimiter
+  );
+  const body = normalizedContent.substring(secondDelimiter + FRONTMATTER_DELIMITER_LENGTH).trim();
 
   const document = YAML.parseDocument(frontmatterStr, { keepSourceTokens: true });
   if (document.errors.length > 0) {
@@ -368,7 +548,7 @@ export function parseFrontmatter<TMetadata extends SkillMetadataMap = SkillMetad
 
   const metadataObject = rawMetadata;
   const metadataMap =
-    'metadata' in metadataObject && isRecord(metadataObject.metadata)
+    FIELD_METADATA in metadataObject && isRecord(metadataObject[FIELD_METADATA])
       ? extractMetadataStringMap(document)
       : null;
 
@@ -395,19 +575,23 @@ export function extractBody(content: SkillContent): SkillBody {
   }
 
   const firstDelimiter = content.indexOf(FRONTMATTER_DELIMITER);
-  const secondDelimiter = content.indexOf(FRONTMATTER_DELIMITER, firstDelimiter + 3);
+  const secondDelimiter = content.indexOf(
+    FRONTMATTER_DELIMITER,
+    firstDelimiter + FRONTMATTER_DELIMITER_LENGTH
+  );
 
   if (secondDelimiter === -1) {
     return content.trim();
   }
 
-  return content.substring(secondDelimiter + 3).trim();
+  return content.substring(secondDelimiter + FRONTMATTER_DELIMITER_LENGTH).trim();
 }
 
 /**
  * Parse SKILL.md content into SkillProperties.
  *
  * @param content - Raw content of SKILL.md file
+ * @param options - Optional frontmatter parsing mode.
  * @returns SkillProperties with parsed metadata and body
  * @throws {ParseError} If SKILL.md has invalid format
  * @throws {ValidationError} If required fields are missing
@@ -425,9 +609,10 @@ export function extractBody(content: SkillContent): SkillBody {
  * Spec: https://agentskills.io/specification
  */
 export function parseSkillContent<TMetadata extends SkillMetadataMap = SkillMetadataMap>(
-  content: SkillContent
+  content: SkillContent,
+  options: ParseFrontmatterOptions = {}
 ): SkillParseResult<TMetadata> {
-  const { metadata, body } = parseFrontmatter<TMetadata>(content);
+  const { metadata, body } = parseFrontmatter<TMetadata>(content, options);
 
   return { properties: frontmatterToProperties(metadata), body };
 }

@@ -28,7 +28,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsdown",
     "check:types": "tsc --noEmit",
     "clean": "rm -rf dist coverage",
     "test": "vitest run",
@@ -42,6 +42,7 @@
   "devDependencies": {
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
+    "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },

@@ -40,18 +40,37 @@ raw content, parsed properties, size, and timestamps.
 ### SkillMetadata
 Lightweight list view for progressive disclosure with token estimates.
 
+### SkillResource / ResolvedSkill
+Tier-3 resource models for progressive disclosure hosts:
+- `SkillResource`: `{ name, path, content }`
+- `ResolvedSkill`: parsed skill body plus associated resources used by
+  read handlers and tool schema generation.
+
 ## Parsing
 
-### parseFrontmatter(content)
+### parseFrontmatter(content, options?)
 Parses YAML frontmatter and returns `{ metadata, body }`.
 Behavior matches the reference parser:
 - Requires frontmatter, validates name/description presence and non-empty strings.
 - Preserves metadata scalar formatting by reading YAML source tokens where possible.
 - Returns hyphenated keys in `metadata`.
 
-### parseSkillContent(content)
+`options.inputMode`:
+- `strict` (default): no preprocessing; requires content to start with `---`.
+- `embedded`: explicit host opt-in for web/embed extraction contexts;
+  strips UTF-8 BOM and leading whitespace before strict parsing.
+
+### parseSkillContent(content, options?)
 Returns `{ properties, body }` where `properties` is the camel-cased
 `SkillProperties` representation of the frontmatter.
+Accepts the same optional `ParseFrontmatterOptions` as `parseFrontmatter`.
+
+### extractResourceLinks(body)
+Extracts markdown links representing tier-3 resources.
+- Includes only links under `scripts/*`, `references/*`, `assets/*`.
+- Ignores URLs, anchors, and traversal-style paths.
+- Accepts and normalizes leading `./`.
+- Returns deduplicated `{ name, path }` pairs.
 
 ### extractBody(content)
 Strips frontmatter and returns the markdown body.
@@ -91,8 +110,28 @@ This mirrors the reference `validate()` without assuming a filesystem.
 
 ### toPrompt(entries)
 Builds the `<available_skills>` XML block. Accepts either:
-- `SkillPromptEntry` objects with `name`, `description`, and `location`, or
-- `SkillPromptSource` objects with raw `SKILL.md` content + location.
+- `SkillPromptEntry` objects with `name`, `description`, and optional `location`, or
+- `SkillPromptSource` objects with raw `SKILL.md` content + optional `location`.
+
+### toDisclosurePrompt(entries)
+Builds `<available_skills>` XML with optional `<resources>` hints for
+progressive disclosure hosts.
+
+### toDisclosureInstructions(options?)
+Generates canonical system-instruction text for the progressive disclosure
+read protocol with configurable tool name.
+
+### handleSkillRead(skills, args)
+Pure in-memory 2-level read handler:
+- no `resource`: returns skill body (tier 2)
+- with `resource`: returns resource content (tier 3)
+- returns structured errors with machine-readable `code`
+
+### toReadToolSchema(skills, options?)
+Builds strict JSON-schema declaration for a read tool:
+- `name` enum derived from runtime skills
+- optional `resource` string
+- `additionalProperties: false`
 
 XML is escaped to preserve safe system prompt formatting.
 

@@ -58,3 +58,6 @@ docs/plans/WEBMCP_SPEC.md
 # MCPB build artifacts
 .mcpb-staging
 *.mcpb
+
+# Co-located fork (separate git repo)
+webmcp-tools/
