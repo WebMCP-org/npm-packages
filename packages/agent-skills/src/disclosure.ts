@@ -92,7 +92,13 @@ export function handleSkillRead(
   skills: ReadonlyArray<ResolvedSkill>,
   args: SkillReadArgs
 ): SkillReadResult | SkillReadError {
-  const skill = skills.find((candidate) => candidate.name === args.name);
+  let skill: ResolvedSkill | undefined;
+  for (const candidate of skills) {
+    if (candidate.name === args.name) {
+      skill = candidate;
+      break;
+    }
+  }
   if (!skill) {
     return {
       ok: false,
@@ -108,7 +114,13 @@ export function handleSkillRead(
     };
   }
 
-  const resource = skill.resources.find((candidate) => candidate.name === args.resource);
+  let resource: SkillResource | undefined;
+  for (const candidate of skill.resources) {
+    if (candidate.name === args.resource) {
+      resource = candidate;
+      break;
+    }
+  }
   if (!resource) {
     return {
       ok: false,

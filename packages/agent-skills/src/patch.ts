@@ -577,6 +577,50 @@ const findMatches = (content: SkillContent, target: string): number[] => {
   return matches;
 };
 
+const applyTextReplacementAtMatches = (
+  content: SkillContent,
+  matches: ReadonlyArray<number>,
+  targetLength: number,
+  replacement: string
+): SkillContent => {
+  if (matches.length === 0) {
+    return content;
+  }
+
+  const pieces: string[] = [];
+  let cursor = 0;
+  for (const matchIndex of matches) {
+    pieces.push(content.slice(cursor, matchIndex));
+    pieces.push(replacement);
+    cursor = matchIndex + targetLength;
+  }
+  pieces.push(content.slice(cursor));
+  return pieces.join('');
+};
+
+const applyTextInsertAtMatches = (
+  content: SkillContent,
+  matches: ReadonlyArray<number>,
+  anchorLength: number,
+  text: string,
+  position: 'before' | 'after'
+): SkillContent => {
+  if (matches.length === 0) {
+    return content;
+  }
+
+  const pieces: string[] = [];
+  let cursor = 0;
+  for (const matchIndex of matches) {
+    const insertIndex = position === 'before' ? matchIndex : matchIndex + anchorLength;
+    pieces.push(content.slice(cursor, insertIndex));
+    pieces.push(text);
+    cursor = insertIndex;
+  }
+  pieces.push(content.slice(cursor));
+  return pieces.join('');
+};
+
 const resolveMatchIssue = (
   matchCount: number,
   expectedMatches: number,
@@ -672,13 +716,7 @@ const applyReplace = (
   if (issue) {
     return issue;
   }
-
-  let nextContent = content;
-  const sortedMatches = [...matches].sort((a, b) => b - a);
-  for (const index of sortedMatches) {
-    nextContent = nextContent.slice(0, index) + after + nextContent.slice(index + before.length);
-  }
-
+  const nextContent = applyTextReplacementAtMatches(content, matches, before.length, after);
   return { content: nextContent, matchCount: matches.length };
 };
 
@@ -703,13 +741,7 @@ const applyDelete = (
   if (issue) {
     return issue;
   }
-
-  let nextContent = content;
-  const sortedMatches = [...matches].sort((a, b) => b - a);
-  for (const index of sortedMatches) {
-    nextContent = nextContent.slice(0, index) + nextContent.slice(index + before.length);
-  }
-
+  const nextContent = applyTextReplacementAtMatches(content, matches, before.length, '');
   return { content: nextContent, matchCount: matches.length };
 };
 
@@ -736,14 +768,7 @@ const applyInsert = (
   if (issue) {
     return issue;
   }
-
-  const sortedMatches = [...matches].sort((a, b) => b - a);
-  let nextContent = content;
-  for (const index of sortedMatches) {
-    const insertIndex = position === 'before' ? index : index + anchor.length;
-    nextContent = nextContent.slice(0, insertIndex) + text + nextContent.slice(insertIndex);
-  }
-
+  const nextContent = applyTextInsertAtMatches(content, matches, anchor.length, text, position);
   return { content: nextContent, matchCount: matches.length };
 };
 
@@ -901,11 +926,12 @@ export function applySkillPatch(
   return { ok: true, content: nextContent, appliedOperations };
 }
 
-const computeDiffMatrix = (base: string[], updated: string[]): number[][] => {
+const computeDiffMatrix = (base: string[], updated: string[]): Uint32Array[] => {
   const baseLen = base.length;
   const updatedLen = updated.length;
-  const matrix: number[][] = Array.from({ length: baseLen + 1 }, () =>
-    Array(updatedLen + 1).fill(0)
+  const matrix: Uint32Array[] = Array.from(
+    { length: baseLen + 1 },
+    () => new Uint32Array(updatedLen + 1)
   );
 
   for (let i = 1; i <= baseLen; i += 1) {
@@ -919,6 +945,53 @@ const computeDiffMatrix = (base: string[], updated: string[]): number[][] => {
   }
 
   return matrix;
+};
+
+const appendDiffSegment = (
+  segments: SkillDiffSegment[],
+  type: SkillDiffSegmentType,
+  lines: string[]
+): void => {
+  if (lines.length === 0) {
+    return;
+  }
+  const last = segments[segments.length - 1];
+  if (last && last.type === type) {
+    last.lines.push(...lines);
+    return;
+  }
+  segments.push({ type, lines: [...lines] });
+};
+
+const computeCommonPrefixLength = (base: string[], updated: string[]): number => {
+  const limit = Math.min(base.length, updated.length);
+  let index = 0;
+  while (index < limit && base[index] === updated[index]) {
+    index += 1;
+  }
+  return index;
+};
+
+const computeCommonSuffixLength = (
+  base: string[],
+  updated: string[],
+  prefixLength: number
+): number => {
+  let baseIndex = base.length - 1;
+  let updatedIndex = updated.length - 1;
+  let suffixLength = 0;
+
+  while (
+    baseIndex >= prefixLength &&
+    updatedIndex >= prefixLength &&
+    base[baseIndex] === updated[updatedIndex]
+  ) {
+    suffixLength += 1;
+    baseIndex -= 1;
+    updatedIndex -= 1;
+  }
+
+  return suffixLength;
 };
 
 /**
@@ -936,40 +1009,48 @@ const computeDiffMatrix = (base: string[], updated: string[]): number[][] => {
 export function diffSkillContent(base: SkillContent, updated: SkillContent): SkillLineDiff {
   const baseLines = base.split('\n');
   const updatedLines = updated.split('\n');
-  const matrix = computeDiffMatrix(baseLines, updatedLines);
-
   const segments: SkillDiffSegment[] = [];
+  const prefixLength = computeCommonPrefixLength(baseLines, updatedLines);
+  const suffixLength = computeCommonSuffixLength(baseLines, updatedLines, prefixLength);
 
-  let i = baseLines.length;
-  let j = updatedLines.length;
-  const reversed: SkillDiffSegment[] = [];
+  const baseMiddle = baseLines.slice(prefixLength, baseLines.length - suffixLength);
+  const updatedMiddle = updatedLines.slice(prefixLength, updatedLines.length - suffixLength);
 
-  while (i > 0 || j > 0) {
-    if (i > 0 && j > 0 && baseLines[i - 1] === updatedLines[j - 1]) {
-      reversed.push({ type: 'equal', lines: [baseLines[i - 1]] });
+  appendDiffSegment(segments, 'equal', baseLines.slice(0, prefixLength));
+
+  if (baseMiddle.length > 0 || updatedMiddle.length > 0) {
+    const matrix = computeDiffMatrix(baseMiddle, updatedMiddle);
+    let i = baseMiddle.length;
+    let j = updatedMiddle.length;
+    const reversed: SkillDiffSegment[] = [];
+
+    while (i > 0 || j > 0) {
+      if (i > 0 && j > 0 && baseMiddle[i - 1] === updatedMiddle[j - 1]) {
+        reversed.push({ type: 'equal', lines: [baseMiddle[i - 1]] });
+        i -= 1;
+        j -= 1;
+        continue;
+      }
+
+      if (j > 0 && (i === 0 || matrix[i][j - 1] >= matrix[i - 1][j])) {
+        reversed.push({ type: 'insert', lines: [updatedMiddle[j - 1]] });
+        j -= 1;
+        continue;
+      }
+
+      reversed.push({ type: 'delete', lines: [baseMiddle[i - 1]] });
       i -= 1;
-      j -= 1;
-      continue;
     }
 
-    if (j > 0 && (i === 0 || matrix[i][j - 1] >= matrix[i - 1][j])) {
-      reversed.push({ type: 'insert', lines: [updatedLines[j - 1]] });
-      j -= 1;
-      continue;
+    reversed.reverse();
+    for (const segment of reversed) {
+      appendDiffSegment(segments, segment.type, segment.lines);
     }
-
-    reversed.push({ type: 'delete', lines: [baseLines[i - 1]] });
-    i -= 1;
   }
 
-  reversed.reverse().forEach((segment) => {
-    const last = segments[segments.length - 1];
-    if (last && last.type === segment.type) {
-      last.lines.push(...segment.lines);
-    } else {
-      segments.push({ type: segment.type, lines: [...segment.lines] });
-    }
-  });
+  if (suffixLength > 0) {
+    appendDiffSegment(segments, 'equal', baseLines.slice(baseLines.length - suffixLength));
+  }
 
   return {
     baseLineCount: baseLines.length,

@@ -37,7 +37,6 @@ const CHAR_OPEN_PAREN = '(';
 const CHAR_CLOSE_PAREN = ')';
 const CHAR_NEWLINE = '\n';
 const URL_SCHEME_PATTERN = /^[a-zA-Z][a-zA-Z\d+\-.]*:/;
-const RESOURCE_URL_PARTS_SPLIT_LIMIT = 1;
 
 /**
  * Checks whether a value is a non-array object record.
@@ -131,7 +130,21 @@ const normalizeResourcePath = (path: string): string | null => {
     return null;
   }
 
-  const normalized = path.split(/[?#]/, RESOURCE_URL_PARTS_SPLIT_LIMIT)[0].replace(/^(\.\/)+/, '');
+  let cutoff = path.length;
+  const queryIndex = path.indexOf('?');
+  if (queryIndex !== -1 && queryIndex < cutoff) {
+    cutoff = queryIndex;
+  }
+  const hashIndex = path.indexOf('#');
+  if (hashIndex !== -1 && hashIndex < cutoff) {
+    cutoff = hashIndex;
+  }
+
+  let normalized = path.slice(0, cutoff);
+  while (normalized.startsWith('./')) {
+    normalized = normalized.slice(2);
+  }
+
   if (!normalized || normalized.includes('\\')) {
     return null;
   }
@@ -279,9 +292,13 @@ const extractMetadataStringMap = (document: Document.Parsed): SkillMetadataMap |
     return null;
   }
 
-  const metadataPair = root.items.find((pair) => {
-    return isScalarNode(pair.key) && pair.key.value === FIELD_METADATA;
-  });
+  let metadataPair: (typeof root.items)[number] | undefined;
+  for (const pair of root.items) {
+    if (isScalarNode(pair.key) && pair.key.value === FIELD_METADATA) {
+      metadataPair = pair;
+      break;
+    }
+  }
 
   if (!metadataPair || !isMapNode(metadataPair.value)) {
     return null;
@@ -573,20 +590,16 @@ export function parseFrontmatter<TMetadata extends SkillMetadataMap = SkillMetad
     throw new ParseError('SKILL.md must start with YAML frontmatter (---)');
   }
 
-  const firstDelimiter = normalizedContent.indexOf(FRONTMATTER_DELIMITER);
   const secondDelimiter = normalizedContent.indexOf(
     FRONTMATTER_DELIMITER,
-    firstDelimiter + FRONTMATTER_DELIMITER_LENGTH
+    FRONTMATTER_DELIMITER_LENGTH
   );
 
   if (secondDelimiter === -1) {
     throw new ParseError('SKILL.md frontmatter not properly closed with ---');
   }
 
-  const frontmatterStr = normalizedContent.substring(
-    firstDelimiter + FRONTMATTER_DELIMITER_LENGTH,
-    secondDelimiter
-  );
+  const frontmatterStr = normalizedContent.substring(FRONTMATTER_DELIMITER_LENGTH, secondDelimiter);
   const body = normalizedContent.substring(secondDelimiter + FRONTMATTER_DELIMITER_LENGTH).trim();
 
   const document = YAML.parseDocument(frontmatterStr, { keepSourceTokens: true });
@@ -629,11 +642,7 @@ export function extractBody(content: SkillContent): SkillBody {
     return content.trim();
   }
 
-  const firstDelimiter = content.indexOf(FRONTMATTER_DELIMITER);
-  const secondDelimiter = content.indexOf(
-    FRONTMATTER_DELIMITER,
-    firstDelimiter + FRONTMATTER_DELIMITER_LENGTH
-  );
+  const secondDelimiter = content.indexOf(FRONTMATTER_DELIMITER, FRONTMATTER_DELIMITER_LENGTH);
 
   if (secondDelimiter === -1) {
     return content.trim();
