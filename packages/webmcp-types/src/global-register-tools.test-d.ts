@@ -295,3 +295,44 @@ test('global registerTool implementation-first examples compile', () => {
 
   navigator.modelContext.unregisterTool('feature_toggle_summary');
 });
+
+test('global registerTool accepts widened-schema tools returning raw values', () => {
+  if (!shouldInvokeRegisterTool) {
+    return;
+  }
+
+  navigator.modelContext.registerTool({
+    name: 'raw_string_result',
+    description: 'Widened schema tool returning raw string',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string' },
+      },
+      required: ['query'],
+    },
+    async execute(args) {
+      return `Results for ${args.query}`;
+    },
+  });
+
+  navigator.modelContext.registerTool({
+    name: 'raw_array_result',
+    description: 'Widened schema tool returning raw array',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+    execute() {
+      return [{ id: 1, name: 'item' }];
+    },
+  });
+
+  navigator.modelContext.registerTool({
+    name: 'raw_no_schema_string',
+    description: 'No-schema tool returning raw string',
+    execute() {
+      return 'pong';
+    },
+  });
+});
