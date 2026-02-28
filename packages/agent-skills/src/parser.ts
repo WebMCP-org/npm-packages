@@ -31,7 +31,11 @@ const INPUT_MODE_STRICT = 'strict';
 const INPUT_MODE_EMBEDDED = 'embedded';
 const RESOURCE_DEDUPE_SEPARATOR = '\u0000';
 const RESOURCE_PATH_SEGMENTS = new Set(['scripts', 'references', 'assets']);
-const RESOURCE_LINK_PATTERN = /\[([^\]\n]+)\]\(([^)\n]+)\)/g;
+const CHAR_OPEN_BRACKET = '[';
+const CHAR_CLOSE_BRACKET = ']';
+const CHAR_OPEN_PAREN = '(';
+const CHAR_CLOSE_PAREN = ')';
+const CHAR_NEWLINE = '\n';
 const URL_SCHEME_PATTERN = /^[a-zA-Z][a-zA-Z\d+\-.]*:/;
 const RESOURCE_URL_PARTS_SPLIT_LIMIT = 1;
 
@@ -454,26 +458,77 @@ export interface ResourceLink {
 export function extractResourceLinks(body: SkillBody): ResourceLink[] {
   const links: ResourceLink[] = [];
   const dedupe = new Set<string>();
+  let index = 0;
 
-  for (const match of body.matchAll(RESOURCE_LINK_PATTERN)) {
-    const rawName = match[1]?.trim();
-    const rawPath = match[2];
+  while (index < body.length) {
+    if (body[index] !== CHAR_OPEN_BRACKET) {
+      index += 1;
+      continue;
+    }
+
+    const nameStart = index + 1;
+    let nameEnd = nameStart;
+    while (
+      nameEnd < body.length &&
+      body[nameEnd] !== CHAR_CLOSE_BRACKET &&
+      body[nameEnd] !== CHAR_NEWLINE
+    ) {
+      nameEnd += 1;
+    }
+
+    if (nameEnd >= body.length) {
+      break;
+    }
+
+    const hasValidName = body[nameEnd] === CHAR_CLOSE_BRACKET && nameEnd > nameStart;
+    const hasPathOpen = body[nameEnd + 1] === CHAR_OPEN_PAREN;
+
+    if (!hasValidName || !hasPathOpen) {
+      index = nameEnd + 1;
+      continue;
+    }
+
+    const pathStart = nameEnd + 2;
+    let pathEnd = pathStart;
+    while (
+      pathEnd < body.length &&
+      body[pathEnd] !== CHAR_CLOSE_PAREN &&
+      body[pathEnd] !== CHAR_NEWLINE
+    ) {
+      pathEnd += 1;
+    }
+
+    if (pathEnd >= body.length) {
+      break;
+    }
+
+    if (body[pathEnd] !== CHAR_CLOSE_PAREN) {
+      index = pathEnd + 1;
+      continue;
+    }
+
+    const rawName = body.slice(nameStart, nameEnd).trim();
+    const rawPath = body.slice(pathStart, pathEnd);
     if (!rawName || !rawPath) {
+      index = pathEnd + 1;
       continue;
     }
 
     const normalizedPath = normalizeResourcePath(stripMarkdownLinkTitle(rawPath));
     if (!normalizedPath) {
+      index = pathEnd + 1;
       continue;
     }
 
     const dedupeKey = `${rawName}${RESOURCE_DEDUPE_SEPARATOR}${normalizedPath}`;
     if (dedupe.has(dedupeKey)) {
+      index = pathEnd + 1;
       continue;
     }
 
     dedupe.add(dedupeKey);
     links.push({ name: rawName, path: normalizedPath });
+    index = pathEnd + 1;
   }
 
   return links;

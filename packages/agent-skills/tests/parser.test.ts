@@ -667,6 +667,12 @@ describe('extractResourceLinks', () => {
       { name: 'spaced', path: 'references/space-path' },
     ]);
   });
+
+  it('should handle pathological bracket-heavy input without extracting invalid links', () => {
+    const body = `${'['.repeat(4000)}\n${'[(('.repeat(2000)}\n[ok](references/final)`;
+
+    expect(extractResourceLinks(body)).toEqual([{ name: 'ok', path: 'references/final' }]);
+  });
 });
 
 describe('readSkillProperties', () => {
