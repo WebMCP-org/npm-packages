@@ -1,4 +1,4 @@
-# @mcp-b/agent-skills API
+# agent-skills-ts-sdk API
 
 This package is a TypeScript implementation of the Agent Skills specification.
 It follows the public spec and mirrors the Python reference library behavior

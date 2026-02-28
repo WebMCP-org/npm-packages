@@ -1,4 +1,4 @@
-# @mcp-b/agent-skills
+# agent-skills-ts-sdk
 
 TypeScript implementation of the [AgentSkills specification](https://agentskills.io/specification).
 
@@ -18,7 +18,7 @@ Agent Skills are folders of instructions, scripts, and resources that agents can
 ## Installation
 
 ```bash
-pnpm add @mcp-b/agent-skills
+pnpm add agent-skills-ts-sdk
 ```
 
 ## Usage
@@ -26,7 +26,7 @@ pnpm add @mcp-b/agent-skills
 ### Parsing SKILL.md
 
 ```typescript
-import { parseSkillContent, validateSkillContent } from "@mcp-b/agent-skills"
+import { parseSkillContent, validateSkillContent } from "agent-skills-ts-sdk"
 
 const content = `---
 name: my-skill
@@ -56,7 +56,7 @@ const { properties, body } = parseSkillContent(contentFromDom, {
 ### Validation
 
 ```typescript
-import { validateSkillProperties } from "@mcp-b/agent-skills"
+import { validateSkillProperties } from "agent-skills-ts-sdk"
 
 const properties = {
   name: "my-skill",
@@ -73,7 +73,7 @@ import {
   findSkillMdFile,
   readSkillProperties,
   validateSkillEntries
-} from "@mcp-b/agent-skills"
+} from "agent-skills-ts-sdk"
 
 const files = [
   { name: "SKILL.md", content: skillMarkdown }
@@ -87,7 +87,7 @@ const errors = validateSkillEntries(files, { expectedName: properties.name })
 ### Prompt generation
 
 ```typescript
-import { toPrompt } from "@mcp-b/agent-skills"
+import { toPrompt } from "agent-skills-ts-sdk"
 
 const promptBlock = toPrompt([
   { content: skillMarkdown, location: "skills/my-skill/SKILL.md" }
@@ -102,7 +102,7 @@ import {
   toDisclosureInstructions,
   toDisclosurePrompt,
   toReadToolSchema
-} from "@mcp-b/agent-skills"
+} from "agent-skills-ts-sdk"
 
 const instructions = toDisclosureInstructions({ toolName: "read_site_context" })
 const skillsXml = toDisclosurePrompt([
@@ -116,7 +116,7 @@ const readTool = toReadToolSchema([{ name: "pizza-maker" }], {
 ### Diff + patch
 
 ```typescript
-import { createSkillPatch, applySkillPatch } from "@mcp-b/agent-skills"
+import { createSkillPatch, applySkillPatch } from "agent-skills-ts-sdk"
 
 const patch = createSkillPatch(oldContent, newContent)
 const result = applySkillPatch(oldContent, patch)

@@ -1,5 +1,5 @@
 /**
- * @mcp-b/agent-skills
+ * agent-skills-ts-sdk
  *
  * TypeScript implementation of the AgentSkills specification.
  *
