@@ -1,3 +1,8 @@
+---
+name: release
+description: This skill should be used when the user wants to publish a package to npm, bump a version, release a new version, or mentions "npm publish", "pnpm publish", "version bump", "release", or "publish". Handles changesets, pnpm publish -r, NPM_TOKEN authentication, and topological dependency ordering for the @mcp-b monorepo.
+---
+
 # Release Skill for @mcp-b Packages
 
 Publish packages from this monorepo to npm. Uses `pnpm publish -r` for automatic topological ordering so dependencies are always published before dependents.
