@@ -5,7 +5,7 @@ import {
   type TabServerTransportOptions,
 } from '@mcp-b/transports';
 import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
-import { BrowserMcpServer, type Transport } from '@mcp-b/webmcp-ts-sdk';
+import { BrowserMcpServer, SERVER_MARKER_PROPERTY, type Transport } from '@mcp-b/webmcp-ts-sdk';
 import type {
   InputSchema,
   ModelContextCore,
@@ -195,6 +195,13 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
   }
 
   if (runtime) {
+    return;
+  }
+
+  // Cross-bundle guard: if navigator.modelContext is already a BrowserMcpServer
+  // (set by another bundle in this window), skip initialization.
+  const existingContext = navigator.modelContext as unknown as Record<string, unknown> | undefined;
+  if (existingContext?.[SERVER_MARKER_PROPERTY]) {
     return;
   }
 

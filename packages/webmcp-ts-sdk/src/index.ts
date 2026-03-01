@@ -91,6 +91,7 @@ export {
   type BrowserMcpServerOptions,
   type PromptDescriptor,
   type ResourceDescriptor,
+  SERVER_MARKER_PROPERTY,
 } from './browser-server.js';
 export { NoOpJsonSchemaValidator } from './no-op-validator.js';
 export { PolyfillJsonSchemaValidator } from './polyfill-validator.js';
