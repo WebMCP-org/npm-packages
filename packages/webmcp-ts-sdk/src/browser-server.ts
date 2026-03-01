@@ -39,6 +39,8 @@ import { PolyfillJsonSchemaValidator } from './polyfill-validator.js';
 const DEFAULT_INPUT_SCHEMA: InputSchema = { type: 'object', properties: {} };
 const DEFAULT_CLIENT_REQUEST_TIMEOUT = 10_000;
 
+export const SERVER_MARKER_PROPERTY = '__isBrowserMcpServer' as const;
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
@@ -179,6 +181,8 @@ type NativeToolsApi = ModelContextCore & Pick<ModelContextExtensions, 'listTools
  * navigator.modelContextTesting (polyfill testing shim) stays in sync.
  */
 export class BrowserMcpServer extends BaseMcpServer {
+  readonly [SERVER_MARKER_PROPERTY] = true as const;
+
   private native: ModelContextCore | undefined;
   private _promptSchemas = new Map<string, InputSchema>();
   private _jsonValidator: PolyfillJsonSchemaValidator;

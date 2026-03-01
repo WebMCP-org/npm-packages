@@ -1,5 +1,6 @@
+import { TabClientTransport, TabServerTransport } from '@mcp-b/transports';
 import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
-import type { BrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
+import { BrowserMcpServer, Client } from '@mcp-b/webmcp-ts-sdk';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanupWebModelContext, initializeWebModelContext } from './global.js';
 
@@ -392,6 +393,40 @@ describe('global adapter', () => {
     expect(tools.some((tool) => tool.name === 'clear_me')).toBe(false);
   });
 
+  it('sets __isBrowserMcpServer marker on navigator.modelContext', () => {
+    initializeWebModelContext();
+    const ctx = navigator.modelContext as unknown as Record<string, unknown>;
+    expect(ctx.__isBrowserMcpServer).toBe(true);
+  });
+
+  it('skips initialization when navigator.modelContext already has __isBrowserMcpServer marker', () => {
+    // Simulate another bundle having already set up a BrowserMcpServer
+    const fakeServer = {
+      __isBrowserMcpServer: true,
+      provideContext: () => {},
+      registerTool: () => {},
+      unregisterTool: () => {},
+      clearContext: () => {},
+    };
+    Object.defineProperty(navigator, 'modelContext', {
+      configurable: true,
+      enumerable: true,
+      writable: true,
+      value: fakeServer,
+    });
+
+    try {
+      initializeWebModelContext();
+
+      // Init should have been skipped — modelContext should still be the fake server
+      expect(navigator.modelContext).toBe(fakeServer);
+    } finally {
+      cleanupWebModelContext();
+      delete (navigator as unknown as Record<string, unknown>).modelContext;
+      delete (navigator as unknown as Record<string, unknown>).modelContextTesting;
+    }
+  });
+
   it('cleanup restores and allows re-init', () => {
     initializeWebModelContext();
     expect(typeof getModelContext().listTools).toBe('function');
@@ -513,5 +548,123 @@ describe('global adapter', () => {
     });
     expect(result.isError).toBeFalsy();
     expect(result.content[0]).toMatchObject({ type: 'text', text: 'echo:hi' });
+  });
+});
+
+describe('cross-bundle duplicate prevention (e2e)', () => {
+  const delay = (ms = 50) => new Promise((resolve) => setTimeout(resolve, ms));
+  const uniqueChannel = () => `e2e-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+  it('duplicate TabServerTransports cause double message delivery (root cause of #136)', async () => {
+    // This test proves the underlying transport bug: two server transports on the
+    // same channel each register their own window.addEventListener('message', ...),
+    // so a single client message is received and processed by BOTH.
+    // This is exactly what happened when two bundles both called initializeWebModelContext().
+    const channelId = uniqueChannel();
+
+    const server1 = new TabServerTransport({ allowedOrigins: ['*'], channelId });
+    const server2 = new TabServerTransport({ allowedOrigins: ['*'], channelId });
+
+    let totalMessageCount = 0;
+
+    server1.onmessage = () => {
+      totalMessageCount++;
+    };
+    server2.onmessage = () => {
+      totalMessageCount++;
+    };
+
+    await server1.start();
+    await server2.start();
+
+    const client = new TabClientTransport({
+      targetOrigin: '*',
+      channelId,
+      requestTimeout: 500,
+    });
+    await client.start();
+    await client.serverReadyPromise;
+
+    await client.send({ jsonrpc: '2.0', method: 'tools/call', id: 1, params: { name: 'test' } });
+    await delay();
+
+    // BUG: 1 client message → 2 server deliveries. This caused double tool invocations.
+    expect(totalMessageCount).toBe(2);
+
+    await server1.close();
+    await server2.close();
+    await client.close().catch(() => {});
+  });
+
+  it('marker guard prevents duplicate transport, tool invoked exactly once', async () => {
+    // Simulate the real cross-bundle scenario:
+    //   Bundle A: creates BrowserMcpServer + TabServerTransport, sets marker on modelContext
+    //   Bundle B: calls initializeWebModelContext() with its own runtime=null,
+    //             sees marker on navigator.modelContext → skips
+    //
+    // We simulate this by manually setting up a BrowserMcpServer with a transport
+    // (acting as Bundle A), then calling initializeWebModelContext() (acting as Bundle B).
+    // Since no prior initializeWebModelContext() call was made in this test,
+    // the module-level `runtime` is null — the marker is the ONLY guard.
+    const channelId = uniqueChannel();
+
+    // --- Bundle A: manually create server + transport ---
+    const serverTransport = new TabServerTransport({ allowedOrigins: ['*'], channelId });
+    const server = new BrowserMcpServer({ name: 'bundle-a', version: '1.0.0' });
+
+    let invocationCount = 0;
+    server.registerTool({
+      name: 'e2e_guard_tool',
+      description: 'Verifies single invocation',
+      inputSchema: { type: 'object', properties: {} },
+      async execute() {
+        invocationCount++;
+        return { content: [{ type: 'text', text: `count:${invocationCount}` }] };
+      },
+    });
+
+    await server.connect(serverTransport);
+
+    // Place server on navigator.modelContext (as initializeWebModelContext would)
+    Object.defineProperty(navigator, 'modelContext', {
+      configurable: true,
+      enumerable: true,
+      writable: true,
+      value: server,
+    });
+
+    // Verify marker is present (BrowserMcpServer sets it automatically)
+    const ctx = navigator.modelContext as unknown as Record<string, unknown>;
+    expect(ctx.__isBrowserMcpServer).toBe(true);
+
+    // --- Bundle B: calls initializeWebModelContext() ---
+    // Module-level `runtime` is null (no prior init in this test).
+    // The ONLY thing preventing a second server+transport is the marker on modelContext.
+    initializeWebModelContext({
+      transport: { tabServer: { allowedOrigins: ['*'], channelId }, iframeServer: false },
+    });
+
+    // modelContext should still be Bundle A's server — not replaced
+    expect(navigator.modelContext).toBe(server);
+
+    // --- Verify: full MCP roundtrip invokes tool exactly once ---
+    const clientTransport = new TabClientTransport({
+      targetOrigin: '*',
+      channelId,
+      requestTimeout: 5000,
+    });
+    const mcpClient = new Client({ name: 'test-client', version: '1.0.0' });
+    await mcpClient.connect(clientTransport);
+
+    const result = await mcpClient.callTool({ name: 'e2e_guard_tool', arguments: {} });
+
+    expect(invocationCount).toBe(1);
+    expect(result.content).toEqual([{ type: 'text', text: 'count:1' }]);
+
+    // Cleanup (manual since we didn't use initializeWebModelContext)
+    await mcpClient.close();
+    await server.close();
+    delete (navigator as unknown as Record<string, unknown>).modelContext;
+    delete (navigator as unknown as Record<string, unknown>).modelContextTesting;
   });
 });
