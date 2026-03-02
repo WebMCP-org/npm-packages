@@ -127,12 +127,12 @@ describe('useWebMCP', () => {
       const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
 
       try {
-        const zodSchema = { username: z.string() };
+        const zodSchema = { username: z.string() } as const;
         await renderHook(() =>
           useWebMCP({
             name: 'zod_like_tool',
             description: 'Tool using zod-like schema',
-            inputSchema: zodSchema as never,
+            inputSchema: zodSchema,
             handler: async () => 'ok',
           })
         );
@@ -149,6 +149,45 @@ describe('useWebMCP', () => {
         expect(descriptor.inputSchema?.type).toBe('object');
         expect(descriptor.inputSchema?.properties).toHaveProperty('username');
         expect(descriptor.inputSchema?.required).toContain('username');
+      } finally {
+        registerToolSpy.mockRestore();
+      }
+    });
+
+    it('converts zod-like outputSchema before registration', async () => {
+      const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
+
+      try {
+        const zodOutputSchema = {
+          count: z.number(),
+          message: z.string(),
+        } as const;
+
+        await renderHook(() =>
+          useWebMCP({
+            name: 'zod_output_tool',
+            description: 'Tool using zod-like output schema',
+            outputSchema: zodOutputSchema,
+            handler: async () => ({ count: 1, message: 'ok' }),
+          })
+        );
+
+        const descriptor = registerToolSpy.mock.calls.at(-1)?.[0] as {
+          name: string;
+          outputSchema?: {
+            type?: string;
+            properties?: Record<string, { type?: string }>;
+            required?: string[];
+          };
+        };
+
+        expect(descriptor.name).toBe('zod_output_tool');
+        expect(descriptor.outputSchema?.type).toBe('object');
+        expect(descriptor.outputSchema?.properties).toHaveProperty('count');
+        expect(descriptor.outputSchema?.properties).toHaveProperty('message');
+        expect(descriptor.outputSchema?.required).toEqual(
+          expect.arrayContaining(['count', 'message'])
+        );
       } finally {
         registerToolSpy.mockRestore();
       }
