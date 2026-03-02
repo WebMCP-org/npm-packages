@@ -279,18 +279,12 @@ export class BrowserMcpServer extends BaseMcpServer {
 
     if (Object.keys(jsonSchema).length === 0) {
       if (requireObjectType) {
-        console.warn(
-          '[BrowserMcpServer] toTransportSchema received empty {} schema, normalizing to default object schema'
-        );
         return DEFAULT_INPUT_SCHEMA;
       }
       return jsonSchema as InputSchema;
     }
 
     if (requireObjectType && jsonSchema.type === undefined) {
-      console.warn(
-        '[BrowserMcpServer] toTransportSchema received schema without root type, prepending type:"object"'
-      );
       return { type: 'object', ...jsonSchema } as InputSchema;
     }
 
