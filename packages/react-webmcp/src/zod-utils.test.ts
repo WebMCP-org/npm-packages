@@ -33,11 +33,21 @@ describe('zod-utils', () => {
         })
       ).toBe(true);
     });
+
+    it('returns true for zod-like schema records with non-zod keys', () => {
+      expect(
+        isZodSchema({
+          type: 'object',
+          username: { _def: { typeName: 'ZodString' } },
+        })
+      ).toBe(true);
+    });
   });
 
   describe('zodToJsonSchema', () => {
     it('converts zod-like fields, strips schema metadata, and infers required keys', () => {
       const schema = {
+        type: 'object',
         requiredField: { _def: { typeName: 'ZodString' } },
         optionalField: { _def: { typeName: 'ZodOptional' } },
         defaultField: { _def: { typeName: 'ZodDefault' } },

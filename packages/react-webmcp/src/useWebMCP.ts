@@ -1,15 +1,11 @@
-import type {
-  CallToolResult,
-  InputSchema,
-  JsonSchemaObject,
-  ToolDescriptor,
-} from '@mcp-b/webmcp-types';
+import type { CallToolResult, InputSchema, ToolDescriptor } from '@mcp-b/webmcp-types';
 import type { DependencyList } from 'react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type {
   InferOutput,
   InferToolInput,
   ReactWebMCPInputSchema,
+  ReactWebMCPOutputSchema,
   ToolExecutionState,
   WebMCPConfig,
   WebMCPReturn,
@@ -105,7 +101,7 @@ const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffec
  */
 export function useWebMCP<
   TInputSchema extends ReactWebMCPInputSchema = InputSchema,
-  TOutputSchema extends JsonSchemaObject | undefined = undefined,
+  TOutputSchema extends ReactWebMCPOutputSchema | undefined = undefined,
 >(
   config: WebMCPConfig<TInputSchema, TOutputSchema>,
   deps?: DependencyList
@@ -287,13 +283,18 @@ export function useWebMCP<
         ? zodToJsonSchema(inputSchema)
         : (inputSchema as InputSchema)
       : undefined;
+    const resolvedOutputSchema = outputSchema
+      ? isZodSchema(outputSchema)
+        ? zodToJsonSchema(outputSchema)
+        : (outputSchema as InputSchema)
+      : undefined;
 
     const ownerToken = Symbol(name);
     (modelContext.registerTool as (tool: ToolDescriptor) => void)({
       name,
       description,
       ...(resolvedInputSchema && { inputSchema: resolvedInputSchema }),
-      ...(outputSchema && { outputSchema: outputSchema as InputSchema }),
+      ...(resolvedOutputSchema && { outputSchema: resolvedOutputSchema }),
       ...(annotations && { annotations }),
       execute: mcpHandler,
     });
