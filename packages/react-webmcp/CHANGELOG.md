@@ -1,5 +1,16 @@
 # @mcp-b/react-webmcp
 
+## 2.0.11
+
+### Patch Changes
+
+- Fix zod schema map detection for mixed objects and apply zod-to-JSON conversion to outputSchema
+  - @mcp-b/webmcp-types@2.0.11
+  - @mcp-b/webmcp-polyfill@2.0.11
+  - @mcp-b/webmcp-ts-sdk@2.0.11
+  - @mcp-b/transports@2.0.11
+  - @mcp-b/global@2.0.11
+
 ## 2.0.10
 
 ### Patch Changes

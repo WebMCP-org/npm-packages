@@ -1,5 +1,7 @@
 # agent-skills-ts-sdk
 
+## 2.0.11
+
 ## 2.0.10
 
 ### Patch Changes
