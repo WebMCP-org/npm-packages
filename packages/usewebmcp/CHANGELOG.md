@@ -1,5 +1,12 @@
 # usewebmcp
 
+## 2.0.10
+
+### Patch Changes
+
+- @mcp-b/webmcp-types@2.0.10
+- @mcp-b/webmcp-polyfill@2.0.10
+
 ## 2.0.9
 
 ### Patch Changes
