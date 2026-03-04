@@ -1,5 +1,6 @@
-import type { z } from 'zod';
-import type { InferOutput } from '../types.js';
+import type { InputSchema } from '@mcp-b/webmcp-types';
+import { z } from 'zod';
+import type { InferOutput, WebMCPConfig, WebMCPReturn } from '../types.js';
 
 type IsEqual<Left, Right> = [Left] extends [Right]
   ? [Right] extends [Left]
@@ -10,23 +11,67 @@ type IsEqual<Left, Right> = [Left] extends [Right]
 type Assert<T extends true> = T;
 type IsAny<T> = 0 extends 1 & T ? true : false;
 
-type UndefinedFallsBackToUnknown = Assert<IsEqual<InferOutput<undefined>, unknown>>;
-type ZodOutput = InferOutput<{ name: z.ZodString }>;
-type ZodOutputIsNotAny = Assert<IsEqual<IsAny<ZodOutput>, false>>;
+const unstructuredConfig = {
+  name: 'list_items',
+  description: 'List items',
+  handler: async () => ({ items: [], total: 0 }),
+} satisfies WebMCPConfig;
 
-declare const zodOutput: ZodOutput;
-export const zodName: string = zodOutput.name;
-
-type JsonOutput = InferOutput<{
+type JsonOutputSchema = {
   type: 'object';
   properties: {
     total: { type: 'number' };
   };
   required: ['total'];
-}>;
+};
+
+const zodConfig: WebMCPConfig<InputSchema, { name: z.ZodString }> = {
+  name: 'zod_output',
+  description: 'Zod output',
+  outputSchema: { name: z.string() },
+  handler: async () => ({ name: 'typed' }),
+};
+
+const jsonOutputSchema: JsonOutputSchema = {
+  type: 'object',
+  properties: {
+    total: { type: 'number' },
+  },
+  required: ['total'],
+};
+
+const jsonConfig: WebMCPConfig<InputSchema, JsonOutputSchema> = {
+  name: 'json_output',
+  description: 'JSON output',
+  outputSchema: jsonOutputSchema,
+  handler: async () => ({ total: 1 }),
+};
+
+type UndefinedFallsBackToUnknown = Assert<IsEqual<InferOutput<undefined>, unknown>>;
+type UnstructuredLastResult = WebMCPReturn['state']['lastResult'];
+type UnstructuredLastResultIsUnknown = Assert<IsEqual<UnstructuredLastResult, unknown | null>>;
+type UnstructuredExecuteResult = Awaited<ReturnType<WebMCPReturn['execute']>>;
+type UnstructuredExecuteResultIsUnknown = Assert<IsEqual<UnstructuredExecuteResult, unknown>>;
+type UnstructuredHandlerResult = Awaited<ReturnType<typeof unstructuredConfig.handler>>;
+type UnstructuredHandlerHasTotal = Assert<
+  UnstructuredHandlerResult extends { total: number } ? true : false
+>;
+
+type ZodOutput = Awaited<ReturnType<typeof zodConfig.handler>>;
+type ZodOutputNameIsString = Assert<IsEqual<ZodOutput['name'], string>>;
+type ZodOutputIsNotAny = Assert<IsEqual<IsAny<ZodOutput>, false>>;
+
+type JsonOutput = Awaited<ReturnType<typeof jsonConfig.handler>>;
+type JsonOutputIsTyped = Assert<IsEqual<JsonOutput, { total: number }>>;
+
+declare const zodOutput: ZodOutput;
+export const zodName: string = zodOutput.name;
 
 declare const jsonOutput: JsonOutput;
 export const jsonTotal: number = jsonOutput.total;
+
+declare const unstructuredOutput: UnstructuredHandlerResult;
+export const unstructuredTotal: number = unstructuredOutput.total;
 
 type HandlerWithoutOutputSchema = () => Promise<InferOutput<undefined>>;
 export const handlerWithoutOutputSchema: HandlerWithoutOutputSchema = async () => ({
@@ -35,4 +80,9 @@ export const handlerWithoutOutputSchema: HandlerWithoutOutputSchema = async () =
 });
 
 export const typeRegressionAssertion: UndefinedFallsBackToUnknown = true;
+export const unstructuredLastResultAssertion: UnstructuredLastResultIsUnknown = true;
+export const unstructuredExecuteAssertion: UnstructuredExecuteResultIsUnknown = true;
+export const unstructuredHandlerAssertion: UnstructuredHandlerHasTotal = true;
+export const zodOutputAssertion: ZodOutputNameIsString = true;
 export const zodAnyAssertion: ZodOutputIsNotAny = true;
+export const jsonOutputAssertion: JsonOutputIsTyped = true;
