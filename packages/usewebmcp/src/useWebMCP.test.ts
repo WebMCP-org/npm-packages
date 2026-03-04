@@ -1,5 +1,4 @@
 import { initializeWebModelContext } from '@mcp-b/global';
-import type { ModelContextTesting } from '@mcp-b/webmcp-types';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
 

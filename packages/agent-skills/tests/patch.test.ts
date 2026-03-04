@@ -521,9 +521,10 @@ describe('applySkillPatch', () => {
       const result = applySkillPatch('no match here', patch, { validate: false });
       expect(result.ok).toBe(false);
       expect(result.errors?.[0].code).toBe('OPERATION_TARGET_NOT_FOUND');
-      expect(result.errors?.[0].snippet).toBeDefined();
+      const snippet = result.errors?.[0].snippet;
+      expect(snippet).toBeDefined();
       // Snippet should be truncated with ...
-      expect(result.errors?.[0].snippet!.length).toBeLessThanOrEqual(80);
+      expect(snippet?.length).toBeLessThanOrEqual(80);
     });
   });
 
@@ -569,7 +570,10 @@ describe('diffSkillContent', () => {
     expect(diff.updatedLineCount).toBe(2);
     const deleteSegment = diff.segments.find((s) => s.type === 'delete');
     expect(deleteSegment).toBeDefined();
-    expect(deleteSegment!.lines).toEqual(['b']);
+    if (!deleteSegment) {
+      throw new Error('Expected delete segment to be defined');
+    }
+    expect(deleteSegment.lines).toEqual(['b']);
   });
 
   it('returns all-equal segments for identical strings', () => {
