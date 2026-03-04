@@ -1456,10 +1456,82 @@ describe('@mcp-b/webmcp-polyfill', () => {
       ).toThrow("parameter 1 is not of type 'Function'");
     });
 
-    it('getCrossDocumentScriptToolResult returns empty array string', async () => {
+    it('parses declarative tool script entries into registered tools', async () => {
+      document.body.innerHTML = `
+        <script type="application/webmcp+json">
+          {
+            "tools": [
+              {
+                "name": "decl_script_tool",
+                "description": "Declarative script tool",
+                "inputSchema": {"type": "object", "properties": {}},
+                "response": {"content": [{"type": "text", "text": "from-script"}]}
+              }
+            ]
+          }
+        </script>
+      `;
+
       initializeWebMCPPolyfill();
+
+      const listed = navigator.modelContextTesting?.listTools() ?? [];
+      expect(listed.some((tool) => tool.name === 'decl_script_tool')).toBe(true);
+
+      const executed = await navigator.modelContextTesting?.executeTool('decl_script_tool', '{}');
+      expect(executed).toContain('from-script');
+
       const result = await navigator.modelContextTesting?.getCrossDocumentScriptToolResult();
-      expect(result).toBe('[]');
+      const parsed = JSON.parse(result ?? '[]') as Array<{ name: string; source: string }>;
+      expect(parsed).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ name: 'decl_script_tool', source: 'script' }),
+        ])
+      );
+    });
+
+    it('parses declarative data-webmcp-tool elements into registered tools', async () => {
+      document.body.innerHTML = '';
+      const node = document.createElement('div');
+      node.dataset.webmcpTool = 'decl_element_tool';
+      node.dataset.webmcpDescription = 'Declarative element tool';
+      node.dataset.webmcpResponse = JSON.stringify({
+        content: [{ type: 'text', text: 'from-element' }],
+      });
+      document.body.appendChild(node);
+
+      initializeWebMCPPolyfill();
+
+      const listed = navigator.modelContextTesting?.listTools() ?? [];
+      expect(listed.some((tool) => tool.name === 'decl_element_tool')).toBe(true);
+
+      const executed = await navigator.modelContextTesting?.executeTool('decl_element_tool', '{}');
+      expect(executed).toContain('from-element');
+    });
+
+    it('keeps declarative registrations synchronized when DOM nodes are removed', async () => {
+      document.body.innerHTML = '';
+      const node = document.createElement('div');
+      node.dataset.webmcpTool = 'decl_dynamic_tool';
+      node.dataset.webmcpDescription = 'Declarative dynamic tool';
+      document.body.appendChild(node);
+
+      initializeWebMCPPolyfill();
+      await Promise.resolve();
+
+      expect(
+        (navigator.modelContextTesting?.listTools() ?? []).some(
+          (tool) => tool.name === 'decl_dynamic_tool'
+        )
+      ).toBe(true);
+
+      node.remove();
+      await Promise.resolve();
+
+      expect(
+        (navigator.modelContextTesting?.listTools() ?? []).some(
+          (tool) => tool.name === 'decl_dynamic_tool'
+        )
+      ).toBe(false);
     });
   });
 

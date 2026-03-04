@@ -74,12 +74,14 @@ interface InstallState {
   installed: boolean;
   previousModelContextDescriptor: PropertyDescriptor | undefined;
   previousModelContextTestingDescriptor: PropertyDescriptor | undefined;
+  cleanupDeclarativeSync: (() => void) | null;
 }
 
 const installState: InstallState = {
   installed: false,
   previousModelContextDescriptor: undefined,
   previousModelContextTestingDescriptor: undefined,
+  cleanupDeclarativeSync: null,
 };
 
 export interface WebMCPPolyfillInitOptions {
@@ -105,9 +107,209 @@ export interface WebMCPPolyfillInitOptions {
   disableIframeTransportByDefault?: boolean;
 }
 
+interface DeclarativeToolDefinition {
+  name: string;
+  description: string;
+  inputSchema?: InputSchema;
+  response?: ToolResponse;
+}
+
+interface DeclarativeToolResult {
+  tool: DeclarativeToolDefinition;
+  source: 'script' | 'element';
+  id: string;
+}
+
+function normalizeDeclarativeToolEntry(
+  entry: Record<string, unknown>
+): DeclarativeToolDefinition | null {
+  const name = entry.name;
+  const description = entry.description;
+  if (typeof name !== 'string' || name.length === 0) {
+    return null;
+  }
+  if (typeof description !== 'string' || description.length === 0) {
+    return null;
+  }
+
+  const output: DeclarativeToolDefinition = { name, description };
+
+  if (isPlainObject(entry.inputSchema)) {
+    output.inputSchema = entry.inputSchema as InputSchema;
+  }
+
+  if (isPlainObject(entry.response)) {
+    output.response = entry.response as ToolResponse;
+  }
+
+  return output;
+}
+
+function parseDeclarativeToolsFromDom(doc: Document): DeclarativeToolResult[] {
+  const results: DeclarativeToolResult[] = [];
+
+  const scriptNodes = doc.querySelectorAll('script[type="application/webmcp+json"]');
+  scriptNodes.forEach((node, index) => {
+    const text = node.textContent?.trim();
+    if (!text) {
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(text) as { tools?: unknown };
+      const tools = Array.isArray(parsed.tools) ? parsed.tools : [];
+      tools.forEach((entry, entryIndex) => {
+        if (!isPlainObject(entry)) {
+          return;
+        }
+        const normalized = normalizeDeclarativeToolEntry(entry);
+        if (!normalized) {
+          return;
+        }
+        results.push({
+          tool: normalized,
+          source: 'script',
+          id: `script:${index}:${entryIndex}`,
+        });
+      });
+    } catch {
+      // Skip invalid declarative scripts.
+    }
+  });
+
+  const elementNodes = doc.querySelectorAll<HTMLElement>('[data-webmcp-tool]');
+  elementNodes.forEach((node, index) => {
+    const name = node.dataset.webmcpTool;
+    const description = node.dataset.webmcpDescription ?? '';
+    if (!name || !description) {
+      return;
+    }
+
+    let inputSchema: InputSchema | undefined;
+    if (node.dataset.webmcpInputSchema) {
+      try {
+        const parsedSchema = JSON.parse(node.dataset.webmcpInputSchema);
+        if (isPlainObject(parsedSchema)) {
+          inputSchema = parsedSchema as InputSchema;
+        }
+      } catch {
+        // Ignore invalid schema declarations.
+      }
+    }
+
+    let response: ToolResponse | undefined;
+    if (node.dataset.webmcpResponse) {
+      try {
+        const parsedResponse = JSON.parse(node.dataset.webmcpResponse);
+        if (isPlainObject(parsedResponse)) {
+          response = parsedResponse as ToolResponse;
+        }
+      } catch {
+        // Ignore invalid response payloads.
+      }
+    }
+
+    results.push({
+      source: 'element',
+      id: `element:${index}`,
+      tool: {
+        name,
+        description,
+        ...(inputSchema ? { inputSchema } : {}),
+        ...(response ? { response } : {}),
+      },
+    });
+  });
+
+  return results;
+}
+
+function startDeclarativeToolSync(context: StrictWebMCPContext): {
+  stop: () => void;
+  getSerializedResult: () => string;
+} {
+  if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') {
+    return { stop: () => {}, getSerializedResult: () => '[]' };
+  }
+
+  const registeredNames = new Set<string>();
+  let lastSerializedResult = '[]';
+
+  const sync = () => {
+    const parsedTools = parseDeclarativeToolsFromDom(document);
+    const nextNames = new Set(parsedTools.map((entry) => entry.tool.name));
+
+    for (const currentName of [...registeredNames]) {
+      if (!nextNames.has(currentName)) {
+        context.unregisterTool(currentName);
+        registeredNames.delete(currentName);
+      }
+    }
+
+    for (const parsedTool of parsedTools) {
+      if (registeredNames.has(parsedTool.tool.name)) {
+        continue;
+      }
+
+      try {
+        context.registerTool({
+          name: parsedTool.tool.name,
+          description: parsedTool.tool.description,
+          inputSchema: parsedTool.tool.inputSchema ?? DEFAULT_INPUT_SCHEMA,
+          execute: async () =>
+            parsedTool.tool.response ?? {
+              content: [{ type: 'text', text: `Declarative tool ${parsedTool.tool.name}` }],
+            },
+        });
+        registeredNames.add(parsedTool.tool.name);
+      } catch {
+        // Ignore duplicate or invalid declarative entries.
+      }
+    }
+
+    lastSerializedResult = JSON.stringify(
+      parsedTools.map((entry) => ({
+        id: entry.id,
+        source: entry.source,
+        name: entry.tool.name,
+        description: entry.tool.description,
+      }))
+    );
+  };
+
+  sync();
+
+  const observer = new MutationObserver(() => {
+    sync();
+  });
+
+  observer.observe(document.documentElement, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    characterData: true,
+  });
+
+  return {
+    stop: () => {
+      observer.disconnect();
+      for (const name of [...registeredNames]) {
+        context.unregisterTool(name);
+      }
+      registeredNames.clear();
+    },
+    getSerializedResult: () => lastSerializedResult,
+  };
+}
+
 class StrictWebMCPContext {
   private tools = new Map<string, PolyfillToolDescriptor>();
   private toolsChangedCallback: (() => void) | null = null;
+  private readonly getCrossDocumentScriptToolResultValue: () => string;
+
+  constructor(getCrossDocumentScriptToolResultValue: () => string = () => '[]') {
+    this.getCrossDocumentScriptToolResultValue = getCrossDocumentScriptToolResultValue;
+  }
 
   provideContext(options: ModelContextOptions = {}): void {
     const nextTools = new Map<string, PolyfillToolDescriptor>();
@@ -170,7 +372,7 @@ class StrictWebMCPContext {
         }
         this.toolsChangedCallback = callback;
       },
-      getCrossDocumentScriptToolResult: async () => '[]',
+      getCrossDocumentScriptToolResult: async () => this.getCrossDocumentScriptToolResultValue(),
     };
   }
 
@@ -792,7 +994,8 @@ export function initializeWebMCPPolyfill(options?: WebMCPPolyfillInitOptions): v
     cleanupWebMCPPolyfill();
   }
 
-  const context = new StrictWebMCPContext();
+  let crossDocumentResultGetter = () => '[]';
+  const context = new StrictWebMCPContext(() => crossDocumentResultGetter());
   const modelContext = context as unknown as PolyfillModelContext;
   modelContext[POLYFILL_MARKER_PROPERTY] = true;
 
@@ -822,6 +1025,10 @@ export function initializeWebMCPPolyfill(options?: WebMCPPolyfillInitOptions): v
     );
   }
 
+  const declarativeSync = startDeclarativeToolSync(context);
+  crossDocumentResultGetter = declarativeSync.getSerializedResult;
+  installState.cleanupDeclarativeSync = declarativeSync.stop;
+
   installState.installed = true;
 }
 
@@ -846,9 +1053,12 @@ export function cleanupWebMCPPolyfill(): void {
   restore('modelContext', installState.previousModelContextDescriptor);
   restore('modelContextTesting', installState.previousModelContextTestingDescriptor);
 
+  installState.cleanupDeclarativeSync?.();
+
   installState.installed = false;
   installState.previousModelContextDescriptor = undefined;
   installState.previousModelContextTestingDescriptor = undefined;
+  installState.cleanupDeclarativeSync = null;
 }
 
 export { initializeWebMCPPolyfill as initializeWebModelContextPolyfill };
