@@ -23,8 +23,21 @@ function normalizeFeatureKey(input: string): string {
   return input.toLowerCase().replace(/\s+/g, '_');
 }
 
-function getModelContextWithExtensions(): Navigator['modelContext'] & ModelContextExtensions {
-  return navigator.modelContext as Navigator['modelContext'] & ModelContextExtensions;
+function hasModelContextExtensions(
+  modelContext: Navigator['modelContext']
+): modelContext is Navigator['modelContext'] & ModelContextExtensions {
+  return 'callTool' in modelContext && 'listTools' in modelContext;
+}
+
+function isInteractionResponse(
+  response: unknown
+): response is { action?: string; content?: { confirmed?: boolean } } {
+  return (
+    typeof response === 'object' &&
+    response !== null &&
+    'action' in response &&
+    'content' in response
+  );
 }
 
 test('global registerTool kitchen sink examples compile', () => {
@@ -124,7 +137,7 @@ test('global registerTool kitchen sink examples compile', () => {
       properties: {
         payload: { type: 'string' },
       },
-    } as InputSchema,
+    } satisfies InputSchema,
     execute(args) {
       const fallbackArgs: Record<string, unknown> = args;
       void fallbackArgs;
@@ -181,20 +194,14 @@ test('global registerTool kitchen sink examples compile', () => {
         };
       });
 
-      if (
-        typeof response !== 'object' ||
-        !response ||
-        !('action' in response) ||
-        !('content' in response)
-      ) {
+      if (!isInteractionResponse(response)) {
         return {
           content: [{ type: 'text', text: 'invalid user interaction response' }],
           isError: true,
         };
       }
 
-      const interaction = response as { action?: string; content?: { confirmed?: boolean } };
-      if (interaction.action !== 'accept' || !interaction.content?.confirmed) {
+      if (response.action !== 'accept' || !response.content?.confirmed) {
         return {
           content: [{ type: 'text', text: 'deployment cancelled' }],
           isError: true,
@@ -262,7 +269,11 @@ test('global registerTool implementation-first examples compile', () => {
     },
   });
 
-  const modelContext = getModelContextWithExtensions();
+  const modelContext = navigator.modelContext;
+  if (!hasModelContextExtensions(modelContext)) {
+    return;
+  }
+
   const callResult = modelContext.callTool({
     name: 'feature_toggle_summary',
     arguments: {
