@@ -39,7 +39,11 @@ export type InferToolInput<T> = T extends { readonly '~standard': { readonly typ
 export type InferOutput<
   TOutputSchema extends JsonSchemaObject | undefined = undefined,
   TFallback = unknown,
-> = TOutputSchema extends JsonSchemaObject ? InferJsonSchema<TOutputSchema> : TFallback;
+> = TOutputSchema extends undefined
+  ? TFallback
+  : TOutputSchema extends JsonSchemaObject
+    ? InferJsonSchema<TOutputSchema>
+    : TFallback;
 
 /**
  * Represents the current execution state of a tool, including loading status,

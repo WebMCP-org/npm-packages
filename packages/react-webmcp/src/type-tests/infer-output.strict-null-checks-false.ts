@@ -17,6 +17,12 @@ const unstructuredConfig = {
   handler: async () => ({ items: [], total: 0 }),
 } satisfies WebMCPConfig;
 
+const noSchemaStringConfig = {
+  name: 'ping',
+  description: 'Ping',
+  handler: async () => 'pong',
+} satisfies WebMCPConfig;
+
 type JsonOutputSchema = {
   type: 'object';
   properties: {
@@ -56,6 +62,8 @@ type UnstructuredHandlerResult = Awaited<ReturnType<typeof unstructuredConfig.ha
 type UnstructuredHandlerHasTotal = Assert<
   UnstructuredHandlerResult extends { total: number } ? true : false
 >;
+type NoSchemaStringResult = Awaited<ReturnType<typeof noSchemaStringConfig.handler>>;
+type NoSchemaStringIsString = Assert<IsEqual<NoSchemaStringResult, string>>;
 
 type ZodOutput = Awaited<ReturnType<typeof zodConfig.handler>>;
 type ZodOutputNameIsString = Assert<IsEqual<ZodOutput['name'], string>>;
@@ -73,16 +81,21 @@ export const jsonTotal: number = jsonOutput.total;
 declare const unstructuredOutput: UnstructuredHandlerResult;
 export const unstructuredTotal: number = unstructuredOutput.total;
 
+declare const noSchemaStringOutput: NoSchemaStringResult;
+export const noSchemaStringText: string = noSchemaStringOutput;
+
 type HandlerWithoutOutputSchema = () => Promise<InferOutput<undefined>>;
 export const handlerWithoutOutputSchema: HandlerWithoutOutputSchema = async () => ({
   items: [],
   total: 0,
 });
+export const stringHandlerWithoutOutputSchema: HandlerWithoutOutputSchema = async () => 'pong';
 
 export const typeRegressionAssertion: UndefinedFallsBackToUnknown = true;
 export const unstructuredLastResultAssertion: UnstructuredLastResultIsUnknown = true;
 export const unstructuredExecuteAssertion: UnstructuredExecuteResultIsUnknown = true;
 export const unstructuredHandlerAssertion: UnstructuredHandlerHasTotal = true;
+export const noSchemaStringAssertion: NoSchemaStringIsString = true;
 export const zodOutputAssertion: ZodOutputNameIsString = true;
 export const zodAnyAssertion: ZodOutputIsNotAny = true;
 export const jsonOutputAssertion: JsonOutputIsTyped = true;
