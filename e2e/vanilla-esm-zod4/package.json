@@ -1,0 +1,22 @@
+{
+  "name": "vanilla-esm-zod4-test-app",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite --port 3014",
+    "preview": "vite preview --port 3014",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mcp-b/global": "workspace:*",
+    "@mcp-b/webmcp-ts-sdk": "workspace:*",
+    "@mcp-b/webmcp-types": "workspace:*",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  }
+}

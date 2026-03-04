@@ -509,7 +509,7 @@ navigator.modelContext.provideContext({
 
 ## Zod Version Compatibility
 
-This package supports **Zod 3.25.76+** (3.x only). JSON Schema is also supported if you prefer not to use Zod.
+This package uses the same v4-compatible conversion path as the MCP TypeScript SDK and supports **Zod 3.25+** and **Zod 4**. JSON Schema is also supported if you prefer not to use Zod.
 
 ## Type Exports
 

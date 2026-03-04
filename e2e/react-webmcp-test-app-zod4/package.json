@@ -1,0 +1,28 @@
+{
+  "name": "react-webmcp-test-app-zod4",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite --port 8889",
+    "preview": "vite preview --port 8889",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mcp-b/global": "workspace:*",
+    "@mcp-b/react-webmcp": "workspace:*",
+    "@mcp-b/transports": "workspace:*",
+    "@modelcontextprotocol/sdk": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  }
+}

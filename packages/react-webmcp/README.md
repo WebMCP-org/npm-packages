@@ -125,7 +125,7 @@ function ToolConsumer() {
 
 ## Zod Version Compatibility
 
-This package supports **Zod 3.25.76+** (3.x only).
+This package internally uses a v4-compatible conversion path and supports projects using **Zod 3.25+** and **Zod 4**.
 
 ## Documentation
 
