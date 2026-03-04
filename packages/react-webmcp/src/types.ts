@@ -24,22 +24,22 @@ export type { ZodSchemaObject } from './zod-utils.js';
 /**
  * Union of all input schema types supported by react-webmcp:
  * - `ToolInputSchema` (JSON Schema + Standard Schema v1)
- * - `ZodSchemaObject` (Zod v3 `Record<string, z.ZodTypeAny>`)
+ * - `ZodSchemaObject` (Zod v3/v4 `Record<string, z.ZodTypeAny>`)
  */
 export type ReactWebMCPInputSchema = ToolInputSchema | ZodSchemaObject;
 
 /**
  * Union of all output schema types supported by react-webmcp:
  * - `JsonSchemaObject` (MCP output schema)
- * - `ZodSchemaObject` (Zod v3 `Record<string, z.ZodTypeAny>`, converted at runtime)
+ * - `ZodSchemaObject` (Zod v3/v4 `Record<string, z.ZodTypeAny>`, converted at runtime)
  */
 export type ReactWebMCPOutputSchema = JsonSchemaObject | ZodSchemaObject;
 
 /**
- * Infers handler input type from a Standard Schema, Zod v3 schema, or JSON Schema.
+ * Infers handler input type from a Standard Schema, Zod v3/v4 schema, or JSON Schema.
  *
  * - **Standard Schema** (Zod v4, Valibot, ArkType): extracts `~standard.types.input`
- * - **Zod v3** (`Record<string, z.ZodTypeAny>`): uses `z.infer<z.ZodObject<T>>`
+ * - **Zod v3/v4** (`Record<string, z.ZodTypeAny>`): uses `z.infer<z.ZodObject<T>>`
  * - **JSON Schema** (`as const`): uses `InferArgsFromInputSchema` for structural inference
  * - **Fallback**: `Record<string, unknown>`
  *
@@ -52,7 +52,7 @@ export type InferToolInput<T> =
     ? Types extends { readonly input: infer I }
       ? I
       : Record<string, unknown>
-    : // Zod v3 schema object
+    : // Zod v3/v4 schema object
       T extends Record<string, z.ZodTypeAny>
       ? z.infer<z.ZodObject<T>>
       : // JSON Schema
@@ -76,7 +76,7 @@ export type InferOutput<
   TFallback = unknown,
 > = TOutputSchema extends undefined
   ? TFallback
-  : TOutputSchema extends Record<string, z.ZodTypeAny> // Zod v3 schema object
+  : TOutputSchema extends Record<string, z.ZodTypeAny> // Zod v3/v4 schema object
     ? z.infer<z.ZodObject<TOutputSchema>>
     : // JSON Schema object
       TOutputSchema extends JsonSchemaObject
