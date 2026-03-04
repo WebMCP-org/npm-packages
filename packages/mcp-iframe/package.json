@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/mcp-iframe",
-  "version": "2.0.11",
+  "version": "2.0.12",
   "description": "Custom element for exposing iframe MCP tools, resources, and prompts to parent page",
   "keywords": [
     "mcp",

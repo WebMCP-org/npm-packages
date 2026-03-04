@@ -1,5 +1,11 @@
 # @mcp-b/transports
 
+## 2.0.12
+
+### Patch Changes
+
+- @mcp-b/webmcp-ts-sdk@2.0.12
+
 ## 2.0.11
 
 ### Patch Changes

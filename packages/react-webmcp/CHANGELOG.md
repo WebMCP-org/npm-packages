@@ -1,5 +1,16 @@
 # @mcp-b/react-webmcp
 
+## 2.0.12
+
+### Patch Changes
+
+- fix(react-webmcp, usewebmcp): guard InferOutput so that `InferOutput<undefined>` resolves to the fallback type instead of never
+  - @mcp-b/webmcp-types@2.0.12
+  - @mcp-b/webmcp-polyfill@2.0.12
+  - @mcp-b/webmcp-ts-sdk@2.0.12
+  - @mcp-b/transports@2.0.12
+  - @mcp-b/global@2.0.12
+
 ## 2.0.11
 
 ### Patch Changes
