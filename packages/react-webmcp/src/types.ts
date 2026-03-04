@@ -74,12 +74,14 @@ export type InferToolInput<T> =
 export type InferOutput<
   TOutputSchema extends ReactWebMCPOutputSchema | undefined = undefined,
   TFallback = unknown,
-> = TOutputSchema extends Record<string, z.ZodTypeAny> // Zod v3 schema object
-  ? z.infer<z.ZodObject<TOutputSchema>>
-  : // JSON Schema object
-    TOutputSchema extends JsonSchemaObject
-    ? InferJsonSchema<TOutputSchema>
-    : TFallback;
+> = TOutputSchema extends undefined
+  ? TFallback
+  : TOutputSchema extends Record<string, z.ZodTypeAny> // Zod v3 schema object
+    ? z.infer<z.ZodObject<TOutputSchema>>
+    : // JSON Schema object
+      TOutputSchema extends JsonSchemaObject
+      ? InferJsonSchema<TOutputSchema>
+      : TFallback;
 
 /**
  * Represents the current execution state of a tool, including loading status,

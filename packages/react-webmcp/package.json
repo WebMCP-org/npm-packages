@@ -65,7 +65,7 @@
     "publish:npm": "pnpm publish --access public",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit && vitest run --typecheck --silent",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.strict-null-checks-false.json --noEmit && vitest run --typecheck --silent",
     "version:major": "pnpm version major --no-git-tag-version",
     "version:minor": "pnpm version minor --no-git-tag-version",
     "version:patch": "pnpm version patch --no-git-tag-version"
