@@ -63,11 +63,9 @@ browserDescribe('Tab transports (browser)', () => {
       await safeClose(clientTransport);
     });
 
-    it('throws if targetOrigin is not provided', () => {
-      expect(() => {
-        // @ts-expect-error testing invalid input
-        new TabClientTransport({});
-      }).toThrow('targetOrigin must be explicitly set for security');
+    it('defaults targetOrigin to * when not provided', () => {
+      const transport = new TabClientTransport({});
+      expect((transport as any)._targetOrigin).toBe('*');
     });
 
     it('rejects sends before start', async () => {
