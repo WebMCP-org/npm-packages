@@ -1,6 +1,6 @@
 {
   "name": "agent-skills-ts-sdk",
-  "version": "2.0.12",
+  "version": "2.0.13",
   "private": false,
   "description": "TypeScript parser, validator, prompt, and patch utilities for the AgentSkills specification",
   "homepage": "https://docs.mcp-b.ai",

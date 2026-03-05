@@ -1,5 +1,12 @@
 # @mcp-b/webmcp-ts-sdk
 
+## 2.0.13
+
+### Patch Changes
+
+- @mcp-b/webmcp-types@2.0.13
+- @mcp-b/webmcp-polyfill@2.0.13
+
 ## 2.0.12
 
 ### Patch Changes
