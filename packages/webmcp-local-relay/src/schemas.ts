@@ -188,8 +188,8 @@ export type RelayClientToServerMessage = z.infer<typeof RelayClientToServerMessa
 
 const RelayToolsPayloadFields = {
   tools: z.array(NormalizedToolSchema),
-  sources: z.array(RelaySourceInfoSchema),
-  toolSourceMap: z.record(z.string(), z.array(z.string())),
+  sources: z.array(RelaySourceInfoSchema).optional().default([]),
+  toolSourceMap: z.record(z.string(), z.array(z.string())).optional().default({}),
 };
 
 /**

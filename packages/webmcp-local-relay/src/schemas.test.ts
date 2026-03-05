@@ -536,13 +536,28 @@ describe('RelayServerToolsSchema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('rejects relay/tools without sources', () => {
+  it('accepts relay/tools without sources (defaults to empty)', () => {
     const result = RelayServerToolsSchema.safeParse({
       type: 'relay/tools',
       tools: [],
       toolSourceMap: {},
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.sources).toEqual([]);
+    }
+  });
+
+  it('accepts relay/tools without sources or toolSourceMap (both default)', () => {
+    const result = RelayServerToolsSchema.safeParse({
+      type: 'relay/tools',
+      tools: [],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.sources).toEqual([]);
+      expect(result.data.toolSourceMap).toEqual({});
+    }
   });
 
   it('rejects relay/tools with invalid tool entries', () => {

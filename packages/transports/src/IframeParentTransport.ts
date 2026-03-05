@@ -4,7 +4,7 @@ export interface IframeParentTransportOptions {
   /** Reference to the iframe element */
   iframe: HTMLIFrameElement;
   /** Expected origin of the iframe (for security) */
-  targetOrigin: string;
+  targetOrigin?: string;
   /** Optional channel name (default: 'mcp-iframe') */
   channelId?: string;
   /** Retry interval for ready handshake in milliseconds (default: 250) */
@@ -49,12 +49,8 @@ export class IframeParentTransport implements Transport {
     if (!options.iframe) {
       throw new Error('iframe element is required');
     }
-    if (!options.targetOrigin) {
-      throw new Error('targetOrigin must be explicitly set for security');
-    }
-
     this._iframe = options.iframe;
-    this._targetOrigin = options.targetOrigin;
+    this._targetOrigin = options.targetOrigin || '*';
     this._channelId = options.channelId || 'mcp-iframe';
     this._checkReadyRetryMs = options.checkReadyRetryMs ?? 250;
 

@@ -16,7 +16,7 @@ export interface TabClientTransportOptions {
    * @example 'https://example.com'
    * @example 'http://localhost:3000'
    */
-  targetOrigin: string;
+  targetOrigin?: string;
 
   /**
    * Channel identifier for message routing.
@@ -194,11 +194,7 @@ export class TabClientTransport implements Transport {
    * @throws {Error} If targetOrigin is not specified
    */
   constructor(options: TabClientTransportOptions) {
-    if (!options.targetOrigin) {
-      throw new Error('targetOrigin must be explicitly set for security');
-    }
-
-    this._targetOrigin = options.targetOrigin;
+    this._targetOrigin = options.targetOrigin || '*';
     this._channelId = options.channelId ?? 'mcp-default';
     this._requestTimeout = options.requestTimeout ?? 10000; // Default 10 seconds
 
