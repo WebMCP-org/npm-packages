@@ -34,6 +34,23 @@ declare module '@mcp-b/webmcp-types' {
 
 declare global {
   interface Window {
+    __WEBMCP_E2E__?: {
+      isReady: () => boolean;
+      registerDynamicTool: () => boolean;
+      unregisterDynamicTool: (name?: string) => boolean;
+      readInvocations: () => Array<{
+        name: string;
+        arguments: Record<string, unknown>;
+      }>;
+      resetInvocations: () => void;
+    };
+    mcpClient?: {
+      listTools: () => Promise<{ tools: Array<{ name: string }> }>;
+      callTool: (params: {
+        name: string;
+        arguments?: Record<string, unknown>;
+      }) => Promise<ToolResponse>;
+    };
     mcpIframeHost: {
       callTool: (name: string, args: Record<string, unknown>) => Promise<unknown>;
       getMcpIframe: () => Element | null;

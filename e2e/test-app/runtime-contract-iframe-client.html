@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Runtime Contract - Iframe Client</title>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, sans-serif;
+        max-width: 960px;
+        margin: 32px auto;
+        padding: 0 16px 40px;
+      }
+      .panel {
+        border: 1px solid #d0d7de;
+        border-radius: 10px;
+        padding: 16px;
+        margin-top: 16px;
+      }
+      .status {
+        padding: 10px 12px;
+        border-radius: 6px;
+        background: #f6f8fa;
+      }
+      .status.ready {
+        background: #dcfce7;
+        color: #166534;
+      }
+      .status.error {
+        background: #fee2e2;
+        color: #991b1b;
+      }
+      iframe {
+        width: 100%;
+        height: 280px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+      }
+      pre {
+        background: #0f172a;
+        color: #e2e8f0;
+        border-radius: 8px;
+        padding: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Runtime Contract - Iframe Transport</h1>
+    <p>Real parent MCP client connected through <code>IframeParentTransport</code>.</p>
+
+    <div class="panel">
+      <h2>Client Status</h2>
+      <div id="iframe-client-status" class="status" data-status="pending">Waiting for iframe...</div>
+    </div>
+
+    <div class="panel">
+      <h2>Iframe Runtime</h2>
+      <iframe id="runtime-contract-iframe" src="/runtime-contract-iframe-child.html" title="Runtime Contract Iframe Child"></iframe>
+    </div>
+
+    <div class="panel">
+      <h2>Discovered Tools</h2>
+      <pre id="iframe-client-tools" data-count="0">[]</pre>
+    </div>
+
+    <script type="module" src="/src/runtime-contract-iframe-client.ts"></script>
+  </body>
+</html>

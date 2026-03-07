@@ -8,6 +8,9 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'index.html'),
+        'runtime-contract': resolve(__dirname, 'runtime-contract.html'),
+        'runtime-contract-iframe-child': resolve(__dirname, 'runtime-contract-iframe-child.html'),
+        'runtime-contract-iframe-client': resolve(__dirname, 'runtime-contract-iframe-client.html'),
         'mcp-iframe-host': resolve(__dirname, 'mcp-iframe-host.html'),
         'mcp-iframe-client': resolve(__dirname, 'mcp-iframe-client.html'),
         'iframe-child': resolve(__dirname, 'iframe-child.html'),
