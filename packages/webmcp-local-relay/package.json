@@ -61,7 +61,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@mcp-b/webmcp-types": "^2.1.0",
+    "@mcp-b/webmcp-types": "workspace:*",
     "@types/node": "catalog:",
     "@types/ws": "^8.5.14",
     "@vitest/coverage-v8": "catalog:",
