@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Extension Runtime Contract",
+  "version": "1.0.0",
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Runtime Contract"
+  }
+}
