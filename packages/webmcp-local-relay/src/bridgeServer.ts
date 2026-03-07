@@ -31,6 +31,8 @@ const RELAY_BROWSER_PROTOCOL = 'webmcp.v1';
 const RELAY_DISCOVERY_PROTOCOL = 'webmcp-discovery.v1';
 const RELAY_INTERNAL_PROTOCOL = 'webmcp-relay.v1';
 const RELAY_SERVER_MESSAGE_TIMEOUT_MS = 750;
+const HEARTBEAT_INTERVAL_MS = 15_000;
+const HEARTBEAT_DEAD_THRESHOLD_MS = 25_000;
 const SUPPORTED_SUBPROTOCOLS = new Set([
   RELAY_BROWSER_PROTOCOL,
   RELAY_DISCOVERY_PROTOCOL,
@@ -148,6 +150,11 @@ export class RelayBridgeServer extends EventEmitter {
   private readonly socketByConnectionId = new Map<string, WebSocket>();
   private readonly pendingInvocations = new Map<string, PendingInvocation>();
   private readonly relayClientConnectionIds = new Set<string>();
+  private readonly heartbeatIntervalByConnectionId = new Map<
+    string,
+    ReturnType<typeof setInterval>
+  >();
+  private readonly lastPongByConnectionId = new Map<string, number>();
   private readonly onStateChangedPushRelay = () => {
     this.pushToolsToRelayClients();
   };
@@ -376,6 +383,12 @@ export class RelayBridgeServer extends EventEmitter {
       }
     }
 
+    for (const intervalId of this.heartbeatIntervalByConnectionId.values()) {
+      clearInterval(intervalId);
+    }
+    this.heartbeatIntervalByConnectionId.clear();
+    this.lastPongByConnectionId.clear();
+
     this.socketByConnectionId.clear();
     this.relayClientConnectionIds.clear();
 
@@ -500,6 +513,8 @@ export class RelayBridgeServer extends EventEmitter {
         );
         this.onSocketClose(connectionId);
       });
+
+      this.startHeartbeat(connectionId);
     });
 
     wss.on('error', (err: Error) => {
@@ -704,6 +719,7 @@ export class RelayBridgeServer extends EventEmitter {
       }
 
       case 'pong':
+        this.lastPongByConnectionId.set(connectionId, Date.now());
         break;
     }
   }
@@ -820,6 +836,7 @@ export class RelayBridgeServer extends EventEmitter {
    * Handles source disconnection and rejects in-flight calls owned by that source.
    */
   private onSocketClose(connectionId: string): void {
+    this.stopHeartbeat(connectionId);
     this.relayClientConnectionIds.delete(connectionId);
     this.registry.removeConnection(connectionId);
     this.socketByConnectionId.delete(connectionId);
@@ -834,6 +851,52 @@ export class RelayBridgeServer extends EventEmitter {
       this.pendingInvocations.delete(callId);
       pending.reject(new Error(`Tool source ${connectionId} disconnected during invocation`));
     }
+  }
+
+  private startHeartbeat(connectionId: string): void {
+    this.lastPongByConnectionId.set(connectionId, Date.now());
+
+    const intervalId = setInterval(() => {
+      const socket = this.socketByConnectionId.get(connectionId);
+      if (!socket || socket.readyState !== WebSocket.OPEN) {
+        this.stopHeartbeat(connectionId);
+        return;
+      }
+
+      // Skip heartbeat for relay client connections — they have their own reconnect logic.
+      if (this.relayClientConnectionIds.has(connectionId)) {
+        return;
+      }
+
+      const lastPong = this.lastPongByConnectionId.get(connectionId) ?? 0;
+      if (Date.now() - lastPong > HEARTBEAT_DEAD_THRESHOLD_MS) {
+        process.stderr.write(
+          `[webmcp-local-relay] warn: connection ${connectionId} missed heartbeat, closing\n`
+        );
+        this.stopHeartbeat(connectionId);
+        socket.close(1001, 'Heartbeat timeout');
+        return;
+      }
+
+      try {
+        socket.send(JSON.stringify({ type: 'ping' }));
+      } catch (err) {
+        process.stderr.write(
+          `[webmcp-local-relay] warn: failed to send heartbeat ping to ${connectionId}: ${err instanceof Error ? err.message : String(err)}\n`
+        );
+      }
+    }, HEARTBEAT_INTERVAL_MS);
+
+    this.heartbeatIntervalByConnectionId.set(connectionId, intervalId);
+  }
+
+  private stopHeartbeat(connectionId: string): void {
+    const intervalId = this.heartbeatIntervalByConnectionId.get(connectionId);
+    if (intervalId !== undefined) {
+      clearInterval(intervalId);
+      this.heartbeatIntervalByConnectionId.delete(connectionId);
+    }
+    this.lastPongByConnectionId.delete(connectionId);
   }
 
   private async startAsClient(port = this.desiredPort): Promise<void> {
