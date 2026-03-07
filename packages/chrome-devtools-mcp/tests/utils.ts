@@ -50,6 +50,7 @@ export async function withBrowser(
   cb: (browser: Browser, page: Page) => Promise<void>,
   options: {debug?: boolean; autoOpenDevTools?: boolean} = {},
 ) {
+  const ciArgs = process.env.CI ? ['--no-sandbox', '--disable-setuid-sandbox'] : [];
   const launchOptions: LaunchOptions = {
     executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
     headless: !options.debug,
@@ -57,6 +58,7 @@ export async function withBrowser(
     devtools: options.autoOpenDevTools ?? false,
     pipe: true,
     handleDevToolsAsPage: true,
+    args: ciArgs,
   };
   const key = JSON.stringify(launchOptions);
 
