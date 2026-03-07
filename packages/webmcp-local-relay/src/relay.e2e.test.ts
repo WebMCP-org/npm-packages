@@ -12,13 +12,15 @@ import { describe, expect, it } from 'vitest';
 
 import { sanitizeName } from './naming.js';
 
-const TEST_TOOL_NAME = 'page_sum';
+const TEST_TOOL_NAME = 'sum';
 const PACKAGE_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const REPO_ROOT = resolve(PACKAGE_DIR, '../..');
 const CLI_ENTRY_PATH = resolve(PACKAGE_DIR, 'dist/cli.js');
 
 const GLOBAL_RUNTIME_PATH = resolve(REPO_ROOT, 'packages/global/dist/index.iife.js');
 const POLYFILL_RUNTIME_PATH = resolve(REPO_ROOT, 'packages/webmcp-polyfill/dist/index.iife.js');
+const RUNTIME_CONTRACT_CORE_PATH = resolve(REPO_ROOT, 'e2e/runtime-contract/core.js');
+const RUNTIME_CONTRACT_MODULE_PATH = resolve(REPO_ROOT, 'e2e/runtime-contract/browser-contract.js');
 const REAL_EMBED_PATH = resolve(PACKAGE_DIR, 'dist/browser/embed.js');
 const REAL_WIDGET_PATH = resolve(PACKAGE_DIR, 'dist/browser/widget.html');
 
@@ -188,9 +190,11 @@ function buildHostPageHtml(options: {
   widgetOrigin: string;
   relayPort: number;
   runtimeScriptRoute: string;
+  runtimeContractRoute: string;
   runtimeMode: RuntimeMode;
 }): string {
-  const { widgetOrigin, relayPort, runtimeScriptRoute, runtimeMode } = options;
+  const { widgetOrigin, relayPort, runtimeScriptRoute, runtimeContractRoute, runtimeMode } =
+    options;
 
   return `<!doctype html>
 <html lang="en">
@@ -202,42 +206,17 @@ function buildHostPageHtml(options: {
     <h1>WebMCP Relay E2E Host</h1>
     <div id="status" data-state="booting">booting</div>
     <script src="${runtimeScriptRoute}"></script>
-    <script>
+    <script type="module">
+      import { installBrowserRuntimeContract } from '${runtimeContractRoute}';
+
       (() => {
         const statusEl = document.getElementById('status');
         const runtimeMode = ${jsonForInlineScript(runtimeMode)};
 
         try {
-          navigator.modelContext.registerTool({
-            name: ${jsonForInlineScript(TEST_TOOL_NAME)},
-            description: 'Add two numbers in host-page context',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                a: { type: 'number' },
-                b: { type: 'number' },
-              },
-            },
-            execute: async (args) => {
-              const a = Number(args?.a ?? 0);
-              const b = Number(args?.b ?? 0);
-              const sum = a + b;
-              return {
-                content: [
-                  {
-                    type: 'text',
-                    text: \`sum=\${sum};runtime=\${runtimeMode};title=\${document.title};path=\${location.pathname}\`,
-                  },
-                ],
-                structuredContent: {
-                  sum,
-                  runtimeMode,
-                  title: document.title,
-                  path: location.pathname,
-                  href: location.href,
-                },
-              };
-            },
+          installBrowserRuntimeContract(navigator.modelContext, {
+            runtimeLabel: runtimeMode,
+            registrationMode: runtimeMode === 'polyfill-testing' ? 'dynamic' : 'context',
           });
 
           statusEl.dataset.state = 'runtime_ready';
@@ -375,6 +354,14 @@ async function setupE2EHarness(options: {
 }): Promise<E2EHarness> {
   const { runtimeCase, relayPort, widgetOrigin, clientName } = options;
   const runtimeScript = readRuntimeScriptOrThrow(runtimeCase.scriptPath);
+  const runtimeContractCore = readRequiredFile(
+    RUNTIME_CONTRACT_CORE_PATH,
+    'shared runtime contract core module'
+  );
+  const runtimeContractModule = readRequiredFile(
+    RUNTIME_CONTRACT_MODULE_PATH,
+    'shared runtime contract module'
+  );
 
   let host: StartedHttpServer | null = null;
   let client: Client | null = null;
@@ -391,6 +378,14 @@ async function setupE2EHarness(options: {
         sendJavaScript(response, runtimeScript);
         return;
       }
+      if (url === '/runtime/browser-contract.js') {
+        sendJavaScript(response, runtimeContractModule);
+        return;
+      }
+      if (url === '/runtime/core.js') {
+        sendJavaScript(response, runtimeContractCore);
+        return;
+      }
       if (url === '/' || url.startsWith('/index.html')) {
         sendHtml(
           response,
@@ -398,6 +393,7 @@ async function setupE2EHarness(options: {
             widgetOrigin,
             relayPort,
             runtimeScriptRoute: runtimeCase.scriptRoute,
+            runtimeContractRoute: '/runtime/browser-contract.js',
             runtimeMode: runtimeCase.mode,
           })
         );
@@ -500,10 +496,23 @@ describe('relay e2e (real browser assets)', () => {
         });
 
         const text = firstContentText(result);
-        expect(text).toContain('sum=7');
-        expect(text).toContain(`runtime=${runtimeCase.mode}`);
-        expect(text).toContain('title=WebMCP Relay E2E Host');
-        expect(text).toContain('path=/');
+        expect(text).toBe('sum:7');
+
+        const invocations = await harness.page.evaluate(() => {
+          return (
+            (
+              window as Window & {
+                __WEBMCP_E2E__?: {
+                  readInvocations: () => Array<{
+                    name: string;
+                    arguments: Record<string, unknown>;
+                  }>;
+                };
+              }
+            ).__WEBMCP_E2E__?.readInvocations() ?? []
+          );
+        });
+        expect(invocations).toEqual([{ name: 'sum', arguments: { a: 2, b: 5 } }]);
       } catch (error) {
         throw formatE2EError(runtimeCase.mode, error, harness);
       } finally {
@@ -529,55 +538,77 @@ describe('relay e2e (real browser assets)', () => {
         const initialTools = await harness.client.listTools();
         expect(initialTools.tools.some((t) => t.name === harness?.expectedToolName)).toBe(true);
 
-        await harness.page.evaluate(() => {
-          const mc = (
-            navigator as unknown as { modelContext: { registerTool: (t: unknown) => void } }
-          ).modelContext;
-          mc.registerTool({
-            name: 'dynamic_e2e_tool',
-            description: 'Dynamically registered tool',
-            inputSchema: { type: 'object', properties: { msg: { type: 'string' } } },
-            execute: async (args: Record<string, unknown>) => ({
-              content: [{ type: 'text' as const, text: `dynamic:${String(args?.msg ?? '')}` }],
-            }),
+        if (runtimeCase.mode === 'polyfill-testing') {
+          await harness.page.evaluate(() => {
+            const modelContext = (
+              navigator as unknown as { modelContext: { registerTool: (tool: unknown) => void } }
+            ).modelContext;
+            modelContext.registerTool({
+              name: 'dynamic_tool',
+              description: 'A dynamically registered contract tool.',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  value: { type: 'string' },
+                },
+                required: ['value'],
+              },
+              execute: async (args: Record<string, unknown>) => ({
+                content: [{ type: 'text' as const, text: `dynamic:${String(args.value ?? '')}` }],
+                structuredContent: {
+                  value: String(args.value ?? ''),
+                  runtime: 'polyfill-testing',
+                },
+              }),
+            });
           });
-        });
+        } else {
+          await harness.page.evaluate(() => {
+            (
+              window as Window & { __WEBMCP_E2E__?: { registerDynamicTool: () => boolean } }
+            ).__WEBMCP_E2E__?.registerDynamicTool();
+          });
+        }
 
         const dynamicToolName = await waitForValue(async () => {
           const toolList = await harness?.client.listTools();
-          const found = toolList?.tools.find((t) => t.name === sanitizeName('dynamic_e2e_tool'));
+          const found = toolList?.tools.find((t) => t.name === sanitizeName('dynamic_tool'));
           return found ? found.name : undefined;
         }, 15_000);
 
-        expect(dynamicToolName).toBe(sanitizeName('dynamic_e2e_tool'));
+        expect(dynamicToolName).toBe(sanitizeName('dynamic_tool'));
 
         const result = await harness.client.callTool({
           name: dynamicToolName,
-          arguments: { msg: 'hello' },
+          arguments: { value: 'hello' },
         });
         const text = firstContentText(result);
         expect(text).toContain('dynamic:hello');
 
-        await harness.page.evaluate(() => {
-          const mc = (
-            navigator as unknown as { modelContext: { unregisterTool: (name: string) => void } }
-          ).modelContext;
-          mc.unregisterTool('dynamic_e2e_tool');
-        });
+        if (runtimeCase.mode === 'polyfill-testing') {
+          await harness.page.evaluate(() => {
+            const modelContext = (
+              navigator as unknown as { modelContext: { unregisterTool: (name: string) => void } }
+            ).modelContext;
+            modelContext.unregisterTool('dynamic_tool');
+          });
+        } else {
+          await harness.page.evaluate(() => {
+            (
+              window as Window & { __WEBMCP_E2E__?: { unregisterDynamicTool: () => boolean } }
+            ).__WEBMCP_E2E__?.unregisterDynamicTool();
+          });
+        }
 
         await waitForValue(async () => {
           const toolList = await harness?.client.listTools();
-          const stillThere = toolList?.tools.some(
-            (t) => t.name === sanitizeName('dynamic_e2e_tool')
-          );
+          const stillThere = toolList?.tools.some((t) => t.name === sanitizeName('dynamic_tool'));
           return stillThere ? undefined : true;
         }, 15_000);
 
         const finalTools = await harness.client.listTools();
         expect(finalTools.tools.some((t) => t.name === harness?.expectedToolName)).toBe(true);
-        expect(finalTools.tools.some((t) => t.name === sanitizeName('dynamic_e2e_tool'))).toBe(
-          false
-        );
+        expect(finalTools.tools.some((t) => t.name === sanitizeName('dynamic_tool'))).toBe(false);
       } catch (error) {
         throw formatE2EError(`${runtimeCase.mode} dynamic-tools`, error, harness);
       } finally {
@@ -619,8 +650,7 @@ describe('relay e2e (real browser assets)', () => {
         const texts = contentTextItems(result);
         const combined = texts.join('\n');
 
-        expect(combined).toContain('sum=13');
-        expect(combined).toContain(`runtime=${runtimeCase.mode}`);
+        expect(combined).toContain('sum:13');
         expect(combined).toContain('Available tools:');
         expect(combined).toContain(harness.expectedToolName);
         expect(result.isError).toBeFalsy();
@@ -637,6 +667,34 @@ describe('relay e2e (real browser assets)', () => {
         expect(errorResult.isError).toBe(true);
       } catch (error) {
         throw formatE2EError(`${runtimeCase.mode} webmcp_call_tool`, error, harness);
+      } finally {
+        await harness?.cleanup();
+        await stopHttpServer(widgetServer?.server ?? null);
+      }
+    });
+
+    it(`propagates runtime-thrown tool errors through the relay (${runtimeCase.mode})`, async () => {
+      let widgetServer: StartedHttpServer | null = null;
+      let harness: E2EHarness | null = null;
+
+      try {
+        const relayPort = await getOpenPort();
+        widgetServer = await startWidgetAssetServer();
+        harness = await setupE2EHarness({
+          runtimeCase,
+          relayPort,
+          widgetOrigin: widgetServer.origin,
+          clientName: `webmcp-local-relay-e2e-client-${runtimeCase.mode}-errors`,
+        });
+
+        const errorResult = await harness.client.callTool({
+          name: 'always_fail',
+          arguments: { reason: runtimeCase.mode },
+        });
+        expect(errorResult.isError).toBe(true);
+        expect(firstContentText(errorResult)).toContain(`always_fail:${runtimeCase.mode}`);
+      } catch (error) {
+        throw formatE2EError(`${runtimeCase.mode} runtime-errors`, error, harness);
       } finally {
         await harness?.cleanup();
         await stopHttpServer(widgetServer?.server ?? null);
@@ -675,8 +733,7 @@ describe('relay e2e (real browser assets)', () => {
         arguments: { a: 9, b: 3 },
       });
       const text = firstContentText(result);
-      expect(text).toContain('sum=12');
-      expect(text).toContain('runtime=global');
+      expect(text).toBe('sum:12');
     } catch (error) {
       throw formatE2EError('client-mode-port-owner', error, harness, ownerRelay?.logs ?? []);
     } finally {

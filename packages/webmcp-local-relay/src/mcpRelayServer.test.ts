@@ -5,6 +5,12 @@ import WebSocket from 'ws';
 
 import { RelayBridgeServer } from './bridgeServer.js';
 import { LocalRelayMcpServer } from './mcpRelayServer.js';
+import {
+  EMPTY_STATIC_TOOL_INPUT_SHAPE,
+  publicInputSchemaFromZodShape,
+  WEBMCP_CALL_TOOL_INPUT_SHAPE,
+  WEBMCP_OPEN_PAGE_INPUT_SHAPE,
+} from './staticToolSchemas.js';
 
 /**
  * Polls until `fn` returns a defined value.
@@ -95,7 +101,7 @@ async function connectBrowser(
   options: {
     tabId: string;
     url: string;
-    tools: { name: string; description?: string }[];
+    tools: Array<{ name: string; description?: string; [key: string]: unknown }>;
     onInvoke?: (msg: {
       callId: string;
       toolName: string;
@@ -497,6 +503,46 @@ describe('LocalRelayMcpServer', () => {
     await cleanup();
   });
 
+  it('preserves inputSchema through the relay to MCP clients', async () => {
+    const { bridge, client, cleanup } = await createConnectedRelay();
+
+    const ws = await connectBrowser(bridge, {
+      tabId: 'tab-schema',
+      url: 'https://example.com',
+      tools: [
+        {
+          name: 'search',
+          description: 'Search docs',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              query: { type: 'string', description: 'Search query' },
+              limit: { type: 'number' },
+            },
+            required: ['query'],
+          },
+        },
+      ],
+    });
+
+    const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
+
+    const list = await client.listTools();
+    const tool = list.tools.find((t) => t.name === toolName);
+    expect(tool).toBeTruthy();
+    expect(tool?.inputSchema).toEqual({
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search query' },
+        limit: { type: 'number' },
+      },
+      required: ['query'],
+    });
+
+    ws.close();
+    await cleanup();
+  });
+
   it('dynamic tool returns error when invokeTool times out', async () => {
     // Use very short timeout so the test completes quickly
     const { bridge, client, cleanup } = await createConnectedRelay({ invokeTimeoutMs: 50 });
@@ -879,6 +925,439 @@ describe('LocalRelayMcpServer', () => {
 
       await waitFor(() => (reloadReceived ? true : undefined));
       expect(reloadReceived).toBe(true);
+
+      ws.close();
+      await cleanup();
+    });
+  });
+
+  describe('listTools schema fidelity', () => {
+    it('returns default inputSchema when browser tool omits it', async () => {
+      const { bridge, client, cleanup } = await createConnectedRelay();
+
+      const ws = await connectBrowser(bridge, {
+        tabId: 'tab-bare',
+        url: 'https://example.com',
+        tools: [{ name: 'bare_tool' }],
+      });
+
+      const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
+
+      const list = await client.listTools();
+      const tool = list.tools.find((t) => t.name === toolName);
+      expect(tool).toBeTruthy();
+      expect(tool?.inputSchema).toEqual({
+        type: 'object',
+        properties: {},
+      });
+
+      ws.close();
+      await cleanup();
+    });
+
+    it('preserves complex nested inputSchema with objects, arrays, and enums', async () => {
+      const { bridge, client, cleanup } = await createConnectedRelay();
+
+      const complexSchema = {
+        type: 'object',
+        properties: {
+          filter: {
+            type: 'object',
+            properties: {
+              tags: { type: 'array', items: { type: 'string' } },
+              status: { type: 'string', enum: ['active', 'archived'] },
+            },
+          },
+          pagination: {
+            type: 'object',
+            properties: {
+              page: { type: 'integer' },
+              perPage: { type: 'integer' },
+            },
+          },
+        },
+        required: ['filter'],
+      };
+
+      const ws = await connectBrowser(bridge, {
+        tabId: 'tab-complex',
+        url: 'https://example.com',
+        tools: [
+          { name: 'complex_tool', description: 'Complex schema', inputSchema: complexSchema },
+        ],
+      });
+
+      const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
+
+      const list = await client.listTools();
+      const tool = list.tools.find((t) => t.name === toolName);
+      expect(tool).toBeTruthy();
+      expect(tool?.inputSchema).toEqual(complexSchema);
+
+      ws.close();
+      await cleanup();
+    });
+
+    it('includes outputSchema on dynamic tools when present', async () => {
+      const { bridge, client, cleanup } = await createConnectedRelay();
+
+      const inputSchema = { type: 'object', properties: { q: { type: 'string' } } };
+      const outputSchema = {
+        type: 'object',
+        properties: {
+          results: { type: 'array', items: { type: 'string' } },
+          total: { type: 'number' },
+        },
+      };
+
+      const ws = await connectBrowser(bridge, {
+        tabId: 'tab-output',
+        url: 'https://example.com',
+        tools: [{ name: 'output_tool', inputSchema, outputSchema }],
+      });
+
+      const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
+
+      const list = await client.listTools();
+      const tool = list.tools.find((t) => t.name === toolName);
+      expect(tool).toBeTruthy();
+      expect(tool?.inputSchema).toEqual(inputSchema);
+      expect((tool as Record<string, unknown>).outputSchema).toEqual(outputSchema);
+
+      ws.close();
+      await cleanup();
+    });
+
+    it('disambiguates same-named tools from different tabs preserving distinct schemas', async () => {
+      const { bridge, client, cleanup } = await createConnectedRelay();
+
+      const schemaA = { type: 'object', properties: { query: { type: 'string' } } };
+      const schemaB = {
+        type: 'object',
+        properties: { term: { type: 'string' }, limit: { type: 'number' } },
+      };
+
+      // Use tabIds that differ in the first 4 chars (disambiguation uses 4-char suffix)
+      const wsA = await connectBrowser(bridge, {
+        tabId: 'aaaa',
+        url: 'https://example.com',
+        tools: [{ name: 'search', description: 'Search A', inputSchema: schemaA }],
+      });
+
+      await waitFor(() => (bridge.registry.listTools().length >= 1 ? true : undefined));
+
+      // Connect second browser — triggers disambiguation
+      const wsB = await connectBrowser(bridge, {
+        tabId: 'bbbb',
+        url: 'https://other.com',
+        tools: [{ name: 'search', description: 'Search B', inputSchema: schemaB }],
+      });
+
+      // Wait for both disambiguated tools to appear in the MCP client
+      const dynamicTools = await waitFor(async () => {
+        const list = await client.listTools();
+        const dynamic = list.tools.filter((t) => !t.name.startsWith('webmcp_'));
+        return dynamic.length >= 2 ? dynamic : undefined;
+      });
+
+      expect(dynamicTools).toHaveLength(2);
+
+      // Each disambiguated tool should have its own schema
+      const schemas = dynamicTools.map((t) => t.inputSchema);
+      expect(schemas).toContainEqual(schemaA);
+      expect(schemas).toContainEqual(schemaB);
+
+      wsA.close();
+      wsB.close();
+      await cleanup();
+    });
+
+    it('returns all static tools alongside dynamic tools with correct schemas', async () => {
+      const { bridge, client, cleanup } = await createConnectedRelay();
+
+      const dynamicSchema = {
+        type: 'object',
+        properties: { query: { type: 'string' } },
+        required: ['query'],
+      };
+
+      const ws = await connectBrowser(bridge, {
+        tabId: 'tab-mixed',
+        url: 'https://example.com',
+        tools: [{ name: 'my_tool', description: 'A tool', inputSchema: dynamicSchema }],
+      });
+
+      const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
+
+      const list = await client.listTools();
+
+      const expectedStaticSchemas: Record<string, Record<string, unknown>> = {
+        webmcp_list_sources: publicInputSchemaFromZodShape(EMPTY_STATIC_TOOL_INPUT_SHAPE),
+        webmcp_list_tools: publicInputSchemaFromZodShape(EMPTY_STATIC_TOOL_INPUT_SHAPE),
+        webmcp_call_tool: publicInputSchemaFromZodShape(WEBMCP_CALL_TOOL_INPUT_SHAPE),
+        webmcp_open_page: publicInputSchemaFromZodShape(WEBMCP_OPEN_PAGE_INPUT_SHAPE),
+      };
+
+      for (const [name, expectedSchema] of Object.entries(expectedStaticSchemas)) {
+        const staticTool = list.tools.find((t) => t.name === name);
+        expect(staticTool).toBeTruthy();
+        expect(staticTool?.inputSchema).toEqual(expectedSchema);
+        expect(staticTool?.inputSchema).not.toHaveProperty('$schema');
+      }
+
+      // Dynamic tool present with real schema
+      const dynamicTool = list.tools.find((t) => t.name === toolName);
+      expect(dynamicTool).toBeTruthy();
+      expect(dynamicTool?.inputSchema).toEqual(dynamicSchema);
+
+      // Total count: 4 static + 1 dynamic
+      expect(list.tools).toHaveLength(5);
+
+      ws.close();
+      await cleanup();
+    });
+
+    it('updates inputSchema when browser sends tools/changed', async () => {
+      const { bridge, client, cleanup } = await createConnectedRelay();
+
+      const initialSchema = {
+        type: 'object',
+        properties: { v: { type: 'number' } },
+      };
+      const updatedSchema = {
+        type: 'object',
+        properties: { v: { type: 'string' }, extra: { type: 'boolean' } },
+      };
+
+      const ws = await connectBrowser(bridge, {
+        tabId: 'tab-update',
+        url: 'https://example.com',
+        tools: [{ name: 'evolving_tool', description: 'Evolves', inputSchema: initialSchema }],
+      });
+
+      const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
+
+      // Verify initial schema
+      const list1 = await client.listTools();
+      const tool1 = list1.tools.find((t) => t.name === toolName);
+      expect(tool1?.inputSchema).toEqual(initialSchema);
+
+      // Send updated schema
+      ws.send(
+        JSON.stringify({
+          type: 'tools/changed',
+          tools: [{ name: 'evolving_tool', description: 'Evolves', inputSchema: updatedSchema }],
+        })
+      );
+
+      // Poll until schema updates
+      await waitFor(async () => {
+        const list = await client.listTools();
+        const tool = list.tools.find((t) => t.name === toolName);
+        return JSON.stringify(tool?.inputSchema) === JSON.stringify(updatedSchema)
+          ? true
+          : undefined;
+      });
+
+      const list2 = await client.listTools();
+      const tool2 = list2.tools.find((t) => t.name === toolName);
+      expect(tool2?.inputSchema).toEqual(updatedSchema);
+
+      ws.close();
+      await cleanup();
+    });
+
+    it('removes dynamic tool data after browser disconnects', async () => {
+      const { bridge, client, cleanup } = await createConnectedRelay();
+
+      const ws = await connectBrowser(bridge, {
+        tabId: 'tab-remove',
+        url: 'https://example.com',
+        tools: [
+          {
+            name: 'ephemeral_tool',
+            inputSchema: { type: 'object', properties: { x: { type: 'string' } } },
+          },
+        ],
+      });
+
+      await waitFor(() => bridge.registry.listTools()[0]?.name);
+
+      // Verify tool is listed
+      const list1 = await client.listTools();
+      expect(list1.tools.find((t) => !t.name.startsWith('webmcp_'))).toBeTruthy();
+
+      // Disconnect browser
+      ws.close();
+
+      // Wait for tool to disappear
+      await waitFor(async () => {
+        const list = await client.listTools();
+        const dynamic = list.tools.filter((t) => !t.name.startsWith('webmcp_'));
+        return dynamic.length === 0 ? true : undefined;
+      });
+
+      const list2 = await client.listTools();
+      expect(list2.tools.filter((t) => !t.name.startsWith('webmcp_'))).toHaveLength(0);
+      expect(list2.tools).toHaveLength(4); // only static tools
+
+      await cleanup();
+    });
+
+    it('preserves distinct schemas for multiple tools from one browser', async () => {
+      const { bridge, client, cleanup } = await createConnectedRelay();
+
+      const tools = [
+        {
+          name: 'tool_a',
+          description: 'A',
+          inputSchema: { type: 'object', properties: { a: { type: 'string' } } },
+        },
+        {
+          name: 'tool_b',
+          description: 'B',
+          inputSchema: { type: 'object', properties: { b: { type: 'number' } } },
+        },
+        {
+          name: 'tool_c',
+          description: 'C',
+          inputSchema: { type: 'object', properties: { c: { type: 'boolean' } } },
+        },
+      ];
+
+      const ws = await connectBrowser(bridge, {
+        tabId: 'tab-multi',
+        url: 'https://example.com',
+        tools,
+      });
+
+      await waitFor(() => {
+        const registered = bridge.registry.listTools();
+        return registered.length >= 3 ? true : undefined;
+      });
+
+      const list = await client.listTools();
+      expect(list.tools).toHaveLength(7); // 4 static + 3 dynamic
+
+      for (const expected of tools) {
+        const found = list.tools.find((t) => t.name.includes(expected.name));
+        expect(found).toBeTruthy();
+        expect(found?.inputSchema).toEqual(expected.inputSchema);
+      }
+
+      ws.close();
+      await cleanup();
+    });
+
+    it('passes through annotations, inputSchema, and outputSchema together', async () => {
+      const { bridge, client, cleanup } = await createConnectedRelay();
+
+      const inputSchema = {
+        type: 'object',
+        properties: { query: { type: 'string' } },
+        required: ['query'],
+      };
+      const outputSchema = {
+        type: 'object',
+        properties: { answer: { type: 'string' } },
+      };
+
+      const ws = await connectBrowser(bridge, {
+        tabId: 'tab-full',
+        url: 'https://example.com',
+        tools: [
+          {
+            name: 'full_tool',
+            description: 'Fully specified',
+            inputSchema,
+            outputSchema,
+            annotations: { readOnlyHint: true, idempotentHint: true },
+          },
+        ],
+      });
+
+      const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
+
+      const list = await client.listTools();
+      const tool = list.tools.find((t) => t.name === toolName);
+      expect(tool).toBeTruthy();
+      expect(tool?.inputSchema).toEqual(inputSchema);
+      expect((tool as Record<string, unknown>).outputSchema).toEqual(outputSchema);
+      expect(tool?.annotations?.readOnlyHint).toBe(true);
+      expect(tool?.annotations?.idempotentHint).toBe(true);
+
+      ws.close();
+      await cleanup();
+    });
+
+    it('normalizes invalid inputSchema to default', async () => {
+      const { bridge, client, cleanup } = await createConnectedRelay();
+
+      const ws = await connectBrowser(bridge, {
+        tabId: 'tab-invalid',
+        url: 'https://example.com',
+        tools: [{ name: 'bad_schema_tool', inputSchema: 'not-an-object' }],
+      });
+
+      const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
+
+      const list = await client.listTools();
+      const tool = list.tools.find((t) => t.name === toolName);
+      expect(tool).toBeTruthy();
+      expect(tool?.inputSchema).toEqual({
+        type: 'object',
+        properties: {},
+      });
+
+      ws.close();
+      await cleanup();
+    });
+
+    it('maintains consistent schemas after rapid connect/disconnect cycles', async () => {
+      const { bridge, client, cleanup } = await createConnectedRelay();
+
+      for (let i = 0; i < 3; i++) {
+        const schema = {
+          type: 'object',
+          properties: { [`field_${i}`]: { type: 'string' } },
+        };
+
+        const ws = await connectBrowser(bridge, {
+          tabId: `tab-cycle-${i}`,
+          url: 'https://example.com',
+          tools: [{ name: 'cycling_tool', inputSchema: schema }],
+        });
+
+        await waitFor(() => bridge.registry.listTools()[0]?.name);
+
+        ws.close();
+
+        await waitFor(() => {
+          const tools = bridge.registry.listTools();
+          return tools.length === 0 ? true : undefined;
+        });
+      }
+
+      // Connect final browser with known schema
+      const finalSchema = {
+        type: 'object',
+        properties: { final: { type: 'boolean' } },
+        required: ['final'],
+      };
+
+      const ws = await connectBrowser(bridge, {
+        tabId: 'tab-final',
+        url: 'https://example.com',
+        tools: [{ name: 'stable_after_churn', inputSchema: finalSchema }],
+      });
+
+      const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
+
+      const list = await client.listTools();
+      expect(list.tools).toHaveLength(5); // 4 static + 1 dynamic
+      const tool = list.tools.find((t) => t.name === toolName);
+      expect(tool).toBeTruthy();
+      expect(tool?.inputSchema).toEqual(finalSchema);
 
       ws.close();
       await cleanup();

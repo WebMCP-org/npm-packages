@@ -3,16 +3,41 @@ import { execFile } from 'node:child_process';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import { ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod/v4';
 
 import { RelayBridgeServer, type RelayBridgeServerOptions } from './bridgeServer.js';
 import type { AggregatedTool, SourceInfo } from './registry.js';
+import {
+  EMPTY_STATIC_TOOL_INPUT_SHAPE,
+  publicInputSchemaFromZodShape,
+  type StaticToolInputShape,
+  WEBMCP_CALL_TOOL_INPUT_SHAPE,
+  WEBMCP_OPEN_PAGE_INPUT_SHAPE,
+} from './staticToolSchemas.js';
 
 /**
  * Handle returned by MCP tool registration.
  */
 interface RegisteredToolHandle {
   remove: () => void;
+}
+
+interface StaticToolRegistration<T extends StaticToolInputShape = StaticToolInputShape> {
+  name: string;
+  description: string;
+  inputShape: T;
+  annotations?: unknown;
+  handler: (args: z.output<z.ZodObject<T>>) => Promise<Record<string, unknown>>;
+}
+
+interface PublicToolMetadata {
+  name: string;
+  title?: string;
+  description?: string;
+  inputSchema: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
+  annotations?: unknown;
 }
 
 /**
@@ -51,7 +76,9 @@ export class LocalRelayMcpServer {
   readonly bridge: RelayBridgeServer;
 
   private readonly mcpServer: McpServer;
+  private readonly staticToolData = new Map<string, PublicToolMetadata>();
   private readonly dynamicToolHandles = new Map<string, RegisteredToolHandle>();
+  private readonly dynamicToolData = new Map<string, AggregatedTool>();
   private readonly dynamicToolSignature = new Map<string, string>();
 
   private syncing = false;
@@ -76,6 +103,7 @@ export class LocalRelayMcpServer {
     });
 
     this.registerStaticTools();
+    this.overrideListToolsHandler();
   }
 
   /**
@@ -137,20 +165,69 @@ export class LocalRelayMcpServer {
   }
 
   /**
+   * Overrides the SDK's ListTools handler to return real JSON Schema
+   * for dynamic tools instead of the empty `z.object({}).passthrough()`
+   * schema that the SDK would otherwise convert to `{ type: 'object' }`.
+   *
+   * The MCP SDK's McpServer internally runs `toJsonSchemaCompat()` on
+   * registered inputSchema values, which strips plain JSON Schema objects
+   * (non-Zod) to empty schemas. This override bypasses that conversion
+   * for dynamic (relayed) tools while preserving static tools as-is.
+   */
+  private overrideListToolsHandler(): void {
+    this.mcpServer.server.setRequestHandler(ListToolsRequestSchema, () => {
+      const tools: Array<Record<string, unknown>> = [
+        ...Array.from(this.staticToolData.values()).map((tool) => ({ ...tool })),
+        ...Array.from(this.dynamicToolData.entries()).map(([name, tool]) => ({
+          name,
+          description: this.dynamicToolDescription(tool),
+          inputSchema: tool.inputSchema,
+          ...(tool.outputSchema ? { outputSchema: tool.outputSchema } : {}),
+          ...(tool.annotations ? { annotations: tool.annotations } : {}),
+        })),
+      ].sort((left, right) => String(left.name).localeCompare(String(right.name)));
+
+      return { tools };
+    });
+  }
+
+  private registerStaticTool<T extends StaticToolInputShape>({
+    name,
+    description,
+    inputShape,
+    annotations,
+    handler,
+  }: StaticToolRegistration<T>): void {
+    this.mcpServer.registerTool(
+      name,
+      {
+        description,
+        inputSchema: inputShape,
+        ...(annotations ? { annotations } : {}),
+      } as Parameters<McpServer['registerTool']>[1],
+      handler as Parameters<McpServer['registerTool']>[2]
+    );
+    this.staticToolData.set(name, {
+      name,
+      description,
+      inputSchema: publicInputSchemaFromZodShape(inputShape),
+      ...(annotations ? { annotations } : {}),
+    });
+  }
+
+  /**
    * Registers built-in management tools exposed by the relay.
    */
   private registerStaticTools(): void {
-    this.mcpServer.registerTool(
-      'webmcp_list_sources',
-      {
-        description: 'List connected browser tool sources and their metadata.',
-        inputSchema: {},
-        annotations: {
-          readOnlyHint: true,
-          idempotentHint: true,
-        },
+    this.registerStaticTool({
+      name: 'webmcp_list_sources',
+      description: 'List connected browser tool sources and their metadata.',
+      inputShape: EMPTY_STATIC_TOOL_INPUT_SHAPE,
+      annotations: {
+        readOnlyHint: true,
+        idempotentHint: true,
       },
-      async () => {
+      handler: async () => {
         if (this.bridge.mode === 'client') {
           const sources = this.bridge.listSourcesFromRelay();
           const info = {
@@ -173,23 +250,19 @@ export class LocalRelayMcpServer {
             sources,
           },
         };
-      }
-    );
-
-    this.mcpServer.registerTool(
-      'webmcp_list_tools',
-      {
-        description:
-          'List WebMCP tools available from connected browser sources. ' +
-          'Returns tool definitions including name, description, input schema, and source info. ' +
-          'Use webmcp_call_tool to invoke a tool by name.',
-        inputSchema: {},
-        annotations: {
-          readOnlyHint: true,
-          idempotentHint: true,
-        },
       },
-      async () => {
+    });
+
+    this.registerStaticTool({
+      name: 'webmcp_list_tools',
+      description:
+        'List WebMCP tools available from connected browser sources. Returns tool definitions including name, description, input schema, and source info. Use webmcp_call_tool to invoke a tool by name.',
+      inputShape: EMPTY_STATIC_TOOL_INPUT_SHAPE,
+      annotations: {
+        readOnlyHint: true,
+        idempotentHint: true,
+      },
+      handler: async () => {
         const tools = this.listAggregatedTools();
         return {
           content: [
@@ -200,31 +273,18 @@ export class LocalRelayMcpServer {
             tools,
           },
         };
-      }
-    );
-
-    this.mcpServer.registerTool(
-      'webmcp_call_tool',
-      {
-        description:
-          'Call a WebMCP tool registered by a connected browser page. ' +
-          'Use webmcp_list_tools first to see available tools and their input schemas.',
-        inputSchema: {
-          name: z
-            .string()
-            .describe('The tool name to call. Use webmcp_list_tools to see available tool names.'),
-          arguments: z
-            .record(z.string(), z.unknown())
-            .optional()
-            .describe(
-              'Arguments to pass to the tool as a JSON object. Check the tool inputSchema from webmcp_list_tools for expected fields.'
-            ),
-        },
-        annotations: {
-          readOnlyHint: false,
-        },
       },
-      async ({ name, arguments: args }) => {
+    });
+
+    this.registerStaticTool({
+      name: 'webmcp_call_tool',
+      description:
+        'Call a WebMCP tool registered by a connected browser page. Use webmcp_list_tools first to see available tools and their input schemas.',
+      inputShape: WEBMCP_CALL_TOOL_INPUT_SHAPE,
+      annotations: {
+        readOnlyHint: false,
+      },
+      handler: async ({ name, arguments: args }) => {
         const tools = this.listAggregatedTools();
         const toolSummary = this.buildToolSummary(tools);
 
@@ -272,27 +332,16 @@ export class LocalRelayMcpServer {
             isError: true,
           };
         }
-      }
-    );
-
-    this.mcpServer.registerTool(
-      'webmcp_open_page',
-      {
-        description:
-          "Open a URL in the user's default browser, or refresh a connected source page. " +
-          'Use to launch WebMCP-enabled pages or reload stale connections.',
-        inputSchema: {
-          url: z.string().describe('URL to open or match for refresh.'),
-          refresh: z
-            .boolean()
-            .optional()
-            .describe(
-              'If true, refresh the connected source matching this URL instead of opening a new tab.'
-            ),
-        },
-        annotations: { readOnlyHint: false },
       },
-      async ({ url, refresh }) => {
+    });
+
+    this.registerStaticTool({
+      name: 'webmcp_open_page',
+      description:
+        "Open a URL in the user's default browser, or refresh a connected source page. Use to launch WebMCP-enabled pages or reload stale connections.",
+      inputShape: WEBMCP_OPEN_PAGE_INPUT_SHAPE,
+      annotations: { readOnlyHint: false },
+      handler: async ({ url, refresh }) => {
         let parsed: URL;
         try {
           parsed = new URL(url);
@@ -419,8 +468,8 @@ export class LocalRelayMcpServer {
         return {
           content: [{ type: 'text' as const, text: `Opened ${url} in the default browser.` }],
         };
-      }
-    );
+      },
+    });
   }
 
   /**
@@ -555,6 +604,7 @@ export class LocalRelayMcpServer {
 
       handle.remove();
       this.dynamicToolHandles.delete(name);
+      this.dynamicToolData.delete(name);
       this.dynamicToolSignature.delete(name);
       changed = true;
     }
@@ -575,6 +625,7 @@ export class LocalRelayMcpServer {
 
       const handle = this.registerDynamicTool(tool);
       this.dynamicToolHandles.set(tool.name, handle);
+      this.dynamicToolData.set(tool.name, tool);
       this.dynamicToolSignature.set(tool.name, signature);
       changed = true;
     }
