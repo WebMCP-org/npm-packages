@@ -1,11 +1,22 @@
-# Chromium Native API E2E Testing Guide
+# Chromium Native Contract Testing
 
-This guide covers the Chromium early-preview `navigator.modelContext` and
-`navigator.modelContextTesting` validation flows in this repo.
+This guide covers the native Chromium WebMCP validation lanes in this repo.
 
-## Quick Run (Chrome Beta, recommended)
+## Definitions
 
-Use this path for current behavior validation:
+- **Canonical native contract**: validates the real browser API surface directly through `navigator.modelContext` and `navigator.modelContextTesting`.
+- **Native parity / showcase integration**: keeps broader compatibility and demo coverage, but is not the canonical E2E gate.
+
+## Quick Run
+
+### Default Chromium Canonical Contract
+
+```bash
+cd e2e
+pnpm test:native-contract:default
+```
+
+### Chrome Beta Canonical Contract
 
 1. Open `chrome://flags/#enable-webmcp-testing`
 2. Enable **WebMCP for testing**
@@ -14,16 +25,49 @@ Use this path for current behavior validation:
 
 ```bash
 cd e2e
-pnpm test:chrome-beta:webmcp
+pnpm test:native-contract:beta
 ```
 
-This runs `tests/chrome-beta-webmcp.spec.ts` through
-`playwright-chrome-beta-webmcp.config.ts` with:
+This uses `playwright-chrome-beta-webmcp.config.ts` with:
+- `--enable-experimental-web-platform-features`
+- `--enable-features=WebMCPTesting`
+
+## Why Native Is Different
+
+For tab, iframe, relay, DevTools, and extension runtimes, the canonical caller is an SDK `Client` over the runtime's real transport.
+
+For native Chromium, the real public boundary is the browser API itself. The canonical contract therefore uses:
+- `navigator.modelContext.registerTool(...)`
+- `navigator.modelContext.unregisterTool(...)`
+- `navigator.modelContextTesting.listTools()`
+- `navigator.modelContextTesting.executeTool(...)`
+
+That is intentional and is the only exception to the SDK-client rule.
+
+## Canonical Assertions
+
+The native contract lane proves that:
+1. tool registration is visible through the browser API
+2. tool execution works through `modelContextTesting.executeTool(...)`
+3. dynamic registration and unregistration are reflected in `listTools()`
+4. runtime-thrown tool errors propagate through the native browser API
+
+## Integration Lanes
+
+These lanes still exist and are useful for broader compatibility checks:
 
 ```bash
---enable-experimental-web-platform-features
---enable-features=WebMCPTesting
+cd e2e
+pnpm test:native-parity:default
+pnpm test:native-parity:beta
+pnpm test:native-showcase
+pnpm test:integration:runtime-api
 ```
+
+They cover suites such as:
+- `tests/chrome-beta-webmcp.spec.ts`
+- `tests/chromium-native-api.spec.ts`
+- `playwright-native-showcase.config.ts`
 
 ## API Surface Validated
 
@@ -40,41 +84,14 @@ This runs `tests/chrome-beta-webmcp.spec.ts` through
 - `registerToolsChangedCallback(callback) => void`
 - `getCrossDocumentScriptToolResult() => Promise<string>`
 
-## Behavior and Error Semantics
-
-### `executeTool(...)`
-- `inputArgsJson` must decode to a JSON object payload.
-- Invalid JSON and non-object payloads reject with `UnknownError`.
-- Missing tools reject with `UnknownError`.
-- Tool invocation failures are normalized to `UnknownError`.
-- Aborted signals (before or during execution) reject with `UnknownError`.
-- Returns `null` for navigation-indicating results.
-
-### `listTools()`
-- Returns tool entries with `name` and `description` strings.
-- `inputSchema` may be omitted; when present it is a parseable JSON string payload.
-- Reflects register/unregister/provide/clear updates.
-
-### `registerToolsChangedCallback(callback)`
-- Non-function callback values throw `TypeError`.
-- Callback registration uses **replacement semantics** (latest callback replaces prior callback).
-- Callback exceptions are caught and do not block registry operations.
-- Callback fires on tool mutations (`registerTool`, `unregisterTool`, `provideContext`, `clearContext`).
-
-## Legacy Compatibility Suite
-
-`tests/chromium-native-api.spec.ts` still exists for broader compatibility checks,
-but Chrome Beta early-preview validation should use
-`tests/chrome-beta-webmcp.spec.ts` + `pnpm test:chrome-beta:webmcp`.
-
 ## Debug Tips
 
 ```bash
-# Headed run
+# Headed Chrome Beta run
 cd e2e
 pnpm test:chrome-beta:webmcp:headed
 
-# Playwright UI mode
+# Playwright UI for Chrome Beta integration lane
 cd e2e
 pnpm test:chrome-beta:webmcp:ui
 ```
