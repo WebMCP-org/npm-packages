@@ -47,6 +47,9 @@ jobs:
       - name: Install Playwright Browsers
         run: pnpm --filter mcp-e2e-tests exec playwright install --with-deps chromium
 
+      - name: Install Puppeteer Chrome (for chrome-devtools-mcp e2e)
+        run: pnpm --filter @mcp-b/chrome-devtools-mcp exec puppeteer browsers install chrome
+
       - name: Run E2E tests
         run: pnpm test:e2e
 
