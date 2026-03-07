@@ -5,7 +5,13 @@
  * Security: The iframe boundary provides origin isolation. All postMessage
  * exchanges validate `event.origin` against the host page's origin.
  */
-import { createRequestId, isJsonObject, isLoopbackHost, safeSend } from './shared.js';
+import {
+  createRequestId,
+  isJsonObject,
+  isLoopbackHost,
+  safeSend,
+  sanitizeLogText,
+} from './shared.js';
 
 interface WidgetConfig {
   hostOrigin: string;
@@ -205,7 +211,10 @@ function runWidget(cfg: WidgetConfig): void {
     }
 
     if (relayMessage.type !== 'invoke') {
-      console.debug('[webmcp-relay-widget] Ignoring unrecognized message type:', relayMessage.type);
+      console.debug(
+        '[webmcp-relay-widget] Ignoring unrecognized message type:',
+        sanitizeLogText(relayMessage.type)
+      );
       return;
     }
 

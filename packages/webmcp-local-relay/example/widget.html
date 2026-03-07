@@ -243,7 +243,10 @@
           }
 
           if (relayMessage.type !== 'invoke') {
-            console.debug('[webmcp-relay-widget] Ignoring unrecognized message type:', relayMessage.type);
+            console.debug(
+              '[webmcp-relay-widget] Ignoring unrecognized message type:',
+              String(relayMessage.type).replace(/[\r\n]/g, '')
+            );
             return;
           }
 

@@ -5,6 +5,7 @@ import {
   isLoopbackHost,
   type SendableSocket,
   safeSend,
+  sanitizeLogText,
 } from './shared.js';
 
 describe('isJsonObject', () => {
@@ -57,6 +58,16 @@ describe('createRequestId', () => {
   });
 });
 
+describe('sanitizeLogText', () => {
+  it('strips newline characters from log values', () => {
+    expect(sanitizeLogText('invoke\r\nspoofed-entry')).toBe('invokespoofed-entry');
+  });
+
+  it('coerces non-string values before sanitizing', () => {
+    expect(sanitizeLogText(42)).toBe('42');
+  });
+});
+
 describe('safeSend', () => {
   function makeSocket(readyState: number, send: SendableSocket['send'] = vi.fn()): SendableSocket {
     return { readyState, send };
@@ -77,9 +88,18 @@ describe('safeSend', () => {
   });
 
   it('catches errors from send', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const ws = makeSocket(WebSocket.OPEN, () => {
       throw new Error('connection reset');
     });
-    expect(() => safeSend(ws, 'data')).not.toThrow();
+    try {
+      expect(() => safeSend(ws, 'data')).not.toThrow();
+      expect(warn).toHaveBeenCalledWith(
+        '[webmcp-relay] Failed to send message:',
+        expect.any(Error)
+      );
+    } finally {
+      warn.mockRestore();
+    }
   });
 });

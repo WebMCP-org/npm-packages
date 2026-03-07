@@ -31,6 +31,13 @@ export function createRequestId(): string {
   return `${String(Date.now())}_${String(Math.random()).slice(2, 10)}`;
 }
 
+/**
+ * Normalizes user-controlled values before writing them to plain-text logs.
+ */
+export function sanitizeLogText(value: unknown): string {
+  return String(value).replace(/[\r\n]/g, '');
+}
+
 export interface SendableSocket {
   readyState: number;
   send(data: string): void;
