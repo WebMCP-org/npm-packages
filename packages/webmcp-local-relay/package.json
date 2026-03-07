@@ -65,6 +65,7 @@
     "@types/node": "catalog:",
     "@types/ws": "^8.5.14",
     "@vitest/coverage-v8": "catalog:",
+    "msw": "2.12.10",
     "playwright": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
