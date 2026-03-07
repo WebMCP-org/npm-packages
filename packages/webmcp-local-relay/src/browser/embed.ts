@@ -42,8 +42,11 @@ interface WidgetRequestMessage {
 }
 
 interface RelayConfig {
+  autoConnect: boolean;
   relayHost: string;
   relayPort: string;
+  relayId?: string;
+  relayWorkspace?: string;
   tabId: string;
   widgetUrl: string;
   widgetOrigin: string;
@@ -110,9 +113,14 @@ function resolveWidgetUrl(script: HTMLScriptElement | null): string {
 
 function buildRelayConfig(script: HTMLScriptElement | null): RelayConfig {
   const widgetUrl = resolveWidgetUrl(script);
+  const relayId = script?.getAttribute('data-relay-id') || undefined;
+  const relayWorkspace = script?.getAttribute('data-relay-workspace') || undefined;
   return {
+    autoConnect: script?.getAttribute('data-auto-connect') !== 'false',
     relayHost: script?.getAttribute('data-relay-host') || '127.0.0.1',
     relayPort: script?.getAttribute('data-relay-port') || '9333',
+    ...(relayId ? { relayId } : {}),
+    ...(relayWorkspace ? { relayWorkspace } : {}),
     tabId: readOrCreateTabId(),
     widgetUrl,
     widgetOrigin: new URL(widgetUrl).origin,
@@ -396,12 +404,20 @@ function injectRelayWidget(cfg: RelayConfig): void {
   searchParams.set('hostTitle', document.title || '');
   searchParams.set('relayHost', cfg.relayHost);
   searchParams.set('relayPort', cfg.relayPort);
+  searchParams.set('autoConnect', cfg.autoConnect ? 'true' : 'false');
+  if (cfg.relayId) {
+    searchParams.set('relayId', cfg.relayId);
+  }
+  if (cfg.relayWorkspace) {
+    searchParams.set('relayWorkspace', cfg.relayWorkspace);
+  }
 
   const iframe = document.createElement('iframe');
   iframe.src = `${cfg.widgetUrl}?${searchParams.toString()}`;
   iframe.style.display = 'none';
   iframe.setAttribute('aria-hidden', 'true');
   iframe.setAttribute('data-webmcp-relay', '1');
+  iframe.setAttribute('allow', 'loopback-network; local-network; local-network-access');
   document.body.appendChild(iframe);
   widgetWindow = iframe.contentWindow;
   iframe.addEventListener('load', () => {

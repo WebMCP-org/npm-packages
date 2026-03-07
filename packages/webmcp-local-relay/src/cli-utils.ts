@@ -4,7 +4,11 @@
 export interface CliOptions {
   host: string;
   port: number;
+  portExplicitlySet: boolean;
   allowedOrigins: string[];
+  label?: string;
+  workspace?: string;
+  relayId?: string;
 }
 
 /**
@@ -14,6 +18,7 @@ export function parseCliOptions(argv: string[]): CliOptions {
   const options: CliOptions = {
     host: '127.0.0.1',
     port: 9333,
+    portExplicitlySet: false,
     // Permissive by default for zero-config local development — any browser page can connect.
     // Use --widget-origin to restrict to trusted origins on shared machines or in production.
     allowedOrigins: ['*'],
@@ -47,6 +52,7 @@ export function parseCliOptions(argv: string[]): CliOptions {
         throw new Error(`Invalid port "${raw}". Port must be a number between 1 and 65535.`);
       }
       options.port = value;
+      options.portExplicitlySet = true;
       continue;
     }
 
@@ -61,6 +67,24 @@ export function parseCliOptions(argv: string[]): CliOptions {
       if (split.length > 0) {
         options.allowedOrigins = split;
       }
+      continue;
+    }
+
+    if (token === '--label') {
+      options.label = readFlagValue(token, i);
+      i += 1;
+      continue;
+    }
+
+    if (token === '--workspace') {
+      options.workspace = readFlagValue(token, i);
+      i += 1;
+      continue;
+    }
+
+    if (token === '--relay-id') {
+      options.relayId = readFlagValue(token, i);
+      i += 1;
       continue;
     }
 
@@ -94,10 +118,13 @@ export function printHelp(): void {
       '',
       'Options:',
       '  --host, -H               Bind host for local websocket relay (default: 127.0.0.1)',
-      '  --port, -p               Bind port for local websocket relay (default: 9333)',
+      '  --port, -p               Preferred root port for the local relay cluster (default: 9333)',
       '  --widget-origin          Allowed host page origin(s), comma-separated (default: *)',
       '  --allowed-origin         Alias for --widget-origin',
       '  --ws-origin              Alias for --widget-origin',
+      '  --label                  Human-readable relay label reported during discovery',
+      '  --workspace              Optional workspace name reported during discovery',
+      '  --relay-id               Stable relay identifier reported during discovery',
       '  --help, -h               Show help',
       '',
     ].join('\n')

@@ -37,11 +37,12 @@ interface WidgetTestEnv {
 
 const originalDescriptors = {
   document: Object.getOwnPropertyDescriptor(globalThis, 'document'),
+  sessionStorage: Object.getOwnPropertyDescriptor(globalThis, 'sessionStorage'),
   window: Object.getOwnPropertyDescriptor(globalThis, 'window'),
 };
 
 function restoreGlobal(
-  key: 'document' | 'window',
+  key: 'document' | 'sessionStorage' | 'window',
   descriptor: PropertyDescriptor | undefined
 ): void {
   if (descriptor) {
@@ -65,7 +66,18 @@ function parseWireData(data: unknown): unknown {
 
 function buildSearch(
   params: Partial<
-    Record<'hostOrigin' | 'hostTitle' | 'hostUrl' | 'relayHost' | 'relayPort' | 'tabId', string>
+    Record<
+      | 'autoConnect'
+      | 'hostOrigin'
+      | 'hostTitle'
+      | 'hostUrl'
+      | 'relayHost'
+      | 'relayId'
+      | 'relayPort'
+      | 'relayWorkspace'
+      | 'tabId',
+      string
+    >
   >
 ): string {
   const search = new URLSearchParams();
@@ -157,7 +169,11 @@ async function completeHandshake(
   return connection;
 }
 
-function installEnvironment(options?: { referrer?: string; search?: string }): WidgetTestEnv {
+function installEnvironment(options?: {
+  referrer?: string;
+  search?: string;
+  sendServerHello?: boolean;
+}): WidgetTestEnv {
   const connections: RelayConnection[] = [];
   const defaultRelayPort = String(nextRelayPort++);
   const search =
@@ -180,6 +196,19 @@ function installEnvironment(options?: { referrer?: string; search?: string }): W
       client.addEventListener('message', (event) => {
         connection.messages.push(parseWireData(event.data));
       });
+      if (options?.sendServerHello !== false) {
+        client.send(
+          JSON.stringify({
+            type: 'server-hello',
+            service: 'webmcp-local-relay',
+            version: 1,
+            host: '127.0.0.1',
+            instanceId: `relay-${relayPort}`,
+            port: Number.parseInt(relayPort, 10),
+            relayId: `relay-${relayPort}`,
+          })
+        );
+      }
       connections.push(connection);
     })
   );
@@ -188,6 +217,26 @@ function installEnvironment(options?: { referrer?: string; search?: string }): W
     configurable: true,
     value: {
       referrer: options?.referrer ?? '',
+    },
+    writable: true,
+  });
+
+  const sessionStorageState = new Map<string, string>();
+  Object.defineProperty(globalThis, 'sessionStorage', {
+    configurable: true,
+    value: {
+      clear(): void {
+        sessionStorageState.clear();
+      },
+      getItem(key: string): string | null {
+        return sessionStorageState.get(key) ?? null;
+      },
+      removeItem(key: string): void {
+        sessionStorageState.delete(key);
+      },
+      setItem(key: string, value: string): void {
+        sessionStorageState.set(key, value);
+      },
     },
     writable: true,
   });
@@ -207,7 +256,11 @@ function installEnvironment(options?: { referrer?: string; search?: string }): W
   return { connections, hostOrigin, hostWindow };
 }
 
-function startRuntime(options?: { referrer?: string; search?: string }): WidgetTestEnv {
+function startRuntime(options?: {
+  referrer?: string;
+  search?: string;
+  sendServerHello?: boolean;
+}): WidgetTestEnv {
   const env = installEnvironment(options);
   startWidgetRuntime();
   return env;
@@ -222,10 +275,12 @@ describe('parseConfig', () => {
     const config = parseConfig(`?hostOrigin=${encodeURIComponent(APP_ORIGIN)}`);
 
     expect(config).toMatchObject({
+      autoConnect: true,
       hostOrigin: APP_ORIGIN,
       hostTitle: '',
       hostUrl: APP_ORIGIN,
-      wsUrl: 'ws://127.0.0.1:9333',
+      relayHostHint: '127.0.0.1',
+      relayPortHint: 9333,
     });
     expect(config?.tabId).toEqual(expect.any(String));
   });
@@ -242,12 +297,14 @@ describe('parseConfig', () => {
       })
     );
 
-    expect(config).toEqual({
+    expect(config).toMatchObject({
+      autoConnect: true,
       hostOrigin: APP_ORIGIN,
       hostTitle: 'Widget Host',
       hostUrl: `${APP_ORIGIN}/tools`,
+      relayHostHint: 'localhost',
+      relayPortHint: 9444,
       tabId: 'tab-9',
-      wsUrl: 'ws://localhost:9444',
     });
   });
 });
@@ -296,6 +353,7 @@ describe('widget runtime', () => {
     relayServer.resetHandlers();
     vi.restoreAllMocks();
     restoreGlobal('document', originalDescriptors.document);
+    restoreGlobal('sessionStorage', originalDescriptors.sessionStorage);
     restoreGlobal('window', originalDescriptors.window);
   });
 
@@ -328,6 +386,62 @@ describe('widget runtime', () => {
       '[webmcp-relay-widget] Missing required hostOrigin parameter. Widget will not start.'
     );
     expect(env.connections).toHaveLength(0);
+  });
+
+  it('discovers the next relay port when the hinted port is not a relay', async () => {
+    const discoveredConnections: RelayConnection[] = [];
+    const relayLink = ws.link('ws://127.0.0.1:9334');
+
+    relayServer.use(
+      relayLink.addEventListener('connection', ({ client }) => {
+        const connection: RelayConnection = { client: client as RelayClient, messages: [] };
+        client.addEventListener('message', (event) => {
+          connection.messages.push(parseWireData(event.data));
+        });
+        client.send(
+          JSON.stringify({
+            type: 'server-hello',
+            service: 'webmcp-local-relay',
+            version: 1,
+            host: '127.0.0.1',
+            instanceId: 'relay-9334',
+            port: 9334,
+            relayId: 'relay-9334',
+          })
+        );
+        discoveredConnections.push(connection);
+      })
+    );
+
+    const env = startRuntime({
+      search: buildSearch({
+        hostOrigin: APP_ORIGIN,
+        relayHost: '127.0.0.1',
+        relayPort: '9333',
+        tabId: 'tab-1',
+      }),
+      sendServerHello: false,
+    });
+
+    const nonRelayConnection = await waitForConnection(env);
+    nonRelayConnection.client.close();
+
+    const request = await waitForPostedMessage(env, 'webmcp.tools.list.request');
+    env.hostWindow.dispatchMessage(APP_ORIGIN, {
+      requestId: request.payload.requestId,
+      tools: [{ name: 'sum' }],
+      type: 'webmcp.tools.list.response',
+    });
+
+    await vi.waitFor(() => {
+      expect(discoveredConnections).toHaveLength(1);
+      expect(discoveredConnections[0]?.messages).toHaveLength(2);
+    });
+
+    expect(discoveredConnections[0]?.messages[0]).toMatchObject({
+      origin: APP_ORIGIN,
+      type: 'hello',
+    });
   });
 
   it('handshakes with the host and forwards tool changes after hello', async () => {

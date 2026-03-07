@@ -1,8 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  buildRelayEndpointCacheKey,
   createRequestId,
   isJsonObject,
   isLoopbackHost,
+  RELAY_BROWSER_PROTOCOL,
+  RELAY_DISCOVERY_PROTOCOL,
+  RELAY_ENDPOINT_CACHE_KEY,
+  RELAY_PORT_RANGE_END,
+  RELAY_PORT_RANGE_START,
   type SendableSocket,
   safeSend,
   sanitizeLogText,
@@ -134,5 +140,27 @@ describe('safeSend', () => {
     } finally {
       warn.mockRestore();
     }
+  });
+});
+
+describe('relay discovery constants', () => {
+  it('exposes the supported browser protocols', () => {
+    expect(RELAY_BROWSER_PROTOCOL).toBe('webmcp.v1');
+    expect(RELAY_DISCOVERY_PROTOCOL).toBe('webmcp-discovery.v1');
+  });
+
+  it('exposes the bounded default relay port range', () => {
+    expect(RELAY_PORT_RANGE_START).toBe(9333);
+    expect(RELAY_PORT_RANGE_END).toBe(9348);
+  });
+
+  it('builds cache keys scoped to the host origin and selectors', () => {
+    expect(
+      buildRelayEndpointCacheKey({
+        hostOrigin: 'https://app.example.com',
+        relayId: 'desktop',
+        workspace: 'default',
+      })
+    ).toBe(`${RELAY_ENDPOINT_CACHE_KEY}:https%3A%2F%2Fapp.example.com:desktop:default`);
   });
 });

@@ -6,6 +6,11 @@
  */
 
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
+export const RELAY_BROWSER_PROTOCOL = 'webmcp.v1';
+export const RELAY_DISCOVERY_PROTOCOL = 'webmcp-discovery.v1';
+export const RELAY_PORT_RANGE_START = 9333;
+export const RELAY_PORT_RANGE_END = 9348;
+export const RELAY_ENDPOINT_CACHE_KEY = '__webmcp_relay_endpoint';
 
 /**
  * Checks if a value is a plain JSON object (not null, not an array).
@@ -54,4 +59,18 @@ export function safeSend(ws: SendableSocket, data: string): void {
   } catch (err) {
     console.warn('[webmcp-relay] Failed to send message:', err);
   }
+}
+
+/**
+ * Builds a sessionStorage key scoped to the embedding host origin and selectors.
+ */
+export function buildRelayEndpointCacheKey(options: {
+  hostOrigin: string;
+  relayId?: string | null;
+  workspace?: string | null;
+}): string {
+  const suffix = [options.hostOrigin, options.relayId ?? '', options.workspace ?? '']
+    .map((value) => encodeURIComponent(value))
+    .join(':');
+  return `${RELAY_ENDPOINT_CACHE_KEY}:${suffix}`;
 }
