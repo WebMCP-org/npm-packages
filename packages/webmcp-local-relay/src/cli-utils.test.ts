@@ -6,6 +6,7 @@ describe('parseCliOptions', () => {
     const options = parseCliOptions([]);
     expect(options.host).toBe('127.0.0.1');
     expect(options.port).toBe(9333);
+    expect(options.portExplicitlySet).toBe(false);
     expect(options.allowedOrigins).toEqual(['*']);
   });
 
@@ -22,11 +23,13 @@ describe('parseCliOptions', () => {
   it('parses --port flag', () => {
     const options = parseCliOptions(['--port', '8080']);
     expect(options.port).toBe(8080);
+    expect(options.portExplicitlySet).toBe(true);
   });
 
   it('parses -p shorthand', () => {
     const options = parseCliOptions(['-p', '4000']);
     expect(options.port).toBe(4000);
+    expect(options.portExplicitlySet).toBe(true);
   });
 
   it('throws for invalid port', () => {
@@ -73,6 +76,21 @@ describe('parseCliOptions', () => {
     expect(options.allowedOrigins).toEqual(['https://a.example.com']);
   });
 
+  it('parses relay identity flags', () => {
+    const options = parseCliOptions([
+      '--label',
+      'Desktop Relay',
+      '--workspace',
+      'default',
+      '--relay-id',
+      'desktop-main',
+    ]);
+
+    expect(options.label).toBe('Desktop Relay');
+    expect(options.workspace).toBe('default');
+    expect(options.relayId).toBe('desktop-main');
+  });
+
   it('throws when --host is missing a value', () => {
     expect(() => parseCliOptions(['--host'])).toThrow('Missing value for --host');
   });
@@ -108,6 +126,7 @@ describe('parseCliOptions', () => {
     ]);
     expect(options.host).toBe('0.0.0.0');
     expect(options.port).toBe(5555);
+    expect(options.portExplicitlySet).toBe(true);
     expect(options.allowedOrigins).toEqual(['https://trusted.example.com']);
   });
 

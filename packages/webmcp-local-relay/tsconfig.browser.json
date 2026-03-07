@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist/browser",
+    "rootDir": "./src/browser",
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  },
+  "include": ["src/browser/**/*"],
+  "exclude": ["**/*.test.*", "**/*.spec.*"]
+}

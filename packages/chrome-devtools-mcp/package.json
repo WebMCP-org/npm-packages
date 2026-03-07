@@ -67,6 +67,7 @@
     "start": "npm run build && node build/src/index.js",
     "start-debug": "DEBUG=mcp:* DEBUG_COLORS=false npm run build && node build/src/index.js",
     "test": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test-reporter spec --test-force-exit --test \"build/tests/**/*.test.js\"",
+    "test:e2e": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test-reporter spec --test-force-exit --test build/tests/webmcp.runtime-contract.e2e.test.js",
     "test:node20": "node --require ./build/tests/setup.js --test-reporter spec --test-force-exit --test build/tests",
     "test:only": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test-reporter spec --test-force-exit --test --test-only \"build/tests/**/*.test.js\"",
     "test:only:no-build": "node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test-reporter spec --test-force-exit --test --test-only \"build/tests/**/*.test.js\"",

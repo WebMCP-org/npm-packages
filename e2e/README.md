@@ -1,262 +1,162 @@
-# E2E Tests & Demos for MCP-B
+# Browser Runtime Contract Tests
 
-This directory contains end-to-end tests and demonstration applications for the MCP-B packages using Playwright.
+This package contains the Playwright-driven browser runtime contract lanes for the monorepo.
 
-## Overview
+## What This Package Covers
 
-The E2E suite includes:
+`pnpm --filter mcp-e2e-tests test` runs the canonical Playwright runtime-contract lane for:
+- tab/global runtime
+- iframe runtime
+- native Chromium runtime
 
-- **Tab Transport Tests**: Validates `@mcp-b/transports` package functionality
-- **React WebMCP Tests**: Tests React hooks integration
-- **Web Standards Showcase**: Interactive demo of the native Chromium Web Model Context API
-- **Full MCP Protocol**: Tool registration, listing, execution, and lifecycle management
+This package also keeps non-canonical integration lanes for direct runtime APIs, demos, and framework integrations.
 
-## Web Standards Showcase
+Other canonical runtime E2E lanes live in package-specific commands:
+- `pnpm --filter @mcp-b/webmcp-local-relay test:e2e`
+- `pnpm --filter @mcp-b/chrome-devtools-mcp test:e2e`
+- `pnpm --filter @mcp-b/extension-tools test:e2e`
 
-**Location:** `web-standards-showcase/`
+## Canonical E2E Definition
 
-Interactive playground demonstrating the **native Chromium Web Model Context API** without polyfills.
+A test is canonical E2E only if it proves:
+1. tools are registered inside the real runtime
+2. tools are discovered through the runtime's public boundary
+3. tools are called through that same boundary
+4. no mocked transports or fake servers are used
 
-**Features:**
-- Live code editor with syntax highlighting
-- Pre-built tool templates (Counter, Calculator, Todo, Timer, State Machine)
-- Two-bucket system demonstration (provideContext vs registerTool)
-- Testing API explorer (navigator.modelContextTesting)
-- Real-time event logging
-- **No polyfill** - Validates native implementation only
-
-**Quick Start:**
-```bash
-cd web-standards-showcase
-pnpm install
-pnpm dev
-
-# Launch Chromium with experimental features enabled:
-chromium --enable-experimental-web-platform-features http://localhost:5174
-```
-
-**Testing:**
-```bash
-# From e2e directory
-pnpm test:native-showcase        # Run tests
-pnpm test:native-showcase:ui     # Playwright UI mode
-pnpm test:native-showcase:headed # Watch tests run
-```
-
-**Documentation:**
-- [web-standards-showcase/README.md](./web-standards-showcase/README.md) - Detailed user guide
-- [web-standards-showcase/CHROMIUM_FLAGS.md](./web-standards-showcase/CHROMIUM_FLAGS.md) - Flag reference
+Native Chromium is the one exception to the SDK-client rule: its real public boundary is `navigator.modelContext` / `navigator.modelContextTesting`, so the canonical native tests use those APIs directly.
 
 ## Structure
 
-```
+```text
 e2e/
-├── test-app/           # Test application using Tab Transports
-│   ├── src/
-│   │   └── main.ts     # MCP server & client implementation
-│   ├── index.html      # Test UI
-│   └── package.json
+├── runtime-contract/
+│   ├── browser-contract.js
+│   ├── server-contract.js
+│   └── core.js
+├── test-app/
+│   ├── runtime-contract.html
+│   ├── runtime-contract-iframe-client.html
+│   ├── runtime-contract-iframe-child.html
+│   └── src/
+│       ├── runtime-contract.ts
+│       ├── runtime-contract-iframe-client.ts
+│       └── runtime-contract-iframe-child.ts
 ├── tests/
-│   └── tab-transport.spec.ts  # Playwright E2E tests
+│   ├── runtime-contract-tab.spec.ts
+│   ├── runtime-contract-iframe.spec.ts
+│   ├── runtime-contract-native.spec.ts
+│   ├── tab-transport.spec.ts
+│   ├── mcp-iframe-element.spec.ts
+│   ├── chromium-native-api.spec.ts
+│   └── chrome-beta-webmcp.spec.ts
 ├── playwright.config.ts
 └── package.json
 ```
 
-## Test Application
+## Shared Runtime Contract
 
-The test app (`test-app/`) is a simple Vite + TypeScript application that:
+The shared runtime fixture lives in `e2e/runtime-contract/`.
 
-1. Creates an MCP server with counter tools (increment, decrement, reset, get)
-2. Connects an MCP client to the server in the same browser context
-3. Provides a UI for manually testing the transports
-4. Exposes a `testApp` API for programmatic testing
+It registers the same deterministic tool set everywhere:
+- `echo`
+- `sum`
+- `dynamic_tool`
+- `always_fail`
 
-## Running Tests
+It also exposes the test-only hook `window.__WEBMCP_E2E__` / `globalThis.__WEBMCP_E2E__` with:
+- `isReady()`
+- `registerDynamicTool()`
+- `unregisterDynamicTool(name?)`
+- `readInvocations()`
+- `resetInvocations()`
 
-### From Root Directory
+The shared hook is for runtime mutation and inspection only. Canonical E2E does not use it as the subject under test for tool invocation.
+
+## Commands
+
+### From Repo Root
 
 ```bash
-# Run all E2E tests
-pnpm test
+# Repo-wide canonical runtime E2E umbrella
+pnpm test:e2e
 
-# Run with Playwright UI (recommended for development)
+# This package only: tab/global + iframe + native contract lane
+pnpm --filter mcp-e2e-tests test
+pnpm --filter mcp-e2e-tests test:runtime-contract
+
+# Playwright convenience commands for this package
 pnpm test:e2e:ui
-
-# Run in headed mode (see browser)
 pnpm test:e2e:headed
-
-# Debug mode (step through tests)
 pnpm test:e2e:debug
 ```
 
-### From E2E Directory
+### From `e2e/`
 
 ```bash
-cd e2e
-
-# Run all tests
+# Canonical browser runtime contract lane
 pnpm test
+pnpm test:runtime-contract
 
-# Run specific test suites
+# Native contract
+pnpm test:native-contract:default
+pnpm test:native-contract:beta
+
+# Runtime API integration (not canonical E2E)
+pnpm test:integration:runtime-api
+
+# Framework integration (not canonical E2E)
+pnpm test:integration:frameworks
+
+# Older targeted commands retained for focused runs
 pnpm test:tab-transport
-pnpm test:react-webmcp
-pnpm test:native-showcase        # Native API tests
-pnpm test:native-parity          # Default Chromium + Chrome Beta parity check
-pnpm test:native-parity:default  # Default browser parity lane
-pnpm test:native-parity:beta     # Chrome Beta parity lane
-
-# Open Playwright UI
-pnpm test:ui
-pnpm test:native-showcase:ui     # Native showcase UI
-
-# Run in headed mode
-pnpm test:headed
-pnpm test:native-showcase:headed # Watch native tests
-
-# Debug tests
-pnpm test:debug
-pnpm test:native-showcase:debug  # Debug native tests
-
-# View test report
-pnpm test:report
+pnpm test:mcp-iframe
+pnpm test:chromium-native-api
+pnpm test:native-showcase
+pnpm test:chrome-beta:webmcp
 ```
 
-## Test Scenarios
+## Canonical Assertions
 
-The test suite covers:
+The browser runtime-contract specs assert the same contract everywhere:
+1. initial discovery returns the expected tools
+2. a successful call returns the expected payload
+3. the runtime records the invocation
+4. dynamic registration becomes discoverable without restart
+5. unregistration removes the tool and later calls fail through the real runtime error surface
+6. runtime-thrown tool errors propagate
 
-### Basic Functionality
-- Load test application
-- Start MCP server
-- Connect MCP client to server
-- List available tools
+## Runtime API Integration Lanes
 
-### Tool Execution
-- Increment counter via MCP tool
-- Decrement counter via MCP tool
-- Reset counter via MCP tool
-- Get counter value via MCP tool
+These suites remain valuable, but they are not the default E2E definition:
+- `tests/tab-transport.spec.ts`
+- `tests/mcp-iframe-element.spec.ts`
+- `tests/chromium-native-api.spec.ts`
+- `tests/notification-batching.spec.ts`
+- `tests/chrome-beta-webmcp.spec.ts`
+- `playwright-native-showcase.config.ts`
 
-### Advanced Scenarios
-- Multiple rapid tool calls (concurrency)
-- Disconnect and reconnect client
-- Stop and restart server
-- Programmatic API testing
-
-## Manual Testing
-
-You can also run the test app manually:
+## Manual Runtime Pages
 
 ```bash
-# Start the test app
 pnpm --filter mcp-tab-transport-test-app dev
-
-# Open http://localhost:5173 in your browser
 ```
 
-Use the UI to:
-1. Start the MCP server
-2. Connect the client
-3. List available tools
-4. Execute counter operations
-5. View the event log
+Then open:
+- `http://localhost:5173/runtime-contract.html`
+- `http://localhost:5173/runtime-contract-iframe-client.html`
 
-## Debugging
-
-### Playwright UI Mode
-
-The best way to debug tests is using Playwright's UI mode:
-
-```bash
-pnpm test:e2e:ui
-```
-
-This provides:
-- Visual test execution
-- Time travel debugging
-- DOM snapshots
-- Network logs
-- Console output
-
-### Debug Mode
-
-For step-by-step debugging:
-
-```bash
-pnpm test:e2e:debug
-```
-
-This opens Playwright Inspector where you can:
-- Set breakpoints
-- Step through tests
-- Inspect selectors
-- View page state
-
-### Screenshots and Traces
-
-Failed tests automatically capture:
-- Screenshots (in `test-results/`)
-- Traces (viewable in Playwright UI)
-
-## CI/CD
-
-Tests run automatically in GitHub Actions on:
-- Pull requests to `main`
-- Pushes to `main`
-
-The CI workflow also runs a **native parity matrix** for
-`e2e/tests/chrome-beta-webmcp.spec.ts` across:
-- Default Chromium
-- Chrome Beta (`--enable-experimental-web-platform-features --enable-features=WebMCPTesting`)
-
-See `.github/workflows/e2e.yml` for CI configuration.
-
-## Writing New Tests
-
-Add new test files to `tests/` directory:
-
-```typescript
-import { test, expect } from '@playwright/test';
-
-test.describe('My Feature', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-  });
-
-  test('should do something', async ({ page }) => {
-    // Your test code
-  });
-});
-```
-
-## Browser Support
-
-Currently testing on:
-- Chromium (Chrome/Edge)
-
-To add more browsers, update `playwright.config.ts`:
-
-```typescript
-projects: [
-  { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-  { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
-  { name: 'webkit', use: { ...devices['Desktop Safari'] } },
-],
-```
-
-## Performance
-
-Tests typically run in ~30-60 seconds for the full suite.
+These pages host the shared runtime contract used by the Playwright lane.
 
 ## Troubleshooting
 
 ### Port Already in Use
 
-`tab-transport` Playwright suites use an isolated local port by default:
-- `PLAYWRIGHT_TAB_TRANSPORT_PORT=4173` (default)
+The Playwright tab/global runtime-contract lane uses:
+- `PLAYWRIGHT_TAB_TRANSPORT_PORT=4173`
 - `PLAYWRIGHT_REUSE_SERVER=1` to explicitly reuse an already-running server
 
-If you still see `EADDRINUSE` errors, kill the process using that configured port:
+If needed:
 
 ```bash
 lsof -ti:4173 | xargs kill
@@ -265,13 +165,9 @@ lsof -ti:4173 | xargs kill
 ### Playwright Browsers Not Installed
 
 ```bash
-pnpm --filter mcp-e2e-tests exec playwright install
+pnpm --filter mcp-e2e-tests exec playwright install chromium
 ```
 
-### Tests Timing Out
+### Native Chromium Details
 
-Increase timeout in `playwright.config.ts`:
-
-```typescript
-timeout: 60000, // 60 seconds
-```
+See [tests/CHROMIUM_TESTING.md](./tests/CHROMIUM_TESTING.md) for the canonical native contract lanes and the Chrome Beta flagged lane.

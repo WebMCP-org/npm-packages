@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * Playwright configuration for Chrome Beta WebMCP testing-flag verification.
+ * Playwright configuration for Chrome Beta native WebMCP verification.
  * Targets Chrome Beta with the current early-preview WebMCP testing feature flag.
  */
 const tabTransportPort = Number.parseInt(process.env.PLAYWRIGHT_TAB_TRANSPORT_PORT ?? '4173', 10);
@@ -10,7 +10,7 @@ const reuseExistingServer = process.env.PLAYWRIGHT_REUSE_SERVER === '1';
 
 export default defineConfig({
   testDir: './tests',
-  testMatch: '**/chrome-beta-webmcp.spec.ts',
+  testMatch: ['**/chrome-beta-webmcp.spec.ts', '**/runtime-contract-native.spec.ts'],
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

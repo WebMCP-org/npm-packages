@@ -87,6 +87,38 @@ export type BrowserToRelayMessage = z.infer<typeof BrowserToRelayMessageSchema>;
 export type BrowserHelloMessage = z.infer<typeof BrowserHelloMessageSchema>;
 
 /**
+ * Shared relay identity used for discovery and attach verification.
+ */
+export const RelayDescriptorSchema = z.object({
+  host: z.string().min(1),
+  instanceId: z.string().min(1),
+  label: z.string().min(1).optional(),
+  port: z.number().int().min(1).max(65535),
+  relayId: z.string().min(1).optional(),
+  workspace: z.string().min(1).optional(),
+});
+
+/**
+ * Relay identity used for discovery and attach verification.
+ */
+export type RelayDescriptor = z.infer<typeof RelayDescriptorSchema>;
+
+/**
+ * Schema for server hello messages sent immediately after WebSocket connect.
+ */
+export const ServerHelloMessageSchema = z.object({
+  type: z.literal('server-hello'),
+  service: z.literal('webmcp-local-relay'),
+  version: z.literal(1),
+  ...RelayDescriptorSchema.shape,
+});
+
+/**
+ * Server hello payload.
+ */
+export type ServerHelloMessage = z.infer<typeof ServerHelloMessageSchema>;
+
+/**
  * Schema for relay invocation messages sent to browser sources.
  */
 export const RelayInvokeMessageSchema = z.object({
@@ -114,6 +146,7 @@ export const RelayReloadMessageSchema = z.object({
  * Union schema for all relay-to-browser protocol messages.
  */
 export const RelayToBrowserMessageSchema = z.discriminatedUnion('type', [
+  ServerHelloMessageSchema,
   RelayInvokeMessageSchema,
   RelayPingMessageSchema,
   RelayReloadMessageSchema,
@@ -221,6 +254,7 @@ export const RelayServerToolsChangedSchema = z.object({
  * Union schema for all relay-server-to-client messages.
  */
 export const RelayServerToClientMessageSchema = z.discriminatedUnion('type', [
+  ServerHelloMessageSchema,
   RelayServerToolsSchema,
   RelayServerResultSchema,
   RelayServerToolsChangedSchema,

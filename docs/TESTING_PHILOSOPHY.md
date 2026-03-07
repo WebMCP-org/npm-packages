@@ -32,9 +32,14 @@ Primary goal: high confidence in behavior with minimal brittle tests.
    - Tooling: Vitest Browser Mode and Playwright-backed execution where configured.
 
 4. Cross-package end-to-end tests (critical journeys)
-   - What: workflows across package boundaries using test apps in `e2e/`.
+   - What: zero-mock workflows across package boundaries using the real runtime public boundary.
    - Why: validates real wiring and compatibility between libraries.
    - Tooling: Playwright (`pnpm test:e2e`).
+
+Runtime API integration is related but separate:
+- direct `page.evaluate(...)` helpers
+- direct `navigator.modelContextTesting` probes outside the canonical native lane
+- demos/showcases used for runtime exploration
 
 5. Artifact validation tests (publish confidence)
    - What: packed/tarball install and real usage checks for published artifacts.

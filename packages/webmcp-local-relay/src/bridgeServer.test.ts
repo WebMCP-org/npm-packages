@@ -1,3 +1,5 @@
+import { createServer as createNetServer, type Socket } from 'node:net';
+
 import { describe, expect, it } from 'vitest';
 import WebSocket from 'ws';
 
@@ -52,6 +54,51 @@ function connectAndRegister(
     });
     ws.once('error', reject);
   });
+}
+
+async function occupyTcpPort(port: number): Promise<{ close: () => Promise<void> }> {
+  const server = createNetServer();
+  const sockets = new Set<Socket>();
+  server.on('connection', (socket) => {
+    sockets.add(socket);
+    socket.on('close', () => {
+      sockets.delete(socket);
+    });
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(port, '127.0.0.1', () => resolve());
+  });
+
+  return {
+    close: () =>
+      new Promise<void>((resolve) => {
+        for (const socket of sockets) {
+          socket.destroy();
+        }
+        server.close(() => resolve());
+      }),
+  };
+}
+
+async function getOpenPort(): Promise<number> {
+  const server = createNetServer();
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => resolve());
+  });
+
+  const address = server.address();
+  if (!address || typeof address === 'string') {
+    throw new Error('Expected an address info result');
+  }
+
+  const port = address.port;
+  await new Promise<void>((resolve) => {
+    server.close(() => resolve());
+  });
+
+  return port;
 }
 
 describe('RelayBridgeServer', () => {
@@ -173,6 +220,40 @@ describe('RelayBridgeServer', () => {
       });
 
       expect(closeCode).toBe(1008);
+    } finally {
+      await bridge.stop();
+    }
+  });
+
+  it('sends server-hello immediately on connect', async () => {
+    const bridge = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+      label: 'Desktop Relay',
+      workspace: 'default',
+    });
+
+    try {
+      await bridge.start();
+
+      const ws = new WebSocket(`ws://127.0.0.1:${bridge.port}`, ['webmcp-discovery.v1']);
+      const message = await new Promise<Record<string, unknown>>((resolve, reject) => {
+        ws.once('message', (raw) => resolve(JSON.parse(String(raw)) as Record<string, unknown>));
+        ws.once('error', reject);
+      });
+
+      expect(message).toMatchObject({
+        type: 'server-hello',
+        service: 'webmcp-local-relay',
+        version: 1,
+        host: '127.0.0.1',
+        label: 'Desktop Relay',
+        port: bridge.port,
+        workspace: 'default',
+      });
+
+      ws.close();
     } finally {
       await bridge.stop();
     }
@@ -537,6 +618,44 @@ describe('RelayBridgeServer', () => {
 
     await bridge2.stop();
     await bridge1.stop();
+  });
+
+  it('skips a non-relay port owner and binds the next available port', async () => {
+    const preferredPort = await getOpenPort();
+    const preferredPortHolder = await occupyTcpPort(preferredPort);
+    const bridge = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: preferredPort,
+      portRangeEnd: preferredPort + 1,
+      allowedOrigins: ['*'],
+    });
+
+    try {
+      await bridge.start();
+      expect(bridge.mode).toBe('server');
+      expect(bridge.port).toBe(preferredPort + 1);
+    } finally {
+      await bridge.stop();
+      await preferredPortHolder.close();
+    }
+  });
+
+  it('fails explicit ports when occupied by a non-relay service', async () => {
+    const preferredPort = await getOpenPort();
+    const preferredPortHolder = await occupyTcpPort(preferredPort);
+    const bridge = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: preferredPort,
+      portExplicitlySet: true,
+      allowedOrigins: ['*'],
+    });
+
+    try {
+      await expect(bridge.start()).rejects.toThrow(/non-WebMCP service/i);
+    } finally {
+      await bridge.stop();
+      await preferredPortHolder.close();
+    }
   });
 
   it('invokes tool with explicit sourceId option', async () => {

@@ -43,7 +43,7 @@
     "skills"
   ],
   "scripts": {
-    "build": "tsdown && mkdir -p dist/browser && cp src/browser/embed.js dist/browser/embed.js && cp src/browser/widget.html dist/browser/widget.html",
+    "build": "tsdown && node scripts/build-widget-html.js",
     "build:mcpb": "bash scripts/build-mcpb.sh",
     "check": "biome check --write .",
     "clean": "rm -rf dist .turbo",
@@ -53,7 +53,7 @@
     "test": "vitest run",
     "test:e2e": "pnpm --filter @mcp-b/webmcp-polyfill build && pnpm --filter @mcp-b/global build && pnpm run build && vitest run --config vitest.e2e.config.ts",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.browser.json"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "catalog:",
@@ -61,9 +61,11 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@mcp-b/webmcp-types": "^2.0.13",
     "@types/node": "catalog:",
     "@types/ws": "^8.5.14",
     "@vitest/coverage-v8": "catalog:",
+    "msw": "2.12.10",
     "playwright": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",

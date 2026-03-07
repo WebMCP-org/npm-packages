@@ -47,8 +47,11 @@ jobs:
       - name: Install Playwright Browsers
         run: pnpm --filter mcp-e2e-tests exec playwright install --with-deps chromium
 
+      - name: Install Puppeteer Chrome (for chrome-devtools-mcp e2e)
+        run: pnpm --filter @mcp-b/chrome-devtools-mcp exec puppeteer browsers install chrome
+
       - name: Run E2E tests
-        run: pnpm --filter mcp-e2e-tests test
+        run: pnpm test:e2e
 
       - name: Run tarball E2E validation (@mcp-b/global)
         run: pnpm test:e2e:tarball:global
@@ -113,15 +116,15 @@ jobs:
           sudo apt-get install -y google-chrome-beta
           google-chrome-beta --version
 
-      - name: Run Native Parity (Default Chromium)
+      - name: Run Native Runtime Contract (Default Chromium)
         if: matrix.mode == 'default'
-        run: pnpm --filter mcp-e2e-tests run test:native-parity:default
+        run: pnpm --filter mcp-e2e-tests run test:native-contract:default
 
-      - name: Run Native Parity (Chrome Beta)
+      - name: Run Native Runtime Contract (Chrome Beta)
         if: matrix.mode == 'chrome-beta'
-        run: pnpm --filter mcp-e2e-tests run test:native-parity:beta
+        run: pnpm --filter mcp-e2e-tests run test:native-contract:beta
 
-      - name: Run Native Showcase (Chrome Beta)
+      - name: Run Native Runtime API Integration (Chrome Beta)
         if: matrix.mode == 'chrome-beta'
         run: pnpm --filter mcp-e2e-tests run test:native-showcase
 

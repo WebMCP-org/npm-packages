@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Runtime Contract - Tab</title>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, sans-serif;
+        max-width: 960px;
+        margin: 32px auto;
+        padding: 0 16px 40px;
+      }
+      .panel {
+        border: 1px solid #d0d7de;
+        border-radius: 10px;
+        padding: 16px;
+        margin-top: 16px;
+      }
+      .status {
+        padding: 10px 12px;
+        border-radius: 6px;
+        background: #f6f8fa;
+      }
+      .status.ready {
+        background: #dcfce7;
+        color: #166534;
+      }
+      .status.error {
+        background: #fee2e2;
+        color: #991b1b;
+      }
+      .toolbar {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      button {
+        border: 1px solid #0f172a;
+        background: #0f172a;
+        color: #fff;
+        border-radius: 999px;
+        padding: 8px 14px;
+        cursor: pointer;
+      }
+      button.secondary {
+        background: #fff;
+        color: #0f172a;
+      }
+      pre {
+        background: #0f172a;
+        color: #e2e8f0;
+        border-radius: 8px;
+        padding: 12px;
+        overflow-x: auto;
+      }
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Runtime Contract - Tab Transport</h1>
+    <p>Real same-window MCP client connected through <code>TabClientTransport</code>.</p>
+
+    <div class="panel">
+      <h2>Runtime Status</h2>
+      <div id="runtime-status" class="status" data-status="booting">Booting runtime...</div>
+    </div>
+
+    <div class="panel">
+      <h2>Client Status</h2>
+      <div id="client-status" class="status" data-status="connecting">Connecting client...</div>
+    </div>
+
+    <div class="panel">
+      <h2>Mutation Controls</h2>
+      <div class="toolbar">
+        <button id="register-dynamic">Register Dynamic Tool</button>
+        <button id="unregister-dynamic" class="secondary">Unregister Dynamic Tool</button>
+        <button id="refresh-tools" class="secondary">Refresh Tool List</button>
+        <button id="reset-invocations" class="secondary">Reset Invocations</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Discovered Tools</h2>
+      <pre id="tool-list" data-count="0">[]</pre>
+    </div>
+
+    <div class="panel">
+      <h2>Recorded Invocations</h2>
+      <pre id="invocation-list" data-count="0">[]</pre>
+    </div>
+
+    <script type="module" src="/src/runtime-contract.ts"></script>
+  </body>
+</html>

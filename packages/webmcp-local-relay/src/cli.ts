@@ -19,12 +19,18 @@ if (options.allowedOrigins.includes('*')) {
   );
 }
 
+const bridgeOptions = {
+  host: options.host,
+  port: options.port,
+  portExplicitlySet: options.portExplicitlySet,
+  allowedOrigins: options.allowedOrigins,
+  ...(options.label ? { label: options.label } : {}),
+  ...(options.relayId ? { relayId: options.relayId } : {}),
+  ...(options.workspace ? { workspace: options.workspace } : {}),
+};
+
 const relay = new LocalRelayMcpServer({
-  bridgeOptions: {
-    host: options.host,
-    port: options.port,
-    allowedOrigins: options.allowedOrigins,
-  },
+  bridgeOptions,
 });
 
 try {
@@ -55,7 +61,7 @@ if (relay.bridge.mode === 'server') {
   );
 } else {
   process.stderr.write(
-    `[webmcp-local-relay] client mode: proxying through existing relay at ws://${options.host}:${options.port}\n`
+    `[webmcp-local-relay] client mode: proxying through existing relay at ws://${options.host}:${relay.bridge.port}\n`
   );
 }
 

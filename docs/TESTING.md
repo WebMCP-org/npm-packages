@@ -1,355 +1,175 @@
-# E2E Testing Infrastructure
+# Runtime E2E Testing
 
-This document covers the Playwright E2E testing setup for the MCP-B NPM packages monorepo.
+This document covers the runtime testing lanes in this monorepo.
 
-For test-layer definitions, mocking policy, and coverage expectations, see [TESTING_PHILOSOPHY.md](./TESTING_PHILOSOPHY.md).
+For general test-layer philosophy, see [TESTING_PHILOSOPHY.md](./TESTING_PHILOSOPHY.md).
 
-## Running Tests
+## Definitions
 
-### Quick Start
+- **Canonical E2E**: tools are registered inside the real runtime, discovered through that runtime's public boundary, and called through that same boundary with zero mocked transports or fake servers.
+- **Runtime API integration**: direct `page.evaluate(...)`, `navigator.modelContextTesting`, demo flows, and other browser-accurate checks that do not use the same public caller boundary as production clients.
+- **Native Chromium exception**: for native WebMCP, the real public boundary is `navigator.modelContext` / `navigator.modelContextTesting`, not an SDK `Client`.
 
-```bash
-# Install dependencies (from repo root)
-pnpm install
-
-# Build packages
-pnpm build
-
-# Install Playwright browsers
-pnpm --filter mcp-e2e-tests exec playwright install chromium
-
-# Run E2E tests
-pnpm test
-```
-
-### Test Commands
+## Default Commands
 
 ```bash
-# Run all E2E tests (headless)
+# Repo default: unit + canonical runtime E2E
 pnpm test
+
+# Canonical zero-mock runtime E2E umbrella
 pnpm test:e2e
 
-# Run specific test suites
-pnpm --filter mcp-e2e-tests test                    # Tab transport tests
-pnpm --filter mcp-e2e-tests test:react-webmcp       # React WebMCP tests
-pnpm --filter mcp-e2e-tests test:native-parity      # Default Chromium + Chrome Beta parity check
-pnpm --filter mcp-e2e-tests test:native-parity:default # Default browser parity lane only
-pnpm --filter mcp-e2e-tests test:native-parity:beta # Chrome Beta parity lane only
-pnpm test:e2e:tarball:global                        # Install packed @mcp-b/global into test app and run tab-transport E2E
+# Playwright browser-runtime contract lane only (tab/global + iframe + native)
+pnpm --filter mcp-e2e-tests test
+pnpm --filter mcp-e2e-tests test:runtime-contract
 
-# Run with Playwright UI (recommended for development)
+# Runtime API integration lanes (not canonical E2E)
+pnpm --filter mcp-e2e-tests test:integration:runtime-api
+pnpm --filter mcp-e2e-tests test:integration:frameworks
+
+# Native contract lanes
+pnpm --filter mcp-e2e-tests test:native-contract:default
+pnpm --filter mcp-e2e-tests test:native-contract:beta
+
+# Native parity / showcase integration lanes
+pnpm --filter mcp-e2e-tests test:native-parity:default
+pnpm --filter mcp-e2e-tests test:native-parity:beta
+pnpm --filter mcp-e2e-tests test:native-showcase
+
+# Runtime-specific canonical E2E packages
+pnpm --filter @mcp-b/webmcp-local-relay test:e2e
+pnpm --filter @mcp-b/chrome-devtools-mcp test:e2e
+pnpm --filter @mcp-b/extension-tools test:e2e
+
+# Tarball validation
+pnpm test:e2e:tarball:global
+```
+
+Notes:
+- `pnpm test:e2e` is the canonical zero-mock umbrella and runs sequentially for stability.
+- `pnpm test:e2e:ui`, `pnpm test:e2e:headed`, and `pnpm test:e2e:debug` drive the Playwright `e2e/` package only. They do not run the relay, DevTools, or extension package E2E lanes.
+
+## Runtime Coverage Matrix
+
+| Runtime | Canonical caller | Real runtime boundary under test | Command |
+| --- | --- | --- | --- |
+| Tab / global | SDK `Client` + `TabClientTransport` | Browser page running `@mcp-b/global` | `pnpm --filter mcp-e2e-tests test:runtime-contract` |
+| Iframe | SDK `Client` + `IframeParentTransport` | Parent/iframe runtime boundary | `pnpm --filter mcp-e2e-tests test:runtime-contract` |
+| Native Chromium | `navigator.modelContext` / `navigator.modelContextTesting` | Native browser API | `pnpm --filter mcp-e2e-tests test:native-contract:default` |
+| Native Chromium (flagged) | `navigator.modelContext` / `navigator.modelContextTesting` | Chrome Beta with WebMCP flags | `pnpm --filter mcp-e2e-tests test:native-contract:beta` |
+| Local relay | SDK `Client` over stdio | Real relay server + real browser runtime | `pnpm --filter @mcp-b/webmcp-local-relay test:e2e` |
+| DevTools bridge | SDK `Client` + `WebMCPClientTransport` | Real page discovered through DevTools bridge | `pnpm --filter @mcp-b/chrome-devtools-mcp test:e2e` |
+| Extension transport | SDK `Client` + `ExtensionClientTransport` | Real MV3 extension using `ExtensionServerTransport` | `pnpm --filter @mcp-b/extension-tools test:e2e` |
+
+## Canonical E2E Assertions
+
+Every canonical runtime suite is expected to prove all of the following against the real runtime:
+
+1. Initial discovery returns the expected base tools.
+2. A successful call returns the expected payload.
+3. The runtime records the invocation.
+4. Dynamic registration becomes discoverable without restarting.
+5. Dynamic unregistration removes the tool and later calls fail through the real runtime error surface.
+6. Runtime-thrown tool errors propagate to the caller.
+
+The shared browser/server fixture lives in `e2e/runtime-contract/` and defines the deterministic tool set:
+- `echo`
+- `sum`
+- `dynamic_tool`
+- `always_fail`
+
+The shared test-only hook is `window.__WEBMCP_E2E__` / `globalThis.__WEBMCP_E2E__` with:
+- `isReady()`
+- `registerDynamicTool()`
+- `unregisterDynamicTool(name?)`
+- `readInvocations()`
+- `resetInvocations()`
+
+## Integration Lanes
+
+These are useful and still required, but they are not the canonical E2E gate.
+
+### Runtime API Integration
+
+`pnpm --filter mcp-e2e-tests test:integration:runtime-api`
+
+This lane keeps direct runtime and demo validation for:
+- `e2e/tests/tab-transport.spec.ts`
+- `e2e/tests/mcp-iframe-element.spec.ts`
+- `e2e/tests/chromium-native-api.spec.ts`
+- `e2e/tests/notification-batching.spec.ts`
+- `e2e/tests/chrome-beta-webmcp.spec.ts`
+- `e2e/playwright-native-showcase.config.ts`
+
+### Framework Integration
+
+`pnpm --filter mcp-e2e-tests test:integration:frameworks`
+
+This lane covers framework-level integrations such as React hooks and validation matrices.
+
+## CI / Default Gate
+
+The canonical runtime gate lives in `.github/workflows/e2e.yml`.
+
+The workflow runs:
+1. `pnpm test:e2e`
+2. Native contract on default Chromium
+3. Native contract on Chrome Beta with WebMCP flags
+4. Native showcase integration coverage
+5. Tarball validation for `@mcp-b/global`
+
+`pnpm test` at the repo root includes this gate by default.
+
+## Extension Transport Testing
+
+Extension transport E2E is no longer future work. The fixture is a real MV3 extension built into `packages/extension-tools/dist/e2e-extension` and exercised with:
+- real background service worker
+- real `ExtensionServerTransport`
+- real extension page client using `ExtensionClientTransport`
+- real SDK `Client`
+
+## Debugging
+
+### Playwright UI / Headed Runs
+
+```bash
 pnpm test:e2e:ui
-
-# Run in headed mode (see the browser)
 pnpm test:e2e:headed
-
-# Debug mode (step through tests)
-pnpm test:e2e:debug
-
-# View test report
-pnpm --filter mcp-e2e-tests test:report
-```
-
-### Manual Testing
-
-Run the test apps manually to experiment:
-
-#### Tab Transport Test App
-
-```bash
-# Start test app dev server
-pnpm --filter mcp-tab-transport-test-app dev
-
-# Open http://localhost:5173 in browser
-```
-
-Then use the UI to:
-1. Start MCP Server
-2. Connect MCP Client
-3. List available tools
-4. Execute counter operations
-5. Monitor the event log
-
-#### React WebMCP Test App
-
-```bash
-# Start React test app
-pnpm --filter react-webmcp-test-app dev
-
-# Open http://localhost:5174 in browser
-```
-
-Test React integration:
-1. See tools registered via `useWebMCP`
-2. Connect client to consume tools
-3. Call tools through MCP protocol
-4. Observe tool state management
-
-## Test Coverage
-
-The Playwright test suite validates:
-
-### Tab Transport Tests (`e2e/tests/tab-transport.spec.ts`)
-
-**Basic Functionality**
-- ✅ Application loads correctly
-- ✅ MCP server starts successfully
-- ✅ MCP client connects to server
-- ✅ Tools can be listed via MCP protocol
-
-**Tool Execution**
-- ✅ Increment counter via MCP tool call
-- ✅ Decrement counter via MCP tool call
-- ✅ Reset counter via MCP tool call
-- ✅ Get counter value via MCP tool call
-
-**Advanced Scenarios**
-- ✅ Multiple rapid tool calls (concurrency)
-- ✅ Client disconnect and reconnect
-- ✅ Server stop and restart
-- ✅ Programmatic API usage
-
-**Transport Validation**
-- ✅ TabServerTransport accepts connections
-- ✅ TabClientTransport establishes connections
-- ✅ postMessage communication works
-- ✅ JSON-RPC messages flow correctly
-- ✅ State persistence across reconnections
-
-### React WebMCP Tests (`e2e/tests/react-webmcp.spec.ts`)
-
-**Hook Integration**
-- ✅ `useWebMCP` registers tools on mount
-- ✅ Tools appear in `navigator.modelContext`
-- ✅ Tools unregister on component unmount
-- ✅ React StrictMode compatibility (double mounting)
-
-**Tool Registration**
-- ✅ Multiple tools registered successfully
-- ✅ Input schema validation with Zod
-- ✅ Tool execution state tracking
-- ✅ Error handling in tool handlers
-
-**Client Consumption**
-- ✅ `McpClientProvider` connects to server
-- ✅ `useMcpClient` lists available tools
-- ✅ Tools can be called from client
-- ✅ Tool responses propagate correctly
-
-**State Management**
-- ✅ Tool execution state (isExecuting, lastResult, error)
-- ✅ State updates during tool execution
-- ✅ Error state management
-- ✅ Execution count tracking
-
-### Native API Parity (`e2e/tests/chrome-beta-webmcp.spec.ts`)
-
-These tests validate that core `navigator.modelContextTesting` behavior remains stable across:
-
-- Default Playwright Chromium lane (`test:native-parity:default`)
-- Chrome Beta + WebMCP flags lane (`test:native-parity:beta`)
-
-This is the required parity gate for changes that affect:
-
-- `@mcp-b/global`
-- `@mcp-b/webmcp-polyfill`
-- `@mcp-b/webmcp-ts-sdk`
-- `@mcp-b/transports`
-- E2E runtime apps and bridge wiring
-
-## CI/CD Integration
-
-Tests run automatically in GitHub Actions:
-
-**Workflow**: `.github/workflows/e2e.yml`
-
-**Triggers**:
-- Pull requests to `main`
-- Pushes to `main`
-
-**Steps**:
-1. Install dependencies
-2. Build all packages
-3. Install Playwright browsers
-4. Run E2E tests
-5. Run native API parity matrix:
-   - Default Chromium parity lane
-   - Chrome Beta parity lane
-6. Run tarball validation (`@mcp-b/global`) against the real test app
-7. Upload test reports and screenshots
-
-**Artifacts**:
-- Playwright HTML report (30 days retention)
-- Test results and screenshots (7 days retention)
-
-## Writing New Tests
-
-### Test Structure
-
-```typescript
-import { test, expect } from '@playwright/test';
-
-test.describe('Feature Name', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    // Setup code
-  });
-
-  test('should do something', async ({ page }) => {
-    // Arrange
-    await page.click('#start-server');
-
-    // Act
-    await page.click('#some-action');
-
-    // Assert
-    await expect(page.locator('#result')).toHaveText('Expected');
-  });
-});
-```
-
-### Best Practices
-
-1. **Use Data Attributes**: The test app uses `data-status`, `data-counter`, etc. for reliable selectors
-2. **Wait for State**: Use `await expect().toHaveText()` with timeouts instead of arbitrary waits
-3. **Test User Flows**: Write tests from the user's perspective, not implementation details
-4. **Check Logs**: Verify operations appear in the event log
-5. **Parallel Safe**: Ensure tests don't depend on shared state
-
-### Testing Extension Transports
-
-For Chrome Extension transports, you'll need to:
-
-1. Create a test extension directory
-2. Use Playwright's `chromium.launchPersistentContext()` with extension support
-3. Test cross-extension communication
-
-Example (future implementation):
-
-```typescript
-test('should connect via ExtensionTransport', async () => {
-  const context = await chromium.launchPersistentContext('', {
-    args: [
-      `--disable-extensions-except=/path/to/test-extension`,
-      `--load-extension=/path/to/test-extension`,
-    ],
-  });
-
-  const page = await context.newPage();
-  // Test extension transport
-});
-```
-
-## Debugging Tests
-
-### Playwright UI Mode (Recommended)
-
-```bash
-pnpm test:e2e:ui
-```
-
-Features:
-- Visual test execution
-- Time travel debugging
-- DOM snapshots at each step
-- Network activity logs
-- Console output
-- Pick locator tool
-
-### Debug Mode
-
-```bash
 pnpm test:e2e:debug
 ```
 
-Features:
-- Playwright Inspector
-- Step through tests line by line
-- Set breakpoints
-- Inspect page state
-- Test selector playground
+These target the Playwright `e2e/` package only.
 
-### Screenshots and Traces
+### Package-Specific Runtime E2E
 
-Failed tests automatically capture:
-
-- **Screenshots**: Saved in `e2e/test-results/`
-- **Traces**: Viewable in Playwright UI or via `npx playwright show-trace trace.zip`
-
-To always capture traces:
-
-```typescript
-// In playwright.config.ts
-use: {
-  trace: 'on', // 'on' | 'off' | 'on-first-retry' | 'retain-on-failure'
-}
+```bash
+pnpm --filter @mcp-b/webmcp-local-relay test:e2e
+pnpm --filter @mcp-b/chrome-devtools-mcp test:e2e
+pnpm --filter @mcp-b/extension-tools test:e2e
 ```
-
-## Performance
-
-- **Typical test suite runtime**: 30-60 seconds
-- **Test parallelization**: Enabled by default (can be configured in `playwright.config.ts`)
-- **CI optimization**: Uses single worker on CI for stability
 
 ## Troubleshooting
 
-### Playwright Installation Issues
-
-If browser installation fails:
+### Playwright Browser Installation
 
 ```bash
-# Install browsers with system dependencies
-pnpm --filter mcp-e2e-tests exec playwright install --with-deps
-
-# Or install specific browser
 pnpm --filter mcp-e2e-tests exec playwright install chromium
 ```
 
 ### Port Conflicts
 
-
-
-Playwright tab-transport runs default to `PLAYWRIGHT_TAB_TRANSPORT_PORT=4173`
-and only reuse existing servers when `PLAYWRIGHT_REUSE_SERVER=1`.
+The Playwright tab/global runtime-contract lane uses `PLAYWRIGHT_TAB_TRANSPORT_PORT=4173` by default and only reuses an existing server when `PLAYWRIGHT_REUSE_SERVER=1`.
 
 If the configured port is in use:
 
 ```bash
-# Find and kill process
 lsof -ti:4173 | xargs kill
-
-# Or change port in playwright.config.ts and vite.config.ts
 ```
 
-### Timeout Issues
+### Chrome Beta Native Contract Lane
 
-Increase timeout in test or config:
+The flagged native lane requires Chrome Beta with:
+- `--enable-experimental-web-platform-features`
+- `--enable-features=WebMCPTesting`
 
-```typescript
-// In test
-test('slow test', async ({ page }) => {
-  test.setTimeout(60000); // 60 seconds
-});
-
-// In config
-export default defineConfig({
-  timeout: 60000,
-});
-```
-
-### CI Failures
-
-Common CI issues:
-
-1. **Missing browsers**: Ensure `playwright install` runs before tests
-2. **Race conditions**: Use `expect().toHaveText()` instead of `waitForTimeout()`
-3. **Flaky tests**: Add retry logic or fix timing issues
-4. **Chrome Beta lane failures**: Verify `google-chrome-beta` can be installed and that the beta lane runs with:
-   - `--enable-experimental-web-platform-features`
-   - `--enable-features=WebMCPTesting`
-
-## Resources
-
-- [Playwright Documentation](https://playwright.dev/docs/intro)
-- [Playwright Best Practices](https://playwright.dev/docs/best-practices)
-- [MCP Specification](https://modelcontextprotocol.io/)
+See [e2e/tests/CHROMIUM_TESTING.md](../e2e/tests/CHROMIUM_TESTING.md) for the native contract details.

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Extension Runtime Contract</title>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, sans-serif;
+        margin: 0;
+        padding: 20px;
+        min-width: 480px;
+      }
+      .status {
+        padding: 10px 12px;
+        border-radius: 6px;
+        background: #f6f8fa;
+      }
+      .status.ready {
+        background: #dcfce7;
+        color: #166534;
+      }
+      .status.error {
+        background: #fee2e2;
+        color: #991b1b;
+      }
+      pre {
+        margin-top: 16px;
+        background: #0f172a;
+        color: #e2e8f0;
+        border-radius: 8px;
+        padding: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Extension Runtime Contract</h1>
+    <div id="client-status" class="status" data-status="booting">Booting extension client...</div>
+    <pre id="client-tools" data-count="0">[]</pre>
+    <script type="module" src="./client.js"></script>
+  </body>
+</html>

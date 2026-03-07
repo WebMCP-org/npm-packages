@@ -11,6 +11,7 @@ import {
   RelayClientInvokeSchema,
   RelayClientListToolsSchema,
   RelayClientToServerMessageSchema,
+  RelayDescriptorSchema,
   RelayInvokeMessageSchema,
   RelayPingMessageSchema,
   RelayReloadMessageSchema,
@@ -20,6 +21,7 @@ import {
   RelayServerToolsSchema,
   RelaySourceInfoSchema,
   RelayToBrowserMessageSchema,
+  ServerHelloMessageSchema,
 } from './schemas.js';
 
 describe('InboundToolSchema', () => {
@@ -107,6 +109,39 @@ describe('BrowserHelloMessageSchema', () => {
   });
 });
 
+describe('RelayDescriptorSchema', () => {
+  it('accepts relay descriptor metadata', () => {
+    const result = RelayDescriptorSchema.safeParse({
+      host: '127.0.0.1',
+      instanceId: 'relay-instance',
+      label: 'Desktop Relay',
+      port: 9333,
+      relayId: 'desktop',
+      workspace: 'default',
+    });
+
+    expect(result.success).toBe(true);
+  });
+});
+
+describe('ServerHelloMessageSchema', () => {
+  it('accepts a valid server-hello message', () => {
+    const result = ServerHelloMessageSchema.safeParse({
+      type: 'server-hello',
+      service: 'webmcp-local-relay',
+      version: 1,
+      host: '127.0.0.1',
+      instanceId: 'relay-instance',
+      label: 'Desktop Relay',
+      port: 9333,
+      relayId: 'desktop',
+      workspace: 'default',
+    });
+
+    expect(result.success).toBe(true);
+  });
+});
+
 describe('BrowserToolResultMessageSchema', () => {
   it('accepts a result with a callId and unknown result', () => {
     const result = BrowserToolResultMessageSchema.safeParse({
@@ -188,6 +223,19 @@ describe('BrowserToRelayMessageSchema', () => {
       data: 123,
     });
     expect(result.success).toBe(false);
+  });
+
+  it('parses a server-hello relay message', () => {
+    const result = RelayToBrowserMessageSchema.safeParse({
+      type: 'server-hello',
+      service: 'webmcp-local-relay',
+      version: 1,
+      host: '127.0.0.1',
+      instanceId: 'relay-instance',
+      port: 9333,
+    });
+    expect(result.success).toBe(true);
+    expect(result.data?.type).toBe('server-hello');
   });
 
   it('rejects a message without a type field', () => {
@@ -297,6 +345,19 @@ describe('RelayReloadMessageSchema', () => {
 });
 
 describe('RelayToBrowserMessageSchema', () => {
+  it('parses a server-hello message', () => {
+    const result = RelayToBrowserMessageSchema.safeParse({
+      type: 'server-hello',
+      service: 'webmcp-local-relay',
+      version: 1,
+      host: '127.0.0.1',
+      instanceId: 'relay-instance',
+      port: 9333,
+    });
+    expect(result.success).toBe(true);
+    expect(result.data?.type).toBe('server-hello');
+  });
+
   it('parses an invoke message', () => {
     const result = RelayToBrowserMessageSchema.safeParse({
       type: 'invoke',
@@ -648,6 +709,19 @@ describe('RelayServerToolsChangedSchema', () => {
 });
 
 describe('RelayServerToClientMessageSchema', () => {
+  it('parses a server-hello message', () => {
+    const result = RelayServerToClientMessageSchema.safeParse({
+      type: 'server-hello',
+      service: 'webmcp-local-relay',
+      version: 1,
+      host: '127.0.0.1',
+      instanceId: 'relay-instance',
+      port: 9333,
+    });
+    expect(result.success).toBe(true);
+    expect(result.data?.type).toBe('server-hello');
+  });
+
   it('parses a relay/tools message', () => {
     const result = RelayServerToClientMessageSchema.safeParse({
       type: 'relay/tools',
