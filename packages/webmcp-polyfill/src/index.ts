@@ -108,6 +108,8 @@ export interface WebMCPPolyfillInitOptions {
 class StrictWebMCPContext {
   private tools = new Map<string, PolyfillToolDescriptor>();
   private toolsChangedCallback: (() => void) | null = null;
+  private toolsChangedNotificationQueued = false;
+  private lastNotifiedToolsSnapshot = '';
 
   provideContext(options: ModelContextOptions = {}): void {
     const nextTools = new Map<string, PolyfillToolDescriptor>();
@@ -169,6 +171,7 @@ class StrictWebMCPContext {
           );
         }
         this.toolsChangedCallback = callback;
+        this.lastNotifiedToolsSnapshot = this.createToolsSnapshot();
       },
       getCrossDocumentScriptToolResult: async () => '[]',
     };
@@ -227,11 +230,26 @@ class StrictWebMCPContext {
   }
 
   private notifyToolsChanged(): void {
-    if (!this.toolsChangedCallback) {
+    if (!this.toolsChangedCallback || this.toolsChangedNotificationQueued) {
       return;
     }
 
+    this.toolsChangedNotificationQueued = true;
+
     queueMicrotask(() => {
+      this.toolsChangedNotificationQueued = false;
+
+      if (!this.toolsChangedCallback) {
+        return;
+      }
+
+      const nextSnapshot = this.createToolsSnapshot();
+      if (nextSnapshot === this.lastNotifiedToolsSnapshot) {
+        return;
+      }
+
+      this.lastNotifiedToolsSnapshot = nextSnapshot;
+
       try {
         this.toolsChangedCallback?.();
       } catch (error) {
@@ -239,6 +257,16 @@ class StrictWebMCPContext {
         console.warn('[WebMCPPolyfill] toolsChanged callback threw:', error);
       }
     });
+  }
+
+  private createToolsSnapshot(): string {
+    return JSON.stringify(
+      [...this.tools.values()].map((tool) => ({
+        name: tool.name,
+        description: tool.description ?? '',
+        inputSchema: tool.inputSchema,
+      }))
+    );
   }
 }
 

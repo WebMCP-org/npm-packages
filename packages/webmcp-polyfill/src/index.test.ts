@@ -139,7 +139,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
     expect(() => navigator.modelContext.unregisterTool('missing')).not.toThrow();
   });
 
-  it('fires registerToolsChangedCallback for registry mutations', async () => {
+  it('fires registerToolsChangedCallback for registry mutations across separate tasks', async () => {
     initializeWebMCPPolyfill();
 
     let count = 0;
@@ -154,7 +154,13 @@ describe('@mcp-b/webmcp-polyfill', () => {
       execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
     });
 
+    await Promise.resolve();
+    await Promise.resolve();
+
     navigator.modelContext.unregisterTool('t1');
+
+    await Promise.resolve();
+    await Promise.resolve();
 
     navigator.modelContext.provideContext({
       tools: [
@@ -166,6 +172,9 @@ describe('@mcp-b/webmcp-polyfill', () => {
         },
       ],
     });
+
+    await Promise.resolve();
+    await Promise.resolve();
 
     navigator.modelContext.clearContext();
 
@@ -1807,6 +1816,70 @@ describe('@mcp-b/webmcp-polyfill', () => {
       });
 
       await Promise.resolve();
+    });
+
+    it('suppresses transient unregister/register churn when the final tool set is unchanged', async () => {
+      initializeWebMCPPolyfill();
+
+      navigator.modelContext.registerTool({
+        name: 'stable_tool',
+        description: 'Original stable tool',
+        inputSchema: { type: 'object', properties: {} },
+        execute: async () => ({ content: [{ type: 'text', text: 'stable' }] }),
+      });
+
+      await Promise.resolve();
+      await Promise.resolve();
+
+      const snapshots: string[][] = [];
+      navigator.modelContextTesting?.registerToolsChangedCallback(() => {
+        snapshots.push(
+          (navigator.modelContextTesting?.listTools() ?? []).map((tool) => tool.name).sort()
+        );
+      });
+
+      navigator.modelContext.unregisterTool('stable_tool');
+      navigator.modelContext.registerTool({
+        name: 'stable_tool',
+        description: 'Original stable tool',
+        inputSchema: { type: 'object', properties: {} },
+        execute: async () => ({ content: [{ type: 'text', text: 'stable' }] }),
+      });
+
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(snapshots).toEqual([]);
+    });
+
+    it('batches same-task tool churn into one callback with the final state', async () => {
+      initializeWebMCPPolyfill();
+
+      const snapshots: string[][] = [];
+      navigator.modelContextTesting?.registerToolsChangedCallback(() => {
+        snapshots.push(
+          (navigator.modelContextTesting?.listTools() ?? []).map((tool) => tool.name).sort()
+        );
+      });
+
+      navigator.modelContext.registerTool({
+        name: 'tool_a',
+        description: 'Tool A',
+        inputSchema: { type: 'object', properties: {} },
+        execute: async () => ({ content: [{ type: 'text', text: 'a' }] }),
+      });
+      navigator.modelContext.unregisterTool('tool_a');
+      navigator.modelContext.registerTool({
+        name: 'tool_b',
+        description: 'Tool B',
+        inputSchema: { type: 'object', properties: {} },
+        execute: async () => ({ content: [{ type: 'text', text: 'b' }] }),
+      });
+
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(snapshots).toEqual([['tool_b']]);
     });
   });
 

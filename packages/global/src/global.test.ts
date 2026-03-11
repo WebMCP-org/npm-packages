@@ -393,6 +393,43 @@ describe('global adapter', () => {
     expect(tools.some((tool) => tool.name === 'clear_me')).toBe(false);
   });
 
+  it('suppresses same-task mirrored tool churn when the final testing-shim state is unchanged', async () => {
+    initializeWebModelContext();
+
+    const modelContext = getModelContext();
+    modelContext.registerTool({
+      name: 'stable_tool',
+      description: 'stable',
+      inputSchema: { type: 'object', properties: {} },
+      async execute() {
+        return { content: [{ type: 'text', text: 'stable' }] };
+      },
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const snapshots: string[][] = [];
+    navigator.modelContextTesting?.registerToolsChangedCallback(() => {
+      snapshots.push((navigator.modelContextTesting?.listTools() ?? []).map((tool) => tool.name));
+    });
+
+    modelContext.unregisterTool('stable_tool');
+    modelContext.registerTool({
+      name: 'stable_tool',
+      description: 'stable',
+      inputSchema: { type: 'object', properties: {} },
+      async execute() {
+        return { content: [{ type: 'text', text: 'stable' }] };
+      },
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(snapshots).toEqual([]);
+  });
+
   it('sets __isBrowserMcpServer marker on navigator.modelContext', () => {
     initializeWebModelContext();
     const ctx = navigator.modelContext as unknown as Record<string, unknown>;
