@@ -359,6 +359,50 @@ describe('global adapter', () => {
     expect(tools.some((tool) => tool.name === 'dynamic_tool')).toBe(false);
   });
 
+  it('tolerates native contexts that omit clearContext while still mirroring provided tools', () => {
+    const registerTool = vi.fn();
+    const nativeContext = {
+      provideContext: () => {},
+      registerTool,
+      listTools: () => [],
+      callTool: async () => ({ content: [{ type: 'text', text: 'native-ok' }] }),
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => true,
+    } as unknown as Navigator['modelContext'];
+
+    Object.defineProperty(navigator, 'modelContext', {
+      configurable: true,
+      enumerable: true,
+      writable: true,
+      value: nativeContext,
+    });
+
+    initializeWebModelContext();
+
+    const modelContext = getModelContext();
+    expect(() =>
+      modelContext.provideContext({
+        tools: [
+          {
+            name: 'context_tool',
+            description: 'context',
+            inputSchema: { type: 'object', properties: {} },
+            async execute() {
+              return { content: [{ type: 'text', text: 'context' }] };
+            },
+          },
+        ],
+      })
+    ).not.toThrow();
+
+    expect(registerTool).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'context_tool',
+      })
+    );
+  });
+
   it('unregisterTool and clearContext remove mirrored tools', () => {
     initializeWebModelContext();
 

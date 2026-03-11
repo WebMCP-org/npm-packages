@@ -168,6 +168,9 @@ type ParentRegisterPromptFn = (
 ) => { remove: () => void };
 
 type NativeToolsApi = ModelContextCore & Pick<ModelContextExtensions, 'listTools' | 'callTool'>;
+type NativeMutationApi = Partial<
+  Pick<ModelContextCore, 'registerTool' | 'unregisterTool' | 'clearContext'>
+>;
 
 /**
  * Browser-optimized MCP Server that speaks WebMCP natively.
@@ -311,6 +314,35 @@ export class BrowserMcpServer extends BaseMcpServer {
     return candidate as NativeToolsApi;
   }
 
+  private getNativeMutationApi(): NativeMutationApi | undefined {
+    if (!this.native) {
+      return undefined;
+    }
+
+    return this.native as NativeMutationApi;
+  }
+
+  private registerToolInNative(tool: ToolDescriptor): void {
+    const nativeMutationApi = this.getNativeMutationApi();
+    if (typeof nativeMutationApi?.registerTool === 'function') {
+      (nativeMutationApi.registerTool as (tool: ToolDescriptor) => void)(tool);
+    }
+  }
+
+  private unregisterToolInNative(name: string): void {
+    const nativeMutationApi = this.getNativeMutationApi();
+    if (typeof nativeMutationApi?.unregisterTool === 'function') {
+      nativeMutationApi.unregisterTool(name);
+    }
+  }
+
+  private clearToolsInNative(): void {
+    const nativeMutationApi = this.getNativeMutationApi();
+    if (typeof nativeMutationApi?.clearContext === 'function') {
+      nativeMutationApi.clearContext();
+    }
+  }
+
   private registerToolInServer(tool: ToolDescriptor): { unregister: () => void } {
     const inputSchema = this.toTransportSchema(tool.inputSchema);
 
@@ -372,23 +404,19 @@ export class BrowserMcpServer extends BaseMcpServer {
   // @ts-expect-error -- WebMCP API: (ToolDescriptor) vs MCP SDK: (name, config, cb)
   override registerTool(tool: ToolDescriptor): { unregister: () => void } {
     // Mirror to native first — the polyfill validates the descriptor
-    if (this.native) {
-      (this.native.registerTool as (tool: ToolDescriptor) => void)(tool);
-    }
+    this.registerToolInNative(tool);
 
     try {
       return this.registerToolInServer(tool);
     } catch (error) {
       // Rollback native registration on server failure
-      if (this.native) {
-        try {
-          this.native.unregisterTool(tool.name);
-        } catch (rollbackError) {
-          console.error(
-            '[BrowserMcpServer] Rollback of native tool registration failed:',
-            rollbackError
-          );
-        }
+      try {
+        this.unregisterToolInNative(tool.name);
+      } catch (rollbackError) {
+        console.error(
+          '[BrowserMcpServer] Rollback of native tool registration failed:',
+          rollbackError
+        );
       }
       throw error;
     }
@@ -418,9 +446,7 @@ export class BrowserMcpServer extends BaseMcpServer {
   unregisterTool(name: string): void {
     this._parentTools[name]?.remove();
 
-    if (this.native) {
-      this.native.unregisterTool(name);
-    }
+    this.unregisterToolInNative(name);
   }
 
   // @ts-expect-error -- WebMCP API: (descriptor) vs MCP SDK: (name, uri, config, readCallback)
@@ -485,9 +511,7 @@ export class BrowserMcpServer extends BaseMcpServer {
       tool.remove();
     }
 
-    if (this.native) {
-      this.native.clearContext();
-    }
+    this.clearToolsInNative();
 
     for (const tool of options?.tools ?? []) {
       this.registerTool(tool);
@@ -502,9 +526,7 @@ export class BrowserMcpServer extends BaseMcpServer {
     // method that only handles tools. Prompt schemas are cleaned up individually
     // via the unregister() callback returned by registerPrompt().
 
-    if (this.native) {
-      this.native.clearContext();
-    }
+    this.clearToolsInNative();
   }
 
   // --- Extension methods ---
