@@ -1881,6 +1881,52 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
       expect(snapshots).toEqual([['tool_b']]);
     });
+
+    it('still notifies when same-task churn changes visible tool metadata', async () => {
+      initializeWebMCPPolyfill();
+
+      navigator.modelContext.registerTool({
+        name: 'stable_tool',
+        description: 'before',
+        inputSchema: { type: 'object', properties: {} },
+        execute: async () => ({ content: [{ type: 'text', text: 'before' }] }),
+      });
+
+      await Promise.resolve();
+      await Promise.resolve();
+
+      const snapshots: Array<Array<{ name: string; description?: string; inputSchema?: string }>> =
+        [];
+      navigator.modelContextTesting?.registerToolsChangedCallback(() => {
+        snapshots.push(navigator.modelContextTesting?.listTools() ?? []);
+      });
+
+      navigator.modelContext.unregisterTool('stable_tool');
+      navigator.modelContext.registerTool({
+        name: 'stable_tool',
+        description: 'after',
+        inputSchema: {
+          type: 'object',
+          properties: { value: { type: 'string' } },
+        },
+        execute: async () => ({ content: [{ type: 'text', text: 'after' }] }),
+      });
+
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(snapshots).toHaveLength(1);
+      expect(snapshots[0]).toEqual([
+        {
+          name: 'stable_tool',
+          description: 'after',
+          inputSchema: JSON.stringify({
+            type: 'object',
+            properties: { value: { type: 'string' } },
+          }),
+        },
+      ]);
+    });
   });
 
   // =========================================================================
