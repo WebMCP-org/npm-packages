@@ -1063,6 +1063,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.0.18(@types/node@22.17.2)(@vitest/browser-playwright@4.0.18)(happy-dom@20.7.0)(jiti@2.6.1)(lightningcss@1.30.2)(msw@2.12.10(@types/node@22.17.2)(typescript@5.9.3))(sass@1.97.1)(tsx@4.21.0)(yaml@2.8.2)
 
   packages/webmcp-types:
     devDependencies:
