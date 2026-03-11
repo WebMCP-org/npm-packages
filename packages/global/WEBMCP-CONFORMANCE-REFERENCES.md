@@ -82,7 +82,12 @@ Goal: keep one place to track standards decisions and implementation details bef
 
 - Shared suite: `src/conformance/runtime-core-conformance.shared.ts`
 - Polyfill runtime entry: `src/conformance/polyfill-runtime.e2e.test.ts`
-- Native runtime entry: `src/conformance/native-runtime.e2e.test.ts`
+
+Temporary MCP-B divergence:
+
+- The polyfill runtime conformance lane currently expects `BrowserMcpServer.registerTool(...)` to return an `{ unregister() }` handle.
+- This is intentionally different from strict core `@mcp-b/webmcp-types` / `@mcp-b/webmcp-polyfill`, which still model `registerTool(...)` as returning `void`.
+- Keep this divergence explicit until upstream WebMCP unregistration design settles.
 
 Run commands:
 

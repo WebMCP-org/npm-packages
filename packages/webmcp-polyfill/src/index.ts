@@ -113,10 +113,7 @@ class StrictWebMCPContext {
   private clearContextDeprecationWarned = false;
 
   provideContext(options: ModelContextOptions = {}): void {
-    this.warnDeprecatedContextMethodOnce(
-      'provideContextDeprecationWarned',
-      '[WebMCPPolyfill] navigator.modelContext.provideContext() is deprecated and will be removed in the next major version. Register tools individually with registerTool() instead.'
-    );
+    this.warnProvideContextDeprecationOnce();
 
     const nextTools = new Map<string, PolyfillToolDescriptor>();
 
@@ -130,10 +127,7 @@ class StrictWebMCPContext {
   }
 
   clearContext(): void {
-    this.warnDeprecatedContextMethodOnce(
-      'clearContextDeprecationWarned',
-      '[WebMCPPolyfill] navigator.modelContext.clearContext() is deprecated and will be removed in the next major version. Unregister individual tools instead.'
-    );
+    this.warnClearContextDeprecationOnce();
 
     this.tools.clear();
     this.notifyToolsChanged();
@@ -255,16 +249,26 @@ class StrictWebMCPContext {
     });
   }
 
-  private warnDeprecatedContextMethodOnce(
-    flag: 'provideContextDeprecationWarned' | 'clearContextDeprecationWarned',
-    message: string
-  ): void {
-    if (this[flag]) {
+  private warnProvideContextDeprecationOnce(): void {
+    if (this.provideContextDeprecationWarned) {
       return;
     }
 
-    this[flag] = true;
-    console.warn(message);
+    this.provideContextDeprecationWarned = true;
+    console.warn(
+      '[WebMCPPolyfill] navigator.modelContext.provideContext() is deprecated and will be removed in the next major version. Register tools individually with registerTool() instead.'
+    );
+  }
+
+  private warnClearContextDeprecationOnce(): void {
+    if (this.clearContextDeprecationWarned) {
+      return;
+    }
+
+    this.clearContextDeprecationWarned = true;
+    console.warn(
+      '[WebMCPPolyfill] navigator.modelContext.clearContext() is deprecated and will be removed in the next major version. Unregister individual tools instead.'
+    );
   }
 }
 

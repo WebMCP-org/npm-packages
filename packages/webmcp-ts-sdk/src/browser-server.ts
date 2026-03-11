@@ -486,10 +486,7 @@ export class BrowserMcpServer extends BaseMcpServer {
   }
 
   provideContext(options?: ModelContextOptions): void {
-    this.warnDeprecatedContextMethodOnce(
-      '_provideContextDeprecationWarned',
-      '[BrowserMcpServer] navigator.modelContext.provideContext() is deprecated and will be removed in the next major version. Register tools individually with registerTool() instead.'
-    );
+    this.warnProvideContextDeprecationOnce();
 
     for (const name of Object.keys(this._parentTools)) {
       this.unregisterTool(name);
@@ -501,10 +498,7 @@ export class BrowserMcpServer extends BaseMcpServer {
   }
 
   clearContext(): void {
-    this.warnDeprecatedContextMethodOnce(
-      '_clearContextDeprecationWarned',
-      '[BrowserMcpServer] navigator.modelContext.clearContext() is deprecated and will be removed in the next major version. Unregister individual tools instead.'
-    );
+    this.warnClearContextDeprecationOnce();
 
     for (const name of Object.keys(this._parentTools)) {
       this.unregisterTool(name);
@@ -528,16 +522,26 @@ export class BrowserMcpServer extends BaseMcpServer {
     );
   }
 
-  private warnDeprecatedContextMethodOnce(
-    flag: '_provideContextDeprecationWarned' | '_clearContextDeprecationWarned',
-    message: string
-  ): void {
-    if (this[flag]) {
+  private warnProvideContextDeprecationOnce(): void {
+    if (this._provideContextDeprecationWarned) {
       return;
     }
 
-    this[flag] = true;
-    console.warn(message);
+    this._provideContextDeprecationWarned = true;
+    console.warn(
+      '[BrowserMcpServer] navigator.modelContext.provideContext() is deprecated and will be removed in the next major version. Register tools individually with registerTool() instead.'
+    );
+  }
+
+  private warnClearContextDeprecationOnce(): void {
+    if (this._clearContextDeprecationWarned) {
+      return;
+    }
+
+    this._clearContextDeprecationWarned = true;
+    console.warn(
+      '[BrowserMcpServer] navigator.modelContext.clearContext() is deprecated and will be removed in the next major version. Unregister individual tools instead.'
+    );
   }
 
   // --- Extension methods ---

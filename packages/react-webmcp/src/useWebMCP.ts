@@ -35,7 +35,7 @@ function defaultFormatOutput(output: unknown): string {
 const TOOL_OWNER_BY_NAME = new Map<string, symbol>();
 type StructuredContent = Exclude<CallToolResult['structuredContent'], undefined>;
 type CompatModelContext = Navigator['modelContext'] & {
-  registerTool: (tool: ToolDescriptor) => void | ModelContextToolRegistrationHandle;
+  registerTool: (tool: ToolDescriptor) => undefined | ModelContextToolRegistrationHandle;
   unregisterTool: (nameOrTool: string | Pick<ToolDescriptor, 'name'>) => void;
 };
 
@@ -69,7 +69,7 @@ function hasToolRegistrationHandle(value: unknown): value is ModelContextToolReg
 function unregisterToolCompat(
   modelContext: CompatModelContext,
   tool: Pick<ToolDescriptor, 'name'>,
-  registration: void | ModelContextToolRegistrationHandle
+  registration: undefined | ModelContextToolRegistrationHandle
 ): void {
   if (hasToolRegistrationHandle(registration)) {
     registration.unregister();

@@ -368,7 +368,7 @@ const result = await navigator.modelContextTesting?.executeTool(
 
 ```javascript
 if ('modelContext' in navigator) {
-  navigator.modelContext.provideContext({ tools: [...] });
+  navigator.modelContext.registerTool({ /* your tool */ });
 }
 ```
 
@@ -379,45 +379,42 @@ if ('modelContext' in navigator) {
 ```typescript
 import '@mcp-b/global';
 
-navigator.modelContext.provideContext({
-  tools: [
-    {
-      name: 'search-products',
-      description: 'Search products by keyword, category, or price range',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          query: { type: 'string', description: 'Search terms' },
-          category: { type: 'string', description: 'Product category' },
-          maxPrice: { type: 'number', description: 'Maximum price filter' },
-        },
-        required: ['query'],
-      },
-      async execute(args) {
-        const results = await fetch(`/api/products?q=${args.query}&cat=${args.category ?? ''}&max=${args.maxPrice ?? ''}`);
-        return { content: [{ type: 'text', text: await results.text() }] };
-      },
+navigator.modelContext.registerTool({
+  name: 'search-products',
+  description: 'Search products by keyword, category, or price range',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      query: { type: 'string', description: 'Search terms' },
+      category: { type: 'string', description: 'Product category' },
+      maxPrice: { type: 'number', description: 'Maximum price filter' },
     },
-    {
-      name: 'add-to-cart',
-      description: 'Add a product to the shopping cart',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          productId: { type: 'string' },
-          quantity: { type: 'integer' },
-        },
-        required: ['productId'],
-      },
-      async execute(args) {
-        await fetch('/api/cart', {
-          method: 'POST',
-          body: JSON.stringify({ productId: args.productId, quantity: args.quantity ?? 1 }),
-        });
-        return { content: [{ type: 'text', text: `Added to cart` }] };
-      },
+    required: ['query'],
+  },
+  async execute(args) {
+    const results = await fetch(`/api/products?q=${args.query}&cat=${args.category ?? ''}&max=${args.maxPrice ?? ''}`);
+    return { content: [{ type: 'text', text: await results.text() }] };
+  },
+});
+
+navigator.modelContext.registerTool({
+  name: 'add-to-cart',
+  description: 'Add a product to the shopping cart',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      productId: { type: 'string' },
+      quantity: { type: 'integer' },
     },
-  ],
+    required: ['productId'],
+  },
+  async execute(args) {
+    await fetch('/api/cart', {
+      method: 'POST',
+      body: JSON.stringify({ productId: args.productId, quantity: args.quantity ?? 1 }),
+    });
+    return { content: [{ type: 'text', text: `Added to cart` }] };
+  },
 });
 ```
 
@@ -427,17 +424,13 @@ navigator.modelContext.provideContext({
 import '@mcp-b/global';
 
 // Start with base tools
-navigator.modelContext.provideContext({
-  tools: [
-    {
-      name: 'get-user',
-      description: 'Get current user info',
-      inputSchema: { type: 'object', properties: {} },
-      async execute() {
-        return { content: [{ type: 'text', text: JSON.stringify(currentUser) }] };
-      },
-    },
-  ],
+const getUserTool = navigator.modelContext.registerTool({
+  name: 'get-user',
+  description: 'Get current user info',
+  inputSchema: { type: 'object', properties: {} },
+  async execute() {
+    return { content: [{ type: 'text', text: JSON.stringify(currentUser) }] };
+  },
 });
 
 // Add tools dynamically based on user role
@@ -459,7 +452,7 @@ if (currentUser.isAdmin) {
 
 // Remove tools when permissions change
 function onLogout() {
-  navigator.modelContext.clearContext();
+  getUserTool.unregister();
 }
 ```
 
@@ -468,37 +461,34 @@ function onLogout() {
 ```typescript
 import '@mcp-b/global';
 
-navigator.modelContext.provideContext({
-  tools: [
-    {
-      name: 'fill-contact-form',
-      description: 'Fill the contact form with provided details',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          name: { type: 'string' },
-          email: { type: 'string' },
-          message: { type: 'string' },
-        },
-        required: ['name', 'email', 'message'],
-      },
-      async execute(args) {
-        document.querySelector('#name').value = args.name;
-        document.querySelector('#email').value = args.email;
-        document.querySelector('#message').value = args.message;
-        return { content: [{ type: 'text', text: 'Form filled' }] };
-      },
+navigator.modelContext.registerTool({
+  name: 'fill-contact-form',
+  description: 'Fill the contact form with provided details',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      name: { type: 'string' },
+      email: { type: 'string' },
+      message: { type: 'string' },
     },
-    {
-      name: 'submit-form',
-      description: 'Submit the contact form',
-      inputSchema: { type: 'object', properties: {} },
-      async execute() {
-        document.querySelector('#contact-form').submit();
-        return { content: [{ type: 'text', text: 'Form submitted' }] };
-      },
-    },
-  ],
+    required: ['name', 'email', 'message'],
+  },
+  async execute(args) {
+    document.querySelector('#name').value = args.name;
+    document.querySelector('#email').value = args.email;
+    document.querySelector('#message').value = args.message;
+    return { content: [{ type: 'text', text: 'Form filled' }] };
+  },
+});
+
+navigator.modelContext.registerTool({
+  name: 'submit-form',
+  description: 'Submit the contact form',
+  inputSchema: { type: 'object', properties: {} },
+  async execute() {
+    document.querySelector('#contact-form').submit();
+    return { content: [{ type: 'text', text: 'Form submitted' }] };
+  },
 });
 ```
 
