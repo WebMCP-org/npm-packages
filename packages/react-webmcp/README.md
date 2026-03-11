@@ -37,6 +37,8 @@ pnpm add @mcp-b/transports @modelcontextprotocol/sdk
 
 **Prerequisites:** Provider hooks require the `navigator.modelContext` API. Install `@mcp-b/global` or use a browser that implements the Web Model Context API.
 
+Provider hooks prefer the runtime's returned tool-registration handle when one exists, and fall back to `navigator.modelContext.unregisterTool(...)` for compatibility with older runtimes.
+
 ## Quick Start - Provider (Registering Tools)
 
 ```tsx

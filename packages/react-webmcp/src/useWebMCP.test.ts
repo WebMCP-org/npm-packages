@@ -795,6 +795,43 @@ describe('useWebMCP', () => {
   });
 
   describe('cleanup edge cases', () => {
+    it('should prefer the registerTool cleanup handle when the runtime provides one', async () => {
+      const originalDescriptor = Object.getOwnPropertyDescriptor(navigator, 'modelContext');
+      const unregister = vi.fn();
+      const unregisterTool = vi.fn();
+
+      Object.defineProperty(navigator, 'modelContext', {
+        configurable: true,
+        enumerable: true,
+        writable: true,
+        value: {
+          registerTool: vi.fn(() => ({ unregister })),
+          unregisterTool,
+        },
+      });
+
+      try {
+        const { unmount } = await renderHook(() =>
+          useWebMCP({
+            name: 'handle_cleanup_tool',
+            description: 'Uses registerTool cleanup handle',
+            handler: async () => 'result',
+          })
+        );
+
+        unmount();
+
+        expect(unregister).toHaveBeenCalledTimes(1);
+        expect(unregisterTool).not.toHaveBeenCalled();
+      } finally {
+        if (originalDescriptor) {
+          Object.defineProperty(navigator, 'modelContext', originalDescriptor);
+        } else {
+          delete (navigator as unknown as Record<string, unknown>).modelContext;
+        }
+      }
+    });
+
     it('should handle unregister errors gracefully', async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const unregisterSpy = vi

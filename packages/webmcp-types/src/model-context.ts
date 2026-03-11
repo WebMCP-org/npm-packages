@@ -175,6 +175,26 @@ export interface ToolCallEvent extends Event {
   respondWith: (response: ToolResponse) => void;
 }
 
+/**
+ * Tool identity accepted by compatibility unregister flows.
+ *
+ * Passing the original tool object aligns with the current spec direction,
+ * while string names remain temporarily supported for backward compatibility.
+ */
+export interface ModelContextToolReference {
+  name: string;
+}
+
+/**
+ * Non-standard compatibility handle returned by some runtimes after registerTool().
+ *
+ * Strict core WebMCP still types registerTool() as returning void. This handle
+ * exists so compatibility layers can prefer capability-scoped cleanup when available.
+ */
+export interface ModelContextToolRegistrationHandle {
+  unregister(): void;
+}
+
 // ============================================================================
 // Model Context
 // ============================================================================
@@ -187,6 +207,7 @@ export interface ModelContextCore {
 
   /**
    * Replaces base context with provided tools.
+   * @deprecated Removed from the upstream WebMCP spec on March 5, 2026. Kept only as a temporary compatibility API.
    */
   provideContext(options?: ModelContextOptions): void;
 
@@ -235,12 +256,16 @@ export interface ModelContextCore {
   ): void;
 
   /**
-   * Unregisters a dynamic tool by name.
+   * Unregisters a dynamic tool by name or tool reference.
+   *
+   * Prefer passing the originally registered tool object where supported.
+   * String names remain accepted during the compatibility window.
    */
-  unregisterTool(name: string): void;
+  unregisterTool(nameOrTool: string | ModelContextToolReference): void;
 
   /**
    * Clears all context (base + dynamic registrations).
+   * @deprecated Removed from the upstream WebMCP spec on March 5, 2026. Kept only as a temporary compatibility API.
    */
   clearContext(): void;
 }

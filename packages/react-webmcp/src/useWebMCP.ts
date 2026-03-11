@@ -1,4 +1,9 @@
-import type { CallToolResult, InputSchema, ToolDescriptor } from '@mcp-b/webmcp-types';
+import type {
+  CallToolResult,
+  InputSchema,
+  ModelContextToolRegistrationHandle,
+  ToolDescriptor,
+} from '@mcp-b/webmcp-types';
 import type { DependencyList } from 'react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type {
@@ -29,6 +34,10 @@ function defaultFormatOutput(output: unknown): string {
 
 const TOOL_OWNER_BY_NAME = new Map<string, symbol>();
 type StructuredContent = Exclude<CallToolResult['structuredContent'], undefined>;
+type CompatModelContext = Navigator['modelContext'] & {
+  registerTool: (tool: ToolDescriptor) => void | ModelContextToolRegistrationHandle;
+  unregisterTool: (nameOrTool: string | Pick<ToolDescriptor, 'name'>) => void;
+};
 
 function toStructuredContent(value: unknown): StructuredContent | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -47,6 +56,33 @@ function toStructuredContent(value: unknown): StructuredContent | null {
 }
 
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
+
+function hasToolRegistrationHandle(value: unknown): value is ModelContextToolRegistrationHandle {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'unregister' in value &&
+    typeof value.unregister === 'function'
+  );
+}
+
+function unregisterToolCompat(
+  modelContext: CompatModelContext,
+  tool: Pick<ToolDescriptor, 'name'>,
+  registration: void | ModelContextToolRegistrationHandle
+): void {
+  if (hasToolRegistrationHandle(registration)) {
+    registration.unregister();
+    return;
+  }
+
+  try {
+    modelContext.unregisterTool(tool.name);
+    return;
+  } catch {
+    modelContext.unregisterTool(tool);
+  }
+}
 
 /**
  * React hook for registering and managing Model Context Protocol (MCP) tools.
@@ -290,14 +326,16 @@ export function useWebMCP<
       : undefined;
 
     const ownerToken = Symbol(name);
-    (modelContext.registerTool as (tool: ToolDescriptor) => void)({
+    const compatModelContext = modelContext as CompatModelContext;
+    const toolDescriptor: ToolDescriptor = {
       name,
       description,
       ...(resolvedInputSchema && { inputSchema: resolvedInputSchema }),
       ...(resolvedOutputSchema && { outputSchema: resolvedOutputSchema }),
       ...(annotations && { annotations }),
       execute: mcpHandler,
-    });
+    };
+    const registration = compatModelContext.registerTool(toolDescriptor);
     TOOL_OWNER_BY_NAME.set(name, ownerToken);
 
     return () => {
@@ -308,7 +346,7 @@ export function useWebMCP<
 
       TOOL_OWNER_BY_NAME.delete(name);
       try {
-        modelContext.unregisterTool(name);
+        unregisterToolCompat(compatModelContext, toolDescriptor, registration);
       } catch (error) {
         console.warn('[ReactWebMCP:useWebMCP]', `Failed to unregister tool "${name}"`, error);
       }

@@ -359,6 +359,24 @@ describe('global adapter', () => {
     expect(tools.some((tool) => tool.name === 'dynamic_tool')).toBe(false);
   });
 
+  it('warns that provideContext is deprecated while preserving behavior', () => {
+    initializeWebModelContext();
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      getModelContext().provideContext();
+      getModelContext().provideContext();
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        '[BrowserMcpServer] navigator.modelContext.provideContext() is deprecated and will be removed in the next major version. Register tools individually with registerTool() instead.'
+      );
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
   it('unregisterTool and clearContext remove mirrored tools', () => {
     initializeWebModelContext();
 
@@ -391,6 +409,46 @@ describe('global adapter', () => {
 
     tools = navigator.modelContextTesting?.listTools() ?? [];
     expect(tools.some((tool) => tool.name === 'clear_me')).toBe(false);
+  });
+
+  it('unregisterTool accepts the originally registered tool object for compatibility', () => {
+    initializeWebModelContext();
+
+    const modelContext = getModelContext();
+    const tool = {
+      name: 'compat_unregister_tool',
+      description: 'Compatibility unregister tool',
+      inputSchema: { type: 'object', properties: {} },
+      async execute() {
+        return { content: [{ type: 'text', text: 'ok' }] };
+      },
+    } satisfies Parameters<typeof modelContext.registerTool>[0];
+
+    modelContext.registerTool(tool);
+    modelContext.unregisterTool(tool);
+
+    const tools = navigator.modelContextTesting?.listTools() ?? [];
+    expect(tools.some((registeredTool) => registeredTool.name === 'compat_unregister_tool')).toBe(
+      false
+    );
+  });
+
+  it('warns that clearContext is deprecated while preserving behavior', () => {
+    initializeWebModelContext();
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      getModelContext().clearContext();
+      getModelContext().clearContext();
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        '[BrowserMcpServer] navigator.modelContext.clearContext() is deprecated and will be removed in the next major version. Unregister individual tools instead.'
+      );
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 
   it('sets __isBrowserMcpServer marker on navigator.modelContext', () => {

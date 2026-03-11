@@ -101,7 +101,7 @@ export function CounterTool() {
 ## How `useWebMCP` Works
 
 - Registers a tool on mount with `navigator.modelContext.registerTool(...)`.
-- Unregisters on unmount with `navigator.modelContext.unregisterTool(name)`.
+- Unregisters on unmount by preferring the returned registration handle when available, then falling back to `navigator.modelContext.unregisterTool(...)`.
 - Exposes local execution state:
   - `state.isExecuting`
   - `state.lastResult`

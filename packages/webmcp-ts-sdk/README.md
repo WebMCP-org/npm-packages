@@ -41,11 +41,17 @@ public registerCapabilities(capabilities: ServerCapabilities): void {
 
 For the Web Model Context API, this restriction is incompatible because:
 
-1. **Tools arrive dynamically** - Web pages call `window.navigator.modelContext.provideContext({ tools: [...] })` at any time
+1. **Tools arrive dynamically** - Web pages call `window.navigator.modelContext.registerTool(...)` at any time
 2. **Transport must be ready immediately** - The MCP server/transport needs to be connected when the page loads
 3. **Asynchronous registration** - Tools are registered as the page's JavaScript executes, potentially long after initialization
 
 This package solves the problem by **pre-registering tool capabilities** before the transport connects, allowing dynamic tool registration to work seamlessly.
+
+Compatibility note:
+
+- `BrowserMcpServer.registerTool(...)` currently returns an `{ unregister() }` handle.
+- The strict `@mcp-b/webmcp-polyfill` / `@mcp-b/webmcp-types` core surface still types `registerTool(...)` as returning `void`.
+- This is a temporary divergence while the upstream WebMCP `unregisterTool` design remains under discussion.
 
 ## Modifications from Official SDK
 

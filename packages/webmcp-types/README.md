@@ -225,6 +225,8 @@ void result;
 
 - This package does not install any runtime behavior.
 - Runtime validation/execution behavior depends on your WebMCP runtime package.
+- `provideContext()` and `clearContext()` remain typed for compatibility, but are deprecated because the upstream WebMCP spec removed them on March 5, 2026.
+- `unregisterTool(...)` accepts either a legacy string name or a tool-like object with `name` during the current compatibility window.
 - `navigator.modelContextTesting` is typed as optional for compatibility with Chromium preview/testing surfaces.
 
 ## License
