@@ -175,6 +175,8 @@ export function McpClientProvider({
   const requestOpts = opts ?? EMPTY_REQUEST_OPTS;
 
   const connectionStateRef = useRef<'disconnected' | 'connecting' | 'connected'>('disconnected');
+  const activeConnectionIdRef = useRef(0);
+  const pendingDisconnectRef = useRef<Promise<void>>(Promise.resolve());
   const toolFlowSequenceRef = useRef(0);
   const logToolFlow = useCallback((event: string, details: Record<string, unknown> = {}) => {
     const sequence = ++toolFlowSequenceRef.current;
@@ -185,62 +187,85 @@ export function McpClientProvider({
     }
   }, []);
 
+  const resetConnectionData = useCallback(() => {
+    setIsConnected(false);
+    setCapabilities(null);
+    setTools([]);
+    setResources([]);
+  }, []);
+
   /**
    * Fetches available resources from the MCP server.
    * Only fetches if the server supports the resources capability.
    */
-  const fetchResourcesInternal = useCallback(async () => {
-    if (!client) return;
+  const fetchResourcesInternal = useCallback(
+    async (connectionId = activeConnectionIdRef.current) => {
+      if (!client) return;
 
-    const serverCapabilities = client.getServerCapabilities();
-    if (!serverCapabilities?.resources) {
-      setResources([]);
-      return;
-    }
+      const serverCapabilities = client.getServerCapabilities();
+      if (!serverCapabilities?.resources) {
+        if (activeConnectionIdRef.current === connectionId) {
+          setResources([]);
+        }
+        return;
+      }
 
-    try {
-      const response = await client.listResources();
-      setResources(response.resources);
-    } catch (e) {
-      console.error('[ReactWebMCP:McpClientProvider]', 'Error fetching resources:', e);
-      throw e;
-    }
-  }, [client]);
+      try {
+        const response = await client.listResources();
+        if (activeConnectionIdRef.current !== connectionId) {
+          return;
+        }
+        setResources(response.resources);
+      } catch (e) {
+        console.error('[ReactWebMCP:McpClientProvider]', 'Error fetching resources:', e);
+        throw e;
+      }
+    },
+    [client]
+  );
 
   /**
    * Fetches available tools from the MCP server.
    * Only fetches if the server supports the tools capability.
    */
-  const fetchToolsInternal = useCallback(async () => {
-    if (!client) return;
+  const fetchToolsInternal = useCallback(
+    async (connectionId = activeConnectionIdRef.current) => {
+      if (!client) return;
 
-    const serverCapabilities = client.getServerCapabilities();
-    if (!serverCapabilities?.tools) {
-      logToolFlow('listTools:capability_missing', {});
-      setTools([]);
-      return;
-    }
+      const serverCapabilities = client.getServerCapabilities();
+      if (!serverCapabilities?.tools) {
+        logToolFlow('listTools:capability_missing', {});
+        if (activeConnectionIdRef.current === connectionId) {
+          setTools([]);
+        }
+        return;
+      }
 
-    const startedAt = Date.now();
-    logToolFlow('listTools:start', {
-      hasToolsCapability: Boolean(serverCapabilities.tools),
-    });
-    try {
-      const response = await client.listTools();
-      setTools(response.tools);
-      logToolFlow('listTools:success', {
-        durationMs: Date.now() - startedAt,
-        toolCount: response.tools.length,
+      const startedAt = Date.now();
+      logToolFlow('listTools:start', {
+        hasToolsCapability: Boolean(serverCapabilities.tools),
       });
-    } catch (e) {
-      logToolFlow('listTools:error', {
-        durationMs: Date.now() - startedAt,
-        errorMessage: e instanceof Error ? e.message : String(e),
-      });
-      console.error('[ReactWebMCP:McpClientProvider]', 'Error fetching tools:', e);
-      throw e;
-    }
-  }, [client, logToolFlow]);
+      try {
+        const response = await client.listTools();
+        if (activeConnectionIdRef.current !== connectionId) {
+          return;
+        }
+        setTools(response.tools);
+        logToolFlow('listTools:success', {
+          durationMs: Date.now() - startedAt,
+          toolCount: response.tools.length,
+        });
+      } catch (e) {
+        logToolFlow('listTools:error', {
+          durationMs: Date.now() - startedAt,
+          errorMessage: e instanceof Error ? e.message : String(e),
+        });
+        console.error('[ReactWebMCP:McpClientProvider]', 'Error fetching tools:', e);
+        throw e;
+      }
+    },
+    [client, logToolFlow]
+  );
 
   /**
    * Establishes connection to the MCP server.
@@ -255,12 +280,28 @@ export function McpClientProvider({
       return;
     }
 
+    const connectionId = ++activeConnectionIdRef.current;
     connectionStateRef.current = 'connecting';
     setIsLoading(true);
     setError(null);
+    resetConnectionData();
+
+    await pendingDisconnectRef.current;
+    if (activeConnectionIdRef.current !== connectionId) {
+      return;
+    }
+
+    let connected = false;
 
     try {
       await client.connect(transport, requestOpts);
+      if (activeConnectionIdRef.current !== connectionId) {
+        pendingDisconnectRef.current = client.close().catch(() => undefined);
+        await pendingDisconnectRef.current;
+        return;
+      }
+
+      connected = true;
       const caps = client.getServerCapabilities();
       setIsConnected(true);
       setCapabilities(caps || null);
@@ -269,26 +310,42 @@ export function McpClientProvider({
         hasToolsListChanged: Boolean(caps?.tools?.listChanged),
       });
 
-      await Promise.all([fetchResourcesInternal(), fetchToolsInternal()]);
+      await Promise.all([fetchResourcesInternal(connectionId), fetchToolsInternal(connectionId)]);
     } catch (e) {
       const err = e instanceof Error ? e : new Error(String(e));
-      connectionStateRef.current = 'disconnected';
-      setError(err);
+      if (activeConnectionIdRef.current === connectionId) {
+        if (!connected) {
+          connectionStateRef.current = 'disconnected';
+          resetConnectionData();
+        }
+        setError(err);
+      }
       throw err;
     } finally {
-      setIsLoading(false);
+      if (activeConnectionIdRef.current === connectionId) {
+        setIsLoading(false);
+      }
     }
-  }, [client, transport, requestOpts, fetchResourcesInternal, fetchToolsInternal, logToolFlow]);
+  }, [
+    client,
+    transport,
+    requestOpts,
+    fetchResourcesInternal,
+    fetchToolsInternal,
+    logToolFlow,
+    resetConnectionData,
+  ]);
 
   useEffect(() => {
     if (!isConnected || !client) {
       return;
     }
 
+    const connectionId = activeConnectionIdRef.current;
     const serverCapabilities = client.getServerCapabilities();
 
     const handleResourcesChanged = () => {
-      fetchResourcesInternal().catch((error) => {
+      fetchResourcesInternal(connectionId).catch((error) => {
         console.error(
           '[ReactWebMCP:McpClientProvider]',
           'Failed to refresh resources after list_changed:',
@@ -299,7 +356,7 @@ export function McpClientProvider({
 
     const handleToolsChanged = () => {
       logToolFlow('notification:tools/list_changed', {});
-      fetchToolsInternal().catch((error) => {
+      fetchToolsInternal(connectionId).catch((error) => {
         console.error(
           '[ReactWebMCP:McpClientProvider]',
           'Failed to refresh tools after list_changed:',
@@ -318,13 +375,15 @@ export function McpClientProvider({
 
     // Re-fetch after setting up handlers to catch any changes that occurred
     // during the gap between initial fetch and handler setup
-    Promise.all([fetchResourcesInternal(), fetchToolsInternal()]).catch((error) => {
-      console.error(
-        '[ReactWebMCP:McpClientProvider]',
-        'Failed to refresh tools/resources after handler registration:',
-        error
-      );
-    });
+    Promise.all([fetchResourcesInternal(connectionId), fetchToolsInternal(connectionId)]).catch(
+      (error) => {
+        console.error(
+          '[ReactWebMCP:McpClientProvider]',
+          'Failed to refresh tools/resources after handler registration:',
+          error
+        );
+      }
+    );
 
     return () => {
       if (serverCapabilities?.resources?.listChanged) {
@@ -346,10 +405,13 @@ export function McpClientProvider({
 
     // Cleanup: mark as disconnected so next mount will reconnect
     return () => {
+      activeConnectionIdRef.current += 1;
       connectionStateRef.current = 'disconnected';
-      setIsConnected(false);
+      pendingDisconnectRef.current = client.close().catch(() => undefined);
+      resetConnectionData();
+      setIsLoading(false);
     };
-  }, [client, transport, reconnect]);
+  }, [client, transport, reconnect, resetConnectionData]);
 
   return (
     <McpClientContext.Provider
