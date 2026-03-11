@@ -5,6 +5,7 @@
 
 import { detectNativeAPI, getAPIInfo } from './api/detection';
 import { templates } from './examples/templates';
+import { installLegacyContextCompat } from './lib/utils';
 import { mountReactToolExecutor } from './mountReactToolExecutor';
 import type { ModelContext, ModelContextTesting, Tool, ToolInfo } from './types';
 import { EventLog } from './ui/eventLog';
@@ -77,6 +78,7 @@ function init(): void {
 
   // Get API references
   modelContext = navigator.modelContext!;
+  installLegacyContextCompat(modelContext);
   modelContextTesting = navigator.modelContextTesting!;
 
   // Initialize UI managers
@@ -1037,6 +1039,12 @@ function iframeParentUnregisterBucketB(): void {
  */
 function iframeParentClearContext(): void {
   modelContext.clearContext();
+  iframeBucketBRegistrations.clear();
+
+  const btn = document.getElementById('iframe-parent-unregister-b') as HTMLButtonElement;
+  if (btn) {
+    btn.disabled = true;
+  }
 
   iframeEventLog.log('info', 'Parent: Context cleared (Bucket A removed)');
   eventLog.info('Iframe Demo', 'Parent context cleared');

@@ -175,6 +175,14 @@ describe('@mcp-b/webmcp-polyfill', () => {
     ).rejects.toThrow('Tool not found: compat_unregister_tool');
   });
 
+  it('throws when unregisterTool receives an invalid compatibility value', () => {
+    initializeWebMCPPolyfill();
+
+    expect(() => navigator.modelContext.unregisterTool({} as never)).toThrow(
+      "Failed to execute 'unregisterTool' on 'ModelContext': parameter 1 must be a string or an object with a string name."
+    );
+  });
+
   it('warns that clearContext is deprecated while preserving behavior', () => {
     initializeWebMCPPolyfill();
 

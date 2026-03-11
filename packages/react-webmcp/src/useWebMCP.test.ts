@@ -832,6 +832,49 @@ describe('useWebMCP', () => {
       }
     });
 
+    it('should fall back to unregistering with a tool-shaped object when string cleanup throws', async () => {
+      const originalDescriptor = Object.getOwnPropertyDescriptor(navigator, 'modelContext');
+      const unregisterTool = vi.fn((nameOrTool: string | { name: string }) => {
+        if (typeof nameOrTool === 'string') {
+          throw new Error('string unregister unsupported');
+        }
+      });
+
+      Object.defineProperty(navigator, 'modelContext', {
+        configurable: true,
+        enumerable: true,
+        writable: true,
+        value: {
+          registerTool: vi.fn(() => undefined),
+          unregisterTool,
+        },
+      });
+
+      try {
+        const { unmount } = await renderHook(() =>
+          useWebMCP({
+            name: 'object_cleanup_tool',
+            description: 'Uses object unregister fallback',
+            handler: async () => 'result',
+          })
+        );
+
+        unmount();
+
+        expect(unregisterTool).toHaveBeenNthCalledWith(1, 'object_cleanup_tool');
+        expect(unregisterTool).toHaveBeenNthCalledWith(
+          2,
+          expect.objectContaining({ name: 'object_cleanup_tool' })
+        );
+      } finally {
+        if (originalDescriptor) {
+          Object.defineProperty(navigator, 'modelContext', originalDescriptor);
+        } else {
+          delete (navigator as unknown as Record<string, unknown>).modelContext;
+        }
+      }
+    });
+
     it('should handle unregister errors gracefully', async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const unregisterSpy = vi

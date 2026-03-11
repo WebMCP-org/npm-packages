@@ -40,18 +40,6 @@ export function detectNativeAPI(): DetectionResult {
     }
   }
 
-  // Additional check: native API should have Chromium-specific methods
-  const hasNativeMethods =
-    typeof navigator.modelContext.unregisterTool === 'function' &&
-    typeof navigator.modelContext.clearContext === 'function';
-
-  if (!hasNativeMethods) {
-    result.isPolyfill = true;
-    result.isNative = false;
-    result.message = 'Missing native methods (unregisterTool, clearContext). Polyfill detected.';
-    return result;
-  }
-
   result.isNative = true;
   result.message = 'Native Chromium Web Model Context API detected!';
   return result;
