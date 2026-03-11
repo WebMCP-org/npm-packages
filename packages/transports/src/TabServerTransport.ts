@@ -12,7 +12,6 @@ export class TabServerTransport implements Transport {
   private _allowedOrigins: string[];
   private _channelId: string;
   private _messageHandler?: (event: MessageEvent) => void;
-  private _clientOrigin?: string;
   private _beforeUnloadHandler?: () => void;
   private _cleanupInterval?: number;
   private _pendingRequests = new Map<
@@ -23,15 +22,12 @@ export class TabServerTransport implements Transport {
       interruptedSent: boolean;
     }
   >();
+  private readonly SELF_TARGET_ORIGIN = '*';
   private readonly REQUEST_TIMEOUT_MS = 300000; // 5 minutes
 
   onclose?: () => void;
   onerror?: (error: Error) => void;
   onmessage?: (message: JSONRPCMessage) => void;
-
-  private _resolveTargetOrigin(origin?: string): string {
-    return origin && origin !== 'null' ? origin : '*';
-  }
 
   constructor(options: TabServerTransportOptions) {
     if (!options.allowedOrigins || options.allowedOrigins.length === 0) {
@@ -60,8 +56,6 @@ export class TabServerTransport implements Transport {
         return;
       }
 
-      this._clientOrigin = event.origin;
-
       const payload = event.data.payload;
 
       if (typeof payload === 'string' && payload === 'mcp-check-ready') {
@@ -73,7 +67,7 @@ export class TabServerTransport implements Transport {
             direction: 'server-to-client',
             payload: 'mcp-server-ready',
           },
-          this._resolveTargetOrigin(this._clientOrigin)
+          this.SELF_TARGET_ORIGIN
         );
         return;
       }
@@ -120,7 +114,7 @@ export class TabServerTransport implements Transport {
         direction: 'server-to-client',
         payload: 'mcp-server-ready',
       },
-      '*'
+      this.SELF_TARGET_ORIGIN
     );
   }
 
@@ -146,10 +140,6 @@ export class TabServerTransport implements Transport {
       this._pendingRequests.delete(message.id);
     }
 
-    // If we have a known client origin, use it (for security)
-    // Otherwise, use '*' for backwards compatibility with clients that don't do the handshake
-    const targetOrigin = this._resolveTargetOrigin(this._clientOrigin);
-
     window.postMessage(
       {
         channel: this._channelId,
@@ -157,7 +147,7 @@ export class TabServerTransport implements Transport {
         direction: 'server-to-client',
         payload: message,
       },
-      targetOrigin
+      this.SELF_TARGET_ORIGIN
     );
   }
 
@@ -203,7 +193,7 @@ export class TabServerTransport implements Transport {
             direction: 'server-to-client',
             payload: interruptedResponse,
           },
-          this._resolveTargetOrigin(this._clientOrigin)
+          this.SELF_TARGET_ORIGIN
         );
       } catch (error) {
         // Best effort - may fail in rare cases
@@ -261,7 +251,7 @@ export class TabServerTransport implements Transport {
         direction: 'server-to-client',
         payload: 'mcp-server-stopped',
       },
-      '*'
+      this.SELF_TARGET_ORIGIN
     );
 
     this.onclose?.();

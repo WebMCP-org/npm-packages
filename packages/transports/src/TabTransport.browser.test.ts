@@ -24,6 +24,30 @@ async function safeClose(transport: {
 const uniqueChannel = (prefix: string) =>
   `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
+function captureServerPayloads(channelId: string): {
+  payloads: unknown[];
+  stop: () => void;
+} {
+  const payloads: unknown[] = [];
+
+  const handler = (event: MessageEvent) => {
+    if (
+      event.data?.channel === channelId &&
+      event.data?.type === 'mcp' &&
+      event.data?.direction === 'server-to-client'
+    ) {
+      payloads.push(event.data.payload);
+    }
+  };
+
+  window.addEventListener('message', handler);
+
+  return {
+    payloads,
+    stop: () => window.removeEventListener('message', handler),
+  };
+}
+
 async function startPair(options?: { channelId?: string; requestTimeout?: number }) {
   const channelId = options?.channelId ?? uniqueChannel('pair');
 
@@ -287,6 +311,163 @@ browserDescribe('Tab transports (browser)', () => {
 
       await serverTransport.start();
       await readyReceived;
+    });
+
+    it('responds to allowed cross-origin ready checks', async () => {
+      const crossOrigin = 'https://app.usechar.ai';
+      const crossOriginChannel = uniqueChannel('cross-origin-ready');
+      const transport = new TabServerTransport({
+        allowedOrigins: [crossOrigin],
+        channelId: crossOriginChannel,
+      });
+      const captured = captureServerPayloads(crossOriginChannel);
+
+      try {
+        await transport.start();
+        await delay();
+        captured.payloads.length = 0;
+
+        window.dispatchEvent(
+          new MessageEvent('message', {
+            origin: crossOrigin,
+            data: {
+              channel: crossOriginChannel,
+              type: 'mcp',
+              direction: 'client-to-server',
+              payload: 'mcp-check-ready',
+            },
+          })
+        );
+
+        await delay();
+
+        expect(captured.payloads).toContain('mcp-server-ready');
+      } finally {
+        captured.stop();
+        await safeClose(transport);
+      }
+    });
+
+    it('does not let a later client origin break an earlier response', async () => {
+      const crossOrigin = 'https://app.usechar.ai';
+      const raceChannel = uniqueChannel('origin-race');
+      const transport = new TabServerTransport({
+        allowedOrigins: [window.location.origin, crossOrigin],
+        channelId: raceChannel,
+      });
+      const captured = captureServerPayloads(raceChannel);
+
+      try {
+        await transport.start();
+        await delay();
+        captured.payloads.length = 0;
+
+        window.postMessage(
+          {
+            channel: raceChannel,
+            type: 'mcp',
+            direction: 'client-to-server',
+            payload: {
+              jsonrpc: '2.0',
+              method: 'tool/run',
+              id: 1,
+            },
+          },
+          window.location.origin
+        );
+
+        await delay();
+
+        window.dispatchEvent(
+          new MessageEvent('message', {
+            origin: crossOrigin,
+            data: {
+              channel: raceChannel,
+              type: 'mcp',
+              direction: 'client-to-server',
+              payload: 'mcp-check-ready',
+            },
+          })
+        );
+
+        await delay();
+        captured.payloads.length = 0;
+
+        await transport.send({
+          jsonrpc: '2.0',
+          id: 1,
+          result: { ok: true },
+        });
+
+        await delay();
+
+        expect(captured.payloads).toContainEqual({
+          jsonrpc: '2.0',
+          id: 1,
+          result: { ok: true },
+        });
+      } finally {
+        captured.stop();
+        await safeClose(transport);
+      }
+    });
+
+    it('delivers interrupted responses for cross-origin pending requests on beforeunload', async () => {
+      const crossOrigin = 'https://app.usechar.ai';
+      const unloadChannel = uniqueChannel('cross-origin-beforeunload');
+      const transport = new TabServerTransport({
+        allowedOrigins: [crossOrigin],
+        channelId: unloadChannel,
+      });
+      const captured = captureServerPayloads(unloadChannel);
+
+      try {
+        await transport.start();
+        await delay();
+        captured.payloads.length = 0;
+
+        window.dispatchEvent(
+          new MessageEvent('message', {
+            origin: crossOrigin,
+            data: {
+              channel: unloadChannel,
+              type: 'mcp',
+              direction: 'client-to-server',
+              payload: {
+                jsonrpc: '2.0',
+                method: 'tools/call',
+                id: 99,
+              },
+            },
+          })
+        );
+
+        await delay();
+        captured.payloads.length = 0;
+
+        window.dispatchEvent(new Event('beforeunload'));
+        await delay();
+
+        expect(captured.payloads).toContainEqual({
+          jsonrpc: '2.0',
+          id: 99,
+          result: {
+            content: [
+              {
+                type: 'text',
+                text: 'Tool execution interrupted by page navigation',
+              },
+            ],
+            metadata: expect.objectContaining({
+              navigationInterrupted: true,
+              originalMethod: 'tools/call',
+            }),
+          },
+        });
+      } finally {
+        captured.stop();
+        await safeClose(transport);
+      }
     });
 
     it('invokes onclose when closed manually', async () => {
