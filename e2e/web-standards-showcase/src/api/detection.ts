@@ -11,6 +11,8 @@ export function detectNativeAPI(): DetectionResult {
     isNative: false,
     isPolyfill: false,
     testingAvailable: false,
+    supportsProvideContext: false,
+    supportsRegisterTool: false,
     supportsUnregisterTool: false,
     supportsClearContext: false,
     message: '',
@@ -42,6 +44,8 @@ export function detectNativeAPI(): DetectionResult {
     }
   }
 
+  result.supportsProvideContext = typeof navigator.modelContext.provideContext === 'function';
+  result.supportsRegisterTool = typeof navigator.modelContext.registerTool === 'function';
   result.supportsUnregisterTool = typeof navigator.modelContext.unregisterTool === 'function';
   result.supportsClearContext = typeof navigator.modelContext.clearContext === 'function';
 
@@ -52,6 +56,8 @@ export function detectNativeAPI(): DetectionResult {
   }
 
   const missingMethods = [
+    !result.supportsProvideContext ? 'provideContext' : null,
+    !result.supportsRegisterTool ? 'registerTool' : null,
     !result.supportsUnregisterTool ? 'unregisterTool' : null,
     !result.supportsClearContext ? 'clearContext' : null,
   ].filter(Boolean);

@@ -326,10 +326,15 @@ function updateToolExecutorSelect(tools: ToolInfo[]): void {
   }
 }
 
-function setBucketATools(tools: Tool[]): void {
+function setBucketATools(tools: Tool[]): boolean {
+  if (typeof modelContext.provideContext !== 'function') {
+    return false;
+  }
+
   modelContext.provideContext({ tools });
   bucketAToolDefinitions = tools;
   bucketATools = tools.map((tool) => tool.name);
+  return true;
 }
 
 function clearKnownTools(): void {
@@ -393,7 +398,10 @@ function provideCounterTools(): void {
     },
   ];
 
-  setBucketATools(tools);
+  if (!setBucketATools(tools)) {
+    eventLog.warning('provideContext() unavailable', 'Bucket A tools are not supported here');
+    return;
+  }
 
   eventLog.success('Bucket A updated', 'Counter tools registered via provideContext()');
   refreshToolDisplay();
@@ -415,7 +423,10 @@ function replaceBucketA(): void {
     },
   };
 
-  setBucketATools([greetTool]);
+  if (!setBucketATools([greetTool])) {
+    eventLog.warning('provideContext() unavailable', 'Bucket A replacement is not supported here');
+    return;
+  }
 
   eventLog.success('Bucket A replaced', 'Old counter tools removed, greet tool added');
   refreshToolDisplay();
@@ -459,6 +470,11 @@ function registerTimerTool(): void {
       }
     },
   };
+
+  if (typeof modelContext.registerTool !== 'function') {
+    eventLog.warning('registerTool() unavailable', 'Bucket B tools are not supported here');
+    return;
+  }
 
   const registration = modelContext.registerTool(timerTool);
   bucketBRegistrations.set('timer', registration);
@@ -541,7 +557,11 @@ function unregisterToolDemo(): void {
   if (typeof modelContext.unregisterTool === 'function') {
     modelContext.unregisterTool(toolName);
   } else {
-    setBucketATools(bucketAToolDefinitions.filter((tool) => tool.name !== toolName));
+    const nextTools = bucketAToolDefinitions.filter((tool) => tool.name !== toolName);
+    if (!setBucketATools(nextTools)) {
+      eventLog.warning('No removal API available', `Could not remove "${toolName}"`);
+      return;
+    }
   }
 
   eventLog.success('unregisterTool() called', `Removed "${toolName}" (native method)`);
@@ -1001,7 +1021,11 @@ function iframeParentRegisterBucketA(): void {
     },
   };
 
-  setBucketATools([tool]);
+  if (!setBucketATools([tool])) {
+    iframeEventLog.log('warning', 'Parent: provideContext is unavailable in this browser');
+    eventLog.warning('Iframe Demo', 'Parent Bucket A registration is unavailable');
+    return;
+  }
 
   iframeEventLog.log('success', 'Parent: Registered parent_greet via provideContext (Bucket A)');
   eventLog.info('Iframe Demo', 'Registered parent_greet in parent context (Bucket A)');
@@ -1028,6 +1052,12 @@ function iframeParentRegisterBucketB(): void {
       return `[Parent Time]: ${new Date().toLocaleTimeString()}`;
     },
   };
+
+  if (typeof modelContext.registerTool !== 'function') {
+    iframeEventLog.log('warning', 'Parent: registerTool is unavailable in this browser');
+    eventLog.warning('Iframe Demo', 'Parent Bucket B registration is unavailable');
+    return;
+  }
 
   const registration = modelContext.registerTool(tool);
   iframeBucketBRegistrations.set('parent_time', registration);

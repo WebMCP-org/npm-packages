@@ -126,9 +126,14 @@ function notifyParent(type: string, data: unknown): void {
   }
 }
 
-function setBucketATools(tools: Tool[]): void {
+function setBucketATools(tools: Tool[]): boolean {
+  if (typeof modelContext.provideContext !== 'function') {
+    return false;
+  }
+
   modelContext.provideContext({ tools });
   bucketATools = tools.map((tool) => tool.name);
+  return true;
 }
 
 /**
@@ -150,7 +155,10 @@ function registerBucketATool(): void {
     },
   };
 
-  setBucketATools([tool]);
+  if (!setBucketATools([tool])) {
+    logEvent('warning', 'provideContext is unavailable in this browser');
+    return;
+  }
 
   logEvent('success', 'Registered iframe_echo via provideContext (Bucket A)');
   notifyParent('tool-registered', { name: 'iframe_echo', bucket: 'A' });
@@ -177,6 +185,11 @@ function registerBucketBTool(): void {
       return `[Iframe Timestamp]: ${new Date().toISOString()}`;
     },
   };
+
+  if (typeof modelContext.registerTool !== 'function') {
+    logEvent('warning', 'registerTool is unavailable in this browser');
+    return;
+  }
 
   const registration = modelContext.registerTool(tool);
   bucketBRegistrations.set('iframe_timestamp', registration);

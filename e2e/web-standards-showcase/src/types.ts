@@ -41,8 +41,8 @@ export interface ProvideContextOptions {
 }
 
 export interface ModelContext extends EventTarget {
-  provideContext(options: ProvideContextOptions): void;
-  registerTool(tool: Tool): ToolRegistration;
+  provideContext?(options: ProvideContextOptions): void;
+  registerTool?(tool: Tool): ToolRegistration;
   listTools(): Tool[];
   executeTool(name: string, input: Record<string, unknown>): Promise<unknown>;
   unregisterTool?(name: string): void;
@@ -80,6 +80,8 @@ export interface DetectionResult {
   isNative: boolean;
   isPolyfill: boolean;
   testingAvailable: boolean;
+  supportsProvideContext: boolean;
+  supportsRegisterTool: boolean;
   supportsUnregisterTool: boolean;
   supportsClearContext: boolean;
   message: string;
