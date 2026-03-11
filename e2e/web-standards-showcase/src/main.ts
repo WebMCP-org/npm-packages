@@ -16,7 +16,8 @@ let modelContextTesting: ModelContextTesting;
 
 // Bucket tracking
 let bucketATools: string[] = [];
-const bucketBRegistrations = new Map<string, { unregister: () => void }>();
+let bucketAToolDefinitions: Tool[] = [];
+const bucketBRegistrations = new Map<string, { unregister?: () => void }>();
 
 // Iframe context tracking
 let iframeReady = false;
@@ -325,6 +326,31 @@ function updateToolExecutorSelect(tools: ToolInfo[]): void {
   }
 }
 
+function setBucketATools(tools: Tool[]): void {
+  modelContext.provideContext({ tools });
+  bucketAToolDefinitions = tools;
+  bucketATools = tools.map((tool) => tool.name);
+}
+
+function clearKnownTools(): void {
+  if (typeof modelContext.clearContext === 'function') {
+    modelContext.clearContext();
+  } else {
+    setBucketATools([]);
+    for (const [toolName, registration] of bucketBRegistrations.entries()) {
+      if (typeof registration.unregister === 'function') {
+        registration.unregister();
+      } else if (typeof modelContext.unregisterTool === 'function') {
+        modelContext.unregisterTool(toolName);
+      }
+    }
+  }
+
+  bucketAToolDefinitions = [];
+  bucketATools = [];
+  bucketBRegistrations.clear();
+}
+
 // ==================== Two-Bucket Demos ====================
 
 function provideCounterTools(): void {
@@ -367,8 +393,7 @@ function provideCounterTools(): void {
     },
   ];
 
-  modelContext.provideContext({ tools });
-  bucketATools = tools.map((t) => t.name);
+  setBucketATools(tools);
 
   eventLog.success('Bucket A updated', 'Counter tools registered via provideContext()');
   refreshToolDisplay();
@@ -390,8 +415,7 @@ function replaceBucketA(): void {
     },
   };
 
-  modelContext.provideContext({ tools: [greetTool] });
-  bucketATools = ['greet'];
+  setBucketATools([greetTool]);
 
   eventLog.success('Bucket A replaced', 'Old counter tools removed, greet tool added');
   refreshToolDisplay();
@@ -446,7 +470,11 @@ function registerTimerTool(): void {
 function unregisterTimerTool(): void {
   const registration = bucketBRegistrations.get('timer');
   if (registration) {
-    registration.unregister();
+    if (typeof registration.unregister === 'function') {
+      registration.unregister();
+    } else if (typeof modelContext.unregisterTool === 'function') {
+      modelContext.unregisterTool('timer');
+    }
     bucketBRegistrations.delete('timer');
     eventLog.success('Tool unregistered', 'Timer tool removed from Bucket B');
     refreshToolDisplay();
@@ -510,16 +538,18 @@ function unregisterToolDemo(): void {
   }
 
   const toolName = bucketATools[0];
-  modelContext.unregisterTool(toolName);
+  if (typeof modelContext.unregisterTool === 'function') {
+    modelContext.unregisterTool(toolName);
+  } else {
+    setBucketATools(bucketAToolDefinitions.filter((tool) => tool.name !== toolName));
+  }
 
   eventLog.success('unregisterTool() called', `Removed "${toolName}" (native method)`);
   refreshToolDisplay();
 }
 
 function clearContextDemo(): void {
-  modelContext.clearContext();
-  bucketATools = [];
-  bucketBRegistrations.clear();
+  clearKnownTools();
 
   eventLog.success('clearContext() called', 'All tools cleared (native method)');
   refreshToolDisplay();
@@ -971,7 +1001,7 @@ function iframeParentRegisterBucketA(): void {
     },
   };
 
-  modelContext.provideContext({ tools: [tool] });
+  setBucketATools([tool]);
 
   iframeEventLog.log('success', 'Parent: Registered parent_greet via provideContext (Bucket A)');
   eventLog.info('Iframe Demo', 'Registered parent_greet in parent context (Bucket A)');
@@ -1018,7 +1048,11 @@ function iframeParentRegisterBucketB(): void {
 function iframeParentUnregisterBucketB(): void {
   const registration = iframeBucketBRegistrations.get('parent_time');
   if (registration) {
-    registration.unregister();
+    if (typeof registration.unregister === 'function') {
+      registration.unregister();
+    } else if (typeof modelContext.unregisterTool === 'function') {
+      modelContext.unregisterTool('parent_time');
+    }
     iframeBucketBRegistrations.delete('parent_time');
 
     const btn = document.getElementById('iframe-parent-unregister-b') as HTMLButtonElement;
@@ -1036,7 +1070,7 @@ function iframeParentUnregisterBucketB(): void {
  * Clear parent context
  */
 function iframeParentClearContext(): void {
-  modelContext.clearContext();
+  clearKnownTools();
 
   iframeEventLog.log('info', 'Parent: Context cleared (Bucket A removed)');
   eventLog.info('Iframe Demo', 'Parent context cleared');

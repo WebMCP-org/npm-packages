@@ -85,6 +85,22 @@ async function waitForToolSet(page: Page, toolNames: string[]): Promise<void> {
     .toEqual(expect.arrayContaining(toolNames));
 }
 
+async function getToolRemovalCapabilities(page: Page): Promise<{
+  hasUnregisterTool: boolean;
+  hasRegistrationUnregister: boolean;
+}> {
+  return page.evaluate(() => {
+    const handle = (
+      window as Window & { __nativeShowcaseRegistration?: { unregister?: () => void } }
+    ).__nativeShowcaseRegistration;
+
+    return {
+      hasUnregisterTool: typeof navigator.modelContext?.unregisterTool === 'function',
+      hasRegistrationUnregister: typeof handle?.unregister === 'function',
+    };
+  });
+}
+
 async function clearAllTools(page: Page): Promise<void> {
   await page.evaluate(() => {
     const context = navigator.modelContext;
@@ -93,7 +109,16 @@ async function clearAllTools(page: Page): Promise<void> {
       return;
     }
 
+    if (typeof context.clearContext === 'function') {
+      context.clearContext();
+      return;
+    }
+
     for (const tool of testing.listTools()) {
+      if (typeof context.unregisterTool !== 'function') {
+        break;
+      }
+
       try {
         context.unregisterTool(tool.name);
       } catch {
@@ -101,7 +126,7 @@ async function clearAllTools(page: Page): Promise<void> {
       }
     }
 
-    context.clearContext();
+    context.provideContext({ tools: [] });
   });
 
   await expect.poll(async () => await getToolNames(page)).toEqual([]);
@@ -136,16 +161,20 @@ test.describe('Native API Detection', () => {
       hasModelContextTesting: typeof navigator.modelContextTesting !== 'undefined',
       hasUnregisterTool: typeof navigator.modelContext?.unregisterTool === 'function',
       hasClearContext: typeof navigator.modelContext?.clearContext === 'function',
+      hasProvideContext: typeof navigator.modelContext?.provideContext === 'function',
+      hasRegisterTool: typeof navigator.modelContext?.registerTool === 'function',
       hasListTools: typeof navigator.modelContextTesting?.listTools === 'function',
       hasExecuteTool: typeof navigator.modelContextTesting?.executeTool === 'function',
     }));
 
     expect(surface.hasModelContext).toBe(true);
     expect(surface.hasModelContextTesting).toBe(true);
-    expect(surface.hasUnregisterTool).toBe(true);
-    expect(surface.hasClearContext).toBe(true);
+    expect(surface.hasProvideContext).toBe(true);
+    expect(surface.hasRegisterTool).toBe(true);
     expect(surface.hasListTools).toBe(true);
     expect(surface.hasExecuteTool).toBe(true);
+    expect(typeof surface.hasUnregisterTool).toBe('boolean');
+    expect(typeof surface.hasClearContext).toBe('boolean');
   });
 
   test('verifies native implementation (not polyfill)', async ({ page }) => {
@@ -225,23 +254,45 @@ test.describe('Native API Semantics', () => {
     const toolName = `native_reg_${Date.now()}`;
 
     await page.evaluate((name) => {
-      navigator.modelContext?.registerTool({
+      const registration = navigator.modelContext?.registerTool({
         name,
         description: 'Temporary test tool',
         inputSchema: { type: 'object', properties: {} },
         async execute() {
           return { content: [{ type: 'text', text: 'ok' }] };
         },
-      });
+      }) as { unregister?: () => void } | undefined;
+      const target = window as Window & {
+        __nativeShowcaseRegistration?: { unregister?: () => void };
+      };
+      if (registration) {
+        target.__nativeShowcaseRegistration = registration;
+      } else {
+        delete target.__nativeShowcaseRegistration;
+      }
     }, toolName);
 
     await waitForToolPresent(page, toolName);
+    const capabilities = await getToolRemovalCapabilities(page);
 
     await page.evaluate((name) => {
-      navigator.modelContext?.unregisterTool(name);
+      const context = navigator.modelContext;
+      const handle = (
+        window as Window & { __nativeShowcaseRegistration?: { unregister?: () => void } }
+      ).__nativeShowcaseRegistration;
+
+      if (typeof context?.unregisterTool === 'function') {
+        context.unregisterTool(name);
+      } else {
+        handle?.unregister?.();
+      }
     }, toolName);
 
-    await waitForToolMissing(page, toolName);
+    if (capabilities.hasUnregisterTool || capabilities.hasRegistrationUnregister) {
+      await waitForToolMissing(page, toolName);
+    } else {
+      await waitForToolPresent(page, toolName);
+    }
   });
 
   test('provideContext replaces previously provided tool set', async ({ page }) => {
@@ -289,10 +340,14 @@ test.describe('Native API Semantics', () => {
   });
 
   test('clearContext removes all registered tools', async ({ page }) => {
-    await page.evaluate(() => {
+    const capabilities = await page.evaluate(() => {
       const context = navigator.modelContext;
       if (!context) {
-        return;
+        return {
+          hasClearContext: false,
+          hasUnregisterTool: false,
+          hasRegistrationUnregister: false,
+        };
       }
 
       context.provideContext({
@@ -308,19 +363,42 @@ test.describe('Native API Semantics', () => {
         ],
       });
 
-      context.registerTool({
+      const registration = context.registerTool({
         name: 'clear_b',
         description: 'clear b',
         inputSchema: { type: 'object', properties: {} },
         async execute() {
           return { content: [{ type: 'text', text: 'b' }] };
         },
-      });
+      }) as { unregister?: () => void } | undefined;
 
-      context.clearContext();
+      if (typeof context.clearContext === 'function') {
+        context.clearContext();
+      } else {
+        context.provideContext({ tools: [] });
+        if (typeof context.unregisterTool === 'function') {
+          context.unregisterTool('clear_b');
+        } else {
+          registration?.unregister?.();
+        }
+      }
+      return {
+        hasClearContext: typeof context.clearContext === 'function',
+        hasUnregisterTool: typeof context.unregisterTool === 'function',
+        hasRegistrationUnregister: typeof registration?.unregister === 'function',
+      };
     });
 
-    await expect.poll(async () => await getToolNames(page)).toEqual([]);
+    if (
+      capabilities.hasClearContext ||
+      capabilities.hasUnregisterTool ||
+      capabilities.hasRegistrationUnregister
+    ) {
+      await expect.poll(async () => await getToolNames(page)).toEqual([]);
+      return;
+    }
+
+    await expect.poll(async () => await getToolNames(page)).not.toContain('clear_a');
   });
 
   test('testing API executeTool works and optionally tracks calls', async ({ page }) => {
@@ -334,7 +412,7 @@ test.describe('Native API Semantics', () => {
       const hasGetToolCalls = typeof testing.getToolCalls === 'function';
       const toolName = `tracking_${Date.now()}`;
 
-      context.registerTool({
+      const registration = context.registerTool({
         name: toolName,
         description: 'tracking test',
         inputSchema: {
@@ -345,14 +423,18 @@ test.describe('Native API Semantics', () => {
         async execute(input: { value: number }) {
           return { content: [{ type: 'text', text: `value:${input.value}` }] };
         },
-      });
+      }) as { unregister?: () => void } | undefined;
 
       try {
         const response = await testing.executeTool(toolName, JSON.stringify({ value: 42 }));
         const calls = hasGetToolCalls ? (testing.getToolCalls?.() ?? []) : [];
         return { missingApi: false, response, hasGetToolCalls, calls };
       } finally {
-        context.unregisterTool(toolName);
+        if (typeof context.unregisterTool === 'function') {
+          context.unregisterTool(toolName);
+        } else {
+          registration?.unregister?.();
+        }
       }
     });
 

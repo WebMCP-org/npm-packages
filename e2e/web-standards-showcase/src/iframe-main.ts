@@ -9,7 +9,7 @@ import type { ModelContext, Tool } from './types';
 // State tracking
 let modelContext: ModelContext;
 let bucketATools: string[] = [];
-const bucketBRegistrations = new Map<string, { unregister: () => void }>();
+const bucketBRegistrations = new Map<string, { unregister?: () => void }>();
 
 /**
  * Initialize the iframe application
@@ -126,6 +126,11 @@ function notifyParent(type: string, data: unknown): void {
   }
 }
 
+function setBucketATools(tools: Tool[]): void {
+  modelContext.provideContext({ tools });
+  bucketATools = tools.map((tool) => tool.name);
+}
+
 /**
  * Register a tool via provideContext (Bucket A)
  */
@@ -145,8 +150,7 @@ function registerBucketATool(): void {
     },
   };
 
-  modelContext.provideContext({ tools: [tool] });
-  bucketATools = ['iframe_echo'];
+  setBucketATools([tool]);
 
   logEvent('success', 'Registered iframe_echo via provideContext (Bucket A)');
   notifyParent('tool-registered', { name: 'iframe_echo', bucket: 'A' });
@@ -193,7 +197,11 @@ function registerBucketBTool(): void {
 function unregisterBucketBTool(): void {
   const registration = bucketBRegistrations.get('iframe_timestamp');
   if (registration) {
-    registration.unregister();
+    if (typeof registration.unregister === 'function') {
+      registration.unregister();
+    } else if (typeof modelContext.unregisterTool === 'function') {
+      modelContext.unregisterTool('iframe_timestamp');
+    }
     bucketBRegistrations.delete('iframe_timestamp');
 
     const unregisterBtn = document.getElementById('unregister-iframe-tool-b') as HTMLButtonElement;
@@ -211,7 +219,19 @@ function unregisterBucketBTool(): void {
  * Clear context (removes Bucket A tools)
  */
 function clearContext(): void {
-  modelContext.clearContext();
+  if (typeof modelContext.clearContext === 'function') {
+    modelContext.clearContext();
+  } else {
+    setBucketATools([]);
+    for (const [toolName, registration] of bucketBRegistrations.entries()) {
+      if (typeof registration.unregister === 'function') {
+        registration.unregister();
+      } else if (typeof modelContext.unregisterTool === 'function') {
+        modelContext.unregisterTool(toolName);
+      }
+    }
+    bucketBRegistrations.clear();
+  }
   bucketATools = [];
 
   logEvent('success', 'Context cleared (Bucket A tools removed)');

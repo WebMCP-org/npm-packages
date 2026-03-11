@@ -33,7 +33,7 @@ export interface Tool {
 }
 
 export interface ToolRegistration {
-  unregister: () => void;
+  unregister?: () => void;
 }
 
 export interface ProvideContextOptions {
@@ -45,8 +45,8 @@ export interface ModelContext extends EventTarget {
   registerTool(tool: Tool): ToolRegistration;
   listTools(): Tool[];
   executeTool(name: string, input: Record<string, unknown>): Promise<unknown>;
-  unregisterTool(name: string): void;
-  clearContext(): void;
+  unregisterTool?(name: string): void;
+  clearContext?(): void;
 }
 
 export interface ToolInfo {
@@ -80,5 +80,7 @@ export interface DetectionResult {
   isNative: boolean;
   isPolyfill: boolean;
   testingAvailable: boolean;
+  supportsUnregisterTool: boolean;
+  supportsClearContext: boolean;
   message: string;
 }

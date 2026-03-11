@@ -11,6 +11,8 @@ export function detectNativeAPI(): DetectionResult {
     isNative: false,
     isPolyfill: false,
     testingAvailable: false,
+    supportsUnregisterTool: false,
+    supportsClearContext: false,
     message: '',
   };
 
@@ -40,20 +42,21 @@ export function detectNativeAPI(): DetectionResult {
     }
   }
 
-  // Additional check: native API should have Chromium-specific methods
-  const hasNativeMethods =
-    typeof navigator.modelContext.unregisterTool === 'function' &&
-    typeof navigator.modelContext.clearContext === 'function';
+  result.supportsUnregisterTool = typeof navigator.modelContext.unregisterTool === 'function';
+  result.supportsClearContext = typeof navigator.modelContext.clearContext === 'function';
 
-  if (!hasNativeMethods) {
-    result.isPolyfill = true;
-    result.isNative = false;
-    result.message = 'Missing native methods (unregisterTool, clearContext). Polyfill detected.';
+  result.isNative = true;
+  if (result.supportsUnregisterTool && result.supportsClearContext) {
+    result.message = 'Native Chromium Web Model Context API detected!';
     return result;
   }
 
-  result.isNative = true;
-  result.message = 'Native Chromium Web Model Context API detected!';
+  const missingMethods = [
+    !result.supportsUnregisterTool ? 'unregisterTool' : null,
+    !result.supportsClearContext ? 'clearContext' : null,
+  ].filter(Boolean);
+
+  result.message = `Native Chromium Web Model Context API detected (partial native surface: missing ${missingMethods.join(', ')}).`;
   return result;
 }
 
