@@ -23,7 +23,7 @@ const bucketBRegistrations = new Map<string, { unregister?: () => void }>();
 let iframeReady = false;
 let iframeTools: string[] = [];
 let iframeBucketBTools: string[] = [];
-const iframeBucketBRegistrations = new Map<string, { unregister: () => void }>();
+const iframeBucketBRegistrations = new Map<string, { unregister?: () => void }>();
 
 // Iframe event log
 class IframeEventLog {
