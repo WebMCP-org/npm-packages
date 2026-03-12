@@ -608,6 +608,30 @@ describe('widget runtime', () => {
     });
   });
 
+  it('ignores invoke messages with invalid tool names', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const env = startRuntime();
+    const connection = await completeHandshake(env);
+
+    connection.client.send(
+      JSON.stringify({
+        args: { a: 1 },
+        callId: 'call-invalid',
+        toolName: '',
+        type: 'invoke',
+      })
+    );
+
+    await vi.waitFor(() => {
+      expect(warn).toHaveBeenCalledWith(
+        '[webmcp-relay-widget] Ignoring invoke with invalid toolName'
+      );
+    });
+
+    expect(getPostedMessages(env, 'webmcp.tools.invoke.request')).toHaveLength(0);
+    expect(connection.messages).toHaveLength(2);
+  });
+
   it('normalizes invoke errors and non-object args into relay error results', async () => {
     const env = startRuntime();
     const connection = await completeHandshake(env);
