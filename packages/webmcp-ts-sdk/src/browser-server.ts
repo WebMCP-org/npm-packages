@@ -428,6 +428,12 @@ export class BrowserMcpServer extends BaseMcpServer {
     }
   }
 
+  private clearRegisteredTools(): void {
+    for (const name of Object.keys(this._parentTools)) {
+      this.unregisterTool(name);
+    }
+  }
+
   // @ts-expect-error -- WebMCP API: (descriptor) vs MCP SDK: (name, uri, config, readCallback)
   override registerResource(descriptor: {
     uri: string;
@@ -487,10 +493,7 @@ export class BrowserMcpServer extends BaseMcpServer {
 
   provideContext(options?: ModelContextOptions): void {
     this.warnProvideContextDeprecationOnce();
-
-    for (const name of Object.keys(this._parentTools)) {
-      this.unregisterTool(name);
-    }
+    this.clearRegisteredTools();
 
     for (const tool of options?.tools ?? []) {
       this.registerTool(tool);
@@ -499,10 +502,7 @@ export class BrowserMcpServer extends BaseMcpServer {
 
   clearContext(): void {
     this.warnClearContextDeprecationOnce();
-
-    for (const name of Object.keys(this._parentTools)) {
-      this.unregisterTool(name);
-    }
+    this.clearRegisteredTools();
     // Note: _promptSchemas is NOT cleared here. clearContext() is a WebMCP standard
     // method that only handles tools. Prompt schemas are cleaned up individually
     // via the unregister() callback returned by registerPrompt().

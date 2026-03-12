@@ -12,17 +12,25 @@ function getModelContext(): BrowserMcpServer {
   return navigator.modelContext as unknown as BrowserMcpServer;
 }
 
-function createNativeModelContextStub(): Navigator['modelContext'] {
-  return {
+function createNativeModelContextStub(options?: {
+  includeClearContext?: boolean;
+}): Navigator['modelContext'] {
+  const includeClearContext = options?.includeClearContext ?? true;
+  const nativeContext: Record<string, unknown> = {
     provideContext: () => {},
     registerTool: () => {},
     unregisterTool: () => {},
-    clearContext: () => {},
     listTools: () => [],
     addEventListener: () => {},
     removeEventListener: () => {},
     dispatchEvent: () => true,
-  } as unknown as Navigator['modelContext'];
+  };
+
+  if (includeClearContext) {
+    nativeContext.clearContext = () => {};
+  }
+
+  return nativeContext as unknown as Navigator['modelContext'];
 }
 
 function setTestingShim(value: unknown): void {
@@ -84,6 +92,67 @@ describe('global adapter', () => {
     cleanupWebModelContext();
     expect(navigator.modelContext).toBe(nativeContext);
     delete (navigator as unknown as Record<string, unknown>).modelContext;
+  });
+
+  it('falls back to unregisterTool when native clearContext is unavailable', () => {
+    const nativeContext = {
+      provideContext: vi.fn(),
+      registerTool: vi.fn(),
+      unregisterTool: vi.fn(),
+      listTools: () => [],
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => true,
+    };
+
+    Object.defineProperty(navigator, 'modelContext', {
+      configurable: true,
+      enumerable: true,
+      writable: true,
+      value: nativeContext as unknown as Navigator['modelContext'],
+    });
+    setTestingShim({
+      listTools: () => [],
+      executeTool: vi.fn(async () => JSON.stringify({ content: [] })),
+    });
+
+    try {
+      initializeWebModelContext();
+      const modelContext = getModelContext();
+
+      modelContext.registerTool({
+        name: 'existing_native_tool',
+        description: 'Existing native tool',
+        inputSchema: { type: 'object', properties: {} },
+        async execute() {
+          return { content: [{ type: 'text', text: 'existing' }] };
+        },
+      });
+
+      expect(() =>
+        modelContext.provideContext({
+          tools: [
+            {
+              name: 'replacement_native_tool',
+              description: 'Replacement native tool',
+              inputSchema: { type: 'object', properties: {} },
+              async execute() {
+                return { content: [{ type: 'text', text: 'replacement' }] };
+              },
+            },
+          ],
+        })
+      ).not.toThrow();
+
+      expect(nativeContext.unregisterTool).toHaveBeenCalledWith('existing_native_tool');
+
+      expect(() => modelContext.clearContext()).not.toThrow();
+      expect(nativeContext.unregisterTool).toHaveBeenCalledWith('replacement_native_tool');
+    } finally {
+      clearTestingShim();
+      cleanupWebModelContext();
+      delete (navigator as unknown as Record<string, unknown>).modelContext;
+    }
   });
 
   it('init replaces navigator.modelContext with BrowserMcpServer', () => {
