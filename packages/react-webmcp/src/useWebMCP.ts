@@ -1,8 +1,4 @@
-import type {
-  CallToolResult,
-  InputSchema,
-  ToolDescriptor,
-} from '@mcp-b/webmcp-types';
+import type { CallToolResult, InputSchema, ToolDescriptor } from '@mcp-b/webmcp-types';
 import type { DependencyList } from 'react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type {

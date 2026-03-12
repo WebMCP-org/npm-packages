@@ -246,9 +246,6 @@ function writeCachedEndpoint(config: WidgetConfig, endpoint: RelayEndpoint): voi
 
 function buildDiscoveryCandidates(config: WidgetConfig): Array<{ host: string; port: number }> {
   const cached = readCachedEndpoint(config);
-  const hosts = [config.relayHostHint, '127.0.0.1', '[::1]'].filter(
-    (host, index, values) => values.indexOf(host) === index
-  );
   const seen = new Set<string>();
   const candidates: Array<{ host: string; port: number }> = [];
 

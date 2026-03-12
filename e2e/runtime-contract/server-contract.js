@@ -7,17 +7,20 @@ import {
 
 function removeHandle(handle) {
   if (!handle) {
-    return;
+    return false;
   }
 
   if (typeof handle.remove === 'function') {
     handle.remove();
-    return;
+    return true;
   }
 
   if (typeof handle.unregister === 'function') {
     handle.unregister();
+    return true;
   }
+
+  return false;
 }
 
 function registerServerTool(server, tool) {
@@ -57,14 +60,16 @@ export function installServerRuntimeContract(server, options = {}) {
         return false;
       }
       const tool = definitions.createDynamicTool();
-      state.dynamicHandle = registerServerTool(server, tool);
+      state.dynamicHandle = registerServerTool(server, tool) ?? { name: dynamicToolName };
       return true;
     },
     (name = dynamicToolName) => {
       if (name !== dynamicToolName || !state.dynamicHandle) {
         return false;
       }
-      removeHandle(state.dynamicHandle);
+      if (!removeHandle(state.dynamicHandle) && typeof server.unregisterTool === 'function') {
+        server.unregisterTool(name);
+      }
       state.dynamicHandle = null;
       return true;
     }
