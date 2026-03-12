@@ -230,6 +230,7 @@ async function evaluateCallTool(
             };
           }
 
+          const trimmed = serialized.trim();
           try {
             return {
               kind: 'success' as const,
@@ -237,6 +238,20 @@ async function evaluateCallTool(
               value: JSON.parse(serialized),
             };
           } catch {
+            // Native modelContextTesting can return a plain text string for
+            // simple tool results. Preserve invalid JSON errors for payloads
+            // that look like structured data but fail to parse.
+            if (
+              trimmed.length > 0 &&
+              !['{', '[', '"'].includes(trimmed[0]) &&
+              !/^[-\d]/.test(trimmed[0])
+            ) {
+              return {
+                kind: 'success' as const,
+                api: 'modelContextTesting' as const,
+                value: serialized,
+              };
+            }
             return {
               kind: 'error' as const,
               message: `Testing tool returned invalid JSON: ${serialized.slice(0, 200)}`,

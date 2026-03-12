@@ -9,7 +9,7 @@ import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
-import {NetworkFormatter} from '../src/formatters/NetworkFormatter.js';
+import {NetworkFormatter} from '../src/formatters/networkFormatter.js';
 import type {HTTPResponse} from '../src/third_party/index.js';
 import type {TraceResult} from '../src/trace-processing/parse.js';
 

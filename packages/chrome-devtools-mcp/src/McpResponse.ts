@@ -5,10 +5,10 @@
  */
 
 import type {ParsedArguments} from './bin/chrome-devtools-mcp-cli-options.js';
-import {ConsoleFormatter} from './formatters/ConsoleFormatter.js';
+import {ConsoleFormatter} from './formatters/consoleFormatter.js';
 import {IssueFormatter} from './formatters/IssueFormatter.js';
-import {NetworkFormatter} from './formatters/NetworkFormatter.js';
-import {SnapshotFormatter} from './formatters/SnapshotFormatter.js';
+import {NetworkFormatter} from './formatters/networkFormatter.js';
+import {SnapshotFormatter} from './formatters/snapshotFormatter.js';
 import type {McpContext} from './McpContext.js';
 import type {McpPage} from './McpPage.js';
 import {UncaughtError} from './PageCollector.js';

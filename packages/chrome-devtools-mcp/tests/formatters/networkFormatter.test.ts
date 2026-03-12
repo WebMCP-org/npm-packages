@@ -10,7 +10,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {afterEach, beforeEach, describe, it} from 'node:test';
 
-import {NetworkFormatter} from '../../src/formatters/NetworkFormatter.js';
+import {NetworkFormatter} from '../../src/formatters/networkFormatter.js';
 import type {HTTPRequest} from '../../src/third_party/index.js';
 import {getMockRequest, getMockResponse} from '../utils.js';
 

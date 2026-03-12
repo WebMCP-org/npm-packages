@@ -76,6 +76,7 @@ function buildTestingPage(options: {
   invalidSchema?: boolean;
   invalidJson?: boolean;
   nullResult?: boolean;
+  plainTextResult?: boolean;
 } = {}): string {
   return html`
     <script>
@@ -106,6 +107,10 @@ function buildTestingPage(options: {
 
           if (${JSON.stringify(options.invalidJson ?? false)}) {
             return '{"broken"';
+          }
+
+          if (${JSON.stringify(options.plainTextResult ?? false)}) {
+            return 'plain:' + name;
           }
 
           const args = JSON.parse(serializedArgs);
@@ -399,6 +404,30 @@ describe('webmcp tools', () => {
         const result = await response.handle(callWebMCPTool.name, context);
         assert.deepStrictEqual(stripUndefined(result.content), [
           {type: 'text', text: 'echo:hi'},
+        ]);
+      });
+    });
+
+    it('accepts plain text results from the native testing fallback', async () => {
+      await withMcpContext(async (_response, context) => {
+        await context
+          .getSelectedMcpPage()
+          .pptrPage.setContent(buildTestingPage({plainTextResult: true}));
+
+        const response = new McpResponse({} as ParsedArguments);
+        await callWebMCPTool.handler(
+          {
+            params: {
+              name: 'testing_echo',
+            },
+          },
+          response,
+          context,
+        );
+
+        const result = await response.handle(callWebMCPTool.name, context);
+        assert.deepStrictEqual(stripUndefined(result.content), [
+          {type: 'text', text: 'plain:testing_echo'},
         ]);
       });
     });
