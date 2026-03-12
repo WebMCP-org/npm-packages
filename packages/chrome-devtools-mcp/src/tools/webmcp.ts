@@ -4,11 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { EmbeddedResource, ImageContent, Page, TextContent } from '../third_party/index.js';
-import { zod } from '../third_party/index.js';
+import type {
+  EmbeddedResource,
+  ImageContent,
+  Page,
+  TextContent,
+} from '../third_party/index.js';
+import {zod} from '../third_party/index.js';
 
-import { ToolCategory } from './categories.js';
-import { defineTool } from './ToolDefinition.js';
+import {ToolCategory} from './categories.js';
+import {defineTool} from './ToolDefinition.js';
 
 const DEFAULT_INPUT_SCHEMA = {
   type: 'object',
@@ -64,9 +69,9 @@ function jsonStringify(value: unknown): string {
 
 function normalizeToolMetadata(
   pageId: number,
-  tools: BrowserToolMetadata[]
-): Array<BrowserToolMetadata & { pageId: number }> {
-  return tools.map((tool) => ({
+  tools: BrowserToolMetadata[],
+): Array<BrowserToolMetadata & {pageId: number}> {
+  return tools.map(tool => ({
     ...tool,
     pageId,
   }));
@@ -79,13 +84,10 @@ function summarizeDescription(description: string): string {
   return summary.length > 120 ? `${summary.slice(0, 117)}...` : summary;
 }
 
-function resolvePage(
-  context: {
-    getPageById(pageId: number): { pptrPage: Page };
-    getSelectedMcpPage(): { id: number; pptrPage: Page };
-  },
-  pageId?: number
-) {
+function resolvePage(context: {
+  getPageById(pageId: number): {pptrPage: Page};
+  getSelectedMcpPage(): {id: number; pptrPage: Page};
+}, pageId?: number) {
   if (pageId !== undefined) {
     return {
       id: pageId,
@@ -96,7 +98,7 @@ function resolvePage(
 }
 
 async function evaluateListTools(page: Page): Promise<BrowserListToolsResult> {
-  return page.evaluate(async (defaultInputSchema) => {
+  return page.evaluate(async defaultInputSchema => {
     function isObject(value: unknown): value is Record<string, unknown> {
       return typeof value === 'object' && value !== null && !Array.isArray(value);
     }
@@ -133,11 +135,12 @@ async function evaluateListTools(page: Page): Promise<BrowserListToolsResult> {
         kind: 'available' as const,
         api: 'modelContext' as const,
         tools: Array.isArray(tools)
-          ? tools.map((tool) => {
+          ? tools.map(tool => {
               const raw = isObject(tool) ? tool : {};
               return {
                 name: typeof raw.name === 'string' ? raw.name : '',
-                description: typeof raw.description === 'string' ? raw.description : '',
+                description:
+                  typeof raw.description === 'string' ? raw.description : '',
                 inputSchema: normalizeCoreSchema(raw.inputSchema),
               };
             })
@@ -145,17 +148,21 @@ async function evaluateListTools(page: Page): Promise<BrowserListToolsResult> {
       };
     }
 
-    if (nav.modelContextTesting && typeof nav.modelContextTesting.listTools === 'function') {
+    if (
+      nav.modelContextTesting &&
+      typeof nav.modelContextTesting.listTools === 'function'
+    ) {
       const tools = await nav.modelContextTesting.listTools();
       return {
         kind: 'available' as const,
         api: 'modelContextTesting' as const,
         tools: Array.isArray(tools)
-          ? tools.map((tool) => {
+          ? tools.map(tool => {
               const raw = isObject(tool) ? tool : {};
               return {
                 name: typeof raw.name === 'string' ? raw.name : '',
-                description: typeof raw.description === 'string' ? raw.description : '',
+                description:
+                  typeof raw.description === 'string' ? raw.description : '',
                 inputSchema: normalizeTestingSchema(raw.inputSchema),
               };
             })
@@ -174,27 +181,29 @@ async function evaluateListTools(page: Page): Promise<BrowserListToolsResult> {
 async function evaluateCallTool(
   page: Page,
   name: string,
-  args: JsonObject
+  args: JsonObject,
 ): Promise<BrowserCallToolResult> {
   return page.evaluate(
-    async ({ toolName, toolArgs }) => {
+    async ({toolName, toolArgs}) => {
       const nav = navigator as Navigator & {
         modelContext?: {
-          callTool?: (request: {
-            name: string;
-            arguments: Record<string, unknown>;
-          }) => unknown | Promise<unknown>;
+          callTool?: (
+            request: {name: string; arguments: Record<string, unknown>},
+          ) => unknown | Promise<unknown>;
         };
         modelContextTesting?: {
           executeTool?: (
             toolName: string,
-            serializedArgs: string
+            serializedArgs: string,
           ) => string | null | Promise<string | null>;
         };
       };
 
       try {
-        if (nav.modelContext && typeof nav.modelContext.callTool === 'function') {
+        if (
+          nav.modelContext &&
+          typeof nav.modelContext.callTool === 'function'
+        ) {
           return {
             kind: 'success' as const,
             api: 'modelContext' as const,
@@ -205,10 +214,13 @@ async function evaluateCallTool(
           };
         }
 
-        if (nav.modelContextTesting && typeof nav.modelContextTesting.executeTool === 'function') {
+        if (
+          nav.modelContextTesting &&
+          typeof nav.modelContextTesting.executeTool === 'function'
+        ) {
           const serialized = await nav.modelContextTesting.executeTool(
             toolName,
-            JSON.stringify(toolArgs)
+            JSON.stringify(toolArgs),
           );
           if (serialized === null) {
             return {
@@ -218,7 +230,6 @@ async function evaluateCallTool(
             };
           }
 
-          const trimmed = serialized.trim();
           try {
             return {
               kind: 'success' as const,
@@ -226,20 +237,6 @@ async function evaluateCallTool(
               value: JSON.parse(serialized),
             };
           } catch {
-            // Native modelContextTesting can return a plain text string for
-            // simple tool results. Preserve invalid JSON errors for payloads
-            // that look like structured data but fail to parse.
-            if (
-              trimmed.length > 0 &&
-              !['{', '[', '"'].includes(trimmed[0]) &&
-              !/^[-\d]/.test(trimmed[0])
-            ) {
-              return {
-                kind: 'success' as const,
-                api: 'modelContextTesting' as const,
-                value: serialized,
-              };
-            }
             return {
               kind: 'error' as const,
               message: `Testing tool returned invalid JSON: ${serialized.slice(0, 200)}`,
@@ -255,18 +252,21 @@ async function evaluateCallTool(
       } catch (error) {
         return {
           kind: 'error' as const,
-          message: error instanceof Error ? error.message : String(error),
+          message:
+            error instanceof Error ? error.message : String(error),
         };
       }
     },
     {
       toolName: name,
       toolArgs: args,
-    }
+    },
   );
 }
 
-function normalizeResource(value: unknown): EmbeddedResource['resource'] | null {
+function normalizeResource(
+  value: unknown,
+): EmbeddedResource['resource'] | null {
   if (!isJsonObject(value) || typeof value.uri !== 'string') {
     return null;
   }
@@ -275,7 +275,8 @@ function normalizeResource(value: unknown): EmbeddedResource['resource'] | null 
     return {
       uri: value.uri,
       text: value.text,
-      mimeType: typeof value.mimeType === 'string' ? value.mimeType : undefined,
+      mimeType:
+        typeof value.mimeType === 'string' ? value.mimeType : undefined,
       _meta: isJsonObject(value._meta) ? value._meta : undefined,
     };
   }
@@ -284,7 +285,8 @@ function normalizeResource(value: unknown): EmbeddedResource['resource'] | null 
     return {
       uri: value.uri,
       blob: value.blob,
-      mimeType: typeof value.mimeType === 'string' ? value.mimeType : undefined,
+      mimeType:
+        typeof value.mimeType === 'string' ? value.mimeType : undefined,
       _meta: isJsonObject(value._meta) ? value._meta : undefined,
     };
   }
@@ -298,7 +300,9 @@ function normalizeContentBlock(value: unknown): WebMcpContentBlock {
       return {
         type: 'text',
         text: value.text,
-        annotations: isJsonObject(value.annotations) ? value.annotations : undefined,
+        annotations: isJsonObject(value.annotations)
+          ? value.annotations
+          : undefined,
         _meta: isJsonObject(value._meta) ? value._meta : undefined,
       };
     }
@@ -312,7 +316,9 @@ function normalizeContentBlock(value: unknown): WebMcpContentBlock {
         type: 'image',
         data: value.data,
         mimeType: value.mimeType,
-        annotations: isJsonObject(value.annotations) ? value.annotations : undefined,
+        annotations: isJsonObject(value.annotations)
+          ? value.annotations
+          : undefined,
         _meta: isJsonObject(value._meta) ? value._meta : undefined,
       };
     }
@@ -323,7 +329,9 @@ function normalizeContentBlock(value: unknown): WebMcpContentBlock {
         return {
           type: 'resource',
           resource,
-          annotations: isJsonObject(value.annotations) ? value.annotations : undefined,
+          annotations: isJsonObject(value.annotations)
+            ? value.annotations
+            : undefined,
           _meta: isJsonObject(value._meta) ? value._meta : undefined,
         };
       }
@@ -332,7 +340,8 @@ function normalizeContentBlock(value: unknown): WebMcpContentBlock {
 
   return {
     type: 'text',
-    text: typeof value === 'string' ? value : jsonStringify(value),
+    text:
+      typeof value === 'string' ? value : jsonStringify(value),
   };
 }
 
@@ -348,7 +357,7 @@ function normalizeToolResult(value: unknown): {
   }
 
   const content = Array.isArray(value.content)
-    ? value.content.map((block) => normalizeContentBlock(block))
+    ? value.content.map(block => normalizeContentBlock(block))
     : [];
 
   if (!content.length) {
@@ -372,8 +381,8 @@ function normalizeToolResult(value: unknown): {
 }
 
 function formatListedTools(
-  tools: Array<BrowserToolMetadata & { pageId: number }>,
-  summary: boolean
+  tools: Array<BrowserToolMetadata & {pageId: number}>,
+  summary: boolean,
 ): Array<
   | {
       name: string;
@@ -388,7 +397,7 @@ function formatListedTools(
     }
 > {
   if (summary) {
-    return tools.map((tool) => ({
+    return tools.map(tool => ({
       name: tool.name,
       description: summarizeDescription(tool.description),
       pageId: tool.pageId,
@@ -425,7 +434,8 @@ export const listWebMCPTools = defineTool({
       .describe('If true, omit input schemas and return compact tool summaries.'),
   },
   handler: async (request, response, context) => {
-    const { allPages = false, pageId, pattern, summary = false } = request.params;
+    const {allPages = false, pageId, pattern, summary = false} =
+      request.params;
 
     if (allPages && pageId !== undefined) {
       throw new Error('Specify either pageId or allPages, not both.');
@@ -444,14 +454,14 @@ export const listWebMCPTools = defineTool({
             count: 0,
             tools: [],
             message: result.message,
-          })
+          }),
         );
         return;
       }
 
       let tools = normalizeToolMetadata(page.id, result.tools);
       if (regex) {
-        tools = tools.filter((tool) => regex.test(tool.name));
+        tools = tools.filter(tool => regex.test(tool.name));
       }
 
       if (!tools.length) {
@@ -464,7 +474,7 @@ export const listWebMCPTools = defineTool({
             message: pattern
               ? `No WebMCP tools matched pattern "${pattern}" on page ${page.id}.`
               : 'No WebMCP tools were exposed on the selected page.',
-          })
+          }),
         );
         return;
       }
@@ -475,7 +485,7 @@ export const listWebMCPTools = defineTool({
           api: result.api,
           count: tools.length,
           tools: formatListedTools(tools, summary),
-        })
+        }),
       );
       return;
     }
@@ -483,31 +493,33 @@ export const listWebMCPTools = defineTool({
     const selectedPageId = context.getSelectedMcpPage().id;
     const pages = context
       .getPages()
-      .map((pptrPage) => {
+      .map(pptrPage => {
         const id = context.getPageId(pptrPage);
-        return id === undefined ? null : { id, pptrPage };
+        return id === undefined ? null : {id, pptrPage};
       })
-      .filter((page) => page !== null);
+      .filter(page => page !== null);
 
     const pageResults = await Promise.all(
-      pages.map(async (page) => ({
+      pages.map(async page => ({
         page,
         result: await evaluateListTools(page.pptrPage),
-      }))
+      })),
     );
 
-    const tools = pageResults.flatMap(({ page, result }) => {
+    const tools = pageResults.flatMap(({page, result}) => {
       if (result.kind !== 'available') {
         return [];
       }
       return normalizeToolMetadata(page.id, result.tools);
     });
 
-    const filteredTools = regex ? tools.filter((tool) => regex.test(tool.name)) : tools;
+    const filteredTools = regex
+      ? tools.filter(tool => regex.test(tool.name))
+      : tools;
 
     const unavailablePageIds = pageResults
-      .filter((entry) => entry.result.kind === 'unavailable')
-      .map((entry) => entry.page.id);
+      .filter(entry => entry.result.kind === 'unavailable')
+      .map(entry => entry.page.id);
 
     response.appendResponseLine(
       jsonStringify({
@@ -521,15 +533,17 @@ export const listWebMCPTools = defineTool({
             : pattern
               ? `No WebMCP tools matched pattern "${pattern}" across ${pages.length} page(s).`
               : 'No WebMCP tools were exposed across the scanned pages.',
-        unavailablePageIds: unavailablePageIds.length > 0 ? unavailablePageIds : undefined,
-      })
+        unavailablePageIds:
+          unavailablePageIds.length > 0 ? unavailablePageIds : undefined,
+      }),
     );
   },
 });
 
 export const callWebMCPTool = defineTool({
   name: 'call_webmcp_tool',
-  description: 'Call a WebMCP tool exposed by the selected page or a specific pageId.',
+  description:
+    'Call a WebMCP tool exposed by the selected page or a specific pageId.',
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
@@ -550,7 +564,7 @@ export const callWebMCPTool = defineTool({
     const result = await evaluateCallTool(
       page.pptrPage,
       request.params.name,
-      request.params.arguments ?? {}
+      request.params.arguments ?? {},
     );
 
     if (result.kind === 'error') {

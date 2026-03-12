@@ -24,7 +24,11 @@ Using `.mcp.json` to debug while using a client:
     "chrome-devtools": {
       "type": "stdio",
       "command": "npx",
-      "args": ["chrome-devtools-mcp@latest", "--log-file", "/path/to/chrome-devtools-mcp.log"],
+      "args": [
+        "chrome-devtools-mcp@latest",
+        "--log-file",
+        "/path/to/chrome-devtools-mcp.log"
+      ],
       "env": {
         "DEBUG": "*"
       }
@@ -122,47 +126,6 @@ Possible workarounds include:
     }
   ```
 
-### Claude Code plugin installation fails with `Failed to clone repository`
-
-When installing `chrome-devtools-mcp` as a Claude Code plugin (either from the
-official marketplace or via `/plugin marketplace add`), the installation may fail
-with a timeout error if your environment cannot reach `github.com` on port 443
-(HTTPS):
-
-```
-Failed to download/cache plugin chrome-devtools-mcp: Failed to clone repository:
-  Cloning into '...'...
-  fatal: unable to access 'https://github.com/ChromeDevTools/chrome-devtools-mcp.git/':
-  Failed to connect to github.com port 443
-```
-
-This can happen in environments with restricted outbound HTTPS connectivity,
-corporate firewalls, or proxy configurations that block HTTPS git operations.
-
-**Workaround 1: Use SSH instead of HTTPS**
-
-If you have SSH access to GitHub configured, you can redirect all GitHub HTTPS
-URLs to use SSH by running:
-
-```sh
-git config --global url."git@github.com:".insteadOf "https://github.com/"
-```
-
-Then retry the plugin installation. This tells git to use your SSH key for all
-GitHub operations instead of HTTPS.
-
-**Workaround 2: Install via CLI instead**
-
-If the plugin marketplace approach fails, you can install `chrome-devtools-mcp`
-as an MCP server directly without cloning the repository:
-
-```sh
-claude mcp add chrome-devtools --scope user npx chrome-devtools-mcp@latest
-```
-
-This bypasses the git clone entirely and uses npm/npx to fetch the package. Note
-that this method installs only the MCP server without the bundled skills.
-
 ### Connection timeouts with `--autoConnect`
 
 If you are using the `--autoConnect` flag and tools like `list_pages`, `new_page`, or `navigate_page` fail with a timeout (e.g., `ProtocolError: Network.enable timed out` or `The socket connection was closed unexpectedly`), this usually means the MCP server cannot handshake with the running Chrome instance correctly. Ensure:
@@ -171,3 +134,21 @@ If you are using the `--autoConnect` flag and tools like `list_pages`, `new_page
 2. Remote debugging is enabled in Chrome via `chrome://inspect/#remote-debugging`.
 3. You have allowed the remote debugging connection prompt in the browser.
 4. There is no other MCP server or tool trying to connect to the same debugging port.
+
+### WebMCP pages expose no tools
+
+If `list_webmcp_tools` returns an empty result:
+
+1. Confirm you are targeting the right tab with `list_pages`, then retry with `--pageId` if needed.
+2. Check whether the page exposes `navigator.modelContext.listTools()` or only the testing fallback by running `evaluate_script '() => ({ hasModelContext: !!navigator.modelContext, hasTesting: !!navigator.modelContextTesting })' --output-format=json`.
+3. If the page is route-driven, navigate first and then re-run `list_webmcp_tools`. Some sites expose different WebMCP inventories on different routes.
+4. Inspect `list_console_messages`, `list_network_requests`, and `take_snapshot` on the same page to confirm the page loaded correctly and to catch app-side failures.
+
+### WebMCP tool calls fail or return unexpected data
+
+If `call_webmcp_tool` fails:
+
+1. Re-run `list_webmcp_tools --summary` and confirm the tool still exists on the current route.
+2. If multiple pages are open, pass `--pageId` explicitly.
+3. Validate the tool arguments you passed to `--arguments`; the CLI expects a JSON object string.
+4. Restart with `DEBUG=*` and `--logFile` if you need daemon or server-side logs while reproducing the failure.

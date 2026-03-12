@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ParsedArguments } from '../bin/chrome-devtools-mcp-cli-options.js';
+import type {ParsedArguments} from '../bin/chrome-devtools-mcp-cli-options.js';
 
 import * as consoleTools from './console.js';
 import * as emulationTools from './emulation.js';
@@ -39,6 +39,7 @@ export const createTools = (args: ParsedArguments) => {
         ...Object.values(screenshotTools),
         ...Object.values(scriptTools),
         ...Object.values(snapshotTools),
+        ...Object.values(webmcpTools),
       ];
 
   const tools = [];

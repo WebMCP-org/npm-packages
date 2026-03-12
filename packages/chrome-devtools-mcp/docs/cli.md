@@ -78,6 +78,59 @@ By default, the CLI outputs a human-readable summary of the tool's result. For p
 chrome-devtools list_pages --output-format=json
 ```
 
+## WebMCP workflow
+
+The CLI exposes WebMCP through explicit first-class commands:
+
+- `list_webmcp_tools`
+- `call_webmcp_tool`
+
+This keeps WebMCP usage stateless and page-targeted. A typical agent or operator loop is:
+
+```sh
+# Start against native Chrome Beta on macOS.
+chrome-devtools start \
+  --headless \
+  --isolated \
+  --executablePath "/Applications/Google Chrome Beta.app/Contents/MacOS/Google Chrome Beta"
+
+# Open or select the page you want to inspect.
+chrome-devtools new_page "https://webmcp.sh"
+chrome-devtools list_pages --output-format=json
+
+# Discover the WebMCP surface on the current page.
+chrome-devtools list_webmcp_tools --summary --output-format=json
+
+# Call a WebMCP tool.
+chrome-devtools call_webmcp_tool get_current_context --output-format=json
+chrome-devtools call_webmcp_tool navigate --arguments '{"to":"/entities"}'
+
+# Re-list after navigation because route changes can expose a different tool inventory.
+chrome-devtools list_webmcp_tools --summary --output-format=json
+chrome-devtools call_webmcp_tool list_entities --output-format=json
+```
+
+When multiple tabs are open, use `list_pages` first and then pass `--pageId` to either WebMCP command to target a specific page.
+
+## Debugging WebMCP pages
+
+When a page exposes no tools or a tool call behaves unexpectedly, use the regular debugging tools against the same page:
+
+```sh
+chrome-devtools list_console_messages
+chrome-devtools list_network_requests
+chrome-devtools take_snapshot
+chrome-devtools evaluate_script '() => window.location.pathname' --output-format=json
+```
+
+If you need daemon or server logs while debugging a WebMCP page, restart with logging enabled:
+
+```sh
+DEBUG=* chrome-devtools start \
+  --logFile /tmp/chrome-devtools-mcp.log \
+  --executablePath "/Applications/Google Chrome Beta.app/Contents/MacOS/Google Chrome Beta"
+```
+
 ## Troubleshooting
 
 If the CLI hangs or fails to connect, try stopping the background process:
