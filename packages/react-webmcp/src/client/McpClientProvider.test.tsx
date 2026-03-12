@@ -1,6 +1,6 @@
 import { TabClientTransport, TabServerTransport } from '@mcp-b/transports';
 import { BrowserMcpServer, Client } from '@mcp-b/webmcp-ts-sdk';
-import type { ReactNode } from 'react';
+import { type ReactNode, useEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, renderHook } from 'vitest-browser-react';
 import {
@@ -11,6 +11,7 @@ import {
 
 // Create mock client and transport
 const mockConnect = vi.fn();
+const mockClose = vi.fn();
 const mockListTools = vi.fn();
 const mockListResources = vi.fn();
 const mockGetServerCapabilities = vi.fn();
@@ -19,6 +20,7 @@ const mockRemoveNotificationHandler = vi.fn();
 
 const createMockClient = () => ({
   connect: mockConnect,
+  close: mockClose,
   listTools: mockListTools,
   listResources: mockListResources,
   getServerCapabilities: mockGetServerCapabilities,
@@ -63,6 +65,7 @@ describe('McpClientProvider', () => {
 
     // Default mocks
     mockConnect.mockResolvedValue(undefined);
+    mockClose.mockResolvedValue(undefined);
     mockGetServerCapabilities.mockReturnValue({
       tools: { listChanged: true },
       resources: { listChanged: true },
@@ -504,6 +507,65 @@ describe('McpClientProvider', () => {
       return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     }
 
+    function registerLiveTool(server: BrowserMcpServer, name: string): void {
+      server.registerTool({
+        name,
+        description: `Tool ${name}`,
+        inputSchema: {
+          type: 'object',
+          properties: { message: { type: 'string' } },
+        },
+        async execute(args) {
+          return {
+            content: [{ type: 'text', text: `${name}:${String(args.message ?? '')}` }],
+          };
+        },
+      });
+    }
+
+    function registerLiveResource(server: BrowserMcpServer, uri: string, name: string): void {
+      server.registerResource({
+        uri,
+        name,
+        async read(resourceUri) {
+          return {
+            contents: [
+              {
+                uri: resourceUri.toString(),
+                mimeType: 'text/plain',
+                text: `${name}:content`,
+              },
+            ],
+          };
+        },
+      });
+    }
+
+    async function createLiveTransportEndpoint(toolName: string): Promise<{
+      server: BrowserMcpServer;
+      serverTransport: TabServerTransport;
+      clientTransport: TabClientTransport;
+    }> {
+      const channelId = uniqueChannelId(`mcp-client-provider-${toolName}`);
+      const server = new BrowserMcpServer({
+        name: 'react-webmcp-test-server',
+        version: '1.0.0',
+      });
+      const serverTransport = new TabServerTransport({
+        channelId,
+        allowedOrigins: [window.location.origin],
+      });
+      await server.connect(serverTransport);
+      registerLiveTool(server, toolName);
+
+      const clientTransport = new TabClientTransport({
+        targetOrigin: window.location.origin,
+        channelId,
+      });
+
+      return { server, serverTransport, clientTransport };
+    }
+
     async function createLiveProvider(): Promise<{
       server: BrowserMcpServer;
       providerProps: Pick<McpClientProviderProps, 'client' | 'transport'>;
@@ -603,6 +665,147 @@ describe('McpClientProvider', () => {
       await vi.waitFor(() => {
         expect(result.current.tools.some((tool) => tool.name === 'list_changed_tool')).toBe(true);
       });
+    });
+
+    it('switches transports with the same client without retaining stale tools', async () => {
+      const client = new Client({ name: 'react-webmcp-switch-client', version: '1.0.0' });
+      const firstEndpoint = await createLiveTransportEndpoint('tab_tool');
+      const secondEndpoint = await createLiveTransportEndpoint('iframe_tool');
+
+      liveConnections.push({
+        client,
+        clientTransport: firstEndpoint.clientTransport,
+        server: firstEndpoint.server,
+        serverTransport: firstEndpoint.serverTransport,
+      });
+      liveConnections.push({
+        client,
+        clientTransport: secondEndpoint.clientTransport,
+        server: secondEndpoint.server,
+        serverTransport: secondEndpoint.serverTransport,
+      });
+
+      const latestTools: { current: string[] } = { current: [] };
+
+      function ToolProbe() {
+        const { tools } = useMcpClient();
+
+        useEffect(() => {
+          latestTools.current = tools.map((tool) => tool.name);
+        }, [tools]);
+
+        return null;
+      }
+
+      const clientProp = client as unknown as McpClientProviderProps['client'];
+      const { rerender } = await render(
+        <McpClientProvider
+          client={clientProp}
+          transport={
+            firstEndpoint.clientTransport as unknown as McpClientProviderProps['transport']
+          }
+        >
+          <ToolProbe />
+        </McpClientProvider>
+      );
+
+      await vi.waitFor(() => {
+        expect(latestTools.current).toContain('tab_tool');
+      });
+      expect(latestTools.current).not.toContain('iframe_tool');
+
+      rerender(
+        <McpClientProvider
+          client={clientProp}
+          transport={
+            secondEndpoint.clientTransport as unknown as McpClientProviderProps['transport']
+          }
+        >
+          <ToolProbe />
+        </McpClientProvider>
+      );
+
+      await vi.waitFor(() => {
+        expect(latestTools.current).toContain('iframe_tool');
+      });
+      expect(latestTools.current).not.toContain('tab_tool');
+
+      registerLiveTool(firstEndpoint.server, 'stale_tab_tool');
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(latestTools.current).not.toContain('stale_tab_tool');
+    });
+
+    it('switches transports with the same client without retaining stale resources', async () => {
+      const client = new Client({ name: 'react-webmcp-switch-resource-client', version: '1.0.0' });
+      const firstEndpoint = await createLiveTransportEndpoint('tab_resource_tool');
+      const secondEndpoint = await createLiveTransportEndpoint('iframe_resource_tool');
+
+      registerLiveResource(firstEndpoint.server, 'resource://tab', 'Tab Resource');
+      registerLiveResource(secondEndpoint.server, 'resource://iframe', 'Iframe Resource');
+
+      liveConnections.push({
+        client,
+        clientTransport: firstEndpoint.clientTransport,
+        server: firstEndpoint.server,
+        serverTransport: firstEndpoint.serverTransport,
+      });
+      liveConnections.push({
+        client,
+        clientTransport: secondEndpoint.clientTransport,
+        server: secondEndpoint.server,
+        serverTransport: secondEndpoint.serverTransport,
+      });
+
+      const latestResources: { current: string[] } = { current: [] };
+
+      function ResourceProbe() {
+        const { resources } = useMcpClient();
+
+        useEffect(() => {
+          latestResources.current = resources.map((resource) => resource.uri);
+        }, [resources]);
+
+        return null;
+      }
+
+      const clientProp = client as unknown as McpClientProviderProps['client'];
+      const { rerender } = await render(
+        <McpClientProvider
+          client={clientProp}
+          transport={
+            firstEndpoint.clientTransport as unknown as McpClientProviderProps['transport']
+          }
+        >
+          <ResourceProbe />
+        </McpClientProvider>
+      );
+
+      await vi.waitFor(() => {
+        expect(latestResources.current).toContain('resource://tab');
+      });
+      expect(latestResources.current).not.toContain('resource://iframe');
+
+      rerender(
+        <McpClientProvider
+          client={clientProp}
+          transport={
+            secondEndpoint.clientTransport as unknown as McpClientProviderProps['transport']
+          }
+        >
+          <ResourceProbe />
+        </McpClientProvider>
+      );
+
+      await vi.waitFor(() => {
+        expect(latestResources.current).toContain('resource://iframe');
+      });
+      expect(latestResources.current).not.toContain('resource://tab');
+
+      registerLiveResource(firstEndpoint.server, 'resource://stale-tab', 'Stale Tab Resource');
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(latestResources.current).not.toContain('resource://stale-tab');
     });
   });
 });
