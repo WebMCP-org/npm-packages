@@ -24,20 +24,26 @@ if (retryIndex !== -1) {
   flags.splice(retryIndex, 1);
 }
 
+import fs from 'node:fs';
+
+const isNode20 = process.version.startsWith('v20.');
+
 if (userArgs.length > 0) {
   for (const arg of userArgs) {
-    // Map .ts files to build/ .js files
     let testPath = arg;
     if (testPath.endsWith('.ts')) {
+      // Map .ts files to build/ .js files
       testPath = testPath.replace(/\.ts$/, '.js');
       if (!testPath.startsWith('build/')) {
         testPath = path.join('build', testPath);
       }
+    } else if (!isNode20 && !testPath.includes('*') && fs.existsSync(testPath) && fs.statSync(testPath).isDirectory()) {
+      // Node 22+ doesn't support directory imports; convert to glob
+      testPath = path.join(testPath, '**/*.test.js');
     }
     files.push(testPath);
   }
 } else {
-  const isNode20 = process.version.startsWith('v20.');
   if (isNode20) {
     files.push('build/tests');
   } else {
