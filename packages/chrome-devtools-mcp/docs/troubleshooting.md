@@ -7,7 +7,35 @@
 - When configuring your MCP client, try using the `--yes` argument to `npx` to
   auto-accept installation prompt.
 - Find a specific error in the output of the `chrome-devtools-mcp` server.
-  Usually, if you client is an IDE, logs would be in the Output pane.
+  Usually, if your client is an IDE, logs would be in the Output pane.
+- Search the [GitHub repository issues and discussions](https://github.com/ChromeDevTools/chrome-devtools-mcp) for help or existing similar problems.
+
+## Debugging
+
+Start the MCP server with debugging enabled and a log file:
+
+- `DEBUG=* npx chrome-devtools-mcp@latest --log-file=/path/to/chrome-devtools-mcp.log`
+
+Using `.mcp.json` to debug while using a client:
+
+```json
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "chrome-devtools-mcp@latest",
+        "--log-file",
+        "/path/to/chrome-devtools-mcp.log"
+      ],
+      "env": {
+        "DEBUG": "*"
+      }
+    }
+  }
+}
+```
 
 ## Specific problems
 
@@ -28,13 +56,99 @@ This indicates that the browser could not be started. Make sure that no Chrome
 instances are running or close them. Make sure you have the latest stable Chrome
 installed and that [your system is able to run Chrome](https://support.google.com/chrome/a/answer/7100626?hl=en).
 
+### Chrome crashes on macOS when using Web Bluetooth
+
+On macOS, Chrome launched by an MCP client application (such as Claude Desktop) may crash when a Web Bluetooth prompt appears. This is caused by a macOS privacy permission violation (TCC).
+
+To resolve this, grant Bluetooth permission to the MCP client application in `System Settings > Privacy & Security > Bluetooth`. After granting permission, restart the client application and start a new MCP session.
+
 ### Remote debugging between virtual machine (VM) and host fails
 
-When connecting DevTools inside a VM to Chrome running on the host, any domain is rejected by Chrome because of host header validation. Tunneling the port over SSH bypasses this restriction. In the VM, run:
+When attempting to connect to Chrome running on a host machine from within a virtual machine (VM), Chrome may reject the connection due to 'Host' header validation. You can bypass this restriction by creating an SSH tunnel from the VM to the host. In the VM, run:
 
 ```sh
 ssh -N -L 127.0.0.1:9222:127.0.0.1:9222 <user>@<host-ip>
 ```
 
-Point the MCP connection inside the VM to `http://127.0.0.1:9222` and DevTools
-will reach the host browser without triggering the Host validation.
+Point the MCP connection inside the VM to `http://127.0.0.1:9222`. This allows DevTools to reach the host browser without triggering the Host validation error.
+
+### Operating system sandboxes
+
+Some MCP clients allow sandboxing the MCP server using macOS Seatbelt or Linux
+containers. If sandboxes are enabled, `chrome-devtools-mcp` is not able to start
+Chrome that requires permissions to create its own sandboxes. As a workaround,
+either disable sandboxing for `chrome-devtools-mcp` in your MCP client or use
+`--browser-url` to connect to a Chrome instance that you start manually outside
+of the MCP client sandbox.
+
+### WSL
+
+By default, `chrome-devtools-mcp` in WSL requires Chrome to be installed within the Linux environment. While it normally attempts to launch Chrome on the Windows side, this currently fails due to a [known WSL issue](https://github.com/microsoft/WSL/issues/14201). Ensure you are using a [Linux distribution compatible with Chrome](https://support.google.com/chrome/a/answer/7100626).
+
+Possible workarounds include:
+
+- **Install Google Chrome in WSL:**
+  - `wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb`
+  - `sudo dpkg -i google-chrome-stable_current_amd64.deb`
+
+- **Use Mirrored networking:**
+  1. Configure [Mirrored networking for WSL](https://learn.microsoft.com/en-us/windows/wsl/networking).
+  2. Start Chrome on the Windows side with:
+     `chrome.exe --remote-debugging-port=9222 --user-data-dir=C:\path\to\dir`
+  3. Start `chrome-devtools-mcp` with:
+     `npx chrome-devtools-mcp --browser-url http://127.0.0.1:9222`
+
+- **Use Powershell or Git Bash** instead of WSL.
+
+### Windows 10: Error during discovery for MCP server 'chrome-devtools': MCP error -32000: Connection closed
+
+- **Solution 1** Call using `cmd` (For more info https://github.com/modelcontextprotocol/servers/issues/1082#issuecomment-2791786310)
+
+  ```json
+  "mcpServers": {
+      "chrome-devtools": {
+        "command": "cmd",
+        "args": ["/c", "npx", "-y", "chrome-devtools-mcp@latest"]
+      }
+    }
+  ```
+
+  > **The Key Change:** On Windows, running a Node.js package via `npx` often requires the `cmd /c` prefix to be executed correctly from within another process like VSCode's extension host. Therefore, `"command": "npx"` was replaced with `"command": "cmd"`, and the actual `npx` command was moved into the `"args"` array, preceded by `"/c"`. This fix allows Windows to interpret the command correctly and launch the server.
+
+- **Solution 2** Instead of another layer of shell you can write the absolute path to `npx`:
+  > Note: The path below is an example. You must adjust it to match the actual location of `npx` on your machine. Depending on your setup, the file extension might be `.cmd`, `.bat`, or `.exe` rather than `.ps1`. Also, ensure you use double backslashes (`\\`) as path delimiters, as required by the JSON format.
+  ```json
+  "mcpServers": {
+      "chrome-devtools": {
+        "command": "C:\\nvm4w\\nodejs\\npx.ps1",
+        "args": ["-y", "chrome-devtools-mcp@latest"]
+      }
+    }
+  ```
+
+### Connection timeouts with `--autoConnect`
+
+If you are using the `--autoConnect` flag and tools like `list_pages`, `new_page`, or `navigate_page` fail with a timeout (e.g., `ProtocolError: Network.enable timed out` or `The socket connection was closed unexpectedly`), this usually means the MCP server cannot handshake with the running Chrome instance correctly. Ensure:
+
+1. Chrome 144+ is **already** running.
+2. Remote debugging is enabled in Chrome via `chrome://inspect/#remote-debugging`.
+3. You have allowed the remote debugging connection prompt in the browser.
+4. There is no other MCP server or tool trying to connect to the same debugging port.
+
+### WebMCP pages expose no tools
+
+If `list_webmcp_tools` returns an empty result:
+
+1. Confirm you are targeting the right tab with `list_pages`, then retry with `--pageId` if needed.
+2. Check whether the page exposes `navigator.modelContext.listTools()` or only the testing fallback by running `evaluate_script '() => ({ hasModelContext: !!navigator.modelContext, hasTesting: !!navigator.modelContextTesting })' --output-format=json`.
+3. If the page is route-driven, navigate first and then re-run `list_webmcp_tools`. Some sites expose different WebMCP inventories on different routes.
+4. Inspect `list_console_messages`, `list_network_requests`, and `take_snapshot` on the same page to confirm the page loaded correctly and to catch app-side failures.
+
+### WebMCP tool calls fail or return unexpected data
+
+If `call_webmcp_tool` fails:
+
+1. Re-run `list_webmcp_tools --summary` and confirm the tool still exists on the current route.
+2. If multiple pages are open, pass `--pageId` explicitly.
+3. Validate the tool arguments you passed to `--arguments`; the CLI expects a JSON object string.
+4. Restart with `DEBUG=*` and `--logFile` if you need daemon or server-side logs while reproducing the failure.

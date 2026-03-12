@@ -1,273 +1,518 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {listWebMCPTools} from '../../src/tools/webmcp.js';
-import {serverHooks} from '../server.js';
-import {withMcpContext} from '../utils.js';
+import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
+import {McpResponse} from '../../src/McpResponse.js';
+import {
+  callWebMCPTool,
+  listWebMCPTools,
+} from '../../src/tools/webmcp.js';
+import {getTextContent, html, withMcpContext} from '../utils.js';
 
-/**
- * A minimal mock of @mcp-b/global's TabServerTransport behavior.
- * This simulates a WebMCP server running in a page.
- */
-const MOCK_WEBMCP_PAGE = `
-<!DOCTYPE html>
-<html>
-<head>
-  <title>WebMCP Test Page</title>
-</head>
-<body>
-  <h1>WebMCP Test Page</h1>
-  <script>
-    // Simulate @mcp-b/global's TabServerTransport
-    (function() {
-      const CHANNEL_ID = 'mcp-default';
-      let requestId = 0;
-
-      // Mock tools registry
-      const tools = [
-        {
-          name: 'test_add',
-          description: 'Add two numbers together',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              a: { type: 'number', description: 'First number' },
-              b: { type: 'number', description: 'Second number' }
-            },
-            required: ['a', 'b']
-          }
-        },
-        {
-          name: 'test_greet',
-          description: 'Greet someone by name',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              name: { type: 'string', description: 'Name to greet' }
-            },
-            required: ['name']
-          }
-        },
-        {
-          name: 'test_error',
-          description: 'A tool that always fails',
-          inputSchema: { type: 'object', properties: {} }
-        }
-      ];
-
-      // Tool handlers
-      function executeTool(name, args) {
-        switch (name) {
-          case 'test_add':
-            return { content: [{ type: 'text', text: String(args.a + args.b) }] };
-          case 'test_greet':
-            return { content: [{ type: 'text', text: 'Hello, ' + args.name + '!' }] };
-          case 'test_error':
-            return {
-              content: [{ type: 'text', text: 'This tool always fails' }],
-              isError: true
-            };
-          default:
-            throw new Error('Unknown tool: ' + name);
-        }
-      }
-
-      // Handle incoming messages from clients (via postMessage)
-      window.addEventListener('message', async function(event) {
-        if (event.source !== window) return;
-
-        const data = event.data;
-        if (!data || data.channel !== CHANNEL_ID || data.type !== 'mcp') return;
-        if (data.direction !== 'client-to-server') return;
-
-        const payload = data.payload;
-
-        // Handle check-ready signal
-        if (payload === 'mcp-check-ready') {
-          window.postMessage({
-            channel: CHANNEL_ID,
-            type: 'mcp',
-            direction: 'server-to-client',
-            payload: 'mcp-server-ready'
-          }, '*');
-          return;
-        }
-
-        // Handle JSON-RPC requests
-        if (typeof payload === 'object' && payload.jsonrpc === '2.0') {
-          let result;
-          let error;
-
-          try {
-            switch (payload.method) {
-              case 'initialize':
-                result = {
-                  protocolVersion: '2024-11-05',
-                  capabilities: { tools: { listChanged: true } },
-                  serverInfo: { name: 'test-webmcp', version: '1.0.0' }
-                };
-                break;
-
-              case 'tools/list':
-                result = { tools: tools };
-                break;
-
-              case 'tools/call':
-                result = executeTool(payload.params.name, payload.params.arguments || {});
-                break;
-
-              default:
-                error = { code: -32601, message: 'Method not found: ' + payload.method };
-            }
-          } catch (e) {
-            error = { code: -32603, message: e.message };
-          }
-
-          // Send response
-          const response = {
-            jsonrpc: '2.0',
-            id: payload.id
-          };
-
-          if (error) {
-            response.error = error;
-          } else {
-            response.result = result;
-          }
-
-          window.postMessage({
-            channel: CHANNEL_ID,
-            type: 'mcp',
-            direction: 'server-to-client',
-            payload: response
-          }, '*');
-        }
-      });
-
-      // Mark modelContext as available (for detection)
+function buildCorePage(): string {
+  return html`
+    <script>
       navigator.modelContext = {
-        registerTool: function() {},
-        provideContext: function() {}
+        async listTools() {
+          return [
+            {
+              name: 'core_sum',
+              description: 'Add two numbers',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  a: { type: 'number' },
+                  b: { type: 'number' },
+                },
+                required: ['a', 'b'],
+              },
+            },
+          ];
+        },
+        async callTool(request) {
+          if (request.name === 'core_sum') {
+            const args = request.arguments || {};
+            return {
+              content: [{ type: 'text', text: String((args.a || 0) + (args.b || 0)) }],
+            };
+          }
+
+          if (request.name === 'core_blocks') {
+            return {
+              isError: true,
+              content: [
+                { type: 'text', text: 'primary' },
+                { type: 'image', mimeType: 'image/png', data: 'aGVsbG8=' },
+                {
+                  type: 'resource',
+                  resource: {
+                    uri: 'file:///tmp/webmcp.txt',
+                    text: 'resource-body',
+                    mimeType: 'text/plain',
+                  },
+                },
+              ],
+            };
+          }
+
+          if (request.name === 'core_throw') {
+            throw new Error('core failure');
+          }
+
+          throw new Error('Unknown tool: ' + request.name);
+        },
       };
+    </script>
+  `;
+}
 
-      // Broadcast server ready on load
-      window.postMessage({
-        channel: CHANNEL_ID,
-        type: 'mcp',
-        direction: 'server-to-client',
-        payload: 'mcp-server-ready'
-      }, '*');
+function buildTestingPage(options: {
+  invalidSchema?: boolean;
+  invalidJson?: boolean;
+  nullResult?: boolean;
+} = {}): string {
+  return html`
+    <script>
+      navigator.modelContextTesting = {
+        async listTools() {
+          return [
+            {
+              name: 'testing_echo',
+              description: 'Echo a message',
+              inputSchema: ${options.invalidSchema
+                ? JSON.stringify('{"badJson"')
+                : JSON.stringify(
+                    JSON.stringify({
+                      type: 'object',
+                      properties: {
+                        message: { type: 'string' },
+                      },
+                      required: ['message'],
+                    }),
+                  )},
+            },
+          ];
+        },
+        async executeTool(name, serializedArgs) {
+          if (${JSON.stringify(options.nullResult ?? false)}) {
+            return null;
+          }
 
-      console.log('[Mock WebMCP] Server initialized');
-    })();
-  </script>
-</body>
-</html>
-`;
+          if (${JSON.stringify(options.invalidJson ?? false)}) {
+            return '{"broken"';
+          }
+
+          const args = JSON.parse(serializedArgs);
+          if (name === 'testing_echo') {
+            return JSON.stringify({
+              content: [{ type: 'text', text: 'echo:' + (args.message || '') }],
+            });
+          }
+
+          return JSON.stringify({
+            isError: true,
+            content: [{ type: 'text', text: 'missing:' + name }],
+          });
+        },
+      };
+    </script>
+  `;
+}
+
+function buildNoApiPage(): string {
+  return html`<p>No WebMCP APIs here.</p>`;
+}
+
+function stripUndefined<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map(item => stripUndefined(item)) as T;
+  }
+  if (value && typeof value === 'object') {
+    const result: Record<string, unknown> = {};
+    for (const [key, entry] of Object.entries(value)) {
+      if (entry !== undefined) {
+        result[key] = stripUndefined(entry);
+      }
+    }
+    return result as T;
+  }
+  return value;
+}
+
+async function parseListResponse(
+  response: McpResponse,
+  context: Parameters<Parameters<typeof withMcpContext>[0]>[1],
+) {
+  const result = await response.handle(listWebMCPTools.name, context);
+  return JSON.parse(getTextContent(result.content[0])) as {
+    pageId?: number;
+    selectedPageId?: number;
+    pagesScanned?: number;
+    api?: string;
+    count?: number;
+    tools: Array<{
+      name: string;
+      description: string;
+      inputSchema?: Record<string, unknown>;
+      pageId: number;
+    }>;
+    message?: string;
+    unavailablePageIds?: number[];
+  };
+}
 
 describe('webmcp tools', () => {
-  const server = serverHooks();
-
   describe('list_webmcp_tools', () => {
-    it('shows message when no tools registered', async () => {
-      await withMcpContext(
-        async (response, context) => {
-          await listWebMCPTools.handler({params: {}}, response, context);
+    it('returns tools from navigator.modelContext.listTools()', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.setContent(buildCorePage());
 
-          const output = response.responseLines.join('\n');
-          assert.ok(
-            output.includes('No WebMCP tools registered'),
-            'Should indicate no tools registered',
-          );
-        },
-        {withToolHub: true},
-      );
+        await listWebMCPTools.handler({params: {}}, response, context);
+
+        const payload = await parseListResponse(response, context);
+        assert.strictEqual(payload.api, 'modelContext');
+        assert.strictEqual(payload.pageId, page.id);
+        assert.deepStrictEqual(payload.tools, [
+          {
+            name: 'core_sum',
+            description: 'Add two numbers',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                a: {type: 'number'},
+                b: {type: 'number'},
+              },
+              required: ['a', 'b'],
+            },
+            pageId: page.id,
+          },
+        ]);
+      });
     });
 
-    it('shows registered tools with schemas after WebMCP connection', async () => {
-      server.addHtmlRoute('/webmcp', MOCK_WEBMCP_PAGE);
+    it('falls back to navigator.modelContextTesting.listTools()', async () => {
+      await withMcpContext(async (response, context) => {
+        await context.getSelectedMcpPage().pptrPage.setContent(buildTestingPage());
 
-      await withMcpContext(
-        async (response, context) => {
-          const page = context.getSelectedPage();
-          await page.goto(server.getRoute('/webmcp'));
+        await listWebMCPTools.handler({params: {}}, response, context);
 
-          // Wait for page to initialize
-          await page.waitForFunction(() => {
-            return (
-              typeof (window as {navigator: {modelContext?: unknown}}).navigator
-                .modelContext !== 'undefined'
-            );
-          });
-
-          // Connect to WebMCP to sync tools to the hub
-          const result = await context.getWebMCPClient(page);
-          assert.ok(result.connected, 'Should connect to WebMCP');
-
-          // Now list_webmcp_tools should show the registered tools as JSON
-          await listWebMCPTools.handler({params: {}}, response, context);
-
-          const output = response.responseLines.join('\n');
-          const parsed = JSON.parse(output);
-
-          assert.ok(Array.isArray(parsed.tools), 'Should have tools array');
-          assert.strictEqual(parsed.tools.length, 3, 'Should have 3 tools');
-
-          // Check tool structure
-          const testAdd = parsed.tools.find((t: {name: string}) => t.name === 'test_add');
-          assert.ok(testAdd, 'Should include test_add');
-          assert.ok(testAdd.description.includes('Add two numbers'), 'Should have description');
-          assert.ok(testAdd.inputSchema, 'Should include inputSchema');
-          assert.deepStrictEqual(testAdd.inputSchema.required, ['a', 'b'], 'Should have required params');
-        },
-        {withToolHub: true},
-      );
+        const payload = await parseListResponse(response, context);
+        assert.strictEqual(payload.api, 'modelContextTesting');
+        assert.strictEqual(payload.tools[0]?.name, 'testing_echo');
+        assert.deepStrictEqual(payload.tools[0]?.inputSchema, {
+          type: 'object',
+          properties: {
+            message: {type: 'string'},
+          },
+          required: ['message'],
+        });
+      });
     });
 
-    it('returns same full list on every call (no diff)', async () => {
-      server.addHtmlRoute('/webmcp2', MOCK_WEBMCP_PAGE);
+    it('returns a clear empty result when neither API exists', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.setContent(buildNoApiPage());
 
-      await withMcpContext(
-        async (response, context) => {
-          const page = context.getSelectedPage();
-          await page.goto(server.getRoute('/webmcp2'));
+        await listWebMCPTools.handler({params: {}}, response, context);
 
-          await page.waitForFunction(() => {
-            return (
-              typeof (window as {navigator: {modelContext?: unknown}}).navigator
-                .modelContext !== 'undefined'
-            );
-          });
+        const payload = await parseListResponse(response, context);
+        assert.strictEqual(payload.pageId, page.id);
+        assert.deepStrictEqual(payload.tools, []);
+        assert.match(
+          payload.message ?? '',
+          /does not expose navigator\.modelContext\.listTools\(\) or navigator\.modelContextTesting\.listTools\(\)/,
+        );
+      });
+    });
 
-          // Connect and sync tools
-          await context.getWebMCPClient(page);
+    it('normalizes malformed testing schemas to an empty object schema', async () => {
+      await withMcpContext(async (response, context) => {
+        await context
+          .getSelectedMcpPage()
+          .pptrPage.setContent(buildTestingPage({invalidSchema: true}));
 
-          // First call
-          await listWebMCPTools.handler({params: {}}, response, context);
-          const firstOutput = response.responseLines.join('\n');
-          const firstParsed = JSON.parse(firstOutput);
+        await listWebMCPTools.handler({params: {}}, response, context);
 
-          response.resetResponseLineForTesting();
+        const payload = await parseListResponse(response, context);
+        assert.deepStrictEqual(payload.tools[0]?.inputSchema, {
+          type: 'object',
+          properties: {},
+        });
+      });
+    });
 
-          // Second call - should return same full list (no diff)
-          await listWebMCPTools.handler({params: {}}, response, context);
-          const secondOutput = response.responseLines.join('\n');
-          const secondParsed = JSON.parse(secondOutput);
+    it('supports summary mode and omits schemas for compact discovery', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.setContent(buildCorePage());
 
-          assert.strictEqual(
-            firstParsed.tools.length,
-            secondParsed.tools.length,
-            'Both calls should return same number of tools',
-          );
-        },
-        {withToolHub: true},
-      );
+        await listWebMCPTools.handler(
+          {params: {summary: true}},
+          response,
+          context,
+        );
+
+        const payload = await parseListResponse(response, context);
+        assert.strictEqual(payload.pageId, page.id);
+        assert.strictEqual(payload.count, 1);
+        assert.deepStrictEqual(payload.tools, [
+          {
+            name: 'core_sum',
+            description: 'Add two numbers',
+            pageId: page.id,
+          },
+        ]);
+      });
+    });
+
+    it('filters tool names with glob patterns', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.setContent(buildCorePage());
+
+        await listWebMCPTools.handler(
+          {params: {pattern: 'core_*'}},
+          response,
+          context,
+        );
+
+        const payload = await parseListResponse(response, context);
+        assert.strictEqual(payload.pageId, page.id);
+        assert.strictEqual(payload.count, 1);
+        assert.strictEqual(payload.tools[0]?.name, 'core_sum');
+      });
+    });
+
+    it('searches across all pages when requested', async () => {
+      await withMcpContext(async (response, context) => {
+        const selectedPage = context.getSelectedMcpPage();
+        await selectedPage.pptrPage.setContent(buildCorePage());
+
+        const otherPage = await context.newPage();
+        await otherPage.pptrPage.setContent(buildTestingPage());
+        context.selectPage(selectedPage);
+
+        await listWebMCPTools.handler(
+          {params: {allPages: true, summary: true}},
+          response,
+          context,
+        );
+
+        const payload = await parseListResponse(response, context);
+        assert.strictEqual(payload.selectedPageId, selectedPage.id);
+        assert.strictEqual(payload.pagesScanned, 2);
+        assert.strictEqual(payload.count, 2);
+        assert.deepStrictEqual(
+          payload.tools.map(tool => ({
+            name: tool.name,
+            pageId: tool.pageId,
+          })),
+          [
+            {name: 'core_sum', pageId: selectedPage.id},
+            {name: 'testing_echo', pageId: otherPage.id},
+          ],
+        );
+      });
+    });
+  });
+
+  describe('call_webmcp_tool', () => {
+    it('uses navigator.modelContext.callTool(...) when available', async () => {
+      await withMcpContext(async (_response, context) => {
+        await context.getSelectedMcpPage().pptrPage.setContent(buildCorePage());
+
+        const response = new McpResponse({} as ParsedArguments);
+        await callWebMCPTool.handler(
+          {
+            params: {
+              name: 'core_sum',
+              arguments: {a: 2, b: 5},
+            },
+          },
+          response,
+          context,
+        );
+
+        const result = await response.handle(callWebMCPTool.name, context);
+        assert.deepStrictEqual(stripUndefined(result.content), [
+          {type: 'text', text: '7'},
+        ]);
+      });
+    });
+
+    it('passes through normalized MCP content blocks and error state once', async () => {
+      await withMcpContext(async (_response, context) => {
+        await context.getSelectedMcpPage().pptrPage.setContent(buildCorePage());
+
+        const response = new McpResponse({} as ParsedArguments);
+        await callWebMCPTool.handler(
+          {
+            params: {
+              name: 'core_blocks',
+            },
+          },
+          response,
+          context,
+        );
+
+        const result = await response.handle(callWebMCPTool.name, context);
+        assert.strictEqual(response.isError, true);
+        assert.deepStrictEqual(stripUndefined(result.content), [
+          {type: 'text', text: 'primary'},
+          {type: 'image', mimeType: 'image/png', data: 'aGVsbG8='},
+          {
+            type: 'resource',
+            resource: {
+              uri: 'file:///tmp/webmcp.txt',
+              text: 'resource-body',
+              mimeType: 'text/plain',
+            },
+          },
+        ]);
+      });
+    });
+
+    it('falls back to navigator.modelContextTesting.executeTool(...)', async () => {
+      await withMcpContext(async (_response, context) => {
+        await context.getSelectedMcpPage().pptrPage.setContent(buildTestingPage());
+
+        const response = new McpResponse({} as ParsedArguments);
+        await callWebMCPTool.handler(
+          {
+            params: {
+              name: 'testing_echo',
+              arguments: {message: 'hi'},
+            },
+          },
+          response,
+          context,
+        );
+
+        const result = await response.handle(callWebMCPTool.name, context);
+        assert.deepStrictEqual(stripUndefined(result.content), [
+          {type: 'text', text: 'echo:hi'},
+        ]);
+      });
+    });
+
+    it('reports invalid JSON from the testing fallback cleanly', async () => {
+      await withMcpContext(async (_response, context) => {
+        await context
+          .getSelectedMcpPage()
+          .pptrPage.setContent(buildTestingPage({invalidJson: true}));
+
+        await assert.rejects(
+          callWebMCPTool.handler(
+            {
+              params: {
+                name: 'testing_echo',
+                arguments: {message: 'hi'},
+              },
+            },
+            new McpResponse({} as ParsedArguments),
+            context,
+          ),
+          /Testing tool returned invalid JSON/,
+        );
+      });
+    });
+
+    it('treats null testing responses as interrupted execution', async () => {
+      await withMcpContext(async (_response, context) => {
+        await context
+          .getSelectedMcpPage()
+          .pptrPage.setContent(buildTestingPage({nullResult: true}));
+
+        await assert.rejects(
+          callWebMCPTool.handler(
+            {
+              params: {
+                name: 'testing_echo',
+                arguments: {message: 'hi'},
+              },
+            },
+            new McpResponse({} as ParsedArguments),
+            context,
+          ),
+          /interrupted by navigation|page became unavailable/i,
+        );
+      });
+    });
+
+    it('surfaces call errors without transport state', async () => {
+      await withMcpContext(async (_response, context) => {
+        await context.getSelectedMcpPage().pptrPage.setContent(buildCorePage());
+
+        await assert.rejects(
+          callWebMCPTool.handler(
+            {
+              params: {
+                name: 'core_throw',
+              },
+            },
+            new McpResponse({} as ParsedArguments),
+            context,
+          ),
+          /core failure/,
+        );
+      });
+    });
+  });
+
+  describe('page targeting', () => {
+    it('targets the selected page by default and honors pageId overrides', async () => {
+      await withMcpContext(async (_response, context) => {
+        const selectedPage = context.getSelectedMcpPage();
+        await selectedPage.pptrPage.setContent(buildCorePage());
+
+        const otherPage = await context.newPage();
+        await otherPage.pptrPage.setContent(buildTestingPage());
+        context.selectPage(selectedPage);
+
+        const defaultResponse = new McpResponse({} as ParsedArguments);
+        await listWebMCPTools.handler({params: {}}, defaultResponse, context);
+        const defaultPayload = await parseListResponse(defaultResponse, context);
+        assert.strictEqual(defaultPayload.pageId, selectedPage.id);
+        assert.strictEqual(defaultPayload.tools[0]?.name, 'core_sum');
+
+        const targetedResponse = new McpResponse({} as ParsedArguments);
+        await listWebMCPTools.handler(
+          {params: {pageId: otherPage.id}},
+          targetedResponse,
+          context,
+        );
+        const targetedPayload = await parseListResponse(
+          targetedResponse,
+          context,
+        );
+        assert.strictEqual(targetedPayload.pageId, otherPage.id);
+        assert.strictEqual(targetedPayload.tools[0]?.name, 'testing_echo');
+
+        const callResponse = new McpResponse({} as ParsedArguments);
+        await callWebMCPTool.handler(
+          {
+            params: {
+              pageId: otherPage.id,
+              name: 'testing_echo',
+              arguments: {message: 'page'},
+            },
+          },
+          callResponse,
+          context,
+        );
+        const callResult = await callResponse.handle(callWebMCPTool.name, context);
+        assert.deepStrictEqual(stripUndefined(callResult.content), [
+          {type: 'text', text: 'echo:page'},
+        ]);
+      });
     });
   });
 });
