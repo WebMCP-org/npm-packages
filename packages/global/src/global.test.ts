@@ -100,7 +100,7 @@ describe('global adapter', () => {
     expect(typeof modelContext.callTool).toBe('function');
   });
 
-  it('registerTool mirrors to native/testing API', async () => {
+  it('registerTool returns a compatibility unregister handle and mirrors to native/testing API', async () => {
     initializeWebModelContext();
 
     const modelContext = getModelContext();
@@ -114,7 +114,9 @@ describe('global adapter', () => {
       },
     });
 
-    expect(result).toBeUndefined();
+    expect(result).toEqual({
+      unregister: expect.any(Function),
+    });
 
     // Testing shim reads from the native polyfill, which is mirrored
     const tools = navigator.modelContextTesting?.listTools() ?? [];
@@ -122,6 +124,11 @@ describe('global adapter', () => {
 
     const serialized = await navigator.modelContextTesting?.executeTool('web_tool', '{}');
     expect(serialized).toContain('web-ok');
+
+    result.unregister();
+    expect(
+      navigator.modelContextTesting?.listTools().some((tool) => tool.name === 'web_tool')
+    ).toBe(false);
   });
 
   it('supports calling destructured registerTool', async () => {

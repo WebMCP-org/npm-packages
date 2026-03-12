@@ -20,7 +20,7 @@
 | **Drop-in IIFE** | Add AI capabilities with a single `<script>` tag - no build step |
 | **Native Chromium Support** | Auto-detects and uses native browser implementation when available |
 | **Dual Transport** | Works with both same-window clients AND parent pages (iframe support) |
-| **Spec-Aware Compatibility** | `provideContext()` / `clearContext()` remain temporarily for compatibility, while `registerTool()` follows current Chromium and returns `undefined` |
+| **Spec-Aware Compatibility** | `provideContext()` / `clearContext()` remain temporarily for compatibility, and MCP-B wrappers still return a deprecated unregister handle from `registerTool()` |
 | **Works with Any AI** | Claude, ChatGPT, Gemini, Cursor, Copilot, and any MCP client |
 
 ## Package Selection
@@ -172,10 +172,10 @@ navigator.modelContext.provideContext({
 
 #### `registerTool(tool)`
 
-Registers a single tool. The tool name must be unique - throws if a tool with the same name already exists. Returns `undefined`, matching current Chromium.
+Registers a single tool. The tool name must be unique - throws if a tool with the same name already exists. `@mcp-b/global` still returns a deprecated compatibility handle with `unregister()` so existing MCP-B integrations do not break, even though current Chromium returns `undefined`.
 
 ```typescript
-navigator.modelContext.registerTool({
+const registration = navigator.modelContext.registerTool({
   name: 'add-to-cart',
   description: 'Add a product to the shopping cart',
   inputSchema: {
@@ -193,6 +193,8 @@ navigator.modelContext.registerTool({
     };
   },
 });
+
+registration.unregister();
 ```
 
 #### `unregisterTool(nameOrTool)`

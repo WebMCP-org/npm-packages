@@ -85,9 +85,11 @@ Goal: keep one place to track standards decisions and implementation details bef
 
 Current MCP-B alignment note:
 
-- `BrowserMcpServer.registerTool(...)` now returns `void`, matching strict core `@mcp-b/webmcp-types` / `@mcp-b/webmcp-polyfill` and current Chrome Beta 147.
+- Strict core `@mcp-b/webmcp-types` / `@mcp-b/webmcp-polyfill` still model `registerTool(...)` as returning `void`, matching current Chrome Beta 147.
+- `BrowserMcpServer.registerTool(...)` keeps a deprecated MCP-B compatibility handle with `unregister()` so existing wrapper users do not break.
 - Current Chromium exposes `unregisterTool(name)` as a string-name API, but the upstream WebMCP unregistration design is still open.
 - Keep browser-surface tests explicit so we do not mistake current Chromium behavior for a finalized spec guarantee.
+- The shared conformance suite is parameterized: strict-core/native lanes should assert `undefined`, while the `@mcp-b/global` polyfill wrapper lane asserts the deprecated compatibility handle intentionally preserved by MCP-B.
 
 Run commands:
 

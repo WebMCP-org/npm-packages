@@ -49,7 +49,7 @@ This package solves the problem by **pre-registering tool capabilities** before 
 
 Compatibility note:
 
-- `BrowserMcpServer.registerTool(...)` returns `void`, matching current Chrome Beta 147 and Chromium `main`.
+- `BrowserMcpServer.registerTool(...)` still returns a deprecated compatibility handle with `unregister()` so existing MCP-B integrations do not break, even though current Chrome Beta 147 and Chromium `main` return `undefined`.
 - Current Chromium exposes `unregisterTool(name)` as a string-name API.
 - The upstream WebMCP unregistration design is still under discussion, so avoid assuming the current Chromium shape is the final spec outcome.
 

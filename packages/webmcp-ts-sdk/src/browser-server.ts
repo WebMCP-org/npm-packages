@@ -374,14 +374,14 @@ export class BrowserMcpServer extends BaseMcpServer {
   // --- WebMCP standard API (primary surface) ---
 
   // @ts-expect-error -- WebMCP API: (ToolDescriptor) vs MCP SDK: (name, config, cb)
-  override registerTool(tool: ToolDescriptor): void {
+  override registerTool(tool: ToolDescriptor): RegisteredToolHandle {
     // Mirror to native first — the polyfill validates the descriptor
     if (this.native) {
       (this.native.registerTool as (tool: ToolDescriptor) => void)(tool);
     }
 
     try {
-      this.registerToolInServer(tool);
+      return this.registerToolInServer(tool);
     } catch (error) {
       // Rollback native registration on server failure
       if (this.native) {

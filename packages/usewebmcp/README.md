@@ -109,7 +109,7 @@ export function CounterTool() {
   - `state.executionCount`
 - Returns `execute(input)` for manual in-app invocation and `reset()` for state reset.
 
-Current Chrome Beta 147 returns `undefined` from `registerTool(...)`, so cleanup should not rely on a returned handle.
+Current Chrome Beta 147 returns `undefined` from `registerTool(...)`, but MCP-B wrappers still expose a deprecated compatibility handle. This hook prefers the returned handle when present and falls back to `unregisterTool(name)`.
 
 Your tool implementation (`config.execute` or `config.handler`) can be synchronous or asynchronous.
 

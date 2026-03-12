@@ -984,7 +984,7 @@ describe('useWebMCP', () => {
   });
 
   describe('cleanup edge cases', () => {
-    it('should unregister by name even when registerTool returns a non-standard handle', async () => {
+    it('should prefer the returned unregister handle when registerTool provides one', async () => {
       const originalDescriptor = Object.getOwnPropertyDescriptor(navigator, 'modelContext');
       const unregister = vi.fn();
       const unregisterTool = vi.fn();
@@ -1010,8 +1010,8 @@ describe('useWebMCP', () => {
 
         unmount();
 
-        expect(unregister).not.toHaveBeenCalled();
-        expect(unregisterTool).toHaveBeenCalledWith('handle_cleanup_tool');
+        expect(unregister).toHaveBeenCalledTimes(1);
+        expect(unregisterTool).not.toHaveBeenCalled();
       } finally {
         if (originalDescriptor) {
           Object.defineProperty(navigator, 'modelContext', originalDescriptor);

@@ -33,7 +33,7 @@ function defaultFormatOutput(output: unknown): string {
 const TOOL_OWNER_BY_NAME = new Map<string, symbol>();
 type StructuredContent = Exclude<CallToolResult['structuredContent'], undefined>;
 type CompatModelContext = Navigator['modelContext'] & {
-  registerTool: (tool: ToolDescriptor) => void;
+  registerTool: (tool: ToolDescriptor) => { unregister: () => void } | undefined;
   unregisterTool: (name: string) => void;
 };
 
@@ -426,7 +426,7 @@ export function useWebMCP<
       execute: mcpHandler,
     };
 
-    modelContext.registerTool(toolDescriptor);
+    const registration = modelContext.registerTool(toolDescriptor);
     TOOL_OWNER_BY_NAME.set(name, ownerToken);
 
     return () => {
@@ -437,6 +437,11 @@ export function useWebMCP<
 
       TOOL_OWNER_BY_NAME.delete(name);
       try {
+        if (registration && typeof registration.unregister === 'function') {
+          registration.unregister();
+          return;
+        }
+
         modelContext.unregisterTool(name);
       } catch (error) {
         if (isDev()) {

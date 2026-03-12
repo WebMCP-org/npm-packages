@@ -7,4 +7,4 @@
 '@mcp-b/react-webmcp': patch
 ---
 
-Align MCP-B with the latest WebMCP compatibility direction by deprecating removed context APIs, accepting tool-object unregistration, and cleaning up React tool registrations through unregister-by-name.
+Align MCP-B with the latest WebMCP compatibility direction by deprecating removed context APIs, accepting tool-object unregistration, and keeping the legacy unregister handle available as a deprecated compatibility path in MCP-B wrappers.
