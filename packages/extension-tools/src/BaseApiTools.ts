@@ -1,4 +1,5 @@
-import type { CallToolResult, McpServer } from '@mcp-b/webmcp-ts-sdk';
+import type { McpServer } from '@mcp-b/webmcp-ts-sdk';
+import type { CallToolResult } from '@mcp-b/webmcp-ts-sdk/client';
 
 export interface ApiAvailability {
   available: boolean;

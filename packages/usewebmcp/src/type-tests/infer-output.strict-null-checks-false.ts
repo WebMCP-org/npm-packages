@@ -42,6 +42,22 @@ const jsonConfig: WebMCPConfig<InputSchema, JsonOutputSchema> = {
   handler: async () => ({ total: 1 }),
 };
 
+const jsonInputSchema = {
+  type: 'object',
+  properties: {
+    name: { type: 'string' },
+    count: { type: 'number' },
+  },
+  required: ['name'],
+} as const;
+
+const jsonInputConfig: WebMCPConfig<typeof jsonInputSchema> = {
+  name: 'json_input',
+  description: 'JSON input',
+  inputSchema: jsonInputSchema,
+  handler: async (input) => ({ greeting: input.name, count: input.count ?? 0 }),
+};
+
 type UndefinedFallsBackToUnknown = Assert<IsEqual<InferOutput<undefined>, unknown>>;
 type NoSchemaLastResult = WebMCPReturn['state']['lastResult'];
 type NoSchemaLastResultIsUnknown = Assert<IsEqual<NoSchemaLastResult, unknown | null>>;
@@ -56,6 +72,9 @@ type NoSchemaStringIsString = Assert<IsEqual<NoSchemaStringResult, string>>;
 
 type JsonOutputResult = Awaited<ReturnType<typeof jsonConfig.handler>>;
 type JsonOutputIsTyped = Assert<IsEqual<JsonOutputResult, { total: number }>>;
+type JsonInput = Parameters<typeof jsonInputConfig.handler>[0];
+type JsonInputNameIsString = Assert<IsEqual<JsonInput['name'], string>>;
+type JsonInputCountIsNumberOrUndefined = Assert<IsEqual<JsonInput['count'], number | undefined>>;
 
 type HandlerWithoutOutputSchema = () => Promise<InferOutput<undefined>>;
 export const objectHandlerWithoutOutputSchema: HandlerWithoutOutputSchema = async () => ({
@@ -73,9 +92,15 @@ export const noSchemaText: string = noSchemaStringOutput;
 declare const jsonOutput: JsonOutputResult;
 export const jsonTotal: number = jsonOutput.total;
 
+declare const jsonInput: JsonInput;
+export const jsonInputName: string = jsonInput.name;
+export const jsonInputCount: number | undefined = jsonInput.count;
+
 export const typeRegressionAssertion: UndefinedFallsBackToUnknown = true;
 export const noSchemaLastResultAssertion: NoSchemaLastResultIsUnknown = true;
 export const noSchemaExecuteAssertion: NoSchemaExecuteResultIsUnknown = true;
 export const noSchemaObjectAssertion: NoSchemaObjectHasTotal = true;
 export const noSchemaStringAssertion: NoSchemaStringIsString = true;
 export const jsonOutputAssertion: JsonOutputIsTyped = true;
+export const jsonInputNameAssertion: JsonInputNameIsString = true;
+export const jsonInputCountAssertion: JsonInputCountIsNumberOrUndefined = true;

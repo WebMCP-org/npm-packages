@@ -506,7 +506,8 @@ export class LocalRelayMcpServer {
         args = [safeUrl];
       } else if (platform === 'win32') {
         command = 'powershell.exe';
-        args = ['-NoProfile', '-Command', `Start-Process "${safeUrl}"`];
+        const escapedUrl = safeUrl.replace(/'/g, "''");
+        args = ['-NoProfile', '-Command', `Start-Process '${escapedUrl}'`];
       } else {
         command = 'xdg-open';
         args = [safeUrl];

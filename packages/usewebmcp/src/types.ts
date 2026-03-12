@@ -229,6 +229,23 @@ interface WebMCPConfigBase<
   formatOutput?: (output: InferOutput<TOutputSchema>) => string;
 
   /**
+   * Whether the tool should currently be registered.
+   *
+   * Defaults to `true`. Set to `false` to skip registration until the tool
+   * should become available again.
+   */
+  enabled?: boolean;
+
+  /**
+   * Optional callback invoked when tool execution begins.
+   * Useful for triggering optimistic UI or loading indicators before the
+   * implementation runs.
+   *
+   * @param input - The input that will be passed to the tool implementation
+   */
+  onStart?: (input: unknown) => void;
+
+  /**
    * Optional callback invoked when the tool execution succeeds.
    * Useful for triggering side effects like navigation or analytics.
    *

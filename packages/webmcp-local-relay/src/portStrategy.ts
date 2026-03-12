@@ -42,8 +42,8 @@ export async function persistPort(
     updatedAt: new Date(now).toISOString(),
   };
 
-  await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+  await mkdir(dirname(path), { recursive: true, mode: 0o700 });
+  await writeFile(path, `${JSON.stringify(payload, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
 }
 
 export async function readPersistedPort(

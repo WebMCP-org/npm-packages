@@ -1,9 +1,5 @@
-import {
-  type JSONRPCMessage,
-  JSONRPCMessageSchema,
-  type Transport,
-  type TransportSendOptions,
-} from '@mcp-b/webmcp-ts-sdk';
+import type { Transport, TransportSendOptions } from '@mcp-b/webmcp-ts-sdk';
+import { type JSONRPCMessage, JSONRPCMessageSchema } from '@mcp-b/webmcp-ts-sdk/protocol';
 
 /**
  * Configuration options for ExtensionClientTransport

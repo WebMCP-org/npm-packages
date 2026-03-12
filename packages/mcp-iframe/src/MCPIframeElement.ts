@@ -34,18 +34,14 @@
 
 import { IframeParentTransport } from '@mcp-b/transports';
 import type {
+  BrowserMcpServer,
   GetPromptResult,
-  Prompt,
+  PromptDescriptor,
   ReadResourceResult,
-  Resource,
-  Tool,
+  ResourceDescriptor,
 } from '@mcp-b/webmcp-ts-sdk';
-import {
-  type BrowserMcpServer,
-  Client,
-  type PromptDescriptor,
-  type ResourceDescriptor,
-} from '@mcp-b/webmcp-ts-sdk';
+import type { Prompt, Resource, Tool } from '@mcp-b/webmcp-ts-sdk/client';
+import { Client } from '@mcp-b/webmcp-ts-sdk/client';
 import type {
   CallToolResult,
   InputSchema,
@@ -415,11 +411,11 @@ export class MCPIframeElement extends HTMLElement {
     // Fetch tools, resources, and prompts in parallel
     const [toolsResult, resourcesResult, promptsResult] = await Promise.all([
       this.#client.listTools(),
-      this.#client.listResources().catch((err) => {
+      this.#client.listResources().catch((err: unknown) => {
         console.warn('[MCPIframeElement] listResources failed, defaulting to empty:', err);
         return { resources: [] };
       }),
-      this.#client.listPrompts().catch((err) => {
+      this.#client.listPrompts().catch((err: unknown) => {
         console.warn('[MCPIframeElement] listPrompts failed, defaulting to empty:', err);
         return { prompts: [] };
       }),

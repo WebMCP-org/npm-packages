@@ -1,4 +1,4 @@
-import type { JSONRPCMessage } from '@mcp-b/webmcp-ts-sdk';
+import type { JSONRPCMessage } from '@mcp-b/webmcp-ts-sdk/protocol';
 
 /**
  * Unique identifier for an event in the event store

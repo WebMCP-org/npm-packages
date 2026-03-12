@@ -53,6 +53,34 @@ const jsonConfig: WebMCPConfig<InputSchema, JsonOutputSchema> = {
   handler: async () => ({ total: 1 }),
 };
 
+const jsonInputSchema = {
+  type: 'object',
+  properties: {
+    name: { type: 'string' },
+    count: { type: 'number' },
+  },
+  required: ['name'],
+} as const;
+
+const jsonInputConfig: WebMCPConfig<typeof jsonInputSchema> = {
+  name: 'json_input',
+  description: 'JSON input',
+  inputSchema: jsonInputSchema,
+  handler: async (input) => ({ greeting: input.name, count: input.count ?? 0 }),
+};
+
+const zodInputSchema = {
+  username: z.string(),
+  age: z.number().optional(),
+};
+
+const zodInputConfig: WebMCPConfig<typeof zodInputSchema> = {
+  name: 'zod_input',
+  description: 'Zod input',
+  inputSchema: zodInputSchema,
+  handler: async (input) => ({ username: input.username, age: input.age ?? 0 }),
+};
+
 type UndefinedFallsBackToUnknown = Assert<IsEqual<InferOutput<undefined>, unknown>>;
 type UnstructuredLastResult = WebMCPReturn['state']['lastResult'];
 type UnstructuredLastResultIsUnknown = Assert<IsEqual<UnstructuredLastResult, unknown | null>>;
@@ -71,12 +99,27 @@ type ZodOutputIsNotAny = Assert<IsEqual<IsAny<ZodOutput>, false>>;
 
 type JsonOutput = Awaited<ReturnType<typeof jsonConfig.handler>>;
 type JsonOutputIsTyped = Assert<IsEqual<JsonOutput, { total: number }>>;
+type JsonInput = Parameters<typeof jsonInputConfig.handler>[0];
+type JsonInputNameIsString = Assert<IsEqual<JsonInput['name'], string>>;
+type JsonInputCountIsNumberOrUndefined = Assert<IsEqual<JsonInput['count'], number | undefined>>;
+
+type ZodInput = Parameters<typeof zodInputConfig.handler>[0];
+type ZodInputUsernameIsString = Assert<IsEqual<ZodInput['username'], string>>;
+type ZodInputAgeIsNumberOrUndefined = Assert<IsEqual<ZodInput['age'], number | undefined>>;
 
 declare const zodOutput: ZodOutput;
 export const zodName: string = zodOutput.name;
 
 declare const jsonOutput: JsonOutput;
 export const jsonTotal: number = jsonOutput.total;
+
+declare const jsonInput: JsonInput;
+export const jsonInputName: string = jsonInput.name;
+export const jsonInputCount: number | undefined = jsonInput.count;
+
+declare const zodInput: ZodInput;
+export const zodInputUsername: string = zodInput.username;
+export const zodInputAge: number | undefined = zodInput.age;
 
 declare const unstructuredOutput: UnstructuredHandlerResult;
 export const unstructuredTotal: number = unstructuredOutput.total;
@@ -99,3 +142,7 @@ export const noSchemaStringAssertion: NoSchemaStringIsString = true;
 export const zodOutputAssertion: ZodOutputNameIsString = true;
 export const zodAnyAssertion: ZodOutputIsNotAny = true;
 export const jsonOutputAssertion: JsonOutputIsTyped = true;
+export const jsonInputNameAssertion: JsonInputNameIsString = true;
+export const jsonInputCountAssertion: JsonInputCountIsNumberOrUndefined = true;
+export const zodInputUsernameAssertion: ZodInputUsernameIsString = true;
+export const zodInputAgeAssertion: ZodInputAgeIsNumberOrUndefined = true;

@@ -38,6 +38,22 @@ const SUPPORTED_SUBPROTOCOLS = new Set([
   RELAY_DISCOVERY_PROTOCOL,
   RELAY_INTERNAL_PROTOCOL,
 ]);
+const MAX_JSON_DEPTH = 64;
+
+function exceedsMaxDepth(value: unknown, maxDepth: number, current = 0): boolean {
+  if (current > maxDepth) return true;
+  if (typeof value !== 'object' || value === null) return false;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      if (exceedsMaxDepth(item, maxDepth, current + 1)) return true;
+    }
+  } else {
+    for (const v of Object.values(value)) {
+      if (exceedsMaxDepth(v, maxDepth, current + 1)) return true;
+    }
+  }
+  return false;
+}
 
 /**
  * In-flight relay invocation waiting for a browser `result` message.
@@ -630,6 +646,13 @@ export class RelayBridgeServer extends EventEmitter {
       const preview = text.length > 200 ? `${text.slice(0, 200)}...` : text;
       process.stderr.write(
         `[webmcp-local-relay] warn: invalid JSON from connection ${connectionId} (${err instanceof Error ? err.message : 'parse error'}): ${preview}\n`
+      );
+      return;
+    }
+
+    if (exceedsMaxDepth(parsedJson, MAX_JSON_DEPTH)) {
+      process.stderr.write(
+        `[webmcp-local-relay] warn: rejecting deeply nested JSON (>${MAX_JSON_DEPTH} levels) from connection ${connectionId}\n`
       );
       return;
     }

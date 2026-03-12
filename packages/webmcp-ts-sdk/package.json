@@ -1,7 +1,7 @@
 {
   "name": "@mcp-b/webmcp-ts-sdk",
   "version": "2.2.0",
-  "description": "Browser-adapted MCP TypeScript SDK - Dynamic tool registration for W3C Web Model Context API and AI agent integration",
+  "description": "Browser MCP server package for dynamic Web Model Context tool registration and browser transports",
   "keywords": [
     "mcp",
     "model-context-protocol",
@@ -44,6 +44,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "import": "./dist/client.js"
+    },
+    "./protocol": {
+      "types": "./dist/protocol.d.ts",
+      "import": "./dist/protocol.js"
     }
   },
   "main": "./dist/index.js",
@@ -68,23 +76,19 @@
   },
   "dependencies": {
     "@mcp-b/webmcp-polyfill": "workspace:*",
-    "@mcp-b/webmcp-types": "workspace:*"
+    "@mcp-b/webmcp-types": "workspace:*",
+    "@modelcontextprotocol/sdk": "catalog:"
   },
   "devDependencies": {
-    "@modelcontextprotocol/sdk": "catalog:",
     "@types/node": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:"
   },
   "peerDependencies": {
-    "zod": "^3.25 || ^4.0",
-    "zod-to-json-schema": "^3.25.0"
+    "zod": "^3.25 || ^4.0"
   },
   "peerDependenciesMeta": {
     "zod": {
-      "optional": true
-    },
-    "zod-to-json-schema": {
       "optional": true
     }
   },

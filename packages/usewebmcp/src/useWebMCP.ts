@@ -6,7 +6,7 @@ import type {
   ToolDescriptor,
 } from '@mcp-b/webmcp-types';
 import type { DependencyList } from 'react';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   InferOutput,
   InferToolInput,
@@ -52,8 +52,6 @@ function toStructuredContent(value: unknown): StructuredContent | null {
     return null;
   }
 }
-
-const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 function isDev(): boolean {
   const env = (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV;
@@ -107,23 +105,9 @@ function isDev(): boolean {
  *
  * - **Ref-based callbacks**: `execute`/`handler`, `onSuccess`, `onError`, and `formatOutput`
  *   are stored in refs, so changing these functions won't trigger re-registration.
- *
- * **IMPORTANT**: If `inputSchema`, `outputSchema`, or `annotations` are defined inline
- * or change on every render, the tool will re-register unnecessarily. To avoid this,
- * define them outside your component with `as const`:
- *
- * ```tsx
- * // Good: Static schema defined outside component
- * const OUTPUT_SCHEMA = {
- *   type: 'object',
- *   properties: { count: { type: 'number' } },
- * } as const;
- *
- * // Bad: Inline schema (creates new object every render)
- * useWebMCP({
- *   outputSchema: { type: 'object', properties: { count: { type: 'number' } } } as const,
- * });
- * ```
+ * - **Structural comparison**: `inputSchema`, `outputSchema`, and `annotations` are compared
+ *   by value (via JSON serialization), so inline objects with identical content won't
+ *   trigger re-registration.
  *
  * @template TInputSchema - JSON Schema defining input parameter types (use `as const` for inference)
  * @template TOutputSchema - JSON Schema object defining output structure (enables structuredContent)
@@ -182,6 +166,8 @@ export function useWebMCP<
     execute: configExecute,
     handler: legacyHandler,
     formatOutput = defaultFormatOutput,
+    enabled = true,
+    onStart,
     onSuccess,
     onError,
   } = config;
@@ -200,10 +186,29 @@ export function useWebMCP<
     executionCount: 0,
   });
 
+  // Stable serialized keys for object deps — prevents re-registration when
+  // structurally identical objects are passed inline on every render.
+  const inputSchemaKey = useMemo(
+    () => (inputSchema != null ? JSON.stringify(inputSchema) : undefined),
+    [inputSchema]
+  );
+  const outputSchemaKey = useMemo(
+    () => (outputSchema != null ? JSON.stringify(outputSchema) : undefined),
+    [outputSchema]
+  );
+  const annotationsKey = useMemo(
+    () => (annotations != null ? JSON.stringify(annotations) : undefined),
+    [annotations]
+  );
+
   const toolExecuteRef = useRef(toolExecute);
+  const onStartRef = useRef(onStart);
   const onSuccessRef = useRef(onSuccess);
   const onErrorRef = useRef(onError);
   const formatOutputRef = useRef(formatOutput);
+  const inputSchemaRef = useRef(inputSchema);
+  const outputSchemaRef = useRef(outputSchema);
+  const annotationsRef = useRef(annotations);
   const isMountedRef = useRef(true);
   const warnedRef = useRef(new Set<string>());
   const prevConfigRef = useRef({
@@ -213,13 +218,26 @@ export function useWebMCP<
     description,
     deps,
   });
-  // Update refs when callbacks change (doesn't trigger re-registration)
-  useIsomorphicLayoutEffect(() => {
+  // Update refs when callbacks/values change (doesn't trigger re-registration)
+  useEffect(() => {
     toolExecuteRef.current = toolExecute;
+    onStartRef.current = onStart;
     onSuccessRef.current = onSuccess;
     onErrorRef.current = onError;
     formatOutputRef.current = formatOutput;
-  }, [toolExecute, onSuccess, onError, formatOutput]);
+    inputSchemaRef.current = inputSchema;
+    outputSchemaRef.current = outputSchema;
+    annotationsRef.current = annotations;
+  }, [
+    toolExecute,
+    onStart,
+    onSuccess,
+    onError,
+    formatOutput,
+    inputSchema,
+    outputSchema,
+    annotations,
+  ]);
 
   // Cleanup: mark component as unmounted
   useEffect(() => {
@@ -295,13 +313,15 @@ export function useWebMCP<
    * @throws Error if validation fails or the tool implementation throws
    */
   const execute = useCallback(async (input: unknown): Promise<TOutput> => {
-    setState((prev) => ({
-      ...prev,
-      isExecuting: true,
-      error: null,
-    }));
-
     try {
+      onStartRef.current?.(input);
+
+      setState((prev) => ({
+        ...prev,
+        isExecuting: true,
+        error: null,
+      }));
+
       const result = await toolExecuteRef.current(input as TInput);
 
       // Only update state if component is still mounted
@@ -362,6 +382,14 @@ export function useWebMCP<
   }, []);
 
   useEffect(() => {
+    void inputSchemaKey;
+    void outputSchemaKey;
+    void annotationsKey;
+
+    if (!enabled) {
+      return;
+    }
+
     if (typeof window === 'undefined' || !window.navigator?.modelContext) {
       console.warn(
         `[useWebMCP] window.navigator.modelContext is not available. Tool "${name}" will not be registered.`
@@ -389,7 +417,7 @@ export function useWebMCP<
           ],
         };
 
-        if (outputSchema) {
+        if (outputSchemaRef.current) {
           const structuredContent = toStructuredContent(result);
           if (!structuredContent) {
             throw new Error(
@@ -415,14 +443,18 @@ export function useWebMCP<
       }
     };
 
+    const currentInputSchema = inputSchemaRef.current;
+    const currentOutputSchema = outputSchemaRef.current;
+    const currentAnnotations = annotationsRef.current;
+
     const ownerToken = Symbol(name);
     const modelContext = window.navigator.modelContext as CompatModelContext;
     const toolDescriptor: ToolDescriptor = {
       name,
       description,
-      ...(inputSchema && { inputSchema: inputSchema as InputSchema }),
-      ...(outputSchema && { outputSchema: outputSchema as InputSchema }),
-      ...(annotations && { annotations }),
+      ...(currentInputSchema && { inputSchema: currentInputSchema as InputSchema }),
+      ...(currentOutputSchema && { outputSchema: currentOutputSchema as InputSchema }),
+      ...(currentAnnotations && { annotations: currentAnnotations }),
       execute: mcpHandler,
     };
 
@@ -449,11 +481,15 @@ export function useWebMCP<
         }
       }
     };
-    // Spread operator in dependencies: Allows users to provide additional dependencies
-    // via the `deps` parameter. While unconventional, this pattern is intentional to support
-    // dynamic dependency injection. The spread is safe because deps is validated and warned
-    // about non-primitive values earlier in this hook.
-  }, [name, description, inputSchema, outputSchema, annotations, ...(deps ?? [])]);
+  }, [
+    name,
+    description,
+    inputSchemaKey,
+    outputSchemaKey,
+    annotationsKey,
+    enabled,
+    ...(deps ?? []),
+  ]);
 
   return {
     state,

@@ -65,3 +65,6 @@ webmcp-tools/
 # Chromium source and depot tools
 chromium/
 depot_tools/
+
+# External docs site (separate git repo)
+website-docs/

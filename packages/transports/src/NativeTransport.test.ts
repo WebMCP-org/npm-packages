@@ -1,8 +1,9 @@
 import { PassThrough } from 'node:stream';
-import { type JSONRPCMessage, serializeMessage } from '@mcp-b/webmcp-ts-sdk';
+import type { JSONRPCMessage } from '@mcp-b/webmcp-ts-sdk/protocol';
 import { describe, expect, it, vi } from 'vitest';
 import { NativeClientTransport } from './NativeClientTransport.js';
 import { NativeServerTransport } from './NativeServerTransport.js';
+import { serializeMessage } from './native-message.js';
 
 const wait = (ms = 10) => new Promise((resolve) => setTimeout(resolve, ms));
 const nodeDescribe = typeof window === 'undefined' ? describe : describe.skip;
