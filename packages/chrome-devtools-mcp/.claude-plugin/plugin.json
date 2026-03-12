@@ -1,11 +1,11 @@
 {
-  "name": "@mcp-b/chrome-devtools-mcp",
+  "name": "chrome-devtools-mcp",
   "version": "latest",
-  "description": "Chrome DevTools MCP with WebMCP integration - browser automation, debugging, performance analysis, and website MCP tools",
+  "description": "Reliable automation, in-depth debugging, and performance analysis in Chrome using Chrome DevTools and Puppeteer",
   "mcpServers": {
     "chrome-devtools": {
       "command": "npx",
-      "args": ["-y", "@mcp-b/chrome-devtools-mcp@latest"]
+      "args": ["chrome-devtools-mcp@latest"]
     }
   }
 }

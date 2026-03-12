@@ -7,77 +7,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-import tsConfig from '../tsconfig.json' with {type: 'json'};
-
-import {sed} from './sed.ts';
-
 const BUILD_DIR = path.join(process.cwd(), 'build');
-
-/**
- * Renames build/node_modules to build/vendor and updates all import paths.
- *
- * This is necessary because pnpm publish automatically strips out any directory
- * named 'node_modules', even nested ones. By renaming to 'vendor', the compiled
- * chrome-devtools-frontend dependencies are included in the published package.
- */
-function renameNodeModulesToVendor(): void {
-  const nodeModulesDir = path.join(BUILD_DIR, 'node_modules');
-  const vendorDir = path.join(BUILD_DIR, 'vendor');
-
-  if (!fs.existsSync(nodeModulesDir)) {
-    console.log('No build/node_modules directory found, skipping rename');
-    return;
-  }
-
-  // Rename the directory
-  console.log('Renaming build/node_modules to build/vendor...');
-  fs.renameSync(nodeModulesDir, vendorDir);
-
-  // Update all import paths in the built JS files
-  console.log('Updating import paths from node_modules to vendor...');
-  const srcDir = path.join(BUILD_DIR, 'src');
-  const testsDir = path.join(BUILD_DIR, 'tests');
-  updateImportPathsInDir(srcDir);
-  updateImportPathsInDir(testsDir);
-
-  console.log('Successfully renamed node_modules to vendor');
-}
-
-/**
- * Recursively updates import paths in all JS files in a directory.
- */
-function updateImportPathsInDir(dir: string): void {
-  if (!fs.existsSync(dir)) return;
-
-  const entries = fs.readdirSync(dir, {withFileTypes: true});
-  for (const entry of entries) {
-    const fullPath = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      updateImportPathsInDir(fullPath);
-    } else if (entry.name.endsWith('.js')) {
-      updateImportPathsInFile(fullPath);
-    }
-  }
-}
-
-/**
- * Updates import paths in a single JS file from node_modules to vendor.
- */
-function updateImportPathsInFile(filePath: string): void {
-  let content = fs.readFileSync(filePath, 'utf-8');
-  const originalContent = content;
-
-  // Replace various forms of node_modules imports with vendor
-  // Handles: '../node_modules/', '../../node_modules/', etc.
-  content = content.replace(
-    /(['"])(\.\.\/)+(node_modules\/)/g,
-    (match, quote, dots) => `${quote}${dots.repeat(match.split('../').length - 1)}vendor/`,
-  );
-
-  if (content !== originalContent) {
-    fs.writeFileSync(filePath, content, 'utf-8');
-  }
-}
 
 /**
  * Writes content to a file.
@@ -88,30 +18,6 @@ function writeFile(filePath: string, content: string): void {
   fs.writeFileSync(filePath, content, 'utf-8');
 }
 
-/**
- * Ensures that licenses for third party files we use gets copied into the build/ dir.
- */
-function copyThirdPartyLicenseFiles() {
-  const thirdPartyDirectories = tsConfig.include.filter(location => {
-    return location.includes(
-      'node_modules/chrome-devtools-frontend/front_end/third_party',
-    );
-  });
-
-  for (const thirdPartyDir of thirdPartyDirectories) {
-    const fullPath = path.join(process.cwd(), thirdPartyDir);
-    const licenseFile = path.join(fullPath, 'LICENSE');
-    if (!fs.existsSync(licenseFile)) {
-      console.error('No LICENSE for', path.basename(thirdPartyDir));
-    }
-
-    const destinationDir = path.join(BUILD_DIR, thirdPartyDir);
-    fs.mkdirSync(destinationDir, {recursive: true});
-    const destinationFile = path.join(destinationDir, 'LICENSE');
-    fs.copyFileSync(licenseFile, destinationFile);
-  }
-}
-
 function main(): void {
   const devtoolsThirdPartyPath =
     'node_modules/chrome-devtools-frontend/front_end/third_party';
@@ -120,7 +26,6 @@ function main(): void {
 
   // Create i18n mock
   const i18nDir = path.join(BUILD_DIR, devtoolsFrontEndCorePath, 'i18n');
-  fs.mkdirSync(i18nDir, {recursive: true});
   const localesFile = path.join(i18nDir, 'locales.js');
   const localesContent = `
 export const LOCALES = [
@@ -163,53 +68,44 @@ export const Runtime = {
 export const experiments = {
   isEnabled: () => false,
 }
+export const ExperimentName = {
+  ALL: '*',
+  CAPTURE_NODE_CREATION_STACKS: 'capture-node-creation-stacks',
+  LIVE_HEAP_PROFILE: 'live-heap-profile',
+  PROTOCOL_MONITOR: 'protocol-monitor',
+  SAMPLING_HEAP_PROFILER_TIMELINE: 'sampling-heap-profiler-timeline',
+  SHOW_OPTION_TO_EXPOSE_INTERNALS_IN_HEAP_SNAPSHOT: 'show-option-to-expose-internals-in-heap-snapshot',
+  TIMELINE_INVALIDATION_TRACKING: 'timeline-invalidation-tracking',
+  TIMELINE_SHOW_ALL_EVENTS: 'timeline-show-all-events',
+  TIMELINE_V8_RUNTIME_CALL_STATS: 'timeline-v8-runtime-call-stats',
+  APCA: 'apca',
+  FONT_EDITOR: 'font-editor',
+  FULL_ACCESSIBILITY_TREE: 'full-accessibility-tree',
+  CONTRAST_ISSUES: 'contrast-issues',
+  EXPERIMENTAL_COOKIE_FEATURES: 'experimental-cookie-features',
+  INSTRUMENTATION_BREAKPOINTS: 'instrumentation-breakpoints',
+  AUTHORED_DEPLOYED_GROUPING: 'authored-deployed-grouping',
+  JUST_MY_CODE: 'just-my-code',
+  USE_SOURCE_MAP_SCOPES: 'use-source-map-scopes',
+  TIMELINE_SHOW_POST_MESSAGE_EVENTS: 'timeline-show-postmessage-events',
+  TIMELINE_DEBUG_MODE: 'timeline-debug-mode',
+}
   `;
   writeFile(runtimeFile, runtimeContent);
 
-  // Update protocol_client to remove:
-  // 1. self.Protocol assignment
-  // 2. Call to register backend commands.
-  const protocolClientDir = path.join(
-    BUILD_DIR,
-    devtoolsFrontEndCorePath,
-    'protocol_client',
-  );
-  const clientFile = path.join(protocolClientDir, 'protocol_client.js');
-  const globalAssignment = /self\.Protocol = self\.Protocol \|\| \{\};/;
-  const registerCommands =
-    /InspectorBackendCommands\.registerCommands\(InspectorBackend\.inspectorBackend\);/;
-  sed(clientFile, globalAssignment, '');
-  sed(clientFile, registerCommands, '');
-
-  const devtoolsLicensePath = path.join(
-    'node_modules',
-    'chrome-devtools-frontend',
-    'LICENSE',
-  );
-  const devtoolsLicenseFileSource = path.join(
-    process.cwd(),
-    devtoolsLicensePath,
-  );
-  const devtoolsLicenseFileDestination = path.join(
-    BUILD_DIR,
-    devtoolsLicensePath,
-  );
-  fs.copyFileSync(devtoolsLicenseFileSource, devtoolsLicenseFileDestination);
-
-  copyThirdPartyLicenseFiles();
   copyDevToolsDescriptionFiles();
-
-  // IMPORTANT: This must be called last!
-  // Rename build/node_modules to build/vendor so pnpm publish includes it.
-  // pnpm automatically strips directories named 'node_modules' from packages.
-  renameNodeModulesToVendor();
 }
 
 function copyDevToolsDescriptionFiles() {
   const devtoolsIssuesDescriptionPath =
     'node_modules/chrome-devtools-frontend/front_end/models/issues_manager/descriptions';
   const sourceDir = path.join(process.cwd(), devtoolsIssuesDescriptionPath);
-  const destDir = path.join(BUILD_DIR, devtoolsIssuesDescriptionPath);
+  const destDir = path.join(
+    BUILD_DIR,
+    'src',
+    'third_party',
+    'issue-descriptions',
+  );
   fs.cpSync(sourceDir, destDir, {recursive: true});
 }
 

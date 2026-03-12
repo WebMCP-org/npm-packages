@@ -1,632 +1,640 @@
 # Changelog
 
-## 2.1.0
+## [0.20.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.19.0...chrome-devtools-mcp-v0.20.0) (2026-03-11)
 
-## 2.0.13
 
-## 2.0.12
+### 🎉 Features
 
-## 2.0.11
+* experimental `chrome-devtools` CLI ([#1100](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1100)) ([1ac574e](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/1ac574e7154948e86e414e5149fb975a190d5bb0))
 
-## 2.0.10
 
-## 2.0.9
+### 📄 Documentation
 
-## 2.0.8
+* fix typo ([#1155](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1155)) ([b59cabc](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/b59cabcc1d59802ffd7d9667040188e46192357d))
+* fix typos and improve phrasing ([#1130](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1130)) ([70d4f36](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/70d4f365dc619a5743e697c30800f7065bc6227d))
+* revise contribution process and add release process ([#1134](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1134)) ([d7d26a1](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d7d26a103b840e2feb7cb9af6a242edda94f1ddf))
+* **troubleshooting:** add symptom for missing tools due to read-only mode ([#1148](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1148)) ([57e7d51](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/57e7d51e8ca1e2ee325a9e7a9c64c033acbe6d6a))
+* Update troubleshooting for MCP server connection errors ([#1017](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1017)) ([00f9c31](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/00f9c3108ab9caefca57998439052c728298920b))
 
-## 2.0.7
 
-## 1.7.2
+### 🏗️ Refactor
 
-### Patch Changes
+* move main files ([#1120](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1120)) ([c2d8009](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/c2d8009ff75f76bce1ec4cf79c2467b50d81725e))
 
-- ada35ea: Auto-connect now checks Chrome's default profile directory for DevToolsActivePort before the MCP cache directory. This enables connecting to a user's existing Chrome instance when remote debugging is enabled via chrome://inspect/#remote-debugging (Chrome 144+), with no extra CLI flags needed.
+## [0.19.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.18.1...chrome-devtools-mcp-v0.19.0) (2026-03-05)
 
-## 2.0.0
 
-### Major Changes
+### 🎉 Features
 
-- BREAKING CHANGE: Migrate from window.webMCP to navigator.modelContext API
+* add pageId routing for parallel multi-agent workflows ([#1022](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1022)) ([caf601a](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/caf601a32832bb87cfac801a6bbeacb87508412f)), closes [#1019](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1019)
+* Add skill which helps with onboarding of the mcp server ([#1083](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1083)) ([7273f16](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/7273f16ec08f6d5b46a2693b0ad4d559086ded89))
+* integrate Lighthouse audits ([#831](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/831)) ([dfdac26](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/dfdac2648e560d756a8711ad3bb1fa470be8e7c9))
 
-  This release migrates the WebMCP API from the legacy `window.webMCP` interface to the W3C-aligned `navigator.modelContext` API.
 
-  ### Migration Guide
+### 🛠️ Fixes
 
-  **Before (v1.x):**
+* improve error messages around --auto-connect ([#1075](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1075)) ([bcb852d](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/bcb852dd2e440b0005f4a9ad270a1a7998767907))
+* improve tool descriptions ([#965](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/965)) ([bdbbc84](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/bdbbc84c125bdd48f4be48aa476bec0323de611c))
+* repair broken markdown and extract snippets in a11y-debugging skill ([#1096](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1096)) ([adac7c5](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/adac7c537ee304f324c5e7284fb363396d1773f5))
+* simplify emulation and script tools ([#1073](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1073)) ([e51ba47](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/e51ba4720338951e621585b77efc6a0e07678d99))
+* simplify focus state management ([#1063](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1063)) ([f763da2](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/f763da24a10e27605c0a5069853ce7c92974eec2))
+* tweak lighthouse description ([#1112](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1112)) ([5538180](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/55381804ae7ffa8a1e5933b621a9b8390b3000ff))
 
-  ```javascript
-  window.webMCP.registerTool({
-    name: 'my_tool',
-    // ...
-  });
-  ```
 
-  **After (v2.x):**
+### 📄 Documentation
 
-  ```javascript
-  navigator.modelContext.registerTool({
-    name: 'my_tool',
-    // ...
-  });
-  ```
+* Adapt a11y skill to utilize Lighthouse ([#1054](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1054)) ([21634e6](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/21634e660c346e469ae62116b1824538f51567dd))
+* add feature release checklist to CONTRIBUTING.md ([#1118](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1118)) ([0378457](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/03784577ffb6e238bcb2d637bff9ad759723ea7b))
+* fix typo in README regarding slim mode ([#1093](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1093)) ([92f2c7b](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/92f2c7b48b56a6b1d6ac7c9e2f2e92beb26bcf62))
 
-  The IIFE build (`@mcp-b/global/dist/index.iife.js`) now auto-initializes `navigator.modelContext` when loaded via script tag.
 
-## 1.6.3
+### 🏗️ Refactor
 
-### Patch Changes
+* clean up more of the context getters ([#1062](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1062)) ([9628dab](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/9628dabcb4d39f0b94d152a0fc419e049246a29d))
+* consistently use McpPage in tools ([#1057](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1057)) ([302e5a0](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/302e5a04191ba0558e3c79f1486d01d5eb0f6896))
+* improve type safety for page scoped tools ([#1051](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1051)) ([5f694c6](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/5f694c60ffd21f8b022554c92b2ad4cbdb457375))
+* make cdp resolvers use McpPage ([#1060](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1060)) ([d6c06c5](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d6c06c56a7b8e4968318adc9fc7c820ace9f5bd9))
+* move dialog handling to McpPage ([#1059](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1059)) ([40c241b](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/40c241bbfc80d6282953ab325b30a597d3d85ade))
+* move server to a separate file ([#1043](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1043)) ([a8bf3e5](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/a8bf3e585682c3126dfd378e9f98b5dc7ab6045d))
+* remove page passing via context ([#1061](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1061)) ([4cb5a17](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/4cb5a17b57f57d8a367cd423c960ba122b9952e3))
+* set defaults to performance trace tool ([#1090](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1090)) ([dfa9b79](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/dfa9b79a4ecc9e67f5b043f2dd97f6889d1fee0b))
+* simplify the response texts ([#1095](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1095)) ([cb0079e](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/cb0079efbbd41874f6913772fe3f2a037e9f5f8f))
+* type-cast as internal CdpPage interface ([#1064](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1064)) ([2d5e4fa](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/2d5e4fa3579650a384ff21c88c2e6b9cda031e1a))
 
-- fix: improve error handling and logging across WebMCP tools
-  - Fix silent failures in McpContext.ts - all catch blocks now log with context
-  - Fix overly broad catch in WebMCPToolHub.syncToolsForPage - now returns error state
-  - Improve error classification in call_webmcp_tool with actionable guidance
-  - Add warning when localStorage access fails in logger.ts
-  - Remove 51 misleading "verbose logging removed" placeholder comments
-  - Differentiate expected timeouts from unexpected errors in WebMCP connections
+## [0.18.1](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.18.0...chrome-devtools-mcp-v0.18.1) (2026-02-25)
 
-## 1.5.8
 
-### Patch Changes
+### 🛠️ Fixes
 
-- Set browser window to nearly full screen (1800x1200) for better UX when launching or connecting to browser
+* remove endsWith for filePath in memory tools ([#1041](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1041)) ([d0622d5](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d0622d52d46ac72a28bc22f93a337fb5007214c7))
 
-## 1.5.0
+## [0.18.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.17.3...chrome-devtools-mcp-v0.18.0) (2026-02-24)
 
-### Minor Changes
 
-- **Chrome DevTools MCP:**
-  - feat: Create new browser window for each MCP session instead of tab - prevents multiple clients from interfering with each other
-  - feat: Restore autoConnect default to true - automatically reconnects to existing browser sessions
-  - fix: Rename export constant listWebMCPTools to match tool name
+### 🎉 Features
 
-  **Global Package:**
-  - fix: Remove verbose console logging to reduce spam during tool registration/unregistration
+* `--slim` mode for maximum token savings ([#958](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/958)) ([c402b43](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/c402b43697d834994c4fc141305189082da14bee))
+* add a new skill for accessibility debugging and auditing with Chrome DevTools MCP. ([#1002](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1002)) ([b0c6d04](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/b0c6d042e4d68763acf989edc8097ce07e85dc7a))
+* add experimental screencast recording tools ([#941](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/941)) ([33446d4](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/33446d457e4386fadcfe4ddf6c7a43b2e9098c9a))
+* add skill to debug and optimize LCP ([#993](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/993)) ([2cd9b95](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/2cd9b95346226aa52cce18f6ab889a2ae194806c))
+* add storage-isolated browser contexts ([#991](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/991)) ([59f6477](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/59f6477a70eb07585e9a510089f1dfc840a012fd))
+* add take_memory_snapshot tool ([#1023](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1023)) ([7ffdc5e](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/7ffdc5ee4d9df9f62f03354fa758fb4d022c3b08))
+* support any-match text arrays in wait_for ([#1011](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1011)) ([496ab1b](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/496ab1b45f7a283a1432643777e0795a17f33667))
+* support type_text ([#1026](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1026)) ([b5d01b5](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/b5d01b5fe65fa20f9b76555b86a749960a5d1738))
 
-### Patch Changes
 
-- Updated dependencies
-  - @mcp-b/global@0.0.0
+### 🛠️ Fixes
 
-## 1.4.0
+* detect X server display on Linux ([#1027](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1027)) ([1746ed9](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/1746ed9ee11c212f78dcbb00af99a0400595e778))
 
-### Minor Changes
 
-- bd559c1: Rename diff_webmcp_tools to list_webmcp_tools for improved UX
+### ♻️ Chores
 
-  The tool name has been changed from `diff_webmcp_tools` to `list_webmcp_tools` to better represent its primary use case. The new name is more intuitive - users expect to "list" tools, not "diff" them - while all the intelligent diff tracking functionality remains intact.
+* cleanup string and structured console formatters ([#1005](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1005)) ([0d78685](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/0d78685a5b37dc68bb11a1088ff8816ecff3bb82))
+* extract version in a seprate file ([#1032](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1032)) ([0106865](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/0106865aad6d51b6cb590bf98ccaf7078e8d7436))
+* move emulation settings to context ([#1000](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1000)) ([bc3c40e](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/bc3c40e8f961433fb2ae858482d66f9a55fdde32))
+* optimize slim tool descriptions and params ([#1028](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1028)) ([ca6635d](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/ca6635d5a5d5e8b7b9944fa8b4e1063e6269a5f2))
+* simplify JavaScript code examples, update code block language, and refine descriptions in a11y debugging skill documentation. ([#1009](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1009)) ([5cedcaa](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/5cedcaad2c8a5e488064e21fb56cbd8643345440))
+* types for JSON output of IssueFormatter ([#1007](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1007)) ([9ef4479](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/9ef4479bec39c5f2651d6ebb63e9ec0fecf8bf89))
 
-  **What's Changed:**
-  - Tool name: `diff_webmcp_tools` → `list_webmcp_tools`
-  - All documentation and error messages updated
-  - Tests updated to reflect new name
+## [0.17.3](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.17.2...chrome-devtools-mcp-v0.17.3) (2026-02-19)
 
-  **What Stays the Same:**
-  - ✅ Diff tracking behavior (first call = full list, subsequent = diff)
-  - ✅ `full` parameter to force complete list
-  - ✅ Error propagation with isError flag
-  - ✅ Token efficiency for large tool lists
-  - ✅ All functionality preserved
 
-  **Migration:**
-  This is a breaking change. Update any code that calls `diff_webmcp_tools` to use `list_webmcp_tools` instead.
+### 🛠️ Fixes
 
-## 1.3.1
+* remove clean from prepare ([#997](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/997)) ([2016b98](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/2016b98217bf5aa8d65c6668b1e46c8a3400276f))
 
-### Patch Changes
+## [0.17.2](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.17.1...chrome-devtools-mcp-v0.17.2) (2026-02-19)
 
-- Improve list_webmcp_tools output: now shows available tool names summary when no changes detected, making it easier to see current tools without using full=true.
 
-## 1.3.0
+### 🛠️ Fixes
 
-### Minor Changes
+* check that combobox is actually a select element before filling out options ([#979](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/979)) ([d2bc489](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d2bc489e4351551ba62a104433839c4198ecae84))
+* handle network request pagination correctly ([#980](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/980)) ([0d9f422](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/0d9f422201538aa847a50417f1ed370e3a6c95b2))
 
-- 6bf4a41: Enable auto-connect by default with smart fallback for improved developer experience
 
-  **Breaking Changes:**
-  - Auto-connect is now enabled by default (previously disabled)
-  - Default Chrome channel changed from `stable` to `dev` (Chrome 145+ required for auto-connect)
+### 📄 Documentation
 
-  **New Features:**
-  - Smart fallback logic: automatically tries to connect to running Chrome instance first, then launches new instance if connection fails
-  - Graceful degradation prevents errors when no running browser is found
-  - Updated CLI descriptions to reflect new fallback behavior
+* Add a note about previously installed server installations ([#982](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/982)) ([c0009f7](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/c0009f7ab2f15bedd1c4ceb609db77bcb3c96f2d))
+* update codex doc URL ([#987](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/987)) ([ebbbea7](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/ebbbea7f9d20e4dea902d06e9b86dfe1cc9b221f))
 
-  **Benefits:**
-  - Faster iteration during development (instant reconnection to running Chrome)
-  - Zero-friction setup (no manual browser launch required)
-  - Better DX with automatic fallback handling
 
-  **Migration Guide:**
-  To use the old behavior (launch new instance always), add `--no-auto-connect` flag:
+### ♻️ Chores
 
-  ```json
-  {
-    "mcpServers": {
-      "chrome-devtools": {
-        "command": "npx",
-        "args": ["-y", "@mcp-b/chrome-devtools-mcp@latest", "--no-auto-connect"]
-      }
-    }
-  }
-  ```
+* **network:** de-duplicate String and JSON formatters ([#985](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/985)) ([1896dbb](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/1896dbb5a7cdc3fc0bcc5e665aee986a1180b014))
+* remove text from the status code for Network requests ([#778](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/778)) ([327a388](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/327a3884d8443b8591c06ddb3f9081771ae973c3))
 
-  To use Chrome Stable instead of Dev, add `--channel=stable` flag:
+## [0.17.1](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.17.0...chrome-devtools-mcp-v0.17.1) (2026-02-16)
 
-  ```json
-  {
-    "mcpServers": {
-      "chrome-devtools": {
-        "command": "npx",
-        "args": ["-y", "@mcp-b/chrome-devtools-mcp@latest", "--channel=stable"]
-      }
-    }
-  }
-  ```
 
-## 1.2.1
+### 📄 Documentation
 
-### Patch Changes
+* Add 'Progressive Complexity' and 'Reference over Value' design principles. ([#939](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/939)) ([8d765c0](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/8d765c0aef7bbcd476c7e7fbe9ea63ee26cf4fa6))
+* add Katalon Studio setup instructions to README ([#929](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/929)) ([6cfef24](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/6cfef24ec734ed62221c66bdf03b09ce000f5bfe))
+* add MCP config for Claude plugin + docs ([#944](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/944)) ([a781da4](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/a781da4434c3490901b28017bc7aa40493ef8dcc))
+* estimate tokens using tiktoken  ([#959](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/959)) ([fd0a919](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/fd0a9193b37be4c5cda21dc4904093c7b58d61be))
+* improve Claude Code installation instructions ([#947](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/947)) ([3ec5b7e](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/3ec5b7e7a2d97c9f0165c5af3317c531a9dc058f))
+* Update README with WSL configuration details ([#946](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/946)) ([107c46a](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/107c46a4dbd2ba7c7b9217a75ae2b1871d3c7f0d))
 
-- docs(chrome-devtools-mcp): add benchmark data, demo images, and quickstart links
-  - Add Token Efficiency section with benchmark comparison chart showing 77-89% token savings vs screenshot-based workflows
-  - Add demo result image showing successful WebMCP tool execution
-  - Add prominent link to Chrome DevTools Quickstart in the header
-  - Enhance documentation with visual aids from chrome-devtools-quickstart repo
 
-## 1.2.0
+### ♻️ Chores
 
-### Minor Changes
+* rename files to have more consistent style ([#935](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/935)) ([9e1f9ac](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/9e1f9ac69667ddc3e2917e2c30e5ee940a03d853))
 
-- 9b49dce: Add per-page WebMCP connection support and improve CDP lifecycle handling
-  - Support per-page WebMCP connections instead of global state
-  - Move WebMCP state from module-level to McpContext for proper isolation
-  - Handle browser close/reopen scenarios for WebMCP transport
-  - Detect and recover from stale CDP connections after page reload
+## [0.17.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.16.0...chrome-devtools-mcp-v0.17.0) (2026-02-10)
 
-### Patch Changes
 
-- d4e18d9: Fix post-build script to update import paths in tests directory
+### 🎉 Features
 
-  The post-build script now correctly updates import paths from `node_modules` to `vendor` in both `src/` and `tests/` directories, fixing test failures after the vendor rename.
+* include Error.cause chain for uncaught errors and logged Errors ([#906](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/906)) ([05b01ec](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/05b01ecaba47cf1ce38564636663222c9cab46de))
+* Integrate CrUX data into performance trace summaries ([#733](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/733)) ([b747f9d](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/b747f9d74a12d2119b6531476b2f88ab66be0ff8))
+* show message and stack trace in details when console.log'ging Error objects ([#902](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/902)) ([ffa00da](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/ffa00dab1b65b2eac8db215e0289317b8ed9b725))
 
-## 1.2.0-beta.1
 
-### Minor Changes
+### 🛠️ Fixes
 
-- Add per-page WebMCP connection support and improve CDP lifecycle handling
-  - Support per-page WebMCP connections instead of global state
-  - Move WebMCP state from module-level to McpContext for proper isolation
-  - Handle browser close/reopen scenarios for WebMCP transport
-  - Detect and recover from stale CDP connections after page reload
+* console formatter hides frames from ignored scripts ([#927](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/927)) ([8e2380b](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/8e2380b434d9659ffa8a7043d2589261772fa04f))
+* limit stack traces to 50 lines ([#923](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/923)) ([caea23a](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/caea23a7cf33c87cd4ce426eb2a10724aba3cc71))
 
-## 1.1.5-beta.0
 
-### Patch Changes
+### 📄 Documentation
 
-- d4e18d9: Fix post-build script to update import paths in tests directory
+* add macOS Web Bluetooth troubleshooting note ([#930](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/930)) ([3c9528b](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/3c9528b43d9bbff166fcfcfee321149ff44ddd21)), closes [#917](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/917)
 
-  The post-build script now correctly updates import paths from `node_modules` to `vendor` in both `src/` and `tests/` directories, fixing test failures after the vendor rename.
+## [0.16.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.15.1...chrome-devtools-mcp-v0.16.0) (2026-02-04)
 
-## 1.1.4
 
-### Patch Changes
+### 🎉 Features
 
-- fac027c: fix(chrome-devtools-mcp): rename build/node_modules to build/vendor for pnpm publish
+* include source-mapped stack trace for uncaught errors ([#876](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/876)) ([ecef712](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/ecef712e70b47ae81eb3364d0aed801ec1c91a70))
 
-  pnpm publish automatically strips out any directory named `node_modules`, even nested ones like `build/node_modules`. This caused the compiled chrome-devtools-frontend dependencies to be missing from published packages.
 
-  The fix renames `build/node_modules` to `build/vendor` after compilation and updates all import paths accordingly.
+### 🛠️ Fixes
 
-## 1.1.3
+* accidental extra typing in the fill tool ([#886](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/886)) ([3d6e59d](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/3d6e59dda42be3c6fd97446344a28cbbaa5809b3))
+* update evaluateScript description formatting ([#880](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/880)) ([24db9dd](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/24db9dd78cd4f054d291322685b4f47601da3f5a))
+* use 1-based line/column and fix wasm offsets in stack frames ([#884](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/884)) ([7e1ec81](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/7e1ec81fb63ec8b7c6d77dbdc88beef4240243ba))
 
-### Patch Changes
 
-- Fix server crash when reloading page with ignoreCache after calling WebMCP tools. Page navigation events are now handled gracefully with connection cleanup instead of throwing errors, allowing automatic reconnection on subsequent WebMCP tool calls.
+### 📄 Documentation
 
-## 1.1.2
+* mention source-mapped stack traces in 'Key features' ([#883](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/883)) ([579d18a](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/579d18a3f4d1d8d05bf267a39de7f2f53e719b17))
+* remove outdated --channel=beta note ([#882](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/882)) ([acdb5c9](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/acdb5c9bb3f249c5a9ce1d4a3e84c580af999141))
 
-### Patch Changes
+## [0.15.1](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.15.0...chrome-devtools-mcp-v0.15.1) (2026-01-30)
 
-- d7d23de: Fix missing runtime dependencies - move core-js, debug, puppeteer, yargs, and zod from devDependencies to dependencies so they are installed when using npx.
 
-## 1.1.1
+### 🛠️ Fixes
 
-### Patch Changes
+* disable usage statistics when CI or CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS env is set ([#862](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/862)) ([c0435a2](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/c0435a2d53eb51b7500fc5cce50344520ea164e7))
+* respect custom timeouts in navigate tools ([#865](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/865)) ([a0aeb97](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/a0aeb97693fd5ca641f45ebcd4ce3b4b08ce21b8))
 
-- 51e345d: Fix turbo build output caching - adds package-level turbo.json to correctly specify build/\*\* as output directory. This fixes the issue where published packages were missing build/node_modules containing compiled chrome-devtools-frontend dependencies.
+## [0.15.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.14.0...chrome-devtools-mcp-v0.15.0) (2026-01-28)
 
-## 1.1.0
 
-### Minor Changes
+### 🎉 Features
 
-- 79de6d9: Add WebMCP integration to connect to MCP tools registered on webpages
+* Add ability to inject script to run on page load ([#568](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/568)) ([d845ad4](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d845ad48584a49aa57b11de308beeb17ed0b2e10))
+* enable usage statistics by default with opt-out ([#855](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/855)) ([7e279f1](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/7e279f1b67c5cfd4ad033a4147c51fe20a7833f7))
+* support testing light and dark mode ([#858](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/858)) ([5a23a8c](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/5a23a8c201d30d40395e283f4434d933826333fa))
 
-  This adds two new tools for interacting with website-specific MCP functionality:
-  - `list_webmcp_tools`: List available website tools (auto-connects to WebMCP)
-  - `call_webmcp_tool`: Call a website tool (auto-connects to WebMCP)
+## [0.14.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.13.0...chrome-devtools-mcp-v0.14.0) (2026-01-27)
 
-  The tools automatically handle connection management - no explicit connect/disconnect
-  calls needed. WebMCP auto-reconnects when navigating between pages.
 
-  Websites can register tools using @mcp-b/global, and AI agents can now interact
-  with those tools through chrome-devtools-mcp using the Chrome DevTools Protocol.
+### 🎉 Features
 
-- Stable release of all packages with backwards-compatible improvements.
+* add a skill for using chrome-devtools-mcp ([#830](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/830)) ([aa0a367](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/aa0a3679f59ab441908d31252afee1cd56102da8))
+* add background parameter to new_page tool ([#837](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/837)) ([d756888](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d7568881ba4aa0e2c10dc6148fd0ef941fee10d5))
+* allow skipping snapshot generation for input tools ([#821](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/821)) ([4b8e9f2](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/4b8e9f287572e0a95c30b5ca612acf08bf79595b))
+* include stack trace in 'get_console_message' tool ([#740](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/740)) ([a3a0021](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/a3a00210a30f78045244bc897ee736bdbdc36007))
+* support device viewport and user agent emulation ([#798](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/798)) ([a816967](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/a8169676f920f88965a2574f53affe15c1278b43))
+* support filePath for network request and response bodies ([#795](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/795)) ([6d0e4ca](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/6d0e4cab28a8498c2783c1c0c6436c655de7b336))
 
-### Patch Changes
 
-- 02833d3: Bump all packages to new beta release
-- 7239bb5: Bump all packages to new beta release
+### 🛠️ Fixes
 
-## 1.0.3-beta.1
+* handle beforeunload dialogs in navigations ([#788](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/788)) ([9b21f8b](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/9b21f8b2e972f78f58c6f633851466356330c77d))
+* improve error handling for console messages ([#844](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/844)) ([dc43ede](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/dc43ede1f20302bd2feb706e63bcf992b4a66a96))
+* improve error reporting when retrieving the element ([#845](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/845)) ([f7dd003](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/f7dd00340a8ac5af7fbe4922f2a1d27d99d933cc))
+* improve performance tool description ([#800](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/800)) ([aa9a176](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/aa9a1769568aca2a357f186b2e80b38b2ed76323))
+* increase timeouts for long text input ([#787](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/787)) ([a83a338](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/a83a33835148905b538b39be93f6115774f91696))
+* make request and response handling more robust ([#846](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/846)) ([695817f](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/695817f6d6da5fcb94934fb1c2be8b006522f53b))
+* re-use node ids across snapshots ([#814](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/814)) ([a6cd2cd](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/a6cd2cd3f2bd823f0e044d7796fd8ff2c100cda3))
 
-### Patch Changes
 
-- Bump all packages to new beta release
+### 📄 Documentation
 
-## 1.0.3-beta.0
+* add a mention of evals into contributing.md ([#773](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/773)) ([9a31ac7](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/9a31ac7abab5890d11fec627bbdcbb8051452453))
+* document how to add extensions to gemini-cli ([#834](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/834)) ([0610d11](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/0610d11aa9add484951b76adef557eed5e2bd275))
+* update auto-connect docs ([#779](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/779)) ([a106fba](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/a106fbadbc1a487ce4c53a9eb783c98e524c0a9e))
+* Update README.md to include a link to Android debugging ([#783](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/783)) ([6e52e66](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/6e52e66a7a7ebbf1f2e2080a857f72192036eb0c))
 
-### Patch Changes
+## [0.13.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.12.1...chrome-devtools-mcp-v0.13.0) (2026-01-14)
 
-- Bump all packages to new beta release
 
-## 1.0.0
+### 🎉 Features
 
-### Major Changes
+* Allow opting out of default Chrome launch arguments ([#729](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/729)) ([9a51af2](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/9a51af219fc9216cd463bef9363716283f41f36a))
+* support filePath in performance tools ([#686](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/686)) ([68ae2f8](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/68ae2f8253e2ba5c34436e25df114874c537f6df))
 
-This is the first stable release of `@mcp-b/chrome-devtools-mcp`, a fork of Chrome DevTools MCP with WebMCP integration.
 
-### Features
+### 🛠️ Fixes
 
-- **WebMCP Integration**: Connect to MCP tools registered on webpages via [@mcp-b/global](https://www.npmjs.com/package/@mcp-b/global)
-  - `list_webmcp_tools`: List available website tools (auto-connects)
-  - `call_webmcp_tool`: Call a website tool (auto-connects)
+* support resize_page when browser window is maximized/fullscreenwindow state ([#748](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/748)) ([4d9ac22](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/4d9ac227ddff6fc4aec44e46673f6e44a8168db9))
+* use relative path for plugin source in marketplace ([#724](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/724)) ([5c1ecf8](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/5c1ecf835ac8aad4947d0a8f82c899acd4115b64))
 
-- **AI-Driven Development Workflow**: Build and test WebMCP tools in real-time
-  - Write tools in your codebase
-  - Hot-reload sees the changes
-  - AI discovers tools via `list_webmcp_tools`
-  - AI tests tools via `call_webmcp_tool`
-  - Iterate until working - TDD for AI!
 
-- **Built-in MCP Prompts**: Three prompts to help with WebMCP development
-  - `webmcp-dev-workflow`: Guide through the AI-driven development workflow
-  - `test-webmcp-tool`: Systematically test WebMCP tools
-  - `debug-webmcp`: Troubleshoot WebMCP connection issues
+### 📄 Documentation
 
-### What's Different from Chrome DevTools MCP?
+* add experimental chrome on android guide ([#691](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/691)) ([4a87702](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/4a87702ca6913ed62987f71e080f3d481d13b8d8))
+* autoConnect - clarify how the mcp server selects a profile ([#693](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/693)) ([28b8ff8](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/28b8ff816461760c82e9b19b70f288bc7fa2fa38))
+* claude code broken link ([#707](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/707)) ([1f532b8](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/1f532b8fafa0fa60aaf94c302bad663fab1c12ea))
+* enhance cli docs + sort required vs opt params ([#674](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/674)) ([81cbd99](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/81cbd99f52d013d07bdcf21a0840f61a16bacd33))
+* update auto connect docs to mention min Chrome version ([#681](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/681)) ([ab2340f](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/ab2340f40127dcdabde6887a411163ce9d130394))
+* Update Claude Code instructions in README.md ([#711](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/711)) ([f81cd2d](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/f81cd2d8dfc35da8c718b227e0ee4c4d7c5daca8))
+* update readme to include OpenCode example ([#560](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/560)) ([fbba3c9](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/fbba3c9461cec8113216fa4569e879c85312ea29))
 
-This fork adds the ability to call MCP tools registered directly on webpages. The original Chrome DevTools MCP provides browser automation, performance analysis, network inspection, and debugging. This fork adds:
 
-| Feature                          | Chrome DevTools MCP | @mcp-b/chrome-devtools-mcp |
-| -------------------------------- | ------------------- | -------------------------- |
-| Browser automation               | ✅                  | ✅                         |
-| Performance analysis             | ✅                  | ✅                         |
-| Network inspection               | ✅                  | ✅                         |
-| **Call website MCP tools**       | ❌                  | ✅                         |
-| **List website MCP tools**       | ❌                  | ✅                         |
-| **AI-driven tool development**   | ❌                  | ✅                         |
-| **Built-in development prompts** | ❌                  | ✅                         |
+### ♻️ Chores
 
-### Attribution
+* change pageIdx to page ids ([#741](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/741)) ([a23c6ba](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/a23c6ba8c9e1da90c885e68946635a8cc536a11e))
 
-This package is a fork of [ChromeDevTools/chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp), developed by Google LLC and the ChromeDevTools team. See [NOTICE](./NOTICE) for full attribution.
+## [0.12.1](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.12.0...chrome-devtools-mcp-v0.12.1) (2025-12-12)
 
----
 
-## 0.12.0-beta.0
+### 🛠️ Fixes
 
-### Minor Changes
+* catch unexpected error in event handlers ([#672](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/672)) ([ca0f560](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/ca0f5607f18bf04134e85ea1f61d1a839a47827b))
+* log unhandledRejection instead of crashing ([#673](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/673)) ([f59b4a2](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/f59b4a2ed8b09e1d64916552ee6db49b978fe9a7))
+* make bringToFront optional in select_page ([#668](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/668)) ([ceae17b](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/ceae17be26b0a812f1b013dcebaed9beb510e7b3))
+* Update installation badges in README.md for VS Code ([#660](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/660)) ([61ede1c](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/61ede1c0531ea8b028d9a5cbb28fcdc00cc521e0))
 
-- 79de6d9: Add WebMCP integration to connect to MCP tools registered on webpages
 
-  This adds two new tools for interacting with website-specific MCP functionality:
-  - `list_webmcp_tools`: List available website tools
-  - `call_webmcp_tool`: Call a website tool
+### 📄 Documentation
 
-  Websites can register tools using @mcp-b/global, and AI agents can now interact
-  with those tools through @mcp-b/chrome-devtools-mcp using the Chrome DevTools Protocol.
+* Add debug instructions ([#670](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/670)) ([a8aae66](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/a8aae6652e205b87ac2efa29217b7cbd18dcbbe6))
+* explain new auto connection feature ([#664](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/664)) ([a537a8c](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/a537a8c8cef4f2a3493e9f7de47345d565b6fc9f))
+
+## [0.12.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.11.0...chrome-devtools-mcp-v0.12.0) (2025-12-09)
+
+
+### 🎉 Features
+
+* support --auto-connect to a Chrome instance ([#651](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/651)) ([6ab6d85](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/6ab6d85d50226cf12a62563430f552e783f428b2))
+* support --user-data-dir with --auto-connect ([#654](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/654)) ([e3c59bc](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/e3c59bcd9c284f3be99cc15e22116b887f04cdab))
+
+
+### 🛠️ Fixes
+
+* map channel for resolveDefaultUserDataDir ([#658](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/658)) ([6f59b39](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/6f59b3975abda50536f8b890f3245662b22e3657))
+
+
+### 📄 Documentation
+
+* Add AX design principles ([#643](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/643)) ([90ed192](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/90ed192c558d36faf9f6300be1c1fd5abd464d8a))
+* improve autoConnect docs ([#653](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/653)) ([09111cc](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/09111cc16464bed27cd623f3b345d3885db12521))
 
 ## [0.11.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.10.2...chrome-devtools-mcp-v0.11.0) (2025-12-03)
 
+
 ### 🎉 Features
 
-- **emulation:** add geolocation emulation tool ([#634](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/634)) ([3991e4c](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/3991e4c2a9c28bf8180f9057ce804d978c39529d))
-- integrate DevTools issues into the console tools ([#636](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/636)) ([d892145](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d8921453c77a1c0815059fb9bc72c0cd769a7bd4))
-- support --user-data-dir ([#622](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/622)) ([fcaf553](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/fcaf55354c2afbdbae538e27eb4b6d02f2e87985))
+* **emulation:** add geolocation emulation tool ([#634](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/634)) ([3991e4c](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/3991e4c2a9c28bf8180f9057ce804d978c39529d))
+* integrate DevTools issues into the console tools ([#636](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/636)) ([d892145](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d8921453c77a1c0815059fb9bc72c0cd769a7bd4))
+* support --user-data-dir ([#622](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/622)) ([fcaf553](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/fcaf55354c2afbdbae538e27eb4b6d02f2e87985))
+
 
 ### 🛠️ Fixes
 
-- handle error messages that are not instanceof Error ([#618](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/618)) ([a67528a](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/a67528a046746c7131d5265f6c94613d607aaf90))
-- handle the case when all pages are filtered out ([#616](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/616)) ([bff5c65](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/bff5c6569003fdbc207448d89a8be6a9a8172ca0))
-- ignore hash parts of URLs when finding DevTools ([#608](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/608)) ([52533d0](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/52533d0c695354b816807de253f0ec17099aa9d7))
-- ignore quality for png ([#589](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/589)) ([2eaf268](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/2eaf2689c3360f88479f4cdab8ddde5899378e33))
-- include a note about selected elements missing from the snapshot ([#593](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/593)) ([80e77fd](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/80e77fd9a35a3dc5c451cc5b070b8baa574c686c))
-- prevent dropping license notices on some files when publishing ([#604](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/604)) ([94752ff](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/94752ffade847671ebfd15e4013a5b5cdf8377df))
-- rename page content to latest page snapshot ([#579](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/579)) ([9cb99ad](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/9cb99ad3e65054f4ea12a39358719f6630a020d0))
-- **wait_for:** respect the provided timeout ([#630](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/630)) ([6b0984a](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/6b0984aa7dca6f651afd1fed56246893810781c9)), closes [#624](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/624)
+* handle error messages that are not instanceof Error ([#618](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/618)) ([a67528a](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/a67528a046746c7131d5265f6c94613d607aaf90))
+* handle the case when all pages are filtered out ([#616](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/616)) ([bff5c65](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/bff5c6569003fdbc207448d89a8be6a9a8172ca0))
+* ignore hash parts of URLs when finding DevTools ([#608](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/608)) ([52533d0](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/52533d0c695354b816807de253f0ec17099aa9d7))
+* ignore quality for png ([#589](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/589)) ([2eaf268](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/2eaf2689c3360f88479f4cdab8ddde5899378e33))
+* include a note about selected elements missing from the snapshot ([#593](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/593)) ([80e77fd](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/80e77fd9a35a3dc5c451cc5b070b8baa574c686c))
+* prevent dropping license notices on some files when publishing ([#604](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/604)) ([94752ff](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/94752ffade847671ebfd15e4013a5b5cdf8377df))
+* rename page content to latest page snapshot ([#579](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/579)) ([9cb99ad](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/9cb99ad3e65054f4ea12a39358719f6630a020d0))
+* **wait_for:** respect the provided timeout ([#630](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/630)) ([6b0984a](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/6b0984aa7dca6f651afd1fed56246893810781c9)), closes [#624](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/624)
+
 
 ### 📄 Documentation
 
-- add Antigravity config ([#580](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/580)) ([6f9182f](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/6f9182f4b60f1f6ff8d321fec35545712828686e))
-- add Qoder CLI to the MCP client configuration section in the README. ([#552](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/552)) ([1a16f15](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/1a16f15546e227a0708f89d3084c98d4916db53f))
-- add VS Code install badges ([#532](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/532)) ([cc4d065](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/cc4d065dd6081a2a9fbcc3d8ebb1536e5426116e))
-- clarify browser-url parameter in README ([#613](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/613)) ([05cf8cb](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/05cf8cb8a6c68506282075bc1522c81f0b84f07b))
-- Fix Antigravity docs ([#605](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/605)) ([fae2608](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/fae260888748ece77b368a13ee913153caffcef7))
-- update readme to explain agy's browser integration ([#612](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/612)) ([2d89865](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/2d89865ddbff6e77332c6157f687dcc2f0bef892))
+* add Antigravity config ([#580](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/580)) ([6f9182f](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/6f9182f4b60f1f6ff8d321fec35545712828686e))
+* add Qoder CLI to the MCP client configuration section in the README. ([#552](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/552)) ([1a16f15](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/1a16f15546e227a0708f89d3084c98d4916db53f))
+* add VS Code install badges ([#532](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/532)) ([cc4d065](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/cc4d065dd6081a2a9fbcc3d8ebb1536e5426116e))
+* clarify browser-url parameter in README ([#613](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/613)) ([05cf8cb](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/05cf8cb8a6c68506282075bc1522c81f0b84f07b))
+* Fix Antigravity docs ([#605](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/605)) ([fae2608](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/fae260888748ece77b368a13ee913153caffcef7))
+* update readme to explain agy's browser integration ([#612](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/612)) ([2d89865](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/2d89865ddbff6e77332c6157f687dcc2f0bef892))
+
 
 ### ♻️ Chores
 
-- avoid throwing in resolveCdpElementId ([#606](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/606)) ([eb261fd](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/eb261fd48b6753db246d24b77e1f477dc7a9455e))
+* avoid throwing in resolveCdpElementId ([#606](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/606)) ([eb261fd](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/eb261fd48b6753db246d24b77e1f477dc7a9455e))
 
 ## [0.10.2](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.10.1...chrome-devtools-mcp-v0.10.2) (2025-11-19)
 
+
 ### 📄 Documentation
 
-- add Factory CLI configuration to MCP clients ([#523](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/523)) ([016e2fd](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/016e2fd6ee57447103f7385285dd503b5576a860))
+* add Factory CLI configuration to MCP clients ([#523](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/523)) ([016e2fd](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/016e2fd6ee57447103f7385285dd503b5576a860))
+
 
 ### ♻️ Chores
 
-- clear issue aggregator on page navigation ([#565](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/565)) ([c3784d1](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/c3784d1990a926f651951e4eef05520c5c448964))
-- disable issues in list_console_messages for now ([#575](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/575)) ([08e9a9f](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/08e9a9f42e6ff1a92c60b3e958b0817c7b785afc))
-- simplify issue management ([#564](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/564)) ([3b016f1](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/3b016f1a814b1a69750813548b3f35e79bfb6fef))
+* clear issue aggregator on page navigation ([#565](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/565)) ([c3784d1](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/c3784d1990a926f651951e4eef05520c5c448964))
+* disable issues in list_console_messages for now ([#575](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/575)) ([08e9a9f](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/08e9a9f42e6ff1a92c60b3e958b0817c7b785afc))
+* simplify issue management ([#564](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/564)) ([3b016f1](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/3b016f1a814b1a69750813548b3f35e79bfb6fef))
 
 ## [0.10.1](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.10.0...chrome-devtools-mcp-v0.10.1) (2025-11-07)
 
+
 ### 🛠️ Fixes
 
-- avoid no page selected errors ([#537](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/537)) ([4724bbb](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/4724bbba9327fc162cd1f0372e608f6ebefc59cc))
+* avoid no page selected errors ([#537](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/537)) ([4724bbb](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/4724bbba9327fc162cd1f0372e608f6ebefc59cc))
 
 ## [0.10.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.9.0...chrome-devtools-mcp-v0.10.0) (2025-11-05)
 
+
 ### 🎉 Features
 
-- add a press_key tool ([#458](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/458)) ([b427392](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/b4273923928704e718e0a0f8b5cc86758416e994))
-- add insightSetId to performance_analyze_insight ([#518](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/518)) ([36504d2](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/36504d29caf637b2d7bf231204c0478b54220c83))
-- an option to ignore cache on reload ([#485](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/485)) ([8e56307](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/8e56307d623fe3651262287b30544ed70426b0b8))
-- detect network requests inspected in DevTools UI ([#477](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/477)) ([796aed7](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/796aed72b7126ed4332888ffbc06d6cb678265ef))
-- fetch DOM node selected in the DevTools Elements panel ([#486](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/486)) ([4a83574](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/4a83574961d8d6b974037db56fc8bdbbb91f79b6))
-- support page reload ([#462](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/462)) ([d177087](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d17708798194486b2571092aa67838085da7231e))
-- support saving snapshots to file ([#463](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/463)) ([b0ce08a](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/b0ce08ae2ce422813fef3f28c18f2cb6c976d9fc))
+* add a press_key tool ([#458](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/458)) ([b427392](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/b4273923928704e718e0a0f8b5cc86758416e994))
+* add insightSetId to performance_analyze_insight ([#518](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/518)) ([36504d2](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/36504d29caf637b2d7bf231204c0478b54220c83))
+* an option to ignore cache on reload ([#485](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/485)) ([8e56307](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/8e56307d623fe3651262287b30544ed70426b0b8))
+* detect network requests inspected in DevTools UI ([#477](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/477)) ([796aed7](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/796aed72b7126ed4332888ffbc06d6cb678265ef))
+* fetch DOM node selected in the DevTools Elements panel ([#486](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/486)) ([4a83574](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/4a83574961d8d6b974037db56fc8bdbbb91f79b6))
+* support page reload ([#462](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/462)) ([d177087](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d17708798194486b2571092aa67838085da7231e))
+* support saving snapshots to file ([#463](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/463)) ([b0ce08a](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/b0ce08ae2ce422813fef3f28c18f2cb6c976d9fc))
+
 
 ### 🛠️ Fixes
 
-- Augment fix to prevent stray OGS frames in NTP from causing hangs. ([#521](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/521)) ([d90abd4](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d90abd4e9e534417622d7f4676e9c3dbeb39ea8d))
-- improve get_network_request description ([#500](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/500)) ([2f448e8](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/2f448e84ea8d3a44687c74b3577edf882ef2c19f))
-- work around NTP iframes causing hangs ([#504](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/504)) ([cca5ff4](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/cca5ff471c2d2c663e63ade1e2ea58f9a7f5a2cd))
+* Augment fix to prevent stray OGS frames in NTP from causing hangs. ([#521](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/521)) ([d90abd4](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d90abd4e9e534417622d7f4676e9c3dbeb39ea8d))
+* improve get_network_request description ([#500](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/500)) ([2f448e8](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/2f448e84ea8d3a44687c74b3577edf882ef2c19f))
+* work around NTP iframes causing hangs ([#504](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/504)) ([cca5ff4](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/cca5ff471c2d2c663e63ade1e2ea58f9a7f5a2cd))
+
 
 ### 📄 Documentation
 
-- add Windsurf to the editor config README ([#493](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/493)) ([63a5d82](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/63a5d824c2d914c9007e2b837fa292f5ba74ceed))
-- fix typos in README.md exlcude -&gt; exclude ([#513](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/513)) ([8854a34](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/8854a3400c3a6b84c761bf8ed82769fc2dec7366))
-- remove unnecessary replace ([#475](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/475)) ([40e1753](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/40e1753d2e874bb22005dbebdb551da304a80033))
+* add Windsurf to the editor config README ([#493](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/493)) ([63a5d82](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/63a5d824c2d914c9007e2b837fa292f5ba74ceed))
+* fix typos in README.md exlcude -&gt; exclude ([#513](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/513)) ([8854a34](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/8854a3400c3a6b84c761bf8ed82769fc2dec7366))
+* remove unnecessary replace ([#475](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/475)) ([40e1753](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/40e1753d2e874bb22005dbebdb551da304a80033))
+
 
 ### ♻️ Chores
 
-- connect to DevTools targets by default ([#466](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/466)) ([a41e440](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/a41e4407996b8090f8cccc85f6c4696006fc31ec))
-- detect DevTools page for each page ([#467](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/467)) ([1560ff2](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/1560ff23cad28ab63c1cf9fb1b961db886bc4a3e))
-- merge emulate tools into one ([#494](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/494)) ([c06f452](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/c06f4522ee8f762b59c60c2fd23a0deaaa544766))
+* connect to DevTools targets by default ([#466](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/466)) ([a41e440](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/a41e4407996b8090f8cccc85f6c4696006fc31ec))
+* detect DevTools page for each page ([#467](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/467)) ([1560ff2](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/1560ff23cad28ab63c1cf9fb1b961db886bc4a3e))
+* merge emulate tools into one ([#494](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/494)) ([c06f452](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/c06f4522ee8f762b59c60c2fd23a0deaaa544766))
 
 ## [0.9.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.8.1...chrome-devtools-mcp-v0.9.0) (2025-10-22)
 
+
 ### 🎉 Features
 
-- add claude marketplace and plugin json ([#396](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/396)) ([0498611](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/0498611429f769c6ccae365674003d2bd538c292))
-- add filters and pagination to the console messages tool ([#387](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/387)) ([15d942c](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/15d942c4f3335b35f1cba8e8634651688323663d))
-- add WebSocket endpoint and custom headers support ([#404](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/404)) ([41d6a10](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/41d6a107baee0d14a1c14573f958d44198de23aa))
-- allow configuring tool categories ([#454](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/454)) ([0fe2b8a](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/0fe2b8a2b4d64b9da5f7d1adccc5425fd7cbec34))
-- expose previous navigations to the MCP ([#419](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/419)) ([165cf9c](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/165cf9c70b7f91dc116558547a870281f29da710))
-- support previous navigation for Console messages ([#452](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/452)) ([6f24362](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/6f243620391f0c608f51d464257cf3222d653e9e))
-- support stable id for network requests ([#375](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/375)) ([f4d7b49](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/f4d7b49bb112b4336bef0d90059485f41f71e4f1))
-- support verbose snapshots ([#388](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/388)) ([d47aaa9](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d47aaa96ff990c49dd07a481ea1924f85881eafa))
-- tool to get a verbose single console message ([#435](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/435)) ([9205593](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/92055933dc44e5d200dda2ee4ae0e365b24281bb))
-- use stable id for network request querying ([#382](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/382)) ([579819b](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/579819b5e76f7a34c7c5c0877ac1e5e284beb328))
+* add claude marketplace and plugin json ([#396](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/396)) ([0498611](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/0498611429f769c6ccae365674003d2bd538c292))
+* add filters and pagination to the console messages tool ([#387](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/387)) ([15d942c](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/15d942c4f3335b35f1cba8e8634651688323663d))
+* add WebSocket endpoint and custom headers support ([#404](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/404)) ([41d6a10](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/41d6a107baee0d14a1c14573f958d44198de23aa))
+* allow configuring tool categories ([#454](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/454)) ([0fe2b8a](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/0fe2b8a2b4d64b9da5f7d1adccc5425fd7cbec34))
+* expose previous navigations to the MCP ([#419](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/419)) ([165cf9c](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/165cf9c70b7f91dc116558547a870281f29da710))
+* support previous navigation for Console messages ([#452](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/452)) ([6f24362](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/6f243620391f0c608f51d464257cf3222d653e9e))
+* support stable id for network requests ([#375](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/375)) ([f4d7b49](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/f4d7b49bb112b4336bef0d90059485f41f71e4f1))
+* support verbose snapshots ([#388](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/388)) ([d47aaa9](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d47aaa96ff990c49dd07a481ea1924f85881eafa))
+* tool to get a verbose single console message ([#435](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/435)) ([9205593](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/92055933dc44e5d200dda2ee4ae0e365b24281bb))
+* use stable id for network request querying ([#382](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/382)) ([579819b](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/579819b5e76f7a34c7c5c0877ac1e5e284beb328))
+
 
 ### 🛠️ Fixes
 
-- allow evaluating in Frames ([#443](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/443)) ([053f1f8](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/053f1f830d051ec415f4b00e645f5a1aff8554a1))
-- better wording for evaluate_script ([#392](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/392)) ([2313fda](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/2313fdacad72a1bc5c4d8f1cbdd80fd64ba91771))
-- indicate when request and response bodies are not available ([#446](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/446)) ([7d47d6b](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/7d47d6b2f40bf08def29de3ca37b1a4a28ce6777))
-- pageerror for non-error types ([#442](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/442)) ([b6b42ec](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/b6b42ecb998dd4f8fbf4a8e7a49f461333a41103))
-- retrieve data correctly with fewer than 3 navigations ([#451](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/451)) ([4c65f59](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/4c65f59cf9f62662cf903fbbd19b67a8828d674a))
+* allow evaluating in Frames ([#443](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/443)) ([053f1f8](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/053f1f830d051ec415f4b00e645f5a1aff8554a1))
+* better wording for evaluate_script ([#392](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/392)) ([2313fda](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/2313fdacad72a1bc5c4d8f1cbdd80fd64ba91771))
+* indicate when request and response bodies are not available ([#446](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/446)) ([7d47d6b](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/7d47d6b2f40bf08def29de3ca37b1a4a28ce6777))
+* pageerror for non-error types ([#442](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/442)) ([b6b42ec](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/b6b42ecb998dd4f8fbf4a8e7a49f461333a41103))
+* retrieve data correctly with fewer than 3 navigations ([#451](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/451)) ([4c65f59](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/4c65f59cf9f62662cf903fbbd19b67a8828d674a))
+
 
 ### 📄 Documentation
 
-- add instructions for Qoder ([#386](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/386)) ([d8df784](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d8df784127afd590eb02e0060378465ae115a7a4))
-- add VM-to-host remote debugging workaround ([#399](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/399)) ([9f9dab0](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/9f9dab0787f19c5730b65daf148c382fb2d9e365))
-- Update Copilot CLI instructions ([#423](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/423)) ([c7733a8](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/c7733a818050e50830c9a8e3d62bb80892cf9121))
+* add instructions for Qoder ([#386](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/386)) ([d8df784](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d8df784127afd590eb02e0060378465ae115a7a4))
+* add VM-to-host remote debugging workaround ([#399](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/399)) ([9f9dab0](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/9f9dab0787f19c5730b65daf148c382fb2d9e365))
+* Update Copilot CLI instructions ([#423](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/423)) ([c7733a8](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/c7733a818050e50830c9a8e3d62bb80892cf9121))
+
 
 ### ♻️ Chores
 
-- bundle all dependencies together ([#450](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/450)) ([914b980](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/914b980113353fd41b301da397aa45975090487a))
-- bundle modelcontextprotocol-sdk ([#409](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/409)) ([6c8432b](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/6c8432b6b69d5d56d0dee01968882492033f2dc1))
-- bundle puppeteer-core ([#417](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/417)) ([b443033](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/b443033000e46a992ea7fa071af0f9ec304b9ea7))
-- bundle zod together with modelcontextprotocol/sdk ([#414](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/414)) ([800e7e8](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/800e7e836433f3f1b2bfafa12ed35a991404d270))
-- cleanup data fetching ([#441](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/441)) ([5c871c3](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/5c871c3bd98127996011f269faddd8d8e7163917))
-- dispose listeners on page destroyed ([#318](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/318)) ([76d5e94](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/76d5e9416d833299561242ac45c0ce7813e61dbe))
-- extract common paginate type ([#415](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/415)) ([29fd602](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/29fd60216ca1394c46a266c6f853f8d65418e861))
-- store the last 3 navigations in PageCollector ([#411](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/411)) ([b873822](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/b8738221d8cf8322d5f968ee829f03dc83238a05))
-- use different format for reqid ([#380](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/380)) ([78bf66a](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/78bf66a7b1eefc93768f39d6d38fd141104fe812))
+* bundle all dependencies together ([#450](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/450)) ([914b980](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/914b980113353fd41b301da397aa45975090487a))
+* bundle modelcontextprotocol-sdk ([#409](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/409)) ([6c8432b](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/6c8432b6b69d5d56d0dee01968882492033f2dc1))
+* bundle puppeteer-core ([#417](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/417)) ([b443033](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/b443033000e46a992ea7fa071af0f9ec304b9ea7))
+* bundle zod together with modelcontextprotocol/sdk ([#414](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/414)) ([800e7e8](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/800e7e836433f3f1b2bfafa12ed35a991404d270))
+* cleanup data fetching ([#441](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/441)) ([5c871c3](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/5c871c3bd98127996011f269faddd8d8e7163917))
+* dispose listeners on page destroyed ([#318](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/318)) ([76d5e94](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/76d5e9416d833299561242ac45c0ce7813e61dbe))
+* extract common paginate type ([#415](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/415)) ([29fd602](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/29fd60216ca1394c46a266c6f853f8d65418e861))
+* store the last 3 navigations in PageCollector ([#411](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/411)) ([b873822](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/b8738221d8cf8322d5f968ee829f03dc83238a05))
+* use different format for reqid ([#380](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/380)) ([78bf66a](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/78bf66a7b1eefc93768f39d6d38fd141104fe812))
 
 ## [0.8.1](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.8.0...chrome-devtools-mcp-v0.8.1) (2025-10-13)
 
+
 ### Bug Fixes
 
-- add an option value to the snapshot ([#362](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/362)) ([207137e](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/207137edd6d8af2f49277d88a30d8afa51671631))
-- improve navigate_page_history error messages ([#321](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/321)) ([0624029](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/0624029e0f8735345d202d29dde446b8869d9561))
-- return the default dialog value correctly ([#366](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/366)) ([f08f808](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/f08f8080d0be1074a48e5c2ab0a6533f01f65928))
-- update puppeteer to 24.24.1 ([#370](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/370)) ([477eef4](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/477eef481a2e6241121ee4aaaed34e8342a8b347))
+* add an option value to the snapshot ([#362](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/362)) ([207137e](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/207137edd6d8af2f49277d88a30d8afa51671631))
+* improve navigate_page_history error messages ([#321](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/321)) ([0624029](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/0624029e0f8735345d202d29dde446b8869d9561))
+* return the default dialog value correctly ([#366](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/366)) ([f08f808](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/f08f8080d0be1074a48e5c2ab0a6533f01f65928))
+* update puppeteer to 24.24.1 ([#370](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/370)) ([477eef4](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/477eef481a2e6241121ee4aaaed34e8342a8b347))
 
 ## [0.8.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.7.1...chrome-devtools-mcp-v0.8.0) (2025-10-10)
 
+
 ### Features
 
-- support passing args to Chrome ([#338](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/338)) ([e1b5363](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/e1b536365363e1e1a3aa7661dd84290c794510ad))
+* support passing args to Chrome ([#338](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/338)) ([e1b5363](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/e1b536365363e1e1a3aa7661dd84290c794510ad))
 
 ## [0.7.1](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.7.0...chrome-devtools-mcp-v0.7.1) (2025-10-10)
 
+
 ### Bug Fixes
 
-- document that console and requests are since the last nav ([#335](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/335)) ([9ad7cbb](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/9ad7cbb2de3d285e46e5f3e7c098b0a7535c7e7a))
+* document that console and requests are since the last nav ([#335](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/335)) ([9ad7cbb](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/9ad7cbb2de3d285e46e5f3e7c098b0a7535c7e7a))
 
 ## [0.7.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.6.1...chrome-devtools-mcp-v0.7.0) (2025-10-10)
 
+
 ### Features
 
-- Add offline network emulation support to emulate_network command ([#326](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/326)) ([139ce60](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/139ce607814bf25ba541a7264ce96a04b2fac871))
-- add request and response body ([#267](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/267)) ([dd3c143](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/dd3c14336ee44d057d06231a5bfd5c5bcf661029))
+* Add offline network emulation support to emulate_network command ([#326](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/326)) ([139ce60](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/139ce607814bf25ba541a7264ce96a04b2fac871))
+* add request and response body ([#267](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/267)) ([dd3c143](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/dd3c14336ee44d057d06231a5bfd5c5bcf661029))
+
 
 ### Bug Fixes
 
-- ordering of information in performance trace summary ([#334](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/334)) ([2d4484a](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/2d4484a123968754b4840d112b9c1ca59fb29997))
-- publishing to MCP registry ([#313](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/313)) ([1faec78](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/1faec78f84569a03f63585fb84df35992bcfe81a))
-- use default ProtocolTimeout ([#315](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/315)) ([a525f19](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/a525f199458afb266db4540bf0fa8007323f3301))
+* ordering of information in performance trace summary ([#334](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/334)) ([2d4484a](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/2d4484a123968754b4840d112b9c1ca59fb29997))
+* publishing to MCP registry ([#313](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/313)) ([1faec78](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/1faec78f84569a03f63585fb84df35992bcfe81a))
+* use default ProtocolTimeout ([#315](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/315)) ([a525f19](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/a525f199458afb266db4540bf0fa8007323f3301))
 
 ## [0.6.1](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.6.0...chrome-devtools-mcp-v0.6.1) (2025-10-07)
 
+
 ### Bug Fixes
 
-- change default screen size in headless ([#299](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/299)) ([357db65](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/357db65d18f87b1299a0f6212b7ec982ef187171))
-- **cli:** tolerate empty browser URLs ([#298](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/298)) ([098a904](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/098a904b363f3ad81595ed58c25d34dd7d82bcd8))
-- guard performance_stop_trace when tracing inactive ([#295](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/295)) ([8200194](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/8200194c8037cc30b8ab815e5ee0d0b2b000bea6))
+* change default screen size in headless ([#299](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/299)) ([357db65](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/357db65d18f87b1299a0f6212b7ec982ef187171))
+* **cli:** tolerate empty browser URLs ([#298](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/298)) ([098a904](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/098a904b363f3ad81595ed58c25d34dd7d82bcd8))
+* guard performance_stop_trace when tracing inactive ([#295](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/295)) ([8200194](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/8200194c8037cc30b8ab815e5ee0d0b2b000bea6))
 
 ## [0.6.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.5.1...chrome-devtools-mcp-v0.6.0) (2025-10-01)
 
+
 ### Features
 
-- **screenshot:** add WebP format support with quality parameter ([#220](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/220)) ([03e02a2](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/03e02a2d769fbfc0c98599444dfed5413d15ae6e))
-- **screenshot:** adds ability to output screenshot to a specific pat… ([#172](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/172)) ([f030726](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/f03072698ddda8587ce23229d733405f88b7c89e))
-- support --accept-insecure-certs CLI ([#231](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/231)) ([efb106d](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/efb106dc94af0057f88c89f810beb65114eeaa4b))
-- support --proxy-server CLI ([#230](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/230)) ([dfacc75](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/dfacc75ee9f46137b5194e35fc604b89a00ff53f))
-- support initial viewport in the CLI ([#229](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/229)) ([ef61a08](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/ef61a08707056c5078d268a83a2c95d10e224f31))
-- support timeouts in wait_for and navigations ([#228](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/228)) ([36e64d5](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/36e64d5ae21e8bb244a18201a23a16932947e938))
+* **screenshot:** add WebP format support with quality parameter ([#220](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/220)) ([03e02a2](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/03e02a2d769fbfc0c98599444dfed5413d15ae6e))
+* **screenshot:** adds ability to output screenshot to a specific pat… ([#172](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/172)) ([f030726](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/f03072698ddda8587ce23229d733405f88b7c89e))
+* support --accept-insecure-certs CLI ([#231](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/231)) ([efb106d](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/efb106dc94af0057f88c89f810beb65114eeaa4b))
+* support --proxy-server CLI ([#230](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/230)) ([dfacc75](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/dfacc75ee9f46137b5194e35fc604b89a00ff53f))
+* support initial viewport in the CLI ([#229](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/229)) ([ef61a08](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/ef61a08707056c5078d268a83a2c95d10e224f31))
+* support timeouts in wait_for and navigations ([#228](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/228)) ([36e64d5](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/36e64d5ae21e8bb244a18201a23a16932947e938))
+
 
 ### Bug Fixes
 
-- **network:** show only selected request ([#236](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/236)) ([73f0aec](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/73f0aecd8a48b9d1ee354897fe14d785c80e863e))
-- PageCollector subscribing multiple times ([#241](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/241)) ([0412878](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/0412878bf51ae46e48a171183bb38cfbbee1038a))
-- snapshot does not capture Iframe content ([#217](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/217)) ([ce356f2](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/ce356f256545e805db74664797de5f42e7b92bed)), closes [#186](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/186)
+* **network:** show only selected request ([#236](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/236)) ([73f0aec](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/73f0aecd8a48b9d1ee354897fe14d785c80e863e))
+* PageCollector subscribing multiple times ([#241](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/241)) ([0412878](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/0412878bf51ae46e48a171183bb38cfbbee1038a))
+* snapshot does not capture Iframe content ([#217](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/217)) ([ce356f2](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/ce356f256545e805db74664797de5f42e7b92bed)), closes [#186](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/186)
 
 ## [0.5.1](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.5.0...chrome-devtools-mcp-v0.5.1) (2025-09-29)
 
+
 ### Bug Fixes
 
-- update package.json engines to reflect node20 support ([#210](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/210)) ([b31e647](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/b31e64713e0524f28cbf760fad27b25829ec419d))
+* update package.json engines to reflect node20 support ([#210](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/210)) ([b31e647](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/b31e64713e0524f28cbf760fad27b25829ec419d))
 
 ## [0.5.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.4.0...chrome-devtools-mcp-v0.5.0) (2025-09-29)
 
+
 ### Features
 
-- **screenshot:** add JPEG quality parameter support ([#184](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/184)) ([139cfd1](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/139cfd135cdb07573fe87d824631fcdb6153186e))
+* **screenshot:** add JPEG quality parameter support ([#184](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/184)) ([139cfd1](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/139cfd135cdb07573fe87d824631fcdb6153186e))
+
 
 ### Bug Fixes
 
-- do not error if the dialog was already handled ([#208](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/208)) ([d9f77f8](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d9f77f85098ffe851308c5de05effb03ac21237b))
-- reference to handle_dialog tool ([#209](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/209)) ([205eef5](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/205eef5cdff19ccb7ddbd113bb1450cb87e8f398))
-- support node20 ([#52](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/52)) ([13613b4](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/13613b4a33ab7cf2d4fb1f4849bfa6b82f546945))
-- update tool reference in an error ([#205](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/205)) ([7765bb3](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/7765bb381ad9d01219547faf879a74978188754a))
+* do not error if the dialog was already handled ([#208](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/208)) ([d9f77f8](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d9f77f85098ffe851308c5de05effb03ac21237b))
+* reference to handle_dialog tool ([#209](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/209)) ([205eef5](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/205eef5cdff19ccb7ddbd113bb1450cb87e8f398))
+* support node20 ([#52](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/52)) ([13613b4](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/13613b4a33ab7cf2d4fb1f4849bfa6b82f546945))
+* update tool reference in an error ([#205](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/205)) ([7765bb3](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/7765bb381ad9d01219547faf879a74978188754a))
 
 ## [0.4.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.3.0...chrome-devtools-mcp-v0.4.0) (2025-09-26)
 
+
 ### Features
 
-- add network request filtering by resource type ([#162](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/162)) ([59d81a3](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/59d81a33258a199a3f993c9e02a415f62ef05ce4))
+* add network request filtering by resource type ([#162](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/162)) ([59d81a3](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/59d81a33258a199a3f993c9e02a415f62ef05ce4))
+
 
 ### Bug Fixes
 
-- add core web vitals to performance_start_trace description ([#168](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/168)) ([6cfc977](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/6cfc9774f4ec7944c70842999506b2bc2018a667))
-- add data format information to trace summary ([#166](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/166)) ([869dd42](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/869dd4273e42309c1bb57d44e0e5a6a9506ffad7))
-- expose --debug-file argument ([#164](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/164)) ([22ec7ee](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/22ec7ee45cc04892000cf6dc32f3fe58d33855c1))
-- typo in the disclaimers ([#156](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/156)) ([90f686e](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/90f686e5df3d880c35ec566c837ee5a98824be28))
+* add core web vitals to performance_start_trace description ([#168](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/168)) ([6cfc977](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/6cfc9774f4ec7944c70842999506b2bc2018a667))
+* add data format information to trace summary ([#166](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/166)) ([869dd42](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/869dd4273e42309c1bb57d44e0e5a6a9506ffad7))
+* expose --debug-file argument ([#164](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/164)) ([22ec7ee](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/22ec7ee45cc04892000cf6dc32f3fe58d33855c1))
+* typo in the disclaimers ([#156](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/156)) ([90f686e](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/90f686e5df3d880c35ec566c837ee5a98824be28))
 
 ## [0.3.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.2.7...chrome-devtools-mcp-v0.3.0) (2025-09-25)
 
+
 ### Features
 
-- Add pagination list_network_requests ([#145](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/145)) ([4c909bb](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/4c909bb8d7c4a420cb8e3219ec98abf28f5cc664))
+* Add pagination list_network_requests ([#145](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/145)) ([4c909bb](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/4c909bb8d7c4a420cb8e3219ec98abf28f5cc664))
+
 
 ### Bug Fixes
 
-- avoid reporting page close errors as errors ([#127](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/127)) ([44cfc8f](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/44cfc8f945edf9370efe26247f322a59a4a4a7be))
-- clarify the node version message ([#135](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/135)) ([0cc907a](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/0cc907a9ad79289a6785e9690c3c6940f0a5de52))
-- do not set channel if executablePath is provided ([#150](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/150)) ([03b59f0](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/03b59f0bca024173ad45d7a617994e919d9cbbad))
-- **performance:** ImageDelivery insight errors ([#144](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/144)) ([d64ba0d](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d64ba0d9027540eb707381e2577ae3c1fe014346))
-- roll latest DevTools to handle Insight errors ([#149](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/149)) ([b2e1e39](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/b2e1e3944c7fa170584ce36c7b8923b0e6d6c6cb))
+* avoid reporting page close errors as errors ([#127](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/127)) ([44cfc8f](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/44cfc8f945edf9370efe26247f322a59a4a4a7be))
+* clarify the node version message ([#135](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/135)) ([0cc907a](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/0cc907a9ad79289a6785e9690c3c6940f0a5de52))
+* do not set channel if executablePath is provided ([#150](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/150)) ([03b59f0](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/03b59f0bca024173ad45d7a617994e919d9cbbad))
+* **performance:** ImageDelivery insight errors ([#144](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/144)) ([d64ba0d](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d64ba0d9027540eb707381e2577ae3c1fe014346))
+* roll latest DevTools to handle Insight errors ([#149](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/149)) ([b2e1e39](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/b2e1e3944c7fa170584ce36c7b8923b0e6d6c6cb))
 
 ## [0.2.7](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.2.6...chrome-devtools-mcp-v0.2.7) (2025-09-24)
 
+
 ### Bug Fixes
 
-- validate and report incompatible Node versions ([#113](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/113)) ([adfcecf](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/adfcecf9871938b1ad5d1460e0050b849fb2aa49))
+* validate and report incompatible Node versions ([#113](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/113)) ([adfcecf](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/adfcecf9871938b1ad5d1460e0050b849fb2aa49))
 
 ## [0.2.6](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.2.5...chrome-devtools-mcp-v0.2.6) (2025-09-24)
 
+
 ### Bug Fixes
 
-- manually bump server.json versions based on package.json ([#105](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/105)) ([cae1cf1](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/cae1cf13d5a97add3b96f20c425f720a1ceabf94))
+* manually bump server.json versions based on package.json ([#105](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/105)) ([cae1cf1](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/cae1cf13d5a97add3b96f20c425f720a1ceabf94))
 
 ## [0.2.5](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.2.4...chrome-devtools-mcp-v0.2.5) (2025-09-24)
 
+
 ### Bug Fixes
 
-- add mcpName to package.json ([#103](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/103)) ([bd0351f](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/bd0351fd36ae35e41e613f0d15df40aeca17ba94))
+* add mcpName to package.json ([#103](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/103)) ([bd0351f](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/bd0351fd36ae35e41e613f0d15df40aeca17ba94))
 
 ## [0.2.4](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.2.3...chrome-devtools-mcp-v0.2.4) (2025-09-24)
 
+
 ### Bug Fixes
 
-- forbid closing the last page ([#90](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/90)) ([0ca2434](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/0ca2434a29eb4bc6e570a4ebe21a135d85f4c0f3))
+* forbid closing the last page ([#90](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/90)) ([0ca2434](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/0ca2434a29eb4bc6e570a4ebe21a135d85f4c0f3))
 
 ## [0.2.3](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.2.2...chrome-devtools-mcp-v0.2.3) (2025-09-24)
 
+
 ### Bug Fixes
 
-- add a message indicating that no console messages exist ([#91](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/91)) ([1a4ba4d](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/1a4ba4d3e05f51a85747816f8638f31230881437))
-- clean up pending promises on action errors ([#84](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/84)) ([4e7001a](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/4e7001ac375ec51f55b29e9faf68aff0dd09fa0f))
+* add a message indicating that no console messages exist ([#91](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/91)) ([1a4ba4d](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/1a4ba4d3e05f51a85747816f8638f31230881437))
+* clean up pending promises on action errors ([#84](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/84)) ([4e7001a](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/4e7001ac375ec51f55b29e9faf68aff0dd09fa0f))
 
 ## [0.2.2](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.2.1...chrome-devtools-mcp-v0.2.2) (2025-09-23)
 
+
 ### Bug Fixes
 
-- cli version being reported as unknown ([#74](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/74)) ([d6bab91](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d6bab912df55dc2e96a8d7893d1906f1fc608d0a))
-- remove unnecessary waiting for navigation ([#83](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/83)) ([924c042](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/924c042492222a555074063841ce765342e3b5b9))
-- rework performance parsing & error handling ([#75](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/75)) ([e8fb30c](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/e8fb30c1bfdc2b4ea8c2daf74b24aa82210f99be))
+* cli version being reported as unknown ([#74](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/74)) ([d6bab91](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d6bab912df55dc2e96a8d7893d1906f1fc608d0a))
+* remove unnecessary waiting for navigation ([#83](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/83)) ([924c042](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/924c042492222a555074063841ce765342e3b5b9))
+* rework performance parsing & error handling ([#75](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/75)) ([e8fb30c](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/e8fb30c1bfdc2b4ea8c2daf74b24aa82210f99be))
 
 ## [0.2.1](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.2.0...chrome-devtools-mcp-v0.2.1) (2025-09-23)
 
+
 ### Bug Fixes
 
-- add 'on the selected page' to performance tools ([#69](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/69)) ([b877f7a](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/b877f7a3053d0cdf2aad1fefc26cf7b913eb95ce))
-- **emulation:** correctly report info for selected page ([#63](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/63)) ([1e8662f](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/1e8662f06860aecb5c01ed4ff1515ceb9dac26e4))
-- expose timeout when Emulation is enabled ([#73](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/73)) ([0208bfd](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/0208bfdcf6924953879408c18f4c20da544bf4ff))
-- fix browserUrl not working ([#53](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/53)) ([a6923b8](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/a6923b8d9397d12ee0f9fe67dd62b10088ec6e87))
-- increase timeouts in case of Emulation ([#71](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/71)) ([c509c64](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/c509c64576e1be1ddc283653004ef08a117907a2))
-- **windows:** work around Chrome not reporting reasons for crash ([#64](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/64)) ([d545741](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d5457412a4a76726547190fb3a46bb78c9d6645c))
+* add 'on the selected page' to performance tools ([#69](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/69)) ([b877f7a](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/b877f7a3053d0cdf2aad1fefc26cf7b913eb95ce))
+* **emulation:** correctly report info for selected page ([#63](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/63)) ([1e8662f](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/1e8662f06860aecb5c01ed4ff1515ceb9dac26e4))
+* expose timeout when Emulation is enabled ([#73](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/73)) ([0208bfd](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/0208bfdcf6924953879408c18f4c20da544bf4ff))
+* fix browserUrl not working ([#53](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/53)) ([a6923b8](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/a6923b8d9397d12ee0f9fe67dd62b10088ec6e87))
+* increase timeouts in case of Emulation ([#71](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/71)) ([c509c64](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/c509c64576e1be1ddc283653004ef08a117907a2))
+* **windows:** work around Chrome not reporting reasons for crash ([#64](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/64)) ([d545741](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d5457412a4a76726547190fb3a46bb78c9d6645c))
 
 ## [0.2.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.1.0...chrome-devtools-mcp-v0.2.0) (2025-09-17)
 
+
 ### Features
 
-- add performance_analyze_insight tool. ([#42](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/42)) ([21e175b](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/21e175b862c624d7a2d07802141187edf2d2e489))
-- support script evaluate arguments ([#40](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/40)) ([c663f4d](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/c663f4d7f9c0b868e8b4750f6441525939bfe920))
-- use Performance Trace Formatter in trace output ([#36](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/36)) ([0cb6147](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/0cb6147b870e17bc3a624e9c6396d963a3e16b44))
-- validate uids ([#37](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/37)) ([014a8bc](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/014a8bc52ecc58080cedeb8023d44f4a55055a05))
+* add performance_analyze_insight tool. ([#42](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/42)) ([21e175b](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/21e175b862c624d7a2d07802141187edf2d2e489))
+* support script evaluate arguments ([#40](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/40)) ([c663f4d](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/c663f4d7f9c0b868e8b4750f6441525939bfe920))
+* use Performance Trace Formatter in trace output ([#36](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/36)) ([0cb6147](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/0cb6147b870e17bc3a624e9c6396d963a3e16b44))
+* validate uids ([#37](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/37)) ([014a8bc](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/014a8bc52ecc58080cedeb8023d44f4a55055a05))
+
 
 ### Bug Fixes
 
-- change profile folder name to browser-profile ([#39](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/39)) ([36115d7](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/36115d757abbae0502ffee814f55368d2ca59b9e))
-- refresh context based on the browser instance ([#44](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/44)) ([93f4579](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/93f4579dd9aca3beef2bd9f2930ddfcc4069c0e3))
-- update puppeteer to fix a11y snapshot issues ([#43](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/43)) ([b58f787](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/b58f787234a34d5fcb01b336f5fb14e1c55ecdd5))
+* change profile folder name to browser-profile ([#39](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/39)) ([36115d7](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/36115d757abbae0502ffee814f55368d2ca59b9e))
+* refresh context based on the browser instance ([#44](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/44)) ([93f4579](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/93f4579dd9aca3beef2bd9f2930ddfcc4069c0e3))
+* update puppeteer to fix a11y snapshot issues ([#43](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/43)) ([b58f787](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/b58f787234a34d5fcb01b336f5fb14e1c55ecdd5))
 
 ## [0.1.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.0.2...chrome-devtools-mcp-v0.1.0) (2025-09-16)
 
+
 ### Features
 
-- improve tools with awaiting common events ([#10](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/10)) ([dba8b3c](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/dba8b3c5fad0d1bca26aaf172751c51188799927))
-- initial version ([31a0bdc](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/31a0bdce266a33eaca9a7daae4611abb78ff5a25))
+* improve tools with awaiting common events ([#10](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/10)) ([dba8b3c](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/dba8b3c5fad0d1bca26aaf172751c51188799927))
+* initial version ([31a0bdc](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/31a0bdce266a33eaca9a7daae4611abb78ff5a25))
+
 
 ### Bug Fixes
 
-- define tracing categories ([#21](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/21)) ([c939456](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/c93945657cc96ac7ba213730a750c16e9ab87526))
-- detect multiple instances and throw ([#12](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/12)) ([732267d](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/732267db5fea0048ed1fcc530bcdd074df4126be))
-- make sure tool calls are processed sequentially ([#22](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/22)) ([a76b23d](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/a76b23dccf074a13304b0341178665465a2c3399))
+* define tracing categories ([#21](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/21)) ([c939456](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/c93945657cc96ac7ba213730a750c16e9ab87526))
+* detect multiple instances and throw ([#12](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/12)) ([732267d](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/732267db5fea0048ed1fcc530bcdd074df4126be))
+* make sure tool calls are processed sequentially ([#22](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/22)) ([a76b23d](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/a76b23dccf074a13304b0341178665465a2c3399))

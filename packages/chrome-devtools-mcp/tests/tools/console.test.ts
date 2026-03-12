@@ -7,9 +7,10 @@
 import assert from 'node:assert';
 import {before, describe, it} from 'node:test';
 
-import {AggregatedIssue} from '../../node_modules/chrome-devtools-frontend/mcp/mcp.js';
+import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
 import {loadIssueDescriptions} from '../../src/issue-descriptions.js';
 import {McpResponse} from '../../src/McpResponse.js';
+import {DevTools} from '../../src/third_party/index.js';
 import {
   getConsoleMessage,
   listConsoleMessages,
@@ -24,49 +25,84 @@ describe('console', () => {
   describe('list_console_messages', () => {
     it('list messages', async () => {
       await withMcpContext(async (response, context) => {
-        await listConsoleMessages.handler({params: {}}, response, context);
+        await listConsoleMessages.handler(
+          {params: {}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
         assert.ok(response.includeConsoleData);
       });
     });
 
     it('lists error messages', async () => {
       await withMcpContext(async (response, context) => {
-        const page = await context.newPage();
-        await page.setContent(
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.setContent(
           '<script>console.error("This is an error")</script>',
         );
-        await listConsoleMessages.handler({params: {}}, response, context);
+        await listConsoleMessages.handler(
+          {params: {}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
         const formattedResponse = await response.handle('test', context);
-        const textContent = getTextContent(formattedResponse[0]);
+        const textContent = getTextContent(formattedResponse.content[0]);
         assert.ok(textContent.includes('msgid=1 [error] This is an error'));
+      });
+    });
+
+    it('lists error objects', async t => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.setContent(
+          '<script>console.error(new Error("This is an error"))</script>',
+        );
+        await listConsoleMessages.handler(
+          {params: {}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle('test', context);
+        const textContent = getTextContent(formattedResponse.content[0]);
+        t.assert.snapshot?.(textContent);
       });
     });
 
     it('work with primitive unhandled errors', async () => {
       await withMcpContext(async (response, context) => {
-        const page = await context.newPage();
-        await page.setContent('<script>throw undefined;</script>');
-        await listConsoleMessages.handler({params: {}}, response, context);
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.setContent('<script>throw undefined;</script>');
+        await listConsoleMessages.handler(
+          {params: {}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
         const formattedResponse = await response.handle('test', context);
-        const textContent = getTextContent(formattedResponse[0]);
-        assert.ok(textContent.includes('msgid=1 [error] undefined (0 args)'));
+        const textContent = getTextContent(formattedResponse.content[0]);
+        assert.ok(textContent.includes('msgid=1 [error] Uncaught  (0 args)'));
       });
     });
 
     describe('issues', () => {
       it('lists issues', async () => {
         await withMcpContext(async (response, context) => {
-          const page = await context.newPage();
+          const page = context.getSelectedMcpPage();
           const issuePromise = new Promise<void>(resolve => {
-            page.once('issue', () => {
+            page.pptrPage.once('issue', () => {
               resolve();
             });
           });
-          await page.setContent('<input type="text" name="username" />');
+          await page.pptrPage.setContent(
+            '<input type="text" name="username" />',
+          );
           await issuePromise;
-          await listConsoleMessages.handler({params: {}}, response, context);
+          await listConsoleMessages.handler(
+            {params: {}, page: context.getSelectedMcpPage()},
+            response,
+            context,
+          );
           const formattedResponse = await response.handle('test', context);
-          const textContent = getTextContent(formattedResponse[0]);
+          const textContent = getTextContent(formattedResponse.content[0]);
           assert.ok(
             textContent.includes(
               `msgid=1 [issue] An element doesn't have an autocomplete attribute (count: 1)`,
@@ -78,18 +114,25 @@ describe('console', () => {
       it('lists issues after a page reload', async () => {
         await withMcpContext(async (response, context) => {
           const page = await context.newPage();
+          response.setPage(page);
           const issuePromise = new Promise<void>(resolve => {
-            page.once('issue', () => {
+            page.pptrPage.once('issue', () => {
               resolve();
             });
           });
 
-          await page.setContent('<input type="text" name="username" />');
+          await page.pptrPage.setContent(
+            '<input type="text" name="username" />',
+          );
           await issuePromise;
-          await listConsoleMessages.handler({params: {}}, response, context);
+          await listConsoleMessages.handler(
+            {params: {}, page: context.getSelectedMcpPage()},
+            response,
+            context,
+          );
           {
             const formattedResponse = await response.handle('test', context);
-            const textContent = getTextContent(formattedResponse[0]);
+            const textContent = getTextContent(formattedResponse.content[0]);
             assert.ok(
               textContent.includes(
                 `msgid=1 [issue] An element doesn't have an autocomplete attribute (count: 1)`,
@@ -98,16 +141,18 @@ describe('console', () => {
           }
 
           const anotherIssuePromise = new Promise<void>(resolve => {
-            page.once('issue', () => {
+            page.pptrPage.once('issue', () => {
               resolve();
             });
           });
-          await page.reload();
-          await page.setContent('<input type="text" name="username" />');
+          await page.pptrPage.reload();
+          await page.pptrPage.setContent(
+            '<input type="text" name="username" />',
+          );
           await anotherIssuePromise;
           {
             const formattedResponse = await response.handle('test', context);
-            const textContent = getTextContent(formattedResponse[0]);
+            const textContent = getTextContent(formattedResponse.content[0]);
             assert.ok(
               textContent.includes(
                 `msgid=2 [issue] An element doesn't have an autocomplete attribute (count: 1)`,
@@ -120,21 +165,27 @@ describe('console', () => {
   });
 
   describe('get_console_message', () => {
+    const server = serverHooks();
+
     it('gets a specific console message', async () => {
       await withMcpContext(async (response, context) => {
-        const page = await context.newPage();
-        await page.setContent(
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.setContent(
           '<script>console.error("This is an error")</script>',
         );
         // The list is needed to populate the console messages in the context.
-        await listConsoleMessages.handler({params: {}}, response, context);
+        await listConsoleMessages.handler(
+          {params: {}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
         await getConsoleMessage.handler(
-          {params: {msgid: 1}},
+          {params: {msgid: 1}, page: context.getSelectedMcpPage()},
           response,
           context,
         );
         const formattedResponse = await response.handle('test', context);
-        const textContent = getTextContent(formattedResponse[0]);
+        const textContent = getTextContent(formattedResponse.content[0]);
         assert.ok(
           textContent.includes('msgid=1 [error] This is an error'),
           'Should contain console message body',
@@ -143,28 +194,33 @@ describe('console', () => {
     });
 
     describe('issues type', () => {
-      const server = serverHooks();
-
       it('gets issue details with node id parsing', async t => {
         await withMcpContext(async (response, context) => {
-          const page = await context.newPage();
+          const page = context.getSelectedMcpPage();
           const issuePromise = new Promise<void>(resolve => {
-            page.once('issue', () => {
+            page.pptrPage.once('issue', () => {
               resolve();
             });
           });
-          await page.setContent('<input type="text" name="username" />');
-          await context.createTextSnapshot();
+          await page.pptrPage.setContent(
+            '<input type="text" name="username" />',
+          );
+          await context.createTextSnapshot(page);
           await issuePromise;
-          await listConsoleMessages.handler({params: {}}, response, context);
-          const response2 = new McpResponse();
+          await listConsoleMessages.handler(
+            {params: {}, page: context.getSelectedMcpPage()},
+            response,
+            context,
+          );
+          const response2 = new McpResponse({} as ParsedArguments);
+          response2.setPage(context.getSelectedMcpPage());
           await getConsoleMessage.handler(
-            {params: {msgid: 1}},
+            {params: {msgid: 1}, page: context.getSelectedMcpPage()},
             response2,
             context,
           );
           const formattedResponse = await response2.handle('test', context);
-          t.assert.snapshot?.(getTextContent(formattedResponse[0]));
+          t.assert.snapshot?.(getTextContent(formattedResponse.content[0]));
         });
       });
       it('gets issue details with request id parsing', async t => {
@@ -175,15 +231,15 @@ describe('console', () => {
         });
 
         await withMcpContext(async (response, context) => {
-          const page = await context.newPage();
+          const page = context.getSelectedMcpPage();
           const issuePromise = new Promise<void>(resolve => {
-            page.once('issue', () => {
+            page.pptrPage.once('issue', () => {
               resolve();
             });
           });
 
           const url = server.getRoute('/data.json');
-          await page.setContent(`
+          await page.pptrPage.setContent(`
             <script>
               fetch('${url}', {
                   method: 'GET',
@@ -194,12 +250,12 @@ describe('console', () => {
               });
             </script>
           `);
-          await context.createTextSnapshot();
+          await context.createTextSnapshot(page);
           await issuePromise;
-          const messages = context.getConsoleData();
+          const messages = context.getConsoleData(page);
           let issueMsg;
           for (const message of messages) {
-            if (message instanceof AggregatedIssue) {
+            if (message instanceof DevTools.AggregatedIssue) {
               issueMsg = message;
               break;
             }
@@ -208,24 +264,213 @@ describe('console', () => {
           const id = context.getConsoleMessageStableId(issueMsg);
           assert.ok(id);
           await listConsoleMessages.handler(
-            {params: {types: ['issue']}},
+            {params: {types: ['issue']}, page: context.getSelectedMcpPage()},
             response,
             context,
           );
-          const response2 = new McpResponse();
+          const response2 = new McpResponse({} as ParsedArguments);
+          response2.setPage(context.getSelectedMcpPage());
           await getConsoleMessage.handler(
-            {params: {msgid: id}},
+            {params: {msgid: id}, page: context.getSelectedMcpPage()},
             response2,
             context,
           );
           const formattedResponse = await response2.handle('test', context);
-          const rawText = getTextContent(formattedResponse[0]);
+          const rawText = getTextContent(formattedResponse.content[0]);
           const sanitizedText = rawText
             .replaceAll(/ID: \d+/g, 'ID: <ID>')
             .replaceAll(/reqid=\d+/g, 'reqid=<reqid>')
             .replaceAll(/localhost:\d+/g, 'hostname:port');
           t.assert.snapshot?.(sanitizedText);
         });
+      });
+    });
+
+    it('applies source maps to stack traces of console messages', async t => {
+      server.addRoute('/main.min.js', (_req, res) => {
+        res.setHeader('Content-Type', 'text/javascript');
+        res.statusCode = 200;
+        res.end(`function n(){console.warn("hello world")}function o(){n()}(function n(){o()})();
+          //# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJuYW1lcyI6WyJiYXIiLCJjb25zb2xlIiwid2FybiIsImZvbyIsIklpZmUiXSwic291cmNlcyI6WyIuL21haW4uanMiXSwic291cmNlc0NvbnRlbnQiOlsiXG5mdW5jdGlvbiBiYXIoKSB7XG4gIGNvbnNvbGUud2FybignaGVsbG8gd29ybGQnKTtcbn1cblxuZnVuY3Rpb24gZm9vKCkge1xuICBiYXIoKTtcbn1cblxuKGZ1bmN0aW9uIElpZmUoKSB7XG4gIGZvbygpO1xufSkoKTtcblxuIl0sIm1hcHBpbmdzIjoiQUFDQSxTQUFTQSxJQUNQQyxRQUFRQyxLQUFLLGNBQ2YsQ0FFQSxTQUFTQyxJQUNQSCxHQUNGLEVBRUEsU0FBVUksSUFDUkQsR0FDRCxFQUZEIiwiaWdub3JlTGlzdCI6W119
+          `);
+      });
+      server.addHtmlRoute(
+        '/index.html',
+        `<script src="${server.getRoute('/main.min.js')}"></script>`,
+      );
+
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.goto(server.getRoute('/index.html'));
+
+        await getConsoleMessage.handler(
+          {params: {msgid: 1}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle('test', context);
+        const rawText = getTextContent(formattedResponse.content[0]);
+
+        t.assert.snapshot?.(rawText);
+      });
+    });
+
+    it('applies source maps to stack traces of uncaught exceptions', async t => {
+      server.addRoute('/main.min.js', (_req, res) => {
+        res.setHeader('Content-Type', 'text/javascript');
+        res.statusCode = 200;
+        res.end(`function n(){throw new Error("b00m!")}function o(){n()}(function n(){o()})();
+          //# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJuYW1lcyI6WyJiYXIiLCJFcnJvciIsImZvbyIsIklpZmUiXSwic291cmNlcyI6WyIuL21haW4uanMiXSwic291cmNlc0NvbnRlbnQiOlsiXG5mdW5jdGlvbiBiYXIoKSB7XG4gIHRocm93IG5ldyBFcnJvcignYjAwbSEnKTtcbn1cblxuZnVuY3Rpb24gZm9vKCkge1xuICBiYXIoKTtcbn1cblxuKGZ1bmN0aW9uIElpZmUoKSB7XG4gIGZvbygpO1xufSkoKTtcblxuIl0sIm1hcHBpbmdzIjoiQUFDQSxTQUFTQSxJQUNQLE1BQU0sSUFBSUMsTUFBTSxRQUNsQixDQUVBLFNBQVNDLElBQ1BGLEdBQ0YsRUFFQSxTQUFVRyxJQUNSRCxHQUNELEVBRkQiLCJpZ25vcmVMaXN0IjpbXX0=
+        `);
+      });
+      server.addHtmlRoute(
+        '/index.html',
+        `<script src="${server.getRoute('/main.min.js')}"></script>`,
+      );
+
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.goto(server.getRoute('/index.html'));
+
+        await getConsoleMessage.handler(
+          {params: {msgid: 1}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle('test', context);
+        const rawText = getTextContent(formattedResponse.content[0]);
+
+        t.assert.snapshot?.(rawText);
+      });
+    });
+
+    it('applies source maps to stack traces of Error object console.log arguments', async t => {
+      server.addRoute('/main.min.js', (_req, res) => {
+        res.setHeader('Content-Type', 'text/javascript');
+        res.statusCode = 200;
+        res.end(`function n(){throw new Error("b00m!")}function o(){n()}(function n(){try{o()}catch(n){console.log("An error happened:",n)}})();
+          //# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJuYW1lcyI6WyJiYXIiLCJFcnJvciIsImZvbyIsIklpZmUiLCJlIiwiY29uc29sZSIsImxvZyJdLCJzb3VyY2VzIjpbIi4vbWFpbi5qcyJdLCJzb3VyY2VzQ29udGVudCI6WyJcbmZ1bmN0aW9uIGJhcigpIHtcbiAgdGhyb3cgbmV3IEVycm9yKCdiMDBtIScpO1xufVxuXG5mdW5jdGlvbiBmb28oKSB7XG4gIGJhcigpO1xufVxuXG4oZnVuY3Rpb24gSWlmZSgpIHtcbiAgdHJ5IHtcbiAgICBmb28oKTtcbiAgfSBjYXRjaCAoZSkge1xuICAgIGNvbnNvbGUubG9nKCdBbiBlcnJvciBoYXBwZW5lZDonLCBlKTtcbiAgfVxufSkoKTtcblxuIl0sIm1hcHBpbmdzIjoiQUFDQSxTQUFTQSxJQUNQLE1BQU0sSUFBSUMsTUFBTSxRQUNsQixDQUVBLFNBQVNDLElBQ1BGLEdBQ0YsRUFFQSxTQUFVRyxJQUNSLElBQ0VELEdBQ0YsQ0FBRSxNQUFPRSxHQUNQQyxRQUFRQyxJQUFJLHFCQUFzQkYsRUFDcEMsQ0FDRCxFQU5EIiwiaWdub3JlTGlzdCI6W119
+        `);
+      });
+      server.addHtmlRoute(
+        '/index.html',
+        `<script src="${server.getRoute('/main.min.js')}"></script>`,
+      );
+
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.goto(server.getRoute('/index.html'));
+
+        await getConsoleMessage.handler(
+          {params: {msgid: 1}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle('test', context);
+        const rawText = getTextContent(formattedResponse.content[0]);
+
+        t.assert.snapshot?.(rawText);
+      });
+    });
+
+    it('applies source maps to stack traces of uncaught exceptions with cause', async t => {
+      server.addRoute('/main.min.js', (_req, res) => {
+        res.setHeader('Content-Type', 'text/javascript');
+        res.statusCode = 200;
+        res.end(`function r(){throw new Error("b00m!")}function o(){try{r()}catch(r){throw new Error("bar failed",{cause:r})}}(function r(){try{o()}catch(r){throw new Error("foo failed",{cause:r})}})();
+          //# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJuYW1lcyI6WyJiYXIiLCJFcnJvciIsImZvbyIsImUiLCJjYXVzZSIsIklpZmUiXSwic291cmNlcyI6WyIuL21haW4uanMiXSwic291cmNlc0NvbnRlbnQiOlsiXG5mdW5jdGlvbiBiYXIoKSB7XG4gIHRocm93IG5ldyBFcnJvcignYjAwbSEnKTtcbn1cblxuZnVuY3Rpb24gZm9vKCkge1xuICB0cnkge1xuICAgIGJhcigpO1xuICB9IGNhdGNoIChlKSB7XG4gICAgdGhyb3cgbmV3IEVycm9yKCdiYXIgZmFpbGVkJywgeyBjYXVzZTogZSB9KTtcbiAgfVxufVxuXG4oZnVuY3Rpb24gSWlmZSgpIHtcbiAgdHJ5IHtcbiAgICBmb28oKTtcbiAgfSBjYXRjaCAoZSkge1xuICAgIHRocm93IG5ldyBFcnJvcignZm9vIGZhaWxlZCcsIHsgY2F1c2U6IGUgfSk7XG4gIH1cbn0pKCk7XG5cbiJdLCJtYXBwaW5ncyI6IkFBQ0EsU0FBU0EsSUFDUCxNQUFNLElBQUlDLE1BQU0sUUFDbEIsQ0FFQSxTQUFTQyxJQUNQLElBQ0VGLEdBQ0YsQ0FBRSxNQUFPRyxHQUNQLE1BQU0sSUFBSUYsTUFBTSxhQUFjLENBQUVHLE1BQU9ELEdBQ3pDLENBQ0YsRUFFQSxTQUFVRSxJQUNSLElBQ0VILEdBQ0YsQ0FBRSxNQUFPQyxHQUNQLE1BQU0sSUFBSUYsTUFBTSxhQUFjLENBQUVHLE1BQU9ELEdBQ3pDLENBQ0QsRUFORCIsImlnbm9yZUxpc3QiOltdfQ==
+        `);
+      });
+      server.addHtmlRoute(
+        '/index.html',
+        `<script src="${server.getRoute('/main.min.js')}"></script>`,
+      );
+
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.goto(server.getRoute('/index.html'));
+
+        await getConsoleMessage.handler(
+          {params: {msgid: 1}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle('test', context);
+        const rawText = getTextContent(formattedResponse.content[0]);
+
+        t.assert.snapshot?.(rawText);
+      });
+    });
+
+    it('applies source maps to stack traces of Error object (with cause) console.log arguments', async t => {
+      server.addRoute('/main.min.js', (_req, res) => {
+        res.setHeader('Content-Type', 'text/javascript');
+        res.statusCode = 200;
+        res.end(`function o(){throw new Error("b00m!")}function r(){try{o()}catch(o){throw new Error("bar failed",{cause:o})}}(function o(){try{r()}catch(o){console.log("foo failed",o)}})();
+          //# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJuYW1lcyI6WyJiYXIiLCJFcnJvciIsImZvbyIsImUiLCJjYXVzZSIsIklpZmUiLCJjb25zb2xlIiwibG9nIl0sInNvdXJjZXMiOlsiLi9tYWluLmpzIl0sInNvdXJjZXNDb250ZW50IjpbIlxuZnVuY3Rpb24gYmFyKCkge1xuICB0aHJvdyBuZXcgRXJyb3IoJ2IwMG0hJyk7XG59XG5cbmZ1bmN0aW9uIGZvbygpIHtcbiAgdHJ5IHtcbiAgICBiYXIoKTtcbiAgfSBjYXRjaCAoZSkge1xuICAgIHRocm93IG5ldyBFcnJvcignYmFyIGZhaWxlZCcsIHsgY2F1c2U6IGUgfSk7XG4gIH1cbn1cblxuKGZ1bmN0aW9uIElpZmUoKSB7XG4gIHRyeSB7XG4gICAgZm9vKCk7XG4gIH0gY2F0Y2ggKGUpIHtcbiAgICBjb25zb2xlLmxvZygnZm9vIGZhaWxlZCcsIGUpO1xuICB9XG59KSgpO1xuXG4iXSwibWFwcGluZ3MiOiJBQUNBLFNBQVNBLElBQ1AsTUFBTSxJQUFJQyxNQUFNLFFBQ2xCLENBRUEsU0FBU0MsSUFDUCxJQUNFRixHQUNGLENBQUUsTUFBT0csR0FDUCxNQUFNLElBQUlGLE1BQU0sYUFBYyxDQUFFRyxNQUFPRCxHQUN6QyxDQUNGLEVBRUEsU0FBVUUsSUFDUixJQUNFSCxHQUNGLENBQUUsTUFBT0MsR0FDUEcsUUFBUUMsSUFBSSxhQUFjSixFQUM1QixDQUNELEVBTkQiLCJpZ25vcmVMaXN0IjpbXX0=
+        `);
+      });
+      server.addHtmlRoute(
+        '/index.html',
+        `<script src="${server.getRoute('/main.min.js')}"></script>`,
+      );
+
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.goto(server.getRoute('/index.html'));
+
+        await getConsoleMessage.handler(
+          {params: {msgid: 1}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle('test', context);
+        const rawText = getTextContent(formattedResponse.content[0]);
+
+        t.assert.snapshot?.(rawText);
+      });
+    });
+
+    it('ignores frames from ignore listed URLs', async t => {
+      server.addHtmlRoute(
+        '/index.html',
+        `<!DOCTYPE html>
+         <script>
+         function ignoredFn1(cb) {
+          ignoredFn2(cb);
+         }
+
+         function ignoredFn2(cb) {
+          cb();
+         }
+         //# sourceURL=./node_modules/foo.js
+         </script>
+         <script>
+          function callback() {
+            console.log('hello from callback');
+          }
+
+          (function callIt() {
+            ignoredFn1(callback);
+          })();
+         //# sourceURL='main.js'
+         </script>
+        `,
+      );
+
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.goto(server.getRoute('/index.html'));
+
+        await getConsoleMessage.handler(
+          {params: {msgid: 1}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle('test', context);
+        const rawText = getTextContent(formattedResponse.content[0]);
+
+        t.assert.snapshot?.(rawText);
       });
     });
   });

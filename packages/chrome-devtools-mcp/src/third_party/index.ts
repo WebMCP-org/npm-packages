@@ -5,7 +5,13 @@
  */
 
 import 'core-js/modules/es.promise.with-resolvers.js';
+import 'core-js/modules/es.set.union.v2.js';
 import 'core-js/proposals/iterator-helpers.js';
+
+import type {Flags, OutputMode, Result, RunnerResult} from 'lighthouse';
+import type {Page} from 'puppeteer-core';
+
+export type {Flags, Result, RunnerResult, OutputMode};
 
 export type {Options as YargsOptions} from 'yargs';
 export {default as yargs} from 'yargs';
@@ -14,20 +20,51 @@ export {default as debug} from 'debug';
 export type {Debugger} from 'debug';
 export {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 export {StdioServerTransport} from '@modelcontextprotocol/sdk/server/stdio.js';
+export {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
+export {Client} from '@modelcontextprotocol/sdk/client/index.js';
 export {
   type CallToolResult,
+  type EmbeddedResource,
   SetLevelRequestSchema,
-  ToolListChangedNotificationSchema,
   type ImageContent,
   type TextContent,
-  type Tool,
 } from '@modelcontextprotocol/sdk/types.js';
 export {z as zod} from 'zod';
 export {
   Locator,
   PredefinedNetworkConditions,
+  KnownDevices,
   CDPSessionEvent,
 } from 'puppeteer-core';
 export {default as puppeteer} from 'puppeteer-core';
 export type * from 'puppeteer-core';
+export {PipeTransport} from 'puppeteer-core/internal/node/PipeTransport.js';
 export type {CdpPage} from 'puppeteer-core/internal/cdp/Page.js';
+export {
+  resolveDefaultUserDataDir,
+  detectBrowserPlatform,
+  Browser as BrowserEnum,
+  type ChromeReleaseChannel as BrowsersChromeReleaseChannel,
+} from '@puppeteer/browsers';
+
+import {
+  snapshot as snapshotImpl,
+  navigation as navigationImpl,
+  generateReport as generateReportImpl,
+} from './lighthouse-devtools-mcp-bundle.js';
+
+export const snapshot = snapshotImpl as (
+  page: Page,
+  options: {flags?: Flags},
+) => Promise<RunnerResult>;
+export const navigation = navigationImpl as (
+  page: Page,
+  url: string,
+  options: {flags?: Flags},
+) => Promise<RunnerResult>;
+export const generateReport = generateReportImpl as (
+  lhr: Result,
+  format: string,
+) => string;
+
+export * as DevTools from '../../node_modules/chrome-devtools-frontend/mcp/mcp.js';

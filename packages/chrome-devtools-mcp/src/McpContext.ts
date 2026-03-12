@@ -5,121 +5,65 @@
  */
 
 import fs from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
 
-import {Client} from '@modelcontextprotocol/sdk/client/index.js';
-import {type AggregatedIssue} from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
-
-import {extractUrlLikeFromDevToolsTitle, urlsEqual} from './DevtoolsUtils.js';
-import {ToolListChangedNotificationSchema} from './third_party/index.js';
-import type {WebMCPToolHub} from './tools/WebMCPToolHub.js';
-import type {ListenerMap} from './PageCollector.js';
+import type {TargetUniverse} from './DevtoolsUtils.js';
+import {UniverseManager} from './DevtoolsUtils.js';
+import {McpPage} from './McpPage.js';
+import type {ListenerMap, UncaughtError} from './PageCollector.js';
 import {NetworkCollector, ConsoleCollector} from './PageCollector.js';
-import {WEB_MCP_BRIDGE_SCRIPT} from './transports/WebMCPBridgeScript.js';
-import {WebMCPClientTransport} from './transports/WebMCPClientTransport.js';
-import {Locator} from './third_party/index.js';
+import type {DevTools} from './third_party/index.js';
 import type {
   Browser,
-  CDPSession,
+  BrowserContext,
   ConsoleMessage,
   Debugger,
-  Dialog,
-  ElementHandle,
   HTTPRequest,
   Page,
+  ScreenRecorder,
   SerializedAXNode,
-  PredefinedNetworkConditions,
+  Viewport,
+  Target,
 } from './third_party/index.js';
+import {Locator} from './third_party/index.js';
+import {PredefinedNetworkConditions} from './third_party/index.js';
 import {listPages} from './tools/pages.js';
-import {takeSnapshot} from './tools/snapshot.js';
 import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
 import type {Context, DevToolsData} from './tools/ToolDefinition.js';
 import type {TraceResult} from './trace-processing/parse.js';
+import type {
+  EmulationSettings,
+  GeolocationOptions,
+  TextSnapshot,
+  TextSnapshotNode,
+  ExtensionServiceWorker,
+} from './types.js';
+import {
+  ExtensionRegistry,
+  type InstalledExtension,
+} from './utils/ExtensionRegistry.js';
+import {saveTemporaryFile} from './utils/files.js';
 import {WaitForHelper} from './WaitForHelper.js';
 
-export interface TextSnapshotNode extends SerializedAXNode {
-  id: string;
-  backendNodeId?: number;
-  children: TextSnapshotNode[];
-}
+export type {
+  EmulationSettings,
+  GeolocationOptions,
+  TextSnapshot,
+  TextSnapshotNode,
+} from './types.js';
 
-export interface GeolocationOptions {
-  latitude: number;
-  longitude: number;
-}
-
-/**
- * Represents a text-based accessibility snapshot of a page.
- */
-export interface TextSnapshot {
-  /** Root node of the accessibility tree. */
-  root: TextSnapshotNode;
-  /** Map of node IDs to their corresponding nodes for O(1) lookup. */
-  idToNode: Map<string, TextSnapshotNode>;
-  /** Unique identifier for this snapshot version. */
-  snapshotId: string;
-  /** UID of the currently selected element, if it exists in this snapshot. */
-  selectedElementUid?: string;
-  /**
-   * Indicates if any element is selected in DevTools.
-   * Note: The selected element may not be part of this snapshot
-   * (e.g., if it's in an iframe or filtered out).
-   */
-  hasSelectedElement: boolean;
-  /** Whether this snapshot includes all accessibility nodes (verbose mode). */
-  verbose: boolean;
-}
-
-/**
- * Configuration options for McpContext initialization.
- */
 interface McpContextOptions {
-  /** Whether to expose DevTools windows as debuggable pages. */
+  // Whether the DevTools windows are exposed as pages for debugging of DevTools.
   experimentalDevToolsDebugging: boolean;
-  /** Whether to expose all page-like targets (including service workers). */
+  // Whether all page-like targets are exposed as pages.
   experimentalIncludeAllPages?: boolean;
-  /** Whether to include chrome-extension:// pages in page listing and tool discovery. */
-  includeExtensionPages?: boolean;
-  /** Callback invoked by reconnectBrowser() to swap the browser at runtime. */
-  onReconnect?: (options: {
-    browserURL?: string;
-    wsEndpoint?: string;
-    wsHeaders?: Record<string, string>;
-    timeout?: number;
-  }) => Promise<{
-    pages: Array<{index: number; url: string; selected: boolean}>;
-    wsEndpoint: string;
-  }>;
+  // Whether CrUX data should be fetched.
+  performanceCrux: boolean;
 }
 
-/**
- * Holds an active WebMCP connection (client + transport) for a specific page.
- */
-interface WebMCPConnection {
-  client: Client;
-  transport: WebMCPClientTransport;
-  page: Page;
-}
-
-/**
- * Result of attempting to get a WebMCP client.
- */
-export type WebMCPClientResult =
-  | {connected: true; client: Client}
-  | {connected: false; error: string};
-
-/** Default timeout for page operations in milliseconds. */
 const DEFAULT_TIMEOUT = 5_000;
-/** Default timeout for navigation operations in milliseconds. */
 const NAVIGATION_TIMEOUT = 10_000;
 
-/**
- * Get the timeout multiplier for a given network condition.
- *
- * @param condition - The network condition name (e.g., "Fast 4G", "Slow 3G").
- * @returns Multiplier to apply to timeouts (1 = no slowdown, 10 = max slowdown).
- */
 function getNetworkMultiplierFromString(condition: string | null): number {
   const puppeteerCondition =
     condition as keyof typeof PredefinedNetworkConditions;
@@ -137,76 +81,40 @@ function getNetworkMultiplierFromString(condition: string | null): number {
   return 1;
 }
 
-/**
- * Get the file extension for a given MIME type.
- *
- * @param mimeType - The MIME type (e.g., "image/png").
- * @returns The corresponding file extension without the dot.
- * @throws Error if the MIME type is not supported.
- */
-function getExtensionFromMimeType(mimeType: string): string {
-  switch (mimeType) {
-    case 'image/png':
-      return 'png';
-    case 'image/jpeg':
-      return 'jpeg';
-    case 'image/webp':
-      return 'webp';
-  }
-  throw new Error(`No mapping for Mime type ${mimeType}.`);
-}
-
-/**
- * Central context for MCP operations on a browser instance.
- *
- * Manages page state, accessibility snapshots, network/console collection,
- * WebMCP connections, and tool registration. This class serves as the primary
- * interface between MCP tools and the browser.
- */
 export class McpContext implements Context {
   browser: Browser;
   logger: Debugger;
 
-  /** Cached list of available pages (refreshed by createPagesSnapshot). */
+  // Maps LLM-provided isolatedContext name → Puppeteer BrowserContext.
+  #isolatedContexts = new Map<string, BrowserContext>();
+  // Auto-generated name counter for when no name is provided.
+  #nextIsolatedContextId = 1;
+
   #pages: Page[] = [];
-  /** Mapping of content pages to their associated DevTools inspector pages. */
-  #pageToDevToolsPage = new Map<Page, Page>();
-  /** Currently selected page for tool operations. */
-  #selectedPage?: Page;
-  /**
-   * Whether the selected page has been explicitly set for this session.
-   * When true, createPagesSnapshot() won't auto-switch to pages[0].
-   * This prevents MCP sessions from interfering with each other in shared browsers.
-   */
-  #pageExplicitlySelected = false;
-  /** Most recent accessibility snapshot of the selected page. */
-  #textSnapshot: TextSnapshot | null = null;
+  #extensionServiceWorkers: ExtensionServiceWorker[] = [];
+
+  #mcpPages = new Map<Page, McpPage>();
+  #selectedPage?: McpPage;
   #networkCollector: NetworkCollector;
   #consoleCollector: ConsoleCollector;
+  #devtoolsUniverseManager: UniverseManager;
+  #extensionRegistry = new ExtensionRegistry();
 
   #isRunningTrace = false;
-  #networkConditionsMap = new WeakMap<Page, string>();
-  #cpuThrottlingRateMap = new WeakMap<Page, number>();
-  #geolocationMap = new WeakMap<Page, GeolocationOptions>();
-  #bypassCSPMap = new WeakMap<Page, boolean>();
-  #dialog?: Dialog;
+  #screenRecorderData: {recorder: ScreenRecorder; filePath: string} | null =
+    null;
+
+  #nextPageId = 1;
+  #extensionPages = new WeakMap<Target, Page>();
+
+  #extensionServiceWorkerMap = new WeakMap<Target, string>();
+  #nextExtensionServiceWorkerId = 1;
 
   #nextSnapshotId = 1;
   #traceResults: TraceResult[] = [];
 
   #locatorClass: typeof Locator;
   #options: McpContextOptions;
-  #webMCPConnections = new WeakMap<Page, WebMCPConnection>();
-  #toolHub?: WebMCPToolHub;
-  /** Tracks pages that have WebMCP auto-detection listeners installed. */
-  #pagesWithWebMCPListeners = new WeakSet<Page>();
-  /**
-   * The windowId that this MCP session owns.
-   * When set, page operations are scoped to only pages in this window.
-   */
-  #sessionWindowId?: number;
-  /** Cached browser-level CDP session for window operations. */
-  #browserCdpSession?: CDPSession;
 
   private constructor(
     browser: Browser,
@@ -226,351 +134,57 @@ export class McpContext implements Context {
         console: event => {
           collect(event);
         },
-        pageerror: event => {
-          if (event instanceof Error) {
-            collect(event);
-          } else {
-            const error = new Error(`${event}`);
-            error.stack = undefined;
-            collect(error);
-          }
+        uncaughtError: event => {
+          collect(event);
         },
         issue: event => {
           collect(event);
         },
       } as ListenerMap;
     });
+    this.#devtoolsUniverseManager = new UniverseManager(this.browser);
   }
 
   async #init() {
     const pages = await this.createPagesSnapshot();
+    await this.createExtensionServiceWorkersSnapshot();
     await this.#networkCollector.init(pages);
     await this.#consoleCollector.init(pages);
-
-    // Auto-inject WebMCP bridge into all pages
-    await this.#setupWebMCPAutoInject();
-  }
-
-  /**
-   * Set up automatic WebMCP bridge injection for all pages.
-   * This injects the bridge script into existing pages and configures
-   * the browser to inject it into all future pages.
-   */
-  async #setupWebMCPAutoInject(): Promise<void> {
-    try {
-      // Get browser-level CDP session to inject into all new pages
-      const browserTarget = this.browser.target();
-      const cdpSession = await browserTarget.createCDPSession();
-
-      // Inject bridge script into all future pages
-      await cdpSession.send('Page.addScriptToEvaluateOnNewDocument', {
-        source: WEB_MCP_BRIDGE_SCRIPT,
-      });
-
-      this.logger('WebMCP bridge auto-inject configured for new pages');
-
-      // Inject into existing pages (they won't have the auto-inject yet)
-      for (const page of this.#pages) {
-        try {
-          // Skip chrome:// and devtools:// pages
-          const url = page.url();
-          if (
-            url.startsWith('chrome://') ||
-            (!this.#options.includeExtensionPages && url.startsWith('chrome-extension://')) ||
-            url.startsWith('devtools://') ||
-            url === 'about:blank'
-          ) {
-            continue;
-          }
-
-          await page.evaluate(WEB_MCP_BRIDGE_SCRIPT);
-        } catch (err) {
-          // Page might not be ready or accessible - log for debugging
-          const message = err instanceof Error ? err.message : String(err);
-          this.logger(`Bridge injection skipped for ${page.url()}: ${message}`);
-        }
-      }
-
-      this.logger('WebMCP bridge injected into existing pages');
-    } catch (err) {
-      // Non-fatal - auto-inject is a convenience feature
-      this.logger('WebMCP auto-inject setup failed:', err);
-    }
+    await this.#devtoolsUniverseManager.init(pages);
   }
 
   dispose() {
     this.#networkCollector.dispose();
     this.#consoleCollector.dispose();
-  }
-
-  /**
-   * Set the WebMCPToolHub for dynamic tool registration.
-   * This enables automatic registration of WebMCP tools as native MCP tools.
-   * Also sets up auto-detection for all existing pages.
-   */
-  setToolHub(hub: WebMCPToolHub): void {
-    this.#toolHub = hub;
-    // Trigger auto-detection for all existing pages asynchronously
-    this.#setupWebMCPAutoDetectionForAllPages().catch(err => {
-      const message = err instanceof Error ? err.message : String(err);
-      this.logger(`WebMCP auto-detection setup failed: ${message}`);
-      // Note: This is non-fatal - individual page connections may still work
-      // when explicitly requested via getWebMCPClient()
-    });
-  }
-
-  /**
-   * Get the WebMCPToolHub instance (for testing purposes)
-   */
-  getToolHub(): WebMCPToolHub | undefined {
-    return this.#toolHub;
-  }
-
-  /**
-   * Get or create a browser-level CDP session for window operations.
-   * Recreates the session if it has become invalid.
-   */
-  async #getBrowserCdpSession(): Promise<CDPSession> {
-    if (this.#browserCdpSession) {
-      // Verify session is still valid by attempting a simple operation
-      try {
-        await this.#browserCdpSession.send('Browser.getVersion');
-        return this.#browserCdpSession;
-      } catch (err) {
-        // Session is stale, recreate it
-        const message = err instanceof Error ? err.message : String(err);
-        this.logger(`Browser CDP session stale (${message}), recreating...`);
-        this.#browserCdpSession = undefined;
-      }
+    this.#devtoolsUniverseManager.dispose();
+    for (const mcpPage of this.#mcpPages.values()) {
+      mcpPage.dispose();
     }
-    this.#browserCdpSession = await this.browser.target().createCDPSession();
-    return this.#browserCdpSession;
+    this.#mcpPages.clear();
+    // Isolated contexts are intentionally not closed here.
+    // Either the entire browser will be closed or we disconnect
+    // without destroying browser state.
+    this.#isolatedContexts.clear();
   }
 
-  /**
-   * Get the windowId for a given page using CDP.
-   */
-  async getWindowIdForPage(page: Page): Promise<number> {
-    const cdpSession = await this.#getBrowserCdpSession();
-    // @ts-expect-error _targetId is internal but stable
-    const targetId = page.target()._targetId as string;
-    const {windowId} = await cdpSession.send('Browser.getWindowForTarget', {
-      targetId,
-    });
-    return windowId;
-  }
-
-  /**
-   * Set the window that this session owns.
-   * When set, page operations are scoped to only pages in this window.
-   */
-  setSessionWindowId(windowId: number): void {
-    this.#sessionWindowId = windowId;
-    this.logger(`Session bound to windowId: ${windowId}`);
-  }
-
-  /**
-   * Get the session's window ID, or undefined if not set.
-   */
-  getSessionWindowId(): number | undefined {
-    return this.#sessionWindowId;
-  }
-
-  /**
-   * Close all pages in the session's window.
-   * Called during cleanup when the MCP server is shutting down.
-   */
-  async closeSessionWindow(): Promise<void> {
-    if (this.#sessionWindowId === undefined) {
-      this.logger('No session window to close');
-      return;
-    }
-
-    this.logger(`Closing session window ${this.#sessionWindowId}...`);
-
-    // Get all pages in this session's window and close them
-    const pagesToClose = [...this.#pages];
-    for (const page of pagesToClose) {
-      try {
-        if (!page.isClosed()) {
-          await page.close();
-        }
-      } catch (err) {
-        // Ignore errors during cleanup - page might already be closed
-        const message = err instanceof Error ? err.message : String(err);
-        this.logger(`Error closing page during cleanup: ${message}`);
-      }
-    }
-
-    // Clean up the CDP session
-    if (this.#browserCdpSession) {
-      try {
-        await this.#browserCdpSession.detach();
-      } catch (err) {
-        // Detach errors during cleanup are expected - log for debugging
-        const message = err instanceof Error ? err.message : String(err);
-        this.logger(`CDP detach during cleanup: ${message}`);
-      }
-      this.#browserCdpSession = undefined;
-    }
-
-    this.logger('Session window closed');
-  }
-
-  /**
-   * Set up automatic WebMCP detection for a page.
-   * This installs listeners that detect WebMCP after navigation and sync tools.
-   */
-  #setupWebMCPAutoDetection(page: Page): void {
-    // Skip if listeners already installed
-    if (this.#pagesWithWebMCPListeners.has(page)) {
-      return;
-    }
-
-    // Skip chrome:// and devtools:// pages
-    const url = page.url();
-    if (
-      url.startsWith('chrome://') ||
-      (!this.#options.includeExtensionPages && url.startsWith('chrome-extension://')) ||
-      url.startsWith('devtools://')
-    ) {
-      return;
-    }
-
-    this.#pagesWithWebMCPListeners.add(page);
-
-    // Handler for frame navigation - detect WebMCP after main frame navigates
-    const onFrameNavigated = async (frame: unknown) => {
-      // Only handle main frame navigation
-      // @ts-expect-error Frame type not exported
-      if (frame.parentFrame?.() !== null) {
-        return;
-      }
-
-      // Skip internal pages
-      const newUrl = page.url();
-      if (
-        newUrl.startsWith('chrome://') ||
-        (!this.#options.includeExtensionPages && newUrl.startsWith('chrome-extension://')) ||
-        newUrl.startsWith('devtools://') ||
-        newUrl === 'about:blank'
-      ) {
-        return;
-      }
-
-      // Immediately try to connect - no polling needed
-      // If no WebMCP, connection will timeout gracefully
-      this.#tryConnectWebMCP(page).catch(err => {
-        const message = err instanceof Error ? err.message : String(err);
-        // Differentiate expected timeouts from unexpected errors
-        const isExpected = message.includes('timeout') ||
-                           message.includes('WebMCP not detected') ||
-                           message.includes('server did not respond');
-        if (isExpected) {
-          this.logger(`No WebMCP detected after navigation: ${page.url()}`);
-        } else {
-          this.logger(`Unexpected WebMCP connection error for ${page.url()}: ${message}`);
-        }
-      });
-    };
-
-    page.on('framenavigated', onFrameNavigated);
-
-    // Clean up listener when page closes
-    page.once('close', () => {
-      page.off('framenavigated', onFrameNavigated);
-      this.#pagesWithWebMCPListeners.delete(page);
-    });
-
-    this.logger(`WebMCP auto-detection listener installed for page: ${url}`);
-  }
-
-  /**
-   * Attempt to connect to WebMCP on a page without pre-checking.
-   * Uses the extension's approach: just try to connect, handle failure gracefully.
-   *
-   * This matches the WebMCP extension's behavior:
-   * - No pre-flight detection polling
-   * - Immediate connection attempt
-   * - Graceful handling if no server exists
-   * - Notification-based syncing when tools appear later
-   *
-   * Reference: /WebMCP/apps/extension/entrypoints/content/connection.ts lines 88-118
-   */
-  async #tryConnectWebMCP(page: Page): Promise<void> {
-    // Skip if tool hub is not enabled
-    if (!this.#toolHub?.isEnabled()) {
-      return;
-    }
-
-    try {
-      // Immediately try to get/create WebMCP client
-      // Transport is configured with requireWebMCP: false and 30s timeout in getWebMCPClient
-      const result = await this.getWebMCPClient(page);
-
-      if (result.connected) {
-        this.logger(`WebMCP connected for page: ${page.url()}`);
-      } else {
-        // This is normal for pages without WebMCP
-        this.logger(`No WebMCP on page: ${page.url()}`);
-      }
-    } catch (err) {
-      // Connection timeout or error is expected on pages without WebMCP
-      this.logger(`WebMCP connection failed for ${page.url()} (normal if page has no WebMCP):`, err);
-    }
-  }
-
-  /**
-   * Set up WebMCP auto-detection for all current pages.
-   * Called during initialization and when tool hub is set.
-   */
-  async #setupWebMCPAutoDetectionForAllPages(): Promise<void> {
-    for (const page of this.#pages) {
-      this.#setupWebMCPAutoDetection(page);
-      // Try to connect immediately (don't await - run in parallel for all pages)
-      this.#tryConnectWebMCP(page).catch(err => {
-        const message = err instanceof Error ? err.message : String(err);
-        // Differentiate expected timeouts from unexpected errors
-        const isExpected = message.includes('timeout') ||
-                           message.includes('WebMCP not detected') ||
-                           message.includes('server did not respond');
-        if (isExpected) {
-          this.logger(`No WebMCP on page during initial scan: ${page.url()}`);
-        } else {
-          this.logger(`Unexpected error during initial WebMCP scan for ${page.url()}: ${message}`);
-        }
-      });
-    }
-  }
-
-  /**
-   * Create a new McpContext instance.
-   *
-   * @param browser - Puppeteer browser instance to operate on.
-   * @param logger - Debug logger for internal operations.
-   * @param opts - Configuration options.
-   * @param locatorClass - Locator class to use (injectable for testing with
-   *   unbundled Puppeteer to avoid class instance mismatch errors).
-   * @returns Initialized McpContext ready for use.
-   */
   static async from(
     browser: Browser,
     logger: Debugger,
     opts: McpContextOptions,
+    /* Let tests use unbundled Locator class to avoid overly strict checks within puppeteer that fail when mixing bundled and unbundled class instances */
     locatorClass: typeof Locator = Locator,
-  ): Promise<McpContext> {
+  ) {
     const context = new McpContext(browser, logger, opts, locatorClass);
     await context.#init();
     return context;
   }
 
-  resolveCdpRequestId(cdpRequestId: string): number | undefined {
-    const selectedPage = this.getSelectedPage();
+  resolveCdpRequestId(page: McpPage, cdpRequestId: string): number | undefined {
     if (!cdpRequestId) {
       this.logger('no network request');
       return;
     }
-    const request = this.#networkCollector.find(selectedPage, request => {
+    const request = this.#networkCollector.find(page.pptrPage, request => {
       // @ts-expect-error id is internal.
       return request.id === cdpRequestId;
     });
@@ -581,24 +195,21 @@ export class McpContext implements Context {
     return this.#networkCollector.getIdForResource(request);
   }
 
-  /**
-   * Resolve a CDP backend node ID to a snapshot element UID.
-   *
-   * @param cdpBackendNodeId - The CDP backend node ID from DevTools.
-   * @returns The corresponding snapshot UID, or undefined if not found.
-   *
-   * @todo Optimize with a backendNodeId index instead of tree traversal.
-   */
-  resolveCdpElementId(cdpBackendNodeId: number): string | undefined {
+  resolveCdpElementId(
+    page: McpPage,
+    cdpBackendNodeId: number,
+  ): string | undefined {
     if (!cdpBackendNodeId) {
       this.logger('no cdpBackendNodeId');
       return;
     }
-    if (this.#textSnapshot === null) {
+    const snapshot = page.textSnapshot;
+    if (!snapshot) {
       this.logger('no text snapshot');
       return;
     }
-    const queue = [this.#textSnapshot.root];
+    // TODO: index by backendNodeId instead.
+    const queue = [snapshot.root];
     while (queue.length) {
       const current = queue.pop()!;
       if (current.backendNodeId === cdpBackendNodeId) {
@@ -611,199 +222,176 @@ export class McpContext implements Context {
     return;
   }
 
-  getNetworkRequests(includePreservedRequests?: boolean): HTTPRequest[] {
-    const page = this.getSelectedPage();
-    return this.#networkCollector.getData(page, includePreservedRequests);
+  getNetworkRequests(
+    page: McpPage,
+    includePreservedRequests?: boolean,
+  ): HTTPRequest[] {
+    return this.#networkCollector.getData(
+      page.pptrPage,
+      includePreservedRequests,
+    );
   }
 
   getConsoleData(
+    page: McpPage,
     includePreservedMessages?: boolean,
-  ): Array<ConsoleMessage | Error | AggregatedIssue> {
-    const page = this.getSelectedPage();
-    return this.#consoleCollector.getData(page, includePreservedMessages);
+  ): Array<ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError> {
+    return this.#consoleCollector.getData(
+      page.pptrPage,
+      includePreservedMessages,
+    );
+  }
+
+  getDevToolsUniverse(page: McpPage): TargetUniverse | null {
+    return this.#devtoolsUniverseManager.get(page.pptrPage);
   }
 
   getConsoleMessageStableId(
-    message: ConsoleMessage | Error | AggregatedIssue,
+    message: ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError,
   ): number {
     return this.#consoleCollector.getIdForResource(message);
   }
 
-  getConsoleMessageById(id: number): ConsoleMessage | Error | AggregatedIssue {
-    return this.#consoleCollector.getById(this.getSelectedPage(), id);
+  getConsoleMessageById(
+    page: McpPage,
+    id: number,
+  ): ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError {
+    return this.#consoleCollector.getById(page.pptrPage, id);
   }
 
-  async newPage(): Promise<Page> {
-    // If we have a session window, ensure our window is focused first
-    // This increases the chance that Chrome creates the new tab in our window
-    if (this.#sessionWindowId !== undefined && this.#pages.length > 0) {
-      try {
-        const existingPage = this.#pages[0];
-        if (existingPage) {
-          await existingPage.bringToFront();
-        }
-      } catch (err) {
-        // Best effort - focus might fail if page is closing
-        const message = err instanceof Error ? err.message : String(err);
-        this.logger(`Window focus failed (non-critical): ${message}`);
+  async newPage(
+    background?: boolean,
+    isolatedContextName?: string,
+  ): Promise<McpPage> {
+    let page: Page;
+    if (isolatedContextName !== undefined) {
+      let ctx = this.#isolatedContexts.get(isolatedContextName);
+      if (!ctx) {
+        ctx = await this.browser.createBrowserContext();
+        this.#isolatedContexts.set(isolatedContextName, ctx);
       }
+      page = await ctx.newPage();
+    } else {
+      page = await this.browser.newPage({background});
     }
-
-    const page = await this.browser.newPage();
-
-    // Verify the new page is in our window (if session scoping is active)
-    if (this.#sessionWindowId !== undefined) {
-      try {
-        const newPageWindowId = await this.getWindowIdForPage(page);
-        if (newPageWindowId !== this.#sessionWindowId) {
-          // New tab went to wrong window - this is a known Chrome behavior issue
-          this.logger(
-            `Warning: new_page created tab in window ${newPageWindowId} instead of session window ${this.#sessionWindowId}. ` +
-              `Tab may not be visible in list_pages.`,
-          );
-        }
-      } catch (err) {
-        // Failed to get windowId - page might be in an unexpected state
-        const message = err instanceof Error ? err.message : String(err);
-        this.logger(`Window ID check failed (non-critical): ${message}`);
-      }
-    }
-
     await this.createPagesSnapshot();
-    // Mark as explicitly selected so this session sticks to this page
-    this.selectPage(page, true);
+    this.selectPage(this.#getMcpPage(page));
     this.#networkCollector.addPage(page);
     this.#consoleCollector.addPage(page);
-    // Set up WebMCP auto-detection for the new page
-    this.#setupWebMCPAutoDetection(page);
-    return page;
+    return this.#getMcpPage(page);
   }
-
-  async newWindow(): Promise<{page: Page; windowId: number}> {
-    // Use CDP to create a new browser window instead of just a tab
-    const browserTarget = this.browser.target();
-    const cdpSession = await browserTarget.createCDPSession();
-
-    // Create a new target with newWindow: true
-    const {targetId} = await cdpSession.send('Target.createTarget', {
-      url: 'about:blank',
-      newWindow: true,
-    });
-
-    // Wait for the new page to be available
-    const target = await this.browser.waitForTarget(
-      target => {
-        // @ts-expect-error _targetId is internal but stable
-        return target._targetId === targetId;
-      },
-      {timeout: 5000},
-    );
-
-    const page = await target.page();
-    if (!page) {
-      throw new Error('Failed to get page from new window target');
-    }
-
-    // Get window ID for this target (required for session scoping)
-    const {windowId} = await cdpSession.send('Browser.getWindowForTarget', {
-      targetId,
-    });
-
-    // Set window to nearly full screen (large size that fits most displays)
-    try {
-      // Set to large dimensions (works well on 1920x1080 and larger displays)
-      // This is ~95% of common display sizes without being truly fullscreen
-      await cdpSession.send('Browser.setWindowBounds', {
-        windowId,
-        bounds: {
-          left: 20,
-          top: 20,
-          width: 1800,
-          height: 1200,
-          windowState: 'normal',
-        },
-      });
-    } catch (err) {
-      // Non-fatal: window sizing is best-effort
-      this.logger('Failed to resize window:', err);
-    }
-
-    await cdpSession.detach();
-
-    await this.createPagesSnapshot();
-    // Mark as explicitly selected so this session sticks to this window
-    this.selectPage(page, true);
-    this.#networkCollector.addPage(page);
-    this.#consoleCollector.addPage(page);
-    // Set up WebMCP auto-detection for the new page
-    this.#setupWebMCPAutoDetection(page);
-    return {page, windowId};
-  }
-  async closePage(pageIdx: number): Promise<void> {
+  async closePage(pageId: number): Promise<void> {
     if (this.#pages.length === 1) {
       throw new Error(CLOSE_PAGE_ERROR);
     }
-    const page = this.getPageByIdx(pageIdx);
-    await page.close({runBeforeUnload: false});
-  }
-
-  getNetworkRequestById(reqid: number): HTTPRequest {
-    return this.#networkCollector.getById(this.getSelectedPage(), reqid);
-  }
-
-  setNetworkConditions(conditions: string | null): void {
-    const page = this.getSelectedPage();
-    if (conditions === null) {
-      this.#networkConditionsMap.delete(page);
-    } else {
-      this.#networkConditionsMap.set(page, conditions);
+    const page = this.getPageById(pageId);
+    if (page) {
+      page.dispose();
+      this.#mcpPages.delete(page.pptrPage);
     }
+    await page.pptrPage.close({runBeforeUnload: false});
+  }
+
+  getNetworkRequestById(page: McpPage, reqid: number): HTTPRequest {
+    return this.#networkCollector.getById(page.pptrPage, reqid);
+  }
+
+  async restoreEmulation(page: McpPage) {
+    const currentSetting = page.emulationSettings;
+    await this.emulate(currentSetting, page.pptrPage);
+  }
+
+  async emulate(
+    options: {
+      networkConditions?: string;
+      cpuThrottlingRate?: number;
+      geolocation?: GeolocationOptions;
+      userAgent?: string;
+      colorScheme?: 'dark' | 'light' | 'auto';
+      viewport?: Viewport;
+    },
+    targetPage?: Page,
+  ): Promise<void> {
+    const page = targetPage ?? this.getSelectedPptrPage();
+    const mcpPage = this.#getMcpPage(page);
+    const newSettings: EmulationSettings = {...mcpPage.emulationSettings};
+
+    if (!options.networkConditions) {
+      await page.emulateNetworkConditions(null);
+      delete newSettings.networkConditions;
+    } else if (options.networkConditions === 'Offline') {
+      await page.emulateNetworkConditions({
+        offline: true,
+        download: 0,
+        upload: 0,
+        latency: 0,
+      });
+      newSettings.networkConditions = 'Offline';
+    } else if (options.networkConditions in PredefinedNetworkConditions) {
+      const networkCondition =
+        PredefinedNetworkConditions[
+          options.networkConditions as keyof typeof PredefinedNetworkConditions
+        ];
+      await page.emulateNetworkConditions(networkCondition);
+      newSettings.networkConditions = options.networkConditions;
+    }
+
+    if (!options.cpuThrottlingRate) {
+      await page.emulateCPUThrottling(1);
+      delete newSettings.cpuThrottlingRate;
+    } else {
+      await page.emulateCPUThrottling(options.cpuThrottlingRate);
+      newSettings.cpuThrottlingRate = options.cpuThrottlingRate;
+    }
+
+    if (!options.geolocation) {
+      await page.setGeolocation({latitude: 0, longitude: 0});
+      delete newSettings.geolocation;
+    } else {
+      await page.setGeolocation(options.geolocation);
+      newSettings.geolocation = options.geolocation;
+    }
+
+    if (!options.userAgent) {
+      await page.setUserAgent({userAgent: undefined});
+      delete newSettings.userAgent;
+    } else {
+      await page.setUserAgent({userAgent: options.userAgent});
+      newSettings.userAgent = options.userAgent;
+    }
+
+    if (!options.colorScheme || options.colorScheme === 'auto') {
+      await page.emulateMediaFeatures([
+        {name: 'prefers-color-scheme', value: ''},
+      ]);
+      delete newSettings.colorScheme;
+    } else {
+      await page.emulateMediaFeatures([
+        {name: 'prefers-color-scheme', value: options.colorScheme},
+      ]);
+      newSettings.colorScheme = options.colorScheme;
+    }
+
+    if (!options.viewport) {
+      await page.setViewport(null);
+      delete newSettings.viewport;
+    } else {
+      const defaults = {
+        deviceScaleFactor: 1,
+        isMobile: false,
+        hasTouch: false,
+        isLandscape: false,
+      };
+      const viewport = {...defaults, ...options.viewport};
+      await page.setViewport(viewport);
+      newSettings.viewport = viewport;
+    }
+
+    mcpPage.emulationSettings = Object.keys(newSettings).length
+      ? newSettings
+      : {};
+
     this.#updateSelectedPageTimeouts();
-  }
-
-  getNetworkConditions(): string | null {
-    const page = this.getSelectedPage();
-    return this.#networkConditionsMap.get(page) ?? null;
-  }
-
-  setCpuThrottlingRate(rate: number): void {
-    const page = this.getSelectedPage();
-    this.#cpuThrottlingRateMap.set(page, rate);
-    this.#updateSelectedPageTimeouts();
-  }
-
-  getCpuThrottlingRate(): number {
-    const page = this.getSelectedPage();
-    return this.#cpuThrottlingRateMap.get(page) ?? 1;
-  }
-
-  setGeolocation(geolocation: GeolocationOptions | null): void {
-    const page = this.getSelectedPage();
-    if (geolocation === null) {
-      this.#geolocationMap.delete(page);
-    } else {
-      this.#geolocationMap.set(page, geolocation);
-    }
-  }
-
-  getGeolocation(): GeolocationOptions | null {
-    const page = this.getSelectedPage();
-    return this.#geolocationMap.get(page) ?? null;
-  }
-
-  async setBypassCSP(enabled: boolean): Promise<void> {
-    const page = this.getSelectedPage();
-    await page.setBypassCSP(enabled);
-    if (enabled) {
-      this.#bypassCSPMap.set(page, true);
-    } else {
-      this.#bypassCSPMap.delete(page);
-    }
-  }
-
-  getBypassCSP(): boolean {
-    const page = this.getSelectedPage();
-    return this.#bypassCSPMap.get(page) ?? false;
   }
 
   setIsRunningPerformanceTrace(x: boolean): void {
@@ -814,269 +402,296 @@ export class McpContext implements Context {
     return this.#isRunningTrace;
   }
 
-  getDialog(): Dialog | undefined {
-    return this.#dialog;
+  getScreenRecorder(): {recorder: ScreenRecorder; filePath: string} | null {
+    return this.#screenRecorderData;
   }
 
-  clearDialog(): void {
-    this.#dialog = undefined;
+  setScreenRecorder(
+    data: {recorder: ScreenRecorder; filePath: string} | null,
+  ): void {
+    this.#screenRecorderData = data;
   }
 
-  getSelectedPage(): Page {
+  isCruxEnabled(): boolean {
+    return this.#options.performanceCrux;
+  }
+
+  getSelectedPptrPage(): Page {
     const page = this.#selectedPage;
     if (!page) {
       throw new Error('No page selected');
     }
-    if (page.isClosed()) {
+    if (page.pptrPage.isClosed()) {
       throw new Error(
-        `The selected page has been closed. Call ${listPages.name} to see open pages.`,
+        `The selected page has been closed. Call ${listPages().name} to see open pages.`,
       );
     }
-    return page;
+    return page.pptrPage;
   }
 
-  getPageByIdx(idx: number): Page {
-    const pages = this.#pages;
-    const page = pages[idx];
+  getSelectedMcpPage(): McpPage {
+    const page = this.getSelectedPptrPage();
+    return this.#getMcpPage(page);
+  }
+
+  getPageById(pageId: number): McpPage {
+    const page = this.#mcpPages.values().find(mcpPage => mcpPage.id === pageId);
     if (!page) {
       throw new Error('No page found');
     }
     return page;
   }
 
-  #dialogHandler = (dialog: Dialog): void => {
-    this.#dialog = dialog;
-  };
-
-  isPageSelected(page: Page): boolean {
-    return this.#selectedPage === page;
+  getPageId(page: Page): number | undefined {
+    return this.#mcpPages.get(page)?.id;
   }
 
-  selectPage(newPage: Page, explicit = false): void {
-    const oldPage = this.#selectedPage;
-    if (oldPage) {
-      oldPage.off('dialog', this.#dialogHandler);
+  #getMcpPage(page: Page): McpPage {
+    const mcpPage = this.#mcpPages.get(page);
+    if (!mcpPage) {
+      throw new Error('No McpPage found for the given page.');
     }
+    return mcpPage;
+  }
+
+  #getSelectedMcpPage(): McpPage {
+    return this.#getMcpPage(this.getSelectedPptrPage());
+  }
+
+  isPageSelected(page: Page): boolean {
+    return this.#selectedPage?.pptrPage === page;
+  }
+
+  selectPage(newPage: McpPage): void {
     this.#selectedPage = newPage;
-    if (explicit) {
-      // Mark page as explicitly selected to prevent auto-switching
-      this.#pageExplicitlySelected = true;
-    }
-    newPage.on('dialog', this.#dialogHandler);
     this.#updateSelectedPageTimeouts();
   }
 
   #updateSelectedPageTimeouts() {
-    const page = this.getSelectedPage();
+    const page = this.#getSelectedMcpPage();
     // For waiters 5sec timeout should be sufficient.
     // Increased in case we throttle the CPU
-    const cpuMultiplier = this.getCpuThrottlingRate();
-    page.setDefaultTimeout(DEFAULT_TIMEOUT * cpuMultiplier);
+    const cpuMultiplier = page.cpuThrottlingRate;
+    page.pptrPage.setDefaultTimeout(DEFAULT_TIMEOUT * cpuMultiplier);
     // 10sec should be enough for the load event to be emitted during
     // navigations.
     // Increased in case we throttle the network requests
     const networkMultiplier = getNetworkMultiplierFromString(
-      this.getNetworkConditions(),
+      page.networkConditions,
     );
-    page.setDefaultNavigationTimeout(NAVIGATION_TIMEOUT * networkMultiplier);
+    page.pptrPage.setDefaultNavigationTimeout(
+      NAVIGATION_TIMEOUT * networkMultiplier,
+    );
   }
 
-  getNavigationTimeout() {
-    const page = this.getSelectedPage();
-    return page.getDefaultNavigationTimeout();
-  }
-
+  // Linear scan over per-page snapshots. The page count is small (typically
+  // 2-10) so a reverse index isn't worthwhile given the uid-reuse lifecycle
+  // complexity it would introduce.
   getAXNodeByUid(uid: string) {
-    return this.#textSnapshot?.idToNode.get(uid);
-  }
-
-  async getElementByUid(uid: string): Promise<ElementHandle<Element>> {
-    if (!this.#textSnapshot?.idToNode.size) {
-      throw new Error(
-        `No snapshot found. Use ${takeSnapshot.name} to capture one.`,
-      );
+    for (const mcpPage of this.#mcpPages.values()) {
+      const node = mcpPage.textSnapshot?.idToNode.get(uid);
+      if (node) {
+        return node;
+      }
     }
-    const [snapshotId] = uid.split('_');
-
-    if (this.#textSnapshot.snapshotId !== snapshotId) {
-      throw new Error(
-        `This uid (${uid}) is from an old snapshot. The page has changed since then. ` +
-        'Always call take_snapshot immediately before using UIDs from it. ' +
-        'Workflow: 1) take_snapshot, 2) use the UIDs from that response, 3) repeat for each action.',
-      );
-    }
-
-    const node = this.#textSnapshot?.idToNode.get(uid);
-    if (!node) {
-      throw new Error('No such element found in the snapshot');
-    }
-    const handle = await node.elementHandle();
-    if (!handle) {
-      throw new Error('No such element found in the snapshot');
-    }
-    return handle;
+    return undefined;
   }
 
   /**
-   * Creates a snapshot of the pages.
-   * If a sessionWindowId is set, only pages from that window are included.
+   * Creates a snapshot of the extension service workers.
    */
-  async createPagesSnapshot(): Promise<Page[]> {
-    const allPages = await this.browser.pages(
-      this.#options.experimentalIncludeAllPages,
-    );
+  async createExtensionServiceWorkersSnapshot(): Promise<
+    ExtensionServiceWorker[]
+  > {
+    const allTargets = await this.browser.targets();
 
-    this.logger(`createPagesSnapshot: found ${allPages.length} total pages`);
-    for (const page of allPages) {
-      this.logger(`  - ${page.url()}`);
+    const serviceWorkers = allTargets.filter(target => {
+      return (
+        target.type() === 'service_worker' &&
+        target.url().includes('chrome-extension://')
+      );
+    });
+
+    for (const serviceWorker of serviceWorkers) {
+      if (!this.#extensionServiceWorkerMap.has(serviceWorker)) {
+        this.#extensionServiceWorkerMap.set(
+          serviceWorker,
+          'sw-' + this.#nextExtensionServiceWorkerId++,
+        );
+      }
     }
 
-    // First filter: DevTools pages (unless experimental mode is enabled)
-    let filteredPages = allPages.filter(page => {
+    this.#extensionServiceWorkers = serviceWorkers.map(serviceWorker => {
+      return {
+        target: serviceWorker,
+        id: this.#extensionServiceWorkerMap.get(serviceWorker)!,
+        url: serviceWorker.url(),
+      };
+    });
+
+    return this.#extensionServiceWorkers;
+  }
+
+  async createPagesSnapshot(): Promise<Page[]> {
+    const {pages: allPages, isolatedContextNames} = await this.#getAllPages();
+
+    for (const page of allPages) {
+      let mcpPage = this.#mcpPages.get(page);
+      if (!mcpPage) {
+        mcpPage = new McpPage(page, this.#nextPageId++);
+        this.#mcpPages.set(page, mcpPage);
+        // We emulate a focused page for all pages to support multi-agent workflows.
+        void page.emulateFocusedPage(true).catch(error => {
+          this.logger('Error turning on focused page emulation', error);
+        });
+      }
+      mcpPage.isolatedContextName = isolatedContextNames.get(page);
+    }
+
+    // Prune orphaned #mcpPages entries (pages that no longer exist).
+    const currentPages = new Set(allPages);
+    for (const [page, mcpPage] of this.#mcpPages) {
+      if (!currentPages.has(page)) {
+        mcpPage.dispose();
+        this.#mcpPages.delete(page);
+      }
+    }
+
+    this.#pages = allPages.filter(page => {
       return (
         this.#options.experimentalDevToolsDebugging ||
         !page.url().startsWith('devtools://')
       );
     });
 
-    // Second filter: Session window scoping
-    // If we have a sessionWindowId, only include pages from that window
-    if (this.#sessionWindowId !== undefined) {
-      const windowFilteredPages: Page[] = [];
-      // Check window IDs in parallel for better performance
-      const windowIdResults = await Promise.allSettled(
-        filteredPages.map(async page => {
-          // Try to get windowId with retry for pages that might be in transitional state
-          let windowId: number | null = null;
-          let lastError: string | null = null;
-
-          for (let attempt = 0; attempt < 3; attempt++) {
-            try {
-              windowId = await this.getWindowIdForPage(page);
-              break; // Success, exit retry loop
-            } catch (err) {
-              lastError = err instanceof Error ? err.message : String(err);
-              if (attempt < 2) {
-                // Wait before retry (50ms, then 100ms)
-                await new Promise(r => setTimeout(r, 50 * (attempt + 1)));
-              }
-            }
-          }
-
-          if (windowId !== null) {
-            return {page, windowId, url: page.url()};
-          }
-
-          // All retries failed
-          this.logger(`Failed to get windowId for page ${page.url()} after 3 attempts: ${lastError}`);
-          return null;
-        }),
-      );
-
-      for (const result of windowIdResults) {
-        if (result.status === 'fulfilled' && result.value) {
-          if (result.value.windowId === this.#sessionWindowId) {
-            windowFilteredPages.push(result.value.page);
-          } else {
-            this.logger(
-              `Excluding page ${result.value.url} (windowId ${result.value.windowId} != session ${this.#sessionWindowId})`,
-            );
-          }
-        }
-      }
-      filteredPages = windowFilteredPages;
-      this.logger(`Window filter: ${windowFilteredPages.length} pages in session window ${this.#sessionWindowId}`);
-
-      // Always include the explicitly selected page even if window filtering excluded it
-      // This handles edge cases where windowId lookup fails after cross-origin navigation
-      if (
-        this.#pageExplicitlySelected &&
-        this.#selectedPage &&
-        !this.#selectedPage.isClosed() &&
-        !filteredPages.includes(this.#selectedPage)
-      ) {
-        this.logger(`Re-adding explicitly selected page that was filtered out: ${this.#selectedPage.url()}`);
-        filteredPages.unshift(this.#selectedPage);
-      }
-    }
-
-    this.#pages = filteredPages;
-
-    // Only auto-select pages[0] if:
-    // 1. No page has been explicitly selected for this session AND
-    // 2. Either there's no selected page OR the selected page is no longer valid
     if (
-      !this.#pageExplicitlySelected &&
-      (!this.#selectedPage || this.#pages.indexOf(this.#selectedPage) === -1) &&
+      (!this.#selectedPage ||
+        this.#pages.indexOf(this.#selectedPage.pptrPage) === -1) &&
       this.#pages[0]
     ) {
-      this.selectPage(this.#pages[0]);
+      this.selectPage(this.#getMcpPage(this.#pages[0]));
     }
 
     await this.detectOpenDevToolsWindows();
 
-    // Set up WebMCP auto-detection for any new pages
-    // (safe to call for existing pages - it checks if listeners are already installed)
-    for (const page of this.#pages) {
-      this.#setupWebMCPAutoDetection(page);
-    }
-
     return this.#pages;
   }
 
-  /**
-   * Detect and map open DevTools windows to their inspected pages.
-   *
-   * Iterates through all browser pages to find DevTools windows and
-   * associates them with the pages they're inspecting.
-   *
-   * @todo Optimize page lookup with a URL-indexed map instead of nested loops.
-   */
-  async detectOpenDevToolsWindows(): Promise<void> {
-    this.logger('Detecting open DevTools windows');
-    const pages = await this.browser.pages(
+  async #getAllPages(): Promise<{
+    pages: Page[];
+    isolatedContextNames: Map<Page, string>;
+  }> {
+    const defaultCtx = this.browser.defaultBrowserContext();
+    const allPages = await this.browser.pages(
       this.#options.experimentalIncludeAllPages,
     );
-    this.#pageToDevToolsPage = new Map<Page, Page>();
-    for (const devToolsPage of pages) {
-      if (devToolsPage.url().startsWith('devtools://')) {
-        try {
-          this.logger('Calling getTargetInfo for ' + devToolsPage.url());
-          const data = await devToolsPage
-            // @ts-expect-error no types for _client().
-            ._client()
-            .send('Target.getTargetInfo');
-          const devtoolsPageTitle = data.targetInfo.title;
-          const urlLike = extractUrlLikeFromDevToolsTitle(devtoolsPageTitle);
-          if (!urlLike) {
-            continue;
+
+    const allTargets = this.browser.targets();
+    const extensionTargets = allTargets.filter(target => {
+      return (
+        target.url().startsWith('chrome-extension://') &&
+        target.type() === 'page'
+      );
+    });
+
+    for (const target of extensionTargets) {
+      // Right now target.page() returns null for popup and side panel pages.
+      let page = await target.page();
+      if (!page) {
+        // We need to cache pages instances for targets because target.asPage()
+        // returns a new page instance every time.
+        page = this.#extensionPages.get(target) ?? null;
+        if (!page) {
+          try {
+            page = await target.asPage();
+            this.#extensionPages.set(target, page);
+          } catch (e) {
+            this.logger('Failed to get page for extension target', e);
           }
-          for (const page of this.#pages) {
-            if (urlsEqual(page.url(), urlLike)) {
-              this.#pageToDevToolsPage.set(page, devToolsPage);
-            }
-          }
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          this.logger(`DevTools detection failed for ${devToolsPage.url()}: ${message}`);
         }
       }
+
+      if (page && !allPages.includes(page)) {
+        allPages.push(page);
+      }
     }
+
+    // Build a reverse lookup from BrowserContext instance → name.
+    const contextToName = new Map<BrowserContext, string>();
+    for (const [name, ctx] of this.#isolatedContexts) {
+      contextToName.set(ctx, name);
+    }
+
+    // Auto-discover BrowserContexts not in our mapping (e.g., externally
+    // created incognito contexts) and assign generated names.
+    const knownContexts = new Set(this.#isolatedContexts.values());
+    for (const ctx of this.browser.browserContexts()) {
+      if (ctx !== defaultCtx && !ctx.closed && !knownContexts.has(ctx)) {
+        const name = `isolated-context-${this.#nextIsolatedContextId++}`;
+        this.#isolatedContexts.set(name, ctx);
+        contextToName.set(ctx, name);
+      }
+    }
+
+    // Map each page to its isolated context name (if any).
+    const isolatedContextNames = new Map<Page, string>();
+    for (const page of allPages) {
+      const ctx = page.browserContext();
+      const name = contextToName.get(ctx);
+      if (name) {
+        isolatedContextNames.set(page, name);
+      }
+    }
+
+    return {pages: allPages, isolatedContextNames};
+  }
+
+  async detectOpenDevToolsWindows() {
+    this.logger('Detecting open DevTools windows');
+    const {pages} = await this.#getAllPages();
+
+    await Promise.all(
+      pages.map(async page => {
+        const mcpPage = this.#mcpPages.get(page);
+        if (!mcpPage) {
+          return;
+        }
+
+        if (await page.hasDevTools()) {
+          mcpPage.devToolsPage = await page.openDevTools();
+        } else {
+          mcpPage.devToolsPage = undefined;
+        }
+      }),
+    );
+  }
+
+  getExtensionServiceWorkers(): ExtensionServiceWorker[] {
+    return this.#extensionServiceWorkers;
+  }
+
+  getExtensionServiceWorkerId(
+    extensionServiceWorker: ExtensionServiceWorker,
+  ): string | undefined {
+    return this.#extensionServiceWorkerMap.get(extensionServiceWorker.target);
   }
 
   getPages(): Page[] {
-    return [...this.#pages];
+    return this.#pages;
+  }
+
+  getIsolatedContextName(page: Page): string | undefined {
+    return this.#mcpPages.get(page)?.isolatedContextName;
   }
 
   getDevToolsPage(page: Page): Page | undefined {
-    return this.#pageToDevToolsPage.get(page);
+    return this.#mcpPages.get(page)?.devToolsPage;
   }
 
-  async getDevToolsData(): Promise<DevToolsData> {
+  async getDevToolsData(page: McpPage): Promise<DevToolsData> {
     try {
       this.logger('Getting DevTools UI data');
-      const selectedPage = this.getSelectedPage();
-      const devtoolsPage = this.getDevToolsPage(selectedPage);
+      const devtoolsPage = this.getDevToolsPage(page.pptrPage);
       if (!devtoolsPage) {
         this.logger('No DevTools page detected');
         return {};
@@ -1110,11 +725,11 @@ export class McpContext implements Context {
    * Creates a text snapshot of a page.
    */
   async createTextSnapshot(
+    page: McpPage,
     verbose = false,
     devtoolsData: DevToolsData | undefined = undefined,
   ): Promise<void> {
-    const page = this.getSelectedPage();
-    const rootNode = await page.accessibility.snapshot({
+    const rootNode = await page.pptrPage.accessibility.snapshot({
       includeIframes: true,
       interestingOnly: !verbose,
     });
@@ -1122,15 +737,31 @@ export class McpContext implements Context {
       return;
     }
 
+    const {uniqueBackendNodeIdToMcpId} = page;
+
     const snapshotId = this.#nextSnapshotId++;
     // Iterate through the whole accessibility node tree and assign node ids that
     // will be used for the tree serialization and mapping ids back to nodes.
     let idCounter = 0;
     const idToNode = new Map<string, TextSnapshotNode>();
+    const seenUniqueIds = new Set<string>();
     const assignIds = (node: SerializedAXNode): TextSnapshotNode => {
+      let id = '';
+      // @ts-expect-error untyped loaderId & backendNodeId.
+      const uniqueBackendId = `${node.loaderId}_${node.backendNodeId}`;
+      if (uniqueBackendNodeIdToMcpId.has(uniqueBackendId)) {
+        // Re-use MCP exposed ID if the uniqueId is the same.
+        id = uniqueBackendNodeIdToMcpId.get(uniqueBackendId)!;
+      } else {
+        // Only generate a new ID if we have not seen the node before.
+        id = `${snapshotId}_${idCounter++}`;
+        uniqueBackendNodeIdToMcpId.set(uniqueBackendId, id);
+      }
+      seenUniqueIds.add(uniqueBackendId);
+
       const nodeWithId: TextSnapshotNode = {
         ...node,
-        id: `${snapshotId}_${idCounter++}`,
+        id,
         children: node.children
           ? node.children.map(child => assignIds(child))
           : [],
@@ -1150,64 +781,55 @@ export class McpContext implements Context {
     };
 
     const rootNodeWithId = assignIds(rootNode);
-    this.#textSnapshot = {
+    const snapshot: TextSnapshot = {
       root: rootNodeWithId,
       snapshotId: String(snapshotId),
       idToNode,
       hasSelectedElement: false,
       verbose,
     };
-    const data = devtoolsData ?? (await this.getDevToolsData());
+    page.textSnapshot = snapshot;
+    const data = devtoolsData ?? (await this.getDevToolsData(page));
     if (data?.cdpBackendNodeId) {
-      this.#textSnapshot.hasSelectedElement = true;
-      this.#textSnapshot.selectedElementUid = this.resolveCdpElementId(
+      snapshot.hasSelectedElement = true;
+      snapshot.selectedElementUid = this.resolveCdpElementId(
+        page,
         data?.cdpBackendNodeId,
       );
     }
-  }
 
-  getTextSnapshot(): TextSnapshot | null {
-    return this.#textSnapshot;
+    // Clean up unique IDs that we did not see anymore.
+    for (const key of uniqueBackendNodeIdToMcpId.keys()) {
+      if (!seenUniqueIds.has(key)) {
+        uniqueBackendNodeIdToMcpId.delete(key);
+      }
+    }
   }
 
   async saveTemporaryFile(
     data: Uint8Array<ArrayBufferLike>,
-    mimeType: 'image/png' | 'image/jpeg' | 'image/webp',
-  ): Promise<{filename: string}> {
-    try {
-      const dir = await fs.mkdtemp(
-        path.join(os.tmpdir(), 'chrome-devtools-mcp-'),
-      );
-
-      const filename = path.join(
-        dir,
-        `screenshot.${getExtensionFromMimeType(mimeType)}`,
-      );
-      // Use mode 0o600 (owner read/write only) for secure temp file creation
-      await fs.writeFile(filename, data, {mode: 0o600});
-      return {filename};
-    } catch (err) {
-      this.logger(err);
-      throw new Error('Could not save a screenshot to a file', {cause: err});
-    }
+    filename: string,
+  ): Promise<{filepath: string}> {
+    return await saveTemporaryFile(data, filename);
   }
-
   async saveFile(
     data: Uint8Array<ArrayBufferLike>,
     filename: string,
   ): Promise<{filename: string}> {
     try {
       const filePath = path.resolve(filename);
-      // Use mode 0o644 (owner read/write, others read) for user-specified paths
-      await fs.writeFile(filePath, data, {mode: 0o644});
-      return {filename};
+      await fs.mkdir(path.dirname(filePath), {recursive: true});
+      await fs.writeFile(filePath, data);
+      return {filename: filePath};
     } catch (err) {
       this.logger(err);
-      throw new Error('Could not save a screenshot to a file', {cause: err});
+      throw new Error('Could not save a file', {cause: err});
     }
   }
 
   storeTraceRecording(result: TraceResult): void {
+    // Clear the trace results because we only consume the latest trace currently.
+    this.#traceResults = [];
     this.#traceResults.push(result);
   }
 
@@ -1223,33 +845,42 @@ export class McpContext implements Context {
     return new WaitForHelper(page, cpuMultiplier, networkMultiplier);
   }
 
-  waitForEventsAfterAction(action: () => Promise<unknown>): Promise<void> {
-    const page = this.getSelectedPage();
-    const cpuMultiplier = this.getCpuThrottlingRate();
+  waitForEventsAfterAction(
+    action: () => Promise<unknown>,
+    options?: {timeout?: number},
+  ): Promise<void> {
+    const page = this.#getSelectedMcpPage();
+    const cpuMultiplier = page.cpuThrottlingRate;
     const networkMultiplier = getNetworkMultiplierFromString(
-      this.getNetworkConditions(),
+      page.networkConditions,
     );
     const waitForHelper = this.getWaitForHelper(
-      page,
+      page.pptrPage,
       cpuMultiplier,
       networkMultiplier,
     );
-    return waitForHelper.waitForEventsAfterAction(action);
+    return waitForHelper.waitForEventsAfterAction(action, options);
   }
 
   getNetworkRequestStableId(request: HTTPRequest): number {
     return this.#networkCollector.getIdForResource(request);
   }
 
-  waitForTextOnPage(text: string, timeout?: number): Promise<Element> {
-    const page = this.getSelectedPage();
+  waitForTextOnPage(
+    text: string[],
+    timeout?: number,
+    targetPage?: Page,
+  ): Promise<Element> {
+    const page = targetPage ?? this.getSelectedPptrPage();
     const frames = page.frames();
 
     let locator = this.#locatorClass.race(
-      frames.flatMap(frame => [
-        frame.locator(`aria/${text}`),
-        frame.locator(`text/${text}`),
-      ]),
+      frames.flatMap(frame =>
+        text.flatMap(value => [
+          frame.locator(`aria/${value}`),
+          frame.locator(`text/${value}`),
+        ]),
+      ),
     );
 
     if (timeout) {
@@ -1257,171 +888,6 @@ export class McpContext implements Context {
     }
 
     return locator.wait();
-  }
-
-  /**
-   * Get a WebMCP client for a page, auto-connecting if needed.
-   *
-   * This method handles the full lifecycle of WebMCP connections:
-   * - Maintains separate connections per page (one-to-many relationship)
-   * - Detects stale connections (page reload, navigation)
-   * - Cleans up old connections before creating new ones
-   * - Auto-connects when WebMCP is available on the page
-   *
-   * @param page - Optional page to get client for. Defaults to selected page.
-   */
-  async getWebMCPClient(page?: Page): Promise<WebMCPClientResult> {
-    const targetPage = page ?? this.getSelectedPage();
-
-    // Check if we have a valid, active connection for this page
-    // We must verify isClosed() to detect page reloads where URL stays the same but frames are invalidated
-    const conn = this.#webMCPConnections.get(targetPage);
-    if (conn && !conn.transport.isClosed()) {
-      return {connected: true, client: conn.client};
-    }
-
-    // If we have a stale connection, clean up first
-    if (conn) {
-      try {
-        await conn.client.close();
-      } catch (err) {
-        // Close errors during reconnection are expected - log for debugging
-        const message = err instanceof Error ? err.message : String(err);
-        this.logger(`WebMCP client close during reconnection: ${message}`);
-      }
-      this.#webMCPConnections.delete(targetPage);
-    }
-
-    // Connect - no pre-checking needed (extension approach)
-    try {
-      const transport = new WebMCPClientTransport({
-        page: targetPage,
-        readyTimeout: 30000,     // 30s to handle slow React apps (up from 10s)
-        requireWebMCP: false,    // Don't pre-check, just try to connect
-      });
-
-      const client = new Client(
-        {name: 'chrome-devtools-mcp', version: '1.0.0'},
-        {capabilities: {}},
-      );
-
-      // Set up onclose handler to clean up connection state
-      // This handles page navigations, reloads, and manual disconnections
-      transport.onclose = () => {
-        const currentConn = this.#webMCPConnections.get(targetPage);
-        if (currentConn?.client === client) {
-          this.#webMCPConnections.delete(targetPage);
-        }
-
-        // Remove tools for this page when transport closes
-        this.#toolHub?.removeToolsForPage(targetPage);
-      };
-
-      // Also listen for page close events to trigger cleanup
-      // This handles cases where the page is closed without navigation
-      const onPageClose = () => {
-        const currentConn = this.#webMCPConnections.get(targetPage);
-        if (currentConn?.client === client) {
-          this.#webMCPConnections.delete(targetPage);
-        }
-        this.#toolHub?.removeToolsForPage(targetPage);
-        // Clean up the listener
-        targetPage.off('close', onPageClose);
-      };
-      targetPage.on('close', onPageClose);
-
-      await client.connect(transport);
-
-      // Store connection for this page
-      this.#webMCPConnections.set(targetPage, {client, transport, page: targetPage});
-
-      // Subscribe to tool list changes if tool hub is enabled and server supports it
-      const serverCapabilities = client.getServerCapabilities();
-      if (serverCapabilities?.tools?.listChanged && this.#toolHub?.isEnabled()) {
-        client.setNotificationHandler(
-          ToolListChangedNotificationSchema,
-          async () => {
-            this.logger('WebMCP tools changed, re-syncing...');
-            await this.#toolHub?.syncToolsForPage(targetPage, client);
-          },
-        );
-      }
-
-      // Initial tool sync if tool hub is enabled
-      if (this.#toolHub?.isEnabled()) {
-        await this.#toolHub.syncToolsForPage(targetPage, client);
-      }
-
-      return {connected: true, client};
-    } catch (err) {
-      return {
-        connected: false,
-        error: `Failed to connect: ${err instanceof Error ? err.message : String(err)}`,
-      };
-    }
-  }
-
-  /**
-   * Evaluate a JavaScript expression in a Chrome extension's background context.
-   *
-   * Supports both MV3 service workers (type "service_worker") and MV2/dev-mode
-   * background pages (type "background_page"). Uses waitForTarget to handle
-   * cases where the worker hasn't been discovered yet.
-   *
-   * @param expression - JavaScript expression to evaluate.
-   * @param extensionId - Optional extension ID. If omitted, uses the first found.
-   * @returns The result of the evaluation.
-   */
-  async evaluateInExtensionWorker(expression: string, extensionId?: string): Promise<unknown> {
-    const isExtensionBackground = (t: {type(): string; url(): string}) =>
-      (t.type() === 'service_worker' || t.type() === 'background_page') &&
-      t.url().startsWith('chrome-extension://') &&
-      (!extensionId || t.url().includes(extensionId));
-
-    // First check already-known targets
-    let target = this.browser.targets().find(isExtensionBackground);
-
-    // If not found, wait briefly for the target to appear (handles startup timing)
-    if (!target) {
-      try {
-        target = await this.browser.waitForTarget(isExtensionBackground, {timeout: 5000});
-      } catch {
-        throw new Error(
-          'No extension background target found. Ensure the extension is loaded in the browser. ' +
-            'If connecting to an existing browser, verify the extension is installed and active.',
-        );
-      }
-    }
-
-    if (target.type() === 'service_worker') {
-      const worker = await target.worker();
-      if (!worker) {
-        throw new Error('Could not attach to service worker');
-      }
-      return worker.evaluate(expression);
-    }
-
-    // background_page — get a Page handle instead
-    const page = await target.page();
-    if (!page) {
-      throw new Error('Could not attach to extension background page');
-    }
-    return page.evaluate(expression);
-  }
-
-  async reconnectBrowser(options: {
-    browserURL?: string;
-    wsEndpoint?: string;
-    wsHeaders?: Record<string, string>;
-    timeout?: number;
-  }): Promise<{
-    pages: Array<{index: number; url: string; selected: boolean}>;
-    wsEndpoint: string;
-  }> {
-    if (!this.#options.onReconnect) {
-      throw new Error('Browser reconnection is not supported in this configuration');
-    }
-    return this.#options.onReconnect(options);
   }
 
   /**
@@ -1438,6 +904,43 @@ export class McpContext implements Context {
         },
       } as ListenerMap;
     });
-    await this.#networkCollector.init(await this.browser.pages());
+    const {pages} = await this.#getAllPages();
+    await this.#networkCollector.init(pages);
+  }
+
+  async installExtension(extensionPath: string): Promise<string> {
+    const id = await this.browser.installExtension(extensionPath);
+    await this.#extensionRegistry.registerExtension(id, extensionPath);
+    return id;
+  }
+
+  async uninstallExtension(id: string): Promise<void> {
+    await this.browser.uninstallExtension(id);
+    this.#extensionRegistry.remove(id);
+  }
+
+  async triggerExtensionAction(id: string): Promise<void> {
+    const page = this.getSelectedPptrPage();
+    // @ts-expect-error internal puppeteer api is needed since we don't have a way to get
+    // a tab id at the moment
+    const theTarget = page._tabId;
+    const session = await this.browser.target().createCDPSession();
+
+    try {
+      await session.send('Extensions.triggerAction', {
+        id,
+        targetId: theTarget,
+      });
+    } finally {
+      await session.detach();
+    }
+  }
+
+  listExtensions(): InstalledExtension[] {
+    return this.#extensionRegistry.list();
+  }
+
+  getExtension(id: string): InstalledExtension | undefined {
+    return this.#extensionRegistry.getById(id);
   }
 }

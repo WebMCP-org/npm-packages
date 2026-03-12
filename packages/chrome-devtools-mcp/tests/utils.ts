@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import assert from 'node:assert';
+
 import type {CallToolResult} from '@modelcontextprotocol/sdk/types.js';
 import logger from 'debug';
 import type {Browser} from 'puppeteer';
@@ -17,12 +19,11 @@ import type {
 } from 'puppeteer-core';
 import sinon from 'sinon';
 
-import {AggregatedIssue} from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
+import type {ParsedArguments} from '../src/bin/chrome-devtools-mcp-cli-options.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpResponse} from '../src/McpResponse.js';
 import {stableIdSymbol} from '../src/PageCollector.js';
-import {WebMCPToolHub} from '../src/tools/WebMCPToolHub.js';
-import type {McpServer} from '../src/third_party/index.js';
+import {DevTools} from '../src/third_party/index.js';
 
 export function getTextContent(
   content: CallToolResult['content'][number],
@@ -43,22 +44,36 @@ export function getImageContent(content: CallToolResult['content'][number]): {
   throw new Error(`Expected image content but got ${content.type}`);
 }
 
+export function extractExtensionId(response: McpResponse) {
+  const responseLine = response.responseLines[0];
+  assert.ok(responseLine, 'Response should not be empty');
+  const match = responseLine.match(/Extension installed\. Id: (.+)/);
+  const extensionId = match ? match[1] : null;
+  assert.ok(extensionId, 'Response should contain a valid key');
+  return extensionId;
+}
+
 const browsers = new Map<string, Browser>();
 let context: McpContext | undefined;
 
 export async function withBrowser(
   cb: (browser: Browser, page: Page) => Promise<void>,
-  options: {debug?: boolean; autoOpenDevTools?: boolean} = {},
+  options: {
+    debug?: boolean;
+    autoOpenDevTools?: boolean;
+    executablePath?: string;
+  } = {},
 ) {
-  const ciArgs = process.env.CI ? ['--no-sandbox', '--disable-setuid-sandbox'] : [];
   const launchOptions: LaunchOptions = {
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
+    executablePath:
+      options.executablePath ?? process.env.PUPPETEER_EXECUTABLE_PATH,
     headless: !options.debug,
     defaultViewport: null,
     devtools: options.autoOpenDevTools ?? false,
     pipe: true,
     handleDevToolsAsPage: true,
-    args: ciArgs,
+    args: ['--screen-info={3840x2160}'],
+    enableExtensions: true,
   };
   const key = JSON.stringify(launchOptions);
 
@@ -80,50 +95,18 @@ export async function withBrowser(
   await cb(browser, newPage);
 }
 
-/**
- * Create a mock MCP server for testing WebMCPToolHub.
- * This mock implements just enough of the McpServer interface
- * to support registerTool with update and remove methods.
- */
-export function createMockMcpServer(): McpServer {
-  const registeredTools = new Map<
-    string,
-    {
-      config: unknown;
-      callback: (...args: unknown[]) => Promise<unknown>;
-    }
-  >();
-
-  return {
-    registerTool: (
-      name: string,
-      config: unknown,
-      callback: (...args: unknown[]) => Promise<unknown>,
-    ) => {
-      registeredTools.set(name, {config, callback});
-      return {
-        update: (newConfig: unknown) => {
-          const existing = registeredTools.get(name);
-          if (existing) {
-            registeredTools.set(name, {...existing, config: newConfig});
-          }
-        },
-        remove: () => {
-          registeredTools.delete(name);
-        },
-      };
-    },
-    // Expose for test verification
-    _registeredTools: registeredTools,
-  } as unknown as McpServer;
-}
-
 export async function withMcpContext(
   cb: (response: McpResponse, context: McpContext) => Promise<void>,
-  options: {debug?: boolean; autoOpenDevTools?: boolean; withToolHub?: boolean} = {},
+  options: {
+    debug?: boolean;
+    autoOpenDevTools?: boolean;
+    performanceCrux?: boolean;
+    executablePath?: string;
+  } = {},
+  args: ParsedArguments = {} as ParsedArguments,
 ) {
   await withBrowser(async browser => {
-    const response = new McpResponse();
+    const response = new McpResponse(args);
     if (context) {
       context.dispose();
     }
@@ -132,16 +115,12 @@ export async function withMcpContext(
       logger('test'),
       {
         experimentalDevToolsDebugging: false,
+        performanceCrux: options.performanceCrux ?? true,
       },
       Locator,
     );
 
-    // Optionally create and attach a tool hub with a mock server
-    if (options.withToolHub) {
-      const mockServer = createMockMcpServer();
-      const toolHub = new WebMCPToolHub(mockServer, context);
-      context.setToolHub(toolHub);
-    }
+    response.setPage(context.getSelectedMcpPage());
 
     await cb(response, context);
   }, options);
@@ -149,6 +128,7 @@ export async function withMcpContext(
 
 export function getMockRequest(
   options: {
+    url?: string;
     method?: string;
     response?: HTTPResponse;
     failure?: HTTPRequest['failure'];
@@ -159,11 +139,12 @@ export function getMockRequest(
     stableId?: number;
     navigationRequest?: boolean;
     frame?: Frame;
+    redirectChain?: HTTPRequest[];
   } = {},
 ): HTTPRequest {
   return {
     url() {
-      return 'http://example.com';
+      return options.url ?? 'http://example.com';
     },
     method() {
       return options.method ?? 'GET';
@@ -192,7 +173,7 @@ export function getMockRequest(
       };
     },
     redirectChain(): HTTPRequest[] {
-      return [];
+      return options.redirectChain ?? [];
     },
     isNavigationRequest() {
       return options.navigationRequest ?? false;
@@ -212,6 +193,9 @@ export function getMockResponse(
   return {
     status() {
       return options.status ?? 200;
+    },
+    headers(): Record<string, string> {
+      return {};
     },
   } as HTTPResponse;
 }
@@ -237,6 +221,27 @@ export function html(
 </html>`;
 }
 
+export function stabilizeStructuredContent(content: unknown): unknown {
+  if (typeof content === 'string') {
+    return stabilizeResponseOutput(content);
+  }
+  if (Array.isArray(content)) {
+    return content.map(item => stabilizeStructuredContent(item));
+  }
+  if (typeof content === 'object' && content !== null) {
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(content)) {
+      if (key === 'snapshotFilePath' && typeof value === 'string') {
+        result[key] = '<file>';
+      } else {
+        result[key] = stabilizeStructuredContent(value);
+      }
+    }
+    return result;
+  }
+  return content;
+}
+
 export function stabilizeResponseOutput(text: unknown) {
   if (typeof text !== 'string') {
     throw new Error('Input must be string');
@@ -260,11 +265,17 @@ export function stabilizeResponseOutput(text: unknown) {
 
   const savedSnapshot = /Saved snapshot to (.*)/g;
   output = output.replaceAll(savedSnapshot, 'Saved snapshot to <file>');
+
+  const acceptLanguageRegEx = /accept-language:.*\n/g;
+  output = output.replaceAll(acceptLanguageRegEx, 'accept-language:<lang>\n');
+
   return output;
 }
 
-export function getMockAggregatedIssue(): sinon.SinonStubbedInstance<AggregatedIssue> {
-  const mockAggregatedIssue = sinon.createStubInstance(AggregatedIssue);
+export function getMockAggregatedIssue(): sinon.SinonStubbedInstance<DevTools.AggregatedIssue> {
+  const mockAggregatedIssue = sinon.createStubInstance(
+    DevTools.AggregatedIssue,
+  );
   mockAggregatedIssue.getAllIssues.returns([]);
   return mockAggregatedIssue;
 }
@@ -297,6 +308,7 @@ export function getMockPage(): Page {
     send: () => {
       // no-op
     },
+    target: () => ({_targetId: '<mock target ID>'}),
   };
   return {
     mainFrame() {

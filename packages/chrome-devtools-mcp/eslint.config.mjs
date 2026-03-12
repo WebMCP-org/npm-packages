@@ -14,7 +14,12 @@ import tseslint from 'typescript-eslint';
 import localPlugin from './scripts/eslint_rules/local-plugin.js';
 
 export default defineConfig([
-  globalIgnores(['**/node_modules', '**/build/']),
+  globalIgnores([
+    '**/node_modules',
+    '**/build/',
+    'tests/tools/fixtures/',
+    'src/third_party/lighthouse-devtools-mcp-bundle.js',
+  ]),
   importPlugin.flatConfigs.typescript,
   {
     languageOptions: {
@@ -60,6 +65,7 @@ export default defineConfig([
     name: 'TypeScript rules',
     rules: {
       '@local/check-license': 'error',
+      curly: ['error', 'all'],
 
       'no-undef': 'off',
       'no-unused-vars': 'off',

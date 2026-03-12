@@ -11,9 +11,13 @@ import {describe, it} from 'node:test';
 
 import {executablePath} from 'puppeteer';
 
-import {launch} from '../src/browser.js';
+import {detectDisplay, ensureBrowserConnected, launch} from '../src/browser.js';
 
 describe('browser', () => {
+  it('detects display does not crash', () => {
+    detectDisplay();
+  });
+
   it('cannot launch multiple times with the same profile', async () => {
     const tmpDir = os.tmpdir();
     const folderPath = path.join(tmpDir, `temp-folder-${crypto.randomUUID()}`);
@@ -69,6 +73,29 @@ describe('browser', () => {
         width: 1501,
         height: 801,
       });
+    } finally {
+      await browser.close();
+    }
+  });
+  it('connects to an existing browser with userDataDir', async () => {
+    const tmpDir = os.tmpdir();
+    const folderPath = path.join(tmpDir, `temp-folder-${crypto.randomUUID()}`);
+    const browser = await launch({
+      headless: true,
+      isolated: false,
+      userDataDir: folderPath,
+      executablePath: executablePath(),
+      devtools: false,
+      chromeArgs: ['--remote-debugging-port=0'],
+    });
+    try {
+      const connectedBrowser = await ensureBrowserConnected({
+        userDataDir: folderPath,
+        devtools: false,
+      });
+      assert.ok(connectedBrowser);
+      assert.ok(connectedBrowser.connected);
+      connectedBrowser.disconnect();
     } finally {
       await browser.close();
     }

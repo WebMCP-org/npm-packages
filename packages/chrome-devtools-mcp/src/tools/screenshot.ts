@@ -8,9 +8,9 @@ import {zod} from '../third_party/index.js';
 import type {ElementHandle, Page} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {defineTool} from './ToolDefinition.js';
+import {definePageTool} from './ToolDefinition.js';
 
-export const screenshot = defineTool({
+export const screenshot = definePageTool({
   name: 'take_screenshot',
   description: `Take a screenshot of the page or element.`,
   annotations: {
@@ -57,9 +57,9 @@ export const screenshot = defineTool({
 
     let pageOrHandle: Page | ElementHandle;
     if (request.params.uid) {
-      pageOrHandle = await context.getElementByUid(request.params.uid);
+      pageOrHandle = await request.page.getElementByUid(request.params.uid);
     } else {
-      pageOrHandle = context.getSelectedPage();
+      pageOrHandle = request.page.pptrPage;
     }
 
     const format = request.params.format;
@@ -90,11 +90,11 @@ export const screenshot = defineTool({
       const file = await context.saveFile(screenshot, request.params.filePath);
       response.appendResponseLine(`Saved screenshot to ${file.filename}.`);
     } else if (screenshot.length >= 2_000_000) {
-      const {filename} = await context.saveTemporaryFile(
+      const {filepath} = await context.saveTemporaryFile(
         screenshot,
-        `image/${request.params.format}` as 'image/png' | 'image/jpeg' | 'image/webp',
+        `screenshot.${request.params.format}`,
       );
-      response.appendResponseLine(`Saved screenshot to ${filename}.`);
+      response.appendResponseLine(`Saved screenshot to ${filepath}.`);
     } else {
       response.attachImage({
         mimeType: `image/${request.params.format}`,

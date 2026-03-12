@@ -7,20 +7,24 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {parseArguments} from '../src/cli.js';
+import {parseArguments} from '../src/bin/chrome-devtools-mcp-cli-options.js';
 
 describe('cli args parsing', () => {
   const defaultArgs = {
-    autoConnect: true,
-    'auto-connect': true,
     'category-emulation': true,
     categoryEmulation: true,
     'category-performance': true,
     categoryPerformance: true,
+    'category-extensions': false,
+    categoryExtensions: false,
     'category-network': true,
     categoryNetwork: true,
-    includeExtensionPages: false,
-    'include-extension-pages': false,
+    'auto-connect': undefined,
+    autoConnect: undefined,
+    'performance-crux': true,
+    performanceCrux: true,
+    'usage-statistics': true,
+    usageStatistics: true,
   };
 
   it('parses with default args', async () => {
@@ -127,7 +131,7 @@ describe('cli args parsing', () => {
     });
   });
 
-  it('parses viewport', async () => {
+  it('parses chrome args', async () => {
     const args = parseArguments('1.0.0', [
       'node',
       'main.js',
@@ -142,6 +146,30 @@ describe('cli args parsing', () => {
       channel: 'stable',
       'chrome-arg': ['--no-sandbox', '--disable-setuid-sandbox'],
       chromeArg: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+  });
+
+  it('parses ignore chrome args', async () => {
+    const args = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      `--ignore-default-chrome-arg='--disable-extensions'`,
+      `--ignore-default-chrome-arg='--disable-cancel-all-touches'`,
+    ]);
+    assert.deepStrictEqual(args, {
+      ...defaultArgs,
+      _: [],
+      headless: false,
+      $0: 'npx chrome-devtools-mcp@latest',
+      channel: 'stable',
+      'ignore-default-chrome-arg': [
+        '--disable-extensions',
+        '--disable-cancel-all-touches',
+      ],
+      ignoreDefaultChromeArg: [
+        '--disable-extensions',
+        '--disable-cancel-all-touches',
+      ],
     });
   });
 
@@ -211,5 +239,59 @@ describe('cli args parsing', () => {
       'category-emulation': false,
       categoryEmulation: false,
     });
+  });
+  it('parses auto-connect', async () => {
+    const args = parseArguments('1.0.0', ['node', 'main.js', '--auto-connect']);
+    assert.deepStrictEqual(args, {
+      ...defaultArgs,
+      _: [],
+      headless: false,
+      $0: 'npx chrome-devtools-mcp@latest',
+      channel: 'stable',
+      'auto-connect': true,
+      autoConnect: true,
+    });
+  });
+
+  it('parses usage statistics flag', async () => {
+    // Test default (should be true).
+    const defaultArgs = parseArguments('1.0.0', ['node', 'main.js']);
+    assert.strictEqual(defaultArgs.usageStatistics, true);
+
+    // Test enabling it
+    const enabledArgs = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--usage-statistics',
+    ]);
+    assert.strictEqual(enabledArgs.usageStatistics, true);
+
+    // Test disabling it
+    const disabledArgs = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--no-usage-statistics',
+    ]);
+    assert.strictEqual(disabledArgs.usageStatistics, false);
+  });
+
+  it('parses performance crux flag', async () => {
+    const defaultArgs = parseArguments('1.0.0', ['node', 'main.js']);
+    assert.strictEqual(defaultArgs.performanceCrux, true);
+
+    // force enable
+    const enabledArgs = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--performance-crux',
+    ]);
+    assert.strictEqual(enabledArgs.performanceCrux, true);
+
+    const disabledArgs = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--no-performance-crux',
+    ]);
+    assert.strictEqual(disabledArgs.performanceCrux, false);
   });
 });
