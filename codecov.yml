@@ -4,3 +4,4 @@ codecov:
     wait_for_ci: false
 ignore:
   - "e2e/web-standards-showcase/**"
+  - "packages/chrome-devtools-mcp/**"
