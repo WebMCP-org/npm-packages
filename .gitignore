@@ -61,3 +61,7 @@ docs/plans/WEBMCP_SPEC.md
 
 # Co-located fork (separate git repo)
 webmcp-tools/
+
+# Chromium source and depot tools
+chromium/
+depot_tools/

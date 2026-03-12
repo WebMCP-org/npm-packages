@@ -1,5 +1,11 @@
 # @mcp-b/webmcp-local-relay
 
+## 2.2.0
+
+### Patch Changes
+
+- Use workspace:\* for internal webmcp-types dependency.
+
 ## 2.1.0
 
 ### Minor Changes

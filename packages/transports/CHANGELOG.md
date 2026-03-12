@@ -1,5 +1,13 @@
 # @mcp-b/transports
 
+## 2.2.0
+
+### Patch Changes
+
+- Fix self-post delivery for cross-origin clients by preserving message routing when source and target share the same window.
+- Updated dependencies [2540527]
+  - @mcp-b/webmcp-ts-sdk@2.2.0
+
 ## 2.1.0
 
 ### Patch Changes

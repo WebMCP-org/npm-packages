@@ -6,7 +6,7 @@
   "scripts": {
     "audit:ci:critical": "node ./scripts/audit-filtered.mjs --level critical --prod --ignore-prefix e2e__ --ignore-prefix examples__ --ignore-prefix 'packages__chrome-devtools-mcp>'",
     "audit:ci:high": "node ./scripts/audit-filtered.mjs --level high --prod --ignore-prefix e2e__ --ignore-prefix examples__ --ignore-prefix 'packages__chrome-devtools-mcp>'",
-    "build": "turbo run build --filter='!@mcp-b/example-*'",
+    "build": "turbo run build --filter='!@mcp-b/example-*' --filter='!@mcp-b/chrome-devtools-mcp'",
     "changeset": "changeset",
     "changeset:publish": "pnpm build && changeset publish",
     "changeset:version": "changeset version",
@@ -32,7 +32,7 @@
     "test:e2e:ui": "pnpm --filter mcp-e2e-tests test:ui",
     "test:unit": "pnpm --filter @mcp-b/transports test && pnpm --filter @mcp-b/transports test:browser && pnpm --filter @mcp-b/global test && pnpm --filter @mcp-b/react-webmcp test && pnpm --filter usewebmcp test && pnpm --filter @mcp-b/webmcp-types test && pnpm --filter @mcp-b/webmcp-types test:browser && pnpm --filter @mcp-b/webmcp-polyfill test && pnpm --filter @mcp-b/webmcp-polyfill test:browser && pnpm --filter @mcp-b/webmcp-local-relay test && pnpm --filter agent-skills-ts-sdk test",
     "test:unit:coverage": "pnpm --filter @mcp-b/transports test --coverage && pnpm --filter @mcp-b/transports test:browser && pnpm --filter @mcp-b/global test --coverage && pnpm --filter @mcp-b/react-webmcp test --coverage && pnpm --filter usewebmcp test --coverage && pnpm --filter @mcp-b/webmcp-types test --coverage && pnpm --filter @mcp-b/webmcp-types test:browser && pnpm --filter @mcp-b/webmcp-polyfill test --coverage && pnpm --filter @mcp-b/webmcp-polyfill test:browser && pnpm --filter @mcp-b/webmcp-local-relay test --coverage && pnpm --filter agent-skills-ts-sdk test --coverage",
-    "typecheck": "turbo run typecheck --filter='!@mcp-b/example-*'",
+    "typecheck": "turbo run typecheck --filter='!@mcp-b/example-*' --filter='!@mcp-b/chrome-devtools-mcp'",
     "validate:publish": "node ./scripts/validate-publish.js"
   },
   "dependencies": {

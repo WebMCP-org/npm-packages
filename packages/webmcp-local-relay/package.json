@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/webmcp-local-relay",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Local MCP relay for browser WebMCP tools via embed iframe and localhost WebSocket",
   "keywords": [
     "mcp",
