@@ -941,7 +941,7 @@ describe('useWebMCP', () => {
       (globalThis as Record<string, unknown>).process = originalProcess;
     });
 
-    it('should warn when inputSchema reference changes in dev mode', async () => {
+    it('should not warn when inputSchema reference changes but structure is identical', async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
       try {
@@ -964,7 +964,7 @@ describe('useWebMCP', () => {
           }
         );
 
-        // Rerender with new inputSchema reference
+        // Rerender with new inputSchema reference (same structure)
         await rerender({
           schema: {
             type: 'object',
@@ -973,7 +973,7 @@ describe('useWebMCP', () => {
           } as const,
         });
 
-        expect(warnSpy).toHaveBeenCalledWith(
+        expect(warnSpy).not.toHaveBeenCalledWith(
           expect.stringContaining('inputSchema reference changed')
         );
       } finally {
@@ -981,7 +981,7 @@ describe('useWebMCP', () => {
       }
     });
 
-    it('should warn when outputSchema reference changes in dev mode', async () => {
+    it('should not warn when outputSchema reference changes but structure is identical', async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
       try {
@@ -1004,7 +1004,7 @@ describe('useWebMCP', () => {
           schema: { type: 'object', properties: { value: { type: 'string' } } } as const,
         });
 
-        expect(warnSpy).toHaveBeenCalledWith(
+        expect(warnSpy).not.toHaveBeenCalledWith(
           expect.stringContaining('outputSchema reference changed')
         );
       } finally {
@@ -1012,7 +1012,7 @@ describe('useWebMCP', () => {
       }
     });
 
-    it('should warn when annotations reference changes in dev mode', async () => {
+    it('should not warn when annotations reference changes but structure is identical', async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
       try {
@@ -1029,7 +1029,7 @@ describe('useWebMCP', () => {
 
         await rerender({ annotations: { destructiveHint: true } });
 
-        expect(warnSpy).toHaveBeenCalledWith(
+        expect(warnSpy).not.toHaveBeenCalledWith(
           expect.stringContaining('annotations reference changed')
         );
       } finally {

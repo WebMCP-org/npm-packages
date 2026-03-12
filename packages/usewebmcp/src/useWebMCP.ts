@@ -299,9 +299,11 @@ export function useWebMCP<
         error: null,
       }));
 
-      onStartRef.current?.(input);
+      const typedInput = input as TInput;
 
-      const result = await toolExecuteRef.current(input as TInput);
+      onStartRef.current?.(typedInput);
+
+      const result = await toolExecuteRef.current(typedInput);
 
       // Only update state if component is still mounted
       if (isMountedRef.current) {
@@ -314,7 +316,7 @@ export function useWebMCP<
       }
 
       if (onSuccessRef.current) {
-        onSuccessRef.current(result, input);
+        onSuccessRef.current(result, typedInput);
       }
 
       return result;
@@ -331,7 +333,7 @@ export function useWebMCP<
       }
 
       if (onErrorRef.current) {
-        onErrorRef.current(err, input);
+        onErrorRef.current(err, input as TInput);
       }
 
       throw err;

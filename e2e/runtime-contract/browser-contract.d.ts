@@ -1,5 +1,6 @@
 import type { RuntimeContractController, RuntimeContractOptions } from './core.js';
 
+// biome-ignore lint/suspicious/noConfusingVoidType: void is needed to match registerTool's return type
 type BrowserRuntimeContractRegisterResult = void | { unregister?: () => void };
 
 export interface BrowserRuntimeContractModelContext {
