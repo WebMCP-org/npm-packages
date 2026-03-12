@@ -1,10 +1,10 @@
 {
   "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2022",
+    "target": "ES2024",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "lib": ["ES2022", "DOM", "WebWorker"],
+    "lib": ["ES2024", "DOM", "WebWorker"],
     "types": ["chrome"],
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
