@@ -120,13 +120,17 @@ jobs:
         if: matrix.mode == 'default'
         run: pnpm --filter mcp-e2e-tests run test:native-contract:default
 
+      - name: Run Native Runtime API Integration (Default Chromium)
+        if: matrix.mode == 'default'
+        run: pnpm --filter mcp-e2e-tests run test:native-showcase
+
       - name: Run Native Runtime Contract (Chrome Beta)
         if: matrix.mode == 'chrome-beta'
         run: pnpm --filter mcp-e2e-tests run test:native-contract:beta
 
-      - name: Run Native Runtime API Integration (Chrome Beta)
+      - name: Run Chrome Beta WebMCP Smoke
         if: matrix.mode == 'chrome-beta'
-        run: pnpm --filter mcp-e2e-tests run test:native-showcase
+        run: pnpm --filter mcp-e2e-tests run test:chrome-beta:webmcp:smoke
 
       - name: Upload Parity Playwright Report
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
