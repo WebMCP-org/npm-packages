@@ -105,7 +105,7 @@ describe('global adapter', () => {
 
     const modelContext = getModelContext();
 
-    modelContext.registerTool({
+    const result = modelContext.registerTool({
       name: 'web_tool',
       description: 'Web style tool',
       inputSchema: { type: 'object', properties: {} },
@@ -113,6 +113,8 @@ describe('global adapter', () => {
         return { content: [{ type: 'text', text: 'web-ok' }] };
       },
     });
+
+    expect(result).toBeUndefined();
 
     // Testing shim reads from the native polyfill, which is mirrored
     const tools = navigator.modelContextTesting?.listTools() ?? [];
@@ -431,6 +433,45 @@ describe('global adapter', () => {
     expect(tools.some((registeredTool) => registeredTool.name === 'compat_unregister_tool')).toBe(
       false
     );
+  });
+
+  it('forwards string tool names to native unregisterTool even for compatibility inputs', () => {
+    const nativeUnregisterTool = vi.fn();
+    const nativeContext = {
+      ...createNativeModelContextStub(),
+      unregisterTool: nativeUnregisterTool,
+    } as Navigator['modelContext'];
+
+    Object.defineProperty(navigator, 'modelContext', {
+      configurable: true,
+      enumerable: true,
+      writable: true,
+      value: nativeContext,
+    });
+
+    try {
+      initializeWebModelContext();
+
+      const modelContext = getModelContext();
+      const tool = {
+        name: 'native_name_forwarding_tool',
+        description: 'Compatibility unregister tool',
+        inputSchema: { type: 'object', properties: {} },
+        async execute() {
+          return { content: [{ type: 'text', text: 'ok' }] };
+        },
+      } satisfies Parameters<typeof modelContext.registerTool>[0];
+
+      modelContext.registerTool(tool);
+      nativeUnregisterTool.mockClear();
+
+      modelContext.unregisterTool(tool);
+
+      expect(nativeUnregisterTool).toHaveBeenCalledWith('native_name_forwarding_tool');
+    } finally {
+      cleanupWebModelContext();
+      delete (navigator as unknown as Record<string, unknown>).modelContext;
+    }
   });
 
   it('warns that clearContext is deprecated while preserving behavior', () => {

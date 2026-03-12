@@ -3,7 +3,6 @@ import type {
   CallToolResult,
   InputSchema,
   JsonSchemaObject,
-  ModelContextToolRegistrationHandle,
   ToolDescriptor,
 } from '@mcp-b/webmcp-types';
 import type { DependencyList } from 'react';
@@ -34,8 +33,8 @@ function defaultFormatOutput(output: unknown): string {
 const TOOL_OWNER_BY_NAME = new Map<string, symbol>();
 type StructuredContent = Exclude<CallToolResult['structuredContent'], undefined>;
 type CompatModelContext = Navigator['modelContext'] & {
-  registerTool: (tool: ToolDescriptor) => undefined | ModelContextToolRegistrationHandle;
-  unregisterTool: (nameOrTool: string | Pick<ToolDescriptor, 'name'>) => void;
+  registerTool: (tool: ToolDescriptor) => void;
+  unregisterTool: (name: string) => void;
 };
 
 function toStructuredContent(value: unknown): StructuredContent | null {
@@ -59,33 +58,6 @@ const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffec
 function isDev(): boolean {
   const env = (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV;
   return env !== undefined ? env !== 'production' : false;
-}
-
-function hasToolRegistrationHandle(value: unknown): value is ModelContextToolRegistrationHandle {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'unregister' in value &&
-    typeof value.unregister === 'function'
-  );
-}
-
-function unregisterToolCompat(
-  modelContext: CompatModelContext,
-  tool: Pick<ToolDescriptor, 'name'>,
-  registration: undefined | ModelContextToolRegistrationHandle
-): void {
-  if (hasToolRegistrationHandle(registration)) {
-    registration.unregister();
-    return;
-  }
-
-  try {
-    modelContext.unregisterTool(tool.name);
-    return;
-  } catch {
-    modelContext.unregisterTool(tool);
-  }
 }
 
 /**
@@ -454,7 +426,7 @@ export function useWebMCP<
       execute: mcpHandler,
     };
 
-    const registration = modelContext.registerTool(toolDescriptor);
+    modelContext.registerTool(toolDescriptor);
     TOOL_OWNER_BY_NAME.set(name, ownerToken);
 
     return () => {
@@ -465,7 +437,7 @@ export function useWebMCP<
 
       TOOL_OWNER_BY_NAME.delete(name);
       try {
-        unregisterToolCompat(modelContext, toolDescriptor, registration);
+        modelContext.unregisterTool(name);
       } catch (error) {
         if (isDev()) {
           console.warn(`[useWebMCP] Failed to unregister tool "${name}" during cleanup:`, error);

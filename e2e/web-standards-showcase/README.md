@@ -160,7 +160,7 @@ navigator.modelContext.provideContext({
 
 - Tools registered via `registerTool(tool)`
 - **Persist across** `provideContext()` calls
-- Must be individually unregistered via `unregister()` method
+- Must be individually unregistered via `unregisterTool(name)`
 - Suitable for long-lived tools
 - Color-coded **green** in the UI
 
@@ -168,12 +168,12 @@ navigator.modelContext.provideContext({
 
 ```javascript
 // Register a persistent tool
-const registration = navigator.modelContext.registerTool(myTool);
+navigator.modelContext.registerTool(myTool);
 
 // This tool will SURVIVE provideContext() calls!
 
 // Later, when you want to remove it:
-registration.unregister();
+navigator.modelContext.unregisterTool(myTool.name);
 ```
 
 ### Native Chromium Methods
@@ -187,14 +187,6 @@ Remove a specific tool by name from **any bucket**.
 
 ```javascript
 navigator.modelContext.unregisterTool('counter_increment');
-```
-
-#### `clearContext()`
-
-Remove **all tools from both buckets**.
-
-```javascript
-navigator.modelContext.clearContext(); // Everything is gone!
 ```
 
 ### Testing API (`navigator.modelContextTesting`)
@@ -249,6 +241,11 @@ navigator.modelContextTesting.reset();
 navigator.modelContextTesting.registerToolsChangedCallback(() => {
   console.log('Tools changed!');
 });
+
+// Chrome Beta 147 also exposes an EventTarget-style property
+navigator.modelContextTesting.ontoolchange = () => {
+  console.log('Tools changed!');
+};
 ```
 
 ---
@@ -297,7 +294,7 @@ The test suite covers:
 - Live code editor functionality
 - Template loading and execution
 - Two-bucket system behavior
-- All native methods (listTools, executeTool, unregisterTool, clearContext)
+- All native methods (listTools, executeTool, unregisterTool)
 - Testing API methods
 - Tool executor with various inputs
 - Event logging

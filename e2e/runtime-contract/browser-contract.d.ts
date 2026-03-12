@@ -2,7 +2,7 @@ import type { RuntimeContractController, RuntimeContractOptions } from './core.j
 
 export interface BrowserRuntimeContractModelContext {
   provideContext(value: unknown): void;
-  registerTool(tool: unknown): { unregister?: () => void } | void;
+  registerTool(tool: unknown): void;
   unregisterTool?(name: string): void;
 }
 

@@ -984,7 +984,7 @@ describe('useWebMCP', () => {
   });
 
   describe('cleanup edge cases', () => {
-    it('should prefer the registerTool cleanup handle when the runtime provides one', async () => {
+    it('should unregister by name even when registerTool returns a non-standard handle', async () => {
       const originalDescriptor = Object.getOwnPropertyDescriptor(navigator, 'modelContext');
       const unregister = vi.fn();
       const unregisterTool = vi.fn();
@@ -1003,15 +1003,15 @@ describe('useWebMCP', () => {
         const { unmount } = await renderHook(() =>
           useWebMCP({
             name: 'handle_cleanup_tool',
-            description: 'Uses registerTool cleanup handle',
+            description: 'Uses string unregister cleanup',
             handler: async () => 'result',
           })
         );
 
         unmount();
 
-        expect(unregister).toHaveBeenCalledTimes(1);
-        expect(unregisterTool).not.toHaveBeenCalled();
+        expect(unregister).not.toHaveBeenCalled();
+        expect(unregisterTool).toHaveBeenCalledWith('handle_cleanup_tool');
       } finally {
         if (originalDescriptor) {
           Object.defineProperty(navigator, 'modelContext', originalDescriptor);
@@ -1021,13 +1021,9 @@ describe('useWebMCP', () => {
       }
     });
 
-    it('should fall back to unregistering with a tool-shaped object when string cleanup throws', async () => {
+    it('should attempt string-name cleanup exactly once', async () => {
       const originalDescriptor = Object.getOwnPropertyDescriptor(navigator, 'modelContext');
-      const unregisterTool = vi.fn((nameOrTool: string | { name: string }) => {
-        if (typeof nameOrTool === 'string') {
-          throw new Error('string unregister unsupported');
-        }
-      });
+      const unregisterTool = vi.fn();
 
       Object.defineProperty(navigator, 'modelContext', {
         configurable: true,
@@ -1042,19 +1038,16 @@ describe('useWebMCP', () => {
       try {
         const { unmount } = await renderHook(() =>
           useWebMCP({
-            name: 'object_cleanup_tool',
-            description: 'Uses object unregister fallback',
+            name: 'string_cleanup_tool',
+            description: 'Uses string unregister cleanup',
             handler: async () => 'result',
           })
         );
 
         unmount();
 
-        expect(unregisterTool).toHaveBeenNthCalledWith(1, 'object_cleanup_tool');
-        expect(unregisterTool).toHaveBeenNthCalledWith(
-          2,
-          expect.objectContaining({ name: 'object_cleanup_tool' })
-        );
+        expect(unregisterTool).toHaveBeenCalledTimes(1);
+        expect(unregisterTool).toHaveBeenCalledWith('string_cleanup_tool');
       } finally {
         if (originalDescriptor) {
           Object.defineProperty(navigator, 'modelContext', originalDescriptor);

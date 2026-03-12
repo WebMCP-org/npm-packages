@@ -156,7 +156,7 @@ Restores previous `navigator.modelContext` and `navigator.modelContextTesting` d
 
 ### `unregisterTool(nameOrTool)`
 
-- Removes a tool by name or by passing the registered tool object.
+- Removes a tool by name. MCP-B compatibility runtimes also accept the originally registered tool object.
 - Unknown names are a no-op.
 
 ### `clearContext()`
@@ -208,6 +208,8 @@ When enabled via `installTestingShim`, the polyfill can install a compatibility 
 - `executeTool(toolName, inputArgsJson, options?)`
 - `registerToolsChangedCallback(callback)`
 - `getCrossDocumentScriptToolResult()`
+
+Current Chrome Beta 147 also exposes `navigator.modelContextTesting.ontoolchange`; the polyfill keeps the callback-based compatibility API for now.
 
 `executeTool(...)` accepts JSON-string arguments and returns a serialized result string or `null` (for navigation-style responses).
 

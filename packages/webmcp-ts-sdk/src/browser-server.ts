@@ -6,7 +6,6 @@ import type {
   ModelContextExtensions,
   ModelContextOptions,
   ModelContextToolReference,
-  ModelContextToolRegistrationHandle,
   ResourceContents,
   ToolDescriptor,
   ToolListItem,
@@ -170,6 +169,7 @@ type ParentRegisterPromptFn = (
 ) => { remove: () => void };
 
 type NativeToolsApi = ModelContextCore & Pick<ModelContextExtensions, 'listTools' | 'callTool'>;
+type RegisteredToolHandle = { unregister: () => void };
 
 /**
  * Browser-optimized MCP Server that speaks WebMCP natively.
@@ -315,7 +315,7 @@ export class BrowserMcpServer extends BaseMcpServer {
     return candidate as NativeToolsApi;
   }
 
-  private registerToolInServer(tool: ToolDescriptor): ModelContextToolRegistrationHandle {
+  private registerToolInServer(tool: ToolDescriptor): RegisteredToolHandle {
     const inputSchema = this.toTransportSchema(tool.inputSchema);
 
     // Cast needed: parent expects Zod-compatible schemas, we pass JSON Schema objects.
@@ -374,19 +374,19 @@ export class BrowserMcpServer extends BaseMcpServer {
   // --- WebMCP standard API (primary surface) ---
 
   // @ts-expect-error -- WebMCP API: (ToolDescriptor) vs MCP SDK: (name, config, cb)
-  override registerTool(tool: ToolDescriptor): ModelContextToolRegistrationHandle {
+  override registerTool(tool: ToolDescriptor): void {
     // Mirror to native first — the polyfill validates the descriptor
     if (this.native) {
       (this.native.registerTool as (tool: ToolDescriptor) => void)(tool);
     }
 
     try {
-      return this.registerToolInServer(tool);
+      this.registerToolInServer(tool);
     } catch (error) {
       // Rollback native registration on server failure
       if (this.native) {
         try {
-          this.native.unregisterTool(tool);
+          this.native.unregisterTool(tool.name);
         } catch (rollbackError) {
           console.error(
             '[BrowserMcpServer] Rollback of native tool registration failed:',
@@ -424,7 +424,7 @@ export class BrowserMcpServer extends BaseMcpServer {
     this._parentTools[name]?.remove();
 
     if (this.native) {
-      this.native.unregisterTool(nameOrTool);
+      this.native.unregisterTool(name);
     }
   }
 

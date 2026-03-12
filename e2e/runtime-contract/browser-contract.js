@@ -40,7 +40,8 @@ export function installBrowserRuntimeContract(modelContext, options = {}) {
       if (state.dynamicHandle) {
         return false;
       }
-      state.dynamicHandle = modelContext.registerTool(descriptors.createDynamicTool());
+      const registration = modelContext.registerTool(descriptors.createDynamicTool());
+      state.dynamicHandle = registration ?? { name: dynamicToolName };
       return true;
     },
     (name = dynamicToolName) => {

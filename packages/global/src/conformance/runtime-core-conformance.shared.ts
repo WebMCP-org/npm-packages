@@ -4,7 +4,6 @@ import type { InputSchema, ModelContext, WebModelContextInitOptions } from '../t
 
 interface RuntimeConformanceOptions {
   suiteName: string;
-  expectedRegisterToolReturn?: 'undefined' | 'handle';
 }
 
 const TEST_INIT_OPTIONS: WebModelContextInitOptions = {
@@ -134,7 +133,7 @@ export function runRuntimeCoreConformanceSuite(options: RuntimeConformanceOption
       expect(toolNames).not.toContain('dynamic_before_provide');
     });
 
-    it('registerTool() returns the expected compatibility shape and duplicate names throw', () => {
+    it('registerTool() returns undefined and duplicate names throw', () => {
       const modelContext = requireModelContext();
 
       const result = modelContext.registerTool({
@@ -146,13 +145,7 @@ export function runRuntimeCoreConformanceSuite(options: RuntimeConformanceOption
         },
       });
 
-      if (options.expectedRegisterToolReturn === 'handle') {
-        expect(result).toMatchObject({
-          unregister: expect.any(Function),
-        });
-      } else {
-        expect(result).toBeUndefined();
-      }
+      expect(result).toBeUndefined();
       expect(() =>
         modelContext.registerTool({
           name: 'duplicate_name_case',

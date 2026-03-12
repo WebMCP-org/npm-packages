@@ -178,8 +178,8 @@ export interface ToolCallEvent extends Event {
 /**
  * Tool identity accepted by compatibility unregister flows.
  *
- * Passing the original tool object aligns with the current spec direction,
- * while string names remain temporarily supported for backward compatibility.
+ * Current Chromium exposes string-name unregistration.
+ * MCP-B compatibility runtimes may also accept the originally registered tool object.
  */
 export interface ModelContextToolReference {
   name: string;
@@ -188,8 +188,8 @@ export interface ModelContextToolReference {
 /**
  * Non-standard compatibility handle returned by some runtimes after registerTool().
  *
- * Strict core WebMCP still types registerTool() as returning void. This handle
- * exists so compatibility layers can prefer capability-scoped cleanup when available.
+ * Strict core WebMCP and current Chromium type registerTool() as returning void.
+ * This handle is kept only for compatibility with older non-standard runtimes.
  */
 export interface ModelContextToolRegistrationHandle {
   unregister(): void;
@@ -258,8 +258,8 @@ export interface ModelContextCore {
   /**
    * Unregisters a dynamic tool by name or tool reference.
    *
-   * Prefer passing the originally registered tool object where supported.
-   * String names remain accepted during the compatibility window.
+   * Current Chromium exposes string-name unregistration.
+   * MCP-B compatibility runtimes may also accept the originally registered tool object.
    */
   unregisterTool(nameOrTool: string | ModelContextToolReference): void;
 

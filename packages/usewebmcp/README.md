@@ -101,13 +101,15 @@ export function CounterTool() {
 ## How `useWebMCP` Works
 
 - Registers a tool on mount with `navigator.modelContext.registerTool(...)`.
-- Unregisters on unmount by preferring the returned registration handle when available, then falling back to `navigator.modelContext.unregisterTool(...)`.
+- Unregisters on unmount with `navigator.modelContext.unregisterTool(name)`.
 - Exposes local execution state:
   - `state.isExecuting`
   - `state.lastResult`
   - `state.error`
   - `state.executionCount`
 - Returns `execute(input)` for manual in-app invocation and `reset()` for state reset.
+
+Current Chrome Beta 147 returns `undefined` from `registerTool(...)`, so cleanup should not rely on a returned handle.
 
 Your tool implementation (`config.execute` or `config.handler`) can be synchronous or asynchronous.
 

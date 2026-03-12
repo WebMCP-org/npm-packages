@@ -49,9 +49,9 @@ This package solves the problem by **pre-registering tool capabilities** before 
 
 Compatibility note:
 
-- `BrowserMcpServer.registerTool(...)` currently returns an `{ unregister() }` handle.
-- The strict `@mcp-b/webmcp-polyfill` / `@mcp-b/webmcp-types` core surface still types `registerTool(...)` as returning `void`.
-- This is a temporary divergence while the upstream WebMCP `unregisterTool` design remains under discussion.
+- `BrowserMcpServer.registerTool(...)` returns `void`, matching current Chrome Beta 147 and Chromium `main`.
+- Current Chromium exposes `unregisterTool(name)` as a string-name API.
+- The upstream WebMCP unregistration design is still under discussion, so avoid assuming the current Chromium shape is the final spec outcome.
 
 ## Modifications from Official SDK
 
