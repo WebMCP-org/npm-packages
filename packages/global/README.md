@@ -195,7 +195,7 @@ navigator.modelContext.registerTool({
 });
 ```
 
-#### `unregisterTool(name)`
+#### `unregisterTool(nameOrTool)`
 
 Removes a tool by name. Current Chrome Beta 147 and Chromium `main` expose string-name unregistration. MCP-B wrappers also accept the originally registered tool object as a temporary compatibility input.
 
@@ -418,7 +418,7 @@ navigator.modelContext.registerTool({
 import '@mcp-b/global';
 
 // Start with base tools
-const getUserTool = navigator.modelContext.registerTool({
+navigator.modelContext.registerTool({
   name: 'get-user',
   description: 'Get current user info',
   inputSchema: { type: 'object', properties: {} },
@@ -446,7 +446,7 @@ if (currentUser.isAdmin) {
 
 // Remove tools when permissions change
 function onLogout() {
-  navigator.modelContext.unregisterTool('get-current-user');
+  navigator.modelContext.unregisterTool('get-user');
 }
 ```
 

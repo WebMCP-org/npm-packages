@@ -2,7 +2,7 @@
   "name": "web-standards-showcase",
   "version": "1.0.3",
   "private": true,
-  "description": "Native Chromium Web Model Context API Showcase - No Polyfill",
+  "description": "Native Chromium Web Model Context API Showcase with in-page demo compatibility helpers",
   "type": "module",
   "scripts": {
     "build": "tsc && vite build",
