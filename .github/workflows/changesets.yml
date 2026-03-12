@@ -30,10 +30,10 @@ jobs:
           fetch-depth: 0
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
         with:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
@@ -69,7 +69,7 @@ jobs:
 
       - name: Generate SBOM
         if: steps.changesets.outputs.published == 'true'
-        uses: anchore/sbom-action@17ae1740179002c89186b61233e0f892c3118b11 # v0.18.0
+        uses: anchore/sbom-action@57aae528053a48a3f6235f2d9461b05fbcb7366d # v0.18.0
         with:
           artifact-name: sbom-${{ github.sha }}.spdx.json
           output-file: ./sbom.spdx.json
@@ -126,7 +126,7 @@ jobs:
 
       - name: Install cosign
         if: steps.changesets.outputs.published == 'true'
-        uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad # v3.8.0
+        uses: sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22 # v3.8.0
 
       - name: Sign release artifacts with sigstore
         if: steps.changesets.outputs.published == 'true'
