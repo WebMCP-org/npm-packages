@@ -984,6 +984,79 @@ describe('useWebMCP', () => {
   });
 
   describe('cleanup edge cases', () => {
+    it('should prefer the returned unregister handle when registerTool provides one', async () => {
+      const originalDescriptor = Object.getOwnPropertyDescriptor(navigator, 'modelContext');
+      const unregister = vi.fn();
+      const unregisterTool = vi.fn();
+
+      Object.defineProperty(navigator, 'modelContext', {
+        configurable: true,
+        enumerable: true,
+        writable: true,
+        value: {
+          registerTool: vi.fn(() => ({ unregister })),
+          unregisterTool,
+        },
+      });
+
+      try {
+        const { unmount } = await renderHook(() =>
+          useWebMCP({
+            name: 'handle_cleanup_tool',
+            description: 'Uses string unregister cleanup',
+            handler: async () => 'result',
+          })
+        );
+
+        unmount();
+
+        expect(unregister).toHaveBeenCalledTimes(1);
+        expect(unregisterTool).not.toHaveBeenCalled();
+      } finally {
+        if (originalDescriptor) {
+          Object.defineProperty(navigator, 'modelContext', originalDescriptor);
+        } else {
+          delete (navigator as unknown as Record<string, unknown>).modelContext;
+        }
+      }
+    });
+
+    it('should attempt string-name cleanup exactly once', async () => {
+      const originalDescriptor = Object.getOwnPropertyDescriptor(navigator, 'modelContext');
+      const unregisterTool = vi.fn();
+
+      Object.defineProperty(navigator, 'modelContext', {
+        configurable: true,
+        enumerable: true,
+        writable: true,
+        value: {
+          registerTool: vi.fn(() => undefined),
+          unregisterTool,
+        },
+      });
+
+      try {
+        const { unmount } = await renderHook(() =>
+          useWebMCP({
+            name: 'string_cleanup_tool',
+            description: 'Uses string unregister cleanup',
+            handler: async () => 'result',
+          })
+        );
+
+        unmount();
+
+        expect(unregisterTool).toHaveBeenCalledTimes(1);
+        expect(unregisterTool).toHaveBeenCalledWith('string_cleanup_tool');
+      } finally {
+        if (originalDescriptor) {
+          Object.defineProperty(navigator, 'modelContext', originalDescriptor);
+        } else {
+          delete (navigator as unknown as Record<string, unknown>).modelContext;
+        }
+      }
+    });
+
     it('should skip unregister if tool owner token has been replaced', async () => {
       // Mock registerTool to allow duplicate registrations (bypass collision check)
       const originalRegisterTool = navigator.modelContext.registerTool.bind(navigator.modelContext);

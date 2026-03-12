@@ -1,19 +1,19 @@
 # Web Model Context API - Native Chromium Showcase
 
 **A live, interactive demonstration of the native Web Model Context API
-running in Chromium without any polyfills.**
+running in Chromium with a small in-page compatibility layer for legacy demos.**
 
 ![Native API Showcase](https://img.shields.io/badge/Native%20API-Chromium-4285F4?style=for-the-badge&logo=google-chrome)
-![No Polyfill](https://img.shields.io/badge/Polyfill-NONE-success?style=for-the-badge)
+![Demo Compat](https://img.shields.io/badge/Demo%20Compat-In--Page-orange?style=for-the-badge)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.8+-blue?style=for-the-badge&logo=typescript)
 
 ## Overview
 
 This application is a **split-pane interactive playground** that
 showcases the native Web Model Context API implementation in Chromium.
-It demonstrates all API surfaces, the two-bucket tool management
-system, and provides a live code editor for experimenting with tool
-registration.
+It demonstrates the current native API surface, preserves the older
+two-bucket demo flows through a local compatibility shim, and provides
+a live code editor for experimenting with tool registration.
 
 ### Key Features
 
@@ -21,10 +21,11 @@ registration.
 - **Split-pane UI** - Split-screen editor with live output.
 - **Pre-built Templates** - Counter, Calculator, Todo, Timer, and
   State Machine examples.
-- **Two-Bucket System** - Demonstrates `provideContext()` versus `registerTool()`.
+- **Two-Bucket System** - Demonstrates the showcase compatibility `provideContext()` flow versus native `registerTool()`.
 - **Testing API Explorer** - Full access to `navigator.modelContextTesting` methods.
 - **Event Log** - Real-time tracking of API operations.
-- **Native-Only Validation** - Explicitly requires and validates native implementation.
+- **Native Runtime Required** - Explicitly requires and validates native implementation.
+- **Legacy Demo Compatibility** - Installs in-page helpers for removed or transitional APIs used by the showcase UI.
 
 ---
 
@@ -133,11 +134,18 @@ Load a template from the dropdown, modify it, and click **▶ Register Tool**.
 
 ### Two-Bucket Tool Management
 
-The Web Model Context API uses a **two-bucket architecture** for managing tools:
+The showcase keeps its historical **two-bucket** demo by installing a
+local compatibility layer on top of the current native API.
+
+Important:
+
+- Current Chrome Beta 147 and Chromium `main` expose `registerTool(...)` and `unregisterTool(name)`.
+- Current native Chromium does **not** expose `provideContext()` or `clearContext()`.
+- The showcase backfills those removed methods locally so the older Bucket A / Bucket B UI still works for exploration.
 
 #### Bucket A - `provideContext()`
 
-- Tools registered via `provideContext({ tools: [...] })`
+- Tools registered via the showcase compatibility `provideContext({ tools: [...] })`
 - **Completely replaced** when `provideContext()` is called again
 - Ideal for dynamic tool sets that need full replacement
 - Color-coded **blue** in the UI
@@ -160,7 +168,7 @@ navigator.modelContext.provideContext({
 
 - Tools registered via `registerTool(tool)`
 - **Persist across** `provideContext()` calls
-- Must be individually unregistered via `unregister()` method
+- Must be individually unregistered via `unregisterTool(name)`
 - Suitable for long-lived tools
 - Color-coded **green** in the UI
 
@@ -168,12 +176,12 @@ navigator.modelContext.provideContext({
 
 ```javascript
 // Register a persistent tool
-const registration = navigator.modelContext.registerTool(myTool);
+navigator.modelContext.registerTool(myTool);
 
 // This tool will SURVIVE provideContext() calls!
 
 // Later, when you want to remove it:
-registration.unregister();
+navigator.modelContext.unregisterTool(myTool.name);
 ```
 
 ### Native Chromium Methods
@@ -187,14 +195,6 @@ Remove a specific tool by name from **any bucket**.
 
 ```javascript
 navigator.modelContext.unregisterTool('counter_increment');
-```
-
-#### `clearContext()`
-
-Remove **all tools from both buckets**.
-
-```javascript
-navigator.modelContext.clearContext(); // Everything is gone!
 ```
 
 ### Testing API (`navigator.modelContextTesting`)
@@ -249,6 +249,11 @@ navigator.modelContextTesting.reset();
 navigator.modelContextTesting.registerToolsChangedCallback(() => {
   console.log('Tools changed!');
 });
+
+// Chrome Beta 147 also exposes an EventTarget-style property
+navigator.modelContextTesting.ontoolchange = () => {
+  console.log('Tools changed!');
+};
 ```
 
 ---
@@ -297,7 +302,7 @@ The test suite covers:
 - Live code editor functionality
 - Template loading and execution
 - Two-bucket system behavior
-- All native methods (listTools, executeTool, unregisterTool, clearContext)
+- All native methods (listTools, executeTool, unregisterTool)
 - Testing API methods
 - Tool executor with various inputs
 - Event logging
@@ -341,7 +346,7 @@ web-standards-showcase/
 
 ### Design Philosophy
 
-1. **No Polyfill** - Explicitly rejects polyfill implementations
+1. **Native Runtime** - Explicitly rejects polyfill implementations while documenting the demo-only compatibility helpers layered on top
 2. **Zero Dependencies** - Pure web standards, no libraries
 3. **Native First** - Showcases native browser capabilities
 4. **Educational** - Clear demonstrations with explanations

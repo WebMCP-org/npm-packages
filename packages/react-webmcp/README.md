@@ -37,6 +37,8 @@ pnpm add @mcp-b/transports @modelcontextprotocol/sdk
 
 **Prerequisites:** Provider hooks require the `navigator.modelContext` API. Install `@mcp-b/global` or use a browser that implements the Web Model Context API.
 
+Provider hooks prefer a returned unregister handle when the runtime exposes one and fall back to `navigator.modelContext.unregisterTool(name)`. Current Chrome Beta 147 returns `undefined`, while MCP-B wrappers still expose a deprecated compatibility handle.
+
 ## Quick Start - Provider (Registering Tools)
 
 ```tsx

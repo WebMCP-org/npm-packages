@@ -54,6 +54,8 @@ export type {
   ModelContextTestingExecuteToolOptions,
   ModelContextTestingPolyfillExtensions,
   ModelContextTestingToolInfo,
+  ModelContextToolReference,
+  ModelContextToolRegistrationHandle,
   ModelContextWithExtensions,
   ToolArgsByName,
   ToolByName,

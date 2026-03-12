@@ -9,6 +9,7 @@ import type {
   ModelContextTesting,
   ModelContextTestingExecuteToolOptions,
   ModelContextTestingToolInfo,
+  ModelContextToolRegistrationHandle,
   ModelContextWithExtensions,
   ToolCallEvent,
 } from './index.js';
@@ -35,8 +36,16 @@ test('ModelContext.registerTool accepts ToolDescriptor and returns void', () => 
   expectTypeOf<ModelContext['registerTool']>().returns.toEqualTypeOf<void>();
 });
 
-test('ModelContext.unregisterTool accepts name string', () => {
-  expectTypeOf<ModelContext['unregisterTool']>().parameter(0).toEqualTypeOf<string>();
+test('ModelContext.unregisterTool accepts legacy string names', () => {
+  expectTypeOf<ModelContext['unregisterTool']>().toBeCallableWith('health');
+});
+
+test('ModelContext.unregisterTool also accepts tool-like objects for compatibility', () => {
+  expectTypeOf<ModelContext['unregisterTool']>().toBeCallableWith({ name: 'health' });
+});
+
+test('ModelContextToolRegistrationHandle exposes unregister()', () => {
+  expectTypeOf<ModelContextToolRegistrationHandle['unregister']>().toBeCallableWith();
 });
 
 test('ModelContextExtensions.listTools returns ToolListItem[]', () => {

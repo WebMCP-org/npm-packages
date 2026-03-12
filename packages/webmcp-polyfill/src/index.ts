@@ -8,6 +8,7 @@ import type {
   ModelContextTesting,
   ModelContextTestingExecuteToolOptions,
   ModelContextTestingToolInfo,
+  ModelContextToolReference,
   ToolDescriptor,
   ToolResponse,
 } from '@mcp-b/webmcp-types';
@@ -108,8 +109,12 @@ export interface WebMCPPolyfillInitOptions {
 class StrictWebMCPContext {
   private tools = new Map<string, PolyfillToolDescriptor>();
   private toolsChangedCallback: (() => void) | null = null;
+  private provideContextDeprecationWarned = false;
+  private clearContextDeprecationWarned = false;
 
   provideContext(options: ModelContextOptions = {}): void {
+    this.warnProvideContextDeprecationOnce();
+
     const nextTools = new Map<string, PolyfillToolDescriptor>();
 
     for (const tool of options.tools ?? []) {
@@ -122,6 +127,8 @@ class StrictWebMCPContext {
   }
 
   clearContext(): void {
+    this.warnClearContextDeprecationOnce();
+
     this.tools.clear();
     this.notifyToolsChanged();
   }
@@ -132,7 +139,8 @@ class StrictWebMCPContext {
     this.notifyToolsChanged();
   }
 
-  unregisterTool(name: string): void {
+  unregisterTool(nameOrTool: string | ModelContextToolReference): void {
+    const name = getToolNameForUnregister(nameOrTool);
     const removed = this.tools.delete(name);
     if (removed) {
       this.notifyToolsChanged();
@@ -240,6 +248,28 @@ class StrictWebMCPContext {
       }
     });
   }
+
+  private warnProvideContextDeprecationOnce(): void {
+    if (this.provideContextDeprecationWarned) {
+      return;
+    }
+
+    this.provideContextDeprecationWarned = true;
+    console.warn(
+      '[WebMCPPolyfill] navigator.modelContext.provideContext() is deprecated and will be removed in the next major version. Register tools individually with registerTool() instead.'
+    );
+  }
+
+  private warnClearContextDeprecationOnce(): void {
+    if (this.clearContextDeprecationWarned) {
+      return;
+    }
+
+    this.clearContextDeprecationWarned = true;
+    console.warn(
+      '[WebMCPPolyfill] navigator.modelContext.clearContext() is deprecated and will be removed in the next major version. Unregister individual tools instead.'
+    );
+  }
 }
 
 function createUnknownError(message: string): Error {
@@ -266,6 +296,20 @@ function parseInputArgsJson(inputArgsJson: string): Record<string, unknown> {
   }
 
   return parsed as Record<string, unknown>;
+}
+
+function getToolNameForUnregister(nameOrTool: string | ModelContextToolReference): string {
+  if (typeof nameOrTool === 'string') {
+    return nameOrTool;
+  }
+
+  if (isPlainObject(nameOrTool) && typeof nameOrTool.name === 'string') {
+    return nameOrTool.name;
+  }
+
+  throw new TypeError(
+    "Failed to execute 'unregisterTool' on 'ModelContext': parameter 1 must be a string or an object with a string name."
+  );
 }
 
 export function isPlainObject(value: unknown): value is Record<string, unknown> {

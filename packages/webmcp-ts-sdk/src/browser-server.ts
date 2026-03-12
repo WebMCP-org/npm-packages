@@ -5,6 +5,7 @@ import type {
   ModelContextCore,
   ModelContextExtensions,
   ModelContextOptions,
+  ModelContextToolReference,
   ResourceContents,
   ToolDescriptor,
   ToolListItem,
@@ -168,6 +169,7 @@ type ParentRegisterPromptFn = (
 ) => { remove: () => void };
 
 type NativeToolsApi = ModelContextCore & Pick<ModelContextExtensions, 'listTools' | 'callTool'>;
+type RegisteredToolHandle = { unregister: () => void };
 
 /**
  * Browser-optimized MCP Server that speaks WebMCP natively.
@@ -187,6 +189,8 @@ export class BrowserMcpServer extends BaseMcpServer {
   private _promptSchemas = new Map<string, InputSchema>();
   private _jsonValidator: PolyfillJsonSchemaValidator;
   private _publicMethodsBound = false;
+  private _provideContextDeprecationWarned = false;
+  private _clearContextDeprecationWarned = false;
 
   constructor(serverInfo: Implementation, options?: BrowserMcpServerOptions) {
     const validator = new PolyfillJsonSchemaValidator();
@@ -311,7 +315,7 @@ export class BrowserMcpServer extends BaseMcpServer {
     return candidate as NativeToolsApi;
   }
 
-  private registerToolInServer(tool: ToolDescriptor): { unregister: () => void } {
+  private registerToolInServer(tool: ToolDescriptor): RegisteredToolHandle {
     const inputSchema = this.toTransportSchema(tool.inputSchema);
 
     // Cast needed: parent expects Zod-compatible schemas, we pass JSON Schema objects.
@@ -370,7 +374,7 @@ export class BrowserMcpServer extends BaseMcpServer {
   // --- WebMCP standard API (primary surface) ---
 
   // @ts-expect-error -- WebMCP API: (ToolDescriptor) vs MCP SDK: (name, config, cb)
-  override registerTool(tool: ToolDescriptor): { unregister: () => void } {
+  override registerTool(tool: ToolDescriptor): RegisteredToolHandle {
     // Mirror to native first — the polyfill validates the descriptor
     if (this.native) {
       (this.native.registerTool as (tool: ToolDescriptor) => void)(tool);
@@ -415,7 +419,8 @@ export class BrowserMcpServer extends BaseMcpServer {
     );
   }
 
-  unregisterTool(name: string): void {
+  unregisterTool(nameOrTool: string | ModelContextToolReference): void {
+    const name = this.resolveToolNameForUnregister(nameOrTool);
     this._parentTools[name]?.remove();
 
     if (this.native) {
@@ -481,12 +486,10 @@ export class BrowserMcpServer extends BaseMcpServer {
   }
 
   provideContext(options?: ModelContextOptions): void {
-    for (const tool of Object.values(this._parentTools)) {
-      tool.remove();
-    }
+    this.warnProvideContextDeprecationOnce();
 
-    if (this.native) {
-      this.native.clearContext();
+    for (const name of Object.keys(this._parentTools)) {
+      this.unregisterTool(name);
     }
 
     for (const tool of options?.tools ?? []) {
@@ -495,16 +498,50 @@ export class BrowserMcpServer extends BaseMcpServer {
   }
 
   clearContext(): void {
-    for (const tool of Object.values(this._parentTools)) {
-      tool.remove();
+    this.warnClearContextDeprecationOnce();
+
+    for (const name of Object.keys(this._parentTools)) {
+      this.unregisterTool(name);
     }
     // Note: _promptSchemas is NOT cleared here. clearContext() is a WebMCP standard
     // method that only handles tools. Prompt schemas are cleaned up individually
     // via the unregister() callback returned by registerPrompt().
+  }
 
-    if (this.native) {
-      this.native.clearContext();
+  private resolveToolNameForUnregister(nameOrTool: string | ModelContextToolReference): string {
+    if (typeof nameOrTool === 'string') {
+      return nameOrTool;
     }
+
+    if (isPlainObject(nameOrTool) && typeof nameOrTool.name === 'string') {
+      return nameOrTool.name;
+    }
+
+    throw new TypeError(
+      "Failed to execute 'unregisterTool' on 'ModelContext': parameter 1 must be a string or an object with a string name."
+    );
+  }
+
+  private warnProvideContextDeprecationOnce(): void {
+    if (this._provideContextDeprecationWarned) {
+      return;
+    }
+
+    this._provideContextDeprecationWarned = true;
+    console.warn(
+      '[BrowserMcpServer] navigator.modelContext.provideContext() is deprecated and will be removed in the next major version. Register tools individually with registerTool() instead.'
+    );
+  }
+
+  private warnClearContextDeprecationOnce(): void {
+    if (this._clearContextDeprecationWarned) {
+      return;
+    }
+
+    this._clearContextDeprecationWarned = true;
+    console.warn(
+      '[BrowserMcpServer] navigator.modelContext.clearContext() is deprecated and will be removed in the next major version. Unregister individual tools instead.'
+    );
   }
 
   // --- Extension methods ---

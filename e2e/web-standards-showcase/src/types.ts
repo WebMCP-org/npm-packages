@@ -1,6 +1,11 @@
 /**
- * Type definitions for the native Chromium Web Model Context API
- * This file provides TypeScript types without importing any polyfills
+ * Showcase-local types for the native Chromium Web Model Context API plus
+ * the in-page compatibility helpers installed by the demo.
+ *
+ * The native runtime no longer exposes provideContext()/clearContext() and
+ * does not return an unregister handle from registerTool(). The showcase
+ * layers temporary compatibility helpers on top so the older bucket demos
+ * can keep running while the upstream unregistration design is still in flux.
  */
 
 export interface ToolInputSchema {

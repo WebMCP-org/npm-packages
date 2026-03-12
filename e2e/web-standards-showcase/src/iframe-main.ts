@@ -4,6 +4,7 @@
  */
 
 import { detectNativeAPI } from './api/detection';
+import { installLegacyContextCompat } from './lib/utils';
 import type { ModelContext, Tool } from './types';
 
 // State tracking
@@ -25,6 +26,7 @@ function init(): void {
   }
 
   modelContext = navigator.modelContext!;
+  installLegacyContextCompat(modelContext);
 
   setupEventListeners();
   setupToolChangeListener();
@@ -213,6 +215,12 @@ function unregisterBucketBTool(): void {
 function clearContext(): void {
   modelContext.clearContext();
   bucketATools = [];
+  bucketBRegistrations.clear();
+
+  const unregisterBtn = document.getElementById('unregister-iframe-tool-b') as HTMLButtonElement;
+  if (unregisterBtn) {
+    unregisterBtn.disabled = true;
+  }
 
   logEvent('success', 'Context cleared (Bucket A tools removed)');
   notifyParent('context-cleared', {});

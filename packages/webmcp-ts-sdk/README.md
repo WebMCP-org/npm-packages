@@ -41,11 +41,17 @@ public registerCapabilities(capabilities: ServerCapabilities): void {
 
 For the Web Model Context API, this restriction is incompatible because:
 
-1. **Tools arrive dynamically** - Web pages call `window.navigator.modelContext.provideContext({ tools: [...] })` at any time
+1. **Tools arrive dynamically** - Web pages call `window.navigator.modelContext.registerTool(...)` at any time
 2. **Transport must be ready immediately** - The MCP server/transport needs to be connected when the page loads
 3. **Asynchronous registration** - Tools are registered as the page's JavaScript executes, potentially long after initialization
 
 This package solves the problem by **pre-registering tool capabilities** before the transport connects, allowing dynamic tool registration to work seamlessly.
+
+Compatibility note:
+
+- `BrowserMcpServer.registerTool(...)` still returns a deprecated compatibility handle with `unregister()` so existing MCP-B integrations do not break, even though current Chrome Beta 147 and Chromium `main` return `undefined`.
+- Current Chromium exposes `unregisterTool(name)` as a string-name API.
+- The upstream WebMCP unregistration design is still under discussion, so avoid assuming the current Chromium shape is the final spec outcome.
 
 ## Modifications from Official SDK
 

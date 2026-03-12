@@ -82,7 +82,14 @@ Goal: keep one place to track standards decisions and implementation details bef
 
 - Shared suite: `src/conformance/runtime-core-conformance.shared.ts`
 - Polyfill runtime entry: `src/conformance/polyfill-runtime.e2e.test.ts`
-- Native runtime entry: `src/conformance/native-runtime.e2e.test.ts`
+
+Current MCP-B alignment note:
+
+- Strict core `@mcp-b/webmcp-types` / `@mcp-b/webmcp-polyfill` still model `registerTool(...)` as returning `void`, matching current Chrome Beta 147.
+- `BrowserMcpServer.registerTool(...)` keeps a deprecated MCP-B compatibility handle with `unregister()` so existing wrapper users do not break.
+- Current Chromium exposes `unregisterTool(name)` as a string-name API, but the upstream WebMCP unregistration design is still open.
+- Keep browser-surface tests explicit so we do not mistake current Chromium behavior for a finalized spec guarantee.
+- The shared conformance suite is parameterized: strict-core/native lanes should assert `undefined`, while the `@mcp-b/global` polyfill wrapper lane asserts the deprecated compatibility handle intentionally preserved by MCP-B.
 
 Run commands:
 
@@ -93,9 +100,11 @@ Run commands:
 - Matrix:
   - `CHROME_BIN=\"/path/to/chrome-beta\" CHROME_FLAGS=\"--enable-experimental-web-platform-features --enable-features=WebMCPTesting\" pnpm --filter @mcp-b/global run test:conformance:matrix`
 
-## Native Validation Behavior Note (Observed February 15, 2026)
+## Native Validation Behavior Note (Updated March 11, 2026)
 
-- In current Chrome Beta native mode (`--enable-experimental-web-platform-features --enable-features=WebMCPTesting`), `navigator.modelContext.callTool` is not exposed.
+- In current Chrome Beta 147 native mode (`--enable-experimental-web-platform-features --enable-features=WebMCPTesting`), `navigator.modelContext.callTool` is not exposed.
+- Current Chrome Beta 147 exposes `navigator.modelContext.registerTool(...)` and `navigator.modelContext.unregisterTool(name)`, but no `provideContext()` or `clearContext()`.
+- Current Chrome Beta 147 exposes both `navigator.modelContextTesting.ontoolchange` and the older `registerToolsChangedCallback(...)` callback.
 - Tool execution goes through `navigator.modelContextTesting.executeTool(toolName, inputArgsJson)`.
 - Native `modelContextTesting.executeTool(...)` currently appears to validate malformed JSON parsing (throws `UnknownError: Failed to parse input arguments`) but does not enforce tool `inputSchema` type/required constraints in the same way as the polyfill path.
 - `@mcp-b/webmcp-polyfill` does enforce schema checks in its testing shim path and rejects schema-invalid args.

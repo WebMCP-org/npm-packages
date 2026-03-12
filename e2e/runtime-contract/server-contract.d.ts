@@ -10,7 +10,8 @@ export interface ServerRuntimeContractServer {
     name: string,
     config: Record<string, unknown>,
     execute: (args: Record<string, unknown>) => Promise<unknown>
-  ): ServerRuntimeContractHandle | void;
+  ): ServerRuntimeContractHandle | undefined;
+  unregisterTool?(name: string): void;
 }
 
 export declare function installServerRuntimeContract(

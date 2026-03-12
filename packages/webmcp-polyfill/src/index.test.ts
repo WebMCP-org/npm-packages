@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import type { InputSchema } from '@mcp-b/webmcp-types';
+import type { InputSchema, ToolDescriptor } from '@mcp-b/webmcp-types';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   cleanupWebMCPPolyfill,
@@ -82,6 +82,24 @@ describe('@mcp-b/webmcp-polyfill', () => {
     expect(serialized).toContain('context');
   });
 
+  it('warns that provideContext is deprecated while preserving behavior', () => {
+    initializeWebMCPPolyfill();
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      navigator.modelContext.provideContext();
+      navigator.modelContext.provideContext();
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        '[WebMCPPolyfill] navigator.modelContext.provideContext() is deprecated and will be removed in the next major version. Register tools individually with registerTool() instead.'
+      );
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
   it('throws on invalid inputSchema during registration', () => {
     initializeWebMCPPolyfill();
 
@@ -137,6 +155,50 @@ describe('@mcp-b/webmcp-polyfill', () => {
   it('unregisterTool on unknown names is a no-op', () => {
     initializeWebMCPPolyfill();
     expect(() => navigator.modelContext.unregisterTool('missing')).not.toThrow();
+  });
+
+  it('unregisterTool accepts the originally registered tool object for compatibility', async () => {
+    initializeWebMCPPolyfill();
+
+    const tool: ToolDescriptor & { inputSchema: InputSchema } = {
+      name: 'compat_unregister_tool',
+      description: 'Compatibility unregister tool',
+      inputSchema: { type: 'object', properties: {} },
+      execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+    };
+
+    navigator.modelContext.registerTool(tool);
+    navigator.modelContext.unregisterTool(tool);
+
+    await expect(
+      navigator.modelContextTesting?.executeTool('compat_unregister_tool', '{}')
+    ).rejects.toThrow('Tool not found: compat_unregister_tool');
+  });
+
+  it('throws when unregisterTool receives an invalid compatibility value', () => {
+    initializeWebMCPPolyfill();
+
+    expect(() => navigator.modelContext.unregisterTool({} as never)).toThrow(
+      "Failed to execute 'unregisterTool' on 'ModelContext': parameter 1 must be a string or an object with a string name."
+    );
+  });
+
+  it('warns that clearContext is deprecated while preserving behavior', () => {
+    initializeWebMCPPolyfill();
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      navigator.modelContext.clearContext();
+      navigator.modelContext.clearContext();
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        '[WebMCPPolyfill] navigator.modelContext.clearContext() is deprecated and will be removed in the next major version. Unregister individual tools instead.'
+      );
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 
   it('fires registerToolsChangedCallback for registry mutations', async () => {

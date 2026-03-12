@@ -20,7 +20,7 @@
 | **Drop-in IIFE** | Add AI capabilities with a single `<script>` tag - no build step |
 | **Native Chromium Support** | Auto-detects and uses native browser implementation when available |
 | **Dual Transport** | Works with both same-window clients AND parent pages (iframe support) |
-| **Strict Core Semantics** | `provideContext()` replaces tool context and `registerTool()` is name-based |
+| **Spec-Aware Compatibility** | `provideContext()` / `clearContext()` remain temporarily for compatibility, and MCP-B wrappers still return a deprecated unregister handle from `registerTool()` |
 | **Works with Any AI** | Claude, ChatGPT, Gemini, Cursor, Copilot, and any MCP client |
 
 ## Package Selection
@@ -43,19 +43,15 @@
   <h1>My AI-Powered App</h1>
 
   <script>
-    navigator.modelContext.provideContext({
-      tools: [
-        {
-          name: "get-page-title",
-          description: "Get the current page title",
-          inputSchema: { type: "object", properties: {} },
-          async execute() {
-            return {
-              content: [{ type: "text", text: document.title }]
-            };
-          }
-        }
-      ]
+    navigator.modelContext.registerTool({
+      name: "get-page-title",
+      description: "Get the current page title",
+      inputSchema: { type: "object", properties: {} },
+      async execute() {
+        return {
+          content: [{ type: "text", text: document.title }]
+        };
+      }
     });
   </script>
 </body>
@@ -71,7 +67,7 @@
 ```html
 <script type="module">
   import '@mcp-b/global';
-  navigator.modelContext.provideContext({ tools: [/* your tools */] });
+  navigator.modelContext.registerTool({ /* your tool */ });
 </script>
 ```
 
@@ -86,9 +82,7 @@ npm install @mcp-b/global
 ```javascript
 import '@mcp-b/global';
 
-navigator.modelContext.provideContext({
-  tools: [/* your tools */]
-});
+navigator.modelContext.registerTool({ /* your tool */ });
 ```
 
 ## API Reference
@@ -137,6 +131,8 @@ After initialization, `navigator.modelContext` exposes these methods:
 
 #### `provideContext(options?)`
 
+Deprecated compatibility API. The upstream WebMCP spec removed `provideContext()` on March 5, 2026. `@mcp-b/global` keeps it functional for now, but logs a deprecation warning and will remove it in the next major version.
+
 Replaces all currently registered tools with a new set. This is an atomic replacement - all previous tools are removed first.
 
 ```typescript
@@ -176,10 +172,10 @@ navigator.modelContext.provideContext({
 
 #### `registerTool(tool)`
 
-Registers a single tool. The tool name must be unique - throws if a tool with the same name already exists.
+Registers a single tool. The tool name must be unique - throws if a tool with the same name already exists. `@mcp-b/global` still returns a deprecated compatibility handle with `unregister()` so existing MCP-B integrations do not break, even though current Chromium returns `undefined`.
 
 ```typescript
-navigator.modelContext.registerTool({
+const registration = navigator.modelContext.registerTool({
   name: 'add-to-cart',
   description: 'Add a product to the shopping cart',
   inputSchema: {
@@ -197,17 +193,21 @@ navigator.modelContext.registerTool({
     };
   },
 });
+
+registration.unregister();
 ```
 
-#### `unregisterTool(name)`
+#### `unregisterTool(nameOrTool)`
 
-Removes a tool by name.
+Removes a tool by name. Current Chrome Beta 147 and Chromium `main` expose string-name unregistration. MCP-B wrappers also accept the originally registered tool object as a temporary compatibility input.
 
 ```typescript
 navigator.modelContext.unregisterTool('add-to-cart');
 ```
 
 #### `clearContext()`
+
+Deprecated compatibility API. The upstream WebMCP spec removed `clearContext()` on March 5, 2026. `@mcp-b/global` keeps it functional for now, but logs a deprecation warning and will remove it in the next major version.
 
 Removes all registered tools.
 
@@ -364,7 +364,7 @@ const result = await navigator.modelContextTesting?.executeTool(
 
 ```javascript
 if ('modelContext' in navigator) {
-  navigator.modelContext.provideContext({ tools: [...] });
+  navigator.modelContext.registerTool({ /* your tool */ });
 }
 ```
 
@@ -375,45 +375,42 @@ if ('modelContext' in navigator) {
 ```typescript
 import '@mcp-b/global';
 
-navigator.modelContext.provideContext({
-  tools: [
-    {
-      name: 'search-products',
-      description: 'Search products by keyword, category, or price range',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          query: { type: 'string', description: 'Search terms' },
-          category: { type: 'string', description: 'Product category' },
-          maxPrice: { type: 'number', description: 'Maximum price filter' },
-        },
-        required: ['query'],
-      },
-      async execute(args) {
-        const results = await fetch(`/api/products?q=${args.query}&cat=${args.category ?? ''}&max=${args.maxPrice ?? ''}`);
-        return { content: [{ type: 'text', text: await results.text() }] };
-      },
+navigator.modelContext.registerTool({
+  name: 'search-products',
+  description: 'Search products by keyword, category, or price range',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      query: { type: 'string', description: 'Search terms' },
+      category: { type: 'string', description: 'Product category' },
+      maxPrice: { type: 'number', description: 'Maximum price filter' },
     },
-    {
-      name: 'add-to-cart',
-      description: 'Add a product to the shopping cart',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          productId: { type: 'string' },
-          quantity: { type: 'integer' },
-        },
-        required: ['productId'],
-      },
-      async execute(args) {
-        await fetch('/api/cart', {
-          method: 'POST',
-          body: JSON.stringify({ productId: args.productId, quantity: args.quantity ?? 1 }),
-        });
-        return { content: [{ type: 'text', text: `Added to cart` }] };
-      },
+    required: ['query'],
+  },
+  async execute(args) {
+    const results = await fetch(`/api/products?q=${args.query}&cat=${args.category ?? ''}&max=${args.maxPrice ?? ''}`);
+    return { content: [{ type: 'text', text: await results.text() }] };
+  },
+});
+
+navigator.modelContext.registerTool({
+  name: 'add-to-cart',
+  description: 'Add a product to the shopping cart',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      productId: { type: 'string' },
+      quantity: { type: 'integer' },
     },
-  ],
+    required: ['productId'],
+  },
+  async execute(args) {
+    await fetch('/api/cart', {
+      method: 'POST',
+      body: JSON.stringify({ productId: args.productId, quantity: args.quantity ?? 1 }),
+    });
+    return { content: [{ type: 'text', text: `Added to cart` }] };
+  },
 });
 ```
 
@@ -423,17 +420,13 @@ navigator.modelContext.provideContext({
 import '@mcp-b/global';
 
 // Start with base tools
-navigator.modelContext.provideContext({
-  tools: [
-    {
-      name: 'get-user',
-      description: 'Get current user info',
-      inputSchema: { type: 'object', properties: {} },
-      async execute() {
-        return { content: [{ type: 'text', text: JSON.stringify(currentUser) }] };
-      },
-    },
-  ],
+navigator.modelContext.registerTool({
+  name: 'get-user',
+  description: 'Get current user info',
+  inputSchema: { type: 'object', properties: {} },
+  async execute() {
+    return { content: [{ type: 'text', text: JSON.stringify(currentUser) }] };
+  },
 });
 
 // Add tools dynamically based on user role
@@ -455,7 +448,7 @@ if (currentUser.isAdmin) {
 
 // Remove tools when permissions change
 function onLogout() {
-  navigator.modelContext.clearContext();
+  navigator.modelContext.unregisterTool('get-user');
 }
 ```
 
@@ -464,37 +457,34 @@ function onLogout() {
 ```typescript
 import '@mcp-b/global';
 
-navigator.modelContext.provideContext({
-  tools: [
-    {
-      name: 'fill-contact-form',
-      description: 'Fill the contact form with provided details',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          name: { type: 'string' },
-          email: { type: 'string' },
-          message: { type: 'string' },
-        },
-        required: ['name', 'email', 'message'],
-      },
-      async execute(args) {
-        document.querySelector('#name').value = args.name;
-        document.querySelector('#email').value = args.email;
-        document.querySelector('#message').value = args.message;
-        return { content: [{ type: 'text', text: 'Form filled' }] };
-      },
+navigator.modelContext.registerTool({
+  name: 'fill-contact-form',
+  description: 'Fill the contact form with provided details',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      name: { type: 'string' },
+      email: { type: 'string' },
+      message: { type: 'string' },
     },
-    {
-      name: 'submit-form',
-      description: 'Submit the contact form',
-      inputSchema: { type: 'object', properties: {} },
-      async execute() {
-        document.querySelector('#contact-form').submit();
-        return { content: [{ type: 'text', text: 'Form submitted' }] };
-      },
-    },
-  ],
+    required: ['name', 'email', 'message'],
+  },
+  async execute(args) {
+    document.querySelector('#name').value = args.name;
+    document.querySelector('#email').value = args.email;
+    document.querySelector('#message').value = args.message;
+    return { content: [{ type: 'text', text: 'Form filled' }] };
+  },
+});
+
+navigator.modelContext.registerTool({
+  name: 'submit-form',
+  description: 'Submit the contact form',
+  inputSchema: { type: 'object', properties: {} },
+  async execute() {
+    document.querySelector('#contact-form').submit();
+    return { content: [{ type: 'text', text: 'Form submitted' }] };
+  },
 });
 ```
 

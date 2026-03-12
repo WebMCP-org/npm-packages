@@ -4,10 +4,10 @@ Strict WebMCP core runtime polyfill for `navigator.modelContext`.
 
 `@mcp-b/webmcp-polyfill` installs only the strict core API:
 
-- `provideContext(options?)`
+- `provideContext(options?)` (deprecated compatibility API)
 - `registerTool(tool)`
-- `unregisterTool(name)`
-- `clearContext()`
+- `unregisterTool(nameOrTool)`
+- `clearContext()` (deprecated compatibility API)
 
 It does not install MCP bridge extensions like `callTool`, resources, or prompts.
 
@@ -15,6 +15,7 @@ Important:
 
 - `navigator.modelContext` in this package does not provide `listTools()` or `callTool(...)`.
 - For list/execute test flows, use `navigator.modelContextTesting` (when `installTestingShim` is enabled).
+- `provideContext()` and `clearContext()` still work for now, but the upstream WebMCP spec removed them on March 5, 2026. The polyfill logs a deprecation warning and will remove them in the next major version.
 
 ## Type Safety First
 
@@ -143,6 +144,7 @@ Restores previous `navigator.modelContext` and `navigator.modelContextTesting` d
 
 ### `provideContext(options?)`
 
+- Deprecated compatibility API.
 - Replaces the active tool registry with `options.tools`.
 - Clears previously registered tools before applying new tools.
 
@@ -152,13 +154,14 @@ Restores previous `navigator.modelContext` and `navigator.modelContextTesting` d
 - Throws on duplicate tool names.
 - If `inputSchema` is omitted, runtime defaults to `{ type: 'object', properties: {} }`.
 
-### `unregisterTool(name)`
+### `unregisterTool(nameOrTool)`
 
-- Removes a tool by name.
+- Removes a tool by name. MCP-B compatibility runtimes also accept the originally registered tool object.
 - Unknown names are a no-op.
 
 ### `clearContext()`
 
+- Deprecated compatibility API.
 - Removes all registered tools.
 
 ## Listing and Executing Tools
@@ -205,6 +208,8 @@ When enabled via `installTestingShim`, the polyfill can install a compatibility 
 - `executeTool(toolName, inputArgsJson, options?)`
 - `registerToolsChangedCallback(callback)`
 - `getCrossDocumentScriptToolResult()`
+
+Current Chrome Beta 147 also exposes `navigator.modelContextTesting.ontoolchange`; the polyfill keeps the callback-based compatibility API for now.
 
 `executeTool(...)` accepts JSON-string arguments and returns a serialized result string or `null` (for navigation-style responses).
 

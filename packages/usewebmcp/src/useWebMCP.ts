@@ -32,6 +32,10 @@ function defaultFormatOutput(output: unknown): string {
 
 const TOOL_OWNER_BY_NAME = new Map<string, symbol>();
 type StructuredContent = Exclude<CallToolResult['structuredContent'], undefined>;
+type CompatModelContext = Navigator['modelContext'] & {
+  registerTool: (tool: ToolDescriptor) => { unregister: () => void } | undefined;
+  unregisterTool: (name: string) => void;
+};
 
 function toStructuredContent(value: unknown): StructuredContent | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -412,16 +416,17 @@ export function useWebMCP<
     };
 
     const ownerToken = Symbol(name);
-    const modelContext = window.navigator.modelContext;
-
-    (modelContext.registerTool as (tool: ToolDescriptor) => void)({
+    const modelContext = window.navigator.modelContext as CompatModelContext;
+    const toolDescriptor: ToolDescriptor = {
       name,
       description,
       ...(inputSchema && { inputSchema: inputSchema as InputSchema }),
       ...(outputSchema && { outputSchema: outputSchema as InputSchema }),
       ...(annotations && { annotations }),
       execute: mcpHandler,
-    });
+    };
+
+    const registration = modelContext.registerTool(toolDescriptor);
     TOOL_OWNER_BY_NAME.set(name, ownerToken);
 
     return () => {
@@ -432,6 +437,11 @@ export function useWebMCP<
 
       TOOL_OWNER_BY_NAME.delete(name);
       try {
+        if (registration && typeof registration.unregister === 'function') {
+          registration.unregister();
+          return;
+        }
+
         modelContext.unregisterTool(name);
       } catch (error) {
         if (isDev()) {
