@@ -1,5 +1,14 @@
 # @mcp-b/webmcp-ts-sdk
 
+## 2.1.1
+
+### Patch Changes
+
+- 2540527: Align MCP-B with the latest WebMCP compatibility direction by deprecating removed context APIs, accepting tool-object unregistration, and keeping the legacy unregister handle available as a deprecated compatibility path in MCP-B wrappers.
+- Updated dependencies [2540527]
+  - @mcp-b/webmcp-types@2.1.1
+  - @mcp-b/webmcp-polyfill@2.1.1
+
 ## 2.1.0
 
 ### Patch Changes

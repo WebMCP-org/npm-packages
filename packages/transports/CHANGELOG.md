@@ -1,5 +1,12 @@
 # @mcp-b/transports
 
+## 2.1.1
+
+### Patch Changes
+
+- Updated dependencies [2540527]
+  - @mcp-b/webmcp-ts-sdk@2.1.1
+
 ## 2.1.0
 
 ### Patch Changes
@@ -88,17 +95,20 @@
 - Add comprehensive request timeout handling and improved documentation to TabClientTransport
 
   **New Features:**
+
   - Request timeout mechanism (default 10s) to prevent infinite hangs during page navigation or server unresponsiveness
   - Server ready detection via handshake protocol
   - Active request tracking with timeout management
 
   **Improvements:**
+
   - Extensive JSDoc documentation with examples and architecture diagrams
   - Better error messages for timeout scenarios
   - Improved type safety with readonly configuration fields
   - Enhanced lifecycle management for cleanup
 
   **Bug Fixes:**
+
   - Prevent memory leaks by properly clearing timeout handlers
   - Handle edge cases during page navigation and server crashes
 

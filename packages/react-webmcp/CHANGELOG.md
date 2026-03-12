@@ -1,5 +1,17 @@
 # @mcp-b/react-webmcp
 
+## 2.1.1
+
+### Patch Changes
+
+- 2540527: Align MCP-B with the latest WebMCP compatibility direction by deprecating removed context APIs, accepting tool-object unregistration, and keeping the legacy unregister handle available as a deprecated compatibility path in MCP-B wrappers.
+- Updated dependencies [2540527]
+  - @mcp-b/webmcp-types@2.1.1
+  - @mcp-b/webmcp-polyfill@2.1.1
+  - @mcp-b/webmcp-ts-sdk@2.1.1
+  - @mcp-b/global@2.1.1
+  - @mcp-b/transports@2.1.1
+
 ## 2.1.0
 
 ### Patch Changes
@@ -144,16 +156,19 @@
 - Improve useWebMCP hook lifecycle management and add development warnings
 
   **New Features:**
+
   - Development-mode warnings for unstable dependencies that cause unnecessary re-registrations
   - Memoization recommendations for inputSchema, outputSchema, and annotations
   - Warning system for non-primitive deps array values
 
   **Bug Fixes:**
+
   - Prevent state updates on unmounted components to avoid memory leaks
   - Fix race condition where callbacks could update after component unmount
   - Use useEffect instead of useLayoutEffect for ref updates (correct lifecycle)
 
   **Improvements:**
+
   - Better development experience with actionable warnings
   - Reduced re-registration frequency through stable config detection
   - Enhanced error reporting for common configuration mistakes
@@ -182,7 +197,7 @@
       description: `Query sites. Current count: ${sites.length}`,
       handler: async () => ({ sites }),
     },
-    [sites], // Re-register when sites changes
+    [sites] // Re-register when sites changes
   );
   ```
 
@@ -191,6 +206,7 @@
   ## Performance Optimizations
 
   The hook is optimized to minimize unnecessary JSON-RPC tool update calls:
+
   - **Memoized JSON conversion**: Zod-to-JSON schema conversions are memoized to avoid recomputation on every render.
   - **Ref-based callbacks**: `handler`, `onSuccess`, `onError`, and `formatOutput` changes don't trigger re-registration.
   - **Single useLayoutEffect**: All callback refs are updated synchronously in a single effect for better performance.
@@ -239,13 +255,14 @@
       description: "...",
       handler: async () => ({ sites }),
     },
-    [siteCount, siteIds], // Only re-register when these primitives change
+    [siteCount, siteIds] // Only re-register when these primitives change
   );
   ```
 
   ## New Demo Application
 
   Added comprehensive demo app at `e2e/mcp-ui-with-webmcp/apps/webmcp-demo` showcasing:
+
   - All `useWebMCP` features with proper memoization patterns
   - Integration with React 19 and Tailwind v4
   - Five working MCP tools with structured outputs
@@ -268,7 +285,7 @@
       description: `Query sites. Current count: ${sites.length}`,
       handler: async () => ({ sites }),
     },
-    [sites], // Re-register when sites changes
+    [sites] // Re-register when sites changes
   );
   ```
 
@@ -277,6 +294,7 @@
   ## Performance Optimizations
 
   The hook is now optimized to minimize unnecessary JSON-RPC tool update calls:
+
   - **React-style schema dependencies**: `inputSchema`, `outputSchema`, and `annotations` follow reference semantics. Memoize these objects to avoid unnecessary re-registration.
   - **Memoized JSON conversion**: Zod-to-JSON schema conversions are memoized.
   - **Ref-based callbacks**: `handler`, `onSuccess`, `onError`, and `formatOutput` changes don't trigger re-registration.
@@ -288,7 +306,7 @@
   const siteIds = sites.map((s) => s.id).join(",");
   useWebMCP(
     { name: "sites_query", description: "...", handler: async () => ({}) },
-    [sites.length, siteIds],
+    [sites.length, siteIds]
   );
   ```
 
@@ -309,6 +327,7 @@
 - b57ebab: fix: return structuredContent when outputSchema is defined
 
   When a tool is registered with an outputSchema, the MCP specification requires the execute result to include both content and structuredContent. This fix ensures compliance with the MCP spec by:
+
   - Returning structuredContent in the MCP response when outputSchema is provided
   - Passing through structuredContent in the @mcp-b/global bridge handler
   - Adding InferOutput utility type for better Zod schema type inference
@@ -331,6 +350,7 @@
 - 057071a: fix: return structuredContent when outputSchema is defined
 
   When a tool is registered with an outputSchema, the MCP specification requires the execute result to include both content and structuredContent. This fix ensures compliance with the MCP spec by:
+
   - Returning structuredContent in the MCP response when outputSchema is provided
   - Passing through structuredContent in the @mcp-b/global bridge handler
   - Adding InferOutput utility type for better Zod schema type inference
