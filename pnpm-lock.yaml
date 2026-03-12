@@ -1046,16 +1046,13 @@ importers:
       '@mcp-b/webmcp-types':
         specifier: workspace:*
         version: link:../webmcp-types
-      '@modelcontextprotocol/sdk':
-        specifier: 'catalog:'
-        version: 1.26.0(@cfworker/json-schema@4.1.1)(zod@4.3.5)
       zod:
         specifier: ^3.25 || ^4.0
         version: 4.3.5
-      zod-to-json-schema:
-        specifier: ^3.25.0
-        version: 3.25.1(zod@4.3.5)
     devDependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: 'catalog:'
+        version: 1.26.0(@cfworker/json-schema@4.1.1)(zod@4.3.5)
       '@types/node':
         specifier: 'catalog:'
         version: 22.17.2

@@ -264,6 +264,11 @@ export class BrowserMcpServer extends BaseMcpServer {
    */
   private toTransportSchema(schema: unknown, requireObjectType = true): InputSchema {
     if (!isPlainObject(schema) || this.isZodSchema(schema) || isStandardSchema(schema)) {
+      if (this.isZodSchema(schema) || isStandardSchema(schema)) {
+        console.warn(
+          '[BrowserMcpServer] Received a Zod or Standard Schema that was not normalized before registration. Falling back to default input schema.'
+        );
+      }
       return requireObjectType ? DEFAULT_INPUT_SCHEMA : ({} as InputSchema);
     }
 

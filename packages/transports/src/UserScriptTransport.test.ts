@@ -1,4 +1,4 @@
-import type { JSONRPCMessage } from '@mcp-b/webmcp-ts-sdk/protocol';
+import type { JSONRPCMessage } from '@mcp-b/webmcp-ts-sdk';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { UserScriptClientTransport } from './UserScriptClientTransport.js';
 import { UserScriptServerTransport } from './UserScriptServerTransport.js';

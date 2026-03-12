@@ -542,7 +542,11 @@ export class MCPIframeElement extends HTMLElement {
               type: 'object',
               properties: Object.fromEntries(
                 prompt.arguments.map(
-                  (arg: { name: string; description?: string; required?: boolean }) => [
+                  (arg: {
+                    name: string;
+                    description?: string | undefined;
+                    required?: boolean | undefined;
+                  }) => [
                     arg.name,
                     {
                       type: 'string',
@@ -553,9 +557,19 @@ export class MCPIframeElement extends HTMLElement {
               ),
               required: prompt.arguments
                 .filter(
-                  (arg: { name: string; description?: string; required?: boolean }) => arg.required
+                  (arg: {
+                    name: string;
+                    description?: string | undefined;
+                    required?: boolean | undefined;
+                  }) => arg.required
                 )
-                .map((arg: { name: string; description?: string; required?: boolean }) => arg.name),
+                .map(
+                  (arg: {
+                    name: string;
+                    description?: string | undefined;
+                    required?: boolean | undefined;
+                  }) => arg.name
+                ),
             } satisfies InputSchema,
           }),
         get: (args: Record<string, unknown>) => this.#getIframePrompt(prompt.name, args),

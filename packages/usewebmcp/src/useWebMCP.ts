@@ -263,27 +263,6 @@ export function useWebMCP<
 
     const prev = prevConfigRef.current;
 
-    if (inputSchema && prev.inputSchema && prev.inputSchema !== inputSchema) {
-      warnOnce(
-        'inputSchema',
-        `Tool "${name}" inputSchema reference changed; memoize or define it outside the component to avoid re-registration.`
-      );
-    }
-
-    if (outputSchema && prev.outputSchema && prev.outputSchema !== outputSchema) {
-      warnOnce(
-        'outputSchema',
-        `Tool "${name}" outputSchema reference changed; memoize or define it outside the component to avoid re-registration.`
-      );
-    }
-
-    if (annotations && prev.annotations && prev.annotations !== annotations) {
-      warnOnce(
-        'annotations',
-        `Tool "${name}" annotations reference changed; memoize or define it outside the component to avoid re-registration.`
-      );
-    }
-
     if (description !== prev.description) {
       warnOnce(
         'description',
@@ -314,13 +293,13 @@ export function useWebMCP<
    */
   const execute = useCallback(async (input: unknown): Promise<TOutput> => {
     try {
-      onStartRef.current?.(input);
-
       setState((prev) => ({
         ...prev,
         isExecuting: true,
         error: null,
       }));
+
+      onStartRef.current?.(input);
 
       const result = await toolExecuteRef.current(input as TInput);
 
@@ -382,6 +361,9 @@ export function useWebMCP<
   }, []);
 
   useEffect(() => {
+    // These keys are derived from JSON.stringify of the schemas/annotations.
+    // Reading them here ensures the effect re-runs on structural changes,
+    // while refs hold the latest values for registration.
     void inputSchemaKey;
     void outputSchemaKey;
     void annotationsKey;

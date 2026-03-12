@@ -654,6 +654,19 @@ export class RelayBridgeServer extends EventEmitter {
       process.stderr.write(
         `[webmcp-local-relay] warn: rejecting deeply nested JSON (>${MAX_JSON_DEPTH} levels) from connection ${connectionId}\n`
       );
+      const msg = parsedJson as Record<string, unknown> | null;
+      if (msg && typeof msg === 'object' && 'id' in msg) {
+        const socket = this.socketByConnectionId.get(connectionId);
+        if (socket) {
+          socket.send(
+            JSON.stringify({
+              jsonrpc: '2.0',
+              id: msg.id,
+              error: { code: -32600, message: 'Message exceeds maximum nesting depth' },
+            })
+          );
+        }
+      }
       return;
     }
 

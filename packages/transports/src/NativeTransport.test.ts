@@ -1,5 +1,5 @@
 import { PassThrough } from 'node:stream';
-import type { JSONRPCMessage } from '@mcp-b/webmcp-ts-sdk/protocol';
+import type { JSONRPCMessage } from '@mcp-b/webmcp-ts-sdk';
 import { describe, expect, it, vi } from 'vitest';
 import { NativeClientTransport } from './NativeClientTransport.js';
 import { NativeServerTransport } from './NativeServerTransport.js';

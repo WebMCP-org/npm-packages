@@ -1,6 +1,6 @@
 import type { RuntimeContractController, RuntimeContractOptions } from './core.js';
 
-type BrowserRuntimeContractRegisterResult = ReturnType<() => void> | { unregister?: () => void };
+type BrowserRuntimeContractRegisterResult = void | { unregister?: () => void };
 
 export interface BrowserRuntimeContractModelContext {
   provideContext(value: unknown): void;

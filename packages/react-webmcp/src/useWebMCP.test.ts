@@ -1940,7 +1940,7 @@ describe('useWebMCP', () => {
 
       try {
         const { rerender } = await renderHook(
-          ({ counter }: { counter: number }) =>
+          ({ counter: _counter }: { counter: number }) =>
             useWebMCP({
               name: 'render_count_annotations_tool',
               description: 'Test',
@@ -1973,7 +1973,7 @@ describe('useWebMCP', () => {
 
       try {
         const { rerender } = await renderHook(
-          ({ counter }: { counter: number }) =>
+          ({ counter: _counter }: { counter: number }) =>
             useWebMCP({
               name: 'render_count_schema_tool',
               description: 'Test',

@@ -1,4 +1,3 @@
-import type { Transport } from '@mcp-b/webmcp-ts-sdk';
 import {
   type Client,
   type Tool as McpTool,
@@ -7,7 +6,8 @@ import {
   ResourceListChangedNotificationSchema,
   type ServerCapabilities,
   ToolListChangedNotificationSchema,
-} from '@mcp-b/webmcp-ts-sdk/client';
+  type Transport,
+} from '@mcp-b/webmcp-ts-sdk';
 import {
   createContext,
   type ReactElement,

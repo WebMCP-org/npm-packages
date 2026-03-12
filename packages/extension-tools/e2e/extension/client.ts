@@ -1,7 +1,7 @@
 /// <reference types="chrome" />
 
 import { ExtensionClientTransport } from '../../../transports/src/index.ts';
-import { Client } from '../../../webmcp-ts-sdk/src/client.ts';
+import { Client } from '../../../webmcp-ts-sdk/src/index.ts';
 
 function requireElement<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);

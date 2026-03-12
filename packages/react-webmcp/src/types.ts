@@ -274,7 +274,7 @@ export interface WebMCPConfig<
    *
    * @param input - The input that will be passed to the handler
    */
-  onStart?: (input: unknown) => void;
+  onStart?: (input: InferToolInput<TInputSchema>) => void;
 
   /**
    * Optional callback invoked when the tool execution succeeds.
@@ -283,7 +283,7 @@ export interface WebMCPConfig<
    * @param result - The successful result from the handler
    * @param input - The input that was passed to the handler
    */
-  onSuccess?: (result: InferOutput<TOutputSchema>, input: unknown) => void;
+  onSuccess?: (result: InferOutput<TOutputSchema>, input: InferToolInput<TInputSchema>) => void;
 
   /**
    * Optional callback invoked when the tool execution fails.
@@ -292,7 +292,7 @@ export interface WebMCPConfig<
    * @param error - The error that occurred during execution
    * @param input - The input that was passed to the handler
    */
-  onError?: (error: Error, input: unknown) => void;
+  onError?: (error: Error, input: InferToolInput<TInputSchema>) => void;
 }
 
 /**

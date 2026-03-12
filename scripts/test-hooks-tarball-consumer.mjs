@@ -38,8 +38,8 @@ function getPnpmStoreDir() {
     if (match?.[1]) {
       return match[1].trim();
     }
-  } catch {
-    // Fall back to `pnpm store path`.
+  } catch (err) {
+    console.warn('Could not read .modules.yaml, falling back to CLI:', err.message);
   }
 
   const result = spawnSync('pnpm', ['store', 'path'], {

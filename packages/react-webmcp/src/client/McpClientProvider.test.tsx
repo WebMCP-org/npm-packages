@@ -1,6 +1,5 @@
 import { TabClientTransport, TabServerTransport } from '@mcp-b/transports';
-import { BrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
-import { Client } from '@mcp-b/webmcp-ts-sdk/client';
+import { BrowserMcpServer, Client } from '@mcp-b/webmcp-ts-sdk';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, renderHook } from 'vitest-browser-react';

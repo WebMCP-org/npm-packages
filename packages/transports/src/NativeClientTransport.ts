@@ -1,7 +1,6 @@
 import process from 'node:process';
 import type { Readable, Writable } from 'node:stream';
-import type { Transport } from '@mcp-b/webmcp-ts-sdk';
-import type { JSONRPCMessage } from '@mcp-b/webmcp-ts-sdk/protocol';
+import type { JSONRPCMessage, Transport } from '@mcp-b/webmcp-ts-sdk';
 import { ReadBuffer, serializeMessage } from './native-message.js';
 
 /**

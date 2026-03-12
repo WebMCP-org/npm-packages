@@ -27,13 +27,7 @@ If you need the full upstream SDK surface, import it directly:
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 ```
 
-`@mcp-b/webmcp-ts-sdk` keeps the browser-facing subset that MCP-B itself uses.
-
-If you need the MCP client helpers that MCP-B uses internally, use the dedicated subpath:
-
-```ts
-import { Client } from '@mcp-b/webmcp-ts-sdk/client';
-```
+`@mcp-b/webmcp-ts-sdk` keeps the browser-facing subset that MCP-B itself uses, and in v2 it re-exports the shared client/protocol symbols MCP-B packages need from the root barrel.
 
 ## Why It Exists
 
@@ -95,22 +89,33 @@ server.registerTool(
 );
 ```
 
-## Kept Root Exports
+## Root Exports
 
-The root export is intentionally small and browser-oriented. It includes:
+The root export includes the browser-first MCP-B surface:
 
 - `BrowserMcpServer`
 - `McpServer`
+- `Client`
 - `SERVER_MARKER_PROPERTY`
 - `Transport`
+- `TransportSendOptions`
+- `JSONRPCMessage`
+- `JSONRPCMessageSchema`
 - `PromptMessage`
 - `ResourceContents`
 - `SamplingRequestParams`
 - `SamplingResult`
+- `CallToolResult`
+- `Prompt`
+- `Resource`
+- `Tool`
+- `RequestOptions`
+- `ResourceListChangedNotificationSchema`
+- `ToolListChangedNotificationSchema`
 - `NoOpJsonSchemaValidator`
 - `PolyfillJsonSchemaValidator`
 
-These are the symbols currently used by MCP-B browser packages and examples. Broad upstream SDK re-exports are intentionally excluded.
+These are the symbols currently used by MCP-B browser packages and examples. Broad upstream SDK re-exports that MCP-B does not use are still intentionally excluded.
 
 ## Schema Support
 

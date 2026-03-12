@@ -184,13 +184,13 @@ export function useWebMCP<
    */
   const execute = useCallback(async (input: unknown): Promise<TOutput> => {
     try {
-      onStartRef.current?.(input);
-
       setState((prev) => ({
         ...prev,
         isExecuting: true,
         error: null,
       }));
+
+      onStartRef.current?.(input);
 
       const result = await handlerRef.current(input as TInput);
 
@@ -252,6 +252,9 @@ export function useWebMCP<
   }, []);
 
   useEffect(() => {
+    // These keys are derived from JSON.stringify of the schemas/annotations.
+    // Reading them here ensures the effect re-runs on structural changes,
+    // while refs hold the latest values for registration.
     void inputSchemaKey;
     void outputSchemaKey;
     void annotationsKey;

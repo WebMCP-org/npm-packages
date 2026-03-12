@@ -243,7 +243,7 @@ interface WebMCPConfigBase<
    *
    * @param input - The input that will be passed to the tool implementation
    */
-  onStart?: (input: unknown) => void;
+  onStart?: (input: InferToolInput<TInputSchema>) => void;
 
   /**
    * Optional callback invoked when the tool execution succeeds.
@@ -252,7 +252,7 @@ interface WebMCPConfigBase<
    * @param result - The successful result from the tool implementation
    * @param input - The input that was passed to the tool implementation
    */
-  onSuccess?: (result: InferOutput<TOutputSchema>, input: unknown) => void;
+  onSuccess?: (result: InferOutput<TOutputSchema>, input: InferToolInput<TInputSchema>) => void;
 
   /**
    * Optional callback invoked when the tool execution fails.
@@ -261,7 +261,7 @@ interface WebMCPConfigBase<
    * @param error - The error that occurred during execution
    * @param input - The input that was passed to the tool implementation
    */
-  onError?: (error: Error, input: unknown) => void;
+  onError?: (error: Error, input: InferToolInput<TInputSchema>) => void;
 }
 
 type WebMCPConfigImplementation<
