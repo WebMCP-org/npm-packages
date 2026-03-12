@@ -960,6 +960,9 @@ importers:
       vitest-browser-react:
         specifier: ^2.0.4
         version: 2.0.4(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(vitest@4.0.18)
+      zod:
+        specifier: ^4.0
+        version: 4.3.5
 
   packages/webmcp-local-relay:
     dependencies:
