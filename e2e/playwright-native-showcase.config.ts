@@ -2,11 +2,14 @@ import { defineConfig, devices } from '@playwright/test';
 
 /**
  * Playwright configuration for Native Web Standards Showcase
- * Launches Chromium with --enable-experimental-web-platform-features
+ * Launches a browser with --enable-experimental-web-platform-features.
+ * Defaults to Playwright Chromium because the showcase expects the fuller
+ * native API surface (including unregisterTool and clearContext).
  */
 const tabTransportPort = Number.parseInt(process.env.PLAYWRIGHT_NATIVE_SHOWCASE_PORT ?? '5174', 10);
 const nativeShowcaseBaseUrl = `http://localhost:${tabTransportPort}`;
 const reuseExistingServer = process.env.PLAYWRIGHT_REUSE_SERVER === '1';
+const nativeShowcaseChannel = process.env.PLAYWRIGHT_NATIVE_SHOWCASE_CHANNEL;
 
 export default defineConfig({
   testDir: './tests',
@@ -34,7 +37,7 @@ export default defineConfig({
       name: 'chromium-native',
       use: {
         ...devices['Desktop Chrome'],
-        channel: 'chrome-beta',
+        ...(nativeShowcaseChannel ? { channel: nativeShowcaseChannel } : {}),
       },
     },
   ],
