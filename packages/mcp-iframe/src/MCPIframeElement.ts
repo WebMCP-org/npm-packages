@@ -36,12 +36,14 @@ import { IframeParentTransport } from '@mcp-b/transports';
 import type {
   BrowserMcpServer,
   GetPromptResult,
+  Prompt,
   PromptDescriptor,
   ReadResourceResult,
+  Resource,
   ResourceDescriptor,
+  Tool,
 } from '@mcp-b/webmcp-ts-sdk';
-import type { Prompt, Resource, Tool } from '@mcp-b/webmcp-ts-sdk/client';
-import { Client } from '@mcp-b/webmcp-ts-sdk/client';
+import { Client } from '@mcp-b/webmcp-ts-sdk';
 import type {
   CallToolResult,
   InputSchema,
@@ -421,9 +423,9 @@ export class MCPIframeElement extends HTMLElement {
       }),
     ]);
 
-    this.#mcpTools = toolsResult.tools;
-    this.#mcpResources = resourcesResult.resources;
-    this.#mcpPrompts = promptsResult.prompts;
+    this.#mcpTools = toolsResult.tools as Tool[];
+    this.#mcpResources = resourcesResult.resources as Resource[];
+    this.#mcpPrompts = promptsResult.prompts as Prompt[];
   }
 
   #getTargetOrigin(): string | null {
@@ -501,7 +503,7 @@ export class MCPIframeElement extends HTMLElement {
         name: resource.name,
         ...(resource.description !== undefined && { description: resource.description }),
         ...(resource.mimeType !== undefined && { mimeType: resource.mimeType }),
-        read: (_uri, _params) =>
+        read: (_uri: URL, _params?: Record<string, string>) =>
           this.#readIframeResource(resource.uri) as ReturnType<ResourceDescriptor['read']>,
       };
       const registration = modelContext.registerResource(descriptor);
@@ -539,18 +541,24 @@ export class MCPIframeElement extends HTMLElement {
             argsSchema: {
               type: 'object',
               properties: Object.fromEntries(
-                prompt.arguments.map((arg) => [
-                  arg.name,
-                  {
-                    type: 'string',
-                    ...(arg.description !== undefined && { description: arg.description }),
-                  },
-                ])
+                prompt.arguments.map(
+                  (arg: { name: string; description?: string; required?: boolean }) => [
+                    arg.name,
+                    {
+                      type: 'string',
+                      ...(arg.description !== undefined && { description: arg.description }),
+                    },
+                  ]
+                )
               ),
-              required: prompt.arguments.filter((a) => a.required).map((a) => a.name),
+              required: prompt.arguments
+                .filter(
+                  (arg: { name: string; description?: string; required?: boolean }) => arg.required
+                )
+                .map((arg: { name: string; description?: string; required?: boolean }) => arg.name),
             } satisfies InputSchema,
           }),
-        get: (args) => this.#getIframePrompt(prompt.name, args),
+        get: (args: Record<string, unknown>) => this.#getIframePrompt(prompt.name, args),
       };
       const registration = modelContext.registerPrompt(descriptor);
       this.#registeredPrompts.set(prefixedName, registration);
