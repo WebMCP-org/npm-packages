@@ -212,9 +212,6 @@ export function useWebMCP<
   const isMountedRef = useRef(true);
   const warnedRef = useRef(new Set<string>());
   const prevConfigRef = useRef({
-    inputSchema,
-    outputSchema,
-    annotations,
     description,
     deps,
   });
@@ -249,7 +246,7 @@ export function useWebMCP<
 
   useEffect(() => {
     if (!isDev()) {
-      prevConfigRef.current = { inputSchema, outputSchema, annotations, description, deps };
+      prevConfigRef.current = { description, deps };
       return;
     }
 
@@ -281,8 +278,8 @@ export function useWebMCP<
       );
     }
 
-    prevConfigRef.current = { inputSchema, outputSchema, annotations, description, deps };
-  }, [annotations, deps, description, inputSchema, name, outputSchema]);
+    prevConfigRef.current = { description, deps };
+  }, [deps, description, name]);
 
   /**
    * Executes the configured tool implementation with input validation and state management.

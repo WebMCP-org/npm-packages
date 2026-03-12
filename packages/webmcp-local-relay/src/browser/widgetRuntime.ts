@@ -455,16 +455,13 @@ export function runWidget(cfg: WidgetConfig): void {
         return;
       }
 
+      if (relayMessage.args !== undefined && !isJsonObject(relayMessage.args)) {
+        console.warn('[webmcp-relay-widget] args is not a JSON object, defaulting to {}');
+      }
+
       requestHost('webmcp.tools.invoke', {
         toolName: relayMessage.toolName,
-        args: isJsonObject(relayMessage.args)
-          ? relayMessage.args
-          : (() => {
-              if (relayMessage.args !== undefined) {
-                console.warn('[webmcp-relay-widget] args is not a JSON object, defaulting to {}');
-              }
-              return {};
-            })(),
+        args: isJsonObject(relayMessage.args) ? relayMessage.args : {},
       })
         .then((hostResponse) => {
           safeSend(

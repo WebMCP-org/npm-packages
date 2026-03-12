@@ -12,12 +12,7 @@ export class ReadBuffer {
   private _buffer = Buffer.alloc(0);
 
   append(chunk: Buffer | Uint8Array | string): void {
-    const nextChunk =
-      typeof chunk === 'string'
-        ? Buffer.from(chunk)
-        : Buffer.isBuffer(chunk)
-          ? chunk
-          : Buffer.from(chunk);
+    const nextChunk = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
 
     this._buffer = Buffer.concat([this._buffer, nextChunk]);
   }
