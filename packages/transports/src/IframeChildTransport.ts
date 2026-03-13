@@ -33,6 +33,7 @@ export class IframeChildTransport implements Transport {
   private _clientOrigin?: string;
   private _serverReadyTimeout: ReturnType<typeof setTimeout> | undefined;
   private readonly _serverReadyRetryMs: number;
+  private _pendingMessages: JSONRPCMessage[] = [];
 
   onclose?: () => void;
   onerror?: (error: Error) => void;
@@ -66,13 +67,21 @@ export class IframeChildTransport implements Transport {
         return;
       }
 
+      const hadClient = !!this._clientOrigin;
       this._clientOrigin = event.origin;
 
       const payload = event.data.payload;
 
       if (typeof payload === 'string' && payload === 'mcp-check-ready') {
         this.broadcastServerReady();
+        if (!hadClient) {
+          this.flushPendingMessages();
+        }
         return;
+      }
+
+      if (!hadClient) {
+        this.flushPendingMessages();
       }
 
       try {
@@ -135,7 +144,7 @@ export class IframeChildTransport implements Transport {
     }
 
     if (!this._clientOrigin) {
-      console.debug('[IframeChildTransport] No client connected, message not sent');
+      this._pendingMessages.push(message);
       return;
     }
 
@@ -154,11 +163,20 @@ export class IframeChildTransport implements Transport {
     }
   }
 
+  private flushPendingMessages() {
+    const messages = this._pendingMessages;
+    this._pendingMessages = [];
+    for (const message of messages) {
+      this.send(message);
+    }
+  }
+
   async close(): Promise<void> {
     if (this._messageHandler) {
       window.removeEventListener('message', this._messageHandler);
     }
     this._started = false;
+    this._pendingMessages = [];
 
     if (this._clientOrigin && window.parent && window.parent !== window) {
       window.parent.postMessage(
