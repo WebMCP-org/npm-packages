@@ -67,21 +67,18 @@ export class IframeChildTransport implements Transport {
         return;
       }
 
-      const hadClient = !!this._clientOrigin;
+      const isFirstConnection = !this._clientOrigin;
       this._clientOrigin = event.origin;
+
+      if (isFirstConnection) {
+        this.flushPendingMessages();
+      }
 
       const payload = event.data.payload;
 
       if (typeof payload === 'string' && payload === 'mcp-check-ready') {
         this.broadcastServerReady();
-        if (!hadClient) {
-          this.flushPendingMessages();
-        }
         return;
-      }
-
-      if (!hadClient) {
-        this.flushPendingMessages();
       }
 
       try {
