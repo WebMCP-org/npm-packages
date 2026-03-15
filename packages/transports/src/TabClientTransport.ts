@@ -394,15 +394,16 @@ export class TabClientTransport implements Transport {
    * @private
    */
   private _startRequestTimeout(message: JSONRPCMessage): void {
-    if (!('id' in message) || message.id === undefined) {
+    if (!('id' in message) || message.id == null) {
       return;
     }
 
+    const requestId = message.id;
     const timeoutId = setTimeout(() => {
-      this._handleRequestTimeout(message.id!);
+      this._handleRequestTimeout(requestId);
     }, this._requestTimeout) as unknown as number;
 
-    this._activeRequests.set(message.id, {
+    this._activeRequests.set(requestId, {
       timeoutId,
       request: message,
     });
@@ -418,7 +419,7 @@ export class TabClientTransport implements Transport {
    * @private
    */
   private _clearRequestTimeout(message: JSONRPCMessage): void {
-    if (('result' in message || 'error' in message) && message.id !== undefined) {
+    if (('result' in message || 'error' in message) && message.id != null) {
       const info = this._activeRequests.get(message.id);
       if (info) {
         clearTimeout(info.timeoutId);

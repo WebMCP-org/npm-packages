@@ -1,6 +1,6 @@
 import { createServer as createNetServer, type Socket } from 'node:net';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import WebSocket from 'ws';
 
 import { RelayBridgeServer } from './bridgeServer.js';
@@ -99,6 +99,14 @@ async function getOpenPort(): Promise<number> {
   });
 
   return port;
+}
+
+function buildDeepJson(levels: number): unknown {
+  let value: unknown = { leaf: true };
+  for (let index = 0; index < levels; index += 1) {
+    value = index % 2 === 0 ? { nested: value } : [value];
+  }
+  return value;
 }
 
 describe('RelayBridgeServer', () => {
@@ -988,6 +996,69 @@ describe('RelayBridgeServer', () => {
     } finally {
       await bridge.stop();
     }
+  });
+
+  it('rejects deeply nested JSON-RPC messages with an error response', () => {
+    const bridge = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+    });
+
+    const fakeSocket = {
+      send: vi.fn(),
+    };
+
+    const internals = bridge as unknown as {
+      onSocketMessage: (connectionId: string, raw: WebSocket.RawData) => void;
+      socketByConnectionId: Map<string, { send: (payload: string) => void }>;
+    };
+
+    internals.socketByConnectionId.set('deep-conn', fakeSocket);
+    internals.onSocketMessage(
+      'deep-conn',
+      JSON.stringify({
+        jsonrpc: '2.0',
+        id: 'deep-1',
+        params: { payload: buildDeepJson(70) },
+      })
+    );
+
+    expect(fakeSocket.send).toHaveBeenCalledWith(
+      JSON.stringify({
+        jsonrpc: '2.0',
+        id: 'deep-1',
+        error: { code: -32600, message: 'Message exceeds maximum nesting depth' },
+      })
+    );
+  });
+
+  it('drops deeply nested messages without ids instead of replying', () => {
+    const bridge = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+    });
+
+    const fakeSocket = {
+      send: vi.fn(),
+    };
+
+    const internals = bridge as unknown as {
+      onSocketMessage: (connectionId: string, raw: WebSocket.RawData) => void;
+      socketByConnectionId: Map<string, { send: (payload: string) => void }>;
+    };
+
+    internals.socketByConnectionId.set('deep-conn', fakeSocket);
+    internals.onSocketMessage(
+      'deep-conn',
+      JSON.stringify({
+        type: 'tools/list',
+        tools: buildDeepJson(70),
+      })
+    );
+
+    expect(fakeSocket.send).not.toHaveBeenCalled();
   });
 
   it('normalizes undefined tool results as MCP errors', async () => {

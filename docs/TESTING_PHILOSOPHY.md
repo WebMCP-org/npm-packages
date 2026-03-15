@@ -112,7 +112,7 @@ Typical command sets:
    - Relevant package-local checks from item 1
 
 4. Packaging/export surface change:
-   - Relevant tarball/install validation script(s), for example `pnpm test:e2e:tarball:global`
+   - Relevant tarball/install validation script(s), for example `pnpm test:e2e:tarball:global` or `pnpm test:e2e:tarball:hooks`
 
 ## Coverage Expectations
 

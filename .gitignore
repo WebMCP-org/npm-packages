@@ -47,6 +47,7 @@ e2e/test-results
 .pnpm-store
 .claude
 .claude-plugin
+skills-lock.json
 
 # Vitest screenshots
 **/__screenshots__
@@ -65,3 +66,6 @@ webmcp-tools/
 # Chromium source and depot tools
 chromium/
 depot_tools/
+
+# External docs site (separate git repo)
+website-docs/

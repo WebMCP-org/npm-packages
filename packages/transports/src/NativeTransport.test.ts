@@ -1,8 +1,9 @@
 import { PassThrough } from 'node:stream';
-import { type JSONRPCMessage, serializeMessage } from '@mcp-b/webmcp-ts-sdk';
+import type { JSONRPCMessage } from '@mcp-b/webmcp-ts-sdk';
 import { describe, expect, it, vi } from 'vitest';
 import { NativeClientTransport } from './NativeClientTransport.js';
 import { NativeServerTransport } from './NativeServerTransport.js';
+import { ReadBuffer, serializeMessage } from './native-message.js';
 
 const wait = (ms = 10) => new Promise((resolve) => setTimeout(resolve, ms));
 const nodeDescribe = typeof window === 'undefined' ? describe : describe.skip;
@@ -57,6 +58,27 @@ class MockPort implements chrome.runtime.Port {
 }
 
 const createMessageBuffer = (message: JSONRPCMessage) => Buffer.from(serializeMessage(message));
+
+nodeDescribe('ReadBuffer', () => {
+  it('throws when the content-length header is missing or invalid', () => {
+    const missingHeaderBuffer = new ReadBuffer();
+    missingHeaderBuffer.append('X-Test: 1\r\n\r\n{}');
+    expect(() => missingHeaderBuffer.readMessage()).toThrow('Missing Content-Length header');
+
+    const invalidHeaderBuffer = new ReadBuffer();
+    invalidHeaderBuffer.append('Content-Length: nope\r\n\r\n{}');
+    expect(() => invalidHeaderBuffer.readMessage()).toThrow(
+      'Invalid Content-Length header: Content-Length: nope'
+    );
+  });
+
+  it('returns null until the full body is available', () => {
+    const buffer = new ReadBuffer();
+    buffer.append('Content-Length: 24\r\n\r\n{"jsonrpc":"2.0","id":1');
+
+    expect(buffer.readMessage()).toBeNull();
+  });
+});
 
 nodeDescribe('NativeClientTransport', () => {
   it('emits parsed messages read from stdin', async () => {

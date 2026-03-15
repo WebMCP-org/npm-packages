@@ -9,6 +9,7 @@ vi.mock('zod-to-json-schema', () => ({
   zodToJsonSchema: zodToJsonSchemaMock,
 }));
 
+import type { ZodSchemaObject } from './zod-utils.js';
 import { isZodSchema, zodToJsonSchema } from './zod-utils.js';
 
 describe('zod-utils', () => {
@@ -23,6 +24,20 @@ describe('zod-utils', () => {
       expect(isZodSchema({})).toBe(false);
       expect(isZodSchema({ type: 'object', properties: {} })).toBe(false);
       expect(isZodSchema({ username: { type: 'string' } })).toBe(false);
+    });
+
+    it('returns false for Standard Schema objects that expose zod-like internals', () => {
+      expect(
+        isZodSchema({
+          '~standard': {
+            version: 1,
+            vendor: 'zod',
+            types: { input: { username: 'string' } },
+          },
+          _def: { typeName: 'ZodObject' },
+          innerType: { _def: { typeName: 'ZodString' } },
+        })
+      ).toBe(false);
     });
 
     it('returns true for zod-like schema records', () => {
@@ -88,7 +103,7 @@ describe('zod-utils', () => {
         };
       });
 
-      const result = zodToJsonSchema(schema as never);
+      const result = zodToJsonSchema(schema as unknown as ZodSchemaObject);
 
       expect(zodToJsonSchemaMock).toHaveBeenCalledTimes(4);
       expect(result).toEqual({
@@ -121,7 +136,7 @@ describe('zod-utils', () => {
         return { type: 'number' };
       });
 
-      const result = zodToJsonSchema(schema as never);
+      const result = zodToJsonSchema(schema as unknown as ZodSchemaObject);
 
       expect(result).toEqual({
         type: 'object',

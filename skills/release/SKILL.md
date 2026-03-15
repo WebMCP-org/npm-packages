@@ -104,7 +104,26 @@ echo "agent-skills-ts-sdk: local=$(node -p "require('./packages/agent-skills/pac
 
 With fixed versioning, ALL versions should be the SAME number.
 
-### Step 8: Commit and Push
+### Step 8: Verify chrome-devtools-mcp Binary
+
+This package bundles all dependencies via rollup and has broken on npm before while
+working fine locally. ALWAYS verify the published binary works from a clean install.
+
+```bash
+TMP=$(mktemp -d) && \
+  npm install --prefix "$TMP" @mcp-b/chrome-devtools-mcp@$(node -p "require('./packages/chrome-devtools-mcp/package.json').version") && \
+  "$TMP/node_modules/.bin/chrome-devtools-mcp" --help && \
+  rm -rf "$TMP"
+```
+
+If this fails with `ERR_MODULE_NOT_FOUND` for any dependency (core-js, puppeteer-core,
+etc.), the `prepack` → `bundle` step didn't run. Check that `package.json` has
+`"prepack": "npm run bundle"` and republish.
+
+**Do NOT skip this step.** If it fails, deprecate the broken version and hotfix (see
+"Hotfix: Emergency Republish" section above).
+
+### Step 9: Commit and Push
 
 ```bash
 git add .
@@ -112,7 +131,7 @@ git commit -m "chore(release): version packages"
 git push origin main
 ```
 
-### Step 9: Create GitHub Release (Optional)
+### Step 10: Create GitHub Release
 
 ```bash
 VERSION=$(node -p "require('./packages/global/package.json').version")
@@ -135,6 +154,52 @@ Instead of publishing locally, let CI handle it:
 3. CI creates a "Version Packages" PR with bumped versions and changelogs
 4. Merge the PR — CI runs `pnpm ci:publish` (`pnpm publish -r --access public`) automatically
 5. CI also builds MCPB bundles, creates GitHub releases, and signs with sigstore
+
+## Hotfix: Emergency Republish of a Single Package
+
+When a specific package is broken on npm and needs an immediate fix without bumping
+the entire repo. This is the ONLY case where manual version edits are acceptable.
+
+### When to Use
+
+- A published version is broken (missing files, unbundled deps, bad build)
+- Only ONE package is affected — the rest are fine
+- You need to fix and republish immediately
+
+### Steps
+
+```bash
+# 1. Deprecate the broken version
+export $(grep -v '^#' .env | xargs)
+npm deprecate @mcp-b/<package>@<broken-version> "Broken: <reason>. Use <next-version>+"
+
+# 2. Fix the root cause in source
+
+# 3. Bump ONLY the affected package (manual edit is OK here)
+# Edit packages/<package>/package.json version field
+
+# 4. Publish just that package
+cd packages/<package>
+pnpm publish --access public --no-git-checks
+
+# 5. Verify
+npm view @mcp-b/<package>@<new-version> version
+
+# 6. Commit the fix
+git add packages/<package>/
+git commit -m "fix(<scope>): <what was broken and how it was fixed>"
+```
+
+### Why No Changeset?
+
+Changesets bump ALL packages in the fixed group. A hotfix for one broken package
+shouldn't force a no-op version bump on 12 healthy packages. The tradeoff is no
+auto-generated CHANGELOG entry — document the fix in the commit message instead.
+
+### After the Hotfix
+
+The hotfixed package will now be one patch version ahead of the rest. This is fine.
+The next regular changeset release will bring everything back in sync.
 
 ## Beta / Preview Releases
 

@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/chrome-devtools-mcp",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "MCP server for Chrome DevTools",
   "homepage": "https://github.com/WebMCP-org/npm-packages/tree/main/packages/chrome-devtools-mcp#readme",
   "bugs": {
@@ -35,6 +35,7 @@
     "eval": "npm run build && node --experimental-strip-types scripts/eval_gemini.ts",
     "format": "eslint --cache --fix . && prettier --write --cache .",
     "gen": "npm run build && npm run docs:generate && npm run cli:generate && npm run format",
+    "prepack": "npm run bundle",
     "prepare": "node --experimental-strip-types scripts/prepare.ts",
     "start": "npm run build && node build/src/index.js",
     "start-debug": "DEBUG=mcp:* DEBUG_COLORS=false npm run build && node build/src/index.js",

@@ -1,6 +1,6 @@
 import type { CallToolResult, InputSchema, ToolDescriptor } from '@mcp-b/webmcp-types';
 import type { DependencyList } from 'react';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   InferOutput,
   InferToolInput,
@@ -49,8 +49,6 @@ function toStructuredContent(value: unknown): StructuredContent | null {
     return null;
   }
 }
-
-const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 /**
  * React hook for registering and managing Model Context Protocol (MCP) tools.
@@ -120,6 +118,8 @@ export function useWebMCP<
     annotations,
     handler,
     formatOutput = defaultFormatOutput,
+    enabled = true,
+    onStart,
     onSuccess,
     onError,
   } = config;
@@ -131,18 +131,41 @@ export function useWebMCP<
     executionCount: 0,
   });
 
+  // Stable serialized keys for object deps — prevents re-registration when
+  // structurally identical objects are passed inline on every render.
+  const inputSchemaKey = useMemo(
+    () => (inputSchema != null ? JSON.stringify(inputSchema) : undefined),
+    [inputSchema]
+  );
+  const outputSchemaKey = useMemo(
+    () => (outputSchema != null ? JSON.stringify(outputSchema) : undefined),
+    [outputSchema]
+  );
+  const annotationsKey = useMemo(
+    () => (annotations != null ? JSON.stringify(annotations) : undefined),
+    [annotations]
+  );
+
   const handlerRef = useRef(handler);
+  const onStartRef = useRef(onStart);
   const onSuccessRef = useRef(onSuccess);
   const onErrorRef = useRef(onError);
   const formatOutputRef = useRef(formatOutput);
+  const inputSchemaRef = useRef(inputSchema);
+  const outputSchemaRef = useRef(outputSchema);
+  const annotationsRef = useRef(annotations);
   const isMountedRef = useRef(true);
-  // Update refs when callbacks change (doesn't trigger re-registration)
-  useIsomorphicLayoutEffect(() => {
+  // Update refs when callbacks/values change (doesn't trigger re-registration)
+  useEffect(() => {
     handlerRef.current = handler;
+    onStartRef.current = onStart;
     onSuccessRef.current = onSuccess;
     onErrorRef.current = onError;
     formatOutputRef.current = formatOutput;
-  }, [handler, onSuccess, onError, formatOutput]);
+    inputSchemaRef.current = inputSchema;
+    outputSchemaRef.current = outputSchema;
+    annotationsRef.current = annotations;
+  }, [handler, onStart, onSuccess, onError, formatOutput, inputSchema, outputSchema, annotations]);
 
   // Cleanup: mark component as unmounted
   useEffect(() => {
@@ -160,14 +183,18 @@ export function useWebMCP<
    * @throws Error if validation fails or the handler throws
    */
   const execute = useCallback(async (input: unknown): Promise<TOutput> => {
-    setState((prev) => ({
-      ...prev,
-      isExecuting: true,
-      error: null,
-    }));
-
     try {
-      const result = await handlerRef.current(input as TInput);
+      setState((prev) => ({
+        ...prev,
+        isExecuting: true,
+        error: null,
+      }));
+
+      const typedInput = input as TInput;
+
+      onStartRef.current?.(typedInput);
+
+      const result = await handlerRef.current(typedInput);
 
       // Only update state if component is still mounted
       if (isMountedRef.current) {
@@ -180,7 +207,7 @@ export function useWebMCP<
       }
 
       if (onSuccessRef.current) {
-        onSuccessRef.current(result, input);
+        onSuccessRef.current(result, typedInput);
       }
 
       return result;
@@ -197,7 +224,7 @@ export function useWebMCP<
       }
 
       if (onErrorRef.current) {
-        onErrorRef.current(err, input);
+        onErrorRef.current(err, input as TInput);
       }
 
       throw err;
@@ -227,6 +254,17 @@ export function useWebMCP<
   }, []);
 
   useEffect(() => {
+    // These keys are derived from JSON.stringify of the schemas/annotations.
+    // Reading them here ensures the effect re-runs on structural changes,
+    // while refs hold the latest values for registration.
+    void inputSchemaKey;
+    void outputSchemaKey;
+    void annotationsKey;
+
+    if (!enabled) {
+      return;
+    }
+
     if (typeof window === 'undefined' || !window.navigator?.modelContext) {
       console.warn(
         '[ReactWebMCP:useWebMCP]',
@@ -256,7 +294,7 @@ export function useWebMCP<
           ],
         };
 
-        if (outputSchema) {
+        if (outputSchemaRef.current) {
           const structuredContent = toStructuredContent(result);
           if (!structuredContent) {
             throw new Error(
@@ -282,15 +320,19 @@ export function useWebMCP<
       }
     };
 
-    const resolvedInputSchema = inputSchema
-      ? isZodSchema(inputSchema)
-        ? zodToJsonSchema(inputSchema)
-        : (inputSchema as InputSchema)
+    const currentInputSchema = inputSchemaRef.current;
+    const currentOutputSchema = outputSchemaRef.current;
+    const currentAnnotations = annotationsRef.current;
+
+    const resolvedInputSchema = currentInputSchema
+      ? isZodSchema(currentInputSchema)
+        ? zodToJsonSchema(currentInputSchema)
+        : (currentInputSchema as InputSchema)
       : undefined;
-    const resolvedOutputSchema = outputSchema
-      ? isZodSchema(outputSchema)
-        ? zodToJsonSchema(outputSchema)
-        : (outputSchema as InputSchema)
+    const resolvedOutputSchema = currentOutputSchema
+      ? isZodSchema(currentOutputSchema)
+        ? zodToJsonSchema(currentOutputSchema)
+        : (currentOutputSchema as InputSchema)
       : undefined;
 
     const ownerToken = Symbol(name);
@@ -300,7 +342,7 @@ export function useWebMCP<
       description,
       ...(resolvedInputSchema && { inputSchema: resolvedInputSchema }),
       ...(resolvedOutputSchema && { outputSchema: resolvedOutputSchema }),
-      ...(annotations && { annotations }),
+      ...(currentAnnotations && { annotations: currentAnnotations }),
       execute: mcpHandler,
     };
     const registration = compatModelContext.registerTool(toolDescriptor);
@@ -324,9 +366,15 @@ export function useWebMCP<
         console.warn('[ReactWebMCP:useWebMCP]', `Failed to unregister tool "${name}"`, error);
       }
     };
-    // Spread operator in dependencies intentionally allows consumers to trigger
-    // re-registration with custom reactive inputs.
-  }, [name, description, inputSchema, outputSchema, annotations, ...(deps ?? [])]);
+  }, [
+    name,
+    description,
+    inputSchemaKey,
+    outputSchemaKey,
+    annotationsKey,
+    enabled,
+    ...(deps ?? []),
+  ]);
 
   return {
     state,

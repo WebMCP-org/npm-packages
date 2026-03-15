@@ -76,7 +76,7 @@ export class TabServerTransport implements Transport {
         const message = JSONRPCMessageSchema.parse(payload);
 
         // Track incoming requests (messages with method and id, but not notifications)
-        if ('method' in message && 'id' in message && message.id !== undefined) {
+        if ('method' in message && 'id' in message && message.id != null) {
           this._pendingRequests.set(message.id, {
             request: message,
             receivedAt: Date.now(),
@@ -124,7 +124,7 @@ export class TabServerTransport implements Transport {
     }
 
     // Check if we already sent an interrupted response for this request
-    if (('result' in message || 'error' in message) && message.id !== undefined) {
+    if (('result' in message || 'error' in message) && message.id != null) {
       const info = this._pendingRequests.get(message.id);
 
       // Don't send if we already sent interrupted response (race condition prevention)

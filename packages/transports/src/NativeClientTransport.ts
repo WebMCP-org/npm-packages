@@ -1,11 +1,7 @@
 import process from 'node:process';
 import type { Readable, Writable } from 'node:stream';
-import {
-  type JSONRPCMessage,
-  ReadBuffer,
-  serializeMessage,
-  type Transport,
-} from '@mcp-b/webmcp-ts-sdk';
+import type { JSONRPCMessage, Transport } from '@mcp-b/webmcp-ts-sdk';
+import { ReadBuffer, serializeMessage } from './native-message.js';
 
 /**
  * Client transport for Native Messaging: this communicates with a server in the Chrome extension by reading from the current process' stdin and writing to stdout.

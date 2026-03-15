@@ -15,6 +15,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -351,22 +352,12 @@ export function McpClientProvider({
     };
   }, [client, transport, reconnect]);
 
-  return (
-    <McpClientContext.Provider
-      value={{
-        client,
-        tools,
-        resources,
-        isConnected,
-        isLoading,
-        error,
-        capabilities,
-        reconnect,
-      }}
-    >
-      {children}
-    </McpClientContext.Provider>
+  const contextValue = useMemo(
+    () => ({ client, tools, resources, isConnected, isLoading, error, capabilities, reconnect }),
+    [client, tools, resources, isConnected, isLoading, error, capabilities, reconnect]
   );
+
+  return <McpClientContext.Provider value={contextValue}>{children}</McpClientContext.Provider>;
 }
 
 /**

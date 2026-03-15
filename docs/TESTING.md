@@ -43,6 +43,7 @@ pnpm --filter @mcp-b/extension-tools test:e2e
 
 # Tarball validation
 pnpm test:e2e:tarball:global
+pnpm test:e2e:tarball:hooks
 ```
 
 Notes:
@@ -60,6 +61,10 @@ Notes:
 | Local relay | SDK `Client` over stdio | Real relay server + real browser runtime | `pnpm --filter @mcp-b/webmcp-local-relay test:e2e` |
 | DevTools bridge | SDK `Client` + `WebMCPClientTransport` | Real page discovered through DevTools bridge | `pnpm --filter @mcp-b/chrome-devtools-mcp test:e2e` |
 | Extension transport | SDK `Client` + `ExtensionClientTransport` | Real MV3 extension using `ExtensionServerTransport` | `pnpm --filter @mcp-b/extension-tools test:e2e` |
+
+Tarball validation lanes:
+- `pnpm test:e2e:tarball:global` validates the packed `@mcp-b/global` artifact in the browser test app.
+- `pnpm test:e2e:tarball:hooks` validates the packed `@mcp-b/react-webmcp` and `usewebmcp` artifacts in a temporary downstream TypeScript consumer, including JSON Schema, Zod v3, Zod v4 Standard Schema, and output inference coverage.
 
 ## Canonical E2E Assertions
 

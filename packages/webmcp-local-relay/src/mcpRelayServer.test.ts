@@ -1,6 +1,7 @@
+import { execFile } from 'node:child_process';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import WebSocket from 'ws';
 
 import { RelayBridgeServer } from './bridgeServer.js';
@@ -11,6 +12,10 @@ import {
   WEBMCP_CALL_TOOL_INPUT_SHAPE,
   WEBMCP_OPEN_PAGE_INPUT_SHAPE,
 } from './staticToolSchemas.js';
+
+vi.mock('node:child_process', () => ({
+  execFile: vi.fn(),
+}));
 
 /**
  * Polls until `fn` returns a defined value.
@@ -928,6 +933,44 @@ describe('LocalRelayMcpServer', () => {
 
       ws.close();
       await cleanup();
+    });
+
+    it('escapes single quotes when opening pages on Windows', async () => {
+      const execFileMock = vi.mocked(execFile);
+      execFileMock.mockImplementation(((...args: Parameters<typeof execFile>) => {
+        const callback = args[args.length - 1];
+        if (typeof callback === 'function') {
+          callback(null, '', '');
+        }
+        return {} as ReturnType<typeof execFile>;
+      }) as typeof execFile);
+
+      const originalProcess = globalThis.process;
+      Object.defineProperty(globalThis, 'process', {
+        configurable: true,
+        value: { ...originalProcess, platform: 'win32' },
+      });
+
+      try {
+        const relay = new LocalRelayMcpServer();
+        await (
+          relay as unknown as {
+            openInBrowser: (url: string) => Promise<void>;
+          }
+        ).openInBrowser("https://example.com/search?q=o'reilly");
+
+        expect(execFileMock).toHaveBeenCalledWith(
+          'powershell.exe',
+          ['-NoProfile', '-Command', "Start-Process 'https://example.com/search?q=o%27reilly'"],
+          expect.any(Function)
+        );
+      } finally {
+        execFileMock.mockReset();
+        Object.defineProperty(globalThis, 'process', {
+          configurable: true,
+          value: originalProcess,
+        });
+      }
     });
   });
 

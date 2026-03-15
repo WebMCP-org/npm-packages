@@ -62,7 +62,8 @@ async function runCli(
 }
 
 describe('chrome-devtools', () => {
-  const browserExecutablePath = executablePath();
+  const browserExecutablePath =
+    process.env.CHROME_M146_EXECUTABLE_PATH || executablePath();
 
   async function assertDaemonIsNotRunning() {
     const result = await runCli(['status']);
