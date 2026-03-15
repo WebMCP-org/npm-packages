@@ -21,17 +21,6 @@ module.exports = {
   source: ['examples/frameworks/*/package.json'],
 
   // ---------------------------------------------------------------------------
-  // Version groups
-  // ---------------------------------------------------------------------------
-  versionGroups: [
-    {
-      label: 'Ignore vite/vite-plus catalog: references',
-      dependencies: ['vite', 'vite-plus', 'vitest'],
-      isIgnored: true,
-    },
-  ],
-
-  // ---------------------------------------------------------------------------
   // Formatting — disabled because Oxfmt already handles package.json formatting.
   // Without these overrides syncpack would re-sort properties and dependencies
   // on every `syncpack format` or flag them as errors during `syncpack lint`.

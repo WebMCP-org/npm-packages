@@ -4,16 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc && vp build",
-    "dev": "vp dev",
-    "preview": "vp preview"
+    "build": "tsc && vite build",
+    "dev": "vite dev",
+    "preview": "vite preview"
   },
   "dependencies": {
     "@mcp-b/webmcp-polyfill": "workspace:*"
   },
   "devDependencies": {
     "typescript": "~5.9.3",
-    "vite": "catalog:",
-    "vite-plus": "catalog:"
+    "vite": "^8.0.0"
   }
 }
