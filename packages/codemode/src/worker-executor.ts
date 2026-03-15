@@ -1,4 +1,5 @@
-import type { ExecuteResult, Executor } from './types';
+import { isExecutionResultMessage, isToolCallMessage } from './messages';
+import type { ExecuteResult, Executor, ToolFunctions } from './types';
 
 export interface WorkerSandboxExecutorOptions {
   timeout?: number;
@@ -97,10 +98,7 @@ export class WorkerSandboxExecutor implements Executor {
     this.#timeout = options?.timeout ?? 30000;
   }
 
-  async execute(
-    code: string,
-    fns: Record<string, (...args: unknown[]) => Promise<unknown>>
-  ): Promise<ExecuteResult> {
+  async execute(code: string, fns: ToolFunctions): Promise<ExecuteResult> {
     return new Promise<ExecuteResult>((resolve) => {
       const workerCode = buildWorkerCode(code);
       const blob = new Blob([workerCode], { type: 'application/javascript' });
@@ -118,35 +116,34 @@ export class WorkerSandboxExecutor implements Executor {
       };
 
       worker.onmessage = async (event: MessageEvent) => {
-        const msg = event.data as
-          | { type: 'tool-call'; id: number; name: string; args: Record<string, unknown> }
-          | { type: 'execution-result'; result: ExecuteResult };
+        const data: unknown = event.data;
 
-        if (msg.type === 'tool-call') {
-          const fn = fns[msg.name];
+        if (isToolCallMessage(data)) {
+          const fn = fns[data.name];
           if (!fn) {
             worker.postMessage({
               type: 'tool-result',
-              id: msg.id,
-              error: `Tool "${msg.name}" not found`,
+              id: data.id,
+              error: `Tool "${data.name}" not found`,
             });
             return;
           }
           try {
-            const result = await fn(msg.args);
-            worker.postMessage({ type: 'tool-result', id: msg.id, result });
+            const result = await fn(data.args);
+            worker.postMessage({ type: 'tool-result', id: data.id, result });
           } catch (err) {
             worker.postMessage({
               type: 'tool-result',
-              id: msg.id,
+              id: data.id,
               error: err instanceof Error ? err.message : String(err),
             });
           }
+          return;
         }
 
-        if (msg.type === 'execution-result') {
+        if (isExecutionResultMessage(data)) {
           cleanup();
-          resolve(msg.result);
+          resolve(data.result);
         }
       };
 
