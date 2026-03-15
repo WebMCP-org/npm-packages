@@ -43,6 +43,7 @@
     "@changesets/cli": "^2.29.8",
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
+    "@typescript/native-preview": "7.0.0-dev.20260315.1",
     "jiti": "^2.6.1",
     "syncpack": "^13.0.0",
     "vite-plus": "catalog:"

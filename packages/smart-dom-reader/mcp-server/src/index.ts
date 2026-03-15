@@ -535,8 +535,8 @@ class SmartDomReaderServer {
         selector: args.selector && args.selector.trim().length > 0 ? args.selector : null,
         format: {
           detail: args.detail ?? 'summary',
-          maxTextLength: args.maxTextLength,
-          maxElements: args.maxElements,
+          ...(args.maxTextLength !== undefined && { maxTextLength: args.maxTextLength }),
+          ...(args.maxElements !== undefined && { maxElements: args.maxElements }),
         },
       });
       const duration = Date.now() - started;
@@ -557,8 +557,10 @@ class SmartDomReaderServer {
         options: args.options ?? {},
         format: {
           detail: args.options?.detail ?? 'region',
-          maxTextLength: args.options?.maxTextLength,
-          maxElements: args.options?.maxElements,
+          ...(args.options?.maxTextLength !== undefined && {
+            maxTextLength: args.options.maxTextLength,
+          }),
+          ...(args.options?.maxElements !== undefined && { maxElements: args.options.maxElements }),
         },
       });
       const duration = Date.now() - started;
@@ -579,8 +581,10 @@ class SmartDomReaderServer {
         options: args.options ?? {},
         format: {
           detail: args.options?.detail ?? 'region',
-          maxTextLength: args.options?.maxTextLength,
-          maxElements: args.options?.maxElements,
+          ...(args.options?.maxTextLength !== undefined && {
+            maxTextLength: args.options.maxTextLength,
+          }),
+          ...(args.options?.maxElements !== undefined && { maxElements: args.options.maxElements }),
         },
       });
       const duration = Date.now() - started;
@@ -601,8 +605,10 @@ class SmartDomReaderServer {
         options: args.options ?? {},
         format: {
           detail: args.options?.detail ?? 'region',
-          maxTextLength: args.options?.maxTextLength,
-          maxElements: args.options?.maxElements,
+          ...(args.options?.maxTextLength !== undefined && {
+            maxTextLength: args.options.maxTextLength,
+          }),
+          ...(args.options?.maxElements !== undefined && { maxElements: args.options.maxElements }),
         },
       });
       const duration = Date.now() - started;
