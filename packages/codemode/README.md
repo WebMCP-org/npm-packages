@@ -1,8 +1,8 @@
 # @mcp-b/codemode
 
-Codemode lets an LLM write and execute code that orchestrates your tools instead of calling them one at a time. Models write better tool-orchestration programs than tool-call chains — they have seen millions of lines of real TypeScript but only contrived tool-calling examples.
+Codemode lets an LLM write and execute code that orchestrates your tools instead of calling them one at a time. LLMs have seen millions of lines of real TypeScript but only contrived tool-calling examples; they write better programs than tool-call chains.
 
-`@mcp-b/codemode` is a zero-dependency browser port of [Cloudflare's codemode](https://github.com/cloudflare/agents/blob/main/docs/codemode.md). It replaces Cloudflare Workers with iframe sandboxing and adds a WebMCP bridge that exposes page tools as codemode tools in one call.
+`@mcp-b/codemode` is a zero-dependency browser port of [Cloudflare's codemode](https://github.com/cloudflare/agents/blob/main/docs/codemode.md). It replaces Cloudflare Workers with iframe sandboxing and adds a WebMCP bridge that turns page tools into codemode tools in one call.
 
 > **New to codemode?** Read [Cloudflare's docs](https://github.com/cloudflare/agents/blob/main/docs/codemode.md) first — they cover the core idea, the [CodeAct paper](https://machinelearning.apple.com/research/codeact), and when codemode beats standard tool calling.
 
@@ -10,7 +10,7 @@ Codemode lets an LLM write and execute code that orchestrates your tools instead
 
 ## When to use codemode
 
-Codemode helps when the model needs to:
+Use codemode when the model needs to:
 
 - Chain multiple tool calls with logic between them
 - Combine results from several tools before returning
@@ -74,9 +74,9 @@ const result = streamText({
 });
 ```
 
-That helper reads tools from `modelContextTesting.listTools()`, converts their JSON Schema inputs into typed codemode descriptors, wires execution through `modelContextTesting.executeTool()`, and returns a single AI SDK tool.
+`createCodeToolFromModelContextTesting` reads tools from `modelContextTesting.listTools()`, converts their JSON Schema inputs into typed codemode descriptors, and wires execution through `modelContextTesting.executeTool()`. It returns a single AI SDK tool.
 
-When the model chooses codemode, it writes code like:
+The model writes code like:
 
 ```js
 async () => {
@@ -86,7 +86,7 @@ async () => {
 };
 ```
 
-That function runs in an iframe sandbox. Each `codemode.*` call routes back to host-side tools via `postMessage`.
+The function runs in an iframe sandbox. Each `codemode.*` call routes back to the host via `postMessage`.
 
 ## Quick start: standalone
 
@@ -126,7 +126,7 @@ interface Executor {
 
 ### IframeSandboxExecutor (recommended)
 
-Runs code in a hidden sandboxed iframe with CSP. Gives you a document boundary, which makes it the better default for in-page WebMCP.
+Runs code in a hidden sandboxed iframe with CSP. The document boundary makes it the better default for in-page WebMCP.
 
 Provisioned mode — codemode creates and manages the iframe:
 
@@ -248,7 +248,7 @@ Returns an AI SDK `Tool`. Import from `@mcp-b/codemode/webmcp`.
 
 ### `generateTypes(tools)`
 
-Returns TypeScript type definitions from your tools. Used internally by `createCodeTool` but exported for displaying available tools in a UI.
+Returns TypeScript type definitions from your tools. Used internally by `createCodeTool`; exported for displaying tools in a UI.
 
 ### `sanitizeToolName(name)`
 
