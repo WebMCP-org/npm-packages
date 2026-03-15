@@ -47,6 +47,7 @@ e2e/test-results
 .pnpm-store
 .claude
 .claude-plugin
+skills-lock.json
 
 # Vitest screenshots
 **/__screenshots__
