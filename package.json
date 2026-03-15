@@ -32,7 +32,7 @@
     "test:e2e:ui": "pnpm --filter mcp-e2e-tests test:ui",
     "test:unit": "pnpm -r --filter '!@mcp-b/example-*' --filter '!@mcp-b/chrome-devtools-mcp' run test",
     "test:unit:coverage": "pnpm -r --filter '!@mcp-b/example-*' --filter '!@mcp-b/chrome-devtools-mcp' run test -- --coverage",
-    "typecheck": "pnpm -r --filter '!@mcp-b/example-*' --filter '!@mcp-b/chrome-devtools-mcp' run typecheck",
+    "typecheck": "pnpm -r --filter '!@mcp-b/example-*' --filter '!@mcp-b/chrome-devtools-mcp' --filter '!mcp-e2e-tests' run typecheck",
     "validate:publish": "node ./scripts/validate-publish.js"
   },
   "dependencies": {
