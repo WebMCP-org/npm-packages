@@ -6,18 +6,15 @@
 
 import assert from 'node:assert';
 import path from 'node:path';
-import {describe, it} from 'node:test';
+import { describe, it } from 'node:test';
 
-import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
-import {installExtension} from '../../src/tools/extensions.js';
-import {evaluateScript} from '../../src/tools/script.js';
-import {serverHooks} from '../server.js';
-import {extractExtensionId, html, withMcpContext} from '../utils.js';
+import type { ParsedArguments } from '../../src/bin/chrome-devtools-mcp-cli-options.js';
+import { installExtension } from '../../src/tools/extensions.js';
+import { evaluateScript } from '../../src/tools/script.js';
+import { serverHooks } from '../server.js';
+import { extractExtensionId, html, withMcpContext } from '../utils.js';
 
-const EXTENSION_PATH = path.join(
-  import.meta.dirname,
-  '../../../tests/tools/fixtures/extension-sw',
-);
+const EXTENSION_PATH = path.join(import.meta.dirname, '../../../tests/tools/fixtures/extension-sw');
 
 describe('script', () => {
   const server = serverHooks();
@@ -27,10 +24,10 @@ describe('script', () => {
       await withMcpContext(async (response, context) => {
         await evaluateScript().handler(
           {
-            params: {function: String(() => 2 * 5)},
+            params: { function: String(() => 2 * 5) },
           },
           response,
-          context,
+          context
         );
         const lineEvaluation = response.responseLines.at(2)!;
         assert.strictEqual(JSON.parse(lineEvaluation), 10);
@@ -40,10 +37,10 @@ describe('script', () => {
       await withMcpContext(async (response, context) => {
         await evaluateScript().handler(
           {
-            params: {function: String(() => document.title)},
+            params: { function: String(() => document.title) },
           },
           response,
-          context,
+          context
         );
 
         let lineEvaluation = response.responseLines.at(2)!;
@@ -59,10 +56,10 @@ describe('script', () => {
         response.resetResponseLineForTesting();
         await evaluateScript().handler(
           {
-            params: {function: String(() => document.title)},
+            params: { function: String(() => document.title) },
           },
           response,
-          context,
+          context
         );
 
         lineEvaluation = response.responseLines.at(2)!;
@@ -74,22 +71,28 @@ describe('script', () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
 
-        await page.setContent(html`<script src="./scripts.js"></script> `);
+        await page.setContent(
+          html`
+            <script src="./scripts.js"></script>
+          `
+        );
 
         await evaluateScript().handler(
           {
             params: {
               function: String(() => {
-                const scripts = Array.from(
-                  document.head.querySelectorAll('script'),
-                ).map(s => ({src: s.src, async: s.async, defer: s.defer}));
+                const scripts = Array.from(document.head.querySelectorAll('script')).map((s) => ({
+                  src: s.src,
+                  async: s.async,
+                  defer: s.defer,
+                }));
 
-                return {scripts};
+                return { scripts };
               }),
             },
           },
           response,
-          context,
+          context
         );
         const lineEvaluation = response.responseLines.at(2)!;
         assert.deepEqual(JSON.parse(lineEvaluation), {
@@ -102,19 +105,23 @@ describe('script', () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
 
-        await page.setContent(html`<script src="./scripts.js"></script> `);
+        await page.setContent(
+          html`
+            <script src="./scripts.js"></script>
+          `
+        );
 
         await evaluateScript().handler(
           {
             params: {
               function: String(async () => {
-                await new Promise(res => setTimeout(res, 0));
+                await new Promise((res) => setTimeout(res, 0));
                 return 'Works';
               }),
             },
           },
           response,
-          context,
+          context
         );
         const lineEvaluation = response.responseLines.at(2)!;
         assert.strictEqual(JSON.parse(lineEvaluation), 'Works');
@@ -125,7 +132,11 @@ describe('script', () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
 
-        await page.setContent(html`<button id="test">test</button>`);
+        await page.setContent(
+          html`
+            <button id="test">test</button>
+          `
+        );
 
         await context.createTextSnapshot(context.getSelectedMcpPage());
 
@@ -139,7 +150,7 @@ describe('script', () => {
             },
           },
           response,
-          context,
+          context
         );
         const lineEvaluation = response.responseLines.at(2)!;
         assert.strictEqual(JSON.parse(lineEvaluation), 'test');
@@ -150,7 +161,11 @@ describe('script', () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
 
-        await page.setContent(html`<button id="test">test</button>`);
+        await page.setContent(
+          html`
+            <button id="test">test</button>
+          `
+        );
 
         await context.createTextSnapshot(context.getSelectedMcpPage());
 
@@ -164,7 +179,7 @@ describe('script', () => {
             },
           },
           response,
-          context,
+          context
         );
         const lineEvaluation = response.responseLines.at(2)!;
         assert.strictEqual(JSON.parse(lineEvaluation), true);
@@ -174,9 +189,16 @@ describe('script', () => {
     it('work for elements inside iframes', async () => {
       server.addHtmlRoute(
         '/iframe',
-        html`<main><button>I am iframe button</button></main>`,
+        html`
+          <main><button>I am iframe button</button></main>
+        `
       );
-      server.addHtmlRoute('/main', html`<iframe src="/iframe"></iframe>`);
+      server.addHtmlRoute(
+        '/main',
+        html`
+          <iframe src="/iframe"></iframe>
+        `
+      );
 
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
@@ -192,7 +214,7 @@ describe('script', () => {
             },
           },
           response,
-          context,
+          context
         );
         const lineEvaluation = response.responseLines.at(2)!;
         assert.strictEqual(JSON.parse(lineEvaluation), 'I am iframe button');
@@ -201,20 +223,16 @@ describe('script', () => {
     it('evaluates inside extension service worker', async () => {
       await withMcpContext(
         async (response, context) => {
-          await installExtension.handler(
-            {params: {path: EXTENSION_PATH}},
-            response,
-            context,
-          );
+          await installExtension.handler({ params: { path: EXTENSION_PATH } }, response, context);
 
           const extensionId = extractExtensionId(response);
           const swTarget = await context.browser.waitForTarget(
-            t => t.type() === 'service_worker' && t.url().includes(extensionId),
+            (t) => t.type() === 'service_worker' && t.url().includes(extensionId)
           );
 
           await context.createExtensionServiceWorkersSnapshot();
           const swList = context.getExtensionServiceWorkers();
-          const sw = swList.find(s => s.target === swTarget);
+          const sw = swList.find((s) => s.target === swTarget);
 
           if (!sw) {
             assert.fail('Service worker not found in context list');
@@ -235,14 +253,14 @@ describe('script', () => {
               },
             },
             response,
-            context,
+            context
           );
 
           const lineEvaluation = response.responseLines.at(2)!;
           assert.strictEqual(JSON.parse(lineEvaluation), 'has-chrome');
         },
         {},
-        {categoryExtensions: true} as ParsedArguments,
+        { categoryExtensions: true } as ParsedArguments
       );
     });
 
@@ -261,15 +279,15 @@ describe('script', () => {
                 },
               },
               response,
-              context,
+              context
             ),
             {
               message: 'specify either a pageId or a serviceWorkerId.',
-            },
+            }
           );
         },
         {},
-        {categoryExtensions: true} as ParsedArguments,
+        { categoryExtensions: true } as ParsedArguments
       );
     });
 
@@ -288,16 +306,15 @@ describe('script', () => {
                 },
               },
               response,
-              context,
+              context
             ),
             {
-              message:
-                'args (element uids) cannot be used when evaluating in a service worker.',
-            },
+              message: 'args (element uids) cannot be used when evaluating in a service worker.',
+            }
           );
         },
         {},
-        {categoryExtensions: true} as ParsedArguments,
+        { categoryExtensions: true } as ParsedArguments
       );
     });
   });

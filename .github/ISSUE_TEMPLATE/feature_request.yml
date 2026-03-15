@@ -1,6 +1,6 @@
 name: Feature Request
 description: Suggest a new feature or improvement
-labels: ["enhancement", "triage"]
+labels: ['enhancement', 'triage']
 body:
   - type: markdown
     attributes:
@@ -13,17 +13,17 @@ body:
       label: Package
       description: Which package is this feature related to?
       options:
-        - "@mcp-b/transports"
-        - "@mcp-b/global"
-        - "@mcp-b/react-webmcp"
-        - "@mcp-b/webmcp-ts-sdk"
-        - "@mcp-b/chrome-devtools-mcp"
-        - "@mcp-b/extension-tools"
-        - "@mcp-b/mcp-iframe"
-        - "@mcp-b/smart-dom-reader"
-        - "@webmcp/helpers"
-        - "New package"
-        - "Other / Multiple"
+        - '@mcp-b/transports'
+        - '@mcp-b/global'
+        - '@mcp-b/react-webmcp'
+        - '@mcp-b/webmcp-ts-sdk'
+        - '@mcp-b/chrome-devtools-mcp'
+        - '@mcp-b/extension-tools'
+        - '@mcp-b/mcp-iframe'
+        - '@mcp-b/smart-dom-reader'
+        - '@webmcp/helpers'
+        - 'New package'
+        - 'Other / Multiple'
     validations:
       required: true
 

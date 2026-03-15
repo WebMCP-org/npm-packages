@@ -1,5 +1,6 @@
 import type { JSONSchema7 } from 'json-schema';
 import type { JsonSchemaToolDescriptor, JsonSchemaToolDescriptors } from './json-schema-types';
+import type { UnknownRecord } from './type-utils';
 
 /**
  * Minimal subset of WebMCP's ToolListItem needed for conversion.
@@ -8,8 +9,8 @@ import type { JsonSchemaToolDescriptor, JsonSchemaToolDescriptors } from './json
 interface ToolListItem {
   name: string;
   description?: string;
-  inputSchema?: Record<string, unknown>;
-  outputSchema?: Record<string, unknown>;
+  inputSchema?: UnknownRecord;
+  outputSchema?: UnknownRecord;
 }
 
 /**
@@ -18,7 +19,7 @@ interface ToolListItem {
  */
 function isJsonSchemaLike(value: unknown): value is JSONSchema7 {
   if (typeof value !== 'object' || value === null) return false;
-  const obj = value as Record<string, unknown>;
+  const obj = value as UnknownRecord;
   return (
     typeof obj.type === 'string' ||
     typeof obj.properties === 'object' ||

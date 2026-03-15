@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {ParsedArguments} from '../bin/chrome-devtools-mcp-cli-options.js';
-import type {McpPage} from '../McpPage.js';
-import {zod} from '../third_party/index.js';
+import type { ParsedArguments } from '../bin/chrome-devtools-mcp-cli-options.js';
+import type { McpPage } from '../McpPage.js';
+import { zod } from '../third_party/index.js';
 import type {
   EmbeddedResource,
   Dialog,
@@ -17,20 +17,14 @@ import type {
   TextContent,
   Viewport,
 } from '../third_party/index.js';
-import type {InsightName, TraceResult} from '../trace-processing/parse.js';
-import type {
-  TextSnapshotNode,
-  GeolocationOptions,
-  ExtensionServiceWorker,
-} from '../types.js';
-import type {InstalledExtension} from '../utils/ExtensionRegistry.js';
-import type {PaginationOptions} from '../utils/types.js';
+import type { InsightName, TraceResult } from '../trace-processing/parse.js';
+import type { TextSnapshotNode, GeolocationOptions, ExtensionServiceWorker } from '../types.js';
+import type { InstalledExtension } from '../utils/ExtensionRegistry.js';
+import type { PaginationOptions } from '../utils/types.js';
 
-import type {ToolCategory} from './categories.js';
+import type { ToolCategory } from './categories.js';
 
-export interface BaseToolDefinition<
-  Schema extends zod.ZodRawShape = zod.ZodRawShape,
-> {
+export interface BaseToolDefinition<Schema extends zod.ZodRawShape = zod.ZodRawShape> {
   name: string;
   description: string;
   annotations: {
@@ -49,11 +43,7 @@ export interface ToolDefinition<
   Schema extends zod.ZodRawShape = zod.ZodRawShape,
 > extends BaseToolDefinition<Schema> {
   schema: Schema;
-  handler: (
-    request: Request<Schema>,
-    response: Response,
-    context: Context,
-  ) => Promise<void>;
+  handler: (request: Request<Schema>, response: Response, context: Context) => Promise<void>;
 }
 
 export interface Request<Schema extends zod.ZodRawShape> {
@@ -107,31 +97,27 @@ export interface Response {
       resourceTypes?: string[];
       includePreservedRequests?: boolean;
       networkRequestIdInDevToolsUI?: number;
-    },
+    }
   ): void;
   setIncludeConsoleData(
     value: boolean,
     options?: PaginationOptions & {
       types?: string[];
       includePreservedMessages?: boolean;
-    },
+    }
   ): void;
   includeSnapshot(params?: SnapshotParams): void;
   attachImage(value: ImageContentData): void;
   attachNetworkRequest(
     reqid: number,
-    options?: {requestFilePath?: string; responseFilePath?: string},
+    options?: { requestFilePath?: string; responseFilePath?: string }
   ): void;
   attachConsoleMessage(msgid: number): void;
   // Allows re-using DevTools data queried by some tools.
   attachDevToolsData(data: DevToolsData): void;
   setTabId(tabId: string): void;
   attachTraceSummary(trace: TraceResult): void;
-  attachTraceInsight(
-    trace: TraceResult,
-    insightSetId: string,
-    insightName: InsightName,
-  ): void;
+  attachTraceInsight(trace: TraceResult, insightSetId: string, insightName: InsightName): void;
   setListExtensions(): void;
   attachLighthouseResult(result: LighthouseData): void;
 }
@@ -146,10 +132,7 @@ export type Context = Readonly<{
   recordedTraces(): TraceResult[];
   storeTraceRecording(result: TraceResult): void;
   getPageById(pageId: number): ContextPage;
-  newPage(
-    background?: boolean,
-    isolatedContextName?: string,
-  ): Promise<ContextPage>;
+  newPage(background?: boolean, isolatedContextName?: string): Promise<ContextPage>;
   closePage(pageId: number): Promise<void>;
   selectPage(page: ContextPage): void;
   restoreEmulation(page: ContextPage): Promise<void>;
@@ -162,37 +145,25 @@ export type Context = Readonly<{
       colorScheme?: 'dark' | 'light' | 'auto';
       viewport?: Viewport;
     },
-    targetPage?: Page,
+    targetPage?: Page
   ): Promise<void>;
   saveTemporaryFile(
     data: Uint8Array<ArrayBufferLike>,
-    filename: string,
-  ): Promise<{filepath: string}>;
-  saveFile(
-    data: Uint8Array<ArrayBufferLike>,
-    filename: string,
-  ): Promise<{filename: string}>;
+    filename: string
+  ): Promise<{ filepath: string }>;
+  saveFile(data: Uint8Array<ArrayBufferLike>, filename: string): Promise<{ filename: string }>;
   waitForEventsAfterAction(
     action: () => Promise<unknown>,
-    options?: {timeout?: number},
+    options?: { timeout?: number }
   ): Promise<void>;
-  waitForTextOnPage(
-    text: string[],
-    timeout?: number,
-    page?: Page,
-  ): Promise<Element>;
+  waitForTextOnPage(text: string[], timeout?: number, page?: Page): Promise<Element>;
   getDevToolsData(page: ContextPage): Promise<DevToolsData>;
   /**
    * Returns a reqid for a cdpRequestId.
    */
-  resolveCdpRequestId(
-    page: ContextPage,
-    cdpRequestId: string,
-  ): number | undefined;
-  getScreenRecorder(): {recorder: ScreenRecorder; filePath: string} | null;
-  setScreenRecorder(
-    data: {recorder: ScreenRecorder; filePath: string} | null,
-  ): void;
+  resolveCdpRequestId(page: ContextPage, cdpRequestId: string): number | undefined;
+  getScreenRecorder(): { recorder: ScreenRecorder; filePath: string } | null;
+  setScreenRecorder(data: { recorder: ScreenRecorder; filePath: string } | null): void;
   installExtension(path: string): Promise<string>;
   uninstallExtension(id: string): Promise<void>;
   triggerExtensionAction(id: string): Promise<void>;
@@ -202,9 +173,7 @@ export type Context = Readonly<{
   getPages(): Page[];
   getPageId(page: Page): number | undefined;
   getExtensionServiceWorkers(): ExtensionServiceWorker[];
-  getExtensionServiceWorkerId(
-    extensionServiceWorker: ExtensionServiceWorker,
-  ): string | undefined;
+  getExtensionServiceWorkerId(extensionServiceWorker: ExtensionServiceWorker): string | undefined;
 }>;
 
 export type ContextPage = Readonly<{
@@ -217,24 +186,18 @@ export type ContextPage = Readonly<{
 }>;
 
 export function defineTool<Schema extends zod.ZodRawShape>(
-  definition: ToolDefinition<Schema>,
+  definition: ToolDefinition<Schema>
 ): ToolDefinition<Schema>;
 
 export function defineTool<
   Schema extends zod.ZodRawShape,
   Args extends ParsedArguments = ParsedArguments,
->(
-  definition: (args?: Args) => ToolDefinition<Schema>,
-): (args?: Args) => ToolDefinition<Schema>;
+>(definition: (args?: Args) => ToolDefinition<Schema>): (args?: Args) => ToolDefinition<Schema>;
 
 export function defineTool<
   Schema extends zod.ZodRawShape,
   Args extends ParsedArguments = ParsedArguments,
->(
-  definition:
-    | ToolDefinition<Schema>
-    | ((args?: Args) => ToolDefinition<Schema>),
-) {
+>(definition: ToolDefinition<Schema> | ((args?: Args) => ToolDefinition<Schema>)) {
   if (typeof definition === 'function') {
     const factory = definition;
     return (args: Args) => {
@@ -248,9 +211,9 @@ interface PageToolDefinition<
   Schema extends zod.ZodRawShape = zod.ZodRawShape,
 > extends BaseToolDefinition<Schema> {
   handler: (
-    request: Request<Schema> & {page: ContextPage},
+    request: Request<Schema> & { page: ContextPage },
     response: Response,
-    context: Context,
+    context: Context
   ) => Promise<void>;
 }
 
@@ -258,30 +221,28 @@ export type DefinedPageTool<Schema extends zod.ZodRawShape = zod.ZodRawShape> =
   PageToolDefinition<Schema> & {
     pageScoped: true;
     handler: (
-      request: Request<Schema> & {page: ContextPage},
+      request: Request<Schema> & { page: ContextPage },
       response: Response,
-      context: Context,
+      context: Context
     ) => Promise<void>;
   };
 
 export function definePageTool<Schema extends zod.ZodRawShape>(
-  definition: PageToolDefinition<Schema>,
+  definition: PageToolDefinition<Schema>
 ): DefinedPageTool<Schema>;
 
 export function definePageTool<
   Schema extends zod.ZodRawShape,
   Args extends ParsedArguments = ParsedArguments,
 >(
-  definition: (args?: Args) => PageToolDefinition<Schema>,
+  definition: (args?: Args) => PageToolDefinition<Schema>
 ): (args?: Args) => DefinedPageTool<Schema>;
 
 export function definePageTool<
   Schema extends zod.ZodRawShape,
   Args extends ParsedArguments = ParsedArguments,
 >(
-  definition:
-    | PageToolDefinition<Schema>
-    | ((args?: Args) => PageToolDefinition<Schema>),
+  definition: PageToolDefinition<Schema> | ((args?: Args) => PageToolDefinition<Schema>)
 ): DefinedPageTool<Schema> | ((args?: Args) => DefinedPageTool<Schema>) {
   if (typeof definition === 'function') {
     return (args?: Args): DefinedPageTool<Schema> => {
@@ -299,8 +260,7 @@ export function definePageTool<
   } as DefinedPageTool<Schema>;
 }
 
-export const CLOSE_PAGE_ERROR =
-  'The last open page cannot be closed. It is fine to keep it open.';
+export const CLOSE_PAGE_ERROR = 'The last open page cannot be closed. It is fine to keep it open.';
 
 export const pageIdSchema = {
   pageId: zod.number().optional().describe('Targets a specific page by ID.'),
@@ -311,10 +271,8 @@ export const timeoutSchema = {
     .number()
     .int()
     .optional()
-    .describe(
-      `Maximum wait time in milliseconds. If set to 0, the default timeout will be used.`,
-    )
-    .transform(value => {
+    .describe(`Maximum wait time in milliseconds. If set to 0, the default timeout will be used.`)
+    .transform((value) => {
       return value && value <= 0 ? undefined : value;
     }),
 };

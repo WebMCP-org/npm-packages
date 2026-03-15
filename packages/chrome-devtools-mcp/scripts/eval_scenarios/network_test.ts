@@ -6,7 +6,7 @@
 
 import assert from 'node:assert';
 
-import type {TestScenario} from '../eval_gemini.ts';
+import type { TestScenario } from '../eval_gemini.ts';
 
 export const scenario: TestScenario = {
   prompt: 'Navigate to <TEST_URL> and list all network requests.',
@@ -20,16 +20,16 @@ export const scenario: TestScenario = {
       </script>
     `,
   },
-  expectations: calls => {
+  expectations: (calls) => {
     assert.strictEqual(calls.length, 2);
     assert.ok(
       calls[0].name === 'navigate_page' || calls[0].name === 'new_page',
-      'First call should be navigation',
+      'First call should be navigation'
     );
     assert.strictEqual(
       calls[1].name,
       'list_network_requests',
-      'Second call should be list_network_requests',
+      'Second call should be list_network_requests'
     );
   },
 };

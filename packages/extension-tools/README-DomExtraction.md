@@ -49,9 +49,9 @@ Chrome requires a user-facing toggle so the `chrome.userScripts` API can run in 
 import { DomExtractionTools } from '@mcp-b/extension-tools';
 
 const domTools = new DomExtractionTools(mcpServer, {
-  extractStructure: true,    // Progressive: Step 1
-  extractRegion: true,       // Progressive: Step 2  
-  extractContent: true       // Progressive: Step 3
+  extractStructure: true, // Progressive: Step 1
+  extractRegion: true, // Progressive: Step 2
+  extractContent: true, // Progressive: Step 3
 });
 
 domTools.registerTools();
@@ -84,11 +84,11 @@ Extract details from a specific region identified in Step 1:
 ```typescript
 const region = await client.callTool('dom_extract_region', {
   selector: 'article.content',
-  mode: 'interactive',  // or 'full'
+  mode: 'interactive', // or 'full'
   options: {
     includeHidden: false,
-    maxDepth: 3
-  }
+    maxDepth: 3,
+  },
 });
 
 // Returns interactive elements in that region
@@ -104,8 +104,8 @@ const content = await client.callTool('dom_extract_content', {
   options: {
     includeHeadings: true,
     includeLists: true,
-    maxTextLength: 1000
-  }
+    maxTextLength: 1000,
+  },
 });
 
 // Returns structured text content
@@ -121,7 +121,7 @@ All tools support extracting from iframes:
 ```typescript
 const iframeContent = await client.callTool('dom_extract_region', {
   frameSelector: 'iframe#content-frame',
-  selector: '.main-content'
+  selector: '.main-content',
 });
 ```
 
@@ -138,9 +138,9 @@ const filtered = await client.callTool('dom_extract_region', {
       excludeSelectors: ['.ad', '.popup'],
       tags: ['button', 'a', 'input'],
       textContains: ['Submit', 'Click'],
-      interactionTypes: ['click', 'submit']
-    }
-  }
+      interactionTypes: ['click', 'submit'],
+    },
+  },
 });
 ```
 
@@ -155,6 +155,7 @@ const filtered = await client.callTool('dom_extract_region', {
 ## Error Handling
 
 The tools handle common errors:
+
 - Tab not found
 - Permission denied
 - iframe access blocked
@@ -179,16 +180,20 @@ All errors are returned in a consistent format:
 ## Use Cases
 
 ### AI Browser Agents
+
 Use progressive extraction for token-efficient exploration:
+
 1. Get structure → understand layout
 2. Extract regions → focus on relevant areas
 3. Extract content → analyze text
 
 ### Web Automation
+
 Combine `dom_extract_structure` with focused `dom_extract_region` calls to catalog
 interactive elements you care about before pulling text with `dom_extract_content`.
 
 ### Testing & QA
+
 - Verify interactive elements presence
 - Check content structure
 - Validate form fields

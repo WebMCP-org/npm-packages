@@ -4,15 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {ParsedArguments} from './bin/chrome-devtools-mcp-cli-options.js';
-import {ConsoleFormatter} from './formatters/consoleFormatter.js';
-import {IssueFormatter} from './formatters/IssueFormatter.js';
-import {NetworkFormatter} from './formatters/networkFormatter.js';
-import {SnapshotFormatter} from './formatters/snapshotFormatter.js';
-import type {McpContext} from './McpContext.js';
-import type {McpPage} from './McpPage.js';
-import {UncaughtError} from './PageCollector.js';
-import {DevTools} from './third_party/index.js';
+import type { ParsedArguments } from './bin/chrome-devtools-mcp-cli-options.js';
+import { ConsoleFormatter } from './formatters/consoleFormatter.js';
+import { IssueFormatter } from './formatters/IssueFormatter.js';
+import { NetworkFormatter } from './formatters/networkFormatter.js';
+import { SnapshotFormatter } from './formatters/snapshotFormatter.js';
+import type { McpContext } from './McpContext.js';
+import type { McpPage } from './McpPage.js';
+import { UncaughtError } from './PageCollector.js';
+import { DevTools } from './third_party/index.js';
 import type {
   ConsoleMessage,
   EmbeddedResource,
@@ -21,7 +21,7 @@ import type {
   ResourceType,
   TextContent,
 } from './third_party/index.js';
-import {handleDialog} from './tools/pages.js';
+import { handleDialog } from './tools/pages.js';
 import type {
   DevToolsData,
   ImageContentData,
@@ -29,11 +29,11 @@ import type {
   Response,
   SnapshotParams,
 } from './tools/ToolDefinition.js';
-import type {InsightName, TraceResult} from './trace-processing/parse.js';
-import {getInsightOutput, getTraceSummary} from './trace-processing/parse.js';
-import type {InstalledExtension} from './utils/ExtensionRegistry.js';
-import {paginate} from './utils/pagination.js';
-import type {PaginationOptions} from './utils/types.js';
+import type { InsightName, TraceResult } from './trace-processing/parse.js';
+import { getInsightOutput, getTraceSummary } from './trace-processing/parse.js';
+import type { InstalledExtension } from './utils/ExtensionRegistry.js';
+import { paginate } from './utils/pagination.js';
+import type { PaginationOptions } from './utils/types.js';
 
 interface TraceInsightData {
   trace: TraceResult;
@@ -119,7 +119,7 @@ export class McpResponse implements Response {
       resourceTypes?: ResourceType[];
       includePreservedRequests?: boolean;
       networkRequestIdInDevToolsUI?: number;
-    },
+    }
   ): void {
     if (!value) {
       this.#networkRequestsOptions = undefined;
@@ -146,7 +146,7 @@ export class McpResponse implements Response {
     options?: PaginationOptions & {
       types?: string[];
       includePreservedMessages?: boolean;
-    },
+    }
   ): void {
     if (!value) {
       this.#consoleDataOptions = undefined;
@@ -169,7 +169,7 @@ export class McpResponse implements Response {
 
   attachNetworkRequest(
     reqid: number,
-    options?: {requestFilePath?: string; responseFilePath?: string},
+    options?: { requestFilePath?: string; responseFilePath?: string }
   ): void {
     this.#attachedNetworkRequestId = reqid;
     this.#attachedNetworkRequestOptions = options;
@@ -183,11 +183,7 @@ export class McpResponse implements Response {
     this.#attachedTraceSummary = result;
   }
 
-  attachTraceInsight(
-    trace: TraceResult,
-    insightSetId: string,
-    insightName: InsightName,
-  ): void {
+  attachTraceInsight(trace: TraceResult, insightSetId: string, insightName: InsightName): void {
     this.#attachedTraceInsight = {
       trace,
       insightSetId,
@@ -199,9 +195,7 @@ export class McpResponse implements Response {
     this.#attachedLighthouseResult = result;
   }
 
-  appendMcpContent(
-    value: TextContent | ImageContent | EmbeddedResource,
-  ): void {
+  appendMcpContent(value: TextContent | ImageContent | EmbeddedResource): void {
     this.#mcpContent.push(value);
   }
 
@@ -271,7 +265,7 @@ export class McpResponse implements Response {
 
   async handle(
     toolName: string,
-    context: McpContext,
+    context: McpContext
   ): Promise<{
     content: Array<TextContent | ImageContent | EmbeddedResource>;
     structuredContent: object;
@@ -292,7 +286,7 @@ export class McpResponse implements Response {
       await context.createTextSnapshot(
         this.#page,
         this.#snapshotParams.verbose,
-        this.#devToolsData,
+        this.#devToolsData
       );
       const textSnapshot = this.#page.textSnapshot;
       if (textSnapshot) {
@@ -300,7 +294,7 @@ export class McpResponse implements Response {
         if (this.#snapshotParams.filePath) {
           await context.saveFile(
             new TextEncoder().encode(formatter.toString()),
-            this.#snapshotParams.filePath,
+            this.#snapshotParams.filePath
           );
           snapshot = this.#snapshotParams.filePath;
         } else {
@@ -314,13 +308,10 @@ export class McpResponse implements Response {
       if (!this.#page) {
         throw new Error(`Response must have an McpPage`);
       }
-      const request = context.getNetworkRequestById(
-        this.#page,
-        this.#attachedNetworkRequestId,
-      );
+      const request = context.getNetworkRequestById(this.#page, this.#attachedNetworkRequestId);
       const formatter = await NetworkFormatter.from(request, {
         requestId: this.#attachedNetworkRequestId,
-        requestIdResolver: req => context.getNetworkRequestStableId(req),
+        requestIdResolver: (req) => context.getNetworkRequestStableId(req),
         fetchData: true,
         requestFilePath: this.#attachedNetworkRequestOptions?.requestFilePath,
         responseFilePath: this.#attachedNetworkRequestOptions?.responseFilePath,
@@ -336,10 +327,7 @@ export class McpResponse implements Response {
         throw new Error(`Response must have an McpPage`);
       }
 
-      const message = context.getConsoleMessageById(
-        this.#page,
-        this.#attachedConsoleMessageId,
-      );
+      const message = context.getConsoleMessageById(this.#page, this.#attachedConsoleMessageId);
       const consoleMessageStableId = this.#attachedConsoleMessageId;
       if ('args' in message || message instanceof UncaughtError) {
         const consoleMessage = message as ConsoleMessage | UncaughtError;
@@ -352,19 +340,11 @@ export class McpResponse implements Response {
       } else if (message instanceof DevTools.AggregatedIssue) {
         const formatter = new IssueFormatter(message, {
           id: consoleMessageStableId,
-          requestIdResolver: context.resolveCdpRequestId.bind(
-            context,
-            this.#page,
-          ),
-          elementIdResolver: context.resolveCdpElementId.bind(
-            context,
-            this.#page,
-          ),
+          requestIdResolver: context.resolveCdpRequestId.bind(context, this.#page),
+          elementIdResolver: context.resolveCdpElementId.bind(context, this.#page),
         });
         if (!formatter.isValid()) {
-          throw new Error(
-            "Can't provide detals for the msgid " + consoleMessageStableId,
-          );
+          throw new Error("Can't provide detals for the msgid " + consoleMessageStableId);
         }
         detailedConsoleMessage = formatter;
       }
@@ -382,12 +362,12 @@ export class McpResponse implements Response {
       const page = this.#page;
       let messages = context.getConsoleData(
         this.#page,
-        this.#consoleDataOptions.includePreservedMessages,
+        this.#consoleDataOptions.includePreservedMessages
       );
 
       if (this.#consoleDataOptions.types?.length) {
         const normalizedTypes = new Set(this.#consoleDataOptions.types);
-        messages = messages.filter(message => {
+        messages = messages.filter((message) => {
           if ('type' in message) {
             return normalizedTypes.has(message.type());
           }
@@ -400,33 +380,30 @@ export class McpResponse implements Response {
 
       consoleMessages = (
         await Promise.all(
-          messages.map(
-            async (item): Promise<ConsoleFormatter | IssueFormatter | null> => {
-              const consoleMessageStableId =
-                context.getConsoleMessageStableId(item);
-              if ('args' in item || item instanceof UncaughtError) {
-                const consoleMessage = item as ConsoleMessage | UncaughtError;
-                const devTools = context.getDevToolsUniverse(page);
-                return await ConsoleFormatter.from(consoleMessage, {
-                  id: consoleMessageStableId,
-                  fetchDetailedData: false,
-                  devTools: devTools ?? undefined,
-                });
+          messages.map(async (item): Promise<ConsoleFormatter | IssueFormatter | null> => {
+            const consoleMessageStableId = context.getConsoleMessageStableId(item);
+            if ('args' in item || item instanceof UncaughtError) {
+              const consoleMessage = item as ConsoleMessage | UncaughtError;
+              const devTools = context.getDevToolsUniverse(page);
+              return await ConsoleFormatter.from(consoleMessage, {
+                id: consoleMessageStableId,
+                fetchDetailedData: false,
+                devTools: devTools ?? undefined,
+              });
+            }
+            if (item instanceof DevTools.AggregatedIssue) {
+              const formatter = new IssueFormatter(item, {
+                id: consoleMessageStableId,
+              });
+              if (!formatter.isValid()) {
+                return null;
               }
-              if (item instanceof DevTools.AggregatedIssue) {
-                const formatter = new IssueFormatter(item, {
-                  id: consoleMessageStableId,
-                });
-                if (!formatter.isValid()) {
-                  return null;
-                }
-                return formatter;
-              }
-              return null;
-            },
-          ),
+              return formatter;
+            }
+            return null;
+          })
         )
-      ).filter(item => item !== null);
+      ).filter((item) => item !== null);
     }
 
     let networkRequests: NetworkFormatter[] | undefined;
@@ -436,15 +413,13 @@ export class McpResponse implements Response {
       }
       let requests = context.getNetworkRequests(
         this.#page,
-        this.#networkRequestsOptions?.includePreservedRequests,
+        this.#networkRequestsOptions?.includePreservedRequests
       );
 
       // Apply resource type filtering if specified
       if (this.#networkRequestsOptions.resourceTypes?.length) {
-        const normalizedTypes = new Set(
-          this.#networkRequestsOptions.resourceTypes,
-        );
-        requests = requests.filter(request => {
+        const normalizedTypes = new Set(this.#networkRequestsOptions.resourceTypes);
+        requests = requests.filter((request) => {
           const type = request.resourceType();
           return normalizedTypes.has(type);
         });
@@ -452,7 +427,7 @@ export class McpResponse implements Response {
 
       if (requests.length) {
         networkRequests = await Promise.all(
-          requests.map(request =>
+          requests.map((request) =>
             NetworkFormatter.from(request, {
               requestId: context.getNetworkRequestStableId(request),
               selectedInDevToolsUI:
@@ -460,8 +435,8 @@ export class McpResponse implements Response {
                 this.#networkRequestsOptions?.networkRequestIdInDevToolsUI,
               fetchData: false,
               saveFile: (data, filename) => context.saveFile(data, filename),
-            }),
-          ),
+            })
+          )
         );
       }
     }
@@ -492,7 +467,7 @@ export class McpResponse implements Response {
       traceInsight?: TraceInsightData;
       extensions?: InstalledExtension[];
       lighthouseResult?: LighthouseData;
-    },
+    }
   ): {
     content: Array<TextContent | ImageContent | EmbeddedResource>;
     structuredContent: object;
@@ -506,7 +481,7 @@ export class McpResponse implements Response {
       consoleMessage?: object;
       consoleMessages?: object[];
       traceSummary?: string;
-      traceInsights?: Array<{insightName: string; insightKey: string}>;
+      traceInsights?: Array<{ insightName: string; insightKey: string }>;
       lighthouseResult?: object;
       extensions?: object[];
       message?: string;
@@ -569,9 +544,7 @@ export class McpResponse implements Response {
     const dialog = this.#page?.getDialog();
     if (dialog) {
       const defaultValueIfNeeded =
-        dialog.type() === 'prompt'
-          ? ` (default value: "${dialog.defaultValue()}")`
-          : '';
+        dialog.type() === 'prompt' ? ` (default value: "${dialog.defaultValue()}")` : '';
       response.push(`# Open dialog
 ${dialog.type()}: ${dialog.message()}${defaultValueIfNeeded}.
 Call ${handleDialog.name} to handle it before continuing.`);
@@ -585,8 +558,8 @@ Call ${handleDialog.name} to handle it before continuing.`);
     if (this.#includePages) {
       const allPages = context.getPages();
 
-      const {regularPages, extensionPages} = allPages.reduce(
-        (acc: {regularPages: Page[]; extensionPages: Page[]}, page: Page) => {
+      const { regularPages, extensionPages } = allPages.reduce(
+        (acc: { regularPages: Page[]; extensionPages: Page[] }, page: Page) => {
           if (page.url().startsWith('chrome-extension://')) {
             acc.extensionPages.push(page);
           } else {
@@ -594,7 +567,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
           }
           return acc;
         },
-        {regularPages: [], extensionPages: []},
+        { regularPages: [], extensionPages: [] }
       );
 
       if (regularPages.length) {
@@ -602,11 +575,9 @@ Call ${handleDialog.name} to handle it before continuing.`);
         const structuredPages = [];
         for (const page of regularPages) {
           const isolatedContextName = context.getIsolatedContextName(page);
-          const contextLabel = isolatedContextName
-            ? ` isolatedContext=${isolatedContextName}`
-            : '';
+          const contextLabel = isolatedContextName ? ` isolatedContext=${isolatedContextName}` : '';
           parts.push(
-            `${context.getPageId(page)}: ${page.url()}${context.isPageSelected(page) ? ' [selected]' : ''}${contextLabel}`,
+            `${context.getPageId(page)}: ${page.url()}${context.isPageSelected(page) ? ' [selected]' : ''}${contextLabel}`
           );
           structuredPages.push(createStructuredPage(page, context));
         }
@@ -624,7 +595,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
               ? ` isolatedContext=${isolatedContextName}`
               : '';
             response.push(
-              `${context.getPageId(page)}: ${page.url()}${context.isPageSelected(page) ? ' [selected]' : ''}${contextLabel}`,
+              `${context.getPageId(page)}: ${page.url()}${context.isPageSelected(page) ? ' [selected]' : ''}${contextLabel}`
             );
             structuredExtensionPages.push(createStructuredPage(page, context));
           }
@@ -639,13 +610,11 @@ Call ${handleDialog.name} to handle it before continuing.`);
       }
 
       for (const extensionServiceWorker of context.getExtensionServiceWorkers()) {
-        response.push(
-          `${extensionServiceWorker.id}: ${extensionServiceWorker.url}`,
-        );
+        response.push(`${extensionServiceWorker.id}: ${extensionServiceWorker.url}`);
       }
       structuredContent.extensionServiceWorkers = context
         .getExtensionServiceWorkers()
-        .map(extensionServiceWorker => {
+        .map((extensionServiceWorker) => {
           return {
             id: extensionServiceWorker.id,
             url: extensionServiceWorker.url,
@@ -676,7 +645,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
       const insightOutput = getInsightOutput(
         data.traceInsight.trace,
         data.traceInsight.insightSetId,
-        data.traceInsight.insightName,
+        data.traceInsight.insightName
       );
       if ('error' in insightOutput) {
         response.push(insightOutput.error);
@@ -687,16 +656,14 @@ Call ${handleDialog.name} to handle it before continuing.`);
 
     if (data.lighthouseResult) {
       structuredContent.lighthouseResult = data.lighthouseResult;
-      const {summary, reports} = data.lighthouseResult;
+      const { summary, reports } = data.lighthouseResult;
       response.push('## Lighthouse Audit Results');
       response.push(`Mode: ${summary.mode}`);
       response.push(`Device: ${summary.device}`);
       response.push(`URL: ${summary.url}`);
       response.push('### Category Scores');
       for (const score of summary.scores) {
-        response.push(
-          `- ${score.title}: ${(score.score ?? 0) * 100} (${score.id})`,
-        );
+        response.push(`- ${score.title}: ${(score.score ?? 0) * 100} (${score.id})`);
       }
       response.push('### Audit Summary');
       response.push(`Passed: ${summary.audits.passed}`);
@@ -721,14 +688,12 @@ Call ${handleDialog.name} to handle it before continuing.`);
 
     if (data.detailedNetworkRequest) {
       response.push(data.detailedNetworkRequest.toStringDetailed());
-      structuredContent.networkRequest =
-        data.detailedNetworkRequest.toJSONDetailed();
+      structuredContent.networkRequest = data.detailedNetworkRequest.toJSONDetailed();
     }
 
     if (data.detailedConsoleMessage) {
       response.push(data.detailedConsoleMessage.toStringDetailed());
-      structuredContent.consoleMessage =
-        data.detailedConsoleMessage.toJSONDetailed();
+      structuredContent.consoleMessage = data.detailedConsoleMessage.toJSONDetailed();
     }
 
     if (data.extensions) {
@@ -738,7 +703,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
         response.push('No extensions installed.');
       } else {
         const extensionsMessage = data.extensions
-          .map(extension => {
+          .map((extension) => {
             return `id=${extension.id} "${extension.name}" v${extension.version} ${extension.isEnabled ? 'Enabled' : 'Disabled'}`;
           })
           .join('\n');
@@ -753,7 +718,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
       if (requests.length) {
         const paginationData = this.#dataWithPagination(
           requests,
-          this.#networkRequestsOptions.pagination,
+          this.#networkRequestsOptions.pagination
         );
         structuredContent.pagination = paginationData.pagination;
         response.push(...paginationData.info);
@@ -776,16 +741,12 @@ Call ${handleDialog.name} to handle it before continuing.`);
       if (messages.length) {
         const paginationData = this.#dataWithPagination(
           messages,
-          this.#consoleDataOptions.pagination,
+          this.#consoleDataOptions.pagination
         );
         structuredContent.pagination = paginationData.pagination;
         response.push(...paginationData.info);
-        response.push(
-          ...paginationData.items.map(message => message.toString()),
-        );
-        structuredContent.consoleMessages = paginationData.items.map(message =>
-          message.toJSON(),
-        );
+        response.push(...paginationData.items.map((message) => message.toString()));
+        structuredContent.consoleMessages = paginationData.items.map((message) => message.toJSON());
       } else {
         response.push('<no console messages found>');
       }
@@ -800,7 +761,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
             },
           ]
         : [];
-    const images: ImageContent[] = this.#images.map(imageData => {
+    const images: ImageContent[] = this.#images.map((imageData) => {
       return {
         type: 'image',
         ...imageData,
@@ -826,9 +787,9 @@ Call ${handleDialog.name} to handle it before continuing.`);
       response.push('Invalid page number provided. Showing first page.');
     }
 
-    const {startIndex, endIndex, currentPage, totalPages} = paginationResult;
+    const { startIndex, endIndex, currentPage, totalPages } = paginationResult;
     response.push(
-      `Showing ${startIndex + 1}-${endIndex} of ${data.length} (Page ${currentPage + 1} of ${totalPages}).`,
+      `Showing ${startIndex + 1}-${endIndex} of ${data.length} (Page ${currentPage + 1} of ${totalPages}).`
     );
     if (pagination) {
       if (paginationResult.hasNextPage) {

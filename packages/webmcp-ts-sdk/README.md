@@ -14,13 +14,13 @@
 
 ## Why Use @mcp-b/webmcp-ts-sdk?
 
-| Feature | Benefit |
-|---------|---------|
+| Feature                       | Benefit                                                               |
+| ----------------------------- | --------------------------------------------------------------------- |
 | **Dynamic Tool Registration** | Register tools after transport connection - required for browser apps |
-| **Minimal Overhead** | Only ~50 lines of custom code on top of official SDK |
-| **Full SDK Compatibility** | Re-exports all types, classes, and utilities from official SDK |
-| **Type-Safe** | No prototype hacks - clean TypeScript extension |
-| **Auto-Updates** | Types and protocol follow official SDK automatically |
+| **Minimal Overhead**          | Only ~50 lines of custom code on top of official SDK                  |
+| **Full SDK Compatibility**    | Re-exports all types, classes, and utilities from official SDK        |
+| **Type-Safe**                 | No prototype hacks - clean TypeScript extension                       |
+| **Auto-Updates**              | Types and protocol follow official SDK automatically                  |
 
 ## Overview
 
@@ -66,8 +66,8 @@ export class BrowserMcpServer extends BaseMcpServer {
     const enhancedOptions = {
       ...options,
       capabilities: mergeCapabilities(options?.capabilities || {}, {
-        tools: { listChanged: true }
-      })
+        tools: { listChanged: true },
+      }),
     };
     super(serverInfo, enhancedOptions);
   }
@@ -87,16 +87,19 @@ export class BrowserMcpServer extends BaseMcpServer {
 This package re-exports almost everything from the official SDK:
 
 ### Types
+
 - All MCP protocol types (`Tool`, `Resource`, `Prompt`, etc.)
 - Request/response schemas
 - Client and server capabilities
 - Error codes and constants
 
 ### Classes
+
 - `Server` - Base server class (unchanged)
 - `McpServer` - Aliased to `BrowserMcpServer` with our modifications
 
 ### Utilities
+
 - `Transport` interface
 - `mergeCapabilities` helper
 - Protocol version constants
@@ -119,7 +122,7 @@ import { TabServerTransport } from '@mcp-b/transports';
 
 const server = new McpServer({
   name: 'my-web-app',
-  version: '1.0.0'
+  version: '1.0.0',
 });
 
 // Connect transport first
@@ -127,42 +130,50 @@ const transport = new TabServerTransport({ allowedOrigins: ['*'] });
 await server.connect(transport);
 
 // Now you can register tools dynamically (this would fail with official SDK)
-server.registerTool('my-tool', {
-  description: 'A dynamically registered tool',
-  inputSchema: { message: z.string() },
-  // Output schemas enable structured, type-safe AI responses
-  outputSchema: { result: z.string() }
-}, async ({ message }) => {
-  return {
-    content: [{ type: 'text', text: `Echo: ${message}` }],
-    // structuredContent must match the outputSchema
-    structuredContent: { result: `Echo: ${message}` }
-  };
-});
+server.registerTool(
+  'my-tool',
+  {
+    description: 'A dynamically registered tool',
+    inputSchema: { message: z.string() },
+    // Output schemas enable structured, type-safe AI responses
+    outputSchema: { result: z.string() },
+  },
+  async ({ message }) => {
+    return {
+      content: [{ type: 'text', text: `Echo: ${message}` }],
+      // structuredContent must match the outputSchema
+      structuredContent: { result: `Echo: ${message}` },
+    };
+  }
+);
 
 // Example with complex output schema
-server.registerTool('analyze-data', {
-  description: 'Analyze data and return structured results',
-  inputSchema: {
-    data: z.array(z.number()),
-    operation: z.enum(['sum', 'average', 'stats'])
+server.registerTool(
+  'analyze-data',
+  {
+    description: 'Analyze data and return structured results',
+    inputSchema: {
+      data: z.array(z.number()),
+      operation: z.enum(['sum', 'average', 'stats']),
+    },
+    outputSchema: {
+      result: z.number(),
+      operation: z.string(),
+      metadata: z.object({
+        count: z.number(),
+        min: z.number().optional(),
+        max: z.number().optional(),
+      }),
+    },
   },
-  outputSchema: {
-    result: z.number(),
-    operation: z.string(),
-    metadata: z.object({
-      count: z.number(),
-      min: z.number().optional(),
-      max: z.number().optional()
-    })
+  async ({ data, operation }) => {
+    const stats = calculateStats(data, operation);
+    return {
+      content: [{ type: 'text', text: `Result: ${stats.result}` }],
+      structuredContent: stats,
+    };
   }
-}, async ({ data, operation }) => {
-  const stats = calculateStats(data, operation);
-  return {
-    content: [{ type: 'text', text: `Result: ${stats.result}` }],
-    structuredContent: stats
-  };
-});
+);
 ```
 
 ## Architecture

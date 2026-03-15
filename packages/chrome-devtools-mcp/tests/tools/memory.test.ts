@@ -5,14 +5,14 @@
  */
 
 import assert from 'node:assert';
-import {existsSync} from 'node:fs';
-import {rm} from 'node:fs/promises';
-import {tmpdir} from 'node:os';
-import {join} from 'node:path';
-import {describe, it} from 'node:test';
+import { existsSync } from 'node:fs';
+import { rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, it } from 'node:test';
 
-import {takeMemorySnapshot} from '../../src/tools/memory.js';
-import {withMcpContext} from '../utils.js';
+import { takeMemorySnapshot } from '../../src/tools/memory.js';
+import { withMcpContext } from '../utils.js';
 
 describe('memory', () => {
   describe('take_memory_snapshot', () => {
@@ -21,17 +21,14 @@ describe('memory', () => {
         const filePath = join(tmpdir(), 'test-screenshot.heapsnapshot');
         try {
           await takeMemorySnapshot.handler(
-            {params: {filePath}, page: context.getSelectedMcpPage()},
+            { params: { filePath }, page: context.getSelectedMcpPage() },
             response,
-            context,
+            context
           );
-          assert.equal(
-            response.responseLines.at(0),
-            `Heap snapshot saved to ${filePath}`,
-          );
+          assert.equal(response.responseLines.at(0), `Heap snapshot saved to ${filePath}`);
           assert.ok(existsSync(filePath));
         } finally {
-          await rm(filePath, {force: true});
+          await rm(filePath, { force: true });
         }
       });
     });

@@ -17,7 +17,6 @@ A skill is a directory containing at minimum a `SKILL.md` file with YAML frontma
 name: skill-name
 description: A description of what this skill does and when to use it.
 ---
-
 # Skill Instructions
 
 Markdown content here...
@@ -27,19 +26,19 @@ Markdown content here...
 
 ### Required Fields
 
-| Field | Type | Constraints |
-|-------|------|-------------|
-| `name` | string | Max 64 characters. Lowercase letters, numbers, and hyphens only. Must not start/end with hyphen or contain consecutive hyphens. Must match parent directory name. |
-| `description` | string | Max 1024 characters. Non-empty. Should describe what the skill does and when to use it. |
+| Field         | Type   | Constraints                                                                                                                                                       |
+| ------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`        | string | Max 64 characters. Lowercase letters, numbers, and hyphens only. Must not start/end with hyphen or contain consecutive hyphens. Must match parent directory name. |
+| `description` | string | Max 1024 characters. Non-empty. Should describe what the skill does and when to use it.                                                                           |
 
 ### Optional Fields
 
-| Field | Type | Constraints |
-|-------|------|-------------|
-| `license` | string | License name or reference to bundled license file. |
+| Field           | Type   | Constraints                                                                              |
+| --------------- | ------ | ---------------------------------------------------------------------------------------- |
+| `license`       | string | License name or reference to bundled license file.                                       |
 | `compatibility` | string | Max 500 characters. Environment requirements (product, system packages, network access). |
-| `metadata` | object | Arbitrary key-value string mapping for additional properties. |
-| `allowed-tools` | string | Space-delimited list of pre-approved tools (Experimental). |
+| `metadata`      | object | Arbitrary key-value string mapping for additional properties.                            |
+| `allowed-tools` | string | Space-delimited list of pre-approved tools (Experimental).                               |
 
 ## Validation Rules
 
@@ -51,12 +50,14 @@ Markdown content here...
 **i18n**: Supports Unicode letters (Chinese, Russian, etc.)
 
 **Rules**:
+
 - Must be lowercase
 - Cannot start or end with hyphen
 - Cannot contain consecutive hyphens (`--`)
 - Must only contain letters, digits, and hyphens
 
 **Valid Examples**:
+
 ```yaml
 name: pdf-processing
 name: data-analysis
@@ -66,6 +67,7 @@ name: мой-навык     # Russian with hyphens
 ```
 
 **Invalid Examples**:
+
 ```yaml
 name: PDF-Processing      # uppercase not allowed
 name: -pdf                # cannot start with hyphen
@@ -79,13 +81,15 @@ name: my_skill            # underscores not allowed
 **Must**: Be non-empty string
 
 **Good Example**:
+
 ```yaml
 description: Extracts text and tables from PDF files, fills PDF forms, and merges multiple PDFs. Use when working with PDF documents or when the user mentions PDFs, forms, or document extraction.
 ```
 
 **Poor Example**:
+
 ```yaml
-description: Helps with PDFs.  # Too vague
+description: Helps with PDFs. # Too vague
 ```
 
 ### Compatibility Field
@@ -106,7 +110,7 @@ compatibility: Requires git, docker, jq, and access to the internet
 ```yaml
 metadata:
   author: example-org
-  version: "1.0"
+  version: '1.0'
   category: data-processing
 ```
 
@@ -164,6 +168,7 @@ skill-name/
 The Python reference implementation (`skills-ref`) provides canonical behavior:
 
 ### Parser (`parser.py`)
+
 - Finds `SKILL.md` (case-insensitive, prefers uppercase)
 - Parses YAML frontmatter with `strictyaml`
 - Validates required fields presence
@@ -171,6 +176,7 @@ The Python reference implementation (`skills-ref`) provides canonical behavior:
 - Converts metadata to string key-value pairs
 
 ### Validator (`validator.py`)
+
 - NFKC Unicode normalization
 - Name format validation (lowercase, hyphens, length)
 - Description length validation
@@ -179,6 +185,7 @@ The Python reference implementation (`skills-ref`) provides canonical behavior:
 - Directory name matching (when applicable)
 
 ### Models (`models.py`)
+
 - `SkillProperties` dataclass with required/optional fields
 - `to_dict()` method excludes None values
 - `allowed-tools` stored with hyphen (not underscore)
@@ -187,6 +194,7 @@ The Python reference implementation (`skills-ref`) provides canonical behavior:
 ## Testing Requirements
 
 This implementation must pass equivalent tests to:
+
 - `tests/test_parser.py` (29+ test cases)
 - `tests/test_validator.py` (32+ test cases)
 

@@ -32,39 +32,39 @@ Beyond `destructiveHint`, use all three annotations:
 useWebMCP({
   name: 'list_products',
   annotations: {
-    readOnlyHint: true,      // No side effects
-    idempotentHint: true,    // Safe to retry
-    destructiveHint: false   // Not destructive (default)
+    readOnlyHint: true, // No side effects
+    idempotentHint: true, // Safe to retry
+    destructiveHint: false, // Not destructive (default)
   },
-  handler: async () => ({ products: await getProducts() })
+  handler: async () => ({ products: await getProducts() }),
 });
 
 // Read-write tool (fills form)
 useWebMCP({
   name: 'fill_checkout_form',
   annotations: {
-    readOnlyHint: false,     // Modifies UI state
-    idempotentHint: true,    // Can call multiple times safely
-    destructiveHint: false   // Not destructive - just filling fields
+    readOnlyHint: false, // Modifies UI state
+    idempotentHint: true, // Can call multiple times safely
+    destructiveHint: false, // Not destructive - just filling fields
   },
   handler: async ({ address, payment }) => {
     setFormData({ address, payment });
     return { success: true };
-  }
+  },
 });
 
 // Destructive tool (actually submits)
 useWebMCP({
   name: 'complete_purchase',
   annotations: {
-    readOnlyHint: false,     // Changes state
-    idempotentHint: false,   // Should only be called once
-    destructiveHint: true    // Charges money - irreversible!
+    readOnlyHint: false, // Changes state
+    idempotentHint: false, // Should only be called once
+    destructiveHint: true, // Charges money - irreversible!
   },
   handler: async () => {
     await chargeCreditCard();
     return { orderId: '...' };
-  }
+  },
 });
 ```
 
@@ -131,15 +131,20 @@ useWebMCP({
 useWebMCP({
   name: 'get_cart',
   // outputSchema: Defines the STRUCTURE (for type safety and validation)
-  outputSchema: useMemo(() => ({
-    items: z.array(z.object({
-      name: z.string(),
-      price: z.number(),
-      quantity: z.number()
-    })),
-    total: z.number(),
-    itemCount: z.number()
-  }), []),
+  outputSchema: useMemo(
+    () => ({
+      items: z.array(
+        z.object({
+          name: z.string(),
+          price: z.number(),
+          quantity: z.number(),
+        })
+      ),
+      total: z.number(),
+      itemCount: z.number(),
+    }),
+    []
+  ),
 
   handler: async () => {
     const cart = await getCart();
@@ -148,18 +153,19 @@ useWebMCP({
     return {
       items: cart.items,
       total: cart.total,
-      itemCount: cart.items.length
+      itemCount: cart.items.length,
     };
   },
 
   // formatOutput: TEXT representation (for display/logging)
   formatOutput: (output) => {
     return `Cart has ${output.itemCount} items (total: $${output.total})`;
-  }
+  },
 });
 ```
 
 **When to use each**:
+
 - **outputSchema**: Always. Provides type safety and structure.
 - **formatOutput**: Optional. Provides human-readable text summary.
 
@@ -194,14 +200,14 @@ useWebMCP({
   name: 'add_to_cart',
   inputSchema: {
     productId: z.string(),
-    quantity: z.number().positive()
+    quantity: z.number().positive(),
   },
   handler: async ({ productId, quantity }) => {
     // Validation error - return structured error
     if (quantity > 10) {
       return {
         success: false,
-        error: 'Maximum quantity is 10'
+        error: 'Maximum quantity is 10',
       };
     }
 
@@ -214,7 +220,7 @@ useWebMCP({
   onError: (error, input) => {
     console.error('Add to cart failed:', error);
     showToast(`Failed to add ${input.productId}: ${error.message}`);
-  }
+  },
 });
 ```
 
@@ -232,18 +238,18 @@ useWebMCP({
   description: 'Permanently delete user account (irreversible)',
   annotations: {
     destructiveHint: true,
-    idempotentHint: false
+    idempotentHint: false,
   },
   inputSchema: {
     // Require explicit confirmation parameter
-    confirmation: z.literal('DELETE_MY_ACCOUNT').describe('Must be exact string DELETE_MY_ACCOUNT')
+    confirmation: z.literal('DELETE_MY_ACCOUNT').describe('Must be exact string DELETE_MY_ACCOUNT'),
   },
   handler: async ({ confirmation }) => {
     // Double confirmation with browser dialog
     const userConfirmed = window.confirm(
       '⚠️ Delete your account permanently?\n\n' +
-      'This action cannot be undone.\n\n' +
-      'All data will be lost.'
+        'This action cannot be undone.\n\n' +
+        'All data will be lost.'
     );
 
     if (!userConfirmed) {
@@ -260,11 +266,12 @@ useWebMCP({
 
     await deleteAccount();
     return { success: true, message: 'Account deleted' };
-  }
+  },
 });
 ```
 
 **Layers of protection**:
+
 1. Literal string in schema (`z.literal('DELETE_MY_ACCOUNT')`)
 2. Browser confirmation dialog (`window.confirm`)
 3. Rate limiting (optional)
@@ -283,7 +290,7 @@ useWebMCP({
   handler: async (input) => {
     updateCartUI(input); // Fast UI update
     return { success: true };
-  }
+  },
 });
 
 // ❌ Bad - slow operation blocks UI
@@ -292,7 +299,7 @@ useWebMCP({
   handler: async (input) => {
     await longRunningTask(); // Blocks for seconds
     return { done: true };
-  }
+  },
 });
 
 // ✅ Better - delegate heavy work
@@ -302,7 +309,7 @@ useWebMCP({
     // Queue work, return immediately
     const jobId = await queueBackgroundJob(input);
     return { queued: true, jobId };
-  }
+  },
 });
 
 // Provide status check tool
@@ -312,7 +319,7 @@ useWebMCP({
   handler: async ({ jobId }) => {
     const status = await getJobStatus(jobId);
     return { status, progress: status.progress };
-  }
+  },
 });
 ```
 

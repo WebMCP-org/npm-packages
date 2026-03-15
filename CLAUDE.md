@@ -5,14 +5,16 @@ Guidance for Claude Code when working with this repository.
 ## Commands
 
 ```bash
-pnpm install          # Install dependencies
+vp install            # Install dependencies
 pnpm build            # Build all packages
 pnpm typecheck        # Type checking
-pnpm check            # Lint and format (Biome)
+vp check --fix        # Lint, format, and fix (Oxlint + Oxfmt)
+vp check              # Check without fixing (CI)
 pnpm check-all        # All checks (typecheck + lint)
-pnpm test             # Run tests
 pnpm test:unit        # Unit tests only
 pnpm test:e2e         # E2E tests only
+vp test run           # Run tests in current package
+vp pack               # Build current library package
 pnpm changeset        # Create a changeset for versioning
 ```
 
@@ -29,19 +31,23 @@ templates/          # Project templates
 
 ## Key Files
 
-| File | Purpose |
-|------|---------|
-| [CONTRIBUTING.md](./CONTRIBUTING.md) | Code quality requirements, commit format, PR process |
-| [.claude/PUBLISHING.md](.claude/PUBLISHING.md) | Publishing workflow and troubleshooting |
-| [docs/TESTING.md](./docs/TESTING.md) | Testing documentation |
-| [pnpm-workspace.yaml](./pnpm-workspace.yaml) | Workspace packages and dependency catalog |
-| [biome.json](./biome.json) | Linting and formatting rules |
+| File                                           | Purpose                                              |
+| ---------------------------------------------- | ---------------------------------------------------- |
+| [CONTRIBUTING.md](./CONTRIBUTING.md)           | Code quality requirements, commit format, PR process |
+| [.claude/PUBLISHING.md](.claude/PUBLISHING.md) | Publishing workflow and troubleshooting              |
+| [docs/TESTING.md](./docs/TESTING.md)           | Testing documentation                                |
+| [pnpm-workspace.yaml](./pnpm-workspace.yaml)   | Workspace packages and dependency catalog            |
+| [vite.config.ts](./vite.config.ts)             | Lint, format, staged, and task config (Vite+)        |
 
 ## Quick Reference
 
-- **Node**: >= 22.12 (see `.nvmrc`)
+- **Node**: >= 22.12
 - **Package manager**: pnpm (not npm/yarn)
-- **Linter**: Biome (not ESLint/Prettier)
+- **Toolchain**: Vite+ (`vp` CLI) — unified dev/build/test/lint/format
+- **Linter**: Oxlint (via `vp lint` / `vp check`)
+- **Formatter**: Oxfmt (via `vp fmt` / `vp check`)
+- **Bundler**: tsdown via `vp pack` (config in each package's `vite.config.ts` `pack` block)
+- **Test runner**: Vitest via `vp test` (config in each package's `vite.config.ts` `test` block)
 - **Zod version**: Optional peer dep. Supports ^3.25 || ^4.0 when present
 - **Commit format**: `<type>(<scope>): <subject>` (enforced by hook)
 
@@ -96,18 +102,18 @@ Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 
 ### What Lives Where
 
-| Method | Web Standard | Polyfill | BrowserMcpServer |
-|--------|:---:|:---:|:---:|
-| `provideContext()` | Y | Y | Y (mirrors to native) |
-| `registerTool()` | Y | Y | Y (mirrors to native) |
-| `unregisterTool()` | Y | Y | Y (mirrors to native) |
-| `clearContext()` | Y | Y | Y (mirrors to native) |
-| `registerPrompt()` | - | - | Y |
-| `registerResource()` | - | - | Y |
-| `listTools()` | - | - | Y |
-| `callTool()` | - | - | Y |
-| `createMessage()` | - | - | Y |
-| `elicitInput()` | - | - | Y |
+| Method               | Web Standard | Polyfill |   BrowserMcpServer    |
+| -------------------- | :----------: | :------: | :-------------------: |
+| `provideContext()`   |      Y       |    Y     | Y (mirrors to native) |
+| `registerTool()`     |      Y       |    Y     | Y (mirrors to native) |
+| `unregisterTool()`   |      Y       |    Y     | Y (mirrors to native) |
+| `clearContext()`     |      Y       |    Y     | Y (mirrors to native) |
+| `registerPrompt()`   |      -       |    -     |           Y           |
+| `registerResource()` |      -       |    -     |           Y           |
+| `listTools()`        |      -       |    -     |           Y           |
+| `callTool()`         |      -       |    -     |           Y           |
+| `createMessage()`    |      -       |    -     |           Y           |
+| `elicitInput()`      |      -       |    -     |           Y           |
 
 ### Key Type Interfaces (`@mcp-b/webmcp-types`)
 
@@ -120,13 +126,14 @@ Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 
 The `.reference/` directory (gitignored) holds shallow clones of upstream repos we track for sync. These are NOT dependencies — they are for human/AI reference when syncing with upstream changes.
 
-| Directory | Upstream | Tracked By |
-|-----------|----------|------------|
-| `cloudflare-agents/` | [cloudflare/agents](https://github.com/cloudflare/agents) | `@mcp-b/codemode` |
-| `standard-schema/` | [standard-schema/standard-schema](https://github.com/standard-schema/standard-schema) | `@mcp-b/webmcp-types` |
-| `typescript-sdk/` | [anthropics/anthropic-sdk-typescript](https://github.com/anthropics/anthropic-sdk-typescript) | General reference |
+| Directory            | Upstream                                                                                      | Tracked By            |
+| -------------------- | --------------------------------------------------------------------------------------------- | --------------------- |
+| `cloudflare-agents/` | [cloudflare/agents](https://github.com/cloudflare/agents)                                     | `@mcp-b/codemode`     |
+| `standard-schema/`   | [standard-schema/standard-schema](https://github.com/standard-schema/standard-schema)         | `@mcp-b/webmcp-types` |
+| `typescript-sdk/`    | [anthropics/anthropic-sdk-typescript](https://github.com/anthropics/anthropic-sdk-typescript) | General reference     |
 
 To clone or refresh:
+
 ```bash
 cd .reference
 git clone --depth 1 https://github.com/cloudflare/agents.git cloudflare-agents
@@ -136,21 +143,22 @@ git clone --depth 1 https://github.com/cloudflare/agents.git cloudflare-agents
 
 `@mcp-b/codemode` is a browser-native port of `@cloudflare/codemode`. The file structure mirrors upstream for easy diffing:
 
-| Our file | Upstream equivalent | Notes |
-|----------|-------------------|-------|
-| `utils.ts` | `utils.ts` | Direct port |
-| `json-schema-types.ts` | `json-schema-types.ts` | Direct port |
-| `normalize.ts` | `normalize.ts` | Direct port |
-| `tool-types.ts` | `tool-types.ts` | Direct port (AI SDK schema introspection) |
-| `tool.ts` | `tool.ts` | Direct port (createCodeTool) |
-| `ai.ts` | `ai.ts` | Re-exports (matches upstream) |
-| `types.ts` | `executor.ts` | Executor/ExecuteResult interfaces only |
-| `iframe-executor.ts` | — | Browser-native (replaces CF's DynamicWorkerExecutor) |
-| `worker-executor.ts` | — | Browser-native fallback |
-| `messages.ts` | — | Typed postMessage protocol |
-| `webmcp.ts` | — | WebMCP bridge |
+| Our file               | Upstream equivalent    | Notes                                                |
+| ---------------------- | ---------------------- | ---------------------------------------------------- |
+| `utils.ts`             | `utils.ts`             | Direct port                                          |
+| `json-schema-types.ts` | `json-schema-types.ts` | Direct port                                          |
+| `normalize.ts`         | `normalize.ts`         | Direct port                                          |
+| `tool-types.ts`        | `tool-types.ts`        | Direct port (AI SDK schema introspection)            |
+| `tool.ts`              | `tool.ts`              | Direct port (createCodeTool)                         |
+| `ai.ts`                | `ai.ts`                | Re-exports (matches upstream)                        |
+| `types.ts`             | `executor.ts`          | Executor/ExecuteResult interfaces only               |
+| `iframe-executor.ts`   | —                      | Browser-native (replaces CF's DynamicWorkerExecutor) |
+| `worker-executor.ts`   | —                      | Browser-native fallback                              |
+| `messages.ts`          | —                      | Typed postMessage protocol                           |
+| `webmcp.ts`            | —                      | WebMCP bridge                                        |
 
 When upstream adds features, diff with:
+
 ```bash
 diff -r .reference/cloudflare-agents/packages/codemode/src packages/codemode/src
 ```
@@ -158,6 +166,7 @@ diff -r .reference/cloudflare-agents/packages/codemode/src packages/codemode/src
 ## Before Committing
 
 All code must pass:
+
 ```bash
-pnpm build && pnpm typecheck && pnpm check && pnpm test:unit
+pnpm build && pnpm typecheck && vp check && pnpm test:unit
 ```

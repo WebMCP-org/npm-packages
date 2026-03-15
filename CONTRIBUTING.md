@@ -17,12 +17,14 @@ These docs define review expectations for safety, contract synchronization, and 
 **All contributions must meet these standards before being merged:**
 
 ### Type Safety
+
 - All code must be written in TypeScript with strict mode enabled
 - No `any` types unless absolutely necessary (and documented why)
 - All public APIs must have explicit type annotations
 - No `@ts-ignore` or `@ts-expect-error` without explanation
 
 ### Testing
+
 - All new features must include tests
 - All bug fixes must include a regression test
 - Tests must pass before submitting a PR:
@@ -34,6 +36,7 @@ These docs define review expectations for safety, contract synchronization, and 
   ```
 
 ### Code Quality Checks
+
 - All code must pass linting and formatting:
   ```bash
   pnpm check        # Biome linting and formatting
@@ -42,7 +45,9 @@ These docs define review expectations for safety, contract synchronization, and 
   ```
 
 ### Before Submitting a PR
+
 Run the full validation suite:
+
 ```bash
 pnpm build && pnpm typecheck && pnpm check && pnpm test:unit
 pnpm audit:ci:high      # informational high-severity report (prod deps; excluding e2e test-app paths)
@@ -122,11 +127,13 @@ For environment setup and workspace commands, see [Development](./README.md#deve
 We follow the [Conventional Commits](https://www.conventionalcommits.org/) specification with **required package scopes** for clarity in our monorepo:
 
 #### Commit Format
+
 ```
 <type>(<scope>): <subject>
 ```
 
 #### Types
+
 - `feat:` New feature
 - `fix:` Bug fix
 - `docs:` Documentation only changes
@@ -139,7 +146,9 @@ We follow the [Conventional Commits](https://www.conventionalcommits.org/) speci
 - `chore:` Other changes that don't modify src or test files
 
 #### Scopes (Required)
+
 Package scopes (all in `packages/` directory):
+
 - `chrome-devtools-mcp` - @mcp-b/chrome-devtools-mcp
 - `extension-tools` - @mcp-b/extension-tools
 - `global` - @mcp-b/global
@@ -154,6 +163,7 @@ Package scopes (all in `packages/` directory):
 - `webmcp-types` - @mcp-b/webmcp-types
 
 Repository-wide scopes:
+
 - `root` - Changes to root config files
 - `deps` - Dependency updates
 - `release` - Release-related changes
@@ -162,6 +172,7 @@ Repository-wide scopes:
 - `*` - Multiple packages affected (use sparingly)
 
 #### Examples
+
 ```bash
 # Package-specific changes
 git commit -m "feat(transports): add postMessage timeout option to TabServerTransport"
@@ -183,6 +194,7 @@ git commit -m "refactor(*): update to new MCP SDK types"
 ### Submitting Your Pull Request
 
 1. **Push your branch**
+
    ```bash
    git push origin feature/your-feature-name
    ```
@@ -228,23 +240,27 @@ npm-packages/
 When contributing to a specific package:
 
 ### @mcp-b/global
+
 - Ensure compatibility with W3C Web Model Context API spec
 - Test in multiple browser environments
 - Validate tool registration and unregistration
 - Handle edge cases in two-bucket system
 
 ### @mcp-b/webmcp-ts-sdk
+
 - Minimal modifications to official SDK
 - Maintain compatibility with upstream SDK updates
 - Focus on dynamic tool registration support
 
 ### @mcp-b/transports
+
 - Ensure browser compatibility
 - Test in multiple browser environments
 - Handle connection lifecycle properly
 - Support both Tab and Extension transports
 
 ### @mcp-b/react-webmcp
+
 - Follow React best practices
 - Ensure proper cleanup in useEffect
 - Add proper TypeScript types for hooks
@@ -252,24 +268,28 @@ When contributing to a specific package:
 - Test with React StrictMode
 
 ### @mcp-b/extension-tools
+
 - Test in Chrome extension context
 - Document required permissions
 - Handle chrome.runtime errors gracefully
 - Auto-generate tools from Chrome API types
 
 ### @mcp-b/smart-dom-reader
+
 - Optimize for token efficiency
 - Test in various DOM structures
 - Handle shadow DOM and iframes
 - Maintain stateless architecture
 
 ### @mcp-b/chrome-devtools-mcp
+
 - Test with Chrome DevTools Protocol
 - Handle browser window lifecycle
 - Support WebMCP tool integration
 - Test auto-connect and session management
 
 ### @mcp-b/mcp-iframe
+
 - Test cross-origin scenarios
 - Handle postMessage security properly
 - Support tool prefixing for namespacing
@@ -310,6 +330,7 @@ Releases are handled automatically by our CI/CD pipeline:
 ## Recognition
 
 Contributors will be recognized in:
+
 - The project README
 - Release notes
 - Our Discord community

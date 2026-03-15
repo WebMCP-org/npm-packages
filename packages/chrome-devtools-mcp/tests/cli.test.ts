@@ -5,9 +5,9 @@
  */
 
 import assert from 'node:assert';
-import {describe, it} from 'node:test';
+import { describe, it } from 'node:test';
 
-import {parseArguments} from '../src/bin/chrome-devtools-mcp-cli-options.js';
+import { parseArguments } from '../src/bin/chrome-devtools-mcp-cli-options.js';
 
 describe('cli args parsing', () => {
   const defaultArgs = {
@@ -75,12 +75,7 @@ describe('cli args parsing', () => {
   });
 
   it('parses an empty browser url', async () => {
-    const args = parseArguments('1.0.0', [
-      'node',
-      'main.js',
-      '--browserUrl',
-      '',
-    ]);
+    const args = parseArguments('1.0.0', ['node', 'main.js', '--browserUrl', '']);
     assert.deepStrictEqual(args, {
       ...defaultArgs,
       _: [],
@@ -112,12 +107,7 @@ describe('cli args parsing', () => {
   });
 
   it('parses viewport', async () => {
-    const args = parseArguments('1.0.0', [
-      'node',
-      'main.js',
-      '--viewport',
-      '888x777',
-    ]);
+    const args = parseArguments('1.0.0', ['node', 'main.js', '--viewport', '888x777']);
     assert.deepStrictEqual(args, {
       ...defaultArgs,
       _: [],
@@ -162,14 +152,8 @@ describe('cli args parsing', () => {
       headless: false,
       $0: 'npx chrome-devtools-mcp@latest',
       channel: 'stable',
-      'ignore-default-chrome-arg': [
-        '--disable-extensions',
-        '--disable-cancel-all-touches',
-      ],
-      ignoreDefaultChromeArg: [
-        '--disable-extensions',
-        '--disable-cancel-all-touches',
-      ],
+      'ignore-default-chrome-arg': ['--disable-extensions', '--disable-cancel-all-touches'],
+      ignoreDefaultChromeArg: ['--disable-extensions', '--disable-cancel-all-touches'],
     });
   });
 
@@ -225,11 +209,7 @@ describe('cli args parsing', () => {
   });
 
   it('parses disabled category', async () => {
-    const args = parseArguments('1.0.0', [
-      'node',
-      'main.js',
-      '--no-category-emulation',
-    ]);
+    const args = parseArguments('1.0.0', ['node', 'main.js', '--no-category-emulation']);
     assert.deepStrictEqual(args, {
       ...defaultArgs,
       _: [],
@@ -259,19 +239,11 @@ describe('cli args parsing', () => {
     assert.strictEqual(defaultArgs.usageStatistics, true);
 
     // Test enabling it
-    const enabledArgs = parseArguments('1.0.0', [
-      'node',
-      'main.js',
-      '--usage-statistics',
-    ]);
+    const enabledArgs = parseArguments('1.0.0', ['node', 'main.js', '--usage-statistics']);
     assert.strictEqual(enabledArgs.usageStatistics, true);
 
     // Test disabling it
-    const disabledArgs = parseArguments('1.0.0', [
-      'node',
-      'main.js',
-      '--no-usage-statistics',
-    ]);
+    const disabledArgs = parseArguments('1.0.0', ['node', 'main.js', '--no-usage-statistics']);
     assert.strictEqual(disabledArgs.usageStatistics, false);
   });
 
@@ -280,18 +252,10 @@ describe('cli args parsing', () => {
     assert.strictEqual(defaultArgs.performanceCrux, true);
 
     // force enable
-    const enabledArgs = parseArguments('1.0.0', [
-      'node',
-      'main.js',
-      '--performance-crux',
-    ]);
+    const enabledArgs = parseArguments('1.0.0', ['node', 'main.js', '--performance-crux']);
     assert.strictEqual(enabledArgs.performanceCrux, true);
 
-    const disabledArgs = parseArguments('1.0.0', [
-      'node',
-      'main.js',
-      '--no-performance-crux',
-    ]);
+    const disabledArgs = parseArguments('1.0.0', ['node', 'main.js', '--no-performance-crux']);
     assert.strictEqual(disabledArgs.performanceCrux, false);
   });
 });

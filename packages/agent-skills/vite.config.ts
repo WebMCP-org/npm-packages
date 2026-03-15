@@ -1,6 +1,21 @@
-import { defineConfig } from 'vitest/config';
+import { defineConfig } from 'vite-plus';
 
 export default defineConfig({
+  pack: {
+    entry: ['src/index.ts'],
+    format: ['esm'],
+    dts: true,
+    splitting: false,
+    sourcemap: true,
+    clean: true,
+    treeshake: true,
+    minify: false,
+    target: 'esnext',
+    platform: 'browser',
+    external: [],
+    noExternal: ['yaml'],
+    tsconfig: './tsconfig.json',
+  },
   test: {
     globals: true,
     environment: 'node',

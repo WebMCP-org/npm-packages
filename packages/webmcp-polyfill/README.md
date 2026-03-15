@@ -29,11 +29,11 @@ Recommended setup:
 
 ## Package Selection
 
-| Package | Use When |
-| --- | --- |
-| `@mcp-b/webmcp-types` | You only need compile-time types (no runtime) |
+| Package                  | Use When                                                   |
+| ------------------------ | ---------------------------------------------------------- |
+| `@mcp-b/webmcp-types`    | You only need compile-time types (no runtime)              |
 | `@mcp-b/webmcp-polyfill` | You need strict `navigator.modelContext` core runtime only |
-| `@mcp-b/global` | You want full MCPB runtime (core + bridge extensions) |
+| `@mcp-b/global`          | You want full MCPB runtime (core + bridge extensions)      |
 
 ## Install
 
@@ -120,11 +120,11 @@ Inference notes:
 
 Installs the strict core polyfill on `navigator.modelContext`.
 
-| Option | Type | Default | Notes |
-| --- | --- | --- | --- |
-| `autoInitialize` | `boolean` | `true` | Used by auto-init flows (IIFE/import side effect). Set `false` to disable auto-init and initialize manually. |
-| `installTestingShim` | `boolean \| 'always' \| 'if-missing'` | `'if-missing'` | Controls whether `navigator.modelContextTesting` is installed. |
-| `disableIframeTransportByDefault` | `boolean` | n/a | Deprecated no-op, kept for compatibility. |
+| Option                            | Type                                  | Default        | Notes                                                                                                        |
+| --------------------------------- | ------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------ |
+| `autoInitialize`                  | `boolean`                             | `true`         | Used by auto-init flows (IIFE/import side effect). Set `false` to disable auto-init and initialize manually. |
+| `installTestingShim`              | `boolean \| 'always' \| 'if-missing'` | `'if-missing'` | Controls whether `navigator.modelContextTesting` is installed.                                               |
+| `disableIframeTransportByDefault` | `boolean`                             | n/a            | Deprecated no-op, kept for compatibility.                                                                    |
 
 Behavior:
 

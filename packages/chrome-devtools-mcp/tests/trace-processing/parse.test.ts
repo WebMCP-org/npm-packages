@@ -5,16 +5,13 @@
  */
 
 import assert from 'node:assert';
-import {describe, it} from 'node:test';
+import { describe, it } from 'node:test';
 
-import {
-  getTraceSummary,
-  parseRawTraceBuffer,
-} from '../../src/trace-processing/parse.js';
+import { getTraceSummary, parseRawTraceBuffer } from '../../src/trace-processing/parse.js';
 
 import '../../src/DevtoolsUtils.js';
 
-import {loadTraceAsBuffer} from './fixtures/load.js';
+import { loadTraceAsBuffer } from './fixtures/load.js';
 
 describe('Trace parsing', async () => {
   it('can parse a Uint8Array from Tracing.stop())', async () => {
@@ -27,7 +24,7 @@ describe('Trace parsing', async () => {
     assert.ok(result?.insights);
   });
 
-  it('can format results of a trace', async t => {
+  it('can format results of a trace', async (t) => {
     const rawData = loadTraceAsBuffer('web-dev-with-commit.json.gz');
     const result = await parseRawTraceBuffer(rawData);
     if ('error' in result) {

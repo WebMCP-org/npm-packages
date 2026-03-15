@@ -5,15 +5,12 @@
  */
 
 import assert from 'node:assert';
-import {beforeEach, describe, it} from 'node:test';
+import { beforeEach, describe, it } from 'node:test';
 
-import {emulate} from '../../src/tools/emulation.js';
-import {
-  geolocationTransform,
-  viewportTransform,
-} from '../../src/tools/ToolDefinition.js';
-import {serverHooks} from '../server.js';
-import {html, withMcpContext} from '../utils.js';
+import { emulate } from '../../src/tools/emulation.js';
+import { geolocationTransform, viewportTransform } from '../../src/tools/ToolDefinition.js';
+import { serverHooks } from '../server.js';
+import { html, withMcpContext } from '../utils.js';
 
 describe('emulation', () => {
   const server = serverHooks();
@@ -94,13 +91,10 @@ describe('emulation', () => {
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
 
-        assert.strictEqual(
-          context.getSelectedMcpPage().networkConditions,
-          'Offline',
-        );
+        assert.strictEqual(context.getSelectedMcpPage().networkConditions, 'Offline');
       });
     });
     it('emulates network throttling when the throttling option is valid', async () => {
@@ -113,13 +107,10 @@ describe('emulation', () => {
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
 
-        assert.strictEqual(
-          context.getSelectedMcpPage().networkConditions,
-          'Slow 3G',
-        );
+        assert.strictEqual(context.getSelectedMcpPage().networkConditions, 'Slow 3G');
       });
     });
 
@@ -131,13 +122,10 @@ describe('emulation', () => {
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
 
-        assert.strictEqual(
-          context.getSelectedMcpPage().networkConditions,
-          null,
-        );
+        assert.strictEqual(context.getSelectedMcpPage().networkConditions, null);
       });
     });
 
@@ -151,13 +139,10 @@ describe('emulation', () => {
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
 
-        assert.strictEqual(
-          context.getSelectedMcpPage().networkConditions,
-          null,
-        );
+        assert.strictEqual(context.getSelectedMcpPage().networkConditions, null);
       });
     });
 
@@ -171,21 +156,15 @@ describe('emulation', () => {
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
 
-        assert.strictEqual(
-          context.getSelectedMcpPage().networkConditions,
-          'Slow 3G',
-        );
+        assert.strictEqual(context.getSelectedMcpPage().networkConditions, 'Slow 3G');
 
         const page = await context.newPage();
         context.selectPage(page);
 
-        assert.strictEqual(
-          context.getSelectedMcpPage().networkConditions,
-          null,
-        );
+        assert.strictEqual(context.getSelectedMcpPage().networkConditions, null);
       });
     });
   });
@@ -201,7 +180,7 @@ describe('emulation', () => {
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
 
         assert.strictEqual(context.getSelectedMcpPage().cpuThrottlingRate, 4);
@@ -221,7 +200,7 @@ describe('emulation', () => {
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
 
         assert.strictEqual(context.getSelectedMcpPage().cpuThrottlingRate, 1);
@@ -238,7 +217,7 @@ describe('emulation', () => {
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
 
         assert.strictEqual(context.getSelectedMcpPage().cpuThrottlingRate, 4);
@@ -265,7 +244,7 @@ describe('emulation', () => {
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
 
         const geolocation = context.getSelectedMcpPage().geolocation;
@@ -288,7 +267,7 @@ describe('emulation', () => {
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
 
         assert.notStrictEqual(context.getSelectedMcpPage().geolocation, null);
@@ -300,7 +279,7 @@ describe('emulation', () => {
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
 
         assert.strictEqual(context.getSelectedMcpPage().geolocation, null);
@@ -320,7 +299,7 @@ describe('emulation', () => {
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
 
         const geolocation = context.getSelectedMcpPage().geolocation;
@@ -336,7 +315,12 @@ describe('emulation', () => {
   });
   describe('viewport', () => {
     beforeEach(() => {
-      server.addHtmlRoute('/viewport', html`Test page`);
+      server.addHtmlRoute(
+        '/viewport',
+        html`
+          Test page
+        `
+      );
     });
 
     it('emulates viewport', async () => {
@@ -358,7 +342,7 @@ describe('emulation', () => {
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
 
         const viewportData = await page.evaluate(() => {
@@ -394,7 +378,7 @@ describe('emulation', () => {
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
 
         const viewportData = await page.evaluate(() => {
@@ -416,7 +400,7 @@ describe('emulation', () => {
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
 
         assert.strictEqual(context.getSelectedMcpPage().viewport, null);
@@ -441,7 +425,7 @@ describe('emulation', () => {
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
 
         assert.ok(context.getSelectedMcpPage().viewport);
@@ -453,7 +437,7 @@ describe('emulation', () => {
         assert.ok(
           await context.getSelectedPptrPage().evaluate(() => {
             return window.innerWidth !== 400 && window.innerHeight !== 400;
-          }),
+          })
         );
       });
     });
@@ -470,7 +454,7 @@ describe('emulation', () => {
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
 
         assert.strictEqual(context.getSelectedMcpPage().userAgent, 'MyUA');
@@ -490,7 +474,7 @@ describe('emulation', () => {
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
         assert.strictEqual(context.getSelectedMcpPage().userAgent, 'UA1');
 
@@ -502,7 +486,7 @@ describe('emulation', () => {
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
         assert.strictEqual(context.getSelectedMcpPage().userAgent, 'UA2');
         const page = context.getSelectedPptrPage();
@@ -521,7 +505,7 @@ describe('emulation', () => {
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
 
         assert.strictEqual(context.getSelectedMcpPage().userAgent, 'MyUA');
@@ -532,7 +516,7 @@ describe('emulation', () => {
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
 
         assert.strictEqual(context.getSelectedMcpPage().userAgent, null);
@@ -553,7 +537,7 @@ describe('emulation', () => {
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
 
         assert.strictEqual(context.getSelectedMcpPage().userAgent, 'MyUA');
@@ -565,7 +549,7 @@ describe('emulation', () => {
         assert.ok(
           await context.getSelectedPptrPage().evaluate(() => {
             return navigator.userAgent !== 'MyUA';
-          }),
+          })
         );
       });
     });
@@ -582,15 +566,13 @@ describe('emulation', () => {
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
 
         assert.strictEqual(context.getSelectedMcpPage().colorScheme, 'dark');
         const page = context.getSelectedPptrPage();
         const scheme = await page.evaluate(() =>
-          window.matchMedia('(prefers-color-scheme: dark)').matches
-            ? 'dark'
-            : 'light',
+          window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
         );
         assert.strictEqual(scheme, 'dark');
       });
@@ -606,7 +588,7 @@ describe('emulation', () => {
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
         assert.strictEqual(context.getSelectedMcpPage().colorScheme, 'dark');
 
@@ -618,14 +600,12 @@ describe('emulation', () => {
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
         assert.strictEqual(context.getSelectedMcpPage().colorScheme, 'light');
         const page = context.getSelectedPptrPage();
         const scheme = await page.evaluate(() =>
-          window.matchMedia('(prefers-color-scheme: light)').matches
-            ? 'light'
-            : 'dark',
+          window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
         );
         assert.strictEqual(scheme, 'light');
       });
@@ -636,7 +616,7 @@ describe('emulation', () => {
         const page = context.getSelectedPptrPage();
 
         const initial = await page.evaluate(
-          () => window.matchMedia('(prefers-color-scheme: dark)').matches,
+          () => window.matchMedia('(prefers-color-scheme: dark)').matches
         );
 
         await emulate.handler(
@@ -647,16 +627,14 @@ describe('emulation', () => {
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
         assert.strictEqual(context.getSelectedMcpPage().colorScheme, 'dark');
         // Check manually that it is dark
 
         assert.strictEqual(
-          await page.evaluate(
-            () => window.matchMedia('(prefers-color-scheme: dark)').matches,
-          ),
-          true,
+          await page.evaluate(() => window.matchMedia('(prefers-color-scheme: dark)').matches),
+          true
         );
 
         await emulate.handler(
@@ -667,15 +645,13 @@ describe('emulation', () => {
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
 
         assert.strictEqual(context.getSelectedMcpPage().colorScheme, null);
         assert.strictEqual(
-          await page.evaluate(
-            () => window.matchMedia('(prefers-color-scheme: dark)').matches,
-          ),
-          initial,
+          await page.evaluate(() => window.matchMedia('(prefers-color-scheme: dark)').matches),
+          initial
         );
       });
     });

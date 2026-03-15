@@ -9,7 +9,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import {describe, it, afterEach, beforeEach} from 'node:test';
+import { describe, it, afterEach, beforeEach } from 'node:test';
 
 import * as persistence from '../../src/telemetry/persistence.js';
 
@@ -17,15 +17,12 @@ describe('FilePersistence', () => {
   let tmpDir: string;
 
   beforeEach(async () => {
-    tmpDir = path.join(
-      await fs.realpath(os.tmpdir()),
-      `telemetry-test-${crypto.randomUUID()}`,
-    );
-    await fs.mkdir(tmpDir, {recursive: true});
+    tmpDir = path.join(await fs.realpath(os.tmpdir()), `telemetry-test-${crypto.randomUUID()}`);
+    await fs.mkdir(tmpDir, { recursive: true });
   });
 
   afterEach(async () => {
-    await fs.rm(tmpDir, {recursive: true, force: true});
+    await fs.rm(tmpDir, { recursive: true, force: true });
   });
 
   describe('loadState', () => {
@@ -41,10 +38,7 @@ describe('FilePersistence', () => {
       const expectedState = {
         lastActive: '2023-01-01T00:00:00.000Z',
       };
-      await fs.writeFile(
-        path.join(tmpDir, 'telemetry_state.json'),
-        JSON.stringify(expectedState),
-      );
+      await fs.writeFile(path.join(tmpDir, 'telemetry_state.json'), JSON.stringify(expectedState));
 
       const filePersistence = new persistence.FilePersistence(tmpDir);
       const state = await filePersistence.loadState();
@@ -60,10 +54,7 @@ describe('FilePersistence', () => {
       const filePersistence = new persistence.FilePersistence(tmpDir);
       await filePersistence.saveState(state);
 
-      const content = await fs.readFile(
-        path.join(tmpDir, 'telemetry_state.json'),
-        'utf-8',
-      );
+      const content = await fs.readFile(path.join(tmpDir, 'telemetry_state.json'), 'utf-8');
       assert.deepStrictEqual(JSON.parse(content), state);
     });
   });

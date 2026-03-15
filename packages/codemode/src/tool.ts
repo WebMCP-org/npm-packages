@@ -3,7 +3,8 @@ import { asSchema, type Tool, tool } from 'ai';
 import { z } from 'zod';
 import { normalizeCode } from './normalize';
 import { generateTypes, type ToolDescriptors } from './tool-types';
-import type { Executor } from './types';
+import type { Executor, ToolFunctions } from './types';
+import type { UnknownRecord } from './type-utils';
 import { sanitizeToolName } from './utils';
 
 const DEFAULT_DESCRIPTION = `Execute code to achieve a goal.
@@ -30,15 +31,15 @@ const codeSchema = z.object({
 type CodeInput = z.infer<typeof codeSchema>;
 type CodeOutput = { code: string; result: unknown; logs?: string[] };
 
-function hasNeedsApproval(t: Record<string, unknown>): boolean {
+function hasNeedsApproval(t: UnknownRecord): boolean {
   return 'needsApproval' in t && t.needsApproval != null;
 }
 
 export function createCodeTool(options: CreateCodeToolOptions): Tool<CodeInput, CodeOutput> {
   const tools: ToolDescriptors | ToolSet = {};
   for (const [name, t] of Object.entries(options.tools)) {
-    if (!hasNeedsApproval(t as Record<string, unknown>)) {
-      (tools as Record<string, unknown>)[name] = t;
+    if (!hasNeedsApproval(t as UnknownRecord)) {
+      (tools as UnknownRecord)[name] = t;
     }
   }
 
@@ -51,7 +52,7 @@ export function createCodeTool(options: CreateCodeToolOptions): Tool<CodeInput, 
     description,
     inputSchema: codeSchema,
     execute: async ({ code }) => {
-      const fns: Record<string, (args: unknown) => Promise<unknown>> = {};
+      const fns: ToolFunctions = {};
 
       for (const [name, t] of Object.entries(tools)) {
         const execute =
@@ -61,7 +62,7 @@ export function createCodeTool(options: CreateCodeToolOptions): Tool<CodeInput, 
             'inputSchema' in t
               ? t.inputSchema
               : 'parameters' in t
-                ? (t as Record<string, unknown>).parameters
+                ? (t as UnknownRecord).parameters
                 : undefined;
 
           const schema = rawSchema != null ? asSchema(rawSchema) : undefined;

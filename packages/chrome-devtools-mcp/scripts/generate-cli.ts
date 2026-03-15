@@ -7,30 +7,24 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import {Client} from '@modelcontextprotocol/sdk/client/index.js';
-import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
-import {parseArguments} from '../build/src/bin/chrome-devtools-mcp-cli-options.js';
-import {labels} from '../build/src/tools/categories.js';
-import {createTools} from '../build/src/tools/tools.js';
+import { parseArguments } from '../build/src/bin/chrome-devtools-mcp-cli-options.js';
+import { labels } from '../build/src/tools/categories.js';
+import { createTools } from '../build/src/tools/tools.js';
 
-const OUTPUT_PATH = path.join(
-  import.meta.dirname,
-  '../src/bin/chrome-devtools-cli-options.ts',
-);
+const OUTPUT_PATH = path.join(import.meta.dirname, '../src/bin/chrome-devtools-cli-options.ts');
 
 async function fetchTools() {
   console.log('Connecting to chrome-devtools-mcp to fetch tools...');
   // Use the local build of the server
-  const serverPath = path.join(
-    import.meta.dirname,
-    '../build/src/bin/chrome-devtools-mcp.js',
-  );
+  const serverPath = path.join(import.meta.dirname, '../build/src/bin/chrome-devtools-mcp.js');
 
   const transport = new StdioClientTransport({
     command: 'node',
     args: [serverPath],
-    env: {...process.env, CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
+    env: { ...process.env, CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true' },
   });
 
   const client = new Client(
@@ -40,7 +34,7 @@ async function fetchTools() {
     },
     {
       capabilities: {},
-    },
+    }
   );
 
   await client.connect(transport);
@@ -85,9 +79,7 @@ function schemaToCLIOptions(schema: JsonSchema): CliOption[] {
     const isRequired = required.includes(name);
     const description = prop.description || '';
     if (typeof prop.type !== 'string') {
-      throw new Error(
-        `Property ${name} has a complex type not supported by CLI.`,
-      );
+      throw new Error(`Property ${name} has a complex type not supported by CLI.`);
     }
     return {
       name,
@@ -106,7 +98,7 @@ async function generateCli() {
   // Sort tools by name
   const sortedTools = tools
     .sort((a, b) => a.name.localeCompare(b.name))
-    .filter(tool => {
+    .filter((tool) => {
       // Skipping fill_form because it is not relevant in shell scripts
       // and CLI does not handle array/JSON args well.
       if (tool.name === 'fill_form') {
@@ -123,15 +115,12 @@ async function generateCli() {
   const staticTools = createTools(parseArguments());
   const toolNameToCategory = new Map<string, string>();
   for (const tool of staticTools) {
-    toolNameToCategory.set(
-      tool.name,
-      labels[tool.annotations.category as keyof typeof labels],
-    );
+    toolNameToCategory.set(tool.name, labels[tool.annotations.category as keyof typeof labels]);
   }
 
   const commands: Record<
     string,
-    {description: string; category: string; args: Record<string, CliOption>}
+    { description: string; category: string; args: Record<string, CliOption> }
   > = {};
 
   for (const tool of sortedTools) {
@@ -182,12 +171,12 @@ export type Commands = Record<
 export const commands: Commands = ${JSON.stringify(commands, null, 2)} as const;
 `);
 
-  fs.mkdirSync(path.dirname(OUTPUT_PATH), {recursive: true});
+  fs.mkdirSync(path.dirname(OUTPUT_PATH), { recursive: true });
   fs.writeFileSync(OUTPUT_PATH, lines.join(''));
   console.log(`Generated CLI at ${OUTPUT_PATH}`);
 }
 
-generateCli().catch(err => {
+generateCli().catch((err) => {
   console.error('Error during generation:', err);
   process.exit(1);
 });

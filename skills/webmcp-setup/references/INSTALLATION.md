@@ -11,6 +11,7 @@ pnpm add @mcp-b/react-webmcp @mcp-b/global zod
 ```
 
 **What each package does**:
+
 - `@mcp-b/react-webmcp`: React hooks for tool registration (`useWebMCP`)
 - `@mcp-b/global`: Browser polyfill for `navigator.modelContext` API
 - `zod`: Schema validation library for type-safe inputs
@@ -27,7 +28,7 @@ Add this script tag to your `index.html` (in `public/` folder):
 
 ```tsx
 // src/main.tsx or src/index.tsx
-import '@mcp-b/global';  // MUST be first import
+import '@mcp-b/global'; // MUST be first import
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
@@ -38,7 +39,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(<App />);
 ### 3. Use the Hook
 
 ```tsx
-'use client';  // For Next.js App Router
+'use client'; // For Next.js App Router
 
 import { useWebMCP } from '@mcp-b/react-webmcp';
 import { z } from 'zod';
@@ -48,12 +49,12 @@ function MyComponent() {
     name: 'my_tool',
     description: 'Does something useful',
     inputSchema: {
-      query: z.string().min(1)
+      query: z.string().min(1),
     },
     handler: async ({ query }) => {
       const result = await doSomething(query);
       return { success: true, result };
-    }
+    },
   });
 
   return <div>My Component</div>;
@@ -63,10 +64,12 @@ function MyComponent() {
 ### Next.js Specific Notes
 
 **App Router (Next.js 13+)**:
+
 - All components with `useWebMCP` must have `'use client'` at the top
 - Import `@mcp-b/global` in the client component (not in server components)
 
 **Pages Router (Next.js 12)**:
+
 - Works the same as regular React
 - No special configuration needed
 
@@ -105,9 +108,9 @@ export function useWebMCPTool(config) {
       async execute(args) {
         const result = await config.handler(args);
         return {
-          content: [{ type: 'text', text: JSON.stringify(result) }]
+          content: [{ type: 'text', text: JSON.stringify(result) }],
         };
-      }
+      },
     });
   });
 
@@ -128,38 +131,38 @@ No npm install needed! Just add this to your HTML:
 ```html
 <!DOCTYPE html>
 <html>
-<head>
-  <script src="https://unpkg.com/@mcp-b/global@latest/dist/index.global.js"></script>
-</head>
-<body>
-  <div id="app">
-    <h1>My App</h1>
-    <button id="myButton">Click me</button>
-  </div>
+  <head>
+    <script src="https://unpkg.com/@mcp-b/global@latest/dist/index.global.js"></script>
+  </head>
+  <body>
+    <div id="app">
+      <h1>My App</h1>
+      <button id="myButton">Click me</button>
+    </div>
 
-  <script>
-    // Register a tool
-    navigator.modelContext.registerTool({
-      name: 'button_click',
-      description: 'Click the button',
-      inputSchema: {
-        type: 'object',
-        properties: {}
-      },
-      async execute() {
-        document.getElementById('myButton').click();
-        return {
-          content: [{ type: 'text', text: 'Button clicked!' }]
-        };
-      }
-    });
+    <script>
+      // Register a tool
+      navigator.modelContext.registerTool({
+        name: 'button_click',
+        description: 'Click the button',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+        },
+        async execute() {
+          document.getElementById('myButton').click();
+          return {
+            content: [{ type: 'text', text: 'Button clicked!' }],
+          };
+        },
+      });
 
-    // Your app logic
-    document.getElementById('myButton').addEventListener('click', () => {
-      console.log('Button was clicked');
-    });
-  </script>
-</body>
+      // Your app logic
+      document.getElementById('myButton').addEventListener('click', () => {
+        console.log('Button was clicked');
+      });
+    </script>
+  </body>
 </html>
 ```
 
@@ -192,6 +195,7 @@ WebMCP works with any framework that generates HTML!
 3. Tools have access to your existing auth/session
 
 **For details**:
+
 - `mcp__docs__SearchWebMcpDocumentation("Rails setup")`
 - `mcp__docs__SearchWebMcpDocumentation("Phoenix setup")`
 - `mcp__docs__SearchWebMcpDocumentation("Django setup")`
@@ -213,7 +217,7 @@ pnpm dev
 Press F12 and type:
 
 ```javascript
-navigator.modelContext
+navigator.modelContext;
 ```
 
 You should see the WebMCP API object (not `undefined`).
@@ -246,6 +250,7 @@ The real test - connect Chrome DevTools MCP and call your tools!
 **Cause**: `@mcp-b/global` not loaded yet
 
 **Fix**:
+
 1. Ensure script tag is in `<head>` (loads first)
 2. Or import `@mcp-b/global` at top of entry file
 3. Wait for DOMContentLoaded before registering tools
@@ -259,11 +264,13 @@ The real test - connect Chrome DevTools MCP and call your tools!
 ### Tools not appearing in Chrome DevTools MCP
 
 **Causes**:
+
 - Component with `useWebMCP` not mounted
 - Tool registration failed (check console for errors)
 - Extension not connected
 
 **Fix**:
+
 1. Check browser console for errors
 2. Verify component is rendered
 3. Check Chrome DevTools MCP connection status

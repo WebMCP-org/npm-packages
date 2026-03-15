@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {PaginationOptions} from './types.js';
+import type { PaginationOptions } from './types.js';
 
 export interface PaginationResult<Item> {
   items: readonly Item[];
@@ -21,7 +21,7 @@ const DEFAULT_PAGE_SIZE = 20;
 
 export function paginate<Item>(
   items: readonly Item[],
-  options?: PaginationOptions,
+  options?: PaginationOptions
 ): PaginationResult<Item> {
   const total = items.length;
 
@@ -40,10 +40,7 @@ export function paginate<Item>(
 
   const pageSize = options.pageSize ?? DEFAULT_PAGE_SIZE;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const {currentPage, invalidPage} = resolvePageIndex(
-    options.pageIdx,
-    totalPages,
-  );
+  const { currentPage, invalidPage } = resolvePageIndex(options.pageIdx, totalPages);
 
   const startIndex = currentPage * pageSize;
   const pageItems = items.slice(startIndex, startIndex + pageSize);
@@ -67,18 +64,18 @@ function noPaginationOptions(options: PaginationOptions): boolean {
 
 function resolvePageIndex(
   pageIdx: number | undefined,
-  totalPages: number,
+  totalPages: number
 ): {
   currentPage: number;
   invalidPage: boolean;
 } {
   if (pageIdx === undefined) {
-    return {currentPage: 0, invalidPage: false};
+    return { currentPage: 0, invalidPage: false };
   }
 
   if (pageIdx < 0 || pageIdx >= totalPages) {
-    return {currentPage: 0, invalidPage: true};
+    return { currentPage: 0, invalidPage: true };
   }
 
-  return {currentPage: pageIdx, invalidPage: false};
+  return { currentPage: pageIdx, invalidPage: false };
 }

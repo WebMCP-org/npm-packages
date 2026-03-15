@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {existsSync, readdirSync, readFileSync, writeFileSync} from 'node:fs';
-import {rm} from 'node:fs/promises';
-import {resolve} from 'node:path';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { rm } from 'node:fs/promises';
+import { resolve } from 'node:path';
 
 const projectRoot = process.cwd();
 
@@ -29,17 +29,15 @@ const formatterWorkerFilesToPatch = [
  * the same property.
  */
 function removeConflictingGlobalDeclaration(): void {
-  console.log(
-    'Removing conflicting global declaration from @paulirish/trace_engine...',
-  );
+  console.log('Removing conflicting global declaration from @paulirish/trace_engine...');
   const pnpmStorePath = resolve(projectRoot, '..', '..', 'node_modules', '.pnpm');
   if (!existsSync(pnpmStorePath)) {
     console.log('Trace engine declaration file not found, skipping cleanup.');
     return;
   }
 
-  const traceEngineDir = readdirSync(pnpmStorePath).find(entry =>
-    entry.startsWith('@paulirish+trace_engine@'),
+  const traceEngineDir = readdirSync(pnpmStorePath).find((entry) =>
+    entry.startsWith('@paulirish+trace_engine@')
   );
   if (!traceEngineDir) {
     console.log('Trace engine declaration file not found, skipping cleanup.');
@@ -54,7 +52,7 @@ function removeConflictingGlobalDeclaration(): void {
     'trace_engine',
     'models',
     'trace',
-    'ModelImpl.d.ts',
+    'ModelImpl.d.ts'
   );
   if (!existsSync(filePath)) {
     console.log('Trace engine declaration file not found, skipping cleanup.');
@@ -65,7 +63,7 @@ function removeConflictingGlobalDeclaration(): void {
   // Matches: declare global { ... interface HTMLElementEventMap { ... } ... }
   const newContent = content.replace(
     /declare global\s*\{\s*interface HTMLElementEventMap\s*\{[^}]*\[ModelUpdateEvent\.eventName\]:\s*ModelUpdateEvent;\s*\}\s*\}/s,
-    '',
+    ''
   );
   writeFileSync(filePath, newContent, 'utf-8');
   console.log('Successfully removed conflicting global declaration.');
@@ -93,7 +91,7 @@ async function main() {
     const fullPath = resolve(projectRoot, file);
     console.log(`Removing: ${file}`);
     try {
-      await rm(fullPath, {recursive: true, force: true});
+      await rm(fullPath, { recursive: true, force: true });
     } catch (error) {
       console.error(`Failed to remove ${file}:`, error);
       process.exit(1);

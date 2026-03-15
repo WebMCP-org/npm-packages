@@ -1,6 +1,7 @@
 # Handoff Context For Next AI
 
 ## User intent (latest and strongest)
+
 - User wants to **rebuild `@mcp-b/global` from scratch** because current code is too heavy.
 - User wants `@mcp-b/global` to be a **thin MCP-first adapter**.
 - User explicitly said:
@@ -9,6 +10,7 @@
   - Keep core `@mcp-b/webmcp-polyfill` strict; global handles adapter behavior.
 
 ## Desired architecture (from user messages)
+
 - `@mcp-b/global` owns MCP runtime behavior for tools/resources/prompts.
 - Core `navigator.modelContext` remains strict WebMCP base.
 - Global should wrap core tool mutators:
@@ -21,6 +23,7 @@
 - Remove heavy global testing layer and extension helpers.
 
 ## What was already changed (partial, currently inconsistent)
+
 - File edited heavily: `packages/global/src/global.ts`.
 - Removed large chunks related to custom `WebModelContextTesting` plumbing.
 - Switched initialization/cleanup toward:
@@ -31,10 +34,13 @@
 - Work is **incomplete** and currently has TypeScript errors.
 
 ## Current compile status
+
 Running:
+
 - `pnpm -C packages/global exec tsc --noEmit`
 
 Current errors include:
+
 - Unused imports in `packages/global/src/global.ts`:
   - `CallToolRequestSchema`
   - `ListToolsRequestSchema`
@@ -43,12 +49,14 @@ Current errors include:
 - Implicit `any` parameter in the attempted callback.
 
 ## Files currently modified (relevant)
+
 - `packages/global/src/global.ts` (modified twice, not clean)
 - `packages/global/src/types.ts` (already modified before this handoff)
 - `packages/global/src/testing.ts` (still present; user wants this removed or minimized)
 - `packages/global/src/global.test.ts` (already modified before this handoff)
 
 ## Suggested reset strategy for next AI
+
 1. Replace `packages/global/src/global.ts` with a fresh minimal implementation.
 2. Decide one clear server abstraction:
    - If using `BrowserMcpServer` methods like `registerTool`, ensure type import/alias matches that class, not a plain `Server` transport type.
@@ -60,5 +68,6 @@ Current errors include:
 5. Update tests/docs only after runtime compiles.
 
 ## Important note
+
 - User said they may delete everything and wants clean context for the next AI.
 - This file is intended to preserve intent and avoid repeating failed incremental patching.

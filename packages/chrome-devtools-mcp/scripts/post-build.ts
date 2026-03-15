@@ -19,10 +19,8 @@ function writeFile(filePath: string, content: string): void {
 }
 
 function main(): void {
-  const devtoolsThirdPartyPath =
-    'node_modules/chrome-devtools-frontend/front_end/third_party';
-  const devtoolsFrontEndCorePath =
-    'node_modules/chrome-devtools-frontend/front_end/core';
+  const devtoolsThirdPartyPath = 'node_modules/chrome-devtools-frontend/front_end/third_party';
+  const devtoolsFrontEndCorePath = 'node_modules/chrome-devtools-frontend/front_end/core';
 
   // Create i18n mock
   const i18nDir = path.join(BUILD_DIR, devtoolsFrontEndCorePath, 'i18n');
@@ -44,19 +42,15 @@ export const LOCAL_FETCH_PATTERN = './locales/@LOCALE@.json';`;
   writeFile(localesFile, localesContent);
 
   // Create codemirror.next mock.
-  const codeMirrorDir = path.join(
-    BUILD_DIR,
-    devtoolsThirdPartyPath,
-    'codemirror.next',
-  );
-  fs.mkdirSync(codeMirrorDir, {recursive: true});
+  const codeMirrorDir = path.join(BUILD_DIR, devtoolsThirdPartyPath, 'codemirror.next');
+  fs.mkdirSync(codeMirrorDir, { recursive: true });
   const codeMirrorFile = path.join(codeMirrorDir, 'codemirror.next.js');
   const codeMirrorContent = `export default {}`;
   writeFile(codeMirrorFile, codeMirrorContent);
 
   // Create root mock
   const rootDir = path.join(BUILD_DIR, devtoolsFrontEndCorePath, 'root');
-  fs.mkdirSync(rootDir, {recursive: true});
+  fs.mkdirSync(rootDir, { recursive: true });
   const runtimeFile = path.join(rootDir, 'Runtime.js');
   const runtimeContent = `
 export function getChromeVersion() { return ''; };
@@ -100,13 +94,8 @@ function copyDevToolsDescriptionFiles() {
   const devtoolsIssuesDescriptionPath =
     'node_modules/chrome-devtools-frontend/front_end/models/issues_manager/descriptions';
   const sourceDir = path.join(process.cwd(), devtoolsIssuesDescriptionPath);
-  const destDir = path.join(
-    BUILD_DIR,
-    'src',
-    'third_party',
-    'issue-descriptions',
-  );
-  fs.cpSync(sourceDir, destDir, {recursive: true});
+  const destDir = path.join(BUILD_DIR, 'src', 'third_party', 'issue-descriptions');
+  fs.cpSync(sourceDir, destDir, { recursive: true });
 }
 
 main();

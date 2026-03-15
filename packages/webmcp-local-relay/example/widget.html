@@ -65,7 +65,10 @@
           const relayPort = params.get('relayPort') || '9333';
 
           if (!isLoopback(relayHost)) {
-            console.error('[webmcp-relay-widget] relayHost must be a loopback address, got:', relayHost);
+            console.error(
+              '[webmcp-relay-widget] relayHost must be a loopback address, got:',
+              relayHost
+            );
             return null;
           }
 
@@ -77,7 +80,11 @@
          * @returns {HostMessage | null}
          */
         function parseHostMessage(value) {
-          if (!isJsonObject(value) || typeof value.requestId !== 'string' || typeof value.type !== 'string') {
+          if (
+            !isJsonObject(value) ||
+            typeof value.requestId !== 'string' ||
+            typeof value.type !== 'string'
+          ) {
             return null;
           }
           return {
@@ -106,7 +113,9 @@
 
         const config = parseConfig();
         if (!config) {
-          console.warn('[webmcp-relay-widget] Missing required hostOrigin parameter. Widget will not start.');
+          console.warn(
+            '[webmcp-relay-widget] Missing required hostOrigin parameter. Widget will not start.'
+          );
           return;
         }
 

@@ -10,9 +10,9 @@
   "compatibility_date": "2025-10-11",
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
-    "not_found_handling": "single-page-application"
+    "not_found_handling": "single-page-application",
   },
   "observability": {
-    "enabled": true
-  }
+    "enabled": true,
+  },
 }

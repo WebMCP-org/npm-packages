@@ -6,7 +6,7 @@
  * Spec: https://agentskills.io/specification
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import type {
   ResolvedSkill,
   SkillFile,

@@ -4,14 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {readFileSync} from 'node:fs';
-import {parseArgs} from 'node:util';
+import { readFileSync } from 'node:fs';
+import { parseArgs } from 'node:util';
 
-import {GoogleGenAI} from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
 
-const ai = new GoogleGenAI({apiKey: process.env.GEMINI_API_KEY});
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-const {values, positionals} = parseArgs({
+const { values, positionals } = parseArgs({
   options: {
     model: {
       type: 'string',

@@ -1,5 +1,5 @@
 import { resolve } from 'node:path';
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vite-plus';
 
 export default defineConfig({
   build: {
@@ -10,7 +10,7 @@ export default defineConfig({
       name: 'SmartDOMReaderBundle',
       fileName: () => 'smart-dom-reader-bundle.js',
     },
-    rollupOptions: {
+    rolldownOptions: {
       output: {
         format: 'iife',
         strict: false,

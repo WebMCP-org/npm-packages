@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -6,7 +6,10 @@
     <title>Runtime Contract - Iframe Client</title>
     <style>
       body {
-        font-family: system-ui, -apple-system, sans-serif;
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
         max-width: 960px;
         margin: 32px auto;
         padding: 0 16px 40px;
@@ -50,12 +53,18 @@
 
     <div class="panel">
       <h2>Client Status</h2>
-      <div id="iframe-client-status" class="status" data-status="pending">Waiting for iframe...</div>
+      <div id="iframe-client-status" class="status" data-status="pending">
+        Waiting for iframe...
+      </div>
     </div>
 
     <div class="panel">
       <h2>Iframe Runtime</h2>
-      <iframe id="runtime-contract-iframe" src="/runtime-contract-iframe-child.html" title="Runtime Contract Iframe Child"></iframe>
+      <iframe
+        id="runtime-contract-iframe"
+        src="/runtime-contract-iframe-child.html"
+        title="Runtime Contract Iframe Child"
+      ></iframe>
     </div>
 
     <div class="panel">

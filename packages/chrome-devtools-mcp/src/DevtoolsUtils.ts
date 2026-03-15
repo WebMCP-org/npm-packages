@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {PuppeteerDevToolsConnection} from './DevToolsConnectionAdapter.js';
-import {Mutex} from './Mutex.js';
-import {DevTools} from './third_party/index.js';
+import { PuppeteerDevToolsConnection } from './DevToolsConnectionAdapter.js';
+import { Mutex } from './Mutex.js';
+import { DevTools } from './third_party/index.js';
 import type {
   Browser,
   ConsoleMessage,
@@ -34,15 +34,14 @@ DevTools.I18n.DevToolsLocale.DevToolsLocale.instance({
   data: {
     navigatorLanguage: 'en-US',
     settingLanguage: 'en-US',
-    lookupClosestDevToolsLocale: l => l,
+    lookupClosestDevToolsLocale: (l) => l,
   },
 });
 DevTools.I18n.i18n.registerLocaleDataForTest('en-US', {});
 
 DevTools.Formatter.FormatterWorkerPool.FormatterWorkerPool.instance({
   forceNew: true,
-  entrypointURL: import.meta
-    .resolve('./third_party/devtools-formatter-worker.js'),
+  entrypointURL: import.meta.resolve('./third_party/devtools-formatter-worker.js'),
 });
 
 export interface TargetUniverse {
@@ -60,10 +59,7 @@ export class UniverseManager {
   /** Guard access to #universes so we don't create unnecessary universes */
   readonly #mutex = new Mutex();
 
-  constructor(
-    browser: Browser,
-    factory: TargetUniverseFactoryFn = DEFAULT_FACTORY,
-  ) {
+  constructor(browser: Browser, factory: TargetUniverseFactoryFn = DEFAULT_FACTORY) {
     this.#browser = browser;
     this.#createUniverseFor = factory;
   }
@@ -74,9 +70,9 @@ export class UniverseManager {
       const promises = [];
       for (const page of pages) {
         promises.push(
-          this.#createUniverseFor(page).then(targetUniverse =>
-            this.#universes.set(page, targetUniverse),
-          ),
+          this.#createUniverseFor(page).then((targetUniverse) =>
+            this.#universes.set(page, targetUniverse)
+          )
         );
       }
 
@@ -133,8 +129,7 @@ const DEFAULT_FACTORY: TargetUniverseFactoryFn = async (page: Page) => {
       syncedStorage: settingStorage,
       globalStorage: settingStorage,
       localStorage: settingStorage,
-      settingRegistrations:
-        DevTools.Common.SettingRegistration.getRegisteredSettings(),
+      settingRegistrations: DevTools.Common.SettingRegistration.getRegisteredSettings(),
     },
     overrideAutoStartModels: new Set([DevTools.DebuggerModel]),
   });
@@ -152,9 +147,9 @@ const DEFAULT_FACTORY: TargetUniverseFactoryFn = async (page: Page) => {
     /* parentTarget */ null,
     session.id(),
     undefined,
-    connection,
+    connection
   );
-  return {target, universe};
+  return { target, universe };
 };
 
 // We don't want to pause any DevTools universe session ever on the MCP side.
@@ -164,7 +159,7 @@ const DEFAULT_FACTORY: TargetUniverseFactoryFn = async (page: Page) => {
 // see the `Debugger.paused`/`Debugger.resumed` events on the MCP side.
 const SKIP_ALL_PAUSES = {
   modelAdded(model: DevTools.DebuggerModel): void {
-    void model.agent.invoke_setSkipAllPauses({skip: true});
+    void model.agent.invoke_setSkipAllPauses({ skip: true });
   },
 
   modelRemoved(): void {
@@ -187,7 +182,7 @@ export class SymbolizedError {
   private constructor(
     message: string,
     stackTrace?: DevTools.StackTrace.StackTrace.StackTrace,
-    cause?: SymbolizedError,
+    cause?: SymbolizedError
   ) {
     this.message = message;
     this.stackTrace = stackTrace;
@@ -207,7 +202,7 @@ export class SymbolizedError {
       return new SymbolizedError(
         message,
         opts.resolvedStackTraceForTesting,
-        opts.resolvedCauseForTesting,
+        opts.resolvedCauseForTesting
       );
     }
 
@@ -216,11 +211,7 @@ export class SymbolizedError {
       stackTrace = opts.resolvedStackTraceForTesting;
     } else if (opts.details.stackTrace) {
       try {
-        stackTrace = await createStackTrace(
-          opts.devTools,
-          opts.details.stackTrace,
-          opts.targetId,
-        );
+        stackTrace = await createStackTrace(opts.devTools, opts.details.stackTrace, opts.targetId);
       } catch {
         // ignore
       }
@@ -236,7 +227,7 @@ export class SymbolizedError {
         const causeRemoteObj = await SymbolizedError.#lookupCause(
           opts.devTools,
           opts.details.exception,
-          opts.targetId,
+          opts.targetId
         );
         if (causeRemoteObj) {
           cause = await SymbolizedError.fromError({
@@ -260,7 +251,7 @@ export class SymbolizedError {
     const details = await SymbolizedError.#getExceptionDetails(
       opts.devTools,
       opts.error,
-      opts.targetId,
+      opts.targetId
     );
     if (details) {
       return SymbolizedError.fromDetails({
@@ -271,9 +262,7 @@ export class SymbolizedError {
       });
     }
 
-    return new SymbolizedError(
-      SymbolizedError.#getMessageFromException(opts.error),
-    );
+    return new SymbolizedError(SymbolizedError.#getMessageFromException(opts.error));
   }
 
   static #getMessage(details: Protocol.Runtime.ExceptionDetails): string {
@@ -281,17 +270,12 @@ export class SymbolizedError {
     // we have to manually parse out the error text from the exception description.
     // In the case of Runtime.getExceptionDetails, `details.text` has the Error.message.
     if (details.text === 'Uncaught' && details.exception) {
-      return (
-        'Uncaught ' +
-        SymbolizedError.#getMessageFromException(details.exception)
-      );
+      return 'Uncaught ' + SymbolizedError.#getMessageFromException(details.exception);
     }
     return details.text;
   }
 
-  static #getMessageFromException(
-    error: Protocol.Runtime.RemoteObject,
-  ): string {
+  static #getMessageFromException(error: Protocol.Runtime.RemoteObject): string {
     const messageWithRest = error.description?.split('\n    at ', 2) ?? [];
     return messageWithRest[0] ?? '';
   }
@@ -299,7 +283,7 @@ export class SymbolizedError {
   static async #getExceptionDetails(
     devTools: TargetUniverse | undefined,
     error: Protocol.Runtime.RemoteObject,
-    targetId: string,
+    targetId: string
   ): Promise<Protocol.Runtime.ExceptionDetails | null> {
     if (!devTools || (error.type !== 'object' && error.subtype !== 'error')) {
       return null;
@@ -312,7 +296,7 @@ export class SymbolizedError {
     const model = target.model(DevTools.RuntimeModel) as DevTools.RuntimeModel;
     return (
       (await model.getExceptionDetails(
-        error.objectId as DevTools.Protocol.Runtime.RemoteObjectId,
+        error.objectId as DevTools.Protocol.Runtime.RemoteObjectId
       )) ?? null
     );
   }
@@ -320,7 +304,7 @@ export class SymbolizedError {
   static async #lookupCause(
     devTools: TargetUniverse | undefined,
     error: Protocol.Runtime.RemoteObject,
-    targetId: string,
+    targetId: string
   ): Promise<Protocol.Runtime.RemoteObject | null> {
     if (!devTools || (error.type !== 'object' && error.subtype !== 'error')) {
       return null;
@@ -338,13 +322,13 @@ export class SymbolizedError {
       return null;
     }
 
-    return properties.result.find(prop => prop.name === 'cause')?.value ?? null;
+    return properties.result.find((prop) => prop.name === 'cause')?.value ?? null;
   }
 
   static createForTesting(
     message: string,
     stackTrace?: DevTools.StackTrace.StackTrace.StackTrace,
-    cause?: SymbolizedError,
+    cause?: SymbolizedError
   ) {
     return new SymbolizedError(message, stackTrace, cause);
   }
@@ -352,7 +336,7 @@ export class SymbolizedError {
 
 export async function createStackTraceForConsoleMessage(
   devTools: TargetUniverse,
-  consoleMessage: ConsoleMessage,
+  consoleMessage: ConsoleMessage
 ): Promise<DevTools.StackTrace.StackTrace.StackTrace | undefined> {
   const message = consoleMessage as ConsoleMessage & {
     _rawStackTrace(): Protocol.Runtime.StackTrace | undefined;
@@ -368,12 +352,10 @@ export async function createStackTraceForConsoleMessage(
 export async function createStackTrace(
   devTools: TargetUniverse,
   rawStackTrace: Protocol.Runtime.StackTrace,
-  targetId: string | undefined,
+  targetId: string | undefined
 ): Promise<DevTools.StackTrace.StackTrace.StackTrace> {
   const targetManager = devTools.universe.context.get(DevTools.TargetManager);
-  const target = targetId
-    ? targetManager.targetById(targetId) || devTools.target
-    : devTools.target;
+  const target = targetId ? targetManager.targetById(targetId) || devTools.target : devTools.target;
   const model = target.model(DevTools.DebuggerModel) as DevTools.DebuggerModel;
 
   // DevTools doesn't wait for source maps to attach before building a stack trace, rather it'll send
@@ -385,11 +367,7 @@ export async function createStackTrace(
   for (const frame of rawStackTrace.callFrames) {
     scriptIds.add(frame.scriptId);
   }
-  for (
-    let asyncStack = rawStackTrace.parent;
-    asyncStack;
-    asyncStack = asyncStack.parent
-  ) {
+  for (let asyncStack = rawStackTrace.parent; asyncStack; asyncStack = asyncStack.parent) {
     for (const frame of asyncStack.callFrames) {
       scriptIds.add(frame.scriptId);
     }
@@ -397,24 +375,20 @@ export async function createStackTrace(
 
   const signal = AbortSignal.timeout(1_000);
   await Promise.all(
-    [...scriptIds].map(id =>
+    [...scriptIds].map((id) =>
       waitForScript(model, id, signal)
-        .then(script =>
-          model.sourceMapManager().sourceMapForClientPromise(script),
-        )
-        .catch(),
-    ),
+        .then((script) => model.sourceMapManager().sourceMapForClientPromise(script))
+        .catch()
+    )
   );
 
-  const binding = devTools.universe.context.get(
-    DevTools.DebuggerWorkspaceBinding,
-  );
+  const binding = devTools.universe.context.get(DevTools.DebuggerWorkspaceBinding);
   // DevTools uses branded types for ScriptId and others. Casting the puppeteer protocol type to the DevTools protocol type is safe.
   return binding.createStackTraceFromProtocolRuntime(
     rawStackTrace as Parameters<
       DevTools.DebuggerWorkspaceBinding['createStackTraceFromProtocolRuntime']
     >[0],
-    target,
+    target
   );
 }
 
@@ -422,7 +396,7 @@ export async function createStackTrace(
 async function waitForScript(
   model: DevTools.DebuggerModel,
   scriptId: Protocol.Runtime.ScriptId,
-  signal: AbortSignal,
+  signal: AbortSignal
 ) {
   while (true) {
     if (signal.aborted) {
@@ -439,9 +413,7 @@ async function waitForScript(
         once: true,
       });
       void model
-        .once(
-          'ParsedScriptSource' as Parameters<DevTools.DebuggerModel['once']>[0],
-        )
+        .once('ParsedScriptSource' as Parameters<DevTools.DebuggerModel['once']>[0])
         .then(resolve);
     });
   }

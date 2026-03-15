@@ -4,7 +4,7 @@
  * Following TDD: Tests written BEFORE implementation
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { estimateTokens } from '../src/utils/token-estimator';
 
 describe('estimateTokens', () => {

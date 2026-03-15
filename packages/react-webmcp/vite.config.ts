@@ -1,9 +1,23 @@
-import { playwright } from '@vitest/browser-playwright';
-import { defineConfig } from 'vitest/config';
+import { playwright } from 'vite-plus/test/browser-playwright';
+import { defineConfig } from 'vite-plus';
 
 const isCI = process.env.CI === 'true';
 
 export default defineConfig({
+  pack: {
+    entry: ['src/index.ts'],
+    platform: 'browser',
+    dts: true,
+    // Enable minification for production builds
+    minify: process.env.NODE_ENV === 'prod',
+    sourcemap: true,
+    clean: true,
+    treeshake: true,
+    // We don't want to bundle these with the library,
+    // as the consuming project will provide them.
+    external: ['react', 'react/jsx-runtime', 'react-dom', 'zod'],
+    tsconfig: './tsconfig.json',
+  },
   test: {
     // Use browser mode for real DOM, React rendering, and navigator testing
     browser: {

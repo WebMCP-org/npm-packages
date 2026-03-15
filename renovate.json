@@ -7,13 +7,13 @@
   "packageRules": [
     {
       "description": "Group code quality tools",
-      "matchPackageNames": ["@biomejs/*", "husky", "lint-staged", "@commitlint/*"],
+      "matchPackageNames": ["@commitlint/*", "syncpack"],
       "groupName": "code-quality"
     },
     {
-      "description": "Group build tools",
-      "matchPackageNames": ["turbo", "tsdown", "tsup", "vite", "@vitejs/*"],
-      "groupName": "build-tools"
+      "description": "Group Vite+ toolchain",
+      "matchPackageNames": ["vite-plus", "@voidzero-dev/*", "@vitejs/*"],
+      "groupName": "vite-plus"
     },
     {
       "description": "Group TypeScript and types",

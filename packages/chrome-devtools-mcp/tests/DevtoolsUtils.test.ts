@@ -5,20 +5,15 @@
  */
 
 import assert from 'node:assert';
-import {afterEach, describe, it} from 'node:test';
+import { afterEach, describe, it } from 'node:test';
 
 import sinon from 'sinon';
 
-import {UniverseManager} from '../src/DevtoolsUtils.js';
-import {DevTools} from '../src/third_party/index.js';
-import type {Browser, Target} from '../src/third_party/index.js';
+import { UniverseManager } from '../src/DevtoolsUtils.js';
+import { DevTools } from '../src/third_party/index.js';
+import type { Browser, Target } from '../src/third_party/index.js';
 
-import {
-  getMockBrowser,
-  getMockPage,
-  mockListener,
-  withBrowser,
-} from './utils.js';
+import { getMockBrowser, getMockPage, mockListener, withBrowser } from './utils.js';
 
 describe('UniverseManager', () => {
   afterEach(() => {
@@ -54,7 +49,7 @@ describe('UniverseManager', () => {
       page: () => Promise.resolve(page),
     } as Target);
 
-    await new Promise(r => setTimeout(r, 0)); // One event loop tick for the micro task queue to run.
+    await new Promise((r) => setTimeout(r, 0)); // One event loop tick for the micro task queue to run.
 
     sinon.assert.calledOnceWithExactly(factory, page);
   });

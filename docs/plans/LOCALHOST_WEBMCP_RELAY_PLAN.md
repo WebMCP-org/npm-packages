@@ -168,7 +168,7 @@ Track per websocket connection:
 - `sourceId` (connection-scoped, ephemeral)
 - `tabId` (stable browser-tab identity generated in widget and persisted in `sessionStorage`)
 - `origin`, `url`, `title`, `connectedAt`, `lastSeenAt`
-- `visibilityState`, `focused` (best effort) — *not yet implemented*
+- `visibilityState`, `focused` (best effort) — _not yet implemented_
 
 ## 7.2 Dedupe policy
 
@@ -203,9 +203,9 @@ No browser-extension dependency in MVP.
 ## 8.1 Local relay server hardening
 
 - Bind websocket server to `127.0.0.1` only.
-- Validate `Origin` header against widget origin allowlist. — *implemented*
-- Validate `Host` for localhost-style access to reduce DNS rebinding surface. — *deferred*
-- Enforce message size limits and per-connection rate limits. — *message size: implemented via maxPayloadBytes; rate limits: deferred*
+- Validate `Origin` header against widget origin allowlist. — _implemented_
+- Validate `Host` for localhost-style access to reduce DNS rebinding surface. — _deferred_
+- Enforce message size limits and per-connection rate limits. — _message size: implemented via maxPayloadBytes; rate limits: deferred_
 - Ignore unknown message types.
 
 ## 8.2 Browser embedding hardening

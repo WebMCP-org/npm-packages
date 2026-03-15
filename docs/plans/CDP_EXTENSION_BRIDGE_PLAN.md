@@ -7,6 +7,7 @@
 ## Overview
 
 Connect chrome-devtools-mcp directly to the MCP-B Extension's McpHub via CDP, enabling:
+
 - Local, low-latency tool access (~1-5ms vs ~50-200ms cloud)
 - Offline operation (no CloudMirror dependency)
 - Access to ALL extension tools (tabs, userscripts, DOM, screenshots + all website tools)
@@ -46,12 +47,12 @@ From `@modelcontextprotocol/sdk/shared/transport.js`:
 ```typescript
 interface Transport {
   // Lifecycle
-  start(): Promise<void>;           // Initialize, take connection steps
+  start(): Promise<void>; // Initialize, take connection steps
   send(message: JSONRPCMessage, options?: TransportSendOptions): Promise<void>;
   close(): Promise<void>;
 
   // Callbacks (set by Client/Server before start())
-  onclose?: () => void;             // Called when connection closes
+  onclose?: () => void; // Called when connection closes
   onerror?: (error: Error) => void; // Called on errors (not necessarily fatal)
   onmessage?: (message: JSONRPCMessage, extra?: MessageExtraInfo) => void;
 
@@ -79,6 +80,7 @@ await client.connect(transport); // calls transport.start() internally
 **Key patterns from StdioClientTransport:**
 
 1. **Process Lifecycle Management:**
+
    ```typescript
    async start() {
      this._process = spawn(command, args, { stdio: ['pipe', 'pipe', 'inherit'] });
@@ -95,6 +97,7 @@ await client.connect(transport); // calls transport.start() internally
    ```
 
 2. **Graceful Shutdown in close():**
+
    ```typescript
    async close() {
      // 1. End stdin gracefully
@@ -132,6 +135,7 @@ process.kill('SIGTERM')      →          browser.close()
 ```
 
 This means the transport should:
+
 1. Accept launch options (or an existing browser)
 2. Launch Chrome with required flags in `start()`
 3. Manage browser lifecycle
@@ -243,12 +247,14 @@ export class CDPServerTransport implements Transport {
 
 // Type declaration for the global
 declare global {
-  var __mcpCDPTransport: {
-    isReady: boolean;
-    version: string;
-    receiveMessage: (jsonStr: string) => void;
-    _sendBinding: ((jsonStr: string) => void) | null;
-  } | undefined;
+  var __mcpCDPTransport:
+    | {
+        isReady: boolean;
+        version: string;
+        receiveMessage: (jsonStr: string) => void;
+        _sendBinding: ((jsonStr: string) => void) | null;
+      }
+    | undefined;
 }
 ```
 
@@ -277,16 +283,16 @@ await mcpHub.server.connect(cdpTransport);
 
 **File:** `packages/chrome-devtools-mcp/src/transports/CDPClientTransport.ts` (new)
 
-```typescript
+````typescript
 /**
  * @license
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Transport} from '@modelcontextprotocol/sdk/shared/transport.js';
-import type {JSONRPCMessage} from '@modelcontextprotocol/sdk/types.js';
-import type {Browser, CDPSession} from 'puppeteer-core';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
+import type { Browser, CDPSession } from 'puppeteer-core';
 
 /**
  * Target info from CDP Target.getTargets
@@ -382,7 +388,7 @@ export class CDPClientTransport implements Transport {
   #closed = false;
 
   /** Bound handler for CDP binding calls */
-  #bindingHandler: ((event: {name: string; payload: string}) => void) | null = null;
+  #bindingHandler: ((event: { name: string; payload: string }) => void) | null = null;
   /** Bound handler for browser disconnect */
   #disconnectHandler: (() => void) | null = null;
 
@@ -417,7 +423,9 @@ export class CDPClientTransport implements Transport {
    */
   async start(): Promise<void> {
     if (this.#started) {
-      throw new Error('CDPClientTransport already started! If using Client class, note that connect() calls start() automatically.');
+      throw new Error(
+        'CDPClientTransport already started! If using Client class, note that connect() calls start() automatically.'
+      );
     }
     if (this.#closed) {
       throw new Error('CDPClientTransport has been closed');
@@ -454,7 +462,7 @@ export class CDPClientTransport implements Transport {
       }
 
       // 3. Attach to the service worker target
-      const {sessionId} = await this.#browserCdp.send('Target.attachToTarget', {
+      const { sessionId } = await this.#browserCdp.send('Target.attachToTarget', {
         targetId: swTarget.targetId,
         flatten: true,
       });
@@ -466,12 +474,12 @@ export class CDPClientTransport implements Transport {
       // 5. Add binding for receiving messages from the extension
       await this.#browserCdp.send(
         'Runtime.addBinding',
-        {name: '__mcpCDPToClient'},
+        { name: '__mcpCDPToClient' },
         this.#sessionId
       );
 
       // 6. Set up handler for binding calls
-      this.#bindingHandler = (event: {name: string; payload: string}) => {
+      this.#bindingHandler = (event: { name: string; payload: string }) => {
         if (event.name !== '__mcpCDPToClient') return;
         if (this.#closed) return;
 
@@ -485,7 +493,7 @@ export class CDPClientTransport implements Transport {
       this.#browserCdp.on('Runtime.bindingCalled', this.#bindingHandler);
 
       // 7. Verify the extension has the CDP transport ready
-      const {result} = await this.#browserCdp.send(
+      const { result } = await this.#browserCdp.send(
         'Runtime.evaluate',
         {
           expression: 'globalThis.__mcpCDPTransport?.isReady === true',
@@ -495,8 +503,7 @@ export class CDPClientTransport implements Transport {
 
       if (!result.value) {
         throw new Error(
-          'Extension CDP transport not found. ' +
-            'Ensure the extension has CDP bridge enabled.'
+          'Extension CDP transport not found. ' + 'Ensure the extension has CDP bridge enabled.'
         );
       }
 
@@ -556,16 +563,18 @@ export class CDPClientTransport implements Transport {
   async #findExtensionServiceWorker(): Promise<TargetInfo | null> {
     if (!this.#browserCdp) return null;
 
-    const {targetInfos} = (await this.#browserCdp.send('Target.getTargets')) as {
+    const { targetInfos } = (await this.#browserCdp.send('Target.getTargets')) as {
       targetInfos: TargetInfo[];
     };
 
-    return targetInfos.find((t) => {
-      if (t.type !== 'service_worker') return false;
-      if (!t.url.startsWith('chrome-extension://')) return false;
-      if (this.#extensionId && !t.url.includes(this.#extensionId)) return false;
-      return true;
-    }) ?? null;
+    return (
+      targetInfos.find((t) => {
+        if (t.type !== 'service_worker') return false;
+        if (!t.url.startsWith('chrome-extension://')) return false;
+        if (this.#extensionId && !t.url.includes(this.#extensionId)) return false;
+        return true;
+      }) ?? null
+    );
   }
 
   /**
@@ -657,10 +666,7 @@ export class CDPClientTransport implements Transport {
 
         // Graceful close with timeout (like StdioClientTransport's SIGTERM → SIGKILL)
         const closePromise = this.#browser.close();
-        await Promise.race([
-          closePromise,
-          new Promise(resolve => setTimeout(resolve, 5000))
-        ]);
+        await Promise.race([closePromise, new Promise((resolve) => setTimeout(resolve, 5000))]);
       } catch {
         // Ignore close errors
       }
@@ -670,7 +676,7 @@ export class CDPClientTransport implements Transport {
     this.onclose?.();
   }
 }
-```
+````
 
 ---
 
@@ -679,6 +685,7 @@ export class CDPClientTransport implements Transport {
 **File:** `packages/chrome-devtools-mcp/src/cli.ts`
 
 Add new options:
+
 ```typescript
 .option('--extension-bridge', 'Connect to MCP-B extension instead of pages', {
   default: false
@@ -689,18 +696,19 @@ Add new options:
 **File:** `packages/chrome-devtools-mcp/src/main.ts`
 
 Add extension bridge mode:
+
 ```typescript
 if (args.extensionBridge) {
   // Launch with --silent-debugger-extension-api
   browser = await ensureBrowserLaunched({
     ...options,
-    extraArgs: ['--silent-debugger-extension-api']
+    extraArgs: ['--silent-debugger-extension-api'],
   });
 
   // Create extension transport
   const transport = new CDPClientTransport({
     browser,
-    extensionId: args.extensionId
+    extensionId: args.extensionId,
   });
   await transport.start();
 
@@ -739,21 +747,21 @@ if (options.extensionBridge) {
 
 ### This Repo (chrome-devtools-mcp) - Runs Locally
 
-| File | Action | Purpose |
-|------|--------|---------|
-| `src/transports/CDPClientTransport.ts` | Create | New CDP→Extension transport |
-| `src/transports/index.ts` | Modify | Export CDPClientTransport |
-| `src/cli.ts` | Modify | Add --extension-bridge flag |
-| `src/main.ts` | Modify | Handle extension bridge mode |
-| `src/browser.ts` | Modify | Add --silent-debugger-extension-api |
-| `src/tools/WebMCPToolHub.ts` | Modify | Add syncToolsFromExtension() |
+| File                                   | Action | Purpose                             |
+| -------------------------------------- | ------ | ----------------------------------- |
+| `src/transports/CDPClientTransport.ts` | Create | New CDP→Extension transport         |
+| `src/transports/index.ts`              | Modify | Export CDPClientTransport           |
+| `src/cli.ts`                           | Modify | Add --extension-bridge flag         |
+| `src/main.ts`                          | Modify | Handle extension bridge mode        |
+| `src/browser.ts`                       | Modify | Add --silent-debugger-extension-api |
+| `src/tools/WebMCPToolHub.ts`           | Modify | Add syncToolsFromExtension()        |
 
 ### WebMCP Repo (Extension) - Runs in Browser
 
-| File | Action | Purpose |
-|------|--------|---------|
-| `apps/extension/.../background/cdpBridge.ts` | Create | CDPServerTransport class |
-| `apps/extension/.../background/index.ts` | Modify | Conditionally initialize CDP bridge |
+| File                                         | Action | Purpose                             |
+| -------------------------------------------- | ------ | ----------------------------------- |
+| `apps/extension/.../background/cdpBridge.ts` | Create | CDPServerTransport class            |
+| `apps/extension/.../background/index.ts`     | Modify | Conditionally initialize CDP bridge |
 
 ---
 
@@ -772,6 +780,7 @@ For initial implementation, option 1 (always expose) is recommended. The transpo
 **Service Worker lifecycle:**
 
 Chrome may suspend the service worker after 30 seconds of inactivity. The transport should:
+
 - Implement keep-alive pings if needed
 - Handle reconnection gracefully if the worker restarts
 
@@ -782,12 +791,14 @@ Chrome may suspend the service worker after 30 seconds of inactivity. The transp
 ### Manual Testing
 
 1. **Extension Side:**
+
    ```bash
    cd WebMCP && pnpm build
    # Load unpacked extension in Chrome
    ```
 
 2. **chrome-devtools-mcp Side:**
+
    ```bash
    cd packages/chrome-devtools-mcp
    pnpm build

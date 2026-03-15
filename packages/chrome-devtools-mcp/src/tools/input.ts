@@ -4,15 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {logger} from '../logger.js';
-import type {McpContext, TextSnapshotNode} from '../McpContext.js';
-import {zod} from '../third_party/index.js';
-import type {ElementHandle, KeyInput} from '../third_party/index.js';
-import {parseKey} from '../utils/keyboard.js';
+import { logger } from '../logger.js';
+import type { McpContext, TextSnapshotNode } from '../McpContext.js';
+import { zod } from '../third_party/index.js';
+import type { ElementHandle, KeyInput } from '../third_party/index.js';
+import { parseKey } from '../utils/keyboard.js';
 
-import {ToolCategory} from './categories.js';
-import type {ContextPage} from './ToolDefinition.js';
-import {definePageTool} from './ToolDefinition.js';
+import { ToolCategory } from './categories.js';
+import type { ContextPage } from './ToolDefinition.js';
+import { definePageTool } from './ToolDefinition.js';
 
 const dblClickSchema = zod
   .boolean()
@@ -27,9 +27,7 @@ const includeSnapshotSchema = zod
 const submitKeySchema = zod
   .string()
   .optional()
-  .describe(
-    'Optional key to press after typing. E.g., "Enter", "Tab", "Escape"',
-  );
+  .describe('Optional key to press after typing. E.g., "Enter", "Tab", "Escape"');
 
 function handleActionError(error: unknown, uid: string) {
   logger('failed to act using a locator', error);
@@ -37,7 +35,7 @@ function handleActionError(error: unknown, uid: string) {
     `Failed to interact with the element with uid ${uid}. The element did not become interactive within the configured timeout.`,
     {
       cause: error,
-    },
+    }
   );
 }
 
@@ -49,11 +47,7 @@ export const click = definePageTool({
     readOnlyHint: false,
   },
   schema: {
-    uid: zod
-      .string()
-      .describe(
-        'The uid of an element on the page from the page content snapshot',
-      ),
+    uid: zod.string().describe('The uid of an element on the page from the page content snapshot'),
     dblClick: dblClickSchema,
     includeSnapshot: includeSnapshotSchema,
   },
@@ -69,7 +63,7 @@ export const click = definePageTool({
       response.appendResponseLine(
         request.params.dblClick
           ? `Successfully double clicked on the element`
-          : `Successfully clicked on the element`,
+          : `Successfully clicked on the element`
       );
       if (request.params.includeSnapshot) {
         response.includeSnapshot();
@@ -106,7 +100,7 @@ export const clickAt = definePageTool({
     response.appendResponseLine(
       request.params.dblClick
         ? `Successfully double clicked at the coordinates`
-        : `Successfully clicked at the coordinates`,
+        : `Successfully clicked at the coordinates`
     );
     if (request.params.includeSnapshot) {
       response.includeSnapshot();
@@ -122,11 +116,7 @@ export const hover = definePageTool({
     readOnlyHint: false,
   },
   schema: {
-    uid: zod
-      .string()
-      .describe(
-        'The uid of an element on the page from the page content snapshot',
-      ),
+    uid: zod.string().describe('The uid of an element on the page from the page content snapshot'),
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
@@ -152,11 +142,7 @@ export const hover = definePageTool({
 // If the form is a combobox, we need to find the correct option by its text value.
 // To do that, loop through the children while checking which child's text matches the requested value (requested value is actually the text content).
 // When the correct option is found, use the element handle to get the real value.
-async function selectOption(
-  handle: ElementHandle,
-  aXNode: TextSnapshotNode,
-  value: string,
-) {
+async function selectOption(handle: ElementHandle, aXNode: TextSnapshotNode, value: string) {
   let optionFound = false;
   for (const child of aXNode.children) {
     if (child.role === 'option' && child.name === value && child.value) {
@@ -186,15 +172,10 @@ async function selectOption(
 }
 
 function hasOptionChildren(aXNode: TextSnapshotNode) {
-  return aXNode.children.some(child => child.role === 'option');
+  return aXNode.children.some((child) => child.role === 'option');
 }
 
-async function fillFormElement(
-  uid: string,
-  value: string,
-  context: McpContext,
-  page: ContextPage,
-) {
+async function fillFormElement(uid: string, value: string, context: McpContext, page: ContextPage) {
   const handle = await page.getElementByUid(uid);
   try {
     const aXNode = context.getAXNodeByUid(uid);
@@ -205,8 +186,7 @@ async function fillFormElement(
     } else {
       // Increase timeout for longer input values.
       const timeoutPerChar = 10; // ms
-      const fillTimeout =
-        page.pptrPage.getDefaultTimeout() + value.length * timeoutPerChar;
+      const fillTimeout = page.pptrPage.getDefaultTimeout() + value.length * timeoutPerChar;
       await handle.asLocator().setTimeout(fillTimeout).fill(value);
     }
   } catch (error) {
@@ -224,23 +204,14 @@ export const fill = definePageTool({
     readOnlyHint: false,
   },
   schema: {
-    uid: zod
-      .string()
-      .describe(
-        'The uid of an element on the page from the page content snapshot',
-      ),
+    uid: zod.string().describe('The uid of an element on the page from the page content snapshot'),
     value: zod.string().describe('The value to fill in'),
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
     const page = request.page;
     await context.waitForEventsAfterAction(async () => {
-      await fillFormElement(
-        request.params.uid,
-        request.params.value,
-        context as McpContext,
-        page,
-      );
+      await fillFormElement(request.params.uid, request.params.value, context as McpContext, page);
     });
     response.appendResponseLine(`Successfully filled out the element`);
     if (request.params.includeSnapshot) {
@@ -265,13 +236,11 @@ export const typeText = definePageTool({
     await context.waitForEventsAfterAction(async () => {
       await page.pptrPage.keyboard.type(request.params.text);
       if (request.params.submitKey) {
-        await page.pptrPage.keyboard.press(
-          request.params.submitKey as KeyInput,
-        );
+        await page.pptrPage.keyboard.press(request.params.submitKey as KeyInput);
       }
     });
     response.appendResponseLine(
-      `Typed text "${request.params.text}${request.params.submitKey ? ` + ${request.params.submitKey}` : ''}"`,
+      `Typed text "${request.params.text}${request.params.submitKey ? ` + ${request.params.submitKey}` : ''}"`
     );
   },
 });
@@ -289,14 +258,12 @@ export const drag = definePageTool({
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
-    const fromHandle = await request.page.getElementByUid(
-      request.params.from_uid,
-    );
+    const fromHandle = await request.page.getElementByUid(request.params.from_uid);
     const toHandle = await request.page.getElementByUid(request.params.to_uid);
     try {
       await context.waitForEventsAfterAction(async () => {
         await fromHandle.drag(toHandle);
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise((resolve) => setTimeout(resolve, 50));
         await toHandle.drop(fromHandle);
       });
       response.appendResponseLine(`Successfully dragged an element`);
@@ -323,7 +290,7 @@ export const fillForm = definePageTool({
         zod.object({
           uid: zod.string().describe('The uid of the element to fill out'),
           value: zod.string().describe('Value for the element'),
-        }),
+        })
       )
       .describe('Elements from snapshot to fill out.'),
     includeSnapshot: includeSnapshotSchema,
@@ -332,12 +299,7 @@ export const fillForm = definePageTool({
     const page = request.page;
     for (const element of request.params.elements) {
       await context.waitForEventsAfterAction(async () => {
-        await fillFormElement(
-          element.uid,
-          element.value,
-          context as McpContext,
-          page,
-        );
+        await fillFormElement(element.uid, element.value, context as McpContext, page);
       });
     }
     response.appendResponseLine(`Successfully filled out the form`);
@@ -358,16 +320,14 @@ export const uploadFile = definePageTool({
     uid: zod
       .string()
       .describe(
-        'The uid of the file input element or an element that will open file chooser on the page from the page content snapshot',
+        'The uid of the file input element or an element that will open file chooser on the page from the page content snapshot'
       ),
     filePath: zod.string().describe('The local path of the file to upload'),
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response) => {
-    const {uid, filePath} = request.params;
-    const handle = (await request.page.getElementByUid(
-      uid,
-    )) as ElementHandle<HTMLInputElement>;
+    const { uid, filePath } = request.params;
+    const handle = (await request.page.getElementByUid(uid)) as ElementHandle<HTMLInputElement>;
     try {
       try {
         await handle.uploadFile(filePath);
@@ -377,13 +337,13 @@ export const uploadFile = definePageTool({
         // Page.waitForFileChooser() and upload the file this way.
         try {
           const [fileChooser] = await Promise.all([
-            request.page.pptrPage.waitForFileChooser({timeout: 3000}),
+            request.page.pptrPage.waitForFileChooser({ timeout: 3000 }),
             handle.asLocator().click(),
           ]);
           await fileChooser.accept([filePath]);
         } catch {
           throw new Error(
-            `Failed to upload file. The element could not accept the file directly, and clicking it did not trigger a file chooser.`,
+            `Failed to upload file. The element could not accept the file directly, and clicking it did not trigger a file chooser.`
           );
         }
       }
@@ -408,7 +368,7 @@ export const pressKey = definePageTool({
     key: zod
       .string()
       .describe(
-        'A key or a combination (e.g., "Enter", "Control+A", "Control++", "Control+Shift+R"). Modifiers: Control, Shift, Alt, Meta',
+        'A key or a combination (e.g., "Enter", "Control+A", "Control++", "Control+Shift+R"). Modifiers: Control, Shift, Alt, Meta'
       ),
     includeSnapshot: includeSnapshotSchema,
   },
@@ -427,9 +387,7 @@ export const pressKey = definePageTool({
       }
     });
 
-    response.appendResponseLine(
-      `Successfully pressed key: ${request.params.key}`,
-    );
+    response.appendResponseLine(`Successfully pressed key: ${request.params.key}`);
     if (request.params.includeSnapshot) {
       response.includeSnapshot();
     }

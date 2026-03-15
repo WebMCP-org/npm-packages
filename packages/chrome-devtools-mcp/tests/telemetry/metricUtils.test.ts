@@ -5,9 +5,9 @@
  */
 
 import assert from 'node:assert';
-import {describe, it} from 'node:test';
+import { describe, it } from 'node:test';
 
-import {bucketizeLatency} from '../../src/telemetry/metricUtils.js';
+import { bucketizeLatency } from '../../src/telemetry/metricUtils.js';
 
 describe('bucketizeLatency', () => {
   it('should bucketize values correctly', () => {

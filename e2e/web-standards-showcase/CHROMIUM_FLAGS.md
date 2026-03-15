@@ -15,6 +15,7 @@ The Web Model Context API is an **experimental feature** in Chromium that must b
 ```
 
 This flag enables all experimental web platform features, including:
+
 - Web Model Context API (`navigator.modelContext`)
 - Model Context Testing API (`navigator.modelContextTesting`)
 - Associated events and methods
@@ -101,10 +102,7 @@ The showcase includes a Playwright config that automatically launches Chromium w
 export default defineConfig({
   use: {
     launchOptions: {
-      args: [
-        '--enable-experimental-web-platform-features',
-        '--enable-features=WebModelContext',
-      ],
+      args: ['--enable-experimental-web-platform-features', '--enable-features=WebModelContext'],
     },
   },
 });
@@ -150,9 +148,10 @@ if (navigator.modelContextTesting) {
 }
 
 // List methods
-console.log('Available methods:', Object.getOwnPropertyNames(
-  Object.getPrototypeOf(navigator.modelContext)
-));
+console.log(
+  'Available methods:',
+  Object.getOwnPropertyNames(Object.getPrototypeOf(navigator.modelContext))
+);
 ```
 
 Expected output for native API:
@@ -183,6 +182,7 @@ Available methods: [
 ### API Not Available
 
 **Symptoms:**
+
 - `navigator.modelContext` is `undefined`
 - Console shows no errors
 - App shows "not found" error
@@ -190,12 +190,14 @@ Available methods: [
 **Solutions:**
 
 1. **Verify flag is enabled:**
+
    ```bash
    # Check chrome://version for the flag
    # Or re-launch with explicit flag
    ```
 
 2. **Use correct Chromium version:**
+
    ```bash
    # Check version
    chromium --version
@@ -212,12 +214,14 @@ Available methods: [
 ### Polyfill Detected Instead of Native
 
 **Symptoms:**
+
 - App shows "Polyfill detected" warning
 - Constructor name includes "WebModelContext"
 
 **Solutions:**
 
 1. **Check for polyfill imports:**
+
    ```javascript
    // Remove these from your code:
    import '@mcp-b/global';
@@ -225,6 +229,7 @@ Available methods: [
    ```
 
 2. **Verify no browser extensions are injecting polyfills:**
+
    ```bash
    # Launch in incognito mode (disables extensions)
    chromium --enable-experimental-web-platform-features --incognito
@@ -241,6 +246,7 @@ Available methods: [
 ### Methods Missing (unregisterTool, clearContext)
 
 **Symptoms:**
+
 - `modelContext.unregisterTool is not a function`
 - `modelContext.clearContext is not a function`
 
@@ -251,12 +257,14 @@ Available methods: [
 ### Tools Not Persisting
 
 **Symptoms:**
+
 - Tools disappear after `provideContext()` call
 - Expected Bucket B behavior not working
 
 **Cause:** Misunderstanding of two-bucket system.
 
 **Solution:** Review bucket architecture:
+
 - Use `provideContext()` for replaceable tools (Bucket A)
 - Use `registerTool()` for persistent tools (Bucket B)
 
@@ -315,7 +323,7 @@ function detectWebModelContextAPI() {
   if (!navigator.modelContext) {
     return {
       available: false,
-      message: 'API not available'
+      message: 'API not available',
     };
   }
 
@@ -328,7 +336,7 @@ function detectWebModelContextAPI() {
     return {
       available: true,
       isNative: false,
-      message: 'Polyfill detected'
+      message: 'Polyfill detected',
     };
   }
 
@@ -348,7 +356,7 @@ function detectWebModelContextAPI() {
     available: true,
     isNative: !isPolyfill,
     hasTestingAPI,
-    message: isPolyfill ? 'Polyfill detected' : 'Native API ready'
+    message: isPolyfill ? 'Polyfill detected' : 'Native API ready',
   };
 }
 
@@ -416,17 +424,17 @@ cd src/third_party/blink/web_tests/external/wpt/model-context/
 
 ## 📝 Flag Reference Sheet
 
-| Flag | Purpose | When to Use |
-|------|---------|-------------|
-| `--enable-experimental-web-platform-features` | Enable all experimental features | Development, testing |
-| `--enable-features=WebModelContext` | Enable only Model Context API | Production-like testing |
-| `--user-data-dir=/tmp/chrome-test` | Isolated browser profile | Avoid conflicts |
-| `--disable-extensions` | Disable all extensions | Debugging issues |
-| `--incognito` | Private browsing mode | Quick isolated test |
-| `--headless=new` | Headless mode | CI/CD pipelines |
-| `--remote-debugging-port=9222` | DevTools Protocol access | Advanced debugging |
-| `--no-sandbox` | Disable sandbox (unsafe) | CI environments only |
-| `--disable-gpu` | Disable GPU acceleration | Headless environments |
+| Flag                                          | Purpose                          | When to Use             |
+| --------------------------------------------- | -------------------------------- | ----------------------- |
+| `--enable-experimental-web-platform-features` | Enable all experimental features | Development, testing    |
+| `--enable-features=WebModelContext`           | Enable only Model Context API    | Production-like testing |
+| `--user-data-dir=/tmp/chrome-test`            | Isolated browser profile         | Avoid conflicts         |
+| `--disable-extensions`                        | Disable all extensions           | Debugging issues        |
+| `--incognito`                                 | Private browsing mode            | Quick isolated test     |
+| `--headless=new`                              | Headless mode                    | CI/CD pipelines         |
+| `--remote-debugging-port=9222`                | DevTools Protocol access         | Advanced debugging      |
+| `--no-sandbox`                                | Disable sandbox (unsafe)         | CI environments only    |
+| `--disable-gpu`                               | Disable GPU acceleration         | Headless environments   |
 
 ---
 
@@ -490,13 +498,13 @@ cd src/third_party/blink/web_tests/external/wpt/model-context/
 
 **A:**
 
-| Feature | Native | Polyfill |
-|---------|--------|----------|
-| `unregisterTool()` | ✅ Yes | ❌ No |
-| `clearContext()` | ✅ Yes | ❌ No |
-| Performance | ⚡ Faster | 🐌 Slower |
-| Constructor name | Native (varies) | "WebModelContextTesting" |
-| Browser support | Chromium only | All browsers |
+| Feature            | Native          | Polyfill                 |
+| ------------------ | --------------- | ------------------------ |
+| `unregisterTool()` | ✅ Yes          | ❌ No                    |
+| `clearContext()`   | ✅ Yes          | ❌ No                    |
+| Performance        | ⚡ Faster       | 🐌 Slower                |
+| Constructor name   | Native (varies) | "WebModelContextTesting" |
+| Browser support    | Chromium only   | All browsers             |
 
 ---
 

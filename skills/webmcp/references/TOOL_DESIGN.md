@@ -18,7 +18,7 @@ navigator.modelContext.registerTool({
     // Only reads, never modifies
     const name = document.querySelector('.user-name')?.textContent;
     return { content: [{ type: 'text', text: JSON.stringify({ name }) }] };
-  }
+  },
 });
 ```
 
@@ -35,7 +35,7 @@ navigator.modelContext.registerTool({
     document.body.classList.toggle('dark-mode');
     const isDark = document.body.classList.contains('dark-mode');
     return { content: [{ type: 'text', text: `Dark mode: ${isDark}` }] };
-  }
+  },
 });
 ```
 
@@ -51,20 +51,20 @@ navigator.modelContext.registerTool({
     type: 'object',
     properties: {
       id: { type: 'string', description: 'Item ID to delete' },
-      confirm: { type: 'boolean', description: 'Must be true to confirm deletion' }
+      confirm: { type: 'boolean', description: 'Must be true to confirm deletion' },
     },
-    required: ['id', 'confirm']
+    required: ['id', 'confirm'],
   },
   execute: async ({ id, confirm }) => {
     if (!confirm) {
       return {
         content: [{ type: 'text', text: 'Set confirm: true to delete' }],
-        isError: true
+        isError: true,
       };
     }
     // Perform deletion...
     return { content: [{ type: 'text', text: `Deleted item ${id}` }] };
-  }
+  },
 });
 ```
 
@@ -92,8 +92,8 @@ navigator.modelContext.registerTool({
       name: { type: 'string', description: 'Your name' },
       email: { type: 'string', description: 'Your email' },
       subject: { type: 'string', description: 'Message subject' },
-      message: { type: 'string', description: 'Message body' }
-    }
+      message: { type: 'string', description: 'Message body' },
+    },
   },
   execute: async (params) => {
     const fields = ['name', 'email', 'subject', 'message'];
@@ -117,12 +117,14 @@ navigator.modelContext.registerTool({
     }
 
     return {
-      content: [{
-        type: 'text',
-        text: JSON.stringify({ filled, currentState: formState }, null, 2)
-      }]
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({ filled, currentState: formState }, null, 2),
+        },
+      ],
     };
-  }
+  },
 });
 
 // Tool 2: Submit form (irreversible)
@@ -143,14 +145,14 @@ navigator.modelContext.registerTool({
       if (!input?.value?.trim()) {
         return {
           content: [{ type: 'text', text: `Missing required field: ${field}` }],
-          isError: true
+          isError: true,
         };
       }
     }
 
     form.submit();
     return { content: [{ type: 'text', text: 'Form submitted!' }] };
-  }
+  },
 });
 ```
 
@@ -163,19 +165,21 @@ navigator.modelContext.registerTool({
   description: 'Preview checkout details before placing order',
   inputSchema: { type: 'object', properties: {} },
   execute: async () => {
-    const items = [...document.querySelectorAll('.cart-item')].map(el => ({
+    const items = [...document.querySelectorAll('.cart-item')].map((el) => ({
       name: el.querySelector('.item-name')?.textContent,
-      price: el.querySelector('.item-price')?.textContent
+      price: el.querySelector('.item-price')?.textContent,
     }));
     const total = document.querySelector('.cart-total')?.textContent;
 
     return {
-      content: [{
-        type: 'text',
-        text: JSON.stringify({ items, total, message: 'Call place_order to proceed' }, null, 2)
-      }]
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({ items, total, message: 'Call place_order to proceed' }, null, 2),
+        },
+      ],
     };
-  }
+  },
 });
 
 // Execute: Perform the action
@@ -185,18 +189,21 @@ navigator.modelContext.registerTool({
   inputSchema: {
     type: 'object',
     properties: {
-      confirm: { type: 'boolean', description: 'Must be true to confirm order' }
+      confirm: { type: 'boolean', description: 'Must be true to confirm order' },
     },
-    required: ['confirm']
+    required: ['confirm'],
   },
   execute: async ({ confirm }) => {
     if (!confirm) {
-      return { content: [{ type: 'text', text: 'Set confirm: true to place order' }], isError: true };
+      return {
+        content: [{ type: 'text', text: 'Set confirm: true to place order' }],
+        isError: true,
+      };
     }
 
     document.querySelector('#place-order-button').click();
     return { content: [{ type: 'text', text: 'Order placed!' }] };
-  }
+  },
 });
 ```
 
@@ -254,12 +261,12 @@ execute: async ({ id }) => {
   if (!element) {
     return {
       content: [{ type: 'text', text: `Item ${id} not found` }],
-      isError: true
+      isError: true,
     };
   }
 
   // Continue with logic...
-}
+};
 ```
 
 ### Validation
@@ -270,12 +277,12 @@ execute: async ({ email }) => {
   if (!email.includes('@')) {
     return {
       content: [{ type: 'text', text: 'Invalid email format' }],
-      isError: true
+      isError: true,
     };
   }
 
   // Proceed...
-}
+};
 ```
 
 ### Try-Catch
@@ -288,10 +295,10 @@ execute: async (params) => {
   } catch (error) {
     return {
       content: [{ type: 'text', text: `Error: ${error.message}` }],
-      isError: true
+      isError: true,
     };
   }
-}
+};
 ```
 
 ## Response Formatting
@@ -301,14 +308,20 @@ execute: async (params) => {
 ```javascript
 // Return as JSON for structured data
 return {
-  content: [{
-    type: 'text',
-    text: JSON.stringify({
-      count: items.length,
-      items: items,
-      hasMore: items.length === limit
-    }, null, 2)
-  }]
+  content: [
+    {
+      type: 'text',
+      text: JSON.stringify(
+        {
+          count: items.length,
+          items: items,
+          hasMore: items.length === limit,
+        },
+        null,
+        2
+      ),
+    },
+  ],
 };
 ```
 
@@ -317,10 +330,12 @@ return {
 ```javascript
 // Return formatted text for direct display
 return {
-  content: [{
-    type: 'text',
-    text: `Found ${count} results:\n\n${items.map((i, n) => `${n+1}. ${i.title}`).join('\n')}`
-  }]
+  content: [
+    {
+      type: 'text',
+      text: `Found ${count} results:\n\n${items.map((i, n) => `${n + 1}. ${i.title}`).join('\n')}`,
+    },
+  ],
 };
 ```
 
@@ -332,14 +347,16 @@ const truncated = fullText.length > 1000;
 const text = truncated ? fullText.substring(0, 1000) + '...' : fullText;
 
 return {
-  content: [{
-    type: 'text',
-    text: JSON.stringify({
-      content: text,
-      truncated,
-      fullLength: fullText.length
-    })
-  }]
+  content: [
+    {
+      type: 'text',
+      text: JSON.stringify({
+        content: text,
+        truncated,
+        fullLength: fullText.length,
+      }),
+    },
+  ],
 };
 ```
 
@@ -359,11 +376,11 @@ return {
 
 ```javascript
 // Good
-description: 'Get the top posts from the current subreddit. Returns title, score, and author.'
+description: 'Get the top posts from the current subreddit. Returns title, score, and author.';
 
 // Better (mentions flow)
-description: 'Fill order form fields. Call submit_order to place the order.'
+description: 'Fill order form fields. Call submit_order to place the order.';
 
 // For destructive actions
-description: 'DELETE the selected item. WARNING: This cannot be undone!'
+description: 'DELETE the selected item. WARNING: This cannot be undone!';
 ```

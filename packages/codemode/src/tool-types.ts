@@ -3,13 +3,15 @@ import { asSchema } from 'ai';
 import type { JSONSchema7 } from 'json-schema';
 import type { ZodType } from 'zod';
 import { type ConversionContext, jsonSchemaToTypeString } from './json-schema-types';
+import type { ToolFunction } from './types';
+import type { UnknownRecord } from './type-utils';
 import { escapeJsDoc, sanitizeToolName, toPascalCase } from './utils';
 
 export interface ToolDescriptor {
   description?: string;
   inputSchema: ZodType;
   outputSchema?: ZodType;
-  execute?: (args: unknown) => Promise<unknown>;
+  execute?: ToolFunction;
 }
 
 export type ToolDescriptors = Record<string, ToolDescriptor>;
@@ -17,11 +19,11 @@ export type ToolDescriptors = Record<string, ToolDescriptor>;
 // --- Schema detection helpers ---
 
 function hasZodMarker(value: object): boolean {
-  return '_zod' in value && (value as Record<string, unknown>)._zod !== undefined;
+  return '_zod' in value && (value as UnknownRecord)._zod !== undefined;
 }
 
 function hasStandardMarker(value: object): boolean {
-  return '~standard' in value && (value as Record<string, unknown>)['~standard'] !== undefined;
+  return '~standard' in value && (value as UnknownRecord)['~standard'] !== undefined;
 }
 
 function isZodSchema(value: unknown): value is ZodType {
@@ -61,9 +63,9 @@ function extractJsonSchema(wrapper: unknown): JSONSchema7 | null {
 function extractDescriptions(schema: unknown): Record<string, string> {
   const descriptions: Record<string, string> = {};
 
-  const shape = (schema as Record<string, unknown>).shape;
+  const shape = (schema as UnknownRecord).shape;
   if (shape && typeof shape === 'object') {
-    for (const [fieldName, fieldSchema] of Object.entries(shape as Record<string, unknown>)) {
+    for (const [fieldName, fieldSchema] of Object.entries(shape as UnknownRecord)) {
       let s = fieldSchema as { description?: string; unwrap?: () => unknown } | null;
       while (s && !s.description && typeof s.unwrap === 'function') {
         s = s.unwrap() as typeof s;

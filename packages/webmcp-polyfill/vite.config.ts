@@ -1,4 +1,5 @@
-import type { Options } from 'tsdown';
+import type { Options } from 'vite-plus/pack';
+import { defineConfig } from 'vite-plus';
 
 // ESM build for npm package
 const esmConfig: Options = {
@@ -13,7 +14,6 @@ const esmConfig: Options = {
   minify: false,
   target: 'esnext',
   platform: 'browser',
-  external: ['@mcp-b/transports', '@mcp-b/webmcp-ts-sdk'],
   tsconfig: './tsconfig.json',
   outDir: 'dist',
 };
@@ -36,11 +36,16 @@ const iifeConfig: Options = {
   noExternal: [/.*/], // Explicitly bundle all dependencies
   tsconfig: './tsconfig.json',
   outDir: 'dist',
-  globalName: 'WebMCP',
+  globalName: 'WebMCPPolyfill',
   outExtensions: () => ({ js: '.js' }),
   onSuccess: async () => {
     console.log('✓ IIFE build complete - auto-initializes on load');
   },
 };
 
-export default [esmConfig, iifeConfig];
+export default defineConfig({
+  pack: [esmConfig, iifeConfig],
+  test: {
+    globals: true,
+  },
+});

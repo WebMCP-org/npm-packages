@@ -2,7 +2,7 @@
  * Patch tests for SKILL.md diff and apply utilities.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import {
   applySkillPatch,
   createSkillPatch,

@@ -36,23 +36,23 @@ Tools registered inside the iframe (e.g. `calculate`) appear on the parent as `m
 
 ## Attributes
 
-| Attribute | Description |
-|-----------|-------------|
-| `src` | URL of the iframe page |
-| `id` | Used as the tool name prefix |
-| `target-origin` | Override the postMessage target origin |
-| `channel` | Channel ID for transport (default: `mcp-iframe`) |
-| `call-timeout` | Timeout in ms for tool calls (default: `30000`) |
+| Attribute          | Description                                      |
+| ------------------ | ------------------------------------------------ |
+| `src`              | URL of the iframe page                           |
+| `id`               | Used as the tool name prefix                     |
+| `target-origin`    | Override the postMessage target origin           |
+| `channel`          | Channel ID for transport (default: `mcp-iframe`) |
+| `call-timeout`     | Timeout in ms for tool calls (default: `30000`)  |
 | `prefix-separator` | Separator between prefix and name (default: `_`) |
 
 Standard iframe attributes (`sandbox`, `allow`, `width`, `height`, etc.) are also mirrored.
 
 ## Events
 
-| Event | Detail |
-|-------|--------|
-| `mcp-iframe-ready` | `{ tools, resources, prompts }` - Fired when connected |
-| `mcp-iframe-error` | `{ error }` - Fired on connection failure |
+| Event                      | Detail                                                    |
+| -------------------------- | --------------------------------------------------------- |
+| `mcp-iframe-ready`         | `{ tools, resources, prompts }` - Fired when connected    |
+| `mcp-iframe-error`         | `{ error }` - Fired on connection failure                 |
 | `mcp-iframe-tools-changed` | `{ tools, resources, prompts }` - Fired after `refresh()` |
 
 ## Related Packages

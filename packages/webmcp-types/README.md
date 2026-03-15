@@ -23,11 +23,11 @@ This package is the type-safety source of truth for WebMCP.
 
 ## Package Selection
 
-| Package | Use When |
-| --- | --- |
-| `@mcp-b/webmcp-types` | You only need compile-time types |
-| `@mcp-b/webmcp-polyfill` | You need strict WebMCP core runtime behavior |
-| `@mcp-b/global` | You want core + MCPB bridge extensions (`callTool`, prompts, resources, etc.) |
+| Package                  | Use When                                                                      |
+| ------------------------ | ----------------------------------------------------------------------------- |
+| `@mcp-b/webmcp-types`    | You only need compile-time types                                              |
+| `@mcp-b/webmcp-polyfill` | You need strict WebMCP core runtime behavior                                  |
+| `@mcp-b/global`          | You want core + MCPB bridge extensions (`callTool`, prompts, resources, etc.) |
 
 ## Install
 
@@ -118,7 +118,7 @@ Use `as const satisfies JsonSchemaForInference` so TypeScript preserves literal 
 If schema types are widened (for example `InputSchema` loaded at runtime), inference intentionally falls back to:
 
 ```ts
-Record<string, unknown>
+Record<string, unknown>;
 ```
 
 ### 2. Input inference rules
@@ -138,12 +138,12 @@ Other schema keywords are accepted as metadata but do not add new inferred struc
 
 ### 3. `additionalProperties` behavior
 
-| Schema shape | Inferred extras |
-| --- | --- |
-| `additionalProperties: false` | No extra keys |
-| `additionalProperties` omitted/`true` | Extra keys allowed as `unknown` |
-| `additionalProperties: { ... }` with no named `properties` | Map-like `Record<string, ...>` |
-| `additionalProperties: { ... }` with named `properties` | Named properties inferred, extras remain `unknown` |
+| Schema shape                                               | Inferred extras                                    |
+| ---------------------------------------------------------- | -------------------------------------------------- |
+| `additionalProperties: false`                              | No extra keys                                      |
+| `additionalProperties` omitted/`true`                      | Extra keys allowed as `unknown`                    |
+| `additionalProperties: { ... }` with no named `properties` | Map-like `Record<string, ...>`                     |
+| `additionalProperties: { ... }` with named `properties`    | Named properties inferred, extras remain `unknown` |
 
 ### 4. Required keys depend on literal `required`
 
@@ -208,18 +208,18 @@ void result;
 
 ## Commonly Used Exports
 
-| Export | Purpose |
-| --- | --- |
-| `ModelContext` | Strict core `navigator.modelContext` type |
-| `ToolDescriptor` | Explicitly typed tool descriptor |
-| `ToolDescriptorFromSchema` | Schema-driven descriptor with inferred args/result |
-| `JsonSchemaForInference` | Supported JSON Schema subset for inference |
-| `InferArgsFromInputSchema` | Derive args shape from a schema type |
-| `ToolResultFromOutputSchema` | Derive `structuredContent` type from output schema |
-| `TypedModelContext` | Name-aware typed `callTool`/`listTools` for known registries |
-| `CallToolResult` | Tool response type |
-| `ContentBlock` / `LooseContentBlock` | Strict and pragmatic content block typing |
-| `ModelContextClient` | Tool execution client (`requestUserInteraction`) |
+| Export                               | Purpose                                                      |
+| ------------------------------------ | ------------------------------------------------------------ |
+| `ModelContext`                       | Strict core `navigator.modelContext` type                    |
+| `ToolDescriptor`                     | Explicitly typed tool descriptor                             |
+| `ToolDescriptorFromSchema`           | Schema-driven descriptor with inferred args/result           |
+| `JsonSchemaForInference`             | Supported JSON Schema subset for inference                   |
+| `InferArgsFromInputSchema`           | Derive args shape from a schema type                         |
+| `ToolResultFromOutputSchema`         | Derive `structuredContent` type from output schema           |
+| `TypedModelContext`                  | Name-aware typed `callTool`/`listTools` for known registries |
+| `CallToolResult`                     | Tool response type                                           |
+| `ContentBlock` / `LooseContentBlock` | Strict and pragmatic content block typing                    |
+| `ModelContextClient`                 | Tool execution client (`requestUserInteraction`)             |
 
 ## Important Notes
 

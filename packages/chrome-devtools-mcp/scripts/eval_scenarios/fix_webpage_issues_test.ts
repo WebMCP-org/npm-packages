@@ -16,13 +16,9 @@
 
 import assert from 'node:assert';
 
-import type {TestScenario} from '../eval_gemini.ts';
+import type { TestScenario } from '../eval_gemini.ts';
 
-const INSPECTION_TOOLS = [
-  'take_snapshot',
-  'list_console_messages',
-  'list_network_requests',
-];
+const INSPECTION_TOOLS = ['take_snapshot', 'list_console_messages', 'list_network_requests'];
 
 export const scenario: TestScenario = {
   prompt: 'Can you fix issues with my webpage?',
@@ -37,26 +33,19 @@ export const scenario: TestScenario = {
       </script>
     `,
   },
-  expectations: calls => {
+  expectations: (calls) => {
     const NAVIGATION_TOOLS = ['navigate_page', 'new_page'];
-    assert.ok(
-      calls.length >= 2,
-      'Expected at least navigation and one inspection',
-    );
-    const navigationIndex = calls.findIndex(c =>
-      NAVIGATION_TOOLS.includes(c.name),
-    );
+    assert.ok(calls.length >= 2, 'Expected at least navigation and one inspection');
+    const navigationIndex = calls.findIndex((c) => NAVIGATION_TOOLS.includes(c.name));
     assert.ok(
       navigationIndex !== -1,
-      `Expected a navigation call (${NAVIGATION_TOOLS.join(' or ')}), got: ${calls.map(c => c.name).join(', ')}`,
+      `Expected a navigation call (${NAVIGATION_TOOLS.join(' or ')}), got: ${calls.map((c) => c.name).join(', ')}`
     );
     const afterNavigation = calls.slice(navigationIndex + 1);
-    const inspectionCalls = afterNavigation.filter(c =>
-      INSPECTION_TOOLS.includes(c.name),
-    );
+    const inspectionCalls = afterNavigation.filter((c) => INSPECTION_TOOLS.includes(c.name));
     assert.ok(
       inspectionCalls.length >= 1,
-      `Expected at least one inspection tool (${INSPECTION_TOOLS.join(', ')}) after navigation, got: ${calls.map(c => c.name).join(', ')}`,
+      `Expected at least one inspection tool (${INSPECTION_TOOLS.join(', ')}) after navigation, got: ${calls.map((c) => c.name).join(', ')}`
     );
   },
 };

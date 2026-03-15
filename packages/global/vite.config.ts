@@ -1,43 +1,71 @@
-import { defineConfig } from 'vite';
-import monkey from 'vite-plugin-monkey';
+import type { Options } from 'vite-plus/pack';
+
+import { playwright } from 'vite-plus/test/browser-playwright';
+import { defineConfig } from 'vite-plus';
+
+const isCI = process.env.CI === 'true';
+
+// ESM build for npm package
+const esmConfig: Options = {
+  entry: {
+    index: 'src/index.ts',
+  },
+  format: ['esm'],
+  dts: true,
+  sourcemap: true,
+  clean: true,
+  treeshake: true,
+  minify: false,
+  target: 'esnext',
+  platform: 'browser',
+  external: ['@mcp-b/transports', '@mcp-b/webmcp-ts-sdk'],
+  tsconfig: './tsconfig.json',
+  outDir: 'dist',
+};
+
+// IIFE build for script tag usage - bundles everything for standalone use
+// Uses index.ts which auto-initializes on load
+const iifeConfig: Options = {
+  entry: {
+    index: 'src/index.ts',
+  },
+  format: ['iife'],
+  dts: false,
+  sourcemap: false,
+  clean: false, // Don't clean since ESM build runs first
+  treeshake: true,
+  minify: true,
+  target: 'esnext',
+  platform: 'browser',
+  external: [], // Bundle everything - no externals for standalone script
+  noExternal: [/.*/], // Explicitly bundle all dependencies
+  tsconfig: './tsconfig.json',
+  outDir: 'dist',
+  globalName: 'WebMCP',
+  outExtensions: () => ({ js: '.js' }),
+  onSuccess: async () => {
+    console.log('✓ IIFE build complete - auto-initializes on load');
+  },
+};
 
 export default defineConfig({
-  optimizeDeps: {
-    include: ['@mcp-b/transports', '@modelcontextprotocol/sdk'],
-  },
-  plugins: [
-    monkey({
-      entry: 'src/index.ts',
-      userscript: {
-        name: 'Web Model Context API Polyfill',
-        namespace: 'https://github.com/WebMCP-org/npm-packages',
-        match: ['*://*/*'], // Match all websites
-        version: '1.0.0',
-        description:
-          'Implements the Web Model Context API (window.agent) bridging to Model Context Protocol',
-        author: 'MCP-B Team',
-        license: 'MIT',
-        homepageURL: 'https://github.com/WebMCP-org/npm-packages',
-        supportURL: 'https://github.com/WebMCP-org/npm-packages/issues',
-      },
-      build: {
-        fileName: 'index.js', // Simple output name for <script> tag usage
-        metaFileName: false, // No metadata file needed
-        autoGrant: false, // No GM grants needed
-        externalGlobals: {}, // Bundle everything
-      },
-    }),
-  ],
-  build: {
-    minify: true, // Minify for smaller bundle size
-    rollupOptions: {
-      output: {
-        format: 'iife', // Self-contained IIFE for <script> tag
-        inlineDynamicImports: true, // Bundle all dynamic imports
-        name: 'WebMCP', // Global variable name (if needed)
-      },
+  pack: [esmConfig, iifeConfig],
+  test: {
+    // Use browser mode for real DOM, postMessage, and navigator testing
+    browser: {
+      enabled: true,
+      provider: playwright({
+        launchOptions: process.env.CHROME_BIN ? { executablePath: process.env.CHROME_BIN } : {},
+      }),
+      instances: [{ browser: 'chromium' }],
     },
-    target: 'esnext', // Modern browsers
-    sourcemap: false, // No sourcemaps in production
+    // Test file patterns - exclude esm-resolution tests as they need Node.js
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    exclude: ['dist', 'node_modules', 'src/esm-resolution.test.ts', 'src/conformance/**/*.test.ts'],
+    // Enable globals for cleaner test syntax
+    globals: true,
+    // Limit concurrency in CI to prevent resource exhaustion
+    maxConcurrency: isCI ? 2 : 10,
+    fileParallelism: !isCI,
   },
 });

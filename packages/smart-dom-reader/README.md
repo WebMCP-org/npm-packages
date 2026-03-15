@@ -14,14 +14,14 @@
 
 ## Why Use @mcp-b/smart-dom-reader?
 
-| Feature | Benefit |
-|---------|---------|
-| **Token-Efficient** | Progressive extraction minimizes LLM context window usage |
-| **Stable Selectors** | Ranked CSS selectors (ID > data-testid > ARIA > classes) for reliable automation |
-| **AI-Optimized Output** | Structured data designed for LLM understanding |
-| **Zero Dependencies** | Lightweight, runs in any browser environment |
-| **Shadow DOM Support** | Traverses shadow roots and iframes |
-| **Stateless API** | Works with any document context - Puppeteer, Playwright, browser extensions |
+| Feature                 | Benefit                                                                          |
+| ----------------------- | -------------------------------------------------------------------------------- |
+| **Token-Efficient**     | Progressive extraction minimizes LLM context window usage                        |
+| **Stable Selectors**    | Ranked CSS selectors (ID > data-testid > ARIA > classes) for reliable automation |
+| **AI-Optimized Output** | Structured data designed for LLM understanding                                   |
+| **Zero Dependencies**   | Lightweight, runs in any browser environment                                     |
+| **Shadow DOM Support**  | Traverses shadow roots and iframes                                               |
+| **Stateless API**       | Works with any document context - Puppeteer, Playwright, browser extensions      |
 
 ## Use Cases
 
@@ -69,7 +69,7 @@ const fullData = SmartDOMReader.extractFull(doc);
 const customData = SmartDOMReader.extractInteractive(doc, {
   mainContentOnly: true,
   viewportOnly: true,
-  includeHidden: false
+  includeHidden: false,
 });
 ```
 
@@ -95,11 +95,10 @@ const mainContent = ProgressiveExtractor.extractRegion(
 );
 
 // Step 3: Extract readable content from a region
-const articleText = ProgressiveExtractor.extractContent(
-  'article.main-article',
-  document,
-  { includeHeadings: true, includeLists: true }
-);
+const articleText = ProgressiveExtractor.extractContent('article.main-article', document, {
+  includeHeadings: true,
+  includeLists: true,
+});
 
 // Structure scoped to a container (e.g., navigation only)
 const nav = document.querySelector('nav');
@@ -112,7 +111,9 @@ if (nav) {
 ## Extraction Modes
 
 ### Interactive Mode
+
 Focuses on elements users can interact with:
+
 - Buttons and button-like elements
 - Links
 - Form inputs (text, select, textarea)
@@ -120,7 +121,9 @@ Focuses on elements users can interact with:
 - Form structures and associations
 
 ### Full Mode
+
 Includes everything from interactive mode plus:
+
 - Semantic HTML elements (articles, sections, nav)
 - Headings hierarchy
 - Images with alt text
@@ -136,7 +139,7 @@ Includes everything from interactive mode plus:
 const reader = new SmartDOMReader({
   mode: 'interactive',
   mainContentOnly: true,
-  viewportOnly: false
+  viewportOnly: false,
 });
 const result = reader.extract(document);
 
@@ -154,19 +157,11 @@ const overview = ProgressiveExtractor.extractStructure(document);
 // Returns: regions, forms, summary, suggestions
 
 // Step 2: Region extraction
-const region = ProgressiveExtractor.extractRegion(
-  selector,
-  document,
-  options
-);
+const region = ProgressiveExtractor.extractRegion(selector, document, options);
 // Returns: Full SmartDOMResult for that region
 
 // Step 3: Content extraction
-const content = ProgressiveExtractor.extractContent(
-  selector,
-  document,
-  { includeMedia: true }
-);
+const content = ProgressiveExtractor.extractContent(selector, document, { includeMedia: true });
 // Returns: Text content, headings, lists, tables, media
 ```
 
@@ -178,7 +173,7 @@ Both approaches return structured data optimized for AI processing:
 interface SmartDOMResult {
   mode: 'interactive' | 'full';
   timestamp: number;
-  
+
   page: {
     url: string;
     title: string;
@@ -187,7 +182,7 @@ interface SmartDOMResult {
     hasModals: boolean;
     hasFocus?: string;
   };
-  
+
   landmarks: {
     navigation: string[];
     main: string[];
@@ -197,7 +192,7 @@ interface SmartDOMResult {
     articles: string[];
     sections: string[];
   };
-  
+
   interactive: {
     buttons: ExtractedElement[];
     links: ExtractedElement[];
@@ -205,16 +200,18 @@ interface SmartDOMResult {
     forms: FormInfo[];
     clickable: ExtractedElement[];
   };
-  
-  semantic?: {  // Only in full mode
+
+  semantic?: {
+    // Only in full mode
     headings: ExtractedElement[];
     images: ExtractedElement[];
     tables: ExtractedElement[];
     lists: ExtractedElement[];
     articles: ExtractedElement[];
   };
-  
-  metadata?: {  // Only in full mode
+
+  metadata?: {
+    // Only in full mode
     totalElements: number;
     extractedElements: number;
     mainContent?: string;
@@ -233,15 +230,23 @@ interface ExtractedElement {
   text: string;
 
   selector: {
-    css: string;         // Best CSS selector (ranked stable-first)
-    xpath: string;       // XPath selector
-    textBased?: string;  // Text-content based hint
+    css: string; // Best CSS selector (ranked stable-first)
+    xpath: string; // XPath selector
+    textBased?: string; // Text-content based hint
     dataTestId?: string; // data-testid if available
-    ariaLabel?: string;  // ARIA label if available
+    ariaLabel?: string; // ARIA label if available
     candidates?: Array<{
-      type: 'id' | 'data-testid' | 'role-aria' | 'name' | 'class-path' | 'css-path' | 'xpath' | 'text';
+      type:
+        | 'id'
+        | 'data-testid'
+        | 'role-aria'
+        | 'name'
+        | 'class-path'
+        | 'css-path'
+        | 'xpath'
+        | 'text';
       value: string;
-      score: number;     // Higher = more stable/robust
+      score: number; // Higher = more stable/robust
     }>;
   };
 
@@ -271,20 +276,21 @@ interface ExtractedElement {
 
 ## Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `mode` | `'interactive' \| 'full'` | `'interactive'` | Extraction mode |
-| `maxDepth` | `number` | `5` | Maximum traversal depth |
-| `includeHidden` | `boolean` | `false` | Include hidden elements |
-| `includeShadowDOM` | `boolean` | `true` | Traverse shadow DOM |
-| `includeIframes` | `boolean` | `false` | Traverse iframes |
-| `viewportOnly` | `boolean` | `false` | Only visible viewport elements |
-| `mainContentOnly` | `boolean` | `false` | Focus on main content area |
-| `customSelectors` | `string[]` | `[]` | Additional selectors to extract |
+| Option             | Type                      | Default         | Description                     |
+| ------------------ | ------------------------- | --------------- | ------------------------------- |
+| `mode`             | `'interactive' \| 'full'` | `'interactive'` | Extraction mode                 |
+| `maxDepth`         | `number`                  | `5`             | Maximum traversal depth         |
+| `includeHidden`    | `boolean`                 | `false`         | Include hidden elements         |
+| `includeShadowDOM` | `boolean`                 | `true`          | Traverse shadow DOM             |
+| `includeIframes`   | `boolean`                 | `false`         | Traverse iframes                |
+| `viewportOnly`     | `boolean`                 | `false`         | Only visible viewport elements  |
+| `mainContentOnly`  | `boolean`                 | `false`         | Focus on main content area      |
+| `customSelectors`  | `string[]`                | `[]`            | Additional selectors to extract |
 
 ## Use Cases
 
 ### AI Userscript Generation (Progressive Approach)
+
 ```typescript
 // First, understand the page structure
 const structure = ProgressiveExtractor.extractStructure(document);
@@ -293,31 +299,31 @@ const structure = ProgressiveExtractor.extractStructure(document);
 const targetRegion = structure.regions.main?.selector || 'body';
 
 // Extract detailed information from chosen region
-const details = ProgressiveExtractor.extractRegion(
-  targetRegion,
-  document,
-  { mode: 'interactive', viewportOnly: true }
-);
+const details = ProgressiveExtractor.extractRegion(targetRegion, document, {
+  mode: 'interactive',
+  viewportOnly: true,
+});
 
 // Generate userscript prompt with focused context
 const prompt = `
   Page: ${details.page.title}
   Main form: ${details.interactive.forms[0]?.selector}
-  Submit button: ${details.interactive.buttons.find(b => b.text.includes('Submit'))?.selector.css}
+  Submit button: ${details.interactive.buttons.find((b) => b.text.includes('Submit'))?.selector.css}
   
   Write a userscript to auto-fill and submit this form.
 `;
 ```
 
 ### Test Automation (Full Extraction)
+
 ```typescript
 // Get all interactive elements at once
 const testData = SmartDOMReader.extractInteractive(document, {
-  customSelectors: ['[data-test]', '[data-cy]']
+  customSelectors: ['[data-test]', '[data-cy]'],
 });
 
 // Use multiple selector strategies for robust testing
-testData.interactive.buttons.forEach(button => {
+testData.interactive.buttons.forEach((button) => {
   console.log(`Button: ${button.text}`);
   console.log(`  CSS: ${button.selector.css}`);
   console.log(`  XPath: ${button.selector.xpath}`);
@@ -327,6 +333,7 @@ testData.interactive.buttons.forEach(button => {
 ```
 
 ### Content Analysis (Progressive Approach)
+
 ```typescript
 // Get structure first
 const structure = ProgressiveExtractor.extractStructure(document);
@@ -401,6 +408,7 @@ This library is designed to provide:
 ### How is this different from Cheerio or jsdom?
 
 This library is **AI-optimized**:
+
 - Outputs structured data designed for LLM consumption
 - Provides ranked selectors with stability scores
 - Progressive extraction minimizes token usage
@@ -421,6 +429,7 @@ const result = await page.evaluate(() => {
 ### How do selector rankings work?
 
 Selectors are ranked by stability (higher = more reliable):
+
 1. **ID selectors** (score: 100) - `#unique-id`
 2. **data-testid** (score: 90) - `[data-testid="submit"]`
 3. **ARIA** (score: 80) - `[role="button"][aria-label="Submit"]`
@@ -437,18 +446,19 @@ Progressive extraction can reduce token usage by 80-95% compared to raw HTML, de
 
 ## Comparison with Alternatives
 
-| Feature | @mcp-b/smart-dom-reader | Cheerio | jsdom | Raw DOM |
-|---------|-------------------------|---------|-------|---------|
-| AI-Optimized Output | Yes | No | No | No |
-| Ranked Selectors | Yes | No | No | No |
-| Token Efficiency | Progressive | N/A | N/A | N/A |
-| Shadow DOM | Yes | No | Limited | Yes |
-| Browser Environment | Native | Parse only | Simulated | Native |
-| Zero Dependencies | Yes | No | No | Yes |
+| Feature             | @mcp-b/smart-dom-reader | Cheerio    | jsdom     | Raw DOM |
+| ------------------- | ----------------------- | ---------- | --------- | ------- |
+| AI-Optimized Output | Yes                     | No         | No        | No      |
+| Ranked Selectors    | Yes                     | No         | No        | No      |
+| Token Efficiency    | Progressive             | N/A        | N/A       | N/A     |
+| Shadow DOM          | Yes                     | No         | Limited   | Yes     |
+| Browser Environment | Native                  | Parse only | Simulated | Native  |
+| Zero Dependencies   | Yes                     | No         | No        | Yes     |
 
 ## Credits
 
 Inspired by:
+
 - [stacking-contexts-inspector](https://github.com/andreadev-it/stacking-contexts-inspector) - DOM traversal techniques
 - [dom-to-semantic-markdown](https://github.com/romansky/dom-to-semantic-markdown) - Content scoring algorithms
 - [z-context](https://github.com/gwwar/z-context) - Selector generation approaches
@@ -485,10 +495,10 @@ For AI agents, use the bundled MCP server which returns XML-wrapped Markdown ins
   - Region: `<page ...>\n  <section><![CDATA[ ...markdown... ]]></section>\n</page>`
   - Content: `<page ...>\n  <content><![CDATA[ ...markdown... ]]></content>\n</page>`
 - Golden path sequence:
-  1) `dom_extract_structure` → get page outline and pick a target
-  2) `dom_extract_region` → get actionable selectors for that area
-  3) Write a script; if unstable, re-run with higher detail or limits
-  4) Optional: `dom_extract_content` for readable text context
+  1. `dom_extract_structure` → get page outline and pick a target
+  2. `dom_extract_region` → get actionable selectors for that area
+  3. Write a script; if unstable, re-run with higher detail or limits
+  4. Optional: `dom_extract_content` for readable text context
 
 ### Running the server
 
@@ -534,6 +544,7 @@ pnpm --filter @mcp-b/smart-dom-reader test:local
 ```
 
 What it validates:
+
 - Stable selectors (ID, data-testid, role+aria, name/id)
 - Semantic extraction (headings/images/tables/lists)
 - Shadow DOM detection

@@ -6,33 +6,29 @@
 
 import type fs from 'node:fs';
 
-import type {parseArguments} from './bin/chrome-devtools-mcp-cli-options.js';
-import type {Channel} from './browser.js';
-import {ensureBrowserConnected, ensureBrowserLaunched} from './browser.js';
-import {loadIssueDescriptions} from './issue-descriptions.js';
-import {logger} from './logger.js';
-import {McpContext} from './McpContext.js';
-import {McpResponse} from './McpResponse.js';
-import {Mutex} from './Mutex.js';
-import {SlimMcpResponse} from './SlimMcpResponse.js';
-import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
-import {bucketizeLatency} from './telemetry/metricUtils.js';
-import {
-  McpServer,
-  type CallToolResult,
-  SetLevelRequestSchema,
-} from './third_party/index.js';
-import {ToolCategory} from './tools/categories.js';
-import type {DefinedPageTool, ToolDefinition} from './tools/ToolDefinition.js';
-import {pageIdSchema} from './tools/ToolDefinition.js';
-import {createTools} from './tools/tools.js';
-import {VERSION} from './version.js';
+import type { parseArguments } from './bin/chrome-devtools-mcp-cli-options.js';
+import type { Channel } from './browser.js';
+import { ensureBrowserConnected, ensureBrowserLaunched } from './browser.js';
+import { loadIssueDescriptions } from './issue-descriptions.js';
+import { logger } from './logger.js';
+import { McpContext } from './McpContext.js';
+import { McpResponse } from './McpResponse.js';
+import { Mutex } from './Mutex.js';
+import { SlimMcpResponse } from './SlimMcpResponse.js';
+import { ClearcutLogger } from './telemetry/ClearcutLogger.js';
+import { bucketizeLatency } from './telemetry/metricUtils.js';
+import { McpServer, type CallToolResult, SetLevelRequestSchema } from './third_party/index.js';
+import { ToolCategory } from './tools/categories.js';
+import type { DefinedPageTool, ToolDefinition } from './tools/ToolDefinition.js';
+import { pageIdSchema } from './tools/ToolDefinition.js';
+import { createTools } from './tools/tools.js';
+import { VERSION } from './version.js';
 
 export async function createMcpServer(
   serverArgs: ReturnType<typeof parseArguments>,
   options: {
     logFile?: fs.WriteStream;
-  },
+  }
 ) {
   let clearcutLogger: ClearcutLogger | undefined;
   if (serverArgs.usageStatistics) {
@@ -51,7 +47,7 @@ export async function createMcpServer(
       title: 'Chrome DevTools MCP server',
       version: VERSION,
     },
-    {capabilities: {logging: {}}},
+    { capabilities: { logging: {} } }
   );
   server.server.setRequestHandler(SetLevelRequestSchema, () => {
     return {};
@@ -60,9 +56,7 @@ export async function createMcpServer(
   let context: McpContext;
   async function getContext(): Promise<McpContext> {
     const chromeArgs: string[] = (serverArgs.chromeArg ?? []).map(String);
-    const ignoreDefaultChromeArgs: string[] = (
-      serverArgs.ignoreDefaultChromeArg ?? []
-    ).map(String);
+    const ignoreDefaultChromeArgs: string[] = (serverArgs.ignoreDefaultChromeArg ?? []).map(String);
     if (serverArgs.proxyServer) {
       chromeArgs.push(`--proxy-server=${serverArgs.proxyServer}`);
     }
@@ -74,9 +68,7 @@ export async function createMcpServer(
             wsEndpoint: serverArgs.wsEndpoint,
             wsHeaders: serverArgs.wsHeaders,
             // Important: only pass channel, if autoConnect is true.
-            channel: serverArgs.autoConnect
-              ? (serverArgs.channel as Channel)
-              : undefined,
+            channel: serverArgs.autoConnect ? (serverArgs.channel as Channel) : undefined,
             userDataDir: serverArgs.userDataDir,
             devtools,
           })
@@ -133,10 +125,7 @@ export async function createMcpServer(
     ) {
       return;
     }
-    if (
-      tool.annotations.conditions?.includes('computerVision') &&
-      !serverArgs.experimentalVision
-    ) {
+    if (tool.annotations.conditions?.includes('computerVision') && !serverArgs.experimentalVision) {
       return;
     }
     if (
@@ -145,10 +134,7 @@ export async function createMcpServer(
     ) {
       return;
     }
-    if (
-      tool.annotations.conditions?.includes('screencast') &&
-      !serverArgs.experimentalScreencast
-    ) {
+    if (tool.annotations.conditions?.includes('screencast') && !serverArgs.experimentalScreencast) {
       return;
     }
     const schema =
@@ -156,7 +142,7 @@ export async function createMcpServer(
       tool.pageScoped &&
       serverArgs.experimentalPageIdRouting &&
       !serverArgs.slim
-        ? {...tool.schema, ...pageIdSchema}
+        ? { ...tool.schema, ...pageIdSchema }
         : tool.schema;
 
     server.registerTool(
@@ -180,9 +166,7 @@ export async function createMcpServer(
             : new McpResponse(serverArgs);
           if ('pageScoped' in tool && tool.pageScoped) {
             const page =
-              serverArgs.experimentalPageIdRouting &&
-              params.pageId &&
-              !serverArgs.slim
+              serverArgs.experimentalPageIdRouting && params.pageId && !serverArgs.slim
                 ? context.getPageById(params.pageId)
                 : context.getSelectedMcpPage();
             response.setPage(page);
@@ -192,7 +176,7 @@ export async function createMcpServer(
                 page,
               },
               response,
-              context,
+              context
             );
           } else {
             await tool.handler(
@@ -201,13 +185,10 @@ export async function createMcpServer(
                 params,
               },
               response,
-              context,
+              context
             );
           }
-          const {content, structuredContent} = await response.handle(
-            tool.name,
-            context,
-          );
+          const { content, structuredContent } = await response.handle(tool.name, context);
           const result: CallToolResult & {
             structuredContent?: Record<string, unknown>;
           } = {
@@ -218,10 +199,7 @@ export async function createMcpServer(
           }
           success = true;
           if (serverArgs.experimentalStructuredContent) {
-            result.structuredContent = structuredContent as Record<
-              string,
-              unknown
-            >;
+            result.structuredContent = structuredContent as Record<string, unknown>;
           }
           return result;
         } catch (err) {
@@ -247,7 +225,7 @@ export async function createMcpServer(
           });
           guard.dispose();
         }
-      },
+      }
     );
   }
 
@@ -258,19 +236,19 @@ export async function createMcpServer(
 
   await loadIssueDescriptions();
 
-  return {server, clearcutLogger};
+  return { server, clearcutLogger };
 }
 
 export const logDisclaimers = (args: ReturnType<typeof parseArguments>) => {
   console.error(
     `chrome-devtools-mcp exposes content of the browser instance to the MCP clients allowing them to inspect,
 debug, and modify any data in the browser or DevTools.
-Avoid sharing sensitive or personal information that you do not want to share with MCP clients.`,
+Avoid sharing sensitive or personal information that you do not want to share with MCP clients.`
   );
 
   if (!args.slim && args.performanceCrux) {
     console.error(
-      `Performance tools may send trace URLs to the Google CrUX API to fetch real-user experience data. To disable, run with --no-performance-crux.`,
+      `Performance tools may send trace URLs to the Google CrUX API to fetch real-user experience data. To disable, run with --no-performance-crux.`
     );
   }
 
@@ -278,7 +256,7 @@ Avoid sharing sensitive or personal information that you do not want to share wi
     console.error(
       `
 Google collects usage statistics to improve Chrome DevTools MCP. To opt-out, run with --no-usage-statistics.
-For more details, visit: https://github.com/ChromeDevTools/chrome-devtools-mcp#usage-statistics`,
+For more details, visit: https://github.com/ChromeDevTools/chrome-devtools-mcp#usage-statistics`
     );
   }
 };

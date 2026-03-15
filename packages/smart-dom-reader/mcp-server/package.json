@@ -5,8 +5,6 @@
   "repository": {
     "directory": "packages/smart-dom-reader/mcp-server"
   },
-  "type": "module",
-  "main": "src/index.ts",
   "bin": {
     "smart-dom-reader-server": "./src/index.ts"
   },
@@ -14,6 +12,8 @@
     "src",
     "lib"
   ],
+  "type": "module",
+  "main": "src/index.ts",
   "scripts": {
     "bundle": "node ./scripts/update-bundle.mjs",
     "dev": "tsx watch --clear-screen=false src/index.ts",

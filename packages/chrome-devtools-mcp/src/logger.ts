@@ -6,7 +6,7 @@
 
 import fs from 'node:fs';
 
-import {debug} from './third_party/index.js';
+import { debug } from './third_party/index.js';
 
 const mcpDebugNamespace = 'mcp:log';
 
@@ -19,7 +19,7 @@ export function saveLogsToFile(fileName: string): fs.WriteStream {
   // Enable overrides everything so we need to add them
   debug.enable(namespacesToEnable.join(','));
 
-  const logFile = fs.createWriteStream(fileName, {flags: 'a+'});
+  const logFile = fs.createWriteStream(fileName, { flags: 'a+' });
   debug.log = function (...chunks: any[]) {
     logFile.write(`${chunks.join(' ')}\n`);
   };
@@ -31,10 +31,7 @@ export function saveLogsToFile(fileName: string): fs.WriteStream {
   return logFile;
 }
 
-export function flushLogs(
-  logFile: fs.WriteStream,
-  timeoutMs = 2000,
-): Promise<void> {
+export function flushLogs(logFile: fs.WriteStream, timeoutMs = 2000): Promise<void> {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(reject, timeoutMs);
     logFile.end(() => {

@@ -126,7 +126,7 @@ async function main() {
       }
     }
     rootPkg.pnpm = rootPkg.pnpm || {};
-    rootPkg.pnpm.overrides = { ...(rootPkg.pnpm.overrides || {}), ...overrides };
+    rootPkg.pnpm.overrides = { ...rootPkg.pnpm.overrides, ...overrides };
     await writeFile(path.join(repoRoot, 'package.json'), `${JSON.stringify(rootPkg, null, 2)}\n`);
 
     const globalTarball = tarballMap.get('@mcp-b/global');

@@ -3,4 +3,4 @@ codecov:
     after_n_builds: 1
     wait_for_ci: false
 ignore:
-  - "e2e/web-standards-showcase/**"
+  - 'e2e/web-standards-showcase/**'

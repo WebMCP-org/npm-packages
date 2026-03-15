@@ -7,10 +7,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-const DESCRIPTIONS_PATH = path.join(
-  import.meta.dirname,
-  'third_party/issue-descriptions',
-);
+const DESCRIPTIONS_PATH = path.join(import.meta.dirname, 'third_party/issue-descriptions');
 
 let issueDescriptions: Record<string, string> = {};
 
@@ -29,10 +26,7 @@ export async function loadIssueDescriptions(): Promise<void> {
     if (!file.endsWith('.md')) {
       continue;
     }
-    const content = await fs.promises.readFile(
-      path.join(DESCRIPTIONS_PATH, file),
-      'utf-8',
-    );
+    const content = await fs.promises.readFile(path.join(DESCRIPTIONS_PATH, file), 'utf-8');
     descriptions[file] = content;
   }
 

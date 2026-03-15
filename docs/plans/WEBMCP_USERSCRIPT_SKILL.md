@@ -62,12 +62,14 @@ User wakes up: working MCP tools, ready for production or distribution
 ### Why a Skill?
 
 From the [Claude Code docs](https://code.claude.com/docs/en/skills):
+
 - Skills are auto-discovered and applied when Claude recognizes the task
 - Skills bundle supporting documentation, templates, and scripts
 - Skills run in the main conversation, enabling live iteration
 - Perfect for "richer workflows that Claude can auto-apply"
 
 This workflow is ideal for a skill because:
+
 1. **Specialized domain** - Userscript patterns, WebMCP APIs, DOM helpers
 2. **Self-verification** - Agent tests its own work via chrome-devtools-mcp
 3. **Repeatable process** - Same steps for any website
@@ -100,18 +102,19 @@ userscripts/gmail/src/index.ts       esbuild (in-memory)      Browser
 
 ### Why Two Bundlers?
 
-| Bundler | Use Case | Why |
-|---------|----------|-----|
+| Bundler     | Use Case                        | Why                                                            |
+| ----------- | ------------------------------- | -------------------------------------------------------------- |
 | **esbuild** | `inject_webmcp_script` internal | `write: false` for in-memory output, no disk I/O, ~10ms builds |
-| **tsdown** | Workspace template builds | Better DX, Rollup plugin ecosystem, future-proof (Vite 8+) |
+| **tsdown**  | Workspace template builds       | Better DX, Rollup plugin ecosystem, future-proof (Vite 8+)     |
 
 **esbuild** is perfect for injection because:
+
 ```typescript
 const result = await esbuild.build({
   entryPoints: [filePath],
   bundle: true,
   format: 'iife',
-  write: false,  // ← Returns code directly, no temp files
+  write: false, // ← Returns code directly, no temp files
   platform: 'browser',
 });
 const code = result.outputFiles[0].text;
@@ -119,6 +122,7 @@ const code = result.outputFiles[0].text;
 ```
 
 **tsdown** is perfect for workspaces because:
+
 - Rust-based (Rolldown), blazing fast
 - ESM-first, tree-shakable
 - Rollup/Vite plugin compatible
@@ -199,15 +203,15 @@ navigator.modelContext.registerTool({
   inputSchema: {
     type: 'object',
     properties: {
-      query: { type: 'string', description: 'Search query' }
+      query: { type: 'string', description: 'Search query' },
     },
-    required: ['query']
+    required: ['query'],
   },
   handler: async ({ query }) => {
     const element = await waitForElement('.result');
     const text = getText(element);
     return {
-      content: [{ type: 'text', text: `Found: ${text}` }]
+      content: [{ type: 'text', text: `Found: ${text}` }],
     };
   },
 });
@@ -223,8 +227,8 @@ When you pass a `.ts` or `.tsx` file, the tool **automatically builds** with esb
 
 ```typescript
 inject_webmcp_script({
-  file_path: 'userscripts/gmail/src/index.ts'  // Source file, not built
-})
+  file_path: 'userscripts/gmail/src/index.ts', // Source file, not built
+});
 
 // Tool automatically:
 // 1. Detects .ts extension
@@ -260,24 +264,36 @@ export const injectWebMCPScript = defineTool({
     readOnlyHint: false,
   },
   schema: {
-    code: zod.string().optional().describe(
-      'The userscript code to inject. Just tool registration code - ' +
-      'polyfill is auto-injected if needed. Either code or file_path must be provided.'
-    ),
-    file_path: zod.string().optional().describe(
-      'Path to a JavaScript file containing the userscript to inject. ' +
-      'If .ts/.tsx, automatically bundles with esbuild (resolves imports). ' +
-      'Either code or file_path must be provided.'
-    ),
-    wait_for_tools: zod.boolean().optional().default(true).describe(
-      'Wait for tools to register before returning. Default: true'
-    ),
-    timeout: zod.number().optional().default(5000).describe(
-      'Timeout in ms to wait for tools. Default: 5000'
-    ),
-    page_index: zod.number().int().optional().describe(
-      'Target page index. Default: currently selected page'
-    ),
+    code: zod
+      .string()
+      .optional()
+      .describe(
+        'The userscript code to inject. Just tool registration code - ' +
+          'polyfill is auto-injected if needed. Either code or file_path must be provided.'
+      ),
+    file_path: zod
+      .string()
+      .optional()
+      .describe(
+        'Path to a JavaScript file containing the userscript to inject. ' +
+          'If .ts/.tsx, automatically bundles with esbuild (resolves imports). ' +
+          'Either code or file_path must be provided.'
+      ),
+    wait_for_tools: zod
+      .boolean()
+      .optional()
+      .default(true)
+      .describe('Wait for tools to register before returning. Default: true'),
+    timeout: zod
+      .number()
+      .optional()
+      .default(5000)
+      .describe('Timeout in ms to wait for tools. Default: 5000'),
+    page_index: zod
+      .number()
+      .int()
+      .optional()
+      .describe('Target page index. Default: currently selected page'),
   },
   handler: async (request, response, context) => {
     const { code, file_path, wait_for_tools = true, timeout = 5000, page_index } = request.params;
@@ -286,9 +302,8 @@ export const injectWebMCPScript = defineTool({
       throw new Error('Either code or file_path must be provided');
     }
 
-    const page = page_index !== undefined
-      ? context.getPageByIdx(page_index)
-      : context.getSelectedPage();
+    const page =
+      page_index !== undefined ? context.getPageByIdx(page_index) : context.getSelectedPage();
 
     response.appendResponseLine(`Target: ${page.url()}`);
     response.appendResponseLine('');
@@ -338,9 +353,8 @@ export const injectWebMCPScript = defineTool({
 
     try {
       // Check if polyfill already exists
-      const hasPolyfill = await page.evaluate(() =>
-        typeof navigator !== 'undefined' &&
-        typeof navigator.modelContext !== 'undefined'
+      const hasPolyfill = await page.evaluate(
+        () => typeof navigator !== 'undefined' && typeof navigator.modelContext !== 'undefined'
       );
 
       let codeToInject = scriptCode;
@@ -381,7 +395,7 @@ export const injectWebMCPScript = defineTool({
       let lastToolCount = 0;
 
       while (Date.now() - startTime < timeout) {
-        await new Promise(r => setTimeout(r, 100)); // Fast polling
+        await new Promise((r) => setTimeout(r, 100)); // Fast polling
 
         try {
           const result = await context.getWebMCPClient(page);
@@ -392,7 +406,7 @@ export const injectWebMCPScript = defineTool({
               // Wait a bit more if tools are still registering
               if (tools.length > lastToolCount) {
                 lastToolCount = tools.length;
-                await new Promise(r => setTimeout(r, 100));
+                await new Promise((r) => setTimeout(r, 100));
                 continue;
               }
 
@@ -415,7 +429,9 @@ export const injectWebMCPScript = defineTool({
                 response.appendResponseLine(`    → ${firstClassName}`);
                 if (tool.description) {
                   const desc = tool.description.substring(0, 60);
-                  response.appendResponseLine(`    ${desc}${tool.description.length > 60 ? '...' : ''}`);
+                  response.appendResponseLine(
+                    `    ${desc}${tool.description.length > 60 ? '...' : ''}`
+                  );
                 }
               }
               response.appendResponseLine('');
@@ -440,9 +456,11 @@ export const injectWebMCPScript = defineTool({
       const message = err instanceof Error ? err.message : String(err);
 
       // Detect CSP blocking
-      if (message.includes('Content Security Policy') ||
-          message.includes('script-src') ||
-          message.includes('Refused to execute inline script')) {
+      if (
+        message.includes('Content Security Policy') ||
+        message.includes('script-src') ||
+        message.includes('Refused to execute inline script')
+      ) {
         response.appendResponseLine('');
         response.appendResponseLine('⚠ Site has Content Security Policy blocking inline scripts.');
         response.appendResponseLine('');
@@ -467,32 +485,35 @@ Based on research into CDP, Tampermonkey, Puppeteer, and browser extension patte
 
 ### 1. Timing is Everything
 
-| Method | When it runs | Use case |
-|--------|--------------|----------|
-| `evaluateOnNewDocument` | Before ANY page JS | Override globals, intercept APIs |
-| `evaluate` / inline script | After page load | Most tool registration ✓ |
-| `@run-at document-start` | Before DOM exists | Monkey-patching built-ins |
-| `@run-at document-end` | After HTML parsed | Most userscripts (default) ✓ |
+| Method                     | When it runs       | Use case                         |
+| -------------------------- | ------------------ | -------------------------------- |
+| `evaluateOnNewDocument`    | Before ANY page JS | Override globals, intercept APIs |
+| `evaluate` / inline script | After page load    | Most tool registration ✓         |
+| `@run-at document-start`   | Before DOM exists  | Monkey-patching built-ins        |
+| `@run-at document-end`     | After HTML parsed  | Most userscripts (default) ✓     |
 
 **For WebMCP tools**, `document-end` timing is fine since we're adding capabilities, not intercepting.
 
 ### 2. Avoid Magic Sleep Numbers
 
 **Bad** (what we had):
+
 ```typescript
-await new Promise(r => setTimeout(r, 500)); // ← Magic number
+await new Promise((r) => setTimeout(r, 500)); // ← Magic number
 ```
 
 **Good** (proper polling):
+
 ```typescript
 while (Date.now() - startTime < timeout) {
-  await new Promise(r => setTimeout(r, 100)); // Fast poll
+  await new Promise((r) => setTimeout(r, 100)); // Fast poll
   const { tools } = await client.listTools();
   if (tools.length > 0) break;
 }
 ```
 
 From [Puppeteer antipatterns](https://serpapi.com/blog/puppeteer-antipatterns/):
+
 > "Sleeping causes a race condition... A duration that's long enough today might be too short tomorrow."
 
 ### 3. Use MutationObserver for Element Waiting
@@ -528,9 +549,11 @@ MutationObserver is **more responsive** than polling - fires on microtask queue.
 ### 4. MAIN_WORLD is Required
 
 From [Chrome content scripts docs](https://developer.chrome.com/docs/extensions/develop/concepts/content-scripts):
+
 > "Content scripts live in an isolated world... JavaScript variables are not visible to the host page."
 
 **We NEED MAIN_WORLD** because:
+
 - Tools must access `navigator.modelContext` (set by polyfill)
 - Tools must interact with page's DOM and possibly page's JS
 
@@ -539,11 +562,13 @@ Inline `<script>` tags always run in MAIN_WORLD ✓
 ### 5. CSP Will Block Some Sites
 
 Sites with strict Content Security Policy (no `unsafe-inline`) will block:
+
 - **Banking/finance** apps
 - **Enterprise** apps (Salesforce, Workday, etc.)
 - **Security-conscious** sites
 
 **Our approach**: Detect early and fail gracefully with clear message:
+
 ```typescript
 if (message.includes('Content Security Policy')) {
   response.appendResponseLine('⚠ Site has CSP blocking inline scripts.');
@@ -556,11 +581,13 @@ No workaround via CDP alone - this is a browser security feature.
 ### 6. Navigation Destroys Everything
 
 When page navigates:
+
 - Injected scripts are lost
 - `navigator.modelContext` is gone
 - All registered tools disappear
 
 **We handle this** in `WebMCPClientTransport`:
+
 ```typescript
 this._page.on('framenavigated', () => {
   this.onclose?.(); // Triggers tool cleanup in WebMCPToolHub
@@ -572,9 +599,9 @@ Agent must reinject after navigation.
 ### 7. Consider Polyfill Versioning
 
 Future enhancement - check polyfill version before injection:
+
 ```typescript
-if (!navigator.modelContext?.version ||
-    navigator.modelContext.version < REQUIRED_VERSION) {
+if (!navigator.modelContext?.version || navigator.modelContext.version < REQUIRED_VERSION) {
   // Inject/upgrade polyfill
 }
 ```
@@ -592,7 +619,7 @@ async function retryUntil<T>(
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const result = await fn();
     if (predicate(result)) return result;
-    await new Promise(r => setTimeout(r, delay));
+    await new Promise((r) => setTimeout(r, delay));
   }
 
   throw new Error(`Failed after ${maxAttempts} attempts`);
@@ -612,7 +639,11 @@ A lightweight, tree-shakable helpers library bundled into userscripts:
 export function waitForElement(selector: string, timeout?: number): Promise<Element>;
 export function waitForElementRemoved(selector: string, timeout?: number): Promise<void>;
 export function clickElement(selector: string): Promise<void>;
-export function typeText(selector: string, text: string, options?: { clear?: boolean }): Promise<void>;
+export function typeText(
+  selector: string,
+  text: string,
+  options?: { clear?: boolean }
+): Promise<void>;
 export function selectOption(selector: string, value: string): Promise<void>;
 
 // Utilities
@@ -627,7 +658,11 @@ export function jsonResponse(data: unknown): ToolResponse;
 export function errorResponse(message: string): ToolResponse;
 
 // Retry Logic
-export function retryUntil<T>(fn: () => Promise<T>, predicate: (r: T) => boolean, options?: RetryOptions): Promise<T>;
+export function retryUntil<T>(
+  fn: () => Promise<T>,
+  predicate: (r: T) => boolean,
+  options?: RetryOptions
+): Promise<T>;
 ```
 
 ### Implementation Highlights
@@ -1022,14 +1057,14 @@ Agent checks: Are Gmail tools available? (diff_webmcp_tools)
 
 ### Why Self-Contained?
 
-| Aspect | Benefit |
-|--------|---------|
-| **Single distribution** | Just Anthropic Skills Registry - one place |
-| **Everything included** | Tools + Intelligence in one package |
-| **Agent knows where to find tools** | Documented path in Setup section |
-| **Clean source travels** | Human-readable .ts, not bundled blob |
-| **esbuild at inject time** | Handles bundling automatically |
-| **Dependencies work** | tools/package.json has deps, esbuild resolves |
+| Aspect                              | Benefit                                       |
+| ----------------------------------- | --------------------------------------------- |
+| **Single distribution**             | Just Anthropic Skills Registry - one place    |
+| **Everything included**             | Tools + Intelligence in one package           |
+| **Agent knows where to find tools** | Documented path in Setup section              |
+| **Clean source travels**            | Human-readable .ts, not bundled blob          |
+| **esbuild at inject time**          | Handles bundling automatically                |
+| **Dependencies work**               | tools/package.json has deps, esbuild resolves |
 
 ### Marketplace Is Optional
 
@@ -1062,18 +1097,20 @@ The tools source is bundled at `tools/src/{{site}}.ts`.
 
 ## Available Tools
 
-| Tool | Description |
-|------|-------------|
+| Tool        | Description  |
+| ----------- | ------------ |
 | `tool_name` | What it does |
 
 ## Workflows
 
 ### [Common Task 1]
+
 1. First tool call
 2. Second tool call
 3. Expected result
 
 ### [Common Task 2]
+
 ...
 
 ## {{Site}}-Specific Tips
@@ -1100,6 +1137,7 @@ See [reference/examples.md](reference/examples.md)
 4. Resolve imports from node_modules automatically
 
 **Success criteria**:
+
 - [ ] `.ts` files auto-bundled before injection
 - [ ] Imports from node_modules resolved
 - [ ] No manual build step required
@@ -1116,6 +1154,7 @@ See [reference/examples.md](reference/examples.md)
 5. Add to workspace dependencies
 
 **Success criteria**:
+
 - [ ] Helpers work when bundled into userscripts
 - [ ] Tree-shakable (unused helpers removed)
 - [ ] Well-documented API
@@ -1125,6 +1164,7 @@ See [reference/examples.md](reference/examples.md)
 **Goal**: Complete self-contained template for tools + skill
 
 1. Create `templates/site-package/` (self-contained structure)
+
    ```
    templates/site-package/
    ├── SKILL.md                    # Template with Setup section
@@ -1159,6 +1199,7 @@ See [reference/examples.md](reference/examples.md)
    - How to verify: `diff_webmcp_tools`
 
 **Success criteria**:
+
 - [ ] Agent can clone and customize template
 - [ ] Template is self-contained (tools inside skill package)
 - [ ] SKILL.md Setup section points to bundled tools
@@ -1178,6 +1219,7 @@ See [reference/examples.md](reference/examples.md)
    - DISTRIBUTION.md - How to upload to registries
 
 **Success criteria**:
+
 - [ ] Agent develops tools AND writes skill
 - [ ] Skill captures how to combine tools
 - [ ] Ready for distribution to both registries
@@ -1187,6 +1229,7 @@ See [reference/examples.md](reference/examples.md)
 **Goal**: Complete flow from request to distribution
 
 Test scenario:
+
 ```
 User: "Create automation tools for Hacker News"
 
@@ -1214,6 +1257,7 @@ Verify:
 3. Consider automation for skill publishing
 
 **Success criteria**:
+
 - [ ] One-command distribution
 - [ ] Versioning handled
 - [ ] Updates work
@@ -1223,20 +1267,25 @@ Verify:
 ## Known Limitations
 
 ### 1. Content Security Policy (CSP)
+
 Some sites block inline scripts. Detect and fail gracefully.
 **Workaround**: Browser extension approach.
 
 ### 2. Page Navigation Clears Tools
+
 Reinject after navigation.
 
 ### 3. Authenticated Pages
+
 User must log in manually first.
 
 ### 4. Large Dependencies
+
 Very large dependencies (e.g., full React) increase bundle size and injection time.
 **Mitigation**: Keep userscripts focused; prefer lightweight helpers.
 
 ### 5. Source Maps
+
 Bundled code has no source maps for debugging.
 **Mitigation**: Use `list_console_messages` for error details.
 
@@ -1245,6 +1294,7 @@ Bundled code has no source maps for debugging.
 ## Success Criteria
 
 ### Core Loop Works
+
 - [x] Agent can write tool code
 - [x] Agent can inject via inject_webmcp_script
 - [x] Agent can verify via diff_webmcp_tools
@@ -1253,12 +1303,14 @@ Bundled code has no source maps for debugging.
 - [x] Agent can iterate (fix → reinject → retest)
 
 ### Enhanced Features
+
 - [ ] TypeScript auto-bundled with esbuild
 - [ ] Imports resolved from node_modules
 - [ ] @webmcp/helpers available
 - [ ] Site package template ready
 
 ### Complete Development Flow
+
 - [ ] Agent clones site-package template
 - [ ] Agent develops tools (the plumbing)
 - [ ] Agent writes SKILL.md (the intelligence)
@@ -1266,6 +1318,7 @@ Bundled code has no source maps for debugging.
 - [ ] Package ready for dual distribution
 
 ### Distribution (Self-Contained)
+
 - [ ] Skill package includes tools (in tools/ directory)
 - [ ] SKILL.md Setup section tells agent where to find tools
 - [ ] Single distribution: Anthropic Skills Registry
@@ -1288,6 +1341,7 @@ Bundled code has no source maps for debugging.
 ## References
 
 ### Script Injection Research
+
 - [Chrome DevTools Protocol](https://chromedevtools.github.io/devtools-protocol/)
 - [Tampermonkey Documentation](https://www.tampermonkey.net/documentation.php)
 - [Content scripts - Chrome Developers](https://developer.chrome.com/docs/extensions/develop/concepts/content-scripts)

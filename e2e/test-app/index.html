@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -6,7 +6,10 @@
     <title>Web Model Context API Test App</title>
     <style>
       body {
-        font-family: system-ui, -apple-system, sans-serif;
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
         max-width: 800px;
         margin: 50px auto;
         padding: 20px;
@@ -91,7 +94,9 @@
   </head>
   <body>
     <h1>Web Model Context API E2E Test</h1>
-    <p class="subtitle">Testing <code>window.navigator.modelContext</code> with two-bucket tool management</p>
+    <p class="subtitle">
+      Testing <code>window.navigator.modelContext</code> with two-bucket tool management
+    </p>
 
     <div class="section">
       <h2>API Status</h2>
@@ -100,9 +105,11 @@
 
     <div class="section">
       <h2>Base Tools (Bucket A - provideContext)</h2>
-      <p>These tools are registered via <code>provideContext()</code> and cleared when called again.</p>
+      <p>
+        These tools are registered via <code>provideContext()</code> and cleared when called again.
+      </p>
       <div class="counter" id="counter-display">0</div>
-      <div style="text-align: center;">
+      <div style="text-align: center">
         <button id="increment">Increment Counter</button>
         <button id="decrement">Decrement Counter</button>
         <button id="reset">Reset Counter</button>
@@ -112,36 +119,51 @@
 
     <div class="section">
       <h2>Dynamic Tools (Bucket B - registerTool)</h2>
-      <p>These tools are registered via <code>registerTool()</code> and can be removed when <code>provideContext()</code> replaces tool context in strict core mode.</p>
-      <div style="text-align: center;">
+      <p>
+        These tools are registered via <code>registerTool()</code> and can be removed when
+        <code>provideContext()</code> replaces tool context in strict core mode.
+      </p>
+      <div style="text-align: center">
         <button id="register-dynamic">Register Dynamic Tool</button>
         <button id="unregister-dynamic" disabled>Unregister Dynamic Tool</button>
         <button id="call-dynamic" disabled>Call Dynamic Tool</button>
       </div>
-      <div id="dynamic-status" style="margin-top: 10px; padding: 10px; background: #f5f5f5; border-radius: 4px;">
+      <div
+        id="dynamic-status"
+        style="margin-top: 10px; padding: 10px; background: #f5f5f5; border-radius: 4px"
+      >
         Dynamic tool status: Not registered
       </div>
     </div>
 
     <div class="section">
       <h2>Test Two-Bucket System</h2>
-      <p>Test strict replacement behavior: <code>provideContext()</code> replaces tool context, including dynamic tools.</p>
+      <p>
+        Test strict replacement behavior: <code>provideContext()</code> replaces tool context,
+        including dynamic tools.
+      </p>
       <button id="replace-base-tools">Replace Base Tools (provideContext)</button>
       <button id="list-all-tools">List All Tools</button>
     </div>
 
     <div class="section">
       <h2>Resources (Bucket A & B)</h2>
-      <p>Test <code>provideContext({ resources })</code> and <code>registerResource()</code> for exposing data to AI models.</p>
-      <div id="resources-status" style="margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 4px;">
+      <p>
+        Test <code>provideContext({ resources })</code> and <code>registerResource()</code> for
+        exposing data to AI models.
+      </p>
+      <div
+        id="resources-status"
+        style="margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 4px"
+      >
         Resources: Not registered
       </div>
-      <div style="text-align: center;">
+      <div style="text-align: center">
         <button id="register-base-resources">Register Base Resources (Bucket A)</button>
         <button id="register-dynamic-resource">Register Dynamic Resource (Bucket B)</button>
         <button id="unregister-dynamic-resource" disabled>Unregister Dynamic Resource</button>
       </div>
-      <div style="text-align: center; margin-top: 10px;">
+      <div style="text-align: center; margin-top: 10px">
         <button id="list-resources">List Resources</button>
         <button id="list-resource-templates">List Resource Templates</button>
         <button id="read-static-resource">Read Static Resource</button>
@@ -151,16 +173,22 @@
 
     <div class="section">
       <h2>Prompts (Bucket A & B)</h2>
-      <p>Test <code>provideContext({ prompts })</code> and <code>registerPrompt()</code> for reusable prompt templates.</p>
-      <div id="prompts-status" style="margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 4px;">
+      <p>
+        Test <code>provideContext({ prompts })</code> and <code>registerPrompt()</code> for reusable
+        prompt templates.
+      </p>
+      <div
+        id="prompts-status"
+        style="margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 4px"
+      >
         Prompts: Not registered
       </div>
-      <div style="text-align: center;">
+      <div style="text-align: center">
         <button id="register-base-prompts">Register Base Prompts (Bucket A)</button>
         <button id="register-dynamic-prompt">Register Dynamic Prompt (Bucket B)</button>
         <button id="unregister-dynamic-prompt" disabled>Unregister Dynamic Prompt</button>
       </div>
-      <div style="text-align: center; margin-top: 10px;">
+      <div style="text-align: center; margin-top: 10px">
         <button id="list-prompts">List Prompts</button>
         <button id="get-prompt-without-args">Get Prompt (no args)</button>
         <button id="get-prompt-with-args">Get Prompt (with args)</button>
@@ -169,11 +197,16 @@
 
     <div class="section">
       <h2>Model Context Testing API</h2>
-      <p>Test <code>navigator.modelContextTesting</code> for debugging and testing tool execution.</p>
-      <div id="testing-api-status" style="margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 4px;">
+      <p>
+        Test <code>navigator.modelContextTesting</code> for debugging and testing tool execution.
+      </p>
+      <div
+        id="testing-api-status"
+        style="margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 4px"
+      >
         Testing API: Not checked
       </div>
-      <div style="text-align: center;">
+      <div style="text-align: center">
         <button id="check-testing-api">Check Testing API</button>
         <button id="test-tool-tracking">Test Tool Call Tracking</button>
         <button id="test-mock-response">Test Mock Response</button>
@@ -183,11 +216,17 @@
 
     <div class="section">
       <h2>Sampling & Elicitation API</h2>
-      <p>Test <code>createMessage()</code> and <code>elicitInput()</code> methods for server-to-client requests.</p>
-      <div id="sampling-status" style="margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 4px;">
+      <p>
+        Test <code>createMessage()</code> and <code>elicitInput()</code> methods for
+        server-to-client requests.
+      </p>
+      <div
+        id="sampling-status"
+        style="margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 4px"
+      >
         Sampling/Elicitation: Not tested
       </div>
-      <div style="text-align: center;">
+      <div style="text-align: center">
         <button id="check-sampling-api">Check Sampling API</button>
         <button id="test-sampling-call">Test createMessage()</button>
         <button id="test-elicitation-call">Test elicitInput()</button>
@@ -196,23 +235,27 @@
 
     <div class="section">
       <h2>Chromium Native API Tests</h2>
-      <p>Test Chromium-compatible APIs: <code>unregisterTool()</code>, <code>clearContext()</code>, <code>executeTool()</code>, <code>listTools()</code>, and <code>registerToolsChangedCallback()</code>.</p>
-      <div id="chromium-callback-status" style="display: none;"></div>
+      <p>
+        Test Chromium-compatible APIs: <code>unregisterTool()</code>, <code>clearContext()</code>,
+        <code>executeTool()</code>, <code>listTools()</code>, and
+        <code>registerToolsChangedCallback()</code>.
+      </p>
+      <div id="chromium-callback-status" style="display: none"></div>
 
       <h3>ModelContext APIs</h3>
-      <div style="text-align: center;">
+      <div style="text-align: center">
         <button id="chromium-unregister-tool">Test unregisterTool()</button>
         <button id="chromium-clear-context">Test clearContext()</button>
       </div>
 
       <h3>ModelContextTesting APIs</h3>
-      <div style="text-align: center;">
+      <div style="text-align: center">
         <button id="chromium-execute-tool">Test executeTool()</button>
         <button id="chromium-list-tools">Test listTools()</button>
       </div>
 
       <h3>Tools Changed Callbacks</h3>
-      <div style="text-align: center;">
+      <div style="text-align: center">
         <button id="chromium-test-callback-register">Test Callback: registerTool()</button>
         <button id="chromium-test-callback-unregister">Test Callback: unregisterTool()</button>
         <button id="chromium-test-callback-provide">Test Callback: provideContext()</button>

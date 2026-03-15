@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {TextSnapshot, TextSnapshotNode} from '../McpContext.js';
+import type { TextSnapshot, TextSnapshotNode } from '../McpContext.js';
 
 export class SnapshotFormatter {
   #snapshot: TextSnapshot;
@@ -55,7 +55,7 @@ Get a verbose snapshot to include all elements if you are interested in the sele
 
   #nodeToJSON(node: TextSnapshotNode): object {
     const rawAttrs = this.#getAttributesMap(node);
-    const children = node.children.map(child => this.#nodeToJSON(child));
+    const children = node.children.map((child) => this.#nodeToJSON(child));
     const result: Record<string, unknown> = structuredClone(rawAttrs);
     if (children.length > 0) {
       result.children = children;
@@ -67,20 +67,13 @@ Get a verbose snapshot to include all elements if you are interested in the sele
     const attributes = [`uid=${serializedAXNodeRoot.id}`];
 
     if (serializedAXNodeRoot.role) {
-      attributes.push(
-        serializedAXNodeRoot.role === 'none'
-          ? 'ignored'
-          : serializedAXNodeRoot.role,
-      );
+      attributes.push(serializedAXNodeRoot.role === 'none' ? 'ignored' : serializedAXNodeRoot.role);
     }
     if (serializedAXNodeRoot.name) {
       attributes.push(`"${serializedAXNodeRoot.name}"`);
     }
 
-    const simpleAttrs = this.#getAttributesMap(
-      serializedAXNodeRoot,
-      /* excludeSpecial */ true,
-    );
+    const simpleAttrs = this.#getAttributesMap(serializedAXNodeRoot, /* excludeSpecial */ true);
 
     for (const attr of Object.keys(serializedAXNodeRoot).sort()) {
       if (excludedAttributes.has(attr)) {
@@ -103,10 +96,7 @@ Get a verbose snapshot to include all elements if you are interested in the sele
     return attributes;
   }
 
-  #getAttributesMap(
-    node: TextSnapshotNode,
-    excludeSpecial = false,
-  ): Record<string, unknown> {
+  #getAttributesMap(node: TextSnapshotNode, excludeSpecial = false): Record<string, unknown> {
     const result: Record<string, unknown> = {};
     if (!excludeSpecial) {
       result.id = node.id;

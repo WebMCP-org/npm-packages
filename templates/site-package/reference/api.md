@@ -13,6 +13,7 @@ Get basic information about the current {{Site}} page.
 **Parameters**: None
 
 **Returns**:
+
 ```json
 {
   "title": "Page Title",
@@ -21,6 +22,7 @@ Get basic information about the current {{Site}} page.
 ```
 
 **Example**:
+
 ```javascript
 webmcp_{{site}}_page0_get_page_info()
 ```
@@ -40,6 +42,7 @@ Search for items on the page.
 | limit | number | No | Maximum results (default: 10) |
 
 **Returns**:
+
 ```json
 {
   "query": "search term",
@@ -51,6 +54,7 @@ Search for items on the page.
 ```
 
 **Example**:
+
 ```javascript
 webmcp_{{site}}_page0_search_items({ query: "example", limit: 5 })
 ```
@@ -71,6 +75,7 @@ Click a button on the page by its label.
 **Returns**: Confirmation message
 
 **Example**:
+
 ```javascript
 webmcp_{{site}}_page0_click_button({ label: "Submit" })
 ```
@@ -89,6 +94,7 @@ All tools return an error response when something goes wrong:
 ```
 
 Common errors:
+
 - **Element not found**: The selector couldn't find the target element
 - **Action failed**: The action (click, type, etc.) couldn't be completed
 - **Timeout**: Element didn't appear within the timeout period

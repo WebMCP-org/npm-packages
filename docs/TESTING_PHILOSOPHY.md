@@ -37,6 +37,7 @@ Primary goal: high confidence in behavior with minimal brittle tests.
    - Tooling: Playwright (`pnpm test:e2e`).
 
 Runtime API integration is related but separate:
+
 - direct `page.evaluate(...)` helpers
 - direct `navigator.modelContextTesting` probes outside the canonical native lane
 - demos/showcases used for runtime exploration

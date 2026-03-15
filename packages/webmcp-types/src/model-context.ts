@@ -91,24 +91,14 @@ export type AnyToolDescriptor = ToolDescriptor<never, unknown, string>;
 /**
  * Infers argument shape from a tool descriptor.
  */
-export type InferToolArgs<TTool> = TTool extends ToolDescriptor<
-  infer TArgs,
-  infer _TResult,
-  infer _TName
->
-  ? TArgs
-  : never;
+export type InferToolArgs<TTool> =
+  TTool extends ToolDescriptor<infer TArgs, infer _TResult, infer _TName> ? TArgs : never;
 
 /**
  * Infers result shape from a tool descriptor.
  */
-export type InferToolResult<TTool> = TTool extends ToolDescriptor<
-  infer _TArgs,
-  infer TResult,
-  infer _TName
->
-  ? TResult
-  : never;
+export type InferToolResult<TTool> =
+  TTool extends ToolDescriptor<infer _TArgs, infer TResult, infer _TName> ? TResult : never;
 
 /**
  * Union of tool names from a tuple/array of descriptors.
@@ -223,7 +213,9 @@ export interface ModelContextCore {
     TInputSchema extends JsonSchemaForInference,
     TOutputSchema extends JsonSchemaForInference | undefined = undefined,
     TName extends string = string,
-  >(tool: ToolDescriptorFromSchema<TInputSchema, TOutputSchema, TName>): void;
+  >(
+    tool: ToolDescriptorFromSchema<TInputSchema, TOutputSchema, TName>
+  ): void;
 
   /**
    * Registers a dynamic tool with explicitly typed args/result.
@@ -286,7 +278,10 @@ export interface ModelContextExtensions {
   callTool<
     TName extends string = string,
     TArgs extends Record<string, unknown> = Record<string, unknown>,
-  >(params: { name: TName; arguments?: TArgs }): Promise<ToolResponse>;
+  >(params: {
+    name: TName;
+    arguments?: TArgs;
+  }): Promise<ToolResponse>;
 
   // ==================== EVENTS ====================
 

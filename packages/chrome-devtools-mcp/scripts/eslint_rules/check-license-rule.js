@@ -68,10 +68,7 @@ export default {
           const nextToken = sourceCode.getTokenAfter(header, {
             includeComments: true,
           });
-          if (
-            nextToken &&
-            nextToken.loc.start.line === header.loc.end.line + 1
-          ) {
+          if (nextToken && nextToken.loc.start.line === header.loc.end.line + 1) {
             context.report({
               node: node,
               loc: header.loc,

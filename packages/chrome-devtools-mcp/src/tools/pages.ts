@@ -4,19 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {logger} from '../logger.js';
-import type {CdpPage, Dialog} from '../third_party/index.js';
-import {zod} from '../third_party/index.js';
+import { logger } from '../logger.js';
+import type { CdpPage, Dialog } from '../third_party/index.js';
+import { zod } from '../third_party/index.js';
 
-import {ToolCategory} from './categories.js';
-import {
-  CLOSE_PAGE_ERROR,
-  definePageTool,
-  defineTool,
-  timeoutSchema,
-} from './ToolDefinition.js';
+import { ToolCategory } from './categories.js';
+import { CLOSE_PAGE_ERROR, definePageTool, defineTool, timeoutSchema } from './ToolDefinition.js';
 
-export const listPages = definePageTool(args => {
+export const listPages = definePageTool((args) => {
   return {
     name: 'list_pages',
     description: `Get a list of pages ${args?.categoryExtensions ? 'including extension service workers' : ''} open in the browser.`,
@@ -41,9 +36,7 @@ export const selectPage = defineTool({
   schema: {
     pageId: zod
       .number()
-      .describe(
-        `The ID of the page to select. Call ${listPages().name} to get available pages.`,
-      ),
+      .describe(`The ID of the page to select. Call ${listPages().name} to get available pages.`),
     bringToFront: zod
       .boolean()
       .optional()
@@ -67,9 +60,7 @@ export const closePage = defineTool({
     readOnlyHint: false,
   },
   schema: {
-    pageId: zod
-      .number()
-      .describe('The ID of the page to close. Call list_pages to list pages.'),
+    pageId: zod.number().describe('The ID of the page to close. Call list_pages to list pages.'),
   },
   handler: async (request, response, context) => {
     try {
@@ -98,7 +89,7 @@ export const newPage = defineTool({
       .boolean()
       .optional()
       .describe(
-        'Whether to open the page in the background without bringing it to the front. Default is false (foreground).',
+        'Whether to open the page in the background without bringing it to the front. Default is false (foreground).'
       ),
     isolatedContext: zod
       .string()
@@ -106,15 +97,12 @@ export const newPage = defineTool({
       .describe(
         'If specified, the page is created in an isolated browser context with the given name. ' +
           'Pages in the same browser context share cookies and storage. ' +
-          'Pages in different browser contexts are fully isolated.',
+          'Pages in different browser contexts are fully isolated.'
       ),
     ...timeoutSchema,
   },
   handler: async (request, response, context) => {
-    const page = await context.newPage(
-      request.params.background,
-      request.params.isolatedContext,
-    );
+    const page = await context.newPage(request.params.background, request.params.isolatedContext);
 
     await context.waitForEventsAfterAction(
       async () => {
@@ -122,7 +110,7 @@ export const newPage = defineTool({
           timeout: request.params.timeout,
         });
       },
-      {timeout: request.params.timeout},
+      { timeout: request.params.timeout }
     );
 
     response.setIncludePages(true);
@@ -140,25 +128,20 @@ export const navigatePage = definePageTool({
     type: zod
       .enum(['url', 'back', 'forward', 'reload'])
       .optional()
-      .describe(
-        'Navigate the page by URL, back or forward in history, or reload.',
-      ),
+      .describe('Navigate the page by URL, back or forward in history, or reload.'),
     url: zod.string().optional().describe('Target URL (only type=url)'),
-    ignoreCache: zod
-      .boolean()
-      .optional()
-      .describe('Whether to ignore cache on reload.'),
+    ignoreCache: zod.boolean().optional().describe('Whether to ignore cache on reload.'),
     handleBeforeUnload: zod
       .enum(['accept', 'decline'])
       .optional()
       .describe(
-        'Whether to auto accept or beforeunload dialogs triggered by this navigation. Default is accept.',
+        'Whether to auto accept or beforeunload dialogs triggered by this navigation. Default is accept.'
       ),
     initScript: zod
       .string()
       .optional()
       .describe(
-        'A JavaScript script to be executed on each new document before any other scripts for the next navigation.',
+        'A JavaScript script to be executed on each new document before any other scripts for the next navigation.'
       ),
     ...timeoutSchema,
   },
@@ -193,9 +176,7 @@ export const navigatePage = definePageTool({
 
     let initScriptId: string | undefined;
     if (request.params.initScript) {
-      const {identifier} = await page.pptrPage.evaluateOnNewDocument(
-        request.params.initScript,
-      );
+      const { identifier } = await page.pptrPage.evaluateOnNewDocument(request.params.initScript);
       initScriptId = identifier;
     }
 
@@ -207,18 +188,14 @@ export const navigatePage = definePageTool({
           switch (request.params.type) {
             case 'url':
               if (!request.params.url) {
-                throw new Error(
-                  'A URL is required for navigation of type=url.',
-                );
+                throw new Error('A URL is required for navigation of type=url.');
               }
               try {
                 await page.pptrPage.goto(request.params.url, options);
-                response.appendResponseLine(
-                  `Successfully navigated to ${request.params.url}.`,
-                );
+                response.appendResponseLine(`Successfully navigated to ${request.params.url}.`);
               } catch (error) {
                 response.appendResponseLine(
-                  `Unable to navigate in the  selected page: ${error.message}.`,
+                  `Unable to navigate in the  selected page: ${error.message}.`
                 );
               }
               break;
@@ -226,11 +203,11 @@ export const navigatePage = definePageTool({
               try {
                 await page.pptrPage.goBack(options);
                 response.appendResponseLine(
-                  `Successfully navigated back to ${page.pptrPage.url()}.`,
+                  `Successfully navigated back to ${page.pptrPage.url()}.`
                 );
               } catch (error) {
                 response.appendResponseLine(
-                  `Unable to navigate back in the selected page: ${error.message}.`,
+                  `Unable to navigate back in the selected page: ${error.message}.`
                 );
               }
               break;
@@ -238,11 +215,11 @@ export const navigatePage = definePageTool({
               try {
                 await page.pptrPage.goForward(options);
                 response.appendResponseLine(
-                  `Successfully navigated forward to ${page.pptrPage.url()}.`,
+                  `Successfully navigated forward to ${page.pptrPage.url()}.`
                 );
               } catch (error) {
                 response.appendResponseLine(
-                  `Unable to navigate forward in the selected page: ${error.message}.`,
+                  `Unable to navigate forward in the selected page: ${error.message}.`
                 );
               }
               break;
@@ -255,22 +232,20 @@ export const navigatePage = definePageTool({
                 response.appendResponseLine(`Successfully reloaded the page.`);
               } catch (error) {
                 response.appendResponseLine(
-                  `Unable to reload the selected page: ${error.message}.`,
+                  `Unable to reload the selected page: ${error.message}.`
                 );
               }
               break;
           }
         },
-        {timeout: request.params.timeout},
+        { timeout: request.params.timeout }
       );
     } finally {
       page.pptrPage.off('dialog', dialogHandler);
       if (initScriptId) {
-        await page.pptrPage
-          .removeScriptToEvaluateOnNewDocument(initScriptId)
-          .catch(error => {
-            logger(`Failed to remove init script`, error);
-          });
+        await page.pptrPage.removeScriptToEvaluateOnNewDocument(initScriptId).catch((error) => {
+          logger(`Failed to remove init script`, error);
+        });
       }
     }
 
@@ -300,10 +275,10 @@ export const resizePage = definePageTool({
 
       if (bounds.windowState === 'fullscreen') {
         // Have to call this twice on Ubuntu when the window is in fullscreen mode.
-        await browser.setWindowBounds(windowId, {windowState: 'normal'});
-        await browser.setWindowBounds(windowId, {windowState: 'normal'});
+        await browser.setWindowBounds(windowId, { windowState: 'normal' });
+        await browser.setWindowBounds(windowId, { windowState: 'normal' });
       } else if (bounds.windowState !== 'normal') {
-        await browser.setWindowBounds(windowId, {windowState: 'normal'});
+        await browser.setWindowBounds(windowId, { windowState: 'normal' });
       }
     } catch {
       // Window APIs are not supported on all platforms
@@ -325,13 +300,8 @@ export const handleDialog = definePageTool({
     readOnlyHint: false,
   },
   schema: {
-    action: zod
-      .enum(['accept', 'dismiss'])
-      .describe('Whether to dismiss or accept the dialog'),
-    promptText: zod
-      .string()
-      .optional()
-      .describe('Optional prompt text to enter into the dialog.'),
+    action: zod.enum(['accept', 'dismiss']).describe('Whether to dismiss or accept the dialog'),
+    promptText: zod.string().optional().describe('Optional prompt text to enter into the dialog.'),
   },
   handler: async (request, response, _context) => {
     const page = request.page;
@@ -380,7 +350,7 @@ export const getTabId = definePageTool({
     pageId: zod
       .number()
       .describe(
-        `The ID of the page to get the tab ID for. Call ${listPages().name} to get available pages.`,
+        `The ID of the page to get the tab ID for. Call ${listPages().name} to get available pages.`
       ),
   },
   handler: async (request, response, context) => {

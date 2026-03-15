@@ -6,7 +6,7 @@
 
 import js from '@eslint/js';
 import stylisticPlugin from '@stylistic/eslint-plugin';
-import {defineConfig, globalIgnores} from 'eslint/config';
+import { defineConfig, globalIgnores } from 'eslint/config';
 import importPlugin from 'eslint-plugin-import';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';

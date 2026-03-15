@@ -5,6 +5,7 @@ Test MCP tools on your running production app (Rails, Django, Laravel, etc.) wit
 ## Overview
 
 For server-rendered apps or production deployments, you can:
+
 1. Navigate to your running app
 2. Inject WebMCP tools via `inject_webmcp_script`
 3. Test tools against real data
@@ -27,6 +28,7 @@ navigate_page({ url: "https://your-app.com/admin" })
 ```
 
 Or for local development:
+
 ```
 navigate_page({ url: "http://localhost:3000/admin" })
 ```
@@ -47,20 +49,20 @@ navigator.modelContext.registerTool({
   inputSchema: {
     type: 'object',
     properties: {
-      limit: { type: 'number', description: 'Max users to return' }
-    }
+      limit: { type: 'number', description: 'Max users to return' },
+    },
   },
   execute: async ({ limit = 10 }) => {
     const rows = [...document.querySelectorAll('table.users tbody tr')];
-    const users = rows.slice(0, limit).map(row => ({
+    const users = rows.slice(0, limit).map((row) => ({
       id: row.querySelector('.user-id')?.textContent?.trim(),
       email: row.querySelector('.user-email')?.textContent?.trim(),
-      status: row.querySelector('.user-status')?.textContent?.trim()
+      status: row.querySelector('.user-status')?.textContent?.trim(),
     }));
     return {
-      content: [{ type: 'text', text: JSON.stringify(users, null, 2) }]
+      content: [{ type: 'text', text: JSON.stringify(users, null, 2) }],
     };
-  }
+  },
 });
 ```
 
@@ -86,8 +88,8 @@ navigator.modelContext.registerTool({
   inputSchema: {
     type: 'object',
     properties: {
-      limit: { type: 'number' }
-    }
+      limit: { type: 'number' },
+    },
   },
   execute: async ({ limit = 20 }) => {
     const table = document.querySelector('table');
@@ -95,16 +97,16 @@ navigator.modelContext.registerTool({
       return { content: [{ type: 'text', text: 'No table found' }], isError: true };
     }
 
-    const headers = [...table.querySelectorAll('thead th')].map(th => th.textContent?.trim());
-    const rows = [...table.querySelectorAll('tbody tr')].slice(0, limit).map(tr => {
-      const cells = [...tr.querySelectorAll('td')].map(td => td.textContent?.trim());
+    const headers = [...table.querySelectorAll('thead th')].map((th) => th.textContent?.trim());
+    const rows = [...table.querySelectorAll('tbody tr')].slice(0, limit).map((tr) => {
+      const cells = [...tr.querySelectorAll('td')].map((td) => td.textContent?.trim());
       return Object.fromEntries(headers.map((h, i) => [h, cells[i]]));
     });
 
     return {
-      content: [{ type: 'text', text: JSON.stringify(rows, null, 2) }]
+      content: [{ type: 'text', text: JSON.stringify(rows, null, 2) }],
     };
-  }
+  },
 });
 ```
 
@@ -119,16 +121,16 @@ navigator.modelContext.registerTool({
     const metrics = {};
 
     // Scrape metric cards
-    document.querySelectorAll('.metric-card, .stat-card').forEach(card => {
+    document.querySelectorAll('.metric-card, .stat-card').forEach((card) => {
       const label = card.querySelector('.metric-label, .stat-label')?.textContent?.trim();
       const value = card.querySelector('.metric-value, .stat-value')?.textContent?.trim();
       if (label) metrics[label] = value;
     });
 
     return {
-      content: [{ type: 'text', text: JSON.stringify(metrics, null, 2) }]
+      content: [{ type: 'text', text: JSON.stringify(metrics, null, 2) }],
     };
-  }
+  },
 });
 ```
 
@@ -141,9 +143,9 @@ navigator.modelContext.registerTool({
   inputSchema: {
     type: 'object',
     properties: {
-      query: { type: 'string', description: 'Search query' }
+      query: { type: 'string', description: 'Search query' },
     },
-    required: ['query']
+    required: ['query'],
   },
   execute: async ({ query }) => {
     const searchInput = document.querySelector('input[type="search"], input[name="q"], #search');
@@ -163,7 +165,7 @@ navigator.modelContext.registerTool({
     if (form && !searchBtn) form.submit();
 
     return { content: [{ type: 'text', text: `Searching for "${query}"...` }] };
-  }
+  },
 });
 ```
 
@@ -179,8 +181,8 @@ navigator.modelContext.registerTool({
     properties: {
       name: { type: 'string' },
       description: { type: 'string' },
-      status: { type: 'string', enum: ['active', 'inactive'] }
-    }
+      status: { type: 'string', enum: ['active', 'inactive'] },
+    },
   },
   execute: async (params) => {
     const filled = [];
@@ -195,9 +197,9 @@ navigator.modelContext.registerTool({
       }
     }
     return {
-      content: [{ type: 'text', text: `Filled fields: ${filled.join(', ')}` }]
+      content: [{ type: 'text', text: `Filled fields: ${filled.join(', ')}` }],
     };
-  }
+  },
 });
 
 navigator.modelContext.registerTool({
@@ -211,7 +213,7 @@ navigator.modelContext.registerTool({
     }
     form.submit();
     return { content: [{ type: 'text', text: 'Form submitted' }] };
-  }
+  },
 });
 ```
 
@@ -260,11 +262,12 @@ const rows = document.querySelectorAll('.fi-ta-row');
 ### Audit Trail
 
 Consider logging tool usage:
+
 ```javascript
 execute: async (params) => {
   console.log('[WebMCP Admin] Tool called:', JSON.stringify(params));
   // ... tool logic
-}
+};
 ```
 
 ## From Prototype to Production

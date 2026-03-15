@@ -5,15 +5,15 @@
  */
 
 import assert from 'node:assert';
-import {describe, it, afterEach, beforeEach} from 'node:test';
+import { describe, it, afterEach, beforeEach } from 'node:test';
 
 import sinon from 'sinon';
 
-import {ClearcutLogger} from '../../src/telemetry/ClearcutLogger.js';
-import type {Persistence} from '../../src/telemetry/persistence.js';
-import {FilePersistence} from '../../src/telemetry/persistence.js';
-import {WatchdogMessageType} from '../../src/telemetry/types.js';
-import {WatchdogClient} from '../../src/telemetry/WatchdogClient.js';
+import { ClearcutLogger } from '../../src/telemetry/ClearcutLogger.js';
+import type { Persistence } from '../../src/telemetry/persistence.js';
+import { FilePersistence } from '../../src/telemetry/persistence.js';
+import { WatchdogMessageType } from '../../src/telemetry/types.js';
+import { WatchdogClient } from '../../src/telemetry/WatchdogClient.js';
 
 describe('ClearcutLogger', () => {
   let mockPersistence: sinon.SinonStubbedInstance<Persistence>;
@@ -62,7 +62,7 @@ describe('ClearcutLogger', () => {
         watchdogClient: mockWatchdogClient,
       });
 
-      await logger.logServerStart({headless: true});
+      await logger.logServerStart({ headless: true });
 
       assert(mockWatchdogClient.send.calledOnce);
       const msg = mockWatchdogClient.send.firstCall.args[0];

@@ -1,6 +1,6 @@
 name: Bug Report
 description: Report a bug in one of the @mcp-b packages
-labels: ["bug", "triage"]
+labels: ['bug', 'triage']
 body:
   - type: markdown
     attributes:
@@ -13,16 +13,16 @@ body:
       label: Package
       description: Which package is this bug related to?
       options:
-        - "@mcp-b/transports"
-        - "@mcp-b/global"
-        - "@mcp-b/react-webmcp"
-        - "@mcp-b/webmcp-ts-sdk"
-        - "@mcp-b/chrome-devtools-mcp"
-        - "@mcp-b/extension-tools"
-        - "@mcp-b/mcp-iframe"
-        - "@mcp-b/smart-dom-reader"
-        - "@webmcp/helpers"
-        - "Other / Multiple"
+        - '@mcp-b/transports'
+        - '@mcp-b/global'
+        - '@mcp-b/react-webmcp'
+        - '@mcp-b/webmcp-ts-sdk'
+        - '@mcp-b/chrome-devtools-mcp'
+        - '@mcp-b/extension-tools'
+        - '@mcp-b/mcp-iframe'
+        - '@mcp-b/smart-dom-reader'
+        - '@webmcp/helpers'
+        - 'Other / Multiple'
     validations:
       required: true
 
@@ -31,7 +31,7 @@ body:
     attributes:
       label: Package Version
       description: What version of the package are you using?
-      placeholder: "e.g., 1.2.3"
+      placeholder: 'e.g., 1.2.3'
     validations:
       required: true
 

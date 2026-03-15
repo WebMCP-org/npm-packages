@@ -3,33 +3,24 @@
   "version": "2.2.0",
   "description": "Strict TypeScript type definitions for the WebMCP core API (navigator.modelContext)",
   "keywords": [
-    "webmcp",
     "model-context",
     "navigator-modelcontext",
     "types",
     "typescript",
-    "web-standard"
+    "web-standard",
+    "webmcp"
   ],
   "homepage": "https://docs.mcp-b.ai/packages/webmcp-types",
   "bugs": {
     "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },
+  "license": "MIT",
+  "author": "Alex Nahas",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/WebMCP-org/npm-packages.git",
     "directory": "packages/webmcp-types"
   },
-  "license": "MIT",
-  "author": "Alex Nahas",
-  "sideEffects": false,
-  "type": "module",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts"
-    }
-  },
-  "main": "",
-  "types": "./dist/index.d.ts",
   "files": [
     "dist",
     "src/common.ts",
@@ -38,31 +29,39 @@
     "src/model-context.ts",
     "src/tool.ts"
   ],
-  "scripts": {
-    "build": "tsc -p tsconfig.build.json",
-    "check": "biome check --write .",
-    "clean": "rm -rf dist .turbo",
-    "format": "biome format --write .",
-    "lint": "biome lint --write .",
-    "prepublishOnly": "node ../../scripts/validate-publish.js && pnpm run build",
-    "publish:dry": "pnpm publish --access public --dry-run",
-    "publish:npm": "pnpm publish --access public",
-    "test": "vitest run && pnpm run test:conformance",
-    "test:browser": "vitest run --config vitest.browser.config.ts --browser.headless",
-    "test:browser:ui": "vitest --config vitest.browser.config.ts --browser",
-    "test:conformance": "vitest run --config vitest.conformance.config.ts",
-    "typecheck": "tsc --noEmit && vitest run --typecheck --silent"
-  },
-  "devDependencies": {
-    "@vitest/browser": "catalog:",
-    "@vitest/browser-playwright": "catalog:",
-    "@vitest/coverage-v8": "catalog:",
-    "playwright": "catalog:",
-    "typescript": "catalog:",
-    "vitest": "catalog:"
+  "type": "module",
+  "sideEffects": false,
+  "main": "",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts"
+    }
   },
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check": "vp check --fix",
+    "clean": "rm -rf dist",
+    "format": "vp fmt --write",
+    "lint": "vp lint --fix",
+    "prepublishOnly": "node ../../scripts/validate-publish.js && pnpm run build",
+    "publish:dry": "pnpm publish --access public --dry-run",
+    "publish:npm": "pnpm publish --access public",
+    "test": "vp test run && pnpm run test:conformance",
+    "test:browser": "vp test run --config vitest.browser.config.ts --browser.headless",
+    "test:browser:ui": "vp test --config vitest.browser.config.ts --browser",
+    "test:conformance": "vp test run --config vitest.conformance.config.ts",
+    "typecheck": "tsc --noEmit && vp test run --typecheck --silent"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "catalog:",
+    "playwright": "catalog:",
+    "typescript": "catalog:",
+    "vite-plus": "catalog:",
+    "vitest": "catalog:"
   }
 }

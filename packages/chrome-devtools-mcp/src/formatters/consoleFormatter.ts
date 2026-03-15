@@ -9,9 +9,9 @@ import {
   type TargetUniverse,
   SymbolizedError,
 } from '../DevtoolsUtils.js';
-import {UncaughtError} from '../PageCollector.js';
+import { UncaughtError } from '../PageCollector.js';
 import * as DevTools from '../third_party/index.js';
-import type {ConsoleMessage} from '../third_party/index.js';
+import type { ConsoleMessage } from '../third_party/index.js';
 
 export interface ConsoleFormatterOptions {
   fetchDetailedData?: boolean;
@@ -23,9 +23,7 @@ export interface ConsoleFormatterOptions {
   isIgnoredForTesting?: IgnoreCheck;
 }
 
-export type IgnoreCheck = (
-  frame: DevTools.DevTools.StackTrace.StackTrace.Frame,
-) => boolean;
+export type IgnoreCheck = (frame: DevTools.DevTools.StackTrace.StackTrace.Frame) => boolean;
 
 interface ConsoleMessageConcise {
   type: string;
@@ -76,27 +74,23 @@ export class ConsoleFormatter {
 
   static async from(
     msg: ConsoleMessage | UncaughtError,
-    options: ConsoleFormatterOptions,
+    options: ConsoleFormatterOptions
   ): Promise<ConsoleFormatter> {
     const ignoreListManager = options?.devTools?.universe.context.get(
-      DevTools.DevTools.IgnoreListManager,
+      DevTools.DevTools.IgnoreListManager
     );
     const isIgnored: IgnoreCheck =
       options.isIgnoredForTesting ||
-      (frame => {
+      ((frame) => {
         if (!ignoreListManager) {
           return false;
         }
         if (frame.uiSourceCode) {
-          return ignoreListManager.isUserOrSourceMapIgnoreListedUISourceCode(
-            frame.uiSourceCode,
-          );
+          return ignoreListManager.isUserOrSourceMapIgnoreListedUISourceCode(frame.uiSourceCode);
         }
         if (frame.url) {
           return ignoreListManager.isUserIgnoreListedURL(
-            frame.url as Parameters<
-              DevTools.DevTools.IgnoreListManager['isUserIgnoreListedURL']
-            >[0],
+            frame.url as Parameters<DevTools.DevTools.IgnoreListManager['isUserIgnoreListedURL']>[0]
           );
         }
         return false;
@@ -129,10 +123,7 @@ export class ConsoleFormatter {
         msg.args().map(async (arg, i) => {
           try {
             const remoteObject = arg.remoteObject();
-            if (
-              remoteObject.type === 'object' &&
-              remoteObject.subtype === 'error'
-            ) {
+            if (remoteObject.type === 'object' && remoteObject.subtype === 'error') {
               return await SymbolizedError.fromError({
                 devTools: options.devTools,
                 error: remoteObject,
@@ -144,7 +135,7 @@ export class ConsoleFormatter {
           } catch {
             return `<error: Argument ${i} is no longer available>`;
           }
-        }),
+        })
       );
     }
 
@@ -207,10 +198,8 @@ export class ConsoleFormatter {
       type: this.#type,
       text: this.#text,
       argsCount: this.#argCount,
-      args: this.#getArgs().map(arg => formatArg(arg, this)),
-      stackTrace: this.#stack
-        ? formatStackTrace(this.#stack, this.#cause, this)
-        : undefined,
+      args: this.#getArgs().map((arg) => formatArg(arg, this)),
+      stackTrace: this.#stack ? formatStackTrace(this.#stack, this.#cause, this) : undefined,
     };
   }
 }
@@ -219,15 +208,13 @@ function convertConsoleMessageConciseToString(msg: ConsoleMessageConcise) {
   return `msgid=${msg.id} [${msg.type}] ${msg.text} (${msg.argsCount} args)`;
 }
 
-function convertConsoleMessageConciseDetailedToString(
-  msg: ConsoleMessageDetailed,
-) {
+function convertConsoleMessageConciseDetailedToString(msg: ConsoleMessageDetailed) {
   const result = [
     `ID: ${msg.id}`,
     `Message: ${msg.type}> ${msg.text}`,
     formatArgs(msg),
     ...(msg.stackTrace ? ['### Stack trace', msg.stackTrace] : []),
-  ].filter(line => !!line);
+  ].filter((line) => !!line);
   return result.join('\n');
 }
 
@@ -247,15 +234,13 @@ function formatArgs(msg: ConsoleMessageDetailed): string {
   return result.join('\n');
 }
 
-function formatArg(arg: unknown, formatter: {isIgnored: IgnoreCheck}) {
+function formatArg(arg: unknown, formatter: { isIgnored: IgnoreCheck }) {
   if (arg instanceof SymbolizedError) {
     return [
       arg.message,
-      arg.stackTrace
-        ? formatStackTrace(arg.stackTrace, arg.cause, formatter)
-        : undefined,
+      arg.stackTrace ? formatStackTrace(arg.stackTrace, arg.cause, formatter) : undefined,
     ]
-      .filter(line => !!line)
+      .filter((line) => !!line)
       .join('\n');
   }
   return typeof arg === 'object' ? JSON.stringify(arg) : String(arg);
@@ -266,7 +251,7 @@ const STACK_TRACE_MAX_LINES = 50;
 function formatStackTrace(
   stackTrace: DevTools.DevTools.StackTrace.StackTrace.StackTrace,
   cause: SymbolizedError | undefined,
-  formatter: {isIgnored: IgnoreCheck},
+  formatter: { isIgnored: IgnoreCheck }
 ): string {
   const lines = formatStackTraceInner(stackTrace, cause, formatter);
   const includedLines = lines.slice(0, STACK_TRACE_MAX_LINES);
@@ -277,14 +262,14 @@ function formatStackTrace(
     reminderCount > 0 ? `... and ${reminderCount} more frames` : '',
     'Note: line and column numbers use 1-based indexing',
   ]
-    .filter(line => !!line)
+    .filter((line) => !!line)
     .join('\n');
 }
 
 function formatStackTraceInner(
   stackTrace: DevTools.DevTools.StackTrace.StackTrace.StackTrace | undefined,
   cause: SymbolizedError | undefined,
-  formatter: {isIgnored: IgnoreCheck},
+  formatter: { isIgnored: IgnoreCheck }
 ): string[] {
   if (!stackTrace) {
     return [];
@@ -292,24 +277,22 @@ function formatStackTraceInner(
 
   return [
     ...formatFragment(stackTrace.syncFragment, formatter),
-    ...stackTrace.asyncFragments
-      .map(item => formatAsyncFragment(item, formatter))
-      .flat(),
+    ...stackTrace.asyncFragments.map((item) => formatAsyncFragment(item, formatter)).flat(),
     ...formatCause(cause, formatter),
   ];
 }
 
 function formatFragment(
   fragment: DevTools.DevTools.StackTrace.StackTrace.Fragment,
-  formatter: {isIgnored: IgnoreCheck},
+  formatter: { isIgnored: IgnoreCheck }
 ): string[] {
-  const frames = fragment.frames.filter(frame => !formatter.isIgnored(frame));
+  const frames = fragment.frames.filter((frame) => !formatter.isIgnored(frame));
   return frames.map(formatFrame);
 }
 
 function formatAsyncFragment(
   fragment: DevTools.DevTools.StackTrace.StackTrace.AsyncFragment,
-  formatter: {isIgnored: IgnoreCheck},
+  formatter: { isIgnored: IgnoreCheck }
 ): string[] {
   const formattedFrames = formatFragment(fragment, formatter);
   if (formattedFrames.length === 0) {
@@ -322,9 +305,7 @@ function formatAsyncFragment(
   return [separator, ...formattedFrames];
 }
 
-function formatFrame(
-  frame: DevTools.DevTools.StackTrace.StackTrace.Frame,
-): string {
+function formatFrame(frame: DevTools.DevTools.StackTrace.StackTrace.Frame): string {
   let result = `at ${frame.name ?? '<anonymous>'}`;
   if (frame.uiSourceCode) {
     const location = frame.uiSourceCode.uiLocation(frame.line, frame.column);
@@ -337,7 +318,7 @@ function formatFrame(
 
 function formatCause(
   cause: SymbolizedError | undefined,
-  formatter: {isIgnored: IgnoreCheck},
+  formatter: { isIgnored: IgnoreCheck }
 ): string[] {
   if (!cause) {
     return [];

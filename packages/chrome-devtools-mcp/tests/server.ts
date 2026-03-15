@@ -4,14 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import http, {
-  type IncomingMessage,
-  type Server,
-  type ServerResponse,
-} from 'node:http';
-import {before, after, afterEach} from 'node:test';
+import http, { type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import { before, after, afterEach } from 'node:test';
 
-import {html} from './utils.js';
+import { html } from './utils.js';
 
 export class TestServer {
   #port: number;
@@ -29,8 +25,7 @@ export class TestServer {
     return Math.floor(Math.random() * (max - min + 1) + min);
   }
 
-  #routes: Record<string, (req: IncomingMessage, res: ServerResponse) => void> =
-    {};
+  #routes: Record<string, (req: IncomingMessage, res: ServerResponse) => void> = {};
 
   constructor(port: number) {
     this.#port = port;
@@ -59,10 +54,7 @@ export class TestServer {
     };
   }
 
-  addRoute(
-    path: string,
-    handler: (req: IncomingMessage, res: ServerResponse) => void,
-  ) {
+  addRoute(path: string, handler: (req: IncomingMessage, res: ServerResponse) => void) {
     if (this.#routes[path]) {
       throw new Error(`Route ${path} was already setup.`);
     }
@@ -76,9 +68,12 @@ export class TestServer {
     if (routeHandler) {
       routeHandler(req, res);
     } else {
-      res.writeHead(404, {'Content-Type': 'text/html'});
+      res.writeHead(404, { 'Content-Type': 'text/html' });
       res.end(
-        html`<h1>404 - Not Found</h1><p>The requested page does not exist.</p>`,
+        html`
+          <h1>404 - Not Found</h1>
+          <p>The requested page does not exist.</p>
+        `
       );
     }
   }
@@ -88,14 +83,14 @@ export class TestServer {
   }
 
   start(): Promise<void> {
-    return new Promise(res => {
+    return new Promise((res) => {
       this.#server.listen(this.#port, res);
     });
   }
 
   stop(): Promise<void> {
     return new Promise((res, rej) => {
-      this.#server.close(err => {
+      this.#server.close((err) => {
         if (err) {
           rej(err);
         } else {

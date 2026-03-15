@@ -35,7 +35,6 @@ WebMCP in this repo is positioned as a browser-native tool surface (`navigator.m
 - Docs consistently present a package-selection funnel: `types` -> `polyfill` -> `global` depending on strictness/features needed.
 - Positioning strongly emphasizes AI-agent interoperability across browser-native, extension, and desktop MCP clients.
 
-
 ## 2) Source-Validated Understanding
 
 ### Core runtime layering (confirmed in source)
@@ -117,8 +116,8 @@ Primary references reviewed:
 10. Add “Spec vs MCP-B Extensions” callout boxes in `global`, `webmcp-polyfill`, `webmcp-types`, and `chrome-devtools-mcp` readmes.
 
 11. Add doc lint checks in CI for:
-   - dead external links
-   - deprecated URLs
-   - stale count claims (tool/API counts)
-   - forbidden references (e.g., `navigator.modelContext.tools`)
 
+- dead external links
+- deprecated URLs
+- stale count claims (tool/API counts)
+- forbidden references (e.g., `navigator.modelContext.tools`)

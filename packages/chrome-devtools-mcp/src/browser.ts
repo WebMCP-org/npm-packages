@@ -4,19 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {execSync} from 'node:child_process';
+import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import {logger} from './logger.js';
-import type {
-  Browser,
-  ChromeReleaseChannel,
-  LaunchOptions,
-  Target,
-} from './third_party/index.js';
-import {puppeteer} from './third_party/index.js';
+import { logger } from './logger.js';
+import type { Browser, ChromeReleaseChannel, LaunchOptions, Target } from './third_party/index.js';
+import { puppeteer } from './third_party/index.js';
 
 let browser: Browser | undefined;
 
@@ -52,7 +47,7 @@ export async function ensureBrowserConnected(options: {
   userDataDir?: string;
   enableExtensions?: boolean;
 }) {
-  const {channel, enableExtensions} = options;
+  const { channel, enableExtensions } = options;
   if (browser?.connected) {
     return browser;
   }
@@ -81,10 +76,10 @@ export async function ensureBrowserConnected(options: {
         const fileContent = await fs.promises.readFile(portPath, 'utf8');
         const [rawPort, rawPath] = fileContent
           .split('\n')
-          .map(line => {
+          .map((line) => {
             return line.trim();
           })
-          .filter(line => {
+          .filter((line) => {
             return !!line;
           });
         if (!rawPort || !rawPath) {
@@ -101,7 +96,7 @@ export async function ensureBrowserConnected(options: {
           `Could not connect to Chrome in ${userDataDir}. Check if Chrome is running and remote debugging is enabled by going to chrome://inspect/#remote-debugging.`,
           {
             cause: error,
-          },
+          }
         );
       }
     } else {
@@ -113,9 +108,7 @@ export async function ensureBrowserConnected(options: {
       ) as ChromeReleaseChannel;
     }
   } else {
-    throw new Error(
-      'Either browserURL, wsEndpoint, channel or userDataDir must be provided',
-    );
+    throw new Error('Either browserURL, wsEndpoint, channel or userDataDir must be provided');
   }
 
   logger('Connecting Puppeteer to ', JSON.stringify(connectOptions));
@@ -126,7 +119,7 @@ export async function ensureBrowserConnected(options: {
       `Could not connect to Chrome. ${autoConnect ? `Check if Chrome is running and remote debugging is enabled by going to chrome://inspect/#remote-debugging.` : `Check if Chrome is running.`}`,
       {
         cause: err,
-      },
+      }
     );
   }
   logger('Connected Puppeteer');
@@ -160,7 +153,7 @@ export function detectDisplay(): void {
   if (!process.env['DISPLAY']) {
     try {
       const result = execSync(
-        `ps -u $(id -u) -o pid= | xargs -I{} cat /proc/{}/environ 2>/dev/null | tr '\\0' '\\n' | grep -m1 '^DISPLAY=' | cut -d= -f2`,
+        `ps -u $(id -u) -o pid= | xargs -I{} cat /proc/{}/environ 2>/dev/null | tr '\\0' '\\n' | grep -m1 '^DISPLAY=' | cut -d= -f2`
       );
       const display = result.toString('utf8').trim();
       process.env['DISPLAY'] = display;
@@ -171,11 +164,9 @@ export function detectDisplay(): void {
 }
 
 export async function launch(options: McpLaunchOptions): Promise<Browser> {
-  const {channel, executablePath, headless, isolated} = options;
+  const { channel, executablePath, headless, isolated } = options;
   const profileDirName =
-    channel && channel !== 'stable'
-      ? `chrome-profile-${channel}`
-      : 'chrome-profile';
+    channel && channel !== 'stable' ? `chrome-profile-${channel}` : 'chrome-profile';
 
   let userDataDir = options.userDataDir;
   if (!isolated && !userDataDir) {
@@ -183,7 +174,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
       os.homedir(),
       '.cache',
       options.viaCli ? 'chrome-devtools-mcp-cli' : 'chrome-devtools-mcp',
-      profileDirName,
+      profileDirName
     );
     await fs.promises.mkdir(userDataDir, {
       recursive: true,
@@ -206,9 +197,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   }
   if (!executablePath) {
     puppeteerChannel =
-      channel && channel !== 'stable'
-        ? (`chrome-${channel}` as ChromeReleaseChannel)
-        : 'chrome';
+      channel && channel !== 'stable' ? (`chrome-${channel}` as ChromeReleaseChannel) : 'chrome';
   }
 
   if (!headless) {
@@ -245,24 +234,19 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     }
     return browser;
   } catch (error) {
-    if (
-      userDataDir &&
-      (error as Error).message.includes('The browser is already running')
-    ) {
+    if (userDataDir && (error as Error).message.includes('The browser is already running')) {
       throw new Error(
         `The browser is already running for ${userDataDir}. Use --isolated to run multiple browser instances.`,
         {
           cause: error,
-        },
+        }
       );
     }
     throw error;
   }
 }
 
-export async function ensureBrowserLaunched(
-  options: McpLaunchOptions,
-): Promise<Browser> {
+export async function ensureBrowserLaunched(options: McpLaunchOptions): Promise<Browser> {
   if (browser?.connected) {
     return browser;
   }

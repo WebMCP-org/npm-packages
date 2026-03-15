@@ -5,14 +5,14 @@
  */
 
 import assert from 'node:assert';
-import {spawn} from 'node:child_process';
+import { spawn } from 'node:child_process';
 import path from 'node:path';
-import {describe, it, afterEach, beforeEach} from 'node:test';
+import { describe, it, afterEach, beforeEach } from 'node:test';
 
-import {executablePath} from 'puppeteer';
+import { executablePath } from 'puppeteer';
 
-import {serverHooks} from '../server.js';
-import {registerRouteAwareWebMCPFixture} from '../webmcp-fixture.js';
+import { serverHooks } from '../server.js';
+import { registerRouteAwareWebMCPFixture } from '../webmcp-fixture.js';
 
 const CLI_PATH = path.resolve('build/src/bin/chrome-devtools.js');
 const server = serverHooks();
@@ -23,9 +23,9 @@ function parseCliJson<T>(stdout: string): T {
     typeof parsed === 'object' &&
     parsed !== null &&
     'message' in parsed &&
-    typeof (parsed as {message: unknown}).message === 'string'
+    typeof (parsed as { message: unknown }).message === 'string'
   ) {
-    return parseCliJson<T>((parsed as {message: string}).message);
+    return parseCliJson<T>((parsed as { message: string }).message);
   }
   if (typeof parsed === 'string') {
     return JSON.parse(parsed) as T;
@@ -42,21 +42,21 @@ function parseCliJson<T>(stdout: string): T {
 }
 
 async function runCli(
-  args: string[],
-): Promise<{status: number | null; stdout: string; stderr: string}> {
+  args: string[]
+): Promise<{ status: number | null; stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
     const child = spawn('node', [CLI_PATH, ...args]);
     let stdout = '';
     let stderr = '';
-    child.stdout.on('data', chunk => {
+    child.stdout.on('data', (chunk) => {
       stdout += chunk;
       process.stdout.write(chunk);
     });
-    child.stderr.on('data', chunk => {
+    child.stderr.on('data', (chunk) => {
       stderr += chunk;
       process.stderr.write(chunk);
     });
-    child.on('close', status => resolve({status, stdout, stderr}));
+    child.on('close', (status) => resolve({ status, stdout, stderr }));
     child.on('error', reject);
   });
 }
@@ -66,17 +66,14 @@ describe('chrome-devtools', () => {
 
   async function assertDaemonIsNotRunning() {
     const result = await runCli(['status']);
-    assert.strictEqual(
-      result.stdout,
-      'chrome-devtools-mcp daemon is not running.\n',
-    );
+    assert.strictEqual(result.stdout, 'chrome-devtools-mcp daemon is not running.\n');
   }
 
   async function assertDaemonIsRunning() {
     const result = await runCli(['status']);
     assert.ok(
       result.stdout.startsWith('chrome-devtools-mcp daemon is running.\n'),
-      'chrome-devtools-mcp daemon is not running',
+      'chrome-devtools-mcp daemon is not running'
     );
   }
 
@@ -94,11 +91,7 @@ describe('chrome-devtools', () => {
     await assertDaemonIsNotRunning();
 
     const startResult = await runCli(['start']);
-    assert.strictEqual(
-      startResult.status,
-      0,
-      `start command failed: ${startResult.stderr}`,
-    );
+    assert.strictEqual(startResult.status, 0, `start command failed: ${startResult.stderr}`);
 
     await assertDaemonIsRunning();
   });
@@ -107,20 +100,12 @@ describe('chrome-devtools', () => {
     await assertDaemonIsNotRunning();
 
     const startResult = await runCli(['start']);
-    assert.strictEqual(
-      startResult.status,
-      0,
-      `start command failed: ${startResult.stderr}`,
-    );
+    assert.strictEqual(startResult.status, 0, `start command failed: ${startResult.stderr}`);
 
     await assertDaemonIsRunning();
 
     const stopResult = await runCli(['stop']);
-    assert.strictEqual(
-      stopResult.status,
-      0,
-      `stop command failed: ${stopResult.stderr}`,
-    );
+    assert.strictEqual(stopResult.status, 0, `stop command failed: ${stopResult.stderr}`);
 
     await assertDaemonIsNotRunning();
   });
@@ -129,56 +114,34 @@ describe('chrome-devtools', () => {
     await assertDaemonIsNotRunning();
 
     const startResult = await runCli(['start']);
-    assert.strictEqual(
-      startResult.status,
-      0,
-      `start command failed: ${startResult.stderr}`,
-    );
+    assert.strictEqual(startResult.status, 0, `start command failed: ${startResult.stderr}`);
 
     const listPagesResult = await runCli(['list_pages']);
     assert.strictEqual(
       listPagesResult.status,
       0,
-      `list_pages command failed: ${listPagesResult.stderr}`,
+      `list_pages command failed: ${listPagesResult.stderr}`
     );
-    assert(
-      listPagesResult.stdout.includes('about:blank'),
-      'list_pages output is unexpected',
-    );
+    assert(listPagesResult.stdout.includes('about:blank'), 'list_pages output is unexpected');
 
     await assertDaemonIsRunning();
   });
 
   it('can take screenshot', async () => {
     const startResult = await runCli(['start']);
-    assert.strictEqual(
-      startResult.status,
-      0,
-      `start command failed: ${startResult.stderr}`,
-    );
+    assert.strictEqual(startResult.status, 0, `start command failed: ${startResult.stderr}`);
 
     const result = await runCli(['take_screenshot']);
-    assert.strictEqual(
-      result.status,
-      0,
-      `take_screenshot command failed: ${result.stderr}`,
-    );
-    assert(
-      result.stdout.includes('.png'),
-      'take_screenshot output is unexpected',
-    );
+    assert.strictEqual(result.status, 0, `take_screenshot command failed: ${result.stderr}`);
+    assert(result.stdout.includes('.png'), 'take_screenshot output is unexpected');
   });
 
   it('forwards disclaimers to stderr on start', async () => {
     const result = await runCli(['start']);
-    assert.strictEqual(
-      result.status,
-      0,
-      `start command failed: ${result.stderr}`,
-    );
+    assert.strictEqual(result.status, 0, `start command failed: ${result.stderr}`);
     assert(
       result.stderr.includes('chrome-devtools-mcp exposes content'),
-      'Disclaimer not found in stderr on start',
+      'Disclaimer not found in stderr on start'
     );
   });
 
@@ -192,22 +155,10 @@ describe('chrome-devtools', () => {
       '--executablePath',
       browserExecutablePath,
     ]);
-    assert.strictEqual(
-      startResult.status,
-      0,
-      `start command failed: ${startResult.stderr}`,
-    );
+    assert.strictEqual(startResult.status, 0, `start command failed: ${startResult.stderr}`);
 
-    const newPageResult = await runCli([
-      'new_page',
-      server.getRoute('/'),
-      '--output-format=json',
-    ]);
-    assert.strictEqual(
-      newPageResult.status,
-      0,
-      `new_page command failed: ${newPageResult.stderr}`,
-    );
+    const newPageResult = await runCli(['new_page', server.getRoute('/'), '--output-format=json']);
+    assert.strictEqual(newPageResult.status, 0, `new_page command failed: ${newPageResult.stderr}`);
 
     const rootToolsResult = await runCli([
       'list_webmcp_tools',
@@ -217,19 +168,19 @@ describe('chrome-devtools', () => {
     assert.strictEqual(
       rootToolsResult.status,
       0,
-      `list_webmcp_tools command failed: ${rootToolsResult.stderr}`,
+      `list_webmcp_tools command failed: ${rootToolsResult.stderr}`
     );
     const rootPayload = parseCliJson<{
       pageId: number;
       api: string;
       count: number;
-      tools: Array<{name: string; description: string; pageId: number}>;
+      tools: Array<{ name: string; description: string; pageId: number }>;
     }>(rootToolsResult.stdout);
     assert.strictEqual(rootPayload.api, 'modelContext');
     assert.strictEqual(rootPayload.count, 3);
     assert.strictEqual(typeof rootPayload.pageId, 'number');
     assert.deepStrictEqual(
-      rootPayload.tools.map(tool => ({
+      rootPayload.tools.map((tool) => ({
         name: tool.name,
         description: tool.description,
         pageId: tool.pageId,
@@ -250,17 +201,14 @@ describe('chrome-devtools', () => {
           description: 'List routes in the test app.',
           pageId: rootPayload.pageId,
         },
-      ],
+      ]
     );
 
-    const currentContextResult = await runCli([
-      'call_webmcp_tool',
-      'get_current_context',
-    ]);
+    const currentContextResult = await runCli(['call_webmcp_tool', 'get_current_context']);
     assert.strictEqual(
       currentContextResult.status,
       0,
-      `call_webmcp_tool command failed: ${currentContextResult.stderr}`,
+      `call_webmcp_tool command failed: ${currentContextResult.stderr}`
     );
     assert.strictEqual(currentContextResult.stdout.trim(), '/');
 
@@ -273,7 +221,7 @@ describe('chrome-devtools', () => {
     assert.strictEqual(
       navigateResult.status,
       0,
-      `navigate command failed: ${navigateResult.stderr}`,
+      `navigate command failed: ${navigateResult.stderr}`
     );
     assert.strictEqual(navigateResult.stdout.trim(), 'Navigated to /entities');
 
@@ -285,19 +233,19 @@ describe('chrome-devtools', () => {
     assert.strictEqual(
       entityToolsResult.status,
       0,
-      `list_webmcp_tools on /entities failed: ${entityToolsResult.stderr}`,
+      `list_webmcp_tools on /entities failed: ${entityToolsResult.stderr}`
     );
     const entityPayload = parseCliJson<{
       pageId: number;
       api: string;
       count: number;
-      tools: Array<{name: string; description: string; pageId: number}>;
+      tools: Array<{ name: string; description: string; pageId: number }>;
     }>(entityToolsResult.stdout);
     assert.strictEqual(entityPayload.api, 'modelContext');
     assert.strictEqual(entityPayload.pageId, rootPayload.pageId);
     assert.strictEqual(entityPayload.count, 3);
     assert.deepStrictEqual(
-      entityPayload.tools.map(tool => ({
+      entityPayload.tools.map((tool) => ({
         name: tool.name,
         description: tool.description,
         pageId: tool.pageId,
@@ -318,21 +266,15 @@ describe('chrome-devtools', () => {
           description: 'List entities visible on the entities route.',
           pageId: rootPayload.pageId,
         },
-      ],
+      ]
     );
 
-    const listEntitiesResult = await runCli([
-      'call_webmcp_tool',
-      'list_entities',
-    ]);
+    const listEntitiesResult = await runCli(['call_webmcp_tool', 'list_entities']);
     assert.strictEqual(
       listEntitiesResult.status,
       0,
-      `list_entities command failed: ${listEntitiesResult.stderr}`,
+      `list_entities command failed: ${listEntitiesResult.stderr}`
     );
-    assert.strictEqual(
-      listEntitiesResult.stdout.trim(),
-      '3 entities: Ada, Linus, Grace',
-    );
+    assert.strictEqual(listEntitiesResult.stdout.trim(), '3 entities: Ada, Linus, Grace');
   });
 });

@@ -5,6 +5,7 @@ A Claude Code skill that provides **strategic guidance** for adding WebMCP (Mode
 ## What This Skill Does
 
 This skill teaches agents how to:
+
 - **Think of WebMCP as creating an LLM UI** - not just installing packages
 - **Design powerful tools** using the three-category system (read-only, read-write, destructive)
 - **Implement the two-tool pattern** for forms (fill + submit)
@@ -19,24 +20,30 @@ WebMCP is about creating a user interface for LLMs. Just as humans use buttons, 
 ## Key Principles
 
 ### 1. Categorize by Safety
+
 - **Read-only** (`readOnlyHint: true`) - Get data, no side effects
 - **Read-write** (default) - Modify UI state, user sees changes, reversible
 - **Destructive** (`destructiveHint: true`) - Permanent actions, requires care
 
 ### 2. Two-Tool Pattern for Forms
+
 **Critical**: Separate filling from submission
+
 - Tool 1: `fill_*_form` (read-write) - Populate fields, user sees it
 - Tool 2: `submit_*_form` (destructive) - Actually submit
 
 **Why?** User can review what's being submitted before it happens.
 
 ### 3. UI Parity
+
 For every major action a human can take, create a corresponding tool.
 
 ### 4. Powerful, Not Granular
+
 One tool per complete task. Not `set_name`, `set_email`, `set_message` - instead `fill_contact_form` with all fields.
 
 ### 5. Dogfood Everything
+
 Test every tool with Chrome DevTools MCP. No exceptions.
 
 ## Installation
@@ -89,6 +96,7 @@ or
 > "Set up WebMCP tools for my app"
 
 The skill will guide you through:
+
 1. Understanding your app's UI capabilities
 2. Designing tools by category (read, write, act)
 3. Implementing tools with proper separation
@@ -100,6 +108,7 @@ The skill will guide you through:
 **Not a package installer** - This skill provides strategic guidance, not mechanical "run this command" instructions.
 
 **Leverages existing tools**:
+
 - **WebMCP Docs MCP** - For API syntax and implementation details
 - **Chrome DevTools MCP** - For testing and dogfooding tools
   - Requires Chrome Dev (v145+) or Canary for auto-connect feature
@@ -118,6 +127,7 @@ The skill will guide the agent to:
    - View todos, add todos, mark complete, delete, filter, search
 
 2. **Plan tools by category**:
+
    ```
    Phase 1 - Read-Only:
     list_todos (readOnlyHint: true)
@@ -151,19 +161,25 @@ The skill will guide the agent to:
 ## Implementation Phases
 
 ### Phase 1: Read the World (Read-Only Tools)
+
 Give the LLM eyes. Build tools that let it understand current state.
+
 - Safe to implement
 - No risk of breaking anything
 - Builds confidence
 
 ### Phase 2: Modify UI (Read-Write Tools)
+
 Let the LLM interact with the UI without permanent consequences.
+
 - User sees changes in real-time
 - Reversible
 - Builds trust
 
 ### Phase 3: Take Action (Destructive Tools)
+
 Let the LLM make permanent changes.
+
 - Most risky
 - Requires phases 1-2 to be solid
 - Extra careful testing
@@ -171,6 +187,7 @@ Let the LLM make permanent changes.
 ## Testing Workflow
 
 For **every tool**:
+
 1. Register the tool in your code
 2. Start dev server
 3. Open Chrome DevTools MCP
@@ -185,16 +202,19 @@ For **every tool**:
 ## Common Patterns
 
 ### Todo App
+
 - Read: `list_todos`, `get_todo_by_id`
 - Write: `fill_todo_form`, `set_filter`
 - Act: `create_todo`, `delete_todo`, `mark_complete`
 
 ### E-Commerce
+
 - Read: `search_products`, `get_cart_contents`
 - Write: `fill_checkout_form`, `apply_filters`
 - Act: `add_to_cart`, `submit_order`
 
 ### Admin Dashboard
+
 - Read: `list_users`, `get_analytics`
 - Write: `fill_user_form`, `set_date_range`
 - Act: `create_user`, `delete_user`, `ban_user`
@@ -242,11 +262,13 @@ The skill provides **strategic guidance** in three areas:
    - Iteration based on feedback
 
 **The skill does NOT**:
+
 - Install packages (agents can figure this out)
 - Provide boilerplate code (use WebMCP Docs MCP)
 - Debug implementation issues (use Chrome DevTools MCP)
 
 **The skill DOES**:
+
 - Teach strategic thinking about tool design
 - Emphasize testing and dogfooding
 - Provide design principles and patterns
@@ -284,23 +306,28 @@ A successful WebMCP integration has:
 ## Troubleshooting
 
 **"The skill doesn't install packages"**
+
 - Correct. Use WebMCP Docs MCP for API syntax: `mcp__docs__SearchWebMcpDocumentation("react setup")`
 
 **"How do I test tools?"**
+
 - Use Chrome DevTools MCP to call tools and verify behavior
 - See the "Critical: Dogfooding" section in SKILL.md
 
 **"Should I make one tool per form field?"**
+
 - No. Make one powerful tool that fills the entire form
 - See "Make Tools Powerful, Not Granular" principle
 
 **"When should I use destructiveHint?"**
+
 - For permanent, irreversible actions (submit, delete, purchase)
 - NOT for filling forms or changing UI state
 
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on:
+
 - Adding framework-specific patterns
 - Improving testing workflows
 - Expanding design principles

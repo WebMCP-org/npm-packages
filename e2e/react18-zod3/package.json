@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "vite build",
-    "dev": "vite --port 3015",
-    "preview": "vite preview --port 3015",
+    "build": "vp build",
+    "dev": "vp dev --port 3015",
+    "preview": "vp preview --port 3015",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -21,8 +21,9 @@
   "devDependencies": {
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
-    "@vitejs/plugin-react": "^4.3.4",
+    "@vitejs/plugin-react": "^6.0.1",
     "typescript": "catalog:",
-    "vite": "catalog:"
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
   }
 }

@@ -50,8 +50,8 @@ navigator.modelContext.registerTool({
   description: 'Get the current page title',
   inputSchema: { type: 'object', properties: {} },
   execute: async () => ({
-    content: [{ type: 'text', text: document.title }]
-  })
+    content: [{ type: 'text', text: document.title }],
+  }),
 });
 ```
 
@@ -73,10 +73,10 @@ navigator.modelContext.registerTool({
 
 After injection, tools become first-class MCP tools:
 
-| Your Tool Name | Becomes |
-|----------------|---------|
-| `search_pages` | `webmcp_notion_so_page0_search_pages` |
-| `list_orders` | `webmcp_localhost_3000_page0_list_orders` |
+| Your Tool Name | Becomes                                   |
+| -------------- | ----------------------------------------- |
+| `search_pages` | `webmcp_notion_so_page0_search_pages`     |
+| `list_orders`  | `webmcp_localhost_3000_page0_list_orders` |
 
 ## inject_webmcp_script Tool
 
@@ -95,19 +95,20 @@ inject_webmcp_script({
       })
     });
   `,
-  wait_for_tools: true,  // Wait for registration (default: true)
-  timeout: 5000          // Max wait time ms (default: 5000)
-})
+  wait_for_tools: true, // Wait for registration (default: true)
+  timeout: 5000, // Max wait time ms (default: 5000)
+});
 
 // Option 2: TypeScript file (production development)
 inject_webmcp_script({
-  file_path: './tools/src/mysite.ts'
+  file_path: './tools/src/mysite.ts',
   // TypeScript auto-bundled via esbuild (~10ms)
   // Imports from node_modules resolved automatically
-})
+});
 ```
 
 **Features:**
+
 - Auto-detects if polyfill needed (checks `navigator.modelContext`)
 - Prepends @mcp-b/global polyfill if missing
 - **Auto-bundles TypeScript** (.ts/.tsx) via esbuild
@@ -124,12 +125,12 @@ Lightweight tree-shakable helpers for userscripts:
 
 ```typescript
 // Helper functions (inlined in template until package published)
-function textResponse(text: string): ToolResponse
-function jsonResponse(data: unknown, indent = 2): ToolResponse
-function errorResponse(message: string): ToolResponse
-function getAllElements(selector: string): Element[]
-function getText(selectorOrElement: string | Element | null): string | null
-function waitForElement(selector: string, timeout = 5000): Promise<Element>
+function textResponse(text: string): ToolResponse;
+function jsonResponse(data: unknown, indent = 2): ToolResponse;
+function errorResponse(message: string): ToolResponse;
+function getAllElements(selector: string): Element[];
+function getText(selectorOrElement: string | Element | null): string | null;
+function waitForElement(selector: string, timeout = 5000): Promise<Element>;
 ```
 
 See [HELPERS_API.md](references/HELPERS_API.md) for full API.
@@ -145,6 +146,7 @@ to inform clients about new tools.
 Tools follow the pattern: `webmcp_{sanitized_domain}_page{N}_{tool_name}`
 
 Examples:
+
 - `webmcp_news_ycombinator_com_page0_get_stories`
 - `webmcp_old_reddit_com_page0_get_posts`
 - `webmcp_github_com_page1_search_repos`
@@ -154,9 +156,10 @@ Examples:
 When calling tools in Claude Code, use the MCP server prefix:
 
 ```javascript
-mcp__chrome-devtools__webmcp_news_ycombinator_com_page0_get_stories({
-  limit: 10
-})
+mcp__chrome -
+  devtools__webmcp_news_ycombinator_com_page0_get_stories({
+    limit: 10,
+  });
 ```
 
 The `mcp__chrome-devtools__` prefix routes the call to the correct MCP server.
@@ -168,8 +171,8 @@ When using the MCP SDK directly (e.g., in test scripts), call by the tool name o
 ```javascript
 await client.callTool({
   name: 'webmcp_news_ycombinator_com_page0_get_stories',
-  arguments: { limit: 10 }
-})
+  arguments: { limit: 10 },
+});
 ```
 
 **No prefix needed** - the SDK already knows which server to call.
@@ -189,25 +192,28 @@ See [SELF_TESTING.md](references/SELF_TESTING.md) for detailed protocol.
 ## Tool Design Principles
 
 **Categories by safety:**
+
 - **Read-only** (`readOnlyHint: true`): No side effects
 - **Read-write**: Modify UI, reversible
 - **Destructive** (`destructiveHint: true`): Permanent actions
 
 **Two-tool pattern for forms:**
+
 - `fill_*_form` (read-write) - populate fields
 - `submit_*_form` (destructive) - commit changes
 
 **Handler return format:**
+
 ```javascript
 // Success
 return {
-  content: [{ type: 'text', text: 'Result data' }]
+  content: [{ type: 'text', text: 'Result data' }],
 };
 
 // Error
 return {
   content: [{ type: 'text', text: 'Error message' }],
-  isError: true
+  isError: true,
 };
 ```
 
@@ -224,8 +230,8 @@ navigator.modelContext.registerTool({
   inputSchema: {
     type: 'object',
     properties: {
-      limit: { type: 'number', description: 'Max items (default: 10)' }
-    }
+      limit: { type: 'number', description: 'Max items (default: 10)' },
+    },
   },
   execute: async ({ limit = 10 }) => {
     const items = [];
@@ -233,13 +239,13 @@ navigator.modelContext.registerTool({
       if (i >= limit) return;
       items.push({
         title: el.querySelector('.title')?.textContent?.trim() || '',
-        url: el.querySelector('a')?.href || ''
+        url: el.querySelector('a')?.href || '',
       });
     });
     return {
-      content: [{ type: 'text', text: JSON.stringify(items, null, 2) }]
+      content: [{ type: 'text', text: JSON.stringify(items, null, 2) }],
     };
-  }
+  },
 });
 ```
 
@@ -255,15 +261,15 @@ navigator.modelContext.registerTool({
     properties: {
       name: { type: 'string' },
       email: { type: 'string' },
-      message: { type: 'string' }
-    }
+      message: { type: 'string' },
+    },
   },
   execute: async ({ name, email, message }) => {
     if (name) document.querySelector('#name').value = name;
     if (email) document.querySelector('#email').value = email;
     if (message) document.querySelector('#message').value = message;
     return { content: [{ type: 'text', text: 'Form filled' }] };
-  }
+  },
 });
 
 // Step 2: Submit form (destructive)
@@ -274,7 +280,7 @@ navigator.modelContext.registerTool({
   execute: async () => {
     document.querySelector('form#contact').submit();
     return { content: [{ type: 'text', text: 'Form submitted' }] };
-  }
+  },
 });
 ```
 
@@ -287,33 +293,36 @@ navigator.modelContext.registerTool({
   inputSchema: {
     type: 'object',
     properties: {
-      section: { type: 'string', enum: ['home', 'about', 'contact'] }
+      section: { type: 'string', enum: ['home', 'about', 'contact'] },
     },
-    required: ['section']
+    required: ['section'],
   },
   execute: async ({ section }) => {
     const urls = { home: '/', about: '/about', contact: '/contact' };
     window.location.href = urls[section];
     return { content: [{ type: 'text', text: `Navigating to ${section}...` }] };
-  }
+  },
 });
 ```
 
 ## When to Use This Skill
 
 **Use when:**
+
 - Creating MCP tools for any website
 - Testing tools on your running app
 - Adding MCP to vanilla JS/HTML/CSS apps
 - Prototyping before committing to an approach
 
 **Don't use when:**
+
 - Site already has WebMCP (just use existing tools)
 - Just exploring without building tools
 
 ## API Reference
 
 Search docs for specifics:
+
 ```
 mcp__docs__SearchWebMcpDocumentation("registerTool inputSchema")
 mcp__docs__SearchWebMcpDocumentation("tool annotations")
@@ -322,6 +331,7 @@ mcp__docs__SearchWebMcpDocumentation("tool annotations")
 ## Example Scripts
 
 Reference implementations available in `examples/`:
+
 - `hackernews.js` - Hacker News
 - `github.js` - GitHub repositories
 - `wikipedia.js` - Wikipedia articles
@@ -353,6 +363,7 @@ inject_webmcp_script({ file_path: "./mysite-mcp/tools/src/mysite.ts" })
 ```
 
 **Site package structure:**
+
 ```
 mysite-mcp/
 ├── SKILL.md              # Main skill (Setup + Workflows)
@@ -373,13 +384,13 @@ See [TROUBLESHOOTING.md](references/TROUBLESHOOTING.md)
 
 **Common issues:**
 
-| Issue | Solution |
-|-------|----------|
-| Connection timeout / stale polyfill | `navigate_page` with `type="reload"`, then reinject |
-| CSP blocking injection | Use browser extension approach |
-| Tools not registering | Check console for errors |
-| Stale tools after navigation | Reinject script |
-| Selector not finding element | Use take_snapshot to verify page state |
-| TypeScript build fails | Check for syntax errors, run `pnpm install` |
-| Imports not resolved | Ensure dependencies in package.json, run install |
-| `handler` not recognized | Use `execute:` instead of `handler:` in tool definition |
+| Issue                               | Solution                                                |
+| ----------------------------------- | ------------------------------------------------------- |
+| Connection timeout / stale polyfill | `navigate_page` with `type="reload"`, then reinject     |
+| CSP blocking injection              | Use browser extension approach                          |
+| Tools not registering               | Check console for errors                                |
+| Stale tools after navigation        | Reinject script                                         |
+| Selector not finding element        | Use take_snapshot to verify page state                  |
+| TypeScript build fails              | Check for syntax errors, run `pnpm install`             |
+| Imports not resolved                | Ensure dependencies in package.json, run install        |
+| `handler` not recognized            | Use `execute:` instead of `handler:` in tool definition |

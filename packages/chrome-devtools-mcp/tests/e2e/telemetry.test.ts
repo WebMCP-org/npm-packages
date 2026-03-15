@@ -5,13 +5,13 @@
  */
 
 import assert from 'node:assert';
-import {spawn, type ChildProcess, type SpawnOptions} from 'node:child_process';
+import { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process';
 import http from 'node:http';
-import type {AddressInfo} from 'node:net';
+import type { AddressInfo } from 'node:net';
 import path from 'node:path';
-import {describe, it} from 'node:test';
+import { describe, it } from 'node:test';
 
-import type {ChromeDevToolsMcpExtension} from '../../src/telemetry/types';
+import type { ChromeDevToolsMcpExtension } from '../../src/telemetry/types';
 
 const SERVER_PATH = path.resolve('build/src/bin/chrome-devtools-mcp.js');
 
@@ -21,7 +21,7 @@ interface MockServerContext {
   events: ChromeDevToolsMcpExtension[];
   watchdogPid?: number;
   waitForEvent: (
-    predicate: (event: ChromeDevToolsMcpExtension) => boolean,
+    predicate: (event: ChromeDevToolsMcpExtension) => boolean
   ) => Promise<ChromeDevToolsMcpExtension>;
 }
 
@@ -41,7 +41,7 @@ async function startMockServer(): Promise<MockServerContext> {
       }
 
       let body = '';
-      req.on('data', chunk => {
+      req.on('data', (chunk) => {
         body += chunk.toString();
       });
       req.on('end', () => {
@@ -52,28 +52,26 @@ async function startMockServer(): Promise<MockServerContext> {
             for (const logEvent of parsed.log_event) {
               if (logEvent.source_extension_json) {
                 const ext = JSON.parse(
-                  logEvent.source_extension_json,
+                  logEvent.source_extension_json
                 ) as ChromeDevToolsMcpExtension;
                 events.push(ext);
 
                 // Check if any waiters are satisfied
-                waitingResolvers = waitingResolvers.filter(
-                  ({predicate, resolve}) => {
-                    if (predicate(ext)) {
-                      resolve(ext);
-                      return false;
-                    }
-                    return true;
-                  },
-                );
+                waitingResolvers = waitingResolvers.filter(({ predicate, resolve }) => {
+                  if (predicate(ext)) {
+                    resolve(ext);
+                    return false;
+                  }
+                  return true;
+                });
               }
             }
           }
         } catch (err) {
           console.error('Failed to parse mock server request', err);
         }
-        res.writeHead(200, {'Content-Type': 'application/json'});
-        res.end(JSON.stringify({next_request_wait_millis: 100}));
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ next_request_wait_millis: 100 }));
       });
     } else {
       res.writeHead(404);
@@ -81,7 +79,7 @@ async function startMockServer(): Promise<MockServerContext> {
     }
   });
 
-  await new Promise<void>(resolve => {
+  await new Promise<void>((resolve) => {
     server.listen(0, '127.0.0.1', () => resolve());
   });
 
@@ -93,14 +91,14 @@ async function startMockServer(): Promise<MockServerContext> {
     get watchdogPid() {
       return watchdogPid;
     },
-    waitForEvent: predicate => {
+    waitForEvent: (predicate) => {
       const existing = events.find(predicate);
       if (existing) {
         return Promise.resolve(existing);
       }
 
-      return new Promise(resolve => {
-        waitingResolvers.push({predicate, resolve});
+      return new Promise((resolve) => {
+        waitingResolvers.push({ predicate, resolve });
       });
     },
   };
@@ -120,16 +118,13 @@ function isProcessAlive(pid: number): boolean {
   }
 }
 
-async function waitForProcessExit(
-  pid: number,
-  timeoutMs = 5000,
-): Promise<void> {
+async function waitForProcessExit(pid: number, timeoutMs = 5000): Promise<void> {
   const startTime = Date.now();
   while (Date.now() - startTime < timeoutMs) {
     if (!isProcessAlive(pid)) {
       return;
     }
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, 50));
   }
   throw new Error(`Timeout waiting for process ${pid} to exit`);
 }
@@ -160,7 +155,7 @@ function cleanupTest(ctx: TestContext): void {
 describe('Telemetry E2E', () => {
   async function runTelemetryTest(
     killFn: (ctx: TestContext) => void,
-    spawnOptions?: SpawnOptions,
+    spawnOptions?: SpawnOptions
   ): Promise<void> {
     const mockContext = await startMockServer();
     const ctx: TestContext = {
@@ -186,16 +181,13 @@ describe('Telemetry E2E', () => {
             CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: undefined,
           },
           ...spawnOptions,
-        },
+        }
       );
 
       const startEvent = await Promise.race([
-        mockContext.waitForEvent(e => e.server_start !== undefined),
+        mockContext.waitForEvent((e) => e.server_start !== undefined),
         new Promise((_, reject) =>
-          setTimeout(
-            () => reject(new Error('Timeout waiting for server_start')),
-            10000,
-          ),
+          setTimeout(() => reject(new Error('Timeout waiting for server_start')), 10000)
         ),
       ]);
       assert.ok(startEvent, 'server_start event not received');
@@ -205,23 +197,16 @@ describe('Telemetry E2E', () => {
       assert.ok(watchdogPid, 'Watchdog PID not captured from headers');
 
       // Assert Watchdog is actually running
-      assert.strictEqual(
-        isProcessAlive(watchdogPid),
-        true,
-        'Watchdog process should be running',
-      );
+      assert.strictEqual(isProcessAlive(watchdogPid), true, 'Watchdog process should be running');
 
       // Trigger shutdown
       killFn(ctx);
 
       // Verify shutdown event
       const shutdownEvent = await Promise.race([
-        mockContext.waitForEvent(e => e.server_shutdown !== undefined),
+        mockContext.waitForEvent((e) => e.server_shutdown !== undefined),
         new Promise((_, reject) =>
-          setTimeout(
-            () => reject(new Error('Timeout waiting for server_shutdown')),
-            10000,
-          ),
+          setTimeout(() => reject(new Error('Timeout waiting for server_shutdown')), 10000)
         ),
       ]);
       assert.ok(shutdownEvent, 'server_shutdown event not received');
@@ -234,24 +219,21 @@ describe('Telemetry E2E', () => {
   }
 
   it('handles SIGKILL', () =>
-    runTelemetryTest(ctx => {
+    runTelemetryTest((ctx) => {
       ctx.process!.kill('SIGKILL');
     }));
 
   it('handles SIGTERM', () =>
-    runTelemetryTest(ctx => {
+    runTelemetryTest((ctx) => {
       ctx.process!.kill('SIGTERM');
     }));
 
-  it(
-    'handles POSIX process group SIGTERM',
-    {skip: process.platform === 'win32'},
-    () =>
-      runTelemetryTest(
-        ctx => {
-          process.kill(-ctx.process!.pid!, 'SIGTERM');
-        },
-        {detached: true},
-      ),
+  it('handles POSIX process group SIGTERM', { skip: process.platform === 'win32' }, () =>
+    runTelemetryTest(
+      (ctx) => {
+        process.kill(-ctx.process!.pid!, 'SIGTERM');
+      },
+      { detached: true }
+    )
   );
 });

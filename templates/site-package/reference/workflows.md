@@ -88,16 +88,16 @@ If something goes wrong:
 
 ```javascript
 // 1. Check console for errors
-list_console_messages()
+list_console_messages();
 
 // 2. Take a snapshot to see current state
-take_snapshot()
+take_snapshot();
 
 // 3. If tools disappeared, reinject
-inject_webmcp_script({ file_path: "./tools/src/{{site}}.ts" })
+inject_webmcp_script({ file_path: './tools/src/{{site}}.ts' });
 
 // 4. Verify tools are back
-diff_webmcp_tools()
+diff_webmcp_tools();
 ```
 
 ---

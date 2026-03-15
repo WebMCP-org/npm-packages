@@ -5,15 +5,12 @@
  */
 
 import assert from 'node:assert';
-import {describe, it} from 'node:test';
+import { describe, it } from 'node:test';
 
-import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
-import {McpResponse} from '../../src/McpResponse.js';
-import {
-  callWebMCPTool,
-  listWebMCPTools,
-} from '../../src/tools/webmcp.js';
-import {getTextContent, html, withMcpContext} from '../utils.js';
+import type { ParsedArguments } from '../../src/bin/chrome-devtools-mcp-cli-options.js';
+import { McpResponse } from '../../src/McpResponse.js';
+import { callWebMCPTool, listWebMCPTools } from '../../src/tools/webmcp.js';
+import { getTextContent, html, withMcpContext } from '../utils.js';
 
 function buildCorePage(): string {
   return html`
@@ -72,12 +69,14 @@ function buildCorePage(): string {
   `;
 }
 
-function buildTestingPage(options: {
-  invalidSchema?: boolean;
-  invalidJson?: boolean;
-  nullResult?: boolean;
-  plainTextResult?: boolean;
-} = {}): string {
+function buildTestingPage(
+  options: {
+    invalidSchema?: boolean;
+    invalidJson?: boolean;
+    nullResult?: boolean;
+    plainTextResult?: boolean;
+  } = {}
+): string {
   return html`
     <script>
       navigator.modelContextTesting = {
@@ -86,17 +85,19 @@ function buildTestingPage(options: {
             {
               name: 'testing_echo',
               description: 'Echo a message',
-              inputSchema: ${options.invalidSchema
-                ? JSON.stringify('{"badJson"')
-                : JSON.stringify(
-                    JSON.stringify({
-                      type: 'object',
-                      properties: {
-                        message: { type: 'string' },
-                      },
-                      required: ['message'],
-                    }),
-                  )},
+              inputSchema: ${
+                options.invalidSchema
+                  ? JSON.stringify('{"badJson"')
+                  : JSON.stringify(
+                      JSON.stringify({
+                        type: 'object',
+                        properties: {
+                          message: { type: 'string' },
+                        },
+                        required: ['message'],
+                      })
+                    )
+              },
             },
           ];
         },
@@ -131,12 +132,14 @@ function buildTestingPage(options: {
 }
 
 function buildNoApiPage(): string {
-  return html`<p>No WebMCP APIs here.</p>`;
+  return html`
+    <p>No WebMCP APIs here.</p>
+  `;
 }
 
 function stripUndefined<T>(value: T): T {
   if (Array.isArray(value)) {
-    return value.map(item => stripUndefined(item)) as T;
+    return value.map((item) => stripUndefined(item)) as T;
   }
   if (value && typeof value === 'object') {
     const result: Record<string, unknown> = {};
@@ -152,7 +155,7 @@ function stripUndefined<T>(value: T): T {
 
 async function parseListResponse(
   response: McpResponse,
-  context: Parameters<Parameters<typeof withMcpContext>[0]>[1],
+  context: Parameters<Parameters<typeof withMcpContext>[0]>[1]
 ) {
   const result = await response.handle(listWebMCPTools.name, context);
   return JSON.parse(getTextContent(result.content[0])) as {
@@ -179,7 +182,7 @@ describe('webmcp tools', () => {
         const page = context.getSelectedMcpPage();
         await page.pptrPage.setContent(buildCorePage());
 
-        await listWebMCPTools.handler({params: {}}, response, context);
+        await listWebMCPTools.handler({ params: {} }, response, context);
 
         const payload = await parseListResponse(response, context);
         assert.strictEqual(payload.api, 'modelContext');
@@ -191,8 +194,8 @@ describe('webmcp tools', () => {
             inputSchema: {
               type: 'object',
               properties: {
-                a: {type: 'number'},
-                b: {type: 'number'},
+                a: { type: 'number' },
+                b: { type: 'number' },
               },
               required: ['a', 'b'],
             },
@@ -206,7 +209,7 @@ describe('webmcp tools', () => {
       await withMcpContext(async (response, context) => {
         await context.getSelectedMcpPage().pptrPage.setContent(buildTestingPage());
 
-        await listWebMCPTools.handler({params: {}}, response, context);
+        await listWebMCPTools.handler({ params: {} }, response, context);
 
         const payload = await parseListResponse(response, context);
         assert.strictEqual(payload.api, 'modelContextTesting');
@@ -214,7 +217,7 @@ describe('webmcp tools', () => {
         assert.deepStrictEqual(payload.tools[0]?.inputSchema, {
           type: 'object',
           properties: {
-            message: {type: 'string'},
+            message: { type: 'string' },
           },
           required: ['message'],
         });
@@ -226,14 +229,14 @@ describe('webmcp tools', () => {
         const page = context.getSelectedMcpPage();
         await page.pptrPage.setContent(buildNoApiPage());
 
-        await listWebMCPTools.handler({params: {}}, response, context);
+        await listWebMCPTools.handler({ params: {} }, response, context);
 
         const payload = await parseListResponse(response, context);
         assert.strictEqual(payload.pageId, page.id);
         assert.deepStrictEqual(payload.tools, []);
         assert.match(
           payload.message ?? '',
-          /does not expose navigator\.modelContext\.listTools\(\) or navigator\.modelContextTesting\.listTools\(\)/,
+          /does not expose navigator\.modelContext\.listTools\(\) or navigator\.modelContextTesting\.listTools\(\)/
         );
       });
     });
@@ -242,9 +245,9 @@ describe('webmcp tools', () => {
       await withMcpContext(async (response, context) => {
         await context
           .getSelectedMcpPage()
-          .pptrPage.setContent(buildTestingPage({invalidSchema: true}));
+          .pptrPage.setContent(buildTestingPage({ invalidSchema: true }));
 
-        await listWebMCPTools.handler({params: {}}, response, context);
+        await listWebMCPTools.handler({ params: {} }, response, context);
 
         const payload = await parseListResponse(response, context);
         assert.deepStrictEqual(payload.tools[0]?.inputSchema, {
@@ -259,11 +262,7 @@ describe('webmcp tools', () => {
         const page = context.getSelectedMcpPage();
         await page.pptrPage.setContent(buildCorePage());
 
-        await listWebMCPTools.handler(
-          {params: {summary: true}},
-          response,
-          context,
-        );
+        await listWebMCPTools.handler({ params: { summary: true } }, response, context);
 
         const payload = await parseListResponse(response, context);
         assert.strictEqual(payload.pageId, page.id);
@@ -283,11 +282,7 @@ describe('webmcp tools', () => {
         const page = context.getSelectedMcpPage();
         await page.pptrPage.setContent(buildCorePage());
 
-        await listWebMCPTools.handler(
-          {params: {pattern: 'core_*'}},
-          response,
-          context,
-        );
+        await listWebMCPTools.handler({ params: { pattern: 'core_*' } }, response, context);
 
         const payload = await parseListResponse(response, context);
         assert.strictEqual(payload.pageId, page.id);
@@ -306,9 +301,9 @@ describe('webmcp tools', () => {
         context.selectPage(selectedPage);
 
         await listWebMCPTools.handler(
-          {params: {allPages: true, summary: true}},
+          { params: { allPages: true, summary: true } },
           response,
-          context,
+          context
         );
 
         const payload = await parseListResponse(response, context);
@@ -316,14 +311,14 @@ describe('webmcp tools', () => {
         assert.strictEqual(payload.pagesScanned, 2);
         assert.strictEqual(payload.count, 2);
         assert.deepStrictEqual(
-          payload.tools.map(tool => ({
+          payload.tools.map((tool) => ({
             name: tool.name,
             pageId: tool.pageId,
           })),
           [
-            {name: 'core_sum', pageId: selectedPage.id},
-            {name: 'testing_echo', pageId: otherPage.id},
-          ],
+            { name: 'core_sum', pageId: selectedPage.id },
+            { name: 'testing_echo', pageId: otherPage.id },
+          ]
         );
       });
     });
@@ -339,17 +334,15 @@ describe('webmcp tools', () => {
           {
             params: {
               name: 'core_sum',
-              arguments: {a: 2, b: 5},
+              arguments: { a: 2, b: 5 },
             },
           },
           response,
-          context,
+          context
         );
 
         const result = await response.handle(callWebMCPTool.name, context);
-        assert.deepStrictEqual(stripUndefined(result.content), [
-          {type: 'text', text: '7'},
-        ]);
+        assert.deepStrictEqual(stripUndefined(result.content), [{ type: 'text', text: '7' }]);
       });
     });
 
@@ -365,14 +358,14 @@ describe('webmcp tools', () => {
             },
           },
           response,
-          context,
+          context
         );
 
         const result = await response.handle(callWebMCPTool.name, context);
         assert.strictEqual(response.isError, true);
         assert.deepStrictEqual(stripUndefined(result.content), [
-          {type: 'text', text: 'primary'},
-          {type: 'image', mimeType: 'image/png', data: 'aGVsbG8='},
+          { type: 'text', text: 'primary' },
+          { type: 'image', mimeType: 'image/png', data: 'aGVsbG8=' },
           {
             type: 'resource',
             resource: {
@@ -394,17 +387,15 @@ describe('webmcp tools', () => {
           {
             params: {
               name: 'testing_echo',
-              arguments: {message: 'hi'},
+              arguments: { message: 'hi' },
             },
           },
           response,
-          context,
+          context
         );
 
         const result = await response.handle(callWebMCPTool.name, context);
-        assert.deepStrictEqual(stripUndefined(result.content), [
-          {type: 'text', text: 'echo:hi'},
-        ]);
+        assert.deepStrictEqual(stripUndefined(result.content), [{ type: 'text', text: 'echo:hi' }]);
       });
     });
 
@@ -412,7 +403,7 @@ describe('webmcp tools', () => {
       await withMcpContext(async (_response, context) => {
         await context
           .getSelectedMcpPage()
-          .pptrPage.setContent(buildTestingPage({plainTextResult: true}));
+          .pptrPage.setContent(buildTestingPage({ plainTextResult: true }));
 
         const response = new McpResponse({} as ParsedArguments);
         await callWebMCPTool.handler(
@@ -422,12 +413,12 @@ describe('webmcp tools', () => {
             },
           },
           response,
-          context,
+          context
         );
 
         const result = await response.handle(callWebMCPTool.name, context);
         assert.deepStrictEqual(stripUndefined(result.content), [
-          {type: 'text', text: 'plain:testing_echo'},
+          { type: 'text', text: 'plain:testing_echo' },
         ]);
       });
     });
@@ -436,20 +427,20 @@ describe('webmcp tools', () => {
       await withMcpContext(async (_response, context) => {
         await context
           .getSelectedMcpPage()
-          .pptrPage.setContent(buildTestingPage({invalidJson: true}));
+          .pptrPage.setContent(buildTestingPage({ invalidJson: true }));
 
         await assert.rejects(
           callWebMCPTool.handler(
             {
               params: {
                 name: 'testing_echo',
-                arguments: {message: 'hi'},
+                arguments: { message: 'hi' },
               },
             },
             new McpResponse({} as ParsedArguments),
-            context,
+            context
           ),
-          /Testing tool returned invalid JSON/,
+          /Testing tool returned invalid JSON/
         );
       });
     });
@@ -458,20 +449,20 @@ describe('webmcp tools', () => {
       await withMcpContext(async (_response, context) => {
         await context
           .getSelectedMcpPage()
-          .pptrPage.setContent(buildTestingPage({nullResult: true}));
+          .pptrPage.setContent(buildTestingPage({ nullResult: true }));
 
         await assert.rejects(
           callWebMCPTool.handler(
             {
               params: {
                 name: 'testing_echo',
-                arguments: {message: 'hi'},
+                arguments: { message: 'hi' },
               },
             },
             new McpResponse({} as ParsedArguments),
-            context,
+            context
           ),
-          /interrupted by navigation|page became unavailable/i,
+          /interrupted by navigation|page became unavailable/i
         );
       });
     });
@@ -488,9 +479,9 @@ describe('webmcp tools', () => {
               },
             },
             new McpResponse({} as ParsedArguments),
-            context,
+            context
           ),
-          /core failure/,
+          /core failure/
         );
       });
     });
@@ -507,21 +498,18 @@ describe('webmcp tools', () => {
         context.selectPage(selectedPage);
 
         const defaultResponse = new McpResponse({} as ParsedArguments);
-        await listWebMCPTools.handler({params: {}}, defaultResponse, context);
+        await listWebMCPTools.handler({ params: {} }, defaultResponse, context);
         const defaultPayload = await parseListResponse(defaultResponse, context);
         assert.strictEqual(defaultPayload.pageId, selectedPage.id);
         assert.strictEqual(defaultPayload.tools[0]?.name, 'core_sum');
 
         const targetedResponse = new McpResponse({} as ParsedArguments);
         await listWebMCPTools.handler(
-          {params: {pageId: otherPage.id}},
+          { params: { pageId: otherPage.id } },
           targetedResponse,
-          context,
+          context
         );
-        const targetedPayload = await parseListResponse(
-          targetedResponse,
-          context,
-        );
+        const targetedPayload = await parseListResponse(targetedResponse, context);
         assert.strictEqual(targetedPayload.pageId, otherPage.id);
         assert.strictEqual(targetedPayload.tools[0]?.name, 'testing_echo');
 
@@ -531,15 +519,15 @@ describe('webmcp tools', () => {
             params: {
               pageId: otherPage.id,
               name: 'testing_echo',
-              arguments: {message: 'page'},
+              arguments: { message: 'page' },
             },
           },
           callResponse,
-          context,
+          context
         );
         const callResult = await callResponse.handle(callWebMCPTool.name, context);
         assert.deepStrictEqual(stripUndefined(callResult.content), [
-          {type: 'text', text: 'echo:page'},
+          { type: 'text', text: 'echo:page' },
         ]);
       });
     });

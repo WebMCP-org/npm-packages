@@ -44,6 +44,7 @@ Add the global bridge script to your HTML file (usually `index.html` or `public/
 ```
 
 **Production tip**: Use a specific version instead of `@latest`:
+
 ```html
 <script src="https://unpkg.com/@mcp-b/global@1.2.0/dist/index.global.js"></script>
 ```
@@ -64,12 +65,12 @@ function App() {
     name: 'set_message',
     description: 'Change the displayed message',
     inputSchema: {
-      message: z.string().min(1).describe('New message to display')
+      message: z.string().min(1).describe('New message to display'),
     },
     handler: async ({ message }) => {
       setMessage(message);
       return { success: true };
-    }
+    },
   });
 
   return <h1>{message}</h1>;
@@ -87,28 +88,34 @@ function Counter() {
   const [count, setCount] = useState(0);
 
   // Tool re-registers when count changes
-  useWebMCP({
-    name: 'get_count',
-    description: `Get current count (currently: ${count})`,
-    outputSchema: useMemo(() => ({
-      count: z.number().describe('Current count value')
-    }), []),
-    handler: async () => ({ count })
-  }, [count]); // <-- deps array
+  useWebMCP(
+    {
+      name: 'get_count',
+      description: `Get current count (currently: ${count})`,
+      outputSchema: useMemo(
+        () => ({
+          count: z.number().describe('Current count value'),
+        }),
+        []
+      ),
+      handler: async () => ({ count }),
+    },
+    [count]
+  ); // <-- deps array
 
   useWebMCP({
     name: 'increment',
     description: 'Increment the counter',
     handler: async () => {
-      setCount(c => c + 1);
+      setCount((c) => c + 1);
       return { success: true, newCount: count + 1 };
-    }
+    },
   });
 
   return (
     <div>
       <p>Count: {count}</p>
-      <button onClick={() => setCount(c => c + 1)}>Increment</button>
+      <button onClick={() => setCount((c) => c + 1)}>Increment</button>
     </div>
   );
 }
@@ -126,11 +133,14 @@ import { z } from 'zod';
 function UserForm() {
   const [user, setUser] = useState({ name: '', email: '' });
 
-  const inputSchema = useMemo(() => ({
-    name: z.string().min(1).max(50).describe('User full name'),
-    email: z.string().email().describe('User email address'),
-    age: z.number().int().positive().optional().describe('User age')
-  }), []);
+  const inputSchema = useMemo(
+    () => ({
+      name: z.string().min(1).max(50).describe('User full name'),
+      email: z.string().email().describe('User email address'),
+      age: z.number().int().positive().optional().describe('User age'),
+    }),
+    []
+  );
 
   useWebMCP({
     name: 'update_user',
@@ -140,7 +150,7 @@ function UserForm() {
       // TypeScript knows the types!
       setUser({ name, email, age });
       return { success: true };
-    }
+    },
   });
 }
 ```
@@ -157,18 +167,21 @@ function UserProfile() {
     id: '123',
     name: 'Alice',
     email: 'alice@example.com',
-    role: 'admin'
+    role: 'admin',
   });
 
-  const outputSchema = useMemo(() => ({
-    user: z.object({
-      id: z.string(),
-      name: z.string(),
-      email: z.string().email(),
-      role: z.enum(['admin', 'user', 'guest'])
+  const outputSchema = useMemo(
+    () => ({
+      user: z.object({
+        id: z.string(),
+        name: z.string(),
+        email: z.string().email(),
+        role: z.enum(['admin', 'user', 'guest']),
+      }),
+      lastUpdated: z.string(),
     }),
-    lastUpdated: z.string()
-  }), []);
+    []
+  );
 
   useWebMCP({
     name: 'get_user_profile',
@@ -176,8 +189,8 @@ function UserProfile() {
     outputSchema,
     handler: async () => ({
       user,
-      lastUpdated: new Date().toISOString()
-    })
+      lastUpdated: new Date().toISOString(),
+    }),
   });
 }
 ```
@@ -192,23 +205,29 @@ The second parameter to `useWebMCP` is a dependency array (like `useEffect`). Th
 function TodoList() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const todoCount = todos.length;
-  const todoIds = todos.map(t => t.id).join(',');
+  const todoIds = todos.map((t) => t.id).join(',');
 
   // Re-register when count or IDs change
-  useWebMCP({
-    name: 'list_todos',
-    description: `List all todos (${todoCount} items)`,
-    handler: async () => ({ todos, count: todoCount })
-  }, [todoCount, todoIds]); // <-- deps array
+  useWebMCP(
+    {
+      name: 'list_todos',
+      description: `List all todos (${todoCount} items)`,
+      handler: async () => ({ todos, count: todoCount }),
+    },
+    [todoCount, todoIds]
+  ); // <-- deps array
 
   // Re-register when todos array changes
-  useWebMCP({
-    name: 'get_first_todo',
-    description: 'Get the first todo item',
-    handler: async () => ({
-      todo: todos[0] || null
-    })
-  }, [todos]); // <-- deps array
+  useWebMCP(
+    {
+      name: 'get_first_todo',
+      description: 'Get the first todo item',
+      handler: async () => ({
+        todo: todos[0] || null,
+      }),
+    },
+    [todos]
+  ); // <-- deps array
 }
 ```
 
@@ -242,15 +261,18 @@ useWebMCP({ ... }, [items]); // Re-registers when array changes
 
 ```tsx
 // ✅ Good: Memoized schema
-const outputSchema = useMemo(() => ({
-  count: z.number(),
-  items: z.array(z.string())
-}), []);
+const outputSchema = useMemo(
+  () => ({
+    count: z.number(),
+    items: z.array(z.string()),
+  }),
+  []
+);
 
 useWebMCP({
   name: 'get_data',
   outputSchema, // Stable reference
-  handler: async () => ({ count: 10, items: [] })
+  handler: async () => ({ count: 10, items: [] }),
 });
 
 // ❌ Bad: Inline schema (new object every render)
@@ -259,7 +281,7 @@ useWebMCP({
   outputSchema: {
     count: z.number(), // New object every render!
   },
-  handler: async () => ({ count: 10 })
+  handler: async () => ({ count: 10 }),
 });
 ```
 
@@ -270,14 +292,14 @@ Even better, define schemas outside the component:
 ```tsx
 const OUTPUT_SCHEMA = {
   count: z.number(),
-  items: z.array(z.string())
+  items: z.array(z.string()),
 };
 
 function MyComponent() {
   useWebMCP({
     name: 'get_data',
     outputSchema: OUTPUT_SCHEMA, // Always stable
-    handler: async () => ({ count: 10, items: [] })
+    handler: async () => ({ count: 10, items: [] }),
   });
 }
 ```
@@ -289,12 +311,15 @@ function TodoApp() {
   const [todos, setTodos] = useState<Todo[]>([]);
 
   const addTodo = useCallback((text: string) => {
-    setTodos(prev => [...prev, { id: crypto.randomUUID(), text }]);
+    setTodos((prev) => [...prev, { id: crypto.randomUUID(), text }]);
   }, []);
 
-  const inputSchema = useMemo(() => ({
-    text: z.string().min(1)
-  }), []);
+  const inputSchema = useMemo(
+    () => ({
+      text: z.string().min(1),
+    }),
+    []
+  );
 
   useWebMCP({
     name: 'add_todo',
@@ -303,7 +328,7 @@ function TodoApp() {
     handler: async ({ text }) => {
       addTodo(text);
       return { success: true };
-    }
+    },
   });
 }
 ```
@@ -321,28 +346,31 @@ function ContactForm() {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    message: ''
+    message: '',
   });
   const [submitted, setSubmitted] = useState(false);
 
-  const fillInputSchema = useMemo(() => ({
-    name: z.string().optional(),
-    email: z.string().email().optional(),
-    message: z.string().optional()
-  }), []);
+  const fillInputSchema = useMemo(
+    () => ({
+      name: z.string().optional(),
+      email: z.string().email().optional(),
+      message: z.string().optional(),
+    }),
+    []
+  );
 
   useWebMCP({
     name: 'fill_contact_form',
     description: 'Fill out the contact form fields',
     inputSchema: fillInputSchema,
     handler: async ({ name, email, message }) => {
-      setFormData(prev => ({
+      setFormData((prev) => ({
         name: name ?? prev.name,
         email: email ?? prev.email,
-        message: message ?? prev.message
+        message: message ?? prev.message,
       }));
       return { success: true };
-    }
+    },
   });
 
   useWebMCP({
@@ -359,43 +387,54 @@ function ContactForm() {
       setSubmitted(true);
 
       return { success: true };
-    }
+    },
   });
 
-  const getFormOutputSchema = useMemo(() => ({
-    formData: z.object({
-      name: z.string(),
-      email: z.string(),
-      message: z.string()
+  const getFormOutputSchema = useMemo(
+    () => ({
+      formData: z.object({
+        name: z.string(),
+        email: z.string(),
+        message: z.string(),
+      }),
+      isValid: z.boolean(),
     }),
-    isValid: z.boolean()
-  }), []);
+    []
+  );
 
-  useWebMCP({
-    name: 'get_form_data',
-    description: 'Get current form data',
-    outputSchema: getFormOutputSchema,
-    handler: async () => ({
-      formData,
-      isValid: !!(formData.name && formData.email)
-    })
-  }, [formData.name, formData.email, formData.message]);
+  useWebMCP(
+    {
+      name: 'get_form_data',
+      description: 'Get current form data',
+      outputSchema: getFormOutputSchema,
+      handler: async () => ({
+        formData,
+        isValid: !!(formData.name && formData.email),
+      }),
+    },
+    [formData.name, formData.email, formData.message]
+  );
 
   return (
-    <form onSubmit={e => { e.preventDefault(); submitForm(formData); }}>
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        submitForm(formData);
+      }}
+    >
       <input
         value={formData.name}
-        onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
+        onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
         placeholder="Name"
       />
       <input
         value={formData.email}
-        onChange={e => setFormData(prev => ({ ...prev, email: e.target.value }))}
+        onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
         placeholder="Email"
       />
       <textarea
         value={formData.message}
-        onChange={e => setFormData(prev => ({ ...prev, message: e.target.value }))}
+        onChange={(e) => setFormData((prev) => ({ ...prev, message: e.target.value }))}
         placeholder="Message"
       />
       <button type="submit">Submit</button>
@@ -423,34 +462,43 @@ function UserTable() {
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredUsers = useMemo(() => {
-    return users.filter(u =>
-      u.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    return users.filter((u) => u.name.toLowerCase().includes(searchQuery.toLowerCase()));
   }, [users, searchQuery]);
 
-  const listOutputSchema = useMemo(() => ({
-    users: z.array(z.object({
-      id: z.string(),
-      name: z.string(),
-      email: z.string(),
-      role: z.string()
-    })),
-    totalCount: z.number()
-  }), []);
+  const listOutputSchema = useMemo(
+    () => ({
+      users: z.array(
+        z.object({
+          id: z.string(),
+          name: z.string(),
+          email: z.string(),
+          role: z.string(),
+        })
+      ),
+      totalCount: z.number(),
+    }),
+    []
+  );
 
-  useWebMCP({
-    name: 'list_users',
-    description: `List users (${filteredUsers.length} of ${users.length})`,
-    outputSchema: listOutputSchema,
-    handler: async () => ({
-      users: filteredUsers,
-      totalCount: users.length
-    })
-  }, [filteredUsers.length, users.length]);
+  useWebMCP(
+    {
+      name: 'list_users',
+      description: `List users (${filteredUsers.length} of ${users.length})`,
+      outputSchema: listOutputSchema,
+      handler: async () => ({
+        users: filteredUsers,
+        totalCount: users.length,
+      }),
+    },
+    [filteredUsers.length, users.length]
+  );
 
-  const searchInputSchema = useMemo(() => ({
-    query: z.string().describe('Search query')
-  }), []);
+  const searchInputSchema = useMemo(
+    () => ({
+      query: z.string().describe('Search query'),
+    }),
+    []
+  );
 
   useWebMCP({
     name: 'search_users',
@@ -459,35 +507,40 @@ function UserTable() {
     handler: async ({ query }) => {
       setSearchQuery(query);
       return { success: true, resultCount: filteredUsers.length };
-    }
+    },
   });
 
-  const updateUserInputSchema = useMemo(() => ({
-    userId: z.string(),
-    name: z.string().optional(),
-    email: z.string().optional(),
-    role: z.string().optional()
-  }), []);
+  const updateUserInputSchema = useMemo(
+    () => ({
+      userId: z.string(),
+      name: z.string().optional(),
+      email: z.string().optional(),
+      role: z.string().optional(),
+    }),
+    []
+  );
 
   useWebMCP({
     name: 'update_user',
     description: 'Update user information',
     inputSchema: updateUserInputSchema,
     handler: async ({ userId, name, email, role }) => {
-      setUsers(prev => prev.map(u =>
-        u.id === userId
-          ? { ...u, ...(name && { name }), ...(email && { email }), ...(role && { role }) }
-          : u
-      ));
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === userId
+            ? { ...u, ...(name && { name }), ...(email && { email }), ...(role && { role }) }
+            : u
+        )
+      );
       return { success: true };
-    }
+    },
   });
 
   return (
     <div>
       <input
         value={searchQuery}
-        onChange={e => setSearchQuery(e.target.value)}
+        onChange={(e) => setSearchQuery(e.target.value)}
         placeholder="Search users..."
       />
       <table>
@@ -499,7 +552,7 @@ function UserTable() {
           </tr>
         </thead>
         <tbody>
-          {filteredUsers.map(user => (
+          {filteredUsers.map((user) => (
             <tr key={user.id}>
               <td>{user.name}</td>
               <td>{user.email}</td>
@@ -536,7 +589,7 @@ export function WebMCPTools() {
     handler: async ({ data }) => {
       setData(data);
       return { success: true };
-    }
+    },
   });
 
   return <div>{data}</div>;
@@ -604,7 +657,7 @@ export default function HomePage() {
     handler: async ({ message }) => {
       setMessage(message);
       return { success: true };
-    }
+    },
   });
 
   return <h1>{message}</h1>;
@@ -625,7 +678,7 @@ describe('useWebMCP', () => {
       useWebMCP({
         name: 'test_tool',
         description: 'Test tool',
-        handler: async () => ({ success: true })
+        handler: async () => ({ success: true }),
       })
     );
 
@@ -640,7 +693,7 @@ describe('useWebMCP', () => {
       useWebMCP({
         name: 'test_tool',
         description: 'Test tool',
-        handler
+        handler,
       })
     );
 

@@ -6,6 +6,7 @@ node_modules
 dist
 build
 .next
+.vite
 .turbo
 *.tsbuildinfo
 .wrangler
@@ -65,3 +66,4 @@ webmcp-tools/
 # Chromium source and depot tools
 chromium/
 depot_tools/
+skills-lock.json

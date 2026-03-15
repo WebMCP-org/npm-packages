@@ -18,6 +18,7 @@ If you encounter bugs or have feature requests:
 ### Suggesting Improvements
 
 We welcome suggestions for:
+
 - New framework support
 - Additional tool patterns
 - Documentation improvements
@@ -83,6 +84,7 @@ type(scope): description
 ```
 
 Types:
+
 - `feat`: New feature
 - `fix`: Bug fix
 - `docs`: Documentation changes
@@ -92,6 +94,7 @@ Types:
 - `chore`: Maintenance tasks
 
 Examples:
+
 ```
 feat(react): add React 19 support
 docs(troubleshooting): add CORS error solutions
@@ -103,11 +106,13 @@ fix(verification): handle missing package.json
 ### Local Testing
 
 1. **Symlink the skill**
+
    ```bash
    ln -s $(pwd)/skills/webmcp-setup ~/.claude/skills/webmcp-setup
    ```
 
 2. **Restart Claude Code**
+
    ```
    /restart
    ```
@@ -120,6 +125,7 @@ fix(verification): handle missing package.json
 ### Testing Changes
 
 1. **Create a test project**
+
    ```bash
    # For React
    pnpm create vite test-react --template react-ts
@@ -144,12 +150,14 @@ fix(verification): handle missing package.json
 ## Pull Request Process
 
 1. **Fork the repository**
+
    ```bash
    git clone https://github.com/your-username/npm-packages.git
    cd npm-packages
    ```
 
 2. **Create a feature branch**
+
    ```bash
    git checkout -b feat/add-angular-support
    ```
@@ -160,15 +168,18 @@ fix(verification): handle missing package.json
    - Update documentation
 
 4. **Commit your changes**
+
    ```bash
    git add .
    git commit -m "feat(angular): add Angular setup guide"
    ```
 
 5. **Push and create PR**
+
    ```bash
    git push origin feat/add-angular-support
    ```
+
    - Open PR on GitHub
    - Fill out PR template
    - Link any related issues
@@ -204,6 +215,7 @@ By contributing, you agree that your contributions will be licensed under the MI
 ## Recognition
 
 Contributors will be recognized in:
+
 - CHANGELOG.md (for significant changes)
 - GitHub contributors page
 - Release notes

@@ -5,14 +5,10 @@
  */
 
 import assert from 'node:assert';
-import {describe, it, afterEach, beforeEach} from 'node:test';
+import { describe, it, afterEach, beforeEach } from 'node:test';
 
-import {
-  handleResponse,
-  startDaemon,
-  stopDaemon,
-} from '../../src/daemon/client.js';
-import {isDaemonRunning} from '../../src/daemon/utils.js';
+import { handleResponse, startDaemon, stopDaemon } from '../../src/daemon/client.js';
+import { isDaemonRunning } from '../../src/daemon/utils.js';
 
 describe('daemon client', () => {
   describe('start/stop', () => {
@@ -54,7 +50,7 @@ describe('daemon client', () => {
 
   describe('parsing', () => {
     it('handles MCP response with text format', async () => {
-      const textResponse = {content: [{type: 'text' as const, text: 'test'}]};
+      const textResponse = { content: [{ type: 'text' as const, text: 'test' }] };
       assert.strictEqual(await handleResponse(textResponse, 'md'), 'test');
     });
 
@@ -68,28 +64,28 @@ describe('daemon client', () => {
       };
       assert.strictEqual(
         await handleResponse(jsonResponse, 'json'),
-        JSON.stringify(jsonResponse.structuredContent),
+        JSON.stringify(jsonResponse.structuredContent)
       );
     });
 
     it('handles error response when isError is true', async () => {
       const errorResponse = {
         isError: true,
-        content: [{type: 'text' as const, text: 'Something went wrong'}],
+        content: [{ type: 'text' as const, text: 'Something went wrong' }],
       };
       assert.strictEqual(
         await handleResponse(errorResponse, 'md'),
-        JSON.stringify(errorResponse.content),
+        JSON.stringify(errorResponse.content)
       );
     });
 
     it('handles text response when json format is requested but no structured content', async () => {
       const textResponse = {
-        content: [{type: 'text' as const, text: 'Fall through text'}],
+        content: [{ type: 'text' as const, text: 'Fall through text' }],
       };
       assert.deepStrictEqual(
         await handleResponse(textResponse, 'json'),
-        JSON.stringify(['Fall through text']),
+        JSON.stringify(['Fall through text'])
       );
     });
 

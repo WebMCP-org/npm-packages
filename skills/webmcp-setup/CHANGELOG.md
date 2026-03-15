@@ -7,7 +7,6 @@
 - Update documentation and skill instructions
 
   **Improvements:**
-
   - Enhanced README with additional setup information
   - Updated SKILL.md with better examples and guidance
   - Improved documentation clarity
@@ -17,7 +16,6 @@
 ### Minor Changes
 
 - ce15daf: Initial release of WebMCP setup skill following Claude Code skills best practices:
-
   - Reduced SKILL.md from 1055 to 566 lines (46% reduction) for better discoverability
   - Implemented progressive disclosure pattern with reference files
   - Created `references/ADVANCED_PATTERNS.md` for detailed implementation patterns

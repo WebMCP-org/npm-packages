@@ -243,6 +243,7 @@ Phase 3 - Destructive:
 ## Common Patterns Across All Apps
 
 ### Search Pattern
+
 ```
 ✓ search_X
   - Input: { query: string, filters?, page?, limit? }
@@ -251,6 +252,7 @@ Phase 3 - Destructive:
 ```
 
 ### CRUD Pattern
+
 ```
 ✓ list_X (read-only)
 ✓ get_X_by_id (read-only)
@@ -261,6 +263,7 @@ Phase 3 - Destructive:
 ```
 
 ### Filter Pattern
+
 ```
 ✓ get_filter_options (read-only)
   - Returns available filters
@@ -273,6 +276,7 @@ Phase 3 - Destructive:
 ```
 
 ### Form Pattern (Two-Tool)
+
 ```
 ✓ fill_X_form (read-write)
   - Populates fields, user sees it

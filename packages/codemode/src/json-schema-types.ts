@@ -1,4 +1,5 @@
 import type { JSONSchema7, JSONSchema7Definition } from 'json-schema';
+import type { UnknownRecord } from './type-utils';
 import {
   escapeJsDoc,
   escapeStringLiteral,
@@ -26,7 +27,7 @@ function resolveRef(ref: string, root: JSONSchema7): JSONSchema7Definition | nul
   let current: unknown = root;
   for (const seg of segments) {
     if (current === null || typeof current !== 'object') return null;
-    current = (current as Record<string, unknown>)[seg];
+    current = (current as UnknownRecord)[seg];
     if (current === undefined) return null;
   }
 
@@ -36,11 +37,7 @@ function resolveRef(ref: string, root: JSONSchema7): JSONSchema7Definition | nul
 }
 
 function applyNullable(result: string, schema: unknown): string {
-  if (
-    result !== 'unknown' &&
-    result !== 'never' &&
-    (schema as Record<string, unknown>)?.nullable === true
-  ) {
+  if (result !== 'unknown' && result !== 'never' && (schema as UnknownRecord)?.nullable === true) {
     return `${result} | null`;
   }
   return result;
@@ -118,7 +115,7 @@ export function jsonSchemaToTypeString(
     if (type === 'null') return 'null';
 
     if (type === 'array') {
-      const prefixItems = (schema as Record<string, unknown>).prefixItems as
+      const prefixItems = (schema as UnknownRecord).prefixItems as
         | JSONSchema7Definition[]
         | undefined;
       if (Array.isArray(prefixItems)) {

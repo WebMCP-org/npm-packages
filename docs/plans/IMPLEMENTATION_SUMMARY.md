@@ -22,6 +22,7 @@ Implemented a three-layer approach to handle page navigation scenarios in WebMCP
 Added two new TypeScript interfaces:
 
 #### `NavigationMetadata`
+
 ```typescript
 interface NavigationMetadata {
   willNavigate: true;
@@ -34,6 +35,7 @@ interface NavigationMetadata {
 **Purpose:** Tools that will navigate include this in their response metadata to signal intentional navigation.
 
 **Example Usage:**
+
 ```typescript
 navigator.modelContext.registerTool({
   name: 'navigate_to_docs',
@@ -50,7 +52,7 @@ navigator.modelContext.registerTool({
     };
 
     // Schedule navigation AFTER return
-    setTimeout(() => window.location.href = url, 100);
+    setTimeout(() => (window.location.href = url), 100);
 
     return response;
   },
@@ -58,6 +60,7 @@ navigator.modelContext.registerTool({
 ```
 
 #### `InterruptionMetadata`
+
 ```typescript
 interface InterruptionMetadata {
   navigationInterrupted: true;
@@ -75,6 +78,7 @@ interface InterruptionMetadata {
 **File:** `transports/src/TabClientTransport.ts`
 
 **Changes:**
+
 1. Added `requestTimeout` option (default: 10 seconds) to `TabClientTransportOptions`
 2. Track active requests with timeout IDs in `_activeRequests` Map
 3. Start timeout when sending requests with `method` and `id` fields
@@ -92,10 +96,13 @@ export interface TabClientTransportOptions {
 
 export class TabClientTransport {
   private _requestTimeout: number;
-  private _activeRequests = new Map<string | number, {
-    timeoutId: number;
-    request: JSONRPCMessage;
-  }>();
+  private _activeRequests = new Map<
+    string | number,
+    {
+      timeoutId: number;
+      request: JSONRPCMessage;
+    }
+  >();
 
   // Start timeout on send
   async send(message: JSONRPCMessage): Promise<void> {
@@ -151,6 +158,7 @@ export class TabClientTransport {
 ```
 
 **Timeout Error Format:**
+
 ```json
 {
   "jsonrpc": "2.0",
@@ -173,6 +181,7 @@ export class TabClientTransport {
 **File:** `transports/src/TabServerTransport.ts`
 
 **Changes:**
+
 1. Track pending requests in `_pendingRequests` Map
 2. Register `beforeunload` event handler on start
 3. Send interrupted responses for all pending requests during beforeunload
@@ -186,11 +195,14 @@ export class TabClientTransport {
 export class TabServerTransport {
   private _beforeUnloadHandler?: () => void;
   private _cleanupInterval?: number;
-  private _pendingRequests = new Map<string | number, {
-    request: JSONRPCMessage;
-    receivedAt: number;
-    interruptedSent: boolean;
-  }>();
+  private _pendingRequests = new Map<
+    string | number,
+    {
+      request: JSONRPCMessage;
+      receivedAt: number;
+      interruptedSent: boolean;
+    }
+  >();
   private readonly REQUEST_TIMEOUT_MS = 300000; // 5 minutes
 
   async start(): Promise<void> {
@@ -253,10 +265,12 @@ export class TabServerTransport {
         jsonrpc: '2.0',
         id,
         result: {
-          content: [{
-            type: 'text',
-            text: 'Tool execution interrupted by page navigation',
-          }],
+          content: [
+            {
+              type: 'text',
+              text: 'Tool execution interrupted by page navigation',
+            },
+          ],
           metadata: {
             navigationInterrupted: true,
             originalMethod: 'method' in info.request ? info.request.method : 'unknown',
@@ -304,15 +318,18 @@ export class TabServerTransport {
 ```
 
 **Interrupted Response Format:**
+
 ```json
 {
   "jsonrpc": "2.0",
   "id": "req-123",
   "result": {
-    "content": [{
-      "type": "text",
-      "text": "Tool execution interrupted by page navigation"
-    }],
+    "content": [
+      {
+        "type": "text",
+        "text": "Tool execution interrupted by page navigation"
+      }
+    ],
     "metadata": {
       "navigationInterrupted": true,
       "originalMethod": "tools/call",
@@ -333,10 +350,7 @@ Added logging for navigation metadata in `executeTool` method:
 ```typescript
 // Log navigation tools for debugging
 if (response.metadata && 'willNavigate' in response.metadata) {
-  console.info(
-    `[Web Model Context] Tool "${toolName}" will trigger navigation`,
-    response.metadata
-  );
+  console.info(`[Web Model Context] Tool "${toolName}" will trigger navigation`, response.metadata);
 }
 ```
 
@@ -349,18 +363,22 @@ if (response.metadata && 'willNavigate' in response.metadata) {
 Comprehensive demo showcasing all three layers with:
 
 ### ✅ Good Pattern Tools
+
 1. **navigate_to_docs** - Correct pattern with setTimeout
 2. **search_and_navigate** - Conditional navigation
 3. **delayed_navigation** - Configurable delay
 
 ### ❌ Bad Pattern Tools
+
 1. **bad_immediate_navigate** - Anti-pattern demonstrating lost responses
 
 ### ⏱️ Test Tools
+
 1. **slow_tool** - 5-second execution
 2. **very_slow_tool** - 60-second execution (triggers timeout)
 
 ### Features
+
 - Color-coded pattern badges (Good/Bad/Special)
 - Manual test controls (back button simulation, reload)
 - Tool list display
@@ -372,6 +390,7 @@ Comprehensive demo showcasing all three layers with:
 ## 📊 How to Test
 
 ### Prerequisites
+
 1. Built packages (`pnpm --filter @mcp-b/global build && pnpm --filter @mcp-b/transports build`)
 2. HTTP server running (e.g., `python3 -m http.server 8080` in examples folder)
 3. Chrome browser with DevTools
@@ -379,6 +398,7 @@ Comprehensive demo showcasing all three layers with:
 ### Test Scenarios
 
 #### Scenario 1: Good Pattern - Normal Navigation
+
 1. Open `http://localhost:8080/navigation-demo.html`
 2. Open Chrome DevTools → MCP tab
 3. Call tool: `navigate_to_docs` with args `{ "section": "getting-started" }`
@@ -389,6 +409,7 @@ Comprehensive demo showcasing all three layers with:
    - No interrupted response
 
 #### Scenario 2: Bad Pattern - Lost Response
+
 1. Open demo page
 2. Call tool: `bad_immediate_navigate` with args `{ "url": "https://example.com" }`
 3. **Expected:**
@@ -398,6 +419,7 @@ Comprehensive demo showcasing all three layers with:
    - Original tool response is lost
 
 #### Scenario 3: Client Timeout
+
 1. Open demo page
 2. Call tool: `very_slow_tool` with args `{}`
 3. **Expected:**
@@ -406,6 +428,7 @@ Comprehensive demo showcasing all three layers with:
    - Tool may still be executing in background
 
 #### Scenario 4: User Navigation During Tool Call
+
 1. Open demo page
 2. Call tool: `slow_tool` with args `{ "durationMs": 10000 }`
 3. Immediately click browser back button or reload
@@ -415,6 +438,7 @@ Comprehensive demo showcasing all three layers with:
    - Tool execution stops (page unloaded)
 
 #### Scenario 5: Race Condition Prevention
+
 1. Open demo page
 2. Call tool: `slow_tool` with args `{ "durationMs": 50 }`
 3. While tool is executing, trigger navigation (e.g., refresh)
@@ -430,6 +454,7 @@ Comprehensive demo showcasing all three layers with:
 Open browser console to see detailed logging:
 
 ### Good Pattern Logging
+
 ```
 [Demo] ✅ Good pattern: Preparing response BEFORE navigation
 [Web Model Context] Executing tool: navigate_to_docs
@@ -438,18 +463,21 @@ Open browser console to see detailed logging:
 ```
 
 ### Bad Pattern Logging
+
 ```
 [Demo] ❌ BAD PATTERN: Navigating BEFORE returning response
 [TabServerTransport] Sending interrupted response for pending request
 ```
 
 ### Timeout Logging
+
 ```
 [TabClientTransport] Request timeout for req-123
 Error: Request timeout - server may have navigated or become unresponsive
 ```
 
 ### BeforeUnload Logging
+
 ```
 [TabServerTransport] BeforeUnload handler executing
 [TabServerTransport] Sending interrupted responses for 2 pending requests
@@ -460,16 +488,19 @@ Error: Request timeout - server may have navigated or become unresponsive
 ## 📈 Performance Impact
 
 ### Memory Overhead
+
 - **Client:** ~100 bytes per active request (timeout tracking)
 - **Server:** ~150 bytes per pending request (request tracking)
 - **Typical:** 1-3 concurrent requests = <1KB memory
 
 ### CPU Overhead
+
 - **Timeout checks:** O(1) map operations
 - **BeforeUnload:** O(n) where n = pending requests (typically <10)
 - **Cleanup:** O(n) every 60 seconds (negligible)
 
 ### Network Impact
+
 - No additional network calls
 - Same postMessage mechanism
 - Interrupted responses typically <500 bytes
@@ -481,12 +512,14 @@ Error: Request timeout - server may have navigated or become unresponsive
 All three layers should:
 
 ✅ **Layer 1 (Metadata):**
+
 - [x] NavigationMetadata type defined
 - [x] InterruptionMetadata type defined
 - [x] Types exported from global package
 - [x] Documentation with examples
 
 ✅ **Layer 2 (Timeout):**
+
 - [x] Configurable timeout (default 10s)
 - [x] Timeout tracks all requests with ID
 - [x] Timeout clears on response
@@ -494,6 +527,7 @@ All three layers should:
 - [x] Clean up on transport close
 
 ✅ **Layer 3 (BeforeUnload):**
+
 - [x] Tracks pending requests
 - [x] Registers beforeunload handler
 - [x] Sends interrupted responses (LIFO order)
@@ -506,23 +540,27 @@ All three layers should:
 ## 🚀 Next Steps
 
 ### Documentation
+
 - [ ] Update `transports/README.md` with timeout option
 - [ ] Update `global/README.md` with navigation patterns
 - [ ] Create migration guide for existing tool authors
 - [ ] Add JSDoc comments to new interfaces
 
 ### Testing
+
 - [ ] Unit tests for client timeout
 - [ ] Unit tests for beforeunload handler
 - [ ] Integration tests with real navigation
 - [ ] E2E tests with Playwright
 
 ### Examples
+
 - [ ] Add more example tools to demo
 - [ ] Create video walkthrough
 - [ ] Add to official documentation
 
 ### Future Enhancements
+
 - [ ] Service worker architecture (v2.0)
 - [ ] SPA navigation detection
 - [ ] sendBeacon fallback (requires server)
@@ -533,17 +571,20 @@ All three layers should:
 ## 📝 Files Modified
 
 ### Core Implementation
+
 1. **global/src/types.ts** - Added NavigationMetadata and InterruptionMetadata types
 2. **transports/src/TabClientTransport.ts** - Implemented client-side timeout
 3. **transports/src/TabServerTransport.ts** - Implemented beforeunload detection
 4. **global/src/global.ts** - Added navigation metadata logging
 
 ### Documentation
+
 5. **docs/plans/NAVIGATION_HANDLING.md** - Comprehensive navigation handling guide
 6. **docs/plans/BEFOREUNLOAD_ANALYSIS.md** - Deep analysis of beforeunload approach
 7. **docs/plans/IMPLEMENTATION_SUMMARY.md** - This document
 
 ### Demo
+
 8. **examples/navigation-demo.html** - Interactive demo with test cases
 
 ---

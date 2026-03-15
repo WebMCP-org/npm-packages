@@ -3,36 +3,26 @@
   "version": "2.2.0",
   "description": "Local MCP relay for browser WebMCP tools via embed iframe and localhost WebSocket",
   "keywords": [
+    "ai-agents",
+    "iframe",
+    "localhost",
     "mcp",
     "model-context-protocol",
-    "webmcp",
     "relay",
-    "localhost",
-    "iframe",
     "stdio",
-    "ai-agents"
+    "webmcp"
   ],
   "homepage": "https://github.com/WebMCP-org/npm-packages#readme",
   "bugs": {
     "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },
+  "license": "MIT",
+  "author": "Alex Nahas",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/WebMCP-org/npm-packages.git",
     "directory": "packages/webmcp-local-relay"
   },
-  "license": "MIT",
-  "author": "Alex Nahas",
-  "type": "module",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "default": "./dist/index.js"
-    }
-  },
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
   "bin": {
     "webmcp-local-relay": "./dist/cli.js"
   },
@@ -42,17 +32,31 @@
     "dist",
     "skills"
   ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "scripts": {
-    "build": "tsdown && node scripts/build-widget-html.js",
+    "build": "vp pack && node scripts/build-widget-html.js",
     "build:mcpb": "bash scripts/build-mcpb.sh",
-    "check": "biome check --write .",
-    "clean": "rm -rf dist .turbo",
-    "format": "biome format --write .",
-    "lint": "biome lint --write .",
+    "check": "vp check --fix",
+    "clean": "rm -rf dist",
+    "format": "vp fmt --write",
+    "lint": "vp lint --fix",
     "prepublishOnly": "node ../../scripts/validate-publish.js && pnpm run build",
-    "test": "vitest run",
-    "test:e2e": "pnpm --filter @mcp-b/webmcp-polyfill build && pnpm --filter @mcp-b/global build && pnpm run build && vitest run --config vitest.e2e.config.ts",
-    "test:watch": "vitest",
+    "test": "vp test run",
+    "test:e2e": "pnpm --filter @mcp-b/webmcp-polyfill build && pnpm --filter @mcp-b/global build && pnpm run build && vp test run --config vitest.e2e.config.ts",
+    "test:watch": "vp test",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.browser.json"
   },
   "dependencies": {
@@ -67,15 +71,11 @@
     "@vitest/coverage-v8": "catalog:",
     "msw": "2.12.10",
     "playwright": "catalog:",
-    "tsdown": "catalog:",
     "typescript": "catalog:",
+    "vite-plus": "catalog:",
     "vitest": "catalog:"
   },
   "engines": {
     "node": ">=22"
-  },
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
   }
 }

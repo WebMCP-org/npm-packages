@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  * */
 
-import {isUtf8} from 'node:buffer';
+import { isUtf8 } from 'node:buffer';
 
-import type {HTTPRequest, HTTPResponse} from '../third_party/index.js';
+import type { HTTPRequest, HTTPResponse } from '../third_party/index.js';
 
 const BODY_CONTEXT_SIZE_LIMIT = 10000;
 
@@ -17,10 +17,7 @@ export interface NetworkFormatterOptions {
   fetchData?: boolean;
   requestFilePath?: string;
   responseFilePath?: string;
-  saveFile?: (
-    data: Uint8Array<ArrayBufferLike>,
-    filename: string,
-  ) => Promise<{filename: string}>;
+  saveFile?: (data: Uint8Array<ArrayBufferLike>, filename: string) => Promise<{ filename: string }>;
 }
 
 interface NetworkRequestConcise {
@@ -57,7 +54,7 @@ export class NetworkFormatter {
 
   static async from(
     request: HTTPRequest,
-    options: NetworkFormatterOptions,
+    options: NetworkFormatterOptions
   ): Promise<NetworkFormatter> {
     const instance = new NetworkFormatter(request, options);
     if (options.fetchData) {
@@ -71,32 +68,24 @@ export class NetworkFormatter {
     if (this.#request.hasPostData()) {
       let data;
       try {
-        data =
-          this.#request.postData() ?? (await this.#request.fetchPostData());
+        data = this.#request.postData() ?? (await this.#request.fetchPostData());
       } catch {
         // Ignore parsing errors
       }
-      const requestBodyNotAvailableMessage =
-        '<Request body not available anymore>';
+      const requestBodyNotAvailableMessage = '<Request body not available anymore>';
       if (this.#options.requestFilePath) {
         if (!this.#options.saveFile) {
           throw new Error('saveFile is not provided');
         }
         if (data) {
-          await this.#options.saveFile(
-            Buffer.from(data),
-            this.#options.requestFilePath,
-          );
+          await this.#options.saveFile(Buffer.from(data), this.#options.requestFilePath);
           this.#requestBodyFilePath = this.#options.requestFilePath;
         } else {
           this.#requestBody = requestBodyNotAvailableMessage;
         }
       } else {
         if (data) {
-          this.#requestBody = getSizeLimitedString(
-            data,
-            BODY_CONTEXT_SIZE_LIMIT,
-          );
+          this.#requestBody = getSizeLimitedString(data, BODY_CONTEXT_SIZE_LIMIT);
         } else {
           this.#requestBody = requestBodyNotAvailableMessage;
         }
@@ -106,8 +95,7 @@ export class NetworkFormatter {
     // Load Response Body
     const response = this.#request.response();
     if (response) {
-      const responseBodyNotAvailableMessage =
-        '<Response body not available anymore>';
+      const responseBodyNotAvailableMessage = '<Response body not available anymore>';
       if (this.#options.responseFilePath) {
         try {
           const buffer = await response.buffer();
@@ -126,7 +114,7 @@ export class NetworkFormatter {
       } else {
         this.#responseBody = await this.#getFormattedResponseBody(
           response,
-          BODY_CONTEXT_SIZE_LIMIT,
+          BODY_CONTEXT_SIZE_LIMIT
         );
       }
     }
@@ -152,7 +140,7 @@ export class NetworkFormatter {
 
   toJSONDetailed(): NetworkRequestDetailed {
     const redirectChain = this.#request.redirectChain();
-    const formattedRedirectChain = redirectChain.reverse().map(request => {
+    const formattedRedirectChain = redirectChain.reverse().map((request) => {
       const id = this.#options.requestIdResolver
         ? this.#options.requestIdResolver(request)
         : undefined;
@@ -172,9 +160,7 @@ export class NetworkFormatter {
       responseBody: this.#responseBody,
       responseBodyFilePath: this.#responseBodyFilePath,
       failure: this.#request.failure()?.errorText,
-      redirectChain: formattedRedirectChain.length
-        ? formattedRedirectChain
-        : undefined,
+      redirectChain: formattedRedirectChain.length ? formattedRedirectChain : undefined,
     };
   }
 
@@ -194,7 +180,7 @@ export class NetworkFormatter {
 
   async #getFormattedResponseBody(
     httpResponse: HTTPResponse,
-    sizeLimit = BODY_CONTEXT_SIZE_LIMIT,
+    sizeLimit = BODY_CONTEXT_SIZE_LIMIT
   ): Promise<string | undefined> {
     try {
       const responseBuffer = await httpResponse.buffer();
@@ -223,9 +209,7 @@ function getSizeLimitedString(text: string, sizeLimit: number) {
   return text;
 }
 
-function convertNetworkRequestConciseToString(
-  data: NetworkRequestConcise,
-): string {
+function convertNetworkRequestConciseToString(data: NetworkRequestConcise): string {
   // TODO truncate the URL
   return `reqid=${data.requestId} ${data.method} ${data.url} [${data.status}]${data.selectedInDevToolsUI ? ` [selected in the DevTools Network panel]` : ''}`;
 }
@@ -238,9 +222,7 @@ function formatHeadlers(headers: Record<string, string>): string[] {
   return response;
 }
 
-function converNetworkRequestDetailedToStringDetailed(
-  data: NetworkRequestDetailed,
-): string {
+function converNetworkRequestDetailedToStringDetailed(data: NetworkRequestDetailed): string {
   const response: string[] = [];
   response.push(`## Request ${data.url}`);
   response.push(`Status: ${data.status}`);
@@ -282,9 +264,7 @@ function converNetworkRequestDetailedToStringDetailed(
     response.push(`### Redirect chain`);
     let indent = 0;
     for (const request of redirectChain.reverse()) {
-      response.push(
-        `${'  '.repeat(indent)}${convertNetworkRequestConciseToString(request)})}`,
-      );
+      response.push(`${'  '.repeat(indent)}${convertNetworkRequestConciseToString(request)})}`);
       indent++;
     }
   }

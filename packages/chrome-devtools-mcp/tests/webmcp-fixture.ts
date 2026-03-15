@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {TestServer} from './server.js';
-import {html} from './utils.js';
+import type { TestServer } from './server.js';
+import { html } from './utils.js';
 
 export const WEBMCP_FIXTURE_ENTITIES = [
-  {id: '1', name: 'Ada'},
-  {id: '2', name: 'Linus'},
-  {id: '3', name: 'Grace'},
+  { id: '1', name: 'Ada' },
+  { id: '2', name: 'Linus' },
+  { id: '3', name: 'Grace' },
 ] as const;
 
 export function buildRouteAwareWebMCPPage(): string {

@@ -4,17 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {zod} from '../third_party/index.js';
-import type {ConsoleMessageType} from '../third_party/index.js';
+import { zod } from '../third_party/index.js';
+import type { ConsoleMessageType } from '../third_party/index.js';
 
-import {ToolCategory} from './categories.js';
-import {definePageTool} from './ToolDefinition.js';
+import { ToolCategory } from './categories.js';
+import { definePageTool } from './ToolDefinition.js';
 type ConsoleResponseType = ConsoleMessageType | 'issue';
 
-const FILTERABLE_MESSAGE_TYPES: [
-  ConsoleResponseType,
-  ...ConsoleResponseType[],
-] = [
+const FILTERABLE_MESSAGE_TYPES: [ConsoleResponseType, ...ConsoleResponseType[]] = [
   'log',
   'debug',
   'info',
@@ -51,30 +48,24 @@ export const listConsoleMessages = definePageTool({
       .int()
       .positive()
       .optional()
-      .describe(
-        'Maximum number of messages to return. When omitted, returns all requests.',
-      ),
+      .describe('Maximum number of messages to return. When omitted, returns all requests.'),
     pageIdx: zod
       .number()
       .int()
       .min(0)
       .optional()
-      .describe(
-        'Page number to return (0-based). When omitted, returns the first page.',
-      ),
+      .describe('Page number to return (0-based). When omitted, returns the first page.'),
     types: zod
       .array(zod.enum(FILTERABLE_MESSAGE_TYPES))
       .optional()
       .describe(
-        'Filter messages to only return messages of the specified resource types. When omitted or empty, returns all messages.',
+        'Filter messages to only return messages of the specified resource types. When omitted or empty, returns all messages.'
       ),
     includePreservedMessages: zod
       .boolean()
       .default(false)
       .optional()
-      .describe(
-        'Set to true to return the preserved messages over the last 3 navigations.',
-      ),
+      .describe('Set to true to return the preserved messages over the last 3 navigations.'),
   },
   handler: async (request, response) => {
     response.setIncludeConsoleData(true, {
@@ -96,9 +87,7 @@ export const getConsoleMessage = definePageTool({
   schema: {
     msgid: zod
       .number()
-      .describe(
-        'The msgid of a console message on the page from the listed console messages',
-      ),
+      .describe('The msgid of a console message on the page from the listed console messages'),
   },
   handler: async (request, response) => {
     response.attachConsoleMessage(request.params.msgid);
