@@ -107,7 +107,7 @@ const toPromptEntry = (entry: SkillPromptEntry | SkillPromptSource): SkillPrompt
   return {
     name: properties.name,
     description: properties.description,
-    location: entry.location,
+    ...(entry.location !== undefined && { location: entry.location }),
   };
 };
 

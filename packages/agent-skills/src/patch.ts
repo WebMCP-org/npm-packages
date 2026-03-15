@@ -478,11 +478,12 @@ export function validateSkillPatch(patch: unknown): SkillPatchValidationResult {
         );
         return;
       }
+      const expectedMatches = toExpectedMatches(operation.expectedMatches);
       normalizedOperations.push({
         type: 'replace',
         before: operation.before,
         after: operation.after,
-        expectedMatches: toExpectedMatches(operation.expectedMatches),
+        ...(expectedMatches !== undefined && { expectedMatches }),
       });
       return;
     }
@@ -524,12 +525,14 @@ export function validateSkillPatch(patch: unknown): SkillPatchValidationResult {
         );
         return;
       }
+      const insertPosition = isInsertPosition(operation.position) ? operation.position : undefined;
+      const insertExpectedMatches = toExpectedMatches(operation.expectedMatches);
       normalizedOperations.push({
         type: 'insert',
         anchor: operation.anchor,
         text: operation.text,
-        position: isInsertPosition(operation.position) ? operation.position : undefined,
-        expectedMatches: toExpectedMatches(operation.expectedMatches),
+        ...(insertPosition !== undefined && { position: insertPosition }),
+        ...(insertExpectedMatches !== undefined && { expectedMatches: insertExpectedMatches }),
       });
       return;
     }
@@ -547,10 +550,11 @@ export function validateSkillPatch(patch: unknown): SkillPatchValidationResult {
       );
       return;
     }
+    const deleteExpectedMatches = toExpectedMatches(operation.expectedMatches);
     normalizedOperations.push({
       type: 'delete',
       before: operation.before,
-      expectedMatches: toExpectedMatches(operation.expectedMatches),
+      ...(deleteExpectedMatches !== undefined && { expectedMatches: deleteExpectedMatches }),
     });
   });
 
@@ -937,9 +941,9 @@ const computeDiffMatrix = (base: string[], updated: string[]): Uint32Array[] => 
   for (let i = 1; i <= baseLen; i += 1) {
     for (let j = 1; j <= updatedLen; j += 1) {
       if (base[i - 1] === updated[j - 1]) {
-        matrix[i][j] = matrix[i - 1][j - 1] + 1;
+        matrix[i]![j] = matrix[i - 1]![j - 1]! + 1;
       } else {
-        matrix[i][j] = Math.max(matrix[i - 1][j], matrix[i][j - 1]);
+        matrix[i]![j] = Math.max(matrix[i - 1]![j]!, matrix[i]![j - 1]!);
       }
     }
   }
@@ -1026,19 +1030,19 @@ export function diffSkillContent(base: SkillContent, updated: SkillContent): Ski
 
     while (i > 0 || j > 0) {
       if (i > 0 && j > 0 && baseMiddle[i - 1] === updatedMiddle[j - 1]) {
-        reversed.push({ type: 'equal', lines: [baseMiddle[i - 1]] });
+        reversed.push({ type: 'equal', lines: [baseMiddle[i - 1]!] });
         i -= 1;
         j -= 1;
         continue;
       }
 
-      if (j > 0 && (i === 0 || matrix[i][j - 1] >= matrix[i - 1][j])) {
-        reversed.push({ type: 'insert', lines: [updatedMiddle[j - 1]] });
+      if (j > 0 && (i === 0 || matrix[i]![j - 1]! >= matrix[i - 1]![j]!)) {
+        reversed.push({ type: 'insert', lines: [updatedMiddle[j - 1]!] });
         j -= 1;
         continue;
       }
 
-      reversed.push({ type: 'delete', lines: [baseMiddle[i - 1]] });
+      reversed.push({ type: 'delete', lines: [baseMiddle[i - 1]!] });
       i -= 1;
     }
 

@@ -3,6 +3,7 @@
 This document covers the runtime testing lanes in this monorepo.
 
 For general test-layer philosophy, see [TESTING_PHILOSOPHY.md](./TESTING_PHILOSOPHY.md).
+For type-surface rules and the repo-wide no-cast policy, see [TYPE_TESTING.md](./TYPE_TESTING.md).
 
 ## Definitions
 
