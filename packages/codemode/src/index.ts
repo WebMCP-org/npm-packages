@@ -30,7 +30,7 @@ export {
   type ToolResultErrorMessage,
   type ToolResultSuccessMessage,
 } from './messages';
-export { normalizeCode } from './normalize';
+export { normalizeCode, type CodeNormalizer } from './normalize';
 export type { ExecuteResult, Executor, ToolFunction, ToolFunctions } from './types';
 export { sanitizeToolName } from './utils';
 export { WorkerSandboxExecutor, type WorkerSandboxExecutorOptions } from './worker-executor';

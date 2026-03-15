@@ -1,7 +1,7 @@
 {
   "name": "@mcp-b/codemode",
   "version": "0.0.1",
-  "description": "Browser-native code sandbox for LLM-generated tool orchestration",
+  "description": "Zero-dependency browser-native code sandbox for LLM-generated tool orchestration",
   "keywords": [
     "ai",
     "codemode",
@@ -11,7 +11,8 @@
     "mcp",
     "sandbox",
     "tool-calling",
-    "webmcp"
+    "webmcp",
+    "zero-dependency"
   ],
   "homepage": "https://docs.mcp-b.ai/packages/codemode",
   "bugs": {
@@ -45,6 +46,10 @@
       "types": "./dist/browser.d.ts",
       "import": "./dist/browser.js"
     },
+    "./acorn": {
+      "types": "./dist/acorn.d.ts",
+      "import": "./dist/acorn.js"
+    },
     "./webmcp": {
       "types": "./dist/webmcp.d.ts",
       "import": "./dist/webmcp.js"
@@ -67,11 +72,9 @@
     "test:watch": "vp test",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
-    "@types/json-schema": "^7.0.15",
-    "acorn": "^8.16.0"
-  },
   "devDependencies": {
+    "@types/json-schema": "^7.0.15",
+    "acorn": "^8.16.0",
     "ai": "catalog:",
     "msw": "^2.12.10",
     "typescript": "catalog:",
@@ -81,11 +84,15 @@
   },
   "peerDependencies": {
     "@mcp-b/webmcp-types": "workspace:*",
+    "acorn": "^8.16.0",
     "ai": "^5.0.0",
     "zod": "^3.25 || ^4.0"
   },
   "peerDependenciesMeta": {
     "@mcp-b/webmcp-types": {
+      "optional": true
+    },
+    "acorn": {
       "optional": true
     },
     "ai": {

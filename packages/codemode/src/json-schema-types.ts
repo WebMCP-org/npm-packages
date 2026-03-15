@@ -241,6 +241,15 @@ export interface JsonSchemaToolDescriptor {
 
 export type JsonSchemaToolDescriptors = Record<string, JsonSchemaToolDescriptor>;
 
+export interface JsonSchemaExecutableToolDescriptor extends JsonSchemaToolDescriptor {
+  execute?: (args: unknown) => Promise<unknown>;
+}
+
+export type JsonSchemaExecutableToolDescriptors = Record<
+  string,
+  JsonSchemaExecutableToolDescriptor
+>;
+
 export function generateTypesFromJsonSchema(tools: JsonSchemaToolDescriptors): string {
   let availableTools = '';
   let availableTypes = '';

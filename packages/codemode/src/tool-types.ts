@@ -2,7 +2,11 @@ import type { ToolSet } from 'ai';
 import { asSchema } from 'ai';
 import type { JSONSchema7 } from 'json-schema';
 import type { ZodType } from 'zod';
-import { type ConversionContext, jsonSchemaToTypeString } from './json-schema-types';
+import {
+  type ConversionContext,
+  jsonSchemaToTypeString,
+  type JsonSchemaExecutableToolDescriptors,
+} from './json-schema-types';
 import type { ToolFunction } from './types';
 import type { UnknownRecord } from './type-utils';
 import { escapeJsDoc, sanitizeToolName, toPascalCase } from './utils';
@@ -50,6 +54,19 @@ function isJsonSchemaWrapper(value: unknown): value is { jsonSchema: JSONSchema7
   return findJsonSchemaInSymbols(value) !== null;
 }
 
+function isJsonSchemaLike(value: unknown): value is JSONSchema7 {
+  if (value === null || typeof value !== 'object') return false;
+  const candidate = value as UnknownRecord;
+  return (
+    typeof candidate.type === 'string' ||
+    typeof candidate.properties === 'object' ||
+    typeof candidate.$ref === 'string' ||
+    Array.isArray(candidate.anyOf) ||
+    Array.isArray(candidate.oneOf) ||
+    Array.isArray(candidate.allOf)
+  );
+}
+
 function extractJsonSchema(wrapper: unknown): JSONSchema7 | null {
   if (wrapper === null || typeof wrapper !== 'object') return null;
   if ('jsonSchema' in wrapper) {
@@ -84,6 +101,14 @@ function extractDescriptions(schema: unknown): Record<string, string> {
         if (propSchema && typeof propSchema === 'object' && propSchema.description) {
           descriptions[fieldName] = propSchema.description;
         }
+      }
+    }
+  }
+
+  if (isJsonSchemaLike(schema) && schema.properties) {
+    for (const [fieldName, propSchema] of Object.entries(schema.properties)) {
+      if (propSchema && typeof propSchema === 'object' && propSchema.description) {
+        descriptions[fieldName] = propSchema.description;
       }
     }
   }
@@ -127,6 +152,17 @@ function safeSchemaToTs(schema: unknown, typeName: string): string {
         const typeBody = jsonSchemaToTypeString(jsonSchema, '', ctx);
         return `type ${typeName} = ${typeBody}`;
       }
+    }
+
+    if (isJsonSchemaLike(schema)) {
+      const ctx: ConversionContext = {
+        root: schema,
+        depth: 0,
+        seen: new Set(),
+        maxDepth: 20,
+      };
+      const typeBody = jsonSchemaToTypeString(schema, '', ctx);
+      return `type ${typeName} = ${typeBody}`;
     }
 
     return `type ${typeName} = unknown`;
@@ -179,7 +215,9 @@ function buildToolSignature(
   return { types, declaration };
 }
 
-export function generateTypes(tools: ToolDescriptors | ToolSet): string {
+export function generateTypes(
+  tools: ToolDescriptors | JsonSchemaExecutableToolDescriptors | ToolSet
+): string {
   let availableTools = '';
   let availableTypes = '';
 
