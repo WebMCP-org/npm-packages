@@ -112,7 +112,7 @@ const codemode = createCodeTool({
 });
 ```
 
-Same `createCodeTool` API as upstream — different executor.
+Same `createCodeTool` shape as upstream, plus a pluggable `normalizeCode` option.
 
 ## Executors
 
