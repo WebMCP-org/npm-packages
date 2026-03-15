@@ -207,6 +207,9 @@ importers:
 
   e2e/test-app:
     dependencies:
+      '@mcp-b/codemode':
+        specifier: workspace:*
+        version: link:../../packages/codemode
       '@mcp-b/global':
         specifier: workspace:*
         version: link:../../packages/global
@@ -225,6 +228,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: 'catalog:'
         version: 1.26.0(@cfworker/json-schema@4.1.1)(zod@3.25.76)
+      ai:
+        specifier: 'catalog:'
+        version: 5.0.154(zod@3.25.76)
       zod:
         specifier: 'catalog:'
         version: 3.25.76
@@ -682,13 +688,13 @@ importers:
       '@mcp-b/webmcp-types':
         specifier: workspace:*
         version: link:../webmcp-types
+    devDependencies:
       '@types/json-schema':
         specifier: ^7.0.15
         version: 7.0.15
       acorn:
         specifier: ^8.16.0
         version: 8.16.0
-    devDependencies:
       ai:
         specifier: 'catalog:'
         version: 5.0.154(zod@3.25.76)
