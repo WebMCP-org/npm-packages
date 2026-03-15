@@ -24,7 +24,7 @@
     "directory": "packages/webmcp-local-relay"
   },
   "bin": {
-    "webmcp-local-relay": "./dist/cli.js"
+    "webmcp-local-relay": "./dist/cli.mjs"
   },
   "files": [
     ".claude-plugin",
@@ -33,13 +33,13 @@
     "skills"
   ],
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "default": "./dist/index.js"
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
     }
   },
   "publishConfig": {

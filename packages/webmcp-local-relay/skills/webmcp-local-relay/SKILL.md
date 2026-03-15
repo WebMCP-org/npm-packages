@@ -62,11 +62,11 @@ pnpm --filter @mcp-b/webmcp-local-relay test:e2e
 Run relay manually during local development:
 
 ```bash
-node packages/webmcp-local-relay/dist/cli.js --host 127.0.0.1 --port 9333
+node packages/webmcp-local-relay/dist/cli.mjs --host 127.0.0.1 --port 9333
 ```
 
 If your widget uses a fixed origin, lock it down:
 
 ```bash
-node packages/webmcp-local-relay/dist/cli.js --host 127.0.0.1 --port 9333 --widget-origin https://your-widget-domain.example
+node packages/webmcp-local-relay/dist/cli.mjs --host 127.0.0.1 --port 9333 --widget-origin https://your-widget-domain.example
 ```
