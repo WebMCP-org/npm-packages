@@ -49,7 +49,7 @@ export default defineConfig({
 
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: `pnpm --filter mcp-tab-transport-test-app exec vite --port ${tabTransportPort}`,
+    command: `pnpm --filter mcp-tab-transport-test-app exec vp dev --port ${tabTransportPort}`,
     url: tabTransportBaseUrl,
     reuseExistingServer,
     timeout: 120 * 1000,
