@@ -14,14 +14,14 @@
 
 ## Why Use @mcp-b/extension-tools?
 
-| Feature | Benefit |
-|---------|---------|
-| **62+ Chrome APIs** | Comprehensive coverage of Chrome Extension APIs |
-| **AI-Ready** | Built for MCP, the standard for AI tool integration |
-| **Granular Control** | Enable only the APIs your extension needs |
+| Feature              | Benefit                                                |
+| -------------------- | ------------------------------------------------------ |
+| **62+ Chrome APIs**  | Comprehensive coverage of Chrome Extension APIs        |
+| **AI-Ready**         | Built for MCP, the standard for AI tool integration    |
+| **Granular Control** | Enable only the APIs your extension needs              |
 | **Permission Aware** | Automatic permission checking and clear error messages |
-| **Manifest V3** | Full support for Chrome's latest extension platform |
-| **TypeScript** | Complete type definitions for all 62+ APIs |
+| **Manifest V3**      | Full support for Chrome's latest extension platform    |
+| **TypeScript**       | Complete type definitions for all 62+ APIs             |
 
 ## Use Cases
 
@@ -547,6 +547,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ### Which AI agents can use these tools?
 
 Any MCP-compatible client, including:
+
 - **Claude Desktop** and Claude.ai
 - **Cursor** IDE
 - **VS Code Copilot**
@@ -559,8 +560,8 @@ No! Each API tool class accepts configuration options. Enable only what you need
 
 ```typescript
 new TabsApiTools(server, {
-  listActiveTabs: true,  // Only enable tab listing
-  createTab: false,      // Disable tab creation
+  listActiveTabs: true, // Only enable tab listing
+  createTab: false, // Disable tab creation
 });
 ```
 
@@ -578,13 +579,13 @@ The APIs target Chrome, but many also work in Firefox (via WebExtensions) and Ed
 
 ## Comparison with Alternatives
 
-| Feature | @mcp-b/extension-tools | Raw Chrome APIs | Puppeteer |
-|---------|------------------------|-----------------|-----------|
-| MCP Protocol Support | Yes | No | No |
-| Type Safety | Full TypeScript | Partial | Full |
-| Permission Handling | Automatic | Manual | N/A |
-| Error Formatting | Structured | Raw | Varies |
-| AI Agent Ready | Yes | Manual | Manual |
+| Feature              | @mcp-b/extension-tools | Raw Chrome APIs | Puppeteer |
+| -------------------- | ---------------------- | --------------- | --------- |
+| MCP Protocol Support | Yes                    | No              | No        |
+| Type Safety          | Full TypeScript        | Partial         | Full      |
+| Permission Handling  | Automatic              | Manual          | N/A       |
+| Error Formatting     | Structured             | Raw             | Varies    |
+| AI Agent Ready       | Yes                    | Manual          | Manual    |
 
 ## Related Packages
 

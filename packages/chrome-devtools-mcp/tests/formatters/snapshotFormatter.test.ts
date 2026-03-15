@@ -5,12 +5,12 @@
  */
 
 import assert from 'node:assert';
-import {describe, it} from 'node:test';
+import { describe, it } from 'node:test';
 
-import type {ElementHandle} from 'puppeteer-core';
+import type { ElementHandle } from 'puppeteer-core';
 
-import {SnapshotFormatter} from '../../src/formatters/snapshotFormatter.js';
-import type {TextSnapshot, TextSnapshotNode} from '../../src/McpContext.js';
+import { SnapshotFormatter } from '../../src/formatters/snapshotFormatter.js';
+import type { TextSnapshot, TextSnapshotNode } from '../../src/McpContext.js';
 
 describe('snapshotFormatter', () => {
   it('formats a snapshot with value properties', () => {
@@ -39,13 +39,13 @@ describe('snapshotFormatter', () => {
       },
     };
 
-    const formatter = new SnapshotFormatter({root: node} as TextSnapshot);
+    const formatter = new SnapshotFormatter({ root: node } as TextSnapshot);
     const formatted = formatter.toString();
     assert.strictEqual(
       formatted,
       `uid=1_1 textbox "textbox" details="details-id" errormessage="error-id" live="polite" relevant="additions" value="value"
   uid=1_2 statictext "text"
-`,
+`
     );
   });
 
@@ -73,13 +73,13 @@ describe('snapshotFormatter', () => {
       },
     };
 
-    const formatter = new SnapshotFormatter({root: node} as TextSnapshot);
+    const formatter = new SnapshotFormatter({ root: node } as TextSnapshot);
     const formatted = formatter.toString();
     assert.strictEqual(
       formatted,
       `uid=1_1 button "button" atomic busy disableable disabled
   uid=1_2 statictext "text"
-`,
+`
     );
   });
 
@@ -105,13 +105,13 @@ describe('snapshotFormatter', () => {
       },
     };
 
-    const formatter = new SnapshotFormatter({root: node} as TextSnapshot);
+    const formatter = new SnapshotFormatter({ root: node } as TextSnapshot);
     const formatted = formatter.toString();
     assert.strictEqual(
       formatted,
       `uid=1_1 checkbox "checkbox" checked
   uid=1_2 statictext "text"
-`,
+`
     );
   });
 
@@ -148,18 +148,18 @@ describe('snapshotFormatter', () => {
       },
     };
 
-    const formatter = new SnapshotFormatter({root: node} as TextSnapshot);
+    const formatter = new SnapshotFormatter({ root: node } as TextSnapshot);
     const formatted = formatter.toString();
     assert.strictEqual(
       formatted,
       `uid=1_1 root "root"
   uid=1_2 button "button" disableable disabled focusable focused
   uid=1_3 textbox "textbox" value="value"
-`,
+`
     );
   });
 
-  it('formats with DevTools data not included into a snapshot', t => {
+  it('formats with DevTools data not included into a snapshot', (t) => {
     const node: TextSnapshotNode = {
       id: '1_1',
       role: 'checkbox',
@@ -193,7 +193,7 @@ describe('snapshotFormatter', () => {
     t.assert.snapshot?.(formatted);
   });
 
-  it('does not include a note if the snapshot is already verbose', t => {
+  it('does not include a note if the snapshot is already verbose', (t) => {
     const node: TextSnapshotNode = {
       id: '1_1',
       role: 'checkbox',
@@ -227,7 +227,7 @@ describe('snapshotFormatter', () => {
     t.assert.snapshot?.(formatted);
   });
 
-  it('formats with DevTools data included into a snapshot', t => {
+  it('formats with DevTools data included into a snapshot', (t) => {
     const node: TextSnapshotNode = {
       id: '1_1',
       role: 'checkbox',
@@ -282,7 +282,7 @@ describe('snapshotFormatter', () => {
       elementHandle: async () => null,
     };
 
-    const formatter = new SnapshotFormatter({root: node} as TextSnapshot);
+    const formatter = new SnapshotFormatter({ root: node } as TextSnapshot);
     const json = formatter.toJSON();
 
     assert.deepStrictEqual(json, {

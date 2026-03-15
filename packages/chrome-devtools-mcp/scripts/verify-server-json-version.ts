@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {execSync} from 'node:child_process';
+import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -43,14 +43,14 @@ try {
 
   console.log(`Downloading ${binName} from ${downloadUrl}`);
   const downloadCmd = `curl -L "${downloadUrl}" | tar xz -C "${tmpDir}" ${binName}`;
-  execSync(downloadCmd, {stdio: 'inherit'});
+  execSync(downloadCmd, { stdio: 'inherit' });
 
   const publisherPath = path.join(tmpDir, binName);
   fs.chmodSync(publisherPath, 0o755);
   console.log(`Downloaded to ${publisherPath}`);
 
   // Create the new server.json in the temporary directory
-  execSync(`${publisherPath} init`, {cwd: tmpDir, stdio: 'inherit'});
+  execSync(`${publisherPath} init`, { cwd: tmpDir, stdio: 'inherit' });
 
   const newServerJsonPath = path.join(tmpDir, 'server.json');
   const newServerJson = JSON.parse(fs.readFileSync(newServerJsonPath, 'utf-8'));
@@ -67,11 +67,10 @@ try {
   if (diffProps.length) {
     throw new Error(
       `The following props in ${serverJsonFilePath} did not match the latest init value:\n${diffProps.map(
-        prop =>
-          `- "${prop}": expected "${newServerJson[prop]}", got "${serverJson[prop]}"`,
-      )}`,
+        (prop) => `- "${prop}": expected "${newServerJson[prop]}", got "${serverJson[prop]}"`
+      )}`
     );
   }
 } finally {
-  fs.rmSync(tmpDir, {recursive: true, force: true});
+  fs.rmSync(tmpDir, { recursive: true, force: true });
 }

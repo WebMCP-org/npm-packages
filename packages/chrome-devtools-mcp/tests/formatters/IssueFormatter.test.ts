@@ -5,13 +5,13 @@
  */
 
 import assert from 'node:assert';
-import {describe, it, beforeEach, afterEach} from 'node:test';
+import { describe, it, beforeEach, afterEach } from 'node:test';
 
 import sinon from 'sinon';
 
-import {IssueFormatter} from '../../src/formatters/IssueFormatter.js';
-import {ISSUE_UTILS} from '../../src/issue-descriptions.js';
-import {getMockAggregatedIssue} from '../utils.js';
+import { IssueFormatter } from '../../src/formatters/IssueFormatter.js';
+import { ISSUE_UTILS } from '../../src/issue-descriptions.js';
+import { getMockAggregatedIssue } from '../utils.js';
 
 describe('IssueFormatter', () => {
   let getIssueDescriptionStub: sinon.SinonStub;
@@ -26,13 +26,13 @@ describe('IssueFormatter', () => {
 
   function formatterTestConcise(
     label: string,
-    setup: (t: it.TestContext) => Promise<IssueFormatter>,
+    setup: (t: it.TestContext) => Promise<IssueFormatter>
   ) {
-    it(label + ' toString', async t => {
+    it(label + ' toString', async (t) => {
       const formatter = await setup(t);
       t.assert.snapshot?.(formatter.toString());
     });
-    it(label + ' toJSON', async t => {
+    it(label + ' toJSON', async (t) => {
       const formatter = await setup(t);
       t.assert.snapshot?.(JSON.stringify(formatter.toJSON(), null, 2));
     });
@@ -40,13 +40,13 @@ describe('IssueFormatter', () => {
 
   function formatterTestDetailed(
     label: string,
-    setup: (t: it.TestContext) => Promise<IssueFormatter>,
+    setup: (t: it.TestContext) => Promise<IssueFormatter>
   ) {
-    it(label + ' toStringDetailed', async t => {
+    it(label + ' toStringDetailed', async (t) => {
       const formatter = await setup(t);
       t.assert.snapshot?.(formatter.toStringDetailed());
     });
-    it(label + ' toJSONDetailed', async t => {
+    it(label + ' toJSONDetailed', async (t) => {
       const formatter = await setup(t);
       t.assert.snapshot?.(JSON.stringify(formatter.toJSONDetailed(), null, 2));
     });
@@ -65,7 +65,7 @@ describe('IssueFormatter', () => {
     const mockDescription = {
       file: 'mock.md',
       links: [
-        {link: 'http://example.com/learnmore', linkTitle: 'Learn more'},
+        { link: 'http://example.com/learnmore', linkTitle: 'Learn more' },
         {
           link: 'http://example.com/another-learnmore',
           linkTitle: 'Learn more 2',
@@ -76,12 +76,9 @@ describe('IssueFormatter', () => {
     // @ts-expect-error generic issue stub bypass
     mockAggregatedIssue.getGenericIssues.returns(new Set([testGenericIssue]));
 
-    const mockDescriptionFileContent =
-      '# Mock Issue Title\n\nThis is a mock issue description';
+    const mockDescriptionFileContent = '# Mock Issue Title\n\nThis is a mock issue description';
 
-    getIssueDescriptionStub
-      .withArgs('mock.md')
-      .returns(mockDescriptionFileContent);
+    getIssueDescriptionStub.withArgs('mock.md').returns(mockDescriptionFileContent);
 
     return new IssueFormatter(mockAggregatedIssue, {
       id: 5,
@@ -95,11 +92,9 @@ describe('IssueFormatter', () => {
       links: [],
     });
     mockAggregatedIssue.getAggregatedIssuesCount.returns(5);
-    getIssueDescriptionStub
-      .withArgs('mock.md')
-      .returns('# Issue Title\n\nIssue content');
+    getIssueDescriptionStub.withArgs('mock.md').returns('# Issue Title\n\nIssue content');
 
-    return new IssueFormatter(mockAggregatedIssue, {id: 1});
+    return new IssueFormatter(mockAggregatedIssue, { id: 1 });
   });
 
   formatterTestDetailed('formats a detailed issue', async () => {
@@ -114,7 +109,7 @@ describe('IssueFormatter', () => {
     const mockAggregatedIssue = getMockAggregatedIssue();
     const mockDescription = {
       file: 'mock.md',
-      links: [{link: 'http://example.com', linkTitle: 'Link 1'}],
+      links: [{ link: 'http://example.com', linkTitle: 'Link 1' }],
       substitutions: new Map([['PLACEHOLDER_VALUE', 'sub value']]),
     };
     mockAggregatedIssue.getDescription.returns(mockDescription);
@@ -124,9 +119,7 @@ describe('IssueFormatter', () => {
     const mockDescriptionFileContent =
       '# Mock Issue Title\n\nThis is a mock issue description {PLACEHOLDER_VALUE}';
 
-    getIssueDescriptionStub
-      .withArgs('mock.md')
-      .returns(mockDescriptionFileContent);
+    getIssueDescriptionStub.withArgs('mock.md').returns(mockDescriptionFileContent);
 
     return new IssueFormatter(mockAggregatedIssue, {
       id: 5,
@@ -139,7 +132,7 @@ describe('IssueFormatter', () => {
       const mockAggregatedIssue = getMockAggregatedIssue();
       mockAggregatedIssue.getDescription.returns(null);
 
-      const formatter = new IssueFormatter(mockAggregatedIssue, {id: 1});
+      const formatter = new IssueFormatter(mockAggregatedIssue, { id: 1 });
       assert.strictEqual(formatter.isValid(), false);
     });
 
@@ -151,7 +144,7 @@ describe('IssueFormatter', () => {
       });
       getIssueDescriptionStub.withArgs('mock.md').returns(null);
 
-      const formatter = new IssueFormatter(mockAggregatedIssue, {id: 1});
+      const formatter = new IssueFormatter(mockAggregatedIssue, { id: 1 });
       assert.strictEqual(formatter.isValid(), false);
     });
 
@@ -161,11 +154,9 @@ describe('IssueFormatter', () => {
         file: 'mock.md',
         links: [],
       });
-      getIssueDescriptionStub
-        .withArgs('mock.md')
-        .returns('No title test {PLACEHOLDER_VALUE}');
+      getIssueDescriptionStub.withArgs('mock.md').returns('No title test {PLACEHOLDER_VALUE}');
 
-      const formatter = new IssueFormatter(mockAggregatedIssue, {id: 1});
+      const formatter = new IssueFormatter(mockAggregatedIssue, { id: 1 });
       assert.strictEqual(formatter.isValid(), false);
     });
 
@@ -177,11 +168,9 @@ describe('IssueFormatter', () => {
         substitutions: new Map([['PLACEHOLDER_VALUE', 'substitution value']]),
       });
 
-      getIssueDescriptionStub
-        .withArgs('mock.md')
-        .returns('No title test {WRONG_PLACEHOLDER}');
+      getIssueDescriptionStub.withArgs('mock.md').returns('No title test {WRONG_PLACEHOLDER}');
 
-      const formatter = new IssueFormatter(mockAggregatedIssue, {id: 1});
+      const formatter = new IssueFormatter(mockAggregatedIssue, { id: 1 });
       assert.strictEqual(formatter.isValid(), false);
     });
 
@@ -196,7 +185,7 @@ describe('IssueFormatter', () => {
         .withArgs('mock.md')
         .returns('# Valid Title\n\nContent {PLACEHOLDER_VALUE}');
 
-      const formatter = new IssueFormatter(mockAggregatedIssue, {id: 1});
+      const formatter = new IssueFormatter(mockAggregatedIssue, { id: 1 });
       assert.strictEqual(formatter.isValid(), true);
 
       // Verify usage of substitutions in detailed output

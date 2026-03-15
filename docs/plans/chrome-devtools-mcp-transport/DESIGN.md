@@ -19,6 +19,7 @@
 ## 1. Problem Statement
 
 Currently, there's a gap between:
+
 - **Local MCP clients** (Claude Desktop, AI coding assistants) that use chrome-devtools-mcp for browser automation
 - **WebMCP tools** registered on webpages via `@mcp-b/global` that are only accessible within the browser
 
@@ -73,6 +74,7 @@ Create a **CDP-based bridge** that connects local MCP clients to WebMCP servers 
 **Decision**: Don't create a new CDP-specific transport in `@mcp-b/global`. Instead, inject a bridge that acts as a TabClient.
 
 **Rationale**:
+
 - Zero changes to `@mcp-b/global` or `@mcp-b/transports`
 - Leverages battle-tested postMessage protocol
 - Server-ready handshake works naturally
@@ -83,6 +85,7 @@ Create a **CDP-based bridge** that connects local MCP clients to WebMCP servers 
 **Decision**: The injected bridge script has no MCP knowledge. It simply ferries JSON between CDP and postMessage.
 
 **Rationale**:
+
 - Minimal injected code footprint
 - No version coupling between bridge and MCP protocol
 - Easy to debug and maintain
@@ -93,6 +96,7 @@ Create a **CDP-based bridge** that connects local MCP clients to WebMCP servers 
 **Decision**: Maintain a fork of chrome-devtools-mcp within the npm-packages monorepo using git subtree.
 
 **Rationale**:
+
 - Can pull upstream changes easily
 - Can add WebMCP-specific features
 - Publishable to npm as a separate package
@@ -103,6 +107,7 @@ Create a **CDP-based bridge** that connects local MCP clients to WebMCP servers 
 **Decision**: Require explicit `connect_webmcp` before using website tools, rather than auto-connecting.
 
 **Rationale**:
+
 - User knows when CDP resources are being used
 - Clear lifecycle (connect/use/disconnect)
 - Avoids overhead on pages without WebMCP
@@ -177,6 +182,7 @@ npm-packages/
 **Purpose**: Injected into page to ferry messages between CDP and TabServerTransport.
 
 **Injected Globals**:
+
 ```typescript
 window.__mcpBridge = {
   toServer(payloadJson: string): void;  // CDP calls this to send to TabServer
@@ -188,6 +194,7 @@ window.__mcpBridgeToClient: (payloadJson: string) => void;  // Set by CDP bindin
 ```
 
 **Message Flow**:
+
 ```
 CDP → Page:
   Runtime.evaluate("__mcpBridge.toServer('{...}')")
@@ -203,6 +210,7 @@ Page → CDP:
 ```
 
 **Protocol Compatibility**:
+
 ```typescript
 // Message format (matches TabServerTransport exactly)
 interface TabMessage {
@@ -218,6 +226,7 @@ interface TabMessage {
 **Purpose**: MCP Transport implementation for use in chrome-devtools-mcp.
 
 **Interface**:
+
 ```typescript
 interface Transport {
   start(): Promise<void>;
@@ -231,6 +240,7 @@ interface Transport {
 ```
 
 **Lifecycle**:
+
 ```
 1. start()
    ├── Create CDPSession via page.createCDPSession()
@@ -251,13 +261,14 @@ interface Transport {
 ```
 
 **Error Handling**:
+
 ```typescript
 // Timeout for server ready
-readyTimeout: 10000  // 10 seconds default
+readyTimeout: 10000; // 10 seconds default
 
 // Retry logic for CDP operations
-maxRetries: 3
-retryDelay: 1000  // 1 second
+maxRetries: 3;
+retryDelay: 1000; // 1 second
 
 // Graceful handling of page navigation
 // (Re-inject bridge on navigation if needed)
@@ -266,6 +277,7 @@ retryDelay: 1000  // 1 second
 ### 2.3 WebMCP Tools
 
 **connect_webmcp**:
+
 ```typescript
 {
   name: 'connect_webmcp',
@@ -282,6 +294,7 @@ retryDelay: 1000  // 1 second
 ```
 
 **list_webmcp_tools**:
+
 ```typescript
 {
   name: 'list_webmcp_tools',
@@ -296,6 +309,7 @@ retryDelay: 1000  // 1 second
 ```
 
 **call_webmcp_tool**:
+
 ```typescript
 {
   name: 'call_webmcp_tool',
@@ -313,6 +327,7 @@ retryDelay: 1000  // 1 second
 ```
 
 **disconnect_webmcp**:
+
 ```typescript
 {
   name: 'disconnect_webmcp',
@@ -329,6 +344,7 @@ retryDelay: 1000  // 1 second
 ### 2.4 McpContext Extensions
 
 **New Fields**:
+
 ```typescript
 // Added to McpContext class
 private _webMCPClient: Client | null = null;
@@ -341,6 +357,7 @@ clearWebMCPClient(): Promise<void>;
 ```
 
 **Page Navigation Handling**:
+
 ```typescript
 // When page navigates, the bridge is lost
 // Listen for page navigation events and clear the client
@@ -356,6 +373,7 @@ page.on('framenavigated', async (frame) => {
 ### 3.1 Origin Validation
 
 The TabServerTransport already validates origins. The bridge respects this:
+
 ```javascript
 // Bridge only listens to same-origin messages
 if (event.origin !== window.location.origin) return;
@@ -364,14 +382,16 @@ if (event.origin !== window.location.origin) return;
 ### 3.2 CDP Session Isolation
 
 Each page gets its own CDP session and bridge instance:
+
 - No cross-page message leakage
 - Clean teardown on disconnect
 
 ### 3.3 Binding Namespace
 
 Use unique binding names to avoid conflicts:
+
 ```typescript
-const BINDING_NAME = '__mcpBridgeToClient';  // Prefixed with __
+const BINDING_NAME = '__mcpBridgeToClient'; // Prefixed with __
 ```
 
 ## 4. Testing Strategy
@@ -415,6 +435,7 @@ git subtree add --prefix=packages/chrome-devtools-mcp cdp-upstream main --squash
 ```
 
 **Why Git Subtree?**
+
 - Allows modifications within monorepo
 - Easy to pull upstream changes: `git subtree pull --prefix=packages/chrome-devtools-mcp cdp-upstream main --squash`
 - No submodule complexity
@@ -423,6 +444,7 @@ git subtree add --prefix=packages/chrome-devtools-mcp cdp-upstream main --squash
 ### Step 0.2: Adapt Package for Monorepo
 
 1. Update `package.json`:
+
    ```json
    {
      "name": "@mcp-b/chrome-devtools-mcp",
@@ -436,6 +458,7 @@ git subtree add --prefix=packages/chrome-devtools-mcp cdp-upstream main --squash
 2. Update `tsconfig.json` to extend monorepo base
 
 3. Add to `pnpm-workspace.yaml`:
+
    ```yaml
    packages:
      - 'packages/chrome-devtools-mcp'
@@ -460,6 +483,7 @@ git checkout -b upstream/chrome-devtools-mcp
 **File**: `packages/chrome-devtools-mcp/src/transports/WebMCPBridgeScript.ts`
 
 **Tasks**:
+
 - [ ] Implement bridge IIFE as template string
 - [ ] Handle all message directions
 - [ ] Add error handling for missing bindings
@@ -472,6 +496,7 @@ git checkout -b upstream/chrome-devtools-mcp
 **File**: `packages/chrome-devtools-mcp/src/transports/WebMCPClientTransport.ts`
 
 **Tasks**:
+
 - [ ] Implement Transport interface
 - [ ] CDP session management
 - [ ] Binding setup and event handling
@@ -486,6 +511,7 @@ git checkout -b upstream/chrome-devtools-mcp
 **File**: `packages/chrome-devtools-mcp/src/transports/__tests__/WebMCPClientTransport.test.ts`
 
 **Tasks**:
+
 - [ ] Mock Puppeteer Page and CDPSession
 - [ ] Test start() lifecycle
 - [ ] Test send() message flow
@@ -499,6 +525,7 @@ git checkout -b upstream/chrome-devtools-mcp
 **File**: `packages/chrome-devtools-mcp/src/tools/categories.ts`
 
 **Tasks**:
+
 - [ ] Add `WEBMCP = 'webmcp'` category
 - [ ] Update category documentation
 
@@ -507,6 +534,7 @@ git checkout -b upstream/chrome-devtools-mcp
 **File**: `packages/chrome-devtools-mcp/src/McpContext.ts`
 
 **Tasks**:
+
 - [ ] Add `_webMCPClient` and `_webMCPTransport` fields
 - [ ] Add getter/setter/clear methods
 - [ ] Handle page navigation cleanup
@@ -516,6 +544,7 @@ git checkout -b upstream/chrome-devtools-mcp
 **File**: `packages/chrome-devtools-mcp/src/tools/webmcp.ts`
 
 **Tasks**:
+
 - [ ] Implement `connect_webmcp`
 - [ ] Implement `list_webmcp_tools`
 - [ ] Implement `call_webmcp_tool`
@@ -526,6 +555,7 @@ git checkout -b upstream/chrome-devtools-mcp
 **File**: `packages/chrome-devtools-mcp/src/tools/tools.ts`
 
 **Tasks**:
+
 - [ ] Import webmcp tools
 - [ ] Add to tools array
 - [ ] Add category flag for enabling/disabling
@@ -535,6 +565,7 @@ git checkout -b upstream/chrome-devtools-mcp
 ### Step 3.1: Integration Test Setup
 
 **Tasks**:
+
 - [ ] Create test page with `@mcp-b/global` and sample tools
 - [ ] Set up Puppeteer test harness
 - [ ] Create test fixtures for common scenarios
@@ -542,6 +573,7 @@ git checkout -b upstream/chrome-devtools-mcp
 ### Step 3.2: Integration Tests
 
 **Tasks**:
+
 - [ ] Test connect/disconnect lifecycle
 - [ ] Test tool listing
 - [ ] Test tool execution with various return types
@@ -551,6 +583,7 @@ git checkout -b upstream/chrome-devtools-mcp
 ### Step 3.3: E2E Testing
 
 **Tasks**:
+
 - [ ] Manual testing with MCP Inspector
 - [ ] Test with Claude Desktop (if available)
 - [ ] Document any edge cases found
@@ -560,6 +593,7 @@ git checkout -b upstream/chrome-devtools-mcp
 ### Step 4.1: Documentation
 
 **Tasks**:
+
 - [ ] Update package README
 - [ ] Add usage examples
 - [ ] Document configuration options
@@ -568,6 +602,7 @@ git checkout -b upstream/chrome-devtools-mcp
 ### Step 4.2: Changeset & Release
 
 **Tasks**:
+
 - [ ] Create changeset: `pnpm changeset`
 - [ ] Update version
 - [ ] Publish to npm
@@ -577,6 +612,7 @@ git checkout -b upstream/chrome-devtools-mcp
 ### Step 5.1: Prepare PR
 
 **Tasks**:
+
 - [ ] Extract WebMCP-specific changes as patches
 - [ ] Create clean PR branch from upstream
 - [ ] Apply changes
@@ -585,6 +621,7 @@ git checkout -b upstream/chrome-devtools-mcp
 ### Step 5.2: Submit & Iterate
 
 **Tasks**:
+
 - [ ] Open PR on ChromeDevTools/chrome-devtools-mcp
 - [ ] Address review feedback
 - [ ] Update fork based on any required changes
@@ -676,12 +713,12 @@ git log --oneline packages/chrome-devtools-mcp
 
 ## Appendix C: Error Scenarios
 
-| Scenario | Detection | Handling |
-|----------|-----------|----------|
-| Page has no WebMCP | `navigator.modelContext` undefined | Return helpful error message |
-| Server not ready (timeout) | Promise timeout after 10s | Clean up, throw error |
-| Page navigates during use | `framenavigated` event | Clear client, notify via onclose |
-| CDP session disconnected | CDP error events | Clean up, throw error |
-| Tool execution fails | `isError: true` in response | Pass through to caller |
-| Invalid JSON from bridge | JSON.parse throws | Fire onerror callback |
-| Bridge script injection fails | page.evaluate throws | Clean up, throw error |
+| Scenario                      | Detection                          | Handling                         |
+| ----------------------------- | ---------------------------------- | -------------------------------- |
+| Page has no WebMCP            | `navigator.modelContext` undefined | Return helpful error message     |
+| Server not ready (timeout)    | Promise timeout after 10s          | Clean up, throw error            |
+| Page navigates during use     | `framenavigated` event             | Clear client, notify via onclose |
+| CDP session disconnected      | CDP error events                   | Clean up, throw error            |
+| Tool execution fails          | `isError: true` in response        | Pass through to caller           |
+| Invalid JSON from bridge      | JSON.parse throws                  | Fire onerror callback            |
+| Bridge script injection fails | page.evaluate throws               | Clean up, throw error            |

@@ -3,23 +3,22 @@
   "version": "0.0.0-beta-20260109203913",
   "description": "Claude Code skill for setting up WebMCP - browser-native MCP integration for web applications",
   "keywords": [
+    "browser-automation",
     "claude",
     "claude-code",
-    "skill",
-    "webmcp",
     "mcp",
-    "browser-automation",
+    "model-context-protocol",
     "react-hooks",
-    "model-context-protocol"
+    "skill",
+    "webmcp"
   ],
+  "license": "MIT",
+  "author": "WebMCP",
   "repository": {
     "type": "git",
     "url": "https://github.com/WebMCP-org/npm-packages.git",
     "directory": "skills/webmcp-setup"
   },
-  "license": "MIT",
-  "author": "WebMCP",
-  "type": "module",
   "files": [
     "SKILL.md",
     "references",
@@ -28,10 +27,11 @@
     "README.md",
     "CHANGELOG.md"
   ],
-  "scripts": {
-    "test": "echo \"Tests not yet implemented\" && exit 0"
-  },
+  "type": "module",
   "publishConfig": {
     "access": "public"
+  },
+  "scripts": {
+    "test": "echo \"Tests not yet implemented\" && exit 0"
   }
 }

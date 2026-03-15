@@ -3,47 +3,54 @@
   "version": "2.2.0",
   "description": "Token-efficient DOM extraction for AI agents - Extract interactive elements, semantic structure, and stable CSS selectors for LLM-powered browser automation",
   "keywords": [
+    "ai",
+    "ai-agents",
+    "anthropic",
+    "browser",
+    "browser-automation",
+    "chatgpt",
+    "claude",
+    "css-selector",
+    "dom",
+    "dom-parser",
+    "extraction",
+    "iframe",
+    "interactive",
+    "llm",
     "mcp",
     "model-context-protocol",
-    "browser",
-    "dom",
-    "extraction",
-    "ai",
-    "selector",
-    "interactive",
-    "semantic",
-    "llm",
-    "claude",
-    "chatgpt",
     "openai",
-    "anthropic",
-    "web-scraping",
-    "css-selector",
-    "xpath",
-    "browser-automation",
-    "puppeteer",
     "playwright",
-    "ai-agents",
-    "token-efficient",
-    "dom-parser",
-    "web-ai",
-    "userscript",
+    "puppeteer",
+    "selector",
+    "semantic",
     "shadow-dom",
-    "iframe"
+    "token-efficient",
+    "userscript",
+    "web-ai",
+    "web-scraping",
+    "xpath"
   ],
   "homepage": "https://docs.mcp-b.ai/packages/smart-dom-reader",
   "bugs": {
     "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },
+  "license": "MIT",
+  "author": "Alex Nahas",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/WebMCP-org/npm-packages.git",
     "directory": "packages/smart-dom-reader"
   },
-  "license": "MIT",
-  "author": "Alex Nahas",
-  "sideEffects": true,
+  "files": [
+    "dist"
+  ],
   "type": "module",
+  "sideEffects": true,
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "browser": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -54,22 +61,19 @@
       "import": "./dist/bundle-string.js"
     }
   },
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "browser": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "files": [
-    "dist"
-  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "scripts": {
     "prebuild": "pnpm build:bundle && node generate-bundle-module.mjs",
-    "build": "tsdown",
-    "build:bundle": "vite build --config vite.config.bundle.ts",
+    "build": "vp pack",
+    "build:bundle": "vp build --config vite.config.bundle.ts",
     "bundle:mcp": "pnpm --filter @mcp-b/smart-dom-reader build && pnpm --filter @mcp-b/smart-dom-reader-server bundle",
-    "check": "biome check --write .",
-    "clean": "rm -rf dist .turbo",
-    "format": "biome format --write .",
-    "lint": "biome lint --write .",
+    "check": "vp check --fix",
+    "clean": "rm -rf dist",
+    "format": "vp fmt --write",
+    "lint": "vp lint --fix",
     "prepublishOnly": "node ../../scripts/validate-publish.js && pnpm run build",
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
@@ -81,10 +85,10 @@
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "tsdown": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
-    "vite-plugin-monkey": "catalog:"
+    "vite-plugin-monkey": "catalog:",
+    "vite-plus": "catalog:"
   },
   "peerDependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0"
@@ -93,9 +97,5 @@
     "@modelcontextprotocol/sdk": {
       "optional": true
     }
-  },
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
   }
 }

@@ -46,20 +46,21 @@ pnpm test:e2e:tarball:global
 ```
 
 Notes:
+
 - `pnpm test:e2e` is the canonical zero-mock umbrella and runs sequentially for stability.
 - `pnpm test:e2e:ui`, `pnpm test:e2e:headed`, and `pnpm test:e2e:debug` drive the Playwright `e2e/` package only. They do not run the relay, DevTools, or extension package E2E lanes.
 
 ## Runtime Coverage Matrix
 
-| Runtime | Canonical caller | Real runtime boundary under test | Command |
-| --- | --- | --- | --- |
-| Tab / global | SDK `Client` + `TabClientTransport` | Browser page running `@mcp-b/global` | `pnpm --filter mcp-e2e-tests test:runtime-contract` |
-| Iframe | SDK `Client` + `IframeParentTransport` | Parent/iframe runtime boundary | `pnpm --filter mcp-e2e-tests test:runtime-contract` |
-| Native Chromium | `navigator.modelContext` / `navigator.modelContextTesting` | Native browser API | `pnpm --filter mcp-e2e-tests test:native-contract:default` |
-| Native Chromium (flagged) | `navigator.modelContext` / `navigator.modelContextTesting` | Chrome Beta with WebMCP flags | `pnpm --filter mcp-e2e-tests test:native-contract:beta` |
-| Local relay | SDK `Client` over stdio | Real relay server + real browser runtime | `pnpm --filter @mcp-b/webmcp-local-relay test:e2e` |
-| DevTools bridge | SDK `Client` + `WebMCPClientTransport` | Real page discovered through DevTools bridge | `pnpm --filter @mcp-b/chrome-devtools-mcp test:e2e` |
-| Extension transport | SDK `Client` + `ExtensionClientTransport` | Real MV3 extension using `ExtensionServerTransport` | `pnpm --filter @mcp-b/extension-tools test:e2e` |
+| Runtime                   | Canonical caller                                           | Real runtime boundary under test                    | Command                                                    |
+| ------------------------- | ---------------------------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------- |
+| Tab / global              | SDK `Client` + `TabClientTransport`                        | Browser page running `@mcp-b/global`                | `pnpm --filter mcp-e2e-tests test:runtime-contract`        |
+| Iframe                    | SDK `Client` + `IframeParentTransport`                     | Parent/iframe runtime boundary                      | `pnpm --filter mcp-e2e-tests test:runtime-contract`        |
+| Native Chromium           | `navigator.modelContext` / `navigator.modelContextTesting` | Native browser API                                  | `pnpm --filter mcp-e2e-tests test:native-contract:default` |
+| Native Chromium (flagged) | `navigator.modelContext` / `navigator.modelContextTesting` | Chrome Beta with WebMCP flags                       | `pnpm --filter mcp-e2e-tests test:native-contract:beta`    |
+| Local relay               | SDK `Client` over stdio                                    | Real relay server + real browser runtime            | `pnpm --filter @mcp-b/webmcp-local-relay test:e2e`         |
+| DevTools bridge           | SDK `Client` + `WebMCPClientTransport`                     | Real page discovered through DevTools bridge        | `pnpm --filter @mcp-b/chrome-devtools-mcp test:e2e`        |
+| Extension transport       | SDK `Client` + `ExtensionClientTransport`                  | Real MV3 extension using `ExtensionServerTransport` | `pnpm --filter @mcp-b/extension-tools test:e2e`            |
 
 ## Canonical E2E Assertions
 
@@ -73,12 +74,14 @@ Every canonical runtime suite is expected to prove all of the following against 
 6. Runtime-thrown tool errors propagate to the caller.
 
 The shared browser/server fixture lives in `e2e/runtime-contract/` and defines the deterministic tool set:
+
 - `echo`
 - `sum`
 - `dynamic_tool`
 - `always_fail`
 
 The shared test-only hook is `window.__WEBMCP_E2E__` / `globalThis.__WEBMCP_E2E__` with:
+
 - `isReady()`
 - `registerDynamicTool()`
 - `unregisterDynamicTool(name?)`
@@ -94,6 +97,7 @@ These are useful and still required, but they are not the canonical E2E gate.
 `pnpm --filter mcp-e2e-tests test:integration:runtime-api`
 
 This lane keeps direct runtime and demo validation for:
+
 - `e2e/tests/tab-transport.spec.ts`
 - `e2e/tests/mcp-iframe-element.spec.ts`
 - `e2e/tests/chromium-native-api.spec.ts`
@@ -112,6 +116,7 @@ This lane covers framework-level integrations such as React hooks and validation
 The canonical runtime gate lives in `.github/workflows/e2e.yml`.
 
 The workflow runs:
+
 1. `pnpm test:e2e`
 2. Native contract on default Chromium
 3. Native contract on Chrome Beta with WebMCP flags
@@ -123,6 +128,7 @@ The workflow runs:
 ## Extension Transport Testing
 
 Extension transport E2E is no longer future work. The fixture is a real MV3 extension built into `packages/extension-tools/dist/e2e-extension` and exercised with:
+
 - real background service worker
 - real `ExtensionServerTransport`
 - real extension page client using `ExtensionClientTransport`
@@ -169,6 +175,7 @@ lsof -ti:4173 | xargs kill
 ### Chrome Beta Native Contract Lane
 
 The flagged native lane requires Chrome Beta with:
+
 - `--enable-experimental-web-platform-features`
 - `--enable-features=WebMCPTesting`
 

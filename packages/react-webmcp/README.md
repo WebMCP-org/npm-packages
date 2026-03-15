@@ -14,13 +14,13 @@
 
 ## Why Use @mcp-b/react-webmcp?
 
-| Feature | Benefit |
-|---------|---------|
-| **React-First Design** | Hooks follow React patterns with automatic cleanup and StrictMode support |
-| **Type-Safe with Zod** | Full TypeScript support with Zod schema validation for inputs/outputs |
-| **Two-Way Integration** | Both expose tools TO AI agents AND consume tools FROM MCP servers |
-| **Execution State Tracking** | Built-in loading, success, and error states for UI feedback |
-| **Works with Any AI** | Compatible with Claude, ChatGPT, Gemini, Cursor, Copilot, and any MCP client |
+| Feature                      | Benefit                                                                      |
+| ---------------------------- | ---------------------------------------------------------------------------- |
+| **React-First Design**       | Hooks follow React patterns with automatic cleanup and StrictMode support    |
+| **Type-Safe with Zod**       | Full TypeScript support with Zod schema validation for inputs/outputs        |
+| **Two-Way Integration**      | Both expose tools TO AI agents AND consume tools FROM MCP servers            |
+| **Execution State Tracking** | Built-in loading, success, and error states for UI feedback                  |
+| **Works with Any AI**        | Compatible with Claude, ChatGPT, Gemini, Cursor, Copilot, and any MCP client |
 
 ## Installation
 
@@ -31,6 +31,7 @@ pnpm add @mcp-b/react-webmcp zod
 If you only want strict core WebMCP hooks (without MCP-B extension APIs like prompts/resources/sampling/elicitation), use `usewebmcp` instead.
 
 For client functionality, you'll also need:
+
 ```bash
 pnpm add @mcp-b/transports @modelcontextprotocol/sdk
 ```
@@ -103,7 +104,9 @@ function ToolConsumer() {
     <div>
       <p>Connected: {isConnected ? 'Yes' : 'No'}</p>
       <p>Available Tools: {tools.length}</p>
-      <button onClick={handleCallTool} disabled={!isConnected}>Call Tool</button>
+      <button onClick={handleCallTool} disabled={!isConnected}>
+        Call Tool
+      </button>
     </div>
   );
 }
@@ -113,17 +116,17 @@ function ToolConsumer() {
 
 ### Provider Hooks
 
-| Hook | Description |
-|------|-------------|
-| `useWebMCP(config, deps?)` | Register a tool with full control over behavior and state |
-| `useWebMCPContext(name, description, getValue)` | Simplified hook for read-only context exposure |
+| Hook                                            | Description                                               |
+| ----------------------------------------------- | --------------------------------------------------------- |
+| `useWebMCP(config, deps?)`                      | Register a tool with full control over behavior and state |
+| `useWebMCPContext(name, description, getValue)` | Simplified hook for read-only context exposure            |
 
 ### Client Hooks
 
-| Hook / Component | Description |
-|-------------------|-------------|
-| `McpClientProvider` | Provider component managing an MCP client connection |
-| `useMcpClient()` | Access client, tools, connection status, and capabilities |
+| Hook / Component    | Description                                               |
+| ------------------- | --------------------------------------------------------- |
+| `McpClientProvider` | Provider component managing an MCP client connection      |
+| `useMcpClient()`    | Access client, tools, connection status, and capabilities |
 
 ## Zod Version Compatibility
 

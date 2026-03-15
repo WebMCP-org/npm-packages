@@ -25,7 +25,7 @@ import path from 'node:path';
 
 import commonjs from '@rollup/plugin-commonjs';
 import json from '@rollup/plugin-json';
-import {nodeResolve} from '@rollup/plugin-node-resolve';
+import { nodeResolve } from '@rollup/plugin-node-resolve';
 import cleanup from 'rollup-plugin-cleanup';
 import license from 'rollup-plugin-license';
 
@@ -43,8 +43,8 @@ const allowedLicenses = [
 
 const thirdPartyDir = './build/src/third_party';
 
-const {devDependencies = {}} = JSON.parse(
-  fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf-8'),
+const { devDependencies = {} } = JSON.parse(
+  fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf-8')
 );
 
 // special case for puppeteer, from which we only bundle puppeteer-core
@@ -56,8 +56,7 @@ const aggregatedStats = {
   bundledPackages: new Set(),
 };
 
-const projectNodeModulesPath =
-  path.join(process.cwd(), 'node_modules') + path.sep;
+const projectNodeModulesPath = path.join(process.cwd(), 'node_modules') + path.sep;
 
 function getPackageName(modulePath) {
   // Handle rollup's virtual module paths (paths starting with 0x00)
@@ -66,9 +65,7 @@ function getPackageName(modulePath) {
     return null;
   }
 
-  const relativePath = modulePath.slice(
-    projectNodeModulesPath.length + absolutePathStart,
-  );
+  const relativePath = modulePath.slice(projectNodeModulesPath.length + absolutePathStart);
   const segments = relativePath.split(path.sep);
 
   // handle scoped packages
@@ -89,7 +86,7 @@ function listBundledDeps() {
       for (const chunk of Object.values(bundle)) {
         if (chunk.type === 'chunk' && chunk.modules) {
           // chunk.modules is an object where keys are the absolute file paths
-          Object.keys(chunk.modules).forEach(modulePath => {
+          Object.keys(chunk.modules).forEach((modulePath) => {
             const packageName = getPackageName(modulePath);
             if (packageName) {
               aggregatedStats.bundledPackages.add(packageName);
@@ -108,8 +105,8 @@ function listBundledDeps() {
             ([name]) =>
               aggregatedStats.bundledPackages.has(name) ||
               name === 'chrome-devtools-frontend' ||
-              name === 'lighthouse',
-          ),
+              name === 'lighthouse'
+          )
         );
 
         fs.writeFileSync(outputPath, JSON.stringify(bundledDevDeps, null, 2));
@@ -126,11 +123,7 @@ const seenDependencies = new Map();
  * @param {import('rollup').ExternalOption} [external=[]]
  * @returns {import('rollup').RollupOptions}
  */
-const bundleDependency = (
-  wrapperIndexName,
-  extraOutputOptions = {},
-  external = [],
-) => ({
+const bundleDependency = (wrapperIndexName, extraOutputOptions = {}, external = []) => ({
   input: path.join(thirdPartyDir, wrapperIndexName),
   output: {
     ...extraOutputOptions,
@@ -148,7 +141,7 @@ const bundleDependency = (
     license({
       thirdParty: {
         allow: {
-          test: dependency => {
+          test: (dependency) => {
             return allowedLicenses.includes(dependency.license);
           },
           failOnUnlicensed: true,
@@ -162,43 +155,38 @@ const bundleDependency = (
               seenDependencies.set(key, dependency);
             }
 
-            const stringifiedDependencies = Array.from(
-              seenDependencies.values(),
-            ).map(dependency => {
-              let arr = [];
-              arr.push(`Name: ${dependency.name ?? 'N/A'}`);
-              let url = dependency.homepage ?? dependency.repository;
-              if (url !== null && typeof url !== 'string') {
-                url = url.url;
+            const stringifiedDependencies = Array.from(seenDependencies.values()).map(
+              (dependency) => {
+                let arr = [];
+                arr.push(`Name: ${dependency.name ?? 'N/A'}`);
+                let url = dependency.homepage ?? dependency.repository;
+                if (url !== null && typeof url !== 'string') {
+                  url = url.url;
+                }
+                arr.push(`URL: ${url ?? 'N/A'}`);
+                arr.push(`Version: ${dependency.version ?? 'N/A'}`);
+                arr.push(`License: ${dependency.license ?? 'N/A'}`);
+                if (dependency.licenseText !== null) {
+                  arr.push('');
+                  arr.push(dependency.licenseText.replaceAll('\r', ''));
+                }
+                return arr.join('\n');
               }
-              arr.push(`URL: ${url ?? 'N/A'}`);
-              arr.push(`Version: ${dependency.version ?? 'N/A'}`);
-              arr.push(`License: ${dependency.license ?? 'N/A'}`);
-              if (dependency.licenseText !== null) {
-                arr.push('');
-                arr.push(dependency.licenseText.replaceAll('\r', ''));
-              }
-              return arr.join('\n');
-            });
+            );
 
             // Manual license handling for chrome-devtools-frontend third_party
             const tsConfig = JSON.parse(
-              fs.readFileSync(
-                path.join(process.cwd(), 'tsconfig.json'),
-                'utf-8',
-              ),
+              fs.readFileSync(path.join(process.cwd(), 'tsconfig.json'), 'utf-8')
             );
-            const thirdPartyDirectories = tsConfig.include.filter(location =>
-              location.includes(
-                'node_modules/chrome-devtools-frontend/front_end/third_party',
-              ),
+            const thirdPartyDirectories = tsConfig.include.filter((location) =>
+              location.includes('node_modules/chrome-devtools-frontend/front_end/third_party')
             );
 
             const manualLicenses = [];
             // Add chrome-devtools-frontend main license
             const cdtfLicensePath = path.join(
               process.cwd(),
-              'node_modules/chrome-devtools-frontend/LICENSE',
+              'node_modules/chrome-devtools-frontend/LICENSE'
             );
             if (fs.existsSync(cdtfLicensePath)) {
               manualLicenses.push(
@@ -207,14 +195,14 @@ const bundleDependency = (
                   'License: Apache-2.0',
                   '',
                   fs.readFileSync(cdtfLicensePath, 'utf-8'),
-                ].join('\n'),
+                ].join('\n')
               );
             }
 
             // Add chrome-devtools-frontend main license
             const lighthouseLicensePath = path.join(
               process.cwd(),
-              'node_modules/lighthouse/LICENSE',
+              'node_modules/lighthouse/LICENSE'
             );
             if (fs.existsSync(lighthouseLicensePath)) {
               manualLicenses.push(
@@ -223,7 +211,7 @@ const bundleDependency = (
                   'License: Apache-2.0',
                   '',
                   fs.readFileSync(lighthouseLicensePath, 'utf-8'),
-                ].join('\n'),
+                ].join('\n')
               );
             }
 
@@ -238,7 +226,7 @@ const bundleDependency = (
                     `License:`,
                     '',
                     fs.readFileSync(licenseFile, 'utf-8').replaceAll('\r', ''),
-                  ].join('\n'),
+                  ].join('\n')
                 );
               }
             }
@@ -247,8 +235,7 @@ const bundleDependency = (
               stringifiedDependencies.push(...manualLicenses);
             }
 
-            const divider =
-              '\n\n-------------------- DEPENDENCY DIVIDER --------------------\n\n';
+            const divider = '\n\n-------------------- DEPENDENCY DIVIDER --------------------\n\n';
             return stringifiedDependencies.join(divider);
           },
         },
@@ -269,11 +256,7 @@ export default [
       inlineDynamicImports: true,
     },
     (source, importer, _isResolved) => {
-      if (
-        source === 'yargs' &&
-        importer &&
-        importer.includes('puppeteer-core')
-      ) {
+      if (source === 'yargs' && importer && importer.includes('puppeteer-core')) {
         return true;
       }
 
@@ -287,13 +270,13 @@ export default [
         return true;
       }
       return false;
-    },
+    }
   ),
   bundleDependency(
     'devtools-formatter-worker.js',
     {
       inlineDynamicImports: true,
     },
-    (_source, _importer, _isResolved) => false,
+    (_source, _importer, _isResolved) => false
   ),
 ];

@@ -5,6 +5,7 @@ This package contains the Playwright-driven browser runtime contract lanes for t
 ## What This Package Covers
 
 `pnpm --filter mcp-e2e-tests test` runs the canonical Playwright runtime-contract lane for:
+
 - tab/global runtime
 - iframe runtime
 - native Chromium runtime
@@ -12,6 +13,7 @@ This package contains the Playwright-driven browser runtime contract lanes for t
 This package also keeps non-canonical integration lanes for direct runtime APIs, demos, and framework integrations.
 
 Other canonical runtime E2E lanes live in package-specific commands:
+
 - `pnpm --filter @mcp-b/webmcp-local-relay test:e2e`
 - `pnpm --filter @mcp-b/chrome-devtools-mcp test:e2e`
 - `pnpm --filter @mcp-b/extension-tools test:e2e`
@@ -19,6 +21,7 @@ Other canonical runtime E2E lanes live in package-specific commands:
 ## Canonical E2E Definition
 
 A test is canonical E2E only if it proves:
+
 1. tools are registered inside the real runtime
 2. tools are discovered through the runtime's public boundary
 3. tools are called through that same boundary
@@ -59,12 +62,14 @@ e2e/
 The shared runtime fixture lives in `e2e/runtime-contract/`.
 
 It registers the same deterministic tool set everywhere:
+
 - `echo`
 - `sum`
 - `dynamic_tool`
 - `always_fail`
 
 It also exposes the test-only hook `window.__WEBMCP_E2E__` / `globalThis.__WEBMCP_E2E__` with:
+
 - `isReady()`
 - `registerDynamicTool()`
 - `unregisterDynamicTool(name?)`
@@ -119,6 +124,7 @@ pnpm test:chrome-beta:webmcp
 ## Canonical Assertions
 
 The browser runtime-contract specs assert the same contract everywhere:
+
 1. initial discovery returns the expected tools
 2. a successful call returns the expected payload
 3. the runtime records the invocation
@@ -129,6 +135,7 @@ The browser runtime-contract specs assert the same contract everywhere:
 ## Runtime API Integration Lanes
 
 These suites remain valuable, but they are not the default E2E definition:
+
 - `tests/tab-transport.spec.ts`
 - `tests/mcp-iframe-element.spec.ts`
 - `tests/chromium-native-api.spec.ts`
@@ -143,6 +150,7 @@ pnpm --filter mcp-tab-transport-test-app dev
 ```
 
 Then open:
+
 - `http://localhost:5173/runtime-contract.html`
 - `http://localhost:5173/runtime-contract-iframe-client.html`
 
@@ -153,6 +161,7 @@ These pages host the shared runtime contract used by the Playwright lane.
 ### Port Already in Use
 
 The Playwright tab/global runtime-contract lane uses:
+
 - `PLAYWRIGHT_TAB_TRANSPORT_PORT=4173`
 - `PLAYWRIGHT_REUSE_SERVER=1` to explicitly reuse an already-running server
 

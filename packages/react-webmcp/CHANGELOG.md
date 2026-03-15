@@ -114,7 +114,7 @@
 
   ```javascript
   window.webMCP.registerTool({
-    name: "my_tool",
+    name: 'my_tool',
     // ...
   });
   ```
@@ -123,7 +123,7 @@
 
   ```javascript
   navigator.modelContext.registerTool({
-    name: "my_tool",
+    name: 'my_tool',
     // ...
   });
   ```
@@ -191,11 +191,11 @@
   ```tsx
   useWebMCP(
     {
-      name: "sites_query",
+      name: 'sites_query',
       description: `Query sites. Current count: ${sites.length}`,
       handler: async () => ({ sites }),
     },
-    [sites], // Re-register when sites changes
+    [sites] // Re-register when sites changes
   );
   ```
 
@@ -243,16 +243,16 @@
 
   ```tsx
   // Better: derived primitives minimize re-registrations
-  const siteIds = sites.map((s) => s.id).join(",");
+  const siteIds = sites.map((s) => s.id).join(',');
   const siteCount = sites.length;
 
   useWebMCP(
     {
-      name: "sites_query",
-      description: "...",
+      name: 'sites_query',
+      description: '...',
       handler: async () => ({ sites }),
     },
-    [siteCount, siteIds], // Only re-register when these primitives change
+    [siteCount, siteIds] // Only re-register when these primitives change
   );
   ```
 
@@ -277,11 +277,11 @@
   ```tsx
   useWebMCP(
     {
-      name: "sites_query",
+      name: 'sites_query',
       description: `Query sites. Current count: ${sites.length}`,
       handler: async () => ({ sites }),
     },
-    [sites], // Re-register when sites changes
+    [sites] // Re-register when sites changes
   );
   ```
 
@@ -298,11 +298,11 @@
 
   ```tsx
   // Better: derived primitives minimize re-registrations
-  const siteIds = sites.map((s) => s.id).join(",");
-  useWebMCP(
-    { name: "sites_query", description: "...", handler: async () => ({}) },
-    [sites.length, siteIds],
-  );
+  const siteIds = sites.map((s) => s.id).join(',');
+  useWebMCP({ name: 'sites_query', description: '...', handler: async () => ({}) }, [
+    sites.length,
+    siteIds,
+  ]);
   ```
 
 ## 0.2.2

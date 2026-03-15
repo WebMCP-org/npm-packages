@@ -17,14 +17,16 @@ When using with `inject_webmcp_script`, imports are automatically bundled via es
 Wait for an element to appear in the DOM using MutationObserver (more efficient than polling).
 
 ```typescript
-function waitForElement(selector: string, timeout?: number): Promise<Element>
+function waitForElement(selector: string, timeout?: number): Promise<Element>;
 ```
 
 **Parameters:**
+
 - `selector` - CSS selector to match
 - `timeout` - Maximum wait time in ms (default: 5000)
 
 **Example:**
+
 ```typescript
 const button = await waitForElement('.submit-btn');
 const modal = await waitForElement('[data-testid="modal"]', 10000);
@@ -35,10 +37,11 @@ const modal = await waitForElement('[data-testid="modal"]', 10000);
 Wait for an element to be removed from the DOM.
 
 ```typescript
-function waitForElementRemoved(selector: string, timeout?: number): Promise<void>
+function waitForElementRemoved(selector: string, timeout?: number): Promise<void>;
 ```
 
 **Example:**
+
 ```typescript
 await waitForElementRemoved('.loading-spinner');
 // Spinner is gone, proceed
@@ -49,10 +52,11 @@ await waitForElementRemoved('.loading-spinner');
 Click an element by selector. Waits for element if not immediately present.
 
 ```typescript
-function clickElement(selector: string, timeout?: number): Promise<void>
+function clickElement(selector: string, timeout?: number): Promise<void>;
 ```
 
 **Example:**
+
 ```typescript
 await clickElement('#submit-button');
 await clickElement('[aria-label="Close"]');
@@ -67,16 +71,18 @@ function typeText(
   selector: string,
   text: string,
   options?: { clear?: boolean; timeout?: number }
-): Promise<void>
+): Promise<void>;
 ```
 
 **Parameters:**
+
 - `selector` - CSS selector for input/textarea
 - `text` - Text to type
 - `options.clear` - Clear existing value first (default: true)
 - `options.timeout` - Max wait for element (default: 5000)
 
 **Example:**
+
 ```typescript
 await typeText('#search-input', 'hello world');
 await typeText('#email', 'test@example.com', { clear: true });
@@ -87,10 +93,11 @@ await typeText('#email', 'test@example.com', { clear: true });
 Select an option from a `<select>` element by value.
 
 ```typescript
-function selectOption(selector: string, value: string, timeout?: number): Promise<void>
+function selectOption(selector: string, value: string, timeout?: number): Promise<void>;
 ```
 
 **Example:**
+
 ```typescript
 await selectOption('#country', 'US');
 ```
@@ -100,10 +107,11 @@ await selectOption('#country', 'US');
 Get trimmed text content from an element.
 
 ```typescript
-function getText(selectorOrElement: string | Element): string | null
+function getText(selectorOrElement: string | Element): string | null;
 ```
 
 **Example:**
+
 ```typescript
 const title = getText('.page-title');
 const text = getText(someElement);
@@ -114,13 +122,14 @@ const text = getText(someElement);
 Get all elements matching a selector as an array.
 
 ```typescript
-function getAllElements(selector: string): Element[]
+function getAllElements(selector: string): Element[];
 ```
 
 **Example:**
+
 ```typescript
 const items = getAllElements('.list-item');
-items.forEach(item => console.log(getText(item)));
+items.forEach((item) => console.log(getText(item)));
 ```
 
 ### isVisible
@@ -128,10 +137,11 @@ items.forEach(item => console.log(getText(item)));
 Check if an element is visible (has dimensions and not hidden via CSS).
 
 ```typescript
-function isVisible(selectorOrElement: string | Element): boolean
+function isVisible(selectorOrElement: string | Element): boolean;
 ```
 
 **Example:**
+
 ```typescript
 if (isVisible('.modal')) {
   // Modal is showing
@@ -147,10 +157,11 @@ function scrollIntoView(
   selector: string,
   options?: ScrollIntoViewOptions,
   timeout?: number
-): Promise<void>
+): Promise<void>;
 ```
 
 **Example:**
+
 ```typescript
 await scrollIntoView('#footer');
 await scrollIntoView('.item', { behavior: 'smooth', block: 'center' });
@@ -161,7 +172,7 @@ await scrollIntoView('.item', { behavior: 'smooth', block: 'center' });
 Get the value of a form field (input, select, or textarea).
 
 ```typescript
-function getFieldValue(selector: string): string | null
+function getFieldValue(selector: string): string | null;
 ```
 
 ### isChecked / setChecked
@@ -169,11 +180,12 @@ function getFieldValue(selector: string): string | null
 Check or set the state of checkboxes/radio buttons.
 
 ```typescript
-function isChecked(selector: string): boolean
-function setChecked(selector: string, checked: boolean, timeout?: number): Promise<void>
+function isChecked(selector: string): boolean;
+function setChecked(selector: string, checked: boolean, timeout?: number): Promise<void>;
 ```
 
 **Example:**
+
 ```typescript
 if (!isChecked('#agree-terms')) {
   await setChecked('#agree-terms', true);
@@ -187,12 +199,13 @@ if (!isChecked('#agree-terms')) {
 Create a text response for tool handlers.
 
 ```typescript
-function textResponse(text: string): ToolResponse
+function textResponse(text: string): ToolResponse;
 ```
 
 **Example:**
+
 ```typescript
-execute: async () => textResponse('Hello, world!')
+execute: async () => textResponse('Hello, world!');
 ```
 
 ### jsonResponse
@@ -200,12 +213,13 @@ execute: async () => textResponse('Hello, world!')
 Create a JSON response (pretty-printed).
 
 ```typescript
-function jsonResponse(data: unknown, indent?: number): ToolResponse
+function jsonResponse(data: unknown, indent?: number): ToolResponse;
 ```
 
 **Example:**
+
 ```typescript
-execute: async () => jsonResponse({ items: [1, 2, 3], count: 3 })
+execute: async () => jsonResponse({ items: [1, 2, 3], count: 3 });
 ```
 
 ### errorResponse
@@ -213,15 +227,16 @@ execute: async () => jsonResponse({ items: [1, 2, 3], count: 3 })
 Create an error response with `isError: true`.
 
 ```typescript
-function errorResponse(message: string): ToolResponse
+function errorResponse(message: string): ToolResponse;
 ```
 
 **Example:**
+
 ```typescript
 execute: async () => {
   if (!user) return errorResponse('User not found');
   return textResponse('Success');
-}
+};
 ```
 
 ### multiTextResponse
@@ -229,7 +244,7 @@ execute: async () => {
 Create a response with multiple text items.
 
 ```typescript
-function multiTextResponse(texts: string[]): ToolResponse
+function multiTextResponse(texts: string[]): ToolResponse;
 ```
 
 ### listResponse
@@ -240,14 +255,15 @@ Create a response from an array with optional header and empty message.
 function listResponse(
   items: unknown[],
   options?: { header?: string; empty?: string }
-): ToolResponse
+): ToolResponse;
 ```
 
 **Example:**
+
 ```typescript
 return listResponse(results, {
   header: 'Found items:',
-  empty: 'No items found'
+  empty: 'No items found',
 });
 ```
 
@@ -256,7 +272,7 @@ return listResponse(results, {
 Create an image response (base64 encoded).
 
 ```typescript
-function imageResponse(base64Data: string, mimeType?: string): ToolResponse
+function imageResponse(base64Data: string, mimeType?: string): ToolResponse;
 ```
 
 ### messageWithData
@@ -264,10 +280,11 @@ function imageResponse(base64Data: string, mimeType?: string): ToolResponse
 Combine a message with structured data.
 
 ```typescript
-function messageWithData(message: string, data: unknown): ToolResponse
+function messageWithData(message: string, data: unknown): ToolResponse;
 ```
 
 **Example:**
+
 ```typescript
 return messageWithData('Found 3 results:', { results, total: 3 });
 ```
@@ -283,17 +300,18 @@ function retryUntil<T>(
   fn: () => Promise<T>,
   predicate: (result: T) => boolean,
   options?: RetryOptions
-): Promise<T>
+): Promise<T>;
 
 interface RetryOptions {
-  maxAttempts?: number;      // Default: 3
-  delay?: number;            // Default: 100ms
+  maxAttempts?: number; // Default: 3
+  delay?: number; // Default: 100ms
   exponentialBackoff?: boolean;
-  maxDelay?: number;         // Default: 5000ms
+  maxDelay?: number; // Default: 5000ms
 }
 ```
 
 **Example:**
+
 ```typescript
 const data = await retryUntil(
   () => fetchData(),
@@ -307,15 +325,13 @@ const data = await retryUntil(
 Retry a function that may throw.
 
 ```typescript
-function retry<T>(fn: () => Promise<T>, options?: RetryOptions): Promise<T>
+function retry<T>(fn: () => Promise<T>, options?: RetryOptions): Promise<T>;
 ```
 
 **Example:**
+
 ```typescript
-const data = await retry(
-  () => riskyApiCall(),
-  { maxAttempts: 3, delay: 500 }
-);
+const data = await retry(() => riskyApiCall(), { maxAttempts: 3, delay: 500 });
 ```
 
 ### pollUntil
@@ -327,10 +343,11 @@ function pollUntil(
   condition: () => boolean | Promise<boolean>,
   timeout?: number,
   interval?: number
-): Promise<void>
+): Promise<void>;
 ```
 
 **Example:**
+
 ```typescript
 await pollUntil(() => window.myApp?.initialized === true, 10000);
 ```
@@ -340,7 +357,7 @@ await pollUntil(() => window.myApp?.initialized === true, 10000);
 Wait for a duration. Use sparingly - prefer waitForElement or pollUntil.
 
 ```typescript
-function sleep(ms: number): Promise<void>
+function sleep(ms: number): Promise<void>;
 ```
 
 ### debounce / throttle
@@ -348,8 +365,8 @@ function sleep(ms: number): Promise<void>
 Rate-limiting utilities.
 
 ```typescript
-function debounce<T extends Function>(fn: T, delay: number): T
-function throttle<T extends Function>(fn: T, interval: number): T
+function debounce<T extends Function>(fn: T, delay: number): T;
+function throttle<T extends Function>(fn: T, interval: number): T;
 ```
 
 ## Complete Example
@@ -371,8 +388,8 @@ navigator.modelContext.registerTool({
   inputSchema: {
     type: 'object',
     properties: {
-      limit: { type: 'number', description: 'Max items' }
-    }
+      limit: { type: 'number', description: 'Max items' },
+    },
   },
   execute: async ({ limit = 10 }) => {
     try {
@@ -381,16 +398,16 @@ navigator.modelContext.registerTool({
 
       // Get items
       const elements = getAllElements('.item').slice(0, limit);
-      const items = elements.map(el => ({
+      const items = elements.map((el) => ({
         title: getText(el.querySelector('.title')),
-        price: getText(el.querySelector('.price'))
+        price: getText(el.querySelector('.price')),
       }));
 
       return jsonResponse(items);
     } catch (error) {
       return errorResponse(`Failed to get items: ${error}`);
     }
-  }
+  },
 });
 
 navigator.modelContext.registerTool({
@@ -399,9 +416,9 @@ navigator.modelContext.registerTool({
   inputSchema: {
     type: 'object',
     properties: {
-      itemId: { type: 'string', description: 'Item ID' }
+      itemId: { type: 'string', description: 'Item ID' },
     },
-    required: ['itemId']
+    required: ['itemId'],
   },
   execute: async ({ itemId }) => {
     try {
@@ -410,6 +427,6 @@ navigator.modelContext.registerTool({
     } catch (error) {
       return errorResponse(`Could not add item: ${error}`);
     }
-  }
+  },
 });
 ```

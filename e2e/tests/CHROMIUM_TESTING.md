@@ -29,6 +29,7 @@ pnpm test:native-contract:beta
 ```
 
 This uses `playwright-chrome-beta-webmcp.config.ts` with:
+
 - `--enable-experimental-web-platform-features`
 - `--enable-features=WebMCPTesting`
 
@@ -37,6 +38,7 @@ This uses `playwright-chrome-beta-webmcp.config.ts` with:
 For tab, iframe, relay, DevTools, and extension runtimes, the canonical caller is an SDK `Client` over the runtime's real transport.
 
 For native Chromium, the real public boundary is the browser API itself. The canonical contract therefore uses:
+
 - `navigator.modelContext.registerTool(...)`
 - `navigator.modelContext.unregisterTool(...)`
 - `navigator.modelContextTesting.listTools()`
@@ -47,6 +49,7 @@ That is intentional and is the only exception to the SDK-client rule.
 ## Canonical Assertions
 
 The native contract lane proves that:
+
 1. tool registration is visible through the browser API
 2. tool execution works through `modelContextTesting.executeTool(...)`
 3. dynamic registration and unregistration are reflected in `listTools()`
@@ -65,6 +68,7 @@ pnpm test:integration:runtime-api
 ```
 
 They cover suites such as:
+
 - `tests/chrome-beta-webmcp.spec.ts`
 - `tests/chromium-native-api.spec.ts`
 - `playwright-native-showcase.config.ts`
@@ -72,6 +76,7 @@ They cover suites such as:
 ## API Surface Validated
 
 ### `navigator.modelContext`
+
 - `provideContext(context)`
 - `registerTool(tool)`
 - `unregisterTool(name)`
@@ -79,6 +84,7 @@ They cover suites such as:
 - `listTools()`
 
 ### `navigator.modelContextTesting`
+
 - `executeTool(toolName, inputArgsJson, options?) => Promise<string | null>`
 - `listTools() => Array<{ name: string; description: string; inputSchema?: string }>`
 - `registerToolsChangedCallback(callback) => void`

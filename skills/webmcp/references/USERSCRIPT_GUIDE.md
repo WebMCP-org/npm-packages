@@ -6,6 +6,7 @@ Build MCP tools for websites you don't control (GitHub, Notion, Twitter, etc.).
 
 Userscripts let you add MCP tools to any website without modifying its source code.
 The `inject_webmcp_script` tool handles everything:
+
 1. Checks if the page already has WebMCP
 2. Injects the @mcp-b/global polyfill if needed
 3. **Auto-bundles TypeScript** (.ts/.tsx) via esbuild
@@ -20,8 +21,8 @@ For quick iterations, use inline code directly:
 
 ```javascript
 inject_webmcp_script({
-  code: `navigator.modelContext.registerTool({...});`
-})
+  code: `navigator.modelContext.registerTool({...});`,
+});
 ```
 
 ### Production Development (TypeScript Files)
@@ -37,12 +38,12 @@ navigator.modelContext.registerTool({
   execute: async () => {
     const el = await waitForElement('.data');
     return jsonResponse({ data: el.textContent });
-  }
+  },
 });
 ```
 
 ```javascript
-inject_webmcp_script({ file_path: './mysite.ts' })
+inject_webmcp_script({ file_path: './mysite.ts' });
 // TypeScript auto-bundled, imports resolved
 ```
 
@@ -61,8 +62,9 @@ take_snapshot()
 ```
 
 Look for:
+
 - CSS selectors for key elements
-- Data attributes (data-*, aria-*)
+- Data attributes (data-_, aria-_)
 - IDs and classes
 - Page structure
 
@@ -77,9 +79,9 @@ navigator.modelContext.registerTool({
     const title = document.querySelector('[itemprop="name"] a')?.textContent;
     const stars = document.querySelector('#repo-stars-counter-star')?.textContent;
     return {
-      content: [{ type: 'text', text: JSON.stringify({ title, stars }) }]
+      content: [{ type: 'text', text: JSON.stringify({ title, stars }) }],
     };
-  }
+  },
 });
 ```
 
@@ -108,6 +110,7 @@ list_console_messages()
 ```
 
 Look for:
+
 - JavaScript errors
 - CSP violations
 - Selector errors
@@ -121,11 +124,13 @@ Fix issues and reinject. The old script is automatically replaced.
 ### Robust Selectors
 
 Prefer:
+
 - Data attributes: `[data-testid="button"]`
 - ARIA attributes: `[aria-label="Close"]`
 - Semantic HTML: `nav`, `article`, `main`
 
 Avoid:
+
 - Generated class names: `.css-1abc2def`
 - Deeply nested paths: `div > div > div > span`
 - Position-based: `:nth-child(3)`
@@ -142,7 +147,7 @@ const value = element?.textContent?.trim() || 'Not found';
 ```javascript
 const description = element.textContent?.trim().substring(0, 500);
 return {
-  content: [{ type: 'text', text: description + (description.length >= 500 ? '...' : '') }]
+  content: [{ type: 'text', text: description + (description.length >= 500 ? '...' : '') }],
 };
 ```
 
@@ -162,7 +167,7 @@ execute: async () => {
 
   // Now scrape
   return jsonResponse({ text: content.textContent });
-}
+};
 ```
 
 **Without helpers** (inline code):
@@ -170,7 +175,7 @@ execute: async () => {
 ```javascript
 execute: async () => {
   // Wait for element to appear
-  await new Promise(resolve => {
+  await new Promise((resolve) => {
     const check = setInterval(() => {
       if (document.querySelector('.dynamic-content')) {
         clearInterval(check);
@@ -183,7 +188,7 @@ execute: async () => {
   // Now scrape
   const content = document.querySelector('.dynamic-content');
   // ...
-}
+};
 ```
 
 ### Group Related Tools
@@ -191,12 +196,12 @@ execute: async () => {
 ```javascript
 // Good: Tools that work together
 const tools = [
-  { name: 'search_repos', /* ... */ },
-  { name: 'get_repo_info', /* ... */ },
-  { name: 'get_readme', /* ... */ }
+  { name: 'search_repos' /* ... */ },
+  { name: 'get_repo_info' /* ... */ },
+  { name: 'get_readme' /* ... */ },
 ];
 
-tools.forEach(tool => navigator.modelContext.registerTool(tool));
+tools.forEach((tool) => navigator.modelContext.registerTool(tool));
 console.log(`[WebMCP] Registered ${tools.length} GitHub tools`);
 ```
 
@@ -205,6 +210,7 @@ console.log(`[WebMCP] Registered ${tools.length} GitHub tools`);
 You can only access what the logged-in user can see.
 
 For auth-required pages:
+
 1. User logs in manually
 2. Agent navigates to target page
 3. Agent injects and uses tools
@@ -219,11 +225,11 @@ navigator.modelContext.registerTool({
     if (!loggedIn) {
       return {
         content: [{ type: 'text', text: 'Please log in first' }],
-        isError: true
+        isError: true,
       };
     }
     // Proceed with scraping...
-  }
+  },
 });
 ```
 
@@ -232,12 +238,14 @@ navigator.modelContext.registerTool({
 Some sites block inline scripts via Content Security Policy.
 
 **Error example:**
+
 ```
 Refused to execute inline script because it violates the following
 Content Security Policy directive: "script-src 'self'"
 ```
 
 **Solutions:**
+
 1. Use browser extension approach (future feature)
 2. Try on a different domain/page
 3. Report in TROUBLESHOOTING.md
@@ -257,8 +265,8 @@ navigator.modelContext.registerTool({
   inputSchema: {
     type: 'object',
     properties: {
-      limit: { type: 'number', description: 'Max tweets (default: 10)' }
-    }
+      limit: { type: 'number', description: 'Max tweets (default: 10)' },
+    },
   },
   execute: async ({ limit = 10 }) => {
     const tweets = [];
@@ -274,9 +282,9 @@ navigator.modelContext.registerTool({
     });
 
     return {
-      content: [{ type: 'text', text: JSON.stringify(tweets, null, 2) }]
+      content: [{ type: 'text', text: JSON.stringify(tweets, null, 2) }],
     };
-  }
+  },
 });
 
 // Navigate to profile
@@ -286,14 +294,14 @@ navigator.modelContext.registerTool({
   inputSchema: {
     type: 'object',
     properties: {
-      username: { type: 'string', description: 'Twitter username' }
+      username: { type: 'string', description: 'Twitter username' },
     },
-    required: ['username']
+    required: ['username'],
   },
   execute: async ({ username }) => {
     window.location.href = `https://twitter.com/${username.replace('@', '')}`;
     return { content: [{ type: 'text', text: `Navigating to @${username}...` }] };
-  }
+  },
 });
 
 console.log('[WebMCP] Twitter tools registered');

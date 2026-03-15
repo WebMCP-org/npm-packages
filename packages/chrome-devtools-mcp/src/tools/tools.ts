@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {ParsedArguments} from '../bin/chrome-devtools-mcp-cli-options.js';
+import type { ParsedArguments } from '../bin/chrome-devtools-mcp-cli-options.js';
 
 import * as consoleTools from './console.js';
 import * as emulationTools from './emulation.js';
@@ -21,7 +21,7 @@ import * as scriptTools from './script.js';
 import * as slimTools from './slim/tools.js';
 import * as snapshotTools from './snapshot.js';
 import * as webmcpTools from './webmcp.js';
-import type {ToolDefinition} from './ToolDefinition.js';
+import type { ToolDefinition } from './ToolDefinition.js';
 
 export const createTools = (args: ParsedArguments) => {
   const rawTools = args.slim

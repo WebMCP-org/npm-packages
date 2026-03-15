@@ -73,7 +73,7 @@
 
   ```javascript
   window.webMCP.registerTool({
-    name: "my_tool",
+    name: 'my_tool',
     // ...
   });
   ```
@@ -82,7 +82,7 @@
 
   ```javascript
   navigator.modelContext.registerTool({
-    name: "my_tool",
+    name: 'my_tool',
     // ...
   });
   ```

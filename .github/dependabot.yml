@@ -1,121 +1,121 @@
 version: 2
 updates:
   # Published packages only (excluding chrome-devtools-mcp)
-  - package-ecosystem: "npm"
-    directory: "/packages/extension-tools"
+  - package-ecosystem: 'npm'
+    directory: '/packages/extension-tools'
     schedule:
-      interval: "weekly"
+      interval: 'weekly'
     commit-message:
-      prefix: "chore(deps)"
+      prefix: 'chore(deps)'
     labels:
-      - "dependencies"
-      - "packages/extension-tools"
+      - 'dependencies'
+      - 'packages/extension-tools'
     ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
 
-  - package-ecosystem: "npm"
-    directory: "/packages/global"
+  - package-ecosystem: 'npm'
+    directory: '/packages/global'
     schedule:
-      interval: "weekly"
+      interval: 'weekly'
     commit-message:
-      prefix: "chore(deps)"
+      prefix: 'chore(deps)'
     labels:
-      - "dependencies"
-      - "packages/global"
+      - 'dependencies'
+      - 'packages/global'
     ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
 
-  - package-ecosystem: "npm"
-    directory: "/packages/mcp-iframe"
+  - package-ecosystem: 'npm'
+    directory: '/packages/mcp-iframe'
     schedule:
-      interval: "weekly"
+      interval: 'weekly'
     commit-message:
-      prefix: "chore(deps)"
+      prefix: 'chore(deps)'
     labels:
-      - "dependencies"
-      - "packages/mcp-iframe"
+      - 'dependencies'
+      - 'packages/mcp-iframe'
     ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
 
-  - package-ecosystem: "npm"
-    directory: "/packages/react-webmcp"
+  - package-ecosystem: 'npm'
+    directory: '/packages/react-webmcp'
     schedule:
-      interval: "weekly"
+      interval: 'weekly'
     commit-message:
-      prefix: "chore(deps)"
+      prefix: 'chore(deps)'
     labels:
-      - "dependencies"
-      - "packages/react-webmcp"
+      - 'dependencies'
+      - 'packages/react-webmcp'
     ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
 
-  - package-ecosystem: "npm"
-    directory: "/packages/smart-dom-reader"
+  - package-ecosystem: 'npm'
+    directory: '/packages/smart-dom-reader'
     schedule:
-      interval: "weekly"
+      interval: 'weekly'
     commit-message:
-      prefix: "chore(deps)"
+      prefix: 'chore(deps)'
     labels:
-      - "dependencies"
-      - "packages/smart-dom-reader"
+      - 'dependencies'
+      - 'packages/smart-dom-reader'
     ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
 
-  - package-ecosystem: "npm"
-    directory: "/packages/transports"
+  - package-ecosystem: 'npm'
+    directory: '/packages/transports'
     schedule:
-      interval: "weekly"
+      interval: 'weekly'
     commit-message:
-      prefix: "chore(deps)"
+      prefix: 'chore(deps)'
     labels:
-      - "dependencies"
-      - "packages/transports"
+      - 'dependencies'
+      - 'packages/transports'
     ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
 
-  - package-ecosystem: "npm"
-    directory: "/packages/usewebmcp"
+  - package-ecosystem: 'npm'
+    directory: '/packages/usewebmcp'
     schedule:
-      interval: "weekly"
+      interval: 'weekly'
     commit-message:
-      prefix: "chore(deps)"
+      prefix: 'chore(deps)'
     labels:
-      - "dependencies"
-      - "packages/usewebmcp"
+      - 'dependencies'
+      - 'packages/usewebmcp'
     ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
 
-  - package-ecosystem: "npm"
-    directory: "/packages/webmcp-ts-sdk"
+  - package-ecosystem: 'npm'
+    directory: '/packages/webmcp-ts-sdk'
     schedule:
-      interval: "weekly"
+      interval: 'weekly'
     commit-message:
-      prefix: "chore(deps)"
+      prefix: 'chore(deps)'
     labels:
-      - "dependencies"
-      - "packages/webmcp-ts-sdk"
+      - 'dependencies'
+      - 'packages/webmcp-ts-sdk'
     ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
 
   # GitHub Actions
-  - package-ecosystem: "github-actions"
-    directory: "/"
+  - package-ecosystem: 'github-actions'
+    directory: '/'
     schedule:
-      interval: "weekly"
+      interval: 'weekly'
     commit-message:
-      prefix: "ci(deps)"
+      prefix: 'ci(deps)'
     labels:
-      - "dependencies"
-      - "github-actions"
+      - 'dependencies'
+      - 'github-actions'
     groups:
       actions:
         patterns:
-          - "*"
+          - '*'

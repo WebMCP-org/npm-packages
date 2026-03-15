@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { handleSkillRead, toReadToolSchema } from '../src/disclosure';
 import type { ResolvedSkill } from '../src/models';
 

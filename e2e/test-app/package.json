@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "vite build",
-    "dev": "vite",
-    "preview": "vite preview",
+    "build": "vp build",
+    "dev": "vp dev",
+    "preview": "vp preview",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -20,6 +20,7 @@
   },
   "devDependencies": {
     "typescript": "catalog:",
-    "vite": "^6.2.5"
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
   }
 }

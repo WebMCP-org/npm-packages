@@ -24,91 +24,97 @@ The Web Model Context API follows the same patterns as other browser APIs.
 ```html
 <!DOCTYPE html>
 <html>
-<head>
-  <title>Web Model Context API Example</title>
-  <script src="https://unpkg.com/@mcp-b/global@latest/dist/index.iife.js"></script>
-</head>
-<body>
-  <h1>Counter App</h1>
-  <p>Count: <span id="count">0</span></p>
-  <button id="increment">+</button>
-  <button id="decrement">-</button>
+  <head>
+    <title>Web Model Context API Example</title>
+    <script src="https://unpkg.com/@mcp-b/global@latest/dist/index.iife.js"></script>
+  </head>
+  <body>
+    <h1>Counter App</h1>
+    <p>Count: <span id="count">0</span></p>
+    <button id="increment">+</button>
+    <button id="decrement">-</button>
 
-  <script>
-    // State
-    let count = 0;
+    <script>
+      // State
+      let count = 0;
 
-    // DOM elements
-    const countEl = document.getElementById('count');
-    const incrementBtn = document.getElementById('increment');
-    const decrementBtn = document.getElementById('decrement');
+      // DOM elements
+      const countEl = document.getElementById('count');
+      const incrementBtn = document.getElementById('increment');
+      const decrementBtn = document.getElementById('decrement');
 
-    // Update UI
-    function updateUI() {
-      countEl.textContent = count;
-    }
+      // Update UI
+      function updateUI() {
+        countEl.textContent = count;
+      }
 
-    // Button handlers
-    incrementBtn.addEventListener('click', () => { count++; updateUI(); });
-    decrementBtn.addEventListener('click', () => { count--; updateUI(); });
-
-    // Feature detection (like navigator.geolocation)
-    if ('modelContext' in navigator) {
-      // Register tools with the Web Model Context API
-      navigator.modelContext.provideContext({
-        tools: [
-          {
-            name: 'counter_get',
-            description: 'Get the current counter value',
-            inputSchema: { type: 'object', properties: {} },
-            execute: async () => ({
-              content: [{ type: 'text', text: String(count) }]
-            })
-          },
-          {
-            name: 'counter_set',
-            description: 'Set the counter to a specific value',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                value: { type: 'number', description: 'The new counter value' }
-              },
-              required: ['value']
-            },
-            execute: async ({ value }) => {
-              count = value;
-              updateUI();
-              return {
-                content: [{ type: 'text', text: `Counter set to ${count}` }]
-              };
-            }
-          },
-          {
-            name: 'counter_increment',
-            description: 'Increment the counter by a specified amount',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                amount: { type: 'number', description: 'Amount to increment by', default: 1 }
-              }
-            },
-            execute: async ({ amount = 1 }) => {
-              count += amount;
-              updateUI();
-              return {
-                content: [{ type: 'text', text: `Counter incremented to ${count}` }]
-              };
-            }
-          }
-        ]
+      // Button handlers
+      incrementBtn.addEventListener('click', () => {
+        count++;
+        updateUI();
+      });
+      decrementBtn.addEventListener('click', () => {
+        count--;
+        updateUI();
       });
 
-      console.log('Web Model Context API: Tools registered');
-    } else {
-      console.warn('Web Model Context API not supported');
-    }
-  </script>
-</body>
+      // Feature detection (like navigator.geolocation)
+      if ('modelContext' in navigator) {
+        // Register tools with the Web Model Context API
+        navigator.modelContext.provideContext({
+          tools: [
+            {
+              name: 'counter_get',
+              description: 'Get the current counter value',
+              inputSchema: { type: 'object', properties: {} },
+              execute: async () => ({
+                content: [{ type: 'text', text: String(count) }],
+              }),
+            },
+            {
+              name: 'counter_set',
+              description: 'Set the counter to a specific value',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  value: { type: 'number', description: 'The new counter value' },
+                },
+                required: ['value'],
+              },
+              execute: async ({ value }) => {
+                count = value;
+                updateUI();
+                return {
+                  content: [{ type: 'text', text: `Counter set to ${count}` }],
+                };
+              },
+            },
+            {
+              name: 'counter_increment',
+              description: 'Increment the counter by a specified amount',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  amount: { type: 'number', description: 'Amount to increment by', default: 1 },
+                },
+              },
+              execute: async ({ amount = 1 }) => {
+                count += amount;
+                updateUI();
+                return {
+                  content: [{ type: 'text', text: `Counter incremented to ${count}` }],
+                };
+              },
+            },
+          ],
+        });
+
+        console.log('Web Model Context API: Tools registered');
+      } else {
+        console.warn('Web Model Context API not supported');
+      }
+    </script>
+  </body>
 </html>
 ```
 
@@ -123,15 +129,21 @@ if ('modelContext' in navigator) {
     description: 'Get information about the current page',
     inputSchema: { type: 'object', properties: {} },
     execute: async () => ({
-      content: [{
-        type: 'text',
-        text: JSON.stringify({
-          title: document.title,
-          url: location.href,
-          timestamp: new Date().toISOString()
-        }, null, 2)
-      }]
-    })
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(
+            {
+              title: document.title,
+              url: location.href,
+              timestamp: new Date().toISOString(),
+            },
+            null,
+            2
+          ),
+        },
+      ],
+    }),
   });
 }
 ```
@@ -148,7 +160,7 @@ if ('modelContext' in navigator) {
     if (event.name === 'custom_handler') {
       event.preventDefault();
       event.respondWith({
-        content: [{ type: 'text', text: 'Custom response' }]
+        content: [{ type: 'text', text: 'Custom response' }],
       });
     }
   });
@@ -162,133 +174,163 @@ Save this as `index.html` and open in a browser:
 ```html
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WebMCP Demo</title>
-  <script src="https://unpkg.com/@mcp-b/global@latest/dist/index.iife.js"></script>
-  <style>
-    body { font-family: system-ui; max-width: 600px; margin: 2rem auto; padding: 0 1rem; }
-    .card { border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin: 1rem 0; }
-    button { padding: 0.5rem 1rem; margin: 0.25rem; cursor: pointer; }
-    #log { font-family: monospace; font-size: 0.85rem; background: #f5f5f5; padding: 1rem; max-height: 200px; overflow-y: auto; }
-  </style>
-</head>
-<body>
-  <h1> WebMCP Demo</h1>
-
-  <div class="card">
-    <h2>Notes App</h2>
-    <input type="text" id="noteInput" placeholder="Enter a note..." style="width: 100%; padding: 0.5rem; box-sizing: border-box;">
-    <button id="addNote">Add Note</button>
-    <ul id="notesList"></ul>
-  </div>
-
-  <div class="card">
-    <h3>Tool Call Log</h3>
-    <div id="log">Waiting for AI tool calls...</div>
-  </div>
-
-  <script>
-    const notes = [];
-    const noteInput = document.getElementById('noteInput');
-    const addNoteBtn = document.getElementById('addNote');
-    const notesList = document.getElementById('notesList');
-    const logEl = document.getElementById('log');
-
-    function renderNotes() {
-      notesList.innerHTML = notes.map((note, i) =>
-        `<li>${note} <button onclick="deleteNote(${i})">x</button></li>`
-      ).join('');
-    }
-
-    function log(message) {
-      const time = new Date().toLocaleTimeString();
-      logEl.innerHTML = `[${time}] ${message}\n` + logEl.innerHTML;
-    }
-
-    addNoteBtn.addEventListener('click', () => {
-      if (noteInput.value.trim()) {
-        notes.push(noteInput.value.trim());
-        noteInput.value = '';
-        renderNotes();
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WebMCP Demo</title>
+    <script src="https://unpkg.com/@mcp-b/global@latest/dist/index.iife.js"></script>
+    <style>
+      body {
+        font-family: system-ui;
+        max-width: 600px;
+        margin: 2rem auto;
+        padding: 0 1rem;
       }
-    });
+      .card {
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 1rem;
+        margin: 1rem 0;
+      }
+      button {
+        padding: 0.5rem 1rem;
+        margin: 0.25rem;
+        cursor: pointer;
+      }
+      #log {
+        font-family: monospace;
+        font-size: 0.85rem;
+        background: #f5f5f5;
+        padding: 1rem;
+        max-height: 200px;
+        overflow-y: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>WebMCP Demo</h1>
 
-    window.deleteNote = (index) => {
-      notes.splice(index, 1);
-      renderNotes();
-    };
+    <div class="card">
+      <h2>Notes App</h2>
+      <input
+        type="text"
+        id="noteInput"
+        placeholder="Enter a note..."
+        style="width: 100%; padding: 0.5rem; box-sizing: border-box;"
+      />
+      <button id="addNote">Add Note</button>
+      <ul id="notesList"></ul>
+    </div>
 
-    if ('modelContext' in navigator) {
-      navigator.modelContext.provideContext({
-        tools: [
-          {
-            name: 'notes_list',
-            description: 'Get all notes',
-            inputSchema: { type: 'object', properties: {} },
-            execute: async () => {
-              log('notes_list called');
-              return {
-                content: [{
-                  type: 'text',
-                  text: notes.length ? notes.map((n, i) => `${i + 1}. ${n}`).join('\n') : 'No notes yet'
-                }]
-              };
-            }
-          },
-          {
-            name: 'notes_add',
-            description: 'Add a new note',
-            inputSchema: {
-              type: 'object',
-              properties: { text: { type: 'string', description: 'The note text' } },
-              required: ['text']
-            },
-            execute: async ({ text }) => {
-              log(`notes_add called: "${text}"`);
-              notes.push(text);
-              renderNotes();
-              return { content: [{ type: 'text', text: `Added note: "${text}"` }] };
-            }
-          },
-          {
-            name: 'notes_delete',
-            description: 'Delete a note by index (1-based)',
-            inputSchema: {
-              type: 'object',
-              properties: { index: { type: 'number', description: 'Note index (1-based)' } },
-              required: ['index']
-            },
-            execute: async ({ index }) => {
-              log(`notes_delete called: index ${index}`);
-              if (index < 1 || index > notes.length) {
-                return { content: [{ type: 'text', text: 'Invalid index' }], isError: true };
-              }
-              const deleted = notes.splice(index - 1, 1)[0];
-              renderNotes();
-              return { content: [{ type: 'text', text: `Deleted: "${deleted}"` }] };
-            }
-          },
-          {
-            name: 'notes_clear',
-            description: 'Delete all notes',
-            inputSchema: { type: 'object', properties: {} },
-            execute: async () => {
-              log('notes_clear called');
-              const count = notes.length;
-              notes.length = 0;
-              renderNotes();
-              return { content: [{ type: 'text', text: `Cleared ${count} notes` }] };
-            }
-          }
-        ]
+    <div class="card">
+      <h3>Tool Call Log</h3>
+      <div id="log">Waiting for AI tool calls...</div>
+    </div>
+
+    <script>
+      const notes = [];
+      const noteInput = document.getElementById('noteInput');
+      const addNoteBtn = document.getElementById('addNote');
+      const notesList = document.getElementById('notesList');
+      const logEl = document.getElementById('log');
+
+      function renderNotes() {
+        notesList.innerHTML = notes
+          .map((note, i) => `<li>${note} <button onclick="deleteNote(${i})">x</button></li>`)
+          .join('');
+      }
+
+      function log(message) {
+        const time = new Date().toLocaleTimeString();
+        logEl.innerHTML = `[${time}] ${message}\n` + logEl.innerHTML;
+      }
+
+      addNoteBtn.addEventListener('click', () => {
+        if (noteInput.value.trim()) {
+          notes.push(noteInput.value.trim());
+          noteInput.value = '';
+          renderNotes();
+        }
       });
 
-      log('Web Model Context API initialized');
-    }
-  </script>
-</body>
+      window.deleteNote = (index) => {
+        notes.splice(index, 1);
+        renderNotes();
+      };
+
+      if ('modelContext' in navigator) {
+        navigator.modelContext.provideContext({
+          tools: [
+            {
+              name: 'notes_list',
+              description: 'Get all notes',
+              inputSchema: { type: 'object', properties: {} },
+              execute: async () => {
+                log('notes_list called');
+                return {
+                  content: [
+                    {
+                      type: 'text',
+                      text: notes.length
+                        ? notes.map((n, i) => `${i + 1}. ${n}`).join('\n')
+                        : 'No notes yet',
+                    },
+                  ],
+                };
+              },
+            },
+            {
+              name: 'notes_add',
+              description: 'Add a new note',
+              inputSchema: {
+                type: 'object',
+                properties: { text: { type: 'string', description: 'The note text' } },
+                required: ['text'],
+              },
+              execute: async ({ text }) => {
+                log(`notes_add called: "${text}"`);
+                notes.push(text);
+                renderNotes();
+                return { content: [{ type: 'text', text: `Added note: "${text}"` }] };
+              },
+            },
+            {
+              name: 'notes_delete',
+              description: 'Delete a note by index (1-based)',
+              inputSchema: {
+                type: 'object',
+                properties: { index: { type: 'number', description: 'Note index (1-based)' } },
+                required: ['index'],
+              },
+              execute: async ({ index }) => {
+                log(`notes_delete called: index ${index}`);
+                if (index < 1 || index > notes.length) {
+                  return { content: [{ type: 'text', text: 'Invalid index' }], isError: true };
+                }
+                const deleted = notes.splice(index - 1, 1)[0];
+                renderNotes();
+                return { content: [{ type: 'text', text: `Deleted: "${deleted}"` }] };
+              },
+            },
+            {
+              name: 'notes_clear',
+              description: 'Delete all notes',
+              inputSchema: { type: 'object', properties: {} },
+              execute: async () => {
+                log('notes_clear called');
+                const count = notes.length;
+                notes.length = 0;
+                renderNotes();
+                return { content: [{ type: 'text', text: `Cleared ${count} notes` }] };
+              },
+            },
+          ],
+        });
+
+        log('Web Model Context API initialized');
+      }
+    </script>
+  </body>
 </html>
 ```
 
@@ -315,12 +357,12 @@ The polyfill exposes `initializeWebModelContext(options?)` to control transport 
 
 `initializeWebModelContext()` is run-once and safe to call multiple times on the same page.
 
-| Page state before inject | Result |
-| --- | --- |
-| `@mcp-b/global` already initialized | No-op (first init wins) |
-| Native WebMCP available | Native adapter mode (single bridge instance) |
-| `@mcp-b/webmcp-polyfill` already installed | Attach-only bridge mode |
-| Custom existing `navigator.modelContext` | Attach-only bridge mode |
+| Page state before inject                   | Result                                       |
+| ------------------------------------------ | -------------------------------------------- |
+| `@mcp-b/global` already initialized        | No-op (first init wins)                      |
+| Native WebMCP available                    | Native adapter mode (single bridge instance) |
+| `@mcp-b/webmcp-polyfill` already installed | Attach-only bridge mode                      |
+| Custom existing `navigator.modelContext`   | Attach-only bridge mode                      |
 
 ### Dual-Server Mode (Tab + Iframe)
 
@@ -372,6 +414,7 @@ When `initializeWebModelContext()` runs:
 ### How Tool Synchronization Works
 
 `@mcp-b/global` pins an internal synchronization callback through `modelContextTesting.registerToolsChangedCallback()`. This callback fires when:
+
 - `registerTool()`, `unregisterTool()`, `provideContext()`, or `clearContext()` is called
 - Tools are added from embedded iframes (native feature)
 
@@ -398,7 +441,7 @@ When the native API is active, tools from embedded iframes are automatically col
     inputSchema: { type: 'object', properties: {} },
     async execute() {
       return { content: [{ type: 'text', text: 'Parent tool' }] };
-    }
+    },
   });
 </script>
 <iframe src="child.html"></iframe>
@@ -414,7 +457,7 @@ When the native API is active, tools from embedded iframes are automatically col
     inputSchema: { type: 'object', properties: {} },
     async execute() {
       return { content: [{ type: 'text', text: 'Child tool' }] };
-    }
+    },
   });
 </script>
 ```
@@ -440,24 +483,24 @@ Registers context and replaces the currently registered tool set.
 window.navigator.modelContext.provideContext({
   tools: [
     {
-      name: "add-todo",
-      description: "Add a new todo item to the list",
+      name: 'add-todo',
+      description: 'Add a new todo item to the list',
       inputSchema: {
-        type: "object",
+        type: 'object',
         properties: {
-          text: { type: "string", description: "The todo item text" },
-          priority: { type: "string", enum: ["low", "medium", "high"] }
+          text: { type: 'string', description: 'The todo item text' },
+          priority: { type: 'string', enum: ['low', 'medium', 'high'] },
         },
-        required: ["text"]
+        required: ['text'],
       },
-      async execute({ text, priority = "medium" }) {
+      async execute({ text, priority = 'medium' }) {
         const todo = addTodoItem(text, priority);
         return {
-          content: [{ type: "text", text: `Added todo: "${text}" with ${priority} priority` }]
+          content: [{ type: 'text', text: `Added todo: "${text}" with ${priority} priority` }],
         };
-      }
-    }
-  ]
+      },
+    },
+  ],
 });
 ```
 
@@ -467,26 +510,26 @@ Registers a single tool. Names must be unique at registration time.
 
 ```javascript
 window.navigator.modelContext.registerTool({
-  name: "get-timestamp",
-  description: "Get the current timestamp",
-  inputSchema: { type: "object", properties: {} },
+  name: 'get-timestamp',
+  description: 'Get the current timestamp',
+  inputSchema: { type: 'object', properties: {} },
   async execute() {
-    return { content: [{ type: "text", text: new Date().toISOString() }] };
-  }
+    return { content: [{ type: 'text', text: new Date().toISOString() }] };
+  },
 });
-window.navigator.modelContext.unregisterTool("get-timestamp");
+window.navigator.modelContext.unregisterTool('get-timestamp');
 ```
 
 ### Tool Descriptor
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `name` | `string` | Unique identifier for the tool |
-| `description` | `string` | Natural language description of what the tool does |
-| `inputSchema` | `object` | Optional JSON Schema defining input parameters |
-| `outputSchema` | `object` | Optional JSON Schema defining structured output |
-| `annotations` | `object` | Optional hints about tool behavior |
-| `execute` | `function` | Async function that implements the tool logic |
+| Property       | Type       | Description                                        |
+| -------------- | ---------- | -------------------------------------------------- |
+| `name`         | `string`   | Unique identifier for the tool                     |
+| `description`  | `string`   | Natural language description of what the tool does |
+| `inputSchema`  | `object`   | Optional JSON Schema defining input parameters     |
+| `outputSchema` | `object`   | Optional JSON Schema defining structured output    |
+| `annotations`  | `object`   | Optional hints about tool behavior                 |
+| `execute`      | `function` | Async function that implements the tool logic      |
 
 ### Tool Response Format
 
@@ -501,13 +544,16 @@ window.navigator.modelContext.unregisterTool("get-timestamp");
 
 ```javascript
 window.navigator.modelContext.provideContext({
-  tools: [{ name: "my-tool", description: "Base", inputSchema: {}, async execute() {} }]
+  tools: [{ name: 'my-tool', description: 'Base', inputSchema: {}, async execute() {} }],
 });
 
 // This will throw an error (name already registered)
 try {
   window.navigator.modelContext.registerTool({
-    name: "my-tool", description: "Dynamic", inputSchema: {}, async execute() {}
+    name: 'my-tool',
+    description: 'Dynamic',
+    inputSchema: {},
+    async execute() {},
   });
 } catch (error) {
   console.error(error.message);
@@ -522,32 +568,39 @@ Output schemas enable type-safe structured responses from tools. Many AI provide
 
 ```javascript
 window.navigator.modelContext.provideContext({
-  tools: [{
-    name: "get-user-profile",
-    description: "Fetch a user's profile information",
-    inputSchema: {
-      type: "object",
-      properties: { userId: { type: "string" } },
-      required: ["userId"]
-    },
-    outputSchema: {
-      type: "object",
-      properties: {
-        id: { type: "string" },
-        name: { type: "string" },
-        email: { type: "string" },
-        createdAt: { type: "string" }
+  tools: [
+    {
+      name: 'get-user-profile',
+      description: "Fetch a user's profile information",
+      inputSchema: {
+        type: 'object',
+        properties: { userId: { type: 'string' } },
+        required: ['userId'],
       },
-      required: ["id", "name", "email"]
+      outputSchema: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          name: { type: 'string' },
+          email: { type: 'string' },
+          createdAt: { type: 'string' },
+        },
+        required: ['id', 'name', 'email'],
+      },
+      async execute({ userId }) {
+        const user = await fetchUser(userId);
+        return {
+          content: [{ type: 'text', text: `Found user: ${user.name}` }],
+          structuredContent: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            createdAt: user.createdAt.toISOString(),
+          },
+        };
+      },
     },
-    async execute({ userId }) {
-      const user = await fetchUser(userId);
-      return {
-        content: [{ type: "text", text: `Found user: ${user.name}` }],
-        structuredContent: { id: user.id, name: user.name, email: user.email, createdAt: user.createdAt.toISOString() }
-      };
-    }
-  }]
+  ],
 });
 ```
 
@@ -559,27 +612,35 @@ Zod schemas are automatically converted to JSON Schema:
 import { z } from 'zod';
 
 window.navigator.modelContext.provideContext({
-  tools: [{
-    name: "search-products",
-    description: "Search the product catalog",
-    inputSchema: {
-      query: z.string().describe("Search query"),
-      limit: z.number().min(1).max(100).default(10),
-      category: z.enum(["electronics", "clothing", "books"]).optional()
+  tools: [
+    {
+      name: 'search-products',
+      description: 'Search the product catalog',
+      inputSchema: {
+        query: z.string().describe('Search query'),
+        limit: z.number().min(1).max(100).default(10),
+        category: z.enum(['electronics', 'clothing', 'books']).optional(),
+      },
+      outputSchema: {
+        products: z.array(
+          z.object({ id: z.string(), name: z.string(), price: z.number(), inStock: z.boolean() })
+        ),
+        total: z.number(),
+        hasMore: z.boolean(),
+      },
+      async execute({ query, limit, category }) {
+        const results = await searchProducts({ query, limit, category });
+        return {
+          content: [{ type: 'text', text: `Found ${results.total} products` }],
+          structuredContent: {
+            products: results.items,
+            total: results.total,
+            hasMore: results.total > limit,
+          },
+        };
+      },
     },
-    outputSchema: {
-      products: z.array(z.object({ id: z.string(), name: z.string(), price: z.number(), inStock: z.boolean() })),
-      total: z.number(),
-      hasMore: z.boolean()
-    },
-    async execute({ query, limit, category }) {
-      const results = await searchProducts({ query, limit, category });
-      return {
-        content: [{ type: "text", text: `Found ${results.total} products` }],
-        structuredContent: { products: results.items, total: results.total, hasMore: results.total > limit }
-      };
-    }
-  }]
+  ],
 });
 ```
 
@@ -593,16 +654,16 @@ import { useEffect } from 'react';
 function MyComponent() {
   useEffect(() => {
     window.navigator.modelContext.registerTool({
-      name: "component-action",
-      description: "Action specific to this component",
-      inputSchema: { type: "object", properties: {} },
+      name: 'component-action',
+      description: 'Action specific to this component',
+      inputSchema: { type: 'object', properties: {} },
       async execute() {
-        return { content: [{ type: "text", text: "Component action executed!" }] };
-      }
+        return { content: [{ type: 'text', text: 'Component action executed!' }] };
+      },
     });
 
     return () => {
-      window.navigator.modelContext.unregisterTool("component-action");
+      window.navigator.modelContext.unregisterTool('component-action');
     };
   }, []);
 
@@ -614,12 +675,15 @@ function MyComponent() {
 
 ```javascript
 window.navigator.modelContext.registerTool({
-  name: "dynamic-tool", description: "Dynamic tool",
-  async execute() { return { content: [{ type: "text", text: "Dynamic!" }] }; }
+  name: 'dynamic-tool',
+  description: 'Dynamic tool',
+  async execute() {
+    return { content: [{ type: 'text', text: 'Dynamic!' }] };
+  },
 });
 
 window.navigator.modelContext.provideContext({
-  tools: [{ name: "base-tool-2", description: "New base tool", async execute() {} }]
+  tools: [{ name: 'base-tool-2', description: 'New base tool', async execute() {} }],
 });
 
 // Result: only the tools in provideContext() remain registered
@@ -633,10 +697,10 @@ For manifest-based or advanced scenarios, handle tool calls as events:
 window.navigator.modelContext.addEventListener('toolcall', async (event) => {
   console.log(`Tool called: ${event.name}`, event.arguments);
 
-  if (event.name === "custom-tool") {
+  if (event.name === 'custom-tool') {
     event.preventDefault();
     event.respondWith({
-      content: [{ type: "text", text: "Custom response from event handler" }]
+      content: [{ type: 'text', text: 'Custom response from event handler' }],
     });
   }
 });
@@ -656,12 +720,12 @@ window.navigator.modelContext.addEventListener('toolcall', async (event) => {
 
 ```javascript
 const result = await navigator.modelContext.callTool({
-  name: "greet",
-  arguments: { name: "Alice" }
+  name: 'greet',
+  arguments: { name: 'Alice' },
 });
 
-navigator.modelContext.addEventListener("toolschanged", () => {
-  console.log("Tools changed:", navigator.modelContext.listTools());
+navigator.modelContext.addEventListener('toolschanged', () => {
+  console.log('Tools changed:', navigator.modelContext.listTools());
 });
 ```
 
@@ -690,19 +754,21 @@ These methods are provided by the polyfill runtime. Native Chromium testing APIs
 ```javascript
 // 1. Register tools
 window.navigator.modelContext.provideContext({
-  tools: [{
-    name: "add-todo",
-    description: "Add a todo item",
-    inputSchema: { type: "object", properties: { text: { type: "string" } }, required: ["text"] },
-    async execute({ text }) {
-      return { content: [{ type: "text", text: `Added: ${text}` }] };
-    }
-  }]
+  tools: [
+    {
+      name: 'add-todo',
+      description: 'Add a todo item',
+      inputSchema: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] },
+      async execute({ text }) {
+        return { content: [{ type: 'text', text: `Added: ${text}` }] };
+      },
+    },
+  ],
 });
 
 // 2. Set up mocks
-window.navigator.modelContextTesting.setMockToolResponse("add-todo", {
-  content: [{ type: "text", text: "Mock: Todo added successfully" }]
+window.navigator.modelContextTesting.setMockToolResponse('add-todo', {
+  content: [{ type: 'text', text: 'Mock: Todo added successfully' }],
 });
 
 // 3. Inspect tool call history
@@ -723,44 +789,44 @@ let todos = [];
 window.navigator.modelContext.provideContext({
   tools: [
     {
-      name: "add-todo",
-      description: "Add a new todo item",
+      name: 'add-todo',
+      description: 'Add a new todo item',
       inputSchema: {
-        type: "object",
-        properties: { text: { type: "string", description: "Todo text" } },
-        required: ["text"]
+        type: 'object',
+        properties: { text: { type: 'string', description: 'Todo text' } },
+        required: ['text'],
       },
       async execute({ text }) {
         const todo = { id: Date.now(), text, done: false };
         todos.push(todo);
-        return { content: [{ type: "text", text: `Added: "${text}"` }] };
-      }
+        return { content: [{ type: 'text', text: `Added: "${text}"` }] };
+      },
     },
     {
-      name: "list-todos",
-      description: "Get all todo items",
-      inputSchema: { type: "object", properties: {} },
+      name: 'list-todos',
+      description: 'Get all todo items',
+      inputSchema: { type: 'object', properties: {} },
       async execute() {
-        const list = todos.map(t => `${t.done ? 'x' : 'o'} ${t.text}`).join('\n');
-        return { content: [{ type: "text", text: list || "No todos" }] };
-      }
+        const list = todos.map((t) => `${t.done ? 'x' : 'o'} ${t.text}`).join('\n');
+        return { content: [{ type: 'text', text: list || 'No todos' }] };
+      },
     },
     {
-      name: "complete-todo",
-      description: "Mark a todo as complete",
+      name: 'complete-todo',
+      description: 'Mark a todo as complete',
       inputSchema: {
-        type: "object",
-        properties: { id: { type: "number", description: "Todo ID" } },
-        required: ["id"]
+        type: 'object',
+        properties: { id: { type: 'number', description: 'Todo ID' } },
+        required: ['id'],
       },
       async execute({ id }) {
-        const todo = todos.find(t => t.id === id);
-        if (!todo) return { content: [{ type: "text", text: "Todo not found" }], isError: true };
+        const todo = todos.find((t) => t.id === id);
+        if (!todo) return { content: [{ type: 'text', text: 'Todo not found' }], isError: true };
         todo.done = true;
-        return { content: [{ type: "text", text: `Completed: "${todo.text}"` }] };
-      }
-    }
-  ]
+        return { content: [{ type: 'text', text: `Completed: "${todo.text}"` }] };
+      },
+    },
+  ],
 });
 ```
 
@@ -770,37 +836,45 @@ window.navigator.modelContext.provideContext({
 window.navigator.modelContext.provideContext({
   tools: [
     {
-      name: "search-products",
-      description: "Search for products in the catalog",
+      name: 'search-products',
+      description: 'Search for products in the catalog',
       inputSchema: {
-        type: "object",
+        type: 'object',
         properties: {
-          query: { type: "string", description: "Search query" },
-          category: { type: "string", enum: ["electronics", "clothing", "books", "all"] },
-          maxPrice: { type: "number", description: "Maximum price filter" }
+          query: { type: 'string', description: 'Search query' },
+          category: { type: 'string', enum: ['electronics', 'clothing', 'books', 'all'] },
+          maxPrice: { type: 'number', description: 'Maximum price filter' },
         },
-        required: ["query"]
+        required: ['query'],
       },
-      async execute({ query, category = "all", maxPrice }) {
-        const results = await searchProducts({ query, category: category !== "all" ? category : undefined, maxPrice });
-        const summary = results.map(p => `${p.name} - $${p.price} (${p.category})`).join('\n');
-        return { content: [{ type: "text", text: `Found ${results.length} products:\n${summary}` }] };
-      }
+      async execute({ query, category = 'all', maxPrice }) {
+        const results = await searchProducts({
+          query,
+          category: category !== 'all' ? category : undefined,
+          maxPrice,
+        });
+        const summary = results.map((p) => `${p.name} - $${p.price} (${p.category})`).join('\n');
+        return {
+          content: [{ type: 'text', text: `Found ${results.length} products:\n${summary}` }],
+        };
+      },
     },
     {
-      name: "add-to-cart",
-      description: "Add a product to the shopping cart",
+      name: 'add-to-cart',
+      description: 'Add a product to the shopping cart',
       inputSchema: {
-        type: "object",
-        properties: { productId: { type: "string" }, quantity: { type: "number", default: 1 } },
-        required: ["productId"]
+        type: 'object',
+        properties: { productId: { type: 'string' }, quantity: { type: 'number', default: 1 } },
+        required: ['productId'],
       },
       async execute({ productId, quantity = 1 }) {
         await addToCart(productId, quantity);
-        return { content: [{ type: "text", text: `Added ${quantity}x product ${productId} to cart` }] };
-      }
-    }
-  ]
+        return {
+          content: [{ type: 'text', text: `Added ${quantity}x product ${productId} to cart` }],
+        };
+      },
+    },
+  ],
 });
 ```
 
@@ -855,7 +929,7 @@ Available namespaces: `WebModelContext`, `NativeAdapter`, `MCPBridge`, `ModelCon
 
 ```javascript
 if (window.__mcpBridge) {
-  console.log("MCP Server:", window.__mcpBridge.server);
-  console.log("Registered tools:", window.__mcpBridge.tools);
+  console.log('MCP Server:', window.__mcpBridge.server);
+  console.log('Registered tools:', window.__mcpBridge.tools);
 }
 ```

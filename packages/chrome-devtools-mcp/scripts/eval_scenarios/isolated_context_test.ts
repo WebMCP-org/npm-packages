@@ -6,7 +6,7 @@
 
 import assert from 'node:assert';
 
-import type {TestScenario} from '../eval_gemini.ts';
+import type { TestScenario } from '../eval_gemini.ts';
 
 export const scenario: TestScenario = {
   prompt:
@@ -18,14 +18,11 @@ export const scenario: TestScenario = {
       <h1>test</h1>
     `,
   },
-  expectations: calls => {
+  expectations: (calls) => {
     console.log(JSON.stringify(calls, null, 2));
     assert.strictEqual(calls.length, 2);
     assert.ok(calls[0].name === 'new_page', 'First call should be navigation');
     assert.deepStrictEqual(calls[0].args.isolatedContext, 'contextB');
-    assert.ok(
-      calls[1].name === 'take_screenshot',
-      'Second call should be a screenshot',
-    );
+    assert.ok(calls[1].name === 'take_screenshot', 'Second call should be a screenshot');
   },
 };

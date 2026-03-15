@@ -103,11 +103,11 @@ webmcp_{{site}}_page0_get_page_info();
 
 ## Tool Inventory (Example)
 
-| Tool | Description |
-| --- | --- |
-| `get_page_info` | Return high-level page context and metadata. |
-| `search_items` | Search or filter visible items. |
-| `click_button` | Trigger a button action by label or selector. |
+| Tool            | Description                                   |
+| --------------- | --------------------------------------------- |
+| `get_page_info` | Return high-level page context and metadata.  |
+| `search_items`  | Search or filter visible items.               |
+| `click_button`  | Trigger a button action by label or selector. |
 
 See [SKILL.md](SKILL.md) for complete usage and behavioral guidance.
 

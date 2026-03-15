@@ -21,34 +21,35 @@ Main hook for registering MCP tools with full control over behavior and state.
 ```tsx
 function useWebMCP<
   TInputSchema extends Record<string, z.ZodTypeAny> = Record<string, never>,
-  TOutputSchema extends Record<string, z.ZodTypeAny> = Record<string, never>
+  TOutputSchema extends Record<string, z.ZodTypeAny> = Record<string, never>,
 >(
   config: WebMCPConfig<TInputSchema, TOutputSchema>,
   deps?: DependencyList
-): WebMCPReturn<TOutputSchema>
+): WebMCPReturn<TOutputSchema>;
 ```
 
 `InferOutput<TOutputSchema>` is the output type inferred from `outputSchema`.
 
 #### Configuration Options
 
-| Option | Type | Required | Description |
-|--------|------|----------|-------------|
-| `name` | `string` | Yes | Unique tool identifier (e.g., 'posts_like') |
-| `description` | `string` | Yes | Human-readable description for AI |
-| `inputSchema` | `Record<string, ZodType>` | - | Input validation using Zod schemas |
-| `outputSchema` | `Record<string, ZodType>` | - | Output schema for structured responses (recommended) |
-| `annotations` | `ToolAnnotations` | - | Metadata hints for the AI |
-| `handler` | `(input) => Promise<TOutput>` | Yes | Function that executes the tool |
-| `formatOutput` | `(output) => string` | - | Custom output formatter |
-| `onSuccess` | `(result, input) => void` | - | Success callback |
-| `onError` | `(error, input) => void` | - | Error handler callback |
+| Option         | Type                          | Required | Description                                          |
+| -------------- | ----------------------------- | -------- | ---------------------------------------------------- |
+| `name`         | `string`                      | Yes      | Unique tool identifier (e.g., 'posts_like')          |
+| `description`  | `string`                      | Yes      | Human-readable description for AI                    |
+| `inputSchema`  | `Record<string, ZodType>`     | -        | Input validation using Zod schemas                   |
+| `outputSchema` | `Record<string, ZodType>`     | -        | Output schema for structured responses (recommended) |
+| `annotations`  | `ToolAnnotations`             | -        | Metadata hints for the AI                            |
+| `handler`      | `(input) => Promise<TOutput>` | Yes      | Function that executes the tool                      |
+| `formatOutput` | `(output) => string`          | -        | Custom output formatter                              |
+| `onSuccess`    | `(result, input) => void`     | -        | Success callback                                     |
+| `onError`      | `(error, input) => void`      | -        | Error handler callback                               |
 
 #### Memoization and `deps` (important)
 
 `useWebMCP` uses reference equality to decide when to re-register a tool. Inline objects/arrays/functions can cause constant re-registration.
 
 Bad:
+
 ```tsx
 useWebMCP({
   name: 'counter',
@@ -59,6 +60,7 @@ useWebMCP({
 ```
 
 Good:
+
 ```tsx
 const OUTPUT_SCHEMA = { count: z.number() };
 const description = useMemo(() => `Count: ${count}`, [count]);
@@ -98,11 +100,7 @@ interface WebMCPReturn<TOutputSchema> {
 Simplified hook for read-only context exposure:
 
 ```tsx
-function useWebMCPContext<T>(
-  name: string,
-  description: string,
-  getValue: () => T
-): WebMCPReturn
+function useWebMCPContext<T>(name: string, description: string, getValue: () => T): WebMCPReturn;
 ```
 
 ### Tool with Output Schema
@@ -123,15 +121,24 @@ function ProductSearch() {
       category: z.enum(['electronics', 'clothing', 'books']).optional(),
     },
     outputSchema: {
-      products: z.array(z.object({
-        id: z.string(), name: z.string(), price: z.number(), inStock: z.boolean(),
-      })),
+      products: z.array(
+        z.object({
+          id: z.string(),
+          name: z.string(),
+          price: z.number(),
+          inStock: z.boolean(),
+        })
+      ),
       total: z.number().describe('Total matching products'),
       hasMore: z.boolean(),
     },
     handler: async ({ query, maxResults, category }) => {
       const results = await api.products.search({ query, maxResults, category });
-      return { products: results.items, total: results.totalCount, hasMore: results.totalCount > maxResults };
+      return {
+        products: results.items,
+        total: results.totalCount,
+        hasMore: results.totalCount > maxResults,
+      };
     },
     formatOutput: (result) => `Found ${result.total} products`,
   });
@@ -156,11 +163,12 @@ function PostDetailPage() {
   const { postId } = useParams();
   const { data: post } = useQuery(['post', postId], () => fetchPost(postId));
 
-  useWebMCPContext(
-    'context_current_post',
-    'Get the currently viewed post ID and metadata',
-    () => ({ postId, title: post?.title, author: post?.author, tags: post?.tags })
-  );
+  useWebMCPContext('context_current_post', 'Get the currently viewed post ID and metadata', () => ({
+    postId,
+    title: post?.title,
+    author: post?.author,
+    tags: post?.tags,
+  }));
 
   return <div>{/* Post UI */}</div>;
 }
@@ -224,7 +232,10 @@ function MyComponent() {
     if (!isConnected) return;
     try {
       const result = await client.callTool({ name: 'my_tool', arguments: { foo: 'bar' } });
-      const text = result.content.filter(c => c.type === 'text').map(c => c.text).join('\n');
+      const text = result.content
+        .filter((c) => c.type === 'text')
+        .map((c) => c.text)
+        .join('\n');
       console.log(text);
     } catch (error) {
       console.error('Tool call failed:', error);
@@ -264,9 +275,9 @@ function ToolProvider() {
     description: 'Increment the counter',
     inputSchema: { amount: z.number().default(1) },
     handler: async ({ amount }) => {
-      setCount(prev => prev + amount);
+      setCount((prev) => prev + amount);
       return { newValue: count + amount };
-    }
+    },
   });
 
   return <div>Counter: {count}</div>;
@@ -283,8 +294,10 @@ function ToolConsumer() {
 
   return (
     <div>
-      <p>Available Tools: {tools.map(t => t.name).join(', ')}</p>
-      <button onClick={callIncrementTool} disabled={!isConnected}>Call increment_counter</button>
+      <p>Available Tools: {tools.map((t) => t.name).join(', ')}</p>
+      <button onClick={callIncrementTool} disabled={!isConnected}>
+        Call increment_counter
+      </button>
       {result && <p>Result: {result}</p>}
     </div>
   );
@@ -317,6 +330,7 @@ import { useWebMCP } from '@mcp-b/react-webmcp';
 ### Converting Server to Provider
 
 **Before:**
+
 ```tsx
 function MyApp() {
   const { registerTool } = useMcpServer();
@@ -328,12 +342,13 @@ function MyApp() {
 ```
 
 **After:**
+
 ```tsx
 function MyApp() {
   useWebMCP({
     name: 'my_tool',
     description: '...',
-    handler: handler
+    handler: handler,
   });
   // Auto-registers and cleans up on unmount
 }
@@ -342,21 +357,25 @@ function MyApp() {
 ## Best Practices
 
 ### Tool Naming
+
 - Use verb-noun format: `posts_like`, `graph_navigate`, `table_filter`
 - Prefix with domain: `posts_`, `comments_`, `graph_`
 - Be specific and descriptive
 
 ### Annotations
+
 - Always set `readOnlyHint` (true for queries, false for mutations)
 - Set `idempotentHint` (true if repeated calls are safe)
 - Set `destructiveHint` for delete/permanent operations
 
 ### Error Handling
+
 - Throw descriptive errors from tool handlers
 - Use `onError` callback for side effects (logging, toasts)
 - Handle connection errors in client components
 
 ### Performance
+
 - Tools automatically prevent duplicate registration in React StrictMode
 - Use `useWebMCPContext` for lightweight read-only data exposure
 - Client automatically manages reconnection and tool list updates
@@ -381,10 +400,10 @@ Yes. Tool handlers have access to component state via closures. State updates tr
 
 ## Comparison with Alternatives
 
-| Feature | @mcp-b/react-webmcp | Raw MCP SDK | Custom Implementation |
-|---------|---------------------|-------------|----------------------|
-| React Lifecycle Integration | Automatic | Manual | Manual |
-| StrictMode Support | Yes | N/A | Manual |
-| Zod Schema Validation | Built-in | Manual | Manual |
-| Execution State Tracking | Built-in | Manual | Manual |
-| TypeScript Support | Full | Partial | Varies |
+| Feature                     | @mcp-b/react-webmcp | Raw MCP SDK | Custom Implementation |
+| --------------------------- | ------------------- | ----------- | --------------------- |
+| React Lifecycle Integration | Automatic           | Manual      | Manual                |
+| StrictMode Support          | Yes                 | N/A         | Manual                |
+| Zod Schema Validation       | Built-in            | Manual      | Manual                |
+| Execution State Tracking    | Built-in            | Manual      | Manual                |
+| TypeScript Support          | Full                | Partial     | Varies                |

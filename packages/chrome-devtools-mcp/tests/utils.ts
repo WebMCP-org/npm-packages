@@ -6,28 +6,20 @@
 
 import assert from 'node:assert';
 
-import type {CallToolResult} from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import logger from 'debug';
-import type {Browser} from 'puppeteer';
-import puppeteer, {Locator} from 'puppeteer';
-import type {
-  Frame,
-  HTTPRequest,
-  HTTPResponse,
-  LaunchOptions,
-  Page,
-} from 'puppeteer-core';
+import type { Browser } from 'puppeteer';
+import puppeteer, { Locator } from 'puppeteer';
+import type { Frame, HTTPRequest, HTTPResponse, LaunchOptions, Page } from 'puppeteer-core';
 import sinon from 'sinon';
 
-import type {ParsedArguments} from '../src/bin/chrome-devtools-mcp-cli-options.js';
-import {McpContext} from '../src/McpContext.js';
-import {McpResponse} from '../src/McpResponse.js';
-import {stableIdSymbol} from '../src/PageCollector.js';
-import {DevTools} from '../src/third_party/index.js';
+import type { ParsedArguments } from '../src/bin/chrome-devtools-mcp-cli-options.js';
+import { McpContext } from '../src/McpContext.js';
+import { McpResponse } from '../src/McpResponse.js';
+import { stableIdSymbol } from '../src/PageCollector.js';
+import { DevTools } from '../src/third_party/index.js';
 
-export function getTextContent(
-  content: CallToolResult['content'][number],
-): string {
+export function getTextContent(content: CallToolResult['content'][number]): string {
   if (content.type === 'text') {
     return content.text;
   }
@@ -39,7 +31,7 @@ export function getImageContent(content: CallToolResult['content'][number]): {
   mimeType: string;
 } {
   if (content.type === 'image') {
-    return {data: content.data, mimeType: content.mimeType};
+    return { data: content.data, mimeType: content.mimeType };
   }
   throw new Error(`Expected image content but got ${content.type}`);
 }
@@ -62,11 +54,10 @@ export async function withBrowser(
     debug?: boolean;
     autoOpenDevTools?: boolean;
     executablePath?: string;
-  } = {},
+  } = {}
 ) {
   const launchOptions: LaunchOptions = {
-    executablePath:
-      options.executablePath ?? process.env.PUPPETEER_EXECUTABLE_PATH,
+    executablePath: options.executablePath ?? process.env.PUPPETEER_EXECUTABLE_PATH,
     headless: !options.debug,
     defaultViewport: null,
     devtools: options.autoOpenDevTools ?? false,
@@ -85,11 +76,11 @@ export async function withBrowser(
   const newPage = await browser.newPage();
   // Close other pages.
   await Promise.all(
-    (await browser.pages()).map(async page => {
+    (await browser.pages()).map(async (page) => {
       if (page !== newPage) {
         await page.close();
       }
-    }),
+    })
   );
 
   await cb(browser, newPage);
@@ -103,9 +94,9 @@ export async function withMcpContext(
     performanceCrux?: boolean;
     executablePath?: string;
   } = {},
-  args: ParsedArguments = {} as ParsedArguments,
+  args: ParsedArguments = {} as ParsedArguments
 ) {
-  await withBrowser(async browser => {
+  await withBrowser(async (browser) => {
     const response = new McpResponse(args);
     if (context) {
       context.dispose();
@@ -117,7 +108,7 @@ export async function withMcpContext(
         experimentalDevToolsDebugging: false,
         performanceCrux: options.performanceCrux ?? true,
       },
-      Locator,
+      Locator
     );
 
     response.setPage(context.getSelectedMcpPage());
@@ -140,7 +131,7 @@ export function getMockRequest(
     navigationRequest?: boolean;
     frame?: Frame;
     redirectChain?: HTTPRequest[];
-  } = {},
+  } = {}
 ): HTTPRequest {
   return {
     url() {
@@ -188,7 +179,7 @@ export function getMockRequest(
 export function getMockResponse(
   options: {
     status?: number;
-  } = {},
+  } = {}
 ): HTTPResponse {
   return {
     status() {
@@ -200,10 +191,7 @@ export function getMockResponse(
   } as HTTPResponse;
 }
 
-export function html(
-  strings: TemplateStringsArray,
-  ...values: unknown[]
-): string {
+export function html(strings: TemplateStringsArray, ...values: unknown[]): string {
   const bodyContent = strings.reduce((acc, str, i) => {
     return acc + str + (values[i] || '');
   }, '');
@@ -226,7 +214,7 @@ export function stabilizeStructuredContent(content: unknown): unknown {
     return stabilizeResponseOutput(content);
   }
   if (Array.isArray(content)) {
-    return content.map(item => stabilizeStructuredContent(item));
+    return content.map((item) => stabilizeStructuredContent(item));
   }
   if (typeof content === 'object' && content !== null) {
     const result: Record<string, unknown> = {};
@@ -273,9 +261,7 @@ export function stabilizeResponseOutput(text: unknown) {
 }
 
 export function getMockAggregatedIssue(): sinon.SinonStubbedInstance<DevTools.AggregatedIssue> {
-  const mockAggregatedIssue = sinon.createStubInstance(
-    DevTools.AggregatedIssue,
-  );
+  const mockAggregatedIssue = sinon.createStubInstance(DevTools.AggregatedIssue);
   mockAggregatedIssue.getAllIssues.returns([]);
   return mockAggregatedIssue;
 }
@@ -308,7 +294,7 @@ export function getMockPage(): Page {
     send: () => {
       // no-op
     },
-    target: () => ({_targetId: '<mock target ID>'}),
+    target: () => ({ _targetId: '<mock target ID>' }),
   };
   return {
     mainFrame() {

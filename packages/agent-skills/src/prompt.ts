@@ -28,8 +28,10 @@ const XML_ESCAPE_MAP: Record<string, string> = {
  * @see https://agentskills.io/specification
  * @see https://github.com/agentskills/agentskills/blob/main/skills-ref/src/skills_ref/prompt.py
  */
-export interface SkillPromptEntry
-  extends Pick<ResolvedSkill, 'name' | 'description' | 'location'> {}
+export interface SkillPromptEntry extends Pick<
+  ResolvedSkill,
+  'name' | 'description' | 'location'
+> {}
 
 /**
  * SKILL.md source data for prompt generation.

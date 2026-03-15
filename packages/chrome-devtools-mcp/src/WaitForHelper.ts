@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {logger} from './logger.js';
-import type {Page, Protocol, CdpPage} from './third_party/index.js';
+import { logger } from './logger.js';
+import type { Page, Protocol, CdpPage } from './third_party/index.js';
 
 export class WaitForHelper {
   #abortController = new AbortController();
@@ -15,11 +15,7 @@ export class WaitForHelper {
   #expectNavigationIn: number;
   #navigationTimeout: number;
 
-  constructor(
-    page: Page,
-    cpuTimeoutMultiplier: number,
-    networkTimeoutMultiplier: number,
-  ) {
+  constructor(page: Page, cpuTimeoutMultiplier: number, networkTimeoutMultiplier: number) {
     this.#stableDomTimeout = 3000 * cpuTimeoutMultiplier;
     this.#stableDomFor = 100 * cpuTimeoutMultiplier;
     this.#expectNavigationIn = 100 * cpuTimeoutMultiplier;
@@ -33,7 +29,7 @@ export class WaitForHelper {
    * for the DOM to be stable before returning.
    */
   async waitForStableDom(): Promise<void> {
-    const stableDomObserver = await this.#page.evaluateHandle(timeout => {
+    const stableDomObserver = await this.#page.evaluateHandle((timeout) => {
       let timeoutId: ReturnType<typeof setTimeout>;
       function callback() {
         clearTimeout(timeoutId);
@@ -61,7 +57,7 @@ export class WaitForHelper {
 
     this.#abortController.signal.addEventListener('abort', async () => {
       try {
-        await stableDomObserver.evaluate(observer => {
+        await stableDomObserver.evaluate((observer) => {
           observer.observer.disconnect();
           observer.resolver.resolve();
         });
@@ -72,7 +68,7 @@ export class WaitForHelper {
     });
 
     return Promise.race([
-      stableDomObserver.evaluate(async observer => {
+      stableDomObserver.evaluate(async (observer) => {
         return await observer.resolver.promise;
       }),
       this.timeout(this.#stableDomTimeout).then(() => {
@@ -84,14 +80,12 @@ export class WaitForHelper {
   async waitForNavigationStarted() {
     // Currently Puppeteer does not have API
     // For when a navigation is about to start
-    const navigationStartedPromise = new Promise<boolean>(resolve => {
+    const navigationStartedPromise = new Promise<boolean>((resolve) => {
       const listener = (event: Protocol.Page.FrameStartedNavigatingEvent) => {
         if (
-          [
-            'historySameDocument',
-            'historyDifferentDocument',
-            'sameDocument',
-          ].includes(event.navigationType)
+          ['historySameDocument', 'historyDifferentDocument', 'sameDocument'].includes(
+            event.navigationType
+          )
         ) {
           resolve(false);
           return;
@@ -114,7 +108,7 @@ export class WaitForHelper {
   }
 
   timeout(time: number): Promise<void> {
-    return new Promise<void>(res => {
+    return new Promise<void>((res) => {
       const id = setTimeout(res, time);
       this.#abortController.signal.addEventListener('abort', () => {
         res();
@@ -125,10 +119,10 @@ export class WaitForHelper {
 
   async waitForEventsAfterAction(
     action: () => Promise<unknown>,
-    options?: {timeout?: number},
+    options?: { timeout?: number }
   ): Promise<void> {
     const navigationFinished = this.waitForNavigationStarted()
-      .then(navigationStated => {
+      .then((navigationStated) => {
         if (navigationStated) {
           return this.#page.waitForNavigation({
             timeout: options?.timeout ?? this.#navigationTimeout,
@@ -137,7 +131,7 @@ export class WaitForHelper {
         }
         return;
       })
-      .catch(error => logger(error));
+      .catch((error) => logger(error));
 
     try {
       await action();

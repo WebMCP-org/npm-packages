@@ -46,8 +46,8 @@ export function UserProfile({ user }) {
     description: `Get current user profile. User: ${user.name}`,
     inputSchema: { type: 'object', properties: {} },
     execute: async () => ({
-      content: [{ type: 'text', text: JSON.stringify(user) }]
-    })
+      content: [{ type: 'text', text: JSON.stringify(user) }],
+    }),
   });
 
   return <div>{user.name}</div>;
@@ -66,8 +66,8 @@ useWebMCP({
   description: 'What the tool does',
   inputSchema: { type: 'object', properties: {} },
   execute: async (params) => ({
-    content: [{ type: 'text', text: 'Result' }]
-  })
+    content: [{ type: 'text', text: 'Result' }],
+  }),
 });
 ```
 
@@ -81,7 +81,7 @@ useWebMCPTools([
     name: 'get_items',
     description: 'Get all items',
     inputSchema: { type: 'object', properties: {} },
-    execute: async () => ({ content: [{ type: 'text', text: JSON.stringify(items) }] })
+    execute: async () => ({ content: [{ type: 'text', text: JSON.stringify(items) }] }),
   },
   {
     name: 'add_item',
@@ -89,13 +89,13 @@ useWebMCPTools([
     inputSchema: {
       type: 'object',
       properties: { name: { type: 'string' } },
-      required: ['name']
+      required: ['name'],
     },
     execute: async ({ name }) => {
       addItem(name);
       return { content: [{ type: 'text', text: `Added ${name}` }] };
-    }
-  }
+    },
+  },
 ]);
 ```
 
@@ -111,11 +111,17 @@ function TodoList({ todos }) {
     description: `Get todos. Currently ${todos.length} items.`,
     inputSchema: { type: 'object', properties: {} },
     execute: async () => ({
-      content: [{ type: 'text', text: JSON.stringify(todos) }]
-    })
+      content: [{ type: 'text', text: JSON.stringify(todos) }],
+    }),
   });
 
-  return <ul>{todos.map(t => <li key={t.id}>{t.text}</li>)}</ul>;
+  return (
+    <ul>
+      {todos.map((t) => (
+        <li key={t.id}>{t.text}</li>
+      ))}
+    </ul>
+  );
 }
 ```
 
@@ -131,21 +137,21 @@ function Counter() {
       description: `Get current count. Value: ${count}`,
       inputSchema: { type: 'object', properties: {} },
       execute: async () => ({
-        content: [{ type: 'text', text: String(count) }]
-      })
+        content: [{ type: 'text', text: String(count) }],
+      }),
     },
     {
       name: 'increment',
       description: 'Increment the counter',
       inputSchema: { type: 'object', properties: {} },
       execute: async () => {
-        setCount(c => c + 1);
+        setCount((c) => c + 1);
         return { content: [{ type: 'text', text: 'Incremented' }] };
-      }
-    }
+      },
+    },
   ]);
 
-  return <button onClick={() => setCount(c => c + 1)}>{count}</button>;
+  return <button onClick={() => setCount((c) => c + 1)}>{count}</button>;
 }
 ```
 
@@ -157,13 +163,13 @@ import { useWebMCPForm } from '@mcp-b/mcp-react-hook-form';
 
 function ContactForm() {
   const form = useForm({
-    defaultValues: { name: '', email: '', message: '' }
+    defaultValues: { name: '', email: '', message: '' },
   });
 
   useWebMCPForm({
     name: 'contact_form',
     description: 'Fill and submit the contact form',
-    form
+    form,
   });
 
   return (
@@ -189,8 +195,8 @@ function ProductPage({ product }) {
     description: `Get product details for "${product.name}"`,
     inputSchema: { type: 'object', properties: {} },
     execute: async () => ({
-      content: [{ type: 'text', text: JSON.stringify(product) }]
-    })
+      content: [{ type: 'text', text: JSON.stringify(product) }],
+    }),
   });
 
   // This tool only exists while on this page
@@ -219,14 +225,17 @@ Use refs or callbacks for latest values:
 ```tsx
 function ItemList({ items }) {
   // items in handler will always be current
-  useWebMCP({
-    name: 'get_items',
-    description: `Get items (${items.length} total)`,
-    inputSchema: { type: 'object', properties: {} },
-    execute: async () => ({
-      content: [{ type: 'text', text: JSON.stringify(items) }]
-    })
-  }, [items]); // Re-register when items change
+  useWebMCP(
+    {
+      name: 'get_items',
+      description: `Get items (${items.length} total)`,
+      inputSchema: { type: 'object', properties: {} },
+      execute: async () => ({
+        content: [{ type: 'text', text: JSON.stringify(items) }],
+      }),
+    },
+    [items]
+  ); // Re-register when items change
 }
 ```
 
@@ -246,13 +255,13 @@ function App() {
 
 ## Comparison: Hooks vs Injection
 
-| Aspect | useWebMCP Hooks | inject_webmcp_script |
-|--------|-----------------|----------------------|
-| **Setup** | Add to source code | No code changes |
-| **Persistence** | Permanent | Lost on navigation |
-| **Type Safety** | Full TypeScript | None |
-| **State Access** | Direct React state | DOM scraping |
-| **Best For** | Your own apps | External sites |
+| Aspect           | useWebMCP Hooks    | inject_webmcp_script |
+| ---------------- | ------------------ | -------------------- |
+| **Setup**        | Add to source code | No code changes      |
+| **Persistence**  | Permanent          | Lost on navigation   |
+| **Type Safety**  | Full TypeScript    | None                 |
+| **State Access** | Direct React state | DOM scraping         |
+| **Best For**     | Your own apps      | External sites       |
 
 ## Testing with inject_webmcp_script
 
@@ -267,6 +276,7 @@ Even with hooks-based apps, you can use injection for rapid prototyping:
 ## Search Documentation
 
 For more details:
+
 ```
 mcp__docs__SearchWebMcpDocumentation("useWebMCP hook")
 mcp__docs__SearchWebMcpDocumentation("react-webmcp")

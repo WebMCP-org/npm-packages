@@ -5,23 +5,16 @@
  */
 
 import assert from 'node:assert';
-import {describe, it, afterEach, beforeEach} from 'node:test';
+import { describe, it, afterEach, beforeEach } from 'node:test';
 import zlib from 'node:zlib';
 
 import sinon from 'sinon';
 
-import {
-  analyzeInsight,
-  startTrace,
-  stopTrace,
-} from '../../src/tools/performance.js';
-import type {TraceResult} from '../../src/trace-processing/parse.js';
-import {
-  parseRawTraceBuffer,
-  traceResultIsSuccess,
-} from '../../src/trace-processing/parse.js';
-import {loadTraceAsBuffer} from '../trace-processing/fixtures/load.js';
-import {withMcpContext} from '../utils.js';
+import { analyzeInsight, startTrace, stopTrace } from '../../src/tools/performance.js';
+import type { TraceResult } from '../../src/trace-processing/parse.js';
+import { parseRawTraceBuffer, traceResultIsSuccess } from '../../src/trace-processing/parse.js';
+import { loadTraceAsBuffer } from '../trace-processing/fixtures/load.js';
+import { withMcpContext } from '../utils.js';
 
 describe('performance', () => {
   afterEach(() => {
@@ -29,13 +22,12 @@ describe('performance', () => {
   });
 
   beforeEach(() => {
-    sinon.stub(globalThis, 'fetch').callsFake(async url => {
-      const cruxEndpoint =
-        'https://chromeuxreport.googleapis.com/v1/records:queryRecord';
+    sinon.stub(globalThis, 'fetch').callsFake(async (url) => {
+      const cruxEndpoint = 'https://chromeuxreport.googleapis.com/v1/records:queryRecord';
       if (url.toString().startsWith(cruxEndpoint)) {
         return new Response(JSON.stringify(cruxResponseFixture()), {
           status: 200,
-          headers: {'Content-Type': 'application/json'},
+          headers: { 'Content-Type': 'application/json' },
         });
       }
       throw new Error(`Unexpected fetch to ${url}`);
@@ -50,18 +42,16 @@ describe('performance', () => {
         const startTracingStub = sinon.stub(selectedPage.tracing, 'start');
         await startTrace.handler(
           {
-            params: {reload: true, autoStop: false},
+            params: { reload: true, autoStop: false },
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
         sinon.assert.calledOnce(startTracingStub);
         assert.ok(context.isRunningPerformanceTrace());
         assert.ok(
-          response.responseLines
-            .join('\n')
-            .match(/The performance trace is being recorded/),
+          response.responseLines.join('\n').match(/The performance trace is being recorded/)
         );
       });
     });
@@ -74,11 +64,11 @@ describe('performance', () => {
         const startTracingStub = sinon.stub(selectedPage.tracing, 'start');
         await startTrace.handler(
           {
-            params: {reload: true, autoStop: false},
+            params: { reload: true, autoStop: false },
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
         sinon.assert.calledOnce(startTracingStub);
         sinon.assert.calledWithExactly(gotoStub, 'about:blank', {
@@ -89,9 +79,7 @@ describe('performance', () => {
         });
         assert.ok(context.isRunningPerformanceTrace());
         assert.ok(
-          response.responseLines
-            .join('\n')
-            .match(/The performance trace is being recorded/),
+          response.responseLines.join('\n').match(/The performance trace is being recorded/)
         );
       });
     });
@@ -104,20 +92,18 @@ describe('performance', () => {
         sinon.stub(selectedPage, 'url').callsFake(() => 'https://www.test.com');
         sinon.stub(selectedPage, 'goto').callsFake(() => Promise.resolve(null));
         const startTracingStub = sinon.stub(selectedPage.tracing, 'start');
-        const stopTracingStub = sinon
-          .stub(selectedPage.tracing, 'stop')
-          .callsFake(() => {
-            return Promise.resolve(rawData);
-          });
+        const stopTracingStub = sinon.stub(selectedPage.tracing, 'stop').callsFake(() => {
+          return Promise.resolve(rawData);
+        });
 
         const clock = sinon.useFakeTimers();
         const handlerPromise = startTrace.handler(
           {
-            params: {reload: true, autoStop: true},
+            params: { reload: true, autoStop: true },
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
         // In the handler we wait 5 seconds after the page load event (which is
         // what DevTools does), hence we now fake-progress time to allow
@@ -130,16 +116,10 @@ describe('performance', () => {
 
         sinon.assert.calledOnce(startTracingStub);
         sinon.assert.calledOnce(stopTracingStub);
-        assert.strictEqual(
-          context.isRunningPerformanceTrace(),
-          false,
-          'Tracing was stopped',
-        );
+        assert.strictEqual(context.isRunningPerformanceTrace(), false, 'Tracing was stopped');
         assert.strictEqual(context.recordedTraces().length, 1);
         assert.ok(
-          response.responseLines
-            .join('\n')
-            .match(/The performance trace has been stopped/),
+          response.responseLines.join('\n').match(/The performance trace has been stopped/)
         );
       });
     });
@@ -151,17 +131,15 @@ describe('performance', () => {
         const startTracingStub = sinon.stub(selectedPage.tracing, 'start');
         await startTrace.handler(
           {
-            params: {reload: true, autoStop: false},
+            params: { reload: true, autoStop: false },
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
         sinon.assert.notCalled(startTracingStub);
         assert.ok(
-          response.responseLines
-            .join('\n')
-            .match(/a performance trace is already running/),
+          response.responseLines.join('\n').match(/a performance trace is already running/)
         );
       });
     });
@@ -179,17 +157,15 @@ describe('performance', () => {
         sinon.stub(selectedPage, 'goto').callsFake(() => Promise.resolve(null));
         sinon.stub(selectedPage.tracing, 'start');
         sinon.stub(selectedPage.tracing, 'stop').resolves(rawData);
-        const saveFileStub = sinon
-          .stub(context, 'saveFile')
-          .resolves({filename: filePath});
+        const saveFileStub = sinon.stub(context, 'saveFile').resolves({ filename: filePath });
 
         const handlerPromise = startTrace.handler(
           {
-            params: {reload: true, autoStop: true, filePath},
+            params: { reload: true, autoStop: true, filePath },
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
         // In the handler we wait 5 seconds after the page load event (which is
         // what DevTools does), hence we now fake-progress time to allow
@@ -198,11 +174,7 @@ describe('performance', () => {
         // execute.
         await handlerPromise;
 
-        assert.ok(
-          response.responseLines.includes(
-            `The raw trace data was saved to ${filePath}.`,
-          ),
-        );
+        assert.ok(response.responseLines.includes(`The raw trace data was saved to ${filePath}.`));
         sinon.assert.calledOnce(saveFileStub);
         const [savedData, savedPath] = saveFileStub.firstCall.args;
         assert.strictEqual(savedPath, filePath);
@@ -238,7 +210,7 @@ describe('performance', () => {
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
 
         assert.ok(response.attachedTracedInsight);
@@ -256,14 +228,14 @@ describe('performance', () => {
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
         assert.ok(
           response.responseLines
             .join('\n')
             .match(
-              /No recorded traces found. Record a performance trace so you have Insights to analyze./,
-            ),
+              /No recorded traces found. Record a performance trace so you have Insights to analyze./
+            )
         );
       });
     });
@@ -276,9 +248,9 @@ describe('performance', () => {
         const selectedPage = context.getSelectedPptrPage();
         const stopTracingStub = sinon.stub(selectedPage.tracing, 'stop');
         await stopTrace.handler(
-          {params: {}, page: context.getSelectedMcpPage()},
+          { params: {}, page: context.getSelectedMcpPage() },
           response,
-          context,
+          context
         );
         sinon.assert.notCalled(stopTracingStub);
         assert.strictEqual(context.isRunningPerformanceTrace(), false);
@@ -290,21 +262,15 @@ describe('performance', () => {
       await withMcpContext(async (response, context) => {
         context.setIsRunningPerformanceTrace(true);
         const selectedPage = context.getSelectedPptrPage();
-        const stopTracingStub = sinon
-          .stub(selectedPage.tracing, 'stop')
-          .callsFake(async () => {
-            return rawData;
-          });
+        const stopTracingStub = sinon.stub(selectedPage.tracing, 'stop').callsFake(async () => {
+          return rawData;
+        });
         await stopTrace.handler(
-          {params: {}, page: context.getSelectedMcpPage()},
+          { params: {}, page: context.getSelectedMcpPage() },
           response,
-          context,
+          context
         );
-        assert.ok(
-          response.responseLines.includes(
-            'The performance trace has been stopped.',
-          ),
-        );
+        assert.ok(response.responseLines.includes('The performance trace has been stopped.'));
         assert.strictEqual(context.recordedTraces().length, 1);
         sinon.assert.calledOnce(stopTracingStub);
       });
@@ -314,17 +280,11 @@ describe('performance', () => {
       await withMcpContext(async (response, context) => {
         context.setIsRunningPerformanceTrace(true);
         const selectedPage = context.getSelectedPptrPage();
-        sinon
-          .stub(selectedPage.tracing, 'stop')
-          .returns(Promise.resolve(undefined));
+        sinon.stub(selectedPage.tracing, 'stop').returns(Promise.resolve(undefined));
 
         await assert.rejects(
-          stopTrace.handler(
-            {params: {}, page: context.getSelectedMcpPage()},
-            response,
-            context,
-          ),
-          /There was an unexpected error parsing the trace/,
+          stopTrace.handler({ params: {}, page: context.getSelectedMcpPage() }, response, context),
+          /There was an unexpected error parsing the trace/
         );
       });
     });
@@ -335,27 +295,19 @@ describe('performance', () => {
         const filePath = 'test-trace.json';
         context.setIsRunningPerformanceTrace(true);
         const selectedPage = context.getSelectedPptrPage();
-        const stopTracingStub = sinon
-          .stub(selectedPage.tracing, 'stop')
-          .resolves(rawData);
-        const saveFileStub = sinon
-          .stub(context, 'saveFile')
-          .resolves({filename: filePath});
+        const stopTracingStub = sinon.stub(selectedPage.tracing, 'stop').resolves(rawData);
+        const saveFileStub = sinon.stub(context, 'saveFile').resolves({ filename: filePath });
 
         await stopTrace.handler(
-          {params: {filePath}, page: context.getSelectedMcpPage()},
+          { params: { filePath }, page: context.getSelectedMcpPage() },
           response,
-          context,
+          context
         );
 
         sinon.assert.calledOnce(stopTracingStub);
         sinon.assert.calledOnce(saveFileStub);
         sinon.assert.calledWith(saveFileStub, rawData, filePath);
-        assert.ok(
-          response.responseLines.includes(
-            `The raw trace data was saved to ${filePath}.`,
-          ),
-        );
+        assert.ok(response.responseLines.includes(`The raw trace data was saved to ${filePath}.`));
       });
     });
 
@@ -368,23 +320,18 @@ describe('performance', () => {
           sinon.stub(selectedPage.tracing, 'stop').resolves(rawData);
 
           await stopTrace.handler(
-            {params: {}, page: context.getSelectedMcpPage()},
+            { params: {}, page: context.getSelectedMcpPage() },
             response,
-            context,
+            context
           );
 
-          const cruxEndpoint =
-            'https://chromeuxreport.googleapis.com/v1/records:queryRecord';
+          const cruxEndpoint = 'https://chromeuxreport.googleapis.com/v1/records:queryRecord';
           const cruxCall = (globalThis.fetch as sinon.SinonStub)
             .getCalls()
-            .find(call => call.args[0].toString().startsWith(cruxEndpoint));
-          assert.strictEqual(
-            cruxCall,
-            undefined,
-            'CrUX fetch should not have been called',
-          );
+            .find((call) => call.args[0].toString().startsWith(cruxEndpoint));
+          assert.strictEqual(cruxCall, undefined, 'CrUX fetch should not have been called');
         },
-        {performanceCrux: false},
+        { performanceCrux: false }
       );
     });
   });
@@ -400,64 +347,64 @@ function cruxResponseFixture() {
       },
       metrics: {
         form_factors: {
-          fractions: {desktop: 0.5056, phone: 0.4796, tablet: 0.0148},
+          fractions: { desktop: 0.5056, phone: 0.4796, tablet: 0.0148 },
         },
         largest_contentful_paint: {
           histogram: [
-            {start: 0, end: 2500, density: 0.7309},
-            {start: 2500, end: 4000, density: 0.163},
-            {start: 4000, density: 0.1061},
+            { start: 0, end: 2500, density: 0.7309 },
+            { start: 2500, end: 4000, density: 0.163 },
+            { start: 4000, density: 0.1061 },
           ],
-          percentiles: {p75: 2595},
+          percentiles: { p75: 2595 },
         },
         largest_contentful_paint_image_element_render_delay: {
-          percentiles: {p75: 786},
+          percentiles: { p75: 786 },
         },
         largest_contentful_paint_image_resource_load_delay: {
-          percentiles: {p75: 86},
+          percentiles: { p75: 86 },
         },
         largest_contentful_paint_image_time_to_first_byte: {
-          percentiles: {p75: 1273},
+          percentiles: { p75: 1273 },
         },
         cumulative_layout_shift: {
           histogram: [
-            {start: '0.00', end: '0.10', density: 0.8665},
-            {start: '0.10', end: '0.25', density: 0.0716},
-            {start: '0.25', density: 0.0619},
+            { start: '0.00', end: '0.10', density: 0.8665 },
+            { start: '0.10', end: '0.25', density: 0.0716 },
+            { start: '0.25', density: 0.0619 },
           ],
-          percentiles: {p75: '0.06'},
+          percentiles: { p75: '0.06' },
         },
         interaction_to_next_paint: {
           histogram: [
-            {start: 0, end: 200, density: 0.8414},
-            {start: 200, end: 500, density: 0.1081},
-            {start: 500, density: 0.0505},
+            { start: 0, end: 200, density: 0.8414 },
+            { start: 200, end: 500, density: 0.1081 },
+            { start: 500, density: 0.0505 },
           ],
-          percentiles: {p75: 140},
+          percentiles: { p75: 140 },
         },
         largest_contentful_paint_image_resource_load_duration: {
-          percentiles: {p75: 451},
+          percentiles: { p75: 451 },
         },
         round_trip_time: {
           histogram: [
-            {start: 0, end: 75, density: 0.3663},
-            {start: 75, end: 275, density: 0.5089},
-            {start: 275, density: 0.1248},
+            { start: 0, end: 75, density: 0.3663 },
+            { start: 75, end: 275, density: 0.5089 },
+            { start: 275, density: 0.1248 },
           ],
-          percentiles: {p75: 178},
+          percentiles: { p75: 178 },
         },
         first_contentful_paint: {
           histogram: [
-            {start: 0, end: 1800, density: 0.5899},
-            {start: 1800, end: 3000, density: 0.2439},
-            {start: 3000, density: 0.1662},
+            { start: 0, end: 1800, density: 0.5899 },
+            { start: 1800, end: 3000, density: 0.2439 },
+            { start: 3000, density: 0.1662 },
           ],
-          percentiles: {p75: 2425},
+          percentiles: { p75: 2425 },
         },
       },
       collectionPeriod: {
-        firstDate: {year: 2025, month: 12, day: 8},
-        lastDate: {year: 2026, month: 1, day: 4},
+        firstDate: { year: 2025, month: 12, day: 8 },
+        lastDate: { year: 2026, month: 1, day: 4 },
       },
     },
   };

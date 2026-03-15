@@ -94,19 +94,21 @@ const tool = {
   inputSchema: {
     type: 'object',
     properties: {
-      param: { type: 'string', description: 'A parameter' }
+      param: { type: 'string', description: 'A parameter' },
     },
-    required: ['param']
+    required: ['param'],
   },
   async execute(input) {
     // Your tool logic here
     return {
-      content: [{
-        type: 'text',
-        text: `Result: ${input.param}`
-      }]
+      content: [
+        {
+          type: 'text',
+          text: `Result: ${input.param}`,
+        },
+      ],
     };
-  }
+  },
 };
 
 // Register using provideContext (Bucket A - replaceable)
@@ -155,12 +157,12 @@ Important:
 ```javascript
 // First call - registers 3 tools
 navigator.modelContext.provideContext({
-  tools: [tool1, tool2, tool3]
+  tools: [tool1, tool2, tool3],
 });
 
 // Second call - REPLACES all tools in Bucket A
 navigator.modelContext.provideContext({
-  tools: [tool4] // tool1, tool2, tool3 are now gone!
+  tools: [tool4], // tool1, tool2, tool3 are now gone!
 });
 ```
 
@@ -220,7 +222,7 @@ Advanced testing features for debugging and development.
 ```javascript
 // List tools (schemas are JSON strings!)
 const tools = navigator.modelContextTesting.listTools();
-tools.forEach(tool => {
+tools.forEach((tool) => {
   const schema = JSON.parse(tool.inputSchema); // Must parse!
 });
 
@@ -403,9 +405,7 @@ console.log('Constructor:', navigator.modelContextTesting?.constructor.name);
 // Should NOT contain "WebModelContext"
 
 // List available methods
-console.log('Methods:', Object.getOwnPropertyNames(
-  Object.getPrototypeOf(navigator.modelContext)
-));
+console.log('Methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(navigator.modelContext)));
 ```
 
 ### Common Issues
@@ -475,14 +475,14 @@ tools in the same context.
 
 ### When to Use Each Bucket
 
-|Scenario|Use Bucket A|Use Bucket B|
-|---|---|---|
-|Tools that change together|Yes|No|
-|Individual tool lifecycle|No|Yes|
-|Page/context-specific tools|Yes|No|
-|Cross-context persistent tools|No|Yes|
-|Full replacement needed|Yes|No|
-|Partial updates|No|Yes|
+| Scenario                       | Use Bucket A | Use Bucket B |
+| ------------------------------ | ------------ | ------------ |
+| Tools that change together     | Yes          | No           |
+| Individual tool lifecycle      | No           | Yes          |
+| Page/context-specific tools    | Yes          | No           |
+| Cross-context persistent tools | No           | Yes          |
+| Full replacement needed        | Yes          | No           |
+| Partial updates                | No           | Yes          |
 
 ### Example: Chat Application with Tools
 

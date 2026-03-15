@@ -5,12 +5,12 @@
  */
 
 import assert from 'node:assert';
-import {describe, it, afterEach} from 'node:test';
+import { describe, it, afterEach } from 'node:test';
 
 import sinon from 'sinon';
 
-import {startScreencast, stopScreencast} from '../../src/tools/screencast.js';
-import {withMcpContext} from '../utils.js';
+import { startScreencast, stopScreencast } from '../../src/tools/screencast.js';
+import { withMcpContext } from '../utils.js';
 
 function createMockRecorder() {
   return {
@@ -34,11 +34,11 @@ describe('screencast', () => {
 
         await startScreencast.handler(
           {
-            params: {path: '/tmp/test-recording.mp4'},
+            params: { path: '/tmp/test-recording.mp4' },
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
 
         sinon.assert.calledOnce(screencastStub);
@@ -47,11 +47,7 @@ describe('screencast', () => {
         assert.ok(callArgs.path?.endsWith('test-recording.mp4'));
 
         assert.ok(context.getScreenRecorder() !== null);
-        assert.ok(
-          response.responseLines
-            .join('\n')
-            .includes('Screencast recording started'),
-        );
+        assert.ok(response.responseLines.join('\n').includes('Screencast recording started'));
       });
     });
 
@@ -64,9 +60,9 @@ describe('screencast', () => {
           .resolves(mockRecorder as never);
 
         await startScreencast.handler(
-          {params: {}, page: context.getSelectedMcpPage()},
+          { params: {}, page: context.getSelectedMcpPage() },
           response,
-          context,
+          context
         );
 
         sinon.assert.calledOnce(screencastStub);
@@ -89,16 +85,16 @@ describe('screencast', () => {
         const screencastStub = sinon.stub(selectedPage, 'screencast');
 
         await startScreencast.handler(
-          {params: {}, page: context.getSelectedMcpPage()},
+          { params: {}, page: context.getSelectedMcpPage() },
           response,
-          context,
+          context
         );
 
         sinon.assert.notCalled(screencastStub);
         assert.ok(
           response.responseLines
             .join('\n')
-            .includes('a screencast recording is already in progress'),
+            .includes('a screencast recording is already in progress')
         );
       });
     });
@@ -112,13 +108,13 @@ describe('screencast', () => {
         await assert.rejects(
           startScreencast.handler(
             {
-              params: {path: '/tmp/test.mp4'},
+              params: { path: '/tmp/test.mp4' },
               page: context.getSelectedMcpPage(),
             },
             response,
-            context,
+            context
           ),
-          /ffmpeg is required for screencast recording/,
+          /ffmpeg is required for screencast recording/
         );
 
         assert.strictEqual(context.getScreenRecorder(), null);
@@ -131,9 +127,9 @@ describe('screencast', () => {
       await withMcpContext(async (response, context) => {
         assert.strictEqual(context.getScreenRecorder(), null);
         await stopScreencast.handler(
-          {params: {}, page: context.getSelectedMcpPage()},
+          { params: {}, page: context.getSelectedMcpPage() },
           response,
-          context,
+          context
         );
         assert.strictEqual(response.responseLines.length, 0);
       });
@@ -149,17 +145,15 @@ describe('screencast', () => {
         });
 
         await stopScreencast.handler(
-          {params: {}, page: context.getSelectedMcpPage()},
+          { params: {}, page: context.getSelectedMcpPage() },
           response,
-          context,
+          context
         );
 
         sinon.assert.calledOnce(mockRecorder.stop);
         assert.strictEqual(context.getScreenRecorder(), null);
         assert.ok(
-          response.responseLines
-            .join('\n')
-            .includes('stopped and saved to /tmp/test-recording.mp4'),
+          response.responseLines.join('\n').includes('stopped and saved to /tmp/test-recording.mp4')
         );
       });
     });
@@ -175,11 +169,11 @@ describe('screencast', () => {
 
         await assert.rejects(
           stopScreencast.handler(
-            {params: {}, page: context.getSelectedMcpPage()},
+            { params: {}, page: context.getSelectedMcpPage() },
             response,
-            context,
+            context
           ),
-          /ffmpeg process error/,
+          /ffmpeg process error/
         );
 
         assert.strictEqual(context.getScreenRecorder(), null);

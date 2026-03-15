@@ -25,18 +25,21 @@ allowed-tools:
 Before using these tools, ensure they're injected into the page:
 
 1. **Navigate to {{Site}}**:
+
    ```javascript
-   navigate_page({ url: "{{site_url}}" })
+   navigate_page({ url: '{{site_url}}' });
    ```
 
 2. **Inject tools**:
+
    ```javascript
-   inject_webmcp_script({ file_path: "./tools/src/{{site}}.ts" })
+   inject_webmcp_script({ file_path: './tools/src/{{site}}.ts' });
    ```
 
 3. **Verify and wait for registration**:
+
    ```javascript
-   diff_webmcp_tools()  // Should show {{site}} tools
+   diff_webmcp_tools(); // Should show {{site}} tools
    ```
 
    After injection, tools are automatically registered with the MCP server and become
@@ -50,6 +53,7 @@ The tools source is bundled at `tools/src/{{site}}.ts`.
 Once injected, tools are registered with naming pattern: `webmcp_{{sanitized_domain}}_page{N}_{tool_name}`
 
 Example for {{site_url}}:
+
 - `webmcp_{{site}}_page0_get_page_info`
 - `webmcp_{{site}}_page0_search_items`
 
@@ -72,8 +76,8 @@ When using the MCP SDK directly (e.g., in tests), call tools by their registered
 ```javascript
 await client.callTool({
   name: 'webmcp_{{site}}_page0_get_page_info',
-  arguments: {}
-})
+  arguments: {},
+});
 ```
 
 **No prefix needed** when calling via MCP SDK - just the tool name as shown in `listTools()`.
@@ -105,24 +109,24 @@ evaluate_script({
     const tools = navigator.modelContext.dynamicTools;
     const tool = tools.get('tool_name');
     return await tool.execute({ param: 'value' });
-  }`
-})
+  }`,
+});
 ```
 
 ### Common Testing Issues
 
-| Issue | Solution |
-|-------|----------|
+| Issue                               | Solution                                     |
+| ----------------------------------- | -------------------------------------------- |
 | "Connection failed" after injection | Normal! Tools still work, test them directly |
-| Tools not in dynamicTools | Check console for registration errors |
-| execute() returns undefined | Check return statement in tool handler |
-| Data looks wrong | Console.log intermediate parsing steps |
+| Tools not in dynamicTools           | Check console for registration errors        |
+| execute() returns undefined         | Check return statement in tool handler       |
+| Data looks wrong                    | Console.log intermediate parsing steps       |
 
 ## Available Tools
 
-| Tool | Description | Category |
-|------|-------------|----------|
-| `tool_name` | What it does | read-only |
+| Tool           | Description  | Category   |
+| -------------- | ------------ | ---------- |
+| `tool_name`    | What it does | read-only  |
 | `another_tool` | What it does | read-write |
 
 ## Workflows
@@ -155,8 +159,8 @@ See [reference/workflows.md](reference/workflows.md) for detailed examples.
 
 ## Troubleshooting
 
-| Issue | Solution |
-|-------|----------|
-| Tools not appearing | Check console for errors, verify you're on the right page |
-| Element not found | Page may have dynamic content - use `take_snapshot` to inspect |
-| Actions not working | Site may require authentication first |
+| Issue               | Solution                                                       |
+| ------------------- | -------------------------------------------------------------- |
+| Tools not appearing | Check console for errors, verify you're on the right page      |
+| Element not found   | Page may have dynamic content - use `take_snapshot` to inspect |
+| Actions not working | Site may require authentication first                          |

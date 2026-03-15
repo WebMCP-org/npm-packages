@@ -7,11 +7,11 @@
 import assert from 'node:assert';
 import os from 'node:os';
 import path from 'node:path';
-import {describe, it} from 'node:test';
+import { describe, it } from 'node:test';
 
-import {executablePath} from 'puppeteer';
+import { executablePath } from 'puppeteer';
 
-import {detectDisplay, ensureBrowserConnected, launch} from '../src/browser.js';
+import { detectDisplay, ensureBrowserConnected, launch } from '../src/browser.js';
 
 describe('browser', () => {
   it('detects display does not crash', () => {
@@ -42,7 +42,7 @@ describe('browser', () => {
       } catch (err) {
         assert.strictEqual(
           err.message,
-          `The browser is already running for ${folderPath}. Use --isolated to run multiple browser instances.`,
+          `The browser is already running for ${folderPath}. Use --isolated to run multiple browser instances.`
         );
       }
     } finally {
@@ -67,7 +67,7 @@ describe('browser', () => {
     try {
       const [page] = await browser.pages();
       const result = await page.evaluate(() => {
-        return {width: window.innerWidth, height: window.innerHeight};
+        return { width: window.innerWidth, height: window.innerHeight };
       });
       assert.deepStrictEqual(result, {
         width: 1501,

@@ -159,7 +159,7 @@
 
 ### `list_pages`
 
-**Description:** Get a list of pages  open in the browser.
+**Description:** Get a list of pages open in the browser.
 
 **Parameters:** None
 
@@ -337,12 +337,12 @@ so returned values have to be JSON-serializable.
 **Parameters:**
 
 - **function** (string) **(required)**: A JavaScript function declaration to be executed by the tool in the currently selected page.
-Example without arguments: `() => {
+  Example without arguments: `() => {
   return document.title
 }` or `async () => {
   return await fetch("example.com")
 }`.
-Example with arguments: `(el) => {
+  Example with arguments: `(el) => {
   return el.innerText;
 }`
 
@@ -393,7 +393,7 @@ Example with arguments: `(el) => {
 
 - **allPages** (boolean) _(optional)_: If true, search across all open pages instead of only the selected page.
 - **pageId** (number) _(optional)_: Targets a specific page by ID. Defaults to the selected page.
-- **pattern** (string) _(optional)_: Optional glob pattern to filter tool names, for example "list_*" or "*_entity".
+- **pattern** (string) _(optional)_: Optional glob pattern to filter tool names, for example "list\__" or "_\_entity".
 - **summary** (boolean) _(optional)_: If true, omit input schemas and return compact tool summaries.
 
 ---

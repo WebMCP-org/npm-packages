@@ -34,6 +34,7 @@ pnpm changeset
 ```
 
 This is interactive. It will ask:
+
 1. Which packages changed? Select only the ones with actual code changes.
 2. What kind of bump? (patch / minor / major)
 3. Summary of changes? Write a clear description.
@@ -52,6 +53,7 @@ pnpm changeset version
 ```
 
 This does three things:
+
 1. Bumps `version` in all `package.json` files (fixed — all get the same version)
 2. Generates `CHANGELOG.md` entries from the changeset summaries
 3. Deletes the consumed `.changeset/*.md` files
@@ -175,6 +177,7 @@ pnpm publish -r --access public --tag canary --no-git-checks
 in `.changeset/config.json`. When any package changes, ALL packages bump together.
 
 Benefits:
+
 - **No stale transitive chains** — every package depends on the same version of its siblings
 - **Instant mismatch detection** — if `global@2.0.5` depends on `transports@2.0.4`, something's wrong
 - **Simple for consumers** — "I'm on WebMCP 2.0.5" instead of juggling 12 different version numbers
@@ -241,48 +244,51 @@ If you discover a stale dependency after publishing:
 
 ## Package Notes
 
-| Package | Notes |
-|---------|-------|
-| `@mcp-b/webmcp-types` | Foundational types. Almost everything depends on this. |
-| `@mcp-b/global` | Dual build (ESM + IIFE). Most internal deps. Most vulnerable to chain issues. |
-| `@mcp-b/chrome-devtools-mcp` | Complex build — always `rm -rf build/` before building. |
-| `usewebmcp` | Standalone package. NOT an alias for react-webmcp. |
-| `agent-skills-ts-sdk` | Published as `agent-skills-ts-sdk` (NOT `@mcp-b/agent-skills`). |
+| Package                      | Notes                                                                         |
+| ---------------------------- | ----------------------------------------------------------------------------- |
+| `@mcp-b/webmcp-types`        | Foundational types. Almost everything depends on this.                        |
+| `@mcp-b/global`              | Dual build (ESM + IIFE). Most internal deps. Most vulnerable to chain issues. |
+| `@mcp-b/chrome-devtools-mcp` | Complex build — always `rm -rf build/` before building.                       |
+| `usewebmcp`                  | Standalone package. NOT an alias for react-webmcp.                            |
+| `agent-skills-ts-sdk`        | Published as `agent-skills-ts-sdk` (NOT `@mcp-b/agent-skills`).               |
 
 ## NPM Authentication
 
 ### Local (.env)
+
 ```
 # In repo root .env (gitignored)
 NPM_TOKEN=npm_YOUR_TOKEN_HERE
 ```
 
 Load before publishing:
+
 ```bash
 export $(grep -v '^#' .env | xargs)
 ```
 
 ### CI (GitHub Secret)
+
 Set via `gh secret set NPM_TOKEN`.
 
 ## Common Issues
 
-| Issue | Fix |
-|-------|-----|
-| `workspace:*` or `catalog:` in published package.json | Use `pnpm publish`, not `npm publish` |
-| `ERR_PNPM_GIT_UNCLEAN` | Add `--no-git-checks` flag |
-| Build files missing from tarball | Check `prepublishOnly` includes build step |
-| Version already exists on npm | Bump to the next patch via `pnpm changeset` |
-| npm view shows old version | Wait 30-60 seconds for propagation |
-| No CHANGELOG entries for a version | Version was bumped manually — use changesets next time |
+| Issue                                                 | Fix                                                    |
+| ----------------------------------------------------- | ------------------------------------------------------ |
+| `workspace:*` or `catalog:` in published package.json | Use `pnpm publish`, not `npm publish`                  |
+| `ERR_PNPM_GIT_UNCLEAN`                                | Add `--no-git-checks` flag                             |
+| Build files missing from tarball                      | Check `prepublishOnly` includes build step             |
+| Version already exists on npm                         | Bump to the next patch via `pnpm changeset`            |
+| npm view shows old version                            | Wait 30-60 seconds for propagation                     |
+| No CHANGELOG entries for a version                    | Version was bumped manually — use changesets next time |
 
 ## Files Reference
 
-| File | Purpose |
-|------|---------|
-| `.changeset/config.json` | Changesets config (includes fixed versioning groups) |
-| `.npmrc` | pnpm registry & auth config |
-| `.env` | Local NPM_TOKEN (gitignored) |
-| `scripts/validate-publish.js` | Prevents accidental npm (non-pnpm) publish |
-| `.github/workflows/changesets.yml` | CI release workflow |
-| `.github/workflows/release-canary.yml` | CI canary release workflow |
+| File                                   | Purpose                                              |
+| -------------------------------------- | ---------------------------------------------------- |
+| `.changeset/config.json`               | Changesets config (includes fixed versioning groups) |
+| `.npmrc`                               | pnpm registry & auth config                          |
+| `.env`                                 | Local NPM_TOKEN (gitignored)                         |
+| `scripts/validate-publish.js`          | Prevents accidental npm (non-pnpm) publish           |
+| `.github/workflows/changesets.yml`     | CI release workflow                                  |
+| `.github/workflows/release-canary.yml` | CI canary release workflow                           |

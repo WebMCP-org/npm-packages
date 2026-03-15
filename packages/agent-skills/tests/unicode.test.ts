@@ -2,7 +2,7 @@
  * Unicode utilities tests
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { normalizeNFKC } from '../src/utils/unicode';
 
 describe('normalizeNFKC', () => {

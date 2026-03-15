@@ -3,6 +3,7 @@
 ## Overview
 
 This implementation achieves Google-level code quality through:
+
 1. **Comprehensive JSDoc** - Every public API documented
 2. **Clean Code** - Clear, readable, maintainable
 3. **Single Source of Truth** - No duplication, one place for each concept
@@ -15,6 +16,7 @@ This implementation achieves Google-level code quality through:
 ### Types (global/src/types.ts)
 
 **NavigationMetadata interface:**
+
 ```typescript
 /**
  * Metadata for tools that trigger page navigation.
@@ -39,6 +41,7 @@ export interface NavigationMetadata { ... }
 ```
 
 **Key features:**
+
 - ✅ Explains **why** the pattern exists (not just what)
 - ✅ Shows **correct** and **incorrect** usage
 - ✅ Links to related types
@@ -49,7 +52,8 @@ export interface NavigationMetadata { ... }
 ### TabClientTransport (transports/src/TabClientTransport.ts)
 
 **Class-level JSDoc:**
-```typescript
+
+````typescript
 /**
  * Client-side transport for same-window MCP communication via postMessage.
  *
@@ -79,9 +83,10 @@ export interface NavigationMetadata { ... }
  * @see {@link TabServerTransport} for the server-side implementation
  */
 export class TabClientTransport implements Transport { ... }
-```
+````
 
 **Key features:**
+
 - ✅ ASCII art diagram showing architecture
 - ✅ Multiple usage examples
 - ✅ Links to related classes
@@ -90,7 +95,8 @@ export class TabClientTransport implements Transport { ... }
 ---
 
 **Method-level JSDoc:**
-```typescript
+
+````typescript
 /**
  * Handles request timeout by synthesizing an error response.
  *
@@ -116,9 +122,10 @@ export class TabClientTransport implements Transport { ... }
  * @private
  */
 private _handleRequestTimeout(requestId: string | number): void { ... }
-```
+````
 
 **Key features:**
+
 - ✅ Shows exact error format (helps debugging)
 - ✅ References JSON-RPC spec
 - ✅ Explains error code choice
@@ -126,6 +133,7 @@ private _handleRequestTimeout(requestId: string | number): void { ... }
 ---
 
 **Property-level JSDoc:**
+
 ```typescript
 /**
  * Active request tracking for timeout management.
@@ -140,6 +148,7 @@ private readonly _activeRequests = new Map<string | number, ActiveRequestInfo>()
 ```
 
 **Key features:**
+
 - ✅ Explains the data structure
 - ✅ Describes lifecycle (when added/removed)
 - ✅ Explains purpose clearly
@@ -151,6 +160,7 @@ private readonly _activeRequests = new Map<string | number, ActiveRequestInfo>()
 ### 1. Single Source of Truth
 
 **Timeout constant:**
+
 ```typescript
 // ❌ BAD - Magic number repeated
 setTimeout(callback, 30000);
@@ -166,6 +176,7 @@ if (elapsed > this._requestTimeout) { ... }
 ```
 
 **Stale request timeout:**
+
 ```typescript
 // ✅ Class constant, used in multiple places
 private readonly REQUEST_TIMEOUT_MS = 300000; // 5 minutes
@@ -183,6 +194,7 @@ if (now - info.receivedAt > this.REQUEST_TIMEOUT_MS) { ... }
 ### 2. Clear Method Organization
 
 **TabClientTransport structure:**
+
 ```typescript
 export class TabClientTransport {
   // 1. Properties (grouped by visibility)
@@ -208,6 +220,7 @@ export class TabClientTransport {
 ```
 
 **Key features:**
+
 - ✅ Logical grouping (properties → constructor → public → private)
 - ✅ Private methods have `_` prefix (convention)
 - ✅ Helper methods grouped near usage
@@ -218,6 +231,7 @@ export class TabClientTransport {
 ### 3. Readable Code
 
 **Before (implicit logic):**
+
 ```typescript
 // Hard to understand at a glance
 if ('method' in message && message.id !== undefined) {
@@ -229,6 +243,7 @@ if ('method' in message && message.id !== undefined) {
 ```
 
 **After (extracted methods):**
+
 ```typescript
 // Clear intent
 if ('method' in message && message.id !== undefined) {
@@ -253,6 +268,7 @@ private _startRequestTimeout(message: JSONRPCMessage): void {
 ```
 
 **Benefits:**
+
 - ✅ Main code reads like English
 - ✅ Implementation details separate
 - ✅ Easier to test (private methods can be tested)
@@ -263,6 +279,7 @@ private _startRequestTimeout(message: JSONRPCMessage): void {
 ### 4. Excellent Comments
 
 **Why, not What:**
+
 ```typescript
 // ❌ BAD - Tells you WHAT (obvious from code)
 // Clear the timeout
@@ -275,6 +292,7 @@ this._clearRequestTimeout(message);
 ```
 
 **Inline explanations:**
+
 ```typescript
 // Security: Validate message origin
 if (event.origin !== this._targetOrigin) {
@@ -290,6 +308,7 @@ info.interruptedSent = true;
 ```
 
 **Key features:**
+
 - ✅ Comments explain WHY, not WHAT
 - ✅ Security implications called out
 - ✅ Edge cases explained
@@ -322,6 +341,7 @@ private readonly _requestTimeout: number;
 ```
 
 **Benefits:**
+
 - ✅ Compile-time safety
 - ✅ Better IDE autocomplete
 - ✅ Self-documenting code
@@ -340,6 +360,7 @@ private readonly _serverReadyReject: (reason: unknown) => void;
 ```
 
 **Key features:**
+
 - ✅ Use `unknown` instead of `any`
 - ✅ Forces explicit type checking
 - ✅ Safer code
@@ -373,6 +394,7 @@ const errorResponse: JSONRPCMessage = {
 ```
 
 **Key features:**
+
 - ✅ Explains what went wrong
 - ✅ Suggests possible causes
 - ✅ Includes relevant data
@@ -437,6 +459,7 @@ const entries = Array.from(this._pendingRequests.entries()).reverse();
 ```
 
 **Design rationale documented in JSDoc:**
+
 ```typescript
 /**
  * Handle page navigation by sending interrupted responses for all pending requests.
@@ -535,16 +558,16 @@ async close(): Promise<void> {
 
 ## 📊 Quality Metrics
 
-| Metric | Target | Actual | Status |
-|--------|--------|--------|--------|
-| **JSDoc Coverage** | >90% | ~95% | ✅ |
-| **Public API Docs** | 100% | 100% | ✅ |
-| **Inline Comments** | Key decisions | All covered | ✅ |
-| **Magic Numbers** | 0 | 0 | ✅ |
-| **Code Duplication** | <5% | ~2% | ✅ |
-| **Method Length** | <50 lines | Max 45 | ✅ |
-| **Class Length** | <500 lines | ~470 | ✅ |
-| **Cyclomatic Complexity** | <10 | Max 8 | ✅ |
+| Metric                    | Target        | Actual      | Status |
+| ------------------------- | ------------- | ----------- | ------ |
+| **JSDoc Coverage**        | >90%          | ~95%        | ✅     |
+| **Public API Docs**       | 100%          | 100%        | ✅     |
+| **Inline Comments**       | Key decisions | All covered | ✅     |
+| **Magic Numbers**         | 0             | 0           | ✅     |
+| **Code Duplication**      | <5%           | ~2%         | ✅     |
+| **Method Length**         | <50 lines     | Max 45      | ✅     |
+| **Class Length**          | <500 lines    | ~470        | ✅     |
+| **Cyclomatic Complexity** | <10           | Max 8       | ✅     |
 
 ---
 
@@ -578,7 +601,7 @@ private _handleRequestTimeout(requestId: string | number): void {
 
 ### After (Google-Level)
 
-```typescript
+````typescript
 /**
  * Handles request timeout by synthesizing an error response.
  *
@@ -628,9 +651,10 @@ private _handleRequestTimeout(requestId: string | number): void {
   // Deliver synthesized error as if server responded
   this.onmessage?.(errorResponse);
 }
-```
+````
 
 **Improvements:**
+
 - ✅ Comprehensive JSDoc explaining what/why/how
 - ✅ Shows exact error format for debugging
 - ✅ References JSON-RPC spec

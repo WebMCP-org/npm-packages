@@ -3,25 +3,32 @@
   "version": "2.2.0",
   "description": "Strict WebMCP core runtime polyfill for navigator.modelContext",
   "keywords": [
-    "webmcp",
+    "browser",
     "model-context",
     "navigator-modelcontext",
     "polyfill",
-    "browser"
+    "webmcp"
   ],
   "homepage": "https://docs.mcp-b.ai/packages/webmcp-polyfill",
   "bugs": {
     "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },
+  "license": "MIT",
+  "author": "Alex Nahas",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/WebMCP-org/npm-packages.git",
     "directory": "packages/webmcp-polyfill"
   },
-  "license": "MIT",
-  "author": "Alex Nahas",
-  "sideEffects": true,
+  "files": [
+    "dist"
+  ],
   "type": "module",
+  "sideEffects": true,
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "browser": "./dist/index.iife.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -33,26 +40,23 @@
       "default": "./dist/index.iife.js"
     }
   },
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "browser": "./dist/index.iife.js",
-  "types": "./dist/index.d.ts",
-  "files": [
-    "dist"
-  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "scripts": {
-    "build": "pnpm --filter @mcp-b/webmcp-types build && tsdown",
-    "check": "biome check --write .",
-    "clean": "rm -rf dist .turbo",
-    "format": "biome format --write .",
-    "lint": "biome lint --write .",
+    "build": "pnpm --filter @mcp-b/webmcp-types build && vp pack",
+    "check": "vp check --fix",
+    "clean": "rm -rf dist",
+    "format": "vp fmt --write",
+    "lint": "vp lint --fix",
     "prepublishOnly": "node ../../scripts/validate-publish.js && pnpm run build",
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
-    "test": "vitest run",
-    "test:browser": "vitest run --config vitest.browser.config.ts --browser.headless",
-    "test:browser:ui": "vitest --config vitest.browser.config.ts --browser",
-    "typecheck": "pnpm --filter @mcp-b/webmcp-types build && tsc --noEmit && vitest run --typecheck --silent"
+    "test": "vp test run",
+    "test:browser": "vp test run --config vitest.browser.config.ts --browser.headless",
+    "test:browser:ui": "vp test --config vitest.browser.config.ts --browser",
+    "typecheck": "pnpm --filter @mcp-b/webmcp-types build && tsc --noEmit && vp test run --typecheck --silent"
   },
   "dependencies": {
     "@cfworker/json-schema": "catalog:",
@@ -60,20 +64,14 @@
     "@standard-schema/spec": "^1.1.0"
   },
   "devDependencies": {
-    "@vitest/browser": "catalog:",
-    "@vitest/browser-playwright": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "happy-dom": "^20.0.0",
     "playwright": "catalog:",
-    "tsdown": "catalog:",
     "typescript": "catalog:",
+    "vite-plus": "catalog:",
     "vitest": "catalog:"
   },
   "engines": {
     "node": ">=18"
-  },
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
   }
 }

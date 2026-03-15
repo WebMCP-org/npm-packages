@@ -5,19 +5,16 @@
  */
 
 import assert from 'node:assert';
-import {readFile, rm} from 'node:fs/promises';
-import {tmpdir} from 'node:os';
-import {join} from 'node:path';
-import {describe, it} from 'node:test';
+import { readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, it } from 'node:test';
 
-import type {InsightName} from '../src/trace-processing/parse.js';
-import {
-  parseRawTraceBuffer,
-  traceResultIsSuccess,
-} from '../src/trace-processing/parse.js';
+import type { InsightName } from '../src/trace-processing/parse.js';
+import { parseRawTraceBuffer, traceResultIsSuccess } from '../src/trace-processing/parse.js';
 
-import {serverHooks} from './server.js';
-import {loadTraceAsBuffer} from './trace-processing/fixtures/load.js';
+import { serverHooks } from './server.js';
+import { loadTraceAsBuffer } from './trace-processing/fixtures/load.js';
 import {
   getImageContent,
   getMockAggregatedIssue,
@@ -31,146 +28,111 @@ import {
 } from './utils.js';
 
 describe('McpResponse', () => {
-  it('list pages', async t => {
+  it('list pages', async (t) => {
     await withMcpContext(async (response, context) => {
       response.setIncludePages(true);
-      const {content, structuredContent} = await response.handle(
-        'test',
-        context,
-      );
+      const { content, structuredContent } = await response.handle('test', context);
       assert.equal(content[0].type, 'text');
       t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot?.(JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2));
     });
   });
 
-  it('allows response text lines to be added', async t => {
+  it('allows response text lines to be added', async (t) => {
     await withMcpContext(async (response, context) => {
       response.appendResponseLine('Testing 1');
       response.appendResponseLine('Testing 2');
-      const {content, structuredContent} = await response.handle(
-        'test',
-        context,
-      );
+      const { content, structuredContent } = await response.handle('test', context);
       assert.equal(content[0].type, 'text');
       t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot?.(JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2));
     });
   });
 
-  it('does not include anything in response if snapshot is null', async t => {
+  it('does not include anything in response if snapshot is null', async (t) => {
     await withMcpContext(async (response, context) => {
       const page = context.getSelectedPptrPage();
       page.accessibility.snapshot = async () => null;
-      const {content, structuredContent} = await response.handle(
-        'test',
-        context,
-      );
+      const { content, structuredContent } = await response.handle('test', context);
       t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot?.(JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2));
     });
   });
 
-  it('returns correctly formatted snapshot for a simple tree', async t => {
+  it('returns correctly formatted snapshot for a simple tree', async (t) => {
     await withMcpContext(async (response, context) => {
       const page = context.getSelectedPptrPage();
       await page.setContent(
-        html`<button>Click me</button>
-          <input
-            type="text"
-            value="Input"
-          />`,
+        html`
+          <button>Click me</button> <input type="text" value="Input" />
+        `
       );
       await page.focus('button');
       response.includeSnapshot();
-      const {content, structuredContent} = await response.handle(
-        'test',
-        context,
-      );
+      const { content, structuredContent } = await response.handle('test', context);
       t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot?.(JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2));
     });
   });
 
-  it('returns values for textboxes', async t => {
+  it('returns values for textboxes', async (t) => {
     await withMcpContext(async (response, context) => {
       const page = context.getSelectedPptrPage();
       await page.setContent(
-        html`<label
-          >username<input
-            name="username"
-            value="mcp"
-        /></label>`,
+        html`
+          <label>username<input name="username" value="mcp" /></label>
+        `
       );
       await page.focus('input');
       response.includeSnapshot();
-      const {content, structuredContent} = await response.handle(
-        'test',
-        context,
-      );
+      const { content, structuredContent } = await response.handle('test', context);
       assert.equal(content[0].type, 'text');
       t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot?.(JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2));
     });
   });
 
-  it('returns verbose snapshot and structured content', async t => {
+  it('returns verbose snapshot and structured content', async (t) => {
     await withMcpContext(async (response, context) => {
       const page = context.getSelectedPptrPage();
-      await page.setContent(html`<aside>test</aside>`);
+      await page.setContent(
+        html`
+          <aside>test</aside>
+        `
+      );
       response.includeSnapshot({
         verbose: true,
       });
-      const {content, structuredContent} = await response.handle(
-        'test',
-        context,
-      );
+      const { content, structuredContent } = await response.handle('test', context);
       assert.equal(content[0].type, 'text');
       t.assert.snapshot?.(getTextContent(content[0]));
       t.assert.snapshot?.(JSON.stringify(structuredContent, null, 2));
     });
   });
 
-  it('saves snapshot to file and returns structured content', async t => {
+  it('saves snapshot to file and returns structured content', async (t) => {
     const filePath = join(tmpdir(), 'test-screenshot.png');
     try {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
-        await page.setContent(html`<aside>test</aside>`);
+        await page.setContent(
+          html`
+            <aside>test</aside>
+          `
+        );
         response.includeSnapshot({
           verbose: true,
           filePath,
         });
-        const {content, structuredContent} = await response.handle(
-          'test',
-          context,
-        );
+        const { content, structuredContent } = await response.handle('test', context);
         assert.equal(content[0].type, 'text');
-        t.assert.snapshot?.(
-          stabilizeResponseOutput(getTextContent(content[0])),
-        );
-        t.assert.snapshot?.(
-          JSON.stringify(
-            stabilizeStructuredContent(structuredContent),
-            null,
-            2,
-          ),
-        );
+        t.assert.snapshot?.(stabilizeResponseOutput(getTextContent(content[0])));
+        t.assert.snapshot?.(JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2));
       });
       const content = await readFile(filePath, 'utf-8');
       t.assert.snapshot?.(stabilizeResponseOutput(content));
     } finally {
-      await rm(filePath, {force: true});
+      await rm(filePath, { force: true });
     }
   });
 
@@ -215,26 +177,10 @@ describe('McpResponse', () => {
       assert.ok(span1IdMatch2, 'Span 1 ID not found in second snapshot');
       assert.ok(btn2IdMatch, 'Button 2 ID not found in second snapshot');
 
-      assert.strictEqual(
-        btn1IdMatch2[1],
-        btn1Id,
-        'Button 1 ID changed between snapshots',
-      );
-      assert.strictEqual(
-        span1IdMatch2[1],
-        span1Id,
-        'Span 1 ID changed between snapshots',
-      );
-      assert.notStrictEqual(
-        btn2IdMatch[1],
-        btn1Id,
-        'Button 2 ID collides with Button 1',
-      );
-      assert.notStrictEqual(
-        btn2IdMatch[1],
-        btn1Id,
-        'Button 2 ID collides with Button 1',
-      );
+      assert.strictEqual(btn1IdMatch2[1], btn1Id, 'Button 1 ID changed between snapshots');
+      assert.strictEqual(span1IdMatch2[1], span1Id, 'Span 1 ID changed between snapshots');
+      assert.notStrictEqual(btn2IdMatch[1], btn1Id, 'Button 2 ID collides with Button 1');
+      assert.notStrictEqual(btn2IdMatch[1], btn1Id, 'Button 2 ID collides with Button 1');
     });
   });
 
@@ -249,7 +195,7 @@ describe('McpResponse', () => {
             <div>
               <button id="btn1">Button 1</button>
             </div>
-          `,
+          `
         );
         const page = context.getSelectedPptrPage();
         await page.goto(server.getRoute('/page.html'));
@@ -270,136 +216,92 @@ describe('McpResponse', () => {
         assert.ok(btn1IdMatch2, 'Button 1 ID not found in second snapshot');
         const btn1Id2 = btn1IdMatch2[1];
 
-        assert.notStrictEqual(
-          btn1Id2,
-          btn1Id,
-          'ID should reset after navigation',
-        );
+        assert.notStrictEqual(btn1Id2, btn1Id, 'ID should reset after navigation');
       });
     });
   });
 
-  it('adds throttling setting when it is not null', async t => {
+  it('adds throttling setting when it is not null', async (t) => {
     await withMcpContext(async (response, context) => {
-      await context.emulate({networkConditions: 'Slow 3G'});
-      const {content, structuredContent} = await response.handle(
-        'test',
-        context,
-      );
+      await context.emulate({ networkConditions: 'Slow 3G' });
+      const { content, structuredContent } = await response.handle('test', context);
       assert.equal(content[0].type, 'text');
       t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot?.(JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2));
     });
   });
 
-  it('does not include throttling setting when it is null', async t => {
+  it('does not include throttling setting when it is null', async (t) => {
     await withMcpContext(async (response, context) => {
-      const {content, structuredContent} = await response.handle(
-        'test',
-        context,
-      );
+      const { content, structuredContent } = await response.handle('test', context);
       await context.emulate({});
       t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot?.(JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2));
     });
   });
-  it('adds image when image is attached', async t => {
+  it('adds image when image is attached', async (t) => {
     await withMcpContext(async (response, context) => {
-      response.attachImage({data: 'imageBase64', mimeType: 'image/png'});
-      const {content, structuredContent} = await response.handle(
-        'test',
-        context,
-      );
+      response.attachImage({ data: 'imageBase64', mimeType: 'image/png' });
+      const { content, structuredContent } = await response.handle('test', context);
       t.assert.snapshot?.(getTextContent(content[0]));
       assert.equal(content[1].type, 'image');
       assert.strictEqual(getImageContent(content[1]).data, 'imageBase64');
       assert.strictEqual(getImageContent(content[1]).mimeType, 'image/png');
-      t.assert.snapshot?.(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot?.(JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2));
     });
   });
 
-  it('adds cpu throttling setting when it is over 1', async t => {
+  it('adds cpu throttling setting when it is over 1', async (t) => {
     await withMcpContext(async (response, context) => {
-      await context.emulate({cpuThrottlingRate: 4});
-      const {content, structuredContent} = await response.handle(
-        'test',
-        context,
-      );
+      await context.emulate({ cpuThrottlingRate: 4 });
+      const { content, structuredContent } = await response.handle('test', context);
       t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot?.(JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2));
     });
   });
 
-  it('does not include cpu throttling setting when it is 1', async t => {
+  it('does not include cpu throttling setting when it is 1', async (t) => {
     await withMcpContext(async (response, context) => {
-      await context.emulate({cpuThrottlingRate: 1});
-      const {content, structuredContent} = await response.handle(
-        'test',
-        context,
-      );
+      await context.emulate({ cpuThrottlingRate: 1 });
+      const { content, structuredContent } = await response.handle('test', context);
       t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot?.(JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2));
     });
   });
 
-  it('adds viewport emulation setting when it is set', async t => {
+  it('adds viewport emulation setting when it is set', async (t) => {
     await withMcpContext(async (response, context) => {
       await context.emulate({
-        viewport: {width: 400, height: 400, deviceScaleFactor: 1},
+        viewport: { width: 400, height: 400, deviceScaleFactor: 1 },
       });
-      const {content, structuredContent} = await response.handle(
-        'test',
-        context,
-      );
+      const { content, structuredContent } = await response.handle('test', context);
       t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot?.(JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2));
     });
   });
 
-  it('adds userAgent emulation setting when it is set', async t => {
+  it('adds userAgent emulation setting when it is set', async (t) => {
     await withMcpContext(async (response, context) => {
-      await context.emulate({userAgent: 'MyUA'});
-      const {content, structuredContent} = await response.handle(
-        'test',
-        context,
-      );
+      await context.emulate({ userAgent: 'MyUA' });
+      const { content, structuredContent } = await response.handle('test', context);
       t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot?.(JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2));
     });
   });
 
-  it('adds color scheme emulation setting when it is set', async t => {
+  it('adds color scheme emulation setting when it is set', async (t) => {
     await withMcpContext(async (response, context) => {
-      await context.emulate({colorScheme: 'dark'});
-      const {content, structuredContent} = await response.handle(
-        'test',
-        context,
-      );
+      await context.emulate({ colorScheme: 'dark' });
+      const { content, structuredContent } = await response.handle('test', context);
       t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot?.(JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2));
     });
   });
 
-  it('adds a prompt dialog', async t => {
+  it('adds a prompt dialog', async (t) => {
     await withMcpContext(async (response, context) => {
       const page = context.getSelectedMcpPage();
-      const dialogPromise = new Promise<void>(resolve => {
+      const dialogPromise = new Promise<void>((resolve) => {
         page.pptrPage.on('dialog', () => {
           resolve();
         });
@@ -408,22 +310,17 @@ describe('McpResponse', () => {
         prompt('message', 'default');
       });
       await dialogPromise;
-      const {content, structuredContent} = await response.handle(
-        'test',
-        context,
-      );
+      const { content, structuredContent } = await response.handle('test', context);
       await page.getDialog()?.dismiss();
       t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot?.(JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2));
     });
   });
 
-  it('adds an alert dialog', async t => {
+  it('adds an alert dialog', async (t) => {
     await withMcpContext(async (response, context) => {
       const page = context.getSelectedMcpPage();
-      const dialogPromise = new Promise<void>(resolve => {
+      const dialogPromise = new Promise<void>((resolve) => {
         page.pptrPage.on('dialog', () => {
           resolve();
         });
@@ -432,58 +329,43 @@ describe('McpResponse', () => {
         alert('message');
       });
       await dialogPromise;
-      const {content, structuredContent} = await response.handle(
-        'test',
-        context,
-      );
+      const { content, structuredContent } = await response.handle('test', context);
       await page.getDialog()?.dismiss();
       t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot?.(JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2));
     });
   });
 
-  it('add network requests when setting is true', async t => {
+  it('add network requests when setting is true', async (t) => {
     await withMcpContext(async (response, context) => {
       response.setIncludeNetworkRequests(true);
       context.getNetworkRequests = () => {
-        return [getMockRequest({stableId: 1}), getMockRequest({stableId: 2})];
+        return [getMockRequest({ stableId: 1 }), getMockRequest({ stableId: 2 })];
       };
-      const {content, structuredContent} = await response.handle(
-        'test',
-        context,
-      );
+      const { content, structuredContent } = await response.handle('test', context);
       t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot?.(JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2));
     });
   });
 
-  it('does not include network requests when setting is false', async t => {
+  it('does not include network requests when setting is false', async (t) => {
     await withMcpContext(async (response, context) => {
       response.setIncludeNetworkRequests(false);
       context.getNetworkRequests = () => {
         return [getMockRequest()];
       };
-      const {content, structuredContent} = await response.handle(
-        'test',
-        context,
-      );
+      const { content, structuredContent } = await response.handle('test', context);
       t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot?.(JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2));
     });
   });
 
-  it('add network request when attached with POST data', async t => {
+  it('add network request when attached with POST data', async (t) => {
     await withMcpContext(async (response, context) => {
       response.setIncludeNetworkRequests(true);
       const httpResponse = getMockResponse();
       httpResponse.buffer = () => {
-        return Promise.resolve(Buffer.from(JSON.stringify({response: 'body'})));
+        return Promise.resolve(Buffer.from(JSON.stringify({ response: 'body' })));
       };
       httpResponse.headers = () => {
         return {
@@ -493,7 +375,7 @@ describe('McpResponse', () => {
       const request = getMockRequest({
         method: 'POST',
         hasPostData: true,
-        postData: JSON.stringify({request: 'body'}),
+        postData: JSON.stringify({ request: 'body' }),
         response: httpResponse,
       });
       context.getNetworkRequests = () => {
@@ -504,19 +386,14 @@ describe('McpResponse', () => {
       };
       response.attachNetworkRequest(1);
 
-      const {content, structuredContent} = await response.handle(
-        'test',
-        context,
-      );
+      const { content, structuredContent } = await response.handle('test', context);
 
       t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot?.(JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2));
     });
   });
 
-  it('add network request when attached', async t => {
+  it('add network request when attached', async (t) => {
     await withMcpContext(async (response, context) => {
       response.setIncludeNetworkRequests(true);
       const request = getMockRequest();
@@ -527,22 +404,17 @@ describe('McpResponse', () => {
         return request;
       };
       response.attachNetworkRequest(1);
-      const {content, structuredContent} = await response.handle(
-        'test',
-        context,
-      );
+      const { content, structuredContent } = await response.handle('test', context);
       t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot?.(JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2));
     });
   });
 
-  it('adds console messages when the setting is true', async t => {
+  it('adds console messages when the setting is true', async (t) => {
     await withMcpContext(async (response, context) => {
       response.setIncludeConsoleData(true);
       const page = context.getSelectedPptrPage();
-      const consoleMessagePromise = new Promise<void>(resolve => {
+      const consoleMessagePromise = new Promise<void>((resolve) => {
         page.on('console', () => {
           resolve();
         });
@@ -551,34 +423,24 @@ describe('McpResponse', () => {
         console.log('Hello from the test');
       });
       await consoleMessagePromise;
-      const {content, structuredContent} = await response.handle(
-        'test',
-        context,
-      );
+      const { content, structuredContent } = await response.handle('test', context);
       assert.ok(getTextContent(content[0]));
       t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot?.(JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2));
     });
   });
 
-  it('adds a message when no console messages exist', async t => {
+  it('adds a message when no console messages exist', async (t) => {
     await withMcpContext(async (response, context) => {
       response.setIncludeConsoleData(true);
-      const {content, structuredContent} = await response.handle(
-        'test',
-        context,
-      );
+      const { content, structuredContent } = await response.handle('test', context);
       assert.ok(getTextContent(content[0]));
       t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot?.(JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2));
     });
   });
 
-  it("doesn't list the issue message if mapping returns null", async t => {
+  it("doesn't list the issue message if mapping returns null", async (t) => {
     await withMcpContext(async (response, context) => {
       const mockAggregatedIssue = getMockAggregatedIssue();
       const mockDescription = {
@@ -591,15 +453,10 @@ describe('McpResponse', () => {
         return [mockAggregatedIssue];
       };
 
-      const {content, structuredContent} = await response.handle(
-        'test',
-        context,
-      );
+      const { content, structuredContent } = await response.handle('test', context);
       const text = getTextContent(content[0]);
       assert.ok(text.includes('<no console messages found>'));
-      t.assert.snapshot?.(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot?.(JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2));
     });
   });
 
@@ -626,218 +483,171 @@ describe('McpResponse', () => {
 });
 
 describe('McpResponse network request filtering', () => {
-  it('filters network requests by resource type', async t => {
+  it('filters network requests by resource type', async (t) => {
     await withMcpContext(async (response, context) => {
       response.setIncludeNetworkRequests(true, {
         resourceTypes: ['script', 'stylesheet'],
       });
       context.getNetworkRequests = () => {
         return [
-          getMockRequest({resourceType: 'script'}),
-          getMockRequest({resourceType: 'image'}),
-          getMockRequest({resourceType: 'stylesheet'}),
-          getMockRequest({resourceType: 'document'}),
+          getMockRequest({ resourceType: 'script' }),
+          getMockRequest({ resourceType: 'image' }),
+          getMockRequest({ resourceType: 'stylesheet' }),
+          getMockRequest({ resourceType: 'document' }),
         ];
       };
-      const {content, structuredContent} = await response.handle(
-        'test',
-        context,
-      );
+      const { content, structuredContent } = await response.handle('test', context);
       t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot?.(JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2));
     });
   });
 
-  it('filters network requests by single resource type', async t => {
+  it('filters network requests by single resource type', async (t) => {
     await withMcpContext(async (response, context) => {
       response.setIncludeNetworkRequests(true, {
         resourceTypes: ['image'],
       });
       context.getNetworkRequests = () => {
         return [
-          getMockRequest({resourceType: 'script'}),
-          getMockRequest({resourceType: 'image'}),
-          getMockRequest({resourceType: 'stylesheet'}),
+          getMockRequest({ resourceType: 'script' }),
+          getMockRequest({ resourceType: 'image' }),
+          getMockRequest({ resourceType: 'stylesheet' }),
         ];
       };
-      const {content, structuredContent} = await response.handle(
-        'test',
-        context,
-      );
+      const { content, structuredContent } = await response.handle('test', context);
       t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot?.(JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2));
     });
   });
 
-  it('shows no requests when filter matches nothing', async t => {
+  it('shows no requests when filter matches nothing', async (t) => {
     await withMcpContext(async (response, context) => {
       response.setIncludeNetworkRequests(true, {
         resourceTypes: ['font'],
       });
       context.getNetworkRequests = () => {
         return [
-          getMockRequest({resourceType: 'script'}),
-          getMockRequest({resourceType: 'image'}),
-          getMockRequest({resourceType: 'stylesheet'}),
+          getMockRequest({ resourceType: 'script' }),
+          getMockRequest({ resourceType: 'image' }),
+          getMockRequest({ resourceType: 'stylesheet' }),
         ];
       };
-      const {content, structuredContent} = await response.handle(
-        'test',
-        context,
-      );
+      const { content, structuredContent } = await response.handle('test', context);
       t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot?.(JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2));
     });
   });
 
-  it('shows all requests when no filters are provided', async t => {
+  it('shows all requests when no filters are provided', async (t) => {
     await withMcpContext(async (response, context) => {
       response.setIncludeNetworkRequests(true);
       context.getNetworkRequests = () => {
         return [
-          getMockRequest({resourceType: 'script'}),
-          getMockRequest({resourceType: 'image'}),
-          getMockRequest({resourceType: 'stylesheet'}),
-          getMockRequest({resourceType: 'document'}),
-          getMockRequest({resourceType: 'font'}),
+          getMockRequest({ resourceType: 'script' }),
+          getMockRequest({ resourceType: 'image' }),
+          getMockRequest({ resourceType: 'stylesheet' }),
+          getMockRequest({ resourceType: 'document' }),
+          getMockRequest({ resourceType: 'font' }),
         ];
       };
-      const {content, structuredContent} = await response.handle(
-        'test',
-        context,
-      );
+      const { content, structuredContent } = await response.handle('test', context);
 
       t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot?.(JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2));
     });
   });
 
-  it('shows all requests when empty resourceTypes array is provided', async t => {
+  it('shows all requests when empty resourceTypes array is provided', async (t) => {
     await withMcpContext(async (response, context) => {
       response.setIncludeNetworkRequests(true, {
         resourceTypes: [],
       });
       context.getNetworkRequests = () => {
         return [
-          getMockRequest({resourceType: 'script'}),
-          getMockRequest({resourceType: 'image'}),
-          getMockRequest({resourceType: 'stylesheet'}),
-          getMockRequest({resourceType: 'document'}),
-          getMockRequest({resourceType: 'font'}),
+          getMockRequest({ resourceType: 'script' }),
+          getMockRequest({ resourceType: 'image' }),
+          getMockRequest({ resourceType: 'stylesheet' }),
+          getMockRequest({ resourceType: 'document' }),
+          getMockRequest({ resourceType: 'font' }),
         ];
       };
-      const {content, structuredContent} = await response.handle(
-        'test',
-        context,
-      );
+      const { content, structuredContent } = await response.handle('test', context);
       t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot?.(JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2));
     });
   });
 });
 
 describe('McpResponse network pagination', () => {
-  it('returns all requests when pagination is not provided', async t => {
+  it('returns all requests when pagination is not provided', async (t) => {
     await withMcpContext(async (response, context) => {
-      const requests = Array.from({length: 5}, () => getMockRequest());
+      const requests = Array.from({ length: 5 }, () => getMockRequest());
       context.getNetworkRequests = () => requests;
       response.setIncludeNetworkRequests(true);
-      const {content, structuredContent} = await response.handle(
-        'test',
-        context,
-      );
+      const { content, structuredContent } = await response.handle('test', context);
       const text = getTextContent(content[0]);
       assert.ok(text.includes('Showing 1-5 of 5 (Page 1 of 1).'));
       assert.ok(!text.includes('Next page:'));
       assert.ok(!text.includes('Previous page:'));
-      t.assert.snapshot?.(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot?.(JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2));
     });
   });
 
-  it('returns first page by default', async t => {
+  it('returns first page by default', async (t) => {
     await withMcpContext(async (response, context) => {
-      const requests = Array.from({length: 30}, (_, idx) =>
-        getMockRequest({method: `GET-${idx}`}),
+      const requests = Array.from({ length: 30 }, (_, idx) =>
+        getMockRequest({ method: `GET-${idx}` })
       );
       context.getNetworkRequests = () => {
         return requests;
       };
-      response.setIncludeNetworkRequests(true, {pageSize: 10});
-      const {content, structuredContent} = await response.handle(
-        'test',
-        context,
-      );
+      response.setIncludeNetworkRequests(true, { pageSize: 10 });
+      const { content, structuredContent } = await response.handle('test', context);
       const text = getTextContent(content[0]);
       assert.ok(text.includes('Showing 1-10 of 30 (Page 1 of 3).'));
       assert.ok(text.includes('Next page: 1'));
       assert.ok(!text.includes('Previous page:'));
-      t.assert.snapshot?.(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot?.(JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2));
     });
   });
 
-  it('returns subsequent page when pageIdx provided', async t => {
+  it('returns subsequent page when pageIdx provided', async (t) => {
     await withMcpContext(async (response, context) => {
-      const requests = Array.from({length: 25}, (_, idx) =>
-        getMockRequest({method: `GET-${idx}`}),
+      const requests = Array.from({ length: 25 }, (_, idx) =>
+        getMockRequest({ method: `GET-${idx}` })
       );
       context.getNetworkRequests = () => requests;
       response.setIncludeNetworkRequests(true, {
         pageSize: 10,
         pageIdx: 1,
       });
-      const {content, structuredContent} = await response.handle(
-        'test',
-        context,
-      );
+      const { content, structuredContent } = await response.handle('test', context);
       const text = getTextContent(content[0]);
       assert.ok(text.includes('Showing 11-20 of 25 (Page 2 of 3).'));
       assert.ok(text.includes('Next page: 2'));
       assert.ok(text.includes('Previous page: 0'));
-      t.assert.snapshot?.(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot?.(JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2));
     });
   });
 
-  it('handles invalid page number by showing first page', async t => {
+  it('handles invalid page number by showing first page', async (t) => {
     await withMcpContext(async (response, context) => {
-      const requests = Array.from({length: 5}, () => getMockRequest());
+      const requests = Array.from({ length: 5 }, () => getMockRequest());
       context.getNetworkRequests = () => requests;
       response.setIncludeNetworkRequests(true, {
         pageSize: 2,
         pageIdx: 10, // Invalid page number
       });
-      const {content, structuredContent} = await response.handle(
-        'test',
-        context,
-      );
+      const { content, structuredContent } = await response.handle('test', context);
       const text = getTextContent(content[0]);
-      assert.ok(
-        text.includes('Invalid page number provided. Showing first page.'),
-      );
+      assert.ok(text.includes('Invalid page number provided. Showing first page.'));
       assert.ok(text.includes('Showing 1-2 of 5 (Page 1 of 3).'));
-      t.assert.snapshot?.(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot?.(JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2));
     });
   });
 
   describe('trace summaries', () => {
-    it('includes the trace summary text and structured data', async t => {
+    it('includes the trace summary text and structured data', async (t) => {
       const rawData = loadTraceAsBuffer('web-dev-with-commit.json.gz');
       const result = await parseRawTraceBuffer(rawData);
       if (!traceResultIsSuccess(result)) {
@@ -846,28 +656,21 @@ describe('McpResponse network pagination', () => {
 
       await withMcpContext(async (response, context) => {
         response.attachTraceSummary(result);
-        const {content, structuredContent} = await response.handle(
-          'test',
-          context,
-        );
+        const { content, structuredContent } = await response.handle('test', context);
 
         t.assert.snapshot?.(getTextContent(content[0]));
         const typedStructuredContent = structuredContent as {
           traceSummary?: string;
           traceInsights?: unknown[];
         };
-        t.assert.snapshot?.(
-          JSON.stringify(typedStructuredContent.traceSummary, null, 2),
-        );
-        t.assert.snapshot?.(
-          JSON.stringify(typedStructuredContent.traceInsights, null, 2),
-        );
+        t.assert.snapshot?.(JSON.stringify(typedStructuredContent.traceSummary, null, 2));
+        t.assert.snapshot?.(JSON.stringify(typedStructuredContent.traceInsights, null, 2));
       });
     });
   });
 
   describe('trace insights', () => {
-    it('includes the trace insight output', async t => {
+    it('includes the trace insight output', async (t) => {
       const rawData = loadTraceAsBuffer('web-dev-with-commit.json.gz');
       const result = await parseRawTraceBuffer(rawData);
       if (!traceResultIsSuccess(result)) {
@@ -875,28 +678,15 @@ describe('McpResponse network pagination', () => {
       }
 
       await withMcpContext(async (response, context) => {
-        response.attachTraceInsight(
-          result,
-          'NAVIGATION_0',
-          'LCPBreakdown' as InsightName,
-        );
-        const {content, structuredContent} = await response.handle(
-          'test',
-          context,
-        );
+        response.attachTraceInsight(result, 'NAVIGATION_0', 'LCPBreakdown' as InsightName);
+        const { content, structuredContent } = await response.handle('test', context);
 
         t.assert.snapshot?.(getTextContent(content[0]));
-        t.assert.snapshot?.(
-          JSON.stringify(
-            stabilizeStructuredContent(structuredContent),
-            null,
-            2,
-          ),
-        );
+        t.assert.snapshot?.(JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2));
       });
     });
 
-    it('includes error if insight not found', async t => {
+    it('includes error if insight not found', async (t) => {
       const rawData = loadTraceAsBuffer('web-dev-with-commit.json.gz');
       const result = await parseRawTraceBuffer(rawData);
       if (!traceResultIsSuccess(result)) {
@@ -904,31 +694,18 @@ describe('McpResponse network pagination', () => {
       }
 
       await withMcpContext(async (response, context) => {
-        response.attachTraceInsight(
-          result,
-          'BAD_ID',
-          'LCPBreakdown' as InsightName,
-        );
-        const {content, structuredContent} = await response.handle(
-          'test',
-          context,
-        );
+        response.attachTraceInsight(result, 'BAD_ID', 'LCPBreakdown' as InsightName);
+        const { content, structuredContent } = await response.handle('test', context);
 
         t.assert.snapshot?.(getTextContent(content[0]));
-        t.assert.snapshot?.(
-          JSON.stringify(
-            stabilizeStructuredContent(structuredContent),
-            null,
-            2,
-          ),
-        );
+        t.assert.snapshot?.(JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2));
       });
     });
   });
 });
 
 describe('extensions', () => {
-  it('lists extensions', async t => {
+  it('lists extensions', async (t) => {
     await withMcpContext(async (response, context) => {
       response.setListExtensions();
       // Empty state testing
@@ -936,7 +713,7 @@ describe('extensions', () => {
       const emptyText = getTextContent(emptyResult.content[0]);
       assert.ok(
         emptyText.includes('No extensions installed.'),
-        'Should show message for ampty extensions',
+        'Should show message for ampty extensions'
       );
 
       response.resetResponseLineForTesting();
@@ -958,10 +735,7 @@ describe('extensions', () => {
         },
       ];
       response.setListExtensions();
-      const {content, structuredContent} = await response.handle(
-        'test',
-        context,
-      );
+      const { content, structuredContent } = await response.handle('test', context);
 
       t.assert.snapshot?.(getTextContent(content[0]));
       t.assert.snapshot?.(JSON.stringify(structuredContent, null, 2));
@@ -970,7 +744,7 @@ describe('extensions', () => {
 });
 
 describe('lighthouse', () => {
-  it('includes lighthouse report paths', async t => {
+  it('includes lighthouse report paths', async (t) => {
     await withMcpContext(async (response, context) => {
       const lighthouseResult = {
         summary: {
@@ -996,10 +770,7 @@ describe('lighthouse', () => {
       };
 
       response.attachLighthouseResult(lighthouseResult);
-      const {content, structuredContent} = await response.handle(
-        'test',
-        context,
-      );
+      const { content, structuredContent } = await response.handle('test', context);
 
       const text = getTextContent(content[0]);
       assert.ok(text.includes('### Reports'));
@@ -1007,9 +778,7 @@ describe('lighthouse', () => {
       assert.ok(text.includes('- /tmp/report.html'));
 
       t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot?.(JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2));
     });
   });
 });

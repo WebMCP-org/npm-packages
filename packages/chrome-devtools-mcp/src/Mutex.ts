@@ -24,7 +24,7 @@ export class Mutex {
       this.#locked = true;
       return new Mutex.Guard(this);
     }
-    const {resolve, promise} = Promise.withResolvers<void>();
+    const { resolve, promise } = Promise.withResolvers<void>();
     this.#acquirers.push(resolve);
     await promise;
     return new Mutex.Guard(this);

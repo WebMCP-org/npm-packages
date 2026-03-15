@@ -59,6 +59,7 @@ Error: page.goto: Page crashed
 ```
 
 This is **NOT** a code issue. The error occurs because:
+
 1. The web server starts successfully (✓)
 2. The HTML loads correctly (✓)
 3. Chromium crashes in the sandboxed Docker environment (✗)
@@ -115,6 +116,7 @@ pnpm playwright test chromium-native-api.spec.ts
 The test suite includes:
 
 ### ModelContext Tests (7 tests)
+
 - ✓ Method availability (unregisterTool, clearContext)
 - ✓ Unregister dynamic tools
 - ✓ Unregister base tools
@@ -123,6 +125,7 @@ The test suite includes:
 - ✓ Handle non-existent tools gracefully
 
 ### ModelContextTesting Tests (16 tests)
+
 - ✓ Method availability (executeTool, listTools, registerToolsChangedCallback)
 - ✓ Execute with valid JSON
 - ✓ Execute returns correct value
@@ -138,6 +141,7 @@ The test suite includes:
 - ✓ Error handling in callbacks
 
 ### Integration Tests (3 tests)
+
 - ✓ executeTool + listTools work together
 - ✓ Callbacks track all operations
 - ✓ Full API specification compliance
@@ -152,8 +156,7 @@ When you run the tests locally, verify:
 4. **Error handling works** (UnknownError, Error)
 5. **Integration works** between APIs
 
-If you have Chromium with the experimental flag enabled, also verify:
-6. **Tests pass with native API** too
+If you have Chromium with the experimental flag enabled, also verify: 6. **Tests pass with native API** too
 
 ## 🔍 Code Locations
 
@@ -166,6 +169,7 @@ If you have Chromium with the experimental flag enabled, also verify:
 ## ✅ Conclusion
 
 The implementation is **complete and correct**:
+
 - ✅ Code compiles without errors
 - ✅ Builds successfully
 - ✅ Linting passes

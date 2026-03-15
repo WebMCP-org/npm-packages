@@ -4,7 +4,7 @@
  * Reference: https://github.com/agentskills/agentskills/blob/main/skills-ref/tests/test_prompt.py
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { toDisclosureInstructions, toDisclosurePrompt, toPrompt } from '../src/prompt';
 
 describe('toPrompt', () => {

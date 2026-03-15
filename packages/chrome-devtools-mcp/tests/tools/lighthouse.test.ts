@@ -8,17 +8,22 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import {describe, it} from 'node:test';
+import { describe, it } from 'node:test';
 
-import {lighthouseAudit} from '../../src/tools/lighthouse.js';
-import {serverHooks} from '../server.js';
-import {html, withMcpContext} from '../utils.js';
+import { lighthouseAudit } from '../../src/tools/lighthouse.js';
+import { serverHooks } from '../server.js';
+import { html, withMcpContext } from '../utils.js';
 
 describe('lighthouse', () => {
   const server = serverHooks();
   describe('lighthouse_audit', () => {
     it('runs Lighthouse audit by default (navigation, desktop)', async () => {
-      server.addHtmlRoute('/test', html`<div>Test</div>`);
+      server.addHtmlRoute(
+        '/test',
+        html`
+          <div>Test</div>
+        `
+      );
 
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
@@ -33,7 +38,7 @@ describe('lighthouse', () => {
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
 
         const data = response.attachedLighthouseResult;
@@ -53,7 +58,12 @@ describe('lighthouse', () => {
     });
 
     it('restores emulation', async () => {
-      server.addHtmlRoute('/test-mobile', html`<div>Test Mobile</div>`);
+      server.addHtmlRoute(
+        '/test-mobile',
+        html`
+          <div>Test Mobile</div>
+        `
+      );
 
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
@@ -94,7 +104,7 @@ describe('lighthouse', () => {
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
 
         {
@@ -118,7 +128,12 @@ describe('lighthouse', () => {
     });
 
     it('runs Lighthouse in snapshot mode with mobile device', async () => {
-      server.addHtmlRoute('/test-mobile', html`<div>Test Mobile</div>`);
+      server.addHtmlRoute(
+        '/test-mobile',
+        html`
+          <div>Test Mobile</div>
+        `
+      );
 
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
@@ -133,7 +148,7 @@ describe('lighthouse', () => {
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
 
         const data = response.attachedLighthouseResult;
@@ -146,13 +161,15 @@ describe('lighthouse', () => {
     });
 
     it('runs Lighthouse with custom output dir', async () => {
-      server.addHtmlRoute('/test-mobile', html`<div>Test Mobile</div>`);
+      server.addHtmlRoute(
+        '/test-mobile',
+        html`
+          <div>Test Mobile</div>
+        `
+      );
 
       const tmpDir = os.tmpdir();
-      const folderPath = path.join(
-        tmpDir,
-        `temp-folder-${crypto.randomUUID()}`,
-      );
+      const folderPath = path.join(tmpDir, `temp-folder-${crypto.randomUUID()}`);
 
       try {
         await withMcpContext(async (response, context) => {
@@ -169,7 +186,7 @@ describe('lighthouse', () => {
               page: context.getSelectedMcpPage(),
             },
             response,
-            context,
+            context
           );
 
           const data = response.attachedLighthouseResult;
@@ -182,7 +199,7 @@ describe('lighthouse', () => {
           }
         });
       } finally {
-        await fs.rm(folderPath, {recursive: true, force: true});
+        await fs.rm(folderPath, { recursive: true, force: true });
       }
     });
   });

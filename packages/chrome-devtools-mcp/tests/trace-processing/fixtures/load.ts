@@ -27,8 +27,8 @@ export function loadTraceAsBuffer(filePath: string): Uint8Array {
         'tests',
         'trace-processing',
         'fixtures',
-        filePath,
-      ),
+        filePath
+      )
     );
     const decompressedData = zlib.gunzipSync(compressedData);
     const jsonString = decompressedData.toString('utf-8');

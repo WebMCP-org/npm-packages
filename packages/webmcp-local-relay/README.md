@@ -109,12 +109,12 @@ npx @mcp-b/webmcp-local-relay
 
 The relay exposes four static management tools that are always available:
 
-| Tool | Description |
-|------|-------------|
-| `webmcp_list_sources` | Lists connected browser tabs with metadata (tab ID, origin, URL, title, icon, tool count) |
-| `webmcp_list_tools` | Lists all relayed tools with source info |
-| `webmcp_call_tool` | Invokes a relayed tool by name with JSON arguments — useful for clients that don't support dynamic tool registration |
-| `webmcp_open_page` | Opens a URL in the user's default browser, or refreshes a connected source page by matching origin |
+| Tool                  | Description                                                                                                          |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `webmcp_list_sources` | Lists connected browser tabs with metadata (tab ID, origin, URL, title, icon, tool count)                            |
+| `webmcp_list_tools`   | Lists all relayed tools with source info                                                                             |
+| `webmcp_call_tool`    | Invokes a relayed tool by name with JSON arguments — useful for clients that don't support dynamic tool registration |
+| `webmcp_open_page`    | Opens a URL in the user's default browser, or refreshes a connected source page by matching origin                   |
 
 **Dynamic tools** are registered directly on the MCP server using the original tool name, sanitized to `[a-zA-Z0-9_]`. When tools from different tabs share a name, a short tab-ID suffix is appended for disambiguation:
 
@@ -153,6 +153,7 @@ npx @mcp-b/webmcp-local-relay --widget-origin https://myapp.com
 - The default `allowedOrigins` is `*`, which permits any browser page to connect and register tools. This is convenient for development but means any website open in your browser can expose tools to the relay.
 - `--widget-origin` validates the **host page origin** reported in the browser `hello` message. This is the origin of the page that loaded `embed.js` (e.g., `https://myapp.com`), regardless of whether the widget iframe is served from CDN or self-hosted.
 - **Recommended:** Use `--widget-origin` to restrict which websites can register tools:
+
   ```bash
   # Only allow tools from myapp.com
   webmcp-local-relay --widget-origin https://myapp.com
@@ -160,6 +161,7 @@ npx @mcp-b/webmcp-local-relay --widget-origin https://myapp.com
   # Allow multiple origins
   webmcp-local-relay --widget-origin https://app1.com,https://app2.com
   ```
+
 - Only the host page origin is checked — any local process can connect regardless of origin restrictions.
 
 ### Architecture
@@ -227,12 +229,12 @@ For Chromium/Chrome Canary native preview testing:
 
 ### Troubleshooting
 
-| Problem | Fix |
-|---------|-----|
-| `No sources connected` | Ensure the page loaded `embed.js` and the relay process is running |
-| `No tools listed` | Ensure tools are registered on the page's WebMCP runtime. If tools register after load, confirm your runtime emits tool-change notifications (`toolschanged` or `registerToolsChangedCallback`) |
-| `Tool not found` | Tab reloaded or disconnected — call `webmcp_list_tools` again to refresh |
-| Connection blocked | Verify `--widget-origin` matches your host page's origin (e.g., `https://myapp.com`), and relay port matches `data-relay-port` |
+| Problem                | Fix                                                                                                                                                                                             |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `No sources connected` | Ensure the page loaded `embed.js` and the relay process is running                                                                                                                              |
+| `No tools listed`      | Ensure tools are registered on the page's WebMCP runtime. If tools register after load, confirm your runtime emits tool-change notifications (`toolschanged` or `registerToolsChangedCallback`) |
+| `Tool not found`       | Tab reloaded or disconnected — call `webmcp_list_tools` again to refresh                                                                                                                        |
+| Connection blocked     | Verify `--widget-origin` matches your host page's origin (e.g., `https://myapp.com`), and relay port matches `data-relay-port`                                                                  |
 
 ---
 
@@ -275,13 +277,13 @@ Produces `webmcp-local-relay-<version>.mcpb` for distribution via Claude Desktop
 
 ### Plugin and Skill Files
 
-| File | Purpose |
-|------|---------|
-| `.claude-plugin/plugin.json` | Claude Code plugin definition |
-| `.claude-plugin/marketplace.json` | Plugin marketplace metadata |
-| `.mcp.json` | MCP server configuration |
+| File                                 | Purpose                         |
+| ------------------------------------ | ------------------------------- |
+| `.claude-plugin/plugin.json`         | Claude Code plugin definition   |
+| `.claude-plugin/marketplace.json`    | Plugin marketplace metadata     |
+| `.mcp.json`                          | MCP server configuration        |
 | `skills/webmcp-local-relay/SKILL.md` | Claude Code skill documentation |
-| `manifest.json` | MCPB bundle manifest |
+| `manifest.json`                      | MCPB bundle manifest            |
 
 ### References
 

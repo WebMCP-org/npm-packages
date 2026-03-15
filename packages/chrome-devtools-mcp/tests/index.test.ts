@@ -6,21 +6,23 @@
 
 import assert from 'node:assert';
 import fs from 'node:fs';
-import {describe, it} from 'node:test';
+import { describe, it } from 'node:test';
 
-import {Client} from '@modelcontextprotocol/sdk/client/index.js';
-import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
-import {executablePath} from 'puppeteer';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { executablePath } from 'puppeteer';
 
-import type {ToolDefinition} from '../src/tools/ToolDefinition';
-import {serverHooks} from './server.js';
-import {registerRouteAwareWebMCPFixture} from './webmcp-fixture.js';
+import type { ToolDefinition } from '../src/tools/ToolDefinition';
+import { serverHooks } from './server.js';
+import { registerRouteAwareWebMCPFixture } from './webmcp-fixture.js';
 
 function getText(result: unknown): string {
-  const content = (result as {
-    content?: Array<{type: string; text?: string}>;
-  }).content;
-  const text = content?.find(item => item.type === 'text');
+  const content = (
+    result as {
+      content?: Array<{ type: string; text?: string }>;
+    }
+  ).content;
+  const text = content?.find((item) => item.type === 'text');
   if (!text || typeof text.text !== 'string') {
     throw new Error('Expected text content');
   }
@@ -30,10 +32,7 @@ function getText(result: unknown): string {
 describe('e2e', () => {
   const server = serverHooks();
 
-  async function withClient(
-    cb: (client: Client) => Promise<void>,
-    extraArgs: string[] = [],
-  ) {
+  async function withClient(cb: (client: Client) => Promise<void>, extraArgs: string[] = []) {
     const transport = new StdioClientTransport({
       command: 'node',
       args: [
@@ -52,7 +51,7 @@ describe('e2e', () => {
       },
       {
         capabilities: {},
-      },
+      }
     );
 
     try {
@@ -62,8 +61,8 @@ describe('e2e', () => {
       await client.close();
     }
   }
-  it('calls a tool', async t => {
-    await withClient(async client => {
+  it('calls a tool', async (t) => {
+    await withClient(async (client) => {
       const result = await client.callTool({
         name: 'list_pages',
         arguments: {},
@@ -72,8 +71,8 @@ describe('e2e', () => {
     });
   });
 
-  it('calls a tool multiple times', async t => {
-    await withClient(async client => {
+  it('calls a tool multiple times', async (t) => {
+    await withClient(async (client) => {
       let result = await client.callTool({
         name: 'list_pages',
         arguments: {},
@@ -87,17 +86,13 @@ describe('e2e', () => {
   });
 
   it('has all tools', async () => {
-    await withClient(async client => {
-      const {tools} = await client.listTools();
-      const exposedNames = tools.map(t => t.name).sort();
+    await withClient(async (client) => {
+      const { tools } = await client.listTools();
+      const exposedNames = tools.map((t) => t.name).sort();
       const files = fs.readdirSync('build/src/tools');
       const definedNames = [];
       for (const file of files) {
-        if (
-          file === 'ToolDefinition.js' ||
-          file === 'tools.js' ||
-          file === 'slim'
-        ) {
+        if (file === 'ToolDefinition.js' || file === 'tools.js' || file === 'slim') {
           continue;
         }
         const fileTools = await import(`../src/tools/${file}`);
@@ -112,11 +107,7 @@ describe('e2e', () => {
             }
             continue;
           }
-          if (
-            typeof maybeTool === 'object' &&
-            maybeTool !== null &&
-            'name' in maybeTool
-          ) {
+          if (typeof maybeTool === 'object' && maybeTool !== null && 'name' in maybeTool) {
             const tool = maybeTool as ToolDefinition;
             if (tool.annotations?.conditions) {
               continue;
@@ -132,41 +123,41 @@ describe('e2e', () => {
 
   it('has experimental extensions tools', async () => {
     await withClient(
-      async client => {
-        const {tools} = await client.listTools();
-        const clickAt = tools.find(t => t.name === 'install_extension');
+      async (client) => {
+        const { tools } = await client.listTools();
+        const clickAt = tools.find((t) => t.name === 'install_extension');
         assert.ok(clickAt);
       },
-      ['--category-extensions'],
+      ['--category-extensions']
     );
   });
 
   it('has experimental vision tools', async () => {
     await withClient(
-      async client => {
-        const {tools} = await client.listTools();
-        const clickAt = tools.find(t => t.name === 'click_at');
+      async (client) => {
+        const { tools } = await client.listTools();
+        const clickAt = tools.find((t) => t.name === 'click_at');
         assert.ok(clickAt);
       },
-      ['--experimental-vision'],
+      ['--experimental-vision']
     );
   });
 
   it('has experimental interop tools', async () => {
     await withClient(
-      async client => {
-        const {tools} = await client.listTools();
-        const getTabId = tools.find(t => t.name === 'get_tab_id');
+      async (client) => {
+        const { tools } = await client.listTools();
+        const getTabId = tools.find((t) => t.name === 'get_tab_id');
         assert.ok(getTabId);
       },
-      ['--experimental-interop-tools'],
+      ['--experimental-interop-tools']
     );
   });
 
   it('supports WebMCP listing, calling, and browser debugging over stdio MCP', async () => {
     registerRouteAwareWebMCPFixture(server);
 
-    await withClient(async client => {
+    await withClient(async (client) => {
       await client.callTool({
         name: 'new_page',
         arguments: {
@@ -183,12 +174,12 @@ describe('e2e', () => {
       const rootPayload = JSON.parse(getText(rootTools)) as {
         pageId: number;
         count: number;
-        tools: Array<{name: string}>;
+        tools: Array<{ name: string }>;
       };
       assert.strictEqual(rootPayload.count, 3);
       assert.deepStrictEqual(
-        rootPayload.tools.map(tool => tool.name),
-        ['navigate', 'get_current_context', 'list_all_routes'],
+        rootPayload.tools.map((tool) => tool.name),
+        ['navigate', 'get_current_context', 'list_all_routes']
       );
 
       const initialContext = await client.callTool({
@@ -203,7 +194,7 @@ describe('e2e', () => {
         name: 'call_webmcp_tool',
         arguments: {
           name: 'navigate',
-          arguments: {to: '/entities'},
+          arguments: { to: '/entities' },
         },
       });
       assert.strictEqual(getText(navigation), 'Navigated to /entities');
@@ -216,12 +207,12 @@ describe('e2e', () => {
       });
       const entityPayload = JSON.parse(getText(entityTools)) as {
         count: number;
-        tools: Array<{name: string}>;
+        tools: Array<{ name: string }>;
       };
       assert.strictEqual(entityPayload.count, 3);
       assert.deepStrictEqual(
-        entityPayload.tools.map(tool => tool.name),
-        ['navigate', 'get_current_context', 'list_entities'],
+        entityPayload.tools.map((tool) => tool.name),
+        ['navigate', 'get_current_context', 'list_entities']
       );
 
       const listEntities = await client.callTool({
@@ -230,10 +221,7 @@ describe('e2e', () => {
           name: 'list_entities',
         },
       });
-      assert.strictEqual(
-        getText(listEntities),
-        '3 entities: Ada, Linus, Grace',
-      );
+      assert.strictEqual(getText(listEntities), '3 entities: Ada, Linus, Grace');
 
       const scriptResult = await client.callTool({
         name: 'evaluate_script',

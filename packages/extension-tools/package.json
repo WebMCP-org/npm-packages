@@ -3,71 +3,75 @@
   "version": "2.2.0",
   "description": "62+ Chrome Extension API tools for Model Context Protocol (MCP) - Let AI agents control tabs, bookmarks, history, storage, and more",
   "keywords": [
+    "ai-agents",
+    "ai-browser-control",
+    "anthropic",
+    "automation",
+    "bookmarks-api",
+    "browser-automation",
+    "browser-control",
+    "browser-extension",
+    "chatgpt",
+    "chrome-api",
+    "chrome-cookies",
+    "chrome-extension",
+    "chrome-history",
+    "chrome-scripting",
+    "chrome-tabs",
+    "claude",
+    "copilot",
+    "cursor",
+    "extension-api",
+    "gemini",
+    "llm",
+    "manifest-v3",
     "mcp",
     "model-context-protocol",
-    "chrome-extension",
-    "browser-extension",
-    "chrome-api",
-    "extension-api",
-    "tabs-api",
-    "bookmarks-api",
-    "storage-api",
-    "browser-automation",
-    "ai-agents",
-    "llm",
-    "claude",
-    "chatgpt",
     "openai",
-    "anthropic",
-    "cursor",
-    "copilot",
-    "gemini",
-    "webmcp",
-    "chrome-tabs",
-    "chrome-history",
-    "chrome-cookies",
-    "chrome-scripting",
-    "ai-browser-control",
-    "manifest-v3",
-    "browser-control",
-    "automation"
+    "storage-api",
+    "tabs-api",
+    "webmcp"
   ],
   "homepage": "https://docs.mcp-b.ai/packages/extension-tools",
   "bugs": {
     "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },
+  "license": "MIT",
+  "author": "Alex Nahas",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/WebMCP-org/npm-packages.git",
     "directory": "packages/extension-tools"
   },
-  "license": "MIT",
-  "author": "Alex Nahas",
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     }
   },
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "files": [
-    "dist",
-    "README.md"
-  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "scripts": {
-    "build": "tsdown",
-    "check": "biome check --write .",
-    "clean": "rm -rf dist .turbo",
-    "format": "biome format --write .",
+    "build": "vp pack",
+    "check": "vp check --fix",
+    "clean": "rm -rf dist",
+    "format": "vp fmt --write",
     "generate-chrome-api-tools": "pnpx tsx src/aiScripts/generate-chrome-api-tools.ts",
-    "lint": "biome lint --write .",
+    "lint": "vp lint --fix",
     "prepublishOnly": "node ../../scripts/validate-publish.js && pnpm run build",
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
-    "test:e2e": "pnpm --filter @mcp-b/transports build && pnpm --filter @mcp-b/webmcp-ts-sdk build && pnpm exec tsdown --config e2e/tsdown.extension.config.ts && node e2e/build-extension.mjs && node --experimental-strip-types --test e2e/extension-runtime.e2e.test.ts",
+    "test:e2e": "pnpm --filter @mcp-b/transports build && pnpm --filter @mcp-b/webmcp-ts-sdk build && vp pack --config e2e/tsdown.extension.config.ts && node e2e/build-extension.mjs && node --experimental-strip-types --test e2e/extension-runtime.e2e.test.ts",
     "typecheck": "tsc -p tsconfig.typecheck.json --noEmit",
     "version:major": "pnpm version major --no-git-tag-version",
     "version:minor": "pnpm version minor --no-git-tag-version",
@@ -85,11 +89,7 @@
     "cheerio": "^1.1.2",
     "dotenv": "^17.2.3",
     "playwright": "^1.54.2",
-    "tsdown": "catalog:",
-    "typescript": "catalog:"
-  },
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
+    "typescript": "catalog:",
+    "vite-plus": "catalog:"
   }
 }

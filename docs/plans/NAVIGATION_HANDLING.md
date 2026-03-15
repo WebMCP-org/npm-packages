@@ -16,16 +16,19 @@ When a WebMCP tool causes a page navigation, the current implementation has no m
 ### Technical Root Cause
 
 **File: `transports/src/TabServerTransport.ts:77`**
+
 ```typescript
 window.addEventListener('message', this._messageHandler);
 ```
 
 **File: `transports/src/TabClientTransport.ts:86`**
+
 ```typescript
 window.addEventListener('message', this._messageHandler);
 ```
 
 **Current Flow When Navigation Occurs:**
+
 ```
 1. Client sends tool call request via postMessage
    ↓
@@ -53,6 +56,7 @@ We recommend implementing **three complementary strategies**:
 Tools that will navigate MUST send their response BEFORE triggering the navigation.
 
 **Response Format:**
+
 ```typescript
 interface NavigationMetadata {
   willNavigate: true;
@@ -68,6 +72,7 @@ interface ToolResponse {
 ```
 
 **Example Implementation:**
+
 ```typescript
 registerTool({
   name: 'navigate_to_docs',
@@ -80,10 +85,12 @@ registerTool({
 
     // CRITICAL: Return response BEFORE navigating
     const response = {
-      content: [{
-        type: 'text',
-        text: `Navigating to ${url}`,
-      }],
+      content: [
+        {
+          type: 'text',
+          text: `Navigating to ${url}`,
+        },
+      ],
       metadata: {
         willNavigate: true,
         navigationUrl: url,
@@ -102,12 +109,14 @@ registerTool({
 ```
 
 **Pros:**
+
 - ✅ Simple to implement
 - ✅ Works with current architecture
 - ✅ Clear developer guidance
 - ✅ Client knows navigation will happen
 
 **Cons:**
+
 - ❌ Requires all tool authors to follow pattern
 - ❌ No protection against accidental immediate navigation
 
@@ -141,10 +150,12 @@ export class TabServerTransport {
         jsonrpc: '2.0' as const,
         id,
         result: {
-          content: [{
-            type: 'text',
-            text: 'Tool execution interrupted by page navigation',
-          }],
+          content: [
+            {
+              type: 'text',
+              text: 'Tool execution interrupted by page navigation',
+            },
+          ],
           metadata: {
             navigationInterrupted: true,
             originalTool: request.method,
@@ -187,11 +198,13 @@ export class TabServerTransport {
 ```
 
 **Pros:**
+
 - ✅ Automatic safety net
 - ✅ Works even if tool author forgets
 - ✅ Clear "navigation interrupted" signal
 
 **Cons:**
+
 - ❌ May not have time to send response during unload
 - ❌ Adds complexity to transport layer
 - ❌ Doesn't distinguish successful navigation from accidental
@@ -279,11 +292,13 @@ export class TabClientTransport {
 ```
 
 **Pros:**
+
 - ✅ Prevents infinite hangs
 - ✅ Configurable per use case
 - ✅ Clear error message to agent
 
 **Cons:**
+
 - ❌ False positives for legitimately slow tools
 - ❌ Doesn't distinguish timeout from navigation
 
@@ -299,6 +314,7 @@ export class TabClientTransport {
 4. **Add warnings** in API documentation
 
 **Files to Create:**
+
 - `docs/TOOL_PATTERNS.md` - Patterns for tool authors
 - `docs/NAVIGATION_TOOLS.md` - Specific guidance for navigation tools
 - Update `global/README.md` with navigation warnings
@@ -449,17 +465,20 @@ async executeTool(
 Implement Strategy 2 (Navigation Detection) and Strategy 3 (Timeouts):
 
 **Changeset 1: Add navigation detection to TabServerTransport**
+
 - Track pending requests
 - Add `beforeunload` listener
 - Send auto-responses for interrupted requests
 
 **Changeset 2: Add timeout mechanism to TabClientTransport**
+
 - Add `toolCallTimeout` option
 - Track active timeouts
 - Clear timeouts on response
 - Synthesize timeout errors
 
 **Files to Modify:**
+
 - `transports/src/TabServerTransport.ts`
 - `transports/src/TabClientTransport.ts`
 - `transports/src/types.ts` (add TransportOptions interface)
@@ -471,6 +490,7 @@ Implement Strategy 2 (Navigation Detection) and Strategy 3 (Timeouts):
 Create comprehensive test suite and example implementations:
 
 **Test Cases:**
+
 1. Tool that navigates immediately without response → timeout
 2. Tool that responds then navigates → success with metadata
 3. Tool interrupted mid-execution → interrupted response
@@ -478,6 +498,7 @@ Create comprehensive test suite and example implementations:
 5. Timeout for slow tool (no navigation) → timeout error
 
 **Example Tools to Create:**
+
 ```typescript
 // examples/navigation-tools.ts
 
@@ -492,7 +513,7 @@ registerTool({
       metadata: { willNavigate: true, navigationUrl: args.url },
     };
 
-    setTimeout(() => window.location.href = args.url, 100);
+    setTimeout(() => (window.location.href = args.url), 100);
     return response;
   },
 });
@@ -512,23 +533,27 @@ registerTool({
       const targetUrl = results[0].url;
 
       const response = {
-        content: [{
-          type: 'text',
-          text: `Found ${results.length} results. Navigating to: ${targetUrl}`,
-        }],
+        content: [
+          {
+            type: 'text',
+            text: `Found ${results.length} results. Navigating to: ${targetUrl}`,
+          },
+        ],
         structuredContent: { results, navigatingTo: targetUrl },
         metadata: { willNavigate: true, navigationUrl: targetUrl },
       };
 
-      setTimeout(() => window.location.href = targetUrl, 100);
+      setTimeout(() => (window.location.href = targetUrl), 100);
       return response;
     }
 
     return {
-      content: [{
-        type: 'text',
-        text: `Found ${results.length} results.`,
-      }],
+      content: [
+        {
+          type: 'text',
+          text: `Found ${results.length} results.`,
+        },
+      ],
       structuredContent: { results },
     };
   },
@@ -558,10 +583,12 @@ registerTool({
     }
 
     const response = {
-      content: [{
-        type: 'text',
-        text: `Submitting form ${args.formId}. This will trigger navigation.`,
-      }],
+      content: [
+        {
+          type: 'text',
+          text: `Submitting form ${args.formId}. This will trigger navigation.`,
+        },
+      ],
       metadata: {
         willNavigate: true,
         navigationTiming: 'immediate',
@@ -589,6 +616,7 @@ When calling tools that may navigate:
 4. **Handle timeout errors** gracefully (may indicate navigation)
 
 **Example Agent Logic:**
+
 ```typescript
 const response = await client.callTool('navigate_to_url', { url: targetUrl });
 
@@ -625,6 +653,7 @@ if (response.metadata?.willNavigate) {
 If you have existing tools that navigate:
 
 **Before:**
+
 ```typescript
 registerTool({
   name: 'go_to_page',
@@ -636,6 +665,7 @@ registerTool({
 ```
 
 **After:**
+
 ```typescript
 registerTool({
   name: 'go_to_page',
@@ -646,7 +676,7 @@ registerTool({
       metadata: { willNavigate: true, navigationUrl: args.url },
     };
 
-    setTimeout(() => window.location.href = args.url, 100);
+    setTimeout(() => (window.location.href = args.url), 100);
     return response;
   },
 });
@@ -681,7 +711,7 @@ registerTool({
       metadata: { willNavigate: true, navigationUrl: args.url },
     };
 
-    setTimeout(() => window.location.href = args.url, 100);
+    setTimeout(() => (window.location.href = args.url), 100);
     return response;
   },
 });
@@ -701,7 +731,7 @@ registerTool({
     iframe.src = args.url;
     document.body.appendChild(iframe);
 
-    await new Promise(resolve => iframe.onload = resolve);
+    await new Promise((resolve) => (iframe.onload = resolve));
 
     // Now navigate main window
     const response = {
@@ -709,7 +739,7 @@ registerTool({
       metadata: { willNavigate: true, navigationUrl: args.url },
     };
 
-    setTimeout(() => window.location.href = args.url, 100);
+    setTimeout(() => (window.location.href = args.url), 100);
     return response;
   },
 });

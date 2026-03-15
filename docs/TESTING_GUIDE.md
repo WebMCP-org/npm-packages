@@ -3,6 +3,7 @@
 ## Prerequisites
 
 1. **Build the packages:**
+
    ```bash
    cd /Users/alexmnahas/personalRepos/WebMCP-org/npm-packages
    pnpm --filter @mcp-b/global build
@@ -10,12 +11,14 @@
    ```
 
 2. **Start HTTP server:**
+
    ```bash
    cd examples
    python3 -m http.server 8080
    ```
 
 3. **Open demo in Chrome:**
+
    ```
    http://localhost:8080/navigation-demo.html
    ```
@@ -34,6 +37,7 @@
 **Tool:** `navigate_to_docs`
 
 **Steps:**
+
 1. Open navigation-demo.html
 2. Open DevTools MCP tab
 3. Call tool: `navigate_to_docs` with args:
@@ -42,6 +46,7 @@
    ```
 
 **Expected Results:**
+
 - ✅ Response received with metadata:
   ```json
   {
@@ -58,6 +63,7 @@
 - ✅ No interrupted response
 
 **What This Tests:**
+
 - Pre-navigation response pattern works correctly
 - Metadata is properly included and logged
 - 100ms delay is sufficient for response transmission
@@ -69,6 +75,7 @@
 **Tool:** `bad_immediate_navigate`
 
 **Steps:**
+
 1. Open navigation-demo.html
 2. Call tool: `bad_immediate_navigate` with args:
    ```json
@@ -76,15 +83,18 @@
    ```
 
 **Expected Results:**
+
 - ❌ Original tool response is LOST (never received)
 - ✅ BeforeUnload handler fires immediately
 - ✅ Interrupted response received:
   ```json
   {
-    "content": [{
-      "type": "text",
-      "text": "Tool execution interrupted by page navigation"
-    }],
+    "content": [
+      {
+        "type": "text",
+        "text": "Tool execution interrupted by page navigation"
+      }
+    ],
     "metadata": {
       "navigationInterrupted": true,
       "originalMethod": "tools/call",
@@ -95,6 +105,7 @@
 - ✅ Console error: `[Demo] ❌ BAD PATTERN: Navigating BEFORE returning response`
 
 **What This Tests:**
+
 - BeforeUnload detection works
 - Interrupted responses are sent correctly
 - Anti-pattern is properly handled
@@ -106,6 +117,7 @@
 **Tool:** `very_slow_tool`
 
 **Steps:**
+
 1. Open navigation-demo.html
 2. Call tool: `very_slow_tool` with args:
    ```json
@@ -114,6 +126,7 @@
 3. Wait 30 seconds
 
 **Expected Results:**
+
 - ⏱️ After exactly 10 seconds, timeout error received:
   ```json
   {
@@ -133,6 +146,7 @@
 - ✅ Tool continues executing in background (check console after 60s)
 
 **What This Tests:**
+
 - Client-side timeout mechanism works
 - Timeout fires at correct interval (30s)
 - Error response is properly formatted
@@ -145,6 +159,7 @@
 **Tool:** `slow_tool`
 
 **Steps:**
+
 1. Open navigation-demo.html
 2. Call tool: `slow_tool` with args:
    ```json
@@ -153,6 +168,7 @@
 3. **Immediately** (within 2-3 seconds) click browser back button or reload
 
 **Expected Results:**
+
 - ✅ BeforeUnload handler fires
 - ✅ Interrupted response received:
   ```json
@@ -168,6 +184,7 @@
 - ✅ No timeout error (beforeunload fires before 30s)
 
 **What This Tests:**
+
 - BeforeUnload detection for user-initiated navigation
 - Interrupted response sent before timeout
 - User actions trigger proper cleanup
@@ -178,22 +195,26 @@
 
 **Setup:**
 This scenario is harder to test manually but can occur when:
+
 1. Tool completes its execution
 2. BeforeUnload fires at nearly the same time
 3. Both try to send responses
 
 **Expected Results:**
+
 - ✅ Only ONE response is received (not two)
 - ✅ If beforeunload fires first: Interrupted response sent, tool response suppressed
 - ✅ If tool completes first: Normal response sent, beforeunload does nothing
 - ✅ Console log (if suppressed): `[TabServerTransport] Suppressing response for <id> - interrupted response already sent`
 
 **What This Tests:**
+
 - `interruptedSent` flag prevents duplicate responses
 - Race condition is properly handled
 - JSON-RPC spec compliance (one response per request)
 
 **How to Test:**
+
 1. Open navigation-demo.html
 2. Call `slow_tool` with args: `{ "durationMs": 50 }`
 3. Refresh page at exactly 50ms (difficult timing)
@@ -206,6 +227,7 @@ This scenario is harder to test manually but can occur when:
 **Tools:** `slow_tool` (multiple calls)
 
 **Steps:**
+
 1. Open navigation-demo.html
 2. Call `slow_tool` three times rapidly:
    - Request 1: `{ "durationMs": 10000 }`
@@ -214,12 +236,14 @@ This scenario is harder to test manually but can occur when:
 3. Immediately refresh the page
 
 **Expected Results:**
+
 - ✅ Three interrupted responses received (one per request)
 - ✅ All responses have unique request IDs
 - ✅ LIFO order: Most recent request processed first
 - ✅ Console log: `[TabServerTransport] Sending interrupted responses for 3 pending requests`
 
 **What This Tests:**
+
 - Multiple pending requests tracked correctly
 - All requests receive interrupted responses
 - LIFO ordering for best-effort delivery
@@ -232,7 +256,9 @@ This scenario is harder to test manually but can occur when:
 **Tool:** `search_and_navigate`
 
 **Steps:**
+
 1. **Without navigation:**
+
    ```json
    { "query": "webmcp", "autoNavigate": false }
    ```
@@ -240,6 +266,7 @@ This scenario is harder to test manually but can occur when:
    **Expected:** Normal response, no navigation, no metadata
 
 2. **With navigation:**
+
    ```json
    { "query": "webmcp", "autoNavigate": true }
    ```
@@ -249,6 +276,7 @@ This scenario is harder to test manually but can occur when:
    - Navigation after 100ms
 
 **What This Tests:**
+
 - Conditional navigation logic
 - Metadata only added when navigating
 - Same tool can work with or without navigation
@@ -260,12 +288,14 @@ This scenario is harder to test manually but can occur when:
 **Tool:** `delayed_navigation`
 
 **Steps:**
+
 1. Call tool with args:
    ```json
    { "url": "https://example.com", "delayMs": 3000 }
    ```
 
 **Expected Results:**
+
 - ✅ Response received immediately with metadata:
   ```json
   {
@@ -282,6 +312,7 @@ This scenario is harder to test manually but can occur when:
 - ✅ User can cancel if needed (has 3 seconds)
 
 **What This Tests:**
+
 - Delayed navigation with custom timing
 - navigationDelayMs metadata field
 - User has time to see the response
@@ -291,6 +322,7 @@ This scenario is harder to test manually but can occur when:
 ## Console Logging Reference
 
 ### Good Pattern Logs
+
 ```
 [Demo] ✅ Good pattern: Preparing response BEFORE navigation
 [Web Model Context] Executing tool: navigate_to_docs
@@ -299,12 +331,14 @@ This scenario is harder to test manually but can occur when:
 ```
 
 ### Bad Pattern Logs
+
 ```
 [Demo] ❌ BAD PATTERN: Navigating BEFORE returning response
 [TabServerTransport] Sending interrupted responses for 1 pending request
 ```
 
 ### Timeout Logs
+
 ```
 [Demo] Slow tool starting (5000ms)
 [TabClientTransport] Request timeout for req-123
@@ -312,12 +346,14 @@ Error: Request timeout - server may have navigated or become unresponsive
 ```
 
 ### BeforeUnload Logs
+
 ```
 [Tab ServerTransport] BeforeUnload handler executing
 [TabServerTransport] Sending interrupted responses for N pending requests
 ```
 
 ### Race Condition Logs
+
 ```
 [TabServerTransport] Suppressing response for req-123 - interrupted response already sent
 ```
@@ -342,34 +378,42 @@ Error: Request timeout - server may have navigated or become unresponsive
 ## Debugging Tips
 
 ### Issue: No MCP tab in DevTools
+
 **Solution:** Enable experimental features in chrome://flags or DevTools experiments
 
 ### Issue: Tool calls not working
+
 **Check:**
+
 1. HTTP server is running on port 8080
 2. Console shows `[Demo] WebMCP Navigation Demo Ready!`
 3. Tools are registered: Check `navigator.modelContext.listTools()`
 
 ### Issue: Navigation happens but no response
+
 **Likely:** Bad pattern - tool navigating before returning response
 **Fix:** Add setTimeout before navigation
 
 ### Issue: BeforeUnload not firing
+
 **Check:**
+
 1. Handler registered: `window.addEventListener('beforeunload', ...)`
 2. Navigation actually occurring (check URL bar)
 3. Console logs enabled
 
 ### Issue: Multiple responses for same request
+
 **Problem:** Race condition - `interruptedSent` flag not working
 **Debug:**
+
 ```javascript
 // In DevTools console
 window.__mcpBridge.tabServer.send = new Proxy(originalSend, {
   apply(target, thisArg, args) {
     console.log('Sending:', args[0]);
     return target.apply(thisArg, args);
-  }
+  },
 });
 ```
 
@@ -378,12 +422,14 @@ window.__mcpBridge.tabServer.send = new Proxy(originalSend, {
 ## Performance Metrics
 
 ### Expected Performance
+
 - **Timeout overhead:** ~50 bytes per active request
 - **BeforeUnload execution:** <5ms for 10 pending requests
 - **Memory usage:** <1KB for typical workload (1-3 concurrent requests)
 - **Network overhead:** None (all postMessage)
 
 ### Monitoring
+
 ```javascript
 // Check active requests (client)
 console.log('Active requests:', transport._activeRequests.size);
@@ -413,6 +459,7 @@ console.log('Pending requests:', window.__mcpBridge.tabServer._pendingRequests.s
 ## Success Criteria
 
 ✅ **All layers working:**
+
 - Layer 1 (Metadata): Tools can signal navigation intent
 - Layer 2 (Timeout): Client times out after 30s
 - Layer 3 (BeforeUnload): Server sends interrupted responses
@@ -459,4 +506,3 @@ console.log('Pending requests:', window.__mcpBridge.tabServer._pendingRequests.s
 - [ ] Single source of truth for all constants
 - [ ] Performance is acceptable
 - [ ] Edge cases are handled
-

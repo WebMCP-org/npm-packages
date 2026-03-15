@@ -29,34 +29,39 @@ allowed-tools:
 
 ## Quick Reference
 
-| Phase | What You're Building | Tools to Use |
-|-------|---------------------|--------------|
-| **Understanding** | Learn WebMCP patterns | `mcp__docs__SearchWebMcpDocumentation` |
-| **Planning** | Design tool architecture | This skill (you're reading it) |
-| **Implementing** | Write tool code | `mcp__docs__SearchWebMcpDocumentation` for APIs |
-| **Testing** | Dogfood every tool | `mcp__chrome-devtools__*` tools (requires Chrome Dev 145+ for auth testing) |
-| **Iterating** | Refine based on usage | Chrome DevTools MCP + dogfooding |
+| Phase             | What You're Building     | Tools to Use                                                                |
+| ----------------- | ------------------------ | --------------------------------------------------------------------------- |
+| **Understanding** | Learn WebMCP patterns    | `mcp__docs__SearchWebMcpDocumentation`                                      |
+| **Planning**      | Design tool architecture | This skill (you're reading it)                                              |
+| **Implementing**  | Write tool code          | `mcp__docs__SearchWebMcpDocumentation` for APIs                             |
+| **Testing**       | Dogfood every tool       | `mcp__chrome-devtools__*` tools (requires Chrome Dev 145+ for auth testing) |
+| **Iterating**     | Refine based on usage    | Chrome DevTools MCP + dogfooding                                            |
 
 ## Success Criteria
 
 ✅ **Every major UI action has a corresponding tool**
+
 - If a human can do it, the LLM should be able to do it
 - UI parity achieved
 
 ✅ **Tools are categorized by safety**
+
 - Read-only, read-write, and destructive tools clearly separated
 - Annotations properly set
 
 ✅ **Forms use two-tool pattern**
+
 - `fill_*_form` (read-write) + `submit_*_form` (destructive)
 - User can see what's being submitted
 
 ✅ **All tools tested with Chrome DevTools MCP**
+
 - Every tool has been called and verified
 - Edge cases tested
 - Return values validated
 
 ✅ **Tools are powerful, not granular**
+
 - One tool does a complete task
 - Minimizes number of tool calls needed
 
@@ -67,44 +72,53 @@ allowed-tools:
 Organize tools into three categories:
 
 #### Read-Only Tools (`readOnlyHint: true`)
+
 **Purpose**: Let the LLM understand the current state
 
 **Characteristics**:
+
 - No side effects
 - Safe to call repeatedly
 - Idempotent
 
 **Examples**:
+
 - `list_todos` - Get all todos with filtering
 - `get_user_profile` - Get current user data
 - `search_products` - Search product catalog
 - `get_cart_contents` - See what's in cart
 
 #### Read-Write Tools (default)
+
 **Purpose**: Modify UI state in a non-destructive way
 
 **Characteristics**:
+
 - Changes what user sees on screen
 - Reversible (user can undo)
 - Does NOT commit/submit/save permanently
 - User sees changes in real-time
 
 **Examples**:
+
 - `fill_contact_form` - Populate form fields (but don't submit)
 - `set_search_query` - Change search box text (but don't search yet)
 - `apply_filters` - Update filter selection (but don't reload data yet)
 - `navigate_to_page` - Change page/tab (reversible with back button)
 
 #### Destructive Tools (`destructiveHint: true`)
+
 **Purpose**: Take permanent, irreversible actions
 
 **Characteristics**:
+
 - Commits changes permanently
 - Submits forms, deletes data, makes purchases
 - Requires careful use
 - Should be separate from filling/preparation
 
 **Examples**:
+
 - `submit_order` - Actually place the order
 - `delete_item` - Permanently remove item
 - `send_message` - Send email/message
@@ -115,6 +129,7 @@ Organize tools into three categories:
 **CRITICAL PRINCIPLE**: Separate filling from submission
 
 #### Bad Approach (Single Tool)
+
 ```tsx
 // ❌ Don't do this
 useWebMCP({
@@ -123,7 +138,7 @@ useWebMCP({
   inputSchema: {
     name: z.string(),
     email: z.string(),
-    message: z.string()
+    message: z.string(),
   },
   handler: async ({ name, email, message }) => {
     // Fill AND submit in one go
@@ -132,11 +147,12 @@ useWebMCP({
     setMessage(message);
     await submitForm(); // User never sees what's being submitted!
     return { success: true };
-  }
+  },
 });
 ```
 
 **Problems**:
+
 - User doesn't see what's being submitted
 - No chance to review or correct
 - Single atomic action = risky
@@ -151,7 +167,7 @@ useWebMCP({
   inputSchema: {
     name: z.string().optional(),
     email: z.string().optional(),
-    message: z.string().optional()
+    message: z.string().optional(),
   },
   handler: async ({ name, email, message }) => {
     // Only fill the fields, don't submit
@@ -159,7 +175,7 @@ useWebMCP({
     if (email) setEmail(email);
     if (message) setMessage(message);
     return { success: true, filledFields: { name, email, message } };
-  }
+  },
 });
 
 // ✅ Tool 2: Submit the form (destructive)
@@ -173,11 +189,12 @@ useWebMCP({
     }
     await submitForm();
     return { success: true, message: 'Form submitted' };
-  }
+  },
 });
 ```
 
 **Benefits**:
+
 - User sees form get filled on screen
 - Separate tool call = explicit intent
 - Can fill, review, then submit
@@ -188,11 +205,13 @@ useWebMCP({
 **Mental Model**: For every major action a human can take in your UI, create a corresponding tool.
 
 **Audit Process**:
+
 1. Open your app as a human user
 2. List all major actions you can take
 3. For each action, create a tool
 
 **Example Audit - Todo App**:
+
 - Human can: View todos → Tool: `list_todos`
 - Human can: Add todo → Tools: `fill_todo_form`, `create_todo`
 - Human can: Mark complete → Tool: `mark_todo_complete`
@@ -206,6 +225,7 @@ useWebMCP({
 **Principle**: One tool should accomplish a complete task, not just one tiny piece.
 
 #### Too Granular (Bad)
+
 ```tsx
 // ❌ User needs 3 tool calls to fill a form
 useWebMCP({ name: 'set_name', ... });
@@ -216,6 +236,7 @@ useWebMCP({ name: 'set_message', ... });
 **Problems**: 3 tool calls instead of 1, inefficient, poor UX
 
 #### Powerful (Good)
+
 ```tsx
 // ✅ One tool call fills entire form
 useWebMCP({
@@ -223,7 +244,7 @@ useWebMCP({
   inputSchema: {
     name: z.string().optional(),
     email: z.string().optional(),
-    message: z.string().optional()
+    message: z.string().optional(),
   },
   handler: async ({ name, email, message }) => {
     // Fill all fields at once
@@ -231,7 +252,7 @@ useWebMCP({
     if (email) setEmail(email);
     if (message) setMessage(message);
     return { success: true };
-  }
+  },
 });
 ```
 
@@ -242,6 +263,7 @@ useWebMCP({
 For detailed patterns that significantly impact tool quality, see:
 
 **[references/ADVANCED_PATTERNS.md](references/ADVANCED_PATTERNS.md)** - Covers:
+
 - Tool naming conventions (`domain_verb_noun`)
 - Complete annotation system (readOnlyHint, idempotentHint, destructiveHint)
 - Avoiding tool overload (>50 tools)
@@ -265,6 +287,7 @@ When using `@mcp-b/react-webmcp` hooks, follow these patterns for optimal perfor
 ### The Three Hooks
 
 **`useWebMCP`** - Main hook for registering tools with full control
+
 ```tsx
 const tool = useWebMCP({
   name: 'posts_like',
@@ -274,20 +297,22 @@ const tool = useWebMCP({
   handler: async ({ postId }) => {
     await api.posts.like(postId);
     return { success: true, likeCount: 42 };
-  }
+  },
 });
 ```
 
 **`useWebMCPContext`** - Simplified hook for read-only context exposure
+
 ```tsx
-useWebMCPContext(
-  'context_current_post',
-  'Get the currently viewed post ID and metadata',
-  () => ({ postId, title: post?.title, author: post?.author })
-);
+useWebMCPContext('context_current_post', 'Get the currently viewed post ID and metadata', () => ({
+  postId,
+  title: post?.title,
+  author: post?.author,
+}));
 ```
 
 **`useWebMCPResource`** - Hook for exposing MCP resources (files, data streams)
+
 ```tsx
 const { isRegistered } = useWebMCPResource({
   uri: 'user://{userId}/profile',
@@ -297,13 +322,14 @@ const { isRegistered } = useWebMCPResource({
   read: async (uri, params) => {
     const profile = await fetchUserProfile(params?.userId);
     return { contents: [{ uri: uri.href, text: JSON.stringify(profile) }] };
-  }
+  },
 });
 ```
 
 ### Critical: Always Use Output Schemas
 
 **Output schemas are MANDATORY for modern WebMCP integrations**. They enable:
+
 - AI providers to compile schemas to TypeScript
 - Type-safe code generation by AI
 - Structured responses that AI can reason about
@@ -341,6 +367,7 @@ useWebMCP({
 ```
 
 **Why this matters**:
+
 - Without `outputSchema`: AI receives `CallToolResult.content[0].text` (string)
 - With `outputSchema`: AI receives `CallToolResult.structuredContent` (typed object)
 - Modern AI models expect structured data for code generation
@@ -353,43 +380,48 @@ useWebMCP({
 // ❌ BAD: New object every render → re-registers constantly
 useWebMCP({
   name: 'get_count',
-  outputSchema: { count: z.number() },  // New object!
-  handler: async () => ({ count: 10 })
+  outputSchema: { count: z.number() }, // New object!
+  handler: async () => ({ count: 10 }),
 });
 
 // ✅ GOOD: Memoized schema → stable reference
-const OUTPUT_SCHEMA = useMemo(() => ({
-  count: z.number(),
-  items: z.array(z.string())
-}), []);
+const OUTPUT_SCHEMA = useMemo(
+  () => ({
+    count: z.number(),
+    items: z.array(z.string()),
+  }),
+  []
+);
 
 useWebMCP({
   name: 'get_count',
-  outputSchema: OUTPUT_SCHEMA,  // Stable reference
-  handler: async () => ({ count: 10, items: [] })
+  outputSchema: OUTPUT_SCHEMA, // Stable reference
+  handler: async () => ({ count: 10, items: [] }),
 });
 
 // ✅ BEST: Static schema outside component
 const OUTPUT_SCHEMA = {
   count: z.number(),
-  items: z.array(z.string())
+  items: z.array(z.string()),
 };
 
 function MyComponent() {
   useWebMCP({
     name: 'get_count',
-    outputSchema: OUTPUT_SCHEMA,  // Always stable
-    handler: async () => ({ count: 10, items: [] })
+    outputSchema: OUTPUT_SCHEMA, // Always stable
+    handler: async () => ({ count: 10, items: [] }),
   });
 }
 ```
 
 **What gets memoized**:
+
 - `inputSchema` - Always memoize or define outside component
 - `outputSchema` - Always memoize or define outside component
 - `annotations` - Always memoize or define outside component
 
 **What does NOT need memoization**:
+
 - `handler` - Stored in a ref, changes don't trigger re-registration
 - `onSuccess` / `onError` - Stored in refs
 - `formatOutput` - Stored in a ref
@@ -401,7 +433,7 @@ Use the second parameter to control when tools re-register:
 ```tsx
 function TodoList({ todos }: { todos: Todo[] }) {
   const todoCount = todos.length;
-  const todoIds = todos.map(t => t.id).join(',');
+  const todoIds = todos.map((t) => t.id).join(',');
 
   // Re-register when count or IDs change
   useWebMCP(
@@ -409,14 +441,15 @@ function TodoList({ todos }: { todos: Todo[] }) {
       name: 'list_todos',
       description: `List all todos (${todoCount} items)`,
       outputSchema: OUTPUT_SCHEMA,
-      handler: async () => ({ todos, count: todoCount })
+      handler: async () => ({ todos, count: todoCount }),
     },
-    [todoCount, todoIds]  // ← deps array
+    [todoCount, todoIds] // ← deps array
   );
 }
 ```
 
 **Best practices for deps**:
+
 - Use **primitive values**: `[count, id]` not `[{ count, id }]`
 - **Derive stable values**: `items.map(i => i.id).join(',')` not `[items]`
 - **Don't include callbacks**: Handler changes don't need re-registration
@@ -444,15 +477,20 @@ Follow the same two-tool pattern (fill + submit) with React state:
 ```tsx
 function ContactForm() {
   const [formData, setFormData] = useState({
-    name: '', email: '', message: ''
+    name: '',
+    email: '',
+    message: '',
   });
 
   // Tool 1: Fill form (read-write, user sees changes)
-  const FILL_SCHEMA = useMemo(() => ({
-    name: z.string().optional(),
-    email: z.string().email().optional(),
-    message: z.string().optional()
-  }), []);
+  const FILL_SCHEMA = useMemo(
+    () => ({
+      name: z.string().optional(),
+      email: z.string().email().optional(),
+      message: z.string().optional(),
+    }),
+    []
+  );
 
   useWebMCP({
     name: 'fill_contact_form',
@@ -461,23 +499,26 @@ function ContactForm() {
     annotations: {
       title: 'Fill Contact Form',
       readOnlyHint: false,
-      destructiveHint: false
+      destructiveHint: false,
     },
     handler: async ({ name, email, message }) => {
-      setFormData(prev => ({
+      setFormData((prev) => ({
         name: name ?? prev.name,
         email: email ?? prev.email,
-        message: message ?? prev.message
+        message: message ?? prev.message,
       }));
       return { success: true };
-    }
+    },
   });
 
   // Tool 2: Submit form (destructive, permanent action)
-  const SUBMIT_OUTPUT_SCHEMA = useMemo(() => ({
-    success: z.boolean(),
-    error: z.string().optional()
-  }), []);
+  const SUBMIT_OUTPUT_SCHEMA = useMemo(
+    () => ({
+      success: z.boolean(),
+      error: z.string().optional(),
+    }),
+    []
+  );
 
   useWebMCP({
     name: 'submit_contact_form',
@@ -485,7 +526,7 @@ function ContactForm() {
     outputSchema: SUBMIT_OUTPUT_SCHEMA,
     annotations: {
       title: 'Submit Contact Form',
-      destructiveHint: true
+      destructiveHint: true,
     },
     handler: async () => {
       if (!formData.name || !formData.email) {
@@ -493,29 +534,35 @@ function ContactForm() {
       }
       await submitForm(formData);
       return { success: true };
-    }
+    },
   });
 
   // Tool 3: Read current form state (read-only)
-  const READ_OUTPUT_SCHEMA = useMemo(() => ({
-    formData: z.object({
-      name: z.string(),
-      email: z.string(),
-      message: z.string()
+  const READ_OUTPUT_SCHEMA = useMemo(
+    () => ({
+      formData: z.object({
+        name: z.string(),
+        email: z.string(),
+        message: z.string(),
+      }),
+      isValid: z.boolean(),
     }),
-    isValid: z.boolean()
-  }), []);
+    []
+  );
 
-  useWebMCP({
-    name: 'get_form_data',
-    description: 'Get current contact form data',
-    outputSchema: READ_OUTPUT_SCHEMA,
-    annotations: { readOnlyHint: true },
-    handler: async () => ({
-      formData,
-      isValid: !!(formData.name && formData.email)
-    })
-  }, [formData.name, formData.email, formData.message]);
+  useWebMCP(
+    {
+      name: 'get_form_data',
+      description: 'Get current contact form data',
+      outputSchema: READ_OUTPUT_SCHEMA,
+      annotations: { readOnlyHint: true },
+      handler: async () => ({
+        formData,
+        isValid: !!(formData.name && formData.email),
+      }),
+    },
+    [formData.name, formData.email, formData.message]
+  );
 
   return <form>{/* UI */}</form>;
 }
@@ -531,23 +578,20 @@ function PostDetailPage() {
   const { data: post } = useQuery(['post', postId], () => fetchPost(postId));
 
   // Expose current context to AI
-  useWebMCPContext(
-    'context_current_post',
-    'Get the currently viewed post ID and metadata',
-    () => ({
-      postId,
-      title: post?.title,
-      author: post?.author,
-      tags: post?.tags,
-      createdAt: post?.createdAt
-    })
-  );
+  useWebMCPContext('context_current_post', 'Get the currently viewed post ID and metadata', () => ({
+    postId,
+    title: post?.title,
+    author: post?.author,
+    tags: post?.tags,
+    createdAt: post?.createdAt,
+  }));
 
   return <PostContent post={post} />;
 }
 ```
 
 **When to use `useWebMCPContext` vs `useWebMCP`**:
+
 - Use `useWebMCPContext` for simple read-only context (current page, user session)
 - Use `useWebMCP` when you need `outputSchema` for structured responses
 - Use `useWebMCP` when you need execution state tracking or callbacks
@@ -564,7 +608,7 @@ function LikeButton({ postId }: { postId: string }) {
     inputSchema: { postId: z.string() },
     outputSchema: {
       success: z.boolean(),
-      likeCount: z.number()
+      likeCount: z.number(),
     },
     handler: async ({ postId }) => {
       const result = await api.posts.like(postId);
@@ -575,15 +619,13 @@ function LikeButton({ postId }: { postId: string }) {
     },
     onError: (error) => {
       toast.error(`Failed: ${error.message}`);
-    }
+    },
   });
 
   return (
     <button onClick={() => likeTool.execute({ postId })}>
       {likeTool.state.isExecuting && <Spinner />}
-      {likeTool.state.lastResult && (
-        <span>♥ {likeTool.state.lastResult.likeCount}</span>
-      )}
+      {likeTool.state.lastResult && <span>♥ {likeTool.state.lastResult.likeCount}</span>}
       {likeTool.state.error && <span>Error</span>}
     </button>
   );
@@ -595,6 +637,7 @@ function LikeButton({ postId }: { postId: string }) {
 See the Chrome DevTools MCP setup section below for how to test React tools with auto-connect to preserve authentication.
 
 **Key workflow**:
+
 1. Start your React dev server (`npm run dev`)
 2. Open Chrome Dev browser
 3. Log into your app (create account, navigate to test page, etc.)
@@ -604,6 +647,7 @@ See the Chrome DevTools MCP setup section below for how to test React tools with
 7. Check return values match `outputSchema`
 
 **Why this matters for React**:
+
 - React hooks register tools on component mount
 - Chrome DevTools MCP can call those tools from outside the browser
 - Auto-connect preserves your authenticated session
@@ -612,13 +656,14 @@ See the Chrome DevTools MCP setup section below for how to test React tools with
 ### Common React Patterns
 
 **Pattern 1: Todo List with Filtering**
+
 ```tsx
 function TodoList() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
 
   const filteredTodos = useMemo(() => {
-    return todos.filter(t => {
+    return todos.filter((t) => {
       if (filter === 'all') return true;
       if (filter === 'active') return !t.completed;
       return t.completed;
@@ -626,50 +671,61 @@ function TodoList() {
   }, [todos, filter]);
 
   // Phase 1: Read tools
-  const LIST_OUTPUT_SCHEMA = useMemo(() => ({
-    todos: z.array(z.object({
-      id: z.string(),
-      text: z.string(),
-      completed: z.boolean()
-    })),
-    count: z.number(),
-    filter: z.enum(['all', 'active', 'completed'])
-  }), []);
+  const LIST_OUTPUT_SCHEMA = useMemo(
+    () => ({
+      todos: z.array(
+        z.object({
+          id: z.string(),
+          text: z.string(),
+          completed: z.boolean(),
+        })
+      ),
+      count: z.number(),
+      filter: z.enum(['all', 'active', 'completed']),
+    }),
+    []
+  );
 
-  useWebMCP({
-    name: 'list_todos',
-    description: `List todos (${filteredTodos.length} of ${todos.length})`,
-    outputSchema: LIST_OUTPUT_SCHEMA,
-    annotations: { readOnlyHint: true },
-    handler: async () => ({
-      todos: filteredTodos,
-      count: todos.length,
-      filter
-    })
-  }, [filteredTodos.length, todos.length, filter]);
+  useWebMCP(
+    {
+      name: 'list_todos',
+      description: `List todos (${filteredTodos.length} of ${todos.length})`,
+      outputSchema: LIST_OUTPUT_SCHEMA,
+      annotations: { readOnlyHint: true },
+      handler: async () => ({
+        todos: filteredTodos,
+        count: todos.length,
+        filter,
+      }),
+    },
+    [filteredTodos.length, todos.length, filter]
+  );
 
   // Phase 2: Write tools
   useWebMCP({
     name: 'set_filter',
     description: 'Change todo filter',
     inputSchema: {
-      filter: z.enum(['all', 'active', 'completed'])
+      filter: z.enum(['all', 'active', 'completed']),
     },
     handler: async ({ filter }) => {
       setFilter(filter);
       return { success: true };
-    }
+    },
   });
 
   // Phase 3: Destructive tools
-  const CREATE_OUTPUT_SCHEMA = useMemo(() => ({
-    success: z.boolean(),
-    todo: z.object({
-      id: z.string(),
-      text: z.string(),
-      completed: z.boolean()
-    })
-  }), []);
+  const CREATE_OUTPUT_SCHEMA = useMemo(
+    () => ({
+      success: z.boolean(),
+      todo: z.object({
+        id: z.string(),
+        text: z.string(),
+        completed: z.boolean(),
+      }),
+    }),
+    []
+  );
 
   useWebMCP({
     name: 'create_todo',
@@ -679,9 +735,9 @@ function TodoList() {
     annotations: { destructiveHint: true },
     handler: async ({ text }) => {
       const newTodo = { id: crypto.randomUUID(), text, completed: false };
-      setTodos(prev => [...prev, newTodo]);
+      setTodos((prev) => [...prev, newTodo]);
       return { success: true, todo: newTodo };
-    }
+    },
   });
 
   useWebMCP({
@@ -690,11 +746,11 @@ function TodoList() {
     inputSchema: { todoId: z.string() },
     annotations: { destructiveHint: true },
     handler: async ({ todoId }) => {
-      setTodos(prev => prev.map(t =>
-        t.id === todoId ? { ...t, completed: !t.completed } : t
-      ));
+      setTodos((prev) =>
+        prev.map((t) => (t.id === todoId ? { ...t, completed: !t.completed } : t))
+      );
       return { success: true };
-    }
+    },
   });
 
   return <div>{/* UI */}</div>;
@@ -702,6 +758,7 @@ function TodoList() {
 ```
 
 **Pattern 2: Search with Debouncing**
+
 ```tsx
 function ProductSearch() {
   const [query, setQuery] = useState('');
@@ -717,14 +774,19 @@ function ProductSearch() {
     return () => clearTimeout(timer);
   }, [query]);
 
-  const SEARCH_OUTPUT_SCHEMA = useMemo(() => ({
-    products: z.array(z.object({
-      id: z.string(),
-      name: z.string(),
-      price: z.number()
-    })),
-    total: z.number()
-  }), []);
+  const SEARCH_OUTPUT_SCHEMA = useMemo(
+    () => ({
+      products: z.array(
+        z.object({
+          id: z.string(),
+          name: z.string(),
+          price: z.number(),
+        })
+      ),
+      total: z.number(),
+    }),
+    []
+  );
 
   useWebMCP({
     name: 'search_products',
@@ -735,7 +797,7 @@ function ProductSearch() {
       setQuery(query);
       // Results update via useEffect debouncing
       return { products: results, total: results.length };
-    }
+    },
   });
 
   return <div>{/* UI */}</div>;
@@ -745,16 +807,19 @@ function ProductSearch() {
 ### React-Specific Gotchas
 
 **1. StrictMode Double Rendering**
+
 - React hooks handle StrictMode automatically
 - Tools only register once even with double render
 - No manual deduplication needed
 
 **2. Hot Module Replacement (HMR)**
+
 - Tools automatically unregister on component unmount
 - New tool versions register on remount
 - Works seamlessly with Vite, Webpack, etc.
 
 **3. Async State Updates**
+
 - React state updates are async
 - Handler returns immediately after `setState`
 - Don't wait for state to update before returning
@@ -764,9 +829,9 @@ function ProductSearch() {
 useWebMCP({
   name: 'increment',
   handler: async () => {
-    setCount(c => c + 1);
-    return { newCount: count };  // Returns OLD value!
-  }
+    setCount((c) => c + 1);
+    return { newCount: count }; // Returns OLD value!
+  },
 });
 
 // ✅ GOOD: Calculate new value directly
@@ -775,12 +840,13 @@ useWebMCP({
   handler: async () => {
     const newCount = count + 1;
     setCount(newCount);
-    return { newCount };  // Returns correct value
-  }
+    return { newCount }; // Returns correct value
+  },
 });
 ```
 
 **4. Memory Leaks**
+
 - React hooks auto-cleanup on unmount
 - State updates after unmount are prevented
 - No manual cleanup needed
@@ -788,14 +854,17 @@ useWebMCP({
 ### Framework Integration
 
 **Next.js App Router**
+
 ```tsx
 // app/components/Tools.tsx
 'use client';
 import { useWebMCP } from '@mcp-b/react-webmcp';
 
 export function WebMCPTools() {
-  useWebMCP({ /* ... */ });
-  return null;  // Can be invisible component
+  useWebMCP({
+    /* ... */
+  });
+  return null; // Can be invisible component
 }
 
 // app/layout.tsx
@@ -817,12 +886,15 @@ export default function RootLayout({ children }) {
 ```
 
 **Remix**
+
 ```tsx
 // app/root.tsx
 import { useWebMCP } from '@mcp-b/react-webmcp';
 
 export default function App() {
-  useWebMCP({ /* ... */ });
+  useWebMCP({
+    /* ... */
+  });
 
   return (
     <html>
@@ -854,6 +926,7 @@ For detailed React setup: `mcp__docs__SearchWebMcpDocumentation("react setup")`
 ## Common App Patterns
 
 See **[examples/COMMON_APPS.md](examples/COMMON_APPS.md)** for complete tool structures for:
+
 - Todo List App
 - E-Commerce Site
 - Admin Dashboard
@@ -869,6 +942,7 @@ Each pattern shows the full tool hierarchy (read → write → destructive) with
 **Goal**: Give the LLM eyes. Let it understand what's on screen.
 
 **What to build**:
+
 1. **List tools** - Get collections of items
    - `list_todos`, `list_products`, `list_users`
 
@@ -882,12 +956,14 @@ Each pattern shows the full tool hierarchy (read → write → destructive) with
    - `get_cart_contents`, `get_current_filters`, `get_theme`
 
 **Why first?**:
+
 - LLM needs context before taking actions
 - Safest to implement and test
 - Builds your confidence with WebMCP
 - No risk of breaking anything
 
 **Testing**:
+
 ```bash
 # For each read-only tool:
 1. Call the tool
@@ -902,6 +978,7 @@ Each pattern shows the full tool hierarchy (read → write → destructive) with
 **Goal**: Let the LLM interact with the UI without permanent consequences.
 
 **What to build**:
+
 1. **Fill tools** - Populate forms (but don't submit)
    - `fill_contact_form`, `fill_checkout_form`, `fill_profile_form`
 
@@ -912,12 +989,14 @@ Each pattern shows the full tool hierarchy (read → write → destructive) with
    - `navigate_to_page`, `open_modal`, `switch_tab`
 
 **Why second?**:
+
 - Gives LLM agency without risk
 - User sees changes in real-time
 - Reversible (user can undo)
 - Builds trust
 
 **Testing**:
+
 ```bash
 # For each read-write tool:
 1. Call the tool with test data
@@ -934,6 +1013,7 @@ Each pattern shows the full tool hierarchy (read → write → destructive) with
 **Goal**: Let the LLM make permanent changes and complete workflows.
 
 **What to build**:
+
 1. **Submit tools** - Actually commit forms
    - `submit_contact_form`, `submit_order`, `submit_profile_update`
 
@@ -947,12 +1027,14 @@ Each pattern shows the full tool hierarchy (read → write → destructive) with
    - `mark_complete`, `send_message`, `publish_post`
 
 **Why last?**:
+
 - Most risky
 - Requires phases 1-2 to be solid
 - Build confidence first
 - Easier to test when you can inspect state
 
 **Testing**:
+
 ```bash
 # For each destructive tool:
 1. Use Phase 2 tools to set up state (fill forms, etc.)
@@ -973,12 +1055,14 @@ Each pattern shows the full tool hierarchy (read → write → destructive) with
 **You are building an interface**. Just like you'd manually test a button to see if it works, you must manually test each tool.
 
 **If you don't test**:
+
 - Tools might not work at all
 - Return values might be wrong
 - Edge cases will be broken
 - User experience will be poor
 
 **If you DO test**:
+
 - You'll catch bugs immediately
 - You'll see what the LLM experiences
 - You'll find confusing APIs and fix them
@@ -1023,12 +1107,14 @@ Does it work correctly?
 ```
 
 **Why this is powerful**:
+
 - **Instant feedback**: HMR means changes appear immediately
 - **Real testing**: Tools are called in actual browser context
 - **Self-verification**: AI can verify its own work
 - **Rapid iteration**: Fix → test → verify in seconds
 
 **Example workflow**:
+
 ```bash
 Agent: "I'll create a search_products tool"
 1. Agent writes tool code using useWebMCP
@@ -1043,6 +1129,7 @@ Agent: "I'll create a search_products tool"
 ```
 
 **If something breaks**:
+
 ```bash
 Agent: "The tool returned undefined instead of products array"
 1. Agent examines the code
@@ -1084,6 +1171,7 @@ Let's say you're building a todo app. Here's what testing looks like:
 ### Common Issues Found During Dogfooding
 
 You'll discover:
+
 - "This tool should return the new todo, not just success:true"
 - "The description doesn't match what the tool actually does"
 - "I need a get_todo_by_id tool to verify the create worked"
@@ -1102,12 +1190,14 @@ To dogfood WebMCP tools effectively, you need Chrome DevTools MCP properly confi
 **Auto-Connect Feature Requires Chrome 145+**
 
 The auto-connect feature (connects to running Chrome with your cookies/auth) requires:
+
 - ✅ **Chrome Dev** (v145+) - Available NOW, recommended for testing
 - ✅ **Chrome Canary** (v146+) - Bleeding edge, may be unstable
 - ❌ **Chrome Stable** (v143) - Does NOT support auto-connect yet (coming Feb 2026)
 - ❌ **Chrome Beta** (v144) - Does NOT support auto-connect yet
 
 **Check your Chrome version:**
+
 ```bash
 # Mac
 /Applications/Google\ Chrome\ Dev.app/Contents/MacOS/Google\ Chrome\ Dev --version
@@ -1120,12 +1210,14 @@ The auto-connect feature (connects to running Chrome with your cookies/auth) req
 **Option 1: Auto-Connect to Running Chrome (Best for Testing)**
 
 Use this when:
+
 - ✅ Testing with authenticated sessions (logged-in user)
 - ✅ Need browser cookies/localStorage from your dev session
 - ✅ Want to reuse existing browser profile with extensions
 - ✅ Testing WebMCP tools that require auth
 
 **MCP Config:**
+
 ```json
 {
   "mcpServers": {
@@ -1138,6 +1230,7 @@ Use this when:
 ```
 
 **What it does:**
+
 1. Tries to connect to running Chrome Dev with your profile
 2. Falls back to launching new Chrome Dev if not running
 3. Preserves cookies, auth tokens, localStorage
@@ -1146,22 +1239,19 @@ Use this when:
 **Option 2: Always Launch Fresh Instance (Headless Testing)**
 
 Use this when:
+
 - Testing without auth requirements
 - CI/CD pipelines
 - Clean slate needed for each test
 
 **MCP Config:**
+
 ```json
 {
   "mcpServers": {
     "chrome-devtools": {
       "command": "npx",
-      "args": [
-        "-y",
-        "@mcp-b/chrome-devtools-mcp@latest",
-        "--no-auto-connect",
-        "--isolated"
-      ]
+      "args": ["-y", "@mcp-b/chrome-devtools-mcp@latest", "--no-auto-connect", "--isolated"]
     }
   }
 }
@@ -1170,17 +1260,13 @@ Use this when:
 **Option 3: Chrome Stable (No Auto-Connect)**
 
 If you don't have Chrome Dev/Canary installed:
+
 ```json
 {
   "mcpServers": {
     "chrome-devtools": {
       "command": "npx",
-      "args": [
-        "-y",
-        "@mcp-b/chrome-devtools-mcp@latest",
-        "--channel=stable",
-        "--no-auto-connect"
-      ]
+      "args": ["-y", "@mcp-b/chrome-devtools-mcp@latest", "--channel=stable", "--no-auto-connect"]
     }
   }
 }
@@ -1193,6 +1279,7 @@ If you don't have Chrome Dev/Canary installed:
 **For apps requiring authentication:**
 
 1. **Start your dev server**
+
    ```bash
    npm run dev  # Your app runs on localhost:3000
    ```
@@ -1212,6 +1299,7 @@ If you don't have Chrome Dev/Canary installed:
    ```
 
 **For apps without auth:**
+
 - Just use default config
 - Chrome DevTools MCP will launch Chrome Dev automatically
 - Navigate to your app and test
@@ -1219,18 +1307,21 @@ If you don't have Chrome Dev/Canary installed:
 #### Why Auto-Connect Matters for Testing
 
 **Without auto-connect (old way):**
+
 - Chrome DevTools MCP launches new browser instance
 - No cookies, no auth, no browser state
 - Can't test authenticated features
 - Have to log in manually every time
 
 **With auto-connect (Chrome 145+):**
+
 - Uses your existing Chrome Dev session
 - Preserves cookies, localStorage, auth tokens
 - Test authenticated tools immediately
 - Reuses browser profile with extensions
 
 **Example: Testing a Todo App with Auth**
+
 ```bash
 # Your workflow:
 1. Open Chrome Dev, navigate to localhost:3000
@@ -1256,12 +1347,14 @@ You have powerful tools at your disposal:
 ### WebMCP Docs MCP (`mcp__docs__SearchWebMcpDocumentation`)
 
 **Use this for**:
+
 - API syntax: "How do I use outputSchema in useWebMCP?"
 - Best practices: "WebMCP tool naming conventions"
 - Examples: "WebMCP form filling example"
 - Troubleshooting: "Why is my tool not re-registering?"
 
 **Example queries**:
+
 ```bash
 mcp__docs__SearchWebMcpDocumentation("useWebMCP deps array")
 mcp__docs__SearchWebMcpDocumentation("outputSchema with Zod")
@@ -1271,6 +1364,7 @@ mcp__docs__SearchWebMcpDocumentation("tool annotations destructiveHint")
 ### Chrome DevTools MCP (`mcp__chrome-devtools__*`)
 
 **Use this for**:
+
 - Testing tools: Call them and verify behavior
 - Inspecting state: Read the page to see what's there
 - Debugging: Take screenshots, check console logs
@@ -1281,12 +1375,14 @@ mcp__docs__SearchWebMcpDocumentation("tool annotations destructiveHint")
 ### This Skill (Strategic Guidance)
 
 **Use this for**:
+
 - Tool design principles
 - Implementation phases
 - Testing workflow
 - Strategic decisions
 
 **Don't use this for**:
+
 - Specific API syntax (use WebMCP Docs MCP)
 - Debugging (use Chrome DevTools MCP)
 - Implementation details (use WebMCP Docs MCP)
@@ -1301,19 +1397,19 @@ Skills should reference tool names explicitly. This helps models map domain know
 
 ```html
 <script type="agent-context">
----
-name: my-app
-description: Manage tasks in my app.
-tools:
-  - create_task
-  - list_tasks
-  - update_task
----
-Create and manage tasks. Use `create_task` for new items
-and `list_tasks` to browse existing ones.
+  ---
+  name: my-app
+  description: Manage tasks in my app.
+  tools:
+    - create_task
+    - list_tasks
+    - update_task
+  ---
+  Create and manage tasks. Use `create_task` for new items
+  and `list_tasks` to browse existing ones.
 
-Resources:
-- [workflow](references/workflow) — Step-by-step tool sequence for common tasks.
+  Resources:
+  - [workflow](references/workflow) — Step-by-step tool sequence for common tasks.
 </script>
 ```
 
@@ -1321,29 +1417,29 @@ Resources:
 
 - **`tools` array in frontmatter** — List every tool the skill relates to. This creates an explicit coupling between the skill and its tools.
 - **Reference tools in resource content** — When describing workflows, parameters, or mappings, name the specific tool (e.g., "Pass the emoji to `add_topping`" not "Add the emoji as a topping").
-- **Don't duplicate tool descriptions** — The tool already describes *what* it does and *how* to call it. The skill describes *when* to use it, *why*, and domain knowledge the tool can't carry (lookup tables, business rules, workflow order).
+- **Don't duplicate tool descriptions** — The tool already describes _what_ it does and _how_ to call it. The skill describes _when_ to use it, _why_, and domain knowledge the tool can't carry (lookup tables, business rules, workflow order).
 - **Resources for progressive disclosure** — Put detailed reference data (code tables, conversion tables, constraint lists) in separate `<script type="agent-context/reference">` tags. This lets smaller models fetch knowledge on demand instead of loading everything upfront.
 
 ### Example: Tool Reference in a Resource
 
 ```html
 <script type="agent-context/reference" data-skill="my-app" data-name="workflow">
-## Build Order
+  ## Build Order
 
-1. `set_size` — Choose the size first
-2. `set_style` — Pick a style
-3. `add_item` — Add items on top
-4. `share` — Share when done
+  1. `set_size` — Choose the size first
+  2. `set_style` — Pick a style
+  3. `add_item` — Add items on top
+  4. `share` — Share when done
 
-## Size Inference
+  ## Size Inference
 
-When the user mentions a group size, infer the right value for `set_size`:
+  When the user mentions a group size, infer the right value for `set_size`:
 
-| Group size | Value       |
-|------------|-------------|
-| 1-2 people | Small       |
-| 3-4 people | Medium      |
-| 5+ people  | Large       |
+  | Group size | Value       |
+  |------------|-------------|
+  | 1-2 people | Small       |
+  | 3-4 people | Medium      |
+  | 5+ people  | Large       |
 </script>
 ```
 

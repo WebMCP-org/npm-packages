@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {zod} from '../third_party/index.js';
+import { zod } from '../third_party/index.js';
 
-import {ToolCategory} from './categories.js';
-import {definePageTool, timeoutSchema} from './ToolDefinition.js';
+import { ToolCategory } from './categories.js';
+import { definePageTool, timeoutSchema } from './ToolDefinition.js';
 
 export const takeSnapshot = definePageTool({
   name: 'take_snapshot',
@@ -24,13 +24,13 @@ in the DevTools Elements panel (if any).`,
       .boolean()
       .optional()
       .describe(
-        'Whether to include all possible information available in the full a11y tree. Default is false.',
+        'Whether to include all possible information available in the full a11y tree. Default is false.'
       ),
     filePath: zod
       .string()
       .optional()
       .describe(
-        'The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.',
+        'The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.'
       ),
   },
   handler: async (request, response) => {
@@ -52,21 +52,15 @@ export const waitFor = definePageTool({
     text: zod
       .array(zod.string())
       .min(1)
-      .describe(
-        'Non-empty list of texts. Resolves when any value appears on the page.',
-      ),
+      .describe('Non-empty list of texts. Resolves when any value appears on the page.'),
     ...timeoutSchema,
   },
   handler: async (request, response, context) => {
     const page = request.page;
-    await context.waitForTextOnPage(
-      request.params.text,
-      request.params.timeout,
-      page.pptrPage,
-    );
+    await context.waitForTextOnPage(request.params.text, request.params.timeout, page.pptrPage);
 
     response.appendResponseLine(
-      `Element matching one of ${JSON.stringify(request.params.text)} found.`,
+      `Element matching one of ${JSON.stringify(request.params.text)} found.`
     );
 
     response.includeSnapshot();

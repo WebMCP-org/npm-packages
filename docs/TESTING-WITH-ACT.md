@@ -6,10 +6,11 @@ This guide explains how to test GitHub Actions workflows locally using [act](htt
 
 1. **Docker Desktop** must be installed and running
 2. **act** must be installed:
+
    ```bash
    # macOS with Homebrew
    brew install act
-   
+
    # Or check installation guide at https://github.com/nektos/act
    ```
 
@@ -29,12 +30,12 @@ NPM_TOKEN=npm_YOUR_NPM_TOKEN_HERE
 
 #### Getting Tokens
 
-- **GitHub Token (GITHUB_TOKEN)**: 
+- **GitHub Token (GITHUB_TOKEN)**:
   1. Go to https://github.com/settings/tokens/new
   2. Select scopes: `repo`, `workflow`, `write:packages`
   3. Generate and copy the token
 
-- **Personal Access Token (PAT_TOKEN)**: 
+- **Personal Access Token (PAT_TOKEN)**:
   1. Go to https://github.com/settings/tokens/new
   2. Select scopes: `repo`, `workflow`, `write:packages`, `pull_request`
   3. Generate and copy the token
@@ -56,6 +57,7 @@ The repository includes an `.actrc` configuration file:
 ```
 
 This configuration:
+
 - Uses an optimized Ubuntu image for act
 - Loads secrets from `.secrets` file
 - Sets CI environment variable
@@ -72,6 +74,7 @@ act push -W .github/workflows/test-publish.yml --container-architecture linux/am
 ```
 
 This workflow:
+
 - Builds all packages
 - Runs `pnpm publish` with `--dry-run` and `--no-git-checks`
 - Validates package configuration without actually publishing
@@ -113,6 +116,7 @@ act push --container-architecture linux/amd64
 ### 2. pnpm Version Mismatch
 
 Ensure the pnpm version in `package.json`'s `packageManager` field matches the version specified in GitHub Actions workflows. If they don't match, you'll see:
+
 ```
 Error: Multiple versions of pnpm specified
 ```
@@ -122,6 +126,7 @@ Fix by updating `packageManager` in `package.json` to match the workflow version
 ### 3. Git Authentication
 
 If you see authentication errors when act tries to clone action repositories:
+
 ```
 authentication required: Invalid username or token
 ```
@@ -131,6 +136,7 @@ Ensure your GitHub token in `.secrets` has the correct permissions.
 ### 4. Uncommitted Changes
 
 The changesets workflow will fail with uncommitted changes:
+
 ```
 ERR_PNPM_GIT_UNCLEAN  Unclean working tree. Commit or stash changes first.
 ```
@@ -142,6 +148,7 @@ This is expected behavior. Use the `test-publish.yml` workflow for testing with 
 ### Verbose Output
 
 Add `-v` flag for verbose output:
+
 ```bash
 act push -v
 ```
@@ -149,6 +156,7 @@ act push -v
 ### Shell Access
 
 Get a shell in the container:
+
 ```bash
 act push -W .github/workflows/ci.yml --container-architecture linux/amd64 -s
 ```
@@ -156,6 +164,7 @@ act push -W .github/workflows/ci.yml --container-architecture linux/amd64 -s
 ### List Available Events
 
 See what events can be triggered:
+
 ```bash
 act -l
 ```
@@ -196,7 +205,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # ... setup steps ...
-      
+
       - name: Test publish (dry-run)
         run: |
           echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" >> ~/.npmrc
@@ -206,6 +215,7 @@ jobs:
 ## Troubleshooting
 
 If Docker isn't running:
+
 ```bash
 # macOS
 open -a Docker
@@ -215,6 +225,7 @@ sudo systemctl start docker
 ```
 
 If act isn't installed:
+
 ```bash
 # Verify installation
 which act

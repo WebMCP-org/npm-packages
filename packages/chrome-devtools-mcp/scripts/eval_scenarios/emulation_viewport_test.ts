@@ -6,14 +6,14 @@
 
 import assert from 'node:assert';
 
-import {KnownDevices} from 'puppeteer';
+import { KnownDevices } from 'puppeteer';
 
-import type {TestScenario} from '../eval_gemini.ts';
+import type { TestScenario } from '../eval_gemini.ts';
 
 export const scenario: TestScenario = {
   prompt: 'Emulate iPhone 14 viewport',
   maxTurns: 2,
-  expectations: calls => {
+  expectations: (calls) => {
     assert.strictEqual(calls.length, 1);
     assert.strictEqual(calls[0].name, 'emulate');
     assert.deepStrictEqual(
@@ -25,7 +25,7 @@ export const scenario: TestScenario = {
       {
         ...KnownDevices['iPhone 14'].viewport,
         height: 844, // Puppeteer is wrong about the expected height.
-      },
+      }
     );
   },
 };

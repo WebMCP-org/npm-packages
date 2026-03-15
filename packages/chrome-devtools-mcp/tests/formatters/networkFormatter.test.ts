@@ -5,14 +5,14 @@
  */
 
 import assert from 'node:assert';
-import {mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
-import {tmpdir} from 'node:os';
-import {join} from 'node:path';
-import {afterEach, beforeEach, describe, it} from 'node:test';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 
-import {NetworkFormatter} from '../../src/formatters/networkFormatter.js';
-import type {HTTPRequest} from '../../src/third_party/index.js';
-import {getMockRequest, getMockResponse} from '../utils.js';
+import { NetworkFormatter } from '../../src/formatters/networkFormatter.js';
+import type { HTTPRequest } from '../../src/third_party/index.js';
+import { getMockRequest, getMockResponse } from '../utils.js';
 
 describe('NetworkFormatter', () => {
   let tmpDir: string;
@@ -22,7 +22,7 @@ describe('NetworkFormatter', () => {
   });
 
   afterEach(async () => {
-    await rm(tmpDir, {recursive: true, force: true});
+    await rm(tmpDir, { recursive: true, force: true });
   });
 
   describe('toString', () => {
@@ -30,68 +30,53 @@ describe('NetworkFormatter', () => {
       const request = getMockRequest();
       const formatter = await NetworkFormatter.from(request, {
         requestId: 1,
-        saveFile: async () => ({filename: ''}),
+        saveFile: async () => ({ filename: '' }),
       });
 
-      assert.equal(
-        formatter.toString(),
-        'reqid=1 GET http://example.com [pending]',
-      );
+      assert.equal(formatter.toString(), 'reqid=1 GET http://example.com [pending]');
     });
     it('shows correct method', async () => {
-      const request = getMockRequest({method: 'POST'});
+      const request = getMockRequest({ method: 'POST' });
       const formatter = await NetworkFormatter.from(request, {
         requestId: 1,
-        saveFile: async () => ({filename: ''}),
+        saveFile: async () => ({ filename: '' }),
       });
 
-      assert.equal(
-        formatter.toString(),
-        'reqid=1 POST http://example.com [pending]',
-      );
+      assert.equal(formatter.toString(), 'reqid=1 POST http://example.com [pending]');
     });
     it('shows correct status for request with response code in 200', async () => {
       const response = getMockResponse();
-      const request = getMockRequest({response});
+      const request = getMockRequest({ response });
       const formatter = await NetworkFormatter.from(request, {
         requestId: 1,
-        saveFile: async () => ({filename: ''}),
+        saveFile: async () => ({ filename: '' }),
       });
 
-      assert.equal(
-        formatter.toString(),
-        'reqid=1 GET http://example.com [200]',
-      );
+      assert.equal(formatter.toString(), 'reqid=1 GET http://example.com [200]');
     });
     it('shows correct status for request with response code in 100', async () => {
       const response = getMockResponse({
         status: 199,
       });
-      const request = getMockRequest({response});
+      const request = getMockRequest({ response });
       const formatter = await NetworkFormatter.from(request, {
         requestId: 1,
-        saveFile: async () => ({filename: ''}),
+        saveFile: async () => ({ filename: '' }),
       });
 
-      assert.equal(
-        formatter.toString(),
-        'reqid=1 GET http://example.com [199]',
-      );
+      assert.equal(formatter.toString(), 'reqid=1 GET http://example.com [199]');
     });
     it('shows correct status for request with response code above 200', async () => {
       const response = getMockResponse({
         status: 300,
       });
-      const request = getMockRequest({response});
+      const request = getMockRequest({ response });
       const formatter = await NetworkFormatter.from(request, {
         requestId: 1,
-        saveFile: async () => ({filename: ''}),
+        saveFile: async () => ({ filename: '' }),
       });
 
-      assert.equal(
-        formatter.toString(),
-        'reqid=1 GET http://example.com [300]',
-      );
+      assert.equal(formatter.toString(), 'reqid=1 GET http://example.com [300]');
     });
     it('shows correct status for request that failed', async () => {
       const request = getMockRequest({
@@ -103,13 +88,10 @@ describe('NetworkFormatter', () => {
       });
       const formatter = await NetworkFormatter.from(request, {
         requestId: 1,
-        saveFile: async () => ({filename: ''}),
+        saveFile: async () => ({ filename: '' }),
       });
 
-      assert.equal(
-        formatter.toString(),
-        'reqid=1 GET http://example.com [Error in Network]',
-      );
+      assert.equal(formatter.toString(), 'reqid=1 GET http://example.com [Error in Network]');
     });
 
     it('marks requests selected in DevTools UI', async () => {
@@ -117,12 +99,12 @@ describe('NetworkFormatter', () => {
       const formatter = await NetworkFormatter.from(request, {
         requestId: 1,
         selectedInDevToolsUI: true,
-        saveFile: async () => ({filename: ''}),
+        saveFile: async () => ({ filename: '' }),
       });
 
       assert.equal(
         formatter.toString(),
-        'reqid=1 GET http://example.com [pending] [selected in the DevTools Network panel]',
+        'reqid=1 GET http://example.com [pending] [selected in the DevTools Network panel]'
       );
     });
   });
@@ -137,7 +119,7 @@ describe('NetworkFormatter', () => {
       const formatter = await NetworkFormatter.from(request, {
         requestId: 200,
         fetchData: true,
-        saveFile: async () => ({filename: ''}),
+        saveFile: async () => ({ filename: '' }),
       });
       const result = formatter.toStringDetailed();
       assert.match(result, /test/);
@@ -153,7 +135,7 @@ describe('NetworkFormatter', () => {
       const formatter = await NetworkFormatter.from(request, {
         requestId: 200,
         fetchData: true,
-        saveFile: async () => ({filename: ''}),
+        saveFile: async () => ({ filename: '' }),
       });
       const result = formatter.toStringDetailed();
 
@@ -162,8 +144,8 @@ describe('NetworkFormatter', () => {
         new RegExp(
           JSON.stringify({
             request: 'body',
-          }),
-        ),
+          })
+        )
       );
     });
 
@@ -175,7 +157,7 @@ describe('NetworkFormatter', () => {
       const formatter = await NetworkFormatter.from(request, {
         requestId: 20,
         fetchData: true,
-        saveFile: async () => ({filename: ''}),
+        saveFile: async () => ({ filename: '' }),
       });
       const result = formatter.toStringDetailed();
       assert.match(result, /some text/);
@@ -207,7 +189,7 @@ describe('NetworkFormatter', () => {
         responseFilePath: resPath,
         saveFile: async (data, filename) => {
           await writeFile(filename, data);
-          return {filename};
+          return { filename };
         },
       });
 
@@ -250,7 +232,7 @@ describe('NetworkFormatter', () => {
         responseFilePath: resPath,
         saveFile: async (data, filename) => {
           await writeFile(filename, data);
-          return {filename};
+          return { filename };
         },
       });
 
@@ -264,14 +246,14 @@ describe('NetworkFormatter', () => {
     it('handles response body', async () => {
       const response = getMockResponse();
       response.buffer = () => {
-        return Promise.resolve(Buffer.from(JSON.stringify({response: 'body'})));
+        return Promise.resolve(Buffer.from(JSON.stringify({ response: 'body' })));
       };
-      const request = getMockRequest({response});
+      const request = getMockRequest({ response });
 
       const formatter = await NetworkFormatter.from(request, {
         requestId: 200,
         fetchData: true,
-        saveFile: async () => ({filename: ''}),
+        saveFile: async () => ({ filename: '' }),
       });
       const result = formatter.toStringDetailed();
 
@@ -288,7 +270,7 @@ describe('NetworkFormatter', () => {
       const formatter = await NetworkFormatter.from(request, {
         requestId: 1,
         requestIdResolver: () => 2,
-        saveFile: async () => ({filename: ''}),
+        saveFile: async () => ({ filename: '' }),
       });
       const result = formatter.toStringDetailed();
       assert.match(result, /Redirect chain/);
@@ -320,7 +302,7 @@ describe('NetworkFormatter', () => {
         responseFilePath: resPath,
         saveFile: async (data, filename) => {
           await writeFile(filename, data);
-          return {filename};
+          return { filename };
         },
       });
 
@@ -359,16 +341,12 @@ describe('NetworkFormatter', () => {
         responseFilePath: resPath,
         saveFile: async (data, filename) => {
           await writeFile(filename, data);
-          return {filename};
+          return { filename };
         },
       });
 
       const result = formatter.toStringDetailed();
-      assert.ok(
-        result.includes(
-          `### Response Body\n<Response body not available anymore>`,
-        ),
-      );
+      assert.ok(result.includes(`### Response Body\n<Response body not available anymore>`));
     });
   });
 
@@ -378,7 +356,7 @@ describe('NetworkFormatter', () => {
       const formatter = await NetworkFormatter.from(request, {
         requestId: 1,
         selectedInDevToolsUI: true,
-        saveFile: async () => ({filename: ''}),
+        saveFile: async () => ({ filename: '' }),
       });
       const result = formatter.toJSON();
       assert.deepEqual(result, {
@@ -403,7 +381,7 @@ describe('NetworkFormatter', () => {
       const formatter = await NetworkFormatter.from(request, {
         requestId: 1,
         fetchData: true,
-        saveFile: async () => ({filename: ''}),
+        saveFile: async () => ({ filename: '' }),
       });
       const result = formatter.toJSONDetailed();
       assert.deepEqual(result, {
@@ -451,7 +429,7 @@ describe('NetworkFormatter', () => {
         responseFilePath: resPath,
         saveFile: async (data, filename) => {
           await writeFile(filename, data);
-          return {filename};
+          return { filename };
         },
       });
 

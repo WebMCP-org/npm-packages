@@ -17,12 +17,12 @@ Standalone React hooks for strict core WebMCP tool registration via `navigator.m
 
 ## Package Selection
 
-| Package | Use When |
-| --- | --- |
-| `usewebmcp` | React hooks for strict core `navigator.modelContext` tools |
-| `@mcp-b/react-webmcp` | React hooks for full MCP-B runtime surface |
-| `@mcp-b/webmcp-polyfill` | You need a strict core runtime polyfill |
-| `@mcp-b/global` | You need full MCP-B runtime (core + extensions) |
+| Package                  | Use When                                                   |
+| ------------------------ | ---------------------------------------------------------- |
+| `usewebmcp`              | React hooks for strict core `navigator.modelContext` tools |
+| `@mcp-b/react-webmcp`    | React hooks for full MCP-B runtime surface                 |
+| `@mcp-b/webmcp-polyfill` | You need a strict core runtime polyfill                    |
+| `@mcp-b/global`          | You need full MCP-B runtime (core + extensions)            |
 
 ## Install
 

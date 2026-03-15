@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {zod} from '../third_party/index.js';
-import type {ResourceType} from '../third_party/index.js';
+import { zod } from '../third_party/index.js';
+import type { ResourceType } from '../third_party/index.js';
 
-import {ToolCategory} from './categories.js';
-import {definePageTool} from './ToolDefinition.js';
+import { ToolCategory } from './categories.js';
+import { definePageTool } from './ToolDefinition.js';
 
 const FILTERABLE_RESOURCE_TYPES: readonly [ResourceType, ...ResourceType[]] = [
   'document',
@@ -45,30 +45,24 @@ export const listNetworkRequests = definePageTool({
       .int()
       .positive()
       .optional()
-      .describe(
-        'Maximum number of requests to return. When omitted, returns all requests.',
-      ),
+      .describe('Maximum number of requests to return. When omitted, returns all requests.'),
     pageIdx: zod
       .number()
       .int()
       .min(0)
       .optional()
-      .describe(
-        'Page number to return (0-based). When omitted, returns the first page.',
-      ),
+      .describe('Page number to return (0-based). When omitted, returns the first page.'),
     resourceTypes: zod
       .array(zod.enum(FILTERABLE_RESOURCE_TYPES))
       .optional()
       .describe(
-        'Filter requests to only return requests of the specified resource types. When omitted or empty, returns all requests.',
+        'Filter requests to only return requests of the specified resource types. When omitted or empty, returns all requests.'
       ),
     includePreservedRequests: zod
       .boolean()
       .default(false)
       .optional()
-      .describe(
-        'Set to true to return the preserved requests over the last 3 navigations.',
-      ),
+      .describe('Set to true to return the preserved requests over the last 3 navigations.'),
   },
   handler: async (request, response, context) => {
     const data = await context.getDevToolsData(request.page);
@@ -98,19 +92,19 @@ export const getNetworkRequest = definePageTool({
       .number()
       .optional()
       .describe(
-        'The reqid of the network request. If omitted returns the currently selected request in the DevTools Network panel.',
+        'The reqid of the network request. If omitted returns the currently selected request in the DevTools Network panel.'
       ),
     requestFilePath: zod
       .string()
       .optional()
       .describe(
-        'The absolute or relative path to save the request body to. If omitted, the body is returned inline.',
+        'The absolute or relative path to save the request body to. If omitted, the body is returned inline.'
       ),
     responseFilePath: zod
       .string()
       .optional()
       .describe(
-        'The absolute or relative path to save the response body to. If omitted, the body is returned inline.',
+        'The absolute or relative path to save the response body to. If omitted, the body is returned inline.'
       ),
   },
   handler: async (request, response, context) => {
@@ -131,9 +125,7 @@ export const getNetworkRequest = definePageTool({
           responseFilePath: request.params.responseFilePath,
         });
       } else {
-        response.appendResponseLine(
-          `Nothing is currently selected in the DevTools Network panel.`,
-        );
+        response.appendResponseLine(`Nothing is currently selected in the DevTools Network panel.`);
       }
     }
   },

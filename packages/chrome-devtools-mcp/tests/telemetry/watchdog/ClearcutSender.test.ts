@@ -6,13 +6,13 @@
 
 import assert from 'node:assert';
 import crypto from 'node:crypto';
-import {describe, it, afterEach, beforeEach} from 'node:test';
+import { describe, it, afterEach, beforeEach } from 'node:test';
 
 import sinon from 'sinon';
 
-import {OsType} from '../../../src/telemetry/types.js';
-import type {LogRequest} from '../../../src/telemetry/types.js';
-import {ClearcutSender} from '../../../src/telemetry/watchdog/ClearcutSender.js';
+import { OsType } from '../../../src/telemetry/types.js';
+import type { LogRequest } from '../../../src/telemetry/types.js';
+import { ClearcutSender } from '../../../src/telemetry/watchdog/ClearcutSender.js';
 
 const FLUSH_INTERVAL_MS = 15 * 1000;
 
@@ -32,7 +32,7 @@ describe('ClearcutSender', () => {
       return `uuid-${++uuidCounter}` as ReturnType<typeof crypto.randomUUID>;
     });
     fetchStub = sinon.stub(global, 'fetch');
-    fetchStub.resolves(new Response(JSON.stringify({}), {status: 200}));
+    fetchStub.resolves(new Response(JSON.stringify({}), { status: 200 }));
   });
 
   afterEach(() => {
@@ -49,16 +49,14 @@ describe('ClearcutSender', () => {
       forceFlushIntervalMs: FLUSH_INTERVAL_MS,
     });
 
-    sender.enqueueEvent({mcp_client: undefined});
+    sender.enqueueEvent({ mcp_client: undefined });
     assert.strictEqual(sender.bufferSizeForTesting, 1);
 
     await clock.tickAsync(FLUSH_INTERVAL_MS);
     sender.stopForTesting();
 
     assert.strictEqual(fetchStub.callCount, 1);
-    const requestBody = JSON.parse(
-      fetchStub.firstCall.args[1].body,
-    ) as LogRequest;
+    const requestBody = JSON.parse(fetchStub.firstCall.args[1].body) as LogRequest;
     const event = JSON.parse(requestBody.log_event[0].source_extension_json);
 
     assert.strictEqual(event.session_id, 'uuid-1');
@@ -74,10 +72,10 @@ describe('ClearcutSender', () => {
     });
 
     sender.enqueueEvent({
-      tool_invocation: {tool_name: 'test1', success: true, latency_ms: 100},
+      tool_invocation: { tool_name: 'test1', success: true, latency_ms: 100 },
     });
     sender.enqueueEvent({
-      tool_invocation: {tool_name: 'test2', success: true, latency_ms: 200},
+      tool_invocation: { tool_name: 'test2', success: true, latency_ms: 200 },
     });
 
     assert.strictEqual(sender.bufferSizeForTesting, 2);
@@ -94,17 +92,14 @@ describe('ClearcutSender', () => {
     });
 
     sender.enqueueEvent({
-      tool_invocation: {tool_name: 'test', success: true, latency_ms: 100},
+      tool_invocation: { tool_name: 'test', success: true, latency_ms: 100 },
     });
 
     await clock.tickAsync(FLUSH_INTERVAL_MS);
     sender.stopForTesting();
 
     const [url, options] = fetchStub.firstCall.args;
-    assert.strictEqual(
-      url,
-      'https://play.googleapis.com/log?format=json_proto',
-    );
+    assert.strictEqual(url, 'https://play.googleapis.com/log?format=json_proto');
     assert.strictEqual(options.method, 'POST');
     assert.strictEqual(options.headers['Content-Type'], 'application/json');
 
@@ -136,7 +131,7 @@ describe('ClearcutSender', () => {
       osType: OsType.OS_TYPE_MACOS,
       forceFlushIntervalMs: FLUSH_INTERVAL_MS,
     });
-    fetchStub.resolves(new Response('Server Error', {status: 500}));
+    fetchStub.resolves(new Response('Server Error', { status: 500 }));
 
     sender.enqueueEvent({});
     await clock.tickAsync(FLUSH_INTERVAL_MS);
@@ -151,7 +146,7 @@ describe('ClearcutSender', () => {
       osType: OsType.OS_TYPE_MACOS,
       forceFlushIntervalMs: FLUSH_INTERVAL_MS,
     });
-    fetchStub.resolves(new Response('Too Many Requests', {status: 429}));
+    fetchStub.resolves(new Response('Too Many Requests', { status: 429 }));
 
     sender.enqueueEvent({});
     await clock.tickAsync(FLUSH_INTERVAL_MS);
@@ -166,7 +161,7 @@ describe('ClearcutSender', () => {
       osType: OsType.OS_TYPE_MACOS,
       forceFlushIntervalMs: FLUSH_INTERVAL_MS,
     });
-    fetchStub.resolves(new Response('Bad Request', {status: 400}));
+    fetchStub.resolves(new Response('Bad Request', { status: 400 }));
 
     sender.enqueueEvent({});
     await clock.tickAsync(FLUSH_INTERVAL_MS);
@@ -200,9 +195,7 @@ describe('ClearcutSender', () => {
     await sender.sendShutdownEvent();
 
     assert.strictEqual(fetchStub.callCount, 1);
-    const requestBody = JSON.parse(
-      fetchStub.firstCall.args[1].body,
-    ) as LogRequest;
+    const requestBody = JSON.parse(fetchStub.firstCall.args[1].body) as LogRequest;
     const event = JSON.parse(requestBody.log_event[0].source_extension_json);
 
     assert.ok(event.server_shutdown);
@@ -216,13 +209,11 @@ describe('ClearcutSender', () => {
     });
 
     sender.enqueueEvent({
-      tool_invocation: {tool_name: 'test', success: true, latency_ms: 100},
+      tool_invocation: { tool_name: 'test', success: true, latency_ms: 100 },
     });
     await sender.sendShutdownEvent();
 
-    const requestBody = JSON.parse(
-      fetchStub.firstCall.args[1].body,
-    ) as LogRequest;
+    const requestBody = JSON.parse(fetchStub.firstCall.args[1].body) as LogRequest;
     assert.strictEqual(requestBody.log_event.length, 2);
   });
 
@@ -234,14 +225,14 @@ describe('ClearcutSender', () => {
     });
 
     sender.enqueueEvent({
-      tool_invocation: {tool_name: 'initial', success: true, latency_ms: 100},
+      tool_invocation: { tool_name: 'initial', success: true, latency_ms: 100 },
     });
     let resolveRequest: (value: Response) => void;
 
     fetchStub.onFirstCall().returns(
-      new Promise<Response>(resolve => {
+      new Promise<Response>((resolve) => {
         resolveRequest = resolve;
-      }),
+      })
     );
 
     clock.tick(FLUSH_INTERVAL_MS);
@@ -258,7 +249,7 @@ describe('ClearcutSender', () => {
 
     assert.strictEqual(sender.bufferSizeForTesting, 1000);
 
-    resolveRequest!(new Response(JSON.stringify({}), {status: 200}));
+    resolveRequest!(new Response(JSON.stringify({}), { status: 200 }));
 
     assert.strictEqual(sender.bufferSizeForTesting, 1000);
 
@@ -281,28 +272,24 @@ describe('ClearcutSender', () => {
 
     let resolveFirstRequest: (value: Response) => void;
     fetchStub.onFirstCall().returns(
-      new Promise<Response>(resolve => {
+      new Promise<Response>((resolve) => {
         resolveFirstRequest = resolve;
-      }),
+      })
     );
 
     clock.tick(FLUSH_INTERVAL_MS);
 
     const shutdownPromise = sender.sendShutdownEvent();
 
-    resolveFirstRequest!(new Response(JSON.stringify({}), {status: 200}));
+    resolveFirstRequest!(new Response(JSON.stringify({}), { status: 200 }));
     await shutdownPromise;
 
     assert.strictEqual(fetchStub.callCount, 2);
     const firstBody = JSON.parse(fetchStub.args[0][1].body) as LogRequest;
     const secondBody = JSON.parse(fetchStub.args[1][1].body) as LogRequest;
 
-    const firstEvents = firstBody.log_event.map(e =>
-      JSON.parse(e.source_extension_json),
-    );
-    const secondEvents = secondBody.log_event.map(e =>
-      JSON.parse(e.source_extension_json),
-    );
+    const firstEvents = firstBody.log_event.map((e) => JSON.parse(e.source_extension_json));
+    const secondEvents = secondBody.log_event.map((e) => JSON.parse(e.source_extension_json));
 
     assert.strictEqual(firstEvents.length, 1);
     assert.strictEqual(firstEvents[0].tool_invocation?.tool_name, 'test-event');
@@ -310,12 +297,9 @@ describe('ClearcutSender', () => {
     assert.strictEqual(
       secondEvents.length,
       1,
-      'Shutdown request should only contain shutdown event',
+      'Shutdown request should only contain shutdown event'
     );
-    assert.ok(
-      secondEvents[0].server_shutdown,
-      'Shutdown request should contain server_shutdown',
-    );
+    assert.ok(secondEvents[0].server_shutdown, 'Shutdown request should contain server_shutdown');
 
     sender.stopForTesting();
   });
@@ -328,34 +312,24 @@ describe('ClearcutSender', () => {
     });
 
     sender.enqueueEvent({
-      tool_invocation: {tool_name: 'test1', success: true, latency_ms: 10},
+      tool_invocation: { tool_name: 'test1', success: true, latency_ms: 10 },
     });
     await clock.tickAsync(FLUSH_INTERVAL_MS);
 
-    const firstCallBody = JSON.parse(
-      fetchStub.firstCall.args[1].body,
-    ) as LogRequest;
-    const firstEvent = JSON.parse(
-      firstCallBody.log_event[0].source_extension_json,
-    );
+    const firstCallBody = JSON.parse(fetchStub.firstCall.args[1].body) as LogRequest;
+    const firstEvent = JSON.parse(firstCallBody.log_event[0].source_extension_json);
     const firstSessionId = firstEvent.session_id;
 
     const SESSION_ROTATION_INTERVAL_MS = 24 * 60 * 60 * 1000;
-    await clock.tickAsync(
-      SESSION_ROTATION_INTERVAL_MS - FLUSH_INTERVAL_MS + 1000,
-    );
+    await clock.tickAsync(SESSION_ROTATION_INTERVAL_MS - FLUSH_INTERVAL_MS + 1000);
 
     sender.enqueueEvent({
-      tool_invocation: {tool_name: 'test2', success: true, latency_ms: 10},
+      tool_invocation: { tool_name: 'test2', success: true, latency_ms: 10 },
     });
     await clock.tickAsync(FLUSH_INTERVAL_MS);
 
-    const secondCallBody = JSON.parse(
-      fetchStub.secondCall.args[1].body,
-    ) as LogRequest;
-    const secondEvent = JSON.parse(
-      secondCallBody.log_event[0].source_extension_json,
-    );
+    const secondCallBody = JSON.parse(fetchStub.secondCall.args[1].body) as LogRequest;
+    const secondEvent = JSON.parse(secondCallBody.log_event[0].source_extension_json);
     const secondSessionId = secondEvent.session_id;
 
     assert.notStrictEqual(firstSessionId, secondSessionId);
@@ -375,8 +349,8 @@ describe('ClearcutSender', () => {
         JSON.stringify({
           next_request_wait_millis: 45000,
         }),
-        {status: 200},
-      ),
+        { status: 200 }
+      )
     );
 
     sender.enqueueEvent({});
@@ -387,11 +361,7 @@ describe('ClearcutSender', () => {
     sender.enqueueEvent({});
 
     await clock.tickAsync(44000);
-    assert.strictEqual(
-      fetchStub.callCount,
-      0,
-      'Should not flush before wait time',
-    );
+    assert.strictEqual(fetchStub.callCount, 0, 'Should not flush before wait time');
 
     await clock.tickAsync(1000);
     assert.strictEqual(fetchStub.callCount, 1, 'Should flush after wait time');
@@ -421,11 +391,7 @@ describe('ClearcutSender', () => {
     await clock.tickAsync(REQUEST_TIMEOUT_MS);
 
     assert.ok(fetchSignal, 'Fetch should have been called with a signal');
-    assert.strictEqual(
-      fetchSignal.aborted,
-      true,
-      'Signal should be aborted after timeout',
-    );
+    assert.strictEqual(fetchSignal.aborted, true, 'Signal should be aborted after timeout');
 
     sender.stopForTesting();
   });
@@ -439,7 +405,7 @@ describe('ClearcutSender', () => {
     fetchStub.returns(
       new Promise(() => {
         // Hangs forever
-      }),
+      })
     );
 
     const shutdownPromise = sender.sendShutdownEvent();

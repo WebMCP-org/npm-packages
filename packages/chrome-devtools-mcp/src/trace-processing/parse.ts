@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {logger} from '../logger.js';
-import {DevTools} from '../third_party/index.js';
+import { logger } from '../logger.js';
+import { DevTools } from '../third_party/index.js';
 
 const engine = DevTools.TraceEngine.TraceModel.Model.createWithAllHandlers();
 
@@ -14,9 +14,7 @@ export interface TraceResult {
   insights: DevTools.TraceEngine.Insights.Types.TraceInsightSets | null;
 }
 
-export function traceResultIsSuccess(
-  x: TraceResult | TraceParseError,
-): x is TraceResult {
+export function traceResultIsSuccess(x: TraceResult | TraceParseError): x is TraceResult {
   return 'parsedTrace' in x;
 }
 
@@ -25,7 +23,7 @@ export interface TraceParseError {
 }
 
 export async function parseRawTraceBuffer(
-  buffer: Uint8Array<ArrayBufferLike> | undefined,
+  buffer: Uint8Array<ArrayBufferLike> | undefined
 ): Promise<TraceResult | TraceParseError> {
   engine.resetProcessor();
   if (!buffer) {
@@ -87,14 +85,13 @@ ${summaryText}
 ${extraFormatDescriptions}`;
 }
 
-export type InsightName =
-  keyof DevTools.TraceEngine.Insights.Types.InsightModels;
-export type InsightOutput = {output: string} | {error: string};
+export type InsightName = keyof DevTools.TraceEngine.Insights.Types.InsightModels;
+export type InsightOutput = { output: string } | { error: string };
 
 export function getInsightOutput(
   result: TraceResult,
   insightSetId: string,
-  insightName: InsightName,
+  insightName: InsightName
 ): InsightOutput {
   if (!result.insights) {
     return {
@@ -110,8 +107,7 @@ export function getInsightOutput(
     };
   }
 
-  const matchingInsight =
-    insightName in insightSet.model ? insightSet.model[insightName] : null;
+  const matchingInsight = insightName in insightSet.model ? insightSet.model[insightName] : null;
   if (!matchingInsight) {
     return {
       error: `No Insight with the name ${insightName} found. Double check the name you provided is accurate and try again.`,
@@ -120,7 +116,7 @@ export function getInsightOutput(
 
   const formatter = new DevTools.PerformanceInsightFormatter(
     DevTools.AgentFocus.fromParsedTrace(result.parsedTrace),
-    matchingInsight,
+    matchingInsight
   );
-  return {output: formatter.formatInsight()};
+  return { output: formatter.formatInsight() };
 }

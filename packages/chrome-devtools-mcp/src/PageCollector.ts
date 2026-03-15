@@ -4,15 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {FakeIssuesManager} from './DevtoolsUtils.js';
-import {logger} from './logger.js';
-import type {
-  Target,
-  CDPSession,
-  ConsoleMessage,
-  Protocol,
-} from './third_party/index.js';
-import {DevTools} from './third_party/index.js';
+import { FakeIssuesManager } from './DevtoolsUtils.js';
+import { logger } from './logger.js';
+import type { Target, CDPSession, ConsoleMessage, Protocol } from './third_party/index.js';
+import { DevTools } from './third_party/index.js';
 import {
   type Browser,
   type Frame,
@@ -58,9 +53,7 @@ type WithSymbolId<T> = T & {
 
 export class PageCollector<T> {
   #browser: Browser;
-  #listenersInitializer: (
-    collector: (item: T) => void,
-  ) => ListenerMap<PageEvents>;
+  #listenersInitializer: (collector: (item: T) => void) => ListenerMap<PageEvents>;
   #listeners = new WeakMap<Page, ListenerMap>();
   #maxNavigationSaved = 3;
 
@@ -73,7 +66,7 @@ export class PageCollector<T> {
 
   constructor(
     browser: Browser,
-    listeners: (collector: (item: T) => void) => ListenerMap<PageEvents>,
+    listeners: (collector: (item: T) => void) => ListenerMap<PageEvents>
   ) {
     this.#browser = browser;
     this.#listenersInitializer = listeners;
@@ -129,7 +122,7 @@ export class PageCollector<T> {
     const storedLists: Array<Array<WithSymbolId<T>>> = [[]];
     this.storage.set(page, storedLists);
 
-    const listeners = this.#listenersInitializer(value => {
+    const listeners = this.#listenersInitializer((value) => {
       const withId = value as WithSymbolId<T>;
       withId[stableIdSymbol] = idGenerator();
 
@@ -201,7 +194,7 @@ export class PageCollector<T> {
       throw new Error('No requests found for selected page');
     }
 
-    const item = this.find(page, item => item[stableIdSymbol] === stableId);
+    const item = this.find(page, (item) => item[stableIdSymbol] === stableId);
 
     if (item) {
       return item;
@@ -210,10 +203,7 @@ export class PageCollector<T> {
     throw new Error('Request not found for selected page');
   }
 
-  find(
-    page: Page,
-    filter: (item: WithSymbolId<T>) => boolean,
-  ): WithSymbolId<T> | undefined {
+  find(page: Page, filter: (item: WithSymbolId<T>) => boolean): WithSymbolId<T> | undefined {
     const navigations = this.storage.get(page);
     if (!navigations) {
       return;
@@ -272,13 +262,13 @@ class PageEventSubscriber {
     if (this.#issueAggregator) {
       this.#issueAggregator.removeEventListener(
         DevTools.IssueAggregatorEvents.AGGREGATED_ISSUE_UPDATED,
-        this.#onAggregatedissue,
+        this.#onAggregatedissue
       );
     }
     this.#issueAggregator = new DevTools.IssueAggregator(this.#issueManager);
     this.#issueAggregator.addEventListener(
       DevTools.IssueAggregatorEvents.AGGREGATED_ISSUE_UPDATED,
-      this.#onAggregatedissue,
+      this.#onAggregatedissue
     );
   }
 
@@ -303,7 +293,7 @@ class PageEventSubscriber {
     if (this.#issueAggregator) {
       this.#issueAggregator.removeEventListener(
         DevTools.IssueAggregatorEvents.AGGREGATED_ISSUE_UPDATED,
-        this.#onAggregatedissue,
+        this.#onAggregatedissue
       );
     }
     void this.#session.send('Audits.disable').catch(() => {
@@ -312,7 +302,7 @@ class PageEventSubscriber {
   }
 
   #onAggregatedissue = (
-    event: DevTools.Common.EventTarget.EventTargetEvent<DevTools.AggregatedIssue>,
+    event: DevTools.Common.EventTarget.EventTargetEvent<DevTools.AggregatedIssue>
   ) => {
     if (this.#seenIssues.has(event.data)) {
       return;
@@ -322,10 +312,7 @@ class PageEventSubscriber {
   };
 
   #onExceptionThrown = (event: Protocol.Runtime.ExceptionThrownEvent) => {
-    this.#page.emit(
-      'uncaughtError',
-      new UncaughtError(event.exceptionDetails, this.#targetId),
-    );
+    this.#page.emit('uncaughtError', new UncaughtError(event.exceptionDetails, this.#targetId));
   };
 
   // On navigation, we reset issue aggregation.
@@ -345,7 +332,7 @@ class PageEventSubscriber {
       const issue = DevTools.createIssuesFromProtocolIssue(
         null,
         // @ts-expect-error Protocol types diverge.
-        inspectorIssue,
+        inspectorIssue
       )[0];
       if (!issue) {
         logger('No issue mapping for for the issue: ', inspectorIssue.code);
@@ -357,14 +344,11 @@ class PageEventSubscriber {
         return;
       }
       this.#seenKeys.add(primaryKey);
-      this.#issueManager.dispatchEventToListeners(
-        DevTools.IssuesManagerEvents.ISSUE_ADDED,
-        {
-          issue,
-          // @ts-expect-error We don't care that issues model is null
-          issuesModel: null,
-        },
-      );
+      this.#issueManager.dispatchEventToListeners(DevTools.IssuesManagerEvents.ISSUE_ADDED, {
+        issue,
+        // @ts-expect-error We don't care that issues model is null
+        issuesModel: null,
+      });
     } catch (error) {
       logger('Error creating a new issue', error);
     }
@@ -374,15 +358,13 @@ class PageEventSubscriber {
 export class NetworkCollector extends PageCollector<HTTPRequest> {
   constructor(
     browser: Browser,
-    listeners: (
-      collector: (item: HTTPRequest) => void,
-    ) => ListenerMap<PageEvents> = collect => {
+    listeners: (collector: (item: HTTPRequest) => void) => ListenerMap<PageEvents> = (collect) => {
       return {
-        request: req => {
+        request: (req) => {
           collect(req);
         },
       } as ListenerMap;
-    },
+    }
   ) {
     super(browser, listeners);
   }
@@ -394,10 +376,8 @@ export class NetworkCollector extends PageCollector<HTTPRequest> {
 
     const requests = navigations[0];
 
-    const lastRequestIdx = requests.findLastIndex(request => {
-      return request.frame() === page.mainFrame()
-        ? request.isNavigationRequest()
-        : false;
+    const lastRequestIdx = requests.findLastIndex((request) => {
+      return request.frame() === page.mainFrame() ? request.isNavigationRequest() : false;
     });
 
     // Keep all requests since the last navigation request including that

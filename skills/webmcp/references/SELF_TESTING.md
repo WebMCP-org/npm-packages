@@ -54,6 +54,7 @@ inject_webmcp_script({
 ```
 
 **Expected output:**
+
 ```
 Target: https://example.com
 
@@ -72,6 +73,7 @@ Tools are now callable as first-class MCP tools.
 ```
 
 **If no tools registered:**
+
 - Check console for JavaScript errors
 - Verify tool code syntax is correct
 - Ensure handler returns proper format
@@ -83,6 +85,7 @@ diff_webmcp_tools()
 ```
 
 **Expected output:**
+
 ```
 3 WebMCP tool(s) registered:
 
@@ -96,6 +99,7 @@ diff_webmcp_tools()
 ```
 
 **Verify:**
+
 - All expected tools appear
 - Names match what you registered
 - Descriptions are correct
@@ -113,6 +117,7 @@ webmcp_example_com_page0_get_items({ limit: 5 })
 ### Edge Cases
 
 Test each tool with:
+
 1. **No parameters** (if optional)
 2. **Minimum values** (limit: 1)
 3. **Maximum values** (limit: 100)
@@ -142,6 +147,7 @@ list_console_messages({ types: ['error', 'warn'] })
 ```
 
 **Common errors:**
+
 - `ReferenceError` - Variable not defined
 - `TypeError` - Calling method on null/undefined
 - `SyntaxError` - Invalid JavaScript
@@ -153,18 +159,19 @@ take_snapshot()
 ```
 
 **Verify:**
+
 - Element you're selecting exists
 - Page is fully loaded
 - Not on wrong page (redirected)
 
 ### Common Fixes
 
-| Problem | Solution |
-|---------|----------|
+| Problem           | Solution                                 |
+| ----------------- | ---------------------------------------- |
 | Element not found | Use optional chaining: `el?.textContent` |
-| Empty result | Check if content is dynamically loaded |
-| Stale data | Page may have changed, reinject |
-| CSP error | Site blocks inline scripts |
+| Empty result      | Check if content is dynamically loaded   |
+| Stale data        | Page may have changed, reinject          |
+| CSP error         | Site blocks inline scripts               |
 
 ## Verification Checklist
 
@@ -212,6 +219,7 @@ webmcp_news_ycombinator_com_page0_navigate_section({ section: "new" })
 ## After Navigation
 
 If a tool navigates the page:
+
 1. Previous tools may be lost
 2. Reinject script on new page
 3. Verify tools work in new context

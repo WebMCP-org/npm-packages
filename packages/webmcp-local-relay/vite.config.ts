@@ -1,4 +1,5 @@
-import type { Options } from 'tsdown';
+import type { Options } from 'vite-plus/pack';
+import { defineConfig } from 'vite-plus';
 
 const nodeConfig: Options = {
   entry: ['src/index.ts', 'src/cli.ts'],
@@ -43,4 +44,11 @@ const widgetConfig: Options = {
   entry: { widget: 'src/browser/widget.ts' },
 };
 
-export default [nodeConfig, embedConfig, widgetConfig];
+export default defineConfig({
+  pack: [nodeConfig, embedConfig, widgetConfig],
+  test: {
+    include: ['src/**/*.{test,spec}.ts'],
+    exclude: ['dist', 'node_modules', 'src/**/*.e2e.test.ts'],
+    globals: true,
+  },
+});

@@ -3,69 +3,73 @@
   "version": "2.2.0",
   "description": "React hooks for Model Context Protocol (MCP) - expose React components as AI tools for Claude, ChatGPT, Cursor, and Copilot with Zod validation",
   "keywords": [
-    "mcp",
-    "model-context-protocol",
-    "react",
-    "hooks",
-    "react-hooks",
-    "browser",
     "ai",
-    "ai-tools",
     "ai-agents",
-    "llm",
-    "claude",
-    "chatgpt",
-    "openai",
-    "anthropic",
-    "cursor",
-    "copilot",
-    "gemini",
-    "typescript",
-    "webmcp",
-    "navigator-modelcontext",
-    "tool-registration",
     "ai-assistant",
-    "react-ai",
     "ai-integration",
+    "ai-tools",
+    "anthropic",
+    "browser",
+    "chatgpt",
+    "claude",
+    "copilot",
+    "cursor",
+    "gemini",
+    "hooks",
+    "llm",
+    "mcp",
     "mcp-client",
     "mcp-server",
-    "web-ai"
+    "model-context-protocol",
+    "navigator-modelcontext",
+    "openai",
+    "react",
+    "react-ai",
+    "react-hooks",
+    "tool-registration",
+    "typescript",
+    "web-ai",
+    "webmcp"
   ],
   "homepage": "https://docs.mcp-b.ai/packages/react-webmcp",
   "bugs": {
     "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },
+  "license": "MIT",
+  "author": "WebMCP Team",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/WebMCP-org/npm-packages.git",
     "directory": "packages/react-webmcp"
   },
-  "license": "MIT",
-  "author": "WebMCP Team",
+  "files": [
+    "dist"
+  ],
   "type": "module",
+  "main": "./dist/index.js",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     }
   },
-  "main": "./dist/index.js",
-  "files": [
-    "dist"
-  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "scripts": {
-    "build": "tsdown",
-    "build:prod": "NODE_ENV=prod tsdown",
-    "check": "biome check --write .",
-    "clean": "rm -rf dist .turbo",
-    "format": "biome format --write .",
-    "lint": "biome lint --write .",
+    "build": "vp pack",
+    "build:prod": "NODE_ENV=prod vp pack",
+    "check": "vp check --fix",
+    "clean": "rm -rf dist",
+    "format": "vp fmt --write",
+    "lint": "vp lint --fix",
     "prepublishOnly": "node ../../scripts/validate-publish.js && pnpm run build:prod",
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.strict-null-checks-false.json --noEmit && vitest run --typecheck --silent",
+    "test": "vp test run",
+    "test:watch": "vp test",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.strict-null-checks-false.json --noEmit && vp test run --typecheck --silent",
     "version:major": "pnpm version major --no-git-tag-version",
     "version:minor": "pnpm version minor --no-git-tag-version",
     "version:patch": "pnpm version patch --no-git-tag-version"
@@ -80,14 +84,12 @@
   "devDependencies": {
     "@types/node": "catalog:",
     "@types/react": "catalog:",
-    "@vitest/browser": "catalog:",
-    "@vitest/browser-playwright": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "playwright": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
-    "tsdown": "catalog:",
     "typescript": "catalog:",
+    "vite-plus": "catalog:",
     "vitest": "catalog:",
     "vitest-browser-react": "^2.0.4"
   },
@@ -103,9 +105,5 @@
     "zod-to-json-schema": {
       "optional": true
     }
-  },
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
   }
 }

@@ -5,15 +5,15 @@
  */
 
 import assert from 'node:assert';
-import {afterEach, describe, it} from 'node:test';
+import { afterEach, describe, it } from 'node:test';
 
 import sinon from 'sinon';
 
-import {NetworkFormatter} from '../src/formatters/networkFormatter.js';
-import type {HTTPResponse} from '../src/third_party/index.js';
-import type {TraceResult} from '../src/trace-processing/parse.js';
+import { NetworkFormatter } from '../src/formatters/networkFormatter.js';
+import type { HTTPResponse } from '../src/third_party/index.js';
+import type { TraceResult } from '../src/trace-processing/parse.js';
 
-import {getMockRequest, html, withMcpContext} from './utils.js';
+import { getMockRequest, html, withMcpContext } from './utils.js';
 
 describe('McpContext', () => {
   afterEach(() => {
@@ -24,11 +24,9 @@ describe('McpContext', () => {
     await withMcpContext(async (_response, context) => {
       const page = context.getSelectedMcpPage();
       await page.pptrPage.setContent(
-        html`<button>Click me</button>
-          <input
-            type="text"
-            value="Input"
-          />`,
+        html`
+          <button>Click me</button> <input type="text" value="Input" />
+        `
       );
       await context.createTextSnapshot(context.getSelectedMcpPage());
       assert.ok(await page.getElementByUid('1_1'));
@@ -51,7 +49,7 @@ describe('McpContext', () => {
     await withMcpContext(async (_response, context) => {
       const page = await context.newPage();
       const timeoutBefore = page.pptrPage.getDefaultTimeout();
-      await context.emulate({cpuThrottlingRate: 2});
+      await context.emulate({ cpuThrottlingRate: 2 });
       const timeoutAfter = page.pptrPage.getDefaultTimeout();
       assert(timeoutBefore < timeoutAfter, 'Timeout was less then expected');
     });
@@ -61,7 +59,7 @@ describe('McpContext', () => {
     await withMcpContext(async (_response, context) => {
       const page = await context.newPage();
       const timeoutBefore = page.pptrPage.getDefaultNavigationTimeout();
-      await context.emulate({networkConditions: 'Slow 3G'});
+      await context.emulate({ networkConditions: 'Slow 3G' });
       const timeoutAfter = page.pptrPage.getDefaultNavigationTimeout();
       assert(timeoutBefore < timeoutAfter, 'Timeout was less then expected');
     });
@@ -92,20 +90,24 @@ describe('McpContext', () => {
         // TODO: we do not know when the CLI flag to auto open DevTools will run
         // so we need this until
         // https://github.com/puppeteer/puppeteer/issues/14368 is there.
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        await new Promise((resolve) => setTimeout(resolve, 5000));
         await context.createPagesSnapshot();
         assert.ok(context.getDevToolsPage(page.pptrPage));
       },
       {
         autoOpenDevTools: true,
-      },
+      }
     );
   });
   it('resolves uid from a non-selected page snapshot', async () => {
     await withMcpContext(async (_response, context) => {
       // Page 1: set content and snapshot
       const page1 = context.getSelectedMcpPage();
-      await page1.pptrPage.setContent(html`<button>Page1 Button</button>`);
+      await page1.pptrPage.setContent(
+        html`
+          <button>Page1 Button</button>
+        `
+      );
       await context.createTextSnapshot(page1, false, undefined);
 
       // Capture a uid from page1's snapshot (snapshotId=1, button is node 1)
@@ -116,7 +118,11 @@ describe('McpContext', () => {
       // Page 2: new page, set content, snapshot
       const page2 = await context.newPage();
       context.selectPage(page2);
-      await page2.pptrPage.setContent(html`<button>Page2 Button</button>`);
+      await page2.pptrPage.setContent(
+        html`
+          <button>Page2 Button</button>
+        `
+      );
       await context.createTextSnapshot(page2, false, undefined);
 
       // Page 2 is now selected. Page 1's uid should still resolve.
@@ -130,7 +136,7 @@ describe('McpContext', () => {
     });
   });
 
-  it('should include network requests in structured content', async t => {
+  it('should include network requests in structured content', async (t) => {
     await withMcpContext(async (response, context) => {
       const mockRequest = getMockRequest({
         url: 'http://example.com/api',
@@ -147,7 +153,7 @@ describe('McpContext', () => {
     });
   });
 
-  it('should include detailed network request in structured content', async t => {
+  it('should include detailed network request in structured content', async (t) => {
     await withMcpContext(async (response, context) => {
       const mockRequest = getMockRequest({
         url: 'http://example.com/detail',
@@ -164,7 +170,7 @@ describe('McpContext', () => {
     });
   });
 
-  it('should include file paths in structured content when saving to file', async t => {
+  it('should include file paths in structured content when saving to file', async (t) => {
     await withMcpContext(async (response, context) => {
       const mockRequest = getMockRequest({
         url: 'http://example.com/file-save',
@@ -173,7 +179,7 @@ describe('McpContext', () => {
         postData: 'some detailed data',
         response: {
           status: () => 200,
-          headers: () => ({'content-type': 'text/plain'}),
+          headers: () => ({ 'content-type': 'text/plain' }),
           buffer: async () => Buffer.from('some response data'),
         } as unknown as HTTPResponse,
       });
@@ -182,24 +188,22 @@ describe('McpContext', () => {
       sinon.stub(context, 'getNetworkRequestStableId').returns(789);
 
       // We stub NetworkFormatter.from to avoid actual file system writes and verify arguments
-      const fromStub = sinon
-        .stub(NetworkFormatter, 'from')
-        .callsFake(async (_req, opts) => {
-          // Verify we received the file paths
-          assert.strictEqual(opts?.requestFilePath, '/tmp/req.txt');
-          assert.strictEqual(opts?.responseFilePath, '/tmp/res.txt');
-          // Return a dummy formatter that behaves as if it saved files
-          // We need to create a real instance or mock one.
-          // Since constructor is private, we can't easily new it up.
-          // But we can return a mock object.
-          return {
-            toStringDetailed: () => 'Detailed string',
-            toJSONDetailed: () => ({
-              requestBody: '/tmp/req.txt',
-              responseBody: '/tmp/res.txt',
-            }),
-          } as unknown as NetworkFormatter;
-        });
+      const fromStub = sinon.stub(NetworkFormatter, 'from').callsFake(async (_req, opts) => {
+        // Verify we received the file paths
+        assert.strictEqual(opts?.requestFilePath, '/tmp/req.txt');
+        assert.strictEqual(opts?.responseFilePath, '/tmp/res.txt');
+        // Return a dummy formatter that behaves as if it saved files
+        // We need to create a real instance or mock one.
+        // Since constructor is private, we can't easily new it up.
+        // But we can return a mock object.
+        return {
+          toStringDetailed: () => 'Detailed string',
+          toJSONDetailed: () => ({
+            requestBody: '/tmp/req.txt',
+            responseBody: '/tmp/res.txt',
+          }),
+        } as unknown as NetworkFormatter;
+      });
 
       response.attachNetworkRequest(789, {
         requestFilePath: '/tmp/req.txt',

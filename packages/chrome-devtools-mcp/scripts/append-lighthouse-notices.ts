@@ -14,17 +14,14 @@ const SOURCE_DIR = path.join(ROOT_DIR, 'src/third_party');
 function main() {
   const lighthouseNotices = fs.readFileSync(
     path.join(SOURCE_DIR, 'LIGHTHOUSE_MCP_BUNDLE_THIRD_PARTY_NOTICES'),
-    'utf8',
+    'utf8'
   );
-  const bundledNotices = fs.readFileSync(
-    path.join(TARGET_DIR, 'THIRD_PARTY_NOTICES'),
-    'utf8',
-  );
+  const bundledNotices = fs.readFileSync(path.join(TARGET_DIR, 'THIRD_PARTY_NOTICES'), 'utf8');
   fs.writeFileSync(
     path.join(TARGET_DIR, 'THIRD_PARTY_NOTICES'),
     bundledNotices +
       '\n\n-------------------- DEPENDENCY DIVIDER --------------------\n\n' +
-      lighthouseNotices,
+      lighthouseNotices
   );
   console.log('Done.');
 }

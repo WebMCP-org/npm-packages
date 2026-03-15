@@ -5,11 +5,11 @@
  */
 
 import assert from 'node:assert';
-import {describe, it} from 'node:test';
+import { describe, it } from 'node:test';
 
-import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
-import {serializeArgs} from '../../src/daemon/utils.js';
-import type {YargsOptions} from '../../src/third_party/index.js';
+import type { ParsedArguments } from '../../src/bin/chrome-devtools-mcp-cli-options.js';
+import { serializeArgs } from '../../src/daemon/utils.js';
+import type { YargsOptions } from '../../src/third_party/index.js';
 
 describe('serializeArgs', () => {
   it('should ignore undefined or null values', () => {
@@ -30,7 +30,7 @@ describe('serializeArgs', () => {
   });
 
   it('should handle boolean values', () => {
-    const options: Record<string, YargsOptions> = {foo: {}, bar: {}};
+    const options: Record<string, YargsOptions> = { foo: {}, bar: {} };
     const argv = {
       foo: true,
       bar: false,
@@ -42,7 +42,7 @@ describe('serializeArgs', () => {
   });
 
   it('should handle array values', () => {
-    const options: Record<string, YargsOptions> = {foo: {}};
+    const options: Record<string, YargsOptions> = { foo: {} };
     const argv = {
       foo: ['val1', 'val2'],
       _: [],
@@ -53,7 +53,7 @@ describe('serializeArgs', () => {
   });
 
   it('should handle primitive values', () => {
-    const options: Record<string, YargsOptions> = {foo: {}, bar: {}};
+    const options: Record<string, YargsOptions> = { foo: {}, bar: {} };
     const argv = {
       foo: 'string',
       bar: 42,
@@ -76,10 +76,6 @@ describe('serializeArgs', () => {
       $0: 'test',
     } as unknown as ParsedArguments;
     const result = serializeArgs(options, argv);
-    assert.deepStrictEqual(result, [
-      '--camel-case-key',
-      'value1',
-      '--another-key',
-    ]);
+    assert.deepStrictEqual(result, ['--camel-case-key', 'value1', '--another-key']);
   });
 });

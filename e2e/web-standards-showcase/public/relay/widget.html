@@ -70,7 +70,11 @@
          * @returns {HostMessage | null}
          */
         function parseHostMessage(value) {
-          if (!isJsonObject(value) || typeof value.requestId !== 'string' || typeof value.type !== 'string') {
+          if (
+            !isJsonObject(value) ||
+            typeof value.requestId !== 'string' ||
+            typeof value.type !== 'string'
+          ) {
             return null;
           }
 
@@ -85,7 +89,9 @@
 
         var config = parseConfig();
         if (!config) {
-          console.warn('[webmcp-relay-widget] Missing required hostOrigin parameter. Widget will not start.');
+          console.warn(
+            '[webmcp-relay-widget] Missing required hostOrigin parameter. Widget will not start.'
+          );
           return;
         }
 

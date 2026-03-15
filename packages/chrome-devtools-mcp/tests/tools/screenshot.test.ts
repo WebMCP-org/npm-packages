@@ -5,14 +5,14 @@
  */
 
 import assert from 'node:assert';
-import {rm, stat, mkdir, chmod, writeFile} from 'node:fs/promises';
-import {tmpdir} from 'node:os';
-import {join} from 'node:path';
-import {describe, it} from 'node:test';
+import { rm, stat, mkdir, chmod, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, it } from 'node:test';
 
-import {screenshot} from '../../src/tools/screenshot.js';
-import {screenshots} from '../snapshot.js';
-import {html, withMcpContext} from '../utils.js';
+import { screenshot } from '../../src/tools/screenshot.js';
+import { screenshots } from '../snapshot.js';
+import { html, withMcpContext } from '../utils.js';
 
 describe('screenshot', () => {
   describe('browser_take_screenshot', () => {
@@ -22,16 +22,16 @@ describe('screenshot', () => {
         const page = context.getSelectedPptrPage();
         await page.setContent(fixture.html);
         await screenshot.handler(
-          {params: {format: 'png'}, page: context.getSelectedMcpPage()},
+          { params: { format: 'png' }, page: context.getSelectedMcpPage() },
           response,
-          context,
+          context
         );
 
         assert.equal(response.images.length, 1);
         assert.equal(response.images[0].mimeType, 'image/png');
         assert.equal(
           response.responseLines.at(0),
-          "Took a screenshot of the current page's viewport.",
+          "Took a screenshot of the current page's viewport."
         );
       });
     });
@@ -42,50 +42,50 @@ describe('screenshot', () => {
         await page.setContent(fixture.html);
         await screenshot.handler(
           {
-            params: {format: 'png', quality: 0},
+            params: { format: 'png', quality: 0 },
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
 
         assert.equal(response.images.length, 1);
         assert.equal(response.images[0].mimeType, 'image/png');
         assert.equal(
           response.responseLines.at(0),
-          "Took a screenshot of the current page's viewport.",
+          "Took a screenshot of the current page's viewport."
         );
       });
     });
     it('with jpeg', async () => {
       await withMcpContext(async (response, context) => {
         await screenshot.handler(
-          {params: {format: 'jpeg'}, page: context.getSelectedMcpPage()},
+          { params: { format: 'jpeg' }, page: context.getSelectedMcpPage() },
           response,
-          context,
+          context
         );
 
         assert.equal(response.images.length, 1);
         assert.equal(response.images[0].mimeType, 'image/jpeg');
         assert.equal(
           response.responseLines.at(0),
-          "Took a screenshot of the current page's viewport.",
+          "Took a screenshot of the current page's viewport."
         );
       });
     });
     it('with webp', async () => {
       await withMcpContext(async (response, context) => {
         await screenshot.handler(
-          {params: {format: 'webp'}, page: context.getSelectedMcpPage()},
+          { params: { format: 'webp' }, page: context.getSelectedMcpPage() },
           response,
-          context,
+          context
         );
 
         assert.equal(response.images.length, 1);
         assert.equal(response.images[0].mimeType, 'image/webp');
         assert.equal(
           response.responseLines.at(0),
-          "Took a screenshot of the current page's viewport.",
+          "Took a screenshot of the current page's viewport."
         );
       });
     });
@@ -96,19 +96,16 @@ describe('screenshot', () => {
         await page.setContent(fixture.html);
         await screenshot.handler(
           {
-            params: {format: 'png', fullPage: true},
+            params: { format: 'png', fullPage: true },
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
 
         assert.equal(response.images.length, 1);
         assert.equal(response.images[0].mimeType, 'image/png');
-        assert.equal(
-          response.responseLines.at(0),
-          'Took a screenshot of the full current page.',
-        );
+        assert.equal(response.responseLines.at(0), 'Took a screenshot of the full current page.');
       });
     });
 
@@ -122,7 +119,7 @@ describe('screenshot', () => {
               id="red"
               style="color:blue;"
               >test</div
-            > `,
+            > `
         );
         await page.evaluate(() => {
           const el = document.querySelector('#red');
@@ -131,21 +128,16 @@ describe('screenshot', () => {
 
         await screenshot.handler(
           {
-            params: {format: 'png', fullPage: true},
+            params: { format: 'png', fullPage: true },
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
 
         assert.equal(response.images.length, 0);
-        assert.equal(
-          response.responseLines.at(0),
-          'Took a screenshot of the full current page.',
-        );
-        assert.ok(
-          response.responseLines.at(1)?.match(/Saved screenshot to.*\.png/),
-        );
+        assert.equal(response.responseLines.at(0), 'Took a screenshot of the full current page.');
+        assert.ok(response.responseLines.at(1)?.match(/Saved screenshot to.*\.png/));
       });
     });
 
@@ -165,15 +157,12 @@ describe('screenshot', () => {
             page: context.getSelectedMcpPage(),
           },
           response,
-          context,
+          context
         );
 
         assert.equal(response.images.length, 1);
         assert.equal(response.images[0].mimeType, 'image/png');
-        assert.equal(
-          response.responseLines.at(0),
-          'Took a screenshot of node with uid "1_1".',
-        );
+        assert.equal(response.responseLines.at(0), 'Took a screenshot of node with uid "1_1".');
       });
     });
 
@@ -186,38 +175,32 @@ describe('screenshot', () => {
           await page.setContent(fixture.html);
           await screenshot.handler(
             {
-              params: {format: 'png', filePath},
+              params: { format: 'png', filePath },
               page: context.getSelectedMcpPage(),
             },
             response,
-            context,
+            context
           );
 
           assert.equal(response.images.length, 0);
           assert.equal(
             response.responseLines.at(0),
-            "Took a screenshot of the current page's viewport.",
+            "Took a screenshot of the current page's viewport."
           );
-          assert.equal(
-            response.responseLines.at(1),
-            `Saved screenshot to ${filePath}.`,
-          );
+          assert.equal(response.responseLines.at(1), `Saved screenshot to ${filePath}.`);
 
           const stats = await stat(filePath);
           assert.ok(stats.isFile());
           assert.ok(stats.size > 0);
         } finally {
-          await rm(filePath, {force: true});
+          await rm(filePath, { force: true });
         }
       });
     });
 
     it('with unwritable filePath', async () => {
       if (process.platform === 'win32') {
-        const filePath = join(
-          tmpdir(),
-          'readonly-file-for-screenshot-test.png',
-        );
+        const filePath = join(tmpdir(), 'readonly-file-for-screenshot-test.png');
         // Create the file and make it read-only.
         await writeFile(filePath, '');
         await chmod(filePath, 0o400);
@@ -230,22 +213,22 @@ describe('screenshot', () => {
             await assert.rejects(
               screenshot.handler(
                 {
-                  params: {format: 'png', filePath},
+                  params: { format: 'png', filePath },
                   page: context.getSelectedMcpPage(),
                 },
                 response,
-                context,
-              ),
+                context
+              )
             );
           });
         } finally {
           // Make the file writable again so it can be deleted.
           await chmod(filePath, 0o600);
-          await rm(filePath, {force: true});
+          await rm(filePath, { force: true });
         }
       } else {
         const dir = join(tmpdir(), 'readonly-dir-for-screenshot-test');
-        await mkdir(dir, {recursive: true});
+        await mkdir(dir, { recursive: true });
         await chmod(dir, 0o500);
         const filePath = join(dir, 'test-screenshot.png');
 
@@ -257,17 +240,17 @@ describe('screenshot', () => {
             await assert.rejects(
               screenshot.handler(
                 {
-                  params: {format: 'png', filePath},
+                  params: { format: 'png', filePath },
                   page: context.getSelectedMcpPage(),
                 },
                 response,
-                context,
-              ),
+                context
+              )
             );
           });
         } finally {
           await chmod(dir, 0o700);
-          await rm(dir, {recursive: true, force: true});
+          await rm(dir, { recursive: true, force: true });
         }
       }
     });
@@ -285,12 +268,12 @@ describe('screenshot', () => {
         await assert.rejects(
           screenshot.handler(
             {
-              params: {format: 'png', filePath},
+              params: { format: 'png', filePath },
               page: context.getSelectedMcpPage(),
             },
             response,
-            context,
-          ),
+            context
+          )
         );
       });
     });

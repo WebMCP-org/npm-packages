@@ -5,7 +5,7 @@
  * Reference: https://github.com/agentskills/agentskills/blob/main/skills-ref/src/skills_ref/errors.py
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { ParseError, ValidationError } from '../src/errors';
 
 describe('ParseError', () => {

@@ -3,61 +3,65 @@
   "version": "2.2.0",
   "description": "Browser-adapted MCP TypeScript SDK - Dynamic tool registration for W3C Web Model Context API and AI agent integration",
   "keywords": [
-    "mcp",
-    "model-context-protocol",
-    "browser",
-    "typescript",
-    "sdk",
     "adapter",
-    "web-model-context",
-    "navigator-modelcontext",
-    "w3c",
     "ai-agents",
-    "llm",
-    "claude",
-    "chatgpt",
-    "openai",
+    "ai-integration",
     "anthropic",
-    "cursor",
+    "browser",
+    "chatgpt",
+    "claude",
     "copilot",
-    "gemini",
-    "webmcp",
+    "cursor",
     "dynamic-tools",
-    "mcp-server",
+    "gemini",
+    "llm",
+    "mcp",
     "mcp-client",
+    "mcp-server",
+    "model-context-protocol",
+    "navigator-modelcontext",
+    "openai",
+    "sdk",
     "tool-registration",
-    "ai-integration"
+    "typescript",
+    "w3c",
+    "web-model-context",
+    "webmcp"
   ],
   "homepage": "https://docs.mcp-b.ai/packages/webmcp-ts-sdk",
   "bugs": {
     "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },
+  "license": "MIT",
+  "author": "Alex Nahas",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/WebMCP-org/npm-packages.git",
     "directory": "packages/webmcp-ts-sdk"
   },
-  "license": "MIT",
-  "author": "Alex Nahas",
+  "files": [
+    "dist"
+  ],
   "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     }
   },
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "files": [
-    "dist"
-  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "scripts": {
-    "build": "tsdown",
-    "check": "biome check --write .",
-    "clean": "rm -rf dist .turbo",
-    "format": "biome format --write .",
-    "lint": "biome lint --write .",
+    "build": "vp pack",
+    "check": "vp check --fix",
+    "clean": "rm -rf dist",
+    "format": "vp fmt --write",
+    "lint": "vp lint --fix",
     "prepublishOnly": "node ../../scripts/validate-publish.js && pnpm run build",
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
@@ -73,8 +77,8 @@
   "devDependencies": {
     "@modelcontextprotocol/sdk": "catalog:",
     "@types/node": "catalog:",
-    "tsdown": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vite-plus": "catalog:"
   },
   "peerDependencies": {
     "zod": "^3.25 || ^4.0",
@@ -90,9 +94,5 @@
   },
   "engines": {
     "node": ">=18"
-  },
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
   }
 }

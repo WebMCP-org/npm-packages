@@ -14,14 +14,14 @@
 
 ## Why Use @mcp-b/global?
 
-| Feature | Benefit |
-|---------|---------|
-| **W3C Standard** | Implements the emerging Web Model Context API specification |
-| **Drop-in IIFE** | Add AI capabilities with a single `<script>` tag - no build step |
-| **Native Chromium Support** | Auto-detects and uses native browser implementation when available |
-| **Dual Transport** | Works with both same-window clients AND parent pages (iframe support) |
+| Feature                      | Benefit                                                                                                                                                          |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **W3C Standard**             | Implements the emerging Web Model Context API specification                                                                                                      |
+| **Drop-in IIFE**             | Add AI capabilities with a single `<script>` tag - no build step                                                                                                 |
+| **Native Chromium Support**  | Auto-detects and uses native browser implementation when available                                                                                               |
+| **Dual Transport**           | Works with both same-window clients AND parent pages (iframe support)                                                                                            |
 | **Spec-Aware Compatibility** | `provideContext()` / `clearContext()` remain temporarily for compatibility, and MCP-B wrappers still return a deprecated unregister handle from `registerTool()` |
-| **Works with Any AI** | Claude, ChatGPT, Gemini, Cursor, Copilot, and any MCP client |
+| **Works with Any AI**        | Claude, ChatGPT, Gemini, Cursor, Copilot, and any MCP client                                                                                                     |
 
 ## Package Selection
 
@@ -36,25 +36,25 @@
 ```html
 <!DOCTYPE html>
 <html>
-<head>
-  <script src="https://unpkg.com/@mcp-b/global@latest/dist/index.iife.js"></script>
-</head>
-<body>
-  <h1>My AI-Powered App</h1>
+  <head>
+    <script src="https://unpkg.com/@mcp-b/global@latest/dist/index.iife.js"></script>
+  </head>
+  <body>
+    <h1>My AI-Powered App</h1>
 
-  <script>
-    navigator.modelContext.registerTool({
-      name: "get-page-title",
-      description: "Get the current page title",
-      inputSchema: { type: "object", properties: {} },
-      async execute() {
-        return {
-          content: [{ type: "text", text: document.title }]
-        };
-      }
-    });
-  </script>
-</body>
+    <script>
+      navigator.modelContext.registerTool({
+        name: 'get-page-title',
+        description: 'Get the current page title',
+        inputSchema: { type: 'object', properties: {} },
+        async execute() {
+          return {
+            content: [{ type: 'text', text: document.title }],
+          };
+        },
+      });
+    </script>
+  </body>
 </html>
 ```
 
@@ -67,7 +67,9 @@
 ```html
 <script type="module">
   import '@mcp-b/global';
-  navigator.modelContext.registerTool({ /* your tool */ });
+  navigator.modelContext.registerTool({
+    /* your tool */
+  });
 </script>
 ```
 
@@ -82,7 +84,9 @@ npm install @mcp-b/global
 ```javascript
 import '@mcp-b/global';
 
-navigator.modelContext.registerTool({ /* your tool */ });
+navigator.modelContext.registerTool({
+  /* your tool */
+});
 ```
 
 ## API Reference
@@ -105,6 +109,7 @@ initializeWebModelContext({
 ```
 
 **Behavior:**
+
 - Only operates in browser environments
 - Idempotent - calling multiple times is a no-op after first initialization
 - Preserves native `navigator.modelContext` by default (configurable)
@@ -238,14 +243,14 @@ const result = await navigator.modelContext.callTool({
 
 ### Tool Descriptor
 
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `name` | `string` | Yes | Unique identifier for the tool |
-| `description` | `string` | Yes | Natural language description of what the tool does |
-| `inputSchema` | `InputSchema` | No | JSON Schema describing accepted input. Defaults to `{ type: 'object', properties: {} }` |
-| `outputSchema` | `InputSchema` | No | JSON Schema describing the output payload shape |
-| `annotations` | `ToolAnnotations` | No | Hints about tool behavior for LLM planners |
-| `execute` | `(args, client) => Promise<ToolResponse>` | Yes | Async function implementing the tool logic |
+| Property       | Type                                      | Required | Description                                                                             |
+| -------------- | ----------------------------------------- | -------- | --------------------------------------------------------------------------------------- |
+| `name`         | `string`                                  | Yes      | Unique identifier for the tool                                                          |
+| `description`  | `string`                                  | Yes      | Natural language description of what the tool does                                      |
+| `inputSchema`  | `InputSchema`                             | No       | JSON Schema describing accepted input. Defaults to `{ type: 'object', properties: {} }` |
+| `outputSchema` | `InputSchema`                             | No       | JSON Schema describing the output payload shape                                         |
+| `annotations`  | `ToolAnnotations`                         | No       | Hints about tool behavior for LLM planners                                              |
+| `execute`      | `(args, client) => Promise<ToolResponse>` | Yes      | Async function implementing the tool logic                                              |
 
 ### Tool Response Format
 
@@ -277,12 +282,12 @@ interface WebModelContextInitOptions {
 }
 ```
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `transport` | Auto-detect | Transport layer configuration (tab server and/or iframe) |
-| `autoInitialize` | `true` | Whether to auto-initialize on import |
-| `nativeModelContextBehavior` | `'preserve'` | `'preserve'` keeps native implementation untouched. `'patch'` replaces it with a BrowserMcpServer that mirrors to the native object |
-| `installTestingShim` | `'if-missing'` | Controls `navigator.modelContextTesting` installation. Only installs when not already present natively |
+| Option                       | Default        | Description                                                                                                                         |
+| ---------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `transport`                  | Auto-detect    | Transport layer configuration (tab server and/or iframe)                                                                            |
+| `autoInitialize`             | `true`         | Whether to auto-initialize on import                                                                                                |
+| `nativeModelContextBehavior` | `'preserve'`   | `'preserve'` keeps native implementation untouched. `'patch'` replaces it with a BrowserMcpServer that mirrors to the native object |
+| `installTestingShim`         | `'if-missing'` | Controls `navigator.modelContextTesting` installation. Only installs when not already present natively                              |
 
 ### Transport Configuration
 
@@ -364,7 +369,9 @@ const result = await navigator.modelContextTesting?.executeTool(
 
 ```javascript
 if ('modelContext' in navigator) {
-  navigator.modelContext.registerTool({ /* your tool */ });
+  navigator.modelContext.registerTool({
+    /* your tool */
+  });
 }
 ```
 
@@ -388,7 +395,9 @@ navigator.modelContext.registerTool({
     required: ['query'],
   },
   async execute(args) {
-    const results = await fetch(`/api/products?q=${args.query}&cat=${args.category ?? ''}&max=${args.maxPrice ?? ''}`);
+    const results = await fetch(
+      `/api/products?q=${args.query}&cat=${args.category ?? ''}&max=${args.maxPrice ?? ''}`
+    );
     return { content: [{ type: 'text', text: await results.text() }] };
   },
 });
@@ -490,12 +499,12 @@ navigator.modelContext.registerTool({
 
 ## Browser Compatibility
 
-| Browser | Native Support | Polyfill |
-|---------|---------------|----------|
-| Chrome/Edge (with flag) | Yes | N/A |
-| Chrome/Edge (default) | No | Yes |
-| Firefox | No | Yes |
-| Safari | No | Yes |
+| Browser                 | Native Support | Polyfill |
+| ----------------------- | -------------- | -------- |
+| Chrome/Edge (with flag) | Yes            | N/A      |
+| Chrome/Edge (default)   | No             | Yes      |
+| Firefox                 | No             | Yes      |
+| Safari                  | No             | Yes      |
 
 ## Zod Version Compatibility
 

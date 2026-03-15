@@ -3,46 +3,53 @@
   "version": "2.2.0",
   "description": "W3C Web Model Context API polyfill - Let AI agents like Claude, ChatGPT, and Gemini interact with your website via navigator.modelContext",
   "keywords": [
+    "ai-agents",
+    "ai-assistant",
+    "ai-integration",
+    "ai-tools",
+    "anthropic",
+    "browser",
+    "browser-ai",
+    "chatgpt",
+    "chromium",
+    "claude",
+    "copilot",
+    "cursor",
+    "gemini",
+    "iife",
+    "llm",
     "mcp",
     "model-context-protocol",
-    "web-model-context",
     "navigator-modelcontext",
-    "w3c",
-    "browser",
-    "polyfill",
-    "web-standard",
-    "ai-agents",
-    "ai-tools",
-    "llm",
-    "claude",
-    "chatgpt",
     "openai",
-    "anthropic",
-    "cursor",
-    "copilot",
-    "gemini",
-    "webmcp",
+    "polyfill",
     "tool-registration",
-    "ai-integration",
-    "browser-ai",
+    "w3c",
     "web-ai",
-    "ai-assistant",
-    "chromium",
-    "iife"
+    "web-model-context",
+    "web-standard",
+    "webmcp"
   ],
   "homepage": "https://docs.mcp-b.ai/packages/global",
   "bugs": {
     "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },
+  "license": "MIT",
+  "author": "Alex Nahas",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/WebMCP-org/npm-packages.git",
     "directory": "packages/global"
   },
-  "license": "MIT",
-  "author": "Alex Nahas",
-  "sideEffects": true,
+  "files": [
+    "dist"
+  ],
   "type": "module",
+  "sideEffects": true,
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "browser": "./dist/index.iife.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -54,31 +61,28 @@
       "default": "./dist/index.iife.js"
     }
   },
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "browser": "./dist/index.iife.js",
-  "types": "./dist/index.d.ts",
-  "files": [
-    "dist"
-  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "scripts": {
-    "build": "tsdown",
-    "check": "biome check --write .",
-    "clean": "rm -rf dist .turbo",
-    "format": "biome format --write .",
-    "lint": "biome lint --write .",
+    "build": "vp pack",
+    "check": "vp check --fix",
+    "clean": "rm -rf dist",
+    "format": "vp fmt --write",
+    "lint": "vp lint --fix",
     "prepublishOnly": "node ../../scripts/validate-publish.js && pnpm run build",
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
-    "test": "vitest run",
-    "test:browser": "vitest run --browser.headless",
-    "test:browser:ui": "vitest --browser",
+    "test": "vp test run",
+    "test:browser": "vp test run --browser.headless",
+    "test:browser:ui": "vp test --browser",
     "test:conformance:matrix": "pnpm run test:conformance:polyfill && pnpm run test:conformance:native",
-    "test:conformance:native": "vitest run --config vitest.conformance.native.config.ts --browser.headless",
-    "test:conformance:polyfill": "vitest run --config vitest.conformance.polyfill.config.ts --browser.headless",
-    "test:node": "vitest run --config vitest.node.config.ts",
-    "test:watch": "vitest",
-    "typecheck": "tsc --noEmit && vitest run --typecheck --silent",
+    "test:conformance:native": "vp test run --config vitest.conformance.native.config.ts --browser.headless",
+    "test:conformance:polyfill": "vp test run --config vitest.conformance.polyfill.config.ts --browser.headless",
+    "test:node": "vp test run --config vitest.node.config.ts",
+    "test:watch": "vp test",
+    "typecheck": "tsc --noEmit && vp test run --typecheck --silent",
     "version:major": "pnpm version major --no-git-tag-version",
     "version:minor": "pnpm version minor --no-git-tag-version",
     "version:patch": "pnpm version patch --no-git-tag-version"
@@ -91,20 +95,14 @@
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "@vitest/browser": "catalog:",
-    "@vitest/browser-playwright": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "fast-check": "catalog:",
     "playwright": "catalog:",
-    "tsdown": "catalog:",
     "typescript": "catalog:",
+    "vite-plus": "catalog:",
     "vitest": "catalog:"
   },
   "engines": {
     "node": ">=18"
-  },
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
   }
 }

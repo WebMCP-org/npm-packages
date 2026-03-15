@@ -10,7 +10,7 @@ The spec defines `inputSchema` but doesn't say whether the browser validates arg
 
 ```ts
 interface StandardSchemaV1<Input, Output> {
-  readonly "~standard": {
+  readonly '~standard': {
     readonly version: 1;
     readonly vendor: string;
     readonly validate: (value: unknown) => Result<Output> | Promise<Result<Output>>;
@@ -23,31 +23,31 @@ The browser (or polyfill) ships a built-in JSON Schema validator wrapped in this
 ```js
 // Plain JSON Schema — built-in validator handles it
 navigator.modelContext.registerTool({
-  name: "send_email",
+  name: 'send_email',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
-      to: { type: "string" },
-      subject: { type: "string" },
+      to: { type: 'string' },
+      subject: { type: 'string' },
     },
-    required: ["to", "subject"],
+    required: ['to', 'subject'],
   },
   execute: async (args) => {
     // args are already validated against the schema
-    return { content: [{ type: "text", text: `Sent to ${args.to}` }] };
+    return { content: [{ type: 'text', text: `Sent to ${args.to}` }] };
   },
 });
 
 // Zod schema — its own validator runs, JSON Schema extracted for agent discovery
 navigator.modelContext.registerTool({
-  name: "send_email",
+  name: 'send_email',
   inputSchema: z.object({
     to: z.string().email(),
     subject: z.string().min(1),
   }),
   execute: async (args) => {
     // args validated by Zod — .email() and .min(1) are enforced
-    return { content: [{ type: "text", text: `Sent to ${args.to}` }] };
+    return { content: [{ type: 'text', text: `Sent to ${args.to}` }] };
   },
 });
 ```

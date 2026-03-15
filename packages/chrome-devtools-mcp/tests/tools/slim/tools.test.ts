@@ -7,14 +7,14 @@
 import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
-import {describe, it} from 'node:test';
+import { describe, it } from 'node:test';
 
-import {evaluate, navigate, screenshot} from '../../../src/tools/slim/tools.js';
-import {screenshots} from '../../snapshot.js';
-import {withMcpContext} from '../../utils.js';
+import { evaluate, navigate, screenshot } from '../../../src/tools/slim/tools.js';
+import { screenshots } from '../../snapshot.js';
+import { withMcpContext } from '../../utils.js';
 
 describe('slim', () => {
-  it('evaluates', async t => {
+  it('evaluates', async (t) => {
     await withMcpContext(async (response, context) => {
       await evaluate.handler(
         {
@@ -24,13 +24,13 @@ describe('slim', () => {
           page: context.getSelectedMcpPage(),
         },
         response,
-        context,
+        context
       );
       t.assert.snapshot?.(response.responseLines.join('\n'));
     });
   });
 
-  it('handles errors', async t => {
+  it('handles errors', async (t) => {
     await withMcpContext(async (response, context) => {
       await evaluate.handler(
         {
@@ -40,26 +40,26 @@ describe('slim', () => {
           page: context.getSelectedMcpPage(),
         },
         response,
-        context,
+        context
       );
       t.assert.snapshot?.(response.responseLines.join('\n'));
     });
   });
 
-  it('navigates to correct page', async t => {
+  it('navigates to correct page', async (t) => {
     await withMcpContext(async (response, context) => {
       await navigate.handler(
         {
-          params: {url: 'data:text/html,<div>Hello MCP</div>'},
+          params: { url: 'data:text/html,<div>Hello MCP</div>' },
           page: context.getSelectedMcpPage(),
         },
         response,
-        context,
+        context
       );
       const page = context.getSelectedPptrPage();
       assert.equal(
         await page.evaluate(() => document.querySelector('div')?.textContent),
-        'Hello MCP',
+        'Hello MCP'
       );
       assert(!response.includePages);
       t.assert.snapshot?.(response.responseLines.join('\n'));
@@ -72,9 +72,9 @@ describe('slim', () => {
       const page = context.getSelectedPptrPage();
       await page.setContent(fixture.html);
       await screenshot.handler(
-        {params: {format: 'png'}, page: context.getSelectedMcpPage()},
+        { params: { format: 'png' }, page: context.getSelectedMcpPage() },
         response,
-        context,
+        context
       );
       assert(path.isAbsolute(response.responseLines.at(0)!));
       assert(fs.existsSync(response.responseLines.at(0)!));

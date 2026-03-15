@@ -9,6 +9,7 @@
 This document outlines the implementation of dynamic WebMCP tool registration in `chrome-devtools-mcp`. WebMCP tools will be exposed as first-class MCP tools, allowing Claude Code to call them directly without the two-step `list_webmcp_tools` → `call_webmcp_tool` process.
 
 ### Key Features
+
 - WebMCP tools appear as native MCP tools: `webmcp_{domain}_page{idx}_{toolName}`
 - Event-driven tool sync via `ToolListChangedNotificationSchema`
 - Automatic cleanup on page navigation/close
@@ -71,6 +72,7 @@ The WebMCP extension's `McpHub` provides a proven pattern for dynamic tool regis
 **File:** `WebMCP/apps/extension/entrypoints/background/src/services/mcpHub.ts`
 
 Key patterns to follow:
+
 - Tool naming: `website_tool_{domain}_{tabId}_{toolName}` (lines 198-199)
 - Handle storage: `private registeredTools = new Map<string, ReturnType<typeof this.server.registerTool>>()` (line 22)
 - Tool update: `this.registeredTools.get(toolName)?.update(config)` (line 219)
@@ -80,6 +82,7 @@ Key patterns to follow:
 **File:** `WebMCP/apps/extension/entrypoints/offscreen/lib/offscreen-tools.ts`
 
 Key pattern for event subscription:
+
 ```typescript
 import { ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
 
@@ -100,6 +103,7 @@ webmcp_{sanitizedDomain}_page{pageIdx}_{sanitizedToolName}
 ```
 
 Examples:
+
 - `webmcp_localhost_3000_page0_getTodos`
 - `webmcp_github_com_page1_searchRepos`
 - `webmcp_example_com_page0_submitForm`
@@ -111,6 +115,7 @@ Examples:
 ```
 
 Example:
+
 ```
 [WebMCP • localhost:3000 • Page 0] Fetch all todo items from the database
 ```
@@ -130,7 +135,8 @@ function extractDomain(url: string): string {
   try {
     const urlObj = new URL(url);
     const hostname = urlObj.hostname;
-    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
+    const isLocalhost =
+      hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
     const domain = isLocalhost ? `localhost_${urlObj.port || '80'}` : hostname;
     return sanitizeName(domain);
   } catch {
@@ -144,9 +150,7 @@ function extractDomain(url: string): string {
 ```typescript
 function getDisplayDomain(sanitizedDomain: string): string {
   // IMPORTANT: Handle localhost FIRST before general underscore replacement
-  return sanitizedDomain
-    .replace(/^localhost_(\d+)$/, 'localhost:$1')
-    .replace(/_/g, '.');
+  return sanitizedDomain.replace(/^localhost_(\d+)$/, 'localhost:$1').replace(/_/g, '.');
 }
 ```
 
@@ -154,14 +158,14 @@ function getDisplayDomain(sanitizedDomain: string): string {
 
 ## Files to Create/Modify
 
-| File | Action | Description |
-|------|--------|-------------|
-| `src/tools/WebMCPToolHub.ts` | **Create** | Main tool hub class |
-| `src/third_party/index.ts` | **Modify** | Export `ToolListChangedNotificationSchema` |
-| `src/main.ts` | **Modify** | Add `tools: { listChanged: true }`, init hub |
-| `src/cli.ts` | **Modify** | Add `--disable-webmcp-auto-register` flag |
-| `src/McpContext.ts` | **Modify** | Add `setToolHub()`, wire up sync + events |
-| `tests/tools/WebMCPToolHub.test.ts` | **Create** | Unit + integration tests |
+| File                                | Action     | Description                                  |
+| ----------------------------------- | ---------- | -------------------------------------------- |
+| `src/tools/WebMCPToolHub.ts`        | **Create** | Main tool hub class                          |
+| `src/third_party/index.ts`          | **Modify** | Export `ToolListChangedNotificationSchema`   |
+| `src/main.ts`                       | **Modify** | Add `tools: { listChanged: true }`, init hub |
+| `src/cli.ts`                        | **Modify** | Add `--disable-webmcp-auto-register` flag    |
+| `src/McpContext.ts`                 | **Modify** | Add `setToolHub()`, wire up sync + events    |
+| `tests/tools/WebMCPToolHub.test.ts` | **Create** | Unit + integration tests                     |
 
 ---
 
@@ -170,6 +174,7 @@ function getDisplayDomain(sanitizedDomain: string): string {
 ### Test Infrastructure
 
 Tests use the existing infrastructure:
+
 - `serverHooks()` - HTTP server for serving test pages
 - `withBrowser()` - Puppeteer browser for page interactions
 - `withMcpContext()` - Full McpContext with McpResponse
@@ -185,7 +190,7 @@ interface MockWebMCPOptions {
   respondReady?: boolean;
   supportListChanged?: boolean;
   sendToolListChangedAfterMs?: number;
-  updatedTools?: Tool[];  // Tools to send after list_changed
+  updatedTools?: Tool[]; // Tools to send after list_changed
 }
 
 function buildMockWebMCPPage(options: MockWebMCPOptions): string {
@@ -327,9 +332,9 @@ async function waitForToolsRegistered(
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     const { tools } = await client.listTools();
-    const matching = tools.filter(t => t.name.startsWith(expectedToolPrefix));
+    const matching = tools.filter((t) => t.name.startsWith(expectedToolPrefix));
     if (matching.length >= count) return matching;
-    await new Promise(r => setTimeout(r, 100));
+    await new Promise((r) => setTimeout(r, 100));
   }
   throw new Error(`Timeout waiting for ${count} tools with prefix ${expectedToolPrefix}`);
 }
@@ -343,9 +348,9 @@ async function waitForToolsRemoved(
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     const { tools } = await client.listTools();
-    const matching = tools.filter(t => t.name.startsWith(toolPrefix));
+    const matching = tools.filter((t) => t.name.startsWith(toolPrefix));
     if (matching.length === 0) return;
-    await new Promise(r => setTimeout(r, 100));
+    await new Promise((r) => setTimeout(r, 100));
   }
   throw new Error(`Timeout waiting for tools with prefix ${toolPrefix} to be removed`);
 }
@@ -356,11 +361,13 @@ async function waitForToolsRemoved(
 ## Implementation Checklist
 
 ### Phase 1: Foundation
+
 - [ ] Export `ToolListChangedNotificationSchema` from `third_party/index.ts`
 - [ ] Add `tools: { listChanged: true }` to server capabilities in `main.ts`
 - [ ] Add `--disable-webmcp-auto-register` CLI flag in `cli.ts`
 
 ### Phase 2: Core Implementation
+
 - [ ] Create `WebMCPToolHub` class in `src/tools/WebMCPToolHub.ts`
   - [ ] `sanitizeName()` helper
   - [ ] `extractDomain()` helper
@@ -372,6 +379,7 @@ async function waitForToolsRemoved(
   - [ ] `executeTool()` method with dynamic page lookup
 
 ### Phase 3: Integration
+
 - [ ] Add `#toolHub` to `McpContext`
 - [ ] Add `setToolHub(hub)` method to `McpContext`
 - [ ] Subscribe to `ToolListChangedNotificationSchema` in `getWebMCPClient()`
@@ -380,6 +388,7 @@ async function waitForToolsRemoved(
 - [ ] Wire up hub initialization in `main.ts`
 
 ### Phase 4: Testing (TDD)
+
 - [ ] Write test file structure with all test cases
 - [ ] Implement mock WebMCP page builder with list_changed support
 - [ ] Implement test utilities (waitForToolsRegistered, etc.)
@@ -418,8 +427,12 @@ export class WebMCPToolHub {
     this.enabled = enabled;
   }
 
-  disable(): void { this.enabled = false; }
-  enable(): void { this.enabled = true; }
+  disable(): void {
+    this.enabled = false;
+  }
+  enable(): void {
+    this.enabled = true;
+  }
 
   /**
    * Sync tools for a page. Called on:
@@ -543,7 +556,12 @@ export class WebMCPToolHub {
         const currentPage = this.getPageForTool(toolId);
         if (!currentPage) {
           return {
-            content: [{ type: 'text', text: 'Tool no longer available - page may have closed or navigated' }],
+            content: [
+              {
+                type: 'text',
+                text: 'Tool no longer available - page may have closed or navigated',
+              },
+            ],
             isError: true,
           };
         }
@@ -582,7 +600,9 @@ export class WebMCPToolHub {
       return await result.client.callTool({ name: toolName, arguments: args });
     } catch (err) {
       return {
-        content: [{ type: 'text', text: `Tool error: ${err instanceof Error ? err.message : String(err)}` }],
+        content: [
+          { type: 'text', text: `Tool error: ${err instanceof Error ? err.message : String(err)}` },
+        ],
         isError: true,
       };
     }
@@ -597,7 +617,11 @@ export class WebMCPToolHub {
     return `webmcp_${domain}_page${pageIdx}_${sanitizeName(toolName)}`;
   }
 
-  private generateDescription(domain: string, pageIdx: number, originalDescription?: string): string {
+  private generateDescription(
+    domain: string,
+    pageIdx: number,
+    originalDescription?: string
+  ): string {
     const displayDomain = getDisplayDomain(domain);
     return `[WebMCP • ${displayDomain} • Page ${pageIdx}] ${originalDescription || 'No description'}`;
   }
@@ -620,7 +644,8 @@ export function extractDomain(url: string): string {
   try {
     const urlObj = new URL(url);
     const hostname = urlObj.hostname;
-    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
+    const isLocalhost =
+      hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
     const domain = isLocalhost ? `localhost_${urlObj.port || '80'}` : hostname;
     return sanitizeName(domain);
   } catch {
@@ -629,9 +654,7 @@ export function extractDomain(url: string): string {
 }
 
 export function getDisplayDomain(sanitizedDomain: string): string {
-  return sanitizedDomain
-    .replace(/^localhost_(\d+)$/, 'localhost:$1')
-    .replace(/_/g, '.');
+  return sanitizedDomain.replace(/^localhost_(\d+)$/, 'localhost:$1').replace(/_/g, '.');
 }
 ```
 
@@ -771,6 +794,7 @@ if (context?.browser !== browser) {
 ### Legacy Tools Remain Available
 
 The existing `list_webmcp_tools` and `call_webmcp_tool` will continue to work for:
+
 - Clients that don't support `list_changed`
 - Debugging/inspection purposes
 - Explicit control over which page to query

@@ -15,21 +15,25 @@ This test app demonstrates and validates all features of the `@mcp-b/react-webmc
 ## Features Tested
 
 ### Counter Tools (Mutation & Query)
+
 - `counter_increment` - Increment counter (mutation, non-idempotent)
 - `counter_decrement` - Decrement counter (mutation, non-idempotent)
 - `counter_reset` - Reset to zero (destructive operation with elicitation)
 - `counter_get` - Get current value (read-only, idempotent query)
 
 ### Posts Tools (Complex Operations)
+
 - `posts_like` - Like a post by ID (mutation, idempotent)
 - `posts_search` - Search posts with filtering (read-only query)
 
 ### Context Tool
+
 - `context_app_state` - Expose current app state (read-only context)
 
 ## Running the App
 
 ### Development Server
+
 ```bash
 pnpm --filter react-webmcp-test-app dev
 ```
@@ -37,6 +41,7 @@ pnpm --filter react-webmcp-test-app dev
 The app will be available at http://localhost:5174
 
 ### Build
+
 ```bash
 pnpm --filter react-webmcp-test-app build
 ```
@@ -44,21 +49,25 @@ pnpm --filter react-webmcp-test-app build
 ## Running Tests
 
 ### Run all React WebMCP tests
+
 ```bash
 pnpm --filter mcp-e2e-tests test:react-webmcp
 ```
 
 ### Run with UI
+
 ```bash
 pnpm --filter mcp-e2e-tests test:react-webmcp:ui
 ```
 
 ### Run in headed mode (see the browser)
+
 ```bash
 pnpm --filter mcp-e2e-tests test:react-webmcp:headed
 ```
 
 ### Debug mode
+
 ```bash
 pnpm --filter mcp-e2e-tests test:react-webmcp:debug
 ```
@@ -128,6 +137,7 @@ src/
 ## Key Test Patterns
 
 ### Testing Tool Registration
+
 ```typescript
 const tools = await page.evaluate(() => {
   return (window as any).mcpTools;
@@ -136,17 +146,19 @@ expect(tools).toContain('counter_increment');
 ```
 
 ### Testing Tool Execution via Real MCP Client
+
 ```typescript
 const result = await page.evaluate(async () => {
   return await (window as any).mcpClient.callTool({
     name: 'counter_increment',
-    arguments: { amount: 5 }
+    arguments: { amount: 5 },
   });
 });
 expect(result.content).toBeDefined();
 ```
 
 ### Testing UI State
+
 ```typescript
 const counter = page.locator('[data-testid="counter-display"]');
 await expect(counter).toContainText('5');

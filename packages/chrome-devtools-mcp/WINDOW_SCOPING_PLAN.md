@@ -32,12 +32,12 @@ getPageByIdx(idx: number): Page {
 
 ### Affected Operations
 
-| Tool | Current Behavior | Problem |
-|------|-----------------|---------|
-| `list_pages` | Shows all pages | Agent sees other sessions' pages |
-| `select_page` | Selects any page by global index | Can select other sessions' pages |
-| `close_page` | Closes any page by global index | Can close other sessions' pages |
-| `new_page` | Creates tab in arbitrary window | Tab may go to wrong window |
+| Tool                | Current Behavior                 | Problem                                        |
+| ------------------- | -------------------------------- | ---------------------------------------------- |
+| `list_pages`        | Shows all pages                  | Agent sees other sessions' pages               |
+| `select_page`       | Selects any page by global index | Can select other sessions' pages               |
+| `close_page`        | Closes any page by global index  | Can close other sessions' pages                |
+| `new_page`          | Creates tab in arbitrary window  | Tab may go to wrong window                     |
 | `getSelectedPage()` | Returns explicitly selected page | Works correctly with `#pageExplicitlySelected` |
 
 ---
@@ -90,16 +90,18 @@ class McpContext {
 **In `main.ts`:**
 
 When a new window is created (connected to existing browser):
+
 ```typescript
 if (!wasLaunched) {
   // Connected to existing browser - create new window
-  const windowId = await context.newWindow();  // Modified to return windowId
+  const windowId = await context.newWindow(); // Modified to return windowId
   context.setSessionWindowId(windowId);
   logger('Created new window for this MCP session, windowId:', windowId);
 }
 ```
 
 When browser is freshly launched:
+
 ```typescript
 if (wasLaunched) {
   // Get windowId for the default page
@@ -393,6 +395,7 @@ async function getContext(): Promise<McpContext> {
 **Issue:** Getting windowId for each page requires a CDP call, which could slow down `createPagesSnapshot()`.
 
 **Mitigation:**
+
 - Cache windowId per page (invalidated on navigation)
 - Use parallel CDP calls for multiple pages
 - Only filter if `#sessionWindowId` is set
@@ -402,6 +405,7 @@ async function getContext(): Promise<McpContext> {
 **Issue:** Chrome doesn't guarantee which window receives a new tab from `browser.newPage()`.
 
 **Mitigation:**
+
 - Focus a page in our window before creating new tab
 - Log a warning if tab ends up in wrong window
 - Document this as known behavior
@@ -411,6 +415,7 @@ async function getContext(): Promise<McpContext> {
 **Issue:** User could manually close the session's window.
 
 **Mitigation:**
+
 - `createPagesSnapshot()` handles missing pages gracefully
 - If no pages remain in our window, error is thrown with clear message
 
@@ -419,6 +424,7 @@ async function getContext(): Promise<McpContext> {
 **Issue:** Existing users might expect to see all windows.
 
 **Mitigation:**
+
 - Add `--no-window-scope` flag to disable window filtering
 - Default to scoped behavior (safer for multi-agent scenarios)
 
@@ -468,7 +474,7 @@ async function getContext(): Promise<McpContext> {
   "method": "Target.createTarget",
   "params": {
     "url": "about:blank",
-    "newWindow": true  // Creates new window instead of tab
+    "newWindow": true // Creates new window instead of tab
   }
 }
 // Returns: { "targetId": "new-target-id" }

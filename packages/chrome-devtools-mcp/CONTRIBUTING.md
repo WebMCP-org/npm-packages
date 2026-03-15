@@ -126,14 +126,14 @@ We look to test that the tools are used correctly without too rigid assertions. 
 Example:
 
 ```ts
-import {TestScenario} from '../eval_gemini.js';
+import { TestScenario } from '../eval_gemini.js';
 
 export const scenario: TestScenario = {
   prompt: 'Navigate to example.com',
   maxTurns: 2,
-  expectations: calls => {
+  expectations: (calls) => {
     // Check that at least one call was 'browse_page'
-    const navigation = calls.find(c => c.name === 'browse_page');
+    const navigation = calls.find((c) => c.name === 'browse_page');
     if (!navigation) throw new Error('Model did not browse the page');
     // Verify essential args
     if (navigation.args.url !== 'http://example.com') {

@@ -6,11 +6,10 @@
 
 import assert from 'node:assert';
 
-import type {TestScenario} from '../eval_gemini.ts';
+import type { TestScenario } from '../eval_gemini.ts';
 
 export const scenario: TestScenario = {
-  prompt:
-    'Go to <TEST_URL>, fill the input with "hello world" and click the button.',
+  prompt: 'Go to <TEST_URL>, fill the input with "hello world" and click the button.',
   maxTurns: 4,
   htmlRoute: {
     path: '/input_test.html',
@@ -19,11 +18,9 @@ export const scenario: TestScenario = {
       <button id="test-button">Submit</button>
     `,
   },
-  expectations: calls => {
+  expectations: (calls) => {
     assert.strictEqual(calls.length, 4);
-    assert.ok(
-      calls[0].name === 'navigate_page' || calls[0].name === 'new_page',
-    );
+    assert.ok(calls[0].name === 'navigate_page' || calls[0].name === 'new_page');
     assert.ok(calls[1].name === 'take_snapshot');
     assert.ok(calls[2].name === 'fill');
     assert.ok(calls[3].name === 'click');

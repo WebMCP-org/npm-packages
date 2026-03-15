@@ -5,8 +5,8 @@
  */
 
 import type * as puppeteer from './third_party/index.js';
-import type {DevTools} from './third_party/index.js';
-import {CDPSessionEvent} from './third_party/index.js';
+import type { DevTools } from './third_party/index.js';
+import { CDPSessionEvent } from './third_party/index.js';
 
 /**
  * This class makes a puppeteer connection look like DevTools CDPConnection.
@@ -16,27 +16,16 @@ import {CDPSessionEvent} from './third_party/index.js';
  * We don't have to recursively listen for 'sessionattached' as the "root" CDP session sees all child session attached
  * events, regardless how deeply nested they are.
  */
-export class PuppeteerDevToolsConnection
-  implements DevTools.CDPConnection.CDPConnection
-{
+export class PuppeteerDevToolsConnection implements DevTools.CDPConnection.CDPConnection {
   readonly #connection: puppeteer.Connection;
   readonly #observers = new Set<DevTools.CDPConnection.CDPConnectionObserver>();
-  readonly #sessionEventHandlers = new Map<
-    string,
-    puppeteer.Handler<unknown>
-  >();
+  readonly #sessionEventHandlers = new Map<string, puppeteer.Handler<unknown>>();
 
   constructor(session: puppeteer.CDPSession) {
     this.#connection = session.connection()!;
 
-    session.on(
-      CDPSessionEvent.SessionAttached,
-      this.#startForwardingCdpEvents.bind(this),
-    );
-    session.on(
-      CDPSessionEvent.SessionDetached,
-      this.#stopForwardingCdpEvents.bind(this),
-    );
+    session.on(CDPSessionEvent.SessionAttached, this.#startForwardingCdpEvents.bind(this));
+    session.on(CDPSessionEvent.SessionDetached, this.#stopForwardingCdpEvents.bind(this));
 
     this.#startForwardingCdpEvents(session);
   }
@@ -44,15 +33,12 @@ export class PuppeteerDevToolsConnection
   send<T extends DevTools.CDPConnection.Command>(
     method: T,
     params: DevTools.CDPConnection.CommandParams<T>,
-    sessionId: string | undefined,
+    sessionId: string | undefined
   ): Promise<
-    | {result: DevTools.CDPConnection.CommandResult<T>}
-    | {error: DevTools.CDPConnection.CDPError}
+    { result: DevTools.CDPConnection.CommandResult<T> } | { error: DevTools.CDPConnection.CDPError }
   > {
     if (sessionId === undefined) {
-      throw new Error(
-        'Attempting to send on the root session. This must not happen',
-      );
+      throw new Error('Attempting to send on the root session. This must not happen');
     }
     const session = this.#connection.session(sessionId);
     if (!session) {
@@ -62,8 +48,8 @@ export class PuppeteerDevToolsConnection
     /* eslint-disable @typescript-eslint/no-explicit-any */
     return session
       .send(method as any, params)
-      .then(result => ({result}))
-      .catch(error => ({error})) as any;
+      .then((result) => ({ result }))
+      .catch((error) => ({ error })) as any;
     /* eslint-enable @typescript-eslint/no-explicit-any */
   }
 
@@ -76,10 +62,7 @@ export class PuppeteerDevToolsConnection
   }
 
   #startForwardingCdpEvents(session: puppeteer.CDPSession): void {
-    const handler = this.#handleEvent.bind(
-      this,
-      session.id(),
-    ) as puppeteer.Handler<unknown>;
+    const handler = this.#handleEvent.bind(this, session.id()) as puppeteer.Handler<unknown>;
     this.#sessionEventHandlers.set(session.id(), handler);
     session.on('*', handler);
   }
@@ -94,19 +77,19 @@ export class PuppeteerDevToolsConnection
   #handleEvent(
     sessionId: string,
     type: string | symbol | number,
-    event: any, // eslint-disable-line @typescript-eslint/no-explicit-any
+    event: any // eslint-disable-line @typescript-eslint/no-explicit-any
   ): void {
     if (
       typeof type === 'string' &&
       type !== CDPSessionEvent.SessionAttached &&
       type !== CDPSessionEvent.SessionDetached
     ) {
-      this.#observers.forEach(observer =>
+      this.#observers.forEach((observer) =>
         observer.onEvent({
           method: type as DevTools.CDPConnection.Event,
           sessionId,
           params: event,
-        }),
+        })
       );
     }
   }

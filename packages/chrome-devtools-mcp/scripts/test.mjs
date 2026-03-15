@@ -7,13 +7,13 @@
 // Note: can be converted to ts file once node 20 support is dropped.
 // Node 20 does not support --experimental-strip-types flag.
 
-import {spawn, execSync} from 'node:child_process';
+import { spawn, execSync } from 'node:child_process';
 import path from 'node:path';
 import process from 'node:process';
 
 const args = process.argv.slice(2);
-const userArgs = args.filter(arg => !arg.startsWith('-'));
-const flags = args.filter(arg => arg.startsWith('-'));
+const userArgs = args.filter((arg) => !arg.startsWith('-'));
+const flags = args.filter((arg) => arg.startsWith('-'));
 
 const files = [];
 
@@ -61,9 +61,7 @@ const nodeArgs = [
 
 function installChrome(version) {
   try {
-    return execSync(
-      `npx puppeteer browsers install chrome@${version} --format "{{path}}"`,
-    )
+    return execSync(`npx puppeteer browsers install chrome@${version} --format "{{path}}"`)
       .toString()
       .trim();
   } catch (e) {
@@ -76,7 +74,7 @@ async function runTests(attempt) {
   if (attempt > 1) {
     console.log(`\nRun attempt ${attempt}...\n`);
   }
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     const child = spawn('node', nodeArgs, {
       stdio: 'inherit',
       env: {
@@ -86,7 +84,7 @@ async function runTests(attempt) {
       },
     });
 
-    child.on('close', code => {
+    child.on('close', (code) => {
       resolve(code);
     });
   });
