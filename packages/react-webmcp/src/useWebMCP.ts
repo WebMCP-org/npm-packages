@@ -34,6 +34,18 @@ type CompatModelContext = Navigator['modelContext'] & {
   unregisterTool: (name: string) => void;
 };
 
+function isObjectOutputSchema(schema: ReactWebMCPOutputSchema | undefined): boolean {
+  if (!schema) {
+    return false;
+  }
+
+  if (isZodSchema(schema)) {
+    return true;
+  }
+
+  return 'type' in schema && schema.type === 'object';
+}
+
 function toStructuredContent(value: unknown): StructuredContent | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return null;
@@ -94,7 +106,7 @@ const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffec
  * ```
  *
  * @template TInputSchema - JSON Schema defining input parameter types (use `as const` for inference)
- * @template TOutputSchema - JSON Schema object defining output structure (enables structuredContent)
+ * @template TOutputSchema - JSON Schema defining output structure (object schemas enable structuredContent)
  *
  * @param config - Configuration object for the tool
  * @param deps - Optional dependency array that triggers tool re-registration when values change.
@@ -256,7 +268,7 @@ export function useWebMCP<
           ],
         };
 
-        if (outputSchema) {
+        if (isObjectOutputSchema(outputSchema)) {
           const structuredContent = toStructuredContent(result);
           if (!structuredContent) {
             throw new Error(

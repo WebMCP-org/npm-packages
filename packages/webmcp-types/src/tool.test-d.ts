@@ -231,3 +231,78 @@ test('ToolExecuteResultFromOutputSchema allows array return for array schema', (
   expectTypeOf<number[]>().toMatchTypeOf<Result>();
   expectTypeOf<CallToolResult>().toMatchTypeOf<Result>();
 });
+
+test('ToolExecuteResultFromOutputSchema rejects wrapped object results missing structuredContent', () => {
+  type OutputSchema = {
+    type: 'object';
+    properties: {
+      status: { type: 'string'; enum: ['ok', 'error'] };
+      total: { type: 'number' };
+    };
+    required: ['status', 'total'];
+  };
+
+  type Result = ToolExecuteResultFromOutputSchema<OutputSchema>;
+
+  // @ts-expect-error - wrapped object outputSchema results must include structuredContent
+  const invalidWrapped: Result = { content: [{ type: 'text', text: 'missing' }] };
+  void invalidWrapped;
+});
+
+test('ToolExecuteResultFromOutputSchema rejects wrapped object results with invalid structuredContent enum', () => {
+  type OutputSchema = {
+    type: 'object';
+    properties: {
+      status: { type: 'string'; enum: ['ok', 'error'] };
+    };
+    required: ['status'];
+  };
+
+  type Result = ToolExecuteResultFromOutputSchema<OutputSchema>;
+
+  // @ts-expect-error - structuredContent.status must satisfy enum
+  const invalidEnum: Result = {
+    content: [{ type: 'text', text: 'bad enum' }],
+    structuredContent: { status: 'pending' },
+  };
+  void invalidEnum;
+});
+
+test('ToolExecuteResultFromOutputSchema rejects wrapped object results with missing required structuredContent keys', () => {
+  type OutputSchema = {
+    type: 'object';
+    properties: {
+      total: { type: 'number' };
+      category: { type: 'string' };
+    };
+    required: ['total'];
+  };
+
+  type Result = ToolExecuteResultFromOutputSchema<OutputSchema>;
+
+  // @ts-expect-error - structuredContent.total is required
+  const missingRequiredKey: Result = {
+    content: [{ type: 'text', text: 'missing key' }],
+    structuredContent: { category: 'news' },
+  };
+  void missingRequiredKey;
+});
+
+test('ToolExecuteResultFromOutputSchema rejects wrapped object results with wrong structuredContent property types', () => {
+  type OutputSchema = {
+    type: 'object';
+    properties: {
+      total: { type: 'number' };
+    };
+    required: ['total'];
+  };
+
+  type Result = ToolExecuteResultFromOutputSchema<OutputSchema>;
+
+  // @ts-expect-error - structuredContent.total must be number
+  const wrongType: Result = {
+    content: [{ type: 'text', text: 'wrong type' }],
+    structuredContent: { total: '1' },
+  };
+  void wrongType;
+});

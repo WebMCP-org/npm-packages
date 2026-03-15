@@ -647,6 +647,45 @@ describe('useWebMCP', () => {
       ).rejects.toThrow();
     });
 
+    
+
+    it('should allow primitive structured outputs when outputSchema is primitive', async () => {
+      await renderHook(() =>
+        useWebMCP({
+          name: 'primitive_schema_tool',
+          description: 'Returns primitive with primitive output schema',
+          outputSchema: { type: 'string' } as const,
+          handler: async () => 'ready',
+        })
+      );
+
+      const result = await navigator.modelContextTesting?.executeTool(
+        'primitive_schema_tool',
+        JSON.stringify({})
+      );
+      const parsed = parseSerializedToolResponse(result);
+      expect(parsed.isError).not.toBe(true);
+      expect(parsed.structuredContent).toBeUndefined();
+    });
+
+    it('should allow array structured outputs when outputSchema is array', async () => {
+      await renderHook(() =>
+        useWebMCP({
+          name: 'array_schema_tool',
+          description: 'Returns array with array output schema',
+          outputSchema: { type: 'array', items: { type: 'number' } } as const,
+          handler: async () => [1, 2, 3],
+        })
+      );
+
+      const result = await navigator.modelContextTesting?.executeTool(
+        'array_schema_tool',
+        JSON.stringify({})
+      );
+      const parsed = parseSerializedToolResponse(result);
+      expect(parsed.isError).not.toBe(true);
+      expect(parsed.structuredContent).toBeUndefined();
+    });
     it('should throw error when outputSchema is defined but handler returns null', async () => {
       await renderHook(() =>
         useWebMCP({

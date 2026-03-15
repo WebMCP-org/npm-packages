@@ -2,7 +2,7 @@ import type { ToolInputSchema } from '@mcp-b/webmcp-polyfill';
 import type {
   CallToolResult,
   InputSchema,
-  JsonSchemaObject,
+  JsonSchemaForInference,
   ToolDescriptor,
 } from '@mcp-b/webmcp-types';
 import type { DependencyList } from 'react';
@@ -36,6 +36,10 @@ type CompatModelContext = Navigator['modelContext'] & {
   registerTool: (tool: ToolDescriptor) => { unregister: () => void } | undefined;
   unregisterTool: (name: string) => void;
 };
+
+function isObjectOutputSchema(schema: JsonSchemaForInference | undefined): boolean {
+  return schema?.type === 'object';
+}
 
 function toStructuredContent(value: unknown): StructuredContent | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -126,7 +130,7 @@ function isDev(): boolean {
  * ```
  *
  * @template TInputSchema - JSON Schema defining input parameter types (use `as const` for inference)
- * @template TOutputSchema - JSON Schema object defining output structure (enables structuredContent)
+ * @template TOutputSchema - JSON Schema defining output structure (object schemas enable structuredContent)
  *
  * @param config - Configuration object for the tool
  * @param deps - Optional dependency array that triggers tool re-registration when values change.
@@ -166,7 +170,7 @@ function isDev(): boolean {
  */
 export function useWebMCP<
   TInputSchema extends ToolInputSchema = InputSchema,
-  TOutputSchema extends JsonSchemaObject | undefined = undefined,
+  TOutputSchema extends JsonSchemaForInference | undefined = undefined,
 >(
   config: WebMCPConfig<TInputSchema, TOutputSchema>,
   deps?: DependencyList
@@ -389,7 +393,7 @@ export function useWebMCP<
           ],
         };
 
-        if (outputSchema) {
+        if (isObjectOutputSchema(outputSchema)) {
           const structuredContent = toStructuredContent(result);
           if (!structuredContent) {
             throw new Error(
