@@ -1,7 +1,7 @@
 import { defineConfig } from 'tsdown';
 
 export default defineConfig({
-  entry: ['src/index.ts', 'src/ai.ts', 'src/webmcp.ts'],
+  entry: ['src/index.ts', 'src/ai.ts', 'src/browser.ts', 'src/webmcp.ts'],
   format: ['esm'],
   dts: true,
   splitting: false,
