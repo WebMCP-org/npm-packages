@@ -60,6 +60,9 @@ jobs:
       - name: Install dependencies
         run: vp install
 
+      - name: Build packages
+        run: pnpm build
+
       - name: Setup Chrome Beta
         id: chrome
         uses: browser-actions/setup-chrome@4f8e94349a351df0f048634f25fec36c3c91eded
