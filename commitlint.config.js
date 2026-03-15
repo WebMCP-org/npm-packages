@@ -8,6 +8,7 @@ export default {
         // Packages (in packages/)
         'agent-skills',
         'chrome-devtools-mcp',
+        'codemode',
         'extension-tools',
         'global',
         'mcp-iframe',
