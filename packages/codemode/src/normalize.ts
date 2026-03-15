@@ -22,19 +22,18 @@ export function normalizeCode(code: string): string {
 
     // Already an arrow function — pass through
     if (ast.body.length === 1 && first?.type === 'ExpressionStatement') {
-      const expr = (first as acorn.ExpressionStatement).expression;
-      if (expr.type === 'ArrowFunctionExpression') return source;
+      if (first.expression.type === 'ArrowFunctionExpression') return source;
     }
 
     // export default <expression> → unwrap to just the expression
     if (ast.body.length === 1 && first?.type === 'ExportDefaultDeclaration') {
-      const decl = (first as acorn.ExportDefaultDeclaration).declaration;
-      const inner = source.slice(decl.start, decl.end);
+      const { declaration } = first;
+      const inner = source.slice(declaration.start, declaration.end);
 
-      if (decl.type === 'FunctionDeclaration' && !(decl as acorn.FunctionDeclaration).id) {
+      if (declaration.type === 'FunctionDeclaration' && !declaration.id) {
         return `async () => {\nreturn (${inner})();\n}`;
       }
-      if (decl.type === 'ClassDeclaration' && !(decl as acorn.ClassDeclaration).id) {
+      if (declaration.type === 'ClassDeclaration' && !declaration.id) {
         return `async () => {\nreturn (${inner});\n}`;
       }
 
@@ -43,17 +42,15 @@ export function normalizeCode(code: string): string {
 
     // Single named function declaration → wrap and call it
     if (ast.body.length === 1 && first?.type === 'FunctionDeclaration') {
-      const fn = first as acorn.FunctionDeclaration;
-      const name = fn.id?.name ?? 'fn';
+      const name = first.id?.name ?? 'fn';
       return `async () => {\n${source}\nreturn ${name}();\n}`;
     }
 
     // Last statement is expression → splice in return
     const last = ast.body[ast.body.length - 1];
     if (last?.type === 'ExpressionStatement') {
-      const exprStmt = last as acorn.ExpressionStatement;
       const before = source.slice(0, last.start);
-      const exprText = source.slice(exprStmt.expression.start, exprStmt.expression.end);
+      const exprText = source.slice(last.expression.start, last.expression.end);
       return `async () => {\n${before}return (${exprText})\n}`;
     }
 

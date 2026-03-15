@@ -1,11 +1,11 @@
-import type { ExecuteResult, Executor } from './types';
+import { isExecutionResultMessage, isToolCallMessage } from './messages';
+import type { ExecuteResult, Executor, ToolFunctions } from './types';
 
 export interface IframeSandboxExecutorOptions {
   timeout?: number;
 }
 
 function buildSrcdoc(code: string): string {
-  // JSON.stringify the code to safely embed it in a script tag
   const safeCode = JSON.stringify(code);
 
   return `<!DOCTYPE html>
@@ -73,10 +73,7 @@ export class IframeSandboxExecutor implements Executor {
     this.#timeout = options?.timeout ?? 30000;
   }
 
-  async execute(
-    code: string,
-    fns: Record<string, (...args: unknown[]) => Promise<unknown>>
-  ): Promise<ExecuteResult> {
+  async execute(code: string, fns: ToolFunctions): Promise<ExecuteResult> {
     return new Promise<ExecuteResult>((resolve) => {
       const iframe = document.createElement('iframe');
       iframe.sandbox.add('allow-scripts');
@@ -98,37 +95,36 @@ export class IframeSandboxExecutor implements Executor {
       const handler = async (event: MessageEvent) => {
         if (event.source !== iframe.contentWindow) return;
 
-        const msg = event.data as
-          | { type: 'tool-call'; id: number; name: string; args: Record<string, unknown> }
-          | { type: 'execution-result'; result: ExecuteResult };
+        const data: unknown = event.data;
 
-        if (msg.type === 'tool-call') {
-          const fn = fns[msg.name];
+        if (isToolCallMessage(data)) {
+          const fn = fns[data.name];
           if (!fn) {
             iframe.contentWindow?.postMessage(
-              { type: 'tool-result', id: msg.id, error: `Tool "${msg.name}" not found` },
+              { type: 'tool-result', id: data.id, error: `Tool "${data.name}" not found` },
               '*'
             );
             return;
           }
           try {
-            const result = await fn(msg.args);
-            iframe.contentWindow?.postMessage({ type: 'tool-result', id: msg.id, result }, '*');
+            const result = await fn(data.args);
+            iframe.contentWindow?.postMessage({ type: 'tool-result', id: data.id, result }, '*');
           } catch (err) {
             iframe.contentWindow?.postMessage(
               {
                 type: 'tool-result',
-                id: msg.id,
+                id: data.id,
                 error: err instanceof Error ? err.message : String(err),
               },
               '*'
             );
           }
+          return;
         }
 
-        if (msg.type === 'execution-result') {
+        if (isExecutionResultMessage(data)) {
           cleanup();
-          resolve(msg.result);
+          resolve(data.result);
         }
       };
 

@@ -13,21 +13,42 @@ interface ToolListItem {
 }
 
 /**
+ * Validates that a value looks like a JSON Schema object (has "type" or "properties").
+ * This is a boundary check — WebMCP schemas are not guaranteed to be valid JSON Schema.
+ */
+function isJsonSchemaLike(value: unknown): value is JSONSchema7 {
+  if (typeof value !== 'object' || value === null) return false;
+  const obj = value as Record<string, unknown>;
+  return (
+    typeof obj.type === 'string' ||
+    typeof obj.properties === 'object' ||
+    typeof obj.$ref === 'string' ||
+    Array.isArray(obj.anyOf) ||
+    Array.isArray(obj.oneOf) ||
+    Array.isArray(obj.allOf)
+  );
+}
+
+/**
  * Convert WebMCP tool list items (from `modelContext.listTools()`)
  * into codemode-compatible JSON Schema tool descriptors.
  */
 export function webmcpToolsToCodemode(tools: ToolListItem[]): JsonSchemaToolDescriptors {
   const descriptors: JsonSchemaToolDescriptors = {};
   for (const tool of tools) {
-    const descriptor: JsonSchemaToolDescriptor = {
-      inputSchema: (tool.inputSchema as JSONSchema7) ?? { type: 'object' },
-    };
+    const inputSchema: JSONSchema7 = isJsonSchemaLike(tool.inputSchema)
+      ? tool.inputSchema
+      : { type: 'object' };
+
+    const descriptor: JsonSchemaToolDescriptor = { inputSchema };
+
     if (tool.description !== undefined) {
       descriptor.description = tool.description;
     }
-    if (tool.outputSchema) {
-      descriptor.outputSchema = tool.outputSchema as JSONSchema7;
+    if (isJsonSchemaLike(tool.outputSchema)) {
+      descriptor.outputSchema = tool.outputSchema;
     }
+
     descriptors[tool.name] = descriptor;
   }
   return descriptors;
