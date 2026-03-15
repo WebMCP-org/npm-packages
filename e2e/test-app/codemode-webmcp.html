@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Codemode WebMCP E2E</title>
+    <style>
+      body {
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+        max-width: 960px;
+        margin: 32px auto;
+        padding: 0 16px 40px;
+      }
+      .panel {
+        border: 1px solid #d0d7de;
+        border-radius: 10px;
+        padding: 16px;
+        margin-top: 16px;
+      }
+      .status {
+        padding: 10px 12px;
+        border-radius: 6px;
+        background: #f6f8fa;
+      }
+      .status.ready {
+        background: #dcfce7;
+        color: #166534;
+      }
+      .status.error {
+        background: #fee2e2;
+        color: #991b1b;
+      }
+      pre {
+        background: #0f172a;
+        color: #e2e8f0;
+        border-radius: 8px;
+        padding: 12px;
+        overflow-x: auto;
+      }
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Codemode WebMCP Runtime</h1>
+    <p>End-to-end coverage for <code>createCodeToolFromModelContextTesting(...)</code>.</p>
+
+    <div class="panel">
+      <h2>Status</h2>
+      <div id="codemode-status" class="status" data-status="booting">Booting codemode...</div>
+    </div>
+
+    <div class="panel">
+      <h2>Discovered Tools</h2>
+      <pre id="codemode-tools" data-count="0">[]</pre>
+    </div>
+
+    <div class="panel">
+      <h2>Generated Types</h2>
+      <pre id="codemode-description"></pre>
+    </div>
+
+    <div class="panel">
+      <h2>Execution Result</h2>
+      <pre id="codemode-result" data-status="pending">pending</pre>
+    </div>
+
+    <div class="panel">
+      <h2>Recorded Tool Calls</h2>
+      <pre id="codemode-calls" data-count="0">[]</pre>
+    </div>
+
+    <script type="module" src="/src/codemode-webmcp.ts"></script>
+  </body>
+</html>

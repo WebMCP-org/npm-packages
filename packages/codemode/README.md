@@ -1,41 +1,45 @@
 # Codemode (Experimental)
 
-`@mcp-b/codemode` is a browser-native codemode package inspired by Cloudflare's codemode work. It gives the model one tool that says "write code", turns your available tools into typed APIs, and runs that generated code inside a browser sandbox.
+Codemode lets an LLM write and execute code that orchestrates your tools instead of calling them one at a time. This works well because models are generally better at writing small programs than planning long tool-call chains step by step.
 
-The default package ships with zero direct runtime dependencies. If you want AST-based code normalization, Acorn is available as an opt-in plugin entrypoint.
+`@mcp-b/codemode` is the browser-native version of that idea. It is heavily inspired by Cloudflare's codemode work, but built for browser runtimes, iframe isolation, and client-side WebMCP.
 
-This package is especially useful on the client side with WebMCP tools.
+The default package has zero direct runtime dependencies. If you want AST-based code normalization, you can opt into Acorn as a plugin.
 
-> **Experimental**
-> The API is still settling and may change in breaking ways.
+> Experimental: this package may change in breaking ways.
+
+## When to use Codemode
+
+Codemode is most useful when the model needs to:
+
+- chain multiple tool calls with logic between them
+- combine results from several tools before returning
+- work with many small WebMCP tools on the client
+- run multi-step workflows that would be awkward with plain tool calling
+
+For simple, single tool calls, standard AI SDK tool calling is usually simpler.
 
 ## Installation
+
+Default install:
 
 ```sh
 npm install @mcp-b/codemode ai zod
 ```
 
-Optional Acorn-based normalization:
+Optional Acorn plugin:
 
 ```sh
 npm install @mcp-b/codemode acorn ai zod
 ```
-
-## Recommended Browser Setup
-
-For browser usage, prefer `IframeSandboxExecutor`.
-
-- It gives you an iframe document boundary plus CSP.
-- It fits client-side WebMCP better than the worker executor.
-- It supports both a codemode-provisioned iframe and a caller-provided iframe.
 
 ## Quick Start With WebMCP
 
 Today, the default WebMCP integration path is `navigator.modelContextTesting`.
 
 ```ts
-import { IframeSandboxExecutor } from '@mcp-b/codemode';
 import { streamText } from 'ai';
+import { IframeSandboxExecutor } from '@mcp-b/codemode';
 import { createCodeToolFromModelContextTesting } from '@mcp-b/codemode/webmcp';
 
 const testing = navigator.modelContextTesting;
@@ -62,33 +66,37 @@ const result = streamText({
 });
 ```
 
-That helper does the whole bridge:
+That helper:
 
 - reads tools from `modelContextTesting.listTools()`
-- parses their JSON input schemas
+- parses JSON input schemas
 - converts them into codemode descriptors
 - wires execution through `modelContextTesting.executeTool(...)`
-- returns a ready-to-use codemode AI SDK tool
+- returns a single codemode tool you can hand to AI SDK
 
-## Optional Acorn Plugin
+When the model chooses codemode, it writes an async arrow function like:
 
-The built-in normalizer is intentionally lightweight and dependency-free. If you want AST-based normalization, opt into the Acorn entrypoint:
+```javascript
+async () => {
+  const total = await codemode.sumNumbers({ a: 7, b: 5 });
+  const greeting = await codemode.greetPerson({ name: 'WebMCP' });
 
-```ts
-import { createCodeTool } from '@mcp-b/codemode/ai';
-import { IframeSandboxExecutor } from '@mcp-b/codemode';
-import { normalizeCodeWithAcorn } from '@mcp-b/codemode/acorn';
-
-const codemode = createCodeTool({
-  tools,
-  executor: new IframeSandboxExecutor(),
-  normalizeCode: normalizeCodeWithAcorn,
-});
+  return {
+    total,
+    greeting,
+  };
+};
 ```
 
-## Executors
+Codemode executes that function in a browser sandbox and routes `codemode.*` calls back to your host tools.
 
-### `IframeSandboxExecutor` (Preferred)
+## Recommended Executor
+
+For browser usage, prefer `IframeSandboxExecutor`.
+
+- It gives you a document boundary plus CSP.
+- It fits client-side WebMCP better than the worker executor.
+- It supports both a provisioned iframe and a caller-provided iframe.
 
 Use the built-in provisioned iframe:
 
@@ -117,23 +125,9 @@ const executor = new IframeSandboxExecutor({
 });
 ```
 
-If you provide your own iframe, you own the iframe's settings, origin, and loaded document. Codemode just uses it as the execution target.
+If you provide your own iframe, you own the iframe settings, origin, and loaded document. Codemode only uses it as the execution target.
 
-### `WorkerSandboxExecutor`
-
-```ts
-import { WorkerSandboxExecutor } from '@mcp-b/codemode';
-
-const executor = new WorkerSandboxExecutor({
-  timeout: 30_000,
-});
-```
-
-Use this when you specifically want a `Worker`-based browser sandbox. For WebMCP in the page, the iframe path is usually the better fit.
-
-## Hosted Iframe Runtime
-
-If you provide your own iframe, boot the runtime inside that iframe page:
+If you host your own iframe runtime, initialize it inside the iframe page:
 
 ```ts
 import { initializeIframeSandboxRuntime } from '@mcp-b/codemode/browser';
@@ -143,9 +137,39 @@ initializeIframeSandboxRuntime({
 });
 ```
 
-## WebMCP Utilities
+## Worker Executor
 
-If you need lower-level building blocks instead of the one-call helper, `@mcp-b/codemode/webmcp` also exports:
+`WorkerSandboxExecutor` is also available:
+
+```ts
+import { WorkerSandboxExecutor } from '@mcp-b/codemode';
+
+const executor = new WorkerSandboxExecutor({
+  timeout: 30_000,
+});
+```
+
+Use it when you specifically want a `Worker` sandbox. For in-page WebMCP, the iframe path is usually the better fit.
+
+## Optional Acorn Plugin
+
+The built-in normalizer is intentionally lightweight and dependency-free. If you want AST-based normalization, opt into the Acorn entrypoint and pass it to `createCodeTool`.
+
+```ts
+import { createCodeTool } from '@mcp-b/codemode/ai';
+import { IframeSandboxExecutor } from '@mcp-b/codemode';
+import { normalizeCodeWithAcorn } from '@mcp-b/codemode/acorn';
+
+const codemode = createCodeTool({
+  tools,
+  executor: new IframeSandboxExecutor(),
+  normalizeCode: normalizeCodeWithAcorn,
+});
+```
+
+## Lower-Level WebMCP Utilities
+
+If you want building blocks instead of the one-call helper, `@mcp-b/codemode/webmcp` also exports:
 
 - `webmcpToolsToCodemode(...)`
 - `modelContextTestingToCodemodeTools(...)`
@@ -153,7 +177,7 @@ If you need lower-level building blocks instead of the one-call helper, `@mcp-b/
 
 ## Current Limitations
 
-- The WebMCP default path currently uses `navigator.modelContextTesting`
+- The default WebMCP path currently uses `navigator.modelContextTesting`
 - `modelContextTesting.listTools()` exposes `inputSchema`, but not `outputSchema`
 - That means codemode can infer input types from the testing API, but not output types
 - Browser sandboxing is practical isolation, not a hardened VM

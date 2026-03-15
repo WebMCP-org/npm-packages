@@ -10,12 +10,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@mcp-b/codemode": "workspace:*",
     "@mcp-b/global": "workspace:*",
     "@mcp-b/mcp-iframe": "workspace:*",
     "@mcp-b/transports": "workspace:*",
     "@mcp-b/webmcp-ts-sdk": "workspace:*",
     "@mcp-b/webmcp-types": "workspace:*",
     "@modelcontextprotocol/sdk": "catalog:",
+    "ai": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
