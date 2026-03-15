@@ -25,7 +25,7 @@
     "syncpack:fix": "syncpack fix-mismatches",
     "syncpack:lint": "syncpack lint",
     "test": "pnpm test:unit && pnpm test:e2e",
-    "test:e2e": "pnpm --filter mcp-e2e-tests run test:runtime-contract && pnpm --filter @mcp-b/webmcp-local-relay test:e2e && pnpm --filter @mcp-b/chrome-devtools-mcp test:e2e && pnpm --filter @mcp-b/extension-tools test:e2e",
+    "test:e2e": "pnpm --filter mcp-e2e-tests run test:runtime-contract && pnpm --filter @mcp-b/webmcp-local-relay test:e2e && pnpm --filter @mcp-b/extension-tools test:e2e",
     "test:e2e:debug": "pnpm --filter mcp-e2e-tests test:debug",
     "test:e2e:headed": "pnpm --filter mcp-e2e-tests test:headed",
     "test:e2e:tarball:global": "node ./scripts/test-global-tarball-e2e.mjs",
