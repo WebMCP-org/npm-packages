@@ -6,7 +6,7 @@
     },
     "webmcp-local-relay": {
       "command": "node",
-      "args": ["./packages/webmcp-local-relay/dist/cli.js"]
+      "args": ["./packages/webmcp-local-relay/dist/cli.mjs"]
     }
   }
 }

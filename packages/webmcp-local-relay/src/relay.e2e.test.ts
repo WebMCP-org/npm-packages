@@ -15,7 +15,7 @@ import { sanitizeName } from './naming.js';
 const TEST_TOOL_NAME = 'sum';
 const PACKAGE_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const REPO_ROOT = resolve(PACKAGE_DIR, '../..');
-const CLI_ENTRY_PATH = resolve(PACKAGE_DIR, 'dist/cli.js');
+const CLI_ENTRY_PATH = resolve(PACKAGE_DIR, 'dist/cli.mjs');
 
 const GLOBAL_RUNTIME_PATH = resolve(REPO_ROOT, 'packages/global/dist/index.iife.js');
 const POLYFILL_RUNTIME_PATH = resolve(REPO_ROOT, 'packages/webmcp-polyfill/dist/index.iife.js');
