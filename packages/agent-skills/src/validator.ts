@@ -374,7 +374,11 @@ export function validateSkillEntries(
     const { metadata } = parseFrontmatter(skillFile.content);
     const errors = validateFrontmatterFields(metadata);
     const properties = frontmatterToProperties(metadata);
-    errors.push(...validateSkillProperties(properties, { expectedName: options.expectedName }));
+    errors.push(
+      ...validateSkillProperties(properties, {
+        ...(options.expectedName !== undefined && { expectedName: options.expectedName }),
+      })
+    );
     return errors;
   } catch (error) {
     if (error instanceof ParseError || error instanceof ValidationError) {
