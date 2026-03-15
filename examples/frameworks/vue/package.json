@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "vue-tsc -b && vp build",
-    "dev": "vp dev",
-    "preview": "vp preview"
+    "build": "vue-tsc -b && vite build",
+    "dev": "vite dev",
+    "preview": "vite preview"
   },
   "dependencies": {
     "@mcp-b/webmcp-polyfill": "workspace:*",
@@ -16,8 +16,7 @@
     "@vitejs/plugin-vue": "^6.0.2",
     "@vue/tsconfig": "^0.8.1",
     "typescript": "~5.9.3",
-    "vite": "catalog:",
-    "vite-plus": "catalog:",
+    "vite": "^8.0.0",
     "vue-tsc": "^3.1.5"
   }
 }

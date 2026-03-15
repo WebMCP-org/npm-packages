@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc -b && vp build",
-    "dev": "vp dev",
-    "preview": "vp preview"
+    "build": "tsc -b && vite build",
+    "dev": "vite dev",
+    "preview": "vite preview"
   },
   "dependencies": {
     "@mcp-b/webmcp-polyfill": "workspace:*",
@@ -19,7 +19,6 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
     "typescript": "~5.9.3",
-    "vite": "catalog:",
-    "vite-plus": "catalog:"
+    "vite": "^8.0.0"
   }
 }
