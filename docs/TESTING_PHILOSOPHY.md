@@ -2,6 +2,8 @@
 
 This document defines how we test in this npm package monorepo.
 
+For type-surface rules and the repo-wide no-cast policy, see [TYPE_TESTING.md](./TYPE_TESTING.md).
+
 Primary goal: high confidence in behavior with minimal brittle tests.
 
 ## Core Principles
