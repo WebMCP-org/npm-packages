@@ -25,7 +25,7 @@ type PendingToolRequest = {
 type RuntimeWindow = Window & typeof globalThis & { __mcpbIframeSandboxInitialized?: boolean };
 
 function iframeSandboxRuntimeMain(config?: { targetOrigin?: string }): void {
-  var runtimeWindow = window as RuntimeWindow;
+  const runtimeWindow = window as RuntimeWindow;
 
   if (runtimeWindow.__mcpbIframeSandboxInitialized) {
     return;
@@ -33,40 +33,41 @@ function iframeSandboxRuntimeMain(config?: { targetOrigin?: string }): void {
 
   runtimeWindow.__mcpbIframeSandboxInitialized = true;
 
-  var targetOrigin = config && typeof config.targetOrigin === 'string' ? config.targetOrigin : '*';
-  var logs: string[] = [];
-  var pending: Record<number, PendingToolRequest> = {};
-  var nextId = 0;
+  const targetOrigin =
+    config && typeof config.targetOrigin === 'string' ? config.targetOrigin : '*';
+  const logs: string[] = [];
+  const pending: Record<number, PendingToolRequest> = {};
+  let nextId = 0;
 
   function post(message: unknown) {
     parent.postMessage(message, targetOrigin);
   }
 
   console.log = (...args: unknown[]) => {
-    var values = [];
-    for (var i = 0; i < args.length; i++) values.push(String(args[i]));
+    const values = [];
+    for (let i = 0; i < args.length; i++) values.push(String(args[i]));
     logs.push(values.join(' '));
   };
   console.warn = (...args: unknown[]) => {
-    var values = [];
-    for (var i = 0; i < args.length; i++) values.push(String(args[i]));
+    const values = [];
+    for (let i = 0; i < args.length; i++) values.push(String(args[i]));
     logs.push('[warn] ' + values.join(' '));
   };
   console.error = (...args: unknown[]) => {
-    var values = [];
-    for (var i = 0; i < args.length; i++) values.push(String(args[i]));
+    const values = [];
+    for (let i = 0; i < args.length; i++) values.push(String(args[i]));
     logs.push('[error] ' + values.join(' '));
   };
 
-  var codemode = new Proxy(
+  const codemode = new Proxy(
     {},
     {
       get: (_, toolName) => {
         return (args: unknown) => {
-          var id = nextId++;
+          const id = nextId++;
           return new Promise((resolve, reject) => {
             pending[id] = { resolve: resolve, reject: reject };
-            var message: ToolCallMessage = {
+            const message: ToolCallMessage = {
               type: 'tool-call',
               id: id,
               name: String(toolName),
@@ -83,19 +84,19 @@ function iframeSandboxRuntimeMain(config?: { targetOrigin?: string }): void {
     message: unknown
   ): message is ToolResultSuccessMessage | ToolResultErrorMessage {
     if (typeof message !== 'object' || message === null) return false;
-    var candidate = message as UnknownRecord;
+    const candidate = message as UnknownRecord;
     return candidate.type === 'tool-result' && typeof candidate.id === 'number';
   }
 
   function isExecuteRequestMessage(message: unknown): message is ExecuteRequestMessage {
     if (typeof message !== 'object' || message === null) return false;
-    var candidate = message as UnknownRecord;
+    const candidate = message as UnknownRecord;
     return candidate.type === 'execute-request' && typeof candidate.code === 'string';
   }
 
   function executeCode(code: string) {
     try {
-      var fn = new Function('codemode', 'return (' + code + ')')(codemode);
+      const fn = new Function('codemode', 'return (' + code + ')')(codemode);
       Promise.resolve(fn())
         .then((result) => {
           post({ type: 'execution-result', result: { result: result, logs: logs } });
@@ -122,10 +123,10 @@ function iframeSandboxRuntimeMain(config?: { targetOrigin?: string }): void {
     if (event.source !== parent) return;
     if (targetOrigin !== '*' && event.origin !== targetOrigin) return;
 
-    var message = event.data;
+    const message = event.data;
 
     if (isToolResultMessage(message)) {
-      var request = pending[message.id];
+      const request = pending[message.id];
       if (!request) return;
 
       delete pending[message.id];

@@ -1,7 +1,8 @@
 import type { ToolSet } from 'ai';
 import { asSchema, type Tool, tool } from 'ai';
 import { z } from 'zod';
-import { normalizeCode } from './normalize';
+import type { JsonSchemaExecutableToolDescriptors } from './json-schema-types';
+import { normalizeCode as defaultNormalizeCode, type CodeNormalizer } from './normalize';
 import { generateTypes, type ToolDescriptors } from './tool-types';
 import type { Executor, ToolFunctions } from './types';
 import type { UnknownRecord } from './type-utils';
@@ -19,9 +20,10 @@ Do NOT define named functions then call them — just write the arrow function b
 Example: async () => { const r = await codemode.searchWeb({ query: "test" }); return r; }`;
 
 export interface CreateCodeToolOptions {
-  tools: ToolDescriptors | ToolSet;
+  tools: ToolDescriptors | JsonSchemaExecutableToolDescriptors | ToolSet;
   executor: Executor;
   description?: string;
+  normalizeCode?: CodeNormalizer;
 }
 
 const codeSchema = z.object({
@@ -35,8 +37,21 @@ function hasNeedsApproval(t: UnknownRecord): boolean {
   return 'needsApproval' in t && t.needsApproval != null;
 }
 
+function isJsonSchemaLike(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null) return false;
+  const candidate = value as UnknownRecord;
+  return (
+    typeof candidate.type === 'string' ||
+    typeof candidate.properties === 'object' ||
+    typeof candidate.$ref === 'string' ||
+    Array.isArray(candidate.anyOf) ||
+    Array.isArray(candidate.oneOf) ||
+    Array.isArray(candidate.allOf)
+  );
+}
+
 export function createCodeTool(options: CreateCodeToolOptions): Tool<CodeInput, CodeOutput> {
-  const tools: ToolDescriptors | ToolSet = {};
+  const tools: ToolDescriptors | JsonSchemaExecutableToolDescriptors | ToolSet = {};
   for (const [name, t] of Object.entries(options.tools)) {
     if (!hasNeedsApproval(t as UnknownRecord)) {
       (tools as UnknownRecord)[name] = t;
@@ -45,6 +60,7 @@ export function createCodeTool(options: CreateCodeToolOptions): Tool<CodeInput, 
 
   const types = generateTypes(tools);
   const executor = options.executor;
+  const normalize = options.normalizeCode ?? defaultNormalizeCode;
 
   const description = (options.description ?? DEFAULT_DESCRIPTION).replace('{{types}}', types);
 
@@ -65,7 +81,8 @@ export function createCodeTool(options: CreateCodeToolOptions): Tool<CodeInput, 
                 ? (t as UnknownRecord).parameters
                 : undefined;
 
-          const schema = rawSchema != null ? asSchema(rawSchema) : undefined;
+          const schema =
+            rawSchema != null && !isJsonSchemaLike(rawSchema) ? asSchema(rawSchema) : undefined;
 
           const validate = schema?.validate;
           fns[sanitizeToolName(name)] = validate
@@ -78,7 +95,7 @@ export function createCodeTool(options: CreateCodeToolOptions): Tool<CodeInput, 
         }
       }
 
-      const normalizedCode = normalizeCode(code);
+      const normalizedCode = normalize(code);
       const executeResult = await executor.execute(normalizedCode, fns);
 
       if (executeResult.error) {

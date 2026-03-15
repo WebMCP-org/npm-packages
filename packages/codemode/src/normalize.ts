@@ -1,4 +1,8 @@
-import * as acorn from 'acorn';
+export type CodeNormalizer = (code: string) => string;
+
+const DEFAULT_ASYNC_ARROW = 'async () => {}';
+const ARROW_FUNCTION_PATTERN = /^(?:async\s+)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>[\s\S]*;?$/;
+const NAMED_FUNCTION_PATTERN = /^(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(/;
 
 function stripCodeFences(code: string): string {
   const fenced = /^```(?:js|javascript|typescript|ts|tsx|jsx)?\s*\n([\s\S]*?)```\s*$/;
@@ -6,56 +10,46 @@ function stripCodeFences(code: string): string {
   return match?.[1] ?? code;
 }
 
-export function normalizeCode(code: string): string {
-  const trimmed = stripCodeFences(code.trim());
-  if (!trimmed.trim()) return 'async () => {}';
+function stripExportDefault(code: string): string {
+  return code.replace(/^export\s+default\s+/, '');
+}
 
-  const source = trimmed.trim();
-
+function canParseExpression(code: string): boolean {
   try {
-    const ast = acorn.parse(source, {
-      ecmaVersion: 'latest',
-      sourceType: 'module',
-    });
-
-    const first = ast.body[0];
-
-    // Already an arrow function — pass through
-    if (ast.body.length === 1 && first?.type === 'ExpressionStatement') {
-      if (first.expression.type === 'ArrowFunctionExpression') return source;
-    }
-
-    // export default <expression> → unwrap to just the expression
-    if (ast.body.length === 1 && first?.type === 'ExportDefaultDeclaration') {
-      const { declaration } = first;
-      const inner = source.slice(declaration.start, declaration.end);
-
-      if (declaration.type === 'FunctionDeclaration' && !declaration.id) {
-        return `async () => {\nreturn (${inner})();\n}`;
-      }
-      if (declaration.type === 'ClassDeclaration' && !declaration.id) {
-        return `async () => {\nreturn (${inner});\n}`;
-      }
-
-      return normalizeCode(inner);
-    }
-
-    // Single named function declaration → wrap and call it
-    if (ast.body.length === 1 && first?.type === 'FunctionDeclaration') {
-      const name = first.id?.name ?? 'fn';
-      return `async () => {\n${source}\nreturn ${name}();\n}`;
-    }
-
-    // Last statement is expression → splice in return
-    const last = ast.body[ast.body.length - 1];
-    if (last?.type === 'ExpressionStatement') {
-      const before = source.slice(0, last.start);
-      const exprText = source.slice(last.expression.start, last.expression.end);
-      return `async () => {\n${before}return (${exprText})\n}`;
-    }
-
-    return `async () => {\n${source}\n}`;
+    // Parse without executing by compiling an async wrapper expression.
+    new Function(`return (async () => (${code}));`);
+    return true;
   } catch {
-    return `async () => {\n${source}\n}`;
+    return false;
   }
+}
+
+export function normalizeCode(code: string): string {
+  const trimmed = stripCodeFences(code.trim()).trim();
+  if (!trimmed) return DEFAULT_ASYNC_ARROW;
+
+  const source = trimmed;
+  const unwrappedExportDefault = source.startsWith('export default ')
+    ? stripExportDefault(source)
+    : source;
+
+  if (unwrappedExportDefault !== source) {
+    return normalizeCode(unwrappedExportDefault);
+  }
+
+  if (ARROW_FUNCTION_PATTERN.test(source)) {
+    return source;
+  }
+
+  const namedFunction = source.match(NAMED_FUNCTION_PATTERN);
+  if (namedFunction?.[1]) {
+    return `async () => {\n${source}\nreturn ${namedFunction[1]}();\n}`;
+  }
+
+  const withoutTrailingSemicolon = source.replace(/;\s*$/, '');
+  if (canParseExpression(withoutTrailingSemicolon)) {
+    return `async () => {\nreturn (${withoutTrailingSemicolon})\n}`;
+  }
+
+  return `async () => {\n${source}\n}`;
 }

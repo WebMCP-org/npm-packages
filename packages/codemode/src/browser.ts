@@ -24,5 +24,6 @@ export {
   type ToolResultErrorMessage,
   type ToolResultSuccessMessage,
 } from './messages';
+export { normalizeCode, type CodeNormalizer } from './normalize';
 export type { ExecuteResult, Executor, ToolFunction, ToolFunctions } from './types';
 export { WorkerSandboxExecutor, type WorkerSandboxExecutorOptions } from './worker-executor';

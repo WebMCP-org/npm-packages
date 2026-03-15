@@ -5,7 +5,7 @@ const isCI = process.env.CI === 'true';
 
 export default defineConfig({
   pack: {
-    entry: ['src/index.ts', 'src/ai.ts', 'src/browser.ts', 'src/webmcp.ts'],
+    entry: ['src/index.ts', 'src/ai.ts', 'src/browser.ts', 'src/acorn.ts', 'src/webmcp.ts'],
     format: ['esm'],
     dts: true,
     splitting: false,
@@ -15,8 +15,7 @@ export default defineConfig({
     minify: false,
     target: 'esnext',
     platform: 'browser',
-    external: [/^ai$/, /^zod/, /^@mcp-b\//],
-    noExternal: ['acorn'],
+    external: [/^ai$/, /^zod/, /^@mcp-b\//, /^acorn$/],
     tsconfig: './tsconfig.json',
   },
   test: {
