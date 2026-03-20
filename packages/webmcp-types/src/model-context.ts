@@ -36,7 +36,7 @@ export type ModelContextOptions = ModelContextInput;
 export interface ModelContextTestingToolInfo {
   name: string;
   description: string;
-  inputSchema: string;
+  inputSchema?: string;
 }
 
 /**
@@ -60,6 +60,10 @@ export interface ModelContextTesting extends EventTarget {
   ): Promise<string | null>;
   getCrossDocumentScriptToolResult(): Promise<string>;
   ontoolchange: ((this: ModelContextTesting, ev: Event) => unknown) | null;
+  /**
+   * @deprecated Use `addEventListener('toolchange', ...)` instead.
+   */
+  registerToolsChangedCallback?(callback: () => void): void;
 }
 
 /**
@@ -312,6 +316,15 @@ export interface ModelContextExtensions {
   ): void;
 
   /**
+   * @deprecated Use `'toolchange'` instead. Will be removed in the next major.
+   */
+  addEventListener(
+    type: 'toolschanged',
+    listener: () => void,
+    options?: boolean | AddEventListenerOptions
+  ): void;
+
+  /**
    * Removes a listener for tool invocation events.
    */
   removeEventListener(
@@ -325,6 +338,15 @@ export interface ModelContextExtensions {
    */
   removeEventListener(
     type: 'toolchange',
+    listener: () => void,
+    options?: boolean | EventListenerOptions
+  ): void;
+
+  /**
+   * @deprecated Use `'toolchange'` instead. Will be removed in the next major.
+   */
+  removeEventListener(
+    type: 'toolschanged',
     listener: () => void,
     options?: boolean | EventListenerOptions
   ): void;

@@ -311,6 +311,8 @@ class PolyfillTestingShim extends EventTarget implements ModelContextTesting {
       console.warn('[WebMCPPolyfill] ontoolchange handler threw:', error);
     }
     this.dispatchEvent(event);
+    // Deprecated compat: fire old event name so existing listeners keep working
+    this.dispatchEvent(new Event('toolschanged'));
   }
 }
 
