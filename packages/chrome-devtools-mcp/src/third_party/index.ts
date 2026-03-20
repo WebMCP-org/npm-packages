@@ -24,7 +24,6 @@ export { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 export { Client } from '@modelcontextprotocol/sdk/client/index.js';
 export {
   type CallToolResult,
-  type EmbeddedResource,
   SetLevelRequestSchema,
   type ImageContent,
   type TextContent,

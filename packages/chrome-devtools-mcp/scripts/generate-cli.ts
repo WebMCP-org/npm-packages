@@ -14,7 +14,7 @@ import { parseArguments } from '../build/src/bin/chrome-devtools-mcp-cli-options
 import { labels } from '../build/src/tools/categories.js';
 import { createTools } from '../build/src/tools/tools.js';
 
-const OUTPUT_PATH = path.join(import.meta.dirname, '../src/bin/chrome-devtools-cli-options.ts');
+const OUTPUT_PATH = path.join(import.meta.dirname, '../src/bin/cliDefinitions.ts');
 
 async function fetchTools() {
   console.log('Connecting to chrome-devtools-mcp to fetch tools...');

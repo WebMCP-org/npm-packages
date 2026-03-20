@@ -7,7 +7,7 @@ control and inspect a live Chrome browser. It acts as a Model-Context-Protocol
 (MCP) server, giving your AI coding assistant access to the full power of
 Chrome DevTools for reliable automation, in-depth debugging, and performance analysis.
 
-## [Tool reference](./docs/tool-reference.md) | [CLI](./docs/cli.md) | [Changelog](./CHANGELOG.md) | [Contributing](./CONTRIBUTING.md) | [Troubleshooting](./docs/troubleshooting.md) | [Design Principles](./docs/design-principles.md)
+## [Tool reference](./docs/tool-reference.md) | [Changelog](./CHANGELOG.md) | [Contributing](./CONTRIBUTING.md) | [Troubleshooting](./docs/troubleshooting.md) | [Design Principles](./docs/design-principles.md)
 
 ## Key features
 
@@ -88,8 +88,6 @@ If you are interested in doing only basic browser tasks, use the `--slim` mode:
 
 See [Slim tool reference](./docs/slim-tool-reference.md).
 
-For the daemon-backed CLI, including WebMCP usage and native Chrome Beta examples, see [docs/cli.md](./docs/cli.md).
-
 ### MCP Client configuration
 
 <details>
@@ -157,6 +155,9 @@ Then, install the plugin:
 ```
 
 Restart Claude Code to have the MCP server and skills load (check with `/skills`).
+
+> [!TIP]
+> If the plugin installation fails with a `Failed to clone repository` error (e.g., HTTPS connectivity issues behind a corporate firewall), see the [troubleshooting guide](./docs/troubleshooting.md#claude-code-plugin-installation-fails-with-failed-to-clone-repository) for workarounds, or use the CLI installation method above instead.
 
 </details>
 
@@ -230,8 +231,16 @@ Configure the following fields and press `CTRL+S` to save the configuration:
 Follow the MCP install <a href="https://code.visualstudio.com/docs/copilot/chat/mcp-servers#_add-an-mcp-server">guide</a>,
 with the standard config from above. You can also install the Chrome DevTools MCP server using the VS Code CLI:
 
+For macOS and Linux:
+
 ```bash
 code --add-mcp '{"name":"io.github.ChromeDevTools/chrome-devtools-mcp","command":"npx","args":["-y","chrome-devtools-mcp"],"env":{}}'
+```
+
+For Windows (PowerShell):
+
+```powershell
+code --add-mcp '{"""name""":"""io.github.ChromeDevTools/chrome-devtools-mcp""","""command""":"""npx""","""args""":["""-y""","""chrome-devtools-mcp"""]}'
 ```
 
 </details>
@@ -444,13 +453,11 @@ If you run into any issues, checkout our [troubleshooting guide](./docs/troubles
 - **Network** (2 tools)
   - [`get_network_request`](docs/tool-reference.md#get_network_request)
   - [`list_network_requests`](docs/tool-reference.md#list_network_requests)
-- **Debugging** (8 tools)
-  - [`call_webmcp_tool`](docs/tool-reference.md#call_webmcp_tool)
+- **Debugging** (6 tools)
   - [`evaluate_script`](docs/tool-reference.md#evaluate_script)
   - [`get_console_message`](docs/tool-reference.md#get_console_message)
   - [`lighthouse_audit`](docs/tool-reference.md#lighthouse_audit)
   - [`list_console_messages`](docs/tool-reference.md#list_console_messages)
-  - [`list_webmcp_tools`](docs/tool-reference.md#list_webmcp_tools)
   - [`take_screenshot`](docs/tool-reference.md#take_screenshot)
   - [`take_snapshot`](docs/tool-reference.md#take_snapshot)
 
