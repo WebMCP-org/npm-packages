@@ -150,9 +150,7 @@ export interface ToolDescriptor<
 export type ToolResultFromOutputSchema<
   TOutputSchema extends JsonSchemaForInference | undefined = undefined,
 > = TOutputSchema extends JsonSchemaObject
-  ? Omit<CallToolResult, 'structuredContent'> & {
-      structuredContent: InferJsonSchema<TOutputSchema>;
-    }
+  ? CallToolResult & { structuredContent?: InferJsonSchema<TOutputSchema> }
   : CallToolResult;
 
 /**

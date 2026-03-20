@@ -245,9 +245,9 @@ test('ToolExecuteResultFromOutputSchema rejects wrapped object results missing s
 
   type Result = ToolExecuteResultFromOutputSchema<OutputSchema>;
 
-  // @ts-expect-error - wrapped object outputSchema results must include structuredContent
-  const invalidWrapped: Result = { content: [{ type: 'text', text: 'missing' }] };
-  void invalidWrapped;
+  // structuredContent is optional even with an object outputSchema — omitting it is valid
+  const wrappedWithoutStructured: Result = { content: [{ type: 'text', text: 'ok' }] };
+  void wrappedWithoutStructured;
 });
 
 test('ToolExecuteResultFromOutputSchema rejects wrapped object results with invalid structuredContent enum', () => {
