@@ -6,7 +6,7 @@ import type {
   ToolDescriptor,
 } from '@mcp-b/webmcp-types';
 import type { DependencyList } from 'react';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   InferOutput,
   InferToolInput,
@@ -151,8 +151,6 @@ function toStructuredContent(value: unknown): StructuredContent | null {
   }
 }
 
-const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
-
 function isToolRegistrationHandle(value: unknown): value is { unregister: () => void } {
   return (
     typeof value === 'object' &&
@@ -286,11 +284,28 @@ export function useWebMCP<
     inputSchema,
     outputSchema,
     annotations,
+    enabled = true,
     handler,
     formatOutput = defaultFormatOutput,
+    onStart,
     onSuccess,
     onError,
   } = config;
+
+  // Memoize schema/annotations keys to prevent re-registration when
+  // structurally identical inline objects are passed on every render.
+  const inputSchemaKey = useMemo(
+    () => (inputSchema != null ? JSON.stringify(inputSchema) : undefined),
+    [inputSchema]
+  );
+  const outputSchemaKey = useMemo(
+    () => (outputSchema != null ? JSON.stringify(outputSchema) : undefined),
+    [outputSchema]
+  );
+  const annotationsKey = useMemo(
+    () => (annotations != null ? JSON.stringify(annotations) : undefined),
+    [annotations]
+  );
 
   const [state, setState] = useState<ToolExecutionState<TOutput>>({
     isExecuting: false,
@@ -300,17 +315,19 @@ export function useWebMCP<
   });
 
   const handlerRef = useRef(handler);
+  const onStartRef = useRef(onStart);
   const onSuccessRef = useRef(onSuccess);
   const onErrorRef = useRef(onError);
   const formatOutputRef = useRef(formatOutput);
   const isMountedRef = useRef(true);
   // Update refs when callbacks change (doesn't trigger re-registration)
-  useIsomorphicLayoutEffect(() => {
+  useEffect(() => {
     handlerRef.current = handler;
+    onStartRef.current = onStart;
     onSuccessRef.current = onSuccess;
     onErrorRef.current = onError;
     formatOutputRef.current = formatOutput;
-  }, [handler, onSuccess, onError, formatOutput]);
+  }, [handler, onStart, onSuccess, onError, formatOutput]);
 
   // Cleanup: mark component as unmounted
   useEffect(() => {
@@ -328,6 +345,10 @@ export function useWebMCP<
    * @throws Error if validation fails or the handler throws
    */
   const execute = useCallback(async (input: TInput): Promise<TOutput> => {
+    if (onStartRef.current) {
+      onStartRef.current(input);
+    }
+
     setState((prev) => ({
       ...prev,
       isExecuting: true,
@@ -395,6 +416,10 @@ export function useWebMCP<
   }, []);
 
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
     if (typeof window === 'undefined' || !window.navigator?.modelContext) {
       console.warn(
         '[ReactWebMCP:useWebMCP]',
@@ -483,9 +508,18 @@ export function useWebMCP<
         console.warn('[ReactWebMCP:useWebMCP]', `Failed to unregister tool "${name}"`, error);
       }
     };
-    // Spread operator in dependencies intentionally allows consumers to trigger
-    // re-registration with custom reactive inputs.
-  }, [name, description, inputSchema, outputSchema, annotations, ...(deps ?? [])]);
+    // inputSchemaKey/outputSchemaKey/annotationsKey are JSON.stringify'd memoized keys
+    // that prevent re-registration when structurally identical inline objects are passed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    name,
+    description,
+    inputSchemaKey,
+    outputSchemaKey,
+    annotationsKey,
+    enabled,
+    ...(deps ?? []),
+  ]);
 
   return {
     state,

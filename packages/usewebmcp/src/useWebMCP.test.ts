@@ -768,31 +768,92 @@ describe('useWebMCP', () => {
     });
   });
 
-  describe('dev mode warnings', () => {
-    let originalProcess: unknown;
+  describe('enabled option', () => {
+    it('should not register tool when enabled is false', async () => {
+      const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
 
-    beforeEach(() => {
-      // Save original process
-      originalProcess = (globalThis as Record<string, unknown>).process;
-      // Set NODE_ENV to development to enable isDev
-      (globalThis as Record<string, unknown>).process = {
-        env: { NODE_ENV: 'development' },
-      };
+      try {
+        const initialCallCount = registerToolSpy.mock.calls.length;
+
+        await renderHook(() =>
+          useWebMCP({
+            name: 'disabled_tool',
+            description: 'Should not register',
+            enabled: false,
+            handler: async () => 'result',
+          })
+        );
+
+        expect(registerToolSpy.mock.calls.length).toBe(initialCallCount);
+      } finally {
+        registerToolSpy.mockRestore();
+      }
     });
 
-    afterEach(() => {
-      // Restore original process
-      (globalThis as Record<string, unknown>).process = originalProcess;
-    });
+    it('should register tool when enabled switches from false to true', async () => {
+      const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
 
-    it('should warn when inputSchema reference changes in dev mode', async () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const { rerender } = await renderHook(
+          ({ enabled }) =>
+            useWebMCP({
+              name: 'toggle_enabled_tool',
+              description: 'Test',
+              enabled,
+              handler: async () => 'result',
+            }),
+          { initialProps: { enabled: false } }
+        );
+
+        const callCountAfterMount = registerToolSpy.mock.calls.length;
+
+        await rerender({ enabled: true });
+
+        expect(registerToolSpy.mock.calls.length).toBeGreaterThan(callCountAfterMount);
+      } finally {
+        registerToolSpy.mockRestore();
+      }
+    });
+  });
+
+  describe('onStart callback', () => {
+    it('should call onStart before execution', async () => {
+      const onStart = vi.fn();
+      const callOrder: string[] = [];
+
+      const { result, act } = await renderHook(() =>
+        useWebMCP({
+          name: 'onstart_tool',
+          description: 'Test',
+          handler: async (input) => {
+            callOrder.push('handler');
+            return `done: ${JSON.stringify(input)}`;
+          },
+          onStart: (input) => {
+            callOrder.push('onStart');
+            onStart(input);
+          },
+        })
+      );
+
+      await act(async () => {
+        await result.current.execute({ key: 'test' });
+      });
+
+      expect(onStart).toHaveBeenCalledWith({ key: 'test' });
+      expect(callOrder).toEqual(['onStart', 'handler']);
+    });
+  });
+
+  describe('schema memoization', () => {
+    it('should not re-register when structurally identical inline schemas are passed', async () => {
+      const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
 
       try {
         const { rerender } = await renderHook(
           ({ schema }) =>
             useWebMCP({
-              name: 'dev_input_warn_tool',
+              name: 'memo_schema_tool',
               description: 'Test',
               inputSchema: schema,
               handler: async () => 'result',
@@ -808,7 +869,9 @@ describe('useWebMCP', () => {
           }
         );
 
-        // Rerender with new inputSchema reference
+        const callCountAfterMount = registerToolSpy.mock.calls.length;
+
+        // Rerender with structurally identical but referentially different schema
         await rerender({
           schema: {
             type: 'object',
@@ -817,205 +880,10 @@ describe('useWebMCP', () => {
           } as const,
         });
 
-        expect(warnSpy).toHaveBeenCalledWith(
-          expect.stringContaining('inputSchema reference changed')
-        );
+        // Should NOT have re-registered because JSON.stringify keys match
+        expect(registerToolSpy.mock.calls.length).toBe(callCountAfterMount);
       } finally {
-        warnSpy.mockRestore();
-      }
-    });
-
-    it('should warn when outputSchema reference changes in dev mode', async () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-      try {
-        const { rerender } = await renderHook(
-          ({ schema }) =>
-            useWebMCP({
-              name: 'dev_output_warn_tool',
-              description: 'Test',
-              outputSchema: schema,
-              handler: async () => ({ value: 'test' }),
-            }),
-          {
-            initialProps: {
-              schema: { type: 'object', properties: { value: { type: 'string' } } } as const,
-            },
-          }
-        );
-
-        await rerender({
-          schema: { type: 'object', properties: { value: { type: 'string' } } } as const,
-        });
-
-        expect(warnSpy).toHaveBeenCalledWith(
-          expect.stringContaining('outputSchema reference changed')
-        );
-      } finally {
-        warnSpy.mockRestore();
-      }
-    });
-
-    it('should warn when annotations reference changes in dev mode', async () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-      try {
-        const { rerender } = await renderHook(
-          ({ annotations }) =>
-            useWebMCP({
-              name: 'dev_annot_warn_tool',
-              description: 'Test',
-              annotations,
-              handler: async () => 'result',
-            }),
-          { initialProps: { annotations: { destructiveHint: true as boolean } } }
-        );
-
-        await rerender({ annotations: { destructiveHint: true } });
-
-        expect(warnSpy).toHaveBeenCalledWith(
-          expect.stringContaining('annotations reference changed')
-        );
-      } finally {
-        warnSpy.mockRestore();
-      }
-    });
-
-    it('should warn when description changes in dev mode', async () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-      try {
-        const { rerender } = await renderHook(
-          ({ desc }) =>
-            useWebMCP({
-              name: 'dev_desc_warn_tool',
-              description: desc,
-              handler: async () => 'result',
-            }),
-          { initialProps: { desc: 'Version 1' } }
-        );
-
-        await rerender({ desc: 'Version 2' });
-
-        expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('description changed'));
-      } finally {
-        warnSpy.mockRestore();
-      }
-    });
-
-    it('should warn when deps contain non-primitive values in dev mode', async () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-      try {
-        const objDep = { key: 'value' };
-        await renderHook(() =>
-          useWebMCP(
-            {
-              name: 'dev_deps_warn_tool',
-              description: 'Test',
-              handler: async () => 'result',
-            },
-            [objDep]
-          )
-        );
-
-        expect(warnSpy).toHaveBeenCalledWith(
-          expect.stringContaining('deps contains non-primitive values')
-        );
-      } finally {
-        warnSpy.mockRestore();
-      }
-    });
-
-    it('should only warn once per category (warnOnce)', async () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-      try {
-        const { rerender } = await renderHook(
-          ({ desc }) =>
-            useWebMCP({
-              name: 'dev_warn_once_tool',
-              description: desc,
-              handler: async () => 'result',
-            }),
-          { initialProps: { desc: 'V1' } }
-        );
-
-        await rerender({ desc: 'V2' });
-        await rerender({ desc: 'V3' });
-
-        // Description warning should only appear once
-        const descWarnings = warnSpy.mock.calls.filter(
-          (call) => typeof call[0] === 'string' && call[0].includes('description changed')
-        );
-        expect(descWarnings).toHaveLength(1);
-      } finally {
-        warnSpy.mockRestore();
-      }
-    });
-
-    it('should warn when deps contain function values in dev mode', async () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-      try {
-        const fnDep = () => {};
-        await renderHook(() =>
-          useWebMCP(
-            {
-              name: 'dev_fn_deps_warn_tool',
-              description: 'Test',
-              handler: async () => 'result',
-            },
-            [fnDep]
-          )
-        );
-
-        expect(warnSpy).toHaveBeenCalledWith(
-          expect.stringContaining('deps contains non-primitive values')
-        );
-      } finally {
-        warnSpy.mockRestore();
-      }
-    });
-  });
-
-  describe('isDev when NODE_ENV is production', () => {
-    let originalProcess: unknown;
-
-    beforeEach(() => {
-      originalProcess = (globalThis as Record<string, unknown>).process;
-      (globalThis as Record<string, unknown>).process = {
-        env: { NODE_ENV: 'production' },
-      };
-    });
-
-    afterEach(() => {
-      (globalThis as Record<string, unknown>).process = originalProcess;
-    });
-
-    it('should not warn in production mode', async () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-      try {
-        const { rerender } = await renderHook(
-          ({ desc }) =>
-            useWebMCP({
-              name: 'prod_tool',
-              description: desc,
-              handler: async () => 'result',
-            }),
-          { initialProps: { desc: 'V1' } }
-        );
-
-        await rerender({ desc: 'V2' });
-
-        // Should not have description change warning in production
-        const descWarnings = warnSpy.mock.calls.filter(
-          (call) => typeof call[0] === 'string' && call[0].includes('description changed')
-        );
-        expect(descWarnings).toHaveLength(0);
-      } finally {
-        warnSpy.mockRestore();
+        registerToolSpy.mockRestore();
       }
     });
   });
@@ -1149,13 +1017,7 @@ describe('useWebMCP', () => {
       }
     });
 
-    it('should handle unregisterTool throwing in dev mode', async () => {
-      let originalProcess: unknown;
-      originalProcess = (globalThis as Record<string, unknown>).process;
-      (globalThis as Record<string, unknown>).process = {
-        env: { NODE_ENV: 'development' },
-      };
-
+    it('should handle unregisterTool throwing gracefully', async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const unregisterSpy = vi.spyOn(navigator.modelContext, 'unregisterTool');
 
@@ -1182,7 +1044,6 @@ describe('useWebMCP', () => {
       } finally {
         warnSpy.mockRestore();
         unregisterSpy.mockRestore();
-        (globalThis as Record<string, unknown>).process = originalProcess;
       }
     });
   });

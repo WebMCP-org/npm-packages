@@ -7,7 +7,7 @@ import type {
   ToolDescriptor,
 } from '@mcp-b/webmcp-types';
 import type { DependencyList } from 'react';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   InferOutput,
   InferToolInput,
@@ -103,13 +103,6 @@ function toStructuredContent(value: unknown): StructuredContent | null {
   } catch {
     return null;
   }
-}
-
-const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
-
-function isDev(): boolean {
-  const env = typeof process !== 'undefined' ? process.env?.NODE_ENV : undefined;
-  return env !== undefined ? env !== 'production' : false;
 }
 
 function isToolRegistrationHandle(value: unknown): value is { unregister: () => void } {
@@ -293,9 +286,11 @@ export function useWebMCP<
     inputSchema,
     outputSchema,
     annotations,
+    enabled = true,
     execute: configExecute,
     handler: legacyHandler,
     formatOutput = defaultFormatOutput,
+    onStart,
     onSuccess,
     onError,
   } = config;
@@ -307,6 +302,21 @@ export function useWebMCP<
     );
   }
 
+  // Memoize schema/annotations keys to prevent re-registration when
+  // structurally identical inline objects are passed on every render.
+  const inputSchemaKey = useMemo(
+    () => (inputSchema != null ? JSON.stringify(inputSchema) : undefined),
+    [inputSchema]
+  );
+  const outputSchemaKey = useMemo(
+    () => (outputSchema != null ? JSON.stringify(outputSchema) : undefined),
+    [outputSchema]
+  );
+  const annotationsKey = useMemo(
+    () => (annotations != null ? JSON.stringify(annotations) : undefined),
+    [annotations]
+  );
+
   const [state, setState] = useState<ToolExecutionState<TOutput>>({
     isExecuting: false,
     lastResult: null,
@@ -315,25 +325,19 @@ export function useWebMCP<
   });
 
   const toolExecuteRef = useRef(toolExecute);
+  const onStartRef = useRef(onStart);
   const onSuccessRef = useRef(onSuccess);
   const onErrorRef = useRef(onError);
   const formatOutputRef = useRef(formatOutput);
   const isMountedRef = useRef(true);
-  const warnedRef = useRef(new Set<string>());
-  const prevConfigRef = useRef({
-    inputSchema,
-    outputSchema,
-    annotations,
-    description,
-    deps,
-  });
   // Update refs when callbacks change (doesn't trigger re-registration)
-  useIsomorphicLayoutEffect(() => {
+  useEffect(() => {
     toolExecuteRef.current = toolExecute;
+    onStartRef.current = onStart;
     onSuccessRef.current = onSuccess;
     onErrorRef.current = onError;
     formatOutputRef.current = formatOutput;
-  }, [toolExecute, onSuccess, onError, formatOutput]);
+  }, [toolExecute, onStart, onSuccess, onError, formatOutput]);
 
   // Cleanup: mark component as unmounted
   useEffect(() => {
@@ -343,64 +347,6 @@ export function useWebMCP<
     };
   }, []);
 
-  useEffect(() => {
-    if (!isDev()) {
-      prevConfigRef.current = { inputSchema, outputSchema, annotations, description, deps };
-      return;
-    }
-
-    const warnOnce = (key: string, message: string) => {
-      if (warnedRef.current.has(key)) {
-        return;
-      }
-      console.warn(`[useWebMCP] ${message}`);
-      warnedRef.current.add(key);
-    };
-
-    const prev = prevConfigRef.current;
-
-    if (inputSchema && prev.inputSchema && prev.inputSchema !== inputSchema) {
-      warnOnce(
-        'inputSchema',
-        `Tool "${name}" inputSchema reference changed; memoize or define it outside the component to avoid re-registration.`
-      );
-    }
-
-    if (outputSchema && prev.outputSchema && prev.outputSchema !== outputSchema) {
-      warnOnce(
-        'outputSchema',
-        `Tool "${name}" outputSchema reference changed; memoize or define it outside the component to avoid re-registration.`
-      );
-    }
-
-    if (annotations && prev.annotations && prev.annotations !== annotations) {
-      warnOnce(
-        'annotations',
-        `Tool "${name}" annotations reference changed; memoize or define it outside the component to avoid re-registration.`
-      );
-    }
-
-    if (description !== prev.description) {
-      warnOnce(
-        'description',
-        `Tool "${name}" description changed; this re-registers the tool. Memoize the description if it does not need to update.`
-      );
-    }
-
-    if (
-      deps?.some(
-        (value) => (typeof value === 'object' && value !== null) || typeof value === 'function'
-      )
-    ) {
-      warnOnce(
-        'deps',
-        `Tool "${name}" deps contains non-primitive values; prefer primitives or memoize objects/functions to reduce re-registration.`
-      );
-    }
-
-    prevConfigRef.current = { inputSchema, outputSchema, annotations, description, deps };
-  }, [annotations, deps, description, inputSchema, name, outputSchema]);
-
   /**
    * Executes the configured tool implementation with input validation and state management.
    *
@@ -409,6 +355,10 @@ export function useWebMCP<
    * @throws Error if validation fails or the tool implementation throws
    */
   const execute = useCallback(async (input: TInput): Promise<TOutput> => {
+    if (onStartRef.current) {
+      onStartRef.current(input);
+    }
+
     setState((prev) => ({
       ...prev,
       isExecuting: true,
@@ -476,6 +426,10 @@ export function useWebMCP<
   }, []);
 
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
     if (typeof window === 'undefined' || !window.navigator?.modelContext) {
       console.warn(
         `[useWebMCP] window.navigator.modelContext is not available. Tool "${name}" will not be registered.`
@@ -560,16 +514,21 @@ export function useWebMCP<
 
         modelContext.unregisterTool(name);
       } catch (error) {
-        if (isDev()) {
-          console.warn(`[useWebMCP] Failed to unregister tool "${name}" during cleanup:`, error);
-        }
+        console.warn(`[useWebMCP] Failed to unregister tool "${name}" during cleanup:`, error);
       }
     };
-    // Spread operator in dependencies: Allows users to provide additional dependencies
-    // via the `deps` parameter. While unconventional, this pattern is intentional to support
-    // dynamic dependency injection. The spread is safe because deps is validated and warned
-    // about non-primitive values earlier in this hook.
-  }, [name, description, inputSchema, outputSchema, annotations, ...(deps ?? [])]);
+    // inputSchemaKey/outputSchemaKey/annotationsKey are JSON.stringify'd memoized keys
+    // that prevent re-registration when structurally identical inline objects are passed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    name,
+    description,
+    inputSchemaKey,
+    outputSchemaKey,
+    annotationsKey,
+    enabled,
+    ...(deps ?? []),
+  ]);
 
   return {
     state,
