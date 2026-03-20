@@ -730,64 +730,40 @@ describe('global adapter', () => {
     expect(result.content[0]).toMatchObject({ type: 'text', text: 'echo:hi' });
   });
 
-  it('normalizes raw single z.object inputSchema registered through navigator.modelContext', async () => {
+  it('rejects validator-only z.object inputSchema registered through navigator.modelContext', () => {
     initializeWebModelContext();
     const modelContext = getModelContext();
 
-    modelContext.registerTool({
-      name: 'zod_object_input_tool',
-      description: 'Tool with single zod object input',
-      inputSchema: z.object({ message: z.string() }) as never,
-      async execute(args) {
-        return { content: [{ type: 'text', text: `echo:${String(args.message ?? '')}` }] };
-      },
-    });
-
-    const tool = modelContext.listTools().find((t) => t.name === 'zod_object_input_tool');
-    expect(tool?.inputSchema).toMatchObject({
-      type: 'object',
-      properties: { message: { type: 'string' } },
-      required: ['message'],
-    });
-
-    const result = await modelContext.callTool({
-      name: 'zod_object_input_tool',
-      arguments: { message: 'hi' },
-    });
-    expect(result.isError).toBeFalsy();
-    expect(result.content[0]).toMatchObject({ type: 'text', text: 'echo:hi' });
+    expect(() =>
+      modelContext.registerTool({
+        name: 'zod_object_input_tool',
+        description: 'Tool with single zod object input',
+        inputSchema: z.object({ message: z.string() }) as never,
+        async execute(args) {
+          return { content: [{ type: 'text', text: `echo:${String(args.message ?? '')}` }] };
+        },
+      })
+    ).toThrow(/validator-only Standard Schema/i);
   });
 
-  it('normalizes raw single z.object outputSchema and preserves structuredContent', async () => {
+  it('rejects validator-only z.object outputSchema registered through navigator.modelContext', () => {
     initializeWebModelContext();
     const modelContext = getModelContext();
 
-    modelContext.registerTool({
-      name: 'zod_object_output_tool',
-      description: 'Tool with single zod object output',
-      inputSchema: EMPTY_INPUT_SCHEMA,
-      outputSchema: z.object({ value: z.string() }) as never,
-      async execute() {
-        return { value: 'ok' };
-      },
-    });
-
-    const tool = modelContext.listTools().find((t) => t.name === 'zod_object_output_tool');
-    expect(tool?.outputSchema).toMatchObject({
-      type: 'object',
-      properties: { value: { type: 'string' } },
-      required: ['value'],
-    });
-
-    const result = await modelContext.callTool({
-      name: 'zod_object_output_tool',
-      arguments: {},
-    });
-    expect(result.isError).toBeFalsy();
-    expect(result.structuredContent).toMatchObject({ value: 'ok' });
+    expect(() =>
+      modelContext.registerTool({
+        name: 'zod_object_output_tool',
+        description: 'Tool with single zod object output',
+        inputSchema: EMPTY_INPUT_SCHEMA,
+        outputSchema: z.object({ value: z.string() }) as never,
+        async execute() {
+          return { value: 'ok' };
+        },
+      })
+    ).toThrow(/validator-only Standard Schema/i);
   });
 
-  it('normalizes raw zod schemas before mirroring registration to the native context', () => {
+  it('rejects validator-only zod schemas before mirroring registration to the native context', () => {
     const nativeRegisterTool = vi.fn();
     const nativeContext = {
       provideContext: vi.fn(),
@@ -813,31 +789,19 @@ describe('global adapter', () => {
     const inputSchema = z.object({ message: z.string() });
     const outputSchema = z.object({ value: z.string() });
 
-    modelContext.registerTool({
-      name: 'native_mirror_zod_tool',
-      description: 'Mirrors normalized JSON Schema to native',
-      inputSchema: inputSchema as never,
-      outputSchema: outputSchema as never,
-      async execute(args) {
-        return { value: String(args.message ?? '') };
-      },
-    });
+    expect(() =>
+      modelContext.registerTool({
+        name: 'native_mirror_zod_tool',
+        description: 'Mirrors normalized JSON Schema to native',
+        inputSchema: inputSchema as never,
+        outputSchema: outputSchema as never,
+        async execute(args) {
+          return { value: String(args.message ?? '') };
+        },
+      })
+    ).toThrow(/validator-only Standard Schema/i);
 
-    const mirroredTool = nativeRegisterTool.mock.calls.at(-1)?.[0] as {
-      inputSchema?: Record<string, unknown>;
-      outputSchema?: Record<string, unknown>;
-    };
-    expect(mirroredTool.inputSchema).toMatchObject({
-      type: 'object',
-      properties: { message: { type: 'string' } },
-      required: ['message'],
-    });
-    expect(mirroredTool.outputSchema).toMatchObject({
-      type: 'object',
-      properties: { value: { type: 'string' } },
-      required: ['value'],
-    });
-    expect(mirroredTool.outputSchema).not.toHaveProperty('properties.note');
+    expect(nativeRegisterTool).not.toHaveBeenCalled();
   });
 });
 

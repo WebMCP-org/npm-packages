@@ -124,19 +124,21 @@ describe('useWebMCP', () => {
       expect(inputSchema.properties).toHaveProperty('name');
     });
 
-    it('passes z.object inputSchema through registration and still normalizes it at runtime', async () => {
+    it('passes z.object inputSchema through registration and lets the runtime reject it', async () => {
       const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
 
       try {
         const zodSchema = z.object({ username: z.string() });
-        await renderHook(() =>
-          useWebMCP({
-            name: 'zod_like_tool',
-            description: 'Tool using z.object schema',
-            inputSchema: zodSchema,
-            handler: async () => 'ok',
-          })
-        );
+        await expect(
+          renderHook(() =>
+            useWebMCP({
+              name: 'zod_like_tool',
+              description: 'Tool using z.object schema',
+              inputSchema: zodSchema,
+              handler: async () => 'ok',
+            })
+          )
+        ).rejects.toThrow(/validator-only Standard Schema/i);
 
         const descriptor = registerToolSpy.mock.calls.at(-1)?.[0] as {
           name: string;
@@ -144,18 +146,13 @@ describe('useWebMCP', () => {
         };
         expect(descriptor.name).toBe('zod_like_tool');
         expect(descriptor.inputSchema).toBe(zodSchema);
-
-        const tools = navigator.modelContextTesting?.listTools();
-        const inputSchema = JSON.parse(tools?.[0]?.inputSchema ?? '{}');
-        expect(inputSchema.type).toBe('object');
-        expect(inputSchema.properties).toHaveProperty('username');
-        expect(inputSchema.required).toContain('username');
+        expect(navigator.modelContextTesting?.listTools()).toHaveLength(0);
       } finally {
         registerToolSpy.mockRestore();
       }
     });
 
-    it('passes z.object outputSchema through registration and still normalizes it at runtime', async () => {
+    it('passes z.object outputSchema through registration and lets the runtime reject it', async () => {
       const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
 
       try {
@@ -164,14 +161,16 @@ describe('useWebMCP', () => {
           message: z.string(),
         });
 
-        await renderHook(() =>
-          useWebMCP({
-            name: 'zod_output_tool',
-            description: 'Tool using z.object output schema',
-            outputSchema: zodOutputSchema,
-            handler: async () => ({ count: 1, message: 'ok' }),
-          })
-        );
+        await expect(
+          renderHook(() =>
+            useWebMCP({
+              name: 'zod_output_tool',
+              description: 'Tool using z.object output schema',
+              outputSchema: zodOutputSchema,
+              handler: async () => ({ count: 1, message: 'ok' }),
+            })
+          )
+        ).rejects.toThrow(/validator-only Standard Schema/i);
 
         const descriptor = registerToolSpy.mock.calls.at(-1)?.[0] as {
           name: string;
@@ -180,14 +179,7 @@ describe('useWebMCP', () => {
 
         expect(descriptor.name).toBe('zod_output_tool');
         expect(descriptor.outputSchema).toBe(zodOutputSchema);
-
-        const tool = navigator.modelContext
-          ?.listTools()
-          .find((registeredTool) => registeredTool.name === 'zod_output_tool');
-        expect(tool?.outputSchema?.type).toBe('object');
-        expect(tool?.outputSchema?.properties).toHaveProperty('count');
-        expect(tool?.outputSchema?.properties).toHaveProperty('message');
-        expect(tool?.outputSchema?.required).toEqual(expect.arrayContaining(['count', 'message']));
+        expect(navigator.modelContextTesting?.listTools()).toHaveLength(0);
       } finally {
         registerToolSpy.mockRestore();
       }

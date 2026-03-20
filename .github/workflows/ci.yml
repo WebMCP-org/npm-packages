@@ -36,8 +36,11 @@ jobs:
       - name: Install dependencies
         run: vp install
 
+      - name: Run formatting checks
+        run: pnpm format:check
+
       - name: Run linting
-        run: vp check
+        run: pnpm lint:check
 
   typecheck:
     name: Typecheck

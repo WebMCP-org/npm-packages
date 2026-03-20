@@ -142,32 +142,28 @@ describe('useWebMCPPrompt', () => {
       expect(prompts[0].arguments).toBeDefined();
     });
 
-    it('passes z.object argsSchema through prompt registration and still normalizes it at runtime', async () => {
+    it('passes z.object argsSchema through prompt registration and lets the runtime reject it', async () => {
       const registerPromptSpy = vi.spyOn(navigator.modelContext, 'registerPrompt');
 
       try {
         const zodSchema = z.object({ code: z.string() });
-        await renderHook(() =>
-          useWebMCPPrompt({
-            name: 'zod_args_prompt',
-            argsSchema: zodSchema as never,
-            get: async () => ({
-              messages: [{ role: 'user', content: { type: 'text', text: 'ok' } }],
-            }),
-          })
-        );
+        await expect(
+          renderHook(() =>
+            useWebMCPPrompt({
+              name: 'zod_args_prompt',
+              argsSchema: zodSchema as never,
+              get: async () => ({
+                messages: [{ role: 'user', content: { type: 'text', text: 'ok' } }],
+              }),
+            })
+          )
+        ).rejects.toThrow(/validator-only Standard Schema/i);
 
         const descriptor = registerPromptSpy.mock.calls.at(-1)?.[0] as {
           argsSchema?: unknown;
         };
         expect(descriptor.argsSchema).toBe(zodSchema);
-
-        const prompt = navigator.modelContext
-          ?.listPrompts()
-          .find((p) => p.name === 'zod_args_prompt');
-        expect(prompt?.arguments).toEqual(
-          expect.arrayContaining([expect.objectContaining({ name: 'code', required: true })])
-        );
+        expect(navigator.modelContext?.listPrompts()).toHaveLength(0);
       } finally {
         registerPromptSpy.mockRestore();
       }
