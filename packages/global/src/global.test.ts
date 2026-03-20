@@ -3,7 +3,6 @@ import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
 import { BrowserMcpServer, Client } from '@mcp-b/webmcp-ts-sdk';
 import type { ToolInputSchema, ToolOutputSchema } from '@mcp-b/webmcp-types';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { z } from 'zod';
 import { cleanupWebModelContext, initializeWebModelContext } from './global.js';
 
 afterEach(() => {
@@ -12,6 +11,16 @@ afterEach(() => {
 
 const EMPTY_INPUT_SCHEMA = { type: 'object', properties: {} } as const satisfies ToolInputSchema;
 const STRING_OUTPUT_SCHEMA = { type: 'string' } as const satisfies ToolOutputSchema;
+
+function createValidatorOnlyStandardSchema() {
+  return {
+    '~standard': {
+      version: 1 as const,
+      vendor: 'test',
+      validate: (value: unknown) => ({ value }),
+    },
+  };
+}
 
 function getModelContext(): BrowserMcpServer {
   return navigator.modelContext as unknown as BrowserMcpServer;
@@ -730,15 +739,15 @@ describe('global adapter', () => {
     expect(result.content[0]).toMatchObject({ type: 'text', text: 'echo:hi' });
   });
 
-  it('rejects validator-only z.object inputSchema registered through navigator.modelContext', () => {
+  it('rejects validator-only Standard Schema inputSchema registered through navigator.modelContext', () => {
     initializeWebModelContext();
     const modelContext = getModelContext();
 
     expect(() =>
       modelContext.registerTool({
-        name: 'zod_object_input_tool',
-        description: 'Tool with single zod object input',
-        inputSchema: z.object({ message: z.string() }) as never,
+        name: 'validator_only_input_tool',
+        description: 'Tool with validator-only standard schema input',
+        inputSchema: createValidatorOnlyStandardSchema() as never,
         async execute(args) {
           return { content: [{ type: 'text', text: `echo:${String(args.message ?? '')}` }] };
         },
@@ -746,16 +755,16 @@ describe('global adapter', () => {
     ).toThrow(/validator-only Standard Schema/i);
   });
 
-  it('rejects validator-only z.object outputSchema registered through navigator.modelContext', () => {
+  it('rejects validator-only Standard Schema outputSchema registered through navigator.modelContext', () => {
     initializeWebModelContext();
     const modelContext = getModelContext();
 
     expect(() =>
       modelContext.registerTool({
-        name: 'zod_object_output_tool',
-        description: 'Tool with single zod object output',
+        name: 'validator_only_output_tool',
+        description: 'Tool with validator-only standard schema output',
         inputSchema: EMPTY_INPUT_SCHEMA,
-        outputSchema: z.object({ value: z.string() }) as never,
+        outputSchema: createValidatorOnlyStandardSchema() as never,
         async execute() {
           return { value: 'ok' };
         },
@@ -763,7 +772,7 @@ describe('global adapter', () => {
     ).toThrow(/validator-only Standard Schema/i);
   });
 
-  it('rejects validator-only zod schemas before mirroring registration to the native context', () => {
+  it('rejects validator-only Standard Schemas before mirroring registration to the native context', () => {
     const nativeRegisterTool = vi.fn();
     const nativeContext = {
       provideContext: vi.fn(),
@@ -786,12 +795,12 @@ describe('global adapter', () => {
     initializeWebModelContext();
     const modelContext = getModelContext();
 
-    const inputSchema = z.object({ message: z.string() });
-    const outputSchema = z.object({ value: z.string() });
+    const inputSchema = createValidatorOnlyStandardSchema();
+    const outputSchema = createValidatorOnlyStandardSchema();
 
     expect(() =>
       modelContext.registerTool({
-        name: 'native_mirror_zod_tool',
+        name: 'native_mirror_validator_only_tool',
         description: 'Mirrors normalized JSON Schema to native',
         inputSchema: inputSchema as never,
         outputSchema: outputSchema as never,
