@@ -20,8 +20,8 @@ Main hook for registering MCP tools with full control over behavior and state.
 
 ```tsx
 function useWebMCP<
-  TInputSchema extends Record<string, z.ZodTypeAny> = Record<string, never>,
-  TOutputSchema extends Record<string, z.ZodTypeAny> = Record<string, never>,
+  TInputSchema extends ToolInputSchema = InputSchema,
+  TOutputSchema extends ToolOutputSchema | undefined = undefined,
 >(
   config: WebMCPConfig<TInputSchema, TOutputSchema>,
   deps?: DependencyList
@@ -36,13 +36,23 @@ function useWebMCP<
 | -------------- | ----------------------------- | -------- | ---------------------------------------------------- |
 | `name`         | `string`                      | Yes      | Unique tool identifier (e.g., 'posts_like')          |
 | `description`  | `string`                      | Yes      | Human-readable description for AI                    |
-| `inputSchema`  | `Record<string, ZodType>`     | -        | Input validation using Zod schemas                   |
-| `outputSchema` | `Record<string, ZodType>`     | -        | Output schema for structured responses (recommended) |
+| `inputSchema`  | `ToolInputSchema`             | -        | Plain JSON Schema or Standard Schema input contract  |
+| `outputSchema` | `ToolOutputSchema`            | -        | JSON-exportable output schema for structured results |
 | `annotations`  | `ToolAnnotations`             | -        | Metadata hints for the AI                            |
 | `handler`      | `(input) => Promise<TOutput>` | Yes      | Function that executes the tool                      |
 | `formatOutput` | `(output) => string`          | -        | Custom output formatter                              |
 | `onSuccess`    | `(result, input) => void`     | -        | Success callback                                     |
 | `onError`      | `(error, input) => void`      | -        | Error handler callback                               |
+
+#### Exact object inference with JSON Schema
+
+When you pass plain JSON Schema literals, TypeScript inference follows JSON Schema rules rather than assuming a closed TypeScript object type.
+
+- Properties are optional unless they are listed in `required`.
+- Objects stay open to extra keys unless you set `additionalProperties: false`.
+- For the best inferred types, write schema literals as `as const satisfies ToolInputSchema` or `ToolOutputSchema`.
+
+This means a schema like `{ type: 'object', properties: { key: { type: 'string' } } }` is intentionally looser than `{ key: string }`. If you want the exact `{ key: string }` shape, add `required: ['key']` and `additionalProperties: false`.
 
 #### Memoization and `deps` (important)
 
@@ -54,7 +64,7 @@ Bad:
 useWebMCP({
   name: 'counter',
   description: `Count: ${count}`,
-  outputSchema: { count: z.number() },
+  outputSchema: z.object({ count: z.number() }),
   handler: async () => ({ count }),
 });
 ```
@@ -62,7 +72,7 @@ useWebMCP({
 Good:
 
 ```tsx
-const OUTPUT_SCHEMA = { count: z.number() };
+const OUTPUT_SCHEMA = z.object({ count: z.number() });
 const description = useMemo(() => `Count: ${count}`, [count]);
 
 useWebMCP(
@@ -115,12 +125,12 @@ function ProductSearch() {
   const searchTool = useWebMCP({
     name: 'products_search',
     description: 'Search for products in the catalog',
-    inputSchema: {
+    inputSchema: z.object({
       query: z.string().describe('Search query'),
       maxResults: z.number().min(1).max(50).default(10),
       category: z.enum(['electronics', 'clothing', 'books']).optional(),
-    },
-    outputSchema: {
+    }),
+    outputSchema: z.object({
       products: z.array(
         z.object({
           id: z.string(),
@@ -131,7 +141,7 @@ function ProductSearch() {
       ),
       total: z.number().describe('Total matching products'),
       hasMore: z.boolean(),
-    },
+    }),
     handler: async ({ query, maxResults, category }) => {
       const results = await api.products.search({ query, maxResults, category });
       return {
@@ -150,6 +160,22 @@ function ProductSearch() {
     </div>
   );
 }
+```
+
+For JSON Schema literals, the equivalent exact-object pattern is:
+
+```tsx
+import type { ToolOutputSchema } from '@mcp-b/webmcp-types';
+
+const PRODUCT_SEARCH_OUTPUT_SCHEMA = {
+  type: 'object',
+  properties: {
+    total: { type: 'integer' },
+    hasMore: { type: 'boolean' },
+  },
+  required: ['total', 'hasMore'],
+  additionalProperties: false,
+} as const satisfies ToolOutputSchema;
 ```
 
 ### Context Tool Example
@@ -273,7 +299,7 @@ function ToolProvider() {
   useWebMCP({
     name: 'increment_counter',
     description: 'Increment the counter',
-    inputSchema: { amount: z.number().default(1) },
+    inputSchema: z.object({ amount: z.number().default(1) }),
     handler: async ({ amount }) => {
       setCount((prev) => prev + amount);
       return { newValue: count + amount };
@@ -404,6 +430,6 @@ Yes. Tool handlers have access to component state via closures. State updates tr
 | --------------------------- | ------------------- | ----------- | --------------------- |
 | React Lifecycle Integration | Automatic           | Manual      | Manual                |
 | StrictMode Support          | Yes                 | N/A         | Manual                |
-| Zod Schema Validation       | Built-in            | Manual      | Manual                |
+| Standards-First Schemas     | Built-in            | Manual      | Manual                |
 | Execution State Tracking    | Built-in            | Manual      | Manual                |
 | TypeScript Support          | Full                | Partial     | Varies                |

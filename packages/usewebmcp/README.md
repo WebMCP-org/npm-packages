@@ -32,7 +32,7 @@ pnpm add usewebmcp react
 npm install usewebmcp react
 ```
 
-Optional (only if you want Standard Schema authoring like Zod v4 input schemas):
+Optional (only if you want Standard Schema authoring such as Zod, Valibot, or ArkType):
 
 ```bash
 pnpm add zod
@@ -132,6 +132,13 @@ Both paths run the same underlying tool logic and update the hook state.
 - JSON Schema literals (`as const`) via `InferArgsFromInputSchema`
 - Standard Schema v1 input typing (for example Zod v4 / Valibot / ArkType) via `~standard.types.input`
 
+When you author object schemas as plain JSON Schema literals, TypeScript inference follows JSON Schema semantics:
+
+- properties are optional unless they appear in `required`
+- objects stay open unless you set `additionalProperties: false`
+
+If you want exact object inference instead of a widened object type, define both `required` and `additionalProperties: false`.
+
 ```tsx
 const INPUT_SCHEMA = {
   type: 'object',
@@ -156,13 +163,21 @@ useWebMCP({
 
 ### Output inference
 
-When `outputSchema` is provided as a literal JSON object schema:
+When `outputSchema` is provided as JSON Schema or Standard JSON Schema:
 
 - implementation return type is inferred from `outputSchema`
 - `state.lastResult` is inferred to the same type
 - MCP response includes `structuredContent`
 
+For plain JSON Schema object literals, loose schemas produce loose inferred types. For example, omitting `required` makes properties optional, and omitting `additionalProperties: false` keeps the result open to extra keys. If you want a precise output type, prefer:
+
+- `as const satisfies ToolOutputSchema`
+- `required` for every guaranteed property
+- `additionalProperties: false` for closed object shapes
+
 ```tsx
+import type { ToolOutputSchema } from '@mcp-b/webmcp-types';
+
 const OUTPUT_SCHEMA = {
   type: 'object',
   properties: {
@@ -170,7 +185,7 @@ const OUTPUT_SCHEMA = {
   },
   required: ['total'],
   additionalProperties: false,
-} as const;
+} as const satisfies ToolOutputSchema;
 
 const tool = useWebMCP({
   name: 'count_items',
@@ -217,6 +232,8 @@ function SearchToolPanel() {
 If `outputSchema` is defined, your tool implementation must return a JSON-serializable object result.
 
 Returning a non-object value (`string`, `null`, array, etc.) causes an error response from the registered MCP tool.
+
+If you intentionally return something that violates the declared schema in a test, add `@ts-expect-error` and explain it. That keeps the inference contract strict while still documenting the negative runtime case you are exercising.
 
 ## Conditional Registration
 

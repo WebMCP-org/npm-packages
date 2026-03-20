@@ -1,4 +1,5 @@
 import { initializeWebModelContext } from '@mcp-b/global';
+import type { ToolInputSchema, ToolOutputSchema } from '@mcp-b/webmcp-types';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
 
@@ -129,7 +130,7 @@ describe('useWebMCP', () => {
             type: 'object',
             properties: { name: { type: 'string' } },
             required: ['name'],
-          } as const,
+          } as const satisfies ToolInputSchema,
           handler: async ({ name }) => `Hello, ${name}!`,
         })
       );
@@ -233,7 +234,7 @@ describe('useWebMCP', () => {
             type: 'object',
             properties: { count: { type: 'number' } },
             required: ['count'],
-          } as const,
+          } as const satisfies ToolInputSchema,
           handler,
         })
       );
@@ -281,7 +282,7 @@ describe('useWebMCP', () => {
             type: 'object',
             properties: { message: { type: 'string' } },
             required: ['message'],
-          } as const,
+          } as const satisfies ToolInputSchema,
           handler: async ({ message }) => `Echo: ${message}`,
         })
       );
@@ -305,8 +306,11 @@ describe('useWebMCP', () => {
             type: 'object',
             properties: { a: { type: 'number' }, b: { type: 'number' } },
             required: ['a', 'b'],
-          } as const,
-          outputSchema: { type: 'object', properties: { result: { type: 'number' } } } as const,
+          } as const satisfies ToolInputSchema,
+          outputSchema: {
+            type: 'object',
+            properties: { result: { type: 'number' } },
+          } as const satisfies ToolOutputSchema,
           handler: async ({ a, b }) => ({ result: a + b }),
         })
       );
@@ -552,7 +556,7 @@ describe('useWebMCP', () => {
             type: 'object',
             properties: { count: { type: 'number' } },
             required: ['count'],
-          } as const,
+          } as const satisfies ToolInputSchema,
           handler: async ({ count }) => `Count: ${count}`,
         })
       );
@@ -615,7 +619,10 @@ describe('useWebMCP', () => {
         useWebMCP({
           name: 'bad_output_tool',
           description: 'Returns string with outputSchema',
-          outputSchema: { type: 'object', properties: { value: { type: 'string' } } } as const,
+          outputSchema: {
+            type: 'object',
+            properties: { value: { type: 'string' } },
+          } as const satisfies ToolOutputSchema,
           // @ts-expect-error - intentionally returning wrong type for test
           handler: async () => 'not an object',
         })
@@ -636,7 +643,7 @@ describe('useWebMCP', () => {
           outputSchema: {
             type: 'object',
             properties: { items: { type: 'array', items: { type: 'string' } } },
-          } as const,
+          } as const satisfies ToolOutputSchema,
           // @ts-expect-error - intentionally returning wrong type for test
           handler: async () => ['item1', 'item2'],
         })
@@ -652,7 +659,7 @@ describe('useWebMCP', () => {
         useWebMCP({
           name: 'primitive_schema_tool',
           description: 'Returns primitive with primitive output schema',
-          outputSchema: { type: 'string' } as const,
+          outputSchema: { type: 'string' } as const satisfies ToolOutputSchema,
           handler: async () => 'ready',
         })
       );
@@ -671,7 +678,10 @@ describe('useWebMCP', () => {
         useWebMCP({
           name: 'array_schema_tool',
           description: 'Returns array with array output schema',
-          outputSchema: { type: 'array', items: { type: 'number' } } as const,
+          outputSchema: {
+            type: 'array',
+            items: { type: 'number' },
+          } as const satisfies ToolOutputSchema,
           handler: async () => [1, 2, 3],
         })
       );
@@ -689,7 +699,10 @@ describe('useWebMCP', () => {
         useWebMCP({
           name: 'null_output_tool',
           description: 'Returns null with outputSchema',
-          outputSchema: { type: 'object', properties: { value: { type: 'string' } } } as const,
+          outputSchema: {
+            type: 'object',
+            properties: { value: { type: 'string' } },
+          } as const satisfies ToolOutputSchema,
           // @ts-expect-error - intentionally returning wrong type for test
           handler: async () => null,
         })
@@ -727,7 +740,10 @@ describe('useWebMCP', () => {
         useWebMCP({
           name: 'output_schema_tool',
           description: 'Tool with output schema',
-          outputSchema: { type: 'object', properties: { message: { type: 'string' } } } as const,
+          outputSchema: {
+            type: 'object',
+            properties: { message: { type: 'string' } },
+          } as const satisfies ToolOutputSchema,
           handler: async () => ({ message: 'hello' }),
         })
       );
@@ -864,7 +880,7 @@ describe('useWebMCP', () => {
                 type: 'object',
                 properties: { name: { type: 'string' } },
                 required: ['name'],
-              } as const,
+              } as const satisfies ToolInputSchema,
             },
           }
         );
@@ -877,7 +893,7 @@ describe('useWebMCP', () => {
             type: 'object',
             properties: { name: { type: 'string' } },
             required: ['name'],
-          } as const,
+          } as const satisfies ToolInputSchema,
         });
 
         // Should NOT have re-registered because JSON.stringify keys match
@@ -1058,8 +1074,14 @@ describe('useWebMCP', () => {
         useWebMCP({
           name: 'circular_tool',
           description: 'Returns circular object',
-          outputSchema: { type: 'object', properties: { key: { type: 'string' } } } as const,
-          // @ts-expect-error - intentionally returning circular for test
+          outputSchema: {
+            type: 'object',
+            properties: { key: { type: 'string' } },
+            required: ['key'],
+            additionalProperties: false,
+          } as const satisfies ToolOutputSchema,
+          // @ts-expect-error Intentionally returns a circular/non-JSON-serializable object that
+          // violates the declared output schema so this runtime guard path stays covered.
           handler: async () => circular,
           // Provide custom formatOutput that handles circular objects
           // so we reach toStructuredContent instead of throwing in formatOutput

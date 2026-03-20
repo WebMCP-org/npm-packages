@@ -1,4 +1,5 @@
 import { initializeWebModelContext } from '@mcp-b/global';
+import type { ToolInputSchema } from '@mcp-b/webmcp-types';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
 import { z } from 'zod';
@@ -122,7 +123,7 @@ describe('useWebMCPPrompt', () => {
             type: 'object',
             properties: { code: { type: 'string' }, language: { type: 'string' } },
             required: ['code'],
-          } as const,
+          } as const satisfies ToolInputSchema,
           get: async ({ code, language }) => ({
             messages: [
               {
@@ -141,11 +142,11 @@ describe('useWebMCPPrompt', () => {
       expect(prompts[0].arguments).toBeDefined();
     });
 
-    it('converts zod-like argsSchema before prompt registration', async () => {
+    it('passes z.object argsSchema through prompt registration and still normalizes it at runtime', async () => {
       const registerPromptSpy = vi.spyOn(navigator.modelContext, 'registerPrompt');
 
       try {
-        const zodSchema = { code: z.string() };
+        const zodSchema = z.object({ code: z.string() });
         await renderHook(() =>
           useWebMCPPrompt({
             name: 'zod_args_prompt',
@@ -157,15 +158,16 @@ describe('useWebMCPPrompt', () => {
         );
 
         const descriptor = registerPromptSpy.mock.calls.at(-1)?.[0] as {
-          argsSchema?: {
-            type?: string;
-            properties?: Record<string, { type?: string }>;
-            required?: string[];
-          };
+          argsSchema?: unknown;
         };
-        expect(descriptor.argsSchema?.type).toBe('object');
-        expect(descriptor.argsSchema?.properties).toHaveProperty('code');
-        expect(descriptor.argsSchema?.required).toContain('code');
+        expect(descriptor.argsSchema).toBe(zodSchema);
+
+        const prompt = navigator.modelContext
+          ?.listPrompts()
+          .find((p) => p.name === 'zod_args_prompt');
+        expect(prompt?.arguments).toEqual(
+          expect.arrayContaining([expect.objectContaining({ name: 'code', required: true })])
+        );
       } finally {
         registerPromptSpy.mockRestore();
       }
@@ -202,7 +204,7 @@ describe('useWebMCPPrompt', () => {
             type: 'object',
             properties: { topic: { type: 'string' } },
             required: ['topic'],
-          } as const,
+          } as const satisfies ToolInputSchema,
           get: getMessage,
         })
       );

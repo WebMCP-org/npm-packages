@@ -1,5 +1,5 @@
 {
-  "name": "vanilla-esm-zod3-test-app",
+  "name": "vanilla-esm-zod4-test-app",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -13,7 +13,7 @@
     "@mcp-b/global": "workspace:*",
     "@mcp-b/webmcp-ts-sdk": "workspace:*",
     "@mcp-b/webmcp-types": "workspace:*",
-    "zod": "3.25.76"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "typescript": "catalog:",

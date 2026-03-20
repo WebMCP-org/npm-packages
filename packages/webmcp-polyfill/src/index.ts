@@ -9,6 +9,9 @@ import type {
   ModelContextTestingExecuteToolOptions,
   ModelContextTestingToolInfo,
   ModelContextToolReference,
+  StandardJSONSchemaV1,
+  ToolInputSchema as WebMCPToolInputSchema,
+  ToolOutputSchema as WebMCPToolOutputSchema,
   ToolDescriptor,
   ToolResponse,
 } from '@mcp-b/webmcp-types';
@@ -28,29 +31,14 @@ export type StandardInputValidatorSchema = StandardSchemaV1<
   Record<string, unknown>,
   Record<string, unknown>
 >;
-export interface StandardJSONSchemaV1<Input = unknown, Output = Input> {
-  readonly '~standard': {
-    readonly version: 1;
-    readonly vendor: string;
-    readonly types?: { readonly input: Input; readonly output: Output } | undefined;
-    readonly jsonSchema: {
-      readonly input: (options: {
-        readonly target: 'draft-2020-12' | 'draft-07' | 'openapi-3.0' | ({} & string);
-        readonly libraryOptions?: Record<string, unknown> | undefined;
-      }) => Record<string, unknown>;
-      readonly output: (options: {
-        readonly target: 'draft-2020-12' | 'draft-07' | 'openapi-3.0' | ({} & string);
-        readonly libraryOptions?: Record<string, unknown> | undefined;
-      }) => Record<string, unknown>;
-    };
-  };
-}
 export type StandardInputJsonSchema = StandardJSONSchemaV1<
   Record<string, unknown>,
   Record<string, unknown>
 >;
-export type ToolInputSchema = InputSchema | StandardInputValidatorSchema | StandardInputJsonSchema;
-export type ToolOutputSchema = InputSchema | StandardInputJsonSchema;
+export type ToolInputSchema = WebMCPToolInputSchema;
+export type ToolOutputSchema = WebMCPToolOutputSchema;
+export type { StandardJSONSchemaV1 } from '@mcp-b/webmcp-types';
+export type { StandardSchemaV1 } from '@standard-schema/spec';
 
 type StandardValidationResult = Awaited<
   ReturnType<StandardInputValidatorSchema['~standard']['validate']>

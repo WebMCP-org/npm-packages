@@ -1,4 +1,5 @@
 import { initializeWebModelContext } from '@mcp-b/global';
+import type { ToolInputSchema, ToolOutputSchema } from '@mcp-b/webmcp-types';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
 import { z } from 'zod';
@@ -110,7 +111,7 @@ describe('useWebMCP', () => {
             type: 'object',
             properties: { name: { type: 'string' } },
             required: ['name'],
-          } as const,
+          } as const satisfies ToolInputSchema,
           handler: async ({ name }) => `Hello, ${name}!`,
         })
       );
@@ -123,15 +124,15 @@ describe('useWebMCP', () => {
       expect(inputSchema.properties).toHaveProperty('name');
     });
 
-    it('converts zod-like inputSchema before registration', async () => {
+    it('passes z.object inputSchema through registration and still normalizes it at runtime', async () => {
       const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
 
       try {
-        const zodSchema = { username: z.string() } as const;
+        const zodSchema = z.object({ username: z.string() });
         await renderHook(() =>
           useWebMCP({
             name: 'zod_like_tool',
-            description: 'Tool using zod-like schema',
+            description: 'Tool using z.object schema',
             inputSchema: zodSchema,
             handler: async () => 'ok',
           })
@@ -139,34 +140,34 @@ describe('useWebMCP', () => {
 
         const descriptor = registerToolSpy.mock.calls.at(-1)?.[0] as {
           name: string;
-          inputSchema?: {
-            type?: string;
-            properties?: Record<string, { type?: string }>;
-            required?: string[];
-          };
+          inputSchema?: unknown;
         };
         expect(descriptor.name).toBe('zod_like_tool');
-        expect(descriptor.inputSchema?.type).toBe('object');
-        expect(descriptor.inputSchema?.properties).toHaveProperty('username');
-        expect(descriptor.inputSchema?.required).toContain('username');
+        expect(descriptor.inputSchema).toBe(zodSchema);
+
+        const tools = navigator.modelContextTesting?.listTools();
+        const inputSchema = JSON.parse(tools?.[0]?.inputSchema ?? '{}');
+        expect(inputSchema.type).toBe('object');
+        expect(inputSchema.properties).toHaveProperty('username');
+        expect(inputSchema.required).toContain('username');
       } finally {
         registerToolSpy.mockRestore();
       }
     });
 
-    it('converts zod-like outputSchema before registration', async () => {
+    it('passes z.object outputSchema through registration and still normalizes it at runtime', async () => {
       const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
 
       try {
-        const zodOutputSchema = {
+        const zodOutputSchema = z.object({
           count: z.number(),
           message: z.string(),
-        } as const;
+        });
 
         await renderHook(() =>
           useWebMCP({
             name: 'zod_output_tool',
-            description: 'Tool using zod-like output schema',
+            description: 'Tool using z.object output schema',
             outputSchema: zodOutputSchema,
             handler: async () => ({ count: 1, message: 'ok' }),
           })
@@ -174,20 +175,19 @@ describe('useWebMCP', () => {
 
         const descriptor = registerToolSpy.mock.calls.at(-1)?.[0] as {
           name: string;
-          outputSchema?: {
-            type?: string;
-            properties?: Record<string, { type?: string }>;
-            required?: string[];
-          };
+          outputSchema?: unknown;
         };
 
         expect(descriptor.name).toBe('zod_output_tool');
-        expect(descriptor.outputSchema?.type).toBe('object');
-        expect(descriptor.outputSchema?.properties).toHaveProperty('count');
-        expect(descriptor.outputSchema?.properties).toHaveProperty('message');
-        expect(descriptor.outputSchema?.required).toEqual(
-          expect.arrayContaining(['count', 'message'])
-        );
+        expect(descriptor.outputSchema).toBe(zodOutputSchema);
+
+        const tool = navigator.modelContext
+          ?.listTools()
+          .find((registeredTool) => registeredTool.name === 'zod_output_tool');
+        expect(tool?.outputSchema?.type).toBe('object');
+        expect(tool?.outputSchema?.properties).toHaveProperty('count');
+        expect(tool?.outputSchema?.properties).toHaveProperty('message');
+        expect(tool?.outputSchema?.required).toEqual(expect.arrayContaining(['count', 'message']));
       } finally {
         registerToolSpy.mockRestore();
       }
@@ -242,7 +242,7 @@ describe('useWebMCP', () => {
             type: 'object',
             properties: { count: { type: 'number' } },
             required: ['count'],
-          } as const,
+          } as const satisfies ToolInputSchema,
           handler,
         })
       );
@@ -312,7 +312,7 @@ describe('useWebMCP', () => {
             type: 'object',
             properties: { message: { type: 'string' } },
             required: ['message'],
-          } as const,
+          } as const satisfies ToolInputSchema,
           handler: async ({ message }) => `Echo: ${message}`,
         })
       );
@@ -336,11 +336,11 @@ describe('useWebMCP', () => {
             type: 'object',
             properties: { a: { type: 'number' }, b: { type: 'number' } },
             required: ['a', 'b'],
-          } as const,
+          } as const satisfies ToolInputSchema,
           outputSchema: {
             type: 'object',
             properties: { result: { type: 'number' } },
-          } as const,
+          } as const satisfies ToolOutputSchema,
           handler: async ({ a, b }) => ({ result: a + b }),
         })
       );
@@ -379,7 +379,7 @@ describe('useWebMCP', () => {
           outputSchema: {
             type: 'object',
             properties: { value: { type: 'string' } },
-          } as const,
+          } as const satisfies ToolOutputSchema,
           handler: async () => 'not an object' as never,
         })
       );
@@ -398,7 +398,7 @@ describe('useWebMCP', () => {
           outputSchema: {
             type: 'object',
             properties: { value: { type: 'string' } },
-          } as const,
+          } as const satisfies ToolOutputSchema,
           handler: async () => ['not', 'an', 'object'] as never,
         })
       );
@@ -413,7 +413,7 @@ describe('useWebMCP', () => {
         useWebMCP({
           name: 'primitive_schema_tool',
           description: 'Primitive output schema',
-          outputSchema: { type: 'string' } as const,
+          outputSchema: { type: 'string' } as const satisfies ToolOutputSchema,
           handler: async () => 'ready',
         })
       );
@@ -432,7 +432,10 @@ describe('useWebMCP', () => {
         useWebMCP({
           name: 'array_schema_tool',
           description: 'Array output schema',
-          outputSchema: { type: 'array', items: { type: 'number' } } as const,
+          outputSchema: {
+            type: 'array',
+            items: { type: 'number' },
+          } as const satisfies ToolOutputSchema,
           handler: async () => [1, 2, 3],
         })
       );
@@ -453,7 +456,7 @@ describe('useWebMCP', () => {
           outputSchema: {
             type: 'object',
             properties: { value: { type: 'string' } },
-          } as const,
+          } as const satisfies ToolOutputSchema,
           handler: async () => null as never,
         })
       );
@@ -690,7 +693,7 @@ describe('useWebMCP', () => {
           outputSchema: {
             type: 'object',
             properties: { count: { type: 'number' }, label: { type: 'string' } },
-          } as const,
+          } as const satisfies ToolOutputSchema,
           handler: async () => ({ count: 1, label: 'test' }),
         })
       );
@@ -756,11 +759,11 @@ describe('useWebMCP', () => {
               type: 'object',
               properties: { name: { type: 'string' } },
               required: ['name'],
-            } as const,
+            } as const satisfies ToolInputSchema,
             outputSchema: {
               type: 'object',
               properties: { value: { type: 'string' } },
-            } as const,
+            } as const satisfies ToolOutputSchema,
             annotations: { destructiveHint: true } as const,
           },
         }
@@ -771,11 +774,11 @@ describe('useWebMCP', () => {
           type: 'object',
           properties: { name: { type: 'string' } },
           required: ['name'],
-        } as const,
+        } as const satisfies ToolInputSchema,
         outputSchema: {
           type: 'object',
           properties: { value: { type: 'string' } },
-        } as const,
+        } as const satisfies ToolOutputSchema,
         annotations: { destructiveHint: true },
       });
 

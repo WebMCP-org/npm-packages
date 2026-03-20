@@ -6,13 +6,12 @@ import type {
   WebMCPPromptConfig,
   WebMCPPromptReturn,
 } from './types.js';
-import { isZodSchema, zodToJsonSchema } from './zod-utils.js';
 
 type PromptModelContext = Navigator['modelContext'] & {
   registerPrompt: (descriptor: {
     name: string;
     description?: string;
-    argsSchema?: InputSchema;
+    argsSchema?: ReactWebMCPInputSchema;
     get: (args: Record<string, unknown>) => Promise<{ messages: PromptMessage[] }>;
   }) => { unregister: () => void } | undefined;
 };
@@ -22,10 +21,9 @@ type PromptModelContext = Navigator['modelContext'] & {
  *
  * This hook handles the complete lifecycle of an MCP prompt:
  * - Registers the prompt with `window.navigator.modelContext`
- * - Converts Zod schemas to JSON Schema for argument validation
  * - Automatically unregisters on component unmount
  *
- * @template TArgsSchema - Zod schema object defining argument types
+ * @template TArgsSchema - Schema object defining argument types
  *
  * @param config - Configuration object for the prompt
  * @returns Object indicating registration status
@@ -109,18 +107,12 @@ export function useWebMCPPrompt<TArgsSchema extends ReactWebMCPInputSchema = Inp
       return getRef.current(args as never);
     };
 
-    const resolvedArgsSchema = argsSchema
-      ? isZodSchema(argsSchema)
-        ? zodToJsonSchema(argsSchema)
-        : (argsSchema as InputSchema)
-      : undefined;
-
     let registration: { unregister: () => void } | undefined;
     try {
       registration = modelContext.registerPrompt({
         name,
         ...(description !== undefined && { description }),
-        ...(resolvedArgsSchema && { argsSchema: resolvedArgsSchema }),
+        ...(argsSchema !== undefined ? { argsSchema } : {}),
         get: promptHandler,
       });
     } catch (error) {

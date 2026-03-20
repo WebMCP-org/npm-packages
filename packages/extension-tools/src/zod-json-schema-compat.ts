@@ -1,28 +1,9 @@
-import type { z } from 'zod';
-import { toJSONSchema as zod4ToJsonSchema } from 'zod/v4-mini';
-import { zodToJsonSchema as zodToJsonSchemaV3 } from 'zod-to-json-schema';
+import * as z from 'zod/v4';
 
 type JsonSchemaObject = Record<string, unknown>;
-type ZodVersion = 'v3' | 'v4';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
-function detectZodVersion(schema: unknown): ZodVersion | null {
-  if (!isRecord(schema)) {
-    return null;
-  }
-
-  if ('_zod' in schema) {
-    return 'v4';
-  }
-
-  if ('_def' in schema) {
-    return 'v3';
-  }
-
-  return null;
 }
 
 function stripSchemaMeta(schema: JsonSchemaObject): JsonSchemaObject {
@@ -41,28 +22,11 @@ function stripSchemaMeta(schema: JsonSchemaObject): JsonSchemaObject {
 }
 
 /**
- * Convert a Zod schema to JSON Schema with Zod v3/v4 compatibility.
- * Uses the same split conversion model as MCP SDK compat helpers.
+ * Convert a Zod v4 schema to JSON Schema.
  */
 export function zodSchemaToJsonSchemaCompat(
   schema: z.ZodTypeAny,
   _name?: string
 ): JsonSchemaObject {
-  const version = detectZodVersion(schema);
-  if (!version) {
-    throw new Error('Expected a Zod schema instance (v3 or v4).');
-  }
-
-  if (version === 'v3') {
-    return stripSchemaMeta(
-      zodToJsonSchemaV3(schema, {
-        strictUnions: true,
-        $refStrategy: 'none',
-      }) as JsonSchemaObject
-    );
-  }
-
-  return stripSchemaMeta(
-    zod4ToJsonSchema(schema as Parameters<typeof zod4ToJsonSchema>[0]) as JsonSchemaObject
-  );
+  return stripSchemaMeta(z.toJSONSchema(schema) as JsonSchemaObject);
 }

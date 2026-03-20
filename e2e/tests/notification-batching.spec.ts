@@ -1,3 +1,4 @@
+import type { ToolInputSchema } from '@mcp-b/webmcp-types';
 import { expect, test } from '@playwright/test';
 
 /**
@@ -93,25 +94,26 @@ test.describe('Notification Batching Tests', () => {
       }
 
       // Register and immediately unregister multiple tools synchronously
-      const registrations: Array<{ unregister: () => void }> = [];
+      const toolNames: string[] = [];
 
       // First, register 5 tools
       for (let i = 0; i < 5; i++) {
-        registrations.push(
-          navigator.modelContext.registerTool({
-            name: `rapidCycleTool_${i}`,
-            description: `Rapid cycle test tool ${i}`,
-            inputSchema: { type: 'object', properties: {} },
-            async execute() {
-              return { content: [{ type: 'text', text: 'test' }] };
-            },
-          })
-        );
+        const name = `rapidCycleTool_${i}`;
+        toolNames.push(name);
+        const inputSchema = { type: 'object', properties: {} } as const satisfies ToolInputSchema;
+        navigator.modelContext.registerTool({
+          name,
+          description: `Rapid cycle test tool ${i}`,
+          inputSchema,
+          async execute() {
+            return { content: [{ type: 'text', text: 'test' }] };
+          },
+        });
       }
 
       // Then immediately unregister all 5
-      registrations.forEach((reg) => {
-        reg.unregister();
+      toolNames.forEach((name) => {
+        navigator.modelContext.unregisterTool(name);
       });
 
       // Wait for microtask to complete
@@ -145,7 +147,7 @@ test.describe('Notification Batching Tests', () => {
           {
             name: 'batchProvide1',
             description: 'test',
-            inputSchema: { type: 'object', properties: {} },
+            inputSchema: { type: 'object', properties: {} } as const satisfies ToolInputSchema,
             async execute() {
               return { content: [{ type: 'text', text: 'test' }] };
             },
@@ -158,7 +160,7 @@ test.describe('Notification Batching Tests', () => {
           {
             name: 'batchProvide2',
             description: 'test',
-            inputSchema: { type: 'object', properties: {} },
+            inputSchema: { type: 'object', properties: {} } as const satisfies ToolInputSchema,
             async execute() {
               return { content: [{ type: 'text', text: 'test' }] };
             },
@@ -171,7 +173,7 @@ test.describe('Notification Batching Tests', () => {
           {
             name: 'batchProvide3',
             description: 'test',
-            inputSchema: { type: 'object', properties: {} },
+            inputSchema: { type: 'object', properties: {} } as const satisfies ToolInputSchema,
             async execute() {
               return { content: [{ type: 'text', text: 'test' }] };
             },
@@ -203,28 +205,29 @@ test.describe('Notification Batching Tests', () => {
         });
       }
 
-      const registrations: Array<{ unregister: () => void }> = [];
+      const toolNames: string[] = [];
 
       // Simulate a React app mounting with 100 useWebMCP hooks
       for (let i = 0; i < 100; i++) {
-        registrations.push(
-          navigator.modelContext.registerTool({
-            name: `reactHookTool_${i}`,
-            description: `Simulated React hook tool ${i}`,
-            inputSchema: { type: 'object', properties: {} },
-            async execute() {
-              return { content: [{ type: 'text', text: 'test' }] };
-            },
-          })
-        );
+        const name = `reactHookTool_${i}`;
+        toolNames.push(name);
+        const inputSchema = { type: 'object', properties: {} } as const satisfies ToolInputSchema;
+        navigator.modelContext.registerTool({
+          name,
+          description: `Simulated React hook tool ${i}`,
+          inputSchema,
+          async execute() {
+            return { content: [{ type: 'text', text: 'test' }] };
+          },
+        });
       }
 
       // Wait for microtask
       await new Promise((resolve) => setTimeout(resolve, 50));
 
       // Cleanup
-      registrations.forEach((reg) => {
-        reg.unregister();
+      toolNames.forEach((name) => {
+        navigator.modelContext.unregisterTool(name);
       });
 
       // Wait for cleanup notifications
@@ -260,10 +263,11 @@ test.describe('Notification Batching - Edge Cases', () => {
         });
       }
 
-      const reg = navigator.modelContext.registerTool({
+      const inputSchema = { type: 'object', properties: {} } as const satisfies ToolInputSchema;
+      navigator.modelContext.registerTool({
         name: 'singleTool',
         description: 'Single tool test',
-        inputSchema: { type: 'object', properties: {} },
+        inputSchema,
         async execute() {
           return { content: [{ type: 'text', text: 'test' }] };
         },
@@ -271,7 +275,7 @@ test.describe('Notification Batching - Edge Cases', () => {
 
       await new Promise((resolve) => setTimeout(resolve, 50));
 
-      reg.unregister();
+      navigator.modelContext.unregisterTool('singleTool');
 
       await new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -288,10 +292,11 @@ test.describe('Notification Batching - Edge Cases', () => {
 
       // Register some tools first
       for (let i = 0; i < 5; i++) {
+        const inputSchema = { type: 'object', properties: {} } as const satisfies ToolInputSchema;
         navigator.modelContext.registerTool({
           name: `clearContextTool_${i}`,
           description: 'test',
-          inputSchema: { type: 'object', properties: {} },
+          inputSchema,
           async execute() {
             return { content: [{ type: 'text', text: 'test' }] };
           },

@@ -7,9 +7,9 @@ packages:
   - e2e/react-webmcp-test-app
   - e2e/web-standards-showcase
   - e2e/vanilla-iife-json
-  - e2e/vanilla-iife-zod3
-  - e2e/vanilla-esm-zod3
-  - e2e/react18-zod3
+  - e2e/vanilla-iife-zod4
+  - e2e/vanilla-esm-zod4
+  - e2e/react18-zod4
   - examples/frameworks/*
 
 catalog:
@@ -41,8 +41,7 @@ catalog:
   vite-plugin-monkey: ^6.0.1
   vitest: npm:@voidzero-dev/vite-plus-test@latest
   wrangler: ^4.45.3
-  zod: 3.25.76
-  zod-to-json-schema: ^3.24.5
+  zod: ^4.0
   vite-plus: latest
 
 onlyBuiltDependencies:

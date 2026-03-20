@@ -179,6 +179,8 @@ navigator.modelContext.provideContext({
 
 Registers a single tool. The tool name must be unique - throws if a tool with the same name already exists. `@mcp-b/global` still returns a deprecated compatibility handle with `unregister()` so existing MCP-B integrations do not break, even though current Chromium returns `undefined`.
 
+At runtime, MCP-B registration surfaces accept plain JSON Schema and Standard JSON Schema. Validator-only Standard Schema objects remain useful for validation and type inference, but `registerTool()` and other MCP transport-facing APIs must be able to export JSON Schema for listing and mirroring.
+
 ```typescript
 const registration = navigator.modelContext.registerTool({
   name: 'add-to-cart',
@@ -243,14 +245,14 @@ const result = await navigator.modelContext.callTool({
 
 ### Tool Descriptor
 
-| Property       | Type                                      | Required | Description                                                                             |
-| -------------- | ----------------------------------------- | -------- | --------------------------------------------------------------------------------------- |
-| `name`         | `string`                                  | Yes      | Unique identifier for the tool                                                          |
-| `description`  | `string`                                  | Yes      | Natural language description of what the tool does                                      |
-| `inputSchema`  | `InputSchema`                             | No       | JSON Schema describing accepted input. Defaults to `{ type: 'object', properties: {} }` |
-| `outputSchema` | `InputSchema`                             | No       | JSON Schema describing the output payload shape                                         |
-| `annotations`  | `ToolAnnotations`                         | No       | Hints about tool behavior for LLM planners                                              |
-| `execute`      | `(args, client) => Promise<ToolResponse>` | Yes      | Async function implementing the tool logic                                              |
+| Property       | Type                                      | Required | Description                                                |
+| -------------- | ----------------------------------------- | -------- | ---------------------------------------------------------- |
+| `name`         | `string`                                  | Yes      | Unique identifier for the tool                             |
+| `description`  | `string`                                  | Yes      | Natural language description of what the tool does         |
+| `inputSchema`  | `JSON Schema \| Standard JSON Schema`     | No       | Input schema used for registration, listing, and transport |
+| `outputSchema` | `JSON Schema \| Standard JSON Schema`     | No       | Output payload schema for structured responses             |
+| `annotations`  | `ToolAnnotations`                         | No       | Hints about tool behavior for LLM planners                 |
+| `execute`      | `(args, client) => Promise<ToolResponse>` | Yes      | Async function implementing the tool logic                 |
 
 ### Tool Response Format
 
@@ -508,7 +510,7 @@ navigator.modelContext.registerTool({
 
 ## Zod Version Compatibility
 
-This package supports **Zod 3.25.76+** (3.x only). JSON Schema is also supported if you prefer not to use Zod.
+This package supports runtime Zod normalization for **Zod 4.x** when tools are registered through MCP-B's wrapped `navigator.modelContext`. Zod 3 is no longer supported. Public TypeScript types remain JSON-Schema-first. JSON Schema is also supported if you prefer not to use Zod.
 
 ## Type Exports
 

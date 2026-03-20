@@ -65,6 +65,7 @@
     "prepublishOnly": "node ../../scripts/validate-publish.js && pnpm run build",
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
+    "test": "vp test run",
     "typecheck": "tsc --noEmit",
     "version:major": "pnpm version major --no-git-tag-version",
     "version:minor": "pnpm version minor --no-git-tag-version",
@@ -77,20 +78,10 @@
   "devDependencies": {
     "@modelcontextprotocol/sdk": "catalog:",
     "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
     "typescript": "catalog:",
-    "vite-plus": "catalog:"
-  },
-  "peerDependencies": {
-    "zod": "^3.25 || ^4.0",
-    "zod-to-json-schema": "^3.25.0"
-  },
-  "peerDependenciesMeta": {
-    "zod": {
-      "optional": true
-    },
-    "zod-to-json-schema": {
-      "optional": true
-    }
+    "vite-plus": "catalog:",
+    "vitest": "catalog:"
   },
   "engines": {
     "node": ">=18"

@@ -40,17 +40,18 @@ export type {
  * - {@link WebMCPConfig} - Configuration for tool registration
  * - {@link WebMCPReturn} - Return value from useWebMCP hook
  * - {@link ToolExecutionState} - Current execution state of a tool
- * - {@link InferOutput} - Utility type for inferring output from Zod schema
+ * - {@link InferOutput} - Utility type for inferring output from schema definitions
  */
 export type {
   InferOutput,
   InferToolInput,
   ReactWebMCPInputSchema,
+  ReactWebMCPOutputSchema,
   ToolExecutionState,
   ToolInputSchema,
+  ToolOutputSchema,
   WebMCPConfig,
   WebMCPReturn,
-  ZodSchemaObject,
 } from './types.js';
 /**
  * Main hook for registering MCP tools with full control over execution state,

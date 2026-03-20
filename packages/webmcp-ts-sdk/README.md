@@ -119,6 +119,7 @@ Use it exactly like the official SDK:
 ```typescript
 import { McpServer } from '@mcp-b/webmcp-ts-sdk';
 import { TabServerTransport } from '@mcp-b/transports';
+import { z } from 'zod';
 
 const server = new McpServer({
   name: 'my-web-app',
@@ -134,9 +135,13 @@ server.registerTool(
   'my-tool',
   {
     description: 'A dynamically registered tool',
-    inputSchema: { message: z.string() },
+    inputSchema: z.object({
+      message: z.string(),
+    }),
     // Output schemas enable structured, type-safe AI responses
-    outputSchema: { result: z.string() },
+    outputSchema: z.object({
+      result: z.string(),
+    }),
   },
   async ({ message }) => {
     return {
@@ -152,11 +157,11 @@ server.registerTool(
   'analyze-data',
   {
     description: 'Analyze data and return structured results',
-    inputSchema: {
+    inputSchema: z.object({
       data: z.array(z.number()),
       operation: z.enum(['sum', 'average', 'stats']),
-    },
-    outputSchema: {
+    }),
+    outputSchema: z.object({
       result: z.number(),
       operation: z.string(),
       metadata: z.object({
@@ -164,7 +169,7 @@ server.registerTool(
         min: z.number().optional(),
         max: z.number().optional(),
       }),
-    },
+    }),
   },
   async ({ data, operation }) => {
     const stats = calculateStats(data, operation);
@@ -175,6 +180,8 @@ server.registerTool(
   }
 );
 ```
+
+`BrowserMcpServer` registration surfaces accept plain JSON Schema and Standard JSON Schema. Validator-only Standard Schema objects are valid for inference and validation layers, but tool and prompt registration must be able to export JSON Schema for listing, mirroring, and MCP transport registration.
 
 ## Architecture
 

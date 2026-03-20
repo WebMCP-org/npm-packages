@@ -1,9 +1,10 @@
 import type { InputSchema, ToolResponse } from './common.js';
-import type { JsonSchemaForInference } from './json-schema.js';
 import type {
+  ToolInputSchema,
   ToolDescriptor,
   ToolDescriptorFromSchema,
   ToolListItem,
+  ToolOutputSchema,
   ToolRawResult,
 } from './tool.js';
 
@@ -216,14 +217,15 @@ export interface ModelContextCore {
   // ==================== TOOLS ====================
 
   /**
-   * Registers a dynamic tool with JSON Schema-driven inference.
+   * Registers a dynamic tool with schema-driven inference.
    *
-   * `execute(args)` is inferred from `inputSchema`, and when a literal object
-   * `outputSchema` is provided, `execute(...).structuredContent` is inferred too.
+   * `execute(args)` is inferred from `inputSchema`, and when an inferable
+   * object `outputSchema` is provided, `execute(...).structuredContent` is
+   * inferred too.
    */
   registerTool<
-    TInputSchema extends JsonSchemaForInference,
-    TOutputSchema extends JsonSchemaForInference | undefined = undefined,
+    TInputSchema extends ToolInputSchema,
+    TOutputSchema extends ToolOutputSchema | undefined = undefined,
     TName extends string = string,
   >(
     tool: ToolDescriptorFromSchema<TInputSchema, TOutputSchema, TName>

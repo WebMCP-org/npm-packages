@@ -4,20 +4,21 @@ import type {
   ContentBlock,
   ElicitationParams,
   ElicitationResult,
-  InputSchema,
   LooseContentBlock,
 } from './common.js';
 import type {
   MaybePromise,
   ModelContextClient,
+  StandardJSONSchemaV1,
   ToolAnnotations,
   ToolDescriptor,
   ToolExecuteResultFromOutputSchema,
   ToolExecutionContext,
+  ToolInputSchema,
   ToolListItem,
+  ToolOutputSchema,
   ToolResultFromOutputSchema,
 } from './tool.js';
-import type { JsonSchemaForInference } from './json-schema.js';
 
 test('ToolDescriptor has required fields', () => {
   expectTypeOf<ToolDescriptor>().toHaveProperty('name');
@@ -114,13 +115,29 @@ test('ToolDescriptor supports literal tool names via generics', () => {
   >().toEqualTypeOf<'health'>();
 });
 
-test('ToolDescriptor.inputSchema supports InputSchema', () => {
-  expectTypeOf<ToolDescriptor['inputSchema']>().toEqualTypeOf<InputSchema | undefined>();
+test('ToolDescriptor.inputSchema supports JSON Schema and Standard Schema inputs', () => {
+  expectTypeOf<ToolDescriptor['inputSchema']>().toEqualTypeOf<ToolInputSchema | undefined>();
 });
 
-test('ToolDescriptor.outputSchema supports inferable JSON Schema', () => {
+test('ToolDescriptor.outputSchema supports inferable JSON Schema and Standard JSON Schema', () => {
   expectTypeOf<ToolDescriptor>().toHaveProperty('outputSchema');
-  expectTypeOf<Required<ToolDescriptor>['outputSchema']>().toEqualTypeOf<JsonSchemaForInference>();
+  expectTypeOf<Required<ToolDescriptor>['outputSchema']>().toEqualTypeOf<ToolOutputSchema>();
+});
+
+test('ToolResultFromOutputSchema infers structuredContent from Standard JSON Schema output types', () => {
+  type OutputSchema = StandardJSONSchemaV1<
+    { query: string },
+    { total: number; status?: 'ok' | 'error' }
+  >;
+
+  type StructuredContent = ToolResultFromOutputSchema<OutputSchema>['structuredContent'];
+  const structuredContent: NonNullable<StructuredContent> = {
+    total: 1,
+    status: 'ok',
+  };
+
+  expectTypeOf(structuredContent.total).toEqualTypeOf<number>();
+  expectTypeOf(structuredContent.status).toEqualTypeOf<'ok' | 'error' | undefined>();
 });
 
 test('ToolResultFromOutputSchema infers structuredContent for object output schemas', () => {

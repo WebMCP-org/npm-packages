@@ -11,6 +11,8 @@ type IsEqual<Left, Right> = [Left] extends [Right]
 type Assert<T extends true> = T;
 type IsAny<T> = 0 extends 1 & T ? true : false;
 
+const zodOutputSchema = z.object({ name: z.string() });
+
 const unstructuredConfig = {
   name: 'list_items',
   description: 'List items',
@@ -31,10 +33,10 @@ type JsonOutputSchema = {
   required: ['total'];
 };
 
-const zodConfig: WebMCPConfig<InputSchema, { name: z.ZodString }> = {
+const zodConfig: WebMCPConfig<InputSchema, typeof zodOutputSchema> = {
   name: 'zod_output',
   description: 'Zod output',
-  outputSchema: { name: z.string() },
+  outputSchema: zodOutputSchema,
   handler: async () => ({ name: 'typed' }),
 };
 

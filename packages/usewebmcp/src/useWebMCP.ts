@@ -1,10 +1,11 @@
-import type { ToolInputSchema } from '@mcp-b/webmcp-polyfill';
 import type {
   CallToolResult,
   InputSchema,
   JsonObject,
   JsonSchemaForInference,
+  ToolInputSchema,
   ToolDescriptor,
+  ToolOutputSchema,
 } from '@mcp-b/webmcp-types';
 import type { DependencyList } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -50,7 +51,9 @@ function isInputSchema(value: unknown): value is InputSchema {
   }
 
   if ('type' in value && value.type !== undefined && typeof value.type !== 'string') {
-    return false;
+    if (!Array.isArray(value.type) || value.type.some((entry) => typeof entry !== 'string')) {
+      return false;
+    }
   }
 
   if ('properties' in value && value.properties !== undefined && !isPlainObject(value.properties)) {
@@ -158,13 +161,38 @@ function toRegisteredInputSchema(
 }
 
 function toRegisteredOutputSchema(
-  outputSchema: JsonSchemaForInference | undefined
+  outputSchema: ToolOutputSchema | undefined
 ): JsonSchemaForInference | undefined {
   if (outputSchema === undefined) {
     return undefined;
   }
 
-  return outputSchema;
+  if (!isPlainObject(outputSchema) || !('~standard' in outputSchema)) {
+    return outputSchema as JsonSchemaForInference;
+  }
+
+  const standard = outputSchema['~standard'];
+  if (!isPlainObject(standard)) {
+    return undefined;
+  }
+
+  const jsonSchema = standard.jsonSchema;
+  if (!isPlainObject(jsonSchema) || typeof jsonSchema.output !== 'function') {
+    return undefined;
+  }
+
+  for (const target of STANDARD_JSON_SCHEMA_TARGETS) {
+    try {
+      const converted = jsonSchema.output({ target });
+      if (isPlainObject(converted)) {
+        return converted as unknown as JsonSchemaForInference;
+      }
+    } catch {
+      // Try the next target before giving up.
+    }
+  }
+
+  return undefined;
 }
 
 /**
@@ -175,11 +203,14 @@ function toRegisteredOutputSchema(
  * - Manages execution state (loading, results, errors)
  * - Handles tool execution and lifecycle callbacks
  * - Automatically unregisters on component unmount
- * - Returns `structuredContent` when `outputSchema` is defined
+ * - Returns `structuredContent` when `outputSchema` describes an object result
  *
- * ## Output Schema (Recommended)
+ * ## Schema Contract
  *
- * Always define an `outputSchema` for your tools. This provides:
+ * `inputSchema` accepts plain JSON Schema or Standard Schema objects.
+ * `outputSchema` accepts plain JSON Schema or Standard JSON Schema objects.
+ *
+ * Defining an `outputSchema` is recommended because it provides:
  * - **Type Safety**: Handler return type is inferred from the schema
  * - **MCP structuredContent**: AI models receive structured, typed data
  * - **Better AI Understanding**: Models can reason about your tool's output format
@@ -188,19 +219,19 @@ function toRegisteredOutputSchema(
  * useWebMCP({
  *   name: 'get_user',
  *   description: 'Get user by ID',
- *   inputSchema: {
+ *   inputSchema: ({
  *     type: 'object',
  *     properties: { userId: { type: 'string' } },
  *     required: ['userId'],
- *   } as const,
- *   outputSchema: {
+ *   } as const satisfies ToolInputSchema),
+ *   outputSchema: ({
  *     type: 'object',
  *     properties: {
  *       id: { type: 'string' },
  *       name: { type: 'string' },
  *       email: { type: 'string' },
  *     },
- *   } as const,
+ *   } as const satisfies ToolOutputSchema),
  *   execute: async ({ userId }) => {
  *     const user = await fetchUser(userId);
  *     return { id: user.id, name: user.name, email: user.email };
@@ -214,26 +245,31 @@ function toRegisteredOutputSchema(
  *
  * - **Ref-based callbacks**: `execute`/`handler`, `onSuccess`, `onError`, and `formatOutput`
  *   are stored in refs, so changing these functions won't trigger re-registration.
+ * - **Structural schema memoization**: JSON-serializable `inputSchema`, `outputSchema`, and
+ *   `annotations` are compared structurally, so identical inline literals do not trigger
+ *   unnecessary re-registration.
  *
- * **IMPORTANT**: If `inputSchema`, `outputSchema`, or `annotations` are defined inline
- * or change on every render, the tool will re-register unnecessarily. To avoid this,
- * define them outside your component with `as const`:
+ * Hoisting shared schemas is still a good idea because it keeps code readable and preserves
+ * literal inference cleanly with `as const satisfies`:
  *
  * ```tsx
- * // Good: Static schema defined outside component
+ * // Good: Shared schema defined once
  * const OUTPUT_SCHEMA = {
  *   type: 'object',
  *   properties: { count: { type: 'number' } },
- * } as const;
+ * } as const satisfies ToolOutputSchema;
  *
- * // Bad: Inline schema (creates new object every render)
+ * // Also valid: structurally identical inline literals are memoized
  * useWebMCP({
- *   outputSchema: { type: 'object', properties: { count: { type: 'number' } } } as const,
+ *   outputSchema: {
+ *     type: 'object',
+ *     properties: { count: { type: 'number' } },
+ *   } as const satisfies ToolOutputSchema,
  * });
  * ```
  *
- * @template TInputSchema - JSON Schema defining input parameter types (use `as const` for inference)
- * @template TOutputSchema - JSON Schema defining output structure (object schemas enable structuredContent)
+ * @template TInputSchema - Plain JSON Schema or Standard Schema defining input parameter types
+ * @template TOutputSchema - Plain JSON Schema or Standard JSON Schema defining output structure
  *
  * @param config - Configuration object for the tool
  * @param deps - Optional dependency array that triggers tool re-registration when values change.
@@ -249,18 +285,18 @@ function toRegisteredOutputSchema(
  *   const likeTool = useWebMCP({
  *     name: 'posts_like',
  *     description: 'Like a post by ID',
- *     inputSchema: {
+ *     inputSchema: ({
  *       type: 'object',
  *       properties: { postId: { type: 'string', description: 'The post ID' } },
  *       required: ['postId'],
- *     } as const,
- *     outputSchema: {
+ *     } as const satisfies ToolInputSchema),
+ *     outputSchema: ({
  *       type: 'object',
  *       properties: {
  *         success: { type: 'boolean' },
  *         likeCount: { type: 'number' },
  *       },
- *     } as const,
+ *     } as const satisfies ToolOutputSchema),
  *     execute: async ({ postId }) => {
  *       const result = await api.posts.like(postId);
  *       return { success: true, likeCount: result.likes };
@@ -273,7 +309,7 @@ function toRegisteredOutputSchema(
  */
 export function useWebMCP<
   TInputSchema extends ToolInputSchema = InputSchema,
-  TOutputSchema extends JsonSchemaForInference | undefined = undefined,
+  TOutputSchema extends ToolOutputSchema | undefined = undefined,
 >(
   config: WebMCPConfig<TInputSchema, TOutputSchema>,
   deps?: DependencyList
@@ -437,6 +473,8 @@ export function useWebMCP<
       return;
     }
 
+    const resolvedOutputSchema = toRegisteredOutputSchema(outputSchema);
+
     /**
      * Handles MCP tool execution by running the tool implementation and formatting the response.
      *
@@ -457,7 +495,7 @@ export function useWebMCP<
           ],
         };
 
-        if (isObjectOutputSchema(outputSchema)) {
+        if (isObjectOutputSchema(resolvedOutputSchema)) {
           const structuredContent = toStructuredContent(result);
           if (!structuredContent) {
             throw new Error(
@@ -486,7 +524,6 @@ export function useWebMCP<
     const ownerToken = Symbol(name);
     const modelContext = window.navigator.modelContext;
     const resolvedInputSchema = toRegisteredInputSchema(inputSchema);
-    const resolvedOutputSchema = toRegisteredOutputSchema(outputSchema);
     const toolDescriptor: ToolDescriptor = {
       name,
       description,
