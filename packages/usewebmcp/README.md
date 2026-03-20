@@ -218,31 +218,49 @@ If `outputSchema` is defined, your tool implementation must return a JSON-serial
 
 Returning a non-object value (`string`, `null`, array, etc.) causes an error response from the registered MCP tool.
 
+## Conditional Registration
+
+Use the `enabled` option to conditionally skip tool registration:
+
+```tsx
+const { isAuthenticated } = useAuth();
+
+useWebMCP({
+  name: 'admin_action',
+  description: 'Perform admin action',
+  enabled: isAuthenticated, // only register when authenticated
+  execute: async () => {
+    /* ... */
+  },
+});
+```
+
+When `enabled` is `false`, the tool is not registered and the effect is a no-op. Switching to `true` registers the tool; switching back unregisters it.
+
 ## Re-Registration and Performance
 
 The tool re-registers when any of these change:
 
 - `name`
 - `description`
-- `inputSchema` reference
-- `outputSchema` reference
-- `annotations` reference
+- `inputSchema` (structurally — compared via `JSON.stringify`)
+- `outputSchema` (structurally — compared via `JSON.stringify`)
+- `annotations` (structurally — compared via `JSON.stringify`)
+- `enabled`
 - values in `deps`
+
+Inline schema objects are safe — the hook memoizes them with `JSON.stringify` so structurally identical objects don't trigger re-registration.
 
 The hook avoids re-registration when only callback references change:
 
 - `execute`
 - `handler`
+- `onStart`
 - `onSuccess`
 - `onError`
 - `formatOutput`
 
 Latest callback versions are still used at execution time.
-
-Recommendation:
-
-- Define schemas/annotations outside render or memoize them.
-- Keep `deps` primitive when possible.
 
 ## API
 
@@ -255,9 +273,11 @@ Recommendation:
 - `inputSchema?`
 - `outputSchema?`
 - `annotations?`
+- `enabled?: boolean` — skip registration when `false` (default: `true`)
 - `execute(input)` (preferred)
 - `handler(input)` (backward-compatible alias)
 - `formatOutput?(output)` (deprecated)
+- `onStart?(input)` — called before execution begins
 - `onSuccess?(result, input)`
 - `onError?(error, input)`
 

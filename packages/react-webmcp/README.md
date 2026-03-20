@@ -121,6 +121,8 @@ function ToolConsumer() {
 | `useWebMCP(config, deps?)`                      | Register a tool with full control over behavior and state |
 | `useWebMCPContext(name, description, getValue)` | Simplified hook for read-only context exposure            |
 
+`useWebMCP` config supports `enabled` (conditional registration), `onStart` (pre-execution callback), and automatic schema memoization for inline objects. See [`usewebmcp` README](../usewebmcp/README.md) for full API details.
+
 ### Client Hooks
 
 | Hook / Component    | Description                                               |
