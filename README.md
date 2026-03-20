@@ -334,21 +334,25 @@ Standalone packages: `extension-tools`, `smart-dom-reader`, `chrome-devtools-mcp
 ```bash
 git clone https://github.com/WebMCP-org/npm-packages.git
 cd npm-packages
-pnpm install
+pnpm install:workspace
 pnpm build
 ```
 
-| Command                     | What it does                      |
-| --------------------------- | --------------------------------- |
-| `pnpm build`                | Build all packages                |
-| `pnpm typecheck`            | Type-check all packages           |
-| `pnpm check`                | Lint + format (Biome)             |
-| `pnpm test:unit`            | Unit tests                        |
-| `pnpm test:e2e`             | E2E tests (Playwright)            |
-| `pnpm test`                 | All tests                         |
-| `pnpm --filter <pkg> build` | Build a single package            |
-| `pnpm --filter <pkg> test`  | Test a single package             |
-| `pnpm changeset`            | Create a changeset for versioning |
+`packages/chrome-devtools-mcp` is a vendored upstream fork with a separate install path. For normal MCP-B work, use the workspace install above. If you need to work on the fork itself, see [Vendored Upstream Forks](./docs/VENDORED_UPSTREAM_FORKS.md).
+
+| Command                            | What it does                         |
+| ---------------------------------- | ------------------------------------ |
+| `pnpm install:workspace`           | Install the MCP-B workspace only     |
+| `pnpm install:chrome-devtools-mcp` | Install the vendored fork separately |
+| `pnpm build`                       | Build all packages                   |
+| `pnpm typecheck`                   | Type-check all packages              |
+| `pnpm check`                       | Lint + format (Biome)                |
+| `pnpm test:unit`                   | Unit tests                           |
+| `pnpm test:e2e`                    | E2E tests (Playwright)               |
+| `pnpm test`                        | All tests                            |
+| `pnpm --filter <pkg> build`        | Build a single package               |
+| `pnpm --filter <pkg> test`         | Test a single package                |
+| `pnpm changeset`                   | Create a changeset for versioning    |
 
 **Prerequisites:** Node.js >= 22.12 (see `.nvmrc`), pnpm >= 10
 

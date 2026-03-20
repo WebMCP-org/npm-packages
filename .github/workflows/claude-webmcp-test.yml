@@ -51,10 +51,16 @@ jobs:
           cache: true
 
       - name: Install dependencies
-        run: vp install
+        run: pnpm install:workspace:ci
 
       - name: Build packages
         run: pnpm build
+
+      - name: Install vendored chrome-devtools-mcp dependencies
+        run: pnpm install:chrome-devtools-mcp:ci
+
+      - name: Build vendored chrome-devtools-mcp
+        run: npm --prefix packages/chrome-devtools-mcp run build
 
       - name: Setup Chrome
         uses: browser-actions/setup-chrome@4f8e94349a351df0f048634f25fec36c3c91eded # latest

@@ -118,6 +118,24 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 
 - Node.js >= 22.12 (check `.nvmrc`)
 - pnpm >= 10.0.0
+
+### Setup
+
+For normal MCP-B work, install the workspace without the vendored Chrome DevTools fork:
+
+```bash
+pnpm install:workspace
+```
+
+If you are actively changing `packages/chrome-devtools-mcp`, install it separately:
+
+```bash
+pnpm install:chrome-devtools-mcp
+npm --prefix packages/chrome-devtools-mcp run build
+```
+
+The fork boundary is documented in [docs/VENDORED_UPSTREAM_FORKS.md](./docs/VENDORED_UPSTREAM_FORKS.md).
+
 - Git
 
 For environment setup and workspace commands, see [Development](./README.md#development) in the root README.

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
@@ -23,30 +23,11 @@ const filesToRemove = [
  * the same property.
  */
 function removeConflictingGlobalDeclaration(): void {
+  const filePath = resolve(
+    projectRoot,
+    'node_modules/@paulirish/trace_engine/models/trace/ModelImpl.d.ts'
+  );
   console.log('Removing conflicting global declaration from @paulirish/trace_engine...');
-  const pnpmVirtualStore = resolve(projectRoot, '../../node_modules/.pnpm');
-  const traceEngineStoreEntry = existsSync(pnpmVirtualStore)
-    ? readdirSync(pnpmVirtualStore).find((entry) => entry.startsWith('@paulirish+trace_engine@'))
-    : undefined;
-  const candidatePaths = [
-    resolve(projectRoot, 'node_modules/@paulirish/trace_engine/models/trace/ModelImpl.d.ts'),
-    ...(traceEngineStoreEntry
-      ? [
-          resolve(
-            pnpmVirtualStore,
-            traceEngineStoreEntry,
-            'node_modules/@paulirish/trace_engine/models/trace/ModelImpl.d.ts'
-          ),
-        ]
-      : []),
-  ];
-  const filePath = candidatePaths.find((path) => existsSync(path));
-
-  if (!filePath) {
-    console.log('No trace_engine ModelImpl.d.ts found; skipping patch.');
-    return;
-  }
-
   const content = readFileSync(filePath, 'utf-8');
   // Remove the declare global block using regex
   // Matches: declare global { ... interface HTMLElementEventMap { ... } ... }
@@ -54,12 +35,6 @@ function removeConflictingGlobalDeclaration(): void {
     /declare global\s*\{\s*interface HTMLElementEventMap\s*\{[^}]*\[ModelUpdateEvent\.eventName\]:\s*ModelUpdateEvent;\s*\}\s*\}/s,
     ''
   );
-
-  if (newContent === content) {
-    console.log('No conflicting global declaration found; skipping patch.');
-    return;
-  }
-
   writeFileSync(filePath, newContent, 'utf-8');
   console.log('Successfully removed conflicting global declaration.');
 }

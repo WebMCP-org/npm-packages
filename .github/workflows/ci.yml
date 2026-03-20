@@ -37,7 +37,7 @@ jobs:
           cache: true
 
       - name: Install dependencies
-        run: vp install
+        run: pnpm install:workspace:ci
 
       - name: Run formatting checks
         run: pnpm format:check
@@ -64,7 +64,7 @@ jobs:
           cache: true
 
       - name: Install dependencies
-        run: vp install
+        run: pnpm install:workspace:ci
 
       - name: Build packages
         run: pnpm build
@@ -98,7 +98,7 @@ jobs:
           cache: true
 
       - name: Install dependencies
-        run: vp install
+        run: pnpm install:workspace:ci
 
       - name: Run @mcp-b/webmcp-types conformance checks
         run: pnpm --filter @mcp-b/webmcp-types test:conformance
@@ -122,7 +122,7 @@ jobs:
           cache: true
 
       - name: Install dependencies
-        run: vp install
+        run: pnpm install:workspace:ci
 
       - name: Build packages
         run: pnpm build
@@ -149,7 +149,7 @@ jobs:
           cache: true
 
       - name: Install dependencies
-        run: vp install
+        run: pnpm install:workspace:ci
 
       - name: Build packages
         run: pnpm build
@@ -191,7 +191,7 @@ jobs:
           cache: true
 
       - name: Install dependencies
-        run: vp install
+        run: pnpm install:workspace:ci
 
       - name: Run syncpack lint
         run: pnpm syncpack:lint
@@ -213,7 +213,7 @@ jobs:
           cache: true
 
       - name: Install dependencies
-        run: vp install
+        run: pnpm install:workspace:ci
 
       - name: Run security audit
         run: pnpm audit:ci:high
