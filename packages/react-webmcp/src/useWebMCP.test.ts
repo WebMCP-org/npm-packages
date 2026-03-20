@@ -2,12 +2,21 @@ import { initializeWebModelContext } from '@mcp-b/global';
 import type { ToolInputSchema, ToolOutputSchema } from '@mcp-b/webmcp-types';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
-import { z } from 'zod';
 
 import { useWebMCP } from './useWebMCP.js';
 
 const TEST_CHANNEL_ID = `useWebMCP-test-${Date.now()}`;
 const DEBUG_CONFIG_KEY = 'WEBMCP_DEBUG';
+
+function createValidatorOnlyStandardSchema() {
+  return {
+    '~standard': {
+      version: 1 as const,
+      vendor: 'test',
+      validate: (value: unknown) => ({ value }),
+    },
+  };
+}
 
 function parseSerializedToolResponse(result: string | null | undefined): {
   content: Array<{ type: string; text?: string }>;
@@ -124,17 +133,17 @@ describe('useWebMCP', () => {
       expect(inputSchema.properties).toHaveProperty('name');
     });
 
-    it('passes z.object inputSchema through registration and lets the runtime reject it', async () => {
+    it('passes validator-only Standard Schema inputSchema through registration and lets the runtime reject it', async () => {
       const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
 
       try {
-        const zodSchema = z.object({ username: z.string() });
+        const validatorOnlySchema = createValidatorOnlyStandardSchema();
         await expect(
           renderHook(() =>
             useWebMCP({
-              name: 'zod_like_tool',
-              description: 'Tool using z.object schema',
-              inputSchema: zodSchema,
+              name: 'validator_only_tool',
+              description: 'Tool using validator-only standard schema',
+              inputSchema: validatorOnlySchema as never,
               handler: async () => 'ok',
             })
           )
@@ -144,29 +153,26 @@ describe('useWebMCP', () => {
           name: string;
           inputSchema?: unknown;
         };
-        expect(descriptor.name).toBe('zod_like_tool');
-        expect(descriptor.inputSchema).toBe(zodSchema);
+        expect(descriptor.name).toBe('validator_only_tool');
+        expect(descriptor.inputSchema).toBe(validatorOnlySchema);
         expect(navigator.modelContextTesting?.listTools()).toHaveLength(0);
       } finally {
         registerToolSpy.mockRestore();
       }
     });
 
-    it('passes z.object outputSchema through registration and lets the runtime reject it', async () => {
+    it('passes validator-only Standard Schema outputSchema through registration and lets the runtime reject it', async () => {
       const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
 
       try {
-        const zodOutputSchema = z.object({
-          count: z.number(),
-          message: z.string(),
-        });
+        const validatorOnlySchema = createValidatorOnlyStandardSchema();
 
         await expect(
           renderHook(() =>
             useWebMCP({
-              name: 'zod_output_tool',
-              description: 'Tool using z.object output schema',
-              outputSchema: zodOutputSchema,
+              name: 'validator_only_output_tool',
+              description: 'Tool using validator-only standard output schema',
+              outputSchema: validatorOnlySchema as never,
               handler: async () => ({ count: 1, message: 'ok' }),
             })
           )
@@ -177,8 +183,8 @@ describe('useWebMCP', () => {
           outputSchema?: unknown;
         };
 
-        expect(descriptor.name).toBe('zod_output_tool');
-        expect(descriptor.outputSchema).toBe(zodOutputSchema);
+        expect(descriptor.name).toBe('validator_only_output_tool');
+        expect(descriptor.outputSchema).toBe(validatorOnlySchema);
         expect(navigator.modelContextTesting?.listTools()).toHaveLength(0);
       } finally {
         registerToolSpy.mockRestore();

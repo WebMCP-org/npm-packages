@@ -2,12 +2,21 @@ import { initializeWebModelContext } from '@mcp-b/global';
 import type { ToolInputSchema } from '@mcp-b/webmcp-types';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
-import { z } from 'zod';
 
 import { useWebMCPPrompt } from './useWebMCPPrompt.js';
 
 const TEST_CHANNEL_ID = `useWebMCPPrompt-test-${Date.now()}`;
 const DEBUG_CONFIG_KEY = 'WEBMCP_DEBUG';
+
+function createValidatorOnlyStandardSchema() {
+  return {
+    '~standard': {
+      version: 1 as const,
+      vendor: 'test',
+      validate: (value: unknown) => ({ value }),
+    },
+  };
+}
 
 function enableDebugLogging(config = '*'): () => void {
   const previous = window.localStorage.getItem(DEBUG_CONFIG_KEY);
@@ -142,16 +151,16 @@ describe('useWebMCPPrompt', () => {
       expect(prompts[0].arguments).toBeDefined();
     });
 
-    it('passes z.object argsSchema through prompt registration and lets the runtime reject it', async () => {
+    it('passes validator-only Standard Schema argsSchema through prompt registration and lets the runtime reject it', async () => {
       const registerPromptSpy = vi.spyOn(navigator.modelContext, 'registerPrompt');
 
       try {
-        const zodSchema = z.object({ code: z.string() });
+        const validatorOnlySchema = createValidatorOnlyStandardSchema();
         await expect(
           renderHook(() =>
             useWebMCPPrompt({
-              name: 'zod_args_prompt',
-              argsSchema: zodSchema as never,
+              name: 'validator_only_args_prompt',
+              argsSchema: validatorOnlySchema as never,
               get: async () => ({
                 messages: [{ role: 'user', content: { type: 'text', text: 'ok' } }],
               }),
@@ -162,7 +171,7 @@ describe('useWebMCPPrompt', () => {
         const descriptor = registerPromptSpy.mock.calls.at(-1)?.[0] as {
           argsSchema?: unknown;
         };
-        expect(descriptor.argsSchema).toBe(zodSchema);
+        expect(descriptor.argsSchema).toBe(validatorOnlySchema);
         expect(navigator.modelContext?.listPrompts()).toHaveLength(0);
       } finally {
         registerPromptSpy.mockRestore();
