@@ -1,6 +1,6 @@
 import type {
-  InferArgsFromInputSchema,
-  InferJsonSchema,
+  InferToolInputSchema,
+  InferToolOutputSchema,
   InputSchema,
   ToolInputSchema,
   ToolAnnotations,
@@ -11,28 +11,22 @@ import type {
  * Infers tool input type from either a Standard Schema or JSON Schema.
  *
  * - **Standard Schema** (Zod v4, Valibot, ArkType): extracts `~standard.types.input`
- * - **JSON Schema** (`as const`): uses `InferArgsFromInputSchema` for structural inference
+ * - **JSON Schema** (`as const`): uses `InferToolInputSchema` for structural inference
  * - **Fallback**: `Record<string, unknown>`
  *
  * @template T - The input schema type
  * @internal
  */
-export type InferToolInput<T> = T extends { readonly '~standard': { readonly types?: infer Types } }
-  ? NonNullable<Types> extends { readonly input: infer I }
-    ? I
-    : Record<string, unknown>
-  : T extends InputSchema
-    ? InferArgsFromInputSchema<T>
-    : Record<string, unknown>;
+export type InferToolInput<T> = InferToolInputSchema<T>;
 
 /**
- * Utility type to infer the output type from a JSON Schema.
+ * Utility type to infer the output type from an output schema.
  *
- * When `TOutputSchema` is a literal inferable JSON schema, this resolves to
- * `InferJsonSchema<TOutputSchema>`. When it's `undefined`,
- * it falls back to the provided `TFallback` type.
+ * - Standard Schema types resolve via `~standard.types.output`
+ * - Inferable output schemas resolve via `InferToolOutputSchema`
+ * - `undefined` falls back to `TFallback`
  *
- * @template TOutputSchema - JSON Schema for output inference
+ * @template TOutputSchema - Output schema for result inference
  * @template TFallback - Fallback type when no schema is provided
  * @internal
  */
@@ -41,13 +35,9 @@ export type InferOutput<
   TFallback = unknown,
 > = TOutputSchema extends undefined
   ? TFallback
-  : TOutputSchema extends { readonly '~standard': { readonly types?: infer Types } }
-    ? NonNullable<Types> extends { readonly output: infer TOutput }
-      ? TOutput
-      : TFallback
-    : TOutputSchema extends InputSchema
-      ? InferJsonSchema<TOutputSchema>
-      : TFallback;
+  : unknown extends InferToolOutputSchema<TOutputSchema>
+    ? TFallback
+    : InferToolOutputSchema<TOutputSchema>;
 
 /**
  * Represents the current execution state of a tool, including loading status,
@@ -170,7 +160,10 @@ interface WebMCPConfigBase<
   /**
    * Schema defining the input parameters for the tool.
    * Accepts plain JSON Schema (typically with `as const` / `satisfies`) or any Standard Schema v1
-   * library (Zod v4, Valibot, ArkType, etc.).
+   * library (Zod v4, Valibot, ArkType, etc.). MCP registration still requires JSON-exportable
+   * metadata, so validator-only Standard Schema inputs are rejected unless the runtime can derive
+   * JSON Schema export. When both validation and JSON export exist, the JSON Schema path is
+   * authoritative.
    *
    * @example JSON Schema
    * ```typescript

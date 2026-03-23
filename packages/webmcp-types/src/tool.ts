@@ -49,17 +49,36 @@ export interface ToolAnnotations {
 }
 
 /**
- * Raw tool result values accepted by execute handlers before runtime normalization.
+ * Untyped placeholder for tool results before the output schema is known.
+ * Used as the default for `TResult` in generic tool descriptor types.
  */
 export type ToolRawResult = unknown;
 
 /**
- * Tool execute return value accepted by WebMCP descriptor types.
+ * Normalized execute return type for tool handlers.
+ *
+ * If `TResult` is already a `CallToolResult` it is returned as-is.
+ * Otherwise the handler may return either a raw `TResult` value (which the
+ * runtime will wrap) or a pre-built `CallToolResult`.
+ *
+ * @template TResult - The raw result shape produced by the tool's execute function.
  */
 export type ToolExecuteResult<TResult = ToolRawResult> = TResult extends CallToolResult
   ? TResult
   : CallToolResult | TResult;
 
+/**
+ * Extension of the Standard Schema V1 protocol that adds JSON Schema export
+ * capability alongside runtime validation.
+ *
+ * Schemas that implement this interface satisfy both `StandardSchemaV1` (for
+ * runtime validation) and expose a `jsonSchema` property so the MCP server can
+ * serialize the schema for tool registration without depending on a specific
+ * validation library at build time.
+ *
+ * @template Input - TypeScript type for validated input values.
+ * @template Output - TypeScript type for validated output values (defaults to `Input`).
+ */
 export interface StandardJSONSchemaV1<Input = unknown, Output = Input> {
   readonly '~standard': {
     readonly version: 1;
@@ -78,17 +97,49 @@ export interface StandardJSONSchemaV1<Input = unknown, Output = Input> {
   };
 }
 
+/**
+ * A Standard Schema V1 object whose input and output are both
+ * `Record<string, unknown>`. Used for runtime-validated tool inputs when no
+ * JSON Schema export is required (e.g. Zod without the JSON Schema plugin).
+ */
 export type ToolInputStandardSchema = StandardSchemaV1<
   Record<string, unknown>,
   Record<string, unknown>
 >;
+
+/**
+ * A {@link StandardJSONSchemaV1} object whose input and output are both
+ * `Record<string, unknown>`. Used for tool inputs when the schema can also
+ * produce a JSON Schema for MCP serialization (e.g. Zod with the JSON Schema
+ * plugin, Valibot, ArkType).
+ */
 export type ToolInputStandardJsonSchema = StandardJSONSchemaV1<
   Record<string, unknown>,
   Record<string, unknown>
 >;
+
+/**
+ * A {@link StandardJSONSchemaV1} object used to describe tool output shape.
+ * Input/output types default to `unknown` since output schemas are not
+ * validated at runtime — they are serialized for the MCP client.
+ */
 export type ToolOutputStandardJsonSchema = StandardJSONSchemaV1;
 
+/**
+ * All schema forms accepted by `ToolDescriptor.inputSchema`.
+ *
+ * - `InputSchema` — plain JSON Schema object (MCP wire format).
+ * - `ToolInputStandardSchema` — Standard Schema V1 with runtime validation only.
+ * - `ToolInputStandardJsonSchema` — Standard Schema V1 with both runtime validation and JSON Schema export.
+ */
 export type ToolInputSchema = InputSchema | ToolInputStandardSchema | ToolInputStandardJsonSchema;
+
+/**
+ * All schema forms accepted by `ToolDescriptor.outputSchema`.
+ *
+ * - `JsonSchemaForInference` — plain JSON Schema object (MCP wire format).
+ * - `ToolOutputStandardJsonSchema` — Standard Schema V1 with JSON Schema export for serialization.
+ */
 export type ToolOutputSchema = JsonSchemaForInference | ToolOutputStandardJsonSchema;
 
 type InferStandardSchemaInput<TSchema> = TSchema extends {
@@ -107,6 +158,15 @@ type InferStandardSchemaOutput<TSchema> = TSchema extends {
     : unknown
   : never;
 
+/**
+ * Infers the TypeScript input argument type from a `ToolInputSchema`.
+ *
+ * - Standard Schema (has `~standard`): uses the schema's `types.input`.
+ * - Plain `InputSchema` (JSON Schema object): inferred via `InferArgsFromInputSchema`.
+ * - Fallback: `Record<string, unknown>`.
+ *
+ * @template TSchema - A value assignable to `ToolInputSchema`.
+ */
 export type InferToolInputSchema<TSchema> = TSchema extends {
   readonly '~standard': { readonly types?: unknown };
 }
@@ -115,6 +175,15 @@ export type InferToolInputSchema<TSchema> = TSchema extends {
     ? InferArgsFromInputSchema<TSchema>
     : Record<string, unknown>;
 
+/**
+ * Infers the TypeScript output type from a `ToolOutputSchema`.
+ *
+ * - Standard Schema (has `~standard`): uses the schema's `types.output`.
+ * - Plain `JsonSchemaForInference` (JSON Schema object): inferred via `InferJsonSchema`.
+ * - Fallback: `unknown`.
+ *
+ * @template TSchema - A value assignable to `ToolOutputSchema`.
+ */
 export type InferToolOutputSchema<TSchema> = TSchema extends {
   readonly '~standard': { readonly types?: unknown };
 }
@@ -210,7 +279,8 @@ export interface ToolDescriptor<
  * When a literal object output schema is provided, `structuredContent` is
  * narrowed to the inferred schema type for wrapped MCP responses.
  *
- * @template TOutputSchema - Optional literal JSON object schema.
+ * @template TOutputSchema - A `ToolOutputSchema` value (Standard Schema or JSON Schema object),
+ *   or `undefined` when no output schema is declared. Defaults to `undefined`.
  */
 export type ToolResultFromOutputSchema<
   TOutputSchema extends ToolOutputSchema | undefined = undefined,
@@ -223,7 +293,14 @@ export type ToolResultFromOutputSchema<
     : CallToolResult;
 
 /**
- * Execute result typing derived from an optional output schema.
+ * Execute return type derived from an optional output schema.
+ *
+ * Determines what an `execute` function may return based on the declared
+ * `outputSchema`: a raw inferred value, a full `CallToolResult`, or the union
+ * of both — matching whatever the runtime can normalize.
+ *
+ * @template TOutputSchema - A `ToolOutputSchema` value (Standard Schema or JSON Schema object),
+ *   or `undefined` when no output schema is declared. Defaults to `undefined`.
  */
 export type ToolExecuteResultFromOutputSchema<
   TOutputSchema extends ToolOutputSchema | undefined = undefined,

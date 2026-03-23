@@ -33,7 +33,6 @@ function defaultFormatOutput(output: unknown): string {
 }
 
 const TOOL_OWNER_BY_NAME = new Map<string, symbol>();
-const DEFAULT_REGISTERED_INPUT_SCHEMA: InputSchema = { type: 'object', properties: {} };
 const STANDARD_JSON_SCHEMA_TARGETS = ['draft-2020-12', 'draft-07'] as const;
 type StructuredContent = Exclude<CallToolResult['structuredContent'], undefined>;
 
@@ -45,30 +44,47 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function isInputSchema(value: unknown): value is InputSchema {
-  if (!isPlainObject(value)) {
-    return false;
+function assertRegisteredOutputSchema(
+  outputSchema: ToolOutputSchema | undefined,
+  toolName: string
+): JsonSchemaForInference | undefined {
+  if (outputSchema === undefined) {
+    return undefined;
   }
 
-  if ('type' in value && value.type !== undefined && typeof value.type !== 'string') {
-    if (!Array.isArray(value.type) || value.type.some((entry) => typeof entry !== 'string')) {
-      return false;
+  if (!isPlainObject(outputSchema) || !('~standard' in outputSchema)) {
+    return outputSchema as JsonSchemaForInference;
+  }
+
+  const standard = outputSchema['~standard'];
+  if (!isPlainObject(standard)) {
+    throw new Error(
+      `[useWebMCP] Tool "${toolName}" outputSchema must expose Standard JSON Schema for output`
+    );
+  }
+
+  const jsonSchema = standard.jsonSchema;
+  if (!isPlainObject(jsonSchema) || typeof jsonSchema.output !== 'function') {
+    throw new Error(
+      `[useWebMCP] Tool "${toolName}" outputSchema must expose Standard JSON Schema for output`
+    );
+  }
+
+  for (const target of STANDARD_JSON_SCHEMA_TARGETS) {
+    try {
+      const converted = jsonSchema.output({ target });
+      if (isPlainObject(converted)) {
+        return converted as unknown as JsonSchemaForInference;
+      }
+    } catch (error) {
+      console.warn(
+        `[useWebMCP] Standard JSON Schema conversion failed for tool "${toolName}" outputSchema with target "${target}":`,
+        error
+      );
     }
   }
 
-  if ('properties' in value && value.properties !== undefined && !isPlainObject(value.properties)) {
-    return false;
-  }
-
-  if (
-    'required' in value &&
-    value.required !== undefined &&
-    (!Array.isArray(value.required) || value.required.some((entry) => typeof entry !== 'string'))
-  ) {
-    return false;
-  }
-
-  return true;
+  throw new Error(`[useWebMCP] Failed to convert tool "${toolName}" outputSchema to JSON Schema`);
 }
 
 function isJsonValue(value: unknown): boolean {
@@ -125,74 +141,38 @@ function registerToolWithCompatibilityHandle(
   return isToolRegistrationHandle(registration) ? registration : undefined;
 }
 
-function toRegisteredInputSchema(
-  inputSchema: ToolInputSchema | undefined
-): InputSchema | undefined {
-  if (inputSchema === undefined) {
-    return undefined;
+function containsFunction(value: unknown, seen = new Set<object>()): boolean {
+  if (typeof value === 'function') {
+    return true;
   }
 
-  if (!isPlainObject(inputSchema) || !('~standard' in inputSchema)) {
-    return isInputSchema(inputSchema) ? inputSchema : DEFAULT_REGISTERED_INPUT_SCHEMA;
+  if (!isPlainObject(value) && !Array.isArray(value)) {
+    return false;
   }
 
-  const standard = inputSchema['~standard'];
-  if (!isPlainObject(standard)) {
-    return DEFAULT_REGISTERED_INPUT_SCHEMA;
+  if (seen.has(value)) {
+    return false;
   }
+  seen.add(value);
 
-  const jsonSchema = standard.jsonSchema;
-  if (!isPlainObject(jsonSchema) || typeof jsonSchema.input !== 'function') {
-    return DEFAULT_REGISTERED_INPUT_SCHEMA;
-  }
-
-  for (const target of STANDARD_JSON_SCHEMA_TARGETS) {
-    try {
-      const converted = jsonSchema.input({ target });
-      if (isInputSchema(converted)) {
-        return converted;
-      }
-    } catch {
-      // Try the next target before falling back to the default registration schema.
-    }
-  }
-
-  return DEFAULT_REGISTERED_INPUT_SCHEMA;
+  const entries = Array.isArray(value) ? value : Object.values(value);
+  return entries.some((entry) => containsFunction(entry, seen));
 }
 
-function toRegisteredOutputSchema(
-  outputSchema: ToolOutputSchema | undefined
-): JsonSchemaForInference | undefined {
-  if (outputSchema === undefined) {
+function getStructuralDependency(value: unknown): unknown {
+  if (value == null) {
     return undefined;
   }
 
-  if (!isPlainObject(outputSchema) || !('~standard' in outputSchema)) {
-    return outputSchema as JsonSchemaForInference;
+  if (containsFunction(value)) {
+    return value;
   }
 
-  const standard = outputSchema['~standard'];
-  if (!isPlainObject(standard)) {
-    return undefined;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return value;
   }
-
-  const jsonSchema = standard.jsonSchema;
-  if (!isPlainObject(jsonSchema) || typeof jsonSchema.output !== 'function') {
-    return undefined;
-  }
-
-  for (const target of STANDARD_JSON_SCHEMA_TARGETS) {
-    try {
-      const converted = jsonSchema.output({ target });
-      if (isPlainObject(converted)) {
-        return converted as unknown as JsonSchemaForInference;
-      }
-    } catch {
-      // Try the next target before giving up.
-    }
-  }
-
-  return undefined;
 }
 
 /**
@@ -208,10 +188,12 @@ function toRegisteredOutputSchema(
  * ## Schema Contract
  *
  * `inputSchema` accepts plain JSON Schema or Standard Schema objects.
+ * Registration still flows through `navigator.modelContext`, so validator-only Standard Schema
+ * inputs must be JSON-exportable or registration will throw.
  * `outputSchema` accepts plain JSON Schema or Standard JSON Schema objects.
  *
  * Defining an `outputSchema` is recommended because it provides:
- * - **Type Safety**: Handler return type is inferred from the schema
+ * - **Type Safety**: Implementation return type is inferred from the schema
  * - **MCP structuredContent**: AI models receive structured, typed data
  * - **Better AI Understanding**: Models can reason about your tool's output format
  *
@@ -340,18 +322,12 @@ export function useWebMCP<
 
   // Memoize schema/annotations keys to prevent re-registration when
   // structurally identical inline objects are passed on every render.
-  const inputSchemaKey = useMemo(
-    () => (inputSchema != null ? JSON.stringify(inputSchema) : undefined),
-    [inputSchema]
-  );
-  const outputSchemaKey = useMemo(
-    () => (outputSchema != null ? JSON.stringify(outputSchema) : undefined),
+  const inputSchemaDependency = useMemo(() => getStructuralDependency(inputSchema), [inputSchema]);
+  const outputSchemaDependency = useMemo(
+    () => getStructuralDependency(outputSchema),
     [outputSchema]
   );
-  const annotationsKey = useMemo(
-    () => (annotations != null ? JSON.stringify(annotations) : undefined),
-    [annotations]
-  );
+  const annotationsDependency = useMemo(() => getStructuralDependency(annotations), [annotations]);
 
   const [state, setState] = useState<ToolExecutionState<TOutput>>({
     isExecuting: false,
@@ -473,7 +449,7 @@ export function useWebMCP<
       return;
     }
 
-    const resolvedOutputSchema = toRegisteredOutputSchema(outputSchema);
+    const resolvedOutputSchema = assertRegisteredOutputSchema(outputSchema, name);
 
     /**
      * Handles MCP tool execution by running the tool implementation and formatting the response.
@@ -523,12 +499,11 @@ export function useWebMCP<
 
     const ownerToken = Symbol(name);
     const modelContext = window.navigator.modelContext;
-    const resolvedInputSchema = toRegisteredInputSchema(inputSchema);
     const toolDescriptor: ToolDescriptor = {
       name,
       description,
-      ...(resolvedInputSchema && { inputSchema: resolvedInputSchema }),
-      ...(resolvedOutputSchema && { outputSchema: resolvedOutputSchema }),
+      ...(inputSchema !== undefined ? { inputSchema } : {}),
+      ...(outputSchema !== undefined ? { outputSchema } : {}),
       ...(annotations && { annotations }),
       execute: mcpHandler,
     };
@@ -554,15 +529,15 @@ export function useWebMCP<
         console.warn(`[useWebMCP] Failed to unregister tool "${name}" during cleanup:`, error);
       }
     };
-    // inputSchemaKey/outputSchemaKey/annotationsKey are JSON.stringify'd memoized keys
-    // that prevent re-registration when structurally identical inline objects are passed.
+    // The dependency sentinels avoid unnecessary re-registration for plain JSON values,
+    // while function-bearing schemas fall back to identity-based tracking.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     name,
     description,
-    inputSchemaKey,
-    outputSchemaKey,
-    annotationsKey,
+    inputSchemaDependency,
+    outputSchemaDependency,
+    annotationsDependency,
     enabled,
     ...(deps ?? []),
   ]);

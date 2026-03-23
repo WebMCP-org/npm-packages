@@ -1,8 +1,8 @@
 import type { PromptMessage, ResourceContents } from '@mcp-b/webmcp-ts-sdk';
 import type {
   CallToolResult,
-  InferArgsFromInputSchema,
-  InferJsonSchema,
+  InferToolInputSchema,
+  InferToolOutputSchema,
   InputSchema,
   ToolInputSchema,
   ToolAnnotations,
@@ -20,11 +20,14 @@ export type { ToolInputSchema, ToolOutputSchema } from '@mcp-b/webmcp-types';
 
 /**
  * Union of all input schema types supported by react-webmcp.
+ * Accepts plain JSON Schema (with `as const`/`satisfies`) or any Standard Schema v1 library
+ * (Zod v4, Valibot, ArkType, etc.).
  */
 export type ReactWebMCPInputSchema = ToolInputSchema;
 
 /**
  * Union of all output schema types supported by react-webmcp.
+ * Accepts plain JSON Schema (with `as const`/`satisfies`) or a Standard JSON Schema object.
  */
 export type ReactWebMCPOutputSchema = ToolOutputSchema;
 
@@ -32,28 +35,19 @@ export type ReactWebMCPOutputSchema = ToolOutputSchema;
  * Infers handler input type from a Standard Schema or JSON Schema.
  *
  * - **Standard Schema** (Zod v4, Valibot, ArkType): extracts `~standard.types.input`
- * - **JSON Schema** (`as const`): uses `InferArgsFromInputSchema` for structural inference
+ * - **JSON Schema** (`as const`): uses `InferToolInputSchema` for structural inference
  * - **Fallback**: `Record<string, unknown>`
  *
  * @template T - The input schema type
  * @internal
  */
-export type InferToolInput<T> =
-  // Standard Schema v1 (Zod v4, Valibot, ArkType)
-  T extends { readonly '~standard': { readonly types?: infer Types } }
-    ? NonNullable<Types> extends { readonly input: infer I }
-      ? I
-      : Record<string, unknown>
-    : // JSON Schema
-      T extends InputSchema
-      ? InferArgsFromInputSchema<T>
-      : Record<string, unknown>;
+export type InferToolInput<T> = InferToolInputSchema<T>;
 
 /**
  * Utility type to infer the output type from an output schema.
  *
  * - Standard schema types resolve via `~standard.types.output`
- * - inferable JSON Schema resolves via `InferJsonSchema`
+ * - inferable output schemas resolve via `InferToolOutputSchema`
  * - `undefined` falls back to `TFallback`
  *
  * @template TOutputSchema - Output schema for result inference
@@ -65,14 +59,9 @@ export type InferOutput<
   TFallback = unknown,
 > = TOutputSchema extends undefined
   ? TFallback
-  : TOutputSchema extends { readonly '~standard': { readonly types?: infer Types } }
-    ? NonNullable<Types> extends { readonly output: infer TOutput }
-      ? TOutput
-      : TFallback
-    : // JSON Schema
-      TOutputSchema extends InputSchema
-      ? InferJsonSchema<TOutputSchema>
-      : TFallback;
+  : unknown extends InferToolOutputSchema<TOutputSchema>
+    ? TFallback
+    : InferToolOutputSchema<TOutputSchema>;
 
 /**
  * Represents the current execution state of a tool, including loading status,
@@ -177,7 +166,10 @@ export interface WebMCPConfig<
 
   /**
    * Plain JSON Schema or Standard Schema defining the input parameters for the tool.
-   * Use `as const` / `satisfies` with JSON Schema literals to preserve inference.
+   * Use `as const` / `satisfies` with JSON Schema literals to preserve inference. MCP registration
+   * still requires JSON-exportable metadata, so validator-only Standard Schema inputs are rejected
+   * unless the runtime can derive JSON Schema export. When both validation and JSON export exist,
+   * the JSON Schema path is authoritative.
    *
    * @example
    * ```typescript

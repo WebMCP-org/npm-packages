@@ -2,6 +2,7 @@ import { type Schema, Validator } from '@cfworker/json-schema';
 import type {
   InputSchema,
   JsonObject,
+  JsonSchemaForInference,
   ModelContext,
   ModelContextClient,
   ModelContextOptions,
@@ -10,9 +11,9 @@ import type {
   ModelContextTestingToolInfo,
   ModelContextToolReference,
   StandardJSONSchemaV1,
+  ToolDescriptor,
   ToolInputSchema as WebMCPToolInputSchema,
   ToolOutputSchema as WebMCPToolOutputSchema,
-  ToolDescriptor,
   ToolResponse,
 } from '@mcp-b/webmcp-types';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
@@ -35,15 +36,673 @@ export type StandardInputJsonSchema = StandardJSONSchemaV1<
   Record<string, unknown>,
   Record<string, unknown>
 >;
+/** Re-export of `ToolInputSchema` from `@mcp-b/webmcp-types`. Accepted as `inputSchema` on tool registration. */
 export type ToolInputSchema = WebMCPToolInputSchema;
+/** Re-export of `ToolOutputSchema` from `@mcp-b/webmcp-types`. Accepted as `outputSchema` on tool registration. */
 export type ToolOutputSchema = WebMCPToolOutputSchema;
 export type { StandardJSONSchemaV1 } from '@mcp-b/webmcp-types';
 export type { StandardSchemaV1 } from '@standard-schema/spec';
+
+type SchemaKind = 'input' | 'output';
 
 type StandardValidationResult = Awaited<
   ReturnType<StandardInputValidatorSchema['~standard']['validate']>
 >;
 type StandardValidationIssue = NonNullable<StandardValidationResult['issues']>[number];
+
+interface StandardProps {
+  readonly version: 1;
+  readonly validate?: ((value: unknown) => unknown) | undefined;
+  readonly jsonSchema?:
+    | {
+        readonly input?:
+          | ((options: { readonly target: string }) => Record<string, unknown>)
+          | undefined;
+        readonly output?:
+          | ((options: { readonly target: string }) => Record<string, unknown>)
+          | undefined;
+      }
+    | undefined;
+}
+
+/**
+ * The result of normalizing a tool's input schema at registration time.
+ * Contains the resolved JSON Schema and a Standard Schema validator derived from it.
+ */
+export interface NormalizedRuntimeInputSchema {
+  inputSchema: InputSchema;
+  standardValidator: StandardInputValidatorSchema;
+}
+
+/**
+ * Options that control error messages produced during schema normalization.
+ * `source` labels the caller (e.g. `'[BrowserMcpServer]'`); `descriptor` names the
+ * specific field being normalized (e.g. `'tool "foo" inputSchema'`).
+ */
+export interface RegistrationNormalizationOptions {
+  descriptor?: string;
+  source?: string;
+}
+
+/**
+ * A fully normalized tool descriptor stored in `WebMCPToolRegistry`.
+ * Extends `ToolDescriptor` with resolved `inputSchema`/`outputSchema` (plain JSON Schema)
+ * and a `standardValidator` used for runtime argument validation.
+ */
+export interface RegisteredToolDescriptor extends ToolDescriptor<
+  Record<string, unknown>,
+  unknown,
+  string
+> {
+  inputSchema: InputSchema;
+  outputSchema?: JsonSchemaForInference;
+  standardValidator: StandardInputValidatorSchema;
+}
+
+function getSourceLabel(source = '[WebMCPPolyfill]'): string {
+  return source;
+}
+
+function getDescriptor(kind: SchemaKind, descriptor: string | undefined): string {
+  return descriptor ?? (kind === 'input' ? 'inputSchema' : 'outputSchema');
+}
+
+function toRegistrationError(
+  kind: SchemaKind,
+  options: RegistrationNormalizationOptions,
+  message: string
+): Error {
+  return new Error(
+    `${getSourceLabel(options.source)} ${message.replace('{descriptor}', getDescriptor(kind, options.descriptor))}`
+  );
+}
+
+function warnStandardJsonSchemaFailure(
+  kind: SchemaKind,
+  options: RegistrationNormalizationOptions,
+  target: string,
+  error: unknown
+): void {
+  console.warn(
+    `${getSourceLabel(options.source)} Standard JSON Schema conversion failed for ${getDescriptor(kind, options.descriptor)} with target "${target}":`,
+    error
+  );
+}
+
+export function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function getStandardProps(value: unknown): StandardProps | null {
+  if (!isPlainObject(value)) {
+    return null;
+  }
+
+  const standard = value['~standard'];
+  if (!isPlainObject(standard) || standard.version !== 1) {
+    return null;
+  }
+
+  return standard as unknown as StandardProps;
+}
+
+function isStandardInputJsonSchema(value: unknown): value is StandardInputJsonSchema {
+  const standard = getStandardProps(value);
+  if (!standard || !isPlainObject(standard.jsonSchema)) {
+    return false;
+  }
+
+  return typeof standard.jsonSchema.input === 'function';
+}
+
+function hasStandardJsonSchema(
+  standard: StandardProps,
+  kind: SchemaKind
+): standard is StandardProps & {
+  readonly jsonSchema: {
+    readonly input: (options: { readonly target: string }) => Record<string, unknown>;
+    readonly output: (options: { readonly target: string }) => Record<string, unknown>;
+  };
+} {
+  if (!isPlainObject(standard.jsonSchema)) {
+    return false;
+  }
+
+  return typeof standard.jsonSchema[kind] === 'function';
+}
+
+function stripSchemaMeta(schema: unknown): unknown {
+  if (Array.isArray(schema)) {
+    return schema.map((entry) => stripSchemaMeta(entry));
+  }
+
+  if (!isPlainObject(schema)) {
+    return schema;
+  }
+
+  const next: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(schema)) {
+    if (key === '$schema') {
+      continue;
+    }
+    next[key] = stripSchemaMeta(value);
+  }
+  return next;
+}
+
+function convertStandardJsonSchema(
+  schema: unknown,
+  kind: SchemaKind,
+  options: RegistrationNormalizationOptions
+): InputSchema | JsonSchemaForInference {
+  const standard = getStandardProps(schema);
+  if (!standard || !hasStandardJsonSchema(standard, kind)) {
+    throw toRegistrationError(
+      kind,
+      options,
+      '{descriptor} must provide Standard JSON Schema export for ' + kind
+    );
+  }
+
+  for (const target of STANDARD_JSON_SCHEMA_TARGETS) {
+    try {
+      const converted = stripSchemaMeta(standard.jsonSchema[kind]({ target }));
+      if (kind === 'input') {
+        validateInputSchema(converted);
+      }
+      return converted as InputSchema | JsonSchemaForInference;
+    } catch (error) {
+      warnStandardJsonSchemaFailure(kind, options, target, error);
+    }
+  }
+
+  throw toRegistrationError(kind, options, 'Failed to convert {descriptor} to JSON Schema');
+}
+
+function validateInputSchema(schema: unknown): asserts schema is InputSchema {
+  if (!isPlainObject(schema)) {
+    throw new Error('inputSchema must be a JSON Schema object');
+  }
+
+  validateJsonSchemaNode(schema, '$');
+}
+
+function validateJsonSchemaNode(node: Record<string, unknown>, path: string): void {
+  const typeValue = node.type;
+  if (
+    typeValue !== undefined &&
+    typeof typeValue !== 'string' &&
+    !(
+      Array.isArray(typeValue) &&
+      typeValue.every((entry) => typeof entry === 'string' && entry.length > 0)
+    )
+  ) {
+    throw new Error(`Invalid JSON Schema at ${path}: "type" must be a string or string[]`);
+  }
+
+  const requiredValue = node.required;
+  if (
+    requiredValue !== undefined &&
+    !(Array.isArray(requiredValue) && requiredValue.every((entry) => typeof entry === 'string'))
+  ) {
+    throw new Error(`Invalid JSON Schema at ${path}: "required" must be an array of strings`);
+  }
+
+  const propertiesValue = node.properties;
+  if (propertiesValue !== undefined) {
+    if (!isPlainObject(propertiesValue)) {
+      throw new Error(`Invalid JSON Schema at ${path}: "properties" must be an object`);
+    }
+
+    for (const [key, value] of Object.entries(propertiesValue)) {
+      if (!isPlainObject(value)) {
+        throw new Error(`Invalid JSON Schema at ${path}.properties.${key}: expected object schema`);
+      }
+      validateJsonSchemaNode(value, `${path}.properties.${key}`);
+    }
+  }
+
+  const itemsValue = node.items;
+  if (itemsValue !== undefined) {
+    if (Array.isArray(itemsValue)) {
+      for (const [index, value] of itemsValue.entries()) {
+        if (!isPlainObject(value)) {
+          throw new Error(`Invalid JSON Schema at ${path}.items[${index}]: expected object schema`);
+        }
+        validateJsonSchemaNode(value, `${path}.items[${index}]`);
+      }
+    } else if (isPlainObject(itemsValue)) {
+      validateJsonSchemaNode(itemsValue, `${path}.items`);
+    } else {
+      throw new Error(`Invalid JSON Schema at ${path}: "items" must be an object or object[]`);
+    }
+  }
+
+  for (const keyword of ['allOf', 'anyOf', 'oneOf'] as const) {
+    const value = node[keyword];
+    if (value === undefined) {
+      continue;
+    }
+
+    if (!Array.isArray(value)) {
+      throw new Error(`Invalid JSON Schema at ${path}: "${keyword}" must be an array`);
+    }
+
+    for (const [index, entry] of value.entries()) {
+      if (!isPlainObject(entry)) {
+        throw new Error(
+          `Invalid JSON Schema at ${path}.${keyword}[${index}]: expected object schema`
+        );
+      }
+      validateJsonSchemaNode(entry, `${path}.${keyword}[${index}]`);
+    }
+  }
+
+  const notValue = node.not;
+  if (notValue !== undefined) {
+    if (!isPlainObject(notValue)) {
+      throw new Error(`Invalid JSON Schema at ${path}: "not" must be an object schema`);
+    }
+    validateJsonSchemaNode(notValue, `${path}.not`);
+  }
+
+  try {
+    JSON.stringify(node);
+  } catch {
+    throw new Error(`Invalid JSON Schema at ${path}: schema must be JSON-serializable`);
+  }
+}
+
+function createStandardValidatorFromJsonSchema(schema: InputSchema): StandardInputValidatorSchema {
+  return {
+    '~standard': {
+      version: 1,
+      vendor: '@mcp-b/webmcp-polyfill-json-schema',
+      validate(value: unknown): StandardValidationResult {
+        if (!isPlainObject(value)) {
+          return {
+            issues: [{ message: 'expected object arguments' }],
+          };
+        }
+
+        const issue = validateArgsWithSchema(value, schema);
+        if (issue) {
+          return {
+            issues: [issue],
+          };
+        }
+
+        return {
+          value,
+        };
+      },
+    },
+  };
+}
+
+function normalizeInputSchemaForRegistration(
+  inputSchema: ToolInputSchema | undefined,
+  options: RegistrationNormalizationOptions = {}
+): InputSchema | undefined {
+  if (inputSchema === undefined) {
+    return undefined;
+  }
+
+  if (isStandardInputJsonSchema(inputSchema)) {
+    return convertStandardJsonSchema(inputSchema, 'input', options) as InputSchema;
+  }
+
+  const standard = getStandardProps(inputSchema);
+  if (standard && typeof standard.validate === 'function') {
+    throw toRegistrationError(
+      'input',
+      options,
+      '{descriptor} cannot use validator-only Standard Schema. Use plain JSON Schema or Standard JSON Schema on MCP registration surfaces.'
+    );
+  }
+
+  if (standard) {
+    throw toRegistrationError(
+      'input',
+      options,
+      '{descriptor} must expose Standard JSON Schema for input'
+    );
+  }
+
+  validateInputSchema(inputSchema);
+
+  if (Object.keys(inputSchema as Record<string, unknown>).length === 0) {
+    return DEFAULT_INPUT_SCHEMA;
+  }
+
+  return inputSchema.type === undefined
+    ? ({ type: 'object', ...inputSchema } as InputSchema)
+    : inputSchema;
+}
+
+function normalizeRuntimeInputSchema(
+  inputSchema: ToolInputSchema | undefined,
+  options: RegistrationNormalizationOptions = {}
+): NormalizedRuntimeInputSchema {
+  const registrationSchema =
+    normalizeInputSchemaForRegistration(inputSchema, options) ?? DEFAULT_INPUT_SCHEMA;
+
+  return {
+    inputSchema: registrationSchema,
+    standardValidator: createStandardValidatorFromJsonSchema(registrationSchema),
+  };
+}
+
+function normalizeOutputSchemaForRegistration(
+  outputSchema: ToolOutputSchema | undefined,
+  options: RegistrationNormalizationOptions = {}
+): JsonSchemaForInference | undefined {
+  if (outputSchema === undefined) {
+    return undefined;
+  }
+
+  const standard = getStandardProps(outputSchema);
+  if (standard && hasStandardJsonSchema(standard, 'output')) {
+    return convertStandardJsonSchema(outputSchema, 'output', options) as JsonSchemaForInference;
+  }
+
+  if (standard && typeof standard.validate === 'function') {
+    throw toRegistrationError(
+      'output',
+      options,
+      '{descriptor} cannot use validator-only Standard Schema. Use plain JSON Schema or Standard JSON Schema on MCP registration surfaces.'
+    );
+  }
+
+  if (standard) {
+    throw toRegistrationError(
+      'output',
+      options,
+      '{descriptor} must expose Standard JSON Schema for output'
+    );
+  }
+
+  return stripSchemaMeta(outputSchema) as JsonSchemaForInference;
+}
+
+function normalizeAnnotations(
+  annotations: ToolDescriptor['annotations']
+): ToolDescriptor['annotations'] | undefined {
+  if (!annotations) {
+    return undefined;
+  }
+
+  return {
+    ...annotations,
+    ...(annotations.readOnlyHint === 'true'
+      ? { readOnlyHint: true }
+      : annotations.readOnlyHint === 'false'
+        ? { readOnlyHint: false }
+        : {}),
+    ...(annotations.destructiveHint === 'true'
+      ? { destructiveHint: true }
+      : annotations.destructiveHint === 'false'
+        ? { destructiveHint: false }
+        : {}),
+    ...(annotations.idempotentHint === 'true'
+      ? { idempotentHint: true }
+      : annotations.idempotentHint === 'false'
+        ? { idempotentHint: false }
+        : {}),
+    ...(annotations.openWorldHint === 'true'
+      ? { openWorldHint: true }
+      : annotations.openWorldHint === 'false'
+        ? { openWorldHint: false }
+        : {}),
+  };
+}
+
+function resolveToolNameForUnregister(nameOrTool: string | ModelContextToolReference): string {
+  if (typeof nameOrTool === 'string') {
+    return nameOrTool;
+  }
+
+  if (isPlainObject(nameOrTool) && typeof nameOrTool.name === 'string') {
+    return nameOrTool.name;
+  }
+
+  throw new TypeError(
+    "Failed to execute 'unregisterTool' on 'ModelContext': parameter 1 must be a string or an object with a string name."
+  );
+}
+
+/**
+ * Shared tool registry used by both the polyfill and `BrowserMcpServer`.
+ *
+ * Handles schema normalization (plain JSON Schema, Standard JSON Schema, Standard Schema)
+ * and maintains the authoritative map of registered tools. Extracted so higher-level
+ * wrappers can delegate tool bookkeeping without duplicating normalization logic.
+ */
+export class WebMCPToolRegistry {
+  private tools = new Map<string, RegisteredToolDescriptor>();
+  private readonly source: string;
+
+  constructor(source = '[WebMCPPolyfill]') {
+    this.source = source;
+  }
+
+  /**
+   * Replaces the entire tool set with the tools listed in `options.tools`.
+   * Any previously registered tools not present in the new list are removed.
+   */
+  provideContext(options: ModelContextOptions = {}): void {
+    const nextTools = new Map<string, RegisteredToolDescriptor>();
+
+    for (const tool of options.tools ?? []) {
+      const normalized = this.normalizeToolDescriptor(tool, nextTools);
+      nextTools.set(normalized.name, normalized);
+    }
+
+    this.tools = nextTools;
+  }
+
+  /**
+   * Removes all registered tools.
+   * @returns `true` if any tools were present before clearing, `false` otherwise.
+   */
+  clearTools(): boolean {
+    const hadTools = this.tools.size > 0;
+    this.tools.clear();
+    return hadTools;
+  }
+
+  /**
+   * Normalizes and registers a single tool.
+   * Throws if the tool name is already registered or if its schemas are invalid.
+   */
+  registerTool(tool: ToolDescriptor): RegisteredToolDescriptor {
+    const normalized = this.normalizeToolDescriptor(tool, this.tools);
+    this.tools.set(normalized.name, normalized);
+    return normalized;
+  }
+
+  /**
+   * Removes a tool by name or tool reference.
+   * @returns `true` if the tool was found and removed, `false` if it was not registered.
+   */
+  unregisterTool(nameOrTool: string | ModelContextToolReference): boolean {
+    return this.tools.delete(resolveToolNameForUnregister(nameOrTool));
+  }
+
+  /** Returns the normalized descriptor for the named tool, or `undefined` if not registered. */
+  getTool(name: string): RegisteredToolDescriptor | undefined {
+    return this.tools.get(name);
+  }
+
+  /** Returns a snapshot of all registered tools serialized as `ModelContextTestingToolInfo[]`. */
+  listToolInfos(): ModelContextTestingToolInfo[] {
+    return [...this.tools.values()].map((tool) => {
+      let inputSchema: string;
+      try {
+        inputSchema = JSON.stringify(tool.inputSchema ?? DEFAULT_INPUT_SCHEMA);
+      } catch {
+        inputSchema = JSON.stringify(DEFAULT_INPUT_SCHEMA);
+      }
+
+      return {
+        name: tool.name,
+        description: tool.description,
+        inputSchema,
+      };
+    });
+  }
+
+  /**
+   * Normalizes a prompt's `argsSchema` for registration (same pipeline as tool `inputSchema`,
+   * but errors are attributed to the named prompt rather than a tool).
+   */
+  normalizePromptArgsSchema(
+    promptName: string,
+    argsSchema: ToolInputSchema | undefined
+  ): InputSchema | undefined {
+    return normalizeInputSchemaForRegistration(argsSchema, {
+      source: this.source,
+      descriptor: `prompt "${promptName}" argsSchema`,
+    });
+  }
+
+  private normalizeToolDescriptor(
+    tool: ToolDescriptor,
+    existing: Map<string, RegisteredToolDescriptor>
+  ): RegisteredToolDescriptor {
+    if (!tool || typeof tool !== 'object') {
+      throw new TypeError('registerTool(tool) requires a tool object');
+    }
+
+    if (typeof tool.name !== 'string' || tool.name.length === 0) {
+      throw new TypeError('Tool "name" must be a non-empty string');
+    }
+
+    if (typeof tool.description !== 'string' || tool.description.length === 0) {
+      throw new TypeError('Tool "description" must be a non-empty string');
+    }
+
+    if (typeof tool.execute !== 'function') {
+      throw new TypeError('Tool "execute" must be a function');
+    }
+
+    if (existing.has(tool.name)) {
+      throw new Error(`Tool already registered: ${tool.name}`);
+    }
+
+    const normalizedInputSchema = normalizeRuntimeInputSchema(tool.inputSchema, {
+      source: this.source,
+      descriptor: `tool "${tool.name}" inputSchema`,
+    });
+    const normalizedOutputSchema = normalizeOutputSchemaForRegistration(tool.outputSchema, {
+      source: this.source,
+      descriptor: `tool "${tool.name}" outputSchema`,
+    });
+    const normalizedAnnotations = normalizeAnnotations(tool.annotations);
+    const {
+      annotations: _rawAnnotations,
+      inputSchema: _rawInputSchema,
+      outputSchema: _rawOutputSchema,
+      ...toolRest
+    } = tool;
+
+    return {
+      ...toolRest,
+      ...(normalizedAnnotations ? { annotations: normalizedAnnotations } : {}),
+      inputSchema: normalizedInputSchema.inputSchema,
+      ...(normalizedOutputSchema !== undefined ? { outputSchema: normalizedOutputSchema } : {}),
+      standardValidator: normalizedInputSchema.standardValidator,
+    };
+  }
+}
+
+export function validateArgsWithSchema(
+  args: Record<string, unknown>,
+  schema: InputSchema
+): StandardValidationIssue | null {
+  const validator = new Validator(schema as Schema, '2020-12', true);
+  const result = validator.validate(args);
+
+  if (result.valid) {
+    return null;
+  }
+
+  const error = result.errors[result.errors.length - 1];
+  if (!error) {
+    return { message: 'Input validation failed' };
+  }
+
+  return { message: error.error };
+}
+
+function isJsonPrimitive(value: unknown): value is string | number | boolean | null {
+  return (
+    value === null ||
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  );
+}
+
+function isJsonValue(value: unknown): boolean {
+  if (isJsonPrimitive(value)) {
+    return Number.isFinite(value as number) || typeof value !== 'number';
+  }
+
+  if (Array.isArray(value)) {
+    return value.every((entry) => isJsonValue(entry));
+  }
+
+  if (!isPlainObject(value)) {
+    return false;
+  }
+
+  return Object.values(value).every((entry) => isJsonValue(entry));
+}
+
+function toStructuredContent(value: unknown): JsonObject | undefined {
+  if (!isPlainObject(value) || !isJsonValue(value)) {
+    return undefined;
+  }
+
+  return value as JsonObject;
+}
+
+function isCallToolResult(value: unknown): value is ToolResponse {
+  return isPlainObject(value) && Array.isArray(value.content);
+}
+
+function serializeTextContent(value: unknown): string {
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  try {
+    const candidate = JSON.stringify(value);
+    return candidate ?? String(value);
+  } catch {
+    return String(value);
+  }
+}
+
+/**
+ * Coerces an arbitrary tool return value into a `ToolResponse`.
+ * If the value is already a `ToolResponse` (has a `content` array) it is returned as-is.
+ * Otherwise the value is serialized to text and wrapped in a single `text` content block.
+ */
+export function normalizeToolResponse(value: unknown): ToolResponse {
+  if (isCallToolResult(value)) {
+    return value;
+  }
+
+  const structuredContent = toStructuredContent(value);
+
+  return {
+    content: [{ type: 'text', text: serializeTextContent(value) }],
+    ...(structuredContent ? { structuredContent } : {}),
+    isError: false,
+  };
+}
 
 interface PolyfillModelContext extends ModelContext {
   [POLYFILL_MARKER_PROPERTY]: true;
@@ -52,11 +711,6 @@ interface PolyfillModelContext extends ModelContext {
 interface PolyfillToolDescriptor extends ToolDescriptor<Record<string, unknown>, unknown, string> {
   inputSchema: InputSchema;
   [STANDARD_VALIDATOR_SYMBOL]: StandardInputValidatorSchema;
-}
-
-interface NormalizedInputSchema {
-  inputSchema: InputSchema;
-  standardValidator: StandardInputValidatorSchema;
 }
 
 interface InstallState {
@@ -95,41 +749,33 @@ export interface WebMCPPolyfillInitOptions {
 }
 
 class StrictWebMCPContext {
-  private tools = new Map<string, PolyfillToolDescriptor>();
+  private toolRegistry = new WebMCPToolRegistry('[WebMCPPolyfill]');
   private testingShim: PolyfillTestingShim | null = null;
   private provideContextDeprecationWarned = false;
   private clearContextDeprecationWarned = false;
 
   provideContext(options: ModelContextOptions = {}): void {
     this.warnProvideContextDeprecationOnce();
-
-    const nextTools = new Map<string, PolyfillToolDescriptor>();
-
-    for (const tool of options.tools ?? []) {
-      const normalized = normalizeToolDescriptor(tool, nextTools);
-      nextTools.set(normalized.name, normalized);
-    }
-
-    this.tools = nextTools;
+    this.toolRegistry.provideContext(options);
     this.notifyToolsChanged();
   }
 
   clearContext(): void {
     this.warnClearContextDeprecationOnce();
-
-    this.tools.clear();
+    if (this.toolRegistry.clearTools()) {
+      this.notifyToolsChanged();
+      return;
+    }
     this.notifyToolsChanged();
   }
 
   registerTool(tool: ToolDescriptor): void {
-    const normalized = normalizeToolDescriptor(tool, this.tools);
-    this.tools.set(normalized.name, normalized);
+    this.toolRegistry.registerTool(tool);
     this.notifyToolsChanged();
   }
 
   unregisterTool(nameOrTool: string | ModelContextToolReference): void {
-    const name = getToolNameForUnregister(nameOrTool);
-    const removed = this.tools.delete(name);
+    const removed = this.toolRegistry.unregisterTool(nameOrTool);
     if (removed) {
       this.notifyToolsChanged();
     }
@@ -144,15 +790,7 @@ class StrictWebMCPContext {
 
   /** @internal Used by PolyfillTestingShim */
   getToolInfos(): ModelContextTestingToolInfo[] {
-    return [...this.tools.values()].map((tool) => {
-      let inputSchema: string;
-      try {
-        inputSchema = JSON.stringify(tool.inputSchema ?? { type: 'object' });
-      } catch {
-        inputSchema = '{"type":"object"}';
-      }
-      return { name: tool.name, description: tool.description, inputSchema };
-    });
+    return this.toolRegistry.listToolInfos();
   }
 
   /** @internal Used by PolyfillTestingShim */
@@ -165,7 +803,7 @@ class StrictWebMCPContext {
       throw createUnknownError(TOOL_CANCELLED_MESSAGE);
     }
 
-    const tool = this.tools.get(toolName);
+    const tool = this.getRegisteredTool(toolName);
     if (!tool) {
       throw createUnknownError(`Tool not found: ${toolName}`);
     }
@@ -212,6 +850,18 @@ class StrictWebMCPContext {
     queueMicrotask(() => {
       this.testingShim?.dispatchToolChange();
     });
+  }
+
+  private getRegisteredTool(name: string): PolyfillToolDescriptor | undefined {
+    const tool = this.toolRegistry.getTool(name);
+    if (!tool) {
+      return undefined;
+    }
+
+    return {
+      ...tool,
+      [STANDARD_VALIDATOR_SYMBOL]: tool.standardValidator,
+    };
   }
 
   private warnProvideContextDeprecationOnce(): void {
@@ -330,315 +980,6 @@ function parseInputArgsJson(inputArgsJson: string): Record<string, unknown> {
   return parsed as Record<string, unknown>;
 }
 
-function getToolNameForUnregister(nameOrTool: string | ModelContextToolReference): string {
-  if (typeof nameOrTool === 'string') {
-    return nameOrTool;
-  }
-
-  if (isPlainObject(nameOrTool) && typeof nameOrTool.name === 'string') {
-    return nameOrTool.name;
-  }
-
-  throw new TypeError(
-    "Failed to execute 'unregisterTool' on 'ModelContext': parameter 1 must be a string or an object with a string name."
-  );
-}
-
-export function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function getStandardProps(value: unknown): Record<string, unknown> | null {
-  if (!isPlainObject(value)) {
-    return null;
-  }
-
-  const standard = value['~standard'];
-  if (!isPlainObject(standard)) {
-    return null;
-  }
-
-  return standard;
-}
-
-function isStandardInputValidatorSchema(value: unknown): value is StandardInputValidatorSchema {
-  const standard = getStandardProps(value);
-  return Boolean(standard && standard.version === 1 && typeof standard.validate === 'function');
-}
-
-function isStandardInputJsonSchema(value: unknown): value is StandardInputJsonSchema {
-  const standard = getStandardProps(value);
-  if (!standard || standard.version !== 1 || !isPlainObject(standard.jsonSchema)) {
-    return false;
-  }
-
-  return typeof standard.jsonSchema.input === 'function';
-}
-
-function createStandardValidatorFromJsonSchema(schema: InputSchema): StandardInputValidatorSchema {
-  return {
-    '~standard': {
-      version: 1,
-      vendor: '@mcp-b/webmcp-polyfill-json-schema',
-      validate(value: unknown): StandardValidationResult {
-        if (!isPlainObject(value)) {
-          return {
-            issues: [{ message: 'expected object arguments' }],
-          };
-        }
-
-        const issue = validateArgsWithSchema(value, schema);
-        if (issue) {
-          return {
-            issues: [issue],
-          };
-        }
-
-        return {
-          value,
-        };
-      },
-    },
-  };
-}
-
-function convertStandardInputSchema(schema: StandardInputJsonSchema): InputSchema {
-  for (const target of STANDARD_JSON_SCHEMA_TARGETS) {
-    try {
-      const converted = schema['~standard'].jsonSchema.input({ target });
-      validateInputSchema(converted);
-      return converted;
-    } catch (error) {
-      console.warn(
-        `[WebMCPPolyfill] Standard JSON Schema conversion failed for target "${target}":`,
-        error
-      );
-    }
-  }
-
-  throw new Error('Failed to convert Standard JSON Schema inputSchema to a JSON Schema object');
-}
-
-function normalizeInputSchema(inputSchema: ToolInputSchema | undefined): NormalizedInputSchema {
-  if (inputSchema === undefined) {
-    const normalized = DEFAULT_INPUT_SCHEMA;
-    return {
-      inputSchema: normalized,
-      standardValidator: createStandardValidatorFromJsonSchema(normalized),
-    };
-  }
-
-  if (isStandardInputJsonSchema(inputSchema)) {
-    // Prefer JSON conversion for parity across JSON and Standard Schema inputs.
-    const converted = convertStandardInputSchema(inputSchema);
-    return {
-      inputSchema: converted,
-      standardValidator: createStandardValidatorFromJsonSchema(converted),
-    };
-  }
-
-  if (isStandardInputValidatorSchema(inputSchema)) {
-    return {
-      inputSchema: DEFAULT_INPUT_SCHEMA,
-      standardValidator: inputSchema,
-    };
-  }
-
-  validateInputSchema(inputSchema);
-
-  // Empty {} is valid JSON Schema but lacks type:"object" required by MCP.
-  if (Object.keys(inputSchema as Record<string, unknown>).length === 0) {
-    return {
-      inputSchema: DEFAULT_INPUT_SCHEMA,
-      standardValidator: createStandardValidatorFromJsonSchema(DEFAULT_INPUT_SCHEMA),
-    };
-  }
-
-  const normalizedSchema =
-    inputSchema.type === undefined
-      ? ({ type: 'object', ...inputSchema } as InputSchema)
-      : inputSchema;
-  return {
-    inputSchema: normalizedSchema,
-    standardValidator: createStandardValidatorFromJsonSchema(normalizedSchema),
-  };
-}
-
-function validateInputSchema(schema: unknown): asserts schema is InputSchema {
-  if (!isPlainObject(schema)) {
-    throw new Error('inputSchema must be a JSON Schema object');
-  }
-
-  validateJsonSchemaNode(schema, '$');
-}
-
-function validateJsonSchemaNode(node: Record<string, unknown>, path: string): void {
-  const typeValue = node.type;
-  if (
-    typeValue !== undefined &&
-    typeof typeValue !== 'string' &&
-    !(
-      Array.isArray(typeValue) &&
-      typeValue.every((entry) => typeof entry === 'string' && entry.length > 0)
-    )
-  ) {
-    throw new Error(`Invalid JSON Schema at ${path}: "type" must be a string or string[]`);
-  }
-
-  const requiredValue = node.required;
-  if (
-    requiredValue !== undefined &&
-    !(Array.isArray(requiredValue) && requiredValue.every((entry) => typeof entry === 'string'))
-  ) {
-    throw new Error(`Invalid JSON Schema at ${path}: "required" must be an array of strings`);
-  }
-
-  const propertiesValue = node.properties;
-  if (propertiesValue !== undefined) {
-    if (!isPlainObject(propertiesValue)) {
-      throw new Error(`Invalid JSON Schema at ${path}: "properties" must be an object`);
-    }
-
-    for (const [key, value] of Object.entries(propertiesValue)) {
-      if (!isPlainObject(value)) {
-        throw new Error(`Invalid JSON Schema at ${path}.properties.${key}: expected object schema`);
-      }
-      validateJsonSchemaNode(value, `${path}.properties.${key}`);
-    }
-  }
-
-  const itemsValue = node.items;
-  if (itemsValue !== undefined) {
-    if (Array.isArray(itemsValue)) {
-      for (const [index, value] of itemsValue.entries()) {
-        if (!isPlainObject(value)) {
-          throw new Error(`Invalid JSON Schema at ${path}.items[${index}]: expected object schema`);
-        }
-        validateJsonSchemaNode(value, `${path}.items[${index}]`);
-      }
-    } else if (isPlainObject(itemsValue)) {
-      validateJsonSchemaNode(itemsValue, `${path}.items`);
-    } else {
-      throw new Error(`Invalid JSON Schema at ${path}: "items" must be an object or object[]`);
-    }
-  }
-
-  for (const keyword of ['allOf', 'anyOf', 'oneOf'] as const) {
-    const value = node[keyword];
-    if (value === undefined) {
-      continue;
-    }
-
-    if (!Array.isArray(value)) {
-      throw new Error(`Invalid JSON Schema at ${path}: "${keyword}" must be an array`);
-    }
-
-    for (const [index, entry] of value.entries()) {
-      if (!isPlainObject(entry)) {
-        throw new Error(
-          `Invalid JSON Schema at ${path}.${keyword}[${index}]: expected object schema`
-        );
-      }
-      validateJsonSchemaNode(entry, `${path}.${keyword}[${index}]`);
-    }
-  }
-
-  const notValue = node.not;
-  if (notValue !== undefined) {
-    if (!isPlainObject(notValue)) {
-      throw new Error(`Invalid JSON Schema at ${path}: "not" must be an object schema`);
-    }
-    validateJsonSchemaNode(notValue, `${path}.not`);
-  }
-
-  try {
-    JSON.stringify(node);
-  } catch {
-    throw new Error(`Invalid JSON Schema at ${path}: schema must be JSON-serializable`);
-  }
-}
-
-function normalizeToolDescriptor(
-  tool: ToolDescriptor,
-  existing: Map<string, PolyfillToolDescriptor>
-): PolyfillToolDescriptor {
-  if (!tool || typeof tool !== 'object') {
-    throw new TypeError('registerTool(tool) requires a tool object');
-  }
-
-  if (typeof tool.name !== 'string' || tool.name.length === 0) {
-    throw new TypeError('Tool "name" must be a non-empty string');
-  }
-
-  if (typeof tool.description !== 'string' || tool.description.length === 0) {
-    throw new TypeError('Tool "description" must be a non-empty string');
-  }
-
-  if (typeof tool.execute !== 'function') {
-    throw new TypeError('Tool "execute" must be a function');
-  }
-
-  if (existing.has(tool.name)) {
-    throw new Error(`Tool already registered: ${tool.name}`);
-  }
-
-  const normalizedInputSchema = normalizeInputSchema(tool.inputSchema);
-
-  const annotations = tool.annotations;
-  const normalizedAnnotations = annotations
-    ? {
-        ...annotations,
-        ...(annotations.readOnlyHint === 'true'
-          ? { readOnlyHint: true }
-          : annotations.readOnlyHint === 'false'
-            ? { readOnlyHint: false }
-            : {}),
-        ...(annotations.destructiveHint === 'true'
-          ? { destructiveHint: true }
-          : annotations.destructiveHint === 'false'
-            ? { destructiveHint: false }
-            : {}),
-        ...(annotations.idempotentHint === 'true'
-          ? { idempotentHint: true }
-          : annotations.idempotentHint === 'false'
-            ? { idempotentHint: false }
-            : {}),
-        ...(annotations.openWorldHint === 'true'
-          ? { openWorldHint: true }
-          : annotations.openWorldHint === 'false'
-            ? { openWorldHint: false }
-            : {}),
-      }
-    : undefined;
-
-  return {
-    ...tool,
-    ...(normalizedAnnotations ? { annotations: normalizedAnnotations } : {}),
-    inputSchema: normalizedInputSchema.inputSchema,
-    [STANDARD_VALIDATOR_SYMBOL]: normalizedInputSchema.standardValidator,
-  };
-}
-
-export function validateArgsWithSchema(
-  args: Record<string, unknown>,
-  schema: InputSchema
-): StandardValidationIssue | null {
-  const validator = new Validator(schema as Schema, '2020-12', true);
-  const result = validator.validate(args);
-
-  if (result.valid) {
-    return null;
-  }
-
-  // Use the deepest (last) error for the most specific message.
-  const error = result.errors[result.errors.length - 1];
-  if (!error) {
-    return { message: 'Input validation failed' };
-  }
-
-  return { message: error.error };
-}
-
 function formatStandardIssuePath(path: StandardValidationIssue['path']) {
   if (!path || path.length === 0) {
     return null;
@@ -697,75 +1038,6 @@ async function validateArgsForTool(
   tool: PolyfillToolDescriptor
 ): Promise<string | null> {
   return validateArgsWithStandardSchema(args, tool[STANDARD_VALIDATOR_SYMBOL]);
-}
-
-function isCallToolResult(value: unknown): value is ToolResponse {
-  return isPlainObject(value) && Array.isArray(value.content);
-}
-
-function isJsonPrimitive(value: unknown): value is string | number | boolean | null {
-  return (
-    value === null ||
-    typeof value === 'string' ||
-    typeof value === 'number' ||
-    typeof value === 'boolean'
-  );
-}
-
-function isJsonValue(value: unknown): boolean {
-  if (isJsonPrimitive(value)) {
-    return Number.isFinite(value as number) || typeof value !== 'number';
-  }
-
-  if (Array.isArray(value)) {
-    return value.every((entry) => isJsonValue(entry));
-  }
-
-  if (!isPlainObject(value)) {
-    return false;
-  }
-
-  return Object.values(value).every((entry) => isJsonValue(entry));
-}
-
-function toStructuredContent(value: unknown): JsonObject | undefined {
-  if (!isPlainObject(value) || !isJsonValue(value)) {
-    return undefined;
-  }
-
-  return value as JsonObject;
-}
-
-function serializeTextContent(value: unknown): string {
-  if (typeof value === 'string') {
-    return value;
-  }
-
-  try {
-    const candidate = JSON.stringify(value);
-    return candidate ?? String(value);
-  } catch {
-    return String(value);
-  }
-}
-
-function normalizeToolResponse(value: unknown): ToolResponse {
-  if (isCallToolResult(value)) {
-    return value;
-  }
-
-  const structuredContent = toStructuredContent(value);
-
-  return {
-    content: [
-      {
-        type: 'text',
-        text: serializeTextContent(value),
-      },
-    ],
-    ...(structuredContent ? { structuredContent } : {}),
-    isError: false,
-  };
 }
 
 function getFirstTextBlock(result: ToolResponse): string | null {
