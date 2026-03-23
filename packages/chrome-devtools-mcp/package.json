@@ -6,15 +6,13 @@
   "bugs": {
     "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },
+  "license": "Apache-2.0",
+  "author": "Google LLC",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/WebMCP-org/npm-packages.git",
     "directory": "packages/chrome-devtools-mcp"
   },
-  "license": "Apache-2.0",
-  "author": "Google LLC",
-  "type": "module",
-  "main": "./build/src/index.js",
   "bin": {
     "chrome-devtools": "./build/src/bin/chrome-devtools.js",
     "chrome-devtools-mcp": "./build/src/bin/chrome-devtools-mcp.js"
@@ -24,6 +22,12 @@
     "LICENSE",
     "!*.tsbuildinfo"
   ],
+  "type": "module",
+  "main": "./build/src/index.js",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "scripts": {
     "build": "npm run clean && tsc && node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/post-build.ts",
     "bundle": "npm run clean && npm run build && rollup -c rollup.config.mjs && node -e \"require('fs').rmSync('build/node_modules', {recursive: true, force: true})\" && node --experimental-strip-types scripts/append-lighthouse-notices.ts",
@@ -87,10 +91,6 @@
   },
   "engines": {
     "node": "^20.19.0 || ^22.12.0 || >=23"
-  },
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
   },
   "mcpName": "@mcp-b/chrome-devtools-mcp",
   "upstream": {
