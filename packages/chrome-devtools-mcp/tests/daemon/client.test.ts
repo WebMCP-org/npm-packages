@@ -103,5 +103,22 @@ describe('daemon client', () => {
       const response = await handleResponse(unsupportedContentResponse, 'md');
       assert.ok(response.includes('.png'));
     });
+
+    it('supports text resources', async () => {
+      const resourceResponse = {
+        content: [
+          {
+            type: 'resource' as const,
+            resource: {
+              uri: 'file:///tmp/webmcp.txt',
+              mimeType: 'text/plain',
+              text: 'resource body',
+            },
+          },
+        ],
+        structuredContent: {},
+      };
+      assert.strictEqual(await handleResponse(resourceResponse, 'md'), 'resource body');
+    });
   });
 });

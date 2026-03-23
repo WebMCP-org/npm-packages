@@ -15,6 +15,7 @@ import { UncaughtError } from './PageCollector.js';
 import { DevTools } from './third_party/index.js';
 import type {
   ConsoleMessage,
+  EmbeddedResource,
   ImageContent,
   Page,
   ResourceType,
@@ -55,7 +56,9 @@ export class McpResponse implements Response {
   #attachedTraceInsight?: TraceInsightData;
   #attachedLighthouseResult?: LighthouseData;
   #textResponseLines: string[] = [];
+  #mcpContent: Array<TextContent | ImageContent | EmbeddedResource> = [];
   #images: ImageContentData[] = [];
+  #isError = false;
   #networkRequestsOptions?: {
     include: boolean;
     pagination?: PaginationOptions;
@@ -192,6 +195,14 @@ export class McpResponse implements Response {
     this.#attachedLighthouseResult = result;
   }
 
+  appendMcpContent(value: TextContent | ImageContent | EmbeddedResource): void {
+    this.#mcpContent.push(value);
+  }
+
+  setToolResultError(value: boolean): void {
+    this.#isError = value;
+  }
+
   get includePages(): boolean {
     return this.#includePages;
   }
@@ -244,6 +255,10 @@ export class McpResponse implements Response {
     return this.#images;
   }
 
+  get isError(): boolean {
+    return this.#isError;
+  }
+
   get snapshotParams(): SnapshotParams | undefined {
     return this.#snapshotParams;
   }
@@ -252,7 +267,7 @@ export class McpResponse implements Response {
     toolName: string,
     context: McpContext
   ): Promise<{
-    content: Array<TextContent | ImageContent>;
+    content: Array<TextContent | ImageContent | EmbeddedResource>;
     structuredContent: object;
   }> {
     if (this.#includePages) {
@@ -453,7 +468,10 @@ export class McpResponse implements Response {
       extensions?: InstalledExtension[];
       lighthouseResult?: LighthouseData;
     }
-  ): { content: Array<TextContent | ImageContent>; structuredContent: object } {
+  ): {
+    content: Array<TextContent | ImageContent | EmbeddedResource>;
+    structuredContent: object;
+  } {
     const structuredContent: {
       snapshot?: object;
       snapshotFilePath?: string;
@@ -734,10 +752,15 @@ Call ${handleDialog.name} to handle it before continuing.`);
       }
     }
 
-    const text: TextContent = {
-      type: 'text',
-      text: response.join('\n'),
-    };
+    const textBlocks: TextContent[] =
+      response.length || !this.#mcpContent.length
+        ? [
+            {
+              type: 'text',
+              text: response.join('\n'),
+            },
+          ]
+        : [];
     const images: ImageContent[] = this.#images.map((imageData) => {
       return {
         type: 'image',
@@ -745,8 +768,14 @@ Call ${handleDialog.name} to handle it before continuing.`);
       } as const;
     });
 
+    const content: Array<TextContent | ImageContent | EmbeddedResource> = [
+      ...textBlocks,
+      ...this.#mcpContent,
+      ...images,
+    ];
+
     return {
-      content: [text, ...images],
+      content,
       structuredContent,
     };
   }

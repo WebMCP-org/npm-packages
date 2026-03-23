@@ -8,10 +8,13 @@ import type { ParsedArguments } from '../bin/chrome-devtools-mcp-cli-options.js'
 import type { McpPage } from '../McpPage.js';
 import { zod } from '../third_party/index.js';
 import type {
+  EmbeddedResource,
   Dialog,
   ElementHandle,
+  ImageContent,
   Page,
   ScreenRecorder,
+  TextContent,
   Viewport,
 } from '../third_party/index.js';
 import type { InsightName, TraceResult } from '../trace-processing/parse.js';
@@ -85,6 +88,8 @@ export interface DevToolsData {
 
 export interface Response {
   appendResponseLine(value: string): void;
+  appendMcpContent(value: TextContent | ImageContent | EmbeddedResource): void;
+  setToolResultError(value: boolean): void;
   setIncludePages(value: boolean): void;
   setIncludeNetworkRequests(
     value: boolean,
@@ -165,6 +170,8 @@ export type Context = Readonly<{
   listExtensions(): InstalledExtension[];
   getExtension(id: string): InstalledExtension | undefined;
   getSelectedMcpPage(): McpPage;
+  getPages(): Page[];
+  getPageId(page: Page): number | undefined;
   getExtensionServiceWorkers(): ExtensionServiceWorker[];
   getExtensionServiceWorkerId(extensionServiceWorker: ExtensionServiceWorker): string | undefined;
 }>;

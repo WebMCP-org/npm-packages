@@ -1,6 +1,6 @@
 <!-- AUTO GENERATED DO NOT EDIT - run 'npm run gen' to update-->
 
-# Chrome DevTools MCP Tool Reference (~6940 cl100k_base tokens)
+# Chrome DevTools MCP Tool Reference (~7422 cl100k_base tokens)
 
 - **[Input automation](#input-automation)** (9 tools)
   - [`click`](#click)
@@ -30,11 +30,13 @@
 - **[Network](#network)** (2 tools)
   - [`get_network_request`](#get_network_request)
   - [`list_network_requests`](#list_network_requests)
-- **[Debugging](#debugging)** (6 tools)
+- **[Debugging](#debugging)** (8 tools)
+  - [`call_webmcp_tool`](#call_webmcp_tool)
   - [`evaluate_script`](#evaluate_script)
   - [`get_console_message`](#get_console_message)
   - [`lighthouse_audit`](#lighthouse_audit)
   - [`list_console_messages`](#list_console_messages)
+  - [`list_webmcp_tools`](#list_webmcp_tools)
   - [`take_screenshot`](#take_screenshot)
   - [`take_snapshot`](#take_snapshot)
 
@@ -315,6 +317,18 @@
 
 ## Debugging
 
+### `call_webmcp_tool`
+
+**Description:** Call a WebMCP tool exposed by the selected page or a specific pageId.
+
+**Parameters:**
+
+- **name** (string) **(required)**: The WebMCP tool name to invoke.
+- **arguments** (unknown) _(optional)_: Tool arguments. Defaults to an empty object.
+- **pageId** (number) _(optional)_: Targets a specific page by ID. Defaults to the selected page.
+
+---
+
 ### `evaluate_script`
 
 **Description:** Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON,
@@ -368,6 +382,19 @@ so returned values have to be JSON-serializable.
 - **pageIdx** (integer) _(optional)_: Page number to return (0-based). When omitted, returns the first page.
 - **pageSize** (integer) _(optional)_: Maximum number of messages to return. When omitted, returns all requests.
 - **types** (array) _(optional)_: Filter messages to only return messages of the specified resource types. When omitted or empty, returns all messages.
+
+---
+
+### `list_webmcp_tools`
+
+**Description:** List WebMCP tools exposed by the selected page, a specific pageId, or across all open pages. Supports compact summaries and glob filtering.
+
+**Parameters:**
+
+- **allPages** (boolean) _(optional)_: If true, search across all open pages instead of only the selected page.
+- **pageId** (number) _(optional)_: Targets a specific page by ID. Defaults to the selected page.
+- **pattern** (string) _(optional)_: Optional glob pattern to filter tool names, for example "list\__" or "_\_entity".
+- **summary** (boolean) _(optional)_: If true, omit input schemas and return compact tool summaries.
 
 ---
 

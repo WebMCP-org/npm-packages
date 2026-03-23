@@ -13,8 +13,6 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { executablePath } from 'puppeteer';
 
 import type { ToolDefinition } from '../src/tools/ToolDefinition';
-
-import type { ToolDefinition } from '../src/tools/ToolDefinition';
 import { serverHooks } from './server.js';
 import { registerRouteAwareWebMCPFixture } from './webmcp-fixture.js';
 

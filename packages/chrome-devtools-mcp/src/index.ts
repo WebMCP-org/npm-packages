@@ -119,7 +119,10 @@ export async function createMcpServer(
     ) {
       return;
     }
-    if (tool.annotations.category === ToolCategory.EXTENSIONS && !serverArgs.categoryExtensions) {
+    if (
+      tool.annotations.category === ToolCategory.EXTENSIONS &&
+      serverArgs.categoryExtensions === false
+    ) {
       return;
     }
     if (tool.annotations.conditions?.includes('computerVision') && !serverArgs.experimentalVision) {
@@ -191,6 +194,9 @@ export async function createMcpServer(
           } = {
             content,
           };
+          if (response.isError) {
+            result.isError = true;
+          }
           success = true;
           if (serverArgs.experimentalStructuredContent) {
             result.structuredContent = structuredContent as Record<string, unknown>;

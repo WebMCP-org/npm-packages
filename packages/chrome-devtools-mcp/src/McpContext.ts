@@ -10,12 +10,8 @@ import path from 'node:path';
 import type { TargetUniverse } from './DevtoolsUtils.js';
 import { UniverseManager } from './DevtoolsUtils.js';
 import { McpPage } from './McpPage.js';
-import {
-  NetworkCollector,
-  ConsoleCollector,
-  type ListenerMap,
-  type UncaughtError,
-} from './PageCollector.js';
+import type { ListenerMap, UncaughtError } from './PageCollector.js';
+import { NetworkCollector, ConsoleCollector } from './PageCollector.js';
 import type { DevTools } from './third_party/index.js';
 import type {
   Browser,
@@ -45,6 +41,13 @@ import type {
 import { ExtensionRegistry, type InstalledExtension } from './utils/ExtensionRegistry.js';
 import { saveTemporaryFile } from './utils/files.js';
 import { WaitForHelper } from './WaitForHelper.js';
+
+export type {
+  EmulationSettings,
+  GeolocationOptions,
+  TextSnapshot,
+  TextSnapshotNode,
+} from './types.js';
 
 interface McpContextOptions {
   // Whether the DevTools windows are exposed as pages for debugging of DevTools.
@@ -610,16 +613,9 @@ export class McpContext implements Context {
           return;
         }
 
-        // Prior to Chrome 144.0.7559.59, the command fails,
-        // Some Electron apps still use older version
-        // Fall back to not exposing DevTools at all.
-        try {
-          if (await page.hasDevTools()) {
-            mcpPage.devToolsPage = await page.openDevTools();
-          } else {
-            mcpPage.devToolsPage = undefined;
-          }
-        } catch {
+        if (await page.hasDevTools()) {
+          mcpPage.devToolsPage = await page.openDevTools();
+        } else {
           mcpPage.devToolsPage = undefined;
         }
       })
