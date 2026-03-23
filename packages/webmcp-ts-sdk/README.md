@@ -181,7 +181,7 @@ server.registerTool(
 );
 ```
 
-`BrowserMcpServer` registration surfaces accept plain JSON Schema and Standard JSON Schema. Validator-only Standard Schema objects are valid for inference and validation layers, but tool and prompt registration must be able to export JSON Schema for listing, mirroring, and MCP transport registration.
+`BrowserMcpServer` accepts plain JSON Schema, Standard Schema, and Standard JSON Schema authoring shapes for `inputSchema`. Tool and prompt registration still must produce JSON Schema metadata for listing, mirroring, and MCP transport registration, so validator-only Standard Schema inputs are rejected unless the runtime can derive JSON export. When a schema exposes both `~standard.validate(...)` and JSON Schema export, the JSON Schema path is authoritative.
 
 ## Architecture
 

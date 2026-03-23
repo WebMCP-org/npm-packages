@@ -179,7 +179,7 @@ navigator.modelContext.provideContext({
 
 Registers a single tool. The tool name must be unique - throws if a tool with the same name already exists. `@mcp-b/global` still returns a deprecated compatibility handle with `unregister()` so existing MCP-B integrations do not break, even though current Chromium returns `undefined`.
 
-At runtime, MCP-B registration surfaces accept plain JSON Schema and Standard JSON Schema. Validator-only Standard Schema objects remain useful for validation and type inference, but `registerTool()` and other MCP transport-facing APIs must be able to export JSON Schema for listing and mirroring.
+At runtime, MCP-B registration surfaces accept plain JSON Schema, Standard Schema, and Standard JSON Schema authoring shapes. Registration still requires JSON-exportable metadata for listing, mirroring, and MCP transport surfaces, so validator-only Standard Schema objects are rejected unless the runtime can derive JSON Schema export. When a schema exposes both `~standard.validate(...)` and JSON Schema export, the JSON Schema path is authoritative for validation parity.
 
 ```typescript
 const registration = navigator.modelContext.registerTool({
@@ -245,14 +245,14 @@ const result = await navigator.modelContext.callTool({
 
 ### Tool Descriptor
 
-| Property       | Type                                      | Required | Description                                                |
-| -------------- | ----------------------------------------- | -------- | ---------------------------------------------------------- |
-| `name`         | `string`                                  | Yes      | Unique identifier for the tool                             |
-| `description`  | `string`                                  | Yes      | Natural language description of what the tool does         |
-| `inputSchema`  | `JSON Schema \| Standard JSON Schema`     | No       | Input schema used for registration, listing, and transport |
-| `outputSchema` | `JSON Schema \| Standard JSON Schema`     | No       | Output payload schema for structured responses             |
-| `annotations`  | `ToolAnnotations`                         | No       | Hints about tool behavior for LLM planners                 |
-| `execute`      | `(args, client) => Promise<ToolResponse>` | Yes      | Async function implementing the tool logic                 |
+| Property       | Type                                                     | Required | Description                                                                          |
+| -------------- | -------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------ |
+| `name`         | `string`                                                 | Yes      | Unique identifier for the tool                                                       |
+| `description`  | `string`                                                 | Yes      | Natural language description of what the tool does                                   |
+| `inputSchema`  | `JSON Schema \| Standard Schema \| Standard JSON Schema` | No       | Input schema authoring surface; registration still requires JSON-exportable metadata |
+| `outputSchema` | `JSON Schema \| Standard JSON Schema`                    | No       | Output payload schema for structured responses                                       |
+| `annotations`  | `ToolAnnotations`                                        | No       | Hints about tool behavior for LLM planners                                           |
+| `execute`      | `(args, client) => Promise<ToolResponse>`                | Yes      | Async function implementing the tool logic                                           |
 
 ### Tool Response Format
 

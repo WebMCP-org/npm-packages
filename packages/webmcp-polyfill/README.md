@@ -189,16 +189,17 @@ If you want `callTool(...)` / extension-style runtime methods on `navigator.mode
 
 ## Input Schema Support
 
-`inputSchema` accepts:
+`inputSchema` authoring accepts:
 
 - Plain JSON Schema objects (`InputSchema`)
-- Standard Schema v1 validator objects (`~standard.validate(...)`)
+- Standard Schema v1 objects
 - Standard JSON Schema v1 objects (`~standard.jsonSchema.input(...)`)
 
 Notes:
 
+- Registration surfaces still require JSON-exportable metadata. Validator-only Standard Schema objects are rejected when they cannot export JSON Schema for listing and transport registration.
 - Standard JSON Schema conversion is attempted with targets `draft-2020-12`, then `draft-07`.
-- When both Standard validator and Standard JSON Schema are present, JSON conversion is preferred for validation parity.
+- When both `~standard.validate(...)` and JSON Schema export are present, JSON conversion is preferred for validation parity and stable error shapes.
 
 ## Optional Testing Shim
 

@@ -132,6 +132,8 @@ Both paths run the same underlying tool logic and update the hook state.
 - JSON Schema literals (`as const`) via `InferArgsFromInputSchema`
 - Standard Schema v1 input typing (for example Zod v4 / Valibot / ArkType) via `~standard.types.input`
 
+Registration still flows through `navigator.modelContext.registerTool(...)`, so input schemas on MCP registration surfaces must remain JSON-exportable. Validator-only Standard Schema objects are rejected by the runtime unless JSON Schema metadata can be derived. When a schema exposes both `~standard.validate(...)` and JSON Schema export, the runtime validates through the JSON Schema path for parity with listing and transport metadata.
+
 When you author object schemas as plain JSON Schema literals, TypeScript inference follows JSON Schema semantics:
 
 - properties are optional unless they appear in `required`
@@ -260,13 +262,13 @@ The tool re-registers when any of these change:
 
 - `name`
 - `description`
-- `inputSchema` (structurally — compared via `JSON.stringify`)
-- `outputSchema` (structurally — compared via `JSON.stringify`)
-- `annotations` (structurally — compared via `JSON.stringify`)
+- `inputSchema` (structurally for plain JSON data; function-bearing schemas fall back to identity)
+- `outputSchema` (structurally for plain JSON data; function-bearing schemas fall back to identity)
+- `annotations` (structurally when JSON-serializable)
 - `enabled`
 - values in `deps`
 
-Inline schema objects are safe — the hook memoizes them with `JSON.stringify` so structurally identical objects don't trigger re-registration.
+Inline JSON schema literals are safe — structurally identical JSON values do not trigger re-registration. Function-bearing schemas such as Standard Schema objects should still be hoisted or memoized so identity stays stable.
 
 The hook avoids re-registration when only callback references change:
 

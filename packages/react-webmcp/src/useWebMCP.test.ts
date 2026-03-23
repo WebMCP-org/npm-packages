@@ -161,7 +161,7 @@ describe('useWebMCP', () => {
       }
     });
 
-    it('passes validator-only Standard Schema outputSchema through registration and lets the runtime reject it', async () => {
+    it('rejects validator-only Standard Schema outputSchema before registration', async () => {
       const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
 
       try {
@@ -176,15 +176,9 @@ describe('useWebMCP', () => {
               handler: async () => ({ count: 1, message: 'ok' }),
             })
           )
-        ).rejects.toThrow(/validator-only Standard Schema/i);
+        ).rejects.toThrow(/must expose Standard JSON Schema for output/i);
 
-        const descriptor = registerToolSpy.mock.calls.at(-1)?.[0] as {
-          name: string;
-          outputSchema?: unknown;
-        };
-
-        expect(descriptor.name).toBe('validator_only_output_tool');
-        expect(descriptor.outputSchema).toBe(validatorOnlySchema);
+        expect(registerToolSpy).not.toHaveBeenCalled();
         expect(navigator.modelContextTesting?.listTools()).toHaveLength(0);
       } finally {
         registerToolSpy.mockRestore();
@@ -205,6 +199,83 @@ describe('useWebMCP', () => {
       unmount();
 
       expect(navigator.modelContextTesting?.listTools()).toHaveLength(0);
+    });
+  });
+
+  describe('enabled option', () => {
+    it('should not register tool when enabled is false', async () => {
+      const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
+
+      try {
+        const initialCallCount = registerToolSpy.mock.calls.length;
+
+        await renderHook(() =>
+          useWebMCP({
+            name: 'disabled_tool',
+            description: 'Should not register',
+            enabled: false,
+            handler: async () => 'result',
+          })
+        );
+
+        expect(registerToolSpy.mock.calls.length).toBe(initialCallCount);
+      } finally {
+        registerToolSpy.mockRestore();
+      }
+    });
+
+    it('should register tool when enabled switches from false to true', async () => {
+      const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
+
+      try {
+        const { rerender } = await renderHook(
+          ({ enabled }) =>
+            useWebMCP({
+              name: 'toggle_enabled_tool',
+              description: 'Test',
+              enabled,
+              handler: async () => 'result',
+            }),
+          { initialProps: { enabled: false } }
+        );
+
+        const callCountAfterMount = registerToolSpy.mock.calls.length;
+
+        await rerender({ enabled: true });
+
+        expect(registerToolSpy.mock.calls.length).toBeGreaterThan(callCountAfterMount);
+      } finally {
+        registerToolSpy.mockRestore();
+      }
+    });
+  });
+
+  describe('onStart callback', () => {
+    it('should call onStart before execution', async () => {
+      const onStart = vi.fn();
+      const callOrder: string[] = [];
+
+      const { result, act } = await renderHook(() =>
+        useWebMCP({
+          name: 'onstart_tool',
+          description: 'Test',
+          handler: async (input) => {
+            callOrder.push('handler');
+            return `done: ${JSON.stringify(input)}`;
+          },
+          onStart: (input) => {
+            callOrder.push('onStart');
+            onStart(input);
+          },
+        })
+      );
+
+      await act(async () => {
+        await result.current.execute({ key: 'test' });
+      });
+
+      expect(onStart).toHaveBeenCalledWith({ key: 'test' });
+      expect(callOrder).toEqual(['onStart', 'handler']);
     });
   });
 

@@ -123,7 +123,7 @@ function ToolConsumer() {
 | `useWebMCP(config, deps?)`                      | Register a tool with full control over behavior and state |
 | `useWebMCPContext(name, description, getValue)` | Simplified hook for read-only context exposure            |
 
-`useWebMCP` config supports `enabled` (conditional registration), `onStart` (pre-execution callback), and automatic schema memoization for inline objects. See [`usewebmcp` README](../usewebmcp/README.md) for full API details.
+`useWebMCP` config supports `enabled` (conditional registration), `onStart` (pre-execution callback), and automatic schema memoization for JSON-serializable inline objects. Function-bearing schemas should still be hoisted or memoized. See [`usewebmcp` README](../usewebmcp/README.md) for full API details.
 
 ### Client Hooks
 
@@ -137,8 +137,10 @@ function ToolConsumer() {
 Provider hooks accept:
 
 - plain JSON Schema objects
-- `StandardSchemaV1` validators for input typing/validation
+- `StandardSchemaV1` schemas for input typing/validation
 - `StandardJSONSchemaV1` objects for JSON Schema export surfaces
+
+Registration still flows through `navigator.modelContext`, so MCP registration surfaces require JSON-exportable metadata. Validator-only Standard Schema inputs are rejected unless the runtime can derive JSON Schema export. When both `~standard.validate(...)` and JSON Schema export exist, the JSON Schema path is authoritative for validation parity.
 
 Zod remains a supported authoring option through `z.object(...)` and the Standard Schema interfaces it exposes. Zod 3 field-map shorthand is not supported.
 

@@ -24,11 +24,7 @@ Using `.mcp.json` to debug while using a client:
     "chrome-devtools": {
       "type": "stdio",
       "command": "npx",
-      "args": [
-        "chrome-devtools-mcp@latest",
-        "--log-file",
-        "/path/to/chrome-devtools-mcp.log"
-      ],
+      "args": ["chrome-devtools-mcp@latest", "--log-file", "/path/to/chrome-devtools-mcp.log"],
       "env": {
         "DEBUG": "*"
       }

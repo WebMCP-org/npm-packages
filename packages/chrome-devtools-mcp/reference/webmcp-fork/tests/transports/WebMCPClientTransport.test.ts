@@ -5,13 +5,13 @@
  */
 
 import assert from 'node:assert';
-import {describe, it} from 'node:test';
+import { describe, it } from 'node:test';
 
-import {Client} from '@modelcontextprotocol/sdk/client/index.js';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 
-import {WebMCPClientTransport} from '../../src/transports/WebMCPClientTransport.js';
-import {serverHooks} from '../server.js';
-import {withBrowser} from '../utils.js';
+import { WebMCPClientTransport } from '../../src/transports/WebMCPClientTransport.js';
+import { serverHooks } from '../server.js';
+import { withBrowser } from '../utils.js';
 
 type WebMcpPageOptions = {
   includeModelContext?: boolean;
@@ -27,8 +27,8 @@ const DEFAULT_TOOLS = [
     inputSchema: {
       type: 'object',
       properties: {
-        a: {type: 'number', description: 'First number'},
-        b: {type: 'number', description: 'Second number'},
+        a: { type: 'number', description: 'First number' },
+        b: { type: 'number', description: 'Second number' },
       },
       required: ['a', 'b'],
     },
@@ -177,14 +177,11 @@ function createClient() {
     },
     {
       capabilities: {},
-    },
+    }
   );
 }
 
-async function cleanup(
-  client: Client,
-  transport: WebMCPClientTransport,
-): Promise<void> {
+async function cleanup(client: Client, transport: WebMCPClientTransport): Promise<void> {
   try {
     await client.close();
   } catch {
@@ -198,11 +195,7 @@ async function cleanup(
   }
 }
 
-async function withTimeout<T>(
-  promise: Promise<T>,
-  ms: number,
-  message: string,
-): Promise<T> {
+async function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
   let timer: NodeJS.Timeout | undefined;
   const timeout = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(new Error(message)), ms);
@@ -226,7 +219,7 @@ describe('WebMCPClientTransport (client edge cases)', () => {
     await withBrowser(async (_browser, page) => {
       await page.goto(server.getRoute('/webmcp-ready'));
 
-      const transport = new WebMCPClientTransport({page});
+      const transport = new WebMCPClientTransport({ page });
       const client = createClient();
 
       try {
@@ -238,10 +231,10 @@ describe('WebMCPClientTransport (client edge cases)', () => {
 
         const result = await client.callTool({
           name: 'test_add',
-          arguments: {a: 2, b: 3},
+          arguments: { a: 2, b: 3 },
         });
         assert.deepStrictEqual(result, {
-          content: [{type: 'text', text: '5'}],
+          content: [{ type: 'text', text: '5' }],
         });
       } finally {
         await cleanup(client, transport);
@@ -255,14 +248,11 @@ describe('WebMCPClientTransport (client edge cases)', () => {
     await withBrowser(async (_browser, page) => {
       await page.goto(server.getRoute('/no-webmcp'));
 
-      const transport = new WebMCPClientTransport({page});
+      const transport = new WebMCPClientTransport({ page });
       const client = createClient();
 
       try {
-        await assert.rejects(
-          client.connect(transport),
-          /WebMCP not detected/,
-        );
+        await assert.rejects(client.connect(transport), /WebMCP not detected/);
       } finally {
         await cleanup(client, transport);
       }
@@ -270,10 +260,7 @@ describe('WebMCPClientTransport (client edge cases)', () => {
   });
 
   it('connects when requireWebMCP is false even without modelContext', async () => {
-    server.addHtmlRoute(
-      '/webmcp-no-modelcontext',
-      buildWebMcpPage({includeModelContext: false}),
-    );
+    server.addHtmlRoute('/webmcp-no-modelcontext', buildWebMcpPage({ includeModelContext: false }));
 
     await withBrowser(async (_browser, page) => {
       await page.goto(server.getRoute('/webmcp-no-modelcontext'));
@@ -295,10 +282,7 @@ describe('WebMCPClientTransport (client edge cases)', () => {
   });
 
   it('times out when server never responds to ready check', async () => {
-    server.addHtmlRoute(
-      '/webmcp-no-ready',
-      buildWebMcpPage({respondReady: false}),
-    );
+    server.addHtmlRoute('/webmcp-no-ready', buildWebMcpPage({ respondReady: false }));
 
     await withBrowser(async (_browser, page) => {
       await page.goto(server.getRoute('/webmcp-no-ready'));
@@ -310,10 +294,7 @@ describe('WebMCPClientTransport (client edge cases)', () => {
       const client = createClient();
 
       try {
-        await assert.rejects(
-          client.connect(transport),
-          /did not respond within 100ms/,
-        );
+        await assert.rejects(client.connect(transport), /did not respond within 100ms/);
         assert.strictEqual(transport.isClosed(), true);
       } finally {
         await cleanup(client, transport);
@@ -322,10 +303,7 @@ describe('WebMCPClientTransport (client edge cases)', () => {
   });
 
   it('rejects connect when navigation happens during handshake', async () => {
-    server.addHtmlRoute(
-      '/webmcp-delayed-ready',
-      buildWebMcpPage({readyDelayMs: 500}),
-    );
+    server.addHtmlRoute('/webmcp-delayed-ready', buildWebMcpPage({ readyDelayMs: 500 }));
     server.addHtmlRoute('/blank', BLANK_PAGE);
 
     await withBrowser(async (_browser, page) => {
@@ -337,7 +315,7 @@ describe('WebMCPClientTransport (client edge cases)', () => {
       });
       const client = createClient();
 
-      const closePromise = new Promise<void>(resolve => {
+      const closePromise = new Promise<void>((resolve) => {
         transport.onclose = () => resolve();
       });
 
@@ -345,11 +323,9 @@ describe('WebMCPClientTransport (client edge cases)', () => {
         const connectPromise = client.connect(transport);
         connectPromise.catch(() => undefined);
         await page.waitForFunction(() => {
-          return Boolean(
-            (window as unknown as {__mcpBridge?: unknown}).__mcpBridge,
-          );
+          return Boolean((window as unknown as { __mcpBridge?: unknown }).__mcpBridge);
         });
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise((resolve) => setTimeout(resolve, 100));
         await page.goto(server.getRoute('/blank'));
 
         await closePromise;
@@ -368,10 +344,10 @@ describe('WebMCPClientTransport (client edge cases)', () => {
     await withBrowser(async (_browser, page) => {
       await page.goto(server.getRoute('/webmcp-ready-2'));
 
-      const transport = new WebMCPClientTransport({page});
+      const transport = new WebMCPClientTransport({ page });
       const client = createClient();
 
-      const closePromise = new Promise<void>(resolve => {
+      const closePromise = new Promise<void>((resolve) => {
         transport.onclose = () => resolve();
       });
 
@@ -391,19 +367,16 @@ describe('WebMCPClientTransport (client edge cases)', () => {
   });
 
   it('emits onerror when server signals stopped', async () => {
-    server.addHtmlRoute(
-      '/webmcp-stopped',
-      buildWebMcpPage({sendServerStoppedAfterMs: 150}),
-    );
+    server.addHtmlRoute('/webmcp-stopped', buildWebMcpPage({ sendServerStoppedAfterMs: 150 }));
 
     await withBrowser(async (_browser, page) => {
       await page.goto(server.getRoute('/webmcp-stopped'));
 
-      const transport = new WebMCPClientTransport({page});
+      const transport = new WebMCPClientTransport({ page });
       const client = createClient();
 
-      const errorPromise = new Promise<Error>(resolve => {
-        transport.onerror = err => resolve(err);
+      const errorPromise = new Promise<Error>((resolve) => {
+        transport.onerror = (err) => resolve(err);
       });
 
       try {
@@ -411,7 +384,7 @@ describe('WebMCPClientTransport (client edge cases)', () => {
         const error = await withTimeout(
           errorPromise,
           1000,
-          'Timed out waiting for server stopped error',
+          'Timed out waiting for server stopped error'
         );
         assert.match(error.message, /server stopped/);
       } finally {

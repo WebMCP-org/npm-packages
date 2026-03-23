@@ -32,17 +32,17 @@ function useWebMCP<
 
 #### Configuration Options
 
-| Option         | Type                          | Required | Description                                          |
-| -------------- | ----------------------------- | -------- | ---------------------------------------------------- |
-| `name`         | `string`                      | Yes      | Unique tool identifier (e.g., 'posts_like')          |
-| `description`  | `string`                      | Yes      | Human-readable description for AI                    |
-| `inputSchema`  | `ToolInputSchema`             | -        | Plain JSON Schema or Standard Schema input contract  |
-| `outputSchema` | `ToolOutputSchema`            | -        | JSON-exportable output schema for structured results |
-| `annotations`  | `ToolAnnotations`             | -        | Metadata hints for the AI                            |
-| `handler`      | `(input) => Promise<TOutput>` | Yes      | Function that executes the tool                      |
-| `formatOutput` | `(output) => string`          | -        | Custom output formatter                              |
-| `onSuccess`    | `(result, input) => void`     | -        | Success callback                                     |
-| `onError`      | `(error, input) => void`      | -        | Error handler callback                               |
+| Option         | Type                          | Required | Description                                                                                                   |
+| -------------- | ----------------------------- | -------- | ------------------------------------------------------------------------------------------------------------- |
+| `name`         | `string`                      | Yes      | Unique tool identifier (e.g., 'posts_like')                                                                   |
+| `description`  | `string`                      | Yes      | Human-readable description for AI                                                                             |
+| `inputSchema`  | `ToolInputSchema`             | -        | Plain JSON Schema or Standard Schema authoring contract; registration still requires JSON-exportable metadata |
+| `outputSchema` | `ToolOutputSchema`            | -        | JSON-exportable output schema for structured results                                                          |
+| `annotations`  | `ToolAnnotations`             | -        | Metadata hints for the AI                                                                                     |
+| `handler`      | `(input) => Promise<TOutput>` | Yes      | Function that executes the tool                                                                               |
+| `formatOutput` | `(output) => string`          | -        | Custom output formatter                                                                                       |
+| `onSuccess`    | `(result, input) => void`     | -        | Success callback                                                                                              |
+| `onError`      | `(error, input) => void`      | -        | Error handler callback                                                                                        |
 
 #### Exact object inference with JSON Schema
 
@@ -56,7 +56,7 @@ This means a schema like `{ type: 'object', properties: { key: { type: 'string' 
 
 #### Memoization and `deps` (important)
 
-`useWebMCP` uses reference equality to decide when to re-register a tool. Inline objects/arrays/functions can cause constant re-registration.
+`useWebMCP` does not blindly use reference equality for every config field. Plain JSON-serializable `inputSchema`, `outputSchema`, and `annotations` are tracked structurally, while function-bearing schemas fall back to identity-based tracking.
 
 Bad:
 
@@ -86,7 +86,7 @@ useWebMCP(
 );
 ```
 
-`deps` behaves like `useEffect` dependencies (reference comparison). Prefer primitive values or memoized objects to avoid unnecessary re-registrations.
+`deps` still behaves like `useEffect` dependencies (reference comparison). Prefer primitive values or memoized objects there to avoid unnecessary re-registrations.
 
 `handler` is stored in a ref to avoid re-registration when it changes. If you memoize `handler` with stale dependencies, you'll still capture stale values.
 

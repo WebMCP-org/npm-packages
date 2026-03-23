@@ -155,7 +155,9 @@ describe('WebMCP runtime contract (real DevTools transport)', () => {
         assert.deepStrictEqual(initialNames, ['always_fail', 'echo', 'sum']);
 
         await page.evaluate(() => {
-          (window as Window & { __WEBMCP_E2E__?: { resetInvocations: () => void } }).__WEBMCP_E2E__?.resetInvocations();
+          (
+            window as Window & { __WEBMCP_E2E__?: { resetInvocations: () => void } }
+          ).__WEBMCP_E2E__?.resetInvocations();
         });
 
         const sumResult = await client.callTool({
@@ -168,7 +170,12 @@ describe('WebMCP runtime contract (real DevTools transport)', () => {
           () =>
             (
               window as Window & {
-                __WEBMCP_E2E__?: { readInvocations: () => Array<{ name: string; arguments: Record<string, unknown> }> };
+                __WEBMCP_E2E__?: {
+                  readInvocations: () => Array<{
+                    name: string;
+                    arguments: Record<string, unknown>;
+                  }>;
+                };
               }
             ).__WEBMCP_E2E__?.readInvocations() ?? []
         );
@@ -230,10 +237,11 @@ describe('WebMCP runtime contract (real DevTools transport)', () => {
         await initialClient.connect(initialTransport);
 
         const initialTools = await initialClient.listTools();
-        assert.deepStrictEqual(
-          initialTools.tools.map((tool) => tool.name).sort(),
-          ['always_fail', 'echo', 'sum']
-        );
+        assert.deepStrictEqual(initialTools.tools.map((tool) => tool.name).sort(), [
+          'always_fail',
+          'echo',
+          'sum',
+        ]);
 
         const initialClose = new Promise<void>((resolve) => {
           initialTransport.onclose = () => resolve();
@@ -255,10 +263,11 @@ describe('WebMCP runtime contract (real DevTools transport)', () => {
         await reconnectedClient.connect(reconnectedTransport);
 
         const reloadedTools = await reconnectedClient.listTools();
-        assert.deepStrictEqual(
-          reloadedTools.tools.map((tool) => tool.name).sort(),
-          ['always_fail', 'echo', 'sum']
-        );
+        assert.deepStrictEqual(reloadedTools.tools.map((tool) => tool.name).sort(), [
+          'always_fail',
+          'echo',
+          'sum',
+        ]);
 
         const echoResult = await reconnectedClient.callTool({
           name: 'echo',

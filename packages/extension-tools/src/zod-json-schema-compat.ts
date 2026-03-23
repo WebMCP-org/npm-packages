@@ -28,5 +28,9 @@ export function zodSchemaToJsonSchemaCompat(
   schema: z.ZodTypeAny,
   _name?: string
 ): JsonSchemaObject {
+  if (!(schema instanceof z.ZodType)) {
+    throw new TypeError('zodSchemaToJsonSchemaCompat expected a Zod v4 schema instance');
+  }
+
   return stripSchemaMeta(z.toJSONSchema(schema) as JsonSchemaObject);
 }

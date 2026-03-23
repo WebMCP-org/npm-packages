@@ -2,7 +2,9 @@
 
 ## Goal
 
-`BrowserMcpServer` is the MCP-B runtime layer that normalizes JSON-exportable schemas before registration reaches:
+`BrowserMcpServer` is the MCP-B SDK-facing registration surface, but the canonical normalization logic now lives in `@mcp-b/webmcp-polyfill`.
+
+`BrowserMcpServer` delegates JSON-exportable schema normalization before registration reaches:
 
 - the wrapped native or polyfilled `navigator.modelContext`
 - the parent MCP TypeScript SDK server
@@ -26,8 +28,8 @@ The result was inconsistent runtime behavior and blurry boundaries between valid
 
 When `BrowserMcpServer.registerTool(tool)` is called:
 
-1. `normalizeToolDescriptorSchemas(tool)` runs first.
-2. `normalizeSchemaForRegistration(...)` checks `inputSchema` and `outputSchema`.
+1. `WebMCPToolRegistry.registerTool(tool)` runs first.
+2. The delegated polyfill runtime checks `inputSchema` and `outputSchema`.
 3. If a schema is:
    - plain JSON Schema, it is passed through
    - `StandardJSONSchemaV1`, it is exported via `~standard.jsonSchema.input/output(...)`
@@ -40,14 +42,14 @@ When `BrowserMcpServer.registerTool(tool)` is called:
 
 `registerPrompt(...)` uses the same idea for `argsSchema`:
 
-1. normalize JSON-exportable schema if present
+1. normalize JSON-exportable schema if present through the delegated polyfill runtime
 2. convert to transport JSON Schema
 3. store that schema locally for prompt validation and listing
 4. avoid giving mutable plain JSON Schema back to the parent SDK path without transport normalization
 
 ## Detection Rules
 
-The runtime helper in [`schema-utils.ts`](./src/schema-utils.ts) uses three simple checks:
+The delegated polyfill runtime uses three simple checks:
 
 - plain JSON Schema objects: pass through
 - `StandardJSONSchemaV1`: export to JSON Schema using `draft-2020-12`, then `draft-07`

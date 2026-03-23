@@ -5,11 +5,11 @@
  */
 
 import assert from 'node:assert';
-import {describe, it} from 'node:test';
+import { describe, it } from 'node:test';
 
-import {listWebMCPTools} from '../../src/tools/webmcp.js';
-import {serverHooks} from '../server.js';
-import {withMcpContext} from '../utils.js';
+import { listWebMCPTools } from '../../src/tools/webmcp.js';
+import { serverHooks } from '../server.js';
+import { withMcpContext } from '../utils.js';
 
 /**
  * A minimal mock of @mcp-b/global's TabServerTransport behavior.
@@ -178,15 +178,15 @@ describe('webmcp tools', () => {
     it('shows message when no tools registered', async () => {
       await withMcpContext(
         async (response, context) => {
-          await listWebMCPTools.handler({params: {}}, response, context);
+          await listWebMCPTools.handler({ params: {} }, response, context);
 
           const output = response.responseLines.join('\n');
           assert.ok(
             output.includes('No WebMCP tools registered'),
-            'Should indicate no tools registered',
+            'Should indicate no tools registered'
           );
         },
-        {withToolHub: true},
+        { withToolHub: true }
       );
     });
 
@@ -201,7 +201,7 @@ describe('webmcp tools', () => {
           // Wait for page to initialize
           await page.waitForFunction(() => {
             return (
-              typeof (window as {navigator: {modelContext?: unknown}}).navigator
+              typeof (window as { navigator: { modelContext?: unknown } }).navigator
                 .modelContext !== 'undefined'
             );
           });
@@ -211,7 +211,7 @@ describe('webmcp tools', () => {
           assert.ok(result.connected, 'Should connect to WebMCP');
 
           // Now list_webmcp_tools should show the registered tools as JSON
-          await listWebMCPTools.handler({params: {}}, response, context);
+          await listWebMCPTools.handler({ params: {} }, response, context);
 
           const output = response.responseLines.join('\n');
           const parsed = JSON.parse(output);
@@ -220,13 +220,17 @@ describe('webmcp tools', () => {
           assert.strictEqual(parsed.tools.length, 3, 'Should have 3 tools');
 
           // Check tool structure
-          const testAdd = parsed.tools.find((t: {name: string}) => t.name === 'test_add');
+          const testAdd = parsed.tools.find((t: { name: string }) => t.name === 'test_add');
           assert.ok(testAdd, 'Should include test_add');
           assert.ok(testAdd.description.includes('Add two numbers'), 'Should have description');
           assert.ok(testAdd.inputSchema, 'Should include inputSchema');
-          assert.deepStrictEqual(testAdd.inputSchema.required, ['a', 'b'], 'Should have required params');
+          assert.deepStrictEqual(
+            testAdd.inputSchema.required,
+            ['a', 'b'],
+            'Should have required params'
+          );
         },
-        {withToolHub: true},
+        { withToolHub: true }
       );
     });
 
@@ -240,7 +244,7 @@ describe('webmcp tools', () => {
 
           await page.waitForFunction(() => {
             return (
-              typeof (window as {navigator: {modelContext?: unknown}}).navigator
+              typeof (window as { navigator: { modelContext?: unknown } }).navigator
                 .modelContext !== 'undefined'
             );
           });
@@ -249,24 +253,24 @@ describe('webmcp tools', () => {
           await context.getWebMCPClient(page);
 
           // First call
-          await listWebMCPTools.handler({params: {}}, response, context);
+          await listWebMCPTools.handler({ params: {} }, response, context);
           const firstOutput = response.responseLines.join('\n');
           const firstParsed = JSON.parse(firstOutput);
 
           response.resetResponseLineForTesting();
 
           // Second call - should return same full list (no diff)
-          await listWebMCPTools.handler({params: {}}, response, context);
+          await listWebMCPTools.handler({ params: {} }, response, context);
           const secondOutput = response.responseLines.join('\n');
           const secondParsed = JSON.parse(secondOutput);
 
           assert.strictEqual(
             firstParsed.tools.length,
             secondParsed.tools.length,
-            'Both calls should return same number of tools',
+            'Both calls should return same number of tools'
           );
         },
-        {withToolHub: true},
+        { withToolHub: true }
       );
     });
   });

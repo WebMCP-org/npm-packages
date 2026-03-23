@@ -39,7 +39,7 @@ These docs define review expectations for safety, contract synchronization, and 
 
 - All code must pass linting and formatting:
   ```bash
-  pnpm check        # Biome linting and formatting
+  pnpm check        # Oxlint linting and Oxfmt formatting
   pnpm typecheck    # TypeScript type checking
   pnpm build        # Build must succeed
   ```
@@ -168,6 +168,7 @@ We follow the [Conventional Commits](https://www.conventionalcommits.org/) speci
 Package scopes (all in `packages/` directory):
 
 - `chrome-devtools-mcp` - @mcp-b/chrome-devtools-mcp
+- `codemode` - @mcp-b/codemode
 - `extension-tools` - @mcp-b/extension-tools
 - `global` - @mcp-b/global
 - `mcp-iframe` - @mcp-b/mcp-iframe
@@ -179,6 +180,7 @@ Package scopes (all in `packages/` directory):
 - `webmcp-polyfill` - @mcp-b/webmcp-polyfill
 - `webmcp-ts-sdk` - @mcp-b/webmcp-ts-sdk
 - `webmcp-types` - @mcp-b/webmcp-types
+- `agent-skills` - agent-skills-ts-sdk
 
 Repository-wide scopes:
 
