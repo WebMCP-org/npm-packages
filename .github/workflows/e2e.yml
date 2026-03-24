@@ -42,7 +42,7 @@ jobs:
         run: vp run --filter './packages/*' --filter '!@mcp-b/example-*' --filter '!@mcp-b/chrome-devtools-mcp' build
 
       - name: Install Playwright Browsers
-        run: pnpm --filter mcp-e2e-tests exec playwright install --with-deps chromium
+        run: vp exec --filter mcp-e2e-tests -- playwright install --with-deps chromium
 
       - name: Run E2E tests
         run: vp run test:e2e
@@ -94,7 +94,7 @@ jobs:
         run: vp run --filter './packages/*' --filter '!@mcp-b/example-*' --filter '!@mcp-b/chrome-devtools-mcp' build
 
       - name: Install Playwright Browsers
-        run: pnpm --filter mcp-e2e-tests exec playwright install --with-deps chromium
+        run: vp exec --filter mcp-e2e-tests -- playwright install --with-deps chromium
 
       - name: Install Google Chrome Beta
         if: matrix.mode == 'chrome-beta'
