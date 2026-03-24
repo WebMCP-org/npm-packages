@@ -48,6 +48,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
       - name: Setup Vite+
         uses: voidzero-dev/setup-vp@v1
         with:
@@ -70,7 +73,7 @@ jobs:
       - name: Run typecheck
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: vp run --filter './packages/*' --filter '!@mcp-b/example-*' --filter '!@mcp-b/chrome-devtools-mcp' --filter '!mcp-e2e-tests' --filter '!mcp-tab-transport-test-app' typecheck
+        run: pnpm -r --filter '!@mcp-b/example-*' --filter '!@mcp-b/chrome-devtools-mcp' --filter '!mcp-e2e-tests' --filter '!mcp-tab-transport-test-app' run typecheck
 
   types-conformance:
     name: Types Conformance
@@ -124,6 +127,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
       - name: Setup Vite+
         uses: voidzero-dev/setup-vp@v1
         with:
@@ -146,7 +152,7 @@ jobs:
       - name: Run unit tests with coverage
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: vp run --filter './packages/*' --filter '!@mcp-b/example-*' --filter '!@mcp-b/chrome-devtools-mcp' --filter '!mcp-e2e-tests' --filter '!mcp-tab-transport-test-app' test -- --coverage
+        run: pnpm -r --filter '!@mcp-b/example-*' --filter '!@mcp-b/chrome-devtools-mcp' --filter '!mcp-e2e-tests' --filter '!mcp-tab-transport-test-app' run test -- --coverage
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5
