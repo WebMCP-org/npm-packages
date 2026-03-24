@@ -21,7 +21,7 @@ env:
 
 jobs:
   check:
-    name: Check (format, lint, typecheck)
+    name: Check (format, lint, type-aware)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -36,8 +36,44 @@ jobs:
       - name: Install dependencies
         run: vp install --frozen-lockfile --filter '!@mcp-b/chrome-devtools-mcp'
 
-      - name: Run format, lint, and type checks
+      - name: Run format, lint, and type-aware checks
         run: vp check
+
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    env:
+      NODE_OPTIONS: --max-old-space-size=16384
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: '24'
+          cache: true
+
+      - name: Install dependencies
+        run: vp install --frozen-lockfile --filter '!@mcp-b/chrome-devtools-mcp'
+
+      - name: Build packages
+        run: vp run --filter './packages/*' --filter '!@mcp-b/example-*' --filter '!@mcp-b/chrome-devtools-mcp' build
+
+      - name: Setup Chrome Beta
+        id: chrome
+        uses: browser-actions/setup-chrome@4f8e94349a351df0f048634f25fec36c3c91eded
+        with:
+          chrome-version: beta
+          install-dependencies: true
+
+      - name: Run typecheck
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: pnpm -r --filter '!@mcp-b/example-*' --filter '!@mcp-b/chrome-devtools-mcp' --filter '!mcp-e2e-tests' --filter '!mcp-tab-transport-test-app' run typecheck
 
   types-conformance:
     name: Types Conformance
