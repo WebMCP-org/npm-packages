@@ -29,9 +29,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
-
       - name: Setup Vite+
         uses: voidzero-dev/setup-vp@v1
         with:
@@ -39,19 +36,19 @@ jobs:
           cache: true
 
       - name: Install dependencies
-        run: pnpm install:workspace:ci
+        run: vp install --frozen-lockfile --filter '!@mcp-b/chrome-devtools-mcp'
 
       - name: Build packages
-        run: pnpm build
+        run: vp run --filter './packages/*' --filter '!@mcp-b/example-*' --filter '!@mcp-b/chrome-devtools-mcp' build
 
       - name: Install Playwright Browsers
-        run: pnpm --filter mcp-e2e-tests exec playwright install --with-deps chromium
+        run: vp pm --filter mcp-e2e-tests exec playwright install --with-deps chromium
 
       - name: Run E2E tests
-        run: pnpm test:e2e
+        run: vp run test:e2e
 
       - name: Run tarball E2E validation (@mcp-b/global)
-        run: pnpm test:e2e:tarball:global
+        run: vp run test:e2e:tarball:global
 
       - name: Upload Playwright Report
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
@@ -84,9 +81,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
-
       - name: Setup Vite+
         uses: voidzero-dev/setup-vp@v1
         with:
@@ -94,13 +88,13 @@ jobs:
           cache: true
 
       - name: Install dependencies
-        run: pnpm install:workspace:ci
+        run: vp install --frozen-lockfile --filter '!@mcp-b/chrome-devtools-mcp'
 
       - name: Build packages
-        run: pnpm build
+        run: vp run --filter './packages/*' --filter '!@mcp-b/example-*' --filter '!@mcp-b/chrome-devtools-mcp' build
 
       - name: Install Playwright Browsers
-        run: pnpm --filter mcp-e2e-tests exec playwright install --with-deps chromium
+        run: vp pm --filter mcp-e2e-tests exec playwright install --with-deps chromium
 
       - name: Install Google Chrome Beta
         if: matrix.mode == 'chrome-beta'
@@ -115,19 +109,19 @@ jobs:
 
       - name: Run Native Runtime Contract (Default Chromium)
         if: matrix.mode == 'default'
-        run: pnpm --filter mcp-e2e-tests run test:native-contract:default
+        run: vp run --filter mcp-e2e-tests test:native-contract:default
 
       - name: Run Native Runtime API Integration (Default Chromium)
         if: matrix.mode == 'default'
-        run: pnpm --filter mcp-e2e-tests run test:native-showcase
+        run: vp run --filter mcp-e2e-tests test:native-showcase
 
       - name: Run Native Runtime Contract (Chrome Beta)
         if: matrix.mode == 'chrome-beta'
-        run: pnpm --filter mcp-e2e-tests run test:native-contract:beta
+        run: vp run --filter mcp-e2e-tests test:native-contract:beta
 
       - name: Run Chrome Beta WebMCP Smoke
         if: matrix.mode == 'chrome-beta'
-        run: pnpm --filter mcp-e2e-tests run test:chrome-beta:webmcp:smoke
+        run: vp run --filter mcp-e2e-tests test:chrome-beta:webmcp:smoke
 
       - name: Upload Parity Playwright Report
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0

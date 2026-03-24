@@ -41,9 +41,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
-
       - name: Setup Vite+
         uses: voidzero-dev/setup-vp@v1
         with:
@@ -51,13 +48,13 @@ jobs:
           cache: true
 
       - name: Install dependencies
-        run: pnpm install:workspace:ci
+        run: vp install --frozen-lockfile --filter '!@mcp-b/chrome-devtools-mcp'
 
       - name: Build packages
-        run: pnpm build
+        run: vp run --filter './packages/*' --filter '!@mcp-b/example-*' --filter '!@mcp-b/chrome-devtools-mcp' build
 
       - name: Install vendored chrome-devtools-mcp dependencies
-        run: pnpm install:chrome-devtools-mcp:ci
+        run: npm ci --prefix packages/chrome-devtools-mcp
 
       - name: Build vendored chrome-devtools-mcp
         run: npm --prefix packages/chrome-devtools-mcp run build
@@ -81,7 +78,7 @@ jobs:
       - name: Start test app in background
         run: |
           cd e2e/react-webmcp-test-app
-          pnpm preview --port 4173 &
+          vp preview --port 4173 &
           echo "Waiting for server to start..."
           sleep 5
           # Verify server is running
