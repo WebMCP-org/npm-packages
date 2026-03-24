@@ -21,7 +21,7 @@ env:
 
 jobs:
   check:
-    name: Check (format, lint, type-aware)
+    name: Check (format + lint)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -36,7 +36,7 @@ jobs:
       - name: Install dependencies
         run: vp install --frozen-lockfile --filter '!@mcp-b/chrome-devtools-mcp'
 
-      - name: Run format, lint, and type-aware checks
+      - name: Run format and lint checks
         run: vp check
 
   typecheck:

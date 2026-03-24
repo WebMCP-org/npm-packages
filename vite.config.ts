@@ -14,18 +14,7 @@ export default defineConfig({
       'chromium/',
       'packages/chrome-devtools-mcp/**',
       'packages/smart-dom-reader/**/lib/**',
-      'website-docs/**',
-      'e2e/**',
-      'skills/**',
-      '**/example/**',
-      '**/e2e/**',
-      '**/test/**',
-      '**/vite.config.ts',
-      '**/vitest.*.config.ts',
     ],
-    options: {
-      typeAware: true,
-    },
   },
   fmt: {
     singleQuote: true,
