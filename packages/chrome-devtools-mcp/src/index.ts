@@ -49,6 +49,19 @@ export async function createMcpServer(
     },
     { capabilities: { logging: {} } }
   );
+
+  // Elicitation bridge: allow WebMCP tool handlers in the browser to request
+  // user input from the MCP client (e.g. Claude Code) via elicitInput().
+  // The bridge is exposed as a globalThis property so that the webmcp tool
+  // module can access it without circular imports.
+  (globalThis as Record<string, unknown>).__cdpElicitBridge = async (
+    params: Record<string, unknown>
+  ): Promise<unknown> => {
+    return await server.server.elicitInput(
+      params as Parameters<typeof server.server.elicitInput>[0]
+    );
+  };
+
   server.server.setRequestHandler(SetLevelRequestSchema, () => {
     return {};
   });

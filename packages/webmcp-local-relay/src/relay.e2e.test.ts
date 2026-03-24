@@ -327,9 +327,12 @@ async function startRelayProcess(relayPort: number): Promise<SpawnedRelay> {
   };
 }
 
-async function startWidgetAssetServer(): Promise<StartedHttpServer> {
+async function startWidgetAssetServer(options?: {
+  widgetMimeType?: 'text/html' | 'text/plain';
+}): Promise<StartedHttpServer> {
   const embedScript = readRequiredFile(REAL_EMBED_PATH, 'packaged embed.js');
   const widgetHtml = readRequiredFile(REAL_WIDGET_PATH, 'packaged widget.html');
+  const mimeType = options?.widgetMimeType ?? 'text/html';
 
   return startHttpServer((request, response) => {
     const url = request.url ?? '/';
@@ -338,7 +341,12 @@ async function startWidgetAssetServer(): Promise<StartedHttpServer> {
       return;
     }
     if (url.startsWith('/widget.html')) {
-      sendHtml(response, widgetHtml);
+      response.statusCode = 200;
+      response.setHeader('content-type', `${mimeType}; charset=utf-8`);
+      if (mimeType === 'text/plain') {
+        response.setHeader('access-control-allow-origin', '*');
+      }
+      response.end(widgetHtml);
       return;
     }
     response.statusCode = 404;
@@ -739,6 +747,35 @@ describe('relay e2e (real browser assets)', () => {
     } finally {
       await harness?.cleanup();
       await ownerRelay?.stop();
+      await stopHttpServer(widgetServer?.server ?? null);
+    }
+  });
+
+  it('relays tools even when widget.html is served as text/plain (CDN MIME fix)', async () => {
+    let widgetServer: StartedHttpServer | null = null;
+    let harness: E2EHarness | null = null;
+
+    try {
+      const relayPort = await getOpenPort();
+      widgetServer = await startWidgetAssetServer({ widgetMimeType: 'text/plain' });
+      harness = await setupE2EHarness({
+        runtimeCase: RUNTIME_CASES[0],
+        relayPort,
+        widgetOrigin: widgetServer.origin,
+        clientName: 'webmcp-local-relay-e2e-client-text-plain-mime',
+      });
+
+      const result = await harness.client.callTool({
+        name: harness.expectedToolName,
+        arguments: { a: 4, b: 6 },
+      });
+
+      const text = firstContentText(result);
+      expect(text).toBe('sum:10');
+    } catch (error) {
+      throw formatE2EError('text-plain-mime', error, harness);
+    } finally {
+      await harness?.cleanup();
       await stopHttpServer(widgetServer?.server ?? null);
     }
   });

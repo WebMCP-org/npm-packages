@@ -307,6 +307,71 @@ describe('parseConfig', () => {
       tabId: 'tab-9',
     });
   });
+
+  it('reads config from __WEBMCP_RELAY_CONFIG global when URL params are empty', () => {
+    const g = globalThis as typeof globalThis & {
+      __WEBMCP_RELAY_CONFIG?: Record<string, string>;
+    };
+    g.__WEBMCP_RELAY_CONFIG = {
+      hostOrigin: APP_ORIGIN,
+      hostTitle: 'Blob Widget',
+      hostUrl: `${APP_ORIGIN}/blob`,
+      relayHost: '127.0.0.1',
+      relayPort: '9333',
+      tabId: 'blob-tab-1',
+      autoConnect: 'true',
+    };
+
+    try {
+      const config = parseConfig('');
+
+      expect(config).toMatchObject({
+        autoConnect: true,
+        hostOrigin: APP_ORIGIN,
+        hostTitle: 'Blob Widget',
+        hostUrl: `${APP_ORIGIN}/blob`,
+        relayHostHint: '127.0.0.1',
+        relayPortHint: 9333,
+        tabId: 'blob-tab-1',
+      });
+    } finally {
+      delete g.__WEBMCP_RELAY_CONFIG;
+    }
+  });
+
+  it('prefers URL params over __WEBMCP_RELAY_CONFIG global', () => {
+    const g = globalThis as typeof globalThis & {
+      __WEBMCP_RELAY_CONFIG?: Record<string, string>;
+    };
+    g.__WEBMCP_RELAY_CONFIG = {
+      hostOrigin: 'https://global.example.com',
+      hostTitle: 'From Global',
+      relayHost: '127.0.0.1',
+      relayPort: '9444',
+      tabId: 'global-tab',
+    };
+
+    try {
+      const config = parseConfig(
+        buildSearch({
+          hostOrigin: APP_ORIGIN,
+          hostTitle: 'From URL',
+          relayHost: '127.0.0.1',
+          relayPort: '9333',
+          tabId: 'url-tab',
+        })
+      );
+
+      expect(config).toMatchObject({
+        hostOrigin: APP_ORIGIN,
+        hostTitle: 'From URL',
+        relayPortHint: 9333,
+        tabId: 'url-tab',
+      });
+    } finally {
+      delete g.__WEBMCP_RELAY_CONFIG;
+    }
+  });
 });
 
 describe('parseHostMessage', () => {

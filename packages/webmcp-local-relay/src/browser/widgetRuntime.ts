@@ -84,21 +84,30 @@ const MAX_ENDPOINT_FAILURES_BEFORE_REDISCOVERY = 5;
 
 export function parseConfig(search = window.location.search): WidgetConfig | null {
   const params = new URLSearchParams(search);
-  const hostOrigin = params.get('hostOrigin');
+
+  const globalConfig = (
+    globalThis as typeof globalThis & { __WEBMCP_RELAY_CONFIG?: Record<string, string> }
+  ).__WEBMCP_RELAY_CONFIG;
+
+  function getParam(key: string): string | null {
+    return params.get(key) ?? globalConfig?.[key] ?? null;
+  }
+
+  const hostOrigin = getParam('hostOrigin');
   if (!hostOrigin) {
     return null;
   }
 
-  const hostUrl = params.get('hostUrl') || hostOrigin;
-  const hostTitle = params.get('hostTitle') || '';
-  const tabId = params.get('tabId') || createRequestId();
-  const relayHostHint = params.get('relayHost') || '127.0.0.1';
-  const relayPortHintRaw = params.get('relayPort');
+  const hostUrl = getParam('hostUrl') || hostOrigin;
+  const hostTitle = getParam('hostTitle') || '';
+  const tabId = getParam('tabId') || createRequestId();
+  const relayHostHint = getParam('relayHost') || '127.0.0.1';
+  const relayPortHintRaw = getParam('relayPort');
   const relayPortHint =
     relayPortHintRaw && relayPortHintRaw.length > 0 ? Number.parseInt(relayPortHintRaw, 10) : 9333;
-  const autoConnect = params.get('autoConnect') !== 'false';
-  const relayId = params.get('relayId') || undefined;
-  const relayWorkspace = params.get('relayWorkspace') || undefined;
+  const autoConnect = getParam('autoConnect') !== 'false';
+  const relayId = getParam('relayId') || undefined;
+  const relayWorkspace = getParam('relayWorkspace') || undefined;
 
   if (!isLoopbackHost(relayHostHint)) {
     console.error(
@@ -442,6 +451,21 @@ export function runWidget(cfg: WidgetConfig): void {
         return;
       }
 
+      // Forward elicitation responses from relay back to embed.ts in the host page.
+      if (relayMessage.type === 'elicitation-response') {
+        window.parent.postMessage(
+          {
+            type: 'webmcp.elicitation.response',
+            callId: relayMessage.callId,
+            result: isJsonObject(relayMessage.result)
+              ? relayMessage.result
+              : { action: 'decline', content: null },
+          },
+          cfg.hostOrigin
+        );
+        return;
+      }
+
       if (relayMessage.type !== 'invoke') {
         console.debug(
           '[webmcp-relay-widget] Ignoring unrecognized message type:',
@@ -661,6 +685,21 @@ export function runWidget(cfg: WidgetConfig): void {
     if (isJsonObject(data) && data.type === 'webmcp.connect') {
       if (!activeSocket && state !== 'discovering') {
         void discoverRelay();
+      }
+      return;
+    }
+
+    // Forward elicitation requests from embed.ts to the relay WebSocket.
+    if (isJsonObject(data) && data.type === 'webmcp.elicitation.request') {
+      if (activeSocket && activeSocket.readyState === WebSocket.OPEN) {
+        safeSend(
+          activeSocket,
+          JSON.stringify({
+            type: 'elicitation-request',
+            callId: data.callId,
+            params: isJsonObject(data.params) ? data.params : {},
+          })
+        );
       }
       return;
     }

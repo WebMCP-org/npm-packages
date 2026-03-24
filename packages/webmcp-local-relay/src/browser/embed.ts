@@ -364,6 +364,72 @@ function handleListRequest(request: WidgetRequestMessage, event: MessageEvent): 
     });
 }
 
+/**
+ * Monkey-patches `navigator.modelContext.elicitInput` to bridge elicitation
+ * requests through the relay widget iframe to the local relay server, which
+ * forwards them to the MCP client (e.g. Claude Code).
+ *
+ * This is the same pattern used in `@mcp-b/chrome-devtools-mcp` for CDP-based
+ * elicitation forwarding. The relay widget and server handle the new
+ * `elicitation-request` / `elicitation-response` message types.
+ */
+let elicitBridgeInstalled = false;
+
+function installElicitBridge(widgetSource: MessageEventSource, widgetOrigin: string): void {
+  if (elicitBridgeInstalled) return;
+
+  const mc = getExtendedModelContext() as
+    | (ModelContextWithExtensions & {
+        elicitInput?: (
+          params: Record<string, unknown>,
+          options?: unknown
+        ) => Promise<Record<string, unknown>>;
+      })
+    | undefined;
+  if (!mc || typeof mc.elicitInput !== 'function') return;
+
+  mc.elicitInput = (
+    params: Record<string, unknown>,
+    _options?: unknown
+  ): Promise<Record<string, unknown>> => {
+    const callId = createElicitCallId();
+    return new Promise<Record<string, unknown>>((resolve) => {
+      const handler = (event: MessageEvent): void => {
+        if (event.origin !== widgetOrigin) return;
+        const data = event.data as Record<string, unknown>;
+        if (
+          !isJsonObject(data) ||
+          data.type !== 'webmcp.elicitation.response' ||
+          data.callId !== callId
+        ) {
+          return;
+        }
+        window.removeEventListener('message', handler);
+        resolve(
+          isJsonObject(data.result)
+            ? (data.result as Record<string, unknown>)
+            : { action: 'decline', content: null }
+        );
+      };
+      window.addEventListener('message', handler);
+
+      (widgetSource as Window).postMessage(
+        { type: 'webmcp.elicitation.request', callId, params },
+        widgetOrigin
+      );
+    });
+  };
+
+  elicitBridgeInstalled = true;
+  debugWarn('Elicitation bridge installed');
+}
+
+let elicitCallCounter = 0;
+function createElicitCallId(): string {
+  elicitCallCounter += 1;
+  return `elicit_${String(Date.now())}_${String(elicitCallCounter)}`;
+}
+
 function handleInvokeRequest(request: WidgetRequestMessage, event: MessageEvent): void {
   const bridge = getToolBridge();
   if (!bridge) {
@@ -373,6 +439,12 @@ function handleInvokeRequest(request: WidgetRequestMessage, event: MessageEvent)
       error: 'No WebMCP runtime found on this page',
     });
     return;
+  }
+
+  // Install elicitation bridge before invoking the tool, so that tool
+  // handlers can call elicitInput() and have it forwarded to the MCP client.
+  if (event.source) {
+    installElicitBridge(event.source, event.origin);
   }
 
   Promise.resolve(bridge.invoke(String(request.toolName ?? ''), toInvokeArgs(request.args)))
@@ -392,7 +464,7 @@ function handleInvokeRequest(request: WidgetRequestMessage, event: MessageEvent)
     });
 }
 
-function injectRelayWidget(cfg: RelayConfig): void {
+async function injectRelayWidget(cfg: RelayConfig): Promise<void> {
   if (document.querySelector(RELAY_IFRAME_SELECTOR)) {
     return;
   }
@@ -415,8 +487,26 @@ function injectRelayWidget(cfg: RelayConfig): void {
     searchParams.set('relayWorkspace', cfg.relayWorkspace);
   }
 
+  // Try fetch + blob URL to work around CDNs serving .html as text/plain.
+  let blobUrl: string | null = null;
+  try {
+    const response = await fetch(cfg.widgetUrl);
+    if (response.ok) {
+      const html = await response.text();
+      const configScript = `<script>window.__WEBMCP_RELAY_CONFIG=${JSON.stringify(Object.fromEntries(searchParams))};</script>`;
+      const blob = new Blob([html.replace('</head>', `${configScript}</head>`)], {
+        type: 'text/html',
+      });
+      blobUrl = URL.createObjectURL(blob);
+      config.widgetOrigin = window.location.origin;
+    }
+  } catch (err) {
+    debugWarn('Failed to fetch widget HTML for blob URL:', err);
+  }
+
   const iframe = document.createElement('iframe');
-  iframe.src = `${cfg.widgetUrl}?${searchParams.toString()}`;
+  // Fallback: direct iframe src (works when widget.html is served as text/html).
+  iframe.src = blobUrl ?? `${cfg.widgetUrl}?${searchParams.toString()}`;
   iframe.style.display = 'none';
   iframe.setAttribute('aria-hidden', 'true');
   iframe.setAttribute('data-webmcp-relay', '1');
@@ -425,6 +515,9 @@ function injectRelayWidget(cfg: RelayConfig): void {
   widgetWindow = iframe.contentWindow;
   iframe.addEventListener('load', () => {
     widgetWindow = iframe.contentWindow;
+    if (blobUrl) {
+      URL.revokeObjectURL(blobUrl);
+    }
   });
   iframe.addEventListener('error', () => {
     console.error(
@@ -432,6 +525,9 @@ function injectRelayWidget(cfg: RelayConfig): void {
       iframe.src,
       '-- WebMCP tools will NOT be relayed. Check network connectivity and widget URL.'
     );
+    if (blobUrl) {
+      URL.revokeObjectURL(blobUrl);
+    }
   });
 }
 
@@ -473,9 +569,11 @@ if (!document.querySelector(RELAY_IFRAME_SELECTOR)) {
   });
 
   if (document.body) {
-    injectRelayWidget(config);
+    void injectRelayWidget(config);
   } else {
-    document.addEventListener('DOMContentLoaded', () => injectRelayWidget(config), { once: true });
+    document.addEventListener('DOMContentLoaded', () => void injectRelayWidget(config), {
+      once: true,
+    });
   }
 
   subscribeToToolChanges();

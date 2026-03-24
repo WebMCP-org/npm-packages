@@ -66,6 +66,21 @@ export const BrowserPongMessageSchema = z.object({
 });
 
 /**
+ * Schema for elicitation request forwarded from a browser tool handler.
+ *
+ * When a WebMCP tool handler calls `elicitInput()`, the embed script
+ * intercepts the call and forwards the parameters to the relay via this
+ * message type. The relay then sends `elicitation/create` to the MCP
+ * client (e.g. Claude Code) and returns the result via an
+ * `elicitation-response` message.
+ */
+export const BrowserElicitationRequestSchema = z.object({
+  type: z.literal('elicitation-request'),
+  callId: z.string().min(1),
+  params: z.record(z.string(), z.unknown()),
+});
+
+/**
  * Union schema for all browser-to-relay protocol messages.
  */
 export const BrowserToRelayMessageSchema = z.discriminatedUnion('type', [
@@ -74,6 +89,7 @@ export const BrowserToRelayMessageSchema = z.discriminatedUnion('type', [
   BrowserToolsChangedMessageSchema,
   BrowserToolResultMessageSchema,
   BrowserPongMessageSchema,
+  BrowserElicitationRequestSchema,
 ]);
 
 /**
@@ -143,6 +159,17 @@ export const RelayReloadMessageSchema = z.object({
 });
 
 /**
+ * Schema for elicitation response sent from relay to browser.
+ *
+ * Contains the MCP client's response to an `elicitation/create` request.
+ */
+export const RelayElicitationResponseSchema = z.object({
+  type: z.literal('elicitation-response'),
+  callId: z.string().min(1),
+  result: z.record(z.string(), z.unknown()),
+});
+
+/**
  * Union schema for all relay-to-browser protocol messages.
  */
 export const RelayToBrowserMessageSchema = z.discriminatedUnion('type', [
@@ -150,6 +177,7 @@ export const RelayToBrowserMessageSchema = z.discriminatedUnion('type', [
   RelayInvokeMessageSchema,
   RelayPingMessageSchema,
   RelayReloadMessageSchema,
+  RelayElicitationResponseSchema,
 ]);
 
 /**

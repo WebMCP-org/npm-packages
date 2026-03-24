@@ -351,34 +351,63 @@
       });
   }
 
-  /** @param {RelayConfig} config */
-  function injectRelayWidget(config) {
+  /** @param {RelayConfig} cfg */
+  async function injectRelayWidget(cfg) {
     if (document.querySelector(RELAY_IFRAME_SELECTOR)) {
       return;
     }
 
     const searchParams = new URLSearchParams();
-    searchParams.set('tabId', config.tabId);
+    searchParams.set('tabId', cfg.tabId);
     searchParams.set('hostOrigin', window.location.origin);
     const cleanUrl = new URL(window.location.href);
     cleanUrl.search = '';
     cleanUrl.hash = '';
     searchParams.set('hostUrl', cleanUrl.href);
     searchParams.set('hostTitle', document.title || '');
-    searchParams.set('relayHost', config.relayHost);
-    searchParams.set('relayPort', config.relayPort);
+    searchParams.set('relayHost', cfg.relayHost);
+    searchParams.set('relayPort', cfg.relayPort);
+
+    // Try fetch + blob URL to work around CDNs serving .html as text/plain.
+    /** @type {string | null} */
+    let blobUrl = null;
+    try {
+      const response = await fetch(cfg.widgetUrl);
+      if (response.ok) {
+        const html = await response.text();
+        const configScript =
+          '<script>window.__WEBMCP_RELAY_CONFIG=' +
+          JSON.stringify(Object.fromEntries(searchParams)) +
+          ';</script>';
+        const blob = new Blob([html.replace('</head>', configScript + '</head>')], {
+          type: 'text/html',
+        });
+        blobUrl = URL.createObjectURL(blob);
+        config.widgetOrigin = window.location.origin;
+      }
+    } catch (err) {
+      console.warn('[webmcp-relay-embed] Failed to fetch widget HTML for blob URL:', err);
+    }
 
     const iframe = document.createElement('iframe');
-    iframe.src = `${config.widgetUrl}?${searchParams.toString()}`;
+    // Fallback: direct iframe src (works when widget.html is served as text/html).
+    iframe.src = blobUrl ?? cfg.widgetUrl + '?' + searchParams.toString();
     iframe.style.display = 'none';
     iframe.setAttribute('aria-hidden', 'true');
     iframe.setAttribute('data-webmcp-relay', '1');
     document.body.appendChild(iframe);
+    widgetWindow = iframe.contentWindow;
     iframe.addEventListener('load', () => {
       widgetWindow = iframe.contentWindow;
+      if (blobUrl) {
+        URL.revokeObjectURL(blobUrl);
+      }
     });
     iframe.addEventListener('error', () => {
       console.error('[webmcp-relay-embed] Failed to load relay widget iframe from:', iframe.src);
+      if (blobUrl) {
+        URL.revokeObjectURL(blobUrl);
+      }
     });
   }
 
@@ -421,9 +450,11 @@
   });
 
   if (document.body) {
-    injectRelayWidget(config);
+    void injectRelayWidget(config);
   } else {
-    document.addEventListener('DOMContentLoaded', () => injectRelayWidget(config), { once: true });
+    document.addEventListener('DOMContentLoaded', () => void injectRelayWidget(config), {
+      once: true,
+    });
   }
 
   subscribeToToolChanges();

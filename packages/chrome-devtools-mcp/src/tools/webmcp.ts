@@ -15,6 +15,45 @@ const DEFAULT_INPUT_SCHEMA = {
   properties: {},
 } as const;
 
+// --- Elicitation bridge ---
+// Enables MCP elicitation (useElicitation / elicitInput) through Chrome DevTools MCP.
+// When a WebMCP tool handler calls elicitInput(), the request is bridged from the
+// browser page to Node.js via Puppeteer's page.exposeFunction (CDP Runtime.addBinding),
+// then forwarded to the MCP client (e.g. Claude Code) via server.server.elicitInput().
+//
+// This uses a monkey-patch approach consistent with the existing page.evaluate()
+// architecture rather than a full TabClientTransport, which would conflict with
+// other MCP clients on the mcp-default postMessage channel.
+
+const _bridgedPages = new WeakSet<Page>();
+
+async function ensureElicitBridge(page: Page): Promise<void> {
+  const bridge = (globalThis as Record<string, unknown>).__cdpElicitBridge as
+    | ((params: Record<string, unknown>) => Promise<unknown>)
+    | undefined;
+  if (!bridge || _bridgedPages.has(page)) {
+    return;
+  }
+  try {
+    await page.exposeFunction('__mcpElicitBridge', async (paramsJson: string): Promise<string> => {
+      try {
+        const params = JSON.parse(paramsJson) as Record<string, unknown>;
+        const result = await bridge(params);
+        return JSON.stringify(result);
+      } catch {
+        // If elicitation fails (e.g. MCP client doesn't support it),
+        // return a decline so the tool handler gets a clean response.
+        return JSON.stringify({ action: 'decline', content: null });
+      }
+    });
+    _bridgedPages.add(page);
+  } catch {
+    // page.exposeFunction throws if the name is already exposed on this page
+    // (e.g. page reused across tool calls). Safe to ignore.
+  }
+}
+// --- End elicitation bridge ---
+
 type JsonObject = Record<string, unknown>;
 type WebMcpContentBlock = TextContent | ImageContent | EmbeddedResource;
 
@@ -176,6 +215,9 @@ async function evaluateCallTool(
   name: string,
   args: JsonObject
 ): Promise<BrowserCallToolResult> {
+  // Set up elicitation bridge on this page if not already done.
+  await ensureElicitBridge(page);
+
   return page.evaluate(
     async ({ toolName, toolArgs }) => {
       const nav = navigator as Navigator & {
@@ -184,6 +226,10 @@ async function evaluateCallTool(
             name: string;
             arguments: Record<string, unknown>;
           }) => unknown | Promise<unknown>;
+          elicitInput?: (
+            params: Record<string, unknown>,
+            options?: unknown
+          ) => unknown | Promise<unknown>;
         };
         modelContextTesting?: {
           executeTool?: (
@@ -195,6 +241,23 @@ async function evaluateCallTool(
 
       try {
         if (nav.modelContext && typeof nav.modelContext.callTool === 'function') {
+          // If the elicitation bridge is available, monkey-patch elicitInput
+          // so that tool handlers can request user confirmation via the MCP client.
+          if (
+            typeof (window as Record<string, unknown>).__mcpElicitBridge === 'function' &&
+            nav.modelContext.elicitInput
+          ) {
+            const bridge = (window as Record<string, unknown>).__mcpElicitBridge as (
+              json: string
+            ) => Promise<string>;
+            nav.modelContext.elicitInput = async (
+              params: Record<string, unknown>
+            ): Promise<unknown> => {
+              const resultJson = await bridge(JSON.stringify(params));
+              return JSON.parse(resultJson);
+            };
+          }
+
           return {
             kind: 'success' as const,
             api: 'modelContext' as const,
