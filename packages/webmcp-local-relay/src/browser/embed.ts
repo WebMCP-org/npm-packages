@@ -6,6 +6,10 @@
  *
  * Add `data-debug` to enable diagnostic logging:
  * `<script src=".../embed.js" data-debug></script>`
+ *
+ * Override the per-request timeout (default 60000 ms) for slow tools that
+ * chain multiple API calls:
+ * `<script src=".../embed.js" data-request-timeout="120000"></script>`
  */
 import type {
   ModelContextTestingPolyfillExtensions,
@@ -48,6 +52,7 @@ interface RelayConfig {
   relayPort: string;
   relayId?: string;
   relayWorkspace?: string;
+  requestTimeout?: string;
   tabId: string;
   widgetUrl: string;
   widgetOrigin: string;
@@ -116,12 +121,14 @@ function buildRelayConfig(script: HTMLScriptElement | null): RelayConfig {
   const widgetUrl = resolveWidgetUrl(script);
   const relayId = script?.getAttribute('data-relay-id') || undefined;
   const relayWorkspace = script?.getAttribute('data-relay-workspace') || undefined;
+  const requestTimeout = script?.getAttribute('data-request-timeout') || undefined;
   return {
     autoConnect: script?.getAttribute('data-auto-connect') !== 'false',
     relayHost: script?.getAttribute('data-relay-host') || '127.0.0.1',
     relayPort: script?.getAttribute('data-relay-port') || '9333',
     ...(relayId ? { relayId } : {}),
     ...(relayWorkspace ? { relayWorkspace } : {}),
+    ...(requestTimeout ? { requestTimeout } : {}),
     tabId: readOrCreateTabId(),
     widgetUrl,
     widgetOrigin: new URL(widgetUrl).origin,
@@ -485,6 +492,9 @@ async function injectRelayWidget(cfg: RelayConfig): Promise<void> {
   }
   if (cfg.relayWorkspace) {
     searchParams.set('relayWorkspace', cfg.relayWorkspace);
+  }
+  if (cfg.requestTimeout) {
+    searchParams.set('requestTimeout', cfg.requestTimeout);
   }
 
   // Try fetch + blob URL to work around CDNs serving .html as text/plain.

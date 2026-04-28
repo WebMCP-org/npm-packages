@@ -75,6 +75,7 @@ function buildSearch(
       | 'relayId'
       | 'relayPort'
       | 'relayWorkspace'
+      | 'requestTimeout'
       | 'tabId',
       string
     >
@@ -281,8 +282,36 @@ describe('parseConfig', () => {
       hostUrl: APP_ORIGIN,
       relayHostHint: '127.0.0.1',
       relayPortHint: 9333,
+      requestTimeoutMs: 60000,
     });
     expect(config?.tabId).toEqual(expect.any(String));
+  });
+
+  it('parses an explicit requestTimeout from URL params', () => {
+    const config = parseConfig(
+      buildSearch({
+        hostOrigin: APP_ORIGIN,
+        requestTimeout: '120000',
+      })
+    );
+
+    expect(config).toMatchObject({ requestTimeoutMs: 120000 });
+  });
+
+  it('reads requestTimeout from __WEBMCP_RELAY_CONFIG global', () => {
+    const g = globalThis as typeof globalThis & {
+      __WEBMCP_RELAY_CONFIG?: Record<string, string>;
+    };
+    g.__WEBMCP_RELAY_CONFIG = {
+      hostOrigin: APP_ORIGIN,
+      requestTimeout: '90000',
+    };
+
+    try {
+      expect(parseConfig('')).toMatchObject({ requestTimeoutMs: 90000 });
+    } finally {
+      delete g.__WEBMCP_RELAY_CONFIG;
+    }
   });
 
   it('preserves explicit host settings', () => {
@@ -452,6 +481,29 @@ describe('widget runtime', () => {
     );
     expect(env.connections).toHaveLength(0);
   });
+
+  it.each([['abc'], ['0'], ['-1']])(
+    'rejects non-positive-integer requestTimeout %s during startup',
+    (invalid) => {
+      const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const env = startRuntime({
+        search: buildSearch({
+          hostOrigin: APP_ORIGIN,
+          requestTimeout: invalid,
+        }),
+      });
+
+      expect(error).toHaveBeenCalledWith(
+        '[webmcp-relay-widget] requestTimeout must be a positive integer (ms), got:',
+        invalid
+      );
+      expect(warn).toHaveBeenCalledWith(
+        '[webmcp-relay-widget] Missing required hostOrigin parameter. Widget will not start.'
+      );
+      expect(env.connections).toHaveLength(0);
+    }
+  );
 
   it('discovers the next relay port when the hinted port is not a relay', async () => {
     const discoveredConnections: RelayConnection[] = [];
