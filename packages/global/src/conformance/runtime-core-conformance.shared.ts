@@ -248,5 +248,74 @@ export function runRuntimeCoreConformanceSuite(options: RuntimeConformanceOption
         content: [{ type: 'text', text: 'value:7' }],
       });
     });
+
+    it('registerTool({ signal }) unregisters when the signal aborts', async (ctx) => {
+      const modelContext = requireModelContext();
+      const registerTool = modelContext.registerTool as (
+        tool: Parameters<ModelContext['registerTool']>[0],
+        options?: { signal?: AbortSignal }
+      ) => unknown;
+
+      if (registerTool.length < 2) {
+        ctx.skip();
+      }
+
+      const ac = new AbortController();
+      registerTool.call(
+        modelContext,
+        {
+          name: 'signal_unregister_case',
+          description: 'AbortSignal-driven unregistration',
+          inputSchema: { type: 'object', properties: {} },
+          async execute() {
+            return { content: [{ type: 'text', text: 'ok' }] };
+          },
+        },
+        { signal: ac.signal }
+      );
+      await flushMicrotasks(2);
+
+      expect(modelContext.listTools().map((tool) => tool.name)).toContain('signal_unregister_case');
+
+      ac.abort();
+      await flushMicrotasks(2);
+
+      expect(modelContext.listTools().map((tool) => tool.name)).not.toContain(
+        'signal_unregister_case'
+      );
+    });
+
+    it('registerTool with a pre-aborted signal does not register the tool', async (ctx) => {
+      const modelContext = requireModelContext();
+      const registerTool = modelContext.registerTool as (
+        tool: Parameters<ModelContext['registerTool']>[0],
+        options?: { signal?: AbortSignal }
+      ) => unknown;
+
+      if (registerTool.length < 2) {
+        ctx.skip();
+      }
+
+      const ac = new AbortController();
+      ac.abort();
+
+      registerTool.call(
+        modelContext,
+        {
+          name: 'preaborted_signal_case',
+          description: 'Pre-aborted signal',
+          inputSchema: { type: 'object', properties: {} },
+          async execute() {
+            return { content: [{ type: 'text', text: 'never' }] };
+          },
+        },
+        { signal: ac.signal }
+      );
+      await flushMicrotasks(2);
+
+      expect(modelContext.listTools().map((tool) => tool.name)).not.toContain(
+        'preaborted_signal_case'
+      );
+    });
   });
 }

@@ -200,6 +200,37 @@ describe('global adapter', () => {
     ).toBe(false);
   });
 
+  it('registerTool({ signal }) abort removes the tool from both wrapper and mirrored native', async () => {
+    initializeWebModelContext();
+
+    const modelContext = getModelContext();
+    const ac = new AbortController();
+
+    modelContext.registerTool(
+      {
+        name: 'signal_tool',
+        description: 'AbortSignal-driven tool',
+        inputSchema: { type: 'object', properties: {} },
+        async execute() {
+          return { content: [{ type: 'text', text: 'signal-ok' }] };
+        },
+      },
+      { signal: ac.signal }
+    );
+
+    expect(modelContext.listTools().some((tool) => tool.name === 'signal_tool')).toBe(true);
+    expect(
+      navigator.modelContextTesting?.listTools().some((tool) => tool.name === 'signal_tool')
+    ).toBe(true);
+
+    ac.abort();
+
+    expect(modelContext.listTools().some((tool) => tool.name === 'signal_tool')).toBe(false);
+    expect(
+      navigator.modelContextTesting?.listTools().some((tool) => tool.name === 'signal_tool')
+    ).toBe(false);
+  });
+
   it('supports calling destructured registerTool', async () => {
     initializeWebModelContext();
 

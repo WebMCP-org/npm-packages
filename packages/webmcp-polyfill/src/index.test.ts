@@ -183,6 +183,89 @@ describe('@mcp-b/webmcp-polyfill', () => {
     );
   });
 
+  it('warns that unregisterTool is deprecated while preserving behavior', () => {
+    initializeWebMCPPolyfill();
+
+    const tool = {
+      name: 'deprecation_tool',
+      description: 'Deprecation tool',
+      inputSchema: { type: 'object', properties: {} },
+      execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+    };
+    navigator.modelContext.registerTool(tool);
+
+    // Re-registration throws iff the tool is in the registry.
+    expect(() => navigator.modelContext.registerTool(tool)).toThrow(
+      'Tool already registered: deprecation_tool'
+    );
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      navigator.modelContext.unregisterTool('deprecation_tool');
+      navigator.modelContext.unregisterTool('deprecation_tool');
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        '[WebMCPPolyfill] navigator.modelContext.unregisterTool() is deprecated. The April 23, 2026 WebMCP draft removed it in favor of registerTool(tool, { signal }) — pass an AbortSignal and abort it to unregister.'
+      );
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      warnSpy.mockRestore();
+    }
+
+    expect(() => navigator.modelContext.registerTool(tool)).not.toThrow();
+  });
+
+  it('registerTool with options.signal unregisters when the signal aborts', () => {
+    initializeWebMCPPolyfill();
+
+    const tool = {
+      name: 'signal_tool',
+      description: 'Signal-driven tool',
+      inputSchema: { type: 'object', properties: {} },
+      execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+    };
+
+    const ac = new AbortController();
+    navigator.modelContext.registerTool(tool, { signal: ac.signal });
+
+    expect(() => navigator.modelContext.registerTool(tool)).toThrow(
+      'Tool already registered: signal_tool'
+    );
+
+    ac.abort();
+
+    expect(() => navigator.modelContext.registerTool(tool)).not.toThrow();
+  });
+
+  it('registerTool with a pre-aborted signal does not register the tool', () => {
+    initializeWebMCPPolyfill();
+
+    const ac = new AbortController();
+    ac.abort();
+
+    const tool = {
+      name: 'preaborted_tool',
+      description: 'Pre-aborted tool',
+      inputSchema: { type: 'object', properties: {} },
+      execute: async () => ({ content: [{ type: 'text', text: 'never' }] }),
+    };
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      navigator.modelContext.registerTool(tool, { signal: ac.signal });
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('options.signal was already aborted')
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
+
+    expect(() => navigator.modelContext.registerTool(tool)).not.toThrow();
+  });
+
   it('warns that clearContext is deprecated while preserving behavior', () => {
     initializeWebMCPPolyfill();
 

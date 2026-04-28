@@ -49,9 +49,10 @@ This package solves the problem by **pre-registering tool capabilities** before 
 
 Compatibility note:
 
-- `BrowserMcpServer.registerTool(...)` still returns a deprecated compatibility handle with `unregister()` so existing MCP-B integrations do not break, even though current Chrome Beta 147 and Chromium `main` return `undefined`.
-- Current Chromium exposes `unregisterTool(name)` as a string-name API.
-- The upstream WebMCP unregistration design is still under discussion, so avoid assuming the current Chromium shape is the final spec outcome.
+- `BrowserMcpServer.registerTool(tool, options?)` accepts the WebMCP April 23, 2026 draft signature, including `options.signal` (`AbortSignal`) for unregistration. When the signal aborts, both the server-side registration and the mirrored native registration are removed.
+- The same call still returns a deprecated `{ unregister }` compatibility handle so existing MCP-B integrations do not break, even though spec/native runtimes return `undefined`. The handle will be removed in the next major version — prefer `options.signal`.
+- `unregisterTool(name)` was removed from the WebMCP draft on April 23, 2026 in favor of the `AbortSignal` flow. It is kept on `BrowserMcpServer` with a one-time deprecation warning to interoperate with current Chrome Beta 147 (which still ships the string-name API). It will be removed in the next major version.
+- `provideContext()` and `clearContext()` were removed from the WebMCP draft on March 5, 2026. They are kept here as deprecated compatibility shims and emit a one-time deprecation warning when invoked.
 
 ## Modifications from Official SDK
 

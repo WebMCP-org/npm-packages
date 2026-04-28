@@ -100,16 +100,14 @@ export function CounterTool() {
 
 ## How `useWebMCP` Works
 
-- Registers a tool on mount with `navigator.modelContext.registerTool(...)`.
-- Unregisters on unmount with `navigator.modelContext.unregisterTool(name)`.
+- Registers a tool on mount with `navigator.modelContext.registerTool(tool, { signal })` and aborts the controller on unmount.
+- On Chrome Beta 147 native (which ignores the second arg) cleanup cannot remove the tool. Install `@mcp-b/global` or `@mcp-b/webmcp-polyfill` for spec-aligned behavior.
 - Exposes local execution state:
   - `state.isExecuting`
   - `state.lastResult`
   - `state.error`
   - `state.executionCount`
 - Returns `execute(input)` for manual in-app invocation and `reset()` for state reset.
-
-Current Chrome Beta 147 returns `undefined` from `registerTool(...)`, but MCP-B wrappers still expose a deprecated compatibility handle. This hook prefers the returned handle when present and falls back to `unregisterTool(name)`.
 
 Your tool implementation (`config.execute` or `config.handler`) can be synchronous or asynchronous.
 

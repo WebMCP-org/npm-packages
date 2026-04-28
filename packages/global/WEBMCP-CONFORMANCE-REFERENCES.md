@@ -85,11 +85,12 @@ Goal: keep one place to track standards decisions and implementation details bef
 
 Current MCP-B alignment note:
 
-- Strict core `@mcp-b/webmcp-types` / `@mcp-b/webmcp-polyfill` still model `registerTool(...)` as returning `void`, matching current Chrome Beta 147.
-- `BrowserMcpServer.registerTool(...)` keeps a deprecated MCP-B compatibility handle with `unregister()` so existing wrapper users do not break.
-- Current Chromium exposes `unregisterTool(name)` as a string-name API, but the upstream WebMCP unregistration design is still open.
+- Strict core `@mcp-b/webmcp-types` / `@mcp-b/webmcp-polyfill` model `registerTool(tool, options?)` per the April 23, 2026 WebMCP draft. The polyfill registers an `abort` listener on `options.signal` and removes the tool when the signal aborts; pre-aborted signals short-circuit registration with a console warning.
+- `BrowserMcpServer.registerTool(tool, options?)` accepts the same shape and forwards `options.signal` to the underlying native context when that context's `registerTool.length >= 2`. It still returns a deprecated `{ unregister }` handle for back-compat; the handle will be removed in the next major version.
+- `unregisterTool(name)` is preserved across all three runtimes for back-compat with Chrome Beta 147 and existing wrappers, but is `@deprecated` in types and emits a one-time runtime deprecation warning.
+- Current Chromium (Beta 147) still exposes only `registerTool(tool)` and `unregisterTool(name)`. Hooks (`@mcp-b/react-webmcp`, `@mcp-b/usewebmcp`) feature-detect via `registerTool.length` and gracefully fall back on Beta 147.
 - Keep browser-surface tests explicit so we do not mistake current Chromium behavior for a finalized spec guarantee.
-- The shared conformance suite is parameterized: strict-core/native lanes should assert `undefined`, while the `@mcp-b/global` polyfill wrapper lane asserts the deprecated compatibility handle intentionally preserved by MCP-B.
+- The shared conformance suite is parameterized: strict-core/native lanes should assert `undefined` for the legacy single-arg path; the `@mcp-b/global` polyfill wrapper lane asserts the deprecated compatibility handle intentionally preserved by MCP-B. Two new shared cases cover AbortSignal registration and pre-aborted signals; both skip on runtimes whose `registerTool` does not accept options.
 
 Run commands:
 
@@ -100,12 +101,14 @@ Run commands:
 - Matrix:
   - `CHROME_BIN=\"/path/to/chrome-beta\" CHROME_FLAGS=\"--enable-experimental-web-platform-features --enable-features=WebMCPTesting\" pnpm --filter @mcp-b/global run test:conformance:matrix`
 
-## Native Validation Behavior Note (Updated March 11, 2026)
+## Native Validation Behavior Note (Updated April 27, 2026)
 
 - In current Chrome Beta 147 native mode (`--enable-experimental-web-platform-features --enable-features=WebMCPTesting`), `navigator.modelContext.callTool` is not exposed.
-- Current Chrome Beta 147 exposes `navigator.modelContext.registerTool(...)` and `navigator.modelContext.unregisterTool(name)`, but no `provideContext()` or `clearContext()`.
+- Current Chrome Beta 147 exposes `navigator.modelContext.registerTool(tool)` (single-arg) and `navigator.modelContext.unregisterTool(name)`, but no `provideContext()` or `clearContext()`.
+- Native does NOT yet ship the April 23, 2026 `registerTool(tool, { signal })` options dictionary. Conformance tests for AbortSignal-driven unregistration are gated on `registerTool.length >= 2` and skip silently on Chrome Beta 147.
 - Current Chrome Beta 147 exposes both `navigator.modelContextTesting.ontoolchange` and the older `registerToolsChangedCallback(...)` callback.
 - Tool execution goes through `navigator.modelContextTesting.executeTool(toolName, inputArgsJson)`.
 - Native `modelContextTesting.executeTool(...)` currently appears to validate malformed JSON parsing (throws `UnknownError: Failed to parse input arguments`) but does not enforce tool `inputSchema` type/required constraints in the same way as the polyfill path.
 - `@mcp-b/webmcp-polyfill` does enforce schema checks in its testing shim path and rejects schema-invalid args.
-- Conformance implication: keep dedicated native vs polyfill validation parity tests and avoid assuming schema-validation parity in native early preview.
+- `@mcp-b/webmcp-polyfill` and `BrowserMcpServer` accept `registerTool(tool, { signal })` per the April 23, 2026 draft. They emit a one-time deprecation warning when `unregisterTool(name)` is called.
+- Conformance implication: keep dedicated native vs polyfill validation parity tests and avoid assuming schema-validation parity in native early preview. Re-enable native AbortSignal conformance once Chromium ships the options-aware signature.

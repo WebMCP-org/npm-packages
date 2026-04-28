@@ -6,6 +6,7 @@ import type {
   ModelContextCore,
   ModelContextExtensions,
   ModelContextOptions,
+  ModelContextRegisterToolOptions,
   ModelContextToolReference,
   ResourceContents,
   ToolDescriptor,
@@ -175,13 +176,15 @@ type RegisteredToolHandle = { unregister: () => void };
 /**
  * Browser-optimized MCP Server that speaks WebMCP natively.
  *
- * This server IS navigator.modelContext — it implements the WebMCP standard API
- * (provideContext, registerTool, unregisterTool, clearContext) while retaining
- * full MCP protocol capabilities (resources, prompts, elicitation, sampling)
- * via the inherited BaseMcpServer surface.
+ * Implements `registerTool(tool, options?)` while retaining MCP capabilities
+ * (resources, prompts, elicitation, sampling) via BaseMcpServer.
  *
- * When `native` is provided, all tool operations are mirrored to it so that
- * navigator.modelContextTesting (polyfill testing shim) stays in sync.
+ * Deprecated compatibility (kept for Chrome Beta 147 and existing wrappers,
+ * removed in the next major): `unregisterTool(name)`, `provideContext()`,
+ * `clearContext()`, and the `{ unregister }` handle returned from `registerTool`.
+ *
+ * When `native` is provided, tool operations are mirrored so that
+ * navigator.modelContextTesting stays in sync.
  */
 export class BrowserMcpServer extends BaseMcpServer {
   readonly [SERVER_MARKER_PROPERTY] = true as const;
@@ -192,6 +195,7 @@ export class BrowserMcpServer extends BaseMcpServer {
   private _publicMethodsBound = false;
   private _provideContextDeprecationWarned = false;
   private _clearContextDeprecationWarned = false;
+  private _unregisterToolDeprecationWarned = false;
 
   constructor(serverInfo: Implementation, options?: BrowserMcpServerOptions) {
     const validator = new PolyfillJsonSchemaValidator();
@@ -374,17 +378,38 @@ export class BrowserMcpServer extends BaseMcpServer {
 
   // --- WebMCP standard API (primary surface) ---
 
-  // @ts-expect-error -- WebMCP API: (ToolDescriptor) vs MCP SDK: (name, config, cb)
-  override registerTool(tool: ToolDescriptor): RegisteredToolHandle {
-    // Mirror to native first — the polyfill validates the descriptor
-    if (this.native) {
-      (this.native.registerTool as (tool: ToolDescriptor) => void)(tool);
+  // @ts-expect-error -- WebMCP API: (ToolDescriptor, options?) vs MCP SDK: (name, config, cb)
+  override registerTool(
+    tool: ToolDescriptor,
+    options?: ModelContextRegisterToolOptions
+  ): RegisteredToolHandle {
+    const signal = options?.signal;
+
+    if (signal?.aborted) {
+      console.warn(
+        `[BrowserMcpServer] registerTool("${tool?.name ?? '<unknown>'}") skipped: options.signal was already aborted.`
+      );
+      return { unregister: () => {} };
     }
 
+    let nativeAcceptedSignal = false;
+    if (this.native) {
+      const nativeRegister = this.native.registerTool as (
+        tool: ToolDescriptor,
+        options?: ModelContextRegisterToolOptions
+      ) => void;
+      if (nativeRegister.length >= 2) {
+        nativeRegister.call(this.native, tool, signal ? { signal } : undefined);
+        nativeAcceptedSignal = Boolean(signal);
+      } else {
+        nativeRegister.call(this.native, tool);
+      }
+    }
+
+    let handle: RegisteredToolHandle;
     try {
-      return this.registerToolInServer(tool);
+      handle = this.registerToolInServer(tool);
     } catch (error) {
-      // Rollback native registration on server failure
       if (this.native) {
         try {
           this.native.unregisterTool(tool.name);
@@ -397,6 +422,28 @@ export class BrowserMcpServer extends BaseMcpServer {
       }
       throw error;
     }
+
+    if (signal) {
+      signal.addEventListener(
+        'abort',
+        () => {
+          this._parentTools[tool.name]?.remove();
+          if (this.native && !nativeAcceptedSignal) {
+            try {
+              this.native.unregisterTool(tool.name);
+            } catch (error) {
+              console.warn(
+                '[BrowserMcpServer] Native unregister via abort fallback failed:',
+                error
+              );
+            }
+          }
+        },
+        { once: true }
+      );
+    }
+
+    return handle;
   }
 
   /**
@@ -421,6 +468,7 @@ export class BrowserMcpServer extends BaseMcpServer {
   }
 
   unregisterTool(nameOrTool: string | ModelContextToolReference): void {
+    this.warnUnregisterToolDeprecationOnce();
     const name = this.resolveToolNameForUnregister(nameOrTool);
     this._parentTools[name]?.remove();
 
@@ -431,7 +479,14 @@ export class BrowserMcpServer extends BaseMcpServer {
 
   private clearRegisteredTools(): void {
     for (const name of Object.keys(this._parentTools)) {
-      this.unregisterTool(name);
+      this._parentTools[name]?.remove();
+      if (this.native) {
+        try {
+          this.native.unregisterTool(name);
+        } catch (error) {
+          console.warn('[BrowserMcpServer] Native unregister during clear failed:', error);
+        }
+      }
     }
   }
 
@@ -542,6 +597,17 @@ export class BrowserMcpServer extends BaseMcpServer {
     this._clearContextDeprecationWarned = true;
     console.warn(
       '[BrowserMcpServer] navigator.modelContext.clearContext() is deprecated and will be removed in the next major version. Unregister individual tools instead.'
+    );
+  }
+
+  private warnUnregisterToolDeprecationOnce(): void {
+    if (this._unregisterToolDeprecationWarned) {
+      return;
+    }
+
+    this._unregisterToolDeprecationWarned = true;
+    console.warn(
+      '[BrowserMcpServer] navigator.modelContext.unregisterTool() is deprecated. The April 23, 2026 WebMCP draft removed it in favor of registerTool(tool, { signal }) — pass an AbortSignal and abort it to unregister.'
     );
   }
 

@@ -4,9 +4,9 @@ Strict WebMCP core runtime polyfill for `navigator.modelContext`.
 
 `@mcp-b/webmcp-polyfill` installs only the strict core API:
 
+- `registerTool(tool, options?)` — pass `options.signal` (`AbortSignal`) to unregister when aborted
+- `unregisterTool(nameOrTool)` (deprecated compatibility API)
 - `provideContext(options?)` (deprecated compatibility API)
-- `registerTool(tool)`
-- `unregisterTool(nameOrTool)`
 - `clearContext()` (deprecated compatibility API)
 
 It does not install MCP bridge extensions like `callTool`, resources, or prompts.
@@ -16,6 +16,7 @@ Important:
 - `navigator.modelContext` in this package does not provide `listTools()` or `callTool(...)`.
 - For list/execute test flows, use `navigator.modelContextTesting` (when `installTestingShim` is enabled).
 - `provideContext()` and `clearContext()` still work for now, but the upstream WebMCP spec removed them on March 5, 2026. The polyfill logs a deprecation warning and will remove them in the next major version.
+- `unregisterTool(name)` was removed from the WebMCP draft on April 23, 2026 in favor of `AbortSignal`-driven unregistration. The polyfill keeps it functional with a one-time deprecation warning; it will be removed in the next major version.
 
 ## Type Safety First
 
@@ -148,16 +149,36 @@ Restores previous `navigator.modelContext` and `navigator.modelContextTesting` d
 - Replaces the active tool registry with `options.tools`.
 - Clears previously registered tools before applying new tools.
 
-### `registerTool(tool)`
+### `registerTool(tool, options?)`
 
 - Requires a non-empty `name`, non-empty `description`, and `execute` function.
 - Throws on duplicate tool names.
 - If `inputSchema` is omitted, runtime defaults to `{ type: 'object', properties: {} }`.
+- `options.signal` (optional `AbortSignal`) — when the signal aborts, the tool is unregistered. If the signal is already aborted at registration time, the polyfill skips the registration and logs a warning (matching the April 23, 2026 spec step).
 
-### `unregisterTool(nameOrTool)`
+```ts
+const ac = new AbortController();
+navigator.modelContext.registerTool(
+  {
+    name: 'search',
+    description: 'Search docs',
+    inputSchema: { type: 'object', properties: {} },
+    async execute() {
+      return { content: [{ type: 'text', text: 'ok' }] };
+    },
+  },
+  { signal: ac.signal }
+);
+
+// Later — unregister cleanly:
+ac.abort();
+```
+
+### `unregisterTool(nameOrTool)` (deprecated)
 
 - Removes a tool by name. MCP-B compatibility runtimes also accept the originally registered tool object.
 - Unknown names are a no-op.
+- Logs a one-time deprecation warning. Prefer the `AbortSignal` form on `registerTool(tool, options)`.
 
 ### `clearContext()`
 
