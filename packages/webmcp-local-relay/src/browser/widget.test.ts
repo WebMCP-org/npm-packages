@@ -173,6 +173,8 @@ async function completeHandshake(
 function installEnvironment(options?: {
   referrer?: string;
   search?: string;
+  sendHelloAccepted?: boolean;
+  sendHelloRejected?: { message: string; reason: string } | false;
   sendServerHello?: boolean;
 }): WidgetTestEnv {
   const connections: RelayConnection[] = [];
@@ -195,7 +197,31 @@ function installEnvironment(options?: {
     relayLink.addEventListener('connection', ({ client }) => {
       const connection: RelayConnection = { client: client as RelayClient, messages: [] };
       client.addEventListener('message', (event) => {
-        connection.messages.push(parseWireData(event.data));
+        const payload = parseWireData(event.data);
+        connection.messages.push(payload);
+        if (!payload || typeof payload !== 'object') {
+          return;
+        }
+
+        const message = payload as { type?: unknown };
+        if (message.type !== 'hello') {
+          return;
+        }
+
+        if (options?.sendHelloRejected) {
+          client.send(
+            JSON.stringify({
+              type: 'hello/rejected',
+              message: options.sendHelloRejected.message,
+              reason: options.sendHelloRejected.reason,
+            })
+          );
+          return;
+        }
+
+        if (options?.sendHelloAccepted !== false) {
+          client.send(JSON.stringify({ type: 'hello/accepted' }));
+        }
       });
       if (options?.sendServerHello !== false) {
         client.send(
@@ -260,6 +286,8 @@ function installEnvironment(options?: {
 function startRuntime(options?: {
   referrer?: string;
   search?: string;
+  sendHelloAccepted?: boolean;
+  sendHelloRejected?: { message: string; reason: string } | false;
   sendServerHello?: boolean;
 }): WidgetTestEnv {
   const env = installEnvironment(options);
@@ -513,7 +541,15 @@ describe('widget runtime', () => {
       relayLink.addEventListener('connection', ({ client }) => {
         const connection: RelayConnection = { client: client as RelayClient, messages: [] };
         client.addEventListener('message', (event) => {
-          connection.messages.push(parseWireData(event.data));
+          const payload = parseWireData(event.data);
+          connection.messages.push(payload);
+          if (
+            payload &&
+            typeof payload === 'object' &&
+            (payload as { type?: unknown }).type === 'hello'
+          ) {
+            client.send(JSON.stringify({ type: 'hello/accepted' }));
+          }
         });
         client.send(
           JSON.stringify({
@@ -806,6 +842,75 @@ describe('widget runtime', () => {
 
     await waitForConnection(env, 2);
     await waitForPostedMessage(env, 'webmcp.tools.list.request', 2);
+  });
+
+  it('surfaces structured hello rejection before the socket closes', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const env = startRuntime({
+      sendHelloRejected: {
+        message: 'Host page origin is not allowed by this relay.',
+        reason: 'host-origin-not-allowed',
+      },
+    });
+
+    const request = await waitForPostedMessage(env, 'webmcp.tools.list.request');
+    env.hostWindow.dispatchMessage(APP_ORIGIN, {
+      requestId: request.payload.requestId,
+      tools: [{ name: 'sum' }],
+      type: 'webmcp.tools.list.response',
+    });
+
+    const connection = await waitForConnection(env);
+    await vi.waitFor(() => {
+      expect(connection.messages).toHaveLength(1);
+    });
+
+    expect(connection.messages[0]).toMatchObject({
+      origin: APP_ORIGIN,
+      type: 'hello',
+    });
+
+    await vi.waitFor(() => {
+      expect(error).toHaveBeenCalledWith(
+        '[webmcp-relay-widget] Relay rejected browser hello:',
+        'host-origin-not-allowed',
+        'Host page origin is not allowed by this relay.'
+      );
+    });
+
+    await vi.waitFor(() => {
+      expect(getPostedMessages(env, 'webmcp.relay.rejected')).toHaveLength(1);
+    });
+  });
+
+  it('falls back to legacy relay behavior when hello is never acknowledged', async () => {
+    const env = startRuntime({
+      sendHelloAccepted: false,
+    });
+
+    const request = await waitForPostedMessage(env, 'webmcp.tools.list.request');
+    env.hostWindow.dispatchMessage(APP_ORIGIN, {
+      requestId: request.payload.requestId,
+      tools: [{ name: 'sum', description: 'Adds numbers' }],
+      type: 'webmcp.tools.list.response',
+    });
+
+    const connection = await waitForConnection(env);
+    await vi.waitFor(
+      () => {
+        expect(connection.messages).toHaveLength(2);
+      },
+      { timeout: 1000 }
+    );
+
+    expect(connection.messages[0]).toMatchObject({
+      origin: APP_ORIGIN,
+      type: 'hello',
+    });
+    expect(connection.messages[1]).toEqual({
+      tools: [{ description: 'Adds numbers', name: 'sum' }],
+      type: 'tools/list',
+    });
   });
 
   it('starts without emitting websocket warnings during a healthy connection', async () => {

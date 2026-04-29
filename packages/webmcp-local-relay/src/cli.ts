@@ -87,6 +87,18 @@ const shutdown = async (signal: string) => {
 
 let shuttingDown = false;
 
+process.on('uncaughtException', (err) => {
+  process.stderr.write(
+    `[webmcp-local-relay] error: uncaught exception: ${err.stack ?? err.message}\n`
+  );
+  void shutdown('uncaughtException');
+});
+process.on('unhandledRejection', (reason) => {
+  const message = reason instanceof Error ? (reason.stack ?? reason.message) : String(reason);
+  process.stderr.write(`[webmcp-local-relay] error: unhandled rejection: ${message}\n`);
+  void shutdown('unhandledRejection');
+});
+
 process.on('SIGINT', () => {
   void shutdown('SIGINT');
 });

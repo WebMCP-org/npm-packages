@@ -117,12 +117,14 @@ export class LocalRelayMcpServer {
               result as Record<string, unknown>
             );
           } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
             process.stderr.write(
-              `[webmcp-local-relay] warn: elicitation forwarding failed: ${err instanceof Error ? err.message : String(err)}\n`
+              `[webmcp-local-relay] warn: elicitation forwarding failed: ${message}\n`
             );
             this.bridge.sendElicitationResponse(request.connectionId, request.callId, {
               action: 'decline',
               content: null,
+              error: message,
             });
           }
         })();
@@ -153,6 +155,12 @@ export class LocalRelayMcpServer {
 
     await this.mcpServer.connect(transport);
     this.connected = true;
+
+    this.mcpServer.server.onerror = (error) => {
+      process.stderr.write(
+        `[webmcp-local-relay] error: MCP protocol error: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`
+      );
+    };
   }
 
   /**
