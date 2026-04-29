@@ -22,6 +22,8 @@ import {
   RelayClientToServerMessageSchema,
   type RelayServerToClientMessage,
   RelayServerToClientMessageSchema,
+  type RelayHelloAcceptedMessage,
+  type RelayHelloRejectedMessage,
   type RelaySourceInfo,
   type RelayToBrowserMessage,
   type ServerHelloMessage,
@@ -666,15 +668,29 @@ export class RelayBridgeServer extends EventEmitter {
     switch (message.type) {
       case 'hello':
         try {
+          const socket = this.socketByConnectionId.get(connectionId);
           if (!this.isHostOriginAllowed(message.origin)) {
             process.stderr.write(
               `[webmcp-local-relay] warn: rejecting source ${connectionId} with disallowed host origin: ${message.origin ?? 'missing'}\n`
             );
-            const socket = this.socketByConnectionId.get(connectionId);
-            socket?.close(1008, 'Host origin not allowed');
+            if (socket) {
+              this.sendHelloRejected(
+                socket,
+                {
+                  type: 'hello/rejected',
+                  reason: 'host-origin-not-allowed',
+                  message: 'Host page origin is not allowed by this relay.',
+                },
+                1008,
+                'Host origin not allowed'
+              );
+            }
             break;
           }
           this.registry.upsertSource(connectionId, message);
+          if (socket) {
+            this.sendHelloAccepted(socket, { type: 'hello/accepted' });
+          }
           this.emit('stateChanged');
         } catch (err) {
           process.stderr.write(
@@ -1292,6 +1308,39 @@ export class RelayBridgeServer extends EventEmitter {
     }
 
     return this.allowedOrigins.includes(origin);
+  }
+
+  private sendHelloAccepted(socket: WebSocket, message: RelayHelloAcceptedMessage): void {
+    try {
+      socket.send(JSON.stringify(message));
+    } catch (err) {
+      process.stderr.write(
+        `[webmcp-local-relay] warn: failed to send hello acceptance: ${err instanceof Error ? err.message : String(err)}\n`
+      );
+      socket.close(1011, 'Failed to send hello acceptance');
+    }
+  }
+
+  private sendHelloRejected(
+    socket: WebSocket,
+    message: RelayHelloRejectedMessage,
+    closeCode: number,
+    closeReason: string
+  ): void {
+    try {
+      socket.send(JSON.stringify(message), () => {
+        try {
+          socket.close(closeCode, closeReason);
+        } catch {
+          // Ignore close failures after a rejection send attempt.
+        }
+      });
+    } catch (err) {
+      process.stderr.write(
+        `[webmcp-local-relay] warn: failed to send hello rejection: ${err instanceof Error ? err.message : String(err)}\n`
+      );
+      socket.close(closeCode, closeReason);
+    }
   }
 
   /**

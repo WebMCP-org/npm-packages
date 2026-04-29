@@ -302,21 +302,30 @@ function subscribeToToolChanges(): void {
   }
 
   let retries = 0;
-  const MAX_RETRIES = 50;
-  const RETRY_INTERVAL_MS = 100;
-  const retryTimer = setInterval(() => {
-    retries++;
-    if (trySubscribe()) {
-      clearInterval(retryTimer);
-      return;
-    }
-    if (retries >= MAX_RETRIES) {
-      clearInterval(retryTimer);
-      debugWarn(
-        `Could not subscribe to tool changes after ${MAX_RETRIES} retries. Dynamic tool updates will not be relayed.`
-      );
-    }
-  }, RETRY_INTERVAL_MS);
+  let retryDelayMs = 100;
+  const MAX_RETRIES = 40;
+  const MAX_RETRY_DELAY_MS = 1000;
+
+  const scheduleRetry = (): void => {
+    setTimeout(() => {
+      retries++;
+      if (trySubscribe()) {
+        return;
+      }
+
+      if (retries >= MAX_RETRIES) {
+        debugWarn(
+          `Could not subscribe to tool changes after ${MAX_RETRIES} retries. Dynamic tool updates will not be relayed.`
+        );
+        return;
+      }
+
+      retryDelayMs = Math.min(Math.round(retryDelayMs * 1.5), MAX_RETRY_DELAY_MS);
+      scheduleRetry();
+    }, retryDelayMs);
+  };
+
+  scheduleRetry();
 }
 
 function respondToSource(
@@ -393,7 +402,10 @@ function installElicitBridge(widgetSource: MessageEventSource, widgetOrigin: str
         ) => Promise<Record<string, unknown>>;
       })
     | undefined;
-  if (!mc || typeof mc.elicitInput !== 'function') return;
+  if (!mc || typeof mc.elicitInput !== 'function') {
+    debugWarn('Elicitation bridge not installed: elicitInput not available on modelContext');
+    return;
+  }
 
   mc.elicitInput = (
     params: Record<string, unknown>,
@@ -401,6 +413,19 @@ function installElicitBridge(widgetSource: MessageEventSource, widgetOrigin: str
   ): Promise<Record<string, unknown>> => {
     const callId = createElicitCallId();
     return new Promise<Record<string, unknown>>((resolve) => {
+      const ELICIT_TIMEOUT_MS = 60_000;
+
+      const cleanup = (): void => {
+        window.removeEventListener('message', handler);
+        clearTimeout(timeout);
+      };
+
+      const timeout = setTimeout(() => {
+        cleanup();
+        debugWarn('Elicitation request timed out after 60s');
+        resolve({ action: 'decline', content: null });
+      }, ELICIT_TIMEOUT_MS);
+
       const handler = (event: MessageEvent): void => {
         if (event.origin !== widgetOrigin) return;
         const data = event.data as Record<string, unknown>;
@@ -411,7 +436,7 @@ function installElicitBridge(widgetSource: MessageEventSource, widgetOrigin: str
         ) {
           return;
         }
-        window.removeEventListener('message', handler);
+        cleanup();
         resolve(
           isJsonObject(data.result)
             ? (data.result as Record<string, unknown>)
@@ -501,7 +526,11 @@ async function injectRelayWidget(cfg: RelayConfig): Promise<void> {
   let blobUrl: string | null = null;
   try {
     const response = await fetch(cfg.widgetUrl);
-    if (response.ok) {
+    if (!response.ok) {
+      console.warn(
+        `[webmcp-relay-embed] Widget HTML fetch returned ${String(response.status)}; falling back to direct iframe src.`
+      );
+    } else if (response.ok) {
       const html = await response.text();
       const configScript = `<script>window.__WEBMCP_RELAY_CONFIG=${JSON.stringify(Object.fromEntries(searchParams))};</script>`;
       const blob = new Blob([html.replace('</head>', `${configScript}</head>`)], {
@@ -578,12 +607,15 @@ if (!document.querySelector(RELAY_IFRAME_SELECTOR)) {
     }
   });
 
-  if (document.body) {
-    void injectRelayWidget(config);
-  } else {
-    document.addEventListener('DOMContentLoaded', () => void injectRelayWidget(config), {
-      once: true,
+  const launchWidget = (): void => {
+    injectRelayWidget(config).catch((err) => {
+      console.error('[webmcp-relay-embed] Failed to inject relay widget:', err);
     });
+  };
+  if (document.body) {
+    launchWidget();
+  } else {
+    document.addEventListener('DOMContentLoaded', launchWidget, { once: true });
   }
 
   subscribeToToolChanges();

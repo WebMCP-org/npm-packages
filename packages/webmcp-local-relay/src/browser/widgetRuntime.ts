@@ -59,6 +59,16 @@ interface RelayHelloMessage {
   workspace?: string;
 }
 
+interface RelayHelloAcceptedMessage {
+  type: 'hello/accepted';
+}
+
+interface RelayHelloRejectedMessage {
+  type: 'hello/rejected';
+  message: string;
+  reason: string;
+}
+
 interface RelayEndpoint {
   hello: RelayHelloMessage;
   host: string;
@@ -81,6 +91,7 @@ const RECONNECT_INITIAL_DELAY_MS = 500;
 const RECONNECT_MAX_DELAY_MS = 3000;
 const DEFAULT_REQUEST_TIMEOUT_MS = 60000;
 const RELAY_SERVER_HELLO_TIMEOUT_MS = 1200;
+const RELAY_HELLO_ACK_TIMEOUT_MS = 250;
 const MAX_ENDPOINT_FAILURES_BEFORE_REDISCOVERY = 5;
 
 export function parseConfig(search = window.location.search): WidgetConfig | null {
@@ -210,6 +221,33 @@ function parseRelayHello(value: unknown): RelayHelloMessage | null {
   };
 }
 
+function parseRelayHelloAccepted(value: unknown): RelayHelloAcceptedMessage | null {
+  if (!isJsonObject(value) || value.type !== 'hello/accepted') {
+    return null;
+  }
+
+  return {
+    type: 'hello/accepted',
+  };
+}
+
+function parseRelayHelloRejected(value: unknown): RelayHelloRejectedMessage | null {
+  if (
+    !isJsonObject(value) ||
+    value.type !== 'hello/rejected' ||
+    typeof value.message !== 'string' ||
+    typeof value.reason !== 'string'
+  ) {
+    return null;
+  }
+
+  return {
+    type: 'hello/rejected',
+    message: value.message,
+    reason: value.reason,
+  };
+}
+
 function cacheKeyForConfig(config: WidgetConfig): string {
   return buildRelayEndpointCacheKey({
     hostOrigin: config.hostOrigin,
@@ -263,6 +301,18 @@ function writeCachedEndpoint(config: WidgetConfig, endpoint: RelayEndpoint): voi
         port: endpoint.port,
       })
     );
+  } catch {
+    // Ignore sessionStorage failures in sandboxed/private browsing contexts.
+  }
+}
+
+function clearCachedEndpoint(config: WidgetConfig): void {
+  if (typeof sessionStorage === 'undefined') {
+    return;
+  }
+
+  try {
+    sessionStorage.removeItem(cacheKeyForConfig(config));
   } catch {
     // Ignore sessionStorage failures in sandboxed/private browsing contexts.
   }
@@ -378,7 +428,8 @@ export function runWidget(cfg: WidgetConfig): void {
   let activeEndpoint: RelayEndpoint | null = null;
   let activeSocket: WebSocket | null = null;
   let consecutiveEndpointFailures = 0;
-  let helloSent = false;
+  let helloAccepted = false;
+  let helloAckTimer: ReturnType<typeof setTimeout> | null = null;
   let reconnectDelayMs = RECONNECT_INITIAL_DELAY_MS;
   let scheduledReconnect: ReturnType<typeof setTimeout> | null = null;
   let state: RelayRuntimeState = 'idle';
@@ -420,6 +471,20 @@ export function runWidget(cfg: WidgetConfig): void {
   }
 
   const activateSocket = (socket: WebSocket, endpoint: RelayEndpoint): void => {
+    let initialTools: unknown[] = [];
+
+    const clearHelloAckTimer = (): void => {
+      if (!helloAckTimer) {
+        return;
+      }
+      clearTimeout(helloAckTimer);
+      helloAckTimer = null;
+    };
+
+    const sendInitialTools = (): void => {
+      safeSend(socket, JSON.stringify({ type: 'tools/list', tools: initialTools }));
+    };
+
     if (scheduledReconnect) {
       clearTimeout(scheduledReconnect);
       scheduledReconnect = null;
@@ -428,9 +493,8 @@ export function runWidget(cfg: WidgetConfig): void {
     activeEndpoint = endpoint;
     activeSocket = socket;
     reconnectDelayMs = RECONNECT_INITIAL_DELAY_MS;
-    helloSent = false;
+    helloAccepted = false;
     setState('connected');
-    writeCachedEndpoint(cfg, endpoint);
 
     socket.addEventListener('message', (event) => {
       let relayMessage: Record<string, unknown>;
@@ -448,6 +512,43 @@ export function runWidget(cfg: WidgetConfig): void {
           host: endpoint.host,
           port: endpoint.port,
         };
+        return;
+      }
+
+      const helloAcceptedMessage = parseRelayHelloAccepted(relayMessage);
+      if (helloAcceptedMessage) {
+        clearHelloAckTimer();
+        helloAccepted = true;
+        writeCachedEndpoint(cfg, endpoint);
+        sendInitialTools();
+        return;
+      }
+
+      const helloRejected = parseRelayHelloRejected(relayMessage);
+      if (helloRejected) {
+        clearHelloAckTimer();
+        helloAccepted = false;
+        clearCachedEndpoint(cfg);
+        window.parent.postMessage(
+          {
+            type: 'webmcp.relay.rejected',
+            host: endpoint.host,
+            port: endpoint.port,
+            message: helloRejected.message,
+            reason: helloRejected.reason,
+          },
+          cfg.hostOrigin
+        );
+        console.error(
+          '[webmcp-relay-widget] Relay rejected browser hello:',
+          helloRejected.reason,
+          helloRejected.message
+        );
+        try {
+          socket.close(1008, helloRejected.message);
+        } catch {
+          // Ignore close failures after a structured rejection.
+        }
         return;
       }
 
@@ -530,8 +631,9 @@ export function runWidget(cfg: WidgetConfig): void {
           return;
         }
 
-        helloSent = false;
+        helloAccepted = false;
         activeSocket = null;
+        clearHelloAckTimer();
         rejectPendingRequests('WebSocket connection lost');
         consecutiveEndpointFailures += 1;
 
@@ -557,7 +659,7 @@ export function runWidget(cfg: WidgetConfig): void {
 
     requestHost('webmcp.tools.list', {})
       .then((message) => {
-        const tools = Array.isArray(message.tools) ? message.tools : [];
+        initialTools = Array.isArray(message.tools) ? message.tools : [];
         safeSend(
           socket,
           JSON.stringify({
@@ -568,8 +670,17 @@ export function runWidget(cfg: WidgetConfig): void {
             url: cfg.hostUrl,
           })
         );
-        safeSend(socket, JSON.stringify({ type: 'tools/list', tools }));
-        helloSent = true;
+        helloAckTimer = setTimeout(() => {
+          helloAckTimer = null;
+          if (activeSocket !== socket || socket.readyState !== WebSocket.OPEN || helloAccepted) {
+            return;
+          }
+
+          // Legacy relays accept browser hello but never acknowledge it.
+          helloAccepted = true;
+          writeCachedEndpoint(cfg, endpoint);
+          sendInitialTools();
+        }, RELAY_HELLO_ACK_TIMEOUT_MS);
       })
       .catch((error) => {
         console.warn('[webmcp-relay-widget] Hello handshake failed:', error);
@@ -685,7 +796,7 @@ export function runWidget(cfg: WidgetConfig): void {
 
     const data = event.data;
     if (isJsonObject(data) && data.type === 'webmcp.tools.changed') {
-      if (activeSocket && helloSent) {
+      if (activeSocket && helloAccepted) {
         safeSend(
           activeSocket,
           JSON.stringify({

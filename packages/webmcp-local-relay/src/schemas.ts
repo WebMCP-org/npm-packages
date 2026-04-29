@@ -135,6 +135,32 @@ export const ServerHelloMessageSchema = z.object({
 export type ServerHelloMessage = z.infer<typeof ServerHelloMessageSchema>;
 
 /**
+ * Schema for acceptance of a browser source hello message.
+ */
+export const RelayHelloAcceptedMessageSchema = z.object({
+  type: z.literal('hello/accepted'),
+});
+
+/**
+ * Acceptance payload for a browser source hello message.
+ */
+export type RelayHelloAcceptedMessage = z.infer<typeof RelayHelloAcceptedMessageSchema>;
+
+/**
+ * Schema for rejection of a browser source hello message.
+ */
+export const RelayHelloRejectedMessageSchema = z.object({
+  type: z.literal('hello/rejected'),
+  reason: z.string().min(1),
+  message: z.string().min(1),
+});
+
+/**
+ * Rejection payload for a browser source hello message.
+ */
+export type RelayHelloRejectedMessage = z.infer<typeof RelayHelloRejectedMessageSchema>;
+
+/**
  * Schema for relay invocation messages sent to browser sources.
  */
 export const RelayInvokeMessageSchema = z.object({
@@ -174,6 +200,8 @@ export const RelayElicitationResponseSchema = z.object({
  */
 export const RelayToBrowserMessageSchema = z.discriminatedUnion('type', [
   ServerHelloMessageSchema,
+  RelayHelloAcceptedMessageSchema,
+  RelayHelloRejectedMessageSchema,
   RelayInvokeMessageSchema,
   RelayPingMessageSchema,
   RelayReloadMessageSchema,
