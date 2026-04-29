@@ -581,6 +581,64 @@ describe('global adapter', () => {
     }
   });
 
+  it('uses AbortSignal cleanup when native mirrors omit unregisterTool', () => {
+    const nativeToolNames = new Set<string>();
+    const nativeRegisterTool = vi.fn(
+      (
+        tool: Parameters<BrowserMcpServer['registerTool']>[0],
+        options?: { signal?: AbortSignal }
+      ) => {
+        nativeToolNames.add(tool.name);
+        options?.signal?.addEventListener(
+          'abort',
+          () => {
+            nativeToolNames.delete(tool.name);
+          },
+          { once: true }
+        );
+      }
+    );
+    const nativeContext = {
+      provideContext: vi.fn(),
+      registerTool: nativeRegisterTool,
+      clearContext: vi.fn(),
+      listTools: () => [...nativeToolNames].map((name) => ({ name })),
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => true,
+    } as unknown as Navigator['modelContext'];
+    const server = new BrowserMcpServer(
+      { name: 'native-signal-test', version: '1.0.0' },
+      {
+        native: nativeContext,
+      }
+    );
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      server.registerTool({
+        name: 'signal_only_native_tool',
+        description: 'Native signal-only cleanup tool',
+        inputSchema: { type: 'object', properties: {} },
+        async execute() {
+          return { content: [{ type: 'text', text: 'ok' }] };
+        },
+      });
+
+      expect(nativeToolNames.has('signal_only_native_tool')).toBe(true);
+      expect(nativeRegisterTool).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'signal_only_native_tool' }),
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
+      );
+
+      expect(() => server.unregisterTool('signal_only_native_tool')).not.toThrow();
+      expect(nativeToolNames.has('signal_only_native_tool')).toBe(false);
+    } finally {
+      warnSpy.mockRestore();
+      void server.close();
+    }
+  });
+
   it('warns that clearContext is deprecated while preserving behavior', () => {
     initializeWebModelContext();
 

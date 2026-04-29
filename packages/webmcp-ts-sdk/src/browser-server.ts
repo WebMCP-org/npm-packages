@@ -172,6 +172,15 @@ type ParentRegisterPromptFn = (
 
 type NativeToolsApi = ModelContextCore & Pick<ModelContextExtensions, 'listTools' | 'callTool'>;
 type RegisteredToolHandle = { unregister: () => void };
+type NativeRegisterToolFn = (
+  tool: ToolDescriptor,
+  options?: ModelContextRegisterToolOptions
+) => void;
+type NativeUnregisterToolFn = (nameOrTool: string | ModelContextToolReference) => void;
+interface NativeToolCleanup {
+  abort: () => void;
+  nativeSignalAccepted: boolean;
+}
 
 /**
  * Browser-optimized MCP Server that speaks WebMCP natively.
@@ -196,6 +205,7 @@ export class BrowserMcpServer extends BaseMcpServer {
   private _provideContextDeprecationWarned = false;
   private _clearContextDeprecationWarned = false;
   private _unregisterToolDeprecationWarned = false;
+  private _nativeToolCleanups = new Map<string, NativeToolCleanup>();
 
   constructor(serverInfo: Implementation, options?: BrowserMcpServerOptions) {
     const validator = new PolyfillJsonSchemaValidator();
@@ -320,6 +330,111 @@ export class BrowserMcpServer extends BaseMcpServer {
     return candidate as NativeToolsApi;
   }
 
+  private getNativeUnregisterTool(): NativeUnregisterToolFn | undefined {
+    if (!this.native) {
+      return undefined;
+    }
+
+    const unregisterTool = (this.native as { unregisterTool?: unknown }).unregisterTool;
+    if (typeof unregisterTool !== 'function') {
+      return undefined;
+    }
+
+    return (nameOrTool: string | ModelContextToolReference) =>
+      unregisterTool.call(this.native, nameOrTool);
+  }
+
+  private createNativeToolCleanup(signal?: AbortSignal): {
+    options: ModelContextRegisterToolOptions;
+    abort: () => void;
+  } {
+    const controller = new AbortController();
+    let removeSignalListener: (() => void) | undefined;
+
+    if (signal) {
+      const abortNativeSignal = () => {
+        controller.abort();
+      };
+
+      if (signal.aborted) {
+        abortNativeSignal();
+      } else {
+        signal.addEventListener('abort', abortNativeSignal, { once: true });
+        removeSignalListener = () => signal.removeEventListener('abort', abortNativeSignal);
+      }
+    }
+
+    return {
+      options: { signal: controller.signal },
+      abort: () => {
+        removeSignalListener?.();
+        if (!controller.signal.aborted) {
+          controller.abort();
+        }
+      },
+    };
+  }
+
+  private registerNativeToolMirror(
+    tool: ToolDescriptor,
+    signal?: AbortSignal
+  ): NativeToolCleanup | undefined {
+    if (!this.native) {
+      return undefined;
+    }
+
+    const nativeRegister = this.native.registerTool as NativeRegisterToolFn;
+    const nativeUnregisterTool = this.getNativeUnregisterTool();
+    const shouldPassSignal = Boolean(signal) || !nativeUnregisterTool;
+    const cleanup = shouldPassSignal ? this.createNativeToolCleanup(signal) : undefined;
+
+    try {
+      if (cleanup) {
+        nativeRegister.call(this.native, tool, cleanup.options);
+      } else {
+        nativeRegister.call(this.native, tool);
+      }
+    } catch (error) {
+      cleanup?.abort();
+      throw error;
+    }
+
+    if (!cleanup) {
+      return undefined;
+    }
+
+    const nativeToolCleanup = {
+      abort: cleanup.abort,
+      // Web IDL optional arguments may not increase function.length. When
+      // unregisterTool is absent, the signal is the only native cleanup path.
+      nativeSignalAccepted: nativeRegister.length >= 2 || !nativeUnregisterTool,
+    };
+    this._nativeToolCleanups.set(tool.name, nativeToolCleanup);
+    return nativeToolCleanup;
+  }
+
+  private unregisterNativeToolMirror(
+    name: string,
+    options?: { preferAbortSignal?: boolean }
+  ): void {
+    const cleanup = this._nativeToolCleanups.get(name);
+    this._nativeToolCleanups.delete(name);
+
+    const nativeUnregisterTool = this.getNativeUnregisterTool();
+    const shouldUseAbortOnly = options?.preferAbortSignal && cleanup?.nativeSignalAccepted === true;
+
+    if (shouldUseAbortOnly || !nativeUnregisterTool) {
+      cleanup?.abort();
+      return;
+    }
+
+    try {
+      nativeUnregisterTool(name);
+    } finally {
+      cleanup?.abort();
+    }
+  }
+
   private registerToolInServer(tool: ToolDescriptor): RegisteredToolHandle {
     const inputSchema = this.toTransportSchema(tool.inputSchema);
 
@@ -392,19 +507,7 @@ export class BrowserMcpServer extends BaseMcpServer {
       return { unregister: () => {} };
     }
 
-    let nativeAcceptedSignal = false;
-    if (this.native) {
-      const nativeRegister = this.native.registerTool as (
-        tool: ToolDescriptor,
-        options?: ModelContextRegisterToolOptions
-      ) => void;
-      if (nativeRegister.length >= 2) {
-        nativeRegister.call(this.native, tool, signal ? { signal } : undefined);
-        nativeAcceptedSignal = Boolean(signal);
-      } else {
-        nativeRegister.call(this.native, tool);
-      }
-    }
+    this.registerNativeToolMirror(tool, signal);
 
     let handle: RegisteredToolHandle;
     try {
@@ -412,7 +515,7 @@ export class BrowserMcpServer extends BaseMcpServer {
     } catch (error) {
       if (this.native) {
         try {
-          this.native.unregisterTool(tool.name);
+          this.unregisterNativeToolMirror(tool.name);
         } catch (rollbackError) {
           console.error(
             '[BrowserMcpServer] Rollback of native tool registration failed:',
@@ -428,15 +531,10 @@ export class BrowserMcpServer extends BaseMcpServer {
         'abort',
         () => {
           this._parentTools[tool.name]?.remove();
-          if (this.native && !nativeAcceptedSignal) {
-            try {
-              this.native.unregisterTool(tool.name);
-            } catch (error) {
-              console.warn(
-                '[BrowserMcpServer] Native unregister via abort fallback failed:',
-                error
-              );
-            }
+          try {
+            this.unregisterNativeToolMirror(tool.name, { preferAbortSignal: true });
+          } catch (error) {
+            console.warn('[BrowserMcpServer] Native unregister via abort fallback failed:', error);
           }
         },
         { once: true }
@@ -473,7 +571,7 @@ export class BrowserMcpServer extends BaseMcpServer {
     this._parentTools[name]?.remove();
 
     if (this.native) {
-      this.native.unregisterTool(name);
+      this.unregisterNativeToolMirror(name);
     }
   }
 
@@ -482,7 +580,7 @@ export class BrowserMcpServer extends BaseMcpServer {
       this._parentTools[name]?.remove();
       if (this.native) {
         try {
-          this.native.unregisterTool(name);
+          this.unregisterNativeToolMirror(name);
         } catch (error) {
           console.warn('[BrowserMcpServer] Native unregister during clear failed:', error);
         }
