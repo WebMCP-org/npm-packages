@@ -471,11 +471,7 @@ export function useWebMCP<
       }
 
       TOOL_OWNER_BY_NAME.delete(name);
-      try {
-        controller.abort();
-      } catch (error) {
-        console.warn('[ReactWebMCP:useWebMCP]', `Failed to unregister tool "${name}"`, error);
-      }
+      controller.abort();
     };
     // Spread operator in dependencies intentionally allows consumers to trigger
     // re-registration with custom reactive inputs.

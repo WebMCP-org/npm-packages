@@ -468,24 +468,6 @@ describe('global adapter', () => {
     expect(tools.some((tool) => tool.name === 'dynamic_tool')).toBe(false);
   });
 
-  it('warns that provideContext is deprecated while preserving behavior', () => {
-    initializeWebModelContext();
-
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-    try {
-      getModelContext().provideContext();
-      getModelContext().provideContext();
-
-      expect(warnSpy).toHaveBeenCalledWith(
-        '[BrowserMcpServer] navigator.modelContext.provideContext() is deprecated and will be removed in the next major version. Register tools individually with registerTool() instead.'
-      );
-      expect(warnSpy).toHaveBeenCalledTimes(1);
-    } finally {
-      warnSpy.mockRestore();
-    }
-  });
-
   it('unregisterTool and clearContext remove mirrored tools', () => {
     initializeWebModelContext();
 
@@ -639,21 +621,68 @@ describe('global adapter', () => {
     }
   });
 
-  it('warns that clearContext is deprecated while preserving behavior', () => {
-    initializeWebModelContext();
-
+  it('aborts signal-only native mirrors when the caller signal aborts', () => {
+    const nativeToolNames = new Set<string>();
+    const nativeRegisterTool = vi.fn(
+      (
+        tool: Parameters<BrowserMcpServer['registerTool']>[0],
+        options?: { signal?: AbortSignal }
+      ) => {
+        nativeToolNames.add(tool.name);
+        options?.signal?.addEventListener(
+          'abort',
+          () => {
+            nativeToolNames.delete(tool.name);
+          },
+          { once: true }
+        );
+      }
+    );
+    const nativeContext = {
+      provideContext: vi.fn(),
+      registerTool: nativeRegisterTool,
+      clearContext: vi.fn(),
+      listTools: () => [...nativeToolNames].map((name) => ({ name })),
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => true,
+    } as unknown as Navigator['modelContext'];
+    const server = new BrowserMcpServer(
+      { name: 'native-signal-abort-test', version: '1.0.0' },
+      {
+        native: nativeContext,
+      }
+    );
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const controller = new AbortController();
 
     try {
-      getModelContext().clearContext();
-      getModelContext().clearContext();
-
-      expect(warnSpy).toHaveBeenCalledWith(
-        '[BrowserMcpServer] navigator.modelContext.clearContext() is deprecated and will be removed in the next major version. Unregister individual tools instead.'
+      server.registerTool(
+        {
+          name: 'caller_signal_only_native_tool',
+          description: 'Native caller signal cleanup tool',
+          inputSchema: { type: 'object', properties: {} },
+          async execute() {
+            return { content: [{ type: 'text', text: 'ok' }] };
+          },
+        },
+        { signal: controller.signal }
       );
-      expect(warnSpy).toHaveBeenCalledTimes(1);
+
+      expect(
+        server.listTools().some((tool) => tool.name === 'caller_signal_only_native_tool')
+      ).toBe(true);
+      expect(nativeToolNames.has('caller_signal_only_native_tool')).toBe(true);
+
+      controller.abort();
+
+      expect(
+        server.listTools().some((tool) => tool.name === 'caller_signal_only_native_tool')
+      ).toBe(false);
+      expect(nativeToolNames.has('caller_signal_only_native_tool')).toBe(false);
     } finally {
       warnSpy.mockRestore();
+      void server.close();
     }
   });
 

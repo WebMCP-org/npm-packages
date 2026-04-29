@@ -551,13 +551,7 @@ export function useWebMCP<
       }
 
       TOOL_OWNER_BY_NAME.delete(name);
-      try {
-        controller.abort();
-      } catch (error) {
-        if (isDev()) {
-          console.warn(`[useWebMCP] Failed to unregister tool "${name}" during cleanup:`, error);
-        }
-      }
+      controller.abort();
     };
     // Spread operator in dependencies: Allows users to provide additional dependencies
     // via the `deps` parameter. While unconventional, this pattern is intentional to support
