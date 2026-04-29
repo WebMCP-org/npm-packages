@@ -32,6 +32,10 @@ export {
 export {
   type BrowserToRelayMessage,
   BrowserToRelayMessageSchema,
+  type RelayHelloAcceptedMessage,
+  RelayHelloAcceptedMessageSchema,
+  type RelayHelloRejectedMessage,
+  RelayHelloRejectedMessageSchema,
   type RelayClientToServerMessage,
   RelayClientToServerMessageSchema,
   type RelayDescriptor,

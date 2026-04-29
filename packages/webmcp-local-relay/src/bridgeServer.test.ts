@@ -215,11 +215,68 @@ describe('RelayBridgeServer', () => {
         })
       );
 
+      const rejection = await new Promise<Record<string, unknown>>((resolve, reject) => {
+        ws.on('message', (raw) => {
+          const message = JSON.parse(String(raw)) as Record<string, unknown>;
+          if (message.type === 'hello/rejected') {
+            resolve(message);
+          }
+        });
+        ws.on('error', reject);
+      });
+
       const closeCode = await new Promise<number>((resolve) => {
         ws.on('close', (code) => resolve(code));
       });
 
+      expect(rejection).toMatchObject({
+        type: 'hello/rejected',
+        reason: 'host-origin-not-allowed',
+      });
       expect(closeCode).toBe(1008);
+    } finally {
+      await bridge.stop();
+    }
+  });
+
+  it('acknowledges hello before accepting tools from an allowed source', async () => {
+    const bridge = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['https://trusted.example.com'],
+    });
+
+    try {
+      await bridge.start();
+
+      const ws = new WebSocket(`ws://127.0.0.1:${bridge.port}`);
+      const messages: Array<Record<string, unknown>> = [];
+      await new Promise<void>((resolve, reject) => {
+        ws.on('message', (raw) => {
+          messages.push(JSON.parse(String(raw)) as Record<string, unknown>);
+          if (
+            messages.some((message) => message.type === 'server-hello') &&
+            messages.some((message) => message.type === 'hello/accepted')
+          ) {
+            resolve();
+          }
+        });
+        ws.once('open', () => {
+          ws.send(
+            JSON.stringify({
+              type: 'hello',
+              tabId: 'tab-1',
+              origin: 'https://trusted.example.com',
+            })
+          );
+        });
+        ws.once('error', reject);
+      });
+
+      expect(messages.map((message) => message.type)).toContain('server-hello');
+      expect(messages.map((message) => message.type)).toContain('hello/accepted');
+
+      ws.close();
     } finally {
       await bridge.stop();
     }

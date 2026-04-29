@@ -12,6 +12,8 @@ import {
   RelayClientListToolsSchema,
   RelayClientToServerMessageSchema,
   RelayDescriptorSchema,
+  RelayHelloAcceptedMessageSchema,
+  RelayHelloRejectedMessageSchema,
   RelayInvokeMessageSchema,
   RelayPingMessageSchema,
   RelayReloadMessageSchema,
@@ -236,6 +238,22 @@ describe('BrowserToRelayMessageSchema', () => {
     });
     expect(result.success).toBe(true);
     expect(result.data?.type).toBe('server-hello');
+  });
+
+  it('parses a hello/accepted relay message', () => {
+    const result = RelayHelloAcceptedMessageSchema.safeParse({
+      type: 'hello/accepted',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('parses a hello/rejected relay message', () => {
+    const result = RelayHelloRejectedMessageSchema.safeParse({
+      type: 'hello/rejected',
+      reason: 'host-origin-not-allowed',
+      message: 'Host page origin is not allowed by this relay.',
+    });
+    expect(result.success).toBe(true);
   });
 
   it('rejects a message without a type field', () => {
