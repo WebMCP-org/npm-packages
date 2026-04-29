@@ -84,6 +84,16 @@ Custom relay port:
 ></script>
 ```
 
+Increase the per-request timeout (default `60000` ms) for tools that chain
+several slow API calls and might exceed one minute:
+
+```html
+<script
+  src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@latest/dist/browser/embed.js"
+  data-request-timeout="120000"
+></script>
+```
+
 Tool registration references:
 
 - [`@mcp-b/global` quick start and `registerTool`](../global/README.md)
@@ -229,12 +239,13 @@ For Chromium/Chrome Canary native preview testing:
 
 ### Troubleshooting
 
-| Problem                | Fix                                                                                                                                                                                             |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `No sources connected` | Ensure the page loaded `embed.js` and the relay process is running                                                                                                                              |
-| `No tools listed`      | Ensure tools are registered on the page's WebMCP runtime. If tools register after load, confirm your runtime emits tool-change notifications (`toolschanged` or `registerToolsChangedCallback`) |
-| `Tool not found`       | Tab reloaded or disconnected — call `webmcp_list_tools` again to refresh                                                                                                                        |
-| Connection blocked     | Verify `--widget-origin` matches your host page's origin (e.g., `https://myapp.com`), and relay port matches `data-relay-port`                                                                  |
+| Problem                  | Fix                                                                                                                                                                                             |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `No sources connected`   | Ensure the page loaded `embed.js` and the relay process is running                                                                                                                              |
+| `No tools listed`        | Ensure tools are registered on the page's WebMCP runtime. If tools register after load, confirm your runtime emits tool-change notifications (`toolschanged` or `registerToolsChangedCallback`) |
+| `Tool not found`         | Tab reloaded or disconnected — call `webmcp_list_tools` again to refresh                                                                                                                        |
+| Connection blocked       | Verify `--widget-origin` matches your host page's origin (e.g., `https://myapp.com`), and relay port matches `data-relay-port`                                                                  |
+| `Host response timeout:` | The host page took longer than the per-request timeout (default 60s) to respond. Increase via `data-request-timeout="<ms>"` on the embed script tag                                             |
 
 ---
 
@@ -244,17 +255,23 @@ For Chromium/Chrome Canary native preview testing:
 
 ```text
 src/
-├── cli.ts                 CLI entry point
-├── cli-utils.ts           CLI argument parsing
-├── mcpRelayServer.ts      MCP server (stdio + dynamic tool sync)
-├── bridgeServer.ts        WebSocket relay server
-├── registry.ts            Multi-source aggregation and deduplication
-├── naming.ts              Tool name sanitization and namespacing
-├── schemas.ts             Browser <-> relay protocol schemas
-├── browser/embed.js       Script-tag loader for website owners
-├── browser/widget.html    Hidden iframe bridge runtime
-└── index.ts               Public API exports
+├── cli.ts                      CLI entry point
+├── cli-utils.ts                CLI argument parsing
+├── mcpRelayServer.ts           MCP server (stdio + dynamic tool sync)
+├── bridgeServer.ts             WebSocket relay server
+├── registry.ts                 Multi-source aggregation and deduplication
+├── naming.ts                   Tool name sanitization and namespacing
+├── schemas.ts                  Browser <-> relay protocol schemas
+├── browser/embed.ts            Script-tag loader for website owners
+├── browser/widget.ts           Widget IIFE entry point (calls startWidgetRuntime)
+├── browser/widgetRuntime.ts    Hidden iframe bridge runtime
+├── browser/shared.ts           Shared browser-side utilities
+└── index.ts                    Public API exports
 ```
+
+`dist/browser/widget.html` is generated at build time by
+`scripts/build-widget-html.js`, which wraps the bundled `widget.js` (compiled
+from `widget.ts` + `widgetRuntime.ts`) into a minimal HTML shell.
 
 ### Build and Test
 
