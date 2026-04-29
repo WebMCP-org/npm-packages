@@ -27,6 +27,7 @@ export interface WidgetConfig {
   relayId?: string;
   relayPortHint?: number;
   relayWorkspace?: string;
+  requestTimeoutMs: number;
   tabId: string;
 }
 
@@ -78,7 +79,7 @@ type RelayRuntimeState =
 
 const RECONNECT_INITIAL_DELAY_MS = 500;
 const RECONNECT_MAX_DELAY_MS = 3000;
-const REQUEST_TIMEOUT_MS = 10000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 60000;
 const RELAY_SERVER_HELLO_TIMEOUT_MS = 1200;
 const MAX_ENDPOINT_FAILURES_BEFORE_REDISCOVERY = 5;
 
@@ -108,6 +109,11 @@ export function parseConfig(search = window.location.search): WidgetConfig | nul
   const autoConnect = getParam('autoConnect') !== 'false';
   const relayId = getParam('relayId') || undefined;
   const relayWorkspace = getParam('relayWorkspace') || undefined;
+  const requestTimeoutRaw = getParam('requestTimeout');
+  const requestTimeoutMs =
+    requestTimeoutRaw && requestTimeoutRaw.length > 0
+      ? Number.parseInt(requestTimeoutRaw, 10)
+      : DEFAULT_REQUEST_TIMEOUT_MS;
 
   if (!isLoopbackHost(relayHostHint)) {
     console.error(
@@ -125,6 +131,14 @@ export function parseConfig(search = window.location.search): WidgetConfig | nul
     return null;
   }
 
+  if (!Number.isInteger(requestTimeoutMs) || requestTimeoutMs < 1) {
+    console.error(
+      '[webmcp-relay-widget] requestTimeout must be a positive integer (ms), got:',
+      requestTimeoutRaw
+    );
+    return null;
+  }
+
   return {
     autoConnect,
     hostOrigin,
@@ -134,6 +148,7 @@ export function parseConfig(search = window.location.search): WidgetConfig | nul
     relayPortHint,
     ...(relayId ? { relayId } : {}),
     ...(relayWorkspace ? { relayWorkspace } : {}),
+    requestTimeoutMs,
     tabId,
   };
 }
@@ -387,7 +402,7 @@ export function runWidget(cfg: WidgetConfig): void {
       const timeoutId = setTimeout(() => {
         pendingRequests.delete(requestId);
         reject(new Error(`Host response timeout: ${baseType}`));
-      }, REQUEST_TIMEOUT_MS);
+      }, cfg.requestTimeoutMs);
 
       pendingRequests.set(requestId, {
         resolve,
