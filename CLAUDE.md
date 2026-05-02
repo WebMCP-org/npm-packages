@@ -6,16 +6,16 @@ Guidance for Claude Code when working with this repository.
 
 ```bash
 vp install            # Install dependencies
-pnpm build            # Build all packages
-pnpm typecheck        # Type checking
+vp run build          # Build all packages
+vp run typecheck      # Type checking
 vp check --fix        # Lint, format, and fix (Oxlint + Oxfmt)
 vp check              # Check without fixing (CI)
-pnpm check-all        # All checks (typecheck + lint)
-pnpm test:unit        # Unit tests only
-pnpm test:e2e         # E2E tests only
+vp run check-all      # All checks (typecheck + lint)
+vp run test:unit      # Unit tests only
+vp run test:e2e       # E2E tests only
 vp test run           # Run tests in current package
 vp pack               # Build current library package
-pnpm changeset        # Create a changeset for versioning
+changeset             # Create a changeset for versioning
 ```
 
 ## Structure

@@ -1,3 +1,4 @@
+import type { ToolInputSchema } from '@mcp-b/webmcp-types';
 import { expect, test } from '@playwright/test';
 
 function isDirectOrWrappedText(value: unknown, expectedText: string): boolean {
@@ -100,10 +101,11 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
 
       const toolName = `beta_list_tracking_${Date.now()}`;
       const before = testing.listTools().length;
+      const inputSchema = { type: 'object', properties: {} } as const satisfies ToolInputSchema;
       context.registerTool({
         name: toolName,
         description: 'Tracking test tool',
-        inputSchema: { type: 'object', properties: {} },
+        inputSchema,
         async execute() {
           return { content: [{ type: 'text', text: 'ok' }] };
         },
@@ -224,14 +226,15 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
       }
 
       const toolName = `beta_exec_ok_${Date.now()}`;
+      const inputSchema = {
+        type: 'object',
+        properties: { value: { type: 'number' } },
+        required: ['value'],
+      } as const satisfies ToolInputSchema;
       context.registerTool({
         name: toolName,
         description: 'executeTool happy path',
-        inputSchema: {
-          type: 'object',
-          properties: { value: { type: 'number' } },
-          required: ['value'],
-        },
+        inputSchema,
         async execute(args: { value: number }) {
           return { content: [{ type: 'text', text: `beta:${args.value}` }] };
         },
@@ -355,10 +358,11 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
       }
 
       const toolName = `beta_exec_throw_${Date.now()}`;
+      const inputSchema = { type: 'object', properties: {} } as const satisfies ToolInputSchema;
       context.registerTool({
         name: toolName,
         description: 'Always throws',
-        inputSchema: { type: 'object', properties: {} },
+        inputSchema,
         async execute() {
           throw new Error('boom');
         },
@@ -428,10 +432,11 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
       }
 
       const toolName = `beta_exec_abort_${Date.now()}`;
+      const inputSchema = { type: 'object', properties: {} } as const satisfies ToolInputSchema;
       context.registerTool({
         name: toolName,
         description: 'Slow abortable tool',
-        inputSchema: { type: 'object', properties: {} },
+        inputSchema,
         async execute() {
           await new Promise((resolve) => setTimeout(resolve, 200));
           return { content: [{ type: 'text', text: 'done' }] };
@@ -493,11 +498,12 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
 
       const dynamicName = `beta_cb_dynamic_${Date.now()}`;
       const providedName = `beta_cb_provided_${Date.now()}`;
+      const inputSchema = { type: 'object', properties: {} } as const satisfies ToolInputSchema;
 
       context.registerTool({
         name: dynamicName,
         description: 'dynamic callback test',
-        inputSchema: { type: 'object', properties: {} },
+        inputSchema,
         async execute() {
           return { content: [{ type: 'text', text: 'ok' }] };
         },
@@ -508,7 +514,7 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
           {
             name: providedName,
             description: 'provided callback test',
-            inputSchema: { type: 'object', properties: {} },
+            inputSchema,
             async execute() {
               return { content: [{ type: 'text', text: 'ok' }] };
             },
@@ -527,7 +533,7 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
         context.registerTool({
           name: `beta_cb_throw_${Date.now()}`,
           description: 'throwing listener operation',
-          inputSchema: { type: 'object', properties: {} },
+          inputSchema,
           async execute() {
             return { content: [{ type: 'text', text: 'ok' }] };
           },
@@ -601,16 +607,17 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
       }
 
       const toolName = `beta_schema_tool_${Date.now()}`;
+      const inputSchema = {
+        type: 'object',
+        properties: {
+          query: { type: 'string' },
+        },
+        required: ['query'],
+      } as const satisfies ToolInputSchema;
       context.registerTool({
         name: toolName,
         description: 'Schema verification tool',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            query: { type: 'string' },
-          },
-          required: ['query'],
-        },
+        inputSchema,
         async execute() {
           return { content: [{ type: 'text', text: 'ok' }] };
         },

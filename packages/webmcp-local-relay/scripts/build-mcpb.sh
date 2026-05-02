@@ -52,7 +52,7 @@ node -e "
   const pkg = JSON.parse(fs.readFileSync('$PKG_DIR/package.json', 'utf8'));
   const catalog = {
     '@modelcontextprotocol/sdk': '1.26.0',
-    'zod': '3.25.76'
+    'zod': '^4.0.0'
   };
   const deps = {};
   for (const [name, ver] of Object.entries(pkg.dependencies || {})) {

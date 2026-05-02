@@ -41,7 +41,7 @@ pnpm --filter mcp-e2e-tests test:native-showcase
 
 # Runtime-specific canonical E2E packages
 pnpm --filter @mcp-b/webmcp-local-relay test:e2e
-pnpm --filter @mcp-b/chrome-devtools-mcp test:e2e
+npm --prefix packages/chrome-devtools-mcp test
 pnpm --filter @mcp-b/extension-tools test:e2e
 
 # Tarball validation
@@ -52,6 +52,7 @@ Notes:
 
 - `pnpm test:e2e` is the canonical zero-mock umbrella and runs sequentially for stability.
 - `pnpm test:e2e:ui`, `pnpm test:e2e:headed`, and `pnpm test:e2e:debug` drive the Playwright `e2e/` package only. They do not run the relay, DevTools, or extension package E2E lanes.
+- `packages/chrome-devtools-mcp` is installed separately from the default workspace. See [Vendored Upstream Forks](./VENDORED_UPSTREAM_FORKS.md) before running its standalone test lane.
 
 ## Runtime Coverage Matrix
 
@@ -62,7 +63,7 @@ Notes:
 | Native Chromium           | `navigator.modelContext` / `navigator.modelContextTesting` | Native browser API                                  | `pnpm --filter mcp-e2e-tests test:native-contract:default` |
 | Native Chromium (flagged) | `navigator.modelContext` / `navigator.modelContextTesting` | Chrome Beta with WebMCP flags                       | `pnpm --filter mcp-e2e-tests test:native-contract:beta`    |
 | Local relay               | SDK `Client` over stdio                                    | Real relay server + real browser runtime            | `pnpm --filter @mcp-b/webmcp-local-relay test:e2e`         |
-| DevTools bridge           | SDK `Client` + `WebMCPClientTransport`                     | Real page discovered through DevTools bridge        | `pnpm --filter @mcp-b/chrome-devtools-mcp test:e2e`        |
+| DevTools bridge           | SDK `Client` + `WebMCPClientTransport`                     | Real page discovered through DevTools bridge        | `npm --prefix packages/chrome-devtools-mcp test`           |
 | Extension transport       | SDK `Client` + `ExtensionClientTransport`                  | Real MV3 extension using `ExtensionServerTransport` | `pnpm --filter @mcp-b/extension-tools test:e2e`            |
 
 ## Canonical E2E Assertions
@@ -159,7 +160,7 @@ These target the Playwright `e2e/` package only.
 
 ```bash
 pnpm --filter @mcp-b/webmcp-local-relay test:e2e
-pnpm --filter @mcp-b/chrome-devtools-mcp test:e2e
+npm --prefix packages/chrome-devtools-mcp test
 pnpm --filter @mcp-b/extension-tools test:e2e
 ```
 

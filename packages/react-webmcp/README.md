@@ -17,7 +17,7 @@
 | Feature                      | Benefit                                                                      |
 | ---------------------------- | ---------------------------------------------------------------------------- |
 | **React-First Design**       | Hooks follow React patterns with automatic cleanup and StrictMode support    |
-| **Type-Safe with Zod**       | Full TypeScript support with Zod schema validation for inputs/outputs        |
+| **Standards-First Schemas**  | Accepts JSON Schema, Standard Schema, and Standard JSON Schema authoring     |
 | **Two-Way Integration**      | Both expose tools TO AI agents AND consume tools FROM MCP servers            |
 | **Execution State Tracking** | Built-in loading, success, and error states for UI feedback                  |
 | **Works with Any AI**        | Compatible with Claude, ChatGPT, Gemini, Cursor, Copilot, and any MCP client |
@@ -25,10 +25,12 @@
 ## Installation
 
 ```bash
-pnpm add @mcp-b/react-webmcp zod
+pnpm add @mcp-b/react-webmcp
 ```
 
 If you only want strict core WebMCP hooks (without MCP-B extension APIs like prompts/resources/sampling/elicitation), use `usewebmcp` instead.
+
+If you want schema authoring with Zod, Valibot, or another Standard Schema library, install that library separately.
 
 For client functionality, you'll also need:
 
@@ -36,7 +38,7 @@ For client functionality, you'll also need:
 pnpm add @mcp-b/transports @modelcontextprotocol/sdk
 ```
 
-**Prerequisites:** Provider hooks require the `navigator.modelContext` API. Install `@mcp-b/global` or use a browser that implements the Web Model Context API.
+**Prerequisites:** Provider hooks require the `navigator.modelContext` API. Install and initialize `@mcp-b/global` for the full MCP-B provider-hook runtime, or use a browser/native runtime that exposes compatible WebMCP behavior.
 
 Provider hooks prefer a returned unregister handle when the runtime exposes one and fall back to `navigator.modelContext.unregisterTool(name)`. Current Chrome Beta 147 returns `undefined`, while MCP-B wrappers still expose a deprecated compatibility handle.
 
@@ -50,9 +52,9 @@ function PostsPage() {
   const likeTool = useWebMCP({
     name: 'posts_like',
     description: 'Like a post by ID. Increments the like count.',
-    inputSchema: {
+    inputSchema: z.object({
       postId: z.string().uuid().describe('The post ID to like'),
-    },
+    }),
     annotations: {
       title: 'Like Post',
       readOnlyHint: false,
@@ -121,6 +123,8 @@ function ToolConsumer() {
 | `useWebMCP(config, deps?)`                      | Register a tool with full control over behavior and state |
 | `useWebMCPContext(name, description, getValue)` | Simplified hook for read-only context exposure            |
 
+`useWebMCP` config supports `enabled` (conditional registration), `onStart` (pre-execution callback), and automatic schema memoization for JSON-serializable inline objects. Function-bearing schemas should still be hoisted or memoized. See [`usewebmcp` README](../usewebmcp/README.md) for full API details.
+
 ### Client Hooks
 
 | Hook / Component    | Description                                               |
@@ -128,9 +132,25 @@ function ToolConsumer() {
 | `McpClientProvider` | Provider component managing an MCP client connection      |
 | `useMcpClient()`    | Access client, tools, connection status, and capabilities |
 
-## Zod Version Compatibility
+## Schema Authoring
 
-This package supports **Zod 3.25.76+** (3.x only).
+Provider hooks accept:
+
+- plain JSON Schema objects
+- `StandardSchemaV1` schemas for input typing/validation
+- `StandardJSONSchemaV1` objects for JSON Schema export surfaces
+
+Registration still flows through `navigator.modelContext`, so MCP registration surfaces require JSON-exportable metadata. Validator-only Standard Schema inputs are rejected unless the runtime can derive JSON Schema export. When both `~standard.validate(...)` and JSON Schema export exist, the JSON Schema path is authoritative for validation parity.
+
+Zod remains a supported authoring option through `z.object(...)` and the Standard Schema interfaces it exposes. Zod 3 field-map shorthand is not supported.
+
+If you use plain JSON Schema literals and want exact TypeScript inference, make the object shape explicit:
+
+- use `as const satisfies ToolInputSchema` / `ToolOutputSchema`
+- put guaranteed keys in `required`
+- set `additionalProperties: false` on closed object shapes
+
+Without those, inference stays faithful to JSON Schema and can widen to optional/open object types.
 
 ## Documentation
 

@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vanilla IIFE + Zod 3 CDN Test</title>
+    <title>Vanilla IIFE + Zod 4 CDN Test</title>
     <script src="/node_modules/@mcp-b/global/dist/index.iife.js"></script>
     <style>
       * {
@@ -41,7 +41,7 @@
         font-weight: 600;
         text-transform: uppercase;
       }
-      .badge.zod3 {
+      .badge.zod4 {
         background: #fef3c7;
         color: #78350f;
       }
@@ -104,14 +104,14 @@
   </head>
   <body>
     <div class="container">
-      <h1>Vanilla IIFE + Zod 3 CDN Test</h1>
+      <h1>Vanilla IIFE + Zod 4 CDN Test</h1>
       <p class="subtitle">
         <span class="badge iife">IIFE Build</span>
-        <span class="badge zod3">Zod 3.25.x</span>
-        Testing validation with Zod 3 schemas from CDN
+        <span class="badge zod4">Zod 4.x</span>
+        Testing validation with Zod 4 schemas from CDN
       </p>
 
-      <div id="status">Loading Zod 3 from CDN...</div>
+      <div id="status">Loading Zod 4 from CDN...</div>
 
       <div class="section">
         <h2>Zod Version Check</h2>
@@ -130,8 +130,8 @@
     </div>
 
     <script type="module">
-      // Load Zod 3 from CDN
-      import { z } from 'https://cdn.jsdelivr.net/npm/zod@3.25.76/+esm';
+      // Load Zod 4 from CDN
+      import { z } from 'https://cdn.jsdelivr.net/npm/zod@4/+esm';
       window.z = z;
 
       const statusEl = document.getElementById('status');
@@ -150,20 +150,19 @@
       // Check Zod version
       const testSchema = z.string();
       const isZod4 = '_zod' in testSchema;
-      const isZod3 = '_def' in testSchema && !isZod4;
       zodVersionEl.innerHTML = `
-      <p style="color: ${isZod3 ? '#22543d' : '#742a2a'}; font-weight: bold;">
-        ${isZod3 ? '✓ Zod 3.x detected (correct)' : isZod4 ? '✗ Zod 4.x detected (wrong!)' : '✗ Unknown Zod version'}
+      <p style="color: ${isZod4 ? '#22543d' : '#742a2a'}; font-weight: bold;">
+        ${isZod4 ? '✓ Zod 4.x detected (correct)' : '✗ Unknown Zod version'}
       </p>
       <p style="color: #718096; font-size: 0.85rem;">
-        Has _def: ${!!testSchema._def}, Has _zod: ${'_zod' in testSchema}
+        Has _zod: ${'_zod' in testSchema}
       </p>
     `;
 
-      if (!isZod3) {
+      if (!isZod4) {
         statusEl.className = 'error';
         statusEl.textContent = 'Wrong Zod version loaded!';
-        log('ERROR: Expected Zod 3.x but got different version', 'error');
+        log('ERROR: Expected Zod 4.x but got different version', 'error');
         throw new Error('Wrong Zod version');
       }
 
@@ -175,33 +174,33 @@
         }
 
         statusEl.className = 'success';
-        statusEl.textContent = 'Zod 3 loaded + modelContext available - Running tests...';
+        statusEl.textContent = 'Zod 4 loaded + modelContext available - Running tests...';
 
         const mc = window.navigator.modelContext;
 
         try {
-          // Register tool with Zod 3 schemas
+          // Register tool with Zod 4 schemas
           mc.registerTool({
-            name: 'zod3-user-validator',
-            description: 'Validate user data using Zod 3 schemas',
-            inputSchema: {
+            name: 'zod4-user-validator',
+            description: 'Validate user data using Zod 4 schemas',
+            inputSchema: z.object({
               username: z.string().min(3).max(20).describe('Username (3-20 chars)'),
               email: z.string().email().describe('Valid email address'),
               age: z.number().int().min(18).max(120).describe('Age (18-120)'),
               tags: z.array(z.string()).optional().describe('Optional tags'),
-            },
+            }),
             async execute({ username, email, age, tags }) {
               return {
                 content: [
                   {
                     type: 'text',
-                    text: `Zod3 validated: ${username}, ${email}, age=${age}, tags=${tags?.join(',') || 'none'}`,
+                    text: `Zod4 validated: ${username}, ${email}, age=${age}, tags=${tags?.join(',') || 'none'}`,
                   },
                 ],
               };
             },
           });
-          log('Tool "zod3-user-validator" registered successfully', 'success');
+          log('Tool "zod4-user-validator" registered successfully', 'success');
 
           // Update tools list
           const tools = await mc.listTools();
@@ -216,7 +215,7 @@
 
           // Test 1: Valid input
           log('Test 1: Valid input...', 'info');
-          const r1 = await mc.executeTool('zod3-user-validator', {
+          const r1 = await mc.executeTool('zod4-user-validator', {
             username: 'validuser',
             email: 'test@example.com',
             age: 25,
@@ -228,7 +227,7 @@
 
           // Test 2: Valid with optional array
           log('Test 2: Valid input with optional array...', 'info');
-          const r2 = await mc.executeTool('zod3-user-validator', {
+          const r2 = await mc.executeTool('zod4-user-validator', {
             username: 'validuser',
             email: 'test@example.com',
             age: 30,
@@ -241,7 +240,7 @@
 
           // Test 3: Missing required field
           log('Test 3: Missing required field (email)...', 'info');
-          const r3 = await mc.executeTool('zod3-user-validator', {
+          const r3 = await mc.executeTool('zod4-user-validator', {
             username: 'testuser',
             age: 30,
           });
@@ -252,7 +251,7 @@
 
           // Test 4: Invalid type (age as string)
           log('Test 4: Invalid type (age as string)...', 'info');
-          const r4 = await mc.executeTool('zod3-user-validator', {
+          const r4 = await mc.executeTool('zod4-user-validator', {
             username: 'testuser',
             email: 'test@example.com',
             age: 'twenty-five',
@@ -264,7 +263,7 @@
 
           // Test 5: Value out of range (age too low)
           log('Test 5: Value out of range (age=15)...', 'info');
-          const r5 = await mc.executeTool('zod3-user-validator', {
+          const r5 = await mc.executeTool('zod4-user-validator', {
             username: 'testuser',
             email: 'test@example.com',
             age: 15,
@@ -276,7 +275,7 @@
 
           // Test 6: String too short (username)
           log('Test 6: String too short (username="ab")...', 'info');
-          const r6 = await mc.executeTool('zod3-user-validator', {
+          const r6 = await mc.executeTool('zod4-user-validator', {
             username: 'ab',
             email: 'test@example.com',
             age: 25,
@@ -288,7 +287,7 @@
 
           // Test 7: Invalid email format
           log('Test 7: Invalid email format...', 'info');
-          const r7 = await mc.executeTool('zod3-user-validator', {
+          const r7 = await mc.executeTool('zod4-user-validator', {
             username: 'testuser',
             email: 'not-an-email',
             age: 25,
@@ -300,7 +299,7 @@
 
           // Test 8: Invalid array item type
           log('Test 8: Invalid array item type (tags with number)...', 'info');
-          const r8 = await mc.executeTool('zod3-user-validator', {
+          const r8 = await mc.executeTool('zod4-user-validator', {
             username: 'testuser',
             email: 'test@example.com',
             age: 25,

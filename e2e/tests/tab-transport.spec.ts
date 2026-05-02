@@ -1,3 +1,4 @@
+import type { ToolInputSchema } from '@mcp-b/webmcp-types';
 import { expect, test } from '@playwright/test';
 
 test.describe('Web Model Context API E2E Tests', () => {
@@ -378,10 +379,11 @@ test.describe('Model Context Testing API Tests', () => {
       });
 
       const toolName = `testingCallbackTool_${Date.now()}`;
+      const inputSchema = { type: 'object', properties: {} } as const satisfies ToolInputSchema;
       navigator.modelContext.registerTool({
         name: toolName,
         description: 'Callback test tool',
-        inputSchema: { type: 'object', properties: {} },
+        inputSchema,
         async execute() {
           return { content: [{ type: 'text', text: 'ok' }] };
         },

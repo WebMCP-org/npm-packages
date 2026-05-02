@@ -1,16 +1,74 @@
 import { useMcpClient, useWebMCP } from '@mcp-b/react-webmcp';
+import type { ToolInputSchema } from '@mcp-b/webmcp-types';
 import { useEffect, useState } from 'react';
 import { z } from 'zod';
 
 // Counter state
 let globalCounter = 0;
+const incrementInputSchema = {
+  type: 'object',
+  properties: {
+    amount: {
+      type: 'number',
+      minimum: 1,
+      maximum: 100,
+      default: 1,
+      description: 'Amount to increment',
+    },
+  },
+  required: ['amount'],
+  additionalProperties: false,
+} as const satisfies ToolInputSchema;
+const decrementInputSchema = {
+  type: 'object',
+  properties: {
+    amount: {
+      type: 'number',
+      minimum: 1,
+      maximum: 100,
+      default: 1,
+      description: 'Amount to decrement',
+    },
+  },
+  required: ['amount'],
+  additionalProperties: false,
+} as const satisfies ToolInputSchema;
+const userValidatorInputSchema = {
+  type: 'object',
+  properties: {
+    username: {
+      type: 'string',
+      minLength: 3,
+      maxLength: 20,
+      description: 'Username (3-20 chars)',
+    },
+    email: {
+      type: 'string',
+      format: 'email',
+      description: 'Valid email address',
+    },
+    age: {
+      type: 'integer',
+      minimum: 18,
+      maximum: 120,
+      description: 'Age (18-120)',
+    },
+    tags: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'Optional tags',
+    },
+  },
+  required: ['username', 'email', 'age'],
+  additionalProperties: false,
+} as const satisfies ToolInputSchema;
 
 function App() {
   const [logs, setLogs] = useState<
     Array<{ id: string; message: string; type: 'info' | 'success' | 'error' }>
   >([]);
   const [zodInfo, setZodInfo] = useState<{
-    isZod3: boolean;
+    isZod4: boolean;
     hasDef: boolean;
     hasZod: boolean;
   } | null>(null);
@@ -30,28 +88,26 @@ function App() {
     const testSchema = z.string();
     const hasZod = '_zod' in testSchema;
     const hasDef = '_def' in testSchema;
-    const isZod3 = hasDef && !hasZod;
-    setZodInfo({ isZod3, hasDef, hasZod });
+    const isZod4 = hasZod;
+    setZodInfo({ isZod4, hasDef, hasZod });
 
-    if (!isZod3) {
-      addLog('WARNING: Expected Zod 3.x but detected different version!', 'error');
+    if (!isZod4) {
+      addLog('WARNING: Expected Zod 4.x but detected different version!', 'error');
     } else {
-      addLog('Zod 3.x detected correctly', 'success');
+      addLog('Zod 4.x detected correctly', 'success');
     }
   }, []);
 
   // Tool 1: Counter Increment
   const incrementTool = useWebMCP({
     name: 'react18_counter_increment',
-    description: 'Increment the counter (React 18 + Zod 3)',
-    inputSchema: {
-      amount: z.number().min(1).max(100).default(1).describe('Amount to increment'),
-    },
-    handler: async (input) => {
+    description: 'Increment the counter (React 18 + Zod 4)',
+    inputSchema: incrementInputSchema,
+    handler: async ({ amount }) => {
       await new Promise((resolve) => setTimeout(resolve, 300));
-      globalCounter += input.amount;
-      addLog(`Incremented by ${input.amount}. New value: ${globalCounter}`, 'success');
-      return { counter: globalCounter, incremented: input.amount };
+      globalCounter += amount;
+      addLog(`Incremented by ${amount}. New value: ${globalCounter}`, 'success');
+      return { counter: globalCounter, incremented: amount };
     },
     onError: (error) => {
       addLog(`Error: ${error.message}`, 'error');
@@ -61,28 +117,21 @@ function App() {
   // Tool 2: Counter Decrement
   const decrementTool = useWebMCP({
     name: 'react18_counter_decrement',
-    description: 'Decrement the counter (React 18 + Zod 3)',
-    inputSchema: {
-      amount: z.number().min(1).max(100).default(1).describe('Amount to decrement'),
-    },
-    handler: async (input) => {
+    description: 'Decrement the counter (React 18 + Zod 4)',
+    inputSchema: decrementInputSchema,
+    handler: async ({ amount }) => {
       await new Promise((resolve) => setTimeout(resolve, 300));
-      globalCounter -= input.amount;
-      addLog(`Decremented by ${input.amount}. New value: ${globalCounter}`, 'success');
-      return { counter: globalCounter, decremented: input.amount };
+      globalCounter -= amount;
+      addLog(`Decremented by ${amount}. New value: ${globalCounter}`, 'success');
+      return { counter: globalCounter, decremented: amount };
     },
   });
 
   // Tool 3: User Validator (comprehensive validation test)
   const userValidatorTool = useWebMCP({
     name: 'react18_user_validator',
-    description: 'Validate user data (React 18 + Zod 3)',
-    inputSchema: {
-      username: z.string().min(3).max(20).describe('Username (3-20 chars)'),
-      email: z.string().email().describe('Valid email address'),
-      age: z.number().int().min(18).max(120).describe('Age (18-120)'),
-      tags: z.array(z.string()).optional().describe('Optional tags'),
-    },
+    description: 'Validate user data (React 18 + Zod 4)',
+    inputSchema: userValidatorInputSchema,
     handler: async ({ username, email, age, tags }) => {
       await new Promise((resolve) => setTimeout(resolve, 200));
       addLog(
@@ -138,7 +187,7 @@ function App() {
         username: 'testuser',
         email: 'test@example.com',
         age: 25,
-        tags: ['react18', 'zod3'],
+        tags: ['react18', 'zod4'],
       });
     } catch (error) {
       console.error(error);
@@ -185,11 +234,11 @@ function App() {
 
   return (
     <div className="app-container">
-      <h1>React 18 + Zod 3 Test App</h1>
+      <h1>React 18 + Zod 4 Test App</h1>
       <p className="subtitle">
         <span className="badge react18">React 18</span>
-        <span className="badge zod3">Zod 3.25.x</span>
-        Testing <code>@mcp-b/react-webmcp</code> with Zod 3
+        <span className="badge zod3">Zod 4.x</span>
+        Testing <code>@mcp-b/react-webmcp</code> with Zod 4
       </p>
 
       {/* Status */}
@@ -204,8 +253,8 @@ function App() {
         <h2>Zod Version Check</h2>
         {zodInfo && (
           <div style={{ padding: '0.5rem', background: 'white', borderRadius: '6px' }}>
-            <p style={{ color: zodInfo.isZod3 ? '#22543d' : '#742a2a', fontWeight: 'bold' }}>
-              {zodInfo.isZod3 ? '✓ Zod 3.x detected (correct)' : '✗ Wrong Zod version!'}
+            <p style={{ color: zodInfo.isZod4 ? '#22543d' : '#742a2a', fontWeight: 'bold' }}>
+              {zodInfo.isZod4 ? '✓ Zod 4.x detected (correct)' : '✗ Wrong Zod version!'}
             </p>
             <p style={{ color: '#718096', fontSize: '0.85rem' }}>
               Has _def: {zodInfo.hasDef.toString()}, Has _zod: {zodInfo.hasZod.toString()}

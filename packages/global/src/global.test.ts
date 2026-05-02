@@ -1,12 +1,26 @@
 import { TabClientTransport, TabServerTransport } from '@mcp-b/transports';
 import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
 import { BrowserMcpServer, Client } from '@mcp-b/webmcp-ts-sdk';
+import type { ToolInputSchema, ToolOutputSchema } from '@mcp-b/webmcp-types';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanupWebModelContext, initializeWebModelContext } from './global.js';
 
 afterEach(() => {
   cleanupWebModelContext();
 });
+
+const EMPTY_INPUT_SCHEMA = { type: 'object', properties: {} } as const satisfies ToolInputSchema;
+const STRING_OUTPUT_SCHEMA = { type: 'string' } as const satisfies ToolOutputSchema;
+
+function createValidatorOnlyStandardSchema() {
+  return {
+    '~standard': {
+      version: 1 as const,
+      vendor: 'test',
+      validate: (value: unknown) => ({ value }),
+    },
+  };
+}
 
 function getModelContext(): BrowserMcpServer {
   return navigator.modelContext as unknown as BrowserMcpServer;
@@ -123,7 +137,7 @@ describe('global adapter', () => {
       modelContext.registerTool({
         name: 'existing_native_tool',
         description: 'Existing native tool',
-        inputSchema: { type: 'object', properties: {} },
+        inputSchema: EMPTY_INPUT_SCHEMA,
         async execute() {
           return { content: [{ type: 'text', text: 'existing' }] };
         },
@@ -135,7 +149,7 @@ describe('global adapter', () => {
             {
               name: 'replacement_native_tool',
               description: 'Replacement native tool',
-              inputSchema: { type: 'object', properties: {} },
+              inputSchema: EMPTY_INPUT_SCHEMA,
               async execute() {
                 return { content: [{ type: 'text', text: 'replacement' }] };
               },
@@ -177,7 +191,7 @@ describe('global adapter', () => {
     const result = modelContext.registerTool({
       name: 'web_tool',
       description: 'Web style tool',
-      inputSchema: { type: 'object', properties: {} },
+      inputSchema: EMPTY_INPUT_SCHEMA,
       async execute() {
         return { content: [{ type: 'text', text: 'web-ok' }] };
       },
@@ -209,7 +223,7 @@ describe('global adapter', () => {
     registerTool({
       name: 'destructured_register_tool',
       description: 'Registered via destructured method',
-      inputSchema: { type: 'object', properties: {} },
+      inputSchema: EMPTY_INPUT_SCHEMA,
       async execute() {
         return { content: [{ type: 'text', text: 'destructured-ok' }] };
       },
@@ -240,7 +254,7 @@ describe('global adapter', () => {
     nativeContext.registerTool({
       name: 'pre_registered_tool',
       description: 'registered before wrapper init',
-      inputSchema: { type: 'object', properties: {} },
+      inputSchema: EMPTY_INPUT_SCHEMA,
       async execute() {
         return { content: [{ type: 'text', text: 'pre-registered-ok' }] };
       },
@@ -638,8 +652,8 @@ describe('global adapter', () => {
     modelContext.registerTool({
       name: 'string_output_tool',
       description: 'Tool with string output schema',
-      inputSchema: { type: 'object', properties: {} },
-      outputSchema: { type: 'string' },
+      inputSchema: EMPTY_INPUT_SCHEMA,
+      outputSchema: STRING_OUTPUT_SCHEMA,
       async execute() {
         return { content: [{ type: 'text', text: 'ok' }] };
       },
@@ -659,13 +673,13 @@ describe('global adapter', () => {
     modelContext.registerTool({
       name: 'output_no_type_tool',
       description: 'Tool with output schema missing root type',
-      inputSchema: {},
+      inputSchema: {} as const satisfies ToolInputSchema,
       outputSchema: {
         properties: {
           value: { type: 'string' },
         },
         required: ['value'],
-      },
+      } as const satisfies ToolOutputSchema,
       async execute() {
         return {
           content: [{ type: 'text', text: 'ok' }],
@@ -700,7 +714,7 @@ describe('global adapter', () => {
           message: { type: 'string' },
         },
         required: ['message'],
-      },
+      } as const satisfies ToolInputSchema,
       async execute(args) {
         return {
           content: [{ type: 'text', text: `echo:${String(args.message ?? '')}` }],
@@ -723,6 +737,80 @@ describe('global adapter', () => {
     });
     expect(result.isError).toBeFalsy();
     expect(result.content[0]).toMatchObject({ type: 'text', text: 'echo:hi' });
+  });
+
+  it('rejects validator-only Standard Schema inputSchema registered through navigator.modelContext', () => {
+    initializeWebModelContext();
+    const modelContext = getModelContext();
+
+    expect(() =>
+      modelContext.registerTool({
+        name: 'validator_only_input_tool',
+        description: 'Tool with validator-only standard schema input',
+        inputSchema: createValidatorOnlyStandardSchema() as never,
+        async execute(args) {
+          return { content: [{ type: 'text', text: `echo:${String(args.message ?? '')}` }] };
+        },
+      })
+    ).toThrow(/validator-only Standard Schema/i);
+  });
+
+  it('rejects validator-only Standard Schema outputSchema registered through navigator.modelContext', () => {
+    initializeWebModelContext();
+    const modelContext = getModelContext();
+
+    expect(() =>
+      modelContext.registerTool({
+        name: 'validator_only_output_tool',
+        description: 'Tool with validator-only standard schema output',
+        inputSchema: EMPTY_INPUT_SCHEMA,
+        outputSchema: createValidatorOnlyStandardSchema() as never,
+        async execute() {
+          return { value: 'ok' };
+        },
+      })
+    ).toThrow(/validator-only Standard Schema/i);
+  });
+
+  it('rejects validator-only Standard Schemas before mirroring registration to the native context', () => {
+    const nativeRegisterTool = vi.fn();
+    const nativeContext = {
+      provideContext: vi.fn(),
+      registerTool: nativeRegisterTool,
+      unregisterTool: vi.fn(),
+      listTools: () => [],
+      clearContext: vi.fn(),
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => true,
+    };
+
+    Object.defineProperty(navigator, 'modelContext', {
+      configurable: true,
+      enumerable: true,
+      writable: true,
+      value: nativeContext as unknown as Navigator['modelContext'],
+    });
+
+    initializeWebModelContext();
+    const modelContext = getModelContext();
+
+    const inputSchema = createValidatorOnlyStandardSchema();
+    const outputSchema = createValidatorOnlyStandardSchema();
+
+    expect(() =>
+      modelContext.registerTool({
+        name: 'native_mirror_validator_only_tool',
+        description: 'Mirrors normalized JSON Schema to native',
+        inputSchema: inputSchema as never,
+        outputSchema: outputSchema as never,
+        async execute(args) {
+          return { value: String(args.message ?? '') };
+        },
+      })
+    ).toThrow(/validator-only Standard Schema/i);
+
+    expect(nativeRegisterTool).not.toHaveBeenCalled();
   });
 });
 

@@ -1,5 +1,4 @@
-import type { InputSchema } from '@mcp-b/webmcp-types';
-import { z } from 'zod';
+import type { InputSchema, StandardJSONSchemaV1 } from '@mcp-b/webmcp-types';
 import type { InferOutput, WebMCPConfig, WebMCPReturn } from '../types.js';
 
 type IsEqual<Left, Right> = [Left] extends [Right]
@@ -10,6 +9,8 @@ type IsEqual<Left, Right> = [Left] extends [Right]
 
 type Assert<T extends true> = T;
 type IsAny<T> = 0 extends 1 & T ? true : false;
+
+declare const standardJsonOutputSchema: StandardJSONSchemaV1<never, { name: string }>;
 
 const unstructuredConfig = {
   name: 'list_items',
@@ -31,10 +32,10 @@ type JsonOutputSchema = {
   required: ['total'];
 };
 
-const zodConfig: WebMCPConfig<InputSchema, { name: z.ZodString }> = {
-  name: 'zod_output',
-  description: 'Zod output',
-  outputSchema: { name: z.string() },
+const standardJsonConfig: WebMCPConfig<InputSchema, typeof standardJsonOutputSchema> = {
+  name: 'standard_json_output',
+  description: 'Standard JSON Schema output',
+  outputSchema: standardJsonOutputSchema,
   handler: async () => ({ name: 'typed' }),
 };
 
@@ -76,15 +77,15 @@ type UnstructuredHandlerHasTotal = Assert<
 type NoSchemaStringResult = Awaited<ReturnType<typeof noSchemaStringConfig.handler>>;
 type NoSchemaStringIsString = Assert<IsEqual<NoSchemaStringResult, string>>;
 
-type ZodOutput = Awaited<ReturnType<typeof zodConfig.handler>>;
-type ZodOutputNameIsString = Assert<IsEqual<ZodOutput['name'], string>>;
-type ZodOutputIsNotAny = Assert<IsEqual<IsAny<ZodOutput>, false>>;
+type StandardJsonOutput = Awaited<ReturnType<typeof standardJsonConfig.handler>>;
+type StandardJsonOutputNameIsString = Assert<IsEqual<StandardJsonOutput['name'], string>>;
+type StandardJsonOutputIsNotAny = Assert<IsEqual<IsAny<StandardJsonOutput>, false>>;
 
 type JsonOutput = Awaited<ReturnType<typeof jsonConfig.handler>>;
 type JsonOutputIsTyped = Assert<IsEqual<JsonOutput, { total: number }>>;
 
-declare const zodOutput: ZodOutput;
-export const zodName: string = zodOutput.name;
+declare const standardJsonOutput: StandardJsonOutput;
+export const standardJsonName: string = standardJsonOutput.name;
 
 declare const jsonOutput: JsonOutput;
 export const jsonTotal: number = jsonOutput.total;
@@ -108,8 +109,8 @@ export const unstructuredExecuteAssertion: UnstructuredExecuteResultIsUnknown = 
 export const typedExecuteInputAssertion: TypedExecuteInputIsInferred = true;
 export const unstructuredHandlerAssertion: UnstructuredHandlerHasTotal = true;
 export const noSchemaStringAssertion: NoSchemaStringIsString = true;
-export const zodOutputAssertion: ZodOutputNameIsString = true;
-export const zodAnyAssertion: ZodOutputIsNotAny = true;
+export const standardJsonOutputAssertion: StandardJsonOutputNameIsString = true;
+export const standardJsonAnyAssertion: StandardJsonOutputIsNotAny = true;
 export const jsonOutputAssertion: JsonOutputIsTyped = true;
 
 // Primitive/array output schema parity checks

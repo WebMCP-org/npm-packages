@@ -1,12 +1,22 @@
 import { initializeWebModelContext } from '@mcp-b/global';
+import type { ToolInputSchema, ToolOutputSchema } from '@mcp-b/webmcp-types';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
-import { z } from 'zod';
 
 import { useWebMCP } from './useWebMCP.js';
 
 const TEST_CHANNEL_ID = `useWebMCP-test-${Date.now()}`;
 const DEBUG_CONFIG_KEY = 'WEBMCP_DEBUG';
+
+function createValidatorOnlyStandardSchema() {
+  return {
+    '~standard': {
+      version: 1 as const,
+      vendor: 'test',
+      validate: (value: unknown) => ({ value }),
+    },
+  };
+}
 
 function parseSerializedToolResponse(result: string | null | undefined): {
   content: Array<{ type: string; text?: string }>;
@@ -110,7 +120,7 @@ describe('useWebMCP', () => {
             type: 'object',
             properties: { name: { type: 'string' } },
             required: ['name'],
-          } as const,
+          } as const satisfies ToolInputSchema,
           handler: async ({ name }) => `Hello, ${name}!`,
         })
       );
@@ -123,71 +133,53 @@ describe('useWebMCP', () => {
       expect(inputSchema.properties).toHaveProperty('name');
     });
 
-    it('converts zod-like inputSchema before registration', async () => {
+    it('passes validator-only Standard Schema inputSchema through registration and lets the runtime reject it', async () => {
       const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
 
       try {
-        const zodSchema = { username: z.string() } as const;
-        await renderHook(() =>
-          useWebMCP({
-            name: 'zod_like_tool',
-            description: 'Tool using zod-like schema',
-            inputSchema: zodSchema,
-            handler: async () => 'ok',
-          })
-        );
+        const validatorOnlySchema = createValidatorOnlyStandardSchema();
+        await expect(
+          renderHook(() =>
+            useWebMCP({
+              name: 'validator_only_tool',
+              description: 'Tool using validator-only standard schema',
+              inputSchema: validatorOnlySchema as never,
+              handler: async () => 'ok',
+            })
+          )
+        ).rejects.toThrow(/validator-only Standard Schema/i);
 
         const descriptor = registerToolSpy.mock.calls.at(-1)?.[0] as {
           name: string;
-          inputSchema?: {
-            type?: string;
-            properties?: Record<string, { type?: string }>;
-            required?: string[];
-          };
+          inputSchema?: unknown;
         };
-        expect(descriptor.name).toBe('zod_like_tool');
-        expect(descriptor.inputSchema?.type).toBe('object');
-        expect(descriptor.inputSchema?.properties).toHaveProperty('username');
-        expect(descriptor.inputSchema?.required).toContain('username');
+        expect(descriptor.name).toBe('validator_only_tool');
+        expect(descriptor.inputSchema).toBe(validatorOnlySchema);
+        expect(navigator.modelContextTesting?.listTools()).toHaveLength(0);
       } finally {
         registerToolSpy.mockRestore();
       }
     });
 
-    it('converts zod-like outputSchema before registration', async () => {
+    it('rejects validator-only Standard Schema outputSchema before registration', async () => {
       const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
 
       try {
-        const zodOutputSchema = {
-          count: z.number(),
-          message: z.string(),
-        } as const;
+        const validatorOnlySchema = createValidatorOnlyStandardSchema();
 
-        await renderHook(() =>
-          useWebMCP({
-            name: 'zod_output_tool',
-            description: 'Tool using zod-like output schema',
-            outputSchema: zodOutputSchema,
-            handler: async () => ({ count: 1, message: 'ok' }),
-          })
-        );
+        await expect(
+          renderHook(() =>
+            useWebMCP({
+              name: 'validator_only_output_tool',
+              description: 'Tool using validator-only standard output schema',
+              outputSchema: validatorOnlySchema as never,
+              handler: async () => ({ count: 1, message: 'ok' }),
+            })
+          )
+        ).rejects.toThrow(/must expose Standard JSON Schema for output/i);
 
-        const descriptor = registerToolSpy.mock.calls.at(-1)?.[0] as {
-          name: string;
-          outputSchema?: {
-            type?: string;
-            properties?: Record<string, { type?: string }>;
-            required?: string[];
-          };
-        };
-
-        expect(descriptor.name).toBe('zod_output_tool');
-        expect(descriptor.outputSchema?.type).toBe('object');
-        expect(descriptor.outputSchema?.properties).toHaveProperty('count');
-        expect(descriptor.outputSchema?.properties).toHaveProperty('message');
-        expect(descriptor.outputSchema?.required).toEqual(
-          expect.arrayContaining(['count', 'message'])
-        );
+        expect(registerToolSpy).not.toHaveBeenCalled();
+        expect(navigator.modelContextTesting?.listTools()).toHaveLength(0);
       } finally {
         registerToolSpy.mockRestore();
       }
@@ -207,6 +199,83 @@ describe('useWebMCP', () => {
       unmount();
 
       expect(navigator.modelContextTesting?.listTools()).toHaveLength(0);
+    });
+  });
+
+  describe('enabled option', () => {
+    it('should not register tool when enabled is false', async () => {
+      const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
+
+      try {
+        const initialCallCount = registerToolSpy.mock.calls.length;
+
+        await renderHook(() =>
+          useWebMCP({
+            name: 'disabled_tool',
+            description: 'Should not register',
+            enabled: false,
+            handler: async () => 'result',
+          })
+        );
+
+        expect(registerToolSpy.mock.calls.length).toBe(initialCallCount);
+      } finally {
+        registerToolSpy.mockRestore();
+      }
+    });
+
+    it('should register tool when enabled switches from false to true', async () => {
+      const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
+
+      try {
+        const { rerender } = await renderHook(
+          ({ enabled }) =>
+            useWebMCP({
+              name: 'toggle_enabled_tool',
+              description: 'Test',
+              enabled,
+              handler: async () => 'result',
+            }),
+          { initialProps: { enabled: false } }
+        );
+
+        const callCountAfterMount = registerToolSpy.mock.calls.length;
+
+        await rerender({ enabled: true });
+
+        expect(registerToolSpy.mock.calls.length).toBeGreaterThan(callCountAfterMount);
+      } finally {
+        registerToolSpy.mockRestore();
+      }
+    });
+  });
+
+  describe('onStart callback', () => {
+    it('should call onStart before execution', async () => {
+      const onStart = vi.fn();
+      const callOrder: string[] = [];
+
+      const { result, act } = await renderHook(() =>
+        useWebMCP({
+          name: 'onstart_tool',
+          description: 'Test',
+          handler: async (input) => {
+            callOrder.push('handler');
+            return `done: ${JSON.stringify(input)}`;
+          },
+          onStart: (input) => {
+            callOrder.push('onStart');
+            onStart(input);
+          },
+        })
+      );
+
+      await act(async () => {
+        await result.current.execute({ key: 'test' });
+      });
+
+      expect(onStart).toHaveBeenCalledWith({ key: 'test' });
+      expect(callOrder).toEqual(['onStart', 'handler']);
     });
   });
 
@@ -242,7 +311,7 @@ describe('useWebMCP', () => {
             type: 'object',
             properties: { count: { type: 'number' } },
             required: ['count'],
-          } as const,
+          } as const satisfies ToolInputSchema,
           handler,
         })
       );
@@ -312,7 +381,7 @@ describe('useWebMCP', () => {
             type: 'object',
             properties: { message: { type: 'string' } },
             required: ['message'],
-          } as const,
+          } as const satisfies ToolInputSchema,
           handler: async ({ message }) => `Echo: ${message}`,
         })
       );
@@ -336,11 +405,11 @@ describe('useWebMCP', () => {
             type: 'object',
             properties: { a: { type: 'number' }, b: { type: 'number' } },
             required: ['a', 'b'],
-          } as const,
+          } as const satisfies ToolInputSchema,
           outputSchema: {
             type: 'object',
             properties: { result: { type: 'number' } },
-          } as const,
+          } as const satisfies ToolOutputSchema,
           handler: async ({ a, b }) => ({ result: a + b }),
         })
       );
@@ -379,7 +448,7 @@ describe('useWebMCP', () => {
           outputSchema: {
             type: 'object',
             properties: { value: { type: 'string' } },
-          } as const,
+          } as const satisfies ToolOutputSchema,
           handler: async () => 'not an object' as never,
         })
       );
@@ -398,7 +467,7 @@ describe('useWebMCP', () => {
           outputSchema: {
             type: 'object',
             properties: { value: { type: 'string' } },
-          } as const,
+          } as const satisfies ToolOutputSchema,
           handler: async () => ['not', 'an', 'object'] as never,
         })
       );
@@ -413,7 +482,7 @@ describe('useWebMCP', () => {
         useWebMCP({
           name: 'primitive_schema_tool',
           description: 'Primitive output schema',
-          outputSchema: { type: 'string' } as const,
+          outputSchema: { type: 'string' } as const satisfies ToolOutputSchema,
           handler: async () => 'ready',
         })
       );
@@ -432,7 +501,10 @@ describe('useWebMCP', () => {
         useWebMCP({
           name: 'array_schema_tool',
           description: 'Array output schema',
-          outputSchema: { type: 'array', items: { type: 'number' } } as const,
+          outputSchema: {
+            type: 'array',
+            items: { type: 'number' },
+          } as const satisfies ToolOutputSchema,
           handler: async () => [1, 2, 3],
         })
       );
@@ -453,7 +525,7 @@ describe('useWebMCP', () => {
           outputSchema: {
             type: 'object',
             properties: { value: { type: 'string' } },
-          } as const,
+          } as const satisfies ToolOutputSchema,
           handler: async () => null as never,
         })
       );
@@ -690,7 +762,7 @@ describe('useWebMCP', () => {
           outputSchema: {
             type: 'object',
             properties: { count: { type: 'number' }, label: { type: 'string' } },
-          } as const,
+          } as const satisfies ToolOutputSchema,
           handler: async () => ({ count: 1, label: 'test' }),
         })
       );
@@ -756,11 +828,11 @@ describe('useWebMCP', () => {
               type: 'object',
               properties: { name: { type: 'string' } },
               required: ['name'],
-            } as const,
+            } as const satisfies ToolInputSchema,
             outputSchema: {
               type: 'object',
               properties: { value: { type: 'string' } },
-            } as const,
+            } as const satisfies ToolOutputSchema,
             annotations: { destructiveHint: true } as const,
           },
         }
@@ -771,11 +843,11 @@ describe('useWebMCP', () => {
           type: 'object',
           properties: { name: { type: 'string' } },
           required: ['name'],
-        } as const,
+        } as const satisfies ToolInputSchema,
         outputSchema: {
           type: 'object',
           properties: { value: { type: 'string' } },
-        } as const,
+        } as const satisfies ToolOutputSchema,
         annotations: { destructiveHint: true },
       });
 

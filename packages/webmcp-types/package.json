@@ -57,6 +57,9 @@
     "test:conformance": "vp test run --config vitest.conformance.config.ts",
     "typecheck": "tsc --noEmit && vp test run --typecheck --silent"
   },
+  "dependencies": {
+    "@standard-schema/spec": "^1.1.0"
+  },
   "devDependencies": {
     "@vitest/coverage-v8": "catalog:",
     "playwright": "catalog:",

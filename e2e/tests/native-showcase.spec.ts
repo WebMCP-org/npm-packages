@@ -1,3 +1,4 @@
+import type { ToolInputSchema, ToolOutputSchema } from '@mcp-b/webmcp-types';
 import { expect, type Page, test } from '@playwright/test';
 
 async function waitForNativeReady(page: Page): Promise<void> {
@@ -225,10 +226,11 @@ test.describe('Native API Semantics', () => {
     const toolName = `native_reg_${Date.now()}`;
 
     await page.evaluate((name) => {
+      const inputSchema = { type: 'object', properties: {} } as const satisfies ToolInputSchema;
       navigator.modelContext?.registerTool({
         name,
         description: 'Temporary test tool',
-        inputSchema: { type: 'object', properties: {} },
+        inputSchema,
         async execute() {
           return { content: [{ type: 'text', text: 'ok' }] };
         },
@@ -257,7 +259,7 @@ test.describe('Native API Semantics', () => {
           {
             name: 'first_tool',
             description: 'first',
-            inputSchema: { type: 'object', properties: {} },
+            inputSchema: { type: 'object', properties: {} } as const satisfies ToolInputSchema,
             async execute() {
               return { content: [{ type: 'text', text: 'first' }] };
             },
@@ -271,7 +273,7 @@ test.describe('Native API Semantics', () => {
           {
             name: 'second_tool',
             description: 'second',
-            inputSchema: { type: 'object', properties: {} },
+            inputSchema: { type: 'object', properties: {} } as const satisfies ToolInputSchema,
             async execute() {
               return { content: [{ type: 'text', text: 'second' }] };
             },
@@ -300,7 +302,7 @@ test.describe('Native API Semantics', () => {
           {
             name: 'clear_a',
             description: 'clear a',
-            inputSchema: { type: 'object', properties: {} },
+            inputSchema: { type: 'object', properties: {} } as const satisfies ToolInputSchema,
             async execute() {
               return { content: [{ type: 'text', text: 'a' }] };
             },
@@ -311,7 +313,7 @@ test.describe('Native API Semantics', () => {
       context.registerTool({
         name: 'clear_b',
         description: 'clear b',
-        inputSchema: { type: 'object', properties: {} },
+        inputSchema: { type: 'object', properties: {} } as const satisfies ToolInputSchema,
         async execute() {
           return { content: [{ type: 'text', text: 'b' }] };
         },
@@ -333,15 +335,16 @@ test.describe('Native API Semantics', () => {
 
       const hasGetToolCalls = typeof testing.getToolCalls === 'function';
       const toolName = `tracking_${Date.now()}`;
+      const inputSchema = {
+        type: 'object',
+        properties: { value: { type: 'number' } },
+        required: ['value'],
+      } as const satisfies ToolInputSchema;
 
       context.registerTool({
         name: toolName,
         description: 'tracking test',
-        inputSchema: {
-          type: 'object',
-          properties: { value: { type: 'number' } },
-          required: ['value'],
-        },
+        inputSchema,
         async execute(input: { value: number }) {
           return { content: [{ type: 'text', text: `value:${input.value}` }] };
         },
@@ -378,7 +381,7 @@ test.describe('Native API Semantics', () => {
           {
             name: 'counter_get',
             description: 'Get counter value',
-            inputSchema: { type: 'object', properties: {} },
+            inputSchema: { type: 'object', properties: {} } as const satisfies ToolInputSchema,
             outputSchema: {
               type: 'object',
               properties: {
@@ -386,7 +389,7 @@ test.describe('Native API Semantics', () => {
                 timestamp: { type: 'string' },
               },
               required: ['counter', 'timestamp'],
-            },
+            } as const satisfies ToolOutputSchema,
             async execute() {
               const structuredContent = { counter: 0, timestamp: new Date().toISOString() };
               return {

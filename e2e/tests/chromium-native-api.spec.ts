@@ -1,3 +1,4 @@
+import type { ToolInputSchema } from '@mcp-b/webmcp-types';
 import { expect, test } from '@playwright/test';
 
 function isDirectOrWrappedText(value: unknown, expectedText: string): boolean {
@@ -217,16 +218,17 @@ test.describe('Chromium Native API - ModelContextTesting', () => {
       if (!testingAPI) return null;
 
       // Register a simple echo tool
+      const inputSchema = {
+        type: 'object',
+        properties: {
+          text: { type: 'string' },
+        },
+        required: ['text'],
+      } as const satisfies ToolInputSchema;
       navigator.modelContext.registerTool({
         name: 'echoTest',
         description: 'Echo test',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            text: { type: 'string' },
-          },
-          required: ['text'],
-        },
+        inputSchema,
         async execute(args: { text: string }) {
           return {
             content: [{ type: 'text', text: args.text }],
@@ -400,10 +402,11 @@ test.describe('Chromium Native API - ModelContextTesting', () => {
       testingAPI.addEventListener('toolchange', callback2);
 
       // Trigger a change
+      const inputSchema = { type: 'object', properties: {} } as const satisfies ToolInputSchema;
       navigator.modelContext.registerTool({
         name: 'tempTool',
         description: 'temp',
-        inputSchema: { type: 'object', properties: {} },
+        inputSchema,
         async execute() {
           return { content: [{ type: 'text', text: 'test' }] };
         },
@@ -435,10 +438,11 @@ test.describe('Chromium Native API - ModelContextTesting', () => {
       });
 
       // Trigger a change
+      const inputSchema = { type: 'object', properties: {} } as const satisfies ToolInputSchema;
       navigator.modelContext.registerTool({
         name: 'tempTool2',
         description: 'temp',
-        inputSchema: { type: 'object', properties: {} },
+        inputSchema,
         async execute() {
           return { content: [{ type: 'text', text: 'test' }] };
         },
@@ -499,10 +503,11 @@ test.describe('Chromium Native API - Integration Tests', () => {
       });
 
       // Perform various operations
+      const inputSchema = { type: 'object', properties: {} } as const satisfies ToolInputSchema;
       navigator.modelContext.registerTool({
         name: 'test1',
         description: 'test',
-        inputSchema: { type: 'object', properties: {} },
+        inputSchema,
         async execute() {
           return { content: [{ type: 'text', text: 'test' }] };
         },
@@ -517,7 +522,7 @@ test.describe('Chromium Native API - Integration Tests', () => {
           {
             name: 'test2',
             description: 'test',
-            inputSchema: { type: 'object', properties: {} },
+            inputSchema,
             async execute() {
               return { content: [{ type: 'text', text: 'test' }] };
             },

@@ -32,7 +32,7 @@ pnpm add usewebmcp react
 npm install usewebmcp react
 ```
 
-Optional (only if you want Standard Schema authoring like Zod v4 input schemas):
+Optional (only if you want Standard Schema authoring such as Zod, Valibot, or ArkType):
 
 ```bash
 pnpm add zod
@@ -132,6 +132,15 @@ Both paths run the same underlying tool logic and update the hook state.
 - JSON Schema literals (`as const`) via `InferArgsFromInputSchema`
 - Standard Schema v1 input typing (for example Zod v4 / Valibot / ArkType) via `~standard.types.input`
 
+Registration still flows through `navigator.modelContext.registerTool(...)`, so input schemas on MCP registration surfaces must remain JSON-exportable. Validator-only Standard Schema objects are rejected by the runtime unless JSON Schema metadata can be derived. When a schema exposes both `~standard.validate(...)` and JSON Schema export, the runtime validates through the JSON Schema path for parity with listing and transport metadata.
+
+When you author object schemas as plain JSON Schema literals, TypeScript inference follows JSON Schema semantics:
+
+- properties are optional unless they appear in `required`
+- objects stay open unless you set `additionalProperties: false`
+
+If you want exact object inference instead of a widened object type, define both `required` and `additionalProperties: false`.
+
 ```tsx
 const INPUT_SCHEMA = {
   type: 'object',
@@ -156,13 +165,21 @@ useWebMCP({
 
 ### Output inference
 
-When `outputSchema` is provided as a literal JSON object schema:
+When `outputSchema` is provided as JSON Schema or Standard JSON Schema:
 
 - implementation return type is inferred from `outputSchema`
 - `state.lastResult` is inferred to the same type
 - MCP response includes `structuredContent`
 
+For plain JSON Schema object literals, loose schemas produce loose inferred types. For example, omitting `required` makes properties optional, and omitting `additionalProperties: false` keeps the result open to extra keys. If you want a precise output type, prefer:
+
+- `as const satisfies ToolOutputSchema`
+- `required` for every guaranteed property
+- `additionalProperties: false` for closed object shapes
+
 ```tsx
+import type { ToolOutputSchema } from '@mcp-b/webmcp-types';
+
 const OUTPUT_SCHEMA = {
   type: 'object',
   properties: {
@@ -170,7 +187,7 @@ const OUTPUT_SCHEMA = {
   },
   required: ['total'],
   additionalProperties: false,
-} as const;
+} as const satisfies ToolOutputSchema;
 
 const tool = useWebMCP({
   name: 'count_items',
@@ -218,31 +235,51 @@ If `outputSchema` is defined, your tool implementation must return a JSON-serial
 
 Returning a non-object value (`string`, `null`, array, etc.) causes an error response from the registered MCP tool.
 
+If you intentionally return something that violates the declared schema in a test, add `@ts-expect-error` and explain it. That keeps the inference contract strict while still documenting the negative runtime case you are exercising.
+
+## Conditional Registration
+
+Use the `enabled` option to conditionally skip tool registration:
+
+```tsx
+const { isAuthenticated } = useAuth();
+
+useWebMCP({
+  name: 'admin_action',
+  description: 'Perform admin action',
+  enabled: isAuthenticated, // only register when authenticated
+  execute: async () => {
+    /* ... */
+  },
+});
+```
+
+When `enabled` is `false`, the tool is not registered and the effect is a no-op. Switching to `true` registers the tool; switching back unregisters it.
+
 ## Re-Registration and Performance
 
 The tool re-registers when any of these change:
 
 - `name`
 - `description`
-- `inputSchema` reference
-- `outputSchema` reference
-- `annotations` reference
+- `inputSchema` (structurally for plain JSON data; function-bearing schemas fall back to identity)
+- `outputSchema` (structurally for plain JSON data; function-bearing schemas fall back to identity)
+- `annotations` (structurally when JSON-serializable)
+- `enabled`
 - values in `deps`
+
+Inline JSON schema literals are safe — structurally identical JSON values do not trigger re-registration. Function-bearing schemas such as Standard Schema objects should still be hoisted or memoized so identity stays stable.
 
 The hook avoids re-registration when only callback references change:
 
 - `execute`
 - `handler`
+- `onStart`
 - `onSuccess`
 - `onError`
 - `formatOutput`
 
 Latest callback versions are still used at execution time.
-
-Recommendation:
-
-- Define schemas/annotations outside render or memoize them.
-- Keep `deps` primitive when possible.
 
 ## API
 
@@ -255,9 +292,11 @@ Recommendation:
 - `inputSchema?`
 - `outputSchema?`
 - `annotations?`
+- `enabled?: boolean` — skip registration when `false` (default: `true`)
 - `execute(input)` (preferred)
 - `handler(input)` (backward-compatible alias)
 - `formatOutput?(output)` (deprecated)
+- `onStart?(input)` — called before execution begins
 - `onSuccess?(result, input)`
 - `onError?(error, input)`
 

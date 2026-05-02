@@ -8,7 +8,6 @@ export default defineConfig({
     entry: ['src/index.ts'],
     dts: true,
     format: ['esm'],
-    splitting: false,
     sourcemap: true,
     clean: true,
     treeshake: true,
@@ -19,7 +18,6 @@ export default defineConfig({
     // inherit its CJS-only ajv dependency. The ajv/ajv-formats imports are
     // aliased to browser-safe no-op stubs (see src/stubs/).
     external: [
-      /^zod/, // zod, zod/v4, zod-to-json-schema
       /^@mcp-b\//, // workspace deps
     ],
     alias: {
@@ -27,5 +25,10 @@ export default defineConfig({
       'ajv-formats': path.resolve(__dirname, 'src/stubs/ajv-formats.ts'),
     },
     tsconfig: './tsconfig.json',
+  },
+  test: {
+    globals: true,
+    include: ['src/**/*.{test,spec}.ts'],
+    exclude: ['dist', 'node_modules'],
   },
 });

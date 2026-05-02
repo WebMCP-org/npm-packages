@@ -8,11 +8,11 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 
 // Expose for testing
-console.log('React 18 + Zod 3 Test App initialized');
+console.log('React 18 + Zod 4 Test App initialized');
 console.log('navigator.modelContext:', navigator.modelContext);
 
 // Create MCP client
-const client = new Client({ name: 'React18Zod3TestClient', version: '1.0.0' });
+const client = new Client({ name: 'React18Zod4TestClient', version: '1.0.0' });
 
 // Use TabClientTransport to connect to the MCP server
 const transport = new TabClientTransport({

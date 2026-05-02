@@ -1,49 +1,43 @@
-import type { ToolInputSchema } from '@mcp-b/webmcp-polyfill';
 import type {
-  InferArgsFromInputSchema,
-  InferJsonSchema,
+  InferToolInputSchema,
+  InferToolOutputSchema,
   InputSchema,
-  JsonSchemaForInference,
+  ToolInputSchema,
   ToolAnnotations,
+  ToolOutputSchema,
 } from '@mcp-b/webmcp-types';
 
 /**
  * Infers tool input type from either a Standard Schema or JSON Schema.
  *
  * - **Standard Schema** (Zod v4, Valibot, ArkType): extracts `~standard.types.input`
- * - **JSON Schema** (`as const`): uses `InferArgsFromInputSchema` for structural inference
+ * - **JSON Schema** (`as const`): uses `InferToolInputSchema` for structural inference
  * - **Fallback**: `Record<string, unknown>`
  *
  * @template T - The input schema type
  * @internal
  */
-export type InferToolInput<T> = T extends { readonly '~standard': { readonly types?: infer Types } }
-  ? Types extends { readonly input: infer I }
-    ? I
-    : Record<string, unknown>
-  : T extends InputSchema
-    ? InferArgsFromInputSchema<T>
-    : Record<string, unknown>;
+export type InferToolInput<T> = InferToolInputSchema<T>;
 
 /**
- * Utility type to infer the output type from a JSON Schema.
+ * Utility type to infer the output type from an output schema.
  *
- * When `TOutputSchema` is a literal inferable JSON schema, this resolves to
- * `InferJsonSchema<TOutputSchema>`. When it's `undefined`,
- * it falls back to the provided `TFallback` type.
+ * - Standard Schema types resolve via `~standard.types.output`
+ * - Inferable output schemas resolve via `InferToolOutputSchema`
+ * - `undefined` falls back to `TFallback`
  *
- * @template TOutputSchema - JSON Schema for output inference
+ * @template TOutputSchema - Output schema for result inference
  * @template TFallback - Fallback type when no schema is provided
  * @internal
  */
 export type InferOutput<
-  TOutputSchema extends JsonSchemaForInference | undefined = undefined,
+  TOutputSchema extends ToolOutputSchema | undefined = undefined,
   TFallback = unknown,
 > = TOutputSchema extends undefined
   ? TFallback
-  : TOutputSchema extends JsonSchemaForInference
-    ? InferJsonSchema<TOutputSchema>
-    : TFallback;
+  : unknown extends InferToolOutputSchema<TOutputSchema>
+    ? TFallback
+    : InferToolOutputSchema<TOutputSchema>;
 
 /**
  * Represents the current execution state of a tool, including loading status,
@@ -83,14 +77,14 @@ export interface ToolExecutionState<TOutput = unknown> {
  *
  * Supports sync or async implementations.
  *
- * @template TInputSchema - Schema defining input parameters
- * @template TOutputSchema - Optional JSON Schema defining output structure
+ * @template TInputSchema - Plain JSON Schema or Standard Schema defining input parameters
+ * @template TOutputSchema - Optional plain JSON Schema or Standard JSON Schema defining output structure
  *
  * @public
  */
 export type ToolExecuteFunction<
   TInputSchema extends ToolInputSchema = InputSchema,
-  TOutputSchema extends JsonSchemaForInference | undefined = undefined,
+  TOutputSchema extends ToolOutputSchema | undefined = undefined,
 > = (
   input: InferToolInput<TInputSchema>
 ) => Promise<InferOutput<TOutputSchema>> | InferOutput<TOutputSchema>;
@@ -99,10 +93,10 @@ export type ToolExecuteFunction<
  * Shared configuration fields for the `useWebMCP` hook.
  *
  * Defines a tool's metadata, schema, and lifecycle callbacks.
- * Uses JSON Schema for type inference via `as const`.
+ * Supports plain JSON Schema plus Standard Schema / Standard JSON Schema authoring.
  *
- * @template TInputSchema - JSON Schema defining input parameters
- * @template TOutputSchema - JSON Schema defining output structure (object schemas enable structuredContent)
+ * @template TInputSchema - Plain JSON Schema or Standard Schema defining input parameters
+ * @template TOutputSchema - Plain JSON Schema or Standard JSON Schema defining output structure
  *
  * @public
  *
@@ -111,11 +105,11 @@ export type ToolExecuteFunction<
  * const config: WebMCPConfig = {
  *   name: 'posts_like',
  *   description: 'Like a post by its ID',
- *   inputSchema: {
+ *   inputSchema: ({
  *     type: 'object',
  *     properties: { postId: { type: 'string' } },
  *     required: ['postId'],
- *   } as const,
+ *   } as const satisfies ToolInputSchema),
  *   execute: async ({ postId }) => {
  *     await api.likePost(postId);
  *     return { success: true };
@@ -128,18 +122,18 @@ export type ToolExecuteFunction<
  * useWebMCP({
  *   name: 'posts_like',
  *   description: 'Like a post and return updated like count',
- *   inputSchema: {
+ *   inputSchema: ({
  *     type: 'object',
  *     properties: { postId: { type: 'string' } },
  *     required: ['postId'],
- *   } as const,
- *   outputSchema: {
+ *   } as const satisfies ToolInputSchema),
+ *   outputSchema: ({
  *     type: 'object',
  *     properties: {
  *       likes: { type: 'number', description: 'Updated like count' },
  *       likedAt: { type: 'string', description: 'ISO timestamp of the like' },
  *     },
- *   } as const,
+ *   } as const satisfies ToolOutputSchema),
  *   execute: async ({ postId }) => {
  *     const result = await api.likePost(postId);
  *     return { likes: result.likes, likedAt: new Date().toISOString() };
@@ -149,7 +143,7 @@ export type ToolExecuteFunction<
  */
 interface WebMCPConfigBase<
   TInputSchema extends ToolInputSchema = InputSchema,
-  TOutputSchema extends JsonSchemaForInference | undefined = undefined,
+  TOutputSchema extends ToolOutputSchema | undefined = undefined,
 > {
   /**
    * Unique identifier for the tool (e.g., 'posts_like', 'graph_navigate').
@@ -165,8 +159,11 @@ interface WebMCPConfigBase<
 
   /**
    * Schema defining the input parameters for the tool.
-   * Accepts JSON Schema (with `as const`) or any Standard Schema v1
-   * library (Zod v4, Valibot, ArkType, etc.).
+   * Accepts plain JSON Schema (typically with `as const` / `satisfies`) or any Standard Schema v1
+   * library (Zod v4, Valibot, ArkType, etc.). MCP registration still requires JSON-exportable
+   * metadata, so validator-only Standard Schema inputs are rejected unless the runtime can derive
+   * JSON Schema export. When both validation and JSON export exist, the JSON Schema path is
+   * authoritative.
    *
    * @example JSON Schema
    * ```typescript
@@ -187,7 +184,7 @@ interface WebMCPConfigBase<
   inputSchema?: TInputSchema;
 
   /**
-   * **Recommended:** JSON Schema defining the expected output structure.
+   * **Recommended:** Plain JSON Schema or Standard JSON Schema defining the expected output structure.
    *
    * When provided, this enables three key features:
    * 1. **Type Safety**: The implementation return type is inferred from this schema
@@ -229,6 +226,20 @@ interface WebMCPConfigBase<
   formatOutput?: (output: InferOutput<TOutputSchema>) => string;
 
   /**
+   * Whether the tool should be registered. Defaults to `true`.
+   * Set to `false` to conditionally skip registration (e.g. behind feature flags or auth gates).
+   */
+  enabled?: boolean;
+
+  /**
+   * Optional callback invoked when tool execution begins, before the implementation runs.
+   * Useful for logging, analytics, or showing loading indicators.
+   *
+   * @param input - The input that will be passed to the tool implementation
+   */
+  onStart?: (input: unknown) => void;
+
+  /**
    * Optional callback invoked when the tool execution succeeds.
    * Useful for triggering side effects like navigation or analytics.
    *
@@ -249,7 +260,7 @@ interface WebMCPConfigBase<
 
 type WebMCPConfigImplementation<
   TInputSchema extends ToolInputSchema = InputSchema,
-  TOutputSchema extends JsonSchemaForInference | undefined = undefined,
+  TOutputSchema extends ToolOutputSchema | undefined = undefined,
 > =
   | {
       /**
@@ -281,14 +292,14 @@ type WebMCPConfigImplementation<
  *
  * If both are provided, `execute` is used.
  *
- * @template TInputSchema - JSON Schema defining input parameters
- * @template TOutputSchema - JSON Schema defining output structure (object schemas enable structuredContent)
+ * @template TInputSchema - Plain JSON Schema or Standard Schema defining input parameters
+ * @template TOutputSchema - Plain JSON Schema or Standard JSON Schema defining output structure
  *
  * @public
  */
 export type WebMCPConfig<
   TInputSchema extends ToolInputSchema = InputSchema,
-  TOutputSchema extends JsonSchemaForInference | undefined = undefined,
+  TOutputSchema extends ToolOutputSchema | undefined = undefined,
 > = WebMCPConfigBase<TInputSchema, TOutputSchema> &
   WebMCPConfigImplementation<TInputSchema, TOutputSchema>;
 
@@ -296,11 +307,11 @@ export type WebMCPConfig<
  * Return value from the `useWebMCP` hook.
  * Provides access to execution state and methods for manual tool control.
  *
- * @template TOutputSchema - JSON Schema defining output structure
+ * @template TOutputSchema - Plain JSON Schema or Standard JSON Schema defining output structure
  * @public
  */
 export interface WebMCPReturn<
-  TOutputSchema extends JsonSchemaForInference | undefined = undefined,
+  TOutputSchema extends ToolOutputSchema | undefined = undefined,
   TInputSchema extends ToolInputSchema = InputSchema,
 > {
   /**

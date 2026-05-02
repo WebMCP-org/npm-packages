@@ -1,12 +1,22 @@
 import { initializeWebModelContext } from '@mcp-b/global';
+import type { ToolInputSchema } from '@mcp-b/webmcp-types';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
-import { z } from 'zod';
 
 import { useWebMCPPrompt } from './useWebMCPPrompt.js';
 
 const TEST_CHANNEL_ID = `useWebMCPPrompt-test-${Date.now()}`;
 const DEBUG_CONFIG_KEY = 'WEBMCP_DEBUG';
+
+function createValidatorOnlyStandardSchema() {
+  return {
+    '~standard': {
+      version: 1 as const,
+      vendor: 'test',
+      validate: (value: unknown) => ({ value }),
+    },
+  };
+}
 
 function enableDebugLogging(config = '*'): () => void {
   const previous = window.localStorage.getItem(DEBUG_CONFIG_KEY);
@@ -122,7 +132,7 @@ describe('useWebMCPPrompt', () => {
             type: 'object',
             properties: { code: { type: 'string' }, language: { type: 'string' } },
             required: ['code'],
-          } as const,
+          } as const satisfies ToolInputSchema,
           get: async ({ code, language }) => ({
             messages: [
               {
@@ -141,31 +151,28 @@ describe('useWebMCPPrompt', () => {
       expect(prompts[0].arguments).toBeDefined();
     });
 
-    it('converts zod-like argsSchema before prompt registration', async () => {
+    it('passes validator-only Standard Schema argsSchema through prompt registration and lets the runtime reject it', async () => {
       const registerPromptSpy = vi.spyOn(navigator.modelContext, 'registerPrompt');
 
       try {
-        const zodSchema = { code: z.string() };
-        await renderHook(() =>
-          useWebMCPPrompt({
-            name: 'zod_args_prompt',
-            argsSchema: zodSchema as never,
-            get: async () => ({
-              messages: [{ role: 'user', content: { type: 'text', text: 'ok' } }],
-            }),
-          })
-        );
+        const validatorOnlySchema = createValidatorOnlyStandardSchema();
+        await expect(
+          renderHook(() =>
+            useWebMCPPrompt({
+              name: 'validator_only_args_prompt',
+              argsSchema: validatorOnlySchema as never,
+              get: async () => ({
+                messages: [{ role: 'user', content: { type: 'text', text: 'ok' } }],
+              }),
+            })
+          )
+        ).rejects.toThrow(/validator-only Standard Schema/i);
 
         const descriptor = registerPromptSpy.mock.calls.at(-1)?.[0] as {
-          argsSchema?: {
-            type?: string;
-            properties?: Record<string, { type?: string }>;
-            required?: string[];
-          };
+          argsSchema?: unknown;
         };
-        expect(descriptor.argsSchema?.type).toBe('object');
-        expect(descriptor.argsSchema?.properties).toHaveProperty('code');
-        expect(descriptor.argsSchema?.required).toContain('code');
+        expect(descriptor.argsSchema).toBe(validatorOnlySchema);
+        expect(navigator.modelContext?.listPrompts()).toHaveLength(0);
       } finally {
         registerPromptSpy.mockRestore();
       }
@@ -202,7 +209,7 @@ describe('useWebMCPPrompt', () => {
             type: 'object',
             properties: { topic: { type: 'string' } },
             required: ['topic'],
-          } as const,
+          } as const satisfies ToolInputSchema,
           get: getMessage,
         })
       );

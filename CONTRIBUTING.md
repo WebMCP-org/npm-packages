@@ -39,7 +39,7 @@ These docs define review expectations for safety, contract synchronization, and 
 
 - All code must pass linting and formatting:
   ```bash
-  pnpm check        # Biome linting and formatting
+  pnpm check        # Oxlint linting and Oxfmt formatting
   pnpm typecheck    # TypeScript type checking
   pnpm build        # Build must succeed
   ```
@@ -118,6 +118,24 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 
 - Node.js >= 22.12 (check `.nvmrc`)
 - pnpm >= 10.0.0
+
+### Setup
+
+For normal MCP-B work, install the workspace without the vendored Chrome DevTools fork:
+
+```bash
+pnpm install:workspace
+```
+
+If you are actively changing `packages/chrome-devtools-mcp`, install it separately:
+
+```bash
+pnpm install:chrome-devtools-mcp
+npm --prefix packages/chrome-devtools-mcp run build
+```
+
+The fork boundary is documented in [docs/VENDORED_UPSTREAM_FORKS.md](./docs/VENDORED_UPSTREAM_FORKS.md).
+
 - Git
 
 For environment setup and workspace commands, see [Development](./README.md#development) in the root README.
@@ -150,6 +168,7 @@ We follow the [Conventional Commits](https://www.conventionalcommits.org/) speci
 Package scopes (all in `packages/` directory):
 
 - `chrome-devtools-mcp` - @mcp-b/chrome-devtools-mcp
+- `codemode` - @mcp-b/codemode
 - `extension-tools` - @mcp-b/extension-tools
 - `global` - @mcp-b/global
 - `mcp-iframe` - @mcp-b/mcp-iframe
@@ -161,6 +180,7 @@ Package scopes (all in `packages/` directory):
 - `webmcp-polyfill` - @mcp-b/webmcp-polyfill
 - `webmcp-ts-sdk` - @mcp-b/webmcp-ts-sdk
 - `webmcp-types` - @mcp-b/webmcp-types
+- `agent-skills` - agent-skills-ts-sdk
 
 Repository-wide scopes:
 

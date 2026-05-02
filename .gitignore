@@ -63,7 +63,14 @@ docs/plans/WEBMCP_SPEC.md
 # Co-located fork (separate git repo)
 webmcp-tools/
 
+# chrome-devtools-mcp uses npm (not pnpm) — its lockfile is local only
+packages/chrome-devtools-mcp/package-lock.json
+
 # Chromium source and depot tools
 chromium/
 depot_tools/
 skills-lock.json
+
+# Working documents / scratch
+UPSTREAM_ISSUE_*.md
+tmp/

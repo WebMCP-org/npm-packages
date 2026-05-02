@@ -1,13 +1,14 @@
-import type { ToolInputSchema } from '@mcp-b/webmcp-polyfill';
 import type {
   CallToolResult,
   InputSchema,
   JsonObject,
   JsonSchemaForInference,
+  ToolInputSchema,
   ToolDescriptor,
+  ToolOutputSchema,
 } from '@mcp-b/webmcp-types';
 import type { DependencyList } from 'react';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   InferOutput,
   InferToolInput,
@@ -32,7 +33,6 @@ function defaultFormatOutput(output: unknown): string {
 }
 
 const TOOL_OWNER_BY_NAME = new Map<string, symbol>();
-const DEFAULT_REGISTERED_INPUT_SCHEMA: InputSchema = { type: 'object', properties: {} };
 const STANDARD_JSON_SCHEMA_TARGETS = ['draft-2020-12', 'draft-07'] as const;
 type StructuredContent = Exclude<CallToolResult['structuredContent'], undefined>;
 
@@ -44,28 +44,47 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function isInputSchema(value: unknown): value is InputSchema {
-  if (!isPlainObject(value)) {
-    return false;
+function assertRegisteredOutputSchema(
+  outputSchema: ToolOutputSchema | undefined,
+  toolName: string
+): JsonSchemaForInference | undefined {
+  if (outputSchema === undefined) {
+    return undefined;
   }
 
-  if ('type' in value && value.type !== undefined && typeof value.type !== 'string') {
-    return false;
+  if (!isPlainObject(outputSchema) || !('~standard' in outputSchema)) {
+    return outputSchema as JsonSchemaForInference;
   }
 
-  if ('properties' in value && value.properties !== undefined && !isPlainObject(value.properties)) {
-    return false;
+  const standard = outputSchema['~standard'];
+  if (!isPlainObject(standard)) {
+    throw new Error(
+      `[useWebMCP] Tool "${toolName}" outputSchema must expose Standard JSON Schema for output`
+    );
   }
 
-  if (
-    'required' in value &&
-    value.required !== undefined &&
-    (!Array.isArray(value.required) || value.required.some((entry) => typeof entry !== 'string'))
-  ) {
-    return false;
+  const jsonSchema = standard.jsonSchema;
+  if (!isPlainObject(jsonSchema) || typeof jsonSchema.output !== 'function') {
+    throw new Error(
+      `[useWebMCP] Tool "${toolName}" outputSchema must expose Standard JSON Schema for output`
+    );
   }
 
-  return true;
+  for (const target of STANDARD_JSON_SCHEMA_TARGETS) {
+    try {
+      const converted = jsonSchema.output({ target });
+      if (isPlainObject(converted)) {
+        return converted as unknown as JsonSchemaForInference;
+      }
+    } catch (error) {
+      console.warn(
+        `[useWebMCP] Standard JSON Schema conversion failed for tool "${toolName}" outputSchema with target "${target}":`,
+        error
+      );
+    }
+  }
+
+  throw new Error(`[useWebMCP] Failed to convert tool "${toolName}" outputSchema to JSON Schema`);
 }
 
 function isJsonValue(value: unknown): boolean {
@@ -105,13 +124,6 @@ function toStructuredContent(value: unknown): StructuredContent | null {
   }
 }
 
-const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
-
-function isDev(): boolean {
-  const env = typeof process !== 'undefined' ? process.env?.NODE_ENV : undefined;
-  return env !== undefined ? env !== 'production' : false;
-}
-
 function isToolRegistrationHandle(value: unknown): value is { unregister: () => void } {
   return (
     typeof value === 'object' &&
@@ -129,49 +141,38 @@ function registerToolWithCompatibilityHandle(
   return isToolRegistrationHandle(registration) ? registration : undefined;
 }
 
-function toRegisteredInputSchema(
-  inputSchema: ToolInputSchema | undefined
-): InputSchema | undefined {
-  if (inputSchema === undefined) {
-    return undefined;
+function containsFunction(value: unknown, seen = new Set<object>()): boolean {
+  if (typeof value === 'function') {
+    return true;
   }
 
-  if (!isPlainObject(inputSchema) || !('~standard' in inputSchema)) {
-    return isInputSchema(inputSchema) ? inputSchema : DEFAULT_REGISTERED_INPUT_SCHEMA;
+  if (!isPlainObject(value) && !Array.isArray(value)) {
+    return false;
   }
 
-  const standard = inputSchema['~standard'];
-  if (!isPlainObject(standard)) {
-    return DEFAULT_REGISTERED_INPUT_SCHEMA;
+  if (seen.has(value)) {
+    return false;
   }
+  seen.add(value);
 
-  const jsonSchema = standard.jsonSchema;
-  if (!isPlainObject(jsonSchema) || typeof jsonSchema.input !== 'function') {
-    return DEFAULT_REGISTERED_INPUT_SCHEMA;
-  }
-
-  for (const target of STANDARD_JSON_SCHEMA_TARGETS) {
-    try {
-      const converted = jsonSchema.input({ target });
-      if (isInputSchema(converted)) {
-        return converted;
-      }
-    } catch {
-      // Try the next target before falling back to the default registration schema.
-    }
-  }
-
-  return DEFAULT_REGISTERED_INPUT_SCHEMA;
+  const entries = Array.isArray(value) ? value : Object.values(value);
+  return entries.some((entry) => containsFunction(entry, seen));
 }
 
-function toRegisteredOutputSchema(
-  outputSchema: JsonSchemaForInference | undefined
-): JsonSchemaForInference | undefined {
-  if (outputSchema === undefined) {
+function getStructuralDependency(value: unknown): unknown {
+  if (value == null) {
     return undefined;
   }
 
-  return outputSchema;
+  if (containsFunction(value)) {
+    return value;
+  }
+
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return value;
+  }
 }
 
 /**
@@ -182,12 +183,17 @@ function toRegisteredOutputSchema(
  * - Manages execution state (loading, results, errors)
  * - Handles tool execution and lifecycle callbacks
  * - Automatically unregisters on component unmount
- * - Returns `structuredContent` when `outputSchema` is defined
+ * - Returns `structuredContent` when `outputSchema` describes an object result
  *
- * ## Output Schema (Recommended)
+ * ## Schema Contract
  *
- * Always define an `outputSchema` for your tools. This provides:
- * - **Type Safety**: Handler return type is inferred from the schema
+ * `inputSchema` accepts plain JSON Schema or Standard Schema objects.
+ * Registration still flows through `navigator.modelContext`, so validator-only Standard Schema
+ * inputs must be JSON-exportable or registration will throw.
+ * `outputSchema` accepts plain JSON Schema or Standard JSON Schema objects.
+ *
+ * Defining an `outputSchema` is recommended because it provides:
+ * - **Type Safety**: Implementation return type is inferred from the schema
  * - **MCP structuredContent**: AI models receive structured, typed data
  * - **Better AI Understanding**: Models can reason about your tool's output format
  *
@@ -195,19 +201,19 @@ function toRegisteredOutputSchema(
  * useWebMCP({
  *   name: 'get_user',
  *   description: 'Get user by ID',
- *   inputSchema: {
+ *   inputSchema: ({
  *     type: 'object',
  *     properties: { userId: { type: 'string' } },
  *     required: ['userId'],
- *   } as const,
- *   outputSchema: {
+ *   } as const satisfies ToolInputSchema),
+ *   outputSchema: ({
  *     type: 'object',
  *     properties: {
  *       id: { type: 'string' },
  *       name: { type: 'string' },
  *       email: { type: 'string' },
  *     },
- *   } as const,
+ *   } as const satisfies ToolOutputSchema),
  *   execute: async ({ userId }) => {
  *     const user = await fetchUser(userId);
  *     return { id: user.id, name: user.name, email: user.email };
@@ -221,26 +227,31 @@ function toRegisteredOutputSchema(
  *
  * - **Ref-based callbacks**: `execute`/`handler`, `onSuccess`, `onError`, and `formatOutput`
  *   are stored in refs, so changing these functions won't trigger re-registration.
+ * - **Structural schema memoization**: JSON-serializable `inputSchema`, `outputSchema`, and
+ *   `annotations` are compared structurally, so identical inline literals do not trigger
+ *   unnecessary re-registration.
  *
- * **IMPORTANT**: If `inputSchema`, `outputSchema`, or `annotations` are defined inline
- * or change on every render, the tool will re-register unnecessarily. To avoid this,
- * define them outside your component with `as const`:
+ * Hoisting shared schemas is still a good idea because it keeps code readable and preserves
+ * literal inference cleanly with `as const satisfies`:
  *
  * ```tsx
- * // Good: Static schema defined outside component
+ * // Good: Shared schema defined once
  * const OUTPUT_SCHEMA = {
  *   type: 'object',
  *   properties: { count: { type: 'number' } },
- * } as const;
+ * } as const satisfies ToolOutputSchema;
  *
- * // Bad: Inline schema (creates new object every render)
+ * // Also valid: structurally identical inline literals are memoized
  * useWebMCP({
- *   outputSchema: { type: 'object', properties: { count: { type: 'number' } } } as const,
+ *   outputSchema: {
+ *     type: 'object',
+ *     properties: { count: { type: 'number' } },
+ *   } as const satisfies ToolOutputSchema,
  * });
  * ```
  *
- * @template TInputSchema - JSON Schema defining input parameter types (use `as const` for inference)
- * @template TOutputSchema - JSON Schema defining output structure (object schemas enable structuredContent)
+ * @template TInputSchema - Plain JSON Schema or Standard Schema defining input parameter types
+ * @template TOutputSchema - Plain JSON Schema or Standard JSON Schema defining output structure
  *
  * @param config - Configuration object for the tool
  * @param deps - Optional dependency array that triggers tool re-registration when values change.
@@ -256,18 +267,18 @@ function toRegisteredOutputSchema(
  *   const likeTool = useWebMCP({
  *     name: 'posts_like',
  *     description: 'Like a post by ID',
- *     inputSchema: {
+ *     inputSchema: ({
  *       type: 'object',
  *       properties: { postId: { type: 'string', description: 'The post ID' } },
  *       required: ['postId'],
- *     } as const,
- *     outputSchema: {
+ *     } as const satisfies ToolInputSchema),
+ *     outputSchema: ({
  *       type: 'object',
  *       properties: {
  *         success: { type: 'boolean' },
  *         likeCount: { type: 'number' },
  *       },
- *     } as const,
+ *     } as const satisfies ToolOutputSchema),
  *     execute: async ({ postId }) => {
  *       const result = await api.posts.like(postId);
  *       return { success: true, likeCount: result.likes };
@@ -280,7 +291,7 @@ function toRegisteredOutputSchema(
  */
 export function useWebMCP<
   TInputSchema extends ToolInputSchema = InputSchema,
-  TOutputSchema extends JsonSchemaForInference | undefined = undefined,
+  TOutputSchema extends ToolOutputSchema | undefined = undefined,
 >(
   config: WebMCPConfig<TInputSchema, TOutputSchema>,
   deps?: DependencyList
@@ -293,9 +304,11 @@ export function useWebMCP<
     inputSchema,
     outputSchema,
     annotations,
+    enabled = true,
     execute: configExecute,
     handler: legacyHandler,
     formatOutput = defaultFormatOutput,
+    onStart,
     onSuccess,
     onError,
   } = config;
@@ -307,6 +320,15 @@ export function useWebMCP<
     );
   }
 
+  // Memoize schema/annotations keys to prevent re-registration when
+  // structurally identical inline objects are passed on every render.
+  const inputSchemaDependency = useMemo(() => getStructuralDependency(inputSchema), [inputSchema]);
+  const outputSchemaDependency = useMemo(
+    () => getStructuralDependency(outputSchema),
+    [outputSchema]
+  );
+  const annotationsDependency = useMemo(() => getStructuralDependency(annotations), [annotations]);
+
   const [state, setState] = useState<ToolExecutionState<TOutput>>({
     isExecuting: false,
     lastResult: null,
@@ -315,25 +337,19 @@ export function useWebMCP<
   });
 
   const toolExecuteRef = useRef(toolExecute);
+  const onStartRef = useRef(onStart);
   const onSuccessRef = useRef(onSuccess);
   const onErrorRef = useRef(onError);
   const formatOutputRef = useRef(formatOutput);
   const isMountedRef = useRef(true);
-  const warnedRef = useRef(new Set<string>());
-  const prevConfigRef = useRef({
-    inputSchema,
-    outputSchema,
-    annotations,
-    description,
-    deps,
-  });
   // Update refs when callbacks change (doesn't trigger re-registration)
-  useIsomorphicLayoutEffect(() => {
+  useEffect(() => {
     toolExecuteRef.current = toolExecute;
+    onStartRef.current = onStart;
     onSuccessRef.current = onSuccess;
     onErrorRef.current = onError;
     formatOutputRef.current = formatOutput;
-  }, [toolExecute, onSuccess, onError, formatOutput]);
+  }, [toolExecute, onStart, onSuccess, onError, formatOutput]);
 
   // Cleanup: mark component as unmounted
   useEffect(() => {
@@ -343,64 +359,6 @@ export function useWebMCP<
     };
   }, []);
 
-  useEffect(() => {
-    if (!isDev()) {
-      prevConfigRef.current = { inputSchema, outputSchema, annotations, description, deps };
-      return;
-    }
-
-    const warnOnce = (key: string, message: string) => {
-      if (warnedRef.current.has(key)) {
-        return;
-      }
-      console.warn(`[useWebMCP] ${message}`);
-      warnedRef.current.add(key);
-    };
-
-    const prev = prevConfigRef.current;
-
-    if (inputSchema && prev.inputSchema && prev.inputSchema !== inputSchema) {
-      warnOnce(
-        'inputSchema',
-        `Tool "${name}" inputSchema reference changed; memoize or define it outside the component to avoid re-registration.`
-      );
-    }
-
-    if (outputSchema && prev.outputSchema && prev.outputSchema !== outputSchema) {
-      warnOnce(
-        'outputSchema',
-        `Tool "${name}" outputSchema reference changed; memoize or define it outside the component to avoid re-registration.`
-      );
-    }
-
-    if (annotations && prev.annotations && prev.annotations !== annotations) {
-      warnOnce(
-        'annotations',
-        `Tool "${name}" annotations reference changed; memoize or define it outside the component to avoid re-registration.`
-      );
-    }
-
-    if (description !== prev.description) {
-      warnOnce(
-        'description',
-        `Tool "${name}" description changed; this re-registers the tool. Memoize the description if it does not need to update.`
-      );
-    }
-
-    if (
-      deps?.some(
-        (value) => (typeof value === 'object' && value !== null) || typeof value === 'function'
-      )
-    ) {
-      warnOnce(
-        'deps',
-        `Tool "${name}" deps contains non-primitive values; prefer primitives or memoize objects/functions to reduce re-registration.`
-      );
-    }
-
-    prevConfigRef.current = { inputSchema, outputSchema, annotations, description, deps };
-  }, [annotations, deps, description, inputSchema, name, outputSchema]);
-
   /**
    * Executes the configured tool implementation with input validation and state management.
    *
@@ -409,6 +367,10 @@ export function useWebMCP<
    * @throws Error if validation fails or the tool implementation throws
    */
   const execute = useCallback(async (input: TInput): Promise<TOutput> => {
+    if (onStartRef.current) {
+      onStartRef.current(input);
+    }
+
     setState((prev) => ({
       ...prev,
       isExecuting: true,
@@ -476,12 +438,18 @@ export function useWebMCP<
   }, []);
 
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
     if (typeof window === 'undefined' || !window.navigator?.modelContext) {
       console.warn(
         `[useWebMCP] window.navigator.modelContext is not available. Tool "${name}" will not be registered.`
       );
       return;
     }
+
+    const resolvedOutputSchema = assertRegisteredOutputSchema(outputSchema, name);
 
     /**
      * Handles MCP tool execution by running the tool implementation and formatting the response.
@@ -503,7 +471,7 @@ export function useWebMCP<
           ],
         };
 
-        if (isObjectOutputSchema(outputSchema)) {
+        if (isObjectOutputSchema(resolvedOutputSchema)) {
           const structuredContent = toStructuredContent(result);
           if (!structuredContent) {
             throw new Error(
@@ -531,13 +499,11 @@ export function useWebMCP<
 
     const ownerToken = Symbol(name);
     const modelContext = window.navigator.modelContext;
-    const resolvedInputSchema = toRegisteredInputSchema(inputSchema);
-    const resolvedOutputSchema = toRegisteredOutputSchema(outputSchema);
     const toolDescriptor: ToolDescriptor = {
       name,
       description,
-      ...(resolvedInputSchema && { inputSchema: resolvedInputSchema }),
-      ...(resolvedOutputSchema && { outputSchema: resolvedOutputSchema }),
+      ...(inputSchema !== undefined ? { inputSchema } : {}),
+      ...(outputSchema !== undefined ? { outputSchema } : {}),
       ...(annotations && { annotations }),
       execute: mcpHandler,
     };
@@ -560,16 +526,21 @@ export function useWebMCP<
 
         modelContext.unregisterTool(name);
       } catch (error) {
-        if (isDev()) {
-          console.warn(`[useWebMCP] Failed to unregister tool "${name}" during cleanup:`, error);
-        }
+        console.warn(`[useWebMCP] Failed to unregister tool "${name}" during cleanup:`, error);
       }
     };
-    // Spread operator in dependencies: Allows users to provide additional dependencies
-    // via the `deps` parameter. While unconventional, this pattern is intentional to support
-    // dynamic dependency injection. The spread is safe because deps is validated and warned
-    // about non-primitive values earlier in this hook.
-  }, [name, description, inputSchema, outputSchema, annotations, ...(deps ?? [])]);
+    // The dependency sentinels avoid unnecessary re-registration for plain JSON values,
+    // while function-bearing schemas fall back to identity-based tracking.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    name,
+    description,
+    inputSchemaDependency,
+    outputSchemaDependency,
+    annotationsDependency,
+    enabled,
+    ...(deps ?? []),
+  ]);
 
   return {
     state,

@@ -25,20 +25,19 @@ function getFirstText(result: { content?: Array<{ type?: string; text?: string }
 // Check Zod version
 const testSchema = z.string();
 const isZod4 = '_zod' in testSchema;
-const isZod3 = '_def' in testSchema && !isZod4;
 zodVersionEl.innerHTML = `
-  <p style="color: ${isZod3 ? '#22543d' : '#742a2a'}; font-weight: bold;">
-    ${isZod3 ? '✓ Zod 3.x detected (correct)' : isZod4 ? '✗ Zod 4.x detected (wrong!)' : '✗ Unknown Zod version'}
+  <p style="color: ${isZod4 ? '#22543d' : '#742a2a'}; font-weight: bold;">
+    ${isZod4 ? '✓ Zod 4.x detected (correct)' : '✗ Unknown Zod version'}
   </p>
   <p style="color: #718096; font-size: 0.85rem;">
     Has _def: ${!!(testSchema as any)._def}, Has _zod: ${'_zod' in testSchema}
   </p>
 `;
 
-if (!isZod3) {
+if (!isZod4) {
   statusEl.className = 'error';
-  statusEl.textContent = 'Wrong Zod version! Expected Zod 3.x';
-  log('ERROR: Expected Zod 3.x but got different version', 'error');
+  statusEl.textContent = 'Wrong Zod version! Expected Zod 4.x';
+  log('ERROR: Expected Zod 4.x but got different version', 'error');
   throw new Error('Wrong Zod version');
 }
 
@@ -53,16 +52,16 @@ async function runTests() {
   }
 
   statusEl.className = 'success';
-  statusEl.textContent = 'ESM + Zod 3 initialized - Running tests...';
+  statusEl.textContent = 'ESM + Zod 4 initialized - Running tests...';
 
   const mc = window.navigator.modelContext as ModelContextWithExtensions;
   const registerTool = mc.registerTool as unknown as (tool: unknown) => void;
 
   try {
-    // Register tool with Zod 3 schemas
+    // Register tool with Zod 4 schemas
     registerTool({
-      name: 'esm-zod3-validator',
-      description: 'Validate data using ESM + Zod 3',
+      name: 'esm-zod4-validator',
+      description: 'Validate data using ESM + Zod 4',
       inputSchema: {
         name: z.string().min(2).max(50).describe('Name (2-50 chars)'),
         email: z.string().email().describe('Valid email'),
@@ -82,13 +81,13 @@ async function runTests() {
           content: [
             {
               type: 'text',
-              text: `ESM Zod3: name=${name}, email=${email}, score=${score}, active=${active ?? 'unset'}, tags=${tags?.join(',') || 'none'}`,
+              text: `ESM Zod4: name=${name}, email=${email}, score=${score}, active=${active ?? 'unset'}, tags=${tags?.join(',') || 'none'}`,
             },
           ],
         };
       },
     });
-    log('Tool "esm-zod3-validator" registered successfully', 'success');
+    log('Tool "esm-zod4-validator" registered successfully', 'success');
 
     // Update tools list
     const tools = mc.listTools();
@@ -104,7 +103,7 @@ async function runTests() {
     // Test 1: Valid input
     log('Test 1: Valid input...', 'info');
     const r1 = await mc.callTool({
-      name: 'esm-zod3-validator',
+      name: 'esm-zod4-validator',
       arguments: {
         name: 'John Doe',
         email: 'john@example.com',
@@ -119,7 +118,7 @@ async function runTests() {
     // Test 2: Valid with optional fields
     log('Test 2: Valid input with optional fields...', 'info');
     const r2 = await mc.callTool({
-      name: 'esm-zod3-validator',
+      name: 'esm-zod4-validator',
       arguments: {
         name: 'Jane Doe',
         email: 'jane@example.com',
@@ -136,7 +135,7 @@ async function runTests() {
     // Test 3: Missing required field
     log('Test 3: Missing required field (email)...', 'info');
     const r3 = await mc.callTool({
-      name: 'esm-zod3-validator',
+      name: 'esm-zod4-validator',
       arguments: {
         name: 'Test User',
         score: 50,
@@ -150,7 +149,7 @@ async function runTests() {
     // Test 4: Invalid type
     log('Test 4: Invalid type (score as string)...', 'info');
     const r4 = await mc.callTool({
-      name: 'esm-zod3-validator',
+      name: 'esm-zod4-validator',
       arguments: {
         name: 'Test User',
         email: 'test@example.com',
@@ -165,7 +164,7 @@ async function runTests() {
     // Test 5: Value out of range
     log('Test 5: Value out of range (score=150)...', 'info');
     const r5 = await mc.callTool({
-      name: 'esm-zod3-validator',
+      name: 'esm-zod4-validator',
       arguments: {
         name: 'Test User',
         email: 'test@example.com',
@@ -180,7 +179,7 @@ async function runTests() {
     // Test 6: String too short
     log('Test 6: String too short (name="A")...', 'info');
     const r6 = await mc.callTool({
-      name: 'esm-zod3-validator',
+      name: 'esm-zod4-validator',
       arguments: {
         name: 'A',
         email: 'test@example.com',
@@ -195,7 +194,7 @@ async function runTests() {
     // Test 7: Invalid email
     log('Test 7: Invalid email format...', 'info');
     const r7 = await mc.callTool({
-      name: 'esm-zod3-validator',
+      name: 'esm-zod4-validator',
       arguments: {
         name: 'Test User',
         email: 'not-an-email',
@@ -210,7 +209,7 @@ async function runTests() {
     // Test 8: Invalid boolean type
     log('Test 8: Invalid boolean type (active="yes")...', 'info');
     const r8 = await mc.callTool({
-      name: 'esm-zod3-validator',
+      name: 'esm-zod4-validator',
       arguments: {
         name: 'Test User',
         email: 'test@example.com',

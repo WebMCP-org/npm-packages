@@ -5,15 +5,26 @@ import {
   useWebMCPPrompt,
   useWebMCPResource,
 } from '@mcp-b/react-webmcp';
+import type { ToolInputSchema, ToolOutputSchema } from '@mcp-b/webmcp-types';
 import { useState } from 'react';
-import { z } from 'zod';
 
 // Counter state (shared across the app)
 let globalCounter = 0;
 
 const COUNTER_AMOUNT_INPUT_SCHEMA = {
-  amount: z.number().min(1).max(100).default(1).describe('Amount to increment'),
-};
+  type: 'object',
+  properties: {
+    amount: {
+      type: 'number',
+      minimum: 1,
+      maximum: 100,
+      default: 1,
+      description: 'Amount to increment',
+    },
+  },
+  required: ['amount'],
+  additionalProperties: false,
+} as const satisfies ToolInputSchema;
 
 const INCREMENT_ANNOTATIONS = {
   title: 'Increment Counter',
@@ -40,7 +51,8 @@ const GET_COUNTER_OUTPUT_SCHEMA = {
     timestamp: { type: 'string', description: 'ISO timestamp when the value was retrieved' },
   },
   required: ['counter', 'timestamp'],
-} as const;
+  additionalProperties: false,
+} as const satisfies ToolOutputSchema;
 
 const GET_COUNTER_ANNOTATIONS = {
   title: 'Get Counter',
@@ -49,8 +61,13 @@ const GET_COUNTER_ANNOTATIONS = {
 };
 
 const LIKE_POST_INPUT_SCHEMA = {
-  postId: z.string().describe('The post ID to like'),
-};
+  type: 'object',
+  properties: {
+    postId: { type: 'string', description: 'The post ID to like' },
+  },
+  required: ['postId'],
+  additionalProperties: false,
+} as const satisfies ToolInputSchema;
 
 const LIKE_POST_ANNOTATIONS = {
   title: 'Like Post',
@@ -59,9 +76,20 @@ const LIKE_POST_ANNOTATIONS = {
 };
 
 const SEARCH_POSTS_INPUT_SCHEMA = {
-  query: z.string().min(1).describe('Search query'),
-  limit: z.number().min(1).max(10).default(10).describe('Max results'),
-};
+  type: 'object',
+  properties: {
+    query: { type: 'string', minLength: 1, description: 'Search query' },
+    limit: {
+      type: 'number',
+      minimum: 1,
+      maximum: 10,
+      default: 10,
+      description: 'Max results',
+    },
+  },
+  required: ['query'],
+  additionalProperties: false,
+} as const satisfies ToolInputSchema;
 
 const SEARCH_POSTS_ANNOTATIONS = {
   title: 'Search Posts',
@@ -70,14 +98,27 @@ const SEARCH_POSTS_ANNOTATIONS = {
 };
 
 const CODE_REVIEW_ARGS_SCHEMA = {
-  code: z.string().describe('The code to review'),
-  language: z.string().optional().describe('Programming language (optional)'),
-};
+  type: 'object',
+  properties: {
+    code: { type: 'string', description: 'The code to review' },
+    language: {
+      type: 'string',
+      description: 'Programming language (optional)',
+    },
+  },
+  required: ['code'],
+  additionalProperties: false,
+} as const satisfies ToolInputSchema;
 
 const SUMMARIZE_ARGS_SCHEMA = {
-  text: z.string().min(1).describe('The text to summarize'),
-  maxLength: z.number().optional().describe('Maximum summary length'),
-};
+  type: 'object',
+  properties: {
+    text: { type: 'string', minLength: 1, description: 'The text to summarize' },
+    maxLength: { type: 'number', description: 'Maximum summary length' },
+  },
+  required: ['text'],
+  additionalProperties: false,
+} as const satisfies ToolInputSchema;
 
 function App() {
   const [posts, setPosts] = useState([
