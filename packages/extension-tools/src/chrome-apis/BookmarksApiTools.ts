@@ -32,10 +32,6 @@ export const BOOKMARK_ACTIONS = [
   'update',
 ] as const;
 
-type BookmarkAction = (typeof BOOKMARK_ACTIONS)[number];
-
-const bookmarkActionSchema = z.enum(BOOKMARK_ACTIONS);
-
 export class BookmarksApiTools extends BaseApiTools<BookmarksApiToolsOptions> {
   protected apiName = 'Bookmarks';
 
@@ -82,250 +78,104 @@ export class BookmarksApiTools extends BaseApiTools<BookmarksApiToolsOptions> {
   }
 
   registerTools(): void {
-    // Unified tool: action-based multiplexer
-    this.server.registerTool(
-      'extension_tool_bookmark_operations',
-      {
-        description:
-          'Perform bookmark operations. Choose an action and supply the corresponding parameters.',
-        // Keep top-level schema simple and validate per-action in handler for robust errors
-        inputSchema: {
-          action: bookmarkActionSchema,
-          // Parameters vary by action; validated in handler using specific schemas
-          params: z
-            .record(z.string(), z.any())
-            .optional()
-            .describe('Parameters for the chosen action'),
-        },
-      },
-      async ({ action, params = {} }) => {
-        try {
-          // Gate action by options
-          if (!this.isActionEnabled(action)) {
-            return this.formatError(`Action '${action}' is disabled by configuration`);
-          }
+    if (this.shouldRegisterTool('create')) {
+      this.registerExtensionTool(
+        'extension_tool_create_bookmark',
+        'Create a bookmark or folder under the specified parent. A folder must have a title and no url',
+        this.createSchema.shape,
+        (params) => this.handleCreate(params)
+      );
+    }
 
-          switch (action as BookmarkAction) {
-            case 'create':
-              return await this.handleCreate(params);
-            case 'get':
-              return await this.handleGet(params);
-            case 'getChildren':
-              return await this.handleGetChildren(params);
-            case 'getRecent':
-              return await this.handleGetRecent(params);
-            case 'getSubTree':
-              return await this.handleGetSubTree(params);
-            case 'getTree':
-              return await this.handleGetTree();
-            case 'move':
-              return await this.handleMove(params);
-            case 'remove':
-              return await this.handleRemove(params);
-            case 'removeTree':
-              return await this.handleRemoveTree(params);
-            case 'search':
-              return await this.handleSearch(params);
-            case 'update':
-              return await this.handleUpdate(params);
-            default:
-              return this.formatError(`Unknown action: ${String(action)}`);
-          }
-        } catch (error) {
-          return this.formatError(error);
-        }
-      }
-    );
+    if (this.shouldRegisterTool('get')) {
+      this.registerExtensionTool(
+        'extension_tool_get_bookmarks',
+        'Retrieve the specified bookmark(s) by ID',
+        this.getSchema.shape,
+        (params) => this.handleGet(params)
+      );
+    }
 
-    this.server.registerTool(
-      'extension_tool_bookmark_parameters_description',
-      {
-        description:
-          'Get the parameters for extension_tool_bookmark_operations tool and the description for the associated action, this tool should be used first before extension_tool_bookmark_operations',
-        inputSchema: {
-          action: bookmarkActionSchema,
-        },
-      },
-      async ({ action }) => {
-        try {
-          // Gate action by options
-          if (!this.isActionEnabled(action)) {
-            return this.formatError(`Action '${action}' is disabled by configuration`);
-          }
+    if (this.shouldRegisterTool('getChildren')) {
+      this.registerExtensionTool(
+        'extension_tool_get_bookmark_children',
+        'Retrieve the children of the specified bookmark folder',
+        this.getChildrenSchema.shape,
+        (params) => this.handleGetChildren(params)
+      );
+    }
 
-          // Build JSON Schema for the params of the requested action so an LLM can construct a valid call
-          const toJson = (schema: z.ZodTypeAny, _name: string) => z.toJSONSchema(schema);
+    if (this.shouldRegisterTool('getRecent')) {
+      this.registerExtensionTool(
+        'extension_tool_get_recent_bookmarks',
+        'Retrieve the recently added bookmarks',
+        this.getRecentSchema.shape,
+        (params) => this.handleGetRecent(params)
+      );
+    }
 
-          const payloadBase = {
-            tool: 'extension_tool_bookmark_operations',
-            action,
-            note: 'Use the description to double check if the correct action is chosen. Use this JSON Schema for the params field when calling the tool. The top-level tool input is { action, params }.',
-          } as const;
+    if (this.shouldRegisterTool('getSubTree')) {
+      this.registerExtensionTool(
+        'extension_tool_get_bookmark_subtree',
+        'Retrieve part of the bookmarks hierarchy, starting at the specified node',
+        this.getSubTreeSchema.shape,
+        (params) => this.handleGetSubTree(params)
+      );
+    }
 
-          switch (action as BookmarkAction) {
-            case 'create': {
-              const paramsJsonSchema = toJson(this.createSchema, 'BookmarksCreateParams');
-              const example = {
-                title: 'My Site',
-                url: 'https://example.com',
-                parentId: '1',
-              };
-              const paramAndDescription = {
-                params: paramsJsonSchema,
-                description:
-                  'Create a bookmark or folder under the specified parent. A folder must have a title and no url',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramAndDescription,
-                example,
-              });
-            }
-            case 'get': {
-              const paramsJsonSchema = toJson(this.getSchema, 'BookmarksGetParams');
-              const example = { idOrIdList: '123' };
-              const paramAndDescription = {
-                params: paramsJsonSchema,
-                description: 'Retrieve the specified bookmark(s) by ID',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramAndDescription,
-                example,
-              });
-            }
-            case 'getChildren': {
-              const paramsJsonSchema = toJson(this.getChildrenSchema, 'BookmarksGetChildrenParams');
-              const example = { id: '1' };
-              const paramAndDescription = {
-                params: paramsJsonSchema,
-                description: 'Retrieve the children of the specified bookmark folder',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramAndDescription,
-                example,
-              });
-            }
-            case 'getRecent': {
-              const paramsJsonSchema = toJson(this.getRecentSchema, 'BookmarksGetRecentParams');
-              const example = { numberOfItems: 10 };
-              const paramAndDescription = {
-                params: paramsJsonSchema,
-                description: 'Retrieve the recently added bookmarks',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramAndDescription,
-                example,
-              });
-            }
-            case 'getSubTree': {
-              const paramsJsonSchema = toJson(this.getSubTreeSchema, 'BookmarksGetSubTreeParams');
-              const example = { id: '1' };
-              const paramAndDescription = {
-                params: paramsJsonSchema,
-                description:
-                  'Retrieve part of the bookmarks hierarchy, starting at the specified node',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramAndDescription,
-                example,
-              });
-            }
-            case 'getTree': {
-              // No params required
-              const paramsJsonSchema = {
-                type: 'object',
-                properties: {},
-                additionalProperties: false,
-              } as const;
-              const example = {};
-              const paramAndDescription = {
-                params: paramsJsonSchema,
-                description: 'Retrieve the entire bookmarks hierarchy',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramAndDescription,
-                example,
-              });
-            }
-            case 'move': {
-              const paramsJsonSchema = toJson(this.moveSchema, 'BookmarksMoveParams');
-              const example = { id: '123', parentId: '1', index: 0 };
-              const paramAndDescription = {
-                params: paramsJsonSchema,
-                description: 'Move the specified bookmark or folder to a new location',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramAndDescription,
-                example,
-              });
-            }
-            case 'remove': {
-              const paramsJsonSchema = toJson(this.removeSchema, 'BookmarksRemoveParams');
-              const example = { id: '123' };
-              const paramAndDescription = {
-                params: paramsJsonSchema,
-                description: 'Remove the specified bookmark or empty folder',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramAndDescription,
-                example,
-              });
-            }
-            case 'removeTree': {
-              const paramsJsonSchema = toJson(this.removeTreeSchema, 'BookmarksRemoveTreeParams');
-              const example = { id: '1' };
-              const paramAndDescription = {
-                params: paramsJsonSchema,
-                description: 'Recursively remove a bookmark folder and all its contents',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramAndDescription,
-                example,
-              });
-            }
-            case 'search': {
-              const paramsJsonSchema = toJson(this.searchSchema, 'BookmarksSearchParams');
-              const example = { query: 'recipes' };
-              const paramsAndDescription = {
-                params: paramsJsonSchema,
-                description: 'Search for bookmarks matching the given query',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-                example,
-              });
-            }
-            case 'update': {
-              const paramsJsonSchema = toJson(this.updateSchema, 'BookmarksUpdateParams');
-              const example = { id: '123', title: 'New title' };
-              const paramsAndDescription = {
-                params: paramsJsonSchema,
-                description:
-                  'Update the properties of a bookmark or folder. Only title and url can be changed',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-                example,
-              });
-            }
-            default:
-              return this.formatError(`Unknown action: ${String(action)}`);
-          }
-        } catch (error) {
-          return this.formatError(error);
-        }
-      }
-    );
+    if (this.shouldRegisterTool('getTree')) {
+      this.registerExtensionTool(
+        'extension_tool_get_bookmark_tree',
+        'Retrieve the entire bookmarks hierarchy',
+        {},
+        () => this.handleGetTree()
+      );
+    }
+
+    if (this.shouldRegisterTool('move')) {
+      this.registerExtensionTool(
+        'extension_tool_move_bookmark',
+        'Move the specified bookmark or folder to a new location',
+        this.moveSchema.shape,
+        (params) => this.handleMove(params)
+      );
+    }
+
+    if (this.shouldRegisterTool('remove')) {
+      this.registerExtensionTool(
+        'extension_tool_remove_bookmark',
+        'Remove the specified bookmark or empty folder',
+        this.removeSchema.shape,
+        (params) => this.handleRemove(params)
+      );
+    }
+
+    if (this.shouldRegisterTool('removeTree')) {
+      this.registerExtensionTool(
+        'extension_tool_remove_bookmark_tree',
+        'Recursively remove a bookmark folder and all its contents',
+        this.removeTreeSchema.shape,
+        (params) => this.handleRemoveTree(params)
+      );
+    }
+
+    if (this.shouldRegisterTool('search')) {
+      this.registerExtensionTool(
+        'extension_tool_search_bookmarks',
+        'Search for bookmarks matching the given query',
+        this.searchSchema.shape,
+        (params) => this.handleSearch(params)
+      );
+    }
+
+    if (this.shouldRegisterTool('update')) {
+      this.registerExtensionTool(
+        'extension_tool_update_bookmark',
+        'Update the properties of a bookmark or folder. Only title and url can be changed',
+        this.updateSchema.shape,
+        (params) => this.handleUpdate(params)
+      );
+    }
   }
 
   // ===== Validation Schemas per action =====
@@ -649,26 +499,5 @@ export class BookmarksApiTools extends BaseApiTools<BookmarksApiToolsOptions> {
       type: result.url ? 'bookmark' : 'folder',
       changes,
     });
-  }
-
-  // ===== Helpers =====
-  private isActionEnabled(action: BookmarkAction): boolean {
-    // By default, all actions are enabled unless explicitly set to false in options
-    const map: Record<BookmarkAction, keyof BookmarksApiToolsOptions> = {
-      create: 'create',
-      get: 'get',
-      getChildren: 'getChildren',
-      getRecent: 'getRecent',
-      getSubTree: 'getSubTree',
-      getTree: 'getTree',
-      move: 'move',
-      remove: 'remove',
-      removeTree: 'removeTree',
-      search: 'search',
-      update: 'update',
-    };
-    const key = map[action];
-    const optVal = (this.options as BookmarksApiToolsOptions)[key];
-    return optVal !== false;
   }
 }

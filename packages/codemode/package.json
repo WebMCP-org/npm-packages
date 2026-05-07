@@ -72,7 +72,7 @@
     "test:e2e": "pnpm --filter mcp-e2e-tests test:codemode:webmcp",
     "test:e2e:beta": "pnpm --filter mcp-e2e-tests test:codemode:webmcp:beta",
     "test:watch": "vp test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "pnpm --filter @mcp-b/webmcp-types build && tsc --noEmit"
   },
   "devDependencies": {
     "@types/json-schema": "^7.0.15",

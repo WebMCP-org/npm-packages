@@ -21,10 +21,6 @@ export const HISTORY_ACTIONS = [
   'search',
 ] as const;
 
-type HistoryAction = (typeof HISTORY_ACTIONS)[number];
-
-const historyActionSchema = z.enum(HISTORY_ACTIONS);
-
 export class HistoryApiTools extends BaseApiTools<HistoryApiToolsOptions> {
   protected apiName = 'History';
 
@@ -73,141 +69,59 @@ export class HistoryApiTools extends BaseApiTools<HistoryApiToolsOptions> {
   }
 
   registerTools(): void {
-    this.server.registerTool(
-      'extension_tool_history_operations',
-      {
-        description: 'Perform operations on the Chrome History API',
-        inputSchema: {
-          action: historyActionSchema,
-          params: z
-            .record(z.string(), z.any())
-            .optional()
-            .describe('Parameters for the chosen action'),
-        },
-      },
-      async ({ action, params = {} }) => {
-        try {
-          if (!this.shouldRegisterTool(action)) {
-            return this.formatError(new Error(`Action "${action}" is not supported`));
-          }
+    if (this.shouldRegisterTool('addUrl')) {
+      this.registerExtensionTool(
+        'extension_tool_add_history_url',
+        'Add a URL to the history at the current time with a transition type of "link"',
+        this.addUrlSchema.shape,
+        (params) => this.handleAddUrl(params)
+      );
+    }
 
-          switch (action as HistoryAction) {
-            case 'addUrl':
-              return await this.handleAddUrl(params);
-            case 'deleteAll':
-              return await this.handleDeleteAll();
-            case 'deleteRange':
-              return await this.handleDeleteRange(params);
-            case 'deleteUrl':
-              return await this.handleDeleteUrl(params);
-            case 'getVisits':
-              return await this.handleGetVisits(params);
-            case 'search':
-              return await this.handleSearch(params);
-            default:
-              return this.formatError(`Unknown action: ${String(action)}`);
-          }
-        } catch (error) {
-          return this.formatError(error);
-        }
-      }
-    );
+    if (this.shouldRegisterTool('deleteAll')) {
+      this.registerExtensionTool(
+        'extension_tool_delete_all_history',
+        'Delete all items from the browser history',
+        this.deleteAllSchema.shape,
+        () => this.handleDeleteAll()
+      );
+    }
 
-    this.server.registerTool(
-      'extension_tool_history_parameters_description',
-      {
-        description:
-          'Get the parameters for extension_tool_history_operations tool and the description for the associated action, this tool should be used first before extension_tool_history_operations',
-        inputSchema: {
-          action: historyActionSchema,
-        },
-      },
-      async ({ action }) => {
-        try {
-          if (!this.shouldRegisterTool(action)) {
-            return this.formatError(new Error(`Action "${action}" is not supported`));
-          }
+    if (this.shouldRegisterTool('deleteRange')) {
+      this.registerExtensionTool(
+        'extension_tool_delete_history_range',
+        'Remove all items within the specified date range from history. Pages will not be removed unless all visits fall within the range',
+        this.deleteRangeSchema.shape,
+        (params) => this.handleDeleteRange(params)
+      );
+    }
 
-          const toJson = (schema: z.ZodTypeAny, _name: string) => z.toJSONSchema(schema);
+    if (this.shouldRegisterTool('deleteUrl')) {
+      this.registerExtensionTool(
+        'extension_tool_delete_history_url',
+        'Remove all occurrences of the given URL from history',
+        this.deleteUrlSchema.shape,
+        (params) => this.handleDeleteUrl(params)
+      );
+    }
 
-          const payloadBase = {
-            tool: 'extension_tool_history_operations',
-            action,
-            note: 'Use the description to double check if the correct action is chosen. Use this JSON Schema for the params field when calling the tool. The top-level tool input is { action, params }.',
-          } as const;
+    if (this.shouldRegisterTool('getVisits')) {
+      this.registerExtensionTool(
+        'extension_tool_get_history_visits',
+        'Retrieve information about visits to a specific URL',
+        this.getVisitsSchema.shape,
+        (params) => this.handleGetVisits(params)
+      );
+    }
 
-          switch (action as HistoryAction) {
-            case 'addUrl': {
-              const paramsAndDescription = {
-                params: toJson(this.addUrlSchema, 'AddUrlParams'),
-                description:
-                  'Add a URL to the history at the current time with a transition type of "link"',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'deleteAll': {
-              const paramsAndDescription = {
-                params: toJson(this.deleteAllSchema, 'DeleteAllParams'),
-                description: 'Delete all items from the browser history',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'deleteRange': {
-              const paramsAndDescription = {
-                params: toJson(this.deleteRangeSchema, 'DeleteRangeParams'),
-                description:
-                  'Remove all items within the specified date range from history. Pages will not be removed unless all visits fall within the range',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'deleteUrl': {
-              const paramsAndDescription = {
-                params: toJson(this.deleteUrlSchema, 'DeleteUrlParams'),
-                description: 'Remove all occurrences of the given URL from history',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'getVisits': {
-              const paramsAndDescription = {
-                params: toJson(this.getVisitsSchema, 'GetVisitsParams'),
-                description: 'Retrieve information about visits to a specific URL',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'search': {
-              const paramAndDescription = {
-                params: toJson(this.searchSchema, 'SearchParams'),
-                description:
-                  'Search the history for the last visit time of each page matching the query',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramAndDescription,
-              });
-            }
-            default:
-              return this.formatError(`Unknown action: ${String(action)}`);
-          }
-        } catch (error) {
-          return this.formatError(error);
-        }
-      }
-    );
+    if (this.shouldRegisterTool('search')) {
+      this.registerExtensionTool(
+        'extension_tool_search_history',
+        'Search the history for the last visit time of each page matching the query',
+        this.searchSchema.shape,
+        (params) => this.handleSearch(params)
+      );
+    }
   }
 
   // ===== Action handlers =====

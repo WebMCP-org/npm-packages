@@ -13,6 +13,18 @@ export type {
   Transport,
   TransportSendOptions,
 } from '@modelcontextprotocol/sdk/shared/transport.js';
+// Re-export WebMCP descriptor/schema types used by the browser-native server API.
+export type {
+  InputSchema,
+  InputSchemaProperty,
+  JsonObject,
+  JsonValue,
+  ModelContextClient,
+  ToolDescriptor,
+  ToolExecuteResult,
+  ToolListItem,
+  ToolResponse,
+} from '@mcp-b/webmcp-types';
 // Re-export all commonly used types from official SDK
 export type {
   CallToolRequest,

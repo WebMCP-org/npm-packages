@@ -12,10 +12,6 @@ export interface TabGroupsApiToolsOptions {
 
 export const TAB_GROUP_ACTIONS = ['get', 'query', 'update', 'move'] as const;
 
-type TabGroupAction = (typeof TAB_GROUP_ACTIONS)[number];
-
-const tabGroupSchema = z.enum(TAB_GROUP_ACTIONS);
-
 export class TabGroupsApiTools extends BaseApiTools<TabGroupsApiToolsOptions> {
   protected apiName = 'TabGroups';
 
@@ -66,114 +62,41 @@ export class TabGroupsApiTools extends BaseApiTools<TabGroupsApiToolsOptions> {
   }
 
   registerTools(): void {
-    this.server.registerTool(
-      'extension_tool_tab_group_operations',
-      {
-        description: 'Perform operations on tab groups using Chrome TabGroups API',
-        inputSchema: {
-          action: tabGroupSchema,
-          params: z
-            .record(z.string(), z.any())
-            .optional()
-            .describe('Parameters for the chosen action'),
-        },
-      },
-      async ({ action, params = {} }) => {
-        try {
-          if (!this.shouldRegisterTool(action)) {
-            return this.formatError(new Error(`Action "${action}" is not supported`));
-          }
+    if (this.shouldRegisterTool('get')) {
+      this.registerExtensionTool(
+        'extension_tool_get_tab_group',
+        'Retrieve a tab group by its ID',
+        this.getSchema.shape,
+        (params) => this.handleGetTabGroup(params)
+      );
+    }
 
-          switch (action as TabGroupAction) {
-            case 'get':
-              return await this.handleGetTabGroup(params);
-            case 'query':
-              return await this.handleQueryTabGroups(params);
-            case 'update':
-              return await this.handleUpdateTabGroup(params);
-            case 'move':
-              return await this.handleMoveTabGroup(params);
-            default:
-              return this.formatError(new Error(`Action "${action}" is not supported`));
-          }
-        } catch (error) {
-          return this.formatError(error);
-        }
-      }
-    );
+    if (this.shouldRegisterTool('query')) {
+      this.registerExtensionTool(
+        'extension_tool_query_tab_groups',
+        'Search for tab groups that match specified criteria',
+        this.querySchema.shape,
+        (params) => this.handleQueryTabGroups(params)
+      );
+    }
 
-    this.server.registerTool(
-      'extension_tool_tab_group_parameters_description',
-      {
-        description:
-          'Get the parameters for extension_tool_tab_group_operations tool and the description for the associated action, this tool should be used first before extension_tool_tab_group_operations',
-        inputSchema: {
-          action: tabGroupSchema,
-        },
-      },
+    if (this.shouldRegisterTool('update')) {
+      this.registerExtensionTool(
+        'extension_tool_update_tab_group',
+        'Modify properties of a tab group',
+        this.updateSchema.shape,
+        (params) => this.handleUpdateTabGroup(params)
+      );
+    }
 
-      async ({ action }) => {
-        try {
-          if (!this.shouldRegisterTool(action)) {
-            return this.formatError(new Error(`Action "${action}" is not supported`));
-          }
-          const toJson = (schema: z.ZodTypeAny, _name: string) => z.toJSONSchema(schema);
-
-          const payloadBase = {
-            tool: 'extension_tool_tab_group_operations',
-            action,
-            note: 'Use the description to double check if the correct action is chosen. Use this JSON Schema for the params field when calling the tool. The top-level tool input is { action, params }.',
-          } as const;
-
-          switch (action as TabGroupAction) {
-            case 'get': {
-              const paramsAndDescription = {
-                params: toJson(this.getSchema, 'GetTabGroupParams'),
-                description: 'Retrieve a tab group by its ID',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'query': {
-              const paramsAndDescription = {
-                params: toJson(this.querySchema, 'QueryTabGroupsParams'),
-                description: 'Search for tab groups that match specified criteria',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'update': {
-              const paramsAndDescription = {
-                params: toJson(this.updateSchema, 'UpdateTabGroupParams'),
-                description: 'Modify properties of a tab group',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'move': {
-              const paramsAndDescription = {
-                params: toJson(this.moveSchema, 'MoveTabGroupParams'),
-                description: 'Move a tab group within its window or to a new window',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            default:
-              return this.formatError(new Error(`Action "${action}" is not supported`));
-          }
-        } catch (error) {
-          return this.formatError(error);
-        }
-      }
-    );
+    if (this.shouldRegisterTool('move')) {
+      this.registerExtensionTool(
+        'extension_tool_move_tab_group',
+        'Move a tab group within its window or to a new window',
+        this.moveSchema.shape,
+        (params) => this.handleMoveTabGroup(params)
+      );
+    }
   }
 
   // ===== Action handlers =====
