@@ -681,6 +681,58 @@ describe('global adapter', () => {
     }
   });
 
+  it('falls back to transport registration when native registerTool is blocked by permissions policy', () => {
+    const nativeRegisterTool = vi.fn(() => {
+      throw new DOMException(
+        "Failed to execute 'registerTool' on 'ModelContext': Access to the feature \"tools\" is disallowed by permissions policy.",
+        'SecurityError'
+      );
+    });
+    const nativeContext = {
+      provideContext: vi.fn(),
+      registerTool: nativeRegisterTool,
+      clearContext: vi.fn(),
+      listTools: () => [],
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => true,
+    } as unknown as Navigator['modelContext'];
+    const server = new BrowserMcpServer(
+      { name: 'native-permissions-policy-test', version: '1.0.0' },
+      {
+        native: nativeContext,
+      }
+    );
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      expect(() =>
+        server.registerTool({
+          name: 'iframe_blocked_native_tool',
+          description: 'Native registration is blocked inside the iframe',
+          inputSchema: { type: 'object', properties: {} },
+          async execute() {
+            return { content: [{ type: 'text', text: 'ok' }] };
+          },
+        })
+      ).not.toThrow();
+
+      expect(nativeRegisterTool).toHaveBeenCalled();
+      expect(server.listTools().some((tool) => tool.name === 'iframe_blocked_native_tool')).toBe(
+        true
+      );
+      expect(server.getTools().some((tool) => tool.name === 'iframe_blocked_native_tool')).toBe(
+        true
+      );
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Native WebMCP tool mirror is blocked by permissions policy')
+      );
+    } finally {
+      warnSpy.mockRestore();
+      void server.close();
+    }
+  });
+
   it('aborts signal-only native mirrors when the caller signal aborts', () => {
     const nativeToolNames = new Set<string>();
     const nativeRegisterTool = vi.fn(

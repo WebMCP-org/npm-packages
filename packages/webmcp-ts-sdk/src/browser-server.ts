@@ -62,6 +62,20 @@ function isJsonPrimitive(value: unknown): value is string | number | boolean | n
   );
 }
 
+function isPermissionsPolicySecurityError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const { name, message } = error as { name?: unknown; message?: unknown };
+
+  return (
+    name === 'SecurityError' &&
+    typeof message === 'string' &&
+    /permissions policy|feature "tools" is disallowed/i.test(message)
+  );
+}
+
 function isJsonValue(value: unknown): boolean {
   if (isJsonPrimitive(value)) {
     return Number.isFinite(value as number) || typeof value !== 'number';
@@ -403,6 +417,12 @@ export class BrowserMcpServer extends BaseMcpServer {
       }
     } catch (error) {
       cleanup?.abort();
+      if (isPermissionsPolicySecurityError(error)) {
+        console.warn(
+          '[BrowserMcpServer] Native WebMCP tool mirror is blocked by permissions policy; continuing with WebMCP transport registration only.'
+        );
+        return undefined;
+      }
       throw error;
     }
 
