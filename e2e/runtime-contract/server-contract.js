@@ -24,7 +24,7 @@ function removeHandle(handle) {
 }
 
 function registerServerTool(server, tool) {
-  if (server.registerTool.length <= 1) {
+  if (server.__isBrowserMcpServer || server.registerTool.length <= 1) {
     return server.registerTool({
       name: tool.name,
       description: tool.config.description,

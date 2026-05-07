@@ -28,7 +28,9 @@ describe('@mcp-b/webmcp-polyfill', () => {
     expect(typeof navigator.modelContext.provideContext).toBe('function');
     expect(typeof navigator.modelContext.clearContext).toBe('function');
     expect(typeof navigator.modelContext.registerTool).toBe('function');
+    expect(typeof navigator.modelContext.getTools).toBe('function');
     expect(typeof navigator.modelContext.unregisterTool).toBe('function');
+    expect(typeof navigator.modelContext.ontoolchange).toBe('object');
     expect((navigator.modelContext as unknown as { callTool?: unknown }).callTool).toBeUndefined();
   });
 
@@ -183,6 +185,89 @@ describe('@mcp-b/webmcp-polyfill', () => {
     );
   });
 
+  it('warns that unregisterTool is deprecated while preserving behavior', () => {
+    initializeWebMCPPolyfill();
+
+    const tool = {
+      name: 'deprecation_tool',
+      description: 'Deprecation tool',
+      inputSchema: { type: 'object', properties: {} },
+      execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+    };
+    navigator.modelContext.registerTool(tool);
+
+    // Re-registration throws iff the tool is in the registry.
+    expect(() => navigator.modelContext.registerTool(tool)).toThrow(
+      'Tool already registered: deprecation_tool'
+    );
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      navigator.modelContext.unregisterTool('deprecation_tool');
+      navigator.modelContext.unregisterTool('deprecation_tool');
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        '[WebMCPPolyfill] navigator.modelContext.unregisterTool() is deprecated. The April 23, 2026 WebMCP draft removed it in favor of registerTool(tool, { signal }) — pass an AbortSignal and abort it to unregister.'
+      );
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      warnSpy.mockRestore();
+    }
+
+    expect(() => navigator.modelContext.registerTool(tool)).not.toThrow();
+  });
+
+  it('registerTool with options.signal unregisters when the signal aborts', () => {
+    initializeWebMCPPolyfill();
+
+    const tool = {
+      name: 'signal_tool',
+      description: 'Signal-driven tool',
+      inputSchema: { type: 'object', properties: {} },
+      execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+    };
+
+    const ac = new AbortController();
+    navigator.modelContext.registerTool(tool, { signal: ac.signal });
+
+    expect(() => navigator.modelContext.registerTool(tool)).toThrow(
+      'Tool already registered: signal_tool'
+    );
+
+    ac.abort();
+
+    expect(() => navigator.modelContext.registerTool(tool)).not.toThrow();
+  });
+
+  it('registerTool with a pre-aborted signal does not register the tool', () => {
+    initializeWebMCPPolyfill();
+
+    const ac = new AbortController();
+    ac.abort();
+
+    const tool = {
+      name: 'preaborted_tool',
+      description: 'Pre-aborted tool',
+      inputSchema: { type: 'object', properties: {} },
+      execute: async () => ({ content: [{ type: 'text', text: 'never' }] }),
+    };
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      navigator.modelContext.registerTool(tool, { signal: ac.signal });
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('options.signal was already aborted')
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
+
+    expect(() => navigator.modelContext.registerTool(tool)).not.toThrow();
+  });
+
   it('warns that clearContext is deprecated while preserving behavior', () => {
     initializeWebMCPPolyfill();
 
@@ -235,6 +320,61 @@ describe('@mcp-b/webmcp-polyfill', () => {
     await Promise.resolve();
 
     expect(count).toBe(4);
+  });
+
+  it('exposes native-shaped getTools on navigator.modelContext', () => {
+    initializeWebMCPPolyfill();
+
+    navigator.modelContext.registerTool({
+      name: 'native_get_tools_shape',
+      description: 'Native getTools shape',
+      inputSchema: {
+        type: 'object',
+        properties: { value: { type: 'number' } },
+        required: ['value'],
+      },
+      execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+    });
+
+    expect(navigator.modelContext.getTools()).toEqual([
+      {
+        name: 'native_get_tools_shape',
+        description: 'Native getTools shape',
+        inputSchema:
+          '{"type":"object","properties":{"value":{"type":"number"}},"required":["value"]}',
+      },
+    ]);
+  });
+
+  it('fires producer toolchange events and ontoolchange for registry mutations', async () => {
+    initializeWebMCPPolyfill();
+
+    let listenerCount = 0;
+    let handlerCount = 0;
+    navigator.modelContext.addEventListener('toolchange', () => {
+      listenerCount += 1;
+    });
+    navigator.modelContext.ontoolchange = () => {
+      handlerCount += 1;
+    };
+
+    const controller = new AbortController();
+    navigator.modelContext.registerTool(
+      {
+        name: 'producer_event_tool',
+        description: 'Producer event tool',
+        inputSchema: { type: 'object', properties: {} },
+        execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+      },
+      { signal: controller.signal }
+    );
+
+    controller.abort();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(listenerCount).toBe(2);
+    expect(handlerCount).toBe(2);
   });
 
   // =========================================================================

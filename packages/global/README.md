@@ -14,14 +14,14 @@
 
 ## Why Use @mcp-b/global?
 
-| Feature                      | Benefit                                                                                                                                                          |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **W3C Standard**             | Implements the emerging Web Model Context API specification                                                                                                      |
-| **Drop-in IIFE**             | Add AI capabilities with a single `<script>` tag - no build step                                                                                                 |
-| **Native Chromium Support**  | Auto-detects and uses native browser implementation when available                                                                                               |
-| **Dual Transport**           | Works with both same-window clients AND parent pages (iframe support)                                                                                            |
-| **Spec-Aware Compatibility** | `provideContext()` / `clearContext()` remain temporarily for compatibility, and MCP-B wrappers still return a deprecated unregister handle from `registerTool()` |
-| **Works with Any AI**        | Claude, ChatGPT, Gemini, Cursor, Copilot, and any MCP client                                                                                                     |
+| Feature                      | Benefit                                                                                                                                                                                                                                                                                          |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **W3C Standard**             | Implements the emerging Web Model Context API specification                                                                                                                                                                                                                                      |
+| **Drop-in IIFE**             | Add AI capabilities with a single `<script>` tag - no build step                                                                                                                                                                                                                                 |
+| **Native Chromium Support**  | Auto-detects and uses native browser implementation when available                                                                                                                                                                                                                               |
+| **Dual Transport**           | Works with both same-window clients AND parent pages (iframe support)                                                                                                                                                                                                                            |
+| **Spec-Aware Compatibility** | Tracks the April 23, 2026 WebMCP draft (`registerTool(tool, { signal })`). Deprecated APIs — `provideContext()`, `clearContext()`, `unregisterTool(name)`, and the `{ unregister }` return handle are still functional but emit one-time warnings and will be removed in the next major version. |
+| **Works with Any AI**        | Claude, ChatGPT, Gemini, Cursor, Copilot, and any MCP client                                                                                                                                                                                                                                     |
 
 ## Package Selection
 
@@ -175,36 +175,43 @@ navigator.modelContext.provideContext({
 });
 ```
 
-#### `registerTool(tool)`
+#### `registerTool(tool, options?)`
 
-Registers a single tool. The tool name must be unique - throws if a tool with the same name already exists. `@mcp-b/global` still returns a deprecated compatibility handle with `unregister()` so existing MCP-B integrations do not break, even though current Chromium returns `undefined`.
+Registers a single tool. The tool name must be unique, otherwise throws if a tool with the same name already exists. The recommended unregistration path is `options.signal` (`AbortSignal`):
 
 ```typescript
-const registration = navigator.modelContext.registerTool({
-  name: 'add-to-cart',
-  description: 'Add a product to the shopping cart',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      productId: { type: 'string' },
-      quantity: { type: 'integer' },
+const ac = new AbortController();
+navigator.modelContext.registerTool(
+  {
+    name: 'add-to-cart',
+    description: 'Add a product to the shopping cart',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        productId: { type: 'string' },
+        quantity: { type: 'integer' },
+      },
+      required: ['productId'],
     },
-    required: ['productId'],
+    async execute(args) {
+      const item = await addToCart(args.productId, args.quantity ?? 1);
+      return {
+        content: [{ type: 'text', text: `Added ${item.name} to cart` }],
+      };
+    },
   },
-  async execute(args) {
-    const item = await addToCart(args.productId, args.quantity ?? 1);
-    return {
-      content: [{ type: 'text', text: `Added ${item.name} to cart` }],
-    };
-  },
-});
+  { signal: ac.signal }
+);
 
-registration.unregister();
+// Later — clean up:
+ac.abort();
 ```
 
-#### `unregisterTool(nameOrTool)`
+For backwards compatibility, `@mcp-b/global` also returns a deprecated `{ unregister }` handle so existing MCP-B integrations do not break, even though current Chromium and the WebMCP spec return `undefined`. The handle will be removed in the next major version.
 
-Removes a tool by name. Current Chrome Beta 147 and Chromium `main` expose string-name unregistration. MCP-B wrappers also accept the originally registered tool object as a temporary compatibility input.
+#### `unregisterTool(nameOrTool)` (deprecated)
+
+Removes a tool by name. The April 23, 2026 WebMCP draft removed `unregisterTool` from the spec in favor of `AbortSignal` on `registerTool`. `@mcp-b/global` keeps `unregisterTool` functional for compatibility with older native previews and existing MCP-B integrations, and emits a one-time deprecation warning when called. It will be removed in the next major version.
 
 ```typescript
 navigator.modelContext.unregisterTool('add-to-cart');

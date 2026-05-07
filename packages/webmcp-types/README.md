@@ -226,7 +226,9 @@ void result;
 - This package does not install any runtime behavior.
 - Runtime validation/execution behavior depends on your WebMCP runtime package.
 - `provideContext()` and `clearContext()` remain typed for compatibility, but are deprecated because the upstream WebMCP spec removed them on March 5, 2026.
-- Current Chrome Beta 147 exposes `unregisterTool(name)` as a string-name API, while MCP-B compatibility runtimes may also accept a tool-like object with `name`.
+- `unregisterTool(name)` is `@deprecated`. The April 23, 2026 WebMCP draft removed it from the spec in favor of an `AbortSignal` passed via `registerTool(tool, { signal })`. The type is retained for compatibility with older native previews and existing MCP-B wrappers; it will be removed in the next major version.
+- `registerTool(tool, options?)` accepts a `ModelContextRegisterToolOptions` dictionary with an optional `signal: AbortSignal`. Aborting the signal unregisters the tool.
+- `ToolAnnotations.untrustedContentHint` was added to the spec on April 23, 2026 to flag tools whose output may include externally-sourced content.
 - `navigator.modelContextTesting` is typed as optional for compatibility with Chromium preview/testing surfaces.
 
 ## License

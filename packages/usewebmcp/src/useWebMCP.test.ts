@@ -1,8 +1,13 @@
 import { initializeWebModelContext } from '@mcp-b/global';
+import type { ModelContextWithExtensions } from '@mcp-b/webmcp-types';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
 
 import { useWebMCP } from './useWebMCP.js';
+
+function listRegisteredToolNames(): string[] {
+  return (navigator.modelContext as ModelContextWithExtensions).listTools().map((t) => t.name);
+}
 
 const TEST_CHANNEL_ID = `useWebMCP-test-${Date.now()}`;
 
@@ -1021,33 +1026,37 @@ describe('useWebMCP', () => {
   });
 
   describe('cleanup edge cases', () => {
-    it('should prefer the returned unregister handle when registerTool provides one', async () => {
+    it('should call registerTool with an AbortSignal and abort on unmount', async () => {
       const originalDescriptor = Object.getOwnPropertyDescriptor(navigator, 'modelContext');
-      const unregister = vi.fn();
+      const registerTool = vi.fn();
       const unregisterTool = vi.fn();
 
       Object.defineProperty(navigator, 'modelContext', {
         configurable: true,
         enumerable: true,
         writable: true,
-        value: {
-          registerTool: vi.fn(() => ({ unregister })),
-          unregisterTool,
-        },
+        value: { registerTool, unregisterTool },
       });
 
       try {
         const { unmount } = await renderHook(() =>
           useWebMCP({
-            name: 'handle_cleanup_tool',
-            description: 'Uses string unregister cleanup',
+            name: 'signal_cleanup_tool',
+            description: 'Uses AbortSignal-driven cleanup',
             handler: async () => 'result',
           })
         );
 
+        expect(registerTool).toHaveBeenCalledTimes(1);
+        const callArgs = registerTool.mock.calls[0];
+        expect(callArgs?.[0]).toMatchObject({ name: 'signal_cleanup_tool' });
+        const passedSignal = callArgs?.[1]?.signal;
+        expect(passedSignal).toBeInstanceOf(AbortSignal);
+        expect(passedSignal?.aborted).toBe(false);
+
         unmount();
 
-        expect(unregister).toHaveBeenCalledTimes(1);
+        expect(passedSignal?.aborted).toBe(true);
         expect(unregisterTool).not.toHaveBeenCalled();
       } finally {
         if (originalDescriptor) {
@@ -1058,61 +1067,40 @@ describe('useWebMCP', () => {
       }
     });
 
-    it('should attempt string-name cleanup exactly once', async () => {
+    it('should remove the tool from the registry on unmount', async () => {
+      const { unmount } = await renderHook(() =>
+        useWebMCP({
+          name: 'cleanup_registry_tool',
+          description: 'Cleanup registry tool',
+          handler: async () => 'result',
+        })
+      );
+
+      expect(listRegisteredToolNames()).toContain('cleanup_registry_tool');
+
+      unmount();
+
+      expect(listRegisteredToolNames()).not.toContain('cleanup_registry_tool');
+    });
+
+    it('should skip cleanup if tool owner token has been replaced', async () => {
+      // Mock modelContext directly so two hooks with the same name can coexist
       const originalDescriptor = Object.getOwnPropertyDescriptor(navigator, 'modelContext');
-      const unregisterTool = vi.fn();
+      const capturedSignals: AbortSignal[] = [];
+      const registerTool = vi.fn((_tool: { name: string }, options?: { signal?: AbortSignal }) => {
+        if (options?.signal) {
+          capturedSignals.push(options.signal);
+        }
+      });
 
       Object.defineProperty(navigator, 'modelContext', {
         configurable: true,
         enumerable: true,
         writable: true,
-        value: {
-          registerTool: vi.fn(() => undefined),
-          unregisterTool,
-        },
+        value: { registerTool, unregisterTool: vi.fn() },
       });
 
       try {
-        const { unmount } = await renderHook(() =>
-          useWebMCP({
-            name: 'string_cleanup_tool',
-            description: 'Uses string unregister cleanup',
-            handler: async () => 'result',
-          })
-        );
-
-        unmount();
-
-        expect(unregisterTool).toHaveBeenCalledTimes(1);
-        expect(unregisterTool).toHaveBeenCalledWith('string_cleanup_tool');
-      } finally {
-        if (originalDescriptor) {
-          Object.defineProperty(navigator, 'modelContext', originalDescriptor);
-        } else {
-          delete (navigator as unknown as Record<string, unknown>).modelContext;
-        }
-      }
-    });
-
-    it('should skip unregister if tool owner token has been replaced', async () => {
-      // Mock registerTool to allow duplicate registrations (bypass collision check)
-      const originalRegisterTool = navigator.modelContext.registerTool.bind(navigator.modelContext);
-      const registerSpy = vi
-        .spyOn(navigator.modelContext, 'registerTool')
-        .mockImplementation((toolDef) => {
-          // Silently unregister the existing tool first, then register the new one
-          try {
-            navigator.modelContext.unregisterTool(toolDef.name);
-          } catch {
-            // Tool may not exist, that's fine
-          }
-          return originalRegisterTool(toolDef);
-        });
-
-      const unregisterSpy = vi.spyOn(navigator.modelContext, 'unregisterTool');
-
-      try {
-        // Register first tool
         const { unmount: unmount1 } = await renderHook(() =>
           useWebMCP({
             name: 'owner_clash_tool',
@@ -1121,7 +1109,6 @@ describe('useWebMCP', () => {
           })
         );
 
-        // Register second tool with the same name (takes ownership of TOOL_OWNER_BY_NAME)
         const { unmount: unmount2 } = await renderHook(() =>
           useWebMCP({
             name: 'owner_clash_tool',
@@ -1130,59 +1117,22 @@ describe('useWebMCP', () => {
           })
         );
 
-        // Clear call counts to only track cleanup calls
-        unregisterSpy.mockClear();
+        expect(capturedSignals).toHaveLength(2);
+        const [firstSignal, secondSignal] = capturedSignals;
 
-        // Unmounting first should NOT call unregisterTool because owner has changed
         unmount1();
+        // Owner token belongs to the second hook, so first hook's cleanup must bail.
+        expect(firstSignal?.aborted).toBe(false);
+        expect(secondSignal?.aborted).toBe(false);
 
-        // unregisterTool should NOT have been called
-        expect(unregisterSpy).not.toHaveBeenCalled();
-
-        // Unmounting second should call unregisterTool since it's the current owner
         unmount2();
-
-        expect(unregisterSpy).toHaveBeenCalledWith('owner_clash_tool');
+        expect(secondSignal?.aborted).toBe(true);
       } finally {
-        registerSpy.mockRestore();
-        unregisterSpy.mockRestore();
-      }
-    });
-
-    it('should handle unregisterTool throwing in dev mode', async () => {
-      let originalProcess: unknown;
-      originalProcess = (globalThis as Record<string, unknown>).process;
-      (globalThis as Record<string, unknown>).process = {
-        env: { NODE_ENV: 'development' },
-      };
-
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const unregisterSpy = vi.spyOn(navigator.modelContext, 'unregisterTool');
-
-      try {
-        const { unmount } = await renderHook(() =>
-          useWebMCP({
-            name: 'cleanup_error_tool',
-            description: 'Test cleanup error',
-            handler: async () => 'result',
-          })
-        );
-
-        // Make unregisterTool throw
-        unregisterSpy.mockImplementation(() => {
-          throw new Error('unregister failed');
-        });
-
-        unmount();
-
-        expect(warnSpy).toHaveBeenCalledWith(
-          expect.stringContaining('Failed to unregister tool'),
-          expect.any(Error)
-        );
-      } finally {
-        warnSpy.mockRestore();
-        unregisterSpy.mockRestore();
-        (globalThis as Record<string, unknown>).process = originalProcess;
+        if (originalDescriptor) {
+          Object.defineProperty(navigator, 'modelContext', originalDescriptor);
+        } else {
+          delete (navigator as unknown as Record<string, unknown>).modelContext;
+        }
       }
     });
   });
@@ -1647,49 +1597,24 @@ describe('useWebMCP', () => {
 
     // --- Effect Cleanup Ordering ---
 
-    it('should unregister before re-registering when name changes', async () => {
-      const callOrder: string[] = [];
-      const originalRegister = navigator.modelContext.registerTool.bind(navigator.modelContext);
-      const originalUnregister = navigator.modelContext.unregisterTool.bind(navigator.modelContext);
+    it('should clean up old tool before registering new one when name changes', async () => {
+      const { rerender } = await renderHook(
+        ({ name }) =>
+          useWebMCP({
+            name,
+            description: 'Test',
+            handler: async () => 'result',
+          }),
+        { initialProps: { name: 'order_tool_old' } }
+      );
 
-      const registerToolSpy = vi
-        .spyOn(navigator.modelContext, 'registerTool')
-        .mockImplementation((...args) => {
-          callOrder.push('register');
-          return originalRegister(...args);
-        });
-      const unregisterToolSpy = vi
-        .spyOn(navigator.modelContext, 'unregisterTool')
-        .mockImplementation((...args: [string]) => {
-          callOrder.push('unregister');
-          return originalUnregister(...args);
-        });
+      expect(listRegisteredToolNames()).toContain('order_tool_old');
 
-      try {
-        const { rerender } = await renderHook(
-          ({ name }) =>
-            useWebMCP({
-              name,
-              description: 'Test',
-              handler: async () => 'result',
-            }),
-          { initialProps: { name: 'order_tool_old' } }
-        );
+      await rerender({ name: 'order_tool_new' });
 
-        callOrder.length = 0;
-
-        await rerender({ name: 'order_tool_new' });
-
-        const unregisterIdx = callOrder.indexOf('unregister');
-        const registerIdx = callOrder.indexOf('register');
-
-        expect(unregisterIdx).toBeGreaterThanOrEqual(0);
-        expect(registerIdx).toBeGreaterThanOrEqual(0);
-        expect(unregisterIdx).toBeLessThan(registerIdx);
-      } finally {
-        registerToolSpy.mockRestore();
-        unregisterToolSpy.mockRestore();
-      }
+      const registeredNames = listRegisteredToolNames();
+      expect(registeredNames).toContain('order_tool_new');
+      expect(registeredNames).not.toContain('order_tool_old');
     });
   });
 });

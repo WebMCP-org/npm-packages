@@ -32,6 +32,6 @@
     "access": "public"
   },
   "scripts": {
-    "test": "echo \"Tests not yet implemented\" && exit 0"
+    "test": "echo \"Tests not yet implemented\""
   }
 }

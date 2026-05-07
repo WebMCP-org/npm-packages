@@ -18,6 +18,7 @@ import type {
   ToolResultFromOutputSchema,
 } from './tool.js';
 import type { JsonSchemaForInference } from './json-schema.js';
+import type { ModelContextCore, ModelContextRegisterToolOptions } from './model-context.js';
 
 test('ToolDescriptor has required fields', () => {
   expectTypeOf<ToolDescriptor>().toHaveProperty('name');
@@ -161,6 +162,7 @@ test('ToolAnnotations has optional behavioral hints', () => {
     title?: string;
     destructiveHint?: boolean | 'true' | 'false';
     readOnlyHint?: boolean | 'true' | 'false';
+    untrustedContentHint?: boolean | 'true' | 'false';
     idempotentHint?: boolean | 'true' | 'false';
     openWorldHint?: boolean | 'true' | 'false';
   }>();
@@ -306,4 +308,13 @@ test('ToolExecuteResultFromOutputSchema rejects wrapped object results with wron
     structuredContent: { total: '1' },
   };
   void wrongType;
+});
+
+test('ModelContextRegisterToolOptions accepts an optional AbortSignal', () => {
+  expectTypeOf<ModelContextRegisterToolOptions>().toExtend<{ signal?: AbortSignal }>();
+});
+
+test('ModelContextCore.registerTool accepts an optional options argument', () => {
+  type RegisterTool = ModelContextCore['registerTool'];
+  expectTypeOf<RegisterTool>().parameter(1).toExtend<ModelContextRegisterToolOptions | undefined>();
 });

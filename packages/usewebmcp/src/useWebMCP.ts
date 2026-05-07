@@ -112,21 +112,20 @@ function isDev(): boolean {
   return env !== undefined ? env !== 'production' : false;
 }
 
-function isToolRegistrationHandle(value: unknown): value is { unregister: () => void } {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'unregister' in value &&
-    typeof value.unregister === 'function'
-  );
-}
-
-function registerToolWithCompatibilityHandle(
+/**
+ * On Chrome Beta 147 native (which ignores the second arg), aborting
+ * the controller cannot remove the tool. Install `@mcp-b/global`
+ * or `@mcp-b/webmcp-polyfill` there.
+ */
+function registerToolWithCleanup(
   modelContext: Navigator['modelContext'],
   toolDescriptor: ToolDescriptor
-): { unregister: () => void } | undefined {
-  const registration = Reflect.apply(modelContext.registerTool, modelContext, [toolDescriptor]);
-  return isToolRegistrationHandle(registration) ? registration : undefined;
+): AbortController {
+  const controller = new AbortController();
+  (
+    modelContext.registerTool as (tool: ToolDescriptor, options?: { signal?: AbortSignal }) => void
+  ).call(modelContext, toolDescriptor, { signal: controller.signal });
+  return controller;
 }
 
 function toRegisteredInputSchema(
@@ -542,7 +541,7 @@ export function useWebMCP<
       execute: mcpHandler,
     };
 
-    const registration = registerToolWithCompatibilityHandle(modelContext, toolDescriptor);
+    const controller = registerToolWithCleanup(modelContext, toolDescriptor);
     TOOL_OWNER_BY_NAME.set(name, ownerToken);
 
     return () => {
@@ -552,18 +551,7 @@ export function useWebMCP<
       }
 
       TOOL_OWNER_BY_NAME.delete(name);
-      try {
-        if (registration && typeof registration.unregister === 'function') {
-          registration.unregister();
-          return;
-        }
-
-        modelContext.unregisterTool(name);
-      } catch (error) {
-        if (isDev()) {
-          console.warn(`[useWebMCP] Failed to unregister tool "${name}" during cleanup:`, error);
-        }
-      }
+      controller.abort();
     };
     // Spread operator in dependencies: Allows users to provide additional dependencies
     // via the `deps` parameter. While unconventional, this pattern is intentional to support

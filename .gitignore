@@ -67,3 +67,4 @@ webmcp-tools/
 chromium/
 depot_tools/
 skills-lock.json
+UPSTREAM_ISSUE_webmcp_polyfill_bridge.md

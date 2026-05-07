@@ -50,6 +50,7 @@ export type {
   ModelContextExtensions,
   ModelContextInput,
   ModelContextOptions,
+  ModelContextRegisterToolOptions,
   ModelContextTesting,
   ModelContextTestingExecuteToolOptions,
   ModelContextTestingPolyfillExtensions,

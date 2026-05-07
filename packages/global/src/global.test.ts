@@ -166,7 +166,9 @@ describe('global adapter', () => {
     expect(typeof modelContext.unregisterTool).toBe('function');
     expect(typeof modelContext.clearContext).toBe('function');
     expect(typeof modelContext.listTools).toBe('function');
+    expect(typeof modelContext.getTools).toBe('function');
     expect(typeof modelContext.callTool).toBe('function');
+    expect(typeof modelContext.ontoolchange).toBe('object');
   });
 
   it('registerTool returns a compatibility unregister handle and mirrors to native/testing API', async () => {
@@ -197,6 +199,95 @@ describe('global adapter', () => {
     result.unregister();
     expect(
       navigator.modelContextTesting?.listTools().some((tool) => tool.name === 'web_tool')
+    ).toBe(false);
+  });
+
+  it('getTools returns the native producer tool-list shape', () => {
+    initializeWebModelContext();
+
+    const modelContext = getModelContext();
+    modelContext.registerTool({
+      name: 'native_shape_tool',
+      description: 'Native shape tool',
+      inputSchema: {
+        type: 'object',
+        properties: { value: { type: 'number' } },
+        required: ['value'],
+      },
+      async execute() {
+        return { content: [{ type: 'text', text: 'ok' }] };
+      },
+    });
+
+    expect(modelContext.getTools()).toEqual([
+      {
+        name: 'native_shape_tool',
+        description: 'Native shape tool',
+        inputSchema:
+          '{"type":"object","properties":{"value":{"type":"number"}},"required":["value"]}',
+      },
+    ]);
+  });
+
+  it('fires producer toolchange events and ontoolchange on wrapper mutations', async () => {
+    initializeWebModelContext();
+
+    const modelContext = getModelContext();
+    let listenerCount = 0;
+    let handlerCount = 0;
+    modelContext.addEventListener('toolchange', () => {
+      listenerCount += 1;
+    });
+    modelContext.ontoolchange = () => {
+      handlerCount += 1;
+    };
+
+    modelContext.registerTool({
+      name: 'wrapper_event_tool',
+      description: 'Wrapper event tool',
+      inputSchema: { type: 'object', properties: {} },
+      async execute() {
+        return { content: [{ type: 'text', text: 'ok' }] };
+      },
+    });
+
+    modelContext.unregisterTool('wrapper_event_tool');
+    await Promise.resolve();
+    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(listenerCount).toBeGreaterThanOrEqual(1);
+    expect(handlerCount).toBeGreaterThanOrEqual(1);
+  });
+
+  it('registerTool({ signal }) abort removes the tool from both wrapper and mirrored native', async () => {
+    initializeWebModelContext();
+
+    const modelContext = getModelContext();
+    const ac = new AbortController();
+
+    modelContext.registerTool(
+      {
+        name: 'signal_tool',
+        description: 'AbortSignal-driven tool',
+        inputSchema: { type: 'object', properties: {} },
+        async execute() {
+          return { content: [{ type: 'text', text: 'signal-ok' }] };
+        },
+      },
+      { signal: ac.signal }
+    );
+
+    expect(modelContext.listTools().some((tool) => tool.name === 'signal_tool')).toBe(true);
+    expect(
+      navigator.modelContextTesting?.listTools().some((tool) => tool.name === 'signal_tool')
+    ).toBe(true);
+
+    ac.abort();
+
+    expect(modelContext.listTools().some((tool) => tool.name === 'signal_tool')).toBe(false);
+    expect(
+      navigator.modelContextTesting?.listTools().some((tool) => tool.name === 'signal_tool')
     ).toBe(false);
   });
 
@@ -437,24 +528,6 @@ describe('global adapter', () => {
     expect(tools.some((tool) => tool.name === 'dynamic_tool')).toBe(false);
   });
 
-  it('warns that provideContext is deprecated while preserving behavior', () => {
-    initializeWebModelContext();
-
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-    try {
-      getModelContext().provideContext();
-      getModelContext().provideContext();
-
-      expect(warnSpy).toHaveBeenCalledWith(
-        '[BrowserMcpServer] navigator.modelContext.provideContext() is deprecated and will be removed in the next major version. Register tools individually with registerTool() instead.'
-      );
-      expect(warnSpy).toHaveBeenCalledTimes(1);
-    } finally {
-      warnSpy.mockRestore();
-    }
-  });
-
   it('unregisterTool and clearContext remove mirrored tools', () => {
     initializeWebModelContext();
 
@@ -550,21 +623,178 @@ describe('global adapter', () => {
     }
   });
 
-  it('warns that clearContext is deprecated while preserving behavior', () => {
-    initializeWebModelContext();
-
+  it('uses AbortSignal cleanup when native mirrors omit unregisterTool', () => {
+    const nativeToolNames = new Set<string>();
+    const nativeRegisterTool = vi.fn(
+      (
+        tool: Parameters<BrowserMcpServer['registerTool']>[0],
+        options?: { signal?: AbortSignal }
+      ) => {
+        nativeToolNames.add(tool.name);
+        options?.signal?.addEventListener(
+          'abort',
+          () => {
+            nativeToolNames.delete(tool.name);
+          },
+          { once: true }
+        );
+      }
+    );
+    const nativeContext = {
+      provideContext: vi.fn(),
+      registerTool: nativeRegisterTool,
+      clearContext: vi.fn(),
+      listTools: () => [...nativeToolNames].map((name) => ({ name })),
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => true,
+    } as unknown as Navigator['modelContext'];
+    const server = new BrowserMcpServer(
+      { name: 'native-signal-test', version: '1.0.0' },
+      {
+        native: nativeContext,
+      }
+    );
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     try {
-      getModelContext().clearContext();
-      getModelContext().clearContext();
+      server.registerTool({
+        name: 'signal_only_native_tool',
+        description: 'Native signal-only cleanup tool',
+        inputSchema: { type: 'object', properties: {} },
+        async execute() {
+          return { content: [{ type: 'text', text: 'ok' }] };
+        },
+      });
 
-      expect(warnSpy).toHaveBeenCalledWith(
-        '[BrowserMcpServer] navigator.modelContext.clearContext() is deprecated and will be removed in the next major version. Unregister individual tools instead.'
+      expect(nativeToolNames.has('signal_only_native_tool')).toBe(true);
+      expect(nativeRegisterTool).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'signal_only_native_tool' }),
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
       );
-      expect(warnSpy).toHaveBeenCalledTimes(1);
+
+      expect(() => server.unregisterTool('signal_only_native_tool')).not.toThrow();
+      expect(nativeToolNames.has('signal_only_native_tool')).toBe(false);
     } finally {
       warnSpy.mockRestore();
+      void server.close();
+    }
+  });
+
+  it('falls back to transport registration when native registerTool is blocked by permissions policy', () => {
+    const nativeRegisterTool = vi.fn(() => {
+      throw new DOMException(
+        "Failed to execute 'registerTool' on 'ModelContext': Access to the feature \"tools\" is disallowed by permissions policy.",
+        'SecurityError'
+      );
+    });
+    const nativeContext = {
+      provideContext: vi.fn(),
+      registerTool: nativeRegisterTool,
+      clearContext: vi.fn(),
+      listTools: () => [],
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => true,
+    } as unknown as Navigator['modelContext'];
+    const server = new BrowserMcpServer(
+      { name: 'native-permissions-policy-test', version: '1.0.0' },
+      {
+        native: nativeContext,
+      }
+    );
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      expect(() =>
+        server.registerTool({
+          name: 'iframe_blocked_native_tool',
+          description: 'Native registration is blocked inside the iframe',
+          inputSchema: { type: 'object', properties: {} },
+          async execute() {
+            return { content: [{ type: 'text', text: 'ok' }] };
+          },
+        })
+      ).not.toThrow();
+
+      expect(nativeRegisterTool).toHaveBeenCalled();
+      expect(server.listTools().some((tool) => tool.name === 'iframe_blocked_native_tool')).toBe(
+        true
+      );
+      expect(server.getTools().some((tool) => tool.name === 'iframe_blocked_native_tool')).toBe(
+        true
+      );
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Native WebMCP tool mirror is blocked by permissions policy')
+      );
+    } finally {
+      warnSpy.mockRestore();
+      void server.close();
+    }
+  });
+
+  it('aborts signal-only native mirrors when the caller signal aborts', () => {
+    const nativeToolNames = new Set<string>();
+    const nativeRegisterTool = vi.fn(
+      (
+        tool: Parameters<BrowserMcpServer['registerTool']>[0],
+        options?: { signal?: AbortSignal }
+      ) => {
+        nativeToolNames.add(tool.name);
+        options?.signal?.addEventListener(
+          'abort',
+          () => {
+            nativeToolNames.delete(tool.name);
+          },
+          { once: true }
+        );
+      }
+    );
+    const nativeContext = {
+      provideContext: vi.fn(),
+      registerTool: nativeRegisterTool,
+      clearContext: vi.fn(),
+      listTools: () => [...nativeToolNames].map((name) => ({ name })),
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => true,
+    } as unknown as Navigator['modelContext'];
+    const server = new BrowserMcpServer(
+      { name: 'native-signal-abort-test', version: '1.0.0' },
+      {
+        native: nativeContext,
+      }
+    );
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const controller = new AbortController();
+
+    try {
+      server.registerTool(
+        {
+          name: 'caller_signal_only_native_tool',
+          description: 'Native caller signal cleanup tool',
+          inputSchema: { type: 'object', properties: {} },
+          async execute() {
+            return { content: [{ type: 'text', text: 'ok' }] };
+          },
+        },
+        { signal: controller.signal }
+      );
+
+      expect(
+        server.listTools().some((tool) => tool.name === 'caller_signal_only_native_tool')
+      ).toBe(true);
+      expect(nativeToolNames.has('caller_signal_only_native_tool')).toBe(true);
+
+      controller.abort();
+
+      expect(
+        server.listTools().some((tool) => tool.name === 'caller_signal_only_native_tool')
+      ).toBe(false);
+      expect(nativeToolNames.has('caller_signal_only_native_tool')).toBe(false);
+    } finally {
+      warnSpy.mockRestore();
+      void server.close();
     }
   });
 

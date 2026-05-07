@@ -18,6 +18,7 @@ import type {
 /**
  * Annotations providing hints about tool behavior.
  *
+ * @see {@link https://webmachinelearning.github.io/webmcp/#dictdef-toolannotations}
  * @see {@link https://spec.modelcontextprotocol.io/specification/server/tools/}
  */
 export interface ToolAnnotations {
@@ -30,6 +31,11 @@ export interface ToolAnnotations {
    * Indicates the tool is read-only.
    */
   readOnlyHint?: boolean | 'true' | 'false';
+
+  /**
+   * Indicates the tool's output may include content from outside the page's trust boundary.
+   */
+  untrustedContentHint?: boolean | 'true' | 'false';
 
   /**
    * Indicates the tool may perform destructive actions.

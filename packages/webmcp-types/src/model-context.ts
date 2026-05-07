@@ -190,11 +190,20 @@ export interface ModelContextToolReference {
 /**
  * Non-standard compatibility handle returned by some runtimes after registerTool().
  *
- * Strict core WebMCP and current Chromium type registerTool() as returning void.
- * This handle is kept only for compatibility with older non-standard runtimes.
+ * @deprecated Use `options.signal` on `registerTool(tool, options)`. Will be removed in the next major.
  */
 export interface ModelContextToolRegistrationHandle {
   unregister(): void;
+}
+
+/**
+ * @see {@link https://webmachinelearning.github.io/webmcp/#dictdef-modelcontextregistertooloptions}
+ */
+export interface ModelContextRegisterToolOptions {
+  /**
+   * An `AbortSignal` whose abortion unregisters the tool. A pre-aborted signal short-circuits registration.
+   */
+  signal?: AbortSignal;
 }
 
 // ============================================================================
@@ -226,7 +235,8 @@ export interface ModelContextCore {
     TOutputSchema extends JsonSchemaForInference | undefined = undefined,
     TName extends string = string,
   >(
-    tool: ToolDescriptorFromSchema<TInputSchema, TOutputSchema, TName>
+    tool: ToolDescriptorFromSchema<TInputSchema, TOutputSchema, TName>,
+    options?: ModelContextRegisterToolOptions
   ): void;
 
   /**
@@ -243,7 +253,8 @@ export interface ModelContextCore {
         ? string extends TInputSchema['type']
           ? unknown
           : never
-        : unknown)
+        : unknown),
+    options?: ModelContextRegisterToolOptions
   ): void;
 
   /**
@@ -256,14 +267,40 @@ export interface ModelContextCore {
   >(
     tool: Omit<ToolDescriptor<TArgs, ToolRawResult, TName>, 'inputSchema'> & {
       inputSchema?: undefined;
-    }
+    },
+    options?: ModelContextRegisterToolOptions
   ): void;
+
+  /**
+   * Lists currently registered producer tools using the native Chromium preview
+   * shape. Current Chromium returns JSON-stringified schemas here, matching
+   * ModelContextTesting.listTools().
+   */
+  getTools(): ModelContextTestingToolInfo[];
+
+  /**
+   * Handler invoked when the producer tool list changes.
+   */
+  ontoolchange: ((this: ModelContextCore, ev: Event) => unknown) | null;
+
+  addEventListener(
+    type: 'toolchange',
+    listener: () => void,
+    options?: boolean | AddEventListenerOptions
+  ): void;
+
+  removeEventListener(
+    type: 'toolchange',
+    listener: () => void,
+    options?: boolean | EventListenerOptions
+  ): void;
+
+  dispatchEvent(event: Event): boolean;
 
   /**
    * Unregisters a dynamic tool by name or tool reference.
    *
-   * Current Chromium exposes string-name unregistration.
-   * MCP-B compatibility runtimes may also accept the originally registered tool object.
+   * @deprecated Removed from the WebMCP spec on April 23, 2026. Use `registerTool(tool, { signal })`. Will be removed in the next major.
    */
   unregisterTool(nameOrTool: string | ModelContextToolReference): void;
 

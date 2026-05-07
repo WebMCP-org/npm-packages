@@ -5,6 +5,7 @@ import type {
   ModelContext,
   ModelContextClient,
   ModelContextOptions,
+  ModelContextRegisterToolOptions,
   ModelContextTesting,
   ModelContextTestingExecuteToolOptions,
   ModelContextTestingToolInfo,
@@ -106,11 +107,21 @@ export interface WebMCPPolyfillInitOptions {
   disableIframeTransportByDefault?: boolean;
 }
 
-class StrictWebMCPContext {
+class StrictWebMCPContext extends EventTarget {
   private tools = new Map<string, PolyfillToolDescriptor>();
   private testingShim: PolyfillTestingShim | null = null;
+  private _ontoolchange: ((this: ModelContext, ev: Event) => unknown) | null = null;
   private provideContextDeprecationWarned = false;
   private clearContextDeprecationWarned = false;
+  private unregisterToolDeprecationWarned = false;
+
+  get ontoolchange(): ((this: ModelContext, ev: Event) => unknown) | null {
+    return this._ontoolchange;
+  }
+
+  set ontoolchange(handler: ((this: ModelContext, ev: Event) => unknown) | null) {
+    this._ontoolchange = handler;
+  }
 
   provideContext(options: ModelContextOptions = {}): void {
     this.warnProvideContextDeprecationOnce();
@@ -133,18 +144,47 @@ class StrictWebMCPContext {
     this.notifyToolsChanged();
   }
 
-  registerTool(tool: ToolDescriptor): void {
+  registerTool(tool: ToolDescriptor, options?: ModelContextRegisterToolOptions): void {
+    const signal = options?.signal;
+
+    if (signal?.aborted) {
+      console.warn(
+        `[WebMCPPolyfill] registerTool("${
+          tool?.name ?? '<unknown>'
+        }") skipped: options.signal was already aborted.`
+      );
+      return;
+    }
+
     const normalized = normalizeToolDescriptor(tool, this.tools);
     this.tools.set(normalized.name, normalized);
     this.notifyToolsChanged();
+
+    if (signal) {
+      signal.addEventListener(
+        'abort',
+        () => {
+          if (this.tools.delete(normalized.name)) {
+            this.notifyToolsChanged();
+          }
+        },
+        { once: true }
+      );
+    }
   }
 
   unregisterTool(nameOrTool: string | ModelContextToolReference): void {
+    this.warnUnregisterToolDeprecationOnce();
+
     const name = getToolNameForUnregister(nameOrTool);
     const removed = this.tools.delete(name);
     if (removed) {
       this.notifyToolsChanged();
     }
+  }
+
+  getTools(): ModelContextTestingToolInfo[] {
+    return this.getToolInfos();
   }
 
   getTestingShim(): PolyfillTestingShim {
@@ -222,6 +262,13 @@ class StrictWebMCPContext {
 
   private notifyToolsChanged(): void {
     queueMicrotask(() => {
+      const event = new Event('toolchange');
+      try {
+        this._ontoolchange?.call(this as unknown as ModelContext, event);
+      } catch (error) {
+        console.warn('[WebMCPPolyfill] navigator.modelContext.ontoolchange handler threw:', error);
+      }
+      this.dispatchEvent(event);
       this.testingShim?.dispatchToolChange();
     });
   }
@@ -245,6 +292,17 @@ class StrictWebMCPContext {
     this.clearContextDeprecationWarned = true;
     console.warn(
       '[WebMCPPolyfill] navigator.modelContext.clearContext() is deprecated and will be removed in the next major version. Unregister individual tools instead.'
+    );
+  }
+
+  private warnUnregisterToolDeprecationOnce(): void {
+    if (this.unregisterToolDeprecationWarned) {
+      return;
+    }
+
+    this.unregisterToolDeprecationWarned = true;
+    console.warn(
+      '[WebMCPPolyfill] navigator.modelContext.unregisterTool() is deprecated. The April 23, 2026 WebMCP draft removed it in favor of registerTool(tool, { signal }) — pass an AbortSignal and abort it to unregister.'
     );
   }
 }
