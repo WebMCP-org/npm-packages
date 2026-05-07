@@ -90,6 +90,7 @@ jobs:
         if: steps.changesets.outputs.published == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           PACKAGES='${{ steps.changesets.outputs.publishedPackages }}'
 
@@ -118,6 +119,18 @@ jobs:
                   TAG="${PKG_NAME}@${PKG_VERSION}"
                   gh release upload "$TAG" "$MCPB_FILE" --clobber
                   echo "✓ Uploaded $MCPB_FILE to release $TAG"
+
+                  if [ -n "${CLOUDFLARE_API_TOKEN:-}" ]; then
+                    pnpm exec wrangler r2 object put \
+                      "webmcp-installs/$MCPB_FILE" \
+                      --file "$MCPB_FILE" \
+                      --content-type application/octet-stream \
+                      --cache-control "public, max-age=31536000, immutable" \
+                      --remote
+                    echo "✓ Uploaded $MCPB_FILE to Cloudflare R2 webmcp-installs"
+                  else
+                    echo "⚠ CLOUDFLARE_API_TOKEN is not set; skipping R2 upload for $MCPB_FILE"
+                  fi
                 else
                   echo "⚠ Expected $MCPB_FILE but file not found after build"
                   ls -la *.mcpb 2>/dev/null || echo "  No .mcpb files in directory"

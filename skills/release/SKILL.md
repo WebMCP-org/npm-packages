@@ -128,6 +128,23 @@ cd packages/webmcp-local-relay && pnpm run build:mcpb && cd ../..
 gh release upload "v$VERSION" packages/webmcp-local-relay/webmcp-local-relay-$VERSION.mcpb
 ```
 
+Also publish the MCPB bundle to the public Cloudflare R2 install bucket. The bucket is
+`webmcp-installs`, exposed at `https://install.mcp-b.ai/` and
+`https://install.mcpb.ai/`. Existing bundles live at the bucket root, so keep using the
+root filename key:
+
+```bash
+pnpm exec wrangler r2 object put \
+  "webmcp-installs/webmcp-local-relay-$VERSION.mcpb" \
+  --file "packages/webmcp-local-relay/webmcp-local-relay-$VERSION.mcpb" \
+  --content-type application/octet-stream \
+  --cache-control "public, max-age=31536000, immutable" \
+  --remote
+
+curl -I "https://install.mcp-b.ai/webmcp-local-relay-$VERSION.mcpb"
+curl -I "https://install.mcpb.ai/webmcp-local-relay-$VERSION.mcpb"
+```
+
 ## Alternative: CI-Driven Release (Fully Automated)
 
 Instead of publishing locally, let CI handle it:

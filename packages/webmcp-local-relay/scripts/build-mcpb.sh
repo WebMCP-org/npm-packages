@@ -28,9 +28,9 @@ echo "[mcpb] Running tsdown build..."
 cd "$PKG_DIR"
 pnpm run build
 
-# ── 3. Copy server files (JS only, no .d.ts or .map) ─────────────────────────
+# ── 3. Copy server files (runtime JS only, no .d.ts or .map) ─────────────────
 echo "[mcpb] Copying server files..."
-for f in dist/*.js; do
+for f in dist/*.mjs; do
   cp "$f" "$STAGING_DIR/server/"
 done
 

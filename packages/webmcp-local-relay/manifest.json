@@ -17,10 +17,10 @@
   "support": "https://github.com/WebMCP-org/npm-packages/issues",
   "server": {
     "type": "node",
-    "entry_point": "server/cli.js",
+    "entry_point": "server/cli.mjs",
     "mcp_config": {
       "command": "node",
-      "args": ["${__dirname}/server/cli.js"],
+      "args": ["${__dirname}/server/cli.mjs"],
       "env": {}
     }
   },
