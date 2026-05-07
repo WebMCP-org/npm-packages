@@ -230,7 +230,7 @@ When enabled via `installTestingShim`, the polyfill can install a compatibility 
 - `registerToolsChangedCallback(callback)`
 - `getCrossDocumentScriptToolResult()`
 
-Current Chrome Beta 147 also exposes `navigator.modelContextTesting.ontoolchange`; the polyfill keeps the callback-based compatibility API for now.
+Older native previews also exposed `navigator.modelContextTesting.ontoolchange`; the polyfill keeps the callback-based compatibility API for now.
 
 `executeTool(...)` accepts JSON-string arguments and returns a serialized result string or `null` (for navigation-style responses).
 

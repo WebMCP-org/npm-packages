@@ -155,10 +155,15 @@ jobs:
           chrome-version: beta
           install-dependencies: true
 
-      - name: Run unit tests with coverage
+      - name: Run hook browser tests with coverage
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: pnpm test:unit:coverage
+        run: pnpm test:hooks:coverage
+
+      - name: Run remaining unit tests with coverage
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: pnpm test:unit:packages:coverage
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5

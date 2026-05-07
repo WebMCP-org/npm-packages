@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import type { InputSchema, ModelContext } from '@mcp-b/webmcp-types';
 import { cleanupWebModelContext, initializeWebModelContext } from '../global.js';
-import type { InputSchema, ModelContext, WebModelContextInitOptions } from '../types.js';
+import type { WebModelContextInitOptions } from '../types.js';
 
 interface RuntimeConformanceOptions {
   suiteName: string;
@@ -249,16 +250,12 @@ export function runRuntimeCoreConformanceSuite(options: RuntimeConformanceOption
       });
     });
 
-    it('registerTool({ signal }) unregisters when the signal aborts', async (ctx) => {
+    it('registerTool({ signal }) unregisters when the signal aborts', async () => {
       const modelContext = requireModelContext();
       const registerTool = modelContext.registerTool as (
         tool: Parameters<ModelContext['registerTool']>[0],
         options?: { signal?: AbortSignal }
       ) => unknown;
-
-      if (registerTool.length < 2) {
-        ctx.skip();
-      }
 
       const ac = new AbortController();
       registerTool.call(
@@ -285,16 +282,12 @@ export function runRuntimeCoreConformanceSuite(options: RuntimeConformanceOption
       );
     });
 
-    it('registerTool with a pre-aborted signal does not register the tool', async (ctx) => {
+    it('registerTool with a pre-aborted signal does not register the tool', async () => {
       const modelContext = requireModelContext();
       const registerTool = modelContext.registerTool as (
         tool: Parameters<ModelContext['registerTool']>[0],
         options?: { signal?: AbortSignal }
       ) => unknown;
-
-      if (registerTool.length < 2) {
-        ctx.skip();
-      }
 
       const ac = new AbortController();
       ac.abort();

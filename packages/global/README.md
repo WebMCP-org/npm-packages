@@ -211,7 +211,7 @@ For backwards compatibility, `@mcp-b/global` also returns a deprecated `{ unregi
 
 #### `unregisterTool(nameOrTool)` (deprecated)
 
-Removes a tool by name. The April 23, 2026 WebMCP draft removed `unregisterTool` from the spec in favor of `AbortSignal` on `registerTool`. `@mcp-b/global` keeps `unregisterTool` functional for compatibility with current Chrome Beta 147 and emits a one-time deprecation warning when called. It will be removed in the next major version.
+Removes a tool by name. The April 23, 2026 WebMCP draft removed `unregisterTool` from the spec in favor of `AbortSignal` on `registerTool`. `@mcp-b/global` keeps `unregisterTool` functional for compatibility with older native previews and existing MCP-B integrations, and emits a one-time deprecation warning when called. It will be removed in the next major version.
 
 ```typescript
 navigator.modelContext.unregisterTool('add-to-cart');
