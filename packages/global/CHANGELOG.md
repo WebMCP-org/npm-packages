@@ -1,5 +1,14 @@
 # @mcp-b/global
 
+## 2.2.1
+
+### Patch Changes
+
+- Add compatibility shims for Chrome's producer-facing `getTools()`, `ontoolchange`, and `toolchange` APIs.
+- Avoid iframe crashes when native Chrome exposes `navigator.modelContext` but denies tool registration through permissions policy.
+- Updated dependencies
+  - @mcp-b/webmcp-ts-sdk@2.2.1
+
 ## 2.2.0
 
 ### Patch Changes

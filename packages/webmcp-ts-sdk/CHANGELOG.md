@@ -1,5 +1,12 @@
 # @mcp-b/webmcp-ts-sdk
 
+## 2.2.1
+
+### Patch Changes
+
+- Add future-facing producer APIs for Chrome's WebMCP surface, including `getTools()`, `ontoolchange`, and `toolchange` event support.
+- Continue registering tools through the WebMCP transport when native Chrome blocks the mirrored `registerTool()` call inside permission-policy-restricted iframes.
+
 ## 2.2.0
 
 ### Patch Changes
