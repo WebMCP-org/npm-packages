@@ -272,6 +272,32 @@ export interface ModelContextCore {
   ): void;
 
   /**
+   * Lists currently registered producer tools using the native Chromium preview
+   * shape. Current Chromium returns JSON-stringified schemas here, matching
+   * ModelContextTesting.listTools().
+   */
+  getTools(): ModelContextTestingToolInfo[];
+
+  /**
+   * Handler invoked when the producer tool list changes.
+   */
+  ontoolchange: ((this: ModelContextCore, ev: Event) => unknown) | null;
+
+  addEventListener(
+    type: 'toolchange',
+    listener: () => void,
+    options?: boolean | AddEventListenerOptions
+  ): void;
+
+  removeEventListener(
+    type: 'toolchange',
+    listener: () => void,
+    options?: boolean | EventListenerOptions
+  ): void;
+
+  dispatchEvent(event: Event): boolean;
+
+  /**
    * Unregisters a dynamic tool by name or tool reference.
    *
    * @deprecated Removed from the WebMCP spec on April 23, 2026. Use `registerTool(tool, { signal })`. Will be removed in the next major.

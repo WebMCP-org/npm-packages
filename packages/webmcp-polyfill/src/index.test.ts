@@ -28,7 +28,9 @@ describe('@mcp-b/webmcp-polyfill', () => {
     expect(typeof navigator.modelContext.provideContext).toBe('function');
     expect(typeof navigator.modelContext.clearContext).toBe('function');
     expect(typeof navigator.modelContext.registerTool).toBe('function');
+    expect(typeof navigator.modelContext.getTools).toBe('function');
     expect(typeof navigator.modelContext.unregisterTool).toBe('function');
+    expect(typeof navigator.modelContext.ontoolchange).toBe('object');
     expect((navigator.modelContext as unknown as { callTool?: unknown }).callTool).toBeUndefined();
   });
 
@@ -318,6 +320,61 @@ describe('@mcp-b/webmcp-polyfill', () => {
     await Promise.resolve();
 
     expect(count).toBe(4);
+  });
+
+  it('exposes native-shaped getTools on navigator.modelContext', () => {
+    initializeWebMCPPolyfill();
+
+    navigator.modelContext.registerTool({
+      name: 'native_get_tools_shape',
+      description: 'Native getTools shape',
+      inputSchema: {
+        type: 'object',
+        properties: { value: { type: 'number' } },
+        required: ['value'],
+      },
+      execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+    });
+
+    expect(navigator.modelContext.getTools()).toEqual([
+      {
+        name: 'native_get_tools_shape',
+        description: 'Native getTools shape',
+        inputSchema:
+          '{"type":"object","properties":{"value":{"type":"number"}},"required":["value"]}',
+      },
+    ]);
+  });
+
+  it('fires producer toolchange events and ontoolchange for registry mutations', async () => {
+    initializeWebMCPPolyfill();
+
+    let listenerCount = 0;
+    let handlerCount = 0;
+    navigator.modelContext.addEventListener('toolchange', () => {
+      listenerCount += 1;
+    });
+    navigator.modelContext.ontoolchange = () => {
+      handlerCount += 1;
+    };
+
+    const controller = new AbortController();
+    navigator.modelContext.registerTool(
+      {
+        name: 'producer_event_tool',
+        description: 'Producer event tool',
+        inputSchema: { type: 'object', properties: {} },
+        execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+      },
+      { signal: controller.signal }
+    );
+
+    controller.abort();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(listenerCount).toBe(2);
+    expect(handlerCount).toBe(2);
   });
 
   // =========================================================================

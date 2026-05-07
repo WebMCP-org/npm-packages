@@ -166,7 +166,9 @@ describe('global adapter', () => {
     expect(typeof modelContext.unregisterTool).toBe('function');
     expect(typeof modelContext.clearContext).toBe('function');
     expect(typeof modelContext.listTools).toBe('function');
+    expect(typeof modelContext.getTools).toBe('function');
     expect(typeof modelContext.callTool).toBe('function');
+    expect(typeof modelContext.ontoolchange).toBe('object');
   });
 
   it('registerTool returns a compatibility unregister handle and mirrors to native/testing API', async () => {
@@ -198,6 +200,64 @@ describe('global adapter', () => {
     expect(
       navigator.modelContextTesting?.listTools().some((tool) => tool.name === 'web_tool')
     ).toBe(false);
+  });
+
+  it('getTools returns the native producer tool-list shape', () => {
+    initializeWebModelContext();
+
+    const modelContext = getModelContext();
+    modelContext.registerTool({
+      name: 'native_shape_tool',
+      description: 'Native shape tool',
+      inputSchema: {
+        type: 'object',
+        properties: { value: { type: 'number' } },
+        required: ['value'],
+      },
+      async execute() {
+        return { content: [{ type: 'text', text: 'ok' }] };
+      },
+    });
+
+    expect(modelContext.getTools()).toEqual([
+      {
+        name: 'native_shape_tool',
+        description: 'Native shape tool',
+        inputSchema:
+          '{"type":"object","properties":{"value":{"type":"number"}},"required":["value"]}',
+      },
+    ]);
+  });
+
+  it('fires producer toolchange events and ontoolchange on wrapper mutations', async () => {
+    initializeWebModelContext();
+
+    const modelContext = getModelContext();
+    let listenerCount = 0;
+    let handlerCount = 0;
+    modelContext.addEventListener('toolchange', () => {
+      listenerCount += 1;
+    });
+    modelContext.ontoolchange = () => {
+      handlerCount += 1;
+    };
+
+    modelContext.registerTool({
+      name: 'wrapper_event_tool',
+      description: 'Wrapper event tool',
+      inputSchema: { type: 'object', properties: {} },
+      async execute() {
+        return { content: [{ type: 'text', text: 'ok' }] };
+      },
+    });
+
+    modelContext.unregisterTool('wrapper_event_tool');
+    await Promise.resolve();
+    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(listenerCount).toBeGreaterThanOrEqual(1);
+    expect(handlerCount).toBeGreaterThanOrEqual(1);
   });
 
   it('registerTool({ signal }) abort removes the tool from both wrapper and mirrored native', async () => {

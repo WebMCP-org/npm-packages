@@ -7,6 +7,7 @@ import type {
   ModelContextExtensions,
   ModelContextOptions,
   ModelContextRegisterToolOptions,
+  ModelContextTestingToolInfo,
   ModelContextToolReference,
   ResourceContents,
   ToolDescriptor,
@@ -206,6 +207,8 @@ export class BrowserMcpServer extends BaseMcpServer {
   private _clearContextDeprecationWarned = false;
   private _unregisterToolDeprecationWarned = false;
   private _nativeToolCleanups = new Map<string, NativeToolCleanup>();
+  private _producerEventTarget = new EventTarget();
+  private _ontoolchange: ((this: ModelContextCore, ev: Event) => unknown) | null = null;
 
   constructor(serverInfo: Implementation, options?: BrowserMcpServerOptions) {
     const validator = new PolyfillJsonSchemaValidator();
@@ -238,8 +241,12 @@ export class BrowserMcpServer extends BaseMcpServer {
     this.provideContext = this.provideContext.bind(this);
     this.clearContext = this.clearContext.bind(this);
     this.listTools = this.listTools.bind(this);
+    this.getTools = this.getTools.bind(this);
     this.callTool = this.callTool.bind(this);
     this.executeTool = this.executeTool.bind(this);
+    this.addEventListener = this.addEventListener.bind(this);
+    this.removeEventListener = this.removeEventListener.bind(this);
+    this.dispatchEvent = this.dispatchEvent.bind(this);
 
     this.registerResource = this.registerResource.bind(this);
     this.listResources = this.listResources.bind(this);
@@ -454,9 +461,53 @@ export class BrowserMcpServer extends BaseMcpServer {
         return normalizeToolResponse(await tool.execute(args, client));
       }
     );
+    this.notifyProducerToolsChanged();
     return {
       unregister: () => this.unregisterTool(tool.name),
     };
+  }
+
+  get ontoolchange(): ((this: ModelContextCore, ev: Event) => unknown) | null {
+    return this._ontoolchange;
+  }
+
+  set ontoolchange(handler: ((this: ModelContextCore, ev: Event) => unknown) | null) {
+    this._ontoolchange = handler;
+  }
+
+  addEventListener(
+    type: string,
+    listener: EventListenerOrEventListenerObject | null,
+    options?: boolean | AddEventListenerOptions
+  ): void {
+    this._producerEventTarget.addEventListener(type, listener, options);
+  }
+
+  removeEventListener(
+    type: string,
+    listener: EventListenerOrEventListenerObject | null,
+    options?: boolean | EventListenerOptions
+  ): void {
+    this._producerEventTarget.removeEventListener(type, listener, options);
+  }
+
+  dispatchEvent(event: Event): boolean {
+    return this._producerEventTarget.dispatchEvent(event);
+  }
+
+  private notifyProducerToolsChanged(): void {
+    queueMicrotask(() => {
+      const event = new Event('toolchange');
+      try {
+        this._ontoolchange?.call(this as unknown as ModelContextCore, event);
+      } catch (error) {
+        console.warn(
+          '[BrowserMcpServer] navigator.modelContext.ontoolchange handler threw:',
+          error
+        );
+      }
+      this.dispatchEvent(event);
+    });
   }
 
   backfillTools(
@@ -530,12 +581,14 @@ export class BrowserMcpServer extends BaseMcpServer {
       signal.addEventListener(
         'abort',
         () => {
-          this._parentTools[tool.name]?.remove();
+          const existing = this._parentTools[tool.name];
+          existing?.remove();
           try {
             this.unregisterNativeToolMirror(tool.name, { preferAbortSignal: true });
           } catch (error) {
             console.warn('[BrowserMcpServer] Native unregister via abort fallback failed:', error);
           }
+          this.notifyProducerToolsChanged();
         },
         { once: true }
       );
@@ -568,16 +621,22 @@ export class BrowserMcpServer extends BaseMcpServer {
   unregisterTool(nameOrTool: string | ModelContextToolReference): void {
     this.warnUnregisterToolDeprecationOnce();
     const name = this.resolveToolNameForUnregister(nameOrTool);
-    this._parentTools[name]?.remove();
+    const existing = this._parentTools[name];
+    existing?.remove();
 
     if (this.native) {
       this.unregisterNativeToolMirror(name);
     }
+    if (existing) {
+      this.notifyProducerToolsChanged();
+    }
   }
 
   private clearRegisteredTools(): void {
+    let changed = false;
     for (const name of Object.keys(this._parentTools)) {
       this._parentTools[name]?.remove();
+      changed = true;
       if (this.native) {
         try {
           this.unregisterNativeToolMirror(name);
@@ -585,6 +644,9 @@ export class BrowserMcpServer extends BaseMcpServer {
           console.warn('[BrowserMcpServer] Native unregister during clear failed:', error);
         }
       }
+    }
+    if (changed) {
+      this.notifyProducerToolsChanged();
     }
   }
 
@@ -801,6 +863,23 @@ export class BrowserMcpServer extends BaseMcpServer {
           item.annotations = tool.annotations as NonNullable<ToolListItem['annotations']>;
         return item;
       });
+  }
+
+  getTools(): ModelContextTestingToolInfo[] {
+    return this.listTools().map((tool) => {
+      let inputSchema: string;
+      try {
+        inputSchema = JSON.stringify(tool.inputSchema ?? DEFAULT_INPUT_SCHEMA);
+      } catch {
+        inputSchema = JSON.stringify(DEFAULT_INPUT_SCHEMA);
+      }
+
+      return {
+        name: tool.name,
+        description: tool.description ?? '',
+        inputSchema,
+      };
+    });
   }
 
   /**
