@@ -30,7 +30,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        uses: pnpm/action-setup@8912a9102ac27614460f54aedde9e1e7f9aec20d # v6.0.5
 
       - name: Setup Vite+
         uses: voidzero-dev/setup-vp@v1
@@ -60,7 +60,7 @@ jobs:
         run: pnpm test:e2e:tarball:global
 
       - name: Upload Playwright Report
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: playwright-report
@@ -68,7 +68,7 @@ jobs:
           retention-days: 30
 
       - name: Upload Test Results
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: test-results
@@ -91,7 +91,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        uses: pnpm/action-setup@8912a9102ac27614460f54aedde9e1e7f9aec20d # v6.0.5
 
       - name: Setup Vite+
         uses: voidzero-dev/setup-vp@v1
@@ -136,7 +136,7 @@ jobs:
         run: pnpm --filter mcp-e2e-tests run test:chrome-beta:webmcp:smoke
 
       - name: Upload Parity Playwright Report
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: playwright-report-native-parity-${{ matrix.mode }}
@@ -144,7 +144,7 @@ jobs:
           retention-days: 14
 
       - name: Upload Parity Test Results
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: test-results-native-parity-${{ matrix.mode }}
