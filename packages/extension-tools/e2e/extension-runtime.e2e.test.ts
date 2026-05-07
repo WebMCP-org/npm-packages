@@ -51,18 +51,45 @@ async function listTools(page: Page): Promise<string[]> {
   });
 }
 
+async function registerDirectApiTools(page: Page): Promise<void> {
+  const registered = await page.evaluate(async () => {
+    return await window.__WEBMCP_E2E__?.registerDirectApiTools?.();
+  });
+  assert.strictEqual(registered, true);
+}
+
 async function callTool(page: Page, name: string, args: Record<string, unknown>): Promise<string> {
+  const result = await callToolResult(page, name, args);
+  const content = Array.isArray(result?.content) ? result.content : [];
+  return typeof content[0]?.text === 'string' ? content[0].text : JSON.stringify(result);
+}
+
+async function callToolResult(
+  page: Page,
+  name: string,
+  args: Record<string, unknown>
+): Promise<{
+  content?: Array<{ type?: string; text?: string }>;
+  structuredContent?: Record<string, unknown>;
+  isError?: boolean;
+}> {
   return page.evaluate(
     async ({ toolName, toolArgs }) => {
-      const result = await window.mcpClient?.callTool({
+      return await window.mcpClient?.callTool({
         name: toolName,
         arguments: toolArgs,
       });
-      const content = Array.isArray(result?.content) ? result.content : [];
-      return typeof content[0]?.text === 'string' ? content[0].text : JSON.stringify(result);
     },
     { toolName: name, toolArgs: args }
   );
+}
+
+async function callJsonTool<T>(
+  page: Page,
+  name: string,
+  args: Record<string, unknown>
+): Promise<T> {
+  return JSON.parse(await callTool(page, name, args)) as T;
 }
 
 async function callToolError(
@@ -167,6 +194,87 @@ describe('extension runtime contract', () => {
       assert.strictEqual(echoText, 'echo:reconnected');
 
       await secondPage.close();
+    } finally {
+      await context.close();
+    }
+  });
+
+  it('runs selected first-party extension API tools against real Chrome APIs', async () => {
+    const { context, extensionId } = await launchExtensionContext();
+
+    try {
+      const page = await openClientPage(context, extensionId);
+
+      await registerDirectApiTools(page);
+      await page.waitForFunction(async () => {
+        const tools = await window.mcpClient?.listTools?.();
+        const names = new Set(tools?.tools.map((tool) => tool.name) ?? []);
+        return (
+          names.has('extension_tool_set_storage') &&
+          names.has('extension_tool_get_storage') &&
+          names.has('extension_tool_create_tab') &&
+          names.has('extension_tool_get_all_tabs') &&
+          names.has('extension_tool_close_tabs')
+        );
+      });
+
+      const setStorageResult = await callToolResult(page, 'extension_tool_set_storage', {
+        area: 'local',
+        data: {
+          webmcp_e2e_value: 'stored from real chrome.storage',
+          webmcp_e2e_count: 2,
+        },
+      });
+      const setStorageText = setStorageResult.content?.[0]?.text ?? '';
+      assert.ok(setStorageText.includes('Stored 2 key(s) in local storage'));
+      assert.deepStrictEqual(setStorageResult.structuredContent, {
+        keys: ['webmcp_e2e_value', 'webmcp_e2e_count'],
+      });
+
+      const getStorageResult = await callToolResult(page, 'extension_tool_get_storage', {
+        area: 'local',
+        keys: ['webmcp_e2e_value', 'webmcp_e2e_count'],
+      });
+      const stored = JSON.parse(getStorageResult.content?.[0]?.text ?? '') as {
+        area: string;
+        data: Record<string, unknown>;
+        keyCount: number;
+      };
+      assert.deepStrictEqual(stored, {
+        area: 'local',
+        data: {
+          webmcp_e2e_value: 'stored from real chrome.storage',
+          webmcp_e2e_count: 2,
+        },
+        keyCount: 2,
+      });
+      assert.deepStrictEqual(getStorageResult.structuredContent, stored);
+
+      const createTabText = await callTool(page, 'extension_tool_create_tab', {
+        url: 'about:blank',
+        active: false,
+      });
+      const createdTabId = Number(createTabText.match(/Created tab (\d+)/)?.[1]);
+      assert.ok(Number.isInteger(createdTabId) && createdTabId > 0);
+
+      const tabs = await callJsonTool<Array<{ id?: number; url?: string }>>(
+        page,
+        'extension_tool_get_all_tabs',
+        {}
+      );
+      assert.ok(tabs.some((tab) => tab.id === createdTabId));
+
+      const closeTabText = await callTool(page, 'extension_tool_close_tabs', {
+        tabIds: [createdTabId],
+      });
+      assert.ok(closeTabText.includes(`Closed 1 tab(s): ${createdTabId}`));
+
+      const tabsAfterClose = await callJsonTool<Array<{ id?: number }>>(
+        page,
+        'extension_tool_get_all_tabs',
+        {}
+      );
+      assert.ok(!tabsAfterClose.some((tab) => tab.id === createdTabId));
     } finally {
       await context.close();
     }

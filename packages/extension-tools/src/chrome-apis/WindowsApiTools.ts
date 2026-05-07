@@ -1,7 +1,7 @@
 import type { McpServer } from '@mcp-b/webmcp-ts-sdk';
-import { z } from 'zod';
 
 import { type ApiAvailability, BaseApiTools } from '../BaseApiTools';
+import { WINDOW_ACTION_IDS, WINDOW_TOOL_CONTRACTS } from '../contracts/windows';
 
 export interface WindowsApiToolsOptions {
   create?: boolean;
@@ -13,19 +13,7 @@ export interface WindowsApiToolsOptions {
   update?: boolean;
 }
 
-export const WINDOW_ACTIONS = [
-  'create',
-  'get',
-  'getAll',
-  'getCurrent',
-  'getLastFocused',
-  'remove',
-  'update',
-] as const;
-
-type WindowAction = (typeof WINDOW_ACTIONS)[number];
-
-const windowActionSchema = z.enum(WINDOW_ACTIONS);
+export const WINDOW_ACTIONS = WINDOW_ACTION_IDS;
 
 export class WindowsApiTools extends BaseApiTools<WindowsApiToolsOptions> {
   protected apiName = 'Windows';
@@ -75,270 +63,55 @@ export class WindowsApiTools extends BaseApiTools<WindowsApiToolsOptions> {
   }
 
   registerTools(): void {
-    this.server.registerTool(
-      'extension_tool_window_operations',
-      {
-        description: 'Perform operations on browser windows',
-        inputSchema: {
-          action: windowActionSchema,
-          // Parameters vary by action; validated in handler using specific schemas
-          params: z
-            .record(z.string(), z.any())
-            .optional()
-            .describe('Parameters for the chosen action'),
-        },
-      },
-      async ({ action, params = {} }) => {
-        try {
-          if (!this.shouldRegisterTool(action)) {
-            return this.formatError(new Error(`Action "${action}" is not supported`));
-          }
+    if (this.shouldRegisterTool('create')) {
+      this.registerExtensionTool(WINDOW_TOOL_CONTRACTS.create, (params) =>
+        this.handleCreate(params)
+      );
+    }
 
-          switch (action as WindowAction) {
-            case 'create':
-              return await this.handleCreate(params);
-            case 'get':
-              return await this.handleGet(params);
-            case 'getAll':
-              return await this.handleGetAll(params);
-            case 'getCurrent':
-              return await this.handleGetCurrent(params);
-            case 'getLastFocused':
-              return await this.handleGetLastFocused(params);
-            case 'remove':
-              return await this.handleRemove(params);
-            case 'update':
-              return await this.handleUpdate(params);
-            default:
-              return this.formatError(`Unknown action: ${String(action)}`);
-          }
-        } catch (error) {
-          return this.formatError(error);
-        }
-      }
-    );
+    if (this.shouldRegisterTool('get')) {
+      this.registerExtensionTool(WINDOW_TOOL_CONTRACTS.get, (params) => this.handleGet(params));
+    }
 
-    this.server.registerTool(
-      'extension_tool_window_parameters_description',
-      {
-        description:
-          'Get the parameters for extension_tool_window_operations tool and the description for the associated action, this tool should be used first before extension_tool_window_operations',
-        inputSchema: {
-          action: windowActionSchema,
-        },
-      },
-      async ({ action }) => {
-        try {
-          // Build JSON Schema for the params of the requested action so an LLM can construct a valid call
-          const toJson = (schema: z.ZodTypeAny, _name: string) => z.toJSONSchema(schema);
+    if (this.shouldRegisterTool('getAll')) {
+      this.registerExtensionTool(WINDOW_TOOL_CONTRACTS.getAll, (params) =>
+        this.handleGetAll(params)
+      );
+    }
 
-          const payloadBase = {
-            tool: 'extension_tool_window_operations',
-            action,
-            note: 'Use the description to double check if the correct action is chosen. Use this JSON Schema for the params field when calling the tool. The top-level tool input is { action, params }.',
-          } as const;
+    if (this.shouldRegisterTool('getCurrent')) {
+      this.registerExtensionTool(WINDOW_TOOL_CONTRACTS.getCurrent, (params) =>
+        this.handleGetCurrent(params)
+      );
+    }
 
-          switch (action as WindowAction) {
-            case 'create': {
-              const paramsAndDescription = {
-                params: toJson(this.createSchema, 'CreateWindowSchema'),
-                description:
-                  'Create a new browser window with optional sizing, position, or default URL',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'get': {
-              const paramsAndDescription = {
-                params: toJson(this.getSchema, 'GetWindowSchema'),
-                description: 'Get details about a specific window',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'getAll': {
-              const paramsAndDescription = {
-                params: toJson(this.getAllSchema, 'GetAllWindowsSchema'),
-                description: 'Get all browser windows',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'getCurrent': {
-              const paramsAndDescription = {
-                params: toJson(this.getCurrentSchema, 'GetCurrentWindowSchema'),
-                description: 'Get the current window',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'getLastFocused': {
-              const paramsAndDescription = {
-                params: toJson(this.getLastFocusedSchema, 'GetLastFocusedWindowSchema'),
-                description: 'Get the window that was most recently focused',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'remove': {
-              const paramAndDescription = {
-                params: toJson(this.removeSchema, 'RemoveWindowSchema'),
-                description: 'Remove (close) a window and all the tabs inside it',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramAndDescription,
-              });
-            }
-            case 'update': {
-              const paramsAndDescription = {
-                params: toJson(this.updateSchema, 'UpdateWindowSchema'),
-                description: 'Update the properties of a window',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            default: {
-              return this.formatError(`Unknown action: ${String(action)}`);
-            }
-          }
-        } catch (error) {
-          return this.formatError(error);
-        }
-      }
-    );
+    if (this.shouldRegisterTool('getLastFocused')) {
+      this.registerExtensionTool(WINDOW_TOOL_CONTRACTS.getLastFocused, (params) =>
+        this.handleGetLastFocused(params)
+      );
+    }
+
+    if (this.shouldRegisterTool('remove')) {
+      this.registerExtensionTool(WINDOW_TOOL_CONTRACTS.remove, (params) =>
+        this.handleRemove(params)
+      );
+    }
+
+    if (this.shouldRegisterTool('update')) {
+      this.registerExtensionTool(WINDOW_TOOL_CONTRACTS.update, (params) =>
+        this.handleUpdate(params)
+      );
+    }
   }
 
   // ===== Validation Schemas per action =====
-  private createSchema = z.object({
-    url: z
-      .union([z.string(), z.array(z.string())])
-      .optional()
-      .describe('A URL or array of URLs to open as tabs in the window'),
-    focused: z
-      .boolean()
-      .optional()
-      .describe('If true, opens an active window. If false, opens an inactive window'),
-    height: z
-      .number()
-      .optional()
-      .describe('The height in pixels of the new window, including the frame'),
-    incognito: z
-      .boolean()
-      .optional()
-      .describe('Whether the new window should be an incognito window'),
-    left: z
-      .number()
-      .optional()
-      .describe('The number of pixels to position the new window from the left edge of the screen'),
-    setSelfAsOpener: z
-      .boolean()
-      .optional()
-      .describe("If true, the newly-created window's 'window.opener' is set to the caller"),
-    state: z
-      .enum(['normal', 'minimized', 'maximized', 'fullscreen', 'locked-fullscreen'])
-      .optional()
-      .describe('The initial state of the window'),
-    tabId: z.number().optional().describe('The ID of the tab to add to the new window'),
-    top: z
-      .number()
-      .optional()
-      .describe('The number of pixels to position the new window from the top edge of the screen'),
-    type: z
-      .enum(['normal', 'popup', 'panel'])
-      .optional()
-      .describe('Specifies what type of browser window to create'),
-    width: z
-      .number()
-      .optional()
-      .describe('The width in pixels of the new window, including the frame'),
-  });
-
-  private getSchema = z.object({
-    windowId: z.number().describe('The ID of the window to get'),
-    populate: z
-      .boolean()
-      .optional()
-      .describe('If true, the window object will include a tabs property with tab details'),
-    windowTypes: z
-      .array(z.enum(['normal', 'popup', 'panel', 'app', 'devtools']))
-      .optional()
-      .describe('Filter the window based on its type'),
-  });
-
-  private getAllSchema = z.object({
-    populate: z
-      .boolean()
-      .optional()
-      .describe('If true, each window object will include a tabs property with tab details'),
-    windowTypes: z
-      .array(z.enum(['normal', 'popup', 'panel', 'app', 'devtools']))
-      .optional()
-      .describe('Filter windows based on their type'),
-  });
-
-  private getCurrentSchema = z.object({
-    populate: z
-      .boolean()
-      .optional()
-      .describe('If true, the window object will include a tabs property with tab details'),
-    windowTypes: z
-      .array(z.enum(['normal', 'popup', 'panel', 'app', 'devtools']))
-      .optional()
-      .describe('Filter the window based on its type'),
-  });
-
-  private getLastFocusedSchema = z.object({
-    populate: z
-      .boolean()
-      .optional()
-      .describe('If true, the window object will include a tabs property with tab details'),
-    windowTypes: z
-      .array(z.enum(['normal', 'popup', 'panel', 'app', 'devtools']))
-      .optional()
-      .describe('Filter the window based on its type'),
-  });
-
-  private removeSchema = z.object({
-    windowId: z.number().describe('The ID of the window to remove'),
-  });
-
-  private updateSchema = z.object({
-    windowId: z.number().describe('The ID of the window to update'),
-    drawAttention: z
-      .boolean()
-      .optional()
-      .describe(
-        "If true, causes the window to be displayed in a manner that draws the user's attention"
-      ),
-    focused: z.boolean().optional().describe('If true, brings the window to the front'),
-    height: z.number().optional().describe('The height to resize the window to in pixels'),
-    left: z
-      .number()
-      .optional()
-      .describe('The offset from the left edge of the screen to move the window to in pixels'),
-    state: z
-      .enum(['normal', 'minimized', 'maximized', 'fullscreen', 'locked-fullscreen'])
-      .optional()
-      .describe('The new state of the window'),
-    top: z
-      .number()
-      .optional()
-      .describe('The offset from the top edge of the screen to move the window to in pixels'),
-    width: z.number().optional().describe('The width to resize the window to in pixels'),
-  });
+  private createSchema = WINDOW_TOOL_CONTRACTS.create.zodInputSchema;
+  private getSchema = WINDOW_TOOL_CONTRACTS.get.zodInputSchema;
+  private getAllSchema = WINDOW_TOOL_CONTRACTS.getAll.zodInputSchema;
+  private getCurrentSchema = WINDOW_TOOL_CONTRACTS.getCurrent.zodInputSchema;
+  private getLastFocusedSchema = WINDOW_TOOL_CONTRACTS.getLastFocused.zodInputSchema;
+  private removeSchema = WINDOW_TOOL_CONTRACTS.remove.zodInputSchema;
+  private updateSchema = WINDOW_TOOL_CONTRACTS.update.zodInputSchema;
 
   // ===== Action handlers =====
   private async handleCreate(raw: unknown) {

@@ -65,7 +65,7 @@
     "prepublishOnly": "node ../../scripts/validate-publish.js && pnpm run build",
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm --filter @mcp-b/webmcp-polyfill build && tsc --noEmit",
     "version:major": "pnpm version major --no-git-tag-version",
     "version:minor": "pnpm version minor --no-git-tag-version",
     "version:patch": "pnpm version patch --no-git-tag-version"
@@ -81,14 +81,10 @@
     "vite-plus": "catalog:"
   },
   "peerDependencies": {
-    "zod": "^3.25 || ^4.0",
-    "zod-to-json-schema": "^3.25.0"
+    "zod": "^3.25 || ^4.0"
   },
   "peerDependenciesMeta": {
     "zod": {
-      "optional": true
-    },
-    "zod-to-json-schema": {
       "optional": true
     }
   },

@@ -13,6 +13,18 @@ export type {
   Transport,
   TransportSendOptions,
 } from '@modelcontextprotocol/sdk/shared/transport.js';
+// Re-export WebMCP descriptor/schema types used by the browser-native server API.
+export type {
+  InputSchema,
+  InputSchemaProperty,
+  JsonObject,
+  JsonValue,
+  ModelContextClient,
+  ToolDescriptor,
+  ToolExecuteResult,
+  ToolListItem,
+  ToolResponse,
+} from '@mcp-b/webmcp-types';
 // Re-export all commonly used types from official SDK
 export type {
   CallToolRequest,
@@ -95,6 +107,12 @@ export {
 } from './browser-server.js';
 export { NoOpJsonSchemaValidator } from './no-op-validator.js';
 export { PolyfillJsonSchemaValidator } from './polyfill-validator.js';
+export {
+  DEFAULT_INPUT_SCHEMA,
+  toWebMcpInputSchema,
+  toWebMcpJsonSchema,
+  type ToWebMcpJsonSchemaOptions,
+} from './schema.js';
 
 // Sampling type aliases (convenience wrappers around MCP SDK types)
 import type { CreateMessageRequest, CreateMessageResult } from '@modelcontextprotocol/sdk/types.js';

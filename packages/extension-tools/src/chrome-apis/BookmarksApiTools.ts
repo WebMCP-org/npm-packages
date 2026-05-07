@@ -1,7 +1,7 @@
 import type { McpServer } from '@mcp-b/webmcp-ts-sdk';
-import { z } from 'zod';
 
 import { type ApiAvailability, BaseApiTools } from '../BaseApiTools';
+import { BOOKMARK_ACTION_IDS, BOOKMARK_TOOL_CONTRACTS } from '../contracts/bookmarks';
 
 export interface BookmarksApiToolsOptions {
   // Gate specific actions (default to enabled)
@@ -18,23 +18,7 @@ export interface BookmarksApiToolsOptions {
   update?: boolean;
 }
 
-export const BOOKMARK_ACTIONS = [
-  'create',
-  'get',
-  'getChildren',
-  'getRecent',
-  'getSubTree',
-  'getTree',
-  'move',
-  'remove',
-  'removeTree',
-  'search',
-  'update',
-] as const;
-
-type BookmarkAction = (typeof BOOKMARK_ACTIONS)[number];
-
-const bookmarkActionSchema = z.enum(BOOKMARK_ACTIONS);
+export const BOOKMARK_ACTIONS = BOOKMARK_ACTION_IDS;
 
 export class BookmarksApiTools extends BaseApiTools<BookmarksApiToolsOptions> {
   protected apiName = 'Bookmarks';
@@ -82,311 +66,78 @@ export class BookmarksApiTools extends BaseApiTools<BookmarksApiToolsOptions> {
   }
 
   registerTools(): void {
-    // Unified tool: action-based multiplexer
-    this.server.registerTool(
-      'extension_tool_bookmark_operations',
-      {
-        description:
-          'Perform bookmark operations. Choose an action and supply the corresponding parameters.',
-        // Keep top-level schema simple and validate per-action in handler for robust errors
-        inputSchema: {
-          action: bookmarkActionSchema,
-          // Parameters vary by action; validated in handler using specific schemas
-          params: z
-            .record(z.string(), z.any())
-            .optional()
-            .describe('Parameters for the chosen action'),
-        },
-      },
-      async ({ action, params = {} }) => {
-        try {
-          // Gate action by options
-          if (!this.isActionEnabled(action)) {
-            return this.formatError(`Action '${action}' is disabled by configuration`);
-          }
+    if (this.shouldRegisterTool('create')) {
+      this.registerExtensionTool(BOOKMARK_TOOL_CONTRACTS.create, (params) =>
+        this.handleCreate(params)
+      );
+    }
 
-          switch (action as BookmarkAction) {
-            case 'create':
-              return await this.handleCreate(params);
-            case 'get':
-              return await this.handleGet(params);
-            case 'getChildren':
-              return await this.handleGetChildren(params);
-            case 'getRecent':
-              return await this.handleGetRecent(params);
-            case 'getSubTree':
-              return await this.handleGetSubTree(params);
-            case 'getTree':
-              return await this.handleGetTree();
-            case 'move':
-              return await this.handleMove(params);
-            case 'remove':
-              return await this.handleRemove(params);
-            case 'removeTree':
-              return await this.handleRemoveTree(params);
-            case 'search':
-              return await this.handleSearch(params);
-            case 'update':
-              return await this.handleUpdate(params);
-            default:
-              return this.formatError(`Unknown action: ${String(action)}`);
-          }
-        } catch (error) {
-          return this.formatError(error);
-        }
-      }
-    );
+    if (this.shouldRegisterTool('get')) {
+      this.registerExtensionTool(BOOKMARK_TOOL_CONTRACTS.get, (params) => this.handleGet(params));
+    }
 
-    this.server.registerTool(
-      'extension_tool_bookmark_parameters_description',
-      {
-        description:
-          'Get the parameters for extension_tool_bookmark_operations tool and the description for the associated action, this tool should be used first before extension_tool_bookmark_operations',
-        inputSchema: {
-          action: bookmarkActionSchema,
-        },
-      },
-      async ({ action }) => {
-        try {
-          // Gate action by options
-          if (!this.isActionEnabled(action)) {
-            return this.formatError(`Action '${action}' is disabled by configuration`);
-          }
+    if (this.shouldRegisterTool('getChildren')) {
+      this.registerExtensionTool(BOOKMARK_TOOL_CONTRACTS.getChildren, (params) =>
+        this.handleGetChildren(params)
+      );
+    }
 
-          // Build JSON Schema for the params of the requested action so an LLM can construct a valid call
-          const toJson = (schema: z.ZodTypeAny, _name: string) => z.toJSONSchema(schema);
+    if (this.shouldRegisterTool('getRecent')) {
+      this.registerExtensionTool(BOOKMARK_TOOL_CONTRACTS.getRecent, (params) =>
+        this.handleGetRecent(params)
+      );
+    }
 
-          const payloadBase = {
-            tool: 'extension_tool_bookmark_operations',
-            action,
-            note: 'Use the description to double check if the correct action is chosen. Use this JSON Schema for the params field when calling the tool. The top-level tool input is { action, params }.',
-          } as const;
+    if (this.shouldRegisterTool('getSubTree')) {
+      this.registerExtensionTool(BOOKMARK_TOOL_CONTRACTS.getSubTree, (params) =>
+        this.handleGetSubTree(params)
+      );
+    }
 
-          switch (action as BookmarkAction) {
-            case 'create': {
-              const paramsJsonSchema = toJson(this.createSchema, 'BookmarksCreateParams');
-              const example = {
-                title: 'My Site',
-                url: 'https://example.com',
-                parentId: '1',
-              };
-              const paramAndDescription = {
-                params: paramsJsonSchema,
-                description:
-                  'Create a bookmark or folder under the specified parent. A folder must have a title and no url',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramAndDescription,
-                example,
-              });
-            }
-            case 'get': {
-              const paramsJsonSchema = toJson(this.getSchema, 'BookmarksGetParams');
-              const example = { idOrIdList: '123' };
-              const paramAndDescription = {
-                params: paramsJsonSchema,
-                description: 'Retrieve the specified bookmark(s) by ID',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramAndDescription,
-                example,
-              });
-            }
-            case 'getChildren': {
-              const paramsJsonSchema = toJson(this.getChildrenSchema, 'BookmarksGetChildrenParams');
-              const example = { id: '1' };
-              const paramAndDescription = {
-                params: paramsJsonSchema,
-                description: 'Retrieve the children of the specified bookmark folder',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramAndDescription,
-                example,
-              });
-            }
-            case 'getRecent': {
-              const paramsJsonSchema = toJson(this.getRecentSchema, 'BookmarksGetRecentParams');
-              const example = { numberOfItems: 10 };
-              const paramAndDescription = {
-                params: paramsJsonSchema,
-                description: 'Retrieve the recently added bookmarks',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramAndDescription,
-                example,
-              });
-            }
-            case 'getSubTree': {
-              const paramsJsonSchema = toJson(this.getSubTreeSchema, 'BookmarksGetSubTreeParams');
-              const example = { id: '1' };
-              const paramAndDescription = {
-                params: paramsJsonSchema,
-                description:
-                  'Retrieve part of the bookmarks hierarchy, starting at the specified node',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramAndDescription,
-                example,
-              });
-            }
-            case 'getTree': {
-              // No params required
-              const paramsJsonSchema = {
-                type: 'object',
-                properties: {},
-                additionalProperties: false,
-              } as const;
-              const example = {};
-              const paramAndDescription = {
-                params: paramsJsonSchema,
-                description: 'Retrieve the entire bookmarks hierarchy',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramAndDescription,
-                example,
-              });
-            }
-            case 'move': {
-              const paramsJsonSchema = toJson(this.moveSchema, 'BookmarksMoveParams');
-              const example = { id: '123', parentId: '1', index: 0 };
-              const paramAndDescription = {
-                params: paramsJsonSchema,
-                description: 'Move the specified bookmark or folder to a new location',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramAndDescription,
-                example,
-              });
-            }
-            case 'remove': {
-              const paramsJsonSchema = toJson(this.removeSchema, 'BookmarksRemoveParams');
-              const example = { id: '123' };
-              const paramAndDescription = {
-                params: paramsJsonSchema,
-                description: 'Remove the specified bookmark or empty folder',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramAndDescription,
-                example,
-              });
-            }
-            case 'removeTree': {
-              const paramsJsonSchema = toJson(this.removeTreeSchema, 'BookmarksRemoveTreeParams');
-              const example = { id: '1' };
-              const paramAndDescription = {
-                params: paramsJsonSchema,
-                description: 'Recursively remove a bookmark folder and all its contents',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramAndDescription,
-                example,
-              });
-            }
-            case 'search': {
-              const paramsJsonSchema = toJson(this.searchSchema, 'BookmarksSearchParams');
-              const example = { query: 'recipes' };
-              const paramsAndDescription = {
-                params: paramsJsonSchema,
-                description: 'Search for bookmarks matching the given query',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-                example,
-              });
-            }
-            case 'update': {
-              const paramsJsonSchema = toJson(this.updateSchema, 'BookmarksUpdateParams');
-              const example = { id: '123', title: 'New title' };
-              const paramsAndDescription = {
-                params: paramsJsonSchema,
-                description:
-                  'Update the properties of a bookmark or folder. Only title and url can be changed',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-                example,
-              });
-            }
-            default:
-              return this.formatError(`Unknown action: ${String(action)}`);
-          }
-        } catch (error) {
-          return this.formatError(error);
-        }
-      }
-    );
+    if (this.shouldRegisterTool('getTree')) {
+      this.registerExtensionTool(BOOKMARK_TOOL_CONTRACTS.getTree, () => this.handleGetTree());
+    }
+
+    if (this.shouldRegisterTool('move')) {
+      this.registerExtensionTool(BOOKMARK_TOOL_CONTRACTS.move, (params) => this.handleMove(params));
+    }
+
+    if (this.shouldRegisterTool('remove')) {
+      this.registerExtensionTool(BOOKMARK_TOOL_CONTRACTS.remove, (params) =>
+        this.handleRemove(params)
+      );
+    }
+
+    if (this.shouldRegisterTool('removeTree')) {
+      this.registerExtensionTool(BOOKMARK_TOOL_CONTRACTS.removeTree, (params) =>
+        this.handleRemoveTree(params)
+      );
+    }
+
+    if (this.shouldRegisterTool('search')) {
+      this.registerExtensionTool(BOOKMARK_TOOL_CONTRACTS.search, (params) =>
+        this.handleSearch(params)
+      );
+    }
+
+    if (this.shouldRegisterTool('update')) {
+      this.registerExtensionTool(BOOKMARK_TOOL_CONTRACTS.update, (params) =>
+        this.handleUpdate(params)
+      );
+    }
   }
 
   // ===== Validation Schemas per action =====
-  private createSchema = z.object({
-    parentId: z
-      .string()
-      .optional()
-      .describe('Parent folder ID. Defaults to the Other Bookmarks folder'),
-    title: z.string().optional().describe('The title of the bookmark or folder'),
-    url: z.string().optional().describe('The URL for the bookmark. Omit for folders'),
-    index: z.number().optional().describe('The position within the parent folder'),
-  });
-
-  private getSchema = z.object({
-    idOrIdList: z
-      .union([z.string(), z.array(z.string())])
-      .describe('A single bookmark ID or array of bookmark IDs'),
-  });
-
-  private getChildrenSchema = z.object({
-    id: z.string().describe('The ID of the folder to get children from'),
-  });
-
-  private getRecentSchema = z.object({
-    numberOfItems: z.number().min(1).describe('The maximum number of items to return'),
-  });
-
-  private getSubTreeSchema = z.object({
-    id: z.string().describe('The ID of the root of the subtree to retrieve'),
-  });
-
-  private moveSchema = z.object({
-    id: z.string().describe('The ID of the bookmark or folder to move'),
-    parentId: z.string().optional().describe('The new parent folder ID'),
-    index: z.number().optional().describe('The new position within the parent folder'),
-  });
-
-  private removeSchema = z.object({
-    id: z.string().describe('The ID of the bookmark or empty folder to remove'),
-  });
-
-  private removeTreeSchema = z.object({
-    id: z.string().describe('The ID of the folder to remove recursively'),
-  });
-
-  private searchSchema = z.object({
-    query: z.union([
-      z.string(),
-      z.object({
-        query: z.string().optional().describe('Words and phrases to match against URLs and titles'),
-        url: z.string().optional().describe('URL to match exactly'),
-        title: z.string().optional().describe('Title to match exactly'),
-      }),
-    ]),
-  });
-
-  private updateSchema = z.object({
-    id: z.string().describe('The ID of the bookmark or folder to update'),
-    title: z.string().optional().describe('The new title'),
-    url: z.string().optional().describe('The new URL (bookmarks only)'),
-  });
+  private createSchema = BOOKMARK_TOOL_CONTRACTS.create.zodInputSchema;
+  private getSchema = BOOKMARK_TOOL_CONTRACTS.get.zodInputSchema;
+  private getChildrenSchema = BOOKMARK_TOOL_CONTRACTS.getChildren.zodInputSchema;
+  private getRecentSchema = BOOKMARK_TOOL_CONTRACTS.getRecent.zodInputSchema;
+  private getSubTreeSchema = BOOKMARK_TOOL_CONTRACTS.getSubTree.zodInputSchema;
+  private moveSchema = BOOKMARK_TOOL_CONTRACTS.move.zodInputSchema;
+  private removeSchema = BOOKMARK_TOOL_CONTRACTS.remove.zodInputSchema;
+  private removeTreeSchema = BOOKMARK_TOOL_CONTRACTS.removeTree.zodInputSchema;
+  private searchSchema = BOOKMARK_TOOL_CONTRACTS.search.zodInputSchema;
+  private updateSchema = BOOKMARK_TOOL_CONTRACTS.update.zodInputSchema;
 
   // ===== Action handlers =====
   private async handleCreate(raw: unknown) {
@@ -649,26 +400,5 @@ export class BookmarksApiTools extends BaseApiTools<BookmarksApiToolsOptions> {
       type: result.url ? 'bookmark' : 'folder',
       changes,
     });
-  }
-
-  // ===== Helpers =====
-  private isActionEnabled(action: BookmarkAction): boolean {
-    // By default, all actions are enabled unless explicitly set to false in options
-    const map: Record<BookmarkAction, keyof BookmarksApiToolsOptions> = {
-      create: 'create',
-      get: 'get',
-      getChildren: 'getChildren',
-      getRecent: 'getRecent',
-      getSubTree: 'getSubTree',
-      getTree: 'getTree',
-      move: 'move',
-      remove: 'remove',
-      removeTree: 'removeTree',
-      search: 'search',
-      update: 'update',
-    };
-    const key = map[action];
-    const optVal = (this.options as BookmarksApiToolsOptions)[key];
-    return optVal !== false;
   }
 }

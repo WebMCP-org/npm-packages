@@ -48,6 +48,7 @@ async function bootstrap() {
     registerDynamicTool: () => sendControlMessage('registerDynamicTool') as Promise<boolean>,
     unregisterDynamicTool: (name?: string) =>
       sendControlMessage('unregisterDynamicTool', name) as Promise<boolean>,
+    registerDirectApiTools: () => sendControlMessage('registerDirectApiTools') as Promise<boolean>,
     readInvocations: () =>
       sendControlMessage('readInvocations') as Promise<
         Array<{ name: string; arguments: Record<string, unknown> }>
@@ -79,6 +80,7 @@ declare global {
       isReady: () => boolean;
       registerDynamicTool: () => Promise<boolean>;
       unregisterDynamicTool: (name?: string) => Promise<boolean>;
+      registerDirectApiTools: () => Promise<boolean>;
       readInvocations: () => Promise<Array<{ name: string; arguments: Record<string, unknown> }>>;
       resetInvocations: () => Promise<void>;
     };

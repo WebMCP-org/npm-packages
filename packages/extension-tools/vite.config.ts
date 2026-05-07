@@ -3,7 +3,16 @@ import { defineConfig } from 'vite-plus';
 
 const mainConfig: Options = {
   name: 'main',
-  entry: ['src/index.ts'],
+  entry: [
+    'src/index.ts',
+    'src/contracts/index.ts',
+    'src/contracts/bookmarks.ts',
+    'src/contracts/history.ts',
+    'src/contracts/storage.ts',
+    'src/contracts/tab-groups.ts',
+    'src/contracts/tabs.ts',
+    'src/contracts/windows.ts',
+  ],
   format: ['esm'],
   dts: true,
   splitting: false,

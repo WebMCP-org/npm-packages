@@ -18,10 +18,8 @@ import type { ServerOptions } from '@modelcontextprotocol/sdk/server/index.js';
 import { McpServer as BaseMcpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {
   getParseErrorMessage,
-  normalizeObjectSchema,
   safeParseAsync,
 } from '@modelcontextprotocol/sdk/server/zod-compat.js';
-import { toJsonSchemaCompat } from '@modelcontextprotocol/sdk/server/zod-json-schema-compat.js';
 import type { RequestOptions } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import { mergeCapabilities } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
@@ -39,8 +37,8 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { PolyfillJsonSchemaValidator } from './polyfill-validator.js';
+import { DEFAULT_INPUT_SCHEMA, toWebMcpJsonSchema } from './schema.js';
 
-const DEFAULT_INPUT_SCHEMA: InputSchema = { type: 'object', properties: {} };
 const DEFAULT_CLIENT_REQUEST_TIMEOUT = 10_000;
 
 export const SERVER_MARKER_PROPERTY = '__isBrowserMcpServer' as const;
@@ -291,44 +289,16 @@ export class BrowserMcpServer extends BaseMcpServer {
       ._registeredPrompts;
   }
 
-  /**
-   * Converts a schema (Zod or plain JSON Schema) to a transport-ready JSON Schema.
-   * When `requireObjectType` is true (the default, for inputSchema), empty `{}` schemas
-   * are normalized to `{ type: "object", properties: {} }` and schemas missing a root
-   * `type` get `type: "object"` prepended — per MCP spec requirements.
-   * When false (for outputSchema), no object-type normalization is applied.
-   */
   private toTransportSchema(schema: unknown, requireObjectType = true): InputSchema {
     if (!schema || typeof schema !== 'object') {
       if (requireObjectType) {
         console.warn(
           `[BrowserMcpServer] toTransportSchema received non-object schema (${typeof schema}), using default`
         );
-        return DEFAULT_INPUT_SCHEMA;
       }
-      return {} as InputSchema;
     }
 
-    const normalized = normalizeObjectSchema(schema as Parameters<typeof normalizeObjectSchema>[0]);
-    const jsonSchema = normalized
-      ? (toJsonSchemaCompat(normalized, {
-          strictUnions: true,
-          pipeStrategy: 'input',
-        }) as unknown as Record<string, unknown>)
-      : (schema as Record<string, unknown>);
-
-    if (Object.keys(jsonSchema).length === 0) {
-      if (requireObjectType) {
-        return DEFAULT_INPUT_SCHEMA;
-      }
-      return jsonSchema as InputSchema;
-    }
-
-    if (requireObjectType && jsonSchema.type === undefined) {
-      return { type: 'object', ...jsonSchema } as InputSchema;
-    }
-
-    return jsonSchema as InputSchema;
+    return toWebMcpJsonSchema(schema, { requireObjectType });
   }
 
   private isZodSchema(schema: unknown): boolean {

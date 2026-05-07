@@ -1,7 +1,7 @@
 import type { McpServer } from '@mcp-b/webmcp-ts-sdk';
-import { z } from 'zod';
 
 import { type ApiAvailability, BaseApiTools } from '../BaseApiTools';
+import { TAB_GROUP_ACTION_IDS, TAB_GROUP_TOOL_CONTRACTS } from '../contracts/tab-groups';
 
 export interface TabGroupsApiToolsOptions {
   get?: boolean;
@@ -10,11 +10,7 @@ export interface TabGroupsApiToolsOptions {
   move?: boolean;
 }
 
-export const TAB_GROUP_ACTIONS = ['get', 'query', 'update', 'move'] as const;
-
-type TabGroupAction = (typeof TAB_GROUP_ACTIONS)[number];
-
-const tabGroupSchema = z.enum(TAB_GROUP_ACTIONS);
+export const TAB_GROUP_ACTIONS = TAB_GROUP_ACTION_IDS;
 
 export class TabGroupsApiTools extends BaseApiTools<TabGroupsApiToolsOptions> {
   protected apiName = 'TabGroups';
@@ -66,114 +62,29 @@ export class TabGroupsApiTools extends BaseApiTools<TabGroupsApiToolsOptions> {
   }
 
   registerTools(): void {
-    this.server.registerTool(
-      'extension_tool_tab_group_operations',
-      {
-        description: 'Perform operations on tab groups using Chrome TabGroups API',
-        inputSchema: {
-          action: tabGroupSchema,
-          params: z
-            .record(z.string(), z.any())
-            .optional()
-            .describe('Parameters for the chosen action'),
-        },
-      },
-      async ({ action, params = {} }) => {
-        try {
-          if (!this.shouldRegisterTool(action)) {
-            return this.formatError(new Error(`Action "${action}" is not supported`));
-          }
+    if (this.shouldRegisterTool('get')) {
+      this.registerExtensionTool(TAB_GROUP_TOOL_CONTRACTS.get, (params) =>
+        this.handleGetTabGroup(params)
+      );
+    }
 
-          switch (action as TabGroupAction) {
-            case 'get':
-              return await this.handleGetTabGroup(params);
-            case 'query':
-              return await this.handleQueryTabGroups(params);
-            case 'update':
-              return await this.handleUpdateTabGroup(params);
-            case 'move':
-              return await this.handleMoveTabGroup(params);
-            default:
-              return this.formatError(new Error(`Action "${action}" is not supported`));
-          }
-        } catch (error) {
-          return this.formatError(error);
-        }
-      }
-    );
+    if (this.shouldRegisterTool('query')) {
+      this.registerExtensionTool(TAB_GROUP_TOOL_CONTRACTS.query, (params) =>
+        this.handleQueryTabGroups(params)
+      );
+    }
 
-    this.server.registerTool(
-      'extension_tool_tab_group_parameters_description',
-      {
-        description:
-          'Get the parameters for extension_tool_tab_group_operations tool and the description for the associated action, this tool should be used first before extension_tool_tab_group_operations',
-        inputSchema: {
-          action: tabGroupSchema,
-        },
-      },
+    if (this.shouldRegisterTool('update')) {
+      this.registerExtensionTool(TAB_GROUP_TOOL_CONTRACTS.update, (params) =>
+        this.handleUpdateTabGroup(params)
+      );
+    }
 
-      async ({ action }) => {
-        try {
-          if (!this.shouldRegisterTool(action)) {
-            return this.formatError(new Error(`Action "${action}" is not supported`));
-          }
-          const toJson = (schema: z.ZodTypeAny, _name: string) => z.toJSONSchema(schema);
-
-          const payloadBase = {
-            tool: 'extension_tool_tab_group_operations',
-            action,
-            note: 'Use the description to double check if the correct action is chosen. Use this JSON Schema for the params field when calling the tool. The top-level tool input is { action, params }.',
-          } as const;
-
-          switch (action as TabGroupAction) {
-            case 'get': {
-              const paramsAndDescription = {
-                params: toJson(this.getSchema, 'GetTabGroupParams'),
-                description: 'Retrieve a tab group by its ID',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'query': {
-              const paramsAndDescription = {
-                params: toJson(this.querySchema, 'QueryTabGroupsParams'),
-                description: 'Search for tab groups that match specified criteria',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'update': {
-              const paramsAndDescription = {
-                params: toJson(this.updateSchema, 'UpdateTabGroupParams'),
-                description: 'Modify properties of a tab group',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'move': {
-              const paramsAndDescription = {
-                params: toJson(this.moveSchema, 'MoveTabGroupParams'),
-                description: 'Move a tab group within its window or to a new window',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            default:
-              return this.formatError(new Error(`Action "${action}" is not supported`));
-          }
-        } catch (error) {
-          return this.formatError(error);
-        }
-      }
-    );
+    if (this.shouldRegisterTool('move')) {
+      this.registerExtensionTool(TAB_GROUP_TOOL_CONTRACTS.move, (params) =>
+        this.handleMoveTabGroup(params)
+      );
+    }
   }
 
   // ===== Action handlers =====
@@ -310,40 +221,8 @@ export class TabGroupsApiTools extends BaseApiTools<TabGroupsApiToolsOptions> {
   }
 
   // ===== Validation Schemas per action =====
-  private getSchema = z.object({
-    groupId: z.number().describe('The ID of the tab group to retrieve'),
-  });
-
-  private querySchema = z.object({
-    collapsed: z.boolean().optional().describe('Whether the groups are collapsed'),
-    color: z
-      .enum(['grey', 'blue', 'red', 'yellow', 'green', 'pink', 'purple', 'cyan', 'orange'])
-      .optional()
-      .describe('The color of the groups'),
-    shared: z.boolean().optional().describe('Whether the group is shared (Chrome 137+)'),
-    title: z.string().optional().describe('Pattern to match group titles against'),
-    windowId: z
-      .number()
-      .optional()
-      .describe('The ID of the parent window, or use -2 for the current window'),
-  });
-
-  private updateSchema = z.object({
-    groupId: z.number().describe('The ID of the group to modify'),
-    collapsed: z.boolean().optional().describe('Whether the group should be collapsed'),
-    color: z
-      .enum(['grey', 'blue', 'red', 'yellow', 'green', 'pink', 'purple', 'cyan', 'orange'])
-      .optional()
-      .describe('The color of the group'),
-    title: z.string().optional().describe('The title of the group'),
-  });
-
-  private moveSchema = z.object({
-    groupId: z.number().describe('The ID of the group to move'),
-    index: z.number().describe('The position to move the group to. Use -1 to place at the end'),
-    windowId: z
-      .number()
-      .optional()
-      .describe('The window to move the group to. Defaults to current window'),
-  });
+  private getSchema = TAB_GROUP_TOOL_CONTRACTS.get.zodInputSchema;
+  private querySchema = TAB_GROUP_TOOL_CONTRACTS.query.zodInputSchema;
+  private updateSchema = TAB_GROUP_TOOL_CONTRACTS.update.zodInputSchema;
+  private moveSchema = TAB_GROUP_TOOL_CONTRACTS.move.zodInputSchema;
 }

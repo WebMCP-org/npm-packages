@@ -3,6 +3,8 @@
 import { installServerRuntimeContract } from '../../../../e2e/runtime-contract/server-contract.js';
 import { ExtensionServerTransport } from '../../../transports/src/index.ts';
 import { McpServer } from '../../../webmcp-ts-sdk/src/index.ts';
+import { StorageApiTools } from '../../src/chrome-apis/StorageApiTools.ts';
+import { TabsApiTools, type TabsApiToolsOptions } from '../../src/chrome-apis/TabsApiTools.ts';
 
 const debugState = {
   events: [] as string[],
@@ -20,6 +22,31 @@ recordDebugEvent('background:loaded');
 let server: McpServer | null = null;
 let runtimeContract: ReturnType<typeof installServerRuntimeContract> | null = null;
 let startupError: string | null = null;
+let directApiToolsRegistered = false;
+
+const TAB_CONFORMANCE_TOOLS: TabsApiToolsOptions = {
+  listActiveTabs: false,
+  createTab: true,
+  updateTab: false,
+  closeTabs: true,
+  getAllTabs: true,
+  navigateHistory: false,
+  reloadTab: false,
+  captureVisibleTab: false,
+  detectLanguage: false,
+  discardTab: false,
+  duplicateTab: false,
+  getTab: false,
+  getZoom: false,
+  getZoomSettings: false,
+  setZoom: false,
+  setZoomSettings: false,
+  groupTabs: false,
+  ungroupTabs: false,
+  highlightTabs: false,
+  moveTabs: false,
+  sendMessage: false,
+};
 
 try {
   server = new McpServer({
@@ -54,6 +81,16 @@ async function handleControlMessage(message: { action?: string; name?: string })
       return { ok: true, value: runtimeContract.readInvocations() };
     case 'resetInvocations':
       runtimeContract.resetInvocations();
+      return { ok: true, value: true };
+    case 'registerDirectApiTools':
+      if (!server) {
+        return { ok: false, error: 'MCP server is not available' };
+      }
+      if (!directApiToolsRegistered) {
+        new StorageApiTools(server).register();
+        new TabsApiTools(server, TAB_CONFORMANCE_TOOLS).register();
+        directApiToolsRegistered = true;
+      }
       return { ok: true, value: true };
     default:
       return { ok: false, error: `Unknown control action: ${String(message.action)}` };

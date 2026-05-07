@@ -48,6 +48,7 @@
     "README.md"
   ],
   "type": "module",
+  "sideEffects": false,
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -55,6 +56,34 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./contracts": {
+      "types": "./dist/contracts/index.d.ts",
+      "import": "./dist/contracts/index.js"
+    },
+    "./contracts/bookmarks": {
+      "types": "./dist/contracts/bookmarks.d.ts",
+      "import": "./dist/contracts/bookmarks.js"
+    },
+    "./contracts/history": {
+      "types": "./dist/contracts/history.d.ts",
+      "import": "./dist/contracts/history.js"
+    },
+    "./contracts/storage": {
+      "types": "./dist/contracts/storage.d.ts",
+      "import": "./dist/contracts/storage.js"
+    },
+    "./contracts/tab-groups": {
+      "types": "./dist/contracts/tab-groups.d.ts",
+      "import": "./dist/contracts/tab-groups.js"
+    },
+    "./contracts/tabs": {
+      "types": "./dist/contracts/tabs.d.ts",
+      "import": "./dist/contracts/tabs.js"
+    },
+    "./contracts/windows": {
+      "types": "./dist/contracts/windows.d.ts",
+      "import": "./dist/contracts/windows.js"
     }
   },
   "publishConfig": {
@@ -71,8 +100,9 @@
     "prepublishOnly": "node ../../scripts/validate-publish.js && pnpm run build",
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
+    "test": "pnpm --filter @mcp-b/webmcp-ts-sdk build && vp test run src/contracts.test.ts src/direct-action-tools.test.ts",
     "test:e2e": "pnpm --filter @mcp-b/transports build && pnpm --filter @mcp-b/webmcp-ts-sdk build && vp pack --filter e2e-extension && node e2e/build-extension.mjs && node --experimental-strip-types --test e2e/extension-runtime.e2e.test.ts",
-    "typecheck": "tsc -p tsconfig.typecheck.json --noEmit",
+    "typecheck": "pnpm --filter @mcp-b/webmcp-types build && pnpm --filter @mcp-b/webmcp-ts-sdk build && tsc -p tsconfig.typecheck.json --noEmit",
     "version:major": "pnpm version major --no-git-tag-version",
     "version:minor": "pnpm version minor --no-git-tag-version",
     "version:patch": "pnpm version patch --no-git-tag-version"

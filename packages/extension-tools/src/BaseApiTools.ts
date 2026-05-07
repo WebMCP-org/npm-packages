@@ -1,4 +1,6 @@
-import type { CallToolResult, McpServer } from '@mcp-b/webmcp-ts-sdk';
+import type { CallToolResult, McpServer, ToolDescriptor } from '@mcp-b/webmcp-ts-sdk';
+
+import type { ExtensionToolContract } from './contracts/core';
 
 export interface ApiAvailability {
   available: boolean;
@@ -22,6 +24,88 @@ export abstract class BaseApiTools<TOptions = Record<string, unknown>> {
       return false;
     }
     return true;
+  }
+
+  protected registerExtensionTool(
+    contract: ExtensionToolContract,
+    handler: (args: Record<string, unknown>) => CallToolResult | Promise<CallToolResult>
+  ): void {
+    const tool: ToolDescriptor<Record<string, unknown>, CallToolResult> = {
+      name: contract.name,
+      description: contract.description,
+      inputSchema: contract.inputSchema,
+      // Contract exports keep outputSchema. Browser registration omits it until extension-page
+      // clients can validate output schemas without Ajv's CSP-blocked code generation.
+      annotations: {
+        title: contract.title,
+        readOnlyHint: contract.annotations.readOnlyHint === true,
+        destructiveHint: contract.annotations.destructiveHint === true,
+        idempotentHint: contract.annotations.idempotentHint === true,
+        openWorldHint: contract.annotations.openWorldHint === true,
+      },
+      execute: async (args: Record<string, unknown>) => {
+        try {
+          return this.attachStructuredContent(contract, await handler(args));
+        } catch (error) {
+          return this.formatError(error);
+        }
+      },
+    };
+
+    this.server.registerTool({
+      ...tool,
+    });
+  }
+
+  private attachStructuredContent(
+    contract: ExtensionToolContract,
+    result: CallToolResult
+  ): CallToolResult {
+    if (!contract.outputSchema || result.isError || result.structuredContent !== undefined) {
+      return result;
+    }
+
+    const textContent = result.content.find((content) => content.type === 'text');
+    if (!textContent) {
+      return result;
+    }
+
+    const structuredContent = this.parseStructuredContent(textContent.text);
+    if (!structuredContent) {
+      return result;
+    }
+
+    return {
+      ...result,
+      structuredContent,
+    };
+  }
+
+  private parseStructuredContent(text: string): Record<string, unknown> | undefined {
+    const fullTextContent = this.parseJsonObject(text);
+    if (fullTextContent) {
+      return fullTextContent;
+    }
+
+    const firstNewlineIndex = text.indexOf('\n');
+    if (firstNewlineIndex === -1) {
+      return undefined;
+    }
+
+    return this.parseJsonObject(text.slice(firstNewlineIndex + 1));
+  }
+
+  private parseJsonObject(text: string): Record<string, unknown> | undefined {
+    try {
+      const parsed = JSON.parse(text) as unknown;
+      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      return undefined;
+    }
+
+    return undefined;
   }
 
   protected formatError(error: unknown): CallToolResult {
