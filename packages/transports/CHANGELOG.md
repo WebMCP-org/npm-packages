@@ -1,5 +1,19 @@
 # @mcp-b/transports
 
+## 2.3.1
+
+### Patch Changes
+
+- @mcp-b/webmcp-ts-sdk@2.3.1
+
+## 2.3.0
+
+### Patch Changes
+
+- Updated dependencies
+- Updated dependencies [9289d98]
+  - @mcp-b/webmcp-ts-sdk@2.3.0
+
 ## 2.2.0
 
 ### Patch Changes

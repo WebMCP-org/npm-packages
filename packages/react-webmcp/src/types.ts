@@ -34,6 +34,17 @@ export type ReactWebMCPInputSchema = ToolInputSchema | ZodSchemaObject;
  * - `ZodSchemaObject` (Zod v3 `Record<string, z.ZodTypeAny>`, converted at runtime)
  */
 export type ReactWebMCPOutputSchema = JsonSchemaForInference | ZodSchemaObject;
+export interface ReactWebMCPStandardOutputSchema<TInput = unknown, TOutput = unknown> {
+  readonly '~standard': {
+    readonly types?: {
+      readonly input: TInput;
+      readonly output: TOutput;
+    };
+  };
+}
+export type ReactWebMCPSupportedOutputSchema =
+  | ReactWebMCPOutputSchema
+  | ReactWebMCPStandardOutputSchema;
 
 /**
  * Infers handler input type from a Standard Schema, Zod v3 schema, or JSON Schema.
@@ -47,14 +58,15 @@ export type ReactWebMCPOutputSchema = JsonSchemaForInference | ZodSchemaObject;
  * @internal
  */
 export type InferToolInput<T> =
-  // Standard Schema v1 (Zod v4, Valibot, ArkType)
-  T extends { readonly '~standard': { readonly types?: infer Types } }
-    ? Types extends { readonly input: infer I }
-      ? I
-      : Record<string, unknown>
-    : // Zod v3 schema object
-      T extends Record<string, z.ZodTypeAny>
-      ? z.infer<z.ZodObject<T>>
+  // Zod v3 schema object. Check this before Standard Schema because newer Zod
+  // versions also expose `~standard` metadata.
+  T extends Record<string, z.ZodTypeAny>
+    ? z.infer<z.ZodObject<T>>
+    : // Standard Schema v1 (Zod v4, Valibot, ArkType)
+      T extends { readonly '~standard': { readonly types?: infer Types } }
+      ? NonNullable<Types> extends { readonly input: infer I }
+        ? I
+        : Record<string, unknown>
       : // JSON Schema
         T extends InputSchema
         ? InferArgsFromInputSchema<T>
@@ -72,16 +84,20 @@ export type InferToolInput<T> =
  * @internal
  */
 export type InferOutput<
-  TOutputSchema extends ReactWebMCPOutputSchema | undefined = undefined,
+  TOutputSchema extends ReactWebMCPSupportedOutputSchema | undefined = undefined,
   TFallback = unknown,
 > = TOutputSchema extends undefined
   ? TFallback
-  : TOutputSchema extends Record<string, z.ZodTypeAny> // Zod v3 schema object
-    ? z.infer<z.ZodObject<TOutputSchema>>
-    : // JSON Schema
-      TOutputSchema extends JsonSchemaForInference
-      ? InferJsonSchema<TOutputSchema>
-      : TFallback;
+  : TOutputSchema extends { readonly '~standard': { readonly types?: infer Types } }
+    ? NonNullable<Types> extends { readonly output: infer O }
+      ? O
+      : TFallback
+    : TOutputSchema extends Record<string, z.ZodTypeAny> // Zod v3 schema object
+      ? z.infer<z.ZodObject<TOutputSchema>>
+      : // JSON Schema
+        TOutputSchema extends JsonSchemaForInference
+        ? InferJsonSchema<TOutputSchema>
+        : TFallback;
 
 /**
  * Represents the current execution state of a tool, including loading status,
@@ -170,7 +186,7 @@ export interface ToolExecutionState<TOutput = unknown> {
  */
 export interface WebMCPConfig<
   TInputSchema extends ReactWebMCPInputSchema = InputSchema,
-  TOutputSchema extends ReactWebMCPOutputSchema | undefined = undefined,
+  TOutputSchema extends ReactWebMCPSupportedOutputSchema | undefined = undefined,
 > {
   /**
    * Unique identifier for the tool (e.g., 'posts_like', 'graph_navigate').
@@ -286,7 +302,7 @@ export interface WebMCPConfig<
  * @public
  */
 export interface WebMCPReturn<
-  TOutputSchema extends ReactWebMCPOutputSchema | undefined = undefined,
+  TOutputSchema extends ReactWebMCPSupportedOutputSchema | undefined = undefined,
   TInputSchema extends ReactWebMCPInputSchema = InputSchema,
 > {
   /**

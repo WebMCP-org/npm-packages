@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/webmcp-types",
-  "version": "2.2.0",
+  "version": "2.3.1",
   "description": "Strict TypeScript type definitions for the WebMCP core API (navigator.modelContext)",
   "keywords": [
     "model-context",
@@ -43,7 +43,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "check": "vp check --fix",
     "clean": "rm -rf dist",
     "format": "vp fmt --write",
