@@ -563,16 +563,14 @@ describe('pages', () => {
     it('reload with accpeting the beforeunload dialog', async () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
-        await page.setContent(
-          html`
+        await page.setContent(html`
             <script>
               window.addEventListener('beforeunload', (e) => {
                 e.preventDefault();
                 e.returnValue = '';
               });
             </script>
-          `
-        );
+          `);
 
         await navigatePage.handler(
           { params: { type: 'reload' }, page: context.getSelectedMcpPage() },
@@ -592,16 +590,14 @@ describe('pages', () => {
     it('reload with declining the beforeunload dialog', async () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
-        await page.setContent(
-          html`
+        await page.setContent(html`
             <script>
               window.addEventListener('beforeunload', (e) => {
                 e.preventDefault();
                 e.returnValue = '';
               });
             </script>
-          `
-        );
+          `);
 
         await navigatePage.handler(
           {

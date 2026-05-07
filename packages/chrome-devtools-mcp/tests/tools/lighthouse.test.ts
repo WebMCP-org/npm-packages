@@ -18,12 +18,7 @@ describe('lighthouse', () => {
   const server = serverHooks();
   describe('lighthouse_audit', () => {
     it('runs Lighthouse audit by default (navigation, desktop)', async () => {
-      server.addHtmlRoute(
-        '/test',
-        html`
-          <div>Test</div>
-        `
-      );
+      server.addHtmlRoute('/test', html` <div>Test</div> `);
 
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
@@ -58,12 +53,7 @@ describe('lighthouse', () => {
     });
 
     it('restores emulation', async () => {
-      server.addHtmlRoute(
-        '/test-mobile',
-        html`
-          <div>Test Mobile</div>
-        `
-      );
+      server.addHtmlRoute('/test-mobile', html` <div>Test Mobile</div> `);
 
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
@@ -128,12 +118,7 @@ describe('lighthouse', () => {
     });
 
     it('runs Lighthouse in snapshot mode with mobile device', async () => {
-      server.addHtmlRoute(
-        '/test-mobile',
-        html`
-          <div>Test Mobile</div>
-        `
-      );
+      server.addHtmlRoute('/test-mobile', html` <div>Test Mobile</div> `);
 
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
@@ -161,12 +146,7 @@ describe('lighthouse', () => {
     });
 
     it('runs Lighthouse with custom output dir', async () => {
-      server.addHtmlRoute(
-        '/test-mobile',
-        html`
-          <div>Test Mobile</div>
-        `
-      );
+      server.addHtmlRoute('/test-mobile', html` <div>Test Mobile</div> `);
 
       const tmpDir = os.tmpdir();
       const folderPath = path.join(tmpDir, `temp-folder-${crypto.randomUUID()}`);

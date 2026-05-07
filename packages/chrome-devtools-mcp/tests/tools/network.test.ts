@@ -27,24 +27,9 @@ describe('network', () => {
     });
 
     it('list requests form current navigations only', async (t) => {
-      server.addHtmlRoute(
-        '/one',
-        html`
-          <main>First</main>
-        `
-      );
-      server.addHtmlRoute(
-        '/two',
-        html`
-          <main>Second</main>
-        `
-      );
-      server.addHtmlRoute(
-        '/three',
-        html`
-          <main>Third</main>
-        `
-      );
+      server.addHtmlRoute('/one', html` <main>First</main> `);
+      server.addHtmlRoute('/two', html` <main>Second</main> `);
+      server.addHtmlRoute('/three', html` <main>Third</main> `);
 
       await withMcpContext(async (response, context) => {
         await context.setUpNetworkCollectorForTesting();
@@ -67,24 +52,9 @@ describe('network', () => {
     });
 
     it('list requests from previous navigations', async (t) => {
-      server.addHtmlRoute(
-        '/one',
-        html`
-          <main>First</main>
-        `
-      );
-      server.addHtmlRoute(
-        '/two',
-        html`
-          <main>Second</main>
-        `
-      );
-      server.addHtmlRoute(
-        '/three',
-        html`
-          <main>Third</main>
-        `
-      );
+      server.addHtmlRoute('/one', html` <main>First</main> `);
+      server.addHtmlRoute('/two', html` <main>Second</main> `);
+      server.addHtmlRoute('/three', html` <main>Third</main> `);
 
       await withMcpContext(async (response, context) => {
         await context.setUpNetworkCollectorForTesting();
@@ -124,12 +94,7 @@ describe('network', () => {
         `
       );
 
-      server.addHtmlRoute(
-        '/redirected-page',
-        html`
-          <main>I was redirected 2 times</main>
-        `
-      );
+      server.addHtmlRoute('/redirected-page', html` <main>I was redirected 2 times</main> `);
 
       await withMcpContext(async (response, context) => {
         await context.setUpNetworkCollectorForTesting();
@@ -179,24 +144,9 @@ describe('network', () => {
       });
     });
     it('should get request from previous navigations', async (t) => {
-      server.addHtmlRoute(
-        '/one',
-        html`
-          <main>First</main>
-        `
-      );
-      server.addHtmlRoute(
-        '/two',
-        html`
-          <main>Second</main>
-        `
-      );
-      server.addHtmlRoute(
-        '/three',
-        html`
-          <main>Third</main>
-        `
-      );
+      server.addHtmlRoute('/one', html` <main>First</main> `);
+      server.addHtmlRoute('/two', html` <main>Second</main> `);
+      server.addHtmlRoute('/three', html` <main>Third</main> `);
 
       await withMcpContext(async (response, context) => {
         await context.setUpNetworkCollectorForTesting();

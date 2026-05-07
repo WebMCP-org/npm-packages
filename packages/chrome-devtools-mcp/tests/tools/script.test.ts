@@ -71,11 +71,7 @@ describe('script', () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
 
-        await page.setContent(
-          html`
-            <script src="./scripts.js"></script>
-          `
-        );
+        await page.setContent(html` <script src="./scripts.js"></script> `);
 
         await evaluateScript().handler(
           {
@@ -105,11 +101,7 @@ describe('script', () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
 
-        await page.setContent(
-          html`
-            <script src="./scripts.js"></script>
-          `
-        );
+        await page.setContent(html` <script src="./scripts.js"></script> `);
 
         await evaluateScript().handler(
           {
@@ -132,11 +124,7 @@ describe('script', () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
 
-        await page.setContent(
-          html`
-            <button id="test">test</button>
-          `
-        );
+        await page.setContent(html` <button id="test">test</button> `);
 
         await context.createTextSnapshot(context.getSelectedMcpPage());
 
@@ -161,11 +149,7 @@ describe('script', () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
 
-        await page.setContent(
-          html`
-            <button id="test">test</button>
-          `
-        );
+        await page.setContent(html` <button id="test">test</button> `);
 
         await context.createTextSnapshot(context.getSelectedMcpPage());
 
@@ -187,18 +171,8 @@ describe('script', () => {
     });
 
     it('work for elements inside iframes', async () => {
-      server.addHtmlRoute(
-        '/iframe',
-        html`
-          <main><button>I am iframe button</button></main>
-        `
-      );
-      server.addHtmlRoute(
-        '/main',
-        html`
-          <iframe src="/iframe"></iframe>
-        `
-      );
+      server.addHtmlRoute('/iframe', html` <main><button>I am iframe button</button></main> `);
+      server.addHtmlRoute('/main', html` <iframe src="/iframe"></iframe> `);
 
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();

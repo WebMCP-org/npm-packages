@@ -62,11 +62,7 @@ describe('McpResponse', () => {
   it('returns correctly formatted snapshot for a simple tree', async (t) => {
     await withMcpContext(async (response, context) => {
       const page = context.getSelectedPptrPage();
-      await page.setContent(
-        html`
-          <button>Click me</button> <input type="text" value="Input" />
-        `
-      );
+      await page.setContent(html` <button>Click me</button> <input type="text" value="Input" /> `);
       await page.focus('button');
       response.includeSnapshot();
       const { content, structuredContent } = await response.handle('test', context);
@@ -78,11 +74,7 @@ describe('McpResponse', () => {
   it('returns values for textboxes', async (t) => {
     await withMcpContext(async (response, context) => {
       const page = context.getSelectedPptrPage();
-      await page.setContent(
-        html`
-          <label>username<input name="username" value="mcp" /></label>
-        `
-      );
+      await page.setContent(html` <label>username<input name="username" value="mcp" /></label> `);
       await page.focus('input');
       response.includeSnapshot();
       const { content, structuredContent } = await response.handle('test', context);
@@ -95,11 +87,7 @@ describe('McpResponse', () => {
   it('returns verbose snapshot and structured content', async (t) => {
     await withMcpContext(async (response, context) => {
       const page = context.getSelectedPptrPage();
-      await page.setContent(
-        html`
-          <aside>test</aside>
-        `
-      );
+      await page.setContent(html` <aside>test</aside> `);
       response.includeSnapshot({
         verbose: true,
       });
@@ -115,11 +103,7 @@ describe('McpResponse', () => {
     try {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
-        await page.setContent(
-          html`
-            <aside>test</aside>
-          `
-        );
+        await page.setContent(html` <aside>test</aside> `);
         response.includeSnapshot({
           verbose: true,
           filePath,

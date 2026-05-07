@@ -77,6 +77,18 @@ function buildTestingPage(
     plainTextResult?: boolean;
   } = {}
 ): string {
+  const inputSchema = options.invalidSchema
+    ? JSON.stringify('{"badJson"')
+    : JSON.stringify(
+        JSON.stringify({
+          type: 'object',
+          properties: {
+            message: { type: 'string' },
+          },
+          required: ['message'],
+        })
+      );
+
   return html`
     <script>
       navigator.modelContextTesting = {
@@ -85,19 +97,7 @@ function buildTestingPage(
             {
               name: 'testing_echo',
               description: 'Echo a message',
-              inputSchema: ${
-                options.invalidSchema
-                  ? JSON.stringify('{"badJson"')
-                  : JSON.stringify(
-                      JSON.stringify({
-                        type: 'object',
-                        properties: {
-                          message: { type: 'string' },
-                        },
-                        required: ['message'],
-                      })
-                    )
-              },
+              inputSchema: ${inputSchema},
             },
           ];
         },
@@ -132,9 +132,7 @@ function buildTestingPage(
 }
 
 function buildNoApiPage(): string {
-  return html`
-    <p>No WebMCP APIs here.</p>
-  `;
+  return html` <p>No WebMCP APIs here.</p> `;
 }
 
 function stripUndefined<T>(value: T): T {
