@@ -8,7 +8,12 @@ import {
   EXTENSION_TOOL_GROUP_CONTRACTS,
   EXTENSION_TOOL_GROUP_CONTRACTS_BY_ID,
 } from './contracts';
+import { BOOKMARK_TOOL_CONTRACTS } from './contracts/bookmarks';
+import { HISTORY_TOOL_CONTRACTS } from './contracts/history';
 import { STORAGE_TOOL_CONTRACTS } from './contracts/storage';
+import { TAB_GROUP_TOOL_CONTRACTS } from './contracts/tab-groups';
+import { TAB_TOOL_CONTRACTS } from './contracts/tabs';
+import { WINDOW_TOOL_CONTRACTS } from './contracts/windows';
 
 function toMcpTool(contract: (typeof EXTENSION_TOOL_CONTRACTS)[number]) {
   return {
@@ -70,6 +75,7 @@ describe('extension tool contracts', () => {
   it('uses sampled concrete output schemas for real-browser storage conformance tools', () => {
     expect(STORAGE_TOOL_CONTRACTS.getStorage.outputSchema).toMatchObject({
       type: 'object',
+      additionalProperties: false,
       required: ['area', 'data', 'keyCount'],
       properties: {
         area: { enum: ['sync', 'local', 'session'] },
@@ -79,6 +85,7 @@ describe('extension tool contracts', () => {
     });
     expect(STORAGE_TOOL_CONTRACTS.setStorage.outputSchema).toMatchObject({
       type: 'object',
+      additionalProperties: false,
       required: ['keys'],
       properties: {
         keys: {
@@ -87,6 +94,367 @@ describe('extension tool contracts', () => {
         },
       },
     });
+    expect(STORAGE_TOOL_CONTRACTS.removeStorage.outputSchema).toMatchObject({
+      type: 'object',
+      additionalProperties: false,
+      required: ['keys'],
+      properties: {
+        keys: {
+          type: 'array',
+          items: { type: 'string' },
+        },
+      },
+    });
+    expect(STORAGE_TOOL_CONTRACTS.getBytesInUse.outputSchema).toMatchObject({
+      type: 'object',
+      additionalProperties: false,
+      required: ['area', 'bytesInUse', 'humanReadable', 'quota', 'percentageUsed'],
+      properties: {
+        area: { enum: ['sync', 'local', 'session'] },
+        bytesInUse: { type: 'number' },
+        humanReadable: { type: 'string' },
+        quota: {
+          anyOf: expect.arrayContaining([
+            expect.objectContaining({
+              type: 'object',
+              additionalProperties: false,
+              required: ['quotaBytes'],
+            }),
+            expect.objectContaining({
+              type: 'null',
+            }),
+          ]),
+        },
+        percentageUsed: {
+          anyOf: expect.arrayContaining([{ type: 'string' }, { type: 'null' }]),
+        },
+      },
+    });
+  });
+
+  it('uses sampled concrete output schemas for real-browser bookmark conformance tools', () => {
+    expect(BOOKMARK_TOOL_CONTRACTS.create.outputSchema).toMatchObject({
+      type: 'object',
+      required: ['id', 'title', 'parentId', 'index', 'dateAdded', 'type'],
+      properties: {
+        id: { type: 'string' },
+        title: { type: 'string' },
+        parentId: { type: 'string' },
+        index: { type: 'number' },
+        dateAdded: { type: 'number' },
+        type: { enum: ['bookmark', 'folder'] },
+      },
+    });
+    expect(BOOKMARK_TOOL_CONTRACTS.get.outputSchema).toMatchObject({
+      type: 'object',
+      required: ['count', 'bookmarks'],
+      properties: {
+        count: { type: 'number' },
+        bookmarks: {
+          type: 'array',
+          items: {
+            required: ['id', 'title', 'type'],
+          },
+        },
+      },
+    });
+    expect(BOOKMARK_TOOL_CONTRACTS.search.outputSchema).toMatchObject({
+      type: 'object',
+      required: ['query', 'count', 'results'],
+      properties: {
+        query: { type: 'string' },
+        count: { type: 'number' },
+        results: {
+          type: 'array',
+          items: {
+            required: ['id', 'title', 'type'],
+          },
+        },
+      },
+    });
+    expect(BOOKMARK_TOOL_CONTRACTS.remove.outputSchema).toMatchObject({
+      type: 'object',
+      required: ['id'],
+      properties: {
+        id: { type: 'string' },
+      },
+    });
+  });
+
+  it('uses sampled concrete output schemas for real-browser tabs conformance tools', () => {
+    expect(TAB_TOOL_CONTRACTS.createTab.outputSchema).toMatchObject({
+      type: 'object',
+      required: ['id', 'index', 'windowId', 'active', 'pinned'],
+      properties: {
+        id: { type: 'number' },
+        url: { type: 'string' },
+        active: { type: 'boolean' },
+        pinned: { type: 'boolean' },
+        windowId: { type: 'number' },
+      },
+    });
+    expect(TAB_TOOL_CONTRACTS.getAllTabs.outputSchema).toMatchObject({
+      type: 'object',
+      required: ['count', 'tabs'],
+      properties: {
+        count: { type: 'number' },
+        tabs: {
+          type: 'array',
+          items: {
+            required: ['id', 'index', 'windowId', 'active', 'pinned'],
+          },
+        },
+      },
+    });
+    expect(TAB_TOOL_CONTRACTS.closeTabs.outputSchema).toMatchObject({
+      type: 'object',
+      required: ['tabIds'],
+      properties: {
+        tabIds: {
+          type: 'array',
+          items: { type: 'number' },
+        },
+      },
+    });
+    expect(TAB_TOOL_CONTRACTS.getTab.outputSchema).toMatchObject({
+      type: 'object',
+      required: ['tab'],
+      properties: {
+        tab: {
+          required: ['id', 'index', 'windowId', 'active', 'pinned'],
+        },
+      },
+    });
+    expect(TAB_TOOL_CONTRACTS.getZoomSettings.outputSchema).toMatchObject({
+      type: 'object',
+      required: ['mode', 'scope', 'defaultZoomFactor'],
+    });
+    expect(TAB_TOOL_CONTRACTS.detectLanguage.outputSchema).toMatchObject({
+      type: 'object',
+      required: ['language'],
+      properties: {
+        language: { type: 'string' },
+      },
+    });
+  });
+
+  it('uses sampled concrete output schemas for real-browser tab-groups conformance tools', () => {
+    expect(TAB_GROUP_TOOL_CONTRACTS.get.outputSchema).toMatchObject({
+      type: 'object',
+      required: ['id', 'color', 'collapsed', 'windowId'],
+      properties: {
+        id: { type: 'number' },
+        title: { type: 'string' },
+        color: {
+          enum: ['grey', 'blue', 'red', 'yellow', 'green', 'pink', 'purple', 'cyan', 'orange'],
+        },
+        collapsed: { type: 'boolean' },
+        shared: { type: 'boolean' },
+        windowId: { type: 'number' },
+      },
+    });
+    expect(TAB_GROUP_TOOL_CONTRACTS.query.outputSchema).toMatchObject({
+      type: 'object',
+      required: ['count', 'groups'],
+      properties: {
+        count: { type: 'number' },
+        groups: {
+          type: 'array',
+          items: {
+            required: ['id', 'color', 'collapsed', 'windowId'],
+          },
+        },
+      },
+    });
+    expect(TAB_GROUP_TOOL_CONTRACTS.update.outputSchema).toMatchObject(
+      TAB_GROUP_TOOL_CONTRACTS.get.outputSchema
+    );
+    expect(TAB_GROUP_TOOL_CONTRACTS.move.outputSchema).toMatchObject(
+      TAB_GROUP_TOOL_CONTRACTS.get.outputSchema
+    );
+  });
+
+  it('keeps tab-groups input schemas aligned with Chrome tabGroups parameter constraints', () => {
+    expect(() => TAB_GROUP_TOOL_CONTRACTS.get.zodInputSchema.parse({ groupId: -1 })).toThrow();
+    expect(() => TAB_GROUP_TOOL_CONTRACTS.get.zodInputSchema.parse({ groupId: 1.5 })).toThrow();
+    expect(() =>
+      TAB_GROUP_TOOL_CONTRACTS.move.zodInputSchema.parse({ groupId: 1, index: -2 })
+    ).toThrow();
+    expect(() => TAB_GROUP_TOOL_CONTRACTS.query.zodInputSchema.parse({ windowId: -3 })).toThrow();
+    expect(TAB_GROUP_TOOL_CONTRACTS.query.zodInputSchema.parse({ windowId: -2 })).toEqual({
+      windowId: -2,
+    });
+    expect(TAB_GROUP_TOOL_CONTRACTS.move.zodInputSchema.parse({ groupId: 1, index: -1 })).toEqual({
+      groupId: 1,
+      index: -1,
+    });
+  });
+
+  it('uses sampled concrete output schemas for real-browser windows conformance tools', () => {
+    expect(WINDOW_TOOL_CONTRACTS.create.outputSchema).toMatchObject({
+      type: 'object',
+      required: ['id', 'focused', 'incognito', 'alwaysOnTop', 'state', 'type'],
+      properties: {
+        id: { type: 'number' },
+        focused: { type: 'boolean' },
+        incognito: { type: 'boolean' },
+        alwaysOnTop: { type: 'boolean' },
+        state: {
+          enum: ['normal', 'minimized', 'maximized', 'fullscreen', 'locked-fullscreen'],
+        },
+        type: { enum: ['normal', 'popup', 'panel', 'app', 'devtools'] },
+        tabs: {
+          type: 'array',
+          items: {
+            type: 'object',
+          },
+        },
+      },
+    });
+    expect(WINDOW_TOOL_CONTRACTS.getAll.outputSchema).toMatchObject({
+      type: 'object',
+      required: ['count', 'windows'],
+      properties: {
+        count: { type: 'number' },
+        windows: {
+          type: 'array',
+          items: {
+            required: ['id', 'focused', 'incognito', 'alwaysOnTop', 'state', 'type'],
+          },
+        },
+      },
+    });
+    expect(WINDOW_TOOL_CONTRACTS.remove.outputSchema).toMatchObject({
+      type: 'object',
+      required: ['windowId'],
+      properties: {
+        windowId: { type: 'number' },
+      },
+    });
+  });
+
+  it('uses sampled concrete output schemas for real-browser history conformance tools', () => {
+    expect(HISTORY_TOOL_CONTRACTS.addUrl.outputSchema).toMatchObject({
+      type: 'object',
+      required: ['url'],
+      properties: {
+        url: { type: 'string' },
+      },
+    });
+    expect(HISTORY_TOOL_CONTRACTS.deleteRange.outputSchema).toMatchObject({
+      type: 'object',
+      required: ['startTime', 'endTime', 'startTimeFormatted', 'endTimeFormatted'],
+      properties: {
+        startTime: { type: 'number' },
+        endTime: { type: 'number' },
+        startTimeFormatted: { type: 'string' },
+        endTimeFormatted: { type: 'string' },
+      },
+    });
+    expect(HISTORY_TOOL_CONTRACTS.getVisits.outputSchema).toMatchObject({
+      type: 'object',
+      required: ['url', 'visitCount', 'visits'],
+      properties: {
+        url: { type: 'string' },
+        visitCount: { type: 'number' },
+        visits: {
+          type: 'array',
+          items: {
+            required: ['id', 'visitId', 'transition'],
+          },
+        },
+      },
+    });
+    expect(HISTORY_TOOL_CONTRACTS.search.outputSchema).toMatchObject({
+      type: 'object',
+      required: ['query', 'resultCount', 'results'],
+      properties: {
+        query: {
+          type: 'object',
+          required: ['text'],
+        },
+        resultCount: { type: 'number' },
+        results: {
+          type: 'array',
+          items: {
+            required: ['id'],
+          },
+        },
+      },
+    });
+    expect(HISTORY_TOOL_CONTRACTS.deleteUrl.outputSchema).toMatchObject({
+      type: 'object',
+      required: ['url'],
+      properties: {
+        url: { type: 'string' },
+      },
+    });
+  });
+
+  it('keeps bookmark input schemas aligned with Chrome bookmark parameter constraints', () => {
+    expect(() =>
+      BOOKMARK_TOOL_CONTRACTS.create.zodInputSchema.parse({ title: 'x', index: -1 })
+    ).toThrow();
+    expect(() =>
+      BOOKMARK_TOOL_CONTRACTS.create.zodInputSchema.parse({ title: 'x', index: 1.25 })
+    ).toThrow();
+    expect(() => BOOKMARK_TOOL_CONTRACTS.get.zodInputSchema.parse({ idOrIdList: [] })).toThrow();
+    expect(() =>
+      BOOKMARK_TOOL_CONTRACTS.getRecent.zodInputSchema.parse({ numberOfItems: 1.5 })
+    ).toThrow();
+    expect(BOOKMARK_TOOL_CONTRACTS.move.zodInputSchema.parse({ id: '1', index: 0 })).toEqual({
+      id: '1',
+      index: 0,
+    });
+  });
+
+  it('keeps tabs input schemas aligned with Chrome tab parameter constraints', () => {
+    expect(() => TAB_TOOL_CONTRACTS.createTab.zodInputSchema.parse({})).not.toThrow();
+    expect(() => TAB_TOOL_CONTRACTS.closeTabs.zodInputSchema.parse({ tabIds: [] })).toThrow();
+    expect(() => TAB_TOOL_CONTRACTS.closeTabs.zodInputSchema.parse({ tabIds: [1.25] })).toThrow();
+    expect(() =>
+      TAB_TOOL_CONTRACTS.moveTabs.zodInputSchema.parse({ tabIds: [1], index: -2 })
+    ).toThrow();
+    expect(TAB_TOOL_CONTRACTS.moveTabs.zodInputSchema.parse({ tabIds: [1], index: -1 })).toEqual({
+      tabIds: [1],
+      index: -1,
+    });
+    expect(() => TAB_TOOL_CONTRACTS.highlightTabs.zodInputSchema.parse({ tabs: [-1] })).toThrow();
+    expect(() => TAB_TOOL_CONTRACTS.setZoom.zodInputSchema.parse({ zoomFactor: 0.1 })).toThrow();
+    expect(TAB_TOOL_CONTRACTS.setZoom.zodInputSchema.parse({ zoomFactor: 0 })).toEqual({
+      zoomFactor: 0,
+    });
+  });
+
+  it('keeps windows input schemas aligned with Chrome window parameter constraints', () => {
+    expect(() => WINDOW_TOOL_CONTRACTS.create.zodInputSchema.parse({})).not.toThrow();
+    expect(() => WINDOW_TOOL_CONTRACTS.create.zodInputSchema.parse({ width: 1.25 })).toThrow();
+    expect(() => WINDOW_TOOL_CONTRACTS.create.zodInputSchema.parse({ width: 0 })).toThrow();
+    expect(() => WINDOW_TOOL_CONTRACTS.create.zodInputSchema.parse({ tabId: -1 })).toThrow();
+    expect(() =>
+      WINDOW_TOOL_CONTRACTS.update.zodInputSchema.parse({ windowId: 1, height: 1.5 })
+    ).toThrow();
+    expect(WINDOW_TOOL_CONTRACTS.update.zodInputSchema.parse({ windowId: -2 })).toEqual({
+      windowId: -2,
+    });
+  });
+
+  it('keeps history input schemas aligned with Chrome history parameter constraints', () => {
+    expect(() =>
+      HISTORY_TOOL_CONTRACTS.search.zodInputSchema.parse({ text: '', maxResults: 1.5 })
+    ).toThrow();
+    expect(() =>
+      HISTORY_TOOL_CONTRACTS.search.zodInputSchema.parse({ text: '', maxResults: 0 })
+    ).toThrow();
+    expect(() =>
+      HISTORY_TOOL_CONTRACTS.deleteRange.zodInputSchema.parse({ startTime: -1, endTime: 1 })
+    ).toThrow();
+    expect(HISTORY_TOOL_CONTRACTS.search.zodInputSchema.parse({ text: '', maxResults: 1 })).toEqual(
+      {
+        text: '',
+        maxResults: 1,
+      }
+    );
   });
 
   it('carries namespaced MCP-B and Chrome extension metadata for each action', () => {

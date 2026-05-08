@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
 import {
-  GENERIC_EXTENSION_TOOL_OUTPUT_SCHEMA,
   defineExtensionToolContract,
+  type ExtensionToolOutputSchema,
   type ExtensionToolGroupContract,
 } from './core';
 
@@ -32,45 +32,46 @@ export const BOOKMARK_ACTION_IDS = [
 export const BOOKMARK_CREATE_INPUT_SCHEMA = z.object({
   parentId: z
     .string()
+    .min(1)
     .optional()
     .describe('Parent folder ID. Defaults to the Other Bookmarks folder'),
   title: z.string().optional().describe('The title of the bookmark or folder'),
   url: z.string().optional().describe('The URL for the bookmark. Omit for folders'),
-  index: z.number().optional().describe('The position within the parent folder'),
+  index: z.number().int().min(0).optional().describe('The position within the parent folder'),
 });
 
 export const BOOKMARK_GET_INPUT_SCHEMA = z.object({
   idOrIdList: z
-    .union([z.string(), z.array(z.string())])
+    .union([z.string().min(1), z.array(z.string().min(1)).min(1)])
     .describe('A single bookmark ID or array of bookmark IDs'),
 });
 
 export const BOOKMARK_GET_CHILDREN_INPUT_SCHEMA = z.object({
-  id: z.string().describe('The ID of the folder to get children from'),
+  id: z.string().min(1).describe('The ID of the folder to get children from'),
 });
 
 export const BOOKMARK_GET_RECENT_INPUT_SCHEMA = z.object({
-  numberOfItems: z.number().min(1).describe('The maximum number of items to return'),
+  numberOfItems: z.number().int().min(1).describe('The maximum number of items to return'),
 });
 
 export const BOOKMARK_GET_SUBTREE_INPUT_SCHEMA = z.object({
-  id: z.string().describe('The ID of the root of the subtree to retrieve'),
+  id: z.string().min(1).describe('The ID of the root of the subtree to retrieve'),
 });
 
 export const BOOKMARK_GET_TREE_INPUT_SCHEMA = z.object({});
 
 export const BOOKMARK_MOVE_INPUT_SCHEMA = z.object({
-  id: z.string().describe('The ID of the bookmark or folder to move'),
-  parentId: z.string().optional().describe('The new parent folder ID'),
-  index: z.number().optional().describe('The new position within the parent folder'),
+  id: z.string().min(1).describe('The ID of the bookmark or folder to move'),
+  parentId: z.string().min(1).optional().describe('The new parent folder ID'),
+  index: z.number().int().min(0).optional().describe('The new position within the parent folder'),
 });
 
 export const BOOKMARK_REMOVE_INPUT_SCHEMA = z.object({
-  id: z.string().describe('The ID of the bookmark or empty folder to remove'),
+  id: z.string().min(1).describe('The ID of the bookmark or empty folder to remove'),
 });
 
 export const BOOKMARK_REMOVE_TREE_INPUT_SCHEMA = z.object({
-  id: z.string().describe('The ID of the folder to remove recursively'),
+  id: z.string().min(1).describe('The ID of the folder to remove recursively'),
 });
 
 export const BOOKMARK_SEARCH_INPUT_SCHEMA = z.object({
@@ -85,10 +86,155 @@ export const BOOKMARK_SEARCH_INPUT_SCHEMA = z.object({
 });
 
 export const BOOKMARK_UPDATE_INPUT_SCHEMA = z.object({
-  id: z.string().describe('The ID of the bookmark or folder to update'),
+  id: z.string().min(1).describe('The ID of the bookmark or folder to update'),
   title: z.string().optional().describe('The new title'),
   url: z.string().optional().describe('The new URL (bookmarks only)'),
 });
+
+const bookmarkNodeProperties = {
+  id: { type: 'string' },
+  title: { type: 'string' },
+  url: { type: 'string' },
+  parentId: { type: 'string' },
+  index: { type: 'number' },
+  dateAdded: { type: 'number' },
+  dateAddedFormatted: { type: 'string' },
+  type: { type: 'string', enum: ['bookmark', 'folder'] },
+} as const;
+
+const bookmarkNodeOutputSchema = {
+  type: 'object',
+  properties: bookmarkNodeProperties,
+  required: ['id', 'title', 'type'],
+} as const;
+
+const bookmarkNodeWithChildrenOutputSchema = {
+  type: 'object',
+  properties: {
+    ...bookmarkNodeProperties,
+    children: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: bookmarkNodeProperties,
+        required: ['id', 'title', 'type'],
+      },
+    },
+  },
+  required: ['id', 'title', 'type'],
+} as const;
+
+export const BOOKMARK_CREATE_OUTPUT_SCHEMA = {
+  type: 'object',
+  properties: bookmarkNodeProperties,
+  required: ['id', 'title', 'parentId', 'index', 'dateAdded', 'type'],
+} as const satisfies ExtensionToolOutputSchema;
+
+export const BOOKMARK_GET_OUTPUT_SCHEMA = {
+  type: 'object',
+  properties: {
+    count: { type: 'number' },
+    bookmarks: {
+      type: 'array',
+      items: bookmarkNodeOutputSchema,
+    },
+  },
+  required: ['count', 'bookmarks'],
+} as const satisfies ExtensionToolOutputSchema;
+
+export const BOOKMARK_GET_CHILDREN_OUTPUT_SCHEMA = {
+  type: 'object',
+  properties: {
+    parentId: { type: 'string' },
+    count: { type: 'number' },
+    children: {
+      type: 'array',
+      items: bookmarkNodeOutputSchema,
+    },
+  },
+  required: ['parentId', 'count', 'children'],
+} as const satisfies ExtensionToolOutputSchema;
+
+export const BOOKMARK_GET_RECENT_OUTPUT_SCHEMA = {
+  type: 'object',
+  properties: {
+    count: { type: 'number' },
+    recentBookmarks: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: bookmarkNodeProperties,
+        required: ['id', 'title'],
+      },
+    },
+  },
+  required: ['count', 'recentBookmarks'],
+} as const satisfies ExtensionToolOutputSchema;
+
+export const BOOKMARK_GET_SUBTREE_OUTPUT_SCHEMA = {
+  type: 'object',
+  properties: {
+    rootId: { type: 'string' },
+    subtree: {
+      type: 'array',
+      items: bookmarkNodeWithChildrenOutputSchema,
+    },
+  },
+  required: ['rootId', 'subtree'],
+} as const satisfies ExtensionToolOutputSchema;
+
+export const BOOKMARK_GET_TREE_OUTPUT_SCHEMA = {
+  type: 'object',
+  properties: {
+    tree: {
+      type: 'array',
+      items: bookmarkNodeWithChildrenOutputSchema,
+    },
+  },
+  required: ['tree'],
+} as const satisfies ExtensionToolOutputSchema;
+
+export const BOOKMARK_MOVE_OUTPUT_SCHEMA = {
+  type: 'object',
+  properties: bookmarkNodeProperties,
+  required: ['id', 'title', 'parentId', 'index', 'type'],
+} as const satisfies ExtensionToolOutputSchema;
+
+export const BOOKMARK_REMOVE_OUTPUT_SCHEMA = {
+  type: 'object',
+  properties: {
+    id: { type: 'string' },
+  },
+  required: ['id'],
+} as const satisfies ExtensionToolOutputSchema;
+
+export const BOOKMARK_SEARCH_OUTPUT_SCHEMA = {
+  type: 'object',
+  properties: {
+    query: { type: 'string' },
+    count: { type: 'number' },
+    results: {
+      type: 'array',
+      items: bookmarkNodeOutputSchema,
+    },
+  },
+  required: ['query', 'count', 'results'],
+} as const satisfies ExtensionToolOutputSchema;
+
+export const BOOKMARK_UPDATE_OUTPUT_SCHEMA = {
+  type: 'object',
+  properties: {
+    ...bookmarkNodeProperties,
+    changes: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        url: { type: 'string' },
+      },
+    },
+  },
+  required: ['id', 'title', 'parentId', 'index', 'type', 'changes'],
+} as const satisfies ExtensionToolOutputSchema;
 
 const readMeta = {
   kind: 'chrome-api',
@@ -125,7 +271,7 @@ export const BOOKMARK_TOOL_CONTRACTS = {
     description:
       'Create a bookmark or folder under the specified parent. A folder must have a title and no url',
     inputSchema: BOOKMARK_CREATE_INPUT_SCHEMA,
-    outputSchema: GENERIC_EXTENSION_TOOL_OUTPUT_SCHEMA,
+    outputSchema: BOOKMARK_CREATE_OUTPUT_SCHEMA,
     annotations: {
       readOnlyHint: false,
       destructiveHint: false,
@@ -141,7 +287,7 @@ export const BOOKMARK_TOOL_CONTRACTS = {
     title: 'Get Bookmarks',
     description: 'Retrieve the specified bookmark(s) by ID',
     inputSchema: BOOKMARK_GET_INPUT_SCHEMA,
-    outputSchema: GENERIC_EXTENSION_TOOL_OUTPUT_SCHEMA,
+    outputSchema: BOOKMARK_GET_OUTPUT_SCHEMA,
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -157,7 +303,7 @@ export const BOOKMARK_TOOL_CONTRACTS = {
     title: 'Get Bookmark Children',
     description: 'Retrieve the children of the specified bookmark folder',
     inputSchema: BOOKMARK_GET_CHILDREN_INPUT_SCHEMA,
-    outputSchema: GENERIC_EXTENSION_TOOL_OUTPUT_SCHEMA,
+    outputSchema: BOOKMARK_GET_CHILDREN_OUTPUT_SCHEMA,
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -173,7 +319,7 @@ export const BOOKMARK_TOOL_CONTRACTS = {
     title: 'Get Recent Bookmarks',
     description: 'Retrieve the recently added bookmarks',
     inputSchema: BOOKMARK_GET_RECENT_INPUT_SCHEMA,
-    outputSchema: GENERIC_EXTENSION_TOOL_OUTPUT_SCHEMA,
+    outputSchema: BOOKMARK_GET_RECENT_OUTPUT_SCHEMA,
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -189,7 +335,7 @@ export const BOOKMARK_TOOL_CONTRACTS = {
     title: 'Get Bookmark Subtree',
     description: 'Retrieve part of the bookmarks hierarchy, starting at the specified node',
     inputSchema: BOOKMARK_GET_SUBTREE_INPUT_SCHEMA,
-    outputSchema: GENERIC_EXTENSION_TOOL_OUTPUT_SCHEMA,
+    outputSchema: BOOKMARK_GET_SUBTREE_OUTPUT_SCHEMA,
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -205,7 +351,7 @@ export const BOOKMARK_TOOL_CONTRACTS = {
     title: 'Get Bookmark Tree',
     description: 'Retrieve the entire bookmarks hierarchy',
     inputSchema: BOOKMARK_GET_TREE_INPUT_SCHEMA,
-    outputSchema: GENERIC_EXTENSION_TOOL_OUTPUT_SCHEMA,
+    outputSchema: BOOKMARK_GET_TREE_OUTPUT_SCHEMA,
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -221,7 +367,7 @@ export const BOOKMARK_TOOL_CONTRACTS = {
     title: 'Move Bookmark',
     description: 'Move the specified bookmark or folder to a new location',
     inputSchema: BOOKMARK_MOVE_INPUT_SCHEMA,
-    outputSchema: GENERIC_EXTENSION_TOOL_OUTPUT_SCHEMA,
+    outputSchema: BOOKMARK_MOVE_OUTPUT_SCHEMA,
     annotations: {
       readOnlyHint: false,
       destructiveHint: false,
@@ -237,7 +383,7 @@ export const BOOKMARK_TOOL_CONTRACTS = {
     title: 'Remove Bookmark',
     description: 'Remove the specified bookmark or empty folder',
     inputSchema: BOOKMARK_REMOVE_INPUT_SCHEMA,
-    outputSchema: GENERIC_EXTENSION_TOOL_OUTPUT_SCHEMA,
+    outputSchema: BOOKMARK_REMOVE_OUTPUT_SCHEMA,
     annotations: {
       readOnlyHint: false,
       destructiveHint: true,
@@ -253,7 +399,7 @@ export const BOOKMARK_TOOL_CONTRACTS = {
     title: 'Remove Bookmark Tree',
     description: 'Recursively remove a bookmark folder and all its contents',
     inputSchema: BOOKMARK_REMOVE_TREE_INPUT_SCHEMA,
-    outputSchema: GENERIC_EXTENSION_TOOL_OUTPUT_SCHEMA,
+    outputSchema: BOOKMARK_REMOVE_OUTPUT_SCHEMA,
     annotations: {
       readOnlyHint: false,
       destructiveHint: true,
@@ -269,7 +415,7 @@ export const BOOKMARK_TOOL_CONTRACTS = {
     title: 'Search Bookmarks',
     description: 'Search for bookmarks matching the given query',
     inputSchema: BOOKMARK_SEARCH_INPUT_SCHEMA,
-    outputSchema: GENERIC_EXTENSION_TOOL_OUTPUT_SCHEMA,
+    outputSchema: BOOKMARK_SEARCH_OUTPUT_SCHEMA,
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -285,7 +431,7 @@ export const BOOKMARK_TOOL_CONTRACTS = {
     title: 'Update Bookmark',
     description: 'Update the properties of a bookmark or folder. Only title and url can be changed',
     inputSchema: BOOKMARK_UPDATE_INPUT_SCHEMA,
-    outputSchema: GENERIC_EXTENSION_TOOL_OUTPUT_SCHEMA,
+    outputSchema: BOOKMARK_UPDATE_OUTPUT_SCHEMA,
     annotations: {
       readOnlyHint: false,
       destructiveHint: false,

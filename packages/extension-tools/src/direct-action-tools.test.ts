@@ -329,12 +329,20 @@ describe('direct extension action tools', () => {
       humanReadable: expect.any(String),
       quota: { quotaBytes: 1024 },
     });
+    expect(bytesResult.structuredContent).toMatchObject({
+      area: 'local',
+      bytesInUse: expect.any(Number),
+      humanReadable: expect.any(String),
+      quota: { quotaBytes: 1024 },
+      percentageUsed: expect.any(String),
+    });
 
     const removeResult = await executeTool(server.getTool('extension_tool_remove_storage'), {
       area: 'local',
       keys: ['theme'],
     });
     expect(removeResult.isError).not.toBe(true);
+    expect(removeResult.structuredContent).toEqual({ keys: ['theme'] });
 
     const afterRemove = await executeTool(server.getTool('extension_tool_get_storage'), {
       area: 'local',

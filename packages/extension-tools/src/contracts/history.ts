@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
 import {
-  GENERIC_EXTENSION_TOOL_OUTPUT_SCHEMA,
   defineExtensionToolContract,
   type ExtensionToolGroupContract,
+  type ExtensionToolOutputSchema,
 } from './core';
 
 export const HISTORY_GROUP_CONTRACT = {
@@ -33,11 +33,13 @@ export const HISTORY_DELETE_ALL_INPUT_SCHEMA = z.object({});
 export const HISTORY_DELETE_RANGE_INPUT_SCHEMA = z.object({
   startTime: z
     .number()
+    .min(0)
     .describe(
       'Items added to history after this date, represented in milliseconds since the epoch'
     ),
   endTime: z
     .number()
+    .min(0)
     .describe(
       'Items added to history before this date, represented in milliseconds since the epoch'
     ),
@@ -79,11 +81,95 @@ export const HISTORY_SEARCH_INPUT_SCHEMA = z.object({
     ),
   maxResults: z
     .number()
+    .int()
     .min(1)
-    .max(1000)
     .optional()
     .describe('The maximum number of results to retrieve. Defaults to 100'),
 });
+
+export const HISTORY_MUTATE_URL_OUTPUT_SCHEMA = {
+  type: 'object',
+  properties: {
+    url: { type: 'string' },
+  },
+  required: ['url'],
+} as const satisfies ExtensionToolOutputSchema;
+
+export const HISTORY_DELETE_RANGE_OUTPUT_SCHEMA = {
+  type: 'object',
+  properties: {
+    startTime: { type: 'number' },
+    endTime: { type: 'number' },
+    startTimeFormatted: { type: 'string' },
+    endTimeFormatted: { type: 'string' },
+  },
+  required: ['startTime', 'endTime', 'startTimeFormatted', 'endTimeFormatted'],
+} as const satisfies ExtensionToolOutputSchema;
+
+const historyItemOutputSchema = {
+  type: 'object',
+  properties: {
+    id: { type: 'string' },
+    url: { type: 'string' },
+    title: { type: 'string' },
+    lastVisitTime: { type: 'number' },
+    lastVisitTimeFormatted: { type: 'string' },
+    visitCount: { type: 'number' },
+    typedCount: { type: 'number' },
+  },
+  required: ['id'],
+  additionalProperties: true,
+} as const;
+
+const historyVisitOutputSchema = {
+  type: 'object',
+  properties: {
+    id: { type: 'string' },
+    visitId: { type: 'string' },
+    visitTime: { type: 'number' },
+    visitTimeFormatted: { type: 'string' },
+    referringVisitId: { type: 'string' },
+    transition: { type: 'string' },
+  },
+  required: ['id', 'visitId', 'transition'],
+  additionalProperties: true,
+} as const;
+
+export const HISTORY_GET_VISITS_OUTPUT_SCHEMA = {
+  type: 'object',
+  properties: {
+    url: { type: 'string' },
+    visitCount: { type: 'number' },
+    visits: {
+      type: 'array',
+      items: historyVisitOutputSchema,
+    },
+  },
+  required: ['url', 'visitCount', 'visits'],
+} as const satisfies ExtensionToolOutputSchema;
+
+export const HISTORY_SEARCH_OUTPUT_SCHEMA = {
+  type: 'object',
+  properties: {
+    query: {
+      type: 'object',
+      properties: {
+        text: { type: 'string' },
+        startTime: { type: 'number' },
+        endTime: { type: 'number' },
+        maxResults: { type: 'number' },
+      },
+      required: ['text'],
+      additionalProperties: true,
+    },
+    resultCount: { type: 'number' },
+    results: {
+      type: 'array',
+      items: historyItemOutputSchema,
+    },
+  },
+  required: ['query', 'resultCount', 'results'],
+} as const satisfies ExtensionToolOutputSchema;
 
 const readMeta = {
   kind: 'chrome-api',
@@ -120,7 +206,7 @@ export const HISTORY_TOOL_CONTRACTS = {
     title: 'Add History URL',
     description: 'Add a URL to the history at the current time with a transition type of "link"',
     inputSchema: HISTORY_ADD_URL_INPUT_SCHEMA,
-    outputSchema: GENERIC_EXTENSION_TOOL_OUTPUT_SCHEMA,
+    outputSchema: HISTORY_MUTATE_URL_OUTPUT_SCHEMA,
     annotations: {
       readOnlyHint: false,
       destructiveHint: false,
@@ -152,7 +238,7 @@ export const HISTORY_TOOL_CONTRACTS = {
     description:
       'Remove all items within the specified date range from history. Pages will not be removed unless all visits fall within the range',
     inputSchema: HISTORY_DELETE_RANGE_INPUT_SCHEMA,
-    outputSchema: GENERIC_EXTENSION_TOOL_OUTPUT_SCHEMA,
+    outputSchema: HISTORY_DELETE_RANGE_OUTPUT_SCHEMA,
     annotations: {
       readOnlyHint: false,
       destructiveHint: true,
@@ -168,7 +254,7 @@ export const HISTORY_TOOL_CONTRACTS = {
     title: 'Delete History URL',
     description: 'Remove all occurrences of the given URL from history',
     inputSchema: HISTORY_DELETE_URL_INPUT_SCHEMA,
-    outputSchema: GENERIC_EXTENSION_TOOL_OUTPUT_SCHEMA,
+    outputSchema: HISTORY_MUTATE_URL_OUTPUT_SCHEMA,
     annotations: {
       readOnlyHint: false,
       destructiveHint: true,
@@ -187,7 +273,7 @@ export const HISTORY_TOOL_CONTRACTS = {
     title: 'Get History Visits',
     description: 'Retrieve information about visits to a specific URL',
     inputSchema: HISTORY_GET_VISITS_INPUT_SCHEMA,
-    outputSchema: GENERIC_EXTENSION_TOOL_OUTPUT_SCHEMA,
+    outputSchema: HISTORY_GET_VISITS_OUTPUT_SCHEMA,
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -206,7 +292,7 @@ export const HISTORY_TOOL_CONTRACTS = {
     title: 'Search History',
     description: 'Search the history for the last visit time of each page matching the query',
     inputSchema: HISTORY_SEARCH_INPUT_SCHEMA,
-    outputSchema: GENERIC_EXTENSION_TOOL_OUTPUT_SCHEMA,
+    outputSchema: HISTORY_SEARCH_OUTPUT_SCHEMA,
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,

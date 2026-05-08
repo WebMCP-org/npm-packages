@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
 import {
-  GENERIC_EXTENSION_TOOL_OUTPUT_SCHEMA,
   defineExtensionToolContract,
   type ExtensionToolGroupContract,
+  type ExtensionToolOutputSchema,
 } from './core';
 
 export const TAB_GROUPS_GROUP_CONTRACT = {
@@ -29,8 +29,14 @@ export const TAB_GROUP_COLOR_SCHEMA = z.enum([
   'orange',
 ]);
 
+const chromeTabGroupIdSchema = z.number().int().min(0);
+const chromeTabGroupWindowIdSchema = z
+  .number()
+  .int()
+  .refine((value) => value >= 0 || value === -2, 'Expected a window ID or -2 for current window');
+
 export const TAB_GROUP_GET_INPUT_SCHEMA = z.object({
-  groupId: z.number().describe('The ID of the tab group to retrieve'),
+  groupId: chromeTabGroupIdSchema.describe('The ID of the tab group to retrieve'),
 });
 
 export const TAB_GROUP_QUERY_INPUT_SCHEMA = z.object({
@@ -38,27 +44,64 @@ export const TAB_GROUP_QUERY_INPUT_SCHEMA = z.object({
   color: TAB_GROUP_COLOR_SCHEMA.optional().describe('The color of the groups'),
   shared: z.boolean().optional().describe('Whether the group is shared (Chrome 137+)'),
   title: z.string().optional().describe('Pattern to match group titles against'),
-  windowId: z
-    .number()
+  windowId: chromeTabGroupWindowIdSchema
     .optional()
     .describe('The ID of the parent window, or use -2 for the current window'),
 });
 
 export const TAB_GROUP_UPDATE_INPUT_SCHEMA = z.object({
-  groupId: z.number().describe('The ID of the group to modify'),
+  groupId: chromeTabGroupIdSchema.describe('The ID of the group to modify'),
   collapsed: z.boolean().optional().describe('Whether the group should be collapsed'),
   color: TAB_GROUP_COLOR_SCHEMA.optional().describe('The color of the group'),
   title: z.string().optional().describe('The title of the group'),
 });
 
 export const TAB_GROUP_MOVE_INPUT_SCHEMA = z.object({
-  groupId: z.number().describe('The ID of the group to move'),
-  index: z.number().describe('The position to move the group to. Use -1 to place at the end'),
-  windowId: z
+  groupId: chromeTabGroupIdSchema.describe('The ID of the group to move'),
+  index: z
     .number()
+    .int()
+    .min(-1)
+    .describe('The position to move the group to. Use -1 to place at the end'),
+  windowId: chromeTabGroupWindowIdSchema
     .optional()
     .describe('The window to move the group to. Defaults to current window'),
 });
+
+const tabGroupOutputSchema = {
+  type: 'object',
+  properties: {
+    id: { type: 'number' },
+    title: { type: 'string' },
+    color: { type: 'string', enum: TAB_GROUP_COLOR_SCHEMA.options },
+    collapsed: { type: 'boolean' },
+    shared: { type: 'boolean' },
+    windowId: { type: 'number' },
+  },
+  required: ['id', 'color', 'collapsed', 'windowId'],
+  additionalProperties: true,
+} as const;
+
+export const TAB_GROUP_GET_OUTPUT_SCHEMA = tabGroupOutputSchema satisfies ExtensionToolOutputSchema;
+
+export const TAB_GROUP_QUERY_OUTPUT_SCHEMA = {
+  type: 'object',
+  properties: {
+    count: { type: 'number' },
+    groups: {
+      type: 'array',
+      items: tabGroupOutputSchema,
+    },
+  },
+  required: ['count', 'groups'],
+  additionalProperties: true,
+} as const satisfies ExtensionToolOutputSchema;
+
+export const TAB_GROUP_UPDATE_OUTPUT_SCHEMA =
+  tabGroupOutputSchema satisfies ExtensionToolOutputSchema;
+
+export const TAB_GROUP_MOVE_OUTPUT_SCHEMA =
+  tabGroupOutputSchema satisfies ExtensionToolOutputSchema;
 
 const readMeta = {
   kind: 'chrome-api',
@@ -89,7 +132,7 @@ export const TAB_GROUP_TOOL_CONTRACTS = {
     title: 'Get Tab Group',
     description: 'Retrieve a tab group by its ID',
     inputSchema: TAB_GROUP_GET_INPUT_SCHEMA,
-    outputSchema: GENERIC_EXTENSION_TOOL_OUTPUT_SCHEMA,
+    outputSchema: TAB_GROUP_GET_OUTPUT_SCHEMA,
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -105,7 +148,7 @@ export const TAB_GROUP_TOOL_CONTRACTS = {
     title: 'Query Tab Groups',
     description: 'Search for tab groups that match specified criteria',
     inputSchema: TAB_GROUP_QUERY_INPUT_SCHEMA,
-    outputSchema: GENERIC_EXTENSION_TOOL_OUTPUT_SCHEMA,
+    outputSchema: TAB_GROUP_QUERY_OUTPUT_SCHEMA,
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -121,7 +164,7 @@ export const TAB_GROUP_TOOL_CONTRACTS = {
     title: 'Update Tab Group',
     description: 'Modify properties of a tab group',
     inputSchema: TAB_GROUP_UPDATE_INPUT_SCHEMA,
-    outputSchema: GENERIC_EXTENSION_TOOL_OUTPUT_SCHEMA,
+    outputSchema: TAB_GROUP_UPDATE_OUTPUT_SCHEMA,
     annotations: {
       readOnlyHint: false,
       destructiveHint: false,
@@ -137,7 +180,7 @@ export const TAB_GROUP_TOOL_CONTRACTS = {
     title: 'Move Tab Group',
     description: 'Move a tab group within its window or to a new window',
     inputSchema: TAB_GROUP_MOVE_INPUT_SCHEMA,
-    outputSchema: GENERIC_EXTENSION_TOOL_OUTPUT_SCHEMA,
+    outputSchema: TAB_GROUP_MOVE_OUTPUT_SCHEMA,
     annotations: {
       readOnlyHint: false,
       destructiveHint: false,

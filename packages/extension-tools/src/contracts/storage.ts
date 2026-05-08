@@ -60,6 +60,7 @@ export const STORAGE_GET_BYTES_IN_USE_INPUT_SCHEMA = z.object({
 
 export const STORAGE_GET_OUTPUT_SCHEMA = {
   type: 'object',
+  additionalProperties: false,
   properties: {
     area: {
       type: 'string',
@@ -78,6 +79,7 @@ export const STORAGE_GET_OUTPUT_SCHEMA = {
 
 export const STORAGE_SET_OUTPUT_SCHEMA = {
   type: 'object',
+  additionalProperties: false,
   properties: {
     keys: {
       type: 'array',
@@ -91,6 +93,7 @@ export const STORAGE_SET_OUTPUT_SCHEMA = {
 
 export const STORAGE_REMOVE_OUTPUT_SCHEMA = {
   type: 'object',
+  additionalProperties: false,
   properties: {
     keys: {
       type: 'array',
@@ -104,6 +107,7 @@ export const STORAGE_REMOVE_OUTPUT_SCHEMA = {
 
 export const STORAGE_BYTES_IN_USE_OUTPUT_SCHEMA = {
   type: 'object',
+  additionalProperties: false,
   properties: {
     area: {
       type: 'string',
@@ -119,7 +123,41 @@ export const STORAGE_BYTES_IN_USE_OUTPUT_SCHEMA = {
       anyOf: [
         {
           type: 'object',
-          additionalProperties: true,
+          additionalProperties: false,
+          properties: {
+            quotaBytes: {
+              type: 'number',
+            },
+          },
+          required: ['quotaBytes'],
+        },
+        {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            quotaBytes: {
+              type: 'number',
+            },
+            quotaBytesPerItem: {
+              type: 'number',
+            },
+            maxItems: {
+              type: 'number',
+            },
+            maxWriteOperationsPerHour: {
+              type: 'number',
+            },
+            maxWriteOperationsPerMinute: {
+              type: 'number',
+            },
+          },
+          required: [
+            'quotaBytes',
+            'quotaBytesPerItem',
+            'maxItems',
+            'maxWriteOperationsPerHour',
+            'maxWriteOperationsPerMinute',
+          ],
         },
         {
           type: 'null',

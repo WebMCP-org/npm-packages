@@ -12,6 +12,19 @@ export interface TabGroupsApiToolsOptions {
 
 export const TAB_GROUP_ACTIONS = TAB_GROUP_ACTION_IDS;
 
+function serializeTabGroup(group: chrome.tabGroups.TabGroup) {
+  return {
+    id: group.id,
+    ...(group.title !== undefined ? { title: group.title } : {}),
+    color: group.color,
+    collapsed: group.collapsed,
+    ...((group as { shared?: boolean }).shared !== undefined
+      ? { shared: (group as { shared?: boolean }).shared }
+      : {}),
+    windowId: group.windowId,
+  };
+}
+
 export class TabGroupsApiTools extends BaseApiTools<TabGroupsApiToolsOptions> {
   protected apiName = 'TabGroups';
 
@@ -100,14 +113,7 @@ export class TabGroupsApiTools extends BaseApiTools<TabGroupsApiToolsOptions> {
       });
     });
 
-    return this.formatJson({
-      id: group.id,
-      title: group.title,
-      color: group.color,
-      collapsed: group.collapsed,
-      shared: (group as any).shared,
-      windowId: group.windowId,
-    });
+    return this.formatJson(serializeTabGroup(group));
   }
 
   private async handleQueryTabGroups(raw: unknown) {
@@ -136,14 +142,7 @@ export class TabGroupsApiTools extends BaseApiTools<TabGroupsApiToolsOptions> {
 
     return this.formatJson({
       count: groups.length,
-      groups: groups.map((group) => ({
-        id: group.id,
-        title: group.title,
-        color: group.color,
-        collapsed: group.collapsed,
-        shared: (group as any).shared,
-        windowId: group.windowId,
-      })),
+      groups: groups.map(serializeTabGroup),
     });
   }
 
@@ -172,14 +171,7 @@ export class TabGroupsApiTools extends BaseApiTools<TabGroupsApiToolsOptions> {
       return this.formatError('Failed to update tab group');
     }
 
-    return this.formatSuccess('Tab group updated successfully', {
-      id: updatedGroup.id,
-      title: updatedGroup.title,
-      color: updatedGroup.color,
-      collapsed: updatedGroup.collapsed,
-      shared: (updatedGroup as any).shared,
-      windowId: updatedGroup.windowId,
-    });
+    return this.formatSuccess('Tab group updated successfully', serializeTabGroup(updatedGroup));
   }
 
   private async handleMoveTabGroup(raw: unknown) {
@@ -209,15 +201,7 @@ export class TabGroupsApiTools extends BaseApiTools<TabGroupsApiToolsOptions> {
       return this.formatError('Failed to move tab group');
     }
 
-    return this.formatSuccess('Tab group moved successfully', {
-      id: movedGroup.id,
-      title: movedGroup.title,
-      color: movedGroup.color,
-      collapsed: movedGroup.collapsed,
-      shared: (movedGroup as any).shared,
-      windowId: movedGroup.windowId,
-      newIndex: index,
-    });
+    return this.formatSuccess('Tab group moved successfully', serializeTabGroup(movedGroup));
   }
 
   // ===== Validation Schemas per action =====

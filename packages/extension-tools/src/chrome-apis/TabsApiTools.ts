@@ -247,13 +247,16 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
       });
     }
 
-    return this.formatJson(byDomain);
+    return this.formatJson({
+      domains: byDomain,
+      totalTabs: tabsInfo.length,
+    });
   }
 
   private async handleCreateTab(raw: unknown) {
     const { url, active, pinned } = this.createTabSchema.parse(raw);
     const tab = await chrome.tabs.create({ url, active, pinned });
-    return this.formatSuccess(`Created tab ${tab.id} with URL: ${tab.url || 'about:blank'}`);
+    return this.formatSuccess(`Created tab ${tab.id} with URL: ${tab.url || 'about:blank'}`, tab);
   }
 
   private async handleUpdateTab(raw: unknown) {
@@ -280,13 +283,16 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
       return this.formatError(new Error('Tab does not exist'));
     }
 
-    return this.formatSuccess(`Updated tab ${tab.id}`, updateProperties);
+    return this.formatSuccess(`Updated tab ${tab.id}`, {
+      tab,
+      changes: updateProperties,
+    });
   }
 
   private async handleCloseTabs(raw: unknown) {
     const { tabIds } = this.closeTabsSchema.parse(raw);
     await chrome.tabs.remove(tabIds);
-    return this.formatSuccess(`Closed ${tabIds.length} tab(s): ${tabIds.join(', ')}`);
+    return this.formatSuccess(`Closed ${tabIds.length} tab(s): ${tabIds.join(', ')}`, { tabIds });
   }
 
   private async handleGetAllTabs(raw: unknown) {
@@ -302,7 +308,10 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
       index: tab.index,
     }));
 
-    return this.formatJson(tabInfo);
+    return this.formatJson({
+      count: tabInfo.length,
+      tabs: tabInfo,
+    });
   }
 
   private async handleNavigateHistory(raw: unknown) {
@@ -329,7 +338,7 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
       await chrome.tabs.goForward(tabId);
     }
 
-    return this.formatSuccess(`Navigated ${direction} in tab ${tabId}`);
+    return this.formatSuccess(`Navigated ${direction} in tab ${tabId}`, { tabId, direction });
   }
 
   private async handleReloadTab(raw: unknown) {
@@ -346,7 +355,10 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
     }
 
     await chrome.tabs.reload(tabId, { bypassCache });
-    return this.formatSuccess(`Reloaded tab ${tabId}${bypassCache ? ' (bypassed cache)' : ''}`);
+    return this.formatSuccess(`Reloaded tab ${tabId}${bypassCache ? ' (bypassed cache)' : ''}`, {
+      tabId,
+      bypassCache: bypassCache === true,
+    });
   }
 
   private async handleCaptureVisibleTab(raw: unknown) {
@@ -362,9 +374,12 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
       ? await chrome.tabs.captureVisibleTab(windowId, {})
       : await chrome.tabs.captureVisibleTab();
 
-    chrome.tabs.create({ url: dataUrl });
     return this.formatSuccess(
-      `Screenshot captured (data URL length: ${dataUrl.length} characters)`
+      `Screenshot captured (data URL length: ${dataUrl.length} characters)`,
+      {
+        dataUrl,
+        length: dataUrl.length,
+      }
     );
   }
 
@@ -397,7 +412,7 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
   private async handleGetTab(raw: unknown) {
     const { tabId } = this.getTabSchema.parse(raw);
     const tab = await chrome.tabs.get(tabId);
-    return this.formatJson(tab);
+    return this.formatJson({ tab });
   }
 
   private async handleGetZoom(raw: unknown) {
@@ -417,7 +432,10 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
   private async handleSetZoom(raw: unknown) {
     const { tabId, zoomFactor } = this.setZoomSchema.parse(raw);
     await chrome.tabs.setZoom(tabId!, zoomFactor);
-    return this.formatSuccess(`Set zoom factor to ${zoomFactor === 0 ? 'default' : zoomFactor}`);
+    return this.formatSuccess(`Set zoom factor to ${zoomFactor === 0 ? 'default' : zoomFactor}`, {
+      ...(tabId !== undefined ? { tabId } : {}),
+      zoomFactor,
+    });
   }
 
   private async handleSetZoomSettings(raw: unknown) {
@@ -427,7 +445,10 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
     if (scope) settings.scope = scope;
 
     await chrome.tabs.setZoomSettings(tabId!, settings);
-    return this.formatSuccess('Updated zoom settings', settings);
+    const zoomSettings = await chrome.tabs.getZoomSettings(tabId!);
+    return this.formatSuccess('Updated zoom settings', {
+      settings: zoomSettings,
+    });
   }
 
   private async handleGroupTabs(raw: unknown) {
@@ -451,7 +472,7 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
   private async handleUngroupTabs(raw: unknown) {
     const { tabIds } = this.ungroupTabsSchema.parse(raw);
     await chrome.tabs.ungroup(tabIds.length === 1 ? tabIds[0]! : tabIds);
-    return this.formatSuccess(`Ungrouped ${tabIds.length} tab(s)`);
+    return this.formatSuccess(`Ungrouped ${tabIds.length} tab(s)`, { tabIds });
   }
 
   private async handleHighlightTabs(raw: unknown) {
@@ -476,12 +497,13 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
       moveProperties.windowId = windowId;
     }
 
-    const tabs = chrome.tabs.move(
-      //@ts-expect-error - to lazy to fix this
-      tabIds.length === 1 ? tabIds[0] : tabIds,
+    const movedTabs = await chrome.tabs.move(
+      tabIds.length === 1 ? tabIds[0]! : tabIds,
       moveProperties
     );
-    return this.formatSuccess(`Moved ${tabIds.length} tab(s) to index ${index}`, { tabs });
+    return this.formatSuccess(`Moved ${tabIds.length} tab(s) to index ${index}`, {
+      tabs: Array.isArray(movedTabs) ? movedTabs : [movedTabs],
+    });
   }
 
   private async handleSendMessage(raw: unknown) {

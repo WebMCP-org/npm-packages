@@ -100,7 +100,6 @@ export class HistoryApiTools extends BaseApiTools<HistoryApiToolsOptions> {
   // ===== Action handlers =====
   private async handleAddUrl(raw: unknown) {
     const { url } = this.addUrlSchema.parse(raw);
-    await chrome.history.addUrl({ url });
     await new Promise<void>((resolve, reject) => {
       chrome.history.addUrl({ url }, () => {
         if (chrome.runtime.lastError) {

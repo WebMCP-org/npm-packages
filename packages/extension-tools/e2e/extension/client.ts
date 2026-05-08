@@ -49,6 +49,17 @@ async function bootstrap() {
     unregisterDynamicTool: (name?: string) =>
       sendControlMessage('unregisterDynamicTool', name) as Promise<boolean>,
     registerDirectApiTools: () => sendControlMessage('registerDirectApiTools') as Promise<boolean>,
+    registerBookmarkApiTools: () =>
+      sendControlMessage('registerBookmarkApiTools') as Promise<boolean>,
+    registerHistoryApiTools: () =>
+      sendControlMessage('registerHistoryApiTools') as Promise<boolean>,
+    registerStorageApiTools: () =>
+      sendControlMessage('registerStorageApiTools') as Promise<boolean>,
+    registerTabGroupsApiTools: () =>
+      sendControlMessage('registerTabGroupsApiTools') as Promise<boolean>,
+    registerTabsApiTools: () => sendControlMessage('registerTabsApiTools') as Promise<boolean>,
+    registerWindowsApiTools: () =>
+      sendControlMessage('registerWindowsApiTools') as Promise<boolean>,
     readInvocations: () =>
       sendControlMessage('readInvocations') as Promise<
         Array<{ name: string; arguments: Record<string, unknown> }>
@@ -81,6 +92,12 @@ declare global {
       registerDynamicTool: () => Promise<boolean>;
       unregisterDynamicTool: (name?: string) => Promise<boolean>;
       registerDirectApiTools: () => Promise<boolean>;
+      registerBookmarkApiTools: () => Promise<boolean>;
+      registerHistoryApiTools: () => Promise<boolean>;
+      registerStorageApiTools: () => Promise<boolean>;
+      registerTabGroupsApiTools: () => Promise<boolean>;
+      registerTabsApiTools: () => Promise<boolean>;
+      registerWindowsApiTools: () => Promise<boolean>;
       readInvocations: () => Promise<Array<{ name: string; arguments: Record<string, unknown> }>>;
       resetInvocations: () => Promise<void>;
     };

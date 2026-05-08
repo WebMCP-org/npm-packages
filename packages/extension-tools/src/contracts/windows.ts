@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
 import {
-  GENERIC_EXTENSION_TOOL_OUTPUT_SCHEMA,
   defineExtensionToolContract,
   type ExtensionToolGroupContract,
+  type ExtensionToolOutputSchema,
 } from './core';
 
 export const WINDOWS_GROUP_CONTRACT = {
@@ -11,7 +11,7 @@ export const WINDOWS_GROUP_CONTRACT = {
   title: 'Windows',
   description: 'Chrome windows API actions for reading and mutating browser windows.',
   chromeApi: 'windows',
-  requiredPermissions: ['windows'],
+  requiredPermissions: [],
   optionalPermissions: [],
 } as const satisfies ExtensionToolGroupContract;
 
@@ -35,6 +35,11 @@ export const WINDOW_STATE_SCHEMA = z.enum([
 export const WINDOW_CREATE_TYPE_SCHEMA = z.enum(['normal', 'popup', 'panel']);
 export const WINDOW_FILTER_TYPE_SCHEMA = z.enum(['normal', 'popup', 'panel', 'app', 'devtools']);
 
+const chromeWindowIdSchema = z.number().int();
+const chromeWindowPositionSchema = z.number().int();
+const chromeWindowSizeSchema = z.number().int().min(1);
+const chromeTabIdSchema = z.number().int().min(0);
+
 export const WINDOW_CREATE_INPUT_SCHEMA = z.object({
   url: z
     .union([z.string(), z.array(z.string())])
@@ -44,16 +49,14 @@ export const WINDOW_CREATE_INPUT_SCHEMA = z.object({
     .boolean()
     .optional()
     .describe('If true, opens an active window. If false, opens an inactive window'),
-  height: z
-    .number()
+  height: chromeWindowSizeSchema
     .optional()
     .describe('The height in pixels of the new window, including the frame'),
   incognito: z
     .boolean()
     .optional()
     .describe('Whether the new window should be an incognito window'),
-  left: z
-    .number()
+  left: chromeWindowPositionSchema
     .optional()
     .describe('The number of pixels to position the new window from the left edge of the screen'),
   setSelfAsOpener: z
@@ -61,22 +64,20 @@ export const WINDOW_CREATE_INPUT_SCHEMA = z.object({
     .optional()
     .describe("If true, the newly-created window's 'window.opener' is set to the caller"),
   state: WINDOW_STATE_SCHEMA.optional().describe('The initial state of the window'),
-  tabId: z.number().optional().describe('The ID of the tab to add to the new window'),
-  top: z
-    .number()
+  tabId: chromeTabIdSchema.optional().describe('The ID of the tab to add to the new window'),
+  top: chromeWindowPositionSchema
     .optional()
     .describe('The number of pixels to position the new window from the top edge of the screen'),
   type: WINDOW_CREATE_TYPE_SCHEMA.optional().describe(
     'Specifies what type of browser window to create'
   ),
-  width: z
-    .number()
+  width: chromeWindowSizeSchema
     .optional()
     .describe('The width in pixels of the new window, including the frame'),
 });
 
 export const WINDOW_GET_INPUT_SCHEMA = z.object({
-  windowId: z.number().describe('The ID of the window to get'),
+  windowId: chromeWindowIdSchema.describe('The ID of the window to get'),
   populate: z
     .boolean()
     .optional()
@@ -121,11 +122,11 @@ export const WINDOW_GET_LAST_FOCUSED_INPUT_SCHEMA = z.object({
 });
 
 export const WINDOW_REMOVE_INPUT_SCHEMA = z.object({
-  windowId: z.number().describe('The ID of the window to remove'),
+  windowId: chromeWindowIdSchema.describe('The ID of the window to remove'),
 });
 
 export const WINDOW_UPDATE_INPUT_SCHEMA = z.object({
-  windowId: z.number().describe('The ID of the window to update'),
+  windowId: chromeWindowIdSchema.describe('The ID of the window to update'),
   drawAttention: z
     .boolean()
     .optional()
@@ -133,18 +134,79 @@ export const WINDOW_UPDATE_INPUT_SCHEMA = z.object({
       "If true, causes the window to be displayed in a manner that draws the user's attention"
     ),
   focused: z.boolean().optional().describe('If true, brings the window to the front'),
-  height: z.number().optional().describe('The height to resize the window to in pixels'),
-  left: z
-    .number()
+  height: chromeWindowSizeSchema
+    .optional()
+    .describe('The height to resize the window to in pixels'),
+  left: chromeWindowPositionSchema
     .optional()
     .describe('The offset from the left edge of the screen to move the window to in pixels'),
   state: WINDOW_STATE_SCHEMA.optional().describe('The new state of the window'),
-  top: z
-    .number()
+  top: chromeWindowPositionSchema
     .optional()
     .describe('The offset from the top edge of the screen to move the window to in pixels'),
-  width: z.number().optional().describe('The width to resize the window to in pixels'),
+  width: chromeWindowSizeSchema.optional().describe('The width to resize the window to in pixels'),
 });
+
+const chromeWindowTabOutputSchema = {
+  type: 'object',
+  properties: {
+    id: { type: 'number' },
+    index: { type: 'number' },
+    url: { type: 'string' },
+    title: { type: 'string' },
+    active: { type: 'boolean' },
+  },
+  additionalProperties: true,
+} as const;
+
+const chromeWindowOutputSchema = {
+  type: 'object',
+  properties: {
+    id: { type: 'number' },
+    focused: { type: 'boolean' },
+    incognito: { type: 'boolean' },
+    alwaysOnTop: { type: 'boolean' },
+    state: {
+      type: 'string',
+      enum: ['normal', 'minimized', 'maximized', 'fullscreen', 'locked-fullscreen'],
+    },
+    type: { type: 'string', enum: ['normal', 'popup', 'panel', 'app', 'devtools'] },
+    left: { type: 'number' },
+    top: { type: 'number' },
+    width: { type: 'number' },
+    height: { type: 'number' },
+    sessionId: { type: 'string' },
+    tabs: {
+      type: 'array',
+      items: chromeWindowTabOutputSchema,
+    },
+  },
+  required: ['id', 'focused', 'incognito', 'alwaysOnTop', 'state', 'type'],
+  additionalProperties: true,
+} as const;
+
+export const WINDOW_SINGLE_OUTPUT_SCHEMA =
+  chromeWindowOutputSchema satisfies ExtensionToolOutputSchema;
+
+export const WINDOW_GET_ALL_OUTPUT_SCHEMA = {
+  type: 'object',
+  properties: {
+    count: { type: 'number' },
+    windows: {
+      type: 'array',
+      items: chromeWindowOutputSchema,
+    },
+  },
+  required: ['count', 'windows'],
+} as const satisfies ExtensionToolOutputSchema;
+
+export const WINDOW_REMOVE_OUTPUT_SCHEMA = {
+  type: 'object',
+  properties: {
+    windowId: { type: 'number' },
+  },
+  required: ['windowId'],
+} as const satisfies ExtensionToolOutputSchema;
 
 const readMeta = {
   kind: 'chrome-api',
@@ -181,7 +243,7 @@ export const WINDOW_TOOL_CONTRACTS = {
     title: 'Create Window',
     description: 'Create a new browser window with optional sizing, position, or default URL',
     inputSchema: WINDOW_CREATE_INPUT_SCHEMA,
-    outputSchema: GENERIC_EXTENSION_TOOL_OUTPUT_SCHEMA,
+    outputSchema: WINDOW_SINGLE_OUTPUT_SCHEMA,
     annotations: {
       readOnlyHint: false,
       destructiveHint: false,
@@ -200,7 +262,7 @@ export const WINDOW_TOOL_CONTRACTS = {
     title: 'Get Window',
     description: 'Get details about a specific window',
     inputSchema: WINDOW_GET_INPUT_SCHEMA,
-    outputSchema: GENERIC_EXTENSION_TOOL_OUTPUT_SCHEMA,
+    outputSchema: WINDOW_SINGLE_OUTPUT_SCHEMA,
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -216,7 +278,7 @@ export const WINDOW_TOOL_CONTRACTS = {
     title: 'Get All Windows',
     description: 'Get all browser windows',
     inputSchema: WINDOW_GET_ALL_INPUT_SCHEMA,
-    outputSchema: GENERIC_EXTENSION_TOOL_OUTPUT_SCHEMA,
+    outputSchema: WINDOW_GET_ALL_OUTPUT_SCHEMA,
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -232,7 +294,7 @@ export const WINDOW_TOOL_CONTRACTS = {
     title: 'Get Current Window',
     description: 'Get the current window',
     inputSchema: WINDOW_GET_CURRENT_INPUT_SCHEMA,
-    outputSchema: GENERIC_EXTENSION_TOOL_OUTPUT_SCHEMA,
+    outputSchema: WINDOW_SINGLE_OUTPUT_SCHEMA,
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -248,7 +310,7 @@ export const WINDOW_TOOL_CONTRACTS = {
     title: 'Get Last Focused Window',
     description: 'Get the window that was most recently focused',
     inputSchema: WINDOW_GET_LAST_FOCUSED_INPUT_SCHEMA,
-    outputSchema: GENERIC_EXTENSION_TOOL_OUTPUT_SCHEMA,
+    outputSchema: WINDOW_SINGLE_OUTPUT_SCHEMA,
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -264,7 +326,7 @@ export const WINDOW_TOOL_CONTRACTS = {
     title: 'Remove Window',
     description: 'Remove (close) a window and all the tabs inside it',
     inputSchema: WINDOW_REMOVE_INPUT_SCHEMA,
-    outputSchema: GENERIC_EXTENSION_TOOL_OUTPUT_SCHEMA,
+    outputSchema: WINDOW_REMOVE_OUTPUT_SCHEMA,
     annotations: {
       readOnlyHint: false,
       destructiveHint: true,
@@ -280,7 +342,7 @@ export const WINDOW_TOOL_CONTRACTS = {
     title: 'Update Window',
     description: 'Update the properties of a window',
     inputSchema: WINDOW_UPDATE_INPUT_SCHEMA,
-    outputSchema: GENERIC_EXTENSION_TOOL_OUTPUT_SCHEMA,
+    outputSchema: WINDOW_SINGLE_OUTPUT_SCHEMA,
     annotations: {
       readOnlyHint: false,
       destructiveHint: false,
