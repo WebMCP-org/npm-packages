@@ -75,9 +75,110 @@ const mcpTools = enabledContracts.map((contract) => ({
 console.log(TAB_TOOL_CONTRACTS.createTab.inputSchema);
 ```
 
-Each contract includes the stable MCP tool name, title, description, JSON input schema, output schema when the runtime returns structured output, MCP annotations, and namespaced package metadata under `mcp-b/extension-tools`.
+Each contract includes the stable MCP tool name, title, description, input schema, output schema when the runtime returns structured output, MCP annotations, and serializable extension metadata.
 
-Stable metadata fields include package/version family, tool kind, group ID, action ID, Chrome API namespace, required and optional permissions, Manifest version, runtime context, host/active-tab/tab/frame/origin/URL/user-gesture requirements, effect, and risk level. This metadata is declarative only; callers still own enablement, approval, and policy enforcement.
+### Contract Authoring Target
+
+Extension tool modules should treat the MCP tool descriptor as the public contract and keep execution separate from that contract.
+
+The target shape is:
+
+- tool contract: MCP `Tool` descriptor fields, without an execution handler
+- schemas: exported Zod input and output schemas
+- types: exported `z.infer` input and output types
+- annotations: MCP `ToolAnnotations`
+- metadata: a small `_meta.extension` payload that serializes through MCP
+- handler: a runtime-only function that accepts the inferred input type and returns the inferred output type
+
+The contract should stay portable. Consumers can adapt it into MCP SDK tools, Vercel AI SDK tools, Mastra tools, setup UIs, policy screens, or docs without importing Chrome execution code.
+
+```typescript
+import { z } from 'zod';
+import type { Tool, ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
+
+export type ExtensionToolMeta = {
+  groupId: string;
+  actionId: string;
+  chromeApi: string;
+  permissions?: string[];
+  hostPermissions?: string[];
+  requiresActiveTab?: boolean;
+};
+
+export type ExtensionToolContract = Omit<Tool, 'inputSchema' | 'outputSchema'> & {
+  inputSchema: z.ZodObject;
+  outputSchema?: z.ZodType;
+  annotations?: ToolAnnotations;
+  _meta?: {
+    extension?: ExtensionToolMeta;
+  };
+};
+```
+
+Example module shape:
+
+```typescript
+export const STORAGE_AREA_SCHEMA = z.enum(['sync', 'local', 'session']);
+
+export const STORAGE_SET_INPUT_SCHEMA = z.object({
+  area: STORAGE_AREA_SCHEMA.default('local'),
+  data: z.record(z.string(), z.unknown()),
+});
+
+export const STORAGE_SET_OUTPUT_SCHEMA = z.object({
+  keys: z.array(z.string()),
+});
+
+export type StorageSetInput = z.infer<typeof STORAGE_SET_INPUT_SCHEMA>;
+export type StorageSetOutput = z.infer<typeof STORAGE_SET_OUTPUT_SCHEMA>;
+
+export const STORAGE_SET_TOOL = {
+  name: 'extension_tool_set_storage',
+  title: 'Set Storage',
+  description: 'Set data in extension storage',
+  inputSchema: STORAGE_SET_INPUT_SCHEMA,
+  outputSchema: STORAGE_SET_OUTPUT_SCHEMA,
+  annotations: {
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
+  },
+  _meta: {
+    extension: {
+      groupId: 'storage',
+      actionId: 'setStorage',
+      chromeApi: 'storage',
+      permissions: ['storage'],
+    },
+  },
+} satisfies ExtensionToolContract;
+```
+
+The handler should use the schema-derived types directly. It should not own names, descriptions, annotations, or metadata.
+
+```typescript
+export async function handleSetStorage(input: StorageSetInput): Promise<StorageSetOutput> {
+  await chrome.storage[input.area].set(input.data);
+
+  return {
+    keys: Object.keys(input.data),
+  };
+}
+```
+
+The runtime adapter owns edge validation and MCP result formatting:
+
+```typescript
+registerExtensionTool({
+  contract: STORAGE_SET_TOOL,
+  inputSchema: STORAGE_SET_INPUT_SCHEMA,
+  outputSchema: STORAGE_SET_OUTPUT_SCHEMA,
+  handler: handleSetStorage,
+});
+```
+
+The adapter validates input once at the tool-call boundary, validates output when an output schema exists, and returns `structuredContent` for successful structured tools. Errors should be returned as MCP errors or `CallToolResult` values with `isError: true`.
 
 ## API Implementation Status
 
