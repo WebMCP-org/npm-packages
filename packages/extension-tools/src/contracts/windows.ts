@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
 import {
-  defineExtensionToolContract,
   type ExtensionToolGroupContract,
-  type ExtensionToolOutputSchema,
+  type ToolAnnotations,
+  type ZodExtensionToolContract,
 } from './core';
 
 export const WINDOWS_GROUP_CONTRACT = {
@@ -147,97 +147,94 @@ export const WINDOW_UPDATE_INPUT_SCHEMA = z.object({
   width: chromeWindowSizeSchema.optional().describe('The width to resize the window to in pixels'),
 });
 
-const chromeWindowTabOutputSchema = {
-  type: 'object',
-  properties: {
-    id: { type: 'number' },
-    index: { type: 'number' },
-    url: { type: 'string' },
-    title: { type: 'string' },
-    active: { type: 'boolean' },
-  },
-  additionalProperties: true,
-} as const;
+export const WINDOW_TAB_OUTPUT_SCHEMA = z.object({
+  id: z.number().optional(),
+  index: z.number().optional(),
+  url: z.string().optional(),
+  title: z.string().optional(),
+  active: z.boolean().optional(),
+});
 
-const chromeWindowOutputSchema = {
-  type: 'object',
-  properties: {
-    id: { type: 'number' },
-    focused: { type: 'boolean' },
-    incognito: { type: 'boolean' },
-    alwaysOnTop: { type: 'boolean' },
-    state: {
-      type: 'string',
-      enum: ['normal', 'minimized', 'maximized', 'fullscreen', 'locked-fullscreen'],
+export const WINDOW_SINGLE_OUTPUT_SCHEMA = z.object({
+  id: z.number(),
+  focused: z.boolean(),
+  incognito: z.boolean(),
+  alwaysOnTop: z.boolean(),
+  state: WINDOW_STATE_SCHEMA,
+  type: WINDOW_FILTER_TYPE_SCHEMA,
+  left: z.number().optional(),
+  top: z.number().optional(),
+  width: z.number().optional(),
+  height: z.number().optional(),
+  sessionId: z.string().optional(),
+  tabs: z.array(WINDOW_TAB_OUTPUT_SCHEMA).optional(),
+});
+
+export const WINDOW_GET_ALL_OUTPUT_SCHEMA = z.object({
+  count: z.number(),
+  windows: z.array(WINDOW_SINGLE_OUTPUT_SCHEMA),
+});
+
+export const WINDOW_REMOVE_OUTPUT_SCHEMA = z.object({
+  windowId: z.number(),
+});
+
+export type WindowCreateInput = z.infer<typeof WINDOW_CREATE_INPUT_SCHEMA>;
+export type WindowCreateOutput = z.infer<typeof WINDOW_SINGLE_OUTPUT_SCHEMA>;
+export type WindowGetInput = z.infer<typeof WINDOW_GET_INPUT_SCHEMA>;
+export type WindowGetOutput = z.infer<typeof WINDOW_SINGLE_OUTPUT_SCHEMA>;
+export type WindowGetAllInput = z.infer<typeof WINDOW_GET_ALL_INPUT_SCHEMA>;
+export type WindowGetAllOutput = z.infer<typeof WINDOW_GET_ALL_OUTPUT_SCHEMA>;
+export type WindowGetCurrentInput = z.infer<typeof WINDOW_GET_CURRENT_INPUT_SCHEMA>;
+export type WindowGetLastFocusedInput = z.infer<typeof WINDOW_GET_LAST_FOCUSED_INPUT_SCHEMA>;
+export type WindowRemoveInput = z.infer<typeof WINDOW_REMOVE_INPUT_SCHEMA>;
+export type WindowRemoveOutput = z.infer<typeof WINDOW_REMOVE_OUTPUT_SCHEMA>;
+export type WindowUpdateInput = z.infer<typeof WINDOW_UPDATE_INPUT_SCHEMA>;
+export type WindowUpdateOutput = z.infer<typeof WINDOW_SINGLE_OUTPUT_SCHEMA>;
+
+const WINDOW_PERMISSIONS = [] as const;
+
+function defineWindowTool<
+  const TName extends string,
+  const TActionId extends (typeof WINDOW_ACTION_IDS)[number],
+  const TInputSchema extends z.AnyZodObject,
+  const TOutputSchema extends z.ZodTypeAny,
+>(options: {
+  actionId: TActionId;
+  name: TName;
+  title: string;
+  description: string;
+  inputSchema: TInputSchema;
+  outputSchema: TOutputSchema;
+  annotations: ToolAnnotations;
+}): ZodExtensionToolContract<TName, 'windows', TActionId, TInputSchema, TOutputSchema> {
+  return {
+    name: options.name,
+    title: options.title,
+    description: options.description,
+    inputSchema: options.inputSchema,
+    outputSchema: options.outputSchema,
+    annotations: {
+      title: options.title,
+      ...options.annotations,
     },
-    type: { type: 'string', enum: ['normal', 'popup', 'panel', 'app', 'devtools'] },
-    left: { type: 'number' },
-    top: { type: 'number' },
-    width: { type: 'number' },
-    height: { type: 'number' },
-    sessionId: { type: 'string' },
-    tabs: {
-      type: 'array',
-      items: chromeWindowTabOutputSchema,
+    _meta: {
+      extension: {
+        groupId: 'windows',
+        actionId: options.actionId,
+        chromeApi: WINDOWS_GROUP_CONTRACT.chromeApi,
+        permissions: WINDOW_PERMISSIONS,
+      },
     },
-  },
-  required: ['id', 'focused', 'incognito', 'alwaysOnTop', 'state', 'type'],
-  additionalProperties: true,
-} as const;
-
-export const WINDOW_SINGLE_OUTPUT_SCHEMA =
-  chromeWindowOutputSchema satisfies ExtensionToolOutputSchema;
-
-export const WINDOW_GET_ALL_OUTPUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    count: { type: 'number' },
-    windows: {
-      type: 'array',
-      items: chromeWindowOutputSchema,
-    },
-  },
-  required: ['count', 'windows'],
-} as const satisfies ExtensionToolOutputSchema;
-
-export const WINDOW_REMOVE_OUTPUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    windowId: { type: 'number' },
-  },
-  required: ['windowId'],
-} as const satisfies ExtensionToolOutputSchema;
-
-const readMeta = {
-  kind: 'chrome-api',
-  runtimeContext: ['bgsw'],
-  hostPermissionsRequired: false,
-  activeTabRequired: false,
-  tabIdRequired: false,
-  frameIdSupported: false,
-  originRequired: false,
-  urlRequired: false,
-  userGestureRequired: false,
-  effect: 'read',
-  riskLevel: 'low',
-} as const;
-
-const mutateMeta = {
-  ...readMeta,
-  effect: 'mutate',
-  riskLevel: 'medium',
-} as const;
-
-const deleteMeta = {
-  ...readMeta,
-  tabIdRequired: false,
-  effect: 'delete',
-  riskLevel: 'high',
-} as const;
+    groupId: 'windows',
+    actionId: options.actionId,
+    zodInputSchema: options.inputSchema,
+    zodOutputSchema: options.outputSchema,
+  };
+}
 
 export const WINDOW_TOOL_CONTRACTS = {
-  create: defineExtensionToolContract({
-    group: WINDOWS_GROUP_CONTRACT,
+  create: defineWindowTool({
     actionId: 'create',
     name: 'extension_tool_create_window',
     title: 'Create Window',
@@ -250,13 +247,8 @@ export const WINDOW_TOOL_CONTRACTS = {
       idempotentHint: false,
       openWorldHint: true,
     },
-    meta: {
-      ...mutateMeta,
-      urlRequired: false,
-    },
   }),
-  get: defineExtensionToolContract({
-    group: WINDOWS_GROUP_CONTRACT,
+  get: defineWindowTool({
     actionId: 'get',
     name: 'extension_tool_get_window',
     title: 'Get Window',
@@ -269,10 +261,8 @@ export const WINDOW_TOOL_CONTRACTS = {
       idempotentHint: true,
       openWorldHint: true,
     },
-    meta: readMeta,
   }),
-  getAll: defineExtensionToolContract({
-    group: WINDOWS_GROUP_CONTRACT,
+  getAll: defineWindowTool({
     actionId: 'getAll',
     name: 'extension_tool_get_all_windows',
     title: 'Get All Windows',
@@ -285,10 +275,8 @@ export const WINDOW_TOOL_CONTRACTS = {
       idempotentHint: true,
       openWorldHint: true,
     },
-    meta: readMeta,
   }),
-  getCurrent: defineExtensionToolContract({
-    group: WINDOWS_GROUP_CONTRACT,
+  getCurrent: defineWindowTool({
     actionId: 'getCurrent',
     name: 'extension_tool_get_current_window',
     title: 'Get Current Window',
@@ -301,10 +289,8 @@ export const WINDOW_TOOL_CONTRACTS = {
       idempotentHint: true,
       openWorldHint: true,
     },
-    meta: readMeta,
   }),
-  getLastFocused: defineExtensionToolContract({
-    group: WINDOWS_GROUP_CONTRACT,
+  getLastFocused: defineWindowTool({
     actionId: 'getLastFocused',
     name: 'extension_tool_get_last_focused_window',
     title: 'Get Last Focused Window',
@@ -317,10 +303,8 @@ export const WINDOW_TOOL_CONTRACTS = {
       idempotentHint: true,
       openWorldHint: true,
     },
-    meta: readMeta,
   }),
-  remove: defineExtensionToolContract({
-    group: WINDOWS_GROUP_CONTRACT,
+  remove: defineWindowTool({
     actionId: 'remove',
     name: 'extension_tool_remove_window',
     title: 'Remove Window',
@@ -333,10 +317,8 @@ export const WINDOW_TOOL_CONTRACTS = {
       idempotentHint: false,
       openWorldHint: true,
     },
-    meta: deleteMeta,
   }),
-  update: defineExtensionToolContract({
-    group: WINDOWS_GROUP_CONTRACT,
+  update: defineWindowTool({
     actionId: 'update',
     name: 'extension_tool_update_window',
     title: 'Update Window',
@@ -349,7 +331,6 @@ export const WINDOW_TOOL_CONTRACTS = {
       idempotentHint: true,
       openWorldHint: true,
     },
-    meta: mutateMeta,
   }),
 } as const;
 

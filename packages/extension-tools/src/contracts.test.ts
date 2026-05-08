@@ -140,7 +140,7 @@ describe('extension tool contracts', () => {
   });
 
   it('uses sampled concrete output schemas for real-browser bookmark conformance tools', () => {
-    expect(BOOKMARK_TOOL_CONTRACTS.create.outputSchema).toMatchObject({
+    expect(getExtensionToolOutputSchema(BOOKMARK_TOOL_CONTRACTS.create)).toMatchObject({
       type: 'object',
       required: ['id', 'title', 'parentId', 'index', 'dateAdded', 'type'],
       properties: {
@@ -152,7 +152,7 @@ describe('extension tool contracts', () => {
         type: { enum: ['bookmark', 'folder'] },
       },
     });
-    expect(BOOKMARK_TOOL_CONTRACTS.get.outputSchema).toMatchObject({
+    expect(getExtensionToolOutputSchema(BOOKMARK_TOOL_CONTRACTS.get)).toMatchObject({
       type: 'object',
       required: ['count', 'bookmarks'],
       properties: {
@@ -165,7 +165,7 @@ describe('extension tool contracts', () => {
         },
       },
     });
-    expect(BOOKMARK_TOOL_CONTRACTS.search.outputSchema).toMatchObject({
+    expect(getExtensionToolOutputSchema(BOOKMARK_TOOL_CONTRACTS.search)).toMatchObject({
       type: 'object',
       required: ['query', 'count', 'results'],
       properties: {
@@ -179,7 +179,7 @@ describe('extension tool contracts', () => {
         },
       },
     });
-    expect(BOOKMARK_TOOL_CONTRACTS.remove.outputSchema).toMatchObject({
+    expect(getExtensionToolOutputSchema(BOOKMARK_TOOL_CONTRACTS.remove)).toMatchObject({
       type: 'object',
       required: ['id'],
       properties: {
@@ -189,7 +189,7 @@ describe('extension tool contracts', () => {
   });
 
   it('uses sampled concrete output schemas for real-browser tabs conformance tools', () => {
-    expect(TAB_TOOL_CONTRACTS.createTab.outputSchema).toMatchObject({
+    expect(getExtensionToolOutputSchema(TAB_TOOL_CONTRACTS.createTab)).toMatchObject({
       type: 'object',
       required: ['id', 'index', 'windowId', 'active', 'pinned'],
       properties: {
@@ -200,7 +200,7 @@ describe('extension tool contracts', () => {
         windowId: { type: 'number' },
       },
     });
-    expect(TAB_TOOL_CONTRACTS.getAllTabs.outputSchema).toMatchObject({
+    expect(getExtensionToolOutputSchema(TAB_TOOL_CONTRACTS.getAllTabs)).toMatchObject({
       type: 'object',
       required: ['count', 'tabs'],
       properties: {
@@ -213,7 +213,7 @@ describe('extension tool contracts', () => {
         },
       },
     });
-    expect(TAB_TOOL_CONTRACTS.closeTabs.outputSchema).toMatchObject({
+    expect(getExtensionToolOutputSchema(TAB_TOOL_CONTRACTS.closeTabs)).toMatchObject({
       type: 'object',
       required: ['tabIds'],
       properties: {
@@ -223,7 +223,7 @@ describe('extension tool contracts', () => {
         },
       },
     });
-    expect(TAB_TOOL_CONTRACTS.getTab.outputSchema).toMatchObject({
+    expect(getExtensionToolOutputSchema(TAB_TOOL_CONTRACTS.getTab)).toMatchObject({
       type: 'object',
       required: ['tab'],
       properties: {
@@ -232,11 +232,11 @@ describe('extension tool contracts', () => {
         },
       },
     });
-    expect(TAB_TOOL_CONTRACTS.getZoomSettings.outputSchema).toMatchObject({
+    expect(getExtensionToolOutputSchema(TAB_TOOL_CONTRACTS.getZoomSettings)).toMatchObject({
       type: 'object',
       required: ['mode', 'scope', 'defaultZoomFactor'],
     });
-    expect(TAB_TOOL_CONTRACTS.detectLanguage.outputSchema).toMatchObject({
+    expect(getExtensionToolOutputSchema(TAB_TOOL_CONTRACTS.detectLanguage)).toMatchObject({
       type: 'object',
       required: ['language'],
       properties: {
@@ -300,7 +300,7 @@ describe('extension tool contracts', () => {
   });
 
   it('uses sampled concrete output schemas for real-browser windows conformance tools', () => {
-    expect(WINDOW_TOOL_CONTRACTS.create.outputSchema).toMatchObject({
+    expect(getExtensionToolOutputSchema(WINDOW_TOOL_CONTRACTS.create)).toMatchObject({
       type: 'object',
       required: ['id', 'focused', 'incognito', 'alwaysOnTop', 'state', 'type'],
       properties: {
@@ -320,7 +320,7 @@ describe('extension tool contracts', () => {
         },
       },
     });
-    expect(WINDOW_TOOL_CONTRACTS.getAll.outputSchema).toMatchObject({
+    expect(getExtensionToolOutputSchema(WINDOW_TOOL_CONTRACTS.getAll)).toMatchObject({
       type: 'object',
       required: ['count', 'windows'],
       properties: {
@@ -333,7 +333,7 @@ describe('extension tool contracts', () => {
         },
       },
     });
-    expect(WINDOW_TOOL_CONTRACTS.remove.outputSchema).toMatchObject({
+    expect(getExtensionToolOutputSchema(WINDOW_TOOL_CONTRACTS.remove)).toMatchObject({
       type: 'object',
       required: ['windowId'],
       properties: {
@@ -343,14 +343,14 @@ describe('extension tool contracts', () => {
   });
 
   it('uses sampled concrete output schemas for real-browser history conformance tools', () => {
-    expect(HISTORY_TOOL_CONTRACTS.addUrl.outputSchema).toMatchObject({
+    expect(getExtensionToolOutputSchema(HISTORY_TOOL_CONTRACTS.addUrl)).toMatchObject({
       type: 'object',
       required: ['url'],
       properties: {
         url: { type: 'string' },
       },
     });
-    expect(HISTORY_TOOL_CONTRACTS.deleteRange.outputSchema).toMatchObject({
+    expect(getExtensionToolOutputSchema(HISTORY_TOOL_CONTRACTS.deleteRange)).toMatchObject({
       type: 'object',
       required: ['startTime', 'endTime', 'startTimeFormatted', 'endTimeFormatted'],
       properties: {
@@ -360,7 +360,7 @@ describe('extension tool contracts', () => {
         endTimeFormatted: { type: 'string' },
       },
     });
-    expect(HISTORY_TOOL_CONTRACTS.getVisits.outputSchema).toMatchObject({
+    expect(getExtensionToolOutputSchema(HISTORY_TOOL_CONTRACTS.getVisits)).toMatchObject({
       type: 'object',
       required: ['url', 'visitCount', 'visits'],
       properties: {
@@ -374,7 +374,7 @@ describe('extension tool contracts', () => {
         },
       },
     });
-    expect(HISTORY_TOOL_CONTRACTS.search.outputSchema).toMatchObject({
+    expect(getExtensionToolOutputSchema(HISTORY_TOOL_CONTRACTS.search)).toMatchObject({
       type: 'object',
       required: ['query', 'resultCount', 'results'],
       properties: {
@@ -391,7 +391,7 @@ describe('extension tool contracts', () => {
         },
       },
     });
-    expect(HISTORY_TOOL_CONTRACTS.deleteUrl.outputSchema).toMatchObject({
+    expect(getExtensionToolOutputSchema(HISTORY_TOOL_CONTRACTS.deleteUrl)).toMatchObject({
       type: 'object',
       required: ['url'],
       properties: {

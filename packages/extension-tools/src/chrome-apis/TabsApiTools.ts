@@ -1,7 +1,30 @@
 import type { McpServer } from '@mcp-b/webmcp-ts-sdk';
 
 import { type ApiAvailability, BaseApiTools } from '../BaseApiTools';
-import { TAB_ACTION_IDS, TAB_TOOL_CONTRACTS } from '../contracts/tabs';
+import {
+  TAB_ACTION_IDS,
+  TAB_TOOL_CONTRACTS,
+  type TabCaptureVisibleInput,
+  type TabCloseInput,
+  type TabCreateInput,
+  type TabDetectLanguageInput,
+  type TabDiscardInput,
+  type TabDuplicateInput,
+  type TabGetAllInput,
+  type TabGetInput,
+  type TabGetZoomInput,
+  type TabGetZoomSettingsInput,
+  type TabGroupInput,
+  type TabHighlightInput,
+  type TabMoveInput,
+  type TabNavigateHistoryInput,
+  type TabReloadInput,
+  type TabSendMessageInput,
+  type TabSetZoomInput,
+  type TabSetZoomSettingsInput,
+  type TabUngroupInput,
+  type TabUpdateInput,
+} from '../contracts/tabs';
 
 export interface TabsApiToolsOptions {
   listActiveTabs?: boolean;
@@ -259,14 +282,12 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
     });
   }
 
-  private async handleCreateTab(raw: unknown) {
-    const { url, active, pinned } = this.createTabSchema.parse(raw);
+  private async handleCreateTab({ url, active, pinned }: TabCreateInput) {
     const tab = await chrome.tabs.create({ url, active, pinned });
     return this.formatSuccess(`Created tab ${tab.id} with URL: ${tab.url || 'about:blank'}`, tab);
   }
 
-  private async handleUpdateTab(raw: unknown) {
-    let { tabId, url, active, pinned, muted } = this.updateTabSchema.parse(raw);
+  private async handleUpdateTab({ tabId, url, active, pinned, muted }: TabUpdateInput) {
     if (tabId === undefined) {
       const [activeTab] = await chrome.tabs.query({
         active: true,
@@ -295,14 +316,12 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
     });
   }
 
-  private async handleCloseTabs(raw: unknown) {
-    const { tabIds } = this.closeTabsSchema.parse(raw);
+  private async handleCloseTabs({ tabIds }: TabCloseInput) {
     await chrome.tabs.remove(tabIds);
     return this.formatSuccess(`Closed ${tabIds.length} tab(s): ${tabIds.join(', ')}`, { tabIds });
   }
 
-  private async handleGetAllTabs(raw: unknown) {
-    const { currentWindow } = this.getAllTabsSchema.parse(raw);
+  private async handleGetAllTabs({ currentWindow }: TabGetAllInput) {
     const tabs = await chrome.tabs.query(currentWindow ? { currentWindow: true } : {});
     const tabInfo = tabs.map((tab) => ({
       id: tab.id,
@@ -320,13 +339,12 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
     });
   }
 
-  private async handleNavigateHistory(raw: unknown) {
+  private async handleNavigateHistory({ tabId, direction }: TabNavigateHistoryInput) {
     if (typeof chrome.tabs.goBack !== 'function' || typeof chrome.tabs.goForward !== 'function') {
       return this.formatError(
         new Error('✗ Navigation methods not available - Chrome 72+ required')
       );
     }
-    let { tabId, direction } = this.navigateHistorySchema.parse(raw);
     if (tabId === undefined) {
       const [activeTab] = await chrome.tabs.query({
         active: true,
@@ -347,8 +365,7 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
     return this.formatSuccess(`Navigated ${direction} in tab ${tabId}`, { tabId, direction });
   }
 
-  private async handleReloadTab(raw: unknown) {
-    let { tabId, bypassCache } = this.reloadTabSchema.parse(raw);
+  private async handleReloadTab({ tabId, bypassCache }: TabReloadInput) {
     if (tabId === undefined) {
       const [activeTab] = await chrome.tabs.query({
         active: true,
@@ -367,7 +384,7 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
     });
   }
 
-  private async handleCaptureVisibleTab(raw: unknown) {
+  private async handleCaptureVisibleTab({ windowId }: TabCaptureVisibleInput) {
     if (typeof chrome.tabs.captureVisibleTab !== 'function') {
       return this.formatError(
         new Error(
@@ -375,7 +392,6 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
         )
       );
     }
-    const { windowId } = this.captureVisibleTabSchema.parse(raw);
     const dataUrl = windowId
       ? await chrome.tabs.captureVisibleTab(windowId, {})
       : await chrome.tabs.captureVisibleTab();
@@ -389,16 +405,14 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
     );
   }
 
-  private async handleDetectLanguage(raw: unknown) {
-    const { tabId } = this.detectLanguageSchema.parse(raw);
+  private async handleDetectLanguage({ tabId }: TabDetectLanguageInput) {
     const language = await chrome.tabs.detectLanguage(tabId);
     return this.formatSuccess(`Tab language detected: ${language}`, {
       language,
     });
   }
 
-  private async handleDiscardTab(raw: unknown) {
-    const { tabId } = this.discardTabSchema.parse(raw);
+  private async handleDiscardTab({ tabId }: TabDiscardInput) {
     const tab = await chrome.tabs.discard(tabId);
     if (!tab) {
       return this.formatError(new Error('Failed to discard tab'));
@@ -406,8 +420,7 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
     return this.formatSuccess(`Discarded tab ${tab.id}`, { tab });
   }
 
-  private async handleDuplicateTab(raw: unknown) {
-    const { tabId } = this.duplicateTabSchema.parse(raw);
+  private async handleDuplicateTab({ tabId }: TabDuplicateInput) {
     const tab = await chrome.tabs.duplicate(tabId);
     if (!tab) {
       return this.formatError(new Error('Failed to duplicate tab'));
@@ -415,28 +428,24 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
     return this.formatSuccess(`Duplicated tab ${tab.id}`, { tab });
   }
 
-  private async handleGetTab(raw: unknown) {
-    const { tabId } = this.getTabSchema.parse(raw);
+  private async handleGetTab({ tabId }: TabGetInput) {
     const tab = await chrome.tabs.get(tabId);
     return this.formatJson({ tab });
   }
 
-  private async handleGetZoom(raw: unknown) {
-    const { tabId } = this.getZoomSchema.parse(raw);
+  private async handleGetZoom({ tabId }: TabGetZoomInput) {
     const zoomFactor = await chrome.tabs.getZoom(tabId);
     return this.formatSuccess(`Zoom factor: ${zoomFactor}`, {
       zoomFactor,
     });
   }
 
-  private async handleGetZoomSettings(raw: unknown) {
-    const { tabId } = this.getZoomSettingsSchema.parse(raw);
+  private async handleGetZoomSettings({ tabId }: TabGetZoomSettingsInput) {
     const zoomSettings = await chrome.tabs.getZoomSettings(tabId);
     return this.formatJson(zoomSettings);
   }
 
-  private async handleSetZoom(raw: unknown) {
-    const { tabId, zoomFactor } = this.setZoomSchema.parse(raw);
+  private async handleSetZoom({ tabId, zoomFactor }: TabSetZoomInput) {
     await chrome.tabs.setZoom(tabId, zoomFactor);
     return this.formatSuccess(`Set zoom factor to ${zoomFactor === 0 ? 'default' : zoomFactor}`, {
       ...(tabId !== undefined ? { tabId } : {}),
@@ -444,8 +453,7 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
     });
   }
 
-  private async handleSetZoomSettings(raw: unknown) {
-    const { tabId, mode, scope } = this.setZoomSettingsSchema.parse(raw);
+  private async handleSetZoomSettings({ tabId, mode, scope }: TabSetZoomSettingsInput) {
     const settings: chrome.tabs.ZoomSettings = {};
     if (mode) settings.mode = mode;
     if (scope) settings.scope = scope;
@@ -457,8 +465,7 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
     });
   }
 
-  private async handleGroupTabs(raw: unknown) {
-    const { tabIds, groupId, createProperties } = this.groupTabsSchema.parse(raw);
+  private async handleGroupTabs({ tabIds, groupId, createProperties }: TabGroupInput) {
     const options: Parameters<typeof chrome.tabs.group>[0] = {
       tabIds: toSingleOrNonEmptyNumberList(tabIds),
     };
@@ -475,14 +482,12 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
     });
   }
 
-  private async handleUngroupTabs(raw: unknown) {
-    const { tabIds } = this.ungroupTabsSchema.parse(raw);
+  private async handleUngroupTabs({ tabIds }: TabUngroupInput) {
     await chrome.tabs.ungroup(toSingleOrNonEmptyNumberList(tabIds));
     return this.formatSuccess(`Ungrouped ${tabIds.length} tab(s)`, { tabIds });
   }
 
-  private async handleHighlightTabs(raw: unknown) {
-    const { tabs, windowId } = this.highlightTabsSchema.parse(raw);
+  private async handleHighlightTabs({ tabs, windowId }: TabHighlightInput) {
     const highlightInfo: chrome.tabs.HighlightInfo = {
       tabs: toSingleOrNonEmptyNumberList(tabs),
     };
@@ -496,8 +501,7 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
     });
   }
 
-  private async handleMoveTabs(raw: unknown) {
-    const { tabIds, index, windowId } = this.moveTabsSchema.parse(raw);
+  private async handleMoveTabs({ tabIds, index, windowId }: TabMoveInput) {
     const moveProperties: chrome.tabs.MoveProperties = { index };
     if (windowId !== undefined) {
       moveProperties.windowId = windowId;
@@ -509,8 +513,7 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
     });
   }
 
-  private async handleSendMessage(raw: unknown) {
-    const { tabId, message, frameId, documentId } = this.sendMessageSchema.parse(raw);
+  private async handleSendMessage({ tabId, message, frameId, documentId }: TabSendMessageInput) {
     const options: chrome.tabs.MessageSendOptions = {};
     if (frameId !== undefined) options.frameId = frameId;
     if (documentId !== undefined) options.documentId = documentId;
@@ -527,26 +530,4 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
       ? chrome.tabs.move(tabIds, moveProperties)
       : chrome.tabs.move(tabIds, moveProperties);
   }
-
-  // ===== Validation Schemas per action =====
-  private createTabSchema = TAB_TOOL_CONTRACTS.createTab.zodInputSchema;
-  private updateTabSchema = TAB_TOOL_CONTRACTS.updateTab.zodInputSchema;
-  private closeTabsSchema = TAB_TOOL_CONTRACTS.closeTabs.zodInputSchema;
-  private getAllTabsSchema = TAB_TOOL_CONTRACTS.getAllTabs.zodInputSchema;
-  private navigateHistorySchema = TAB_TOOL_CONTRACTS.navigateHistory.zodInputSchema;
-  private reloadTabSchema = TAB_TOOL_CONTRACTS.reloadTab.zodInputSchema;
-  private captureVisibleTabSchema = TAB_TOOL_CONTRACTS.captureVisibleTab.zodInputSchema;
-  private detectLanguageSchema = TAB_TOOL_CONTRACTS.detectLanguage.zodInputSchema;
-  private discardTabSchema = TAB_TOOL_CONTRACTS.discardTab.zodInputSchema;
-  private duplicateTabSchema = TAB_TOOL_CONTRACTS.duplicateTab.zodInputSchema;
-  private getTabSchema = TAB_TOOL_CONTRACTS.getTab.zodInputSchema;
-  private getZoomSchema = TAB_TOOL_CONTRACTS.getZoom.zodInputSchema;
-  private getZoomSettingsSchema = TAB_TOOL_CONTRACTS.getZoomSettings.zodInputSchema;
-  private setZoomSchema = TAB_TOOL_CONTRACTS.setZoom.zodInputSchema;
-  private setZoomSettingsSchema = TAB_TOOL_CONTRACTS.setZoomSettings.zodInputSchema;
-  private groupTabsSchema = TAB_TOOL_CONTRACTS.groupTabs.zodInputSchema;
-  private ungroupTabsSchema = TAB_TOOL_CONTRACTS.ungroupTabs.zodInputSchema;
-  private highlightTabsSchema = TAB_TOOL_CONTRACTS.highlightTabs.zodInputSchema;
-  private moveTabsSchema = TAB_TOOL_CONTRACTS.moveTabs.zodInputSchema;
-  private sendMessageSchema = TAB_TOOL_CONTRACTS.sendMessage.zodInputSchema;
 }

@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
 import {
-  defineExtensionToolContract,
-  type ExtensionToolOutputSchema,
   type ExtensionToolGroupContract,
+  type ToolAnnotations,
+  type ZodExtensionToolContract,
 } from './core';
 
 export const BOOKMARKS_GROUP_CONTRACT = {
@@ -91,180 +91,161 @@ export const BOOKMARK_UPDATE_INPUT_SCHEMA = z.object({
   url: z.string().optional().describe('The new URL (bookmarks only)'),
 });
 
-const bookmarkNodeProperties = {
-  id: { type: 'string' },
-  title: { type: 'string' },
-  url: { type: 'string' },
-  parentId: { type: 'string' },
-  index: { type: 'number' },
-  dateAdded: { type: 'number' },
-  dateAddedFormatted: { type: 'string' },
-  type: { type: 'string', enum: ['bookmark', 'folder'] },
-} as const;
+export const BOOKMARK_NODE_TYPE_SCHEMA = z.enum(['bookmark', 'folder']);
 
-const bookmarkNodeOutputSchema = {
-  type: 'object',
-  properties: bookmarkNodeProperties,
-  required: ['id', 'title', 'type'],
-} as const;
+export interface BookmarkNodeOutput {
+  id: string;
+  title: string;
+  url?: string | undefined;
+  parentId?: string | undefined;
+  index?: number | undefined;
+  dateAdded?: number | undefined;
+  dateAddedFormatted?: string | undefined;
+  type: z.infer<typeof BOOKMARK_NODE_TYPE_SCHEMA>;
+  children?: BookmarkNodeOutput[] | undefined;
+}
 
-const bookmarkNodeWithChildrenOutputSchema = {
-  type: 'object',
-  properties: {
-    ...bookmarkNodeProperties,
-    children: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: bookmarkNodeProperties,
-        required: ['id', 'title', 'type'],
+export const BOOKMARK_NODE_BASE_OUTPUT_SCHEMA = z.object({
+  id: z.string(),
+  title: z.string(),
+  url: z.string().optional(),
+  parentId: z.string().optional(),
+  index: z.number().optional(),
+  dateAdded: z.number().optional(),
+  dateAddedFormatted: z.string().optional(),
+  type: BOOKMARK_NODE_TYPE_SCHEMA,
+});
+
+export const BOOKMARK_NODE_OUTPUT_SCHEMA: z.ZodType<BookmarkNodeOutput> = z.lazy(() =>
+  BOOKMARK_NODE_BASE_OUTPUT_SCHEMA.extend({
+    children: z.array(BOOKMARK_NODE_OUTPUT_SCHEMA).optional(),
+  })
+);
+
+export const BOOKMARK_CREATE_OUTPUT_SCHEMA = BOOKMARK_NODE_BASE_OUTPUT_SCHEMA.extend({
+  parentId: z.string(),
+  index: z.number(),
+  dateAdded: z.number(),
+});
+
+export const BOOKMARK_GET_OUTPUT_SCHEMA = z.object({
+  count: z.number(),
+  bookmarks: z.array(BOOKMARK_NODE_BASE_OUTPUT_SCHEMA),
+});
+
+export const BOOKMARK_GET_CHILDREN_OUTPUT_SCHEMA = z.object({
+  parentId: z.string(),
+  count: z.number(),
+  children: z.array(BOOKMARK_NODE_BASE_OUTPUT_SCHEMA),
+});
+
+export const BOOKMARK_GET_RECENT_OUTPUT_SCHEMA = z.object({
+  count: z.number(),
+  recentBookmarks: z.array(
+    BOOKMARK_NODE_BASE_OUTPUT_SCHEMA.extend({
+      type: BOOKMARK_NODE_TYPE_SCHEMA.optional(),
+    })
+  ),
+});
+
+export const BOOKMARK_GET_SUBTREE_OUTPUT_SCHEMA = z.object({
+  rootId: z.string(),
+  subtree: z.array(BOOKMARK_NODE_OUTPUT_SCHEMA),
+});
+
+export const BOOKMARK_GET_TREE_OUTPUT_SCHEMA = z.object({
+  tree: z.array(BOOKMARK_NODE_OUTPUT_SCHEMA),
+});
+
+export const BOOKMARK_MOVE_OUTPUT_SCHEMA = BOOKMARK_NODE_BASE_OUTPUT_SCHEMA.extend({
+  parentId: z.string(),
+  index: z.number(),
+});
+
+export const BOOKMARK_REMOVE_OUTPUT_SCHEMA = z.object({
+  id: z.string(),
+});
+
+export const BOOKMARK_SEARCH_OUTPUT_SCHEMA = z.object({
+  query: z.string(),
+  count: z.number(),
+  results: z.array(BOOKMARK_NODE_BASE_OUTPUT_SCHEMA),
+});
+
+export const BOOKMARK_UPDATE_OUTPUT_SCHEMA = BOOKMARK_NODE_BASE_OUTPUT_SCHEMA.extend({
+  parentId: z.string(),
+  index: z.number(),
+  changes: z.object({
+    title: z.string().optional(),
+    url: z.string().optional(),
+  }),
+});
+
+export type BookmarkCreateInput = z.infer<typeof BOOKMARK_CREATE_INPUT_SCHEMA>;
+export type BookmarkCreateOutput = z.infer<typeof BOOKMARK_CREATE_OUTPUT_SCHEMA>;
+export type BookmarkGetInput = z.infer<typeof BOOKMARK_GET_INPUT_SCHEMA>;
+export type BookmarkGetOutput = z.infer<typeof BOOKMARK_GET_OUTPUT_SCHEMA>;
+export type BookmarkGetChildrenInput = z.infer<typeof BOOKMARK_GET_CHILDREN_INPUT_SCHEMA>;
+export type BookmarkGetChildrenOutput = z.infer<typeof BOOKMARK_GET_CHILDREN_OUTPUT_SCHEMA>;
+export type BookmarkGetRecentInput = z.infer<typeof BOOKMARK_GET_RECENT_INPUT_SCHEMA>;
+export type BookmarkGetRecentOutput = z.infer<typeof BOOKMARK_GET_RECENT_OUTPUT_SCHEMA>;
+export type BookmarkGetSubTreeInput = z.infer<typeof BOOKMARK_GET_SUBTREE_INPUT_SCHEMA>;
+export type BookmarkGetSubTreeOutput = z.infer<typeof BOOKMARK_GET_SUBTREE_OUTPUT_SCHEMA>;
+export type BookmarkGetTreeInput = z.infer<typeof BOOKMARK_GET_TREE_INPUT_SCHEMA>;
+export type BookmarkGetTreeOutput = z.infer<typeof BOOKMARK_GET_TREE_OUTPUT_SCHEMA>;
+export type BookmarkMoveInput = z.infer<typeof BOOKMARK_MOVE_INPUT_SCHEMA>;
+export type BookmarkMoveOutput = z.infer<typeof BOOKMARK_MOVE_OUTPUT_SCHEMA>;
+export type BookmarkRemoveInput = z.infer<typeof BOOKMARK_REMOVE_INPUT_SCHEMA>;
+export type BookmarkRemoveOutput = z.infer<typeof BOOKMARK_REMOVE_OUTPUT_SCHEMA>;
+export type BookmarkRemoveTreeInput = z.infer<typeof BOOKMARK_REMOVE_TREE_INPUT_SCHEMA>;
+export type BookmarkSearchInput = z.infer<typeof BOOKMARK_SEARCH_INPUT_SCHEMA>;
+export type BookmarkSearchOutput = z.infer<typeof BOOKMARK_SEARCH_OUTPUT_SCHEMA>;
+export type BookmarkUpdateInput = z.infer<typeof BOOKMARK_UPDATE_INPUT_SCHEMA>;
+export type BookmarkUpdateOutput = z.infer<typeof BOOKMARK_UPDATE_OUTPUT_SCHEMA>;
+
+const BOOKMARK_PERMISSIONS = ['bookmarks'] as const;
+
+function defineBookmarkTool<
+  const TName extends string,
+  const TActionId extends (typeof BOOKMARK_ACTION_IDS)[number],
+  const TInputSchema extends z.AnyZodObject,
+  const TOutputSchema extends z.ZodTypeAny | undefined = undefined,
+>(options: {
+  actionId: TActionId;
+  name: TName;
+  title: string;
+  description: string;
+  inputSchema: TInputSchema;
+  outputSchema?: TOutputSchema;
+  annotations: ToolAnnotations;
+}): ZodExtensionToolContract<TName, 'bookmarks', TActionId, TInputSchema, TOutputSchema> {
+  return {
+    name: options.name,
+    title: options.title,
+    description: options.description,
+    inputSchema: options.inputSchema,
+    ...(options.outputSchema ? { outputSchema: options.outputSchema } : {}),
+    annotations: {
+      title: options.title,
+      ...options.annotations,
+    },
+    _meta: {
+      extension: {
+        groupId: 'bookmarks',
+        actionId: options.actionId,
+        chromeApi: BOOKMARKS_GROUP_CONTRACT.chromeApi,
+        permissions: BOOKMARK_PERMISSIONS,
       },
     },
-  },
-  required: ['id', 'title', 'type'],
-} as const;
-
-export const BOOKMARK_CREATE_OUTPUT_SCHEMA = {
-  type: 'object',
-  properties: bookmarkNodeProperties,
-  required: ['id', 'title', 'parentId', 'index', 'dateAdded', 'type'],
-} as const satisfies ExtensionToolOutputSchema;
-
-export const BOOKMARK_GET_OUTPUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    count: { type: 'number' },
-    bookmarks: {
-      type: 'array',
-      items: bookmarkNodeOutputSchema,
-    },
-  },
-  required: ['count', 'bookmarks'],
-} as const satisfies ExtensionToolOutputSchema;
-
-export const BOOKMARK_GET_CHILDREN_OUTPUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    parentId: { type: 'string' },
-    count: { type: 'number' },
-    children: {
-      type: 'array',
-      items: bookmarkNodeOutputSchema,
-    },
-  },
-  required: ['parentId', 'count', 'children'],
-} as const satisfies ExtensionToolOutputSchema;
-
-export const BOOKMARK_GET_RECENT_OUTPUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    count: { type: 'number' },
-    recentBookmarks: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: bookmarkNodeProperties,
-        required: ['id', 'title'],
-      },
-    },
-  },
-  required: ['count', 'recentBookmarks'],
-} as const satisfies ExtensionToolOutputSchema;
-
-export const BOOKMARK_GET_SUBTREE_OUTPUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    rootId: { type: 'string' },
-    subtree: {
-      type: 'array',
-      items: bookmarkNodeWithChildrenOutputSchema,
-    },
-  },
-  required: ['rootId', 'subtree'],
-} as const satisfies ExtensionToolOutputSchema;
-
-export const BOOKMARK_GET_TREE_OUTPUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    tree: {
-      type: 'array',
-      items: bookmarkNodeWithChildrenOutputSchema,
-    },
-  },
-  required: ['tree'],
-} as const satisfies ExtensionToolOutputSchema;
-
-export const BOOKMARK_MOVE_OUTPUT_SCHEMA = {
-  type: 'object',
-  properties: bookmarkNodeProperties,
-  required: ['id', 'title', 'parentId', 'index', 'type'],
-} as const satisfies ExtensionToolOutputSchema;
-
-export const BOOKMARK_REMOVE_OUTPUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    id: { type: 'string' },
-  },
-  required: ['id'],
-} as const satisfies ExtensionToolOutputSchema;
-
-export const BOOKMARK_SEARCH_OUTPUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    query: { type: 'string' },
-    count: { type: 'number' },
-    results: {
-      type: 'array',
-      items: bookmarkNodeOutputSchema,
-    },
-  },
-  required: ['query', 'count', 'results'],
-} as const satisfies ExtensionToolOutputSchema;
-
-export const BOOKMARK_UPDATE_OUTPUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    ...bookmarkNodeProperties,
-    changes: {
-      type: 'object',
-      properties: {
-        title: { type: 'string' },
-        url: { type: 'string' },
-      },
-    },
-  },
-  required: ['id', 'title', 'parentId', 'index', 'type', 'changes'],
-} as const satisfies ExtensionToolOutputSchema;
-
-const readMeta = {
-  kind: 'chrome-api',
-  runtimeContext: ['bgsw'],
-  hostPermissionsRequired: false,
-  activeTabRequired: false,
-  tabIdRequired: false,
-  frameIdSupported: false,
-  originRequired: false,
-  urlRequired: false,
-  userGestureRequired: false,
-  effect: 'read',
-  riskLevel: 'low',
-} as const;
-
-const mutateMeta = {
-  ...readMeta,
-  effect: 'mutate',
-  riskLevel: 'medium',
-} as const;
-
-const deleteMeta = {
-  ...readMeta,
-  effect: 'delete',
-  riskLevel: 'high',
-} as const;
+    groupId: 'bookmarks',
+    actionId: options.actionId,
+    zodInputSchema: options.inputSchema,
+    ...(options.outputSchema ? { zodOutputSchema: options.outputSchema } : {}),
+  };
+}
 
 export const BOOKMARK_TOOL_CONTRACTS = {
-  create: defineExtensionToolContract({
-    group: BOOKMARKS_GROUP_CONTRACT,
+  create: defineBookmarkTool({
     actionId: 'create',
     name: 'extension_tool_create_bookmark',
     title: 'Create Bookmark',
@@ -278,10 +259,8 @@ export const BOOKMARK_TOOL_CONTRACTS = {
       idempotentHint: false,
       openWorldHint: false,
     },
-    meta: mutateMeta,
   }),
-  get: defineExtensionToolContract({
-    group: BOOKMARKS_GROUP_CONTRACT,
+  get: defineBookmarkTool({
     actionId: 'get',
     name: 'extension_tool_get_bookmarks',
     title: 'Get Bookmarks',
@@ -294,10 +273,8 @@ export const BOOKMARK_TOOL_CONTRACTS = {
       idempotentHint: true,
       openWorldHint: false,
     },
-    meta: readMeta,
   }),
-  getChildren: defineExtensionToolContract({
-    group: BOOKMARKS_GROUP_CONTRACT,
+  getChildren: defineBookmarkTool({
     actionId: 'getChildren',
     name: 'extension_tool_get_bookmark_children',
     title: 'Get Bookmark Children',
@@ -310,10 +287,8 @@ export const BOOKMARK_TOOL_CONTRACTS = {
       idempotentHint: true,
       openWorldHint: false,
     },
-    meta: readMeta,
   }),
-  getRecent: defineExtensionToolContract({
-    group: BOOKMARKS_GROUP_CONTRACT,
+  getRecent: defineBookmarkTool({
     actionId: 'getRecent',
     name: 'extension_tool_get_recent_bookmarks',
     title: 'Get Recent Bookmarks',
@@ -326,10 +301,8 @@ export const BOOKMARK_TOOL_CONTRACTS = {
       idempotentHint: true,
       openWorldHint: false,
     },
-    meta: readMeta,
   }),
-  getSubTree: defineExtensionToolContract({
-    group: BOOKMARKS_GROUP_CONTRACT,
+  getSubTree: defineBookmarkTool({
     actionId: 'getSubTree',
     name: 'extension_tool_get_bookmark_subtree',
     title: 'Get Bookmark Subtree',
@@ -342,10 +315,8 @@ export const BOOKMARK_TOOL_CONTRACTS = {
       idempotentHint: true,
       openWorldHint: false,
     },
-    meta: readMeta,
   }),
-  getTree: defineExtensionToolContract({
-    group: BOOKMARKS_GROUP_CONTRACT,
+  getTree: defineBookmarkTool({
     actionId: 'getTree',
     name: 'extension_tool_get_bookmark_tree',
     title: 'Get Bookmark Tree',
@@ -358,10 +329,8 @@ export const BOOKMARK_TOOL_CONTRACTS = {
       idempotentHint: true,
       openWorldHint: false,
     },
-    meta: readMeta,
   }),
-  move: defineExtensionToolContract({
-    group: BOOKMARKS_GROUP_CONTRACT,
+  move: defineBookmarkTool({
     actionId: 'move',
     name: 'extension_tool_move_bookmark',
     title: 'Move Bookmark',
@@ -374,10 +343,8 @@ export const BOOKMARK_TOOL_CONTRACTS = {
       idempotentHint: false,
       openWorldHint: false,
     },
-    meta: mutateMeta,
   }),
-  remove: defineExtensionToolContract({
-    group: BOOKMARKS_GROUP_CONTRACT,
+  remove: defineBookmarkTool({
     actionId: 'remove',
     name: 'extension_tool_remove_bookmark',
     title: 'Remove Bookmark',
@@ -390,10 +357,8 @@ export const BOOKMARK_TOOL_CONTRACTS = {
       idempotentHint: false,
       openWorldHint: false,
     },
-    meta: deleteMeta,
   }),
-  removeTree: defineExtensionToolContract({
-    group: BOOKMARKS_GROUP_CONTRACT,
+  removeTree: defineBookmarkTool({
     actionId: 'removeTree',
     name: 'extension_tool_remove_bookmark_tree',
     title: 'Remove Bookmark Tree',
@@ -406,10 +371,8 @@ export const BOOKMARK_TOOL_CONTRACTS = {
       idempotentHint: false,
       openWorldHint: false,
     },
-    meta: deleteMeta,
   }),
-  search: defineExtensionToolContract({
-    group: BOOKMARKS_GROUP_CONTRACT,
+  search: defineBookmarkTool({
     actionId: 'search',
     name: 'extension_tool_search_bookmarks',
     title: 'Search Bookmarks',
@@ -422,10 +385,8 @@ export const BOOKMARK_TOOL_CONTRACTS = {
       idempotentHint: true,
       openWorldHint: false,
     },
-    meta: readMeta,
   }),
-  update: defineExtensionToolContract({
-    group: BOOKMARKS_GROUP_CONTRACT,
+  update: defineBookmarkTool({
     actionId: 'update',
     name: 'extension_tool_update_bookmark',
     title: 'Update Bookmark',
@@ -438,7 +399,6 @@ export const BOOKMARK_TOOL_CONTRACTS = {
       idempotentHint: true,
       openWorldHint: false,
     },
-    meta: mutateMeta,
   }),
 } as const;
 

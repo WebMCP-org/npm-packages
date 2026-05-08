@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
 import {
-  defineExtensionToolContract,
   type ExtensionToolGroupContract,
-  type ExtensionToolOutputSchema,
+  type ToolAnnotations,
+  type ZodExtensionToolContract,
 } from './core';
 
 export const TABS_GROUP_CONTRACT = {
@@ -165,297 +165,232 @@ export const TAB_SEND_MESSAGE_INPUT_SCHEMA = z.object({
   documentId: z.string().optional().describe('Specific document ID to target'),
 });
 
-const chromeTabOutputProperties = {
-  id: { type: 'number' },
-  index: { type: 'number' },
-  windowId: { type: 'number' },
-  openerTabId: { type: 'number' },
-  selected: { type: 'boolean' },
-  highlighted: { type: 'boolean' },
-  active: { type: 'boolean' },
-  pinned: { type: 'boolean' },
-  audible: { type: 'boolean' },
-  discarded: { type: 'boolean' },
-  autoDiscardable: { type: 'boolean' },
-  mutedInfo: { type: 'object', additionalProperties: true },
-  url: { type: 'string' },
-  pendingUrl: { type: 'string' },
-  title: { type: 'string' },
-  favIconUrl: { type: 'string' },
-  status: { type: 'string', enum: ['loading', 'complete'] },
-  incognito: { type: 'boolean' },
-  width: { type: 'number' },
-  height: { type: 'number' },
-  sessionId: { type: 'string' },
-  groupId: { type: 'number' },
-} as const;
+export const CHROME_TAB_OUTPUT_SCHEMA = z.object({
+  id: z.number(),
+  index: z.number(),
+  windowId: z.number(),
+  openerTabId: z.number().optional(),
+  selected: z.boolean().optional(),
+  highlighted: z.boolean().optional(),
+  active: z.boolean(),
+  pinned: z.boolean(),
+  audible: z.boolean().optional(),
+  discarded: z.boolean().optional(),
+  autoDiscardable: z.boolean().optional(),
+  mutedInfo: z.object({}).passthrough().optional(),
+  url: z.string().optional(),
+  pendingUrl: z.string().optional(),
+  title: z.string().optional(),
+  favIconUrl: z.string().optional(),
+  status: z.enum(['loading', 'complete']).optional(),
+  incognito: z.boolean().optional(),
+  width: z.number().optional(),
+  height: z.number().optional(),
+  sessionId: z.string().optional(),
+  groupId: z.number().optional(),
+});
 
-const chromeTabOutputSchema = {
-  type: 'object',
-  properties: chromeTabOutputProperties,
-  required: ['id', 'index', 'windowId', 'active', 'pinned'],
-  additionalProperties: true,
-} as const;
+export const TAB_ZOOM_SETTINGS_VALUE_SCHEMA = z.object({
+  mode: z.enum(['automatic', 'manual', 'disabled']),
+  scope: z.enum(['per-origin', 'per-tab']),
+  defaultZoomFactor: z.number(),
+});
 
-const zoomSettingsOutputSchema = {
-  type: 'object',
-  properties: {
-    mode: { type: 'string', enum: ['automatic', 'manual', 'disabled'] },
-    scope: { type: 'string', enum: ['per-origin', 'per-tab'] },
-    defaultZoomFactor: { type: 'number' },
-  },
-  required: ['mode', 'scope', 'defaultZoomFactor'],
-  additionalProperties: true,
-} as const;
+export const TAB_WINDOW_OUTPUT_SCHEMA = z.object({
+  id: z.number().optional(),
+  focused: z.boolean().optional(),
+  top: z.number().optional(),
+  left: z.number().optional(),
+  width: z.number().optional(),
+  height: z.number().optional(),
+  incognito: z.boolean().optional(),
+  type: z.string().optional(),
+  state: z.string().optional(),
+  alwaysOnTop: z.boolean().optional(),
+  tabs: z.array(CHROME_TAB_OUTPUT_SCHEMA).optional(),
+});
 
-const windowOutputSchema = {
-  type: 'object',
-  properties: {
-    id: { type: 'number' },
-    focused: { type: 'boolean' },
-    top: { type: 'number' },
-    left: { type: 'number' },
-    width: { type: 'number' },
-    height: { type: 'number' },
-    incognito: { type: 'boolean' },
-    type: { type: 'string' },
-    state: { type: 'string' },
-    alwaysOnTop: { type: 'boolean' },
-    tabs: {
-      type: 'array',
-      items: chromeTabOutputSchema,
+export const TAB_LIST_ACTIVE_ENTRY_OUTPUT_SCHEMA = z.object({
+  tabId: z.number().optional(),
+  domain: z.string(),
+  url: z.string().optional(),
+  title: z.string().optional(),
+  isActive: z.boolean(),
+  windowId: z.number(),
+  index: z.number(),
+  pinned: z.boolean(),
+  audible: z.boolean().optional(),
+  mutedInfo: z.object({}).passthrough().optional(),
+  status: z.enum(['loading', 'complete']).optional(),
+});
+
+export const TAB_LIST_ACTIVE_OUTPUT_SCHEMA = z.object({
+  domains: z.record(z.string(), z.array(TAB_LIST_ACTIVE_ENTRY_OUTPUT_SCHEMA)),
+  totalTabs: z.number(),
+});
+
+export const TAB_CREATE_OUTPUT_SCHEMA = CHROME_TAB_OUTPUT_SCHEMA;
+
+export const TAB_UPDATE_OUTPUT_SCHEMA = z.object({
+  tab: CHROME_TAB_OUTPUT_SCHEMA,
+  changes: z.object({}).passthrough(),
+});
+
+export const TAB_CLOSE_OUTPUT_SCHEMA = z.object({
+  tabIds: z.array(z.number()),
+});
+
+export const TAB_GET_ALL_OUTPUT_SCHEMA = z.object({
+  count: z.number(),
+  tabs: z.array(CHROME_TAB_OUTPUT_SCHEMA),
+});
+
+export const TAB_HISTORY_OUTPUT_SCHEMA = z.object({
+  tabId: z.number(),
+  direction: z.enum(['back', 'forward']),
+});
+
+export const TAB_RELOAD_OUTPUT_SCHEMA = z.object({
+  tabId: z.number(),
+  bypassCache: z.boolean(),
+});
+
+export const TAB_CAPTURE_VISIBLE_OUTPUT_SCHEMA = z.object({
+  dataUrl: z.string(),
+  length: z.number(),
+});
+
+export const TAB_DETECT_LANGUAGE_OUTPUT_SCHEMA = z.object({
+  language: z.string(),
+});
+
+export const TAB_SINGLE_TAB_OUTPUT_SCHEMA = z.object({
+  tab: CHROME_TAB_OUTPUT_SCHEMA,
+});
+
+export const TAB_ZOOM_OUTPUT_SCHEMA = z.object({
+  zoomFactor: z.number(),
+});
+
+export const TAB_ZOOM_SETTINGS_OUTPUT_SCHEMA = TAB_ZOOM_SETTINGS_VALUE_SCHEMA;
+
+export const TAB_SET_ZOOM_OUTPUT_SCHEMA = z.object({
+  tabId: z.number().optional(),
+  zoomFactor: z.number(),
+});
+
+export const TAB_SET_ZOOM_SETTINGS_OUTPUT_SCHEMA = z.object({
+  settings: TAB_ZOOM_SETTINGS_VALUE_SCHEMA,
+});
+
+export const TAB_GROUP_OUTPUT_SCHEMA = z.object({
+  groupId: z.number(),
+});
+
+export const TAB_UNGROUP_OUTPUT_SCHEMA = z.object({
+  tabIds: z.array(z.number()),
+});
+
+export const TAB_HIGHLIGHT_OUTPUT_SCHEMA = z.object({
+  window: TAB_WINDOW_OUTPUT_SCHEMA,
+});
+
+export const TAB_MOVE_OUTPUT_SCHEMA = z.object({
+  tabs: z.array(CHROME_TAB_OUTPUT_SCHEMA),
+});
+
+export const TAB_SEND_MESSAGE_OUTPUT_SCHEMA = z.object({
+  response: z.unknown(),
+});
+
+export type TabListActiveInput = z.infer<typeof TAB_LIST_ACTIVE_INPUT_SCHEMA>;
+export type TabListActiveOutput = z.infer<typeof TAB_LIST_ACTIVE_OUTPUT_SCHEMA>;
+export type TabCreateInput = z.infer<typeof TAB_CREATE_INPUT_SCHEMA>;
+export type TabCreateOutput = z.infer<typeof TAB_CREATE_OUTPUT_SCHEMA>;
+export type TabUpdateInput = z.infer<typeof TAB_UPDATE_INPUT_SCHEMA>;
+export type TabUpdateOutput = z.infer<typeof TAB_UPDATE_OUTPUT_SCHEMA>;
+export type TabCloseInput = z.infer<typeof TAB_CLOSE_INPUT_SCHEMA>;
+export type TabCloseOutput = z.infer<typeof TAB_CLOSE_OUTPUT_SCHEMA>;
+export type TabGetAllInput = z.infer<typeof TAB_GET_ALL_INPUT_SCHEMA>;
+export type TabGetAllOutput = z.infer<typeof TAB_GET_ALL_OUTPUT_SCHEMA>;
+export type TabNavigateHistoryInput = z.infer<typeof TAB_NAVIGATE_HISTORY_INPUT_SCHEMA>;
+export type TabNavigateHistoryOutput = z.infer<typeof TAB_HISTORY_OUTPUT_SCHEMA>;
+export type TabReloadInput = z.infer<typeof TAB_RELOAD_INPUT_SCHEMA>;
+export type TabReloadOutput = z.infer<typeof TAB_RELOAD_OUTPUT_SCHEMA>;
+export type TabCaptureVisibleInput = z.infer<typeof TAB_CAPTURE_VISIBLE_INPUT_SCHEMA>;
+export type TabCaptureVisibleOutput = z.infer<typeof TAB_CAPTURE_VISIBLE_OUTPUT_SCHEMA>;
+export type TabDetectLanguageInput = z.infer<typeof TAB_DETECT_LANGUAGE_INPUT_SCHEMA>;
+export type TabDetectLanguageOutput = z.infer<typeof TAB_DETECT_LANGUAGE_OUTPUT_SCHEMA>;
+export type TabDiscardInput = z.infer<typeof TAB_DISCARD_INPUT_SCHEMA>;
+export type TabDuplicateInput = z.infer<typeof TAB_DUPLICATE_INPUT_SCHEMA>;
+export type TabGetInput = z.infer<typeof TAB_GET_INPUT_SCHEMA>;
+export type TabSingleTabOutput = z.infer<typeof TAB_SINGLE_TAB_OUTPUT_SCHEMA>;
+export type TabGetZoomInput = z.infer<typeof TAB_GET_ZOOM_INPUT_SCHEMA>;
+export type TabZoomOutput = z.infer<typeof TAB_ZOOM_OUTPUT_SCHEMA>;
+export type TabGetZoomSettingsInput = z.infer<typeof TAB_GET_ZOOM_SETTINGS_INPUT_SCHEMA>;
+export type TabZoomSettingsOutput = z.infer<typeof TAB_ZOOM_SETTINGS_OUTPUT_SCHEMA>;
+export type TabSetZoomInput = z.infer<typeof TAB_SET_ZOOM_INPUT_SCHEMA>;
+export type TabSetZoomOutput = z.infer<typeof TAB_SET_ZOOM_OUTPUT_SCHEMA>;
+export type TabSetZoomSettingsInput = z.infer<typeof TAB_SET_ZOOM_SETTINGS_INPUT_SCHEMA>;
+export type TabSetZoomSettingsOutput = z.infer<typeof TAB_SET_ZOOM_SETTINGS_OUTPUT_SCHEMA>;
+export type TabGroupInput = z.infer<typeof TAB_GROUP_INPUT_SCHEMA>;
+export type TabGroupOutput = z.infer<typeof TAB_GROUP_OUTPUT_SCHEMA>;
+export type TabUngroupInput = z.infer<typeof TAB_UNGROUP_INPUT_SCHEMA>;
+export type TabUngroupOutput = z.infer<typeof TAB_UNGROUP_OUTPUT_SCHEMA>;
+export type TabHighlightInput = z.infer<typeof TAB_HIGHLIGHT_INPUT_SCHEMA>;
+export type TabHighlightOutput = z.infer<typeof TAB_HIGHLIGHT_OUTPUT_SCHEMA>;
+export type TabMoveInput = z.infer<typeof TAB_MOVE_INPUT_SCHEMA>;
+export type TabMoveOutput = z.infer<typeof TAB_MOVE_OUTPUT_SCHEMA>;
+export type TabSendMessageInput = z.infer<typeof TAB_SEND_MESSAGE_INPUT_SCHEMA>;
+export type TabSendMessageOutput = z.infer<typeof TAB_SEND_MESSAGE_OUTPUT_SCHEMA>;
+
+const TAB_PERMISSIONS = ['tabs'] as const;
+
+function defineTabTool<
+  const TName extends string,
+  const TActionId extends (typeof TAB_ACTION_IDS)[number],
+  const TInputSchema extends z.AnyZodObject,
+  const TOutputSchema extends z.ZodTypeAny,
+>(options: {
+  actionId: TActionId;
+  name: TName;
+  title: string;
+  description: string;
+  inputSchema: TInputSchema;
+  outputSchema: TOutputSchema;
+  annotations: ToolAnnotations;
+  requiresActiveTab?: boolean;
+  hostPermissions?: readonly string[];
+}): ZodExtensionToolContract<TName, 'tabs', TActionId, TInputSchema, TOutputSchema> {
+  return {
+    name: options.name,
+    title: options.title,
+    description: options.description,
+    inputSchema: options.inputSchema,
+    outputSchema: options.outputSchema,
+    annotations: {
+      title: options.title,
+      ...options.annotations,
     },
-  },
-  additionalProperties: true,
-} as const;
-
-export const TAB_LIST_ACTIVE_OUTPUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    domains: {
-      type: 'object',
-      additionalProperties: {
-        type: 'array',
-        items: {
-          type: 'object',
-          properties: {
-            tabId: { type: 'number' },
-            domain: { type: 'string' },
-            url: { type: 'string' },
-            title: { type: 'string' },
-            isActive: { type: 'boolean' },
-            windowId: { type: 'number' },
-            index: { type: 'number' },
-            pinned: { type: 'boolean' },
-            audible: { type: 'boolean' },
-            mutedInfo: { type: 'object', additionalProperties: true },
-            status: { type: 'string', enum: ['loading', 'complete'] },
-          },
-          required: ['domain', 'isActive', 'windowId', 'index', 'pinned'],
-          additionalProperties: true,
-        },
+    _meta: {
+      extension: {
+        groupId: 'tabs',
+        actionId: options.actionId,
+        chromeApi: TABS_GROUP_CONTRACT.chromeApi,
+        permissions: TAB_PERMISSIONS,
+        ...(options.hostPermissions ? { hostPermissions: options.hostPermissions } : {}),
+        ...(options.requiresActiveTab ? { requiresActiveTab: true } : {}),
       },
     },
-    totalTabs: { type: 'number' },
-  },
-  required: ['domains', 'totalTabs'],
-} as const satisfies ExtensionToolOutputSchema;
-
-export const TAB_CREATE_OUTPUT_SCHEMA = chromeTabOutputSchema satisfies ExtensionToolOutputSchema;
-
-export const TAB_UPDATE_OUTPUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    tab: chromeTabOutputSchema,
-    changes: { type: 'object', additionalProperties: true },
-  },
-  required: ['tab', 'changes'],
-} as const satisfies ExtensionToolOutputSchema;
-
-export const TAB_CLOSE_OUTPUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    tabIds: { type: 'array', items: { type: 'number' } },
-  },
-  required: ['tabIds'],
-} as const satisfies ExtensionToolOutputSchema;
-
-export const TAB_GET_ALL_OUTPUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    count: { type: 'number' },
-    tabs: {
-      type: 'array',
-      items: chromeTabOutputSchema,
-    },
-  },
-  required: ['count', 'tabs'],
-} as const satisfies ExtensionToolOutputSchema;
-
-export const TAB_HISTORY_OUTPUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    tabId: { type: 'number' },
-    direction: { type: 'string', enum: ['back', 'forward'] },
-  },
-  required: ['tabId', 'direction'],
-} as const satisfies ExtensionToolOutputSchema;
-
-export const TAB_RELOAD_OUTPUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    tabId: { type: 'number' },
-    bypassCache: { type: 'boolean' },
-  },
-  required: ['tabId', 'bypassCache'],
-} as const satisfies ExtensionToolOutputSchema;
-
-export const TAB_CAPTURE_VISIBLE_OUTPUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    dataUrl: { type: 'string' },
-    length: { type: 'number' },
-  },
-  required: ['dataUrl', 'length'],
-} as const satisfies ExtensionToolOutputSchema;
-
-export const TAB_DETECT_LANGUAGE_OUTPUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    language: { type: 'string' },
-  },
-  required: ['language'],
-} as const satisfies ExtensionToolOutputSchema;
-
-export const TAB_SINGLE_TAB_OUTPUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    tab: chromeTabOutputSchema,
-  },
-  required: ['tab'],
-} as const satisfies ExtensionToolOutputSchema;
-
-export const TAB_ZOOM_OUTPUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    zoomFactor: { type: 'number' },
-  },
-  required: ['zoomFactor'],
-} as const satisfies ExtensionToolOutputSchema;
-
-export const TAB_ZOOM_SETTINGS_OUTPUT_SCHEMA =
-  zoomSettingsOutputSchema satisfies ExtensionToolOutputSchema;
-
-export const TAB_SET_ZOOM_OUTPUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    tabId: { type: 'number' },
-    zoomFactor: { type: 'number' },
-  },
-  required: ['zoomFactor'],
-} as const satisfies ExtensionToolOutputSchema;
-
-export const TAB_SET_ZOOM_SETTINGS_OUTPUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    settings: zoomSettingsOutputSchema,
-  },
-  required: ['settings'],
-} as const satisfies ExtensionToolOutputSchema;
-
-export const TAB_GROUP_OUTPUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    groupId: { type: 'number' },
-  },
-  required: ['groupId'],
-} as const satisfies ExtensionToolOutputSchema;
-
-export const TAB_UNGROUP_OUTPUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    tabIds: { type: 'array', items: { type: 'number' } },
-  },
-  required: ['tabIds'],
-} as const satisfies ExtensionToolOutputSchema;
-
-export const TAB_HIGHLIGHT_OUTPUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    window: windowOutputSchema,
-  },
-  required: ['window'],
-} as const satisfies ExtensionToolOutputSchema;
-
-export const TAB_MOVE_OUTPUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    tabs: {
-      type: 'array',
-      items: chromeTabOutputSchema,
-    },
-  },
-  required: ['tabs'],
-} as const satisfies ExtensionToolOutputSchema;
-
-export const TAB_SEND_MESSAGE_OUTPUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    response: {
-      anyOf: [
-        { type: 'object', additionalProperties: true },
-        { type: 'array', items: true },
-        { type: 'string' },
-        { type: 'number' },
-        { type: 'boolean' },
-        { type: 'null' },
-      ],
-    },
-  },
-  required: ['response'],
-} as const satisfies ExtensionToolOutputSchema;
-
-const readMeta = {
-  kind: 'chrome-api',
-  runtimeContext: ['bgsw'],
-  hostPermissionsRequired: false,
-  activeTabRequired: false,
-  tabIdRequired: false,
-  frameIdSupported: false,
-  originRequired: false,
-  urlRequired: false,
-  userGestureRequired: false,
-  effect: 'read',
-  riskLevel: 'low',
-} as const;
-
-const mutateMeta = {
-  ...readMeta,
-  effect: 'mutate',
-  riskLevel: 'medium',
-} as const;
-
-const navigateMeta = {
-  ...readMeta,
-  effect: 'navigate',
-  riskLevel: 'medium',
-} as const;
-
-const deleteMeta = {
-  ...readMeta,
-  effect: 'delete',
-  riskLevel: 'high',
-} as const;
-
-const executeMeta = {
-  ...readMeta,
-  effect: 'execute',
-  riskLevel: 'medium',
-} as const;
+    groupId: 'tabs',
+    actionId: options.actionId,
+    zodInputSchema: options.inputSchema,
+    zodOutputSchema: options.outputSchema,
+  };
+}
 
 export const TAB_TOOL_CONTRACTS = {
-  listActiveTabs: defineExtensionToolContract({
-    group: TABS_GROUP_CONTRACT,
+  listActiveTabs: defineTabTool({
     actionId: 'listActiveTabs',
     name: 'extension_tool_list_active_tabs',
     title: 'List Active Tabs',
@@ -468,10 +403,8 @@ export const TAB_TOOL_CONTRACTS = {
       idempotentHint: true,
       openWorldHint: true,
     },
-    meta: readMeta,
   }),
-  createTab: defineExtensionToolContract({
-    group: TABS_GROUP_CONTRACT,
+  createTab: defineTabTool({
     actionId: 'createTab',
     name: 'extension_tool_create_tab',
     title: 'Create Tab',
@@ -484,10 +417,8 @@ export const TAB_TOOL_CONTRACTS = {
       idempotentHint: false,
       openWorldHint: true,
     },
-    meta: navigateMeta,
   }),
-  updateTab: defineExtensionToolContract({
-    group: TABS_GROUP_CONTRACT,
+  updateTab: defineTabTool({
     actionId: 'updateTab',
     name: 'extension_tool_update_tab',
     title: 'Update Tab',
@@ -501,13 +432,8 @@ export const TAB_TOOL_CONTRACTS = {
       idempotentHint: true,
       openWorldHint: true,
     },
-    meta: {
-      ...navigateMeta,
-      urlRequired: false,
-    },
   }),
-  closeTabs: defineExtensionToolContract({
-    group: TABS_GROUP_CONTRACT,
+  closeTabs: defineTabTool({
     actionId: 'closeTabs',
     name: 'extension_tool_close_tabs',
     title: 'Close Tabs',
@@ -520,13 +446,8 @@ export const TAB_TOOL_CONTRACTS = {
       idempotentHint: false,
       openWorldHint: true,
     },
-    meta: {
-      ...deleteMeta,
-      tabIdRequired: true,
-    },
   }),
-  getAllTabs: defineExtensionToolContract({
-    group: TABS_GROUP_CONTRACT,
+  getAllTabs: defineTabTool({
     actionId: 'getAllTabs',
     name: 'extension_tool_get_all_tabs',
     title: 'Get All Tabs',
@@ -539,10 +460,8 @@ export const TAB_TOOL_CONTRACTS = {
       idempotentHint: true,
       openWorldHint: true,
     },
-    meta: readMeta,
   }),
-  navigateHistory: defineExtensionToolContract({
-    group: TABS_GROUP_CONTRACT,
+  navigateHistory: defineTabTool({
     actionId: 'navigateHistory',
     name: 'extension_tool_navigate_tab_history',
     title: 'Navigate Tab History',
@@ -556,10 +475,8 @@ export const TAB_TOOL_CONTRACTS = {
       idempotentHint: false,
       openWorldHint: true,
     },
-    meta: navigateMeta,
   }),
-  reloadTab: defineExtensionToolContract({
-    group: TABS_GROUP_CONTRACT,
+  reloadTab: defineTabTool({
     actionId: 'reloadTab',
     name: 'extension_tool_reload_tab',
     title: 'Reload Tab',
@@ -572,10 +489,8 @@ export const TAB_TOOL_CONTRACTS = {
       idempotentHint: false,
       openWorldHint: true,
     },
-    meta: navigateMeta,
   }),
-  captureVisibleTab: defineExtensionToolContract({
-    group: TABS_GROUP_CONTRACT,
+  captureVisibleTab: defineTabTool({
     actionId: 'captureVisibleTab',
     name: 'extension_tool_capture_visible_tab',
     title: 'Capture Visible Tab',
@@ -588,13 +503,8 @@ export const TAB_TOOL_CONTRACTS = {
       idempotentHint: false,
       openWorldHint: true,
     },
-    meta: {
-      ...readMeta,
-      activeTabRequired: true,
-    },
   }),
-  detectLanguage: defineExtensionToolContract({
-    group: TABS_GROUP_CONTRACT,
+  detectLanguage: defineTabTool({
     actionId: 'detectLanguage',
     name: 'extension_tool_detect_tab_language',
     title: 'Detect Tab Language',
@@ -607,10 +517,8 @@ export const TAB_TOOL_CONTRACTS = {
       idempotentHint: true,
       openWorldHint: true,
     },
-    meta: readMeta,
   }),
-  discardTab: defineExtensionToolContract({
-    group: TABS_GROUP_CONTRACT,
+  discardTab: defineTabTool({
     actionId: 'discardTab',
     name: 'extension_tool_discard_tab',
     title: 'Discard Tab',
@@ -624,10 +532,8 @@ export const TAB_TOOL_CONTRACTS = {
       idempotentHint: false,
       openWorldHint: true,
     },
-    meta: mutateMeta,
   }),
-  duplicateTab: defineExtensionToolContract({
-    group: TABS_GROUP_CONTRACT,
+  duplicateTab: defineTabTool({
     actionId: 'duplicateTab',
     name: 'extension_tool_duplicate_tab',
     title: 'Duplicate Tab',
@@ -640,13 +546,8 @@ export const TAB_TOOL_CONTRACTS = {
       idempotentHint: false,
       openWorldHint: true,
     },
-    meta: {
-      ...mutateMeta,
-      tabIdRequired: true,
-    },
   }),
-  getTab: defineExtensionToolContract({
-    group: TABS_GROUP_CONTRACT,
+  getTab: defineTabTool({
     actionId: 'getTab',
     name: 'extension_tool_get_tab',
     title: 'Get Tab',
@@ -659,13 +560,8 @@ export const TAB_TOOL_CONTRACTS = {
       idempotentHint: true,
       openWorldHint: true,
     },
-    meta: {
-      ...readMeta,
-      tabIdRequired: true,
-    },
   }),
-  getZoom: defineExtensionToolContract({
-    group: TABS_GROUP_CONTRACT,
+  getZoom: defineTabTool({
     actionId: 'getZoom',
     name: 'extension_tool_get_tab_zoom',
     title: 'Get Tab Zoom',
@@ -678,10 +574,8 @@ export const TAB_TOOL_CONTRACTS = {
       idempotentHint: true,
       openWorldHint: true,
     },
-    meta: readMeta,
   }),
-  getZoomSettings: defineExtensionToolContract({
-    group: TABS_GROUP_CONTRACT,
+  getZoomSettings: defineTabTool({
     actionId: 'getZoomSettings',
     name: 'extension_tool_get_tab_zoom_settings',
     title: 'Get Tab Zoom Settings',
@@ -694,10 +588,8 @@ export const TAB_TOOL_CONTRACTS = {
       idempotentHint: true,
       openWorldHint: true,
     },
-    meta: readMeta,
   }),
-  setZoom: defineExtensionToolContract({
-    group: TABS_GROUP_CONTRACT,
+  setZoom: defineTabTool({
     actionId: 'setZoom',
     name: 'extension_tool_set_tab_zoom',
     title: 'Set Tab Zoom',
@@ -710,10 +602,8 @@ export const TAB_TOOL_CONTRACTS = {
       idempotentHint: true,
       openWorldHint: true,
     },
-    meta: mutateMeta,
   }),
-  setZoomSettings: defineExtensionToolContract({
-    group: TABS_GROUP_CONTRACT,
+  setZoomSettings: defineTabTool({
     actionId: 'setZoomSettings',
     name: 'extension_tool_set_tab_zoom_settings',
     title: 'Set Tab Zoom Settings',
@@ -726,10 +616,8 @@ export const TAB_TOOL_CONTRACTS = {
       idempotentHint: true,
       openWorldHint: true,
     },
-    meta: mutateMeta,
   }),
-  groupTabs: defineExtensionToolContract({
-    group: TABS_GROUP_CONTRACT,
+  groupTabs: defineTabTool({
     actionId: 'groupTabs',
     name: 'extension_tool_group_tabs',
     title: 'Group Tabs',
@@ -742,13 +630,8 @@ export const TAB_TOOL_CONTRACTS = {
       idempotentHint: false,
       openWorldHint: true,
     },
-    meta: {
-      ...mutateMeta,
-      tabIdRequired: true,
-    },
   }),
-  ungroupTabs: defineExtensionToolContract({
-    group: TABS_GROUP_CONTRACT,
+  ungroupTabs: defineTabTool({
     actionId: 'ungroupTabs',
     name: 'extension_tool_ungroup_tabs',
     title: 'Ungroup Tabs',
@@ -761,13 +644,8 @@ export const TAB_TOOL_CONTRACTS = {
       idempotentHint: false,
       openWorldHint: true,
     },
-    meta: {
-      ...mutateMeta,
-      tabIdRequired: true,
-    },
   }),
-  highlightTabs: defineExtensionToolContract({
-    group: TABS_GROUP_CONTRACT,
+  highlightTabs: defineTabTool({
     actionId: 'highlightTabs',
     name: 'extension_tool_highlight_tabs',
     title: 'Highlight Tabs',
@@ -780,10 +658,8 @@ export const TAB_TOOL_CONTRACTS = {
       idempotentHint: true,
       openWorldHint: true,
     },
-    meta: mutateMeta,
   }),
-  moveTabs: defineExtensionToolContract({
-    group: TABS_GROUP_CONTRACT,
+  moveTabs: defineTabTool({
     actionId: 'moveTabs',
     name: 'extension_tool_move_tabs',
     title: 'Move Tabs',
@@ -796,13 +672,8 @@ export const TAB_TOOL_CONTRACTS = {
       idempotentHint: false,
       openWorldHint: true,
     },
-    meta: {
-      ...mutateMeta,
-      tabIdRequired: true,
-    },
   }),
-  sendMessage: defineExtensionToolContract({
-    group: TABS_GROUP_CONTRACT,
+  sendMessage: defineTabTool({
     actionId: 'sendMessage',
     name: 'extension_tool_send_tab_message',
     title: 'Send Tab Message',
@@ -814,12 +685,6 @@ export const TAB_TOOL_CONTRACTS = {
       destructiveHint: false,
       idempotentHint: false,
       openWorldHint: true,
-    },
-    meta: {
-      ...executeMeta,
-      hostPermissionsRequired: true,
-      tabIdRequired: true,
-      frameIdSupported: true,
     },
   }),
 } as const;

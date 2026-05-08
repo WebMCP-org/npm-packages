@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
 import {
-  defineExtensionToolContract,
   type ExtensionToolGroupContract,
-  type ExtensionToolOutputSchema,
+  type ToolAnnotations,
+  type ZodExtensionToolContract,
 } from './core';
 
 export const HISTORY_GROUP_CONTRACT = {
@@ -87,120 +87,108 @@ export const HISTORY_SEARCH_INPUT_SCHEMA = z.object({
     .describe('The maximum number of results to retrieve. Defaults to 100'),
 });
 
-export const HISTORY_MUTATE_URL_OUTPUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    url: { type: 'string' },
-  },
-  required: ['url'],
-} as const satisfies ExtensionToolOutputSchema;
+export const HISTORY_MUTATE_URL_OUTPUT_SCHEMA = z.object({
+  url: z.string(),
+});
 
-export const HISTORY_DELETE_RANGE_OUTPUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    startTime: { type: 'number' },
-    endTime: { type: 'number' },
-    startTimeFormatted: { type: 'string' },
-    endTimeFormatted: { type: 'string' },
-  },
-  required: ['startTime', 'endTime', 'startTimeFormatted', 'endTimeFormatted'],
-} as const satisfies ExtensionToolOutputSchema;
+export const HISTORY_DELETE_RANGE_OUTPUT_SCHEMA = z.object({
+  startTime: z.number(),
+  endTime: z.number(),
+  startTimeFormatted: z.string(),
+  endTimeFormatted: z.string(),
+});
 
-const historyItemOutputSchema = {
-  type: 'object',
-  properties: {
-    id: { type: 'string' },
-    url: { type: 'string' },
-    title: { type: 'string' },
-    lastVisitTime: { type: 'number' },
-    lastVisitTimeFormatted: { type: 'string' },
-    visitCount: { type: 'number' },
-    typedCount: { type: 'number' },
-  },
-  required: ['id'],
-  additionalProperties: true,
-} as const;
+export const HISTORY_ITEM_OUTPUT_SCHEMA = z.object({
+  id: z.string(),
+  url: z.string().optional(),
+  title: z.string().optional(),
+  lastVisitTime: z.number().optional(),
+  lastVisitTimeFormatted: z.string().optional(),
+  visitCount: z.number().optional(),
+  typedCount: z.number().optional(),
+});
 
-const historyVisitOutputSchema = {
-  type: 'object',
-  properties: {
-    id: { type: 'string' },
-    visitId: { type: 'string' },
-    visitTime: { type: 'number' },
-    visitTimeFormatted: { type: 'string' },
-    referringVisitId: { type: 'string' },
-    transition: { type: 'string' },
-  },
-  required: ['id', 'visitId', 'transition'],
-  additionalProperties: true,
-} as const;
+export const HISTORY_VISIT_OUTPUT_SCHEMA = z.object({
+  id: z.string(),
+  visitId: z.string(),
+  visitTime: z.number().optional(),
+  visitTimeFormatted: z.string().optional(),
+  referringVisitId: z.string().optional(),
+  transition: z.string(),
+});
 
-export const HISTORY_GET_VISITS_OUTPUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    url: { type: 'string' },
-    visitCount: { type: 'number' },
-    visits: {
-      type: 'array',
-      items: historyVisitOutputSchema,
+export const HISTORY_GET_VISITS_OUTPUT_SCHEMA = z.object({
+  url: z.string(),
+  visitCount: z.number(),
+  visits: z.array(HISTORY_VISIT_OUTPUT_SCHEMA),
+});
+
+export const HISTORY_SEARCH_OUTPUT_SCHEMA = z.object({
+  query: z.object({
+    text: z.string(),
+    startTime: z.number().optional(),
+    endTime: z.number().optional(),
+    maxResults: z.number().optional(),
+  }),
+  resultCount: z.number(),
+  results: z.array(HISTORY_ITEM_OUTPUT_SCHEMA),
+});
+
+export type HistoryAddUrlInput = z.infer<typeof HISTORY_ADD_URL_INPUT_SCHEMA>;
+export type HistoryAddUrlOutput = z.infer<typeof HISTORY_MUTATE_URL_OUTPUT_SCHEMA>;
+export type HistoryDeleteAllInput = z.infer<typeof HISTORY_DELETE_ALL_INPUT_SCHEMA>;
+export type HistoryDeleteRangeInput = z.infer<typeof HISTORY_DELETE_RANGE_INPUT_SCHEMA>;
+export type HistoryDeleteRangeOutput = z.infer<typeof HISTORY_DELETE_RANGE_OUTPUT_SCHEMA>;
+export type HistoryDeleteUrlInput = z.infer<typeof HISTORY_DELETE_URL_INPUT_SCHEMA>;
+export type HistoryDeleteUrlOutput = z.infer<typeof HISTORY_MUTATE_URL_OUTPUT_SCHEMA>;
+export type HistoryGetVisitsInput = z.infer<typeof HISTORY_GET_VISITS_INPUT_SCHEMA>;
+export type HistoryGetVisitsOutput = z.infer<typeof HISTORY_GET_VISITS_OUTPUT_SCHEMA>;
+export type HistorySearchInput = z.infer<typeof HISTORY_SEARCH_INPUT_SCHEMA>;
+export type HistorySearchOutput = z.infer<typeof HISTORY_SEARCH_OUTPUT_SCHEMA>;
+
+const HISTORY_PERMISSIONS = ['history'] as const;
+
+function defineHistoryTool<
+  const TName extends string,
+  const TActionId extends (typeof HISTORY_ACTION_IDS)[number],
+  const TInputSchema extends z.AnyZodObject,
+  const TOutputSchema extends z.ZodTypeAny | undefined = undefined,
+>(options: {
+  actionId: TActionId;
+  name: TName;
+  title: string;
+  description: string;
+  inputSchema: TInputSchema;
+  outputSchema?: TOutputSchema;
+  annotations: ToolAnnotations;
+}): ZodExtensionToolContract<TName, 'history', TActionId, TInputSchema, TOutputSchema> {
+  return {
+    name: options.name,
+    title: options.title,
+    description: options.description,
+    inputSchema: options.inputSchema,
+    ...(options.outputSchema ? { outputSchema: options.outputSchema } : {}),
+    annotations: {
+      title: options.title,
+      ...options.annotations,
     },
-  },
-  required: ['url', 'visitCount', 'visits'],
-} as const satisfies ExtensionToolOutputSchema;
-
-export const HISTORY_SEARCH_OUTPUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    query: {
-      type: 'object',
-      properties: {
-        text: { type: 'string' },
-        startTime: { type: 'number' },
-        endTime: { type: 'number' },
-        maxResults: { type: 'number' },
+    _meta: {
+      extension: {
+        groupId: 'history',
+        actionId: options.actionId,
+        chromeApi: HISTORY_GROUP_CONTRACT.chromeApi,
+        permissions: HISTORY_PERMISSIONS,
       },
-      required: ['text'],
-      additionalProperties: true,
     },
-    resultCount: { type: 'number' },
-    results: {
-      type: 'array',
-      items: historyItemOutputSchema,
-    },
-  },
-  required: ['query', 'resultCount', 'results'],
-} as const satisfies ExtensionToolOutputSchema;
-
-const readMeta = {
-  kind: 'chrome-api',
-  runtimeContext: ['bgsw'],
-  hostPermissionsRequired: false,
-  activeTabRequired: false,
-  tabIdRequired: false,
-  frameIdSupported: false,
-  originRequired: false,
-  urlRequired: false,
-  userGestureRequired: false,
-  effect: 'read',
-  riskLevel: 'low',
-} as const;
-
-const mutateMeta = {
-  ...readMeta,
-  urlRequired: true,
-  effect: 'mutate',
-  riskLevel: 'medium',
-} as const;
-
-const deleteMeta = {
-  ...readMeta,
-  effect: 'delete',
-  riskLevel: 'high',
-} as const;
+    groupId: 'history',
+    actionId: options.actionId,
+    zodInputSchema: options.inputSchema,
+    ...(options.outputSchema ? { zodOutputSchema: options.outputSchema } : {}),
+  };
+}
 
 export const HISTORY_TOOL_CONTRACTS = {
-  addUrl: defineExtensionToolContract({
-    group: HISTORY_GROUP_CONTRACT,
+  addUrl: defineHistoryTool({
     actionId: 'addUrl',
     name: 'extension_tool_add_history_url',
     title: 'Add History URL',
@@ -213,10 +201,8 @@ export const HISTORY_TOOL_CONTRACTS = {
       idempotentHint: false,
       openWorldHint: true,
     },
-    meta: mutateMeta,
   }),
-  deleteAll: defineExtensionToolContract({
-    group: HISTORY_GROUP_CONTRACT,
+  deleteAll: defineHistoryTool({
     actionId: 'deleteAll',
     name: 'extension_tool_delete_all_history',
     title: 'Delete All History',
@@ -228,10 +214,8 @@ export const HISTORY_TOOL_CONTRACTS = {
       idempotentHint: false,
       openWorldHint: true,
     },
-    meta: deleteMeta,
   }),
-  deleteRange: defineExtensionToolContract({
-    group: HISTORY_GROUP_CONTRACT,
+  deleteRange: defineHistoryTool({
     actionId: 'deleteRange',
     name: 'extension_tool_delete_history_range',
     title: 'Delete History Range',
@@ -245,10 +229,8 @@ export const HISTORY_TOOL_CONTRACTS = {
       idempotentHint: false,
       openWorldHint: true,
     },
-    meta: deleteMeta,
   }),
-  deleteUrl: defineExtensionToolContract({
-    group: HISTORY_GROUP_CONTRACT,
+  deleteUrl: defineHistoryTool({
     actionId: 'deleteUrl',
     name: 'extension_tool_delete_history_url',
     title: 'Delete History URL',
@@ -261,13 +243,8 @@ export const HISTORY_TOOL_CONTRACTS = {
       idempotentHint: false,
       openWorldHint: true,
     },
-    meta: {
-      ...deleteMeta,
-      urlRequired: true,
-    },
   }),
-  getVisits: defineExtensionToolContract({
-    group: HISTORY_GROUP_CONTRACT,
+  getVisits: defineHistoryTool({
     actionId: 'getVisits',
     name: 'extension_tool_get_history_visits',
     title: 'Get History Visits',
@@ -280,13 +257,8 @@ export const HISTORY_TOOL_CONTRACTS = {
       idempotentHint: true,
       openWorldHint: true,
     },
-    meta: {
-      ...readMeta,
-      urlRequired: true,
-    },
   }),
-  search: defineExtensionToolContract({
-    group: HISTORY_GROUP_CONTRACT,
+  search: defineHistoryTool({
     actionId: 'search',
     name: 'extension_tool_search_history',
     title: 'Search History',
@@ -299,7 +271,6 @@ export const HISTORY_TOOL_CONTRACTS = {
       idempotentHint: true,
       openWorldHint: true,
     },
-    meta: readMeta,
   }),
 } as const;
 

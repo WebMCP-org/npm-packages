@@ -1,7 +1,17 @@
 import type { McpServer } from '@mcp-b/webmcp-ts-sdk';
 
 import { type ApiAvailability, BaseApiTools } from '../BaseApiTools';
-import { WINDOW_ACTION_IDS, WINDOW_TOOL_CONTRACTS } from '../contracts/windows';
+import {
+  WINDOW_ACTION_IDS,
+  WINDOW_TOOL_CONTRACTS,
+  type WindowCreateInput,
+  type WindowGetAllInput,
+  type WindowGetCurrentInput,
+  type WindowGetInput,
+  type WindowGetLastFocusedInput,
+  type WindowRemoveInput,
+  type WindowUpdateInput,
+} from '../contracts/windows';
 
 export interface WindowsApiToolsOptions {
   create?: boolean;
@@ -104,30 +114,20 @@ export class WindowsApiTools extends BaseApiTools<WindowsApiToolsOptions> {
     }
   }
 
-  // ===== Validation Schemas per action =====
-  private createSchema = WINDOW_TOOL_CONTRACTS.create.zodInputSchema;
-  private getSchema = WINDOW_TOOL_CONTRACTS.get.zodInputSchema;
-  private getAllSchema = WINDOW_TOOL_CONTRACTS.getAll.zodInputSchema;
-  private getCurrentSchema = WINDOW_TOOL_CONTRACTS.getCurrent.zodInputSchema;
-  private getLastFocusedSchema = WINDOW_TOOL_CONTRACTS.getLastFocused.zodInputSchema;
-  private removeSchema = WINDOW_TOOL_CONTRACTS.remove.zodInputSchema;
-  private updateSchema = WINDOW_TOOL_CONTRACTS.update.zodInputSchema;
-
   // ===== Action handlers =====
-  private async handleCreate(raw: unknown) {
-    const {
-      url,
-      focused,
-      height,
-      incognito,
-      left,
-      setSelfAsOpener,
-      state,
-      tabId,
-      top,
-      type,
-      width,
-    } = this.createSchema.parse(raw);
+  private async handleCreate({
+    url,
+    focused,
+    height,
+    incognito,
+    left,
+    setSelfAsOpener,
+    state,
+    tabId,
+    top,
+    type,
+    width,
+  }: WindowCreateInput) {
     const createData: chrome.windows.CreateData = {};
 
     if (url !== undefined) createData.url = url;
@@ -167,8 +167,7 @@ export class WindowsApiTools extends BaseApiTools<WindowsApiToolsOptions> {
     });
   }
 
-  private async handleGet(raw: unknown) {
-    const { windowId, populate, windowTypes } = this.getSchema.parse(raw);
+  private async handleGet({ windowId, populate, windowTypes }: WindowGetInput) {
     const queryOptions: chrome.windows.QueryOptions = {};
     if (populate !== undefined) queryOptions.populate = populate;
     if (windowTypes !== undefined) queryOptions.windowTypes = windowTypes;
@@ -205,8 +204,7 @@ export class WindowsApiTools extends BaseApiTools<WindowsApiToolsOptions> {
     });
   }
 
-  private async handleGetAll(raw: unknown) {
-    const { populate, windowTypes } = this.getAllSchema.parse(raw);
+  private async handleGetAll({ populate, windowTypes }: WindowGetAllInput) {
     const queryOptions: chrome.windows.QueryOptions = {};
     if (populate !== undefined) queryOptions.populate = populate;
     if (windowTypes !== undefined) queryOptions.windowTypes = windowTypes;
@@ -246,8 +244,7 @@ export class WindowsApiTools extends BaseApiTools<WindowsApiToolsOptions> {
     });
   }
 
-  private async handleGetCurrent(raw: unknown) {
-    const { populate, windowTypes } = this.getCurrentSchema.parse(raw);
+  private async handleGetCurrent({ populate, windowTypes }: WindowGetCurrentInput) {
     const queryOptions: chrome.windows.QueryOptions = {};
     if (populate !== undefined) queryOptions.populate = populate;
     if (windowTypes !== undefined) queryOptions.windowTypes = windowTypes;
@@ -284,8 +281,7 @@ export class WindowsApiTools extends BaseApiTools<WindowsApiToolsOptions> {
     });
   }
 
-  private async handleGetLastFocused(raw: unknown) {
-    const { populate, windowTypes } = this.getLastFocusedSchema.parse(raw);
+  private async handleGetLastFocused({ populate, windowTypes }: WindowGetLastFocusedInput) {
     const queryOptions: chrome.windows.QueryOptions = {};
     if (populate !== undefined) queryOptions.populate = populate;
     if (windowTypes !== undefined) queryOptions.windowTypes = windowTypes;
@@ -322,8 +318,7 @@ export class WindowsApiTools extends BaseApiTools<WindowsApiToolsOptions> {
     });
   }
 
-  private async handleRemove(raw: unknown) {
-    const { windowId } = this.removeSchema.parse(raw);
+  private async handleRemove({ windowId }: WindowRemoveInput) {
     await new Promise<void>((resolve, reject) => {
       chrome.windows.remove(windowId, () => {
         if (chrome.runtime.lastError) {
@@ -337,9 +332,16 @@ export class WindowsApiTools extends BaseApiTools<WindowsApiToolsOptions> {
     return this.formatSuccess('Window removed successfully', { windowId });
   }
 
-  private async handleUpdate(raw: unknown) {
-    const { windowId, drawAttention, focused, height, left, state, top, width } =
-      this.updateSchema.parse(raw);
+  private async handleUpdate({
+    windowId,
+    drawAttention,
+    focused,
+    height,
+    left,
+    state,
+    top,
+    width,
+  }: WindowUpdateInput) {
     const updateInfo: chrome.windows.UpdateInfo = {};
 
     if (drawAttention !== undefined) updateInfo.drawAttention = drawAttention;

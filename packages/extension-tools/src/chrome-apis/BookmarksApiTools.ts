@@ -1,7 +1,20 @@
 import type { McpServer } from '@mcp-b/webmcp-ts-sdk';
 
 import { type ApiAvailability, BaseApiTools } from '../BaseApiTools';
-import { BOOKMARK_ACTION_IDS, BOOKMARK_TOOL_CONTRACTS } from '../contracts/bookmarks';
+import {
+  BOOKMARK_ACTION_IDS,
+  BOOKMARK_TOOL_CONTRACTS,
+  type BookmarkCreateInput,
+  type BookmarkGetChildrenInput,
+  type BookmarkGetInput,
+  type BookmarkGetRecentInput,
+  type BookmarkGetSubTreeInput,
+  type BookmarkMoveInput,
+  type BookmarkRemoveInput,
+  type BookmarkRemoveTreeInput,
+  type BookmarkSearchInput,
+  type BookmarkUpdateInput,
+} from '../contracts/bookmarks';
 
 export interface BookmarksApiToolsOptions {
   // Gate specific actions (default to enabled)
@@ -139,21 +152,8 @@ export class BookmarksApiTools extends BaseApiTools<BookmarksApiToolsOptions> {
     }
   }
 
-  // ===== Validation Schemas per action =====
-  private createSchema = BOOKMARK_TOOL_CONTRACTS.create.zodInputSchema;
-  private getSchema = BOOKMARK_TOOL_CONTRACTS.get.zodInputSchema;
-  private getChildrenSchema = BOOKMARK_TOOL_CONTRACTS.getChildren.zodInputSchema;
-  private getRecentSchema = BOOKMARK_TOOL_CONTRACTS.getRecent.zodInputSchema;
-  private getSubTreeSchema = BOOKMARK_TOOL_CONTRACTS.getSubTree.zodInputSchema;
-  private moveSchema = BOOKMARK_TOOL_CONTRACTS.move.zodInputSchema;
-  private removeSchema = BOOKMARK_TOOL_CONTRACTS.remove.zodInputSchema;
-  private removeTreeSchema = BOOKMARK_TOOL_CONTRACTS.removeTree.zodInputSchema;
-  private searchSchema = BOOKMARK_TOOL_CONTRACTS.search.zodInputSchema;
-  private updateSchema = BOOKMARK_TOOL_CONTRACTS.update.zodInputSchema;
-
   // ===== Action handlers =====
-  private async handleCreate(raw: unknown) {
-    const { parentId, title, url, index } = this.createSchema.parse(raw);
+  private async handleCreate({ parentId, title, url, index }: BookmarkCreateInput) {
     if (title === undefined && url === undefined) {
       throw new Error('Either title or url must be provided');
     }
@@ -179,8 +179,7 @@ export class BookmarksApiTools extends BaseApiTools<BookmarksApiToolsOptions> {
     });
   }
 
-  private async handleGet(raw: unknown) {
-    const { idOrIdList } = this.getSchema.parse(raw);
+  private async handleGet({ idOrIdList }: BookmarkGetInput) {
     const results = await chrome.bookmarks.get(this.toBookmarkIdRequest(idOrIdList));
 
     return this.formatJson({
@@ -200,8 +199,7 @@ export class BookmarksApiTools extends BaseApiTools<BookmarksApiToolsOptions> {
     });
   }
 
-  private async handleGetChildren(raw: unknown) {
-    const { id } = this.getChildrenSchema.parse(raw);
+  private async handleGetChildren({ id }: BookmarkGetChildrenInput) {
     const results = await chrome.bookmarks.getChildren(id);
 
     return this.formatJson({
@@ -222,8 +220,7 @@ export class BookmarksApiTools extends BaseApiTools<BookmarksApiToolsOptions> {
     });
   }
 
-  private async handleGetRecent(raw: unknown) {
-    const { numberOfItems } = this.getRecentSchema.parse(raw);
+  private async handleGetRecent({ numberOfItems }: BookmarkGetRecentInput) {
     const results = await chrome.bookmarks.getRecent(numberOfItems);
 
     return this.formatJson({
@@ -242,8 +239,7 @@ export class BookmarksApiTools extends BaseApiTools<BookmarksApiToolsOptions> {
     });
   }
 
-  private async handleGetSubTree(raw: unknown) {
-    const { id } = this.getSubTreeSchema.parse(raw);
+  private async handleGetSubTree({ id }: BookmarkGetSubTreeInput) {
     const results = await chrome.bookmarks.getSubTree(id);
 
     const formatNode = (node: chrome.bookmarks.BookmarkTreeNode): SerializedBookmarkNode => ({
@@ -284,8 +280,7 @@ export class BookmarksApiTools extends BaseApiTools<BookmarksApiToolsOptions> {
     });
   }
 
-  private async handleMove(raw: unknown) {
-    const { id, parentId, index } = this.moveSchema.parse(raw);
+  private async handleMove({ id, parentId, index }: BookmarkMoveInput) {
     const destination: chrome.bookmarks.MoveDestination = {};
     if (parentId !== undefined) destination.parentId = parentId;
     if (index !== undefined) destination.index = index;
@@ -302,20 +297,17 @@ export class BookmarksApiTools extends BaseApiTools<BookmarksApiToolsOptions> {
     });
   }
 
-  private async handleRemove(raw: unknown) {
-    const { id } = this.removeSchema.parse(raw);
+  private async handleRemove({ id }: BookmarkRemoveInput) {
     await chrome.bookmarks.remove(id);
     return this.formatSuccess('Bookmark removed successfully', { id });
   }
 
-  private async handleRemoveTree(raw: unknown) {
-    const { id } = this.removeTreeSchema.parse(raw);
+  private async handleRemoveTree({ id }: BookmarkRemoveTreeInput) {
     await chrome.bookmarks.removeTree(id);
     return this.formatSuccess('Bookmark folder and all contents removed successfully', { id });
   }
 
-  private async handleSearch(raw: unknown) {
-    const { query } = this.searchSchema.parse(raw);
+  private async handleSearch({ query }: BookmarkSearchInput) {
     const results = await chrome.bookmarks.search(this.toBookmarkSearchQuery(query));
 
     return this.formatJson({
@@ -336,8 +328,7 @@ export class BookmarksApiTools extends BaseApiTools<BookmarksApiToolsOptions> {
     });
   }
 
-  private async handleUpdate(raw: unknown) {
-    const { id, title, url } = this.updateSchema.parse(raw);
+  private async handleUpdate({ id, title, url }: BookmarkUpdateInput) {
     const changes: chrome.bookmarks.UpdateChanges = {};
     if (title !== undefined) changes.title = title;
     if (url !== undefined) changes.url = url;

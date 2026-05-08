@@ -1,7 +1,15 @@
 import type { McpServer } from '@mcp-b/webmcp-ts-sdk';
 
 import { type ApiAvailability, BaseApiTools } from '../BaseApiTools';
-import { HISTORY_ACTION_IDS, HISTORY_TOOL_CONTRACTS } from '../contracts/history';
+import {
+  HISTORY_ACTION_IDS,
+  HISTORY_TOOL_CONTRACTS,
+  type HistoryAddUrlInput,
+  type HistoryDeleteRangeInput,
+  type HistoryDeleteUrlInput,
+  type HistoryGetVisitsInput,
+  type HistorySearchInput,
+} from '../contracts/history';
 
 export interface HistoryApiToolsOptions {
   addUrl?: boolean;
@@ -98,8 +106,7 @@ export class HistoryApiTools extends BaseApiTools<HistoryApiToolsOptions> {
   }
 
   // ===== Action handlers =====
-  private async handleAddUrl(raw: unknown) {
-    const { url } = this.addUrlSchema.parse(raw);
+  private async handleAddUrl({ url }: HistoryAddUrlInput) {
     await chrome.history.addUrl({ url });
 
     return this.formatSuccess('URL added to history successfully', { url });
@@ -111,8 +118,7 @@ export class HistoryApiTools extends BaseApiTools<HistoryApiToolsOptions> {
     return this.formatSuccess('All history deleted successfully');
   }
 
-  private async handleDeleteRange(raw: unknown) {
-    const { startTime, endTime } = this.deleteRangeSchema.parse(raw);
+  private async handleDeleteRange({ startTime, endTime }: HistoryDeleteRangeInput) {
     if (startTime >= endTime) {
       return this.formatError('startTime must be less than endTime');
     }
@@ -126,15 +132,13 @@ export class HistoryApiTools extends BaseApiTools<HistoryApiToolsOptions> {
     });
   }
 
-  private async handleDeleteUrl(raw: unknown) {
-    const { url } = this.deleteUrlSchema.parse(raw);
+  private async handleDeleteUrl({ url }: HistoryDeleteUrlInput) {
     await chrome.history.deleteUrl({ url });
 
     return this.formatSuccess('URL deleted from history successfully', { url });
   }
 
-  private async handleGetVisits(raw: unknown) {
-    const { url } = this.getVisitsSchema.parse(raw);
+  private async handleGetVisits({ url }: HistoryGetVisitsInput) {
     const visits = await chrome.history.getVisits({ url });
 
     return this.formatJson({
@@ -151,9 +155,7 @@ export class HistoryApiTools extends BaseApiTools<HistoryApiToolsOptions> {
     });
   }
 
-  private async handleSearch(raw: unknown) {
-    const { text, startTime, endTime, maxResults } = this.searchSchema.parse(raw);
-
+  private async handleSearch({ text, startTime, endTime, maxResults }: HistorySearchInput) {
     const query: chrome.history.HistoryQuery = { text };
 
     if (startTime !== undefined) {
@@ -191,11 +193,4 @@ export class HistoryApiTools extends BaseApiTools<HistoryApiToolsOptions> {
       })),
     });
   }
-
-  // ===== Validation Schemas per action =====
-  private addUrlSchema = HISTORY_TOOL_CONTRACTS.addUrl.zodInputSchema;
-  private deleteRangeSchema = HISTORY_TOOL_CONTRACTS.deleteRange.zodInputSchema;
-  private deleteUrlSchema = HISTORY_TOOL_CONTRACTS.deleteUrl.zodInputSchema;
-  private getVisitsSchema = HISTORY_TOOL_CONTRACTS.getVisits.zodInputSchema;
-  private searchSchema = HISTORY_TOOL_CONTRACTS.search.zodInputSchema;
 }
