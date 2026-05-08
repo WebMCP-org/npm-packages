@@ -22,7 +22,7 @@ catalog:
   '@sentry/cloudflare': ^10.22.0
   '@sentry/react': ^10.22.0
   '@sentry/vite-plugin': ^4.6.0
-  '@types/chrome': ^0.0.326
+  '@types/chrome': ^0.1.42
   '@types/node': 22.17.2
   '@types/react': ^19.2.9
   '@types/react-dom': ^19.1.2

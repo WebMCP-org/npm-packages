@@ -3,6 +3,7 @@ import type { McpServer } from '@mcp-b/webmcp-ts-sdk';
 import { type ApiAvailability, BaseApiTools } from '../BaseApiTools';
 import {
   STORAGE_ACTION_IDS,
+  STORAGE_AREA_SCHEMA,
   STORAGE_TOOL_CONTRACTS,
   type StorageClearInput,
   type StorageGetBytesInUseInput,
@@ -20,6 +21,11 @@ export interface StorageApiToolsOptions {
 }
 
 export const STORAGE_ACTIONS = STORAGE_ACTION_IDS;
+type StorageAreaName = StorageGetInput['area'];
+type WritableStorageArea =
+  | chrome.storage.LocalStorageArea
+  | chrome.storage.SessionStorageArea
+  | chrome.storage.SyncStorageArea;
 
 export class StorageApiTools extends BaseApiTools<StorageApiToolsOptions> {
   protected apiName = 'Storage';
@@ -109,7 +115,7 @@ export class StorageApiTools extends BaseApiTools<StorageApiToolsOptions> {
 
   // ===== Action handlers =====
   private async handleGetStorage({ keys, area }: StorageGetInput) {
-    const storage = chrome.storage[area as keyof typeof chrome.storage] as any;
+    const storage = this.getStorageArea(area);
     if (!storage || typeof storage.get !== 'function') {
       return this.formatError(new Error(`Storage area '${area}' is not available`));
     }
@@ -127,7 +133,7 @@ export class StorageApiTools extends BaseApiTools<StorageApiToolsOptions> {
   }
 
   private async handleSetStorage({ data, area }: StorageSetInput) {
-    const storage = chrome.storage[area as keyof typeof chrome.storage] as any;
+    const storage = this.getStorageArea(area);
     if (!storage || typeof storage.set !== 'function') {
       return this.formatError(new Error(`Storage area '${area}' is not available`));
     }
@@ -140,7 +146,7 @@ export class StorageApiTools extends BaseApiTools<StorageApiToolsOptions> {
   }
 
   private async handleRemoveStorage({ keys, area }: StorageRemoveInput) {
-    const storage = chrome.storage[area as keyof typeof chrome.storage] as any;
+    const storage = this.getStorageArea(area);
     if (!storage || typeof storage.remove !== 'function') {
       return this.formatError(new Error(`Storage area '${area}' is not available`));
     }
@@ -157,7 +163,7 @@ export class StorageApiTools extends BaseApiTools<StorageApiToolsOptions> {
       );
     }
 
-    const storage = chrome.storage[area as keyof typeof chrome.storage] as any;
+    const storage = this.getStorageArea(area);
     if (!storage || typeof storage.clear !== 'function') {
       return this.formatError(new Error(`Storage area '${area}' is not available`));
     }
@@ -168,7 +174,7 @@ export class StorageApiTools extends BaseApiTools<StorageApiToolsOptions> {
   }
 
   private async handleGetBytesInUse({ keys, area }: StorageGetBytesInUseInput) {
-    const storage = chrome.storage[area as keyof typeof chrome.storage] as any;
+    const storage = this.getStorageArea(area);
     if (!storage) {
       return this.formatError(new Error(`Storage area '${area}' is not available`));
     }
@@ -213,5 +219,13 @@ export class StorageApiTools extends BaseApiTools<StorageApiToolsOptions> {
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return `${Number.parseFloat((bytes / k ** i).toFixed(2))} ${sizes[i]}`;
+  }
+
+  private getStorageArea(area: StorageAreaName): WritableStorageArea | undefined {
+    if (!STORAGE_AREA_SCHEMA.safeParse(area).success) {
+      return undefined;
+    }
+
+    return chrome.storage[area];
   }
 }
