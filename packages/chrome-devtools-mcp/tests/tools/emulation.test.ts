@@ -315,12 +315,7 @@ describe('emulation', () => {
   });
   describe('viewport', () => {
     beforeEach(() => {
-      server.addHtmlRoute(
-        '/viewport',
-        html`
-          Test page
-        `
-      );
+      server.addHtmlRoute('/viewport', html` Test page `);
     });
 
     it('emulates viewport', async () => {

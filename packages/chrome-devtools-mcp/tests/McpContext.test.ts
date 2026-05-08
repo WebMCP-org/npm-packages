@@ -23,11 +23,9 @@ describe('McpContext', () => {
   it('list pages', async () => {
     await withMcpContext(async (_response, context) => {
       const page = context.getSelectedMcpPage();
-      await page.pptrPage.setContent(
-        html`
-          <button>Click me</button> <input type="text" value="Input" />
-        `
-      );
+      await page.pptrPage.setContent(html`
+        <button>Click me</button> <input type="text" value="Input" />
+      `);
       await context.createTextSnapshot(context.getSelectedMcpPage());
       assert.ok(await page.getElementByUid('1_1'));
       await context.createTextSnapshot(context.getSelectedMcpPage());
@@ -103,11 +101,7 @@ describe('McpContext', () => {
     await withMcpContext(async (_response, context) => {
       // Page 1: set content and snapshot
       const page1 = context.getSelectedMcpPage();
-      await page1.pptrPage.setContent(
-        html`
-          <button>Page1 Button</button>
-        `
-      );
+      await page1.pptrPage.setContent(html` <button>Page1 Button</button> `);
       await context.createTextSnapshot(page1, false, undefined);
 
       // Capture a uid from page1's snapshot (snapshotId=1, button is node 1)
@@ -118,11 +112,7 @@ describe('McpContext', () => {
       // Page 2: new page, set content, snapshot
       const page2 = await context.newPage();
       context.selectPage(page2);
-      await page2.pptrPage.setContent(
-        html`
-          <button>Page2 Button</button>
-        `
-      );
+      await page2.pptrPage.setContent(html` <button>Page2 Button</button> `);
       await context.createTextSnapshot(page2, false, undefined);
 
       // Page 2 is now selected. Page 1's uid should still resolve.

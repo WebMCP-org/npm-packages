@@ -115,11 +115,7 @@ describe('screenshot', () => {
 
         await page.setContent(
           html`${`<div style="color:blue;">test</div>`.repeat(6500)}
-            <div
-              id="red"
-              style="color:blue;"
-              >test</div
-            > `
+            <div id="red" style="color:blue;">test</div> `
         );
         await page.evaluate(() => {
           const el = document.querySelector('#red');

@@ -49,7 +49,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        uses: pnpm/action-setup@8912a9102ac27614460f54aedde9e1e7f9aec20d # v6.0.5
 
       - name: Setup Vite+
         uses: voidzero-dev/setup-vp@v1
@@ -65,7 +65,7 @@ jobs:
 
       - name: Setup Chrome Beta
         id: chrome
-        uses: browser-actions/setup-chrome@4f8e94349a351df0f048634f25fec36c3c91eded
+        uses: browser-actions/setup-chrome@2e1d749697dd1612b833dba4a722266286fbefcd
         with:
           chrome-version: beta
           install-dependencies: true
@@ -83,7 +83,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        uses: pnpm/action-setup@8912a9102ac27614460f54aedde9e1e7f9aec20d # v6.0.5
 
       - name: Setup Vite+
         uses: voidzero-dev/setup-vp@v1
@@ -107,7 +107,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        uses: pnpm/action-setup@8912a9102ac27614460f54aedde9e1e7f9aec20d # v6.0.5
 
       - name: Setup Vite+
         uses: voidzero-dev/setup-vp@v1
@@ -134,7 +134,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        uses: pnpm/action-setup@8912a9102ac27614460f54aedde9e1e7f9aec20d # v6.0.5
 
       - name: Setup Vite+
         uses: voidzero-dev/setup-vp@v1
@@ -150,7 +150,7 @@ jobs:
 
       - name: Setup Chrome Beta
         id: chrome
-        uses: browser-actions/setup-chrome@4f8e94349a351df0f048634f25fec36c3c91eded
+        uses: browser-actions/setup-chrome@2e1d749697dd1612b833dba4a722266286fbefcd
         with:
           chrome-version: beta
           install-dependencies: true
@@ -166,7 +166,7 @@ jobs:
         run: pnpm test:unit:packages:coverage
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5
+        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v5
         with:
           use_oidc: true
           files: ./packages/*/coverage/coverage-final.json,./packages/*/coverage/clover.xml
@@ -181,7 +181,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        uses: pnpm/action-setup@8912a9102ac27614460f54aedde9e1e7f9aec20d # v6.0.5
 
       - name: Setup Vite+
         uses: voidzero-dev/setup-vp@v1
@@ -203,7 +203,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        uses: pnpm/action-setup@8912a9102ac27614460f54aedde9e1e7f9aec20d # v6.0.5
 
       - name: Setup Vite+
         uses: voidzero-dev/setup-vp@v1

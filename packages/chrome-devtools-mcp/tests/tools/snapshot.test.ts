@@ -28,14 +28,12 @@ describe('snapshot', () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
 
-        await page.setContent(
-          html`
-            <main>
-              <span>Hello</span><span> </span>
-              <div>World</div>
-            </main>
-          `
-        );
+        await page.setContent(html`
+          <main>
+            <span>Hello</span><span> </span>
+            <div>World</div>
+          </main>
+        `);
         await waitFor.handler(
           {
             params: {
@@ -56,14 +54,12 @@ describe('snapshot', () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
 
-        await page.setContent(
-          html`
-            <main>
-              <span>Status</span>
-              <div>Error</div>
-            </main>
-          `
-        );
+        await page.setContent(html`
+          <main>
+            <span>Status</span>
+            <div>Error</div>
+          </main>
+        `);
         await waitFor.handler(
           {
             params: {
@@ -98,14 +94,12 @@ describe('snapshot', () => {
           context
         );
 
-        await page.setContent(
-          html`
-            <main>
-              <span>Hello</span><span> </span>
-              <div>Complete</div>
-            </main>
-          `
-        );
+        await page.setContent(html`
+          <main>
+            <span>Hello</span><span> </span>
+            <div>Complete</div>
+          </main>
+        `);
 
         await handlePromise;
 
@@ -132,14 +126,12 @@ describe('snapshot', () => {
           context
         );
 
-        await page.setContent(
-          html`
-            <main>
-              <span>Hello</span><span> </span>
-              <div>World</div>
-            </main>
-          `
-        );
+        await page.setContent(html`
+          <main>
+            <span>Hello</span><span> </span>
+            <div>World</div>
+          </main>
+        `);
 
         await handlePromise;
 
@@ -151,14 +143,12 @@ describe('snapshot', () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
 
-        await page.setContent(
-          html`
-            <main>
-              <h1>Header</h1>
-              <div>Text</div>
-            </main>
-          `
-        );
+        await page.setContent(html`
+          <main>
+            <h1>Header</h1>
+            <div>Text</div>
+          </main>
+        `);
 
         await waitFor.handler(
           {
@@ -180,12 +170,10 @@ describe('snapshot', () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
 
-        await page.setContent(
-          html`
-            <h1>Top level</h1>
-            <iframe srcdoc="<p>Hello iframe</p>"></iframe>
-          `
-        );
+        await page.setContent(html`
+          <h1>Top level</h1>
+          <iframe srcdoc="<p>Hello iframe</p>"></iframe>
+        `);
 
         await waitFor.handler(
           {

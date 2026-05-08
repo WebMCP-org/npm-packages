@@ -42,7 +42,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        uses: pnpm/action-setup@8912a9102ac27614460f54aedde9e1e7f9aec20d # v6.0.5
 
       - name: Setup Vite+
         uses: voidzero-dev/setup-vp@v1
@@ -57,7 +57,7 @@ jobs:
         run: pnpm build
 
       - name: Setup Chrome
-        uses: browser-actions/setup-chrome@4f8e94349a351df0f048634f25fec36c3c91eded # latest
+        uses: browser-actions/setup-chrome@2e1d749697dd1612b833dba4a722266286fbefcd # latest
         id: setup-chrome
         with:
           chrome-version: stable
@@ -107,7 +107,7 @@ jobs:
           echo "Chrome path: ${{ steps.setup-chrome.outputs.chrome-path }}"
 
       - name: Run Claude WebMCP Integration Test
-        uses: anthropics/claude-code-action@26ec041249acb0a944c0a47b6c0c13f05dbc5b44 # v1
+        uses: anthropics/claude-code-action@9db782c3a17ef2bfc274cd17411bc3e0a5ba1345 # v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           allowed_bots: '*'

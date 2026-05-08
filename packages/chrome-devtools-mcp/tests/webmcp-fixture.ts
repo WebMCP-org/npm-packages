@@ -22,8 +22,7 @@ export function buildRouteAwareWebMCPPage(): string {
       const ENTITIES = ${JSON.stringify(WEBMCP_FIXTURE_ENTITIES)};
 
       function renderRoute() {
-        document.querySelector('#route').textContent =
-          'Route: ' + window.location.pathname;
+        document.querySelector('#route').textContent = 'Route: ' + window.location.pathname;
         console.info('webmcp route', window.location.pathname);
       }
 
@@ -36,7 +35,7 @@ export function buildRouteAwareWebMCPPage(): string {
               inputSchema: {
                 type: 'object',
                 properties: {
-                  to: {type: 'string'},
+                  to: { type: 'string' },
                 },
                 required: ['to'],
               },
@@ -67,7 +66,7 @@ export function buildRouteAwareWebMCPPage(): string {
             inputSchema: {
               type: 'object',
               properties: {
-                to: {type: 'string'},
+                to: { type: 'string' },
               },
               required: ['to'],
             },
@@ -107,16 +106,16 @@ export function buildRouteAwareWebMCPPage(): string {
               history.pushState({}, '', to);
               renderRoute();
               return {
-                content: [{type: 'text', text: 'Navigated to ' + window.location.pathname}],
+                content: [{ type: 'text', text: 'Navigated to ' + window.location.pathname }],
               };
             }
             case 'get_current_context':
               return {
-                content: [{type: 'text', text: window.location.pathname}],
+                content: [{ type: 'text', text: window.location.pathname }],
               };
             case 'list_all_routes':
               return {
-                content: [{type: 'text', text: '/,/entities'}],
+                content: [{ type: 'text', text: '/,/entities' }],
               };
             case 'list_entities': {
               const entities = await fetchEntities();
@@ -128,7 +127,7 @@ export function buildRouteAwareWebMCPPage(): string {
                     text:
                       entities.length +
                       ' entities: ' +
-                      entities.map(entity => entity.name).join(', '),
+                      entities.map((entity) => entity.name).join(', '),
                   },
                 ],
               };
