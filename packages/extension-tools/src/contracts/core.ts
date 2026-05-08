@@ -2,7 +2,6 @@ import {
   toWebMcpJsonSchema,
   toWebMcpInputSchema,
   type InputSchema,
-  type Tool,
   type ToolAnnotations,
 } from '@mcp-b/webmcp-ts-sdk';
 import type { z } from 'zod';
@@ -29,7 +28,12 @@ export type ExtensionRuntimeContext =
 export type ExtensionToolEffect = 'delete' | 'execute' | 'mutate' | 'navigate' | 'read';
 export type ExtensionToolRiskLevel = 'low' | 'medium' | 'high';
 export type ExtensionToolInputSchema = InputSchema;
-export type ExtensionToolOutputSchema = NonNullable<Tool['outputSchema']>;
+export interface ExtensionToolOutputSchema {
+  readonly [key: string]: unknown;
+  readonly type: 'object';
+  readonly properties?: Readonly<Record<string, object>>;
+  readonly required?: readonly string[];
+}
 
 export const GENERIC_EXTENSION_TOOL_OUTPUT_SCHEMA = {
   type: 'object',

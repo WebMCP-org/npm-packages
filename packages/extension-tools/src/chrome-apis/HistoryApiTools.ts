@@ -100,29 +100,13 @@ export class HistoryApiTools extends BaseApiTools<HistoryApiToolsOptions> {
   // ===== Action handlers =====
   private async handleAddUrl(raw: unknown) {
     const { url } = this.addUrlSchema.parse(raw);
-    await new Promise<void>((resolve, reject) => {
-      chrome.history.addUrl({ url }, () => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-        } else {
-          resolve();
-        }
-      });
-    });
+    await chrome.history.addUrl({ url });
 
     return this.formatSuccess('URL added to history successfully', { url });
   }
 
   private async handleDeleteAll() {
-    await new Promise<void>((resolve, reject) => {
-      chrome.history.deleteAll(() => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-        } else {
-          resolve();
-        }
-      });
-    });
+    await chrome.history.deleteAll();
 
     return this.formatSuccess('All history deleted successfully');
   }
@@ -132,15 +116,7 @@ export class HistoryApiTools extends BaseApiTools<HistoryApiToolsOptions> {
     if (startTime >= endTime) {
       return this.formatError('startTime must be less than endTime');
     }
-    await new Promise<void>((resolve, reject) => {
-      chrome.history.deleteRange({ startTime, endTime }, () => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-        } else {
-          resolve();
-        }
-      });
-    });
+    await chrome.history.deleteRange({ startTime, endTime });
 
     return this.formatSuccess('History range deleted successfully', {
       startTime,
@@ -152,30 +128,14 @@ export class HistoryApiTools extends BaseApiTools<HistoryApiToolsOptions> {
 
   private async handleDeleteUrl(raw: unknown) {
     const { url } = this.deleteUrlSchema.parse(raw);
-    await new Promise<void>((resolve, reject) => {
-      chrome.history.deleteUrl({ url }, () => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-        } else {
-          resolve();
-        }
-      });
-    });
+    await chrome.history.deleteUrl({ url });
 
     return this.formatSuccess('URL deleted from history successfully', { url });
   }
 
   private async handleGetVisits(raw: unknown) {
     const { url } = this.getVisitsSchema.parse(raw);
-    const visits = await new Promise<chrome.history.VisitItem[]>((resolve, reject) => {
-      chrome.history.getVisits({ url }, (visits) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-        } else {
-          resolve(visits);
-        }
-      });
-    });
+    const visits = await chrome.history.getVisits({ url });
 
     return this.formatJson({
       url,
@@ -194,7 +154,7 @@ export class HistoryApiTools extends BaseApiTools<HistoryApiToolsOptions> {
   private async handleSearch(raw: unknown) {
     const { text, startTime, endTime, maxResults } = this.searchSchema.parse(raw);
 
-    const query: any = { text };
+    const query: chrome.history.HistoryQuery = { text };
 
     if (startTime !== undefined) {
       query.startTime = startTime;
@@ -208,15 +168,7 @@ export class HistoryApiTools extends BaseApiTools<HistoryApiToolsOptions> {
       query.maxResults = maxResults;
     }
 
-    const results = await new Promise<chrome.history.HistoryItem[]>((resolve, reject) => {
-      chrome.history.search(query, (results) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-        } else {
-          resolve(results);
-        }
-      });
-    });
+    const results = await chrome.history.search(query);
 
     return this.formatJson({
       query: {

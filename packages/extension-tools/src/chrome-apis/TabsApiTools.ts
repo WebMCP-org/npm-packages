@@ -29,6 +29,15 @@ export interface TabsApiToolsOptions {
 
 export const TAB_ACTIONS = TAB_ACTION_IDS;
 
+function toSingleOrNonEmptyNumberList(values: number[]): number | [number, ...number[]] {
+  const [firstValue, ...remainingValues] = values;
+  if (firstValue === undefined) {
+    throw new Error('At least one tab id is required');
+  }
+
+  return remainingValues.length === 0 ? firstValue : [firstValue, ...remainingValues];
+}
+
 export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
   protected apiName = 'Tabs';
 
@@ -226,15 +235,12 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
       };
     });
 
-    const byDomain = tabsInfo.reduce(
-      (acc, tab) => {
-        const domain = tab.domain || 'unknown';
-        if (!acc[domain]) acc[domain] = [];
-        acc[domain].push(tab);
-        return acc;
-      },
-      {} as Record<string, typeof tabsInfo>
-    );
+    const byDomain: Record<string, typeof tabsInfo> = {};
+    for (const tab of tabsInfo) {
+      const domain = tab.domain || 'unknown';
+      byDomain[domain] ??= [];
+      byDomain[domain].push(tab);
+    }
 
     // Sort tabs within each domain by their index
     for (const tabs of Object.values(byDomain)) {
@@ -385,7 +391,7 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
 
   private async handleDetectLanguage(raw: unknown) {
     const { tabId } = this.detectLanguageSchema.parse(raw);
-    const language = await chrome.tabs.detectLanguage(tabId!);
+    const language = await chrome.tabs.detectLanguage(tabId);
     return this.formatSuccess(`Tab language detected: ${language}`, {
       language,
     });
@@ -417,7 +423,7 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
 
   private async handleGetZoom(raw: unknown) {
     const { tabId } = this.getZoomSchema.parse(raw);
-    const zoomFactor = await chrome.tabs.getZoom(tabId!);
+    const zoomFactor = await chrome.tabs.getZoom(tabId);
     return this.formatSuccess(`Zoom factor: ${zoomFactor}`, {
       zoomFactor,
     });
@@ -425,13 +431,13 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
 
   private async handleGetZoomSettings(raw: unknown) {
     const { tabId } = this.getZoomSettingsSchema.parse(raw);
-    const zoomSettings = await chrome.tabs.getZoomSettings(tabId!);
+    const zoomSettings = await chrome.tabs.getZoomSettings(tabId);
     return this.formatJson(zoomSettings);
   }
 
   private async handleSetZoom(raw: unknown) {
     const { tabId, zoomFactor } = this.setZoomSchema.parse(raw);
-    await chrome.tabs.setZoom(tabId!, zoomFactor);
+    await chrome.tabs.setZoom(tabId, zoomFactor);
     return this.formatSuccess(`Set zoom factor to ${zoomFactor === 0 ? 'default' : zoomFactor}`, {
       ...(tabId !== undefined ? { tabId } : {}),
       zoomFactor,
@@ -444,8 +450,8 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
     if (mode) settings.mode = mode;
     if (scope) settings.scope = scope;
 
-    await chrome.tabs.setZoomSettings(tabId!, settings);
-    const zoomSettings = await chrome.tabs.getZoomSettings(tabId!);
+    await chrome.tabs.setZoomSettings(tabId, settings);
+    const zoomSettings = await chrome.tabs.getZoomSettings(tabId);
     return this.formatSuccess('Updated zoom settings', {
       settings: zoomSettings,
     });
@@ -454,7 +460,7 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
   private async handleGroupTabs(raw: unknown) {
     const { tabIds, groupId, createProperties } = this.groupTabsSchema.parse(raw);
     const options: Parameters<typeof chrome.tabs.group>[0] = {
-      tabIds: tabIds.length === 1 ? tabIds[0] : tabIds,
+      tabIds: toSingleOrNonEmptyNumberList(tabIds),
     };
 
     if (groupId !== undefined) {
@@ -471,14 +477,14 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
 
   private async handleUngroupTabs(raw: unknown) {
     const { tabIds } = this.ungroupTabsSchema.parse(raw);
-    await chrome.tabs.ungroup(tabIds.length === 1 ? tabIds[0]! : tabIds);
+    await chrome.tabs.ungroup(toSingleOrNonEmptyNumberList(tabIds));
     return this.formatSuccess(`Ungrouped ${tabIds.length} tab(s)`, { tabIds });
   }
 
   private async handleHighlightTabs(raw: unknown) {
     const { tabs, windowId } = this.highlightTabsSchema.parse(raw);
     const highlightInfo: chrome.tabs.HighlightInfo = {
-      tabs: tabs.length === 1 ? tabs[0]! : tabs,
+      tabs: toSingleOrNonEmptyNumberList(tabs),
     };
     if (windowId !== undefined) {
       highlightInfo.windowId = windowId;
@@ -497,10 +503,7 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
       moveProperties.windowId = windowId;
     }
 
-    const movedTabs = await chrome.tabs.move(
-      tabIds.length === 1 ? tabIds[0]! : tabIds,
-      moveProperties
-    );
+    const movedTabs = await this.moveTabs(toSingleOrNonEmptyNumberList(tabIds), moveProperties);
     return this.formatSuccess(`Moved ${tabIds.length} tab(s) to index ${index}`, {
       tabs: Array.isArray(movedTabs) ? movedTabs : [movedTabs],
     });
@@ -514,6 +517,15 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
 
     const response = await chrome.tabs.sendMessage(tabId, message, options);
     return this.formatSuccess('Message sent successfully', { response });
+  }
+
+  private async moveTabs(
+    tabIds: number | [number, ...number[]],
+    moveProperties: chrome.tabs.MoveProperties
+  ): Promise<chrome.tabs.Tab | chrome.tabs.Tab[]> {
+    return Array.isArray(tabIds)
+      ? chrome.tabs.move(tabIds, moveProperties)
+      : chrome.tabs.move(tabIds, moveProperties);
   }
 
   // ===== Validation Schemas per action =====

@@ -18,9 +18,7 @@ function serializeTabGroup(group: chrome.tabGroups.TabGroup) {
     ...(group.title !== undefined ? { title: group.title } : {}),
     color: group.color,
     collapsed: group.collapsed,
-    ...((group as { shared?: boolean }).shared !== undefined
-      ? { shared: (group as { shared?: boolean }).shared }
-      : {}),
+    shared: group.shared,
     windowId: group.windowId,
   };
 }
@@ -103,15 +101,7 @@ export class TabGroupsApiTools extends BaseApiTools<TabGroupsApiToolsOptions> {
   // ===== Action handlers =====
   private async handleGetTabGroup(raw: unknown) {
     const { groupId } = this.getSchema.parse(raw);
-    const group = await new Promise<chrome.tabGroups.TabGroup>((resolve, reject) => {
-      chrome.tabGroups.get(groupId, (group) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-        } else {
-          resolve(group);
-        }
-      });
-    });
+    const group = await chrome.tabGroups.get(groupId);
 
     return this.formatJson(serializeTabGroup(group));
   }
@@ -119,7 +109,7 @@ export class TabGroupsApiTools extends BaseApiTools<TabGroupsApiToolsOptions> {
   private async handleQueryTabGroups(raw: unknown) {
     const { collapsed, color, shared, title, windowId } = this.querySchema.parse(raw);
     // Build query info
-    const queryInfo: any = {};
+    const queryInfo: chrome.tabGroups.QueryInfo = {};
 
     if (collapsed !== undefined) queryInfo.collapsed = collapsed;
     if (color !== undefined) queryInfo.color = color;
@@ -130,15 +120,7 @@ export class TabGroupsApiTools extends BaseApiTools<TabGroupsApiToolsOptions> {
       queryInfo.windowId = windowId === -2 ? chrome.windows.WINDOW_ID_CURRENT : windowId;
     }
 
-    const groups = await new Promise<chrome.tabGroups.TabGroup[]>((resolve, reject) => {
-      chrome.tabGroups.query(queryInfo, (groups) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-        } else {
-          resolve(groups);
-        }
-      });
-    });
+    const groups = await chrome.tabGroups.query(queryInfo);
 
     return this.formatJson({
       count: groups.length,
@@ -149,23 +131,13 @@ export class TabGroupsApiTools extends BaseApiTools<TabGroupsApiToolsOptions> {
   private async handleUpdateTabGroup(raw: unknown) {
     const { groupId, collapsed, color, title } = this.updateSchema.parse(raw);
     // Build update properties
-    const updateProperties: any = {};
+    const updateProperties: chrome.tabGroups.UpdateProperties = {};
 
     if (collapsed !== undefined) updateProperties.collapsed = collapsed;
     if (color !== undefined) updateProperties.color = color;
     if (title !== undefined) updateProperties.title = title;
 
-    const updatedGroup = await new Promise<chrome.tabGroups.TabGroup | undefined>(
-      (resolve, reject) => {
-        chrome.tabGroups.update(groupId, updateProperties, (group) => {
-          if (chrome.runtime.lastError) {
-            reject(new Error(chrome.runtime.lastError.message));
-          } else {
-            resolve(group);
-          }
-        });
-      }
-    );
+    const updatedGroup = await chrome.tabGroups.update(groupId, updateProperties);
 
     if (!updatedGroup) {
       return this.formatError('Failed to update tab group');
@@ -177,25 +149,13 @@ export class TabGroupsApiTools extends BaseApiTools<TabGroupsApiToolsOptions> {
   private async handleMoveTabGroup(raw: unknown) {
     const { groupId, index, windowId } = this.moveSchema.parse(raw);
     // Build move properties
-    const moveProperties: any = {
-      index: index,
-    };
+    const moveProperties: chrome.tabGroups.MoveProperties = { index };
 
     if (windowId !== undefined) {
       moveProperties.windowId = windowId;
     }
 
-    const movedGroup = await new Promise<chrome.tabGroups.TabGroup | undefined>(
-      (resolve, reject) => {
-        chrome.tabGroups.move(groupId, moveProperties, (group) => {
-          if (chrome.runtime.lastError) {
-            reject(new Error(chrome.runtime.lastError.message));
-          } else {
-            resolve(group);
-          }
-        });
-      }
-    );
+    const movedGroup = await chrome.tabGroups.move(groupId, moveProperties);
 
     if (!movedGroup) {
       return this.formatError('Failed to move tab group');

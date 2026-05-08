@@ -6,7 +6,12 @@
   },
   "include": [
     "src/BaseApiTools.ts",
+    "src/chrome-apis/BookmarksApiTools.ts",
+    "src/chrome-apis/HistoryApiTools.ts",
     "src/chrome-apis/StorageApiTools.ts",
+    "src/chrome-apis/TabGroupsApiTools.ts",
+    "src/chrome-apis/TabsApiTools.ts",
+    "src/chrome-apis/WindowsApiTools.ts",
     "src/storage-contract-types.type-test.ts"
   ],
   "exclude": ["node_modules", "dist"]

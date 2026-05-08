@@ -142,15 +142,10 @@ export class WindowsApiTools extends BaseApiTools<WindowsApiToolsOptions> {
     if (type !== undefined) createData.type = type;
     if (width !== undefined) createData.width = width;
 
-    const window = await new Promise<chrome.windows.Window>((resolve, reject) => {
-      chrome.windows.create(createData, (window) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-        } else {
-          resolve(window!);
-        }
-      });
-    });
+    const window = await chrome.windows.create(createData);
+    if (!window) {
+      return this.formatError(new Error('Failed to create window'));
+    }
 
     return this.formatJson({
       id: window.id,

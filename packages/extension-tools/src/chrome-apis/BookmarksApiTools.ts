@@ -20,6 +20,18 @@ export interface BookmarksApiToolsOptions {
 
 export const BOOKMARK_ACTIONS = BOOKMARK_ACTION_IDS;
 
+interface SerializedBookmarkNode {
+  id: string;
+  title: string;
+  url?: string | undefined;
+  parentId?: string | undefined;
+  index?: number | undefined;
+  dateAdded?: number | undefined;
+  dateAddedFormatted?: string | undefined;
+  type: 'bookmark' | 'folder';
+  children?: SerializedBookmarkNode[] | undefined;
+}
+
 export class BookmarksApiTools extends BaseApiTools<BookmarksApiToolsOptions> {
   protected apiName = 'Bookmarks';
 
@@ -154,12 +166,7 @@ export class BookmarksApiTools extends BaseApiTools<BookmarksApiToolsOptions> {
     if (url !== undefined) createDetails.url = url;
     if (index !== undefined) createDetails.index = index;
 
-    const result = await new Promise<chrome.bookmarks.BookmarkTreeNode>((resolve, reject) => {
-      chrome.bookmarks.create(createDetails, (res) => {
-        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-        else resolve(res);
-      });
-    });
+    const result = await chrome.bookmarks.create(createDetails);
 
     return this.formatJson({
       id: result.id,
@@ -174,12 +181,7 @@ export class BookmarksApiTools extends BaseApiTools<BookmarksApiToolsOptions> {
 
   private async handleGet(raw: unknown) {
     const { idOrIdList } = this.getSchema.parse(raw);
-    const results = await new Promise<chrome.bookmarks.BookmarkTreeNode[]>((resolve, reject) => {
-      chrome.bookmarks.get(idOrIdList as any, (res) => {
-        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-        else resolve(res);
-      });
-    });
+    const results = await chrome.bookmarks.get(this.toBookmarkIdRequest(idOrIdList));
 
     return this.formatJson({
       count: results.length,
@@ -200,12 +202,7 @@ export class BookmarksApiTools extends BaseApiTools<BookmarksApiToolsOptions> {
 
   private async handleGetChildren(raw: unknown) {
     const { id } = this.getChildrenSchema.parse(raw);
-    const results = await new Promise<chrome.bookmarks.BookmarkTreeNode[]>((resolve, reject) => {
-      chrome.bookmarks.getChildren(id, (res) => {
-        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-        else resolve(res);
-      });
-    });
+    const results = await chrome.bookmarks.getChildren(id);
 
     return this.formatJson({
       parentId: id,
@@ -227,12 +224,7 @@ export class BookmarksApiTools extends BaseApiTools<BookmarksApiToolsOptions> {
 
   private async handleGetRecent(raw: unknown) {
     const { numberOfItems } = this.getRecentSchema.parse(raw);
-    const results = await new Promise<chrome.bookmarks.BookmarkTreeNode[]>((resolve, reject) => {
-      chrome.bookmarks.getRecent(numberOfItems, (res) => {
-        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-        else resolve(res);
-      });
-    });
+    const results = await chrome.bookmarks.getRecent(numberOfItems);
 
     return this.formatJson({
       count: results.length,
@@ -252,14 +244,9 @@ export class BookmarksApiTools extends BaseApiTools<BookmarksApiToolsOptions> {
 
   private async handleGetSubTree(raw: unknown) {
     const { id } = this.getSubTreeSchema.parse(raw);
-    const results = await new Promise<chrome.bookmarks.BookmarkTreeNode[]>((resolve, reject) => {
-      chrome.bookmarks.getSubTree(id, (res) => {
-        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-        else resolve(res);
-      });
-    });
+    const results = await chrome.bookmarks.getSubTree(id);
 
-    const formatNode = (node: chrome.bookmarks.BookmarkTreeNode): any => ({
+    const formatNode = (node: chrome.bookmarks.BookmarkTreeNode): SerializedBookmarkNode => ({
       id: node.id,
       title: node.title,
       url: node.url,
@@ -278,14 +265,9 @@ export class BookmarksApiTools extends BaseApiTools<BookmarksApiToolsOptions> {
   }
 
   private async handleGetTree() {
-    const results = await new Promise<chrome.bookmarks.BookmarkTreeNode[]>((resolve, reject) => {
-      chrome.bookmarks.getTree((res) => {
-        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-        else resolve(res);
-      });
-    });
+    const results = await chrome.bookmarks.getTree();
 
-    const formatNode = (node: chrome.bookmarks.BookmarkTreeNode): any => ({
+    const formatNode = (node: chrome.bookmarks.BookmarkTreeNode): SerializedBookmarkNode => ({
       id: node.id,
       title: node.title,
       url: node.url,
@@ -304,16 +286,11 @@ export class BookmarksApiTools extends BaseApiTools<BookmarksApiToolsOptions> {
 
   private async handleMove(raw: unknown) {
     const { id, parentId, index } = this.moveSchema.parse(raw);
-    const destination: { parentId?: string; index?: number } = {};
+    const destination: chrome.bookmarks.MoveDestination = {};
     if (parentId !== undefined) destination.parentId = parentId;
     if (index !== undefined) destination.index = index;
 
-    const result = await new Promise<chrome.bookmarks.BookmarkTreeNode>((resolve, reject) => {
-      chrome.bookmarks.move(id, destination, (res) => {
-        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-        else resolve(res);
-      });
-    });
+    const result = await chrome.bookmarks.move(id, destination);
 
     return this.formatSuccess('Bookmark moved successfully', {
       id: result.id,
@@ -327,34 +304,19 @@ export class BookmarksApiTools extends BaseApiTools<BookmarksApiToolsOptions> {
 
   private async handleRemove(raw: unknown) {
     const { id } = this.removeSchema.parse(raw);
-    await new Promise<void>((resolve, reject) => {
-      chrome.bookmarks.remove(id, () => {
-        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-        else resolve();
-      });
-    });
+    await chrome.bookmarks.remove(id);
     return this.formatSuccess('Bookmark removed successfully', { id });
   }
 
   private async handleRemoveTree(raw: unknown) {
     const { id } = this.removeTreeSchema.parse(raw);
-    await new Promise<void>((resolve, reject) => {
-      chrome.bookmarks.removeTree(id, () => {
-        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-        else resolve();
-      });
-    });
+    await chrome.bookmarks.removeTree(id);
     return this.formatSuccess('Bookmark folder and all contents removed successfully', { id });
   }
 
   private async handleSearch(raw: unknown) {
     const { query } = this.searchSchema.parse(raw);
-    const results = await new Promise<chrome.bookmarks.BookmarkTreeNode[]>((resolve, reject) => {
-      chrome.bookmarks.search(query as any, (res) => {
-        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-        else resolve(res);
-      });
-    });
+    const results = await chrome.bookmarks.search(this.toBookmarkSearchQuery(query));
 
     return this.formatJson({
       query: typeof query === 'string' ? query : JSON.stringify(query),
@@ -376,7 +338,7 @@ export class BookmarksApiTools extends BaseApiTools<BookmarksApiToolsOptions> {
 
   private async handleUpdate(raw: unknown) {
     const { id, title, url } = this.updateSchema.parse(raw);
-    const changes: { title?: string; url?: string } = {};
+    const changes: chrome.bookmarks.UpdateChanges = {};
     if (title !== undefined) changes.title = title;
     if (url !== undefined) changes.url = url;
 
@@ -384,12 +346,7 @@ export class BookmarksApiTools extends BaseApiTools<BookmarksApiToolsOptions> {
       return this.formatError('At least one property (title or url) must be specified to update');
     }
 
-    const result = await new Promise<chrome.bookmarks.BookmarkTreeNode>((resolve, reject) => {
-      chrome.bookmarks.update(id, changes, (res) => {
-        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-        else resolve(res);
-      });
-    });
+    const result = await chrome.bookmarks.update(id, changes);
 
     return this.formatSuccess('Bookmark updated successfully', {
       id: result.id,
@@ -400,5 +357,34 @@ export class BookmarksApiTools extends BaseApiTools<BookmarksApiToolsOptions> {
       type: result.url ? 'bookmark' : 'folder',
       changes,
     });
+  }
+
+  private toBookmarkIdRequest(idOrIdList: string | string[]): string | [string, ...string[]] {
+    if (typeof idOrIdList === 'string') {
+      return idOrIdList;
+    }
+
+    const [firstId, ...remainingIds] = idOrIdList;
+    if (firstId === undefined) {
+      throw new Error('At least one bookmark id is required');
+    }
+
+    return [firstId, ...remainingIds];
+  }
+
+  private toBookmarkSearchQuery(
+    query:
+      | string
+      | { query?: string | undefined; title?: string | undefined; url?: string | undefined }
+  ): string | chrome.bookmarks.SearchQuery {
+    if (typeof query === 'string') {
+      return query;
+    }
+
+    const searchQuery: chrome.bookmarks.SearchQuery = {};
+    if (query.query !== undefined) searchQuery.query = query.query;
+    if (query.title !== undefined) searchQuery.title = query.title;
+    if (query.url !== undefined) searchQuery.url = query.url;
+    return searchQuery;
   }
 }
