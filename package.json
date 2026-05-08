@@ -12,7 +12,7 @@
     "changeset:version": "changeset version",
     "check": "vp check --fix",
     "check:ci": "vp check",
-    "check-all": "pnpm -r --filter '!@mcp-b/example-*' --filter '!@mcp-b/chrome-devtools-mcp' run typecheck && vp check",
+    "check-all": "pnpm typecheck && vp check",
     "ci:publish": "pnpm publish -r --access public",
     "clean": "git clean -xdf .cache .vite node_modules",
     "format": "vp fmt --write",
@@ -37,7 +37,8 @@
     "test:unit:coverage": "pnpm test:unit:packages:coverage && pnpm test:hooks:coverage",
     "test:unit:packages": "pnpm -r --filter '!@mcp-b/example-*' --filter '!@mcp-b/chrome-devtools-mcp' --filter '!mcp-e2e-tests' --filter '!mcp-tab-transport-test-app' --filter '!usewebmcp' --filter '!@mcp-b/react-webmcp' run test",
     "test:unit:packages:coverage": "pnpm -r --filter '!@mcp-b/example-*' --filter '!@mcp-b/chrome-devtools-mcp' --filter '!mcp-e2e-tests' --filter '!mcp-tab-transport-test-app' --filter '!usewebmcp' --filter '!@mcp-b/react-webmcp' run test -- --coverage",
-    "typecheck": "pnpm -r --filter '!@mcp-b/example-*' --filter '!@mcp-b/chrome-devtools-mcp' --filter '!mcp-e2e-tests' --filter '!mcp-tab-transport-test-app' run typecheck",
+    "typecheck": "pnpm run typecheck:prebuild && pnpm -r --workspace-concurrency=1 --filter '!@mcp-b/example-*' --filter '!@mcp-b/chrome-devtools-mcp' --filter '!mcp-e2e-tests' --filter '!mcp-tab-transport-test-app' run typecheck",
+    "typecheck:prebuild": "pnpm --filter @mcp-b/webmcp-types build && pnpm --filter @mcp-b/webmcp-polyfill build && pnpm --filter @mcp-b/webmcp-ts-sdk build && pnpm --filter @mcp-b/transports build && pnpm --filter @mcp-b/global build && pnpm --filter @mcp-b/mcp-iframe build && pnpm --filter @mcp-b/react-webmcp build && pnpm --filter usewebmcp build",
     "validate:publish": "node ./scripts/validate-publish.js"
   },
   "dependencies": {

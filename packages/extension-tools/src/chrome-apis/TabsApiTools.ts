@@ -17,7 +17,9 @@ export interface TabsApiToolsOptions {
   duplicateTab?: boolean;
   getTab?: boolean;
   getZoom?: boolean;
+  getZoomSettings?: boolean;
   setZoom?: boolean;
+  setZoomSettings?: boolean;
   groupTabs?: boolean;
   ungroupTabs?: boolean;
   highlightTabs?: boolean;
@@ -48,10 +50,6 @@ export const TAB_ACTIONS = [
   'moveTabs',
   'sendMessage',
 ] as const;
-
-type TabAction = (typeof TAB_ACTIONS)[number];
-
-const tabActionSchema = z.enum(TAB_ACTIONS);
 
 export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
   protected apiName = 'Tabs';
@@ -94,324 +92,194 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
   }
 
   registerTools(): void {
-    this.server.registerTool(
-      'extension_tool_tab_operations',
-      {
-        description: 'Perform various tab operations using the Chrome Tabs API',
-        inputSchema: {
-          action: tabActionSchema,
-          params: z
-            .record(z.string(), z.any())
-            .optional()
-            .describe('Parameters for the chosen action'),
-        },
-      },
-      async ({ action, params = {} }) => {
-        try {
-          if (!this.shouldRegisterTool(action)) {
-            return this.formatError(new Error(`Action "${action}" is not supported`));
-          }
+    if (this.shouldRegisterTool('listActiveTabs')) {
+      this.registerExtensionTool(
+        'extension_tool_list_active_tabs',
+        'Lists all tabs grouped by domain',
+        this.listActiveTabsSchema.shape,
+        () => this.handleListActiveTabs()
+      );
+    }
 
-          switch (action as TabAction) {
-            case 'listActiveTabs':
-              return await this.handleListActiveTabs();
-            case 'createTab':
-              return await this.handleCreateTab(params);
-            case 'updateTab':
-              return await this.handleUpdateTab(params);
-            case 'closeTabs':
-              return await this.handleCloseTabs(params);
-            case 'getAllTabs':
-              return await this.handleGetAllTabs(params);
-            case 'navigateHistory':
-              return await this.handleNavigateHistory(params);
-            case 'reloadTab':
-              return await this.handleReloadTab(params);
-            case 'captureVisibleTab':
-              return await this.handleCaptureVisibleTab(params);
-            case 'detectLanguage':
-              return await this.handleDetectLanguage(params);
-            case 'discardTab':
-              return await this.handleDiscardTab(params);
-            case 'duplicateTab':
-              return await this.handleDuplicateTab(params);
-            case 'getTab':
-              return await this.handleGetTab(params);
-            case 'getZoom':
-              return await this.handleGetZoom(params);
-            case 'getZoomSettings':
-              return await this.handleGetZoomSettings(params);
-            case 'setZoom':
-              return await this.handleSetZoom(params);
-            case 'setZoomSettings':
-              return await this.handleSetZoomSettings(params);
-            case 'groupTabs':
-              return await this.handleGroupTabs(params);
-            case 'ungroupTabs':
-              return await this.handleUngroupTabs(params);
-            case 'highlightTabs':
-              return await this.handleHighlightTabs(params);
-            case 'moveTabs':
-              return await this.handleMoveTabs(params);
-            case 'sendMessage':
-              return await this.handleSendMessage(params);
-            default:
-              return this.formatError(new Error(`Action "${action}" is not supported`));
-          }
-        } catch (error) {
-          return this.formatError(error);
-        }
-      }
-    );
+    if (this.shouldRegisterTool('createTab')) {
+      this.registerExtensionTool(
+        'extension_tool_create_tab',
+        'Create a new browser tab',
+        this.createTabSchema.shape,
+        (params) => this.handleCreateTab(params)
+      );
+    }
 
-    this.server.registerTool(
-      'extension_tool_tab_parameters_description',
-      {
-        description:
-          'Get the parameters for extension_tool_tab_operations tool and the description for the associated action, this tool should be used first before extension_tool_tab_operations',
-        inputSchema: {
-          action: tabActionSchema,
-        },
-      },
-      async ({ action }) => {
-        try {
-          if (!this.shouldRegisterTool(action)) {
-            return this.formatError(new Error(`Action "${action}" is not supported`));
-          }
+    if (this.shouldRegisterTool('updateTab')) {
+      this.registerExtensionTool(
+        'extension_tool_update_tab',
+        'Update properties of an existing tab. If no tabId is specified, operates on the currently active tab',
+        this.updateTabSchema.shape,
+        (params) => this.handleUpdateTab(params)
+      );
+    }
 
-          const toJson = (schema: z.ZodTypeAny, _name: string) => z.toJSONSchema(schema);
+    if (this.shouldRegisterTool('closeTabs')) {
+      this.registerExtensionTool(
+        'extension_tool_close_tabs',
+        'Close one or more tabs',
+        this.closeTabsSchema.shape,
+        (params) => this.handleCloseTabs(params)
+      );
+    }
 
-          const payloadBase = {
-            tool: 'extension_tool_tab_operations',
-            action,
-            note: 'Use the description to double check if the correct action is chosen. Use this JSON Schema for the params field when calling the tool. The top-level tool input is { action, params }.',
-          } as const;
+    if (this.shouldRegisterTool('getAllTabs')) {
+      this.registerExtensionTool(
+        'extension_tool_get_all_tabs',
+        'Get information about all open tabs',
+        this.getAllTabsSchema.shape,
+        (params) => this.handleGetAllTabs(params)
+      );
+    }
 
-          switch (action as TabAction) {
-            case 'listActiveTabs': {
-              const paramsAndDescription = {
-                params: toJson(this.listActiveTabsSchema, 'ListActiveTabsParams'),
-                description: 'Lists all tabs grouped by domain',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'createTab': {
-              const paramsAndDescription = {
-                params: toJson(this.createTabSchema, 'CreateTabParams'),
-                description: 'Create a new browser tab',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'updateTab': {
-              const paramsAndDescription = {
-                params: toJson(this.updateTabSchema, 'UpdateTabParams'),
-                description:
-                  'Update properties of an existing tab. If no tabId is specified, operates on the currently active tab',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'closeTabs': {
-              const paramsAndDescription = {
-                params: toJson(this.closeTabsSchema, 'CloseTabsParams'),
-                description: 'Close one or more tabs',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'getAllTabs': {
-              const paramsAndDescription = {
-                params: toJson(this.getAllTabsSchema, 'GetAllTabsParams'),
-                description: 'Get information about all open tabs',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'navigateHistory': {
-              const paramsAndDescription = {
-                params: toJson(this.navigateHistorySchema, 'NavigateHistoryParams'),
-                description:
-                  "Navigate forward or backward in a tab's history. If no tabId is specified, operates on the currently active tab",
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'reloadTab': {
-              const paramsAndDescription = {
-                params: toJson(this.reloadTabSchema, 'ReloadTabParams'),
-                description:
-                  'Reload a tab. If no tabId is specified, operates on the currently active tab',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'captureVisibleTab': {
-              const paramsAndDescription = {
-                params: toJson(this.captureVisibleTabSchema, 'CaptureVisibleTabParams'),
-                description:
-                  'Take a screenshot of the visible area of the currently active tab in a window. Once the screenshot is captured',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'detectLanguage': {
-              const paramsAndDescription = {
-                params: toJson(this.detectLanguageSchema, 'DetectLanguageParams'),
-                description: 'Detect the primary language of the content in a tab',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'discardTab': {
-              const paramsAndDescription = {
-                params: toJson(this.discardTabSchema, 'DiscardTabParams'),
-                description:
-                  'Discards a tab from memory. Discarded tabs are still visible but need to reload when activated',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'duplicateTab': {
-              const paramsAndDescription = {
-                params: toJson(this.duplicateTabSchema, 'DuplicateTabParams'),
-                description: 'Duplicate a tab',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'getTab': {
-              const paramsAndDescription = {
-                params: toJson(this.getTabSchema, 'GetTabParams'),
-                description: 'Retrieves details about a specific tab',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'getZoom': {
-              const paramsAndDescription = {
-                params: toJson(this.getZoomSchema, 'GetZoomParams'),
-                description: 'Retrieves the current zoom level of a tab',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'getZoomSettings': {
-              const paramsAndDescription = {
-                params: toJson(this.getZoomSettingsSchema, 'GetZoomSettingsParams'),
-                description: 'Gets the current zoom settings of a tab',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'setZoom': {
-              const paramsAndDescription = {
-                params: toJson(this.setZoomSchema, 'SetZoomParams'),
-                description: 'Sets the zoom factor of a tab',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'setZoomSettings': {
-              const paramsAndDescription = {
-                params: toJson(this.setZoomSettingsSchema, 'SetZoomSettingsParams'),
-                description: 'Sets zoom settings for a tab (how zoom changes are handled)',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'groupTabs': {
-              const paramsAndDescription = {
-                params: toJson(this.groupTabsSchema, 'GroupTabsParams'),
-                description: 'Groups one or more tabs together',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'ungroupTabs': {
-              const paramsAndDescription = {
-                params: toJson(this.ungroupTabsSchema, 'UngroupTabsParams'),
-                description: 'Removes tabs from their groups',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'highlightTabs': {
-              const paramsAndDescription = {
-                params: toJson(this.highlightTabsSchema, 'HighlightTabsParams'),
-                description: 'Highlights the given tabs and focuses on the first one',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'moveTabs': {
-              const paramsAndDescription = {
-                params: toJson(this.moveTabsSchema, 'MoveTabsParams'),
-                description:
-                  'Moves tabs to a new position within their window or to another window',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'sendMessage': {
-              const paramsAndDescription = {
-                params: toJson(this.sendMessageSchema, 'SendMessageParams'),
-                description: 'Sends a message to content scripts in a specific tab',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            default:
-              return this.formatError(new Error(`Action "${action}" is not supported`));
-          }
-        } catch (error) {
-          return this.formatError(error);
-        }
-      }
-    );
+    if (this.shouldRegisterTool('navigateHistory')) {
+      this.registerExtensionTool(
+        'extension_tool_navigate_tab_history',
+        "Navigate forward or backward in a tab's history. If no tabId is specified, operates on the currently active tab",
+        this.navigateHistorySchema.shape,
+        (params) => this.handleNavigateHistory(params)
+      );
+    }
+
+    if (this.shouldRegisterTool('reloadTab')) {
+      this.registerExtensionTool(
+        'extension_tool_reload_tab',
+        'Reload a tab. If no tabId is specified, operates on the currently active tab',
+        this.reloadTabSchema.shape,
+        (params) => this.handleReloadTab(params)
+      );
+    }
+
+    if (this.shouldRegisterTool('captureVisibleTab')) {
+      this.registerExtensionTool(
+        'extension_tool_capture_visible_tab',
+        'Take a screenshot of the visible area of the currently active tab in a window',
+        this.captureVisibleTabSchema.shape,
+        (params) => this.handleCaptureVisibleTab(params)
+      );
+    }
+
+    if (this.shouldRegisterTool('detectLanguage')) {
+      this.registerExtensionTool(
+        'extension_tool_detect_tab_language',
+        'Detect the primary language of the content in a tab',
+        this.detectLanguageSchema.shape,
+        (params) => this.handleDetectLanguage(params)
+      );
+    }
+
+    if (this.shouldRegisterTool('discardTab')) {
+      this.registerExtensionTool(
+        'extension_tool_discard_tab',
+        'Discards a tab from memory. Discarded tabs are still visible but need to reload when activated',
+        this.discardTabSchema.shape,
+        (params) => this.handleDiscardTab(params)
+      );
+    }
+
+    if (this.shouldRegisterTool('duplicateTab')) {
+      this.registerExtensionTool(
+        'extension_tool_duplicate_tab',
+        'Duplicate a tab',
+        this.duplicateTabSchema.shape,
+        (params) => this.handleDuplicateTab(params)
+      );
+    }
+
+    if (this.shouldRegisterTool('getTab')) {
+      this.registerExtensionTool(
+        'extension_tool_get_tab',
+        'Retrieves details about a specific tab',
+        this.getTabSchema.shape,
+        (params) => this.handleGetTab(params)
+      );
+    }
+
+    if (this.shouldRegisterTool('getZoom')) {
+      this.registerExtensionTool(
+        'extension_tool_get_tab_zoom',
+        'Retrieves the current zoom level of a tab',
+        this.getZoomSchema.shape,
+        (params) => this.handleGetZoom(params)
+      );
+    }
+
+    if (this.shouldRegisterTool('getZoomSettings')) {
+      this.registerExtensionTool(
+        'extension_tool_get_tab_zoom_settings',
+        'Gets the current zoom settings of a tab',
+        this.getZoomSettingsSchema.shape,
+        (params) => this.handleGetZoomSettings(params)
+      );
+    }
+
+    if (this.shouldRegisterTool('setZoom')) {
+      this.registerExtensionTool(
+        'extension_tool_set_tab_zoom',
+        'Sets the zoom factor of a tab',
+        this.setZoomSchema.shape,
+        (params) => this.handleSetZoom(params)
+      );
+    }
+
+    if (this.shouldRegisterTool('setZoomSettings')) {
+      this.registerExtensionTool(
+        'extension_tool_set_tab_zoom_settings',
+        'Sets zoom settings for a tab (how zoom changes are handled)',
+        this.setZoomSettingsSchema.shape,
+        (params) => this.handleSetZoomSettings(params)
+      );
+    }
+
+    if (this.shouldRegisterTool('groupTabs')) {
+      this.registerExtensionTool(
+        'extension_tool_group_tabs',
+        'Groups one or more tabs together',
+        this.groupTabsSchema.shape,
+        (params) => this.handleGroupTabs(params)
+      );
+    }
+
+    if (this.shouldRegisterTool('ungroupTabs')) {
+      this.registerExtensionTool(
+        'extension_tool_ungroup_tabs',
+        'Removes tabs from their groups',
+        this.ungroupTabsSchema.shape,
+        (params) => this.handleUngroupTabs(params)
+      );
+    }
+
+    if (this.shouldRegisterTool('highlightTabs')) {
+      this.registerExtensionTool(
+        'extension_tool_highlight_tabs',
+        'Highlights the given tabs and focuses on the first one',
+        this.highlightTabsSchema.shape,
+        (params) => this.handleHighlightTabs(params)
+      );
+    }
+
+    if (this.shouldRegisterTool('moveTabs')) {
+      this.registerExtensionTool(
+        'extension_tool_move_tabs',
+        'Moves tabs to a new position within their window or to another window',
+        this.moveTabsSchema.shape,
+        (params) => this.handleMoveTabs(params)
+      );
+    }
+
+    if (this.shouldRegisterTool('sendMessage')) {
+      this.registerExtensionTool(
+        'extension_tool_send_tab_message',
+        'Sends a message to content scripts in a specific tab',
+        this.sendMessageSchema.shape,
+        (params) => this.handleSendMessage(params)
+      );
+    }
   }
 
   // ===== Action handlers =====

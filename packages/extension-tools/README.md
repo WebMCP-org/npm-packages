@@ -171,10 +171,10 @@ const tabsTools = new TabsApiTools(server, {
 tabsTools.register();
 
 const bookmarksTools = new BookmarksApiTools(server, {
-  getBookmarks: true,
-  createBookmark: true,
-  updateBookmark: true,
-  removeBookmark: true,
+  get: true,
+  create: true,
+  update: true,
+  remove: true,
 });
 bookmarksTools.register();
 
@@ -217,7 +217,7 @@ console.log('Available tools:', tools);
 // Call extension tools
 // Create a new tab
 const createResult = await client.callTool({
-  name: 'create_tab',
+  name: 'extension_tool_create_tab',
   arguments: {
     url: 'https://example.com',
     active: true,
@@ -227,7 +227,7 @@ const createResult = await client.callTool({
 
 // Get all tabs
 const tabsResult = await client.callTool({
-  name: 'get_all_tabs',
+  name: 'extension_tool_get_all_tabs',
   arguments: {
     currentWindow: true,
   },
@@ -235,7 +235,7 @@ const tabsResult = await client.callTool({
 
 // Search bookmarks
 const bookmarksResult = await client.callTool({
-  name: 'get_bookmarks',
+  name: 'extension_tool_search_bookmarks',
   arguments: {
     query: 'example',
   },
@@ -243,10 +243,10 @@ const bookmarksResult = await client.callTool({
 
 // Store data
 const storageResult = await client.callTool({
-  name: 'set_storage',
+  name: 'extension_tool_set_storage',
   arguments: {
     area: 'local',
-    items: {
+    data: {
       key1: 'value1',
       key2: { nested: 'object' },
     },
@@ -255,7 +255,7 @@ const storageResult = await client.callTool({
 
 // Execute script in active tab
 const scriptResult = await client.callTool({
-  name: 'execute_script',
+  name: 'extension_tool_execute_script',
   arguments: {
     target: { tabId: undefined }, // defaults to active tab
     func: '() => document.title',
@@ -265,7 +265,7 @@ const scriptResult = await client.callTool({
 
 ## Tool Configuration
 
-Each API tool class accepts configuration options to enable specific methods:
+Each API tool class accepts configuration options for specific methods. Methods are enabled by default; set an option to `false` to omit that action from tool discovery:
 
 ```typescript
 // TabsApiTools options
@@ -283,7 +283,9 @@ interface TabsOptions {
   duplicateTab?: boolean;
   getTab?: boolean;
   getZoom?: boolean;
+  getZoomSettings?: boolean;
   setZoom?: boolean;
+  setZoomSettings?: boolean;
   groupTabs?: boolean;
   ungroupTabs?: boolean;
   highlightTabs?: boolean;
@@ -371,13 +373,13 @@ Each Chrome API requires specific permissions in your extension's manifest.json.
 ```typescript
 // List tabs grouped by domain
 const result = await client.callTool({
-  name: 'list_active_tabs',
+  name: 'extension_tool_list_active_tabs',
   arguments: {},
 });
 
 // Update the active tab's URL
 const updateResult = await client.callTool({
-  name: 'update_tab',
+  name: 'extension_tool_update_tab',
   arguments: {
     url: 'https://new-url.com',
     active: true,
@@ -386,7 +388,7 @@ const updateResult = await client.callTool({
 
 // Group multiple tabs
 const groupResult = await client.callTool({
-  name: 'group_tabs',
+  name: 'extension_tool_group_tabs',
   arguments: {
     tabIds: [1, 2, 3],
   },
@@ -398,7 +400,7 @@ const groupResult = await client.callTool({
 ```typescript
 // Get storage data
 const data = await client.callTool({
-  name: 'get_storage',
+  name: 'extension_tool_get_storage',
   arguments: {
     area: 'local',
     keys: ['setting1', 'setting2'],
@@ -407,9 +409,10 @@ const data = await client.callTool({
 
 // Clear all storage
 const clearResult = await client.callTool({
-  name: 'clear_storage',
+  name: 'extension_tool_clear_storage',
   arguments: {
     area: 'local',
+    confirm: true,
   },
 });
 ```
@@ -419,7 +422,7 @@ const clearResult = await client.callTool({
 ```typescript
 // Search browsing history
 const historyResult = await client.callTool({
-  name: 'search_history',
+  name: 'extension_tool_search_history',
   arguments: {
     text: 'github',
     maxResults: 20,
@@ -463,7 +466,7 @@ All tools include comprehensive error handling and return structured error respo
 ```typescript
 try {
   const result = await client.callTool({
-    name: 'create_tab',
+    name: 'extension_tool_create_tab',
     arguments: { url: 'invalid-url' },
   });
 } catch (error) {
@@ -505,15 +508,15 @@ async function setupMcpServer() {
       getAllTabs: true,
     }),
     new BookmarksApiTools(server, {
-      getBookmarks: true,
-      createBookmark: true,
+      get: true,
+      create: true,
     }),
     new StorageApiTools(server, {
       getStorage: true,
       setStorage: true,
     }),
     new HistoryApiTools(server, {
-      searchHistory: true,
+      search: true,
     }),
     new ScriptingApiTools(server, {
       executeScript: true,

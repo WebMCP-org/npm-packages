@@ -1,4 +1,7 @@
 import type { CallToolResult, McpServer } from '@mcp-b/webmcp-ts-sdk';
+import { z } from 'zod';
+
+import { zodSchemaToJsonSchemaCompat } from './zod-json-schema-compat';
 
 export interface ApiAvailability {
   available: boolean;
@@ -22,6 +25,29 @@ export abstract class BaseApiTools<TOptions = Record<string, unknown>> {
       return false;
     }
     return true;
+  }
+
+  protected registerExtensionTool(
+    name: string,
+    description: string,
+    inputSchema: z.ZodRawShape,
+    handler: (args: Record<string, unknown>) => CallToolResult | Promise<CallToolResult>
+  ): void {
+    // WebMCP tool descriptors expose JSON Schema, while these API wrappers keep
+    // their validation schemas in Zod. Convert at registration so native tool
+    // discovery receives the same parameter constraints the handlers enforce.
+    this.server.registerTool({
+      name,
+      description,
+      inputSchema: zodSchemaToJsonSchemaCompat(z.object(inputSchema)),
+      execute: async (args: Record<string, unknown>) => {
+        try {
+          return await handler(args);
+        } catch (error) {
+          return this.formatError(error);
+        }
+      },
+    });
   }
 
   protected formatError(error: unknown): CallToolResult {

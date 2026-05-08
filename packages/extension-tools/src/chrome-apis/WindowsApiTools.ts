@@ -23,10 +23,6 @@ export const WINDOW_ACTIONS = [
   'update',
 ] as const;
 
-type WindowAction = (typeof WINDOW_ACTIONS)[number];
-
-const windowActionSchema = z.enum(WINDOW_ACTIONS);
-
 export class WindowsApiTools extends BaseApiTools<WindowsApiToolsOptions> {
   protected apiName = 'Windows';
 
@@ -75,150 +71,68 @@ export class WindowsApiTools extends BaseApiTools<WindowsApiToolsOptions> {
   }
 
   registerTools(): void {
-    this.server.registerTool(
-      'extension_tool_window_operations',
-      {
-        description: 'Perform operations on browser windows',
-        inputSchema: {
-          action: windowActionSchema,
-          // Parameters vary by action; validated in handler using specific schemas
-          params: z
-            .record(z.string(), z.any())
-            .optional()
-            .describe('Parameters for the chosen action'),
-        },
-      },
-      async ({ action, params = {} }) => {
-        try {
-          if (!this.shouldRegisterTool(action)) {
-            return this.formatError(new Error(`Action "${action}" is not supported`));
-          }
+    if (this.shouldRegisterTool('create')) {
+      this.registerExtensionTool(
+        'extension_tool_create_window',
+        'Create a new browser window with optional sizing, position, or default URL',
+        this.createSchema.shape,
+        (params) => this.handleCreate(params)
+      );
+    }
 
-          switch (action as WindowAction) {
-            case 'create':
-              return await this.handleCreate(params);
-            case 'get':
-              return await this.handleGet(params);
-            case 'getAll':
-              return await this.handleGetAll(params);
-            case 'getCurrent':
-              return await this.handleGetCurrent(params);
-            case 'getLastFocused':
-              return await this.handleGetLastFocused(params);
-            case 'remove':
-              return await this.handleRemove(params);
-            case 'update':
-              return await this.handleUpdate(params);
-            default:
-              return this.formatError(`Unknown action: ${String(action)}`);
-          }
-        } catch (error) {
-          return this.formatError(error);
-        }
-      }
-    );
+    if (this.shouldRegisterTool('get')) {
+      this.registerExtensionTool(
+        'extension_tool_get_window',
+        'Get details about a specific window',
+        this.getSchema.shape,
+        (params) => this.handleGet(params)
+      );
+    }
 
-    this.server.registerTool(
-      'extension_tool_window_parameters_description',
-      {
-        description:
-          'Get the parameters for extension_tool_window_operations tool and the description for the associated action, this tool should be used first before extension_tool_window_operations',
-        inputSchema: {
-          action: windowActionSchema,
-        },
-      },
-      async ({ action }) => {
-        try {
-          // Build JSON Schema for the params of the requested action so an LLM can construct a valid call
-          const toJson = (schema: z.ZodTypeAny, _name: string) => z.toJSONSchema(schema);
+    if (this.shouldRegisterTool('getAll')) {
+      this.registerExtensionTool(
+        'extension_tool_get_all_windows',
+        'Get all browser windows',
+        this.getAllSchema.shape,
+        (params) => this.handleGetAll(params)
+      );
+    }
 
-          const payloadBase = {
-            tool: 'extension_tool_window_operations',
-            action,
-            note: 'Use the description to double check if the correct action is chosen. Use this JSON Schema for the params field when calling the tool. The top-level tool input is { action, params }.',
-          } as const;
+    if (this.shouldRegisterTool('getCurrent')) {
+      this.registerExtensionTool(
+        'extension_tool_get_current_window',
+        'Get the current window',
+        this.getCurrentSchema.shape,
+        (params) => this.handleGetCurrent(params)
+      );
+    }
 
-          switch (action as WindowAction) {
-            case 'create': {
-              const paramsAndDescription = {
-                params: toJson(this.createSchema, 'CreateWindowSchema'),
-                description:
-                  'Create a new browser window with optional sizing, position, or default URL',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'get': {
-              const paramsAndDescription = {
-                params: toJson(this.getSchema, 'GetWindowSchema'),
-                description: 'Get details about a specific window',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'getAll': {
-              const paramsAndDescription = {
-                params: toJson(this.getAllSchema, 'GetAllWindowsSchema'),
-                description: 'Get all browser windows',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'getCurrent': {
-              const paramsAndDescription = {
-                params: toJson(this.getCurrentSchema, 'GetCurrentWindowSchema'),
-                description: 'Get the current window',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'getLastFocused': {
-              const paramsAndDescription = {
-                params: toJson(this.getLastFocusedSchema, 'GetLastFocusedWindowSchema'),
-                description: 'Get the window that was most recently focused',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'remove': {
-              const paramAndDescription = {
-                params: toJson(this.removeSchema, 'RemoveWindowSchema'),
-                description: 'Remove (close) a window and all the tabs inside it',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramAndDescription,
-              });
-            }
-            case 'update': {
-              const paramsAndDescription = {
-                params: toJson(this.updateSchema, 'UpdateWindowSchema'),
-                description: 'Update the properties of a window',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            default: {
-              return this.formatError(`Unknown action: ${String(action)}`);
-            }
-          }
-        } catch (error) {
-          return this.formatError(error);
-        }
-      }
-    );
+    if (this.shouldRegisterTool('getLastFocused')) {
+      this.registerExtensionTool(
+        'extension_tool_get_last_focused_window',
+        'Get the window that was most recently focused',
+        this.getLastFocusedSchema.shape,
+        (params) => this.handleGetLastFocused(params)
+      );
+    }
+
+    if (this.shouldRegisterTool('remove')) {
+      this.registerExtensionTool(
+        'extension_tool_remove_window',
+        'Remove (close) a window and all the tabs inside it',
+        this.removeSchema.shape,
+        (params) => this.handleRemove(params)
+      );
+    }
+
+    if (this.shouldRegisterTool('update')) {
+      this.registerExtensionTool(
+        'extension_tool_update_window',
+        'Update the properties of a window',
+        this.updateSchema.shape,
+        (params) => this.handleUpdate(params)
+      );
+    }
   }
 
   // ===== Validation Schemas per action =====

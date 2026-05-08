@@ -19,10 +19,6 @@ export const STORAGE_ACTIONS = [
   'getBytesInUse',
 ] as const;
 
-type StorageAction = (typeof STORAGE_ACTIONS)[number];
-
-const storageActionSchema = z.enum(STORAGE_ACTIONS);
-
 export class StorageApiTools extends BaseApiTools<StorageApiToolsOptions> {
   protected apiName = 'Storage';
 
@@ -78,126 +74,50 @@ export class StorageApiTools extends BaseApiTools<StorageApiToolsOptions> {
   }
 
   registerTools(): void {
-    this.server.registerTool(
-      'extension_tool_storage_operations',
-      {
-        description: 'Perform operations on Chrome storage API',
-        inputSchema: {
-          action: storageActionSchema,
-          params: z
-            .record(z.string(), z.any())
-            .optional()
-            .describe('Parameters for the chosen action'),
-        },
-      },
-      async ({ action, params = {} }) => {
-        try {
-          if (!this.shouldRegisterTool(action)) {
-            return this.formatError(new Error(`Action "${action}" is not supported`));
-          }
+    if (this.shouldRegisterTool('getStorage')) {
+      this.registerExtensionTool(
+        'extension_tool_get_storage',
+        'Get data from extension storage',
+        this.getStorageSchema.shape,
+        (params) => this.handleGetStorage(params)
+      );
+    }
 
-          switch (action as StorageAction) {
-            case 'getStorage':
-              return await this.handleGetStorage(params);
-            case 'setStorage':
-              return await this.handleSetStorage(params);
-            case 'removeStorage':
-              return await this.handleRemoveStorage(params);
-            case 'clearStorage':
-              return await this.handleClearStorage(params);
-            case 'getBytesInUse':
-              return await this.handleGetBytesInUse(params);
-            default:
-              return this.formatError(new Error(`Action "${action}" is not supported`));
-          }
-        } catch (error) {
-          return this.formatError(error);
-        }
-      }
-    );
+    if (this.shouldRegisterTool('setStorage')) {
+      this.registerExtensionTool(
+        'extension_tool_set_storage',
+        'Set data in extension storage',
+        this.setStorageSchema.shape,
+        (params) => this.handleSetStorage(params)
+      );
+    }
 
-    this.server.registerTool(
-      'extension_tool_storage_parameters_description',
-      {
-        description:
-          'Get the parameters for extension_tool_storage_operations tool and the description for the associated action, this tool should be used first before extension_tool_storage_operations',
-        inputSchema: {
-          action: storageActionSchema,
-        },
-      },
-      async ({ action }) => {
-        try {
-          if (!this.shouldRegisterTool(action)) {
-            return this.formatError(new Error(`Action "${action}" is not supported`));
-          }
+    if (this.shouldRegisterTool('removeStorage')) {
+      this.registerExtensionTool(
+        'extension_tool_remove_storage',
+        'Remove specific keys from extension storage',
+        this.removeStorageSchema.shape,
+        (params) => this.handleRemoveStorage(params)
+      );
+    }
 
-          const toJson = (schema: z.ZodTypeAny, _name: string) => z.toJSONSchema(schema);
+    if (this.shouldRegisterTool('clearStorage')) {
+      this.registerExtensionTool(
+        'extension_tool_clear_storage',
+        'Clear all data from a storage area',
+        this.clearStorageSchema.shape,
+        (params) => this.handleClearStorage(params)
+      );
+    }
 
-          const payloadBase = {
-            tool: 'extension_tool_storage_operations',
-            action,
-            note: 'Use the description to double check if the correct action is chosen. Use this JSON Schema for the params field when calling the tool. The top-level tool input is { action, params }.',
-          } as const;
-
-          switch (action as StorageAction) {
-            case 'getStorage': {
-              const paramsAndDescription = {
-                params: toJson(this.getStorageSchema, 'GetStorageParams'),
-                description: 'Get data from extension storage',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'setStorage': {
-              const paramsAndDescription = {
-                params: toJson(this.setStorageSchema, 'SetStorageParams'),
-                description: 'Set data in extension storage',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'removeStorage': {
-              const paramsAndDescription = {
-                params: toJson(this.removeStorageSchema, 'RemoveStorageParams'),
-                description: 'Remove specific keys from extension storage',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'clearStorage': {
-              const paramsAndDescription = {
-                params: toJson(this.clearStorageSchema, 'ClearStorageParams'),
-                description: 'Clear all data from a storage area',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            case 'getBytesInUse': {
-              const paramsAndDescription = {
-                params: toJson(this.getBytesInUseSchema, 'GetBytesInUseParams'),
-                description: 'Get the amount of storage space used',
-              };
-              return this.formatJson({
-                ...payloadBase,
-                ...paramsAndDescription,
-              });
-            }
-            default:
-              return this.formatError(new Error(`Action "${action}" is not supported`));
-          }
-        } catch (error) {
-          return this.formatError(error);
-        }
-      }
-    );
+    if (this.shouldRegisterTool('getBytesInUse')) {
+      this.registerExtensionTool(
+        'extension_tool_get_storage_bytes_in_use',
+        'Get the amount of storage space used',
+        this.getBytesInUseSchema.shape,
+        (params) => this.handleGetBytesInUse(params)
+      );
+    }
   }
 
   private getAvailableAreas(): string[] {
