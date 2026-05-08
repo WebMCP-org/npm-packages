@@ -14,27 +14,28 @@ export interface ApiAvailability {
   details?: string;
 }
 
-export abstract class BaseApiTools<TOptions = Record<string, unknown>> {
+export abstract class BaseApiTools<TOptions extends object = Record<string, boolean | undefined>> {
   protected abstract apiName: string;
 
   constructor(
     protected server: McpServer,
-    protected options: TOptions = {} as TOptions
+    protected options: Partial<TOptions> = {}
   ) {}
 
   abstract checkAvailability(): ApiAvailability;
   abstract registerTools(): void;
 
-  protected shouldRegisterTool(toolName: string): boolean {
-    if ((this.options as Record<string, unknown>)[toolName] === false) {
-      return false;
-    }
-    return true;
+  protected shouldRegisterTool(toolName: keyof TOptions & string): boolean {
+    return this.options[toolName] !== false;
   }
 
   protected registerExtensionTool<TContract extends AnyExtensionToolContract>(
     contract: TContract,
     handler: (args: InferExtensionToolInput<TContract>) => CallToolResult | Promise<CallToolResult>
+  ): void;
+  protected registerExtensionTool(
+    contract: AnyExtensionToolContract,
+    handler: (args: Record<string, unknown>) => CallToolResult | Promise<CallToolResult>
   ): void {
     const tool: ToolDescriptor<Record<string, unknown>, CallToolResult> = {
       name: contract.name,
@@ -51,12 +52,9 @@ export abstract class BaseApiTools<TOptions = Record<string, unknown>> {
       },
       execute: async (args: Record<string, unknown>) => {
         try {
-          const parsedArgs = isZodExtensionToolContract(contract)
-            ? contract.inputSchema.parse(args)
-            : contract.zodInputSchema.parse(args);
           return this.attachStructuredContent(
             contract,
-            await handler(parsedArgs as InferExtensionToolInput<TContract>)
+            await handler(this.parseToolInput(contract, args))
           );
         } catch (error) {
           return this.formatError(error);
@@ -67,6 +65,15 @@ export abstract class BaseApiTools<TOptions = Record<string, unknown>> {
     this.server.registerTool({
       ...tool,
     });
+  }
+
+  private parseToolInput<TContract extends AnyExtensionToolContract>(
+    contract: TContract,
+    args: Record<string, unknown>
+  ): Record<string, unknown> {
+    return isZodExtensionToolContract(contract)
+      ? contract.inputSchema.parse(args)
+      : contract.zodInputSchema.parse(args);
   }
 
   private attachStructuredContent(
