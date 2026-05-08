@@ -246,8 +246,9 @@ describe('extension tool contracts', () => {
   });
 
   it('uses sampled concrete output schemas for real-browser tab-groups conformance tools', () => {
-    expect(TAB_GROUP_TOOL_CONTRACTS.get.outputSchema).toMatchObject({
+    expect(getExtensionToolOutputSchema(TAB_GROUP_TOOL_CONTRACTS.get)).toMatchObject({
       type: 'object',
+      additionalProperties: false,
       required: ['id', 'color', 'collapsed', 'windowId'],
       properties: {
         id: { type: 'number' },
@@ -260,8 +261,9 @@ describe('extension tool contracts', () => {
         windowId: { type: 'number' },
       },
     });
-    expect(TAB_GROUP_TOOL_CONTRACTS.query.outputSchema).toMatchObject({
+    expect(getExtensionToolOutputSchema(TAB_GROUP_TOOL_CONTRACTS.query)).toMatchObject({
       type: 'object',
+      additionalProperties: false,
       required: ['count', 'groups'],
       properties: {
         count: { type: 'number' },
@@ -273,11 +275,11 @@ describe('extension tool contracts', () => {
         },
       },
     });
-    expect(TAB_GROUP_TOOL_CONTRACTS.update.outputSchema).toMatchObject(
-      TAB_GROUP_TOOL_CONTRACTS.get.outputSchema
+    expect(getExtensionToolOutputSchema(TAB_GROUP_TOOL_CONTRACTS.update)).toMatchObject(
+      getExtensionToolOutputSchema(TAB_GROUP_TOOL_CONTRACTS.get)
     );
-    expect(TAB_GROUP_TOOL_CONTRACTS.move.outputSchema).toMatchObject(
-      TAB_GROUP_TOOL_CONTRACTS.get.outputSchema
+    expect(getExtensionToolOutputSchema(TAB_GROUP_TOOL_CONTRACTS.move)).toMatchObject(
+      getExtensionToolOutputSchema(TAB_GROUP_TOOL_CONTRACTS.get)
     );
   });
 

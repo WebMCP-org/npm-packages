@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
 import {
-  defineExtensionToolContract,
   type ExtensionToolGroupContract,
-  type ExtensionToolOutputSchema,
+  type ToolAnnotations,
+  type ZodExtensionToolContract,
 } from './core';
 
 export const TAB_GROUPS_GROUP_CONTRACT = {
@@ -68,65 +68,77 @@ export const TAB_GROUP_MOVE_INPUT_SCHEMA = z.object({
     .describe('The window to move the group to. Defaults to current window'),
 });
 
-const tabGroupOutputSchema = {
-  type: 'object',
-  properties: {
-    id: { type: 'number' },
-    title: { type: 'string' },
-    color: { type: 'string', enum: TAB_GROUP_COLOR_SCHEMA.options },
-    collapsed: { type: 'boolean' },
-    shared: { type: 'boolean' },
-    windowId: { type: 'number' },
-  },
-  required: ['id', 'color', 'collapsed', 'windowId'],
-  additionalProperties: true,
-} as const;
+export const TAB_GROUP_OUTPUT_SCHEMA = z.object({
+  id: z.number(),
+  title: z.string().optional(),
+  color: TAB_GROUP_COLOR_SCHEMA,
+  collapsed: z.boolean(),
+  shared: z.boolean().optional(),
+  windowId: z.number(),
+});
 
-export const TAB_GROUP_GET_OUTPUT_SCHEMA = tabGroupOutputSchema satisfies ExtensionToolOutputSchema;
+export const TAB_GROUP_GET_OUTPUT_SCHEMA = TAB_GROUP_OUTPUT_SCHEMA;
 
-export const TAB_GROUP_QUERY_OUTPUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    count: { type: 'number' },
-    groups: {
-      type: 'array',
-      items: tabGroupOutputSchema,
+export const TAB_GROUP_QUERY_OUTPUT_SCHEMA = z.object({
+  count: z.number(),
+  groups: z.array(TAB_GROUP_OUTPUT_SCHEMA),
+});
+
+export const TAB_GROUP_UPDATE_OUTPUT_SCHEMA = TAB_GROUP_OUTPUT_SCHEMA;
+export const TAB_GROUP_MOVE_OUTPUT_SCHEMA = TAB_GROUP_OUTPUT_SCHEMA;
+
+export type TabGroupGetInput = z.infer<typeof TAB_GROUP_GET_INPUT_SCHEMA>;
+export type TabGroupGetOutput = z.infer<typeof TAB_GROUP_GET_OUTPUT_SCHEMA>;
+export type TabGroupQueryInput = z.infer<typeof TAB_GROUP_QUERY_INPUT_SCHEMA>;
+export type TabGroupQueryOutput = z.infer<typeof TAB_GROUP_QUERY_OUTPUT_SCHEMA>;
+export type TabGroupUpdateInput = z.infer<typeof TAB_GROUP_UPDATE_INPUT_SCHEMA>;
+export type TabGroupUpdateOutput = z.infer<typeof TAB_GROUP_UPDATE_OUTPUT_SCHEMA>;
+export type TabGroupMoveInput = z.infer<typeof TAB_GROUP_MOVE_INPUT_SCHEMA>;
+export type TabGroupMoveOutput = z.infer<typeof TAB_GROUP_MOVE_OUTPUT_SCHEMA>;
+
+const TAB_GROUP_PERMISSIONS = ['tabGroups'] as const;
+
+function defineTabGroupTool<
+  const TName extends string,
+  const TActionId extends (typeof TAB_GROUP_ACTION_IDS)[number],
+  const TInputSchema extends z.AnyZodObject,
+  const TOutputSchema extends z.ZodTypeAny,
+>(options: {
+  actionId: TActionId;
+  name: TName;
+  title: string;
+  description: string;
+  inputSchema: TInputSchema;
+  outputSchema: TOutputSchema;
+  annotations: ToolAnnotations;
+}): ZodExtensionToolContract<TName, 'tabGroups', TActionId, TInputSchema, TOutputSchema> {
+  return {
+    name: options.name,
+    title: options.title,
+    description: options.description,
+    inputSchema: options.inputSchema,
+    outputSchema: options.outputSchema,
+    annotations: {
+      title: options.title,
+      ...options.annotations,
     },
-  },
-  required: ['count', 'groups'],
-  additionalProperties: true,
-} as const satisfies ExtensionToolOutputSchema;
-
-export const TAB_GROUP_UPDATE_OUTPUT_SCHEMA =
-  tabGroupOutputSchema satisfies ExtensionToolOutputSchema;
-
-export const TAB_GROUP_MOVE_OUTPUT_SCHEMA =
-  tabGroupOutputSchema satisfies ExtensionToolOutputSchema;
-
-const readMeta = {
-  kind: 'chrome-api',
-  runtimeContext: ['bgsw'],
-  hostPermissionsRequired: false,
-  activeTabRequired: false,
-  tabIdRequired: false,
-  frameIdSupported: false,
-  originRequired: false,
-  urlRequired: false,
-  userGestureRequired: false,
-  minChromeVersion: '89',
-  effect: 'read',
-  riskLevel: 'low',
-} as const;
-
-const mutateMeta = {
-  ...readMeta,
-  effect: 'mutate',
-  riskLevel: 'medium',
-} as const;
+    _meta: {
+      extension: {
+        groupId: 'tabGroups',
+        actionId: options.actionId,
+        chromeApi: TAB_GROUPS_GROUP_CONTRACT.chromeApi,
+        permissions: TAB_GROUP_PERMISSIONS,
+      },
+    },
+    groupId: 'tabGroups',
+    actionId: options.actionId,
+    zodInputSchema: options.inputSchema,
+    zodOutputSchema: options.outputSchema,
+  };
+}
 
 export const TAB_GROUP_TOOL_CONTRACTS = {
-  get: defineExtensionToolContract({
-    group: TAB_GROUPS_GROUP_CONTRACT,
+  get: defineTabGroupTool({
     actionId: 'get',
     name: 'extension_tool_get_tab_group',
     title: 'Get Tab Group',
@@ -139,10 +151,8 @@ export const TAB_GROUP_TOOL_CONTRACTS = {
       idempotentHint: true,
       openWorldHint: true,
     },
-    meta: readMeta,
   }),
-  query: defineExtensionToolContract({
-    group: TAB_GROUPS_GROUP_CONTRACT,
+  query: defineTabGroupTool({
     actionId: 'query',
     name: 'extension_tool_query_tab_groups',
     title: 'Query Tab Groups',
@@ -155,10 +165,8 @@ export const TAB_GROUP_TOOL_CONTRACTS = {
       idempotentHint: true,
       openWorldHint: true,
     },
-    meta: readMeta,
   }),
-  update: defineExtensionToolContract({
-    group: TAB_GROUPS_GROUP_CONTRACT,
+  update: defineTabGroupTool({
     actionId: 'update',
     name: 'extension_tool_update_tab_group',
     title: 'Update Tab Group',
@@ -171,10 +179,8 @@ export const TAB_GROUP_TOOL_CONTRACTS = {
       idempotentHint: true,
       openWorldHint: true,
     },
-    meta: mutateMeta,
   }),
-  move: defineExtensionToolContract({
-    group: TAB_GROUPS_GROUP_CONTRACT,
+  move: defineTabGroupTool({
     actionId: 'move',
     name: 'extension_tool_move_tab_group',
     title: 'Move Tab Group',
@@ -187,7 +193,6 @@ export const TAB_GROUP_TOOL_CONTRACTS = {
       idempotentHint: false,
       openWorldHint: true,
     },
-    meta: mutateMeta,
   }),
 } as const;
 

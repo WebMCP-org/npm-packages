@@ -1,7 +1,14 @@
 import type { McpServer } from '@mcp-b/webmcp-ts-sdk';
 
 import { type ApiAvailability, BaseApiTools } from '../BaseApiTools';
-import { TAB_GROUP_ACTION_IDS, TAB_GROUP_TOOL_CONTRACTS } from '../contracts/tab-groups';
+import {
+  TAB_GROUP_ACTION_IDS,
+  TAB_GROUP_TOOL_CONTRACTS,
+  type TabGroupGetInput,
+  type TabGroupMoveInput,
+  type TabGroupQueryInput,
+  type TabGroupUpdateInput,
+} from '../contracts/tab-groups';
 
 export interface TabGroupsApiToolsOptions {
   get?: boolean;
@@ -99,15 +106,19 @@ export class TabGroupsApiTools extends BaseApiTools<TabGroupsApiToolsOptions> {
   }
 
   // ===== Action handlers =====
-  private async handleGetTabGroup(raw: unknown) {
-    const { groupId } = this.getSchema.parse(raw);
+  private async handleGetTabGroup({ groupId }: TabGroupGetInput) {
     const group = await chrome.tabGroups.get(groupId);
 
     return this.formatJson(serializeTabGroup(group));
   }
 
-  private async handleQueryTabGroups(raw: unknown) {
-    const { collapsed, color, shared, title, windowId } = this.querySchema.parse(raw);
+  private async handleQueryTabGroups({
+    collapsed,
+    color,
+    shared,
+    title,
+    windowId,
+  }: TabGroupQueryInput) {
     // Build query info
     const queryInfo: chrome.tabGroups.QueryInfo = {};
 
@@ -128,8 +139,7 @@ export class TabGroupsApiTools extends BaseApiTools<TabGroupsApiToolsOptions> {
     });
   }
 
-  private async handleUpdateTabGroup(raw: unknown) {
-    const { groupId, collapsed, color, title } = this.updateSchema.parse(raw);
+  private async handleUpdateTabGroup({ groupId, collapsed, color, title }: TabGroupUpdateInput) {
     // Build update properties
     const updateProperties: chrome.tabGroups.UpdateProperties = {};
 
@@ -146,8 +156,7 @@ export class TabGroupsApiTools extends BaseApiTools<TabGroupsApiToolsOptions> {
     return this.formatSuccess('Tab group updated successfully', serializeTabGroup(updatedGroup));
   }
 
-  private async handleMoveTabGroup(raw: unknown) {
-    const { groupId, index, windowId } = this.moveSchema.parse(raw);
+  private async handleMoveTabGroup({ groupId, index, windowId }: TabGroupMoveInput) {
     // Build move properties
     const moveProperties: chrome.tabGroups.MoveProperties = { index };
 
@@ -163,10 +172,4 @@ export class TabGroupsApiTools extends BaseApiTools<TabGroupsApiToolsOptions> {
 
     return this.formatSuccess('Tab group moved successfully', serializeTabGroup(movedGroup));
   }
-
-  // ===== Validation Schemas per action =====
-  private getSchema = TAB_GROUP_TOOL_CONTRACTS.get.zodInputSchema;
-  private querySchema = TAB_GROUP_TOOL_CONTRACTS.query.zodInputSchema;
-  private updateSchema = TAB_GROUP_TOOL_CONTRACTS.update.zodInputSchema;
-  private moveSchema = TAB_GROUP_TOOL_CONTRACTS.move.zodInputSchema;
 }
