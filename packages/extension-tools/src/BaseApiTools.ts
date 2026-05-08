@@ -1,6 +1,12 @@
 import type { CallToolResult, McpServer, ToolDescriptor } from '@mcp-b/webmcp-ts-sdk';
 
-import type { ExtensionToolContract } from './contracts/core';
+import {
+  getExtensionToolInputSchema,
+  getExtensionToolOutputSchema,
+  isZodExtensionToolContract,
+  type AnyExtensionToolContract,
+  type InferExtensionToolInput,
+} from './contracts/core';
 
 export interface ApiAvailability {
   available: boolean;
@@ -26,14 +32,14 @@ export abstract class BaseApiTools<TOptions = Record<string, unknown>> {
     return true;
   }
 
-  protected registerExtensionTool(
-    contract: ExtensionToolContract,
-    handler: (args: Record<string, unknown>) => CallToolResult | Promise<CallToolResult>
+  protected registerExtensionTool<TContract extends AnyExtensionToolContract>(
+    contract: TContract,
+    handler: (args: InferExtensionToolInput<TContract>) => CallToolResult | Promise<CallToolResult>
   ): void {
     const tool: ToolDescriptor<Record<string, unknown>, CallToolResult> = {
       name: contract.name,
       description: contract.description,
-      inputSchema: contract.inputSchema,
+      inputSchema: getExtensionToolInputSchema(contract),
       // Contract exports keep outputSchema. Browser registration omits it until extension-page
       // clients can validate output schemas without Ajv's CSP-blocked code generation.
       annotations: {
@@ -45,7 +51,13 @@ export abstract class BaseApiTools<TOptions = Record<string, unknown>> {
       },
       execute: async (args: Record<string, unknown>) => {
         try {
-          return this.attachStructuredContent(contract, await handler(args));
+          const parsedArgs = isZodExtensionToolContract(contract)
+            ? contract.inputSchema.parse(args)
+            : contract.zodInputSchema.parse(args);
+          return this.attachStructuredContent(
+            contract,
+            await handler(parsedArgs as InferExtensionToolInput<TContract>)
+          );
         } catch (error) {
           return this.formatError(error);
         }
@@ -58,10 +70,11 @@ export abstract class BaseApiTools<TOptions = Record<string, unknown>> {
   }
 
   private attachStructuredContent(
-    contract: ExtensionToolContract,
+    contract: AnyExtensionToolContract,
     result: CallToolResult
   ): CallToolResult {
-    if (!contract.outputSchema || result.isError || result.structuredContent !== undefined) {
+    const outputSchema = getExtensionToolOutputSchema(contract);
+    if (!outputSchema || result.isError || result.structuredContent !== undefined) {
       return result;
     }
 
@@ -73,6 +86,10 @@ export abstract class BaseApiTools<TOptions = Record<string, unknown>> {
     const structuredContent = this.parseStructuredContent(textContent.text);
     if (!structuredContent) {
       return result;
+    }
+
+    if (isZodExtensionToolContract(contract) && contract.outputSchema) {
+      contract.outputSchema.parse(structuredContent);
     }
 
     return {

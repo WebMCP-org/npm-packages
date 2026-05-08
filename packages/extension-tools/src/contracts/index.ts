@@ -11,7 +11,7 @@ import {
   BOOKMARK_TOOL_CONTRACTS,
   type BookmarkToolName,
 } from './bookmarks';
-import type { ExtensionToolContract } from './core';
+import type { AnyExtensionToolContract } from './core';
 import { HISTORY_GROUP_CONTRACT, HISTORY_TOOL_CONTRACTS, type HistoryToolName } from './history';
 import { STORAGE_GROUP_CONTRACT, STORAGE_TOOL_CONTRACTS, type StorageToolName } from './storage';
 import {
@@ -96,6 +96,6 @@ export const EXTENSION_ACTION_CONTRACTS_BY_GROUP_ACTION_ID = Object.fromEntries(
 ) as {
   readonly [TKey in ExtensionToolGroupActionKey]: Extract<
     (typeof EXTENSION_TOOL_CONTRACTS)[number],
-    ExtensionToolContract
+    AnyExtensionToolContract
   >;
 };

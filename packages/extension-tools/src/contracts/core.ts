@@ -1,10 +1,13 @@
 import {
+  toWebMcpJsonSchema,
   toWebMcpInputSchema,
   type InputSchema,
   type Tool,
   type ToolAnnotations,
 } from '@mcp-b/webmcp-ts-sdk';
 import type { z } from 'zod';
+
+export type { ToolAnnotations };
 
 export const EXTENSION_TOOLS_META_KEY = 'mcp-b/extension-tools' as const;
 export const EXTENSION_TOOLS_PACKAGE_NAME = '@mcp-b/extension-tools' as const;
@@ -55,6 +58,15 @@ export interface ExtensionToolMeta {
   riskLevel: ExtensionToolRiskLevel;
 }
 
+export interface ExtensionMeta {
+  groupId: string;
+  actionId: string;
+  chromeApi: string;
+  permissions: readonly string[];
+  hostPermissions?: readonly string[];
+  requiresActiveTab?: boolean;
+}
+
 export interface ExtensionToolGroupContract {
   id: string;
   title: string;
@@ -86,6 +98,33 @@ export interface ExtensionToolContract<
   actionId: TActionId;
   zodInputSchema: TInputSchema;
 }
+
+export interface ZodExtensionToolContract<
+  TName extends string = string,
+  TGroupId extends string = string,
+  TActionId extends string = string,
+  TInputSchema extends z.AnyZodObject = z.AnyZodObject,
+  TOutputSchema extends z.ZodTypeAny | undefined = z.ZodTypeAny | undefined,
+> {
+  name: TName;
+  title: string;
+  description: string;
+  inputSchema: TInputSchema;
+  outputSchema?: TOutputSchema;
+  annotations: ToolAnnotations;
+  _meta: {
+    extension: ExtensionMeta & {
+      groupId: TGroupId;
+      actionId: TActionId;
+    };
+  };
+  groupId: TGroupId;
+  actionId: TActionId;
+  zodInputSchema: TInputSchema;
+  zodOutputSchema?: TOutputSchema;
+}
+
+export type AnyExtensionToolContract = ExtensionToolContract | ZodExtensionToolContract;
 
 export interface DefineExtensionToolContractOptions<
   TName extends string,
@@ -166,7 +205,50 @@ export function defineExtensionToolContract<
   };
 }
 
+export function isZodExtensionToolContract(
+  contract: AnyExtensionToolContract
+): contract is ZodExtensionToolContract {
+  return (
+    typeof contract.inputSchema === 'object' &&
+    contract.inputSchema !== null &&
+    'safeParse' in contract.inputSchema
+  );
+}
+
+export function getExtensionToolInputSchema(contract: AnyExtensionToolContract): InputSchema {
+  return isZodExtensionToolContract(contract)
+    ? toWebMcpInputSchema(contract.inputSchema)
+    : contract.inputSchema;
+}
+
+export function getExtensionToolOutputSchema(
+  contract: AnyExtensionToolContract
+): ExtensionToolOutputSchema | undefined {
+  if (!contract.outputSchema) {
+    return undefined;
+  }
+
+  return isZodExtensionToolContract(contract)
+    ? (toWebMcpJsonSchema(contract.outputSchema, {
+        requireObjectType: true,
+      }) as ExtensionToolOutputSchema)
+    : contract.outputSchema;
+}
+
 export type InferExtensionToolInput<TContract> =
-  TContract extends ExtensionToolContract<string, string, string, infer TSchema>
+  TContract extends ZodExtensionToolContract<string, string, string, infer TSchema>
     ? z.infer<TSchema>
+    : TContract extends ExtensionToolContract<string, string, string, infer TSchema>
+      ? z.infer<TSchema>
+      : never;
+
+export type InferExtensionToolOutput<TContract> =
+  TContract extends ZodExtensionToolContract<string, string, string, z.AnyZodObject, infer TSchema>
+    ? TSchema extends z.ZodTypeAny
+      ? z.infer<TSchema>
+      : undefined
     : never;
+
+export type ExtensionToolHandler<TContract> = (
+  input: InferExtensionToolInput<TContract>
+) => Promise<InferExtensionToolOutput<TContract>> | InferExtensionToolOutput<TContract>;

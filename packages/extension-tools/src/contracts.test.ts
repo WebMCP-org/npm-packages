@@ -7,6 +7,8 @@ import {
   EXTENSION_TOOL_CONTRACTS_BY_NAME,
   EXTENSION_TOOL_GROUP_CONTRACTS,
   EXTENSION_TOOL_GROUP_CONTRACTS_BY_ID,
+  getExtensionToolInputSchema,
+  getExtensionToolOutputSchema,
 } from './contracts';
 import { BOOKMARK_TOOL_CONTRACTS } from './contracts/bookmarks';
 import { HISTORY_TOOL_CONTRACTS } from './contracts/history';
@@ -20,8 +22,10 @@ function toMcpTool(contract: (typeof EXTENSION_TOOL_CONTRACTS)[number]) {
     name: contract.name,
     title: contract.title,
     description: contract.description,
-    inputSchema: contract.inputSchema,
-    ...(contract.outputSchema ? { outputSchema: contract.outputSchema } : {}),
+    inputSchema: getExtensionToolInputSchema(contract),
+    ...(getExtensionToolOutputSchema(contract)
+      ? { outputSchema: getExtensionToolOutputSchema(contract) }
+      : {}),
     annotations: contract.annotations,
     _meta: contract._meta,
   };
@@ -55,11 +59,14 @@ describe('extension tool contracts', () => {
 
   it('uses object-root JSON Schemas and declares complete MCP annotations', () => {
     for (const contract of EXTENSION_TOOL_CONTRACTS) {
-      expect(contract.inputSchema.type).toBe('object');
-      expect(contract.inputSchema).toHaveProperty('properties');
+      const inputSchema = getExtensionToolInputSchema(contract);
+      const outputSchema = getExtensionToolOutputSchema(contract);
 
-      if (contract.outputSchema) {
-        expect(contract.outputSchema.type).toBe('object');
+      expect(inputSchema.type).toBe('object');
+      expect(inputSchema).toHaveProperty('properties');
+
+      if (outputSchema) {
+        expect(outputSchema.type).toBe('object');
       }
 
       expect(contract.annotations).toMatchObject({
@@ -73,7 +80,7 @@ describe('extension tool contracts', () => {
   });
 
   it('uses sampled concrete output schemas for real-browser storage conformance tools', () => {
-    expect(STORAGE_TOOL_CONTRACTS.getStorage.outputSchema).toMatchObject({
+    expect(getExtensionToolOutputSchema(STORAGE_TOOL_CONTRACTS.getStorage)).toMatchObject({
       type: 'object',
       additionalProperties: false,
       required: ['area', 'data', 'keyCount'],
@@ -83,7 +90,7 @@ describe('extension tool contracts', () => {
         keyCount: { type: 'number' },
       },
     });
-    expect(STORAGE_TOOL_CONTRACTS.setStorage.outputSchema).toMatchObject({
+    expect(getExtensionToolOutputSchema(STORAGE_TOOL_CONTRACTS.setStorage)).toMatchObject({
       type: 'object',
       additionalProperties: false,
       required: ['keys'],
@@ -94,7 +101,7 @@ describe('extension tool contracts', () => {
         },
       },
     });
-    expect(STORAGE_TOOL_CONTRACTS.removeStorage.outputSchema).toMatchObject({
+    expect(getExtensionToolOutputSchema(STORAGE_TOOL_CONTRACTS.removeStorage)).toMatchObject({
       type: 'object',
       additionalProperties: false,
       required: ['keys'],
@@ -105,7 +112,7 @@ describe('extension tool contracts', () => {
         },
       },
     });
-    expect(STORAGE_TOOL_CONTRACTS.getBytesInUse.outputSchema).toMatchObject({
+    expect(getExtensionToolOutputSchema(STORAGE_TOOL_CONTRACTS.getBytesInUse)).toMatchObject({
       type: 'object',
       additionalProperties: false,
       required: ['area', 'bytesInUse', 'humanReadable', 'quota', 'percentageUsed'],
@@ -126,7 +133,7 @@ describe('extension tool contracts', () => {
           ]),
         },
         percentageUsed: {
-          anyOf: expect.arrayContaining([{ type: 'string' }, { type: 'null' }]),
+          type: ['string', 'null'],
         },
       },
     });
@@ -465,28 +472,37 @@ describe('extension tool contracts', () => {
       expect(contract.groupId.length).toBeGreaterThan(0);
       expect(contract.actionId.length).toBeGreaterThan(0);
 
-      const meta = contract._meta[EXTENSION_TOOLS_META_KEY];
-      expect(meta).toMatchObject({
-        packageName: '@mcp-b/extension-tools',
-        versionFamily: expect.any(String),
-        kind: expect.any(String),
-        groupId: contract.groupId,
-        actionId: contract.actionId,
-        chromeApi: expect.any(String),
-        requiredPermissions: expect.any(Array),
-        optionalPermissions: expect.any(Array),
-        manifestVersion: 3,
-        runtimeContext: expect.any(Array),
-        hostPermissionsRequired: expect.any(Boolean),
-        activeTabRequired: expect.any(Boolean),
-        tabIdRequired: expect.any(Boolean),
-        frameIdSupported: expect.any(Boolean),
-        originRequired: expect.any(Boolean),
-        urlRequired: expect.any(Boolean),
-        userGestureRequired: expect.any(Boolean),
-        effect: expect.stringMatching(/^(delete|execute|mutate|navigate|read)$/),
-        riskLevel: expect.stringMatching(/^(low|medium|high)$/),
-      });
+      if ('extension' in contract._meta) {
+        expect(contract._meta.extension).toMatchObject({
+          groupId: contract.groupId,
+          actionId: contract.actionId,
+          chromeApi: expect.any(String),
+          permissions: expect.any(Array),
+        });
+      } else {
+        const meta = contract._meta[EXTENSION_TOOLS_META_KEY];
+        expect(meta).toMatchObject({
+          packageName: '@mcp-b/extension-tools',
+          versionFamily: expect.any(String),
+          kind: expect.any(String),
+          groupId: contract.groupId,
+          actionId: contract.actionId,
+          chromeApi: expect.any(String),
+          requiredPermissions: expect.any(Array),
+          optionalPermissions: expect.any(Array),
+          manifestVersion: 3,
+          runtimeContext: expect.any(Array),
+          hostPermissionsRequired: expect.any(Boolean),
+          activeTabRequired: expect.any(Boolean),
+          tabIdRequired: expect.any(Boolean),
+          frameIdSupported: expect.any(Boolean),
+          originRequired: expect.any(Boolean),
+          urlRequired: expect.any(Boolean),
+          userGestureRequired: expect.any(Boolean),
+          effect: expect.stringMatching(/^(delete|execute|mutate|navigate|read)$/),
+          riskLevel: expect.stringMatching(/^(low|medium|high)$/),
+        });
+      }
     }
   });
 });

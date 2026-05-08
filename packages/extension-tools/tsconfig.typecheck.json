@@ -4,6 +4,10 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["src/BaseApiTools.ts", "src/chrome-typecheck.d.ts"],
+  "include": [
+    "src/BaseApiTools.ts",
+    "src/chrome-typecheck.d.ts",
+    "src/storage-contract-types.type-test.ts"
+  ],
   "exclude": ["node_modules", "dist"]
 }

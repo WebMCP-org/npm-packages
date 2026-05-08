@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
 import {
-  defineExtensionToolContract,
-  type ExtensionToolOutputSchema,
   type ExtensionToolGroupContract,
+  type ToolAnnotations,
+  type ZodExtensionToolContract,
 } from './core';
 
 export const STORAGE_GROUP_CONTRACT = {
@@ -27,21 +27,21 @@ export const STORAGE_AREA_SCHEMA = z.enum(['sync', 'local', 'session']);
 
 export const STORAGE_GET_INPUT_SCHEMA = z.object({
   keys: z.array(z.string()).optional().describe('Specific keys to retrieve (omit for all)'),
-  area: STORAGE_AREA_SCHEMA.optional().describe(
+  area: STORAGE_AREA_SCHEMA.default('local').describe(
     'Storage area to use. Available: sync, local, session (default: local)'
   ),
 });
 
 export const STORAGE_SET_INPUT_SCHEMA = z.object({
   data: z.record(z.string(), z.any()).describe('Key-value pairs to store'),
-  area: STORAGE_AREA_SCHEMA.optional().describe(
+  area: STORAGE_AREA_SCHEMA.default('local').describe(
     'Storage area to use. Available: sync, local, session (default: local)'
   ),
 });
 
 export const STORAGE_REMOVE_INPUT_SCHEMA = z.object({
   keys: z.array(z.string()).describe('Keys to remove from storage'),
-  area: STORAGE_AREA_SCHEMA.optional().describe(
+  area: STORAGE_AREA_SCHEMA.default('local').describe(
     'Storage area to use. Available: sync, local, session (default: local)'
   ),
 });
@@ -53,160 +53,97 @@ export const STORAGE_CLEAR_INPUT_SCHEMA = z.object({
 
 export const STORAGE_GET_BYTES_IN_USE_INPUT_SCHEMA = z.object({
   keys: z.array(z.string()).optional().describe('Specific keys to check (omit for total)'),
-  area: STORAGE_AREA_SCHEMA.optional().describe(
+  area: STORAGE_AREA_SCHEMA.default('local').describe(
     'Storage area to check. Available: sync, local, session (default: local)'
   ),
 });
 
-export const STORAGE_GET_OUTPUT_SCHEMA = {
-  type: 'object',
-  additionalProperties: false,
-  properties: {
-    area: {
-      type: 'string',
-      enum: ['sync', 'local', 'session'],
-    },
-    data: {
-      type: 'object',
-      additionalProperties: true,
-    },
-    keyCount: {
-      type: 'number',
-    },
-  },
-  required: ['area', 'data', 'keyCount'],
-} as const satisfies ExtensionToolOutputSchema;
+export const STORAGE_GET_OUTPUT_SCHEMA = z.object({
+  area: STORAGE_AREA_SCHEMA,
+  data: z.record(z.string(), z.unknown()),
+  keyCount: z.number(),
+});
 
-export const STORAGE_SET_OUTPUT_SCHEMA = {
-  type: 'object',
-  additionalProperties: false,
-  properties: {
-    keys: {
-      type: 'array',
-      items: {
-        type: 'string',
+export const STORAGE_MUTATE_KEYS_OUTPUT_SCHEMA = z.object({
+  keys: z.array(z.string()),
+});
+
+export const STORAGE_SET_OUTPUT_SCHEMA = STORAGE_MUTATE_KEYS_OUTPUT_SCHEMA;
+export const STORAGE_REMOVE_OUTPUT_SCHEMA = STORAGE_MUTATE_KEYS_OUTPUT_SCHEMA;
+
+export const STORAGE_QUOTA_LOCAL_SCHEMA = z.object({
+  quotaBytes: z.number(),
+});
+
+export const STORAGE_QUOTA_SYNC_SCHEMA = z.object({
+  quotaBytes: z.number(),
+  quotaBytesPerItem: z.number(),
+  maxItems: z.number(),
+  maxWriteOperationsPerHour: z.number(),
+  maxWriteOperationsPerMinute: z.number(),
+});
+
+export const STORAGE_BYTES_IN_USE_OUTPUT_SCHEMA = z.object({
+  area: STORAGE_AREA_SCHEMA,
+  bytesInUse: z.number(),
+  humanReadable: z.string(),
+  quota: z.union([STORAGE_QUOTA_LOCAL_SCHEMA, STORAGE_QUOTA_SYNC_SCHEMA, z.null()]),
+  percentageUsed: z.string().nullable(),
+});
+
+export type StorageGetInput = z.infer<typeof STORAGE_GET_INPUT_SCHEMA>;
+export type StorageGetOutput = z.infer<typeof STORAGE_GET_OUTPUT_SCHEMA>;
+export type StorageSetInput = z.infer<typeof STORAGE_SET_INPUT_SCHEMA>;
+export type StorageSetOutput = z.infer<typeof STORAGE_SET_OUTPUT_SCHEMA>;
+export type StorageRemoveInput = z.infer<typeof STORAGE_REMOVE_INPUT_SCHEMA>;
+export type StorageRemoveOutput = z.infer<typeof STORAGE_REMOVE_OUTPUT_SCHEMA>;
+export type StorageClearInput = z.infer<typeof STORAGE_CLEAR_INPUT_SCHEMA>;
+export type StorageGetBytesInUseInput = z.infer<typeof STORAGE_GET_BYTES_IN_USE_INPUT_SCHEMA>;
+export type StorageGetBytesInUseOutput = z.infer<typeof STORAGE_BYTES_IN_USE_OUTPUT_SCHEMA>;
+
+const STORAGE_PERMISSIONS = ['storage'] as const;
+
+function defineStorageTool<
+  const TName extends string,
+  const TActionId extends (typeof STORAGE_ACTION_IDS)[number],
+  const TInputSchema extends z.AnyZodObject,
+  const TOutputSchema extends z.ZodTypeAny | undefined = undefined,
+>(options: {
+  actionId: TActionId;
+  name: TName;
+  title: string;
+  description: string;
+  inputSchema: TInputSchema;
+  outputSchema?: TOutputSchema;
+  annotations: ToolAnnotations;
+}): ZodExtensionToolContract<TName, 'storage', TActionId, TInputSchema, TOutputSchema> {
+  return {
+    name: options.name,
+    title: options.title,
+    description: options.description,
+    inputSchema: options.inputSchema,
+    ...(options.outputSchema ? { outputSchema: options.outputSchema } : {}),
+    annotations: {
+      title: options.title,
+      ...options.annotations,
+    },
+    _meta: {
+      extension: {
+        groupId: 'storage',
+        actionId: options.actionId,
+        chromeApi: STORAGE_GROUP_CONTRACT.chromeApi,
+        permissions: STORAGE_PERMISSIONS,
       },
     },
-  },
-  required: ['keys'],
-} as const satisfies ExtensionToolOutputSchema;
-
-export const STORAGE_REMOVE_OUTPUT_SCHEMA = {
-  type: 'object',
-  additionalProperties: false,
-  properties: {
-    keys: {
-      type: 'array',
-      items: {
-        type: 'string',
-      },
-    },
-  },
-  required: ['keys'],
-} as const satisfies ExtensionToolOutputSchema;
-
-export const STORAGE_BYTES_IN_USE_OUTPUT_SCHEMA = {
-  type: 'object',
-  additionalProperties: false,
-  properties: {
-    area: {
-      type: 'string',
-      enum: ['sync', 'local', 'session'],
-    },
-    bytesInUse: {
-      type: 'number',
-    },
-    humanReadable: {
-      type: 'string',
-    },
-    quota: {
-      anyOf: [
-        {
-          type: 'object',
-          additionalProperties: false,
-          properties: {
-            quotaBytes: {
-              type: 'number',
-            },
-          },
-          required: ['quotaBytes'],
-        },
-        {
-          type: 'object',
-          additionalProperties: false,
-          properties: {
-            quotaBytes: {
-              type: 'number',
-            },
-            quotaBytesPerItem: {
-              type: 'number',
-            },
-            maxItems: {
-              type: 'number',
-            },
-            maxWriteOperationsPerHour: {
-              type: 'number',
-            },
-            maxWriteOperationsPerMinute: {
-              type: 'number',
-            },
-          },
-          required: [
-            'quotaBytes',
-            'quotaBytesPerItem',
-            'maxItems',
-            'maxWriteOperationsPerHour',
-            'maxWriteOperationsPerMinute',
-          ],
-        },
-        {
-          type: 'null',
-        },
-      ],
-    },
-    percentageUsed: {
-      anyOf: [
-        {
-          type: 'string',
-        },
-        {
-          type: 'null',
-        },
-      ],
-    },
-  },
-  required: ['area', 'bytesInUse', 'humanReadable', 'quota', 'percentageUsed'],
-} as const satisfies ExtensionToolOutputSchema;
-
-const readMeta = {
-  kind: 'chrome-api',
-  runtimeContext: ['bgsw'],
-  hostPermissionsRequired: false,
-  activeTabRequired: false,
-  tabIdRequired: false,
-  frameIdSupported: false,
-  originRequired: false,
-  urlRequired: false,
-  userGestureRequired: false,
-  effect: 'read',
-  riskLevel: 'low',
-} as const;
-
-const mutateMeta = {
-  ...readMeta,
-  effect: 'mutate',
-  riskLevel: 'medium',
-} as const;
-
-const deleteMeta = {
-  ...readMeta,
-  effect: 'delete',
-  riskLevel: 'high',
-} as const;
+    groupId: 'storage',
+    actionId: options.actionId,
+    zodInputSchema: options.inputSchema,
+    ...(options.outputSchema ? { zodOutputSchema: options.outputSchema } : {}),
+  };
+}
 
 export const STORAGE_TOOL_CONTRACTS = {
-  getStorage: defineExtensionToolContract({
-    group: STORAGE_GROUP_CONTRACT,
+  getStorage: defineStorageTool({
     actionId: 'getStorage',
     name: 'extension_tool_get_storage',
     title: 'Get Storage',
@@ -219,10 +156,8 @@ export const STORAGE_TOOL_CONTRACTS = {
       idempotentHint: true,
       openWorldHint: false,
     },
-    meta: readMeta,
   }),
-  setStorage: defineExtensionToolContract({
-    group: STORAGE_GROUP_CONTRACT,
+  setStorage: defineStorageTool({
     actionId: 'setStorage',
     name: 'extension_tool_set_storage',
     title: 'Set Storage',
@@ -235,10 +170,8 @@ export const STORAGE_TOOL_CONTRACTS = {
       idempotentHint: true,
       openWorldHint: false,
     },
-    meta: mutateMeta,
   }),
-  removeStorage: defineExtensionToolContract({
-    group: STORAGE_GROUP_CONTRACT,
+  removeStorage: defineStorageTool({
     actionId: 'removeStorage',
     name: 'extension_tool_remove_storage',
     title: 'Remove Storage',
@@ -251,10 +184,8 @@ export const STORAGE_TOOL_CONTRACTS = {
       idempotentHint: false,
       openWorldHint: false,
     },
-    meta: deleteMeta,
   }),
-  clearStorage: defineExtensionToolContract({
-    group: STORAGE_GROUP_CONTRACT,
+  clearStorage: defineStorageTool({
     actionId: 'clearStorage',
     name: 'extension_tool_clear_storage',
     title: 'Clear Storage',
@@ -266,10 +197,8 @@ export const STORAGE_TOOL_CONTRACTS = {
       idempotentHint: false,
       openWorldHint: false,
     },
-    meta: deleteMeta,
   }),
-  getBytesInUse: defineExtensionToolContract({
-    group: STORAGE_GROUP_CONTRACT,
+  getBytesInUse: defineStorageTool({
     actionId: 'getBytesInUse',
     name: 'extension_tool_get_storage_bytes_in_use',
     title: 'Get Storage Bytes In Use',
@@ -282,7 +211,6 @@ export const STORAGE_TOOL_CONTRACTS = {
       idempotentHint: true,
       openWorldHint: false,
     },
-    meta: readMeta,
   }),
 } as const;
 
