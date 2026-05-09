@@ -59,6 +59,38 @@
     "./contracts": {
       "types": "./dist/contracts/index.d.ts",
       "import": "./dist/contracts/index.js"
+    },
+    "./contracts/alarms": {
+      "types": "./dist/contracts/alarms.d.ts",
+      "import": "./dist/contracts/alarms.js"
+    },
+    "./contracts/cookies": {
+      "types": "./dist/contracts/cookies.d.ts",
+      "import": "./dist/contracts/cookies.js"
+    },
+    "./contracts/downloads": {
+      "types": "./dist/contracts/downloads.d.ts",
+      "import": "./dist/contracts/downloads.js"
+    },
+    "./contracts/permissions": {
+      "types": "./dist/contracts/permissions.d.ts",
+      "import": "./dist/contracts/permissions.js"
+    },
+    "./contracts/runtime": {
+      "types": "./dist/contracts/runtime.d.ts",
+      "import": "./dist/contracts/runtime.js"
+    },
+    "./contracts/scripting": {
+      "types": "./dist/contracts/scripting.d.ts",
+      "import": "./dist/contracts/scripting.js"
+    },
+    "./contracts/shared": {
+      "types": "./dist/contracts/shared.d.ts",
+      "import": "./dist/contracts/shared.js"
+    },
+    "./contracts/userScripts": {
+      "types": "./dist/contracts/userScripts.d.ts",
+      "import": "./dist/contracts/userScripts.js"
     }
   },
   "publishConfig": {
