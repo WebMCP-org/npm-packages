@@ -5,8 +5,11 @@ import { ToolSchema } from '@modelcontextprotocol/sdk/types.js';
 import { zodSchemaToJsonSchemaCompat } from '../zod-json-schema-compat.js';
 import {
   alarmsContracts,
+  allExtensionToolContracts,
   cookiesContracts,
   downloadsContracts,
+  extensionToolContractsByGroup,
+  extensionToolContractsByName,
   permissionsContracts,
   runtimeContractList,
   scriptingContractList,
@@ -54,15 +57,7 @@ type _UserScriptExecuteOutput = Assert<
   IsAssignable<UserScriptExecuteOutput, { injectionCount: number }>
 >;
 
-const groups = [
-  ['alarms', alarmsContracts],
-  ['cookies', cookiesContracts],
-  ['downloads', downloadsContracts],
-  ['permissions', permissionsContracts],
-  ['runtime', runtimeContractList],
-  ['scripting', scriptingContractList],
-  ['userScripts', userScriptsContracts],
-] as const;
+const groups = Object.entries(extensionToolContractsByGroup);
 
 describe('raw Chrome API contracts', () => {
   it('can be imported without chrome globals', async () => {
@@ -71,6 +66,16 @@ describe('raw Chrome API contracts', () => {
     await import('./index.js');
     assert.equal(Reflect.get(globalThis, 'chrome'), undefined);
     if (originalChrome !== undefined) Reflect.set(globalThis, 'chrome', originalChrome);
+  });
+
+  it('exports a shared unique contract catalog', () => {
+    const names = allExtensionToolContracts.map((contract) => contract.name);
+    assert.equal(new Set(names).size, names.length);
+    assert.equal(Object.keys(extensionToolContractsByName).length, names.length);
+    for (const contract of allExtensionToolContracts) {
+      assert.equal(extensionToolContractsByName[contract.name], contract);
+      assert.equal(contract._meta.extension.groupId in extensionToolContractsByGroup, true);
+    }
   });
 
   it('exports valid MCP tool descriptors with object-root schemas', () => {

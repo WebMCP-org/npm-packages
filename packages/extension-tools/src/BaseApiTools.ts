@@ -106,8 +106,8 @@ export abstract class BaseApiTools<TOptions = Record<string, unknown>> {
     const config = {
       title: contract.title,
       description: contract.description,
-      inputSchema: contract.inputSchema.shape,
-      outputSchema: contract.outputSchema?.shape,
+      inputSchema: contract.inputSchema,
+      outputSchema: contract.outputSchema,
       annotations: contract.annotations,
       _meta: contract._meta,
     };

@@ -246,7 +246,7 @@ export const userScriptContracts = {
     }),
   }),
   execute: contract({
-    name: 'extension_tool_execute_user_script',
+    name: 'extension_tool_user_scripts_execute',
     title: 'Execute user script',
     description: 'Inject a user script into a target context.',
     inputSchema: userScriptExecuteInputSchema,

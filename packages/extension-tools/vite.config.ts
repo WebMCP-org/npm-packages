@@ -3,7 +3,7 @@ import { defineConfig } from 'vite-plus';
 
 const mainConfig: Options = {
   name: 'main',
-  entry: ['src/index.ts'],
+  entry: ['src/index.ts', 'src/contracts/index.ts'],
   format: ['esm'],
   dts: true,
   splitting: false,
