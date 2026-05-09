@@ -44,7 +44,7 @@ try {
   runtimeContract = installServerRuntimeContract(server, { runtimeLabel: 'extension' });
   recordDebugEvent('runtime-contract:installed');
   startupStep = 'scripting';
-  new ScriptingApiTools(server, { executeUserScript: false }).register();
+  new ScriptingApiTools(server).register();
   startupStep = 'userScripts';
   new UserScriptsApiTools(server, { execute: false }).register();
   startupStep = 'cookies';
@@ -52,9 +52,7 @@ try {
   startupStep = 'downloads';
   new DownloadsApiTools(server, {
     acceptDanger: false,
-    download: false,
     open: false,
-    removeFile: false,
     setUiOptions: false,
     show: false,
     showDefaultFolder: false,
