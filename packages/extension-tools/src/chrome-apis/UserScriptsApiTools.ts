@@ -58,25 +58,19 @@ export class UserScriptsApiTools extends BaseApiTools<UserScriptsApiToolsOptions
       this.registerContractTool(userScriptContracts.configureWorld, (input) =>
         this.configureWorld(input)
       );
-    if (
-      this.shouldRegisterTool('getWorldConfigurations') &&
-      chrome.userScripts.getWorldConfigurations
-    )
+    if (this.shouldRegisterTool('getWorldConfigurations'))
       this.registerContractTool(userScriptContracts.getWorldConfigurations, () =>
         this.getWorldConfigurations()
       );
-    if (
-      this.shouldRegisterTool('resetWorldConfiguration') &&
-      chrome.userScripts.resetWorldConfiguration
-    )
+    if (this.shouldRegisterTool('resetWorldConfiguration'))
       this.registerContractTool(userScriptContracts.resetWorldConfiguration, (input) =>
         this.resetWorldConfiguration(input)
       );
-    if (this.shouldRegisterTool('execute') && chrome.userScripts.execute)
+    if (this.shouldRegisterTool('execute'))
       this.registerContractTool(userScriptContracts.execute, (input) => this.execute(input));
   }
 
-  private async getScriptsRaw(input: GetUserScriptsInput) {
+  public async getScriptsRaw(input: GetUserScriptsInput) {
     return chrome.userScripts.getScripts(input);
   }
 
@@ -95,33 +89,33 @@ export class UserScriptsApiTools extends BaseApiTools<UserScriptsApiToolsOptions
     };
   }
 
-  private async registerScripts({ scripts }: RegisterUserScriptsInput) {
+  public async registerScripts({ scripts }: RegisterUserScriptsInput) {
     await chrome.userScripts.register(scripts);
     return { count: scripts.length, scriptIds: scripts.map((script) => script.id) };
   }
 
-  private async getScripts(input: GetUserScriptsInput) {
+  public async getScripts(input: GetUserScriptsInput) {
     const scripts = await this.getScriptsRaw(input);
     return { count: scripts.length, scripts: scripts.map((script) => this.toScript(script)) };
   }
 
-  private async updateScripts({ scripts }: UpdateUserScriptsInput) {
+  public async updateScripts({ scripts }: UpdateUserScriptsInput) {
     await chrome.userScripts.update(scripts);
     return { count: scripts.length, scriptIds: scripts.map((script) => script.id) };
   }
 
-  private async unregisterScripts(input: UnregisterUserScriptsInput) {
+  public async unregisterScripts(input: UnregisterUserScriptsInput) {
     const before = await this.getScriptsRaw(input);
     await chrome.userScripts.unregister(input);
     return { count: before.length, scriptIds: before.map((script) => script.id) };
   }
 
-  private async configureWorld(input: ConfigureWorldInput) {
+  public async configureWorld(input: ConfigureWorldInput) {
     await chrome.userScripts.configureWorld(input);
     return { worldId: input.worldId, csp: input.csp, messaging: input.messaging };
   }
 
-  private async getWorldConfigurations() {
+  public async getWorldConfigurations() {
     const worlds = await chrome.userScripts.getWorldConfigurations();
     return {
       count: worlds.length,
@@ -133,12 +127,12 @@ export class UserScriptsApiTools extends BaseApiTools<UserScriptsApiToolsOptions
     };
   }
 
-  private async resetWorldConfiguration({ worldId }: ResetWorldConfigurationInput) {
+  public async resetWorldConfiguration({ worldId }: ResetWorldConfigurationInput) {
     await chrome.userScripts.resetWorldConfiguration(worldId);
     return { ok: true, message: `World configuration reset for ${worldId || 'default'}` };
   }
 
-  private async execute(input: UserScriptExecuteInput) {
+  public async execute(input: UserScriptExecuteInput) {
     const results = await chrome.userScripts.execute(input);
     return {
       injectionCount: results.length,

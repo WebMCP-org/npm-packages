@@ -66,7 +66,7 @@ export class AlarmsApiTools extends BaseApiTools<AlarmsApiToolsOptions> {
     });
   }
 
-  private async createAlarm({ name, delayInMinutes, periodInMinutes, when }: CreateAlarmInput) {
+  public async createAlarm({ name, delayInMinutes, periodInMinutes, when }: CreateAlarmInput) {
     const alarmInfo: chrome.alarms.AlarmCreateInfo = {};
     if (delayInMinutes !== undefined) alarmInfo.delayInMinutes = delayInMinutes;
     if (periodInMinutes !== undefined) alarmInfo.periodInMinutes = periodInMinutes;
@@ -82,12 +82,12 @@ export class AlarmsApiTools extends BaseApiTools<AlarmsApiToolsOptions> {
     return { alarm: this.toAlarm(alarm) };
   }
 
-  private async getAlarm({ name }: GetAlarmInput) {
+  public async getAlarm({ name }: GetAlarmInput) {
     const alarm = await this.getAlarmRaw(name);
     return { alarm: alarm ? this.toAlarm(alarm) : null };
   }
 
-  private async getAllAlarms() {
+  public async getAllAlarms() {
     const alarms = await new Promise<chrome.alarms.Alarm[]>((resolve, reject) => {
       chrome.alarms.getAll((items) =>
         chrome.runtime.lastError
@@ -98,7 +98,7 @@ export class AlarmsApiTools extends BaseApiTools<AlarmsApiToolsOptions> {
     return { count: alarms.length, alarms: alarms.map((alarm) => this.toAlarm(alarm)) };
   }
 
-  private async clearAlarm({ name }: ClearAlarmInput) {
+  public async clearAlarm({ name }: ClearAlarmInput) {
     const cleared = await new Promise<boolean>((resolve, reject) => {
       const callback = (value: boolean) =>
         chrome.runtime.lastError
@@ -110,7 +110,7 @@ export class AlarmsApiTools extends BaseApiTools<AlarmsApiToolsOptions> {
     return { name: name ?? '', cleared };
   }
 
-  private async clearAllAlarms() {
+  public async clearAllAlarms() {
     const before = await this.getAllAlarms();
     const cleared = await new Promise<boolean>((resolve, reject) => {
       chrome.alarms.clearAll((value) =>

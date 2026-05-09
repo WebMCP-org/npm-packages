@@ -47,7 +47,7 @@ export class CookiesApiTools extends BaseApiTools<CookiesApiToolsOptions> {
       this.registerContractTool(cookieContracts.getAllCookieStores, () =>
         this.getAllCookieStores()
       );
-    if (this.shouldRegisterTool('getPartitionKey') && chrome.cookies.getPartitionKey)
+    if (this.shouldRegisterTool('getPartitionKey'))
       this.registerContractTool(cookieContracts.getPartitionKey, (input) =>
         this.getPartitionKey(input)
       );
@@ -74,7 +74,7 @@ export class CookiesApiTools extends BaseApiTools<CookiesApiToolsOptions> {
     };
   }
 
-  private async getCookie(input: GetCookieInput) {
+  public async getCookie(input: GetCookieInput) {
     const cookie = await new Promise<chrome.cookies.Cookie | undefined>((resolve, reject) => {
       chrome.cookies.get(input, (value) =>
         chrome.runtime.lastError
@@ -85,7 +85,7 @@ export class CookiesApiTools extends BaseApiTools<CookiesApiToolsOptions> {
     return { cookie: cookie ? this.toCookie(cookie) : null, name: input.name, url: input.url };
   }
 
-  private async getAllCookies(input: GetAllCookiesInput) {
+  public async getAllCookies(input: GetAllCookiesInput) {
     const cookies = await new Promise<chrome.cookies.Cookie[]>((resolve, reject) => {
       chrome.cookies.getAll(input, (items) =>
         chrome.runtime.lastError
@@ -96,7 +96,7 @@ export class CookiesApiTools extends BaseApiTools<CookiesApiToolsOptions> {
     return { count: cookies.length, cookies: cookies.map((cookie) => this.toCookie(cookie)) };
   }
 
-  private async getAllCookieStores() {
+  public async getAllCookieStores() {
     const cookieStores = await new Promise<chrome.cookies.CookieStore[]>((resolve, reject) => {
       chrome.cookies.getAllCookieStores((stores) =>
         chrome.runtime.lastError
@@ -110,7 +110,7 @@ export class CookiesApiTools extends BaseApiTools<CookiesApiToolsOptions> {
     };
   }
 
-  private async getPartitionKey(input: GetPartitionKeyInput) {
+  public async getPartitionKey(input: GetPartitionKeyInput) {
     const result = await new Promise<{ partitionKey: chrome.cookies.CookiePartitionKey }>(
       (resolve, reject) => {
         chrome.cookies.getPartitionKey(input, (value) =>
@@ -123,7 +123,7 @@ export class CookiesApiTools extends BaseApiTools<CookiesApiToolsOptions> {
     return { partitionKey: result.partitionKey };
   }
 
-  private async setCookie(input: SetCookieInput) {
+  public async setCookie(input: SetCookieInput) {
     const cookie = await new Promise<chrome.cookies.Cookie | undefined>((resolve, reject) => {
       chrome.cookies.set(input, (value) =>
         chrome.runtime.lastError
@@ -135,7 +135,7 @@ export class CookiesApiTools extends BaseApiTools<CookiesApiToolsOptions> {
     return { cookie: this.toCookie(cookie) };
   }
 
-  private async removeCookie(input: RemoveCookieInput) {
+  public async removeCookie(input: RemoveCookieInput) {
     const result = await new Promise<chrome.cookies.Details | undefined>((resolve, reject) => {
       chrome.cookies.remove(input, (value) =>
         chrome.runtime.lastError

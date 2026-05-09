@@ -46,18 +46,15 @@ export class RuntimeApiTools extends BaseApiTools<RuntimeApiToolsOptions> {
   registerTools(): void {
     if (this.shouldRegisterTool('connect'))
       this.registerContractTool(runtimeContracts.connect, (input) => this.connect(input));
-    if (this.shouldRegisterTool('connectNative') && chrome.runtime.connectNative)
+    if (this.shouldRegisterTool('connectNative'))
       this.registerContractTool(runtimeContracts.connectNative, (input) =>
         this.connectNative(input)
       );
-    if (this.shouldRegisterTool('getContexts') && chrome.runtime.getContexts)
+    if (this.shouldRegisterTool('getContexts'))
       this.registerContractTool(runtimeContracts.getContexts, (input) => this.getContexts(input));
     if (this.shouldRegisterTool('getManifest'))
       this.registerContractTool(runtimeContracts.getManifest, () => this.getManifest());
-    if (
-      this.shouldRegisterTool('getPackageDirectoryEntry') &&
-      chrome.runtime.getPackageDirectoryEntry
-    )
+    if (this.shouldRegisterTool('getPackageDirectoryEntry'))
       this.registerContractTool(runtimeContracts.getPackageDirectoryEntry, () =>
         this.getPackageDirectoryEntry()
       );
@@ -65,7 +62,7 @@ export class RuntimeApiTools extends BaseApiTools<RuntimeApiToolsOptions> {
       this.registerContractTool(runtimeContracts.getPlatformInfo, () => this.getPlatformInfo());
     if (this.shouldRegisterTool('getURL'))
       this.registerContractTool(runtimeContracts.getURL, (input) => this.getURL(input));
-    if (this.shouldRegisterTool('openOptionsPage') && chrome.runtime.openOptionsPage)
+    if (this.shouldRegisterTool('openOptionsPage'))
       this.registerContractTool(runtimeContracts.openOptionsPage, () => this.openOptionsPage());
     if (this.shouldRegisterTool('reload'))
       this.registerContractTool(runtimeContracts.reload, () => this.reload());
@@ -73,15 +70,15 @@ export class RuntimeApiTools extends BaseApiTools<RuntimeApiToolsOptions> {
       this.registerContractTool(runtimeContracts.requestUpdateCheck, () =>
         this.requestUpdateCheck()
       );
-    if (this.shouldRegisterTool('restart') && chrome.runtime.restart)
+    if (this.shouldRegisterTool('restart'))
       this.registerContractTool(runtimeContracts.restart, () => this.restart());
-    if (this.shouldRegisterTool('restartAfterDelay') && chrome.runtime.restartAfterDelay)
+    if (this.shouldRegisterTool('restartAfterDelay'))
       this.registerContractTool(runtimeContracts.restartAfterDelay, (input) =>
         this.restartAfterDelay(input)
       );
     if (this.shouldRegisterTool('sendMessage'))
       this.registerContractTool(runtimeContracts.sendMessage, (input) => this.sendMessage(input));
-    if (this.shouldRegisterTool('sendNativeMessage') && chrome.runtime.sendNativeMessage)
+    if (this.shouldRegisterTool('sendNativeMessage'))
       this.registerContractTool(runtimeContracts.sendNativeMessage, (input) =>
         this.sendNativeMessage(input)
       );
@@ -91,7 +88,7 @@ export class RuntimeApiTools extends BaseApiTools<RuntimeApiToolsOptions> {
       );
   }
 
-  private connect({ extensionId, name, includeTlsChannelId }: RuntimeConnectInput) {
+  public connect({ extensionId, name, includeTlsChannelId }: RuntimeConnectInput) {
     const connectInfo = {
       ...(name !== undefined ? { name } : {}),
       ...(includeTlsChannelId !== undefined ? { includeTlsChannelId } : {}),
@@ -102,12 +99,12 @@ export class RuntimeApiTools extends BaseApiTools<RuntimeApiToolsOptions> {
     return Promise.resolve({ portName: port.name, extensionId: extensionId ?? 'own extension' });
   }
 
-  private connectNative({ application }: RuntimeConnectNativeInput) {
+  public connectNative({ application }: RuntimeConnectNativeInput) {
     const port = chrome.runtime.connectNative(application);
     return Promise.resolve({ portName: port.name, extensionId: application });
   }
 
-  private async getContexts(input: RuntimeGetContextsInput) {
+  public async getContexts(input: RuntimeGetContextsInput) {
     const contexts = await new Promise<chrome.runtime.ExtensionContext[]>((resolve, reject) => {
       chrome.runtime.getContexts(input, (items) =>
         chrome.runtime.lastError
@@ -131,7 +128,7 @@ export class RuntimeApiTools extends BaseApiTools<RuntimeApiToolsOptions> {
     };
   }
 
-  private getManifest() {
+  public getManifest() {
     const manifest = chrome.runtime.getManifest();
     return Promise.resolve({
       manifest,
@@ -144,7 +141,7 @@ export class RuntimeApiTools extends BaseApiTools<RuntimeApiToolsOptions> {
     });
   }
 
-  private async getPackageDirectoryEntry() {
+  public async getPackageDirectoryEntry() {
     const entry = await new Promise<DirectoryEntry>((resolve, reject) => {
       chrome.runtime.getPackageDirectoryEntry((value) =>
         chrome.runtime.lastError
@@ -160,7 +157,7 @@ export class RuntimeApiTools extends BaseApiTools<RuntimeApiToolsOptions> {
     };
   }
 
-  private async getPlatformInfo() {
+  public async getPlatformInfo() {
     const info = await new Promise<chrome.runtime.PlatformInfo>((resolve, reject) => {
       chrome.runtime.getPlatformInfo((value) =>
         chrome.runtime.lastError
@@ -171,11 +168,11 @@ export class RuntimeApiTools extends BaseApiTools<RuntimeApiToolsOptions> {
     return { os: info.os, arch: info.arch, nacl_arch: info.nacl_arch };
   }
 
-  private getURL({ path }: RuntimeGetUrlInput) {
+  public getURL({ path }: RuntimeGetUrlInput) {
     return Promise.resolve({ relativePath: path, fullUrl: chrome.runtime.getURL(path) });
   }
 
-  private async openOptionsPage() {
+  public async openOptionsPage() {
     await new Promise<void>((resolve, reject) => {
       chrome.runtime.openOptionsPage(() =>
         chrome.runtime.lastError ? reject(new Error(chrome.runtime.lastError.message)) : resolve()
@@ -184,12 +181,12 @@ export class RuntimeApiTools extends BaseApiTools<RuntimeApiToolsOptions> {
     return { ok: true, message: 'Options page opened' };
   }
 
-  private reload() {
+  public reload() {
     chrome.runtime.reload();
     return Promise.resolve({ ok: true, message: 'Extension reload initiated' });
   }
 
-  private async requestUpdateCheck() {
+  public async requestUpdateCheck() {
     const result = await new Promise<chrome.runtime.RequestUpdateCheckStatus>((resolve, reject) => {
       chrome.runtime.requestUpdateCheck((status, details) =>
         chrome.runtime.lastError
@@ -200,12 +197,12 @@ export class RuntimeApiTools extends BaseApiTools<RuntimeApiToolsOptions> {
     return result;
   }
 
-  private restart() {
+  public restart() {
     chrome.runtime.restart();
     return Promise.resolve({ ok: true, message: 'Device restart initiated' });
   }
 
-  private async restartAfterDelay({ seconds }: RuntimeRestartAfterDelayInput) {
+  public async restartAfterDelay({ seconds }: RuntimeRestartAfterDelayInput) {
     await new Promise<void>((resolve, reject) => {
       chrome.runtime.restartAfterDelay(seconds, () =>
         chrome.runtime.lastError ? reject(new Error(chrome.runtime.lastError.message)) : resolve()
@@ -217,11 +214,7 @@ export class RuntimeApiTools extends BaseApiTools<RuntimeApiToolsOptions> {
     };
   }
 
-  private async sendMessage({
-    message,
-    extensionId,
-    includeTlsChannelId,
-  }: RuntimeSendMessageInput) {
+  public async sendMessage({ message, extensionId, includeTlsChannelId }: RuntimeSendMessageInput) {
     const response = await new Promise<unknown>((resolve, reject) => {
       const options = includeTlsChannelId === undefined ? undefined : { includeTlsChannelId };
       const callback = (value: unknown) =>
@@ -234,7 +227,7 @@ export class RuntimeApiTools extends BaseApiTools<RuntimeApiToolsOptions> {
     return { messageSent: message, response, extensionId: extensionId ?? 'own extension' };
   }
 
-  private async sendNativeMessage({ application, message }: RuntimeSendNativeMessageInput) {
+  public async sendNativeMessage({ application, message }: RuntimeSendNativeMessageInput) {
     const response = await new Promise<unknown>((resolve, reject) => {
       chrome.runtime.sendNativeMessage(application, message, (value) =>
         chrome.runtime.lastError
@@ -245,7 +238,7 @@ export class RuntimeApiTools extends BaseApiTools<RuntimeApiToolsOptions> {
     return { application, messageSent: message, response };
   }
 
-  private async setUninstallURL({ url }: RuntimeSetUninstallUrlInput) {
+  public async setUninstallURL({ url }: RuntimeSetUninstallUrlInput) {
     await new Promise<void>((resolve, reject) => {
       chrome.runtime.setUninstallURL(url, () =>
         chrome.runtime.lastError ? reject(new Error(chrome.runtime.lastError.message)) : resolve()

@@ -50,14 +50,11 @@ export class PermissionsApiTools extends BaseApiTools<PermissionsApiToolsOptions
       this.registerContractTool(permissionContracts.getAll, () => this.getAll());
     if (this.shouldRegisterTool('remove'))
       this.registerContractTool(permissionContracts.remove, (input) => this.remove(input));
-    if (this.shouldRegisterTool('addHostAccessRequest') && chrome.permissions.addHostAccessRequest)
+    if (this.shouldRegisterTool('addHostAccessRequest'))
       this.registerContractTool(permissionContracts.addHostAccessRequest, (input) =>
         this.addHostAccessRequest(input)
       );
-    if (
-      this.shouldRegisterTool('removeHostAccessRequest') &&
-      chrome.permissions.removeHostAccessRequest
-    )
+    if (this.shouldRegisterTool('removeHostAccessRequest'))
       this.registerContractTool(permissionContracts.removeHostAccessRequest, (input) =>
         this.removeHostAccessRequest(input)
       );
@@ -72,7 +69,7 @@ export class PermissionsApiTools extends BaseApiTools<PermissionsApiToolsOptions
     };
   }
 
-  private async request(input: PermissionsObjectInput) {
+  public async request(input: PermissionsObjectInput) {
     const granted = await new Promise<boolean>((resolve, reject) => {
       chrome.permissions.request(this.toPermissions(input), (value) =>
         chrome.runtime.lastError
@@ -83,7 +80,7 @@ export class PermissionsApiTools extends BaseApiTools<PermissionsApiToolsOptions
     return { ok: granted, message: granted ? 'Permissions granted' : 'Permissions denied' };
   }
 
-  private async contains(input: PermissionsObjectInput) {
+  public async contains(input: PermissionsObjectInput) {
     const hasPermissions = await new Promise<boolean>((resolve, reject) => {
       chrome.permissions.contains(this.toPermissions(input), (value) =>
         chrome.runtime.lastError
@@ -98,7 +95,7 @@ export class PermissionsApiTools extends BaseApiTools<PermissionsApiToolsOptions
     };
   }
 
-  private async getAll() {
+  public async getAll() {
     const permissions = await new Promise<chrome.permissions.Permissions>((resolve, reject) => {
       chrome.permissions.getAll((value) =>
         chrome.runtime.lastError
@@ -114,7 +111,7 @@ export class PermissionsApiTools extends BaseApiTools<PermissionsApiToolsOptions
     };
   }
 
-  private async remove(input: PermissionsObjectInput) {
+  public async remove(input: PermissionsObjectInput) {
     const removed = await new Promise<boolean>((resolve, reject) => {
       chrome.permissions.remove(this.toPermissions(input), (value) =>
         chrome.runtime.lastError
@@ -125,7 +122,7 @@ export class PermissionsApiTools extends BaseApiTools<PermissionsApiToolsOptions
     return { ok: removed, message: removed ? 'Permissions removed' : 'Permissions not removed' };
   }
 
-  private async addHostAccessRequest(input: HostAccessRequestInput) {
+  public async addHostAccessRequest(input: HostAccessRequestInput) {
     await new Promise<void>((resolve, reject) => {
       chrome.permissions.addHostAccessRequest(input, () =>
         chrome.runtime.lastError ? reject(new Error(chrome.runtime.lastError.message)) : resolve()
@@ -134,7 +131,7 @@ export class PermissionsApiTools extends BaseApiTools<PermissionsApiToolsOptions
     return { ok: true, message: 'Host access request added' };
   }
 
-  private async removeHostAccessRequest(input: HostAccessRequestInput) {
+  public async removeHostAccessRequest(input: HostAccessRequestInput) {
     await new Promise<void>((resolve, reject) => {
       chrome.permissions.removeHostAccessRequest(input, () =>
         chrome.runtime.lastError ? reject(new Error(chrome.runtime.lastError.message)) : resolve()

@@ -595,18 +595,28 @@ describe('extension runtime contract', () => {
       assert.strictEqual(script.results[0]?.result, 'WebMCP e2e fixture');
 
       if (toolNames.includes('extension_tool_execute_user_script')) {
-        const userScript = await callStructured(
-          page,
-          'extension_tool_execute_user_script',
-          {
-            tabId: targetTabId,
-            code: 'location.origin',
-            world: 'MAIN',
-          },
-          executeUserScriptOutputSchema
-        );
-        assert.strictEqual(userScript.injectionCount, 1);
-        assert.strictEqual(userScript.results[0]?.result, origin);
+        const userScriptResult = (await callToolResult(page, 'extension_tool_execute_user_script', {
+          tabId: targetTabId,
+          code: 'location.origin',
+          world: 'MAIN',
+        })) as {
+          isError?: boolean;
+          structuredContent?: { chromeApi?: string; message?: string };
+        };
+
+        if (userScriptResult.isError) {
+          assert.strictEqual(
+            userScriptResult.structuredContent?.chromeApi,
+            'chrome.userScripts.execute'
+          );
+          assert.match(userScriptResult.structuredContent?.message ?? '', /userScripts/i);
+        } else {
+          const userScript = executeUserScriptOutputSchema.parse(
+            userScriptResult.structuredContent
+          );
+          assert.strictEqual(userScript.injectionCount, 1);
+          assert.strictEqual(userScript.results[0]?.result, origin);
+        }
       }
 
       const removeCss = await callStructured(

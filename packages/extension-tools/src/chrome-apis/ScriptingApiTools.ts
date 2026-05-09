@@ -37,13 +37,13 @@ export class ScriptingApiTools extends BaseApiTools<ScriptingApiToolsOptions> {
       this.registerContractTool(scriptingContracts.executeScript, (input) =>
         this.executeScript(input)
       );
-    if (this.shouldRegisterTool('executeUserScript') && chrome.userScripts?.execute)
+    if (this.shouldRegisterTool('executeUserScript'))
       this.registerContractTool(scriptingContracts.executeUserScript, (input) =>
         this.executeUserScript(input)
       );
     if (this.shouldRegisterTool('insertCSS'))
       this.registerContractTool(scriptingContracts.insertCSS, (input) => this.insertCSS(input));
-    if (this.shouldRegisterTool('removeCSS') && chrome.scripting.removeCSS)
+    if (this.shouldRegisterTool('removeCSS'))
       this.registerContractTool(scriptingContracts.removeCSS, (input) => this.removeCSS(input));
   }
 
@@ -65,7 +65,7 @@ export class ScriptingApiTools extends BaseApiTools<ScriptingApiToolsOptions> {
     };
   }
 
-  private async executeScript({
+  public async executeScript({
     tabId,
     code,
     allFrames = false,
@@ -88,12 +88,17 @@ export class ScriptingApiTools extends BaseApiTools<ScriptingApiToolsOptions> {
     return this.toInjectionResults(results);
   }
 
-  private async executeUserScript({
+  public async executeUserScript({
     tabId,
     code,
     allFrames = false,
     world = 'USER_SCRIPT',
   }: ExecuteUserScriptInput) {
+    if (!chrome.userScripts?.execute) {
+      throw new Error(
+        'chrome.userScripts.execute API is not available. Enable Allow User Scripts for this extension.'
+      );
+    }
     const resolvedTabId = await this.activeTabId(tabId);
     const results = await chrome.userScripts.execute({
       target: { tabId: resolvedTabId, allFrames },
@@ -104,13 +109,13 @@ export class ScriptingApiTools extends BaseApiTools<ScriptingApiToolsOptions> {
     return this.toInjectionResults(results);
   }
 
-  private async insertCSS({ tabId, css, allFrames = false }: CssInjectionInput) {
+  public async insertCSS({ tabId, css, allFrames = false }: CssInjectionInput) {
     const resolvedTabId = await this.activeTabId(tabId);
     await chrome.scripting.insertCSS({ target: { tabId: resolvedTabId, allFrames }, css });
     return { ok: true, message: `CSS inserted into tab ${resolvedTabId}` };
   }
 
-  private async removeCSS({ tabId, css, allFrames = false }: CssInjectionInput) {
+  public async removeCSS({ tabId, css, allFrames = false }: CssInjectionInput) {
     const resolvedTabId = await this.activeTabId(tabId);
     await chrome.scripting.removeCSS({ target: { tabId: resolvedTabId, allFrames }, css });
     return { ok: true, message: `CSS removed from tab ${resolvedTabId}` };

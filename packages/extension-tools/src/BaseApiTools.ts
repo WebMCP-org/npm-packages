@@ -1,9 +1,29 @@
 import type { CallToolResult, McpServer } from '@mcp-b/webmcp-ts-sdk';
-import type { z } from 'zod';
+import { z } from 'zod';
 
 export interface ApiAvailability {
   available: boolean;
   message: string;
+  details?: string;
+}
+
+export type ExtensionToolErrorCode =
+  | 'api_unavailable'
+  | 'tool_execution_failed'
+  | 'tool_input_invalid'
+  | 'tool_output_invalid';
+
+export interface ExtensionToolErrorContent {
+  [key: string]: unknown;
+  ok: false;
+  code: ExtensionToolErrorCode;
+  message: string;
+  groupId?: string;
+  actionId?: string;
+  chromeApi?: string;
+  permissions?: string[];
+  hostPermissions?: string[];
+  requiresActiveTab?: boolean;
   details?: string;
 }
 
@@ -25,16 +45,27 @@ export abstract class BaseApiTools<TOptions = Record<string, unknown>> {
     return true;
   }
 
-  protected formatError(error: unknown): CallToolResult {
-    const message = error instanceof Error ? error.message : String(error);
+  protected formatError(
+    error: unknown,
+    overrides: Partial<ExtensionToolErrorContent> = {}
+  ): CallToolResult {
+    const message = overrides.message ?? (error instanceof Error ? error.message : String(error));
+    const structuredContent: ExtensionToolErrorContent = {
+      ok: false,
+      code: overrides.code ?? 'tool_execution_failed',
+      message,
+      ...overrides,
+    };
+
     return {
       content: [
         {
           type: 'text',
-          text: `Error: ${message}`,
+          text: JSON.stringify(structuredContent, null, 2),
         },
       ],
       isError: true,
+      structuredContent,
     };
   }
 
@@ -83,23 +114,54 @@ export abstract class BaseApiTools<TOptions = Record<string, unknown>> {
       inputSchema: TInput;
       outputSchema?: TOutput;
       annotations?: Record<string, unknown>;
-      _meta?: Record<string, unknown>;
+      _meta?: {
+        extension?: Partial<ExtensionToolErrorContent>;
+      };
     },
     handler: (input: z.infer<TInput>) => Promise<Record<string, unknown> | CallToolResult>
   ): void {
     const execute = async (rawInput: unknown) => {
+      let input: z.infer<TInput>;
       try {
-        const input = contract.inputSchema.parse(rawInput);
+        input = contract.inputSchema.parse(rawInput);
+      } catch (error) {
+        return this.formatError(error, {
+          code: 'tool_input_invalid',
+          message: error instanceof Error ? error.message : String(error),
+          ...contract._meta?.extension,
+        });
+      }
+
+      try {
+        const availability = this.checkAvailability();
+        if (!availability.available) {
+          const details = availability.details ? { details: availability.details } : {};
+          return this.formatError(new Error(availability.message), {
+            code: 'api_unavailable',
+            message: availability.message,
+            ...details,
+            ...contract._meta?.extension,
+          });
+        }
+
         const result = await handler(input);
 
         if (contract.outputSchema) {
-          const structuredContent = contract.outputSchema.parse(result);
+          const parsedOutput = contract.outputSchema.safeParse(result);
+          if (!parsedOutput.success) {
+            return this.formatError(parsedOutput.error, {
+              code: 'tool_output_invalid',
+              message: parsedOutput.error.message,
+              ...contract._meta?.extension,
+            });
+          }
+          const structuredContent = parsedOutput.data;
           return this.formatStructured(structuredContent);
         }
 
         return result as CallToolResult;
       } catch (error) {
-        return this.formatError(error);
+        return this.formatError(error, contract._meta?.extension ?? {});
       }
     };
 
@@ -131,10 +193,10 @@ export abstract class BaseApiTools<TOptions = Record<string, unknown>> {
       if (availability.details) {
         console.warn(`  Details: ${availability.details}`);
       }
-      return;
+    } else {
+      console.log(`✓ ${this.apiName} API available`);
     }
 
-    console.log(`✓ ${this.apiName} API available`);
     this.registerTools();
   }
 }

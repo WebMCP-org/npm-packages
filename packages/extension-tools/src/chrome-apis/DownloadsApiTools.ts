@@ -51,15 +51,15 @@ export class DownloadsApiTools extends BaseApiTools<DownloadsApiToolsOptions> {
       this.registerContractTool(downloadContracts.search, (input) => this.search(input));
     if (this.shouldRegisterTool('pause'))
       this.registerContractTool(downloadContracts.pause, ({ downloadId }) =>
-        this.downloadVoid('paused', downloadId, chrome.downloads.pause)
+        this.pause(downloadId)
       );
     if (this.shouldRegisterTool('resume'))
       this.registerContractTool(downloadContracts.resume, ({ downloadId }) =>
-        this.downloadVoid('resumed', downloadId, chrome.downloads.resume)
+        this.resume(downloadId)
       );
     if (this.shouldRegisterTool('cancel'))
       this.registerContractTool(downloadContracts.cancel, ({ downloadId }) =>
-        this.downloadVoid('cancelled', downloadId, chrome.downloads.cancel)
+        this.cancel(downloadId)
       );
     if (this.shouldRegisterTool('getFileIcon'))
       this.registerContractTool(downloadContracts.getFileIcon, (input) => this.getFileIcon(input));
@@ -75,13 +75,13 @@ export class DownloadsApiTools extends BaseApiTools<DownloadsApiToolsOptions> {
       this.registerContractTool(downloadContracts.erase, (input) => this.erase(input));
     if (this.shouldRegisterTool('removeFile'))
       this.registerContractTool(downloadContracts.removeFile, ({ downloadId }) =>
-        this.downloadVoid('file removed', downloadId, chrome.downloads.removeFile)
+        this.removeFile(downloadId)
       );
     if (this.shouldRegisterTool('acceptDanger'))
       this.registerContractTool(downloadContracts.acceptDanger, ({ downloadId }) =>
-        this.downloadVoid('danger accepted', downloadId, chrome.downloads.acceptDanger)
+        this.acceptDanger(downloadId)
       );
-    if (this.shouldRegisterTool('setUiOptions') && chrome.downloads.setUiOptions)
+    if (this.shouldRegisterTool('setUiOptions'))
       this.registerContractTool(downloadContracts.setUiOptions, (input) =>
         this.setUiOptions(input)
       );
@@ -112,7 +112,7 @@ export class DownloadsApiTools extends BaseApiTools<DownloadsApiToolsOptions> {
     };
   }
 
-  private async download(input: DownloadFileInput) {
+  public async download(input: DownloadFileInput) {
     const downloadId = await new Promise<number>((resolve, reject) => {
       chrome.downloads.download(input, (id) =>
         chrome.runtime.lastError ? reject(new Error(chrome.runtime.lastError.message)) : resolve(id)
@@ -121,7 +121,7 @@ export class DownloadsApiTools extends BaseApiTools<DownloadsApiToolsOptions> {
     return { downloadId, url: input.url, filename: input.filename ?? 'auto-generated' };
   }
 
-  private async search(input: SearchDownloadsInput) {
+  public async search(input: SearchDownloadsInput) {
     const downloads = await new Promise<chrome.downloads.DownloadItem[]>((resolve, reject) => {
       chrome.downloads.search(input, (items) =>
         chrome.runtime.lastError
@@ -148,7 +148,27 @@ export class DownloadsApiTools extends BaseApiTools<DownloadsApiToolsOptions> {
     return { ok: true, message: `Download ${action}` };
   }
 
-  private async getFileIcon({ downloadId, size }: GetFileIconInput) {
+  public async pause(downloadId: number) {
+    return this.downloadVoid('paused', downloadId, chrome.downloads.pause);
+  }
+
+  public async resume(downloadId: number) {
+    return this.downloadVoid('resumed', downloadId, chrome.downloads.resume);
+  }
+
+  public async cancel(downloadId: number) {
+    return this.downloadVoid('cancelled', downloadId, chrome.downloads.cancel);
+  }
+
+  public async removeFile(downloadId: number) {
+    return this.downloadVoid('file removed', downloadId, chrome.downloads.removeFile);
+  }
+
+  public async acceptDanger(downloadId: number) {
+    return this.downloadVoid('danger accepted', downloadId, chrome.downloads.acceptDanger);
+  }
+
+  public async getFileIcon({ downloadId, size }: GetFileIconInput) {
     const iconURL = await new Promise<string | undefined>((resolve, reject) => {
       chrome.downloads.getFileIcon(downloadId, size ? { size } : {}, (url) =>
         chrome.runtime.lastError
@@ -159,22 +179,22 @@ export class DownloadsApiTools extends BaseApiTools<DownloadsApiToolsOptions> {
     return { downloadId, iconURL: iconURL ?? null, size: size ?? 32 };
   }
 
-  private async open({ downloadId }: DownloadIdInput) {
+  public async open({ downloadId }: DownloadIdInput) {
     chrome.downloads.open(downloadId);
     return { ok: true, message: 'Download opened' };
   }
 
-  private async show({ downloadId }: DownloadIdInput) {
+  public async show({ downloadId }: DownloadIdInput) {
     chrome.downloads.show(downloadId);
     return { ok: true, message: 'Download shown' };
   }
 
-  private async showDefaultFolder() {
+  public async showDefaultFolder() {
     chrome.downloads.showDefaultFolder();
     return { ok: true, message: 'Default downloads folder shown' };
   }
 
-  private async erase(input: EraseDownloadsInput) {
+  public async erase(input: EraseDownloadsInput) {
     const erasedIds = await new Promise<number[]>((resolve, reject) => {
       chrome.downloads.erase(input, (ids) =>
         chrome.runtime.lastError
@@ -185,7 +205,7 @@ export class DownloadsApiTools extends BaseApiTools<DownloadsApiToolsOptions> {
     return { erasedCount: erasedIds.length, erasedIds, filesDeleted: false as const };
   }
 
-  private async setUiOptions({ enabled }: SetUiOptionsInput) {
+  public async setUiOptions({ enabled }: SetUiOptionsInput) {
     await new Promise<void>((resolve, reject) => {
       chrome.downloads.setUiOptions({ enabled }, () =>
         chrome.runtime.lastError ? reject(new Error(chrome.runtime.lastError.message)) : resolve()
