@@ -98,7 +98,7 @@ function isJsonSchemaForInference(value: unknown): value is JsonSchemaForInferen
     if (schemaType === 'object' && 'properties' in value && value.properties !== undefined) {
       return (
         isPlainObject(value.properties) &&
-        Object.values(value.properties).every(isJsonSchemaForInference)
+        Object.values(value.properties).every(isJsonSchemaProperty)
       );
     }
 
@@ -112,6 +112,14 @@ function isJsonSchemaForInference(value: unknown): value is JsonSchemaForInferen
       ['array', 'boolean', 'integer', 'null', 'number', 'object', 'string'].includes(entry)
     )
   );
+}
+
+function isJsonSchemaProperty(value: unknown): boolean {
+  if (!isPlainObject(value)) {
+    return false;
+  }
+
+  return !('type' in value) || isJsonSchemaForInference(value);
 }
 
 function isJsonValue(value: unknown): boolean {
