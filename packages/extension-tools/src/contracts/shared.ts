@@ -1,5 +1,21 @@
 import { z } from 'zod';
 
+export type ExtensionToolMeta = {
+  groupId: string;
+  actionId: string;
+  chromeApi: string;
+  permissions: string[];
+  hostPermissions?: string[];
+  requiresActiveTab?: true;
+  modelFacing?: false;
+  risk?: 'high';
+};
+
+export type NormalizedExtensionToolMeta = ExtensionToolMeta & {
+  modelFacing: boolean;
+  risk: 'default' | 'high';
+};
+
 export type ChromeApiContract<
   TInput extends z.ZodObject = z.ZodObject,
   TOutput extends z.ZodObject | undefined = z.ZodObject | undefined,
@@ -16,16 +32,7 @@ export type ChromeApiContract<
     openWorldHint?: boolean;
   };
   _meta: {
-    extension: {
-      groupId: string;
-      actionId: string;
-      chromeApi: string;
-      permissions: string[];
-      hostPermissions?: string[];
-      requiresActiveTab?: true;
-      modelFacing?: false;
-      risk?: 'high';
-    };
+    extension: ExtensionToolMeta;
   };
 };
 
@@ -54,4 +61,12 @@ export function contract<
   TOutput extends z.ZodObject | undefined = undefined,
 >(value: ChromeApiContract<TInput, TOutput>): ChromeApiContract<TInput, TOutput> {
   return value;
+}
+
+export function normalizeExtensionToolMeta(meta: ExtensionToolMeta): NormalizedExtensionToolMeta {
+  return {
+    ...meta,
+    modelFacing: meta.modelFacing ?? true,
+    risk: meta.risk ?? 'default',
+  };
 }

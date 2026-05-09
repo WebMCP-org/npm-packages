@@ -99,13 +99,17 @@ export const removeCookieOutputSchema = z.object({
 export type RemoveCookieInput = z.infer<typeof removeCookieInputSchema>;
 export type RemoveCookieOutput = z.infer<typeof removeCookieOutputSchema>;
 
-const meta = (actionId: string, chromeApi: string) => ({
+const meta = (
+  actionId: string,
+  chromeApi: string,
+  options: { hostPermissions?: string[] } = { hostPermissions: ['<all_urls>'] }
+) => ({
   extension: {
     groupId: 'cookies',
     actionId,
     chromeApi,
     permissions: ['cookies'],
-    hostPermissions: ['<all_urls>'],
+    ...options,
   },
 });
 
@@ -135,7 +139,7 @@ export const cookieContracts = {
     inputSchema: getAllCookieStoresInputSchema,
     outputSchema: getAllCookieStoresOutputSchema,
     annotations: { readOnlyHint: true, idempotentHint: true },
-    _meta: meta('getAllCookieStores', 'chrome.cookies.getAllCookieStores'),
+    _meta: meta('getAllCookieStores', 'chrome.cookies.getAllCookieStores', {}),
   }),
   getPartitionKey: contract({
     name: 'extension_tool_get_partition_key',

@@ -12,6 +12,8 @@ import {
   scriptingContractList,
   userScriptsContracts,
   configureWorldInputSchema,
+  cookieContracts,
+  normalizeExtensionToolMeta,
   registerUserScriptsInputSchema,
   type ClearAlarmInput,
   type ClearAlarmOutput,
@@ -24,6 +26,7 @@ import {
   updateUserScriptsInputSchema,
   userScriptExecuteInputSchema,
   userScriptExecuteOutputSchema,
+  userScriptContracts,
   type UserScriptExecuteOutput,
 } from './index.ts';
 
@@ -111,6 +114,60 @@ describe('raw Chrome API contracts', () => {
         assert.equal(extension.risk, 'high', contract.name);
       }
     }
+  });
+
+  it('keeps extension metadata machine-consumable with documented defaults', () => {
+    const allowedFields = new Set([
+      'actionId',
+      'chromeApi',
+      'groupId',
+      'hostPermissions',
+      'modelFacing',
+      'permissions',
+      'requiresActiveTab',
+      'risk',
+    ]);
+
+    for (const [_group, contracts] of groups) {
+      for (const contract of contracts) {
+        const extension = contract._meta.extension;
+        for (const field of Object.keys(extension)) {
+          assert.ok(
+            allowedFields.has(field),
+            `${contract.name} has unexpected _meta field ${field}`
+          );
+        }
+
+        const normalized = normalizeExtensionToolMeta(extension);
+        assert.equal(typeof normalized.modelFacing, 'boolean', contract.name);
+        assert.ok(['default', 'high'].includes(normalized.risk), contract.name);
+
+        if (!('modelFacing' in extension))
+          assert.equal(normalized.modelFacing, true, contract.name);
+        if (!('risk' in extension)) assert.equal(normalized.risk, 'default', contract.name);
+        if ('requiresActiveTab' in extension)
+          assert.equal(extension.requiresActiveTab, true, contract.name);
+      }
+    }
+  });
+
+  it('does not overstate static host or activeTab requirements in metadata', () => {
+    assert.equal(
+      'hostPermissions' in cookieContracts.getAllCookieStores._meta.extension,
+      false,
+      'cookie store listing does not require static host permissions'
+    );
+    assert.equal(
+      'requiresActiveTab' in userScriptContracts.register._meta.extension,
+      false,
+      'registering user scripts does not require an active tab at call time'
+    );
+    assert.equal(
+      'requiresActiveTab' in userScriptContracts.update._meta.extension,
+      false,
+      'updating user scripts does not require an active tab at call time'
+    );
+    assert.equal(userScriptContracts.execute._meta.extension.requiresActiveTab, true);
   });
 
   it('infers representative handler input and output types from schemas', () => {

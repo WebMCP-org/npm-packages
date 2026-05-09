@@ -173,6 +173,11 @@ const injectionMeta = (actionId: string, chromeApi: string) =>
     requiresActiveTab: true,
     risk: 'high',
   });
+const dynamicScriptMeta = (actionId: string, chromeApi: string) =>
+  baseMeta(actionId, chromeApi, {
+    hostPermissions: ['<all_urls>'],
+    risk: 'high',
+  });
 
 export const userScriptContracts = {
   register: contract({
@@ -182,7 +187,7 @@ export const userScriptContracts = {
     inputSchema: registerUserScriptsInputSchema,
     outputSchema: userScriptMutationOutputSchema,
     annotations: { openWorldHint: true },
-    _meta: injectionMeta('register', 'chrome.userScripts.register'),
+    _meta: dynamicScriptMeta('register', 'chrome.userScripts.register'),
   }),
   getScripts: contract({
     name: 'extension_tool_get_user_scripts',
@@ -200,7 +205,7 @@ export const userScriptContracts = {
     inputSchema: updateUserScriptsInputSchema,
     outputSchema: userScriptMutationOutputSchema,
     annotations: { openWorldHint: true },
-    _meta: injectionMeta('update', 'chrome.userScripts.update'),
+    _meta: dynamicScriptMeta('update', 'chrome.userScripts.update'),
   }),
   unregister: contract({
     name: 'extension_tool_unregister_user_scripts',
