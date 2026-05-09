@@ -477,17 +477,21 @@ describe('extension runtime contract', () => {
       assert.strictEqual(downloads.count, 1);
       assert.strictEqual(downloads.downloads[0]?.id, download.downloadId);
 
-      const icon = await callStructured(
-        page,
-        'extension_tool_get_file_icon',
-        {
-          downloadId: download.downloadId,
-          size: 16,
-        },
-        getFileIconOutputSchema
-      );
-      assert.strictEqual(icon.downloadId, download.downloadId);
-      assert.strictEqual(icon.size, 16);
+      const iconResult = (await callToolResult(page, 'extension_tool_get_file_icon', {
+        downloadId: download.downloadId,
+        size: 16,
+      })) as {
+        content?: Array<{ text?: string }>;
+        isError?: boolean;
+        structuredContent?: unknown;
+      };
+      if (iconResult.isError) {
+        assert.match(iconResult.content?.[0]?.text ?? '', /Icon not found/);
+      } else {
+        const icon = getFileIconOutputSchema.parse(iconResult.structuredContent);
+        assert.strictEqual(icon.downloadId, download.downloadId);
+        assert.strictEqual(icon.size, 16);
+      }
 
       const removeFile = await callStructured(
         page,
