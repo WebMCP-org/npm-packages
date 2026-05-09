@@ -65,6 +65,22 @@ async function callTool(page: Page, name: string, args: Record<string, unknown>)
   );
 }
 
+async function callToolResult(
+  page: Page,
+  name: string,
+  args: Record<string, unknown>
+): Promise<unknown> {
+  return page.evaluate(
+    async ({ toolName, toolArgs }) => {
+      return await window.mcpClient?.callTool({
+        name: toolName,
+        arguments: toolArgs,
+      });
+    },
+    { toolName: name, toolArgs: args }
+  );
+}
+
 async function callToolError(
   page: Page,
   name: string,
@@ -104,7 +120,9 @@ describe('extension runtime contract', () => {
       const page = await openClientPage(context, extensionId);
 
       const initialTools = await listTools(page);
-      assert.deepStrictEqual(initialTools, ['always_fail', 'echo', 'sum']);
+      assert.ok(initialTools.includes('always_fail'));
+      assert.ok(initialTools.includes('echo'));
+      assert.ok(initialTools.includes('sum'));
 
       await page.evaluate(async () => {
         await window.__WEBMCP_E2E__?.resetInvocations?.();
@@ -156,17 +174,101 @@ describe('extension runtime contract', () => {
 
     try {
       const firstPage = await openClientPage(context, extensionId);
-      assert.deepStrictEqual(await listTools(firstPage), ['always_fail', 'echo', 'sum']);
+      assert.ok((await listTools(firstPage)).includes('sum'));
 
       await firstPage.close();
 
       const secondPage = await openClientPage(context, extensionId);
-      assert.deepStrictEqual(await listTools(secondPage), ['always_fail', 'echo', 'sum']);
+      assert.ok((await listTools(secondPage)).includes('sum'));
 
       const echoText = await callTool(secondPage, 'echo', { message: 'reconnected' });
       assert.strictEqual(echoText, 'echo:reconnected');
 
       await secondPage.close();
+    } finally {
+      await context.close();
+    }
+  });
+
+  it('exercises migrated Chrome API contracts with structuredContent in real Chromium', async () => {
+    const { context, extensionId } = await launchExtensionContext();
+
+    try {
+      const page = await openClientPage(context, extensionId);
+      const toolNames = await listTools(page);
+      for (const name of [
+        'extension_tool_get_all_alarms',
+        'extension_tool_get_all_cookie_stores',
+        'extension_tool_search_downloads',
+        'extension_tool_runtime_get_manifest',
+        'extension_tool_contains_permissions',
+        'extension_tool_execute_script',
+      ]) {
+        assert.ok(toolNames.includes(name), `${name} should be registered`);
+      }
+
+      const alarmName = `webmcp-e2e-${Date.now()}`;
+      const alarm = (await callToolResult(page, 'extension_tool_create_alarm', {
+        name: alarmName,
+        delayInMinutes: 1,
+      })) as { structuredContent?: { alarm?: { name?: string } } };
+      assert.strictEqual(alarm.structuredContent?.alarm?.name, alarmName);
+
+      const alarms = (await callToolResult(page, 'extension_tool_get_all_alarms', {})) as {
+        structuredContent?: { count?: number; alarms?: unknown[] };
+      };
+      assert.ok((alarms.structuredContent?.count ?? -1) >= 1);
+      assert.ok(Array.isArray(alarms.structuredContent?.alarms));
+
+      const stores = (await callToolResult(page, 'extension_tool_get_all_cookie_stores', {})) as {
+        structuredContent?: { count?: number; cookieStores?: unknown[] };
+      };
+      assert.ok((stores.structuredContent?.count ?? -1) >= 1);
+      assert.ok(Array.isArray(stores.structuredContent?.cookieStores));
+
+      const downloads = (await callToolResult(page, 'extension_tool_search_downloads', {
+        limit: 1,
+      })) as { structuredContent?: { count?: number; downloads?: unknown[] } };
+      assert.ok((downloads.structuredContent?.count ?? -1) >= 0);
+      assert.ok(Array.isArray(downloads.structuredContent?.downloads));
+
+      const manifest = (await callToolResult(page, 'extension_tool_runtime_get_manifest', {})) as {
+        structuredContent?: { name?: string; manifestVersion?: number };
+      };
+      assert.strictEqual(manifest.structuredContent?.name, 'Extension Runtime Contract');
+      assert.strictEqual(manifest.structuredContent?.manifestVersion, 3);
+
+      const permissions = (await callToolResult(page, 'extension_tool_contains_permissions', {
+        permissions: ['alarms'],
+      })) as { structuredContent?: { hasPermissions?: boolean } };
+      assert.strictEqual(permissions.structuredContent?.hasPermissions, true);
+
+      const targetPage = await context.newPage();
+      await targetPage.goto('https://example.com');
+
+      const css = (await callToolResult(page, 'extension_tool_insert_css', {
+        css: 'body { outline: 1px solid transparent; }',
+      })) as {
+        structuredContent?: { ok?: boolean };
+      };
+      assert.strictEqual(css.structuredContent?.ok, true);
+
+      const script = (await callToolResult(page, 'extension_tool_execute_script', {
+        code: 'document.title',
+      })) as {
+        structuredContent?: { injectionCount?: number; results?: Array<{ result?: unknown }> };
+      };
+      assert.strictEqual(script.structuredContent?.injectionCount, 1);
+
+      const clear = (await callToolResult(page, 'extension_tool_clear_alarm', {
+        name: alarmName,
+      })) as { structuredContent?: { cleared?: boolean } };
+      assert.strictEqual(clear.structuredContent?.cleared, true);
+
+      const error = (await callToolResult(page, 'extension_tool_create_alarm', {})) as {
+        isError?: boolean;
+      };
+      assert.strictEqual(error.isError, true);
     } finally {
       await context.close();
     }

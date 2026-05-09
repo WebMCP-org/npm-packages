@@ -1,6 +1,10 @@
 import type { McpServer } from '@mcp-b/webmcp-ts-sdk';
-import { z } from 'zod';
 import { type ApiAvailability, BaseApiTools } from '../BaseApiTools';
+import {
+  permissionContracts,
+  type HostAccessRequestInput,
+  type PermissionsObjectInput,
+} from '../contracts/permissions';
 
 export interface PermissionsApiToolsOptions {
   request?: boolean;
@@ -14,433 +18,128 @@ export interface PermissionsApiToolsOptions {
 export class PermissionsApiTools extends BaseApiTools<PermissionsApiToolsOptions> {
   protected apiName = 'Permissions';
 
-  constructor(server: McpServer, options: PermissionsApiToolsOptions = {}) {
+  constructor(
+    server: McpServer,
+    options: PermissionsApiToolsOptions = {
+      request: false,
+      remove: false,
+      addHostAccessRequest: false,
+      removeHostAccessRequest: false,
+    }
+  ) {
     super(server, options);
   }
 
   checkAvailability(): ApiAvailability {
-    try {
-      // Check if API exists
-      if (!chrome.permissions) {
-        return {
-          available: false,
-          message: 'chrome.permissions API is not defined',
-          details: 'This extension needs the "permissions" permission in its manifest.json',
-        };
-      }
-
-      // Test a basic method
-      if (typeof chrome.permissions.getAll !== 'function') {
-        return {
-          available: false,
-          message: 'chrome.permissions.getAll is not available',
-          details:
-            'The permissions API appears to be partially available. Check manifest permissions.',
-        };
-      }
-
-      // Try to actually use the API
-      chrome.permissions.getAll((_permissions) => {
-        if (chrome.runtime.lastError) {
-          throw new Error(chrome.runtime.lastError.message);
-        }
-      });
-
-      return {
-        available: true,
-        message: 'Permissions API is fully available',
-      };
-    } catch (error) {
+    if (!chrome.permissions?.getAll) {
       return {
         available: false,
-        message: 'Failed to access chrome.permissions API',
-        details: error instanceof Error ? error.message : 'Unknown error occurred',
+        message: 'chrome.permissions API is not defined',
+        details: 'This extension needs the "permissions" permission',
       };
     }
+    return { available: true, message: 'Permissions API is fully available' };
   }
 
   registerTools(): void {
-    if (this.shouldRegisterTool('request')) {
-      this.registerRequest();
-    }
-
-    if (this.shouldRegisterTool('contains')) {
-      this.registerContains();
-    }
-
-    if (this.shouldRegisterTool('getAll')) {
-      this.registerGetAll();
-    }
-
-    if (this.shouldRegisterTool('remove')) {
-      this.registerRemove();
-    }
-
-    if (this.shouldRegisterTool('addHostAccessRequest')) {
-      this.registerAddHostAccessRequest();
-    }
-
-    if (this.shouldRegisterTool('removeHostAccessRequest')) {
-      this.registerRemoveHostAccessRequest();
-    }
+    if (this.shouldRegisterTool('request'))
+      this.registerContractTool(permissionContracts.request, (input) => this.request(input));
+    if (this.shouldRegisterTool('contains'))
+      this.registerContractTool(permissionContracts.contains, (input) => this.contains(input));
+    if (this.shouldRegisterTool('getAll'))
+      this.registerContractTool(permissionContracts.getAll, () => this.getAll());
+    if (this.shouldRegisterTool('remove'))
+      this.registerContractTool(permissionContracts.remove, (input) => this.remove(input));
+    if (this.shouldRegisterTool('addHostAccessRequest') && chrome.permissions.addHostAccessRequest)
+      this.registerContractTool(permissionContracts.addHostAccessRequest, (input) =>
+        this.addHostAccessRequest(input)
+      );
+    if (
+      this.shouldRegisterTool('removeHostAccessRequest') &&
+      chrome.permissions.removeHostAccessRequest
+    )
+      this.registerContractTool(permissionContracts.removeHostAccessRequest, (input) =>
+        this.removeHostAccessRequest(input)
+      );
   }
 
-  private registerRequest(): void {
-    this.server.registerTool(
-      'extension_tool_request_permissions',
-      {
-        description:
-          'Request access to specified permissions, displaying a prompt to the user if necessary',
-        inputSchema: {
-          permissions: z
-            .array(z.string())
-            .optional()
-            .describe('List of named permissions to request'),
-          origins: z
-            .array(z.string())
-            .optional()
-            .describe('List of host permissions to request (e.g., ["https://www.google.com/"])'),
-        },
-      },
-      async ({ permissions, origins }) => {
-        try {
-          // Validate that at least one permission type is provided
-          if (!permissions && !origins) {
-            return this.formatError(
-              'Either permissions or origins must be specified to request permissions'
-            );
-          }
-
-          // Build permissions object
-          const permissionsRequest: chrome.permissions.Permissions = {};
-
-          if (permissions && permissions.length > 0) {
-            permissionsRequest.permissions = permissions as chrome.runtime.ManifestPermissions[];
-          }
-
-          if (origins && origins.length > 0) {
-            permissionsRequest.origins = origins;
-          }
-
-          // Request the permissions
-          const granted = await new Promise<boolean>((resolve, reject) => {
-            chrome.permissions.request(permissionsRequest, (granted) => {
-              if (chrome.runtime.lastError) {
-                reject(new Error(chrome.runtime.lastError.message));
-              } else {
-                resolve(granted);
-              }
-            });
-          });
-
-          if (granted) {
-            return this.formatSuccess('Permissions granted successfully', {
-              permissions: permissions || [],
-              origins: origins || [],
-            });
-          }
-          return this.formatSuccess('Permissions request denied by user', {
-            permissions: permissions || [],
-            origins: origins || [],
-          });
-        } catch (error) {
-          return this.formatError(error);
-        }
-      }
-    );
+  private toPermissions(input: PermissionsObjectInput): chrome.permissions.Permissions {
+    return {
+      ...(input.permissions?.length
+        ? { permissions: input.permissions as chrome.runtime.ManifestPermissions[] }
+        : {}),
+      ...(input.origins?.length ? { origins: input.origins } : {}),
+    };
   }
 
-  private registerContains(): void {
-    this.server.registerTool(
-      'extension_tool_contains_permissions',
-      {
-        description: 'Check if the extension has the specified permissions',
-        inputSchema: {
-          permissions: z
-            .array(z.string())
-            .optional()
-            .describe('List of named permissions to check'),
-          origins: z
-            .array(z.string())
-            .optional()
-            .describe('List of host permissions to check (e.g., ["https://www.google.com/"])'),
-        },
-      },
-      async ({ permissions, origins }) => {
-        try {
-          // Validate that at least one permission type is provided
-          if (!permissions && !origins) {
-            return this.formatError(
-              'Either permissions or origins must be specified to check permissions'
-            );
-          }
-
-          // Build permissions object
-          const permissionsCheck: chrome.permissions.Permissions = {};
-
-          if (permissions && permissions.length > 0) {
-            permissionsCheck.permissions = permissions as chrome.runtime.ManifestPermissions[];
-          }
-
-          if (origins && origins.length > 0) {
-            permissionsCheck.origins = origins;
-          }
-
-          // Check the permissions
-          const hasPermissions = await new Promise<boolean>((resolve, reject) => {
-            chrome.permissions.contains(permissionsCheck, (result) => {
-              if (chrome.runtime.lastError) {
-                reject(new Error(chrome.runtime.lastError.message));
-              } else {
-                resolve(result);
-              }
-            });
-          });
-
-          return this.formatJson({
-            hasPermissions,
-            checkedPermissions: permissions || [],
-            checkedOrigins: origins || [],
-          });
-        } catch (error) {
-          return this.formatError(error);
-        }
-      }
-    );
+  private async request(input: PermissionsObjectInput) {
+    const granted = await new Promise<boolean>((resolve, reject) => {
+      chrome.permissions.request(this.toPermissions(input), (value) =>
+        chrome.runtime.lastError
+          ? reject(new Error(chrome.runtime.lastError.message))
+          : resolve(value)
+      );
+    });
+    return { ok: granted, message: granted ? 'Permissions granted' : 'Permissions denied' };
   }
 
-  private registerGetAll(): void {
-    this.server.registerTool(
-      'extension_tool_get_all_permissions',
-      {
-        description: "Get the extension's current set of permissions",
-        inputSchema: {},
-      },
-      async () => {
-        try {
-          const allPermissions = await new Promise<chrome.permissions.Permissions>(
-            (resolve, reject) => {
-              chrome.permissions.getAll((permissions) => {
-                if (chrome.runtime.lastError) {
-                  reject(new Error(chrome.runtime.lastError.message));
-                } else {
-                  resolve(permissions);
-                }
-              });
-            }
-          );
-
-          return this.formatJson({
-            permissions: allPermissions.permissions || [],
-            origins: allPermissions.origins || [],
-            permissionsCount: (allPermissions.permissions || []).length,
-            originsCount: (allPermissions.origins || []).length,
-          });
-        } catch (error) {
-          return this.formatError(error);
-        }
-      }
-    );
+  private async contains(input: PermissionsObjectInput) {
+    const hasPermissions = await new Promise<boolean>((resolve, reject) => {
+      chrome.permissions.contains(this.toPermissions(input), (value) =>
+        chrome.runtime.lastError
+          ? reject(new Error(chrome.runtime.lastError.message))
+          : resolve(value)
+      );
+    });
+    return {
+      hasPermissions,
+      checkedPermissions: input.permissions ?? [],
+      checkedOrigins: input.origins ?? [],
+    };
   }
 
-  private registerRemove(): void {
-    this.server.registerTool(
-      'extension_tool_remove_permissions',
-      {
-        description: 'Remove access to the specified permissions',
-        inputSchema: {
-          permissions: z
-            .array(z.string())
-            .optional()
-            .describe('List of named permissions to remove'),
-          origins: z
-            .array(z.string())
-            .optional()
-            .describe('List of host permissions to remove (e.g., ["https://www.google.com/"])'),
-        },
-      },
-      async ({ permissions, origins }) => {
-        try {
-          // Validate that at least one permission type is provided
-          if (!permissions && !origins) {
-            return this.formatError(
-              'Either permissions or origins must be specified to remove permissions'
-            );
-          }
-
-          // Build permissions object
-          const permissionsRemove: chrome.permissions.Permissions = {};
-
-          if (permissions && permissions.length > 0) {
-            permissionsRemove.permissions = permissions as chrome.runtime.ManifestPermissions[];
-          }
-
-          if (origins && origins.length > 0) {
-            permissionsRemove.origins = origins;
-          }
-
-          // Remove the permissions
-          const removed = await new Promise<boolean>((resolve, reject) => {
-            chrome.permissions.remove(permissionsRemove, (removed) => {
-              if (chrome.runtime.lastError) {
-                reject(new Error(chrome.runtime.lastError.message));
-              } else {
-                resolve(removed);
-              }
-            });
-          });
-
-          if (removed) {
-            return this.formatSuccess('Permissions removed successfully', {
-              permissions: permissions || [],
-              origins: origins || [],
-            });
-          }
-          return this.formatSuccess(
-            'Permissions could not be removed (may be required permissions)',
-            {
-              permissions: permissions || [],
-              origins: origins || [],
-            }
-          );
-        } catch (error) {
-          return this.formatError(error);
-        }
-      }
-    );
+  private async getAll() {
+    const permissions = await new Promise<chrome.permissions.Permissions>((resolve, reject) => {
+      chrome.permissions.getAll((value) =>
+        chrome.runtime.lastError
+          ? reject(new Error(chrome.runtime.lastError.message))
+          : resolve(value)
+      );
+    });
+    return {
+      permissions: permissions.permissions ?? [],
+      origins: permissions.origins ?? [],
+      permissionsCount: permissions.permissions?.length ?? 0,
+      originsCount: permissions.origins?.length ?? 0,
+    };
   }
 
-  private registerAddHostAccessRequest(): void {
-    this.server.registerTool(
-      'extension_tool_add_host_access_request',
-      {
-        description: 'Add a host access request that will be shown to the user',
-        inputSchema: {
-          tabId: z
-            .number()
-            .optional()
-            .describe('The id of the tab where host access requests can be shown'),
-          documentId: z
-            .string()
-            .optional()
-            .describe('The id of a document where host access requests can be shown'),
-          pattern: z
-            .string()
-            .optional()
-            .describe('The URL pattern where host access requests can be shown'),
-        },
-      },
-      async ({ tabId, documentId, pattern }) => {
-        try {
-          // Validate that either tabId or documentId is provided
-          if (tabId === undefined && documentId === undefined) {
-            return this.formatError(
-              'Either tabId or documentId must be specified to add host access request'
-            );
-          }
-
-          // Build request object
-          const request: any = {};
-
-          if (tabId !== undefined) {
-            request.tabId = tabId;
-          }
-
-          if (documentId !== undefined) {
-            request.documentId = documentId;
-          }
-
-          if (pattern !== undefined) {
-            request.pattern = pattern;
-          }
-
-          // Add the host access request
-          await new Promise<void>((resolve, reject) => {
-            chrome.permissions.addHostAccessRequest(request, () => {
-              if (chrome.runtime.lastError) {
-                reject(new Error(chrome.runtime.lastError.message));
-              } else {
-                resolve();
-              }
-            });
-          });
-
-          return this.formatSuccess('Host access request added successfully', {
-            tabId,
-            documentId,
-            pattern,
-          });
-        } catch (error) {
-          return this.formatError(error);
-        }
-      }
-    );
+  private async remove(input: PermissionsObjectInput) {
+    const removed = await new Promise<boolean>((resolve, reject) => {
+      chrome.permissions.remove(this.toPermissions(input), (value) =>
+        chrome.runtime.lastError
+          ? reject(new Error(chrome.runtime.lastError.message))
+          : resolve(value)
+      );
+    });
+    return { ok: removed, message: removed ? 'Permissions removed' : 'Permissions not removed' };
   }
 
-  private registerRemoveHostAccessRequest(): void {
-    this.server.registerTool(
-      'extension_tool_remove_host_access_request',
-      {
-        description: 'Remove a host access request',
-        inputSchema: {
-          tabId: z
-            .number()
-            .optional()
-            .describe('The id of the tab where host access request will be removed'),
-          documentId: z
-            .string()
-            .optional()
-            .describe('The id of a document where host access request will be removed'),
-          pattern: z
-            .string()
-            .optional()
-            .describe('The URL pattern where host access request will be removed'),
-        },
-      },
-      async ({ tabId, documentId, pattern }) => {
-        try {
-          // Validate that either tabId or documentId is provided
-          if (tabId === undefined && documentId === undefined) {
-            return this.formatError(
-              'Either tabId or documentId must be specified to remove host access request'
-            );
-          }
+  private async addHostAccessRequest(input: HostAccessRequestInput) {
+    await new Promise<void>((resolve, reject) => {
+      chrome.permissions.addHostAccessRequest(input, () =>
+        chrome.runtime.lastError ? reject(new Error(chrome.runtime.lastError.message)) : resolve()
+      );
+    });
+    return { ok: true, message: 'Host access request added' };
+  }
 
-          // Build request object
-          const request: any = {};
-
-          if (tabId !== undefined) {
-            request.tabId = tabId;
-          }
-
-          if (documentId !== undefined) {
-            request.documentId = documentId;
-          }
-
-          if (pattern !== undefined) {
-            request.pattern = pattern;
-          }
-
-          // Remove the host access request
-          await new Promise<void>((resolve, reject) => {
-            chrome.permissions.removeHostAccessRequest(request, () => {
-              if (chrome.runtime.lastError) {
-                reject(new Error(chrome.runtime.lastError.message));
-              } else {
-                resolve();
-              }
-            });
-          });
-
-          return this.formatSuccess('Host access request removed successfully', {
-            tabId,
-            documentId,
-            pattern,
-          });
-        } catch (error) {
-          return this.formatError(error);
-        }
-      }
-    );
+  private async removeHostAccessRequest(input: HostAccessRequestInput) {
+    await new Promise<void>((resolve, reject) => {
+      chrome.permissions.removeHostAccessRequest(input, () =>
+        chrome.runtime.lastError ? reject(new Error(chrome.runtime.lastError.message)) : resolve()
+      );
+    });
+    return { ok: true, message: 'Host access request removed' };
   }
 }

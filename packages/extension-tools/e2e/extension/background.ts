@@ -3,6 +3,14 @@
 import { installServerRuntimeContract } from '../../../../e2e/runtime-contract/server-contract.js';
 import { ExtensionServerTransport } from '../../../transports/src/index.ts';
 import { McpServer } from '../../../webmcp-ts-sdk/src/index.ts';
+import { NoOpJsonSchemaValidator } from '../../../webmcp-ts-sdk/src/no-op-validator.ts';
+import { AlarmsApiTools } from '../../src/chrome-apis/AlarmsApiTools.ts';
+import { CookiesApiTools } from '../../src/chrome-apis/CookiesApiTools.ts';
+import { DownloadsApiTools } from '../../src/chrome-apis/DownloadsApiTools.ts';
+import { PermissionsApiTools } from '../../src/chrome-apis/PermissionsApiTools.ts';
+import { RuntimeApiTools } from '../../src/chrome-apis/RuntimeApiTools.ts';
+import { ScriptingApiTools } from '../../src/chrome-apis/ScriptingApiTools.ts';
+import { UserScriptsApiTools } from '../../src/chrome-apis/UserScriptsApiTools.ts';
 
 const debugState = {
   events: [] as string[],
@@ -20,17 +28,58 @@ recordDebugEvent('background:loaded');
 let server: McpServer | null = null;
 let runtimeContract: ReturnType<typeof installServerRuntimeContract> | null = null;
 let startupError: string | null = null;
+let startupStep = 'initializing';
 
 try {
-  server = new McpServer({
-    name: 'extension-runtime-contract',
-    version: '1.0.0',
-  });
+  server = new McpServer(
+    {
+      name: 'extension-runtime-contract',
+      version: '1.0.0',
+    },
+    {
+      jsonSchemaValidator: new NoOpJsonSchemaValidator(),
+    }
+  );
   recordDebugEvent('server:created');
   runtimeContract = installServerRuntimeContract(server, { runtimeLabel: 'extension' });
   recordDebugEvent('runtime-contract:installed');
+  startupStep = 'scripting';
+  new ScriptingApiTools(server, { executeUserScript: false }).register();
+  startupStep = 'userScripts';
+  new UserScriptsApiTools(server, { execute: false }).register();
+  startupStep = 'cookies';
+  new CookiesApiTools(server).register();
+  startupStep = 'downloads';
+  new DownloadsApiTools(server, {
+    acceptDanger: false,
+    download: false,
+    open: false,
+    removeFile: false,
+    setUiOptions: false,
+    show: false,
+    showDefaultFolder: false,
+  }).register();
+  startupStep = 'alarms';
+  new AlarmsApiTools(server).register();
+  startupStep = 'runtime';
+  new RuntimeApiTools(server, {
+    connect: false,
+    connectNative: false,
+    openOptionsPage: false,
+    reload: false,
+    restart: false,
+    restartAfterDelay: false,
+    sendMessage: false,
+    sendNativeMessage: false,
+    setUninstallURL: false,
+  }).register();
+  startupStep = 'permissions';
+  new PermissionsApiTools(server).register();
+  startupStep = 'done';
+  recordDebugEvent('chrome-api-contracts:installed');
 } catch (error) {
-  startupError = error instanceof Error ? error.message : String(error);
+  const message = error instanceof Error ? (error.stack ?? error.message) : String(error);
+  startupError = `${startupStep}: ${message}`;
   recordDebugEvent(`startup:error:${startupError}`);
 }
 
