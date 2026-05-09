@@ -11,6 +11,8 @@ import {
   runtimeContractList,
   scriptingContractList,
   userScriptsContracts,
+  configureWorldInputSchema,
+  registerUserScriptsInputSchema,
   type ClearAlarmInput,
   type ClearAlarmOutput,
   type ContainsPermissionsOutput,
@@ -19,6 +21,9 @@ import {
   type GetAllCookiesOutput,
   type RuntimeGetManifestOutput,
   type SearchDownloadsInput,
+  updateUserScriptsInputSchema,
+  userScriptExecuteInputSchema,
+  userScriptExecuteOutputSchema,
   type UserScriptExecuteOutput,
 } from './index.ts';
 
@@ -110,5 +115,81 @@ describe('raw Chrome API contracts', () => {
 
   it('infers representative handler input and output types from schemas', () => {
     assert.ok(true);
+  });
+
+  it('models current userScripts API validation constraints', () => {
+    assert.equal(
+      registerUserScriptsInputSchema.safeParse({
+        scripts: [{ id: 'script-1', matches: ['*://example.com/*'] }],
+      }).success,
+      false,
+      'register requires non-empty js sources'
+    );
+
+    assert.equal(
+      registerUserScriptsInputSchema.safeParse({
+        scripts: [
+          {
+            id: '_reserved',
+            matches: ['*://example.com/*'],
+            js: [{ code: '1' }],
+          },
+        ],
+      }).success,
+      false,
+      'registered script IDs cannot start with underscore'
+    );
+
+    assert.equal(
+      updateUserScriptsInputSchema.safeParse({
+        scripts: [{ id: '_reserved' }],
+      }).success,
+      false,
+      'updated script IDs cannot start with underscore'
+    );
+
+    assert.equal(
+      configureWorldInputSchema.safeParse({ worldId: '_reserved' }).success,
+      false,
+      'world IDs cannot start with underscore'
+    );
+
+    assert.equal(
+      userScriptExecuteInputSchema.safeParse({
+        target: { tabId: 1, frameIds: [0], allFrames: true },
+        js: [{ code: 'location.href' }],
+      }).success,
+      false,
+      'allFrames cannot be combined with frameIds'
+    );
+
+    assert.equal(
+      userScriptExecuteInputSchema.safeParse({
+        target: { tabId: 1, frameIds: [0], documentIds: ['document'] },
+        js: [{ code: 'location.href' }],
+      }).success,
+      false,
+      'documentIds cannot be combined with frameIds'
+    );
+
+    assert.equal(
+      userScriptExecuteInputSchema.safeParse({
+        target: { tabId: 1 },
+        js: [{ code: 'location.href' }],
+        world: 'MAIN',
+        worldId: 'world',
+      }).success,
+      false,
+      'worldId cannot be combined with MAIN world'
+    );
+
+    assert.equal(
+      userScriptExecuteOutputSchema.safeParse({
+        injectionCount: 1,
+        results: [{ frameId: 0 }],
+      }).success,
+      false,
+      'userScripts injection results require documentId'
+    );
   });
 });

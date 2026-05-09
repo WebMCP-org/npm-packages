@@ -77,13 +77,7 @@ export class UserScriptsApiTools extends BaseApiTools<UserScriptsApiToolsOptions
   }
 
   private async getScriptsRaw(input: GetUserScriptsInput) {
-    return new Promise<chrome.userScripts.RegisteredUserScript[]>((resolve, reject) => {
-      chrome.userScripts.getScripts(input, (scripts) =>
-        chrome.runtime.lastError
-          ? reject(new Error(chrome.runtime.lastError.message))
-          : resolve(scripts)
-      );
-    });
+    return chrome.userScripts.getScripts(input);
   }
 
   private toScript(script: chrome.userScripts.RegisteredUserScript) {
@@ -102,11 +96,7 @@ export class UserScriptsApiTools extends BaseApiTools<UserScriptsApiToolsOptions
   }
 
   private async registerScripts({ scripts }: RegisterUserScriptsInput) {
-    await new Promise<void>((resolve, reject) => {
-      chrome.userScripts.register(scripts, () =>
-        chrome.runtime.lastError ? reject(new Error(chrome.runtime.lastError.message)) : resolve()
-      );
-    });
+    await chrome.userScripts.register(scripts);
     return { count: scripts.length, scriptIds: scripts.map((script) => script.id) };
   }
 
@@ -116,57 +106,35 @@ export class UserScriptsApiTools extends BaseApiTools<UserScriptsApiToolsOptions
   }
 
   private async updateScripts({ scripts }: UpdateUserScriptsInput) {
-    await new Promise<void>((resolve, reject) => {
-      chrome.userScripts.update(scripts, () =>
-        chrome.runtime.lastError ? reject(new Error(chrome.runtime.lastError.message)) : resolve()
-      );
-    });
+    await chrome.userScripts.update(scripts);
     return { count: scripts.length, scriptIds: scripts.map((script) => script.id) };
   }
 
   private async unregisterScripts(input: UnregisterUserScriptsInput) {
     const before = await this.getScriptsRaw(input);
-    await new Promise<void>((resolve, reject) => {
-      chrome.userScripts.unregister(input, () =>
-        chrome.runtime.lastError ? reject(new Error(chrome.runtime.lastError.message)) : resolve()
-      );
-    });
+    await chrome.userScripts.unregister(input);
     return { count: before.length, scriptIds: before.map((script) => script.id) };
   }
 
   private async configureWorld(input: ConfigureWorldInput) {
-    await new Promise<void>((resolve, reject) => {
-      chrome.userScripts.configureWorld(input, () =>
-        chrome.runtime.lastError ? reject(new Error(chrome.runtime.lastError.message)) : resolve()
-      );
-    });
-    return { worldId: input.worldId ?? '', csp: input.csp, messaging: input.messaging };
+    await chrome.userScripts.configureWorld(input);
+    return { worldId: input.worldId, csp: input.csp, messaging: input.messaging };
   }
 
   private async getWorldConfigurations() {
-    const worlds = await new Promise<chrome.userScripts.WorldProperties[]>((resolve, reject) => {
-      chrome.userScripts.getWorldConfigurations((items) =>
-        chrome.runtime.lastError
-          ? reject(new Error(chrome.runtime.lastError.message))
-          : resolve(items)
-      );
-    });
+    const worlds = await chrome.userScripts.getWorldConfigurations();
     return {
       count: worlds.length,
       worlds: worlds.map((world) => ({
-        worldId: world.worldId ?? '',
+        worldId: world.worldId,
         csp: world.csp,
         messaging: world.messaging,
       })),
     };
   }
 
-  private async resetWorldConfiguration({ worldId = '' }: ResetWorldConfigurationInput) {
-    await new Promise<void>((resolve, reject) => {
-      chrome.userScripts.resetWorldConfiguration(worldId, () =>
-        chrome.runtime.lastError ? reject(new Error(chrome.runtime.lastError.message)) : resolve()
-      );
-    });
+  private async resetWorldConfiguration({ worldId }: ResetWorldConfigurationInput) {
+    await chrome.userScripts.resetWorldConfiguration(worldId);
     return { ok: true, message: `World configuration reset for ${worldId || 'default'}` };
   }
 

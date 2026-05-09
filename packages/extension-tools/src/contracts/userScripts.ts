@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { contract, emptyInputSchema, messageResultSchema } from './shared';
-import { executeScriptOutputSchema } from './scripting';
 
 const scriptSourceSchema = z
   .object({ code: z.string().optional(), file: z.string().optional() })
@@ -8,25 +7,47 @@ const scriptSourceSchema = z
     message: 'Exactly one of code or file must be specified for each script source',
   });
 
-export const userScriptSchema = z.object({
-  id: z.string(),
+const scriptSourcesSchema = z.array(scriptSourceSchema).nonempty();
+const userScriptIdSchema = z
+  .string()
+  .refine((id) => !id.startsWith('_'), 'Script ID cannot start with underscore');
+const worldIdSchema = z
+  .string()
+  .refine((worldId) => !worldId.startsWith('_'), 'World ID cannot start with underscore');
+const executionWorldSchema = z.enum(['MAIN', 'USER_SCRIPT']);
+const runAtSchema = z.enum(['document_start', 'document_end', 'document_idle']);
+
+function ensureWorldIdAllowed(input: { world?: string; worldId?: string }) {
+  return input.worldId === undefined || input.world === undefined || input.world === 'USER_SCRIPT';
+}
+
+const userScriptObjectSchema = z.object({
+  id: userScriptIdSchema,
   matches: z.array(z.string()).optional(),
-  js: z.array(scriptSourceSchema).optional(),
+  js: scriptSourcesSchema.optional(),
   allFrames: z.boolean().optional(),
   excludeMatches: z.array(z.string()).optional(),
   includeGlobs: z.array(z.string()).optional(),
   excludeGlobs: z.array(z.string()).optional(),
-  runAt: z.enum(['document_start', 'document_end', 'document_idle']).optional(),
-  world: z.enum(['MAIN', 'USER_SCRIPT']).optional(),
-  worldId: z.string().optional(),
+  runAt: runAtSchema.optional(),
+  world: executionWorldSchema.optional(),
+  worldId: worldIdSchema.optional(),
+});
+
+export const userScriptSchema = userScriptObjectSchema.refine(ensureWorldIdAllowed, {
+  message: 'worldId is only valid when world is omitted or USER_SCRIPT',
 });
 
 export const registerUserScriptsInputSchema = z.object({
   scripts: z.array(
-    userScriptSchema.extend({
-      matches: z.array(z.string()),
-      id: z.string().refine((id) => !id.startsWith('_'), 'Script ID cannot start with underscore'),
-    })
+    userScriptObjectSchema
+      .extend({
+        matches: z.array(z.string()).nonempty(),
+        js: scriptSourcesSchema,
+      })
+      .refine(ensureWorldIdAllowed, {
+        message: 'worldId is only valid when world is omitted or USER_SCRIPT',
+      })
   ),
 });
 export const updateUserScriptsInputSchema = z.object({ scripts: z.array(userScriptSchema) });
@@ -70,10 +91,10 @@ export type UnregisterUserScriptsOutput = z.infer<typeof unregisterUserScriptsOu
 export const configureWorldInputSchema = z.object({
   csp: z.string().optional(),
   messaging: z.boolean().optional(),
-  worldId: z.string().optional(),
+  worldId: worldIdSchema.optional(),
 });
 export const worldConfigurationOutputSchema = z.object({
-  worldId: z.string(),
+  worldId: z.string().optional(),
   csp: z.string().optional(),
   messaging: z.boolean().optional(),
 });
@@ -87,37 +108,71 @@ export const getWorldConfigurationsOutputSchema = z.object({
 export type GetWorldConfigurationsInput = z.infer<typeof emptyInputSchema>;
 export type GetWorldConfigurationsOutput = z.infer<typeof getWorldConfigurationsOutputSchema>;
 
-export const resetWorldConfigurationInputSchema = z.object({ worldId: z.string().optional() });
+export const resetWorldConfigurationInputSchema = z.object({ worldId: worldIdSchema.optional() });
 export type ResetWorldConfigurationInput = z.infer<typeof resetWorldConfigurationInputSchema>;
 
-export const userScriptExecuteInputSchema = z.object({
-  target: z.object({
+const injectionTargetSchema = z
+  .object({
     tabId: z.number(),
     frameIds: z.array(z.number()).optional(),
     documentIds: z.array(z.string()).optional(),
     allFrames: z.boolean().optional(),
-  }),
-  js: z.array(scriptSourceSchema),
-  world: z.enum(['MAIN', 'USER_SCRIPT']).optional(),
-  worldId: z.string().optional(),
-  injectImmediately: z.boolean().optional(),
+  })
+  .refine((target) => !(target.allFrames === true && target.frameIds !== undefined), {
+    message: 'allFrames cannot be true when frameIds is specified',
+  })
+  .refine((target) => !(target.documentIds !== undefined && target.frameIds !== undefined), {
+    message: 'documentIds cannot be specified with frameIds',
+  });
+
+export const userScriptExecuteInputSchema = z
+  .object({
+    target: injectionTargetSchema,
+    js: scriptSourcesSchema,
+    world: executionWorldSchema.optional(),
+    worldId: worldIdSchema.optional(),
+    injectImmediately: z.boolean().optional(),
+  })
+  .refine(ensureWorldIdAllowed, {
+    message: 'worldId is only valid when world is omitted or USER_SCRIPT',
+  });
+export const userScriptInjectionResultSchema = z.object({
+  documentId: z.string(),
+  frameId: z.number(),
+  result: z.unknown().optional(),
+  error: z.string().optional(),
 });
-export const userScriptExecuteOutputSchema = executeScriptOutputSchema;
+export const userScriptExecuteOutputSchema = z.object({
+  injectionCount: z.number(),
+  results: z.array(userScriptInjectionResultSchema),
+});
 export type UserScriptExecuteInput = z.infer<typeof userScriptExecuteInputSchema>;
 export type UserScriptExecuteOutput = z.infer<typeof userScriptExecuteOutputSchema>;
 
-const meta = (actionId: string, chromeApi: string, modelFacing = true) => ({
+const baseMeta = (
+  actionId: string,
+  chromeApi: string,
+  options: {
+    hostPermissions?: string[];
+    requiresActiveTab?: true;
+    risk?: 'high';
+    modelFacing?: false;
+  } = {}
+) => ({
   extension: {
     groupId: 'userScripts',
     actionId,
     chromeApi,
     permissions: ['userScripts'],
-    hostPermissions: ['<all_urls>'],
-    requiresActiveTab: true as const,
-    risk: 'high' as const,
-    ...(modelFacing ? {} : { modelFacing: false as const }),
+    ...options,
   },
 });
+const injectionMeta = (actionId: string, chromeApi: string) =>
+  baseMeta(actionId, chromeApi, {
+    hostPermissions: ['<all_urls>'],
+    requiresActiveTab: true,
+    risk: 'high',
+  });
 
 export const userScriptContracts = {
   register: contract({
@@ -127,7 +182,7 @@ export const userScriptContracts = {
     inputSchema: registerUserScriptsInputSchema,
     outputSchema: userScriptMutationOutputSchema,
     annotations: { openWorldHint: true },
-    _meta: meta('register', 'chrome.userScripts.register'),
+    _meta: injectionMeta('register', 'chrome.userScripts.register'),
   }),
   getScripts: contract({
     name: 'extension_tool_get_user_scripts',
@@ -136,7 +191,7 @@ export const userScriptContracts = {
     inputSchema: userScriptFilterInputSchema,
     outputSchema: getUserScriptsOutputSchema,
     annotations: { readOnlyHint: true, idempotentHint: true },
-    _meta: meta('getScripts', 'chrome.userScripts.getScripts'),
+    _meta: baseMeta('getScripts', 'chrome.userScripts.getScripts'),
   }),
   update: contract({
     name: 'extension_tool_update_user_scripts',
@@ -145,7 +200,7 @@ export const userScriptContracts = {
     inputSchema: updateUserScriptsInputSchema,
     outputSchema: userScriptMutationOutputSchema,
     annotations: { openWorldHint: true },
-    _meta: meta('update', 'chrome.userScripts.update'),
+    _meta: injectionMeta('update', 'chrome.userScripts.update'),
   }),
   unregister: contract({
     name: 'extension_tool_unregister_user_scripts',
@@ -154,7 +209,7 @@ export const userScriptContracts = {
     inputSchema: userScriptFilterInputSchema,
     outputSchema: unregisterUserScriptsOutputSchema,
     annotations: { destructiveHint: true, idempotentHint: true },
-    _meta: meta('unregister', 'chrome.userScripts.unregister'),
+    _meta: baseMeta('unregister', 'chrome.userScripts.unregister'),
   }),
   configureWorld: contract({
     name: 'extension_tool_configure_user_script_world',
@@ -163,7 +218,7 @@ export const userScriptContracts = {
     inputSchema: configureWorldInputSchema,
     outputSchema: worldConfigurationOutputSchema,
     annotations: { idempotentHint: true },
-    _meta: meta('configureWorld', 'chrome.userScripts.configureWorld'),
+    _meta: baseMeta('configureWorld', 'chrome.userScripts.configureWorld', { risk: 'high' }),
   }),
   getWorldConfigurations: contract({
     name: 'extension_tool_get_world_configurations',
@@ -172,7 +227,7 @@ export const userScriptContracts = {
     inputSchema: emptyInputSchema,
     outputSchema: getWorldConfigurationsOutputSchema,
     annotations: { readOnlyHint: true, idempotentHint: true },
-    _meta: meta('getWorldConfigurations', 'chrome.userScripts.getWorldConfigurations'),
+    _meta: baseMeta('getWorldConfigurations', 'chrome.userScripts.getWorldConfigurations'),
   }),
   resetWorldConfiguration: contract({
     name: 'extension_tool_reset_world_configuration',
@@ -181,7 +236,9 @@ export const userScriptContracts = {
     inputSchema: resetWorldConfigurationInputSchema,
     outputSchema: messageResultSchema,
     annotations: { idempotentHint: true },
-    _meta: meta('resetWorldConfiguration', 'chrome.userScripts.resetWorldConfiguration'),
+    _meta: baseMeta('resetWorldConfiguration', 'chrome.userScripts.resetWorldConfiguration', {
+      risk: 'high',
+    }),
   }),
   execute: contract({
     name: 'extension_tool_execute_user_script',
@@ -190,7 +247,7 @@ export const userScriptContracts = {
     inputSchema: userScriptExecuteInputSchema,
     outputSchema: userScriptExecuteOutputSchema,
     annotations: { openWorldHint: true },
-    _meta: meta('execute', 'chrome.userScripts.execute'),
+    _meta: injectionMeta('execute', 'chrome.userScripts.execute'),
   }),
 } as const;
 
