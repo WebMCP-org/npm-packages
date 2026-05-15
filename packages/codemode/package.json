@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/codemode",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Zero-dependency browser-native code sandbox for LLM-generated tool orchestration",
   "keywords": [
     "ai",
@@ -18,21 +18,15 @@
   "bugs": {
     "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },
-  "license": "MIT",
-  "author": "Alex Nahas",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/WebMCP-org/npm-packages.git",
     "directory": "packages/codemode"
   },
-  "files": [
-    "dist"
-  ],
-  "type": "module",
+  "license": "MIT",
+  "author": "Alex Nahas",
   "sideEffects": false,
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "type": "module",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -55,10 +49,12 @@
       "import": "./dist/webmcp.js"
     }
   },
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
-  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "vp pack",
     "check": "vp check --fix",
@@ -106,5 +102,9 @@
   },
   "engines": {
     "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   }
 }

@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/webmcp-types",
-  "version": "2.3.1",
+  "version": "2.3.2",
   "description": "Strict TypeScript type definitions for the WebMCP core API (navigator.modelContext)",
   "keywords": [
     "model-context",
@@ -14,13 +14,22 @@
   "bugs": {
     "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },
-  "license": "MIT",
-  "author": "Alex Nahas",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/WebMCP-org/npm-packages.git",
     "directory": "packages/webmcp-types"
   },
+  "license": "MIT",
+  "author": "Alex Nahas",
+  "sideEffects": false,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "main": "",
+  "types": "./dist/index.d.ts",
   "files": [
     "dist",
     "src/common.ts",
@@ -29,19 +38,6 @@
     "src/model-context.ts",
     "src/tool.ts"
   ],
-  "type": "module",
-  "sideEffects": false,
-  "main": "",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts"
-    }
-  },
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
-  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "check": "vp check --fix",
@@ -63,5 +59,9 @@
     "typescript": "catalog:",
     "vite-plus": "catalog:",
     "vitest": "catalog:"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   }
 }

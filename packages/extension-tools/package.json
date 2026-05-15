@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/extension-tools",
-  "version": "2.3.1",
+  "version": "2.3.2",
   "description": "62+ Chrome Extension API tools for Model Context Protocol (MCP) - Let AI agents control tabs, bookmarks, history, storage, and more",
   "keywords": [
     "ai-agents",
@@ -36,21 +36,14 @@
   "bugs": {
     "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },
-  "license": "MIT",
-  "author": "Alex Nahas",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/WebMCP-org/npm-packages.git",
     "directory": "packages/extension-tools"
   },
-  "files": [
-    "dist",
-    "README.md"
-  ],
+  "license": "MIT",
+  "author": "Alex Nahas",
   "type": "module",
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -93,10 +86,13 @@
       "import": "./dist/contracts/userScripts.js"
     }
   },
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
-  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "vp pack --filter main",
     "check": "vp check --fix",
@@ -132,5 +128,9 @@
     "vite-plus": "catalog:",
     "vitest": "catalog:",
     "zod-to-json-schema": "catalog:"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   }
 }

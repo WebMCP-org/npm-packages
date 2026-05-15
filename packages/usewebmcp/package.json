@@ -1,6 +1,6 @@
 {
   "name": "usewebmcp",
-  "version": "2.3.1",
+  "version": "2.3.2",
   "description": "Standalone React hooks for strict core WebMCP tool registration with navigator.modelContext",
   "keywords": [
     "ai",
@@ -18,28 +18,24 @@
   "bugs": {
     "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },
-  "license": "MIT",
-  "author": "WebMCP Team",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/WebMCP-org/npm-packages.git",
     "directory": "packages/usewebmcp"
   },
-  "files": [
-    "dist"
-  ],
+  "license": "MIT",
+  "author": "WebMCP Team",
   "type": "module",
-  "main": "./dist/index.js",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     }
   },
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
-  },
+  "main": "./dist/index.js",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "vp pack",
     "build:prod": "NODE_ENV=prod vp pack",
@@ -73,5 +69,9 @@
   },
   "peerDependencies": {
     "react": "^17.0.0 || ^18.0.0 || ^19.0.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   }
 }

@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/mcp-iframe",
-  "version": "2.3.1",
+  "version": "2.3.2",
   "description": "Custom element for exposing iframe MCP tools, resources, and prompts to parent page",
   "keywords": [
     "browser",
@@ -15,21 +15,15 @@
   "bugs": {
     "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },
-  "license": "MIT",
-  "author": "Alex Nahas",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/WebMCP-org/npm-packages.git",
     "directory": "packages/mcp-iframe"
   },
-  "files": [
-    "dist"
-  ],
-  "type": "module",
+  "license": "MIT",
+  "author": "Alex Nahas",
   "sideEffects": true,
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "type": "module",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -37,10 +31,12 @@
       "default": "./dist/index.js"
     }
   },
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
-  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "vp pack",
     "check": "vp check --fix",
@@ -67,5 +63,9 @@
   },
   "engines": {
     "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   }
 }
