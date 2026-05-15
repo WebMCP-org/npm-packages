@@ -244,10 +244,11 @@ async function evaluateCallTool(
           // If the elicitation bridge is available, monkey-patch elicitInput
           // so that tool handlers can request user confirmation via the MCP client.
           if (
-            typeof (window as Record<string, unknown>).__mcpElicitBridge === 'function' &&
+            typeof (window as unknown as Record<string, unknown>).__mcpElicitBridge ===
+              'function' &&
             nav.modelContext.elicitInput
           ) {
-            const bridge = (window as Record<string, unknown>).__mcpElicitBridge as (
+            const bridge = (window as unknown as Record<string, unknown>).__mcpElicitBridge as (
               json: string
             ) => Promise<string>;
             nav.modelContext.elicitInput = async (

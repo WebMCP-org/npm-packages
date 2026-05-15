@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/webmcp-types",
-  "version": "2.3.1",
+  "version": "2.3.2",
   "description": "Strict TypeScript type definitions for the WebMCP core API (navigator.modelContext)",
   "keywords": [
     "model-context",

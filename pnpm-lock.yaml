@@ -42,6 +42,9 @@ catalogs:
     react-dom:
       specifier: ^19.1.0
       version: 19.2.4
+    tsx:
+      specifier: ^4.20.0
+      version: 4.21.0
     typescript:
       specifier: ^5.8.3
       version: 5.9.3
@@ -60,6 +63,9 @@ catalogs:
     zod:
       specifier: 3.25.76
       version: 3.25.76
+    zod-to-json-schema:
+      specifier: ^3.24.5
+      version: 3.25.1
 
 overrides:
   ajv@8: '>=8.18.0'
@@ -735,6 +741,9 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^0.95.0
         version: 0.95.1(zod@3.25.76)
+      '@modelcontextprotocol/sdk':
+        specifier: 'catalog:'
+        version: 1.26.0(@cfworker/json-schema@4.1.1)(zod@3.25.76)
       '@types/chrome':
         specifier: 'catalog:'
         version: 0.0.326
@@ -750,12 +759,21 @@ importers:
       playwright:
         specifier: ^1.54.2
         version: 1.58.0
+      tsx:
+        specifier: 'catalog:'
+        version: 4.21.0
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
       vite-plus:
         specifier: 'catalog:'
         version: 0.1.20(8b613c41b2d5628f7ba39956779b81de)
+      vitest:
+        specifier: 'catalog:'
+        version: '@voidzero-dev/vite-plus-test@0.1.11(@opentelemetry/api@1.9.0)(@types/node@22.17.2)(esbuild@0.27.7)(happy-dom@20.8.9)(jiti@2.6.1)(sass@1.97.1)(tsx@4.21.0)(typescript@5.9.3)(vite@8.0.5(@emnapi/core@1.8.1)(@emnapi/runtime@1.10.0)(@types/node@22.17.2)(esbuild@0.27.7)(jiti@2.6.1)(sass@1.97.1)(tsx@4.21.0)(yaml@2.8.3))(yaml@2.8.3)'
+      zod-to-json-schema:
+        specifier: 'catalog:'
+        version: 3.25.1(zod@3.25.76)
 
   packages/global:
     dependencies:
@@ -8378,10 +8396,6 @@ packages:
     resolution: {integrity: sha512-7uU4ZnKeQq22t9AsmHGD2w4OYQGonwFnTypDypaWi7Qr2EvQIFVtG8J5D/3bE7W123Wdc9+v4CZDu5hJXVCtBg==}
     engines: {node: '>=20.x'}
 
-  pixelmatch@7.1.0:
-    resolution: {integrity: sha512-1wrVzJ2STrpmONHKBy228LM1b84msXDUoAzVEl0R8Mz4Ce6EPr+IVtxm8+yvrqLYMHswREkjYFaMxnyGnaY3Ng==}
-    hasBin: true
-
   pixelmatch@7.2.0:
     resolution: {integrity: sha512-xhcb4yHu9sM/G7foGzoLtXYcC0zHEaOXXjRKhGup0fw78Nf2Tkiapv4EQyMzrbcmQPsllAI7DbFY2UT7PlI9Pg==}
     hasBin: true
@@ -9238,10 +9252,6 @@ packages:
 
   tinyexec@1.0.1:
     resolution: {integrity: sha512-5uC6DDlmeqiOwCPmK9jMSdOuZTh8bU39Ys6yidB+UTt5hfZUPGAypSgFRiEp+jbi9qH40BLDvy85jIU88wKSqw==}
-
-  tinyexec@1.0.2:
-    resolution: {integrity: sha512-W/KYk+NFhkmsYpuHq5JykngiOCnxeVL8v8dFnqxSD8qEEdRfXk1SDM6JzNqcERbcGYj9tMrDQBYV9cjgnunFIg==}
-    engines: {node: '>=18'}
 
   tinyexec@1.1.2:
     resolution: {integrity: sha512-dAqSqE/RabpBKI8+h26GfLq6Vb3JVXs30XYQjdMjaj/c2tS8IYYMbIzP599KtRj7c57/wYApb3QjgRgXmrCukA==}
@@ -14242,15 +14252,15 @@ snapshots:
       '@voidzero-dev/vite-plus-core': 0.1.11(@types/node@22.17.2)(esbuild@0.27.7)(jiti@2.6.1)(sass@1.97.1)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.8.3)
       es-module-lexer: 1.7.0
       obug: 2.1.1
-      pixelmatch: 7.1.0
+      pixelmatch: 7.2.0
       pngjs: 7.0.0
       sirv: 3.0.2
-      std-env: 4.0.0
+      std-env: 4.1.0
       tinybench: 2.9.0
-      tinyexec: 1.0.2
-      tinyglobby: 0.2.15
+      tinyexec: 1.1.2
+      tinyglobby: 0.2.16
       vite: 8.0.5(@emnapi/core@1.8.1)(@emnapi/runtime@1.10.0)(@types/node@22.17.2)(esbuild@0.27.7)(jiti@2.6.1)(sass@1.97.1)(tsx@4.21.0)(yaml@2.8.3)
-      ws: 8.19.0
+      ws: 8.20.0
     optionalDependencies:
       '@opentelemetry/api': 1.9.0
       '@types/node': 22.17.2
@@ -14283,15 +14293,15 @@ snapshots:
       '@voidzero-dev/vite-plus-core': 0.1.11(@types/node@25.6.0)(esbuild@0.27.7)(jiti@2.6.1)(sass@1.97.1)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.8.3)
       es-module-lexer: 1.7.0
       obug: 2.1.1
-      pixelmatch: 7.1.0
+      pixelmatch: 7.2.0
       pngjs: 7.0.0
       sirv: 3.0.2
-      std-env: 4.0.0
+      std-env: 4.1.0
       tinybench: 2.9.0
-      tinyexec: 1.0.2
-      tinyglobby: 0.2.15
+      tinyexec: 1.1.2
+      tinyglobby: 0.2.16
       vite: 8.0.5(@emnapi/core@1.8.1)(@emnapi/runtime@1.10.0)(@types/node@25.6.0)(esbuild@0.27.7)(jiti@2.6.1)(sass@1.97.1)(tsx@4.21.0)(yaml@2.8.3)
-      ws: 8.19.0
+      ws: 8.20.0
     optionalDependencies:
       '@opentelemetry/api': 1.9.0
       '@types/node': 25.6.0
@@ -18046,10 +18056,6 @@ snapshots:
     optionalDependencies:
       '@napi-rs/nice': 1.1.1
 
-  pixelmatch@7.1.0:
-    dependencies:
-      pngjs: 7.0.0
-
   pixelmatch@7.2.0:
     dependencies:
       pngjs: 7.0.0
@@ -19184,8 +19190,6 @@ snapshots:
   tinyclip@0.1.12: {}
 
   tinyexec@1.0.1: {}
-
-  tinyexec@1.0.2: {}
 
   tinyexec@1.1.2: {}
 

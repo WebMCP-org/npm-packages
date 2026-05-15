@@ -2,6 +2,7 @@
 
 import { ExtensionClientTransport } from '../../../transports/src/index.ts';
 import { Client } from '../../../webmcp-ts-sdk/src/index.ts';
+import { NoOpJsonSchemaValidator } from '../../../webmcp-ts-sdk/src/no-op-validator.ts';
 
 function requireElement<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
@@ -36,7 +37,10 @@ async function sendControlMessage(action: string, name?: string): Promise<unknow
 }
 
 async function bootstrap() {
-  const client = new Client({ name: 'extension-runtime-contract-client', version: '1.0.0' });
+  const client = new Client(
+    { name: 'extension-runtime-contract-client', version: '1.0.0' },
+    { jsonSchemaValidator: new NoOpJsonSchemaValidator() }
+  );
   const transport = new ExtensionClientTransport({
     portName: 'mcp',
     autoReconnect: false,

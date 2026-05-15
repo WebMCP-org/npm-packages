@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.3.2
+
+### Patch Changes
+
+- Run the chrome-devtools-mcp bundle and package verification during publish to prevent unbundled npm releases.
+
 ## 2.3.1
 
 ## 2.3.0

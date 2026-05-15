@@ -1,5 +1,13 @@
 # @mcp-b/mcp-iframe
 
+## 2.3.2
+
+### Patch Changes
+
+- @mcp-b/webmcp-types@2.3.2
+- @mcp-b/webmcp-ts-sdk@2.3.2
+- @mcp-b/transports@2.3.2
+
 ## 2.3.1
 
 ### Patch Changes

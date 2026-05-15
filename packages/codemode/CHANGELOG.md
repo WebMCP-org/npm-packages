@@ -1,5 +1,11 @@
 # @mcp-b/codemode
 
+## 1.0.2
+
+### Patch Changes
+
+- @mcp-b/webmcp-types@2.3.2
+
 ## 1.0.1
 
 ### Patch Changes
