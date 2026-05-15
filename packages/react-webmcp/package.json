@@ -35,24 +35,28 @@
   "bugs": {
     "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },
+  "license": "MIT",
+  "author": "WebMCP Team",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/WebMCP-org/npm-packages.git",
     "directory": "packages/react-webmcp"
   },
-  "license": "MIT",
-  "author": "WebMCP Team",
+  "files": [
+    "dist"
+  ],
   "type": "module",
+  "main": "./dist/index.js",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     }
   },
-  "main": "./dist/index.js",
-  "files": [
-    "dist"
-  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "scripts": {
     "build": "vp pack",
     "build:prod": "NODE_ENV=prod vp pack",
@@ -101,9 +105,5 @@
     "zod-to-json-schema": {
       "optional": true
     }
-  },
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
   }
 }

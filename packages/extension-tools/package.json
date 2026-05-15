@@ -36,14 +36,21 @@
   "bugs": {
     "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },
+  "license": "MIT",
+  "author": "Alex Nahas",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/WebMCP-org/npm-packages.git",
     "directory": "packages/extension-tools"
   },
-  "license": "MIT",
-  "author": "Alex Nahas",
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -86,13 +93,10 @@
       "import": "./dist/contracts/userScripts.js"
     }
   },
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "files": [
-    "dist",
-    "README.md"
-  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "scripts": {
     "build": "vp pack --filter main",
     "check": "vp check --fix",
@@ -128,9 +132,5 @@
     "vite-plus": "catalog:",
     "vitest": "catalog:",
     "zod-to-json-schema": "catalog:"
-  },
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
   }
 }

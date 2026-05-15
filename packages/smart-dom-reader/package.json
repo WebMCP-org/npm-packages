@@ -35,15 +35,22 @@
   "bugs": {
     "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },
+  "license": "MIT",
+  "author": "Alex Nahas",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/WebMCP-org/npm-packages.git",
     "directory": "packages/smart-dom-reader"
   },
-  "license": "MIT",
-  "author": "Alex Nahas",
-  "sideEffects": true,
+  "files": [
+    "dist"
+  ],
   "type": "module",
+  "sideEffects": true,
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "browser": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -54,13 +61,10 @@
       "import": "./dist/bundle-string.js"
     }
   },
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "browser": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "files": [
-    "dist"
-  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "scripts": {
     "prebuild": "pnpm build:bundle && node generate-bundle-module.mjs",
     "build": "vp pack",
@@ -93,9 +97,5 @@
     "@modelcontextprotocol/sdk": {
       "optional": true
     }
-  },
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
   }
 }

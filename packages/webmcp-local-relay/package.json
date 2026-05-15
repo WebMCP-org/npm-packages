@@ -16,23 +16,13 @@
   "bugs": {
     "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },
+  "license": "MIT",
+  "author": "Alex Nahas",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/WebMCP-org/npm-packages.git",
     "directory": "packages/webmcp-local-relay"
   },
-  "license": "MIT",
-  "author": "Alex Nahas",
-  "type": "module",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.mts",
-      "import": "./dist/index.mjs",
-      "default": "./dist/index.mjs"
-    }
-  },
-  "main": "./dist/index.mjs",
-  "types": "./dist/index.d.mts",
   "bin": {
     "webmcp-local-relay": "./dist/cli.mjs"
   },
@@ -42,6 +32,20 @@
     "dist",
     "skills"
   ],
+  "type": "module",
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "scripts": {
     "build": "vp pack && node scripts/build-widget-html.js",
     "build:mcpb": "bash scripts/build-mcpb.sh",
@@ -73,9 +77,5 @@
   },
   "engines": {
     "node": ">=22"
-  },
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
   }
 }

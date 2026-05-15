@@ -13,15 +13,22 @@
   "bugs": {
     "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },
+  "license": "MIT",
+  "author": "Alex Nahas",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/WebMCP-org/npm-packages.git",
     "directory": "packages/webmcp-polyfill"
   },
-  "license": "MIT",
-  "author": "Alex Nahas",
-  "sideEffects": true,
+  "files": [
+    "dist"
+  ],
   "type": "module",
+  "sideEffects": true,
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "browser": "./dist/index.iife.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -33,13 +40,10 @@
       "default": "./dist/index.iife.js"
     }
   },
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "browser": "./dist/index.iife.js",
-  "types": "./dist/index.d.ts",
-  "files": [
-    "dist"
-  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "scripts": {
     "build": "pnpm --filter @mcp-b/webmcp-types build && vp pack",
     "check": "vp check --fix",
@@ -69,9 +73,5 @@
   },
   "engines": {
     "node": ">=18"
-  },
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
   }
 }
