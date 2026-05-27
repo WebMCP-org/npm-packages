@@ -44,16 +44,23 @@ jobs:
       - name: Build packages
         run: pnpm build
 
-      - name: Install Playwright Browsers
-        run: pnpm --filter mcp-e2e-tests exec playwright install chromium
+      - name: Setup Chrome
+        uses: browser-actions/setup-chrome@2e1d749697dd1612b833dba4a722266286fbefcd
+        with:
+          chrome-version: stable
+          install-dependencies: true
 
       - name: Install Puppeteer Chrome (for chrome-devtools-mcp e2e)
         run: pnpm --filter @mcp-b/chrome-devtools-mcp exec puppeteer browsers install chrome
 
       - name: Run E2E tests
+        env:
+          PLAYWRIGHT_CHROMIUM_CHANNEL: chrome
         run: pnpm test:e2e
 
       - name: Run framework integration E2E tests
+        env:
+          PLAYWRIGHT_CHROMIUM_CHANNEL: chrome
         run: pnpm test:e2e:frameworks
 
       - name: Run tarball E2E validation (@mcp-b/global)
@@ -105,8 +112,12 @@ jobs:
       - name: Build packages
         run: pnpm build
 
-      - name: Install Playwright Browsers
-        run: pnpm --filter mcp-e2e-tests exec playwright install chromium
+      - name: Setup Chrome
+        if: matrix.mode == 'default'
+        uses: browser-actions/setup-chrome@2e1d749697dd1612b833dba4a722266286fbefcd
+        with:
+          chrome-version: stable
+          install-dependencies: true
 
       - name: Install Google Chrome Beta
         if: matrix.mode == 'chrome-beta'
@@ -121,10 +132,15 @@ jobs:
 
       - name: Run Native Runtime Contract (Default Chromium)
         if: matrix.mode == 'default'
+        env:
+          PLAYWRIGHT_CHROMIUM_CHANNEL: chrome
         run: pnpm --filter mcp-e2e-tests run test:native-contract:default
 
       - name: Run Native Runtime API Integration (Default Chromium)
         if: matrix.mode == 'default'
+        env:
+          PLAYWRIGHT_CHROMIUM_CHANNEL: chrome
+          PLAYWRIGHT_NATIVE_SHOWCASE_CHANNEL: chrome
         run: pnpm --filter mcp-e2e-tests run test:native-showcase
 
       - name: Run Native Runtime Contract (Chrome Beta)

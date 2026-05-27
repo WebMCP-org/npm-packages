@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const chromiumChannel = process.env.PLAYWRIGHT_CHROMIUM_CHANNEL;
+
 /**
  * Playwright config for Validation Matrix tests
  *
@@ -33,7 +35,10 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        ...(chromiumChannel ? { channel: chromiumChannel } : {}),
+      },
     },
   ],
 

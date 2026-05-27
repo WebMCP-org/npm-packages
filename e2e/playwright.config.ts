@@ -6,6 +6,7 @@ import { defineConfig, devices } from '@playwright/test';
 const tabTransportPort = Number.parseInt(process.env.PLAYWRIGHT_TAB_TRANSPORT_PORT ?? '4173', 10);
 const tabTransportBaseUrl = `http://localhost:${tabTransportPort}`;
 const reuseExistingServer = process.env.PLAYWRIGHT_REUSE_SERVER === '1';
+const chromiumChannel = process.env.PLAYWRIGHT_CHROMIUM_CHANNEL;
 
 export default defineConfig({
   testDir: './tests',
@@ -33,7 +34,10 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        ...(chromiumChannel ? { channel: chromiumChannel } : {}),
+      },
     },
 
     // Uncomment to test on other browsers
