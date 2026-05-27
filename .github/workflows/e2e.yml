@@ -50,8 +50,8 @@ jobs:
           chrome-version: stable
           install-dependencies: true
 
-      - name: Install Xvfb (for extension E2E)
-        run: sudo apt-get install -y xvfb
+      - name: Install Playwright Chromium (for extension E2E)
+        run: pnpm --filter @mcp-b/extension-tools exec playwright install chromium
 
       - name: Install Puppeteer Chrome (for chrome-devtools-mcp e2e)
         run: pnpm --filter @mcp-b/chrome-devtools-mcp exec puppeteer browsers install chrome
@@ -67,10 +67,7 @@ jobs:
         run: pnpm --filter @mcp-b/webmcp-local-relay test:e2e
 
       - name: Run extension E2E tests
-        env:
-          PLAYWRIGHT_EXTENSION_CHROMIUM_CHANNEL: chrome
-          PLAYWRIGHT_EXTENSION_HEADLESS: 'false'
-        run: timeout 120s xvfb-run -a pnpm --filter @mcp-b/extension-tools test:e2e
+        run: pnpm --filter @mcp-b/extension-tools test:e2e
 
       - name: Run framework integration E2E tests
         env:
