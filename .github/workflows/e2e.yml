@@ -69,6 +69,8 @@ jobs:
         run: pnpm test:e2e:frameworks
 
       - name: Run tarball E2E validation (@mcp-b/global)
+        env:
+          PLAYWRIGHT_CHROMIUM_CHANNEL: chrome
         run: pnpm test:e2e:tarball:global
 
       - name: Upload Playwright Report
