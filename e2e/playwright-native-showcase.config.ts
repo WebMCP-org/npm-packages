@@ -24,7 +24,6 @@ export default defineConfig({
     baseURL: nativeShowcaseBaseUrl,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
 
     // CRITICAL: Launch with experimental web platform features enabled
     launchOptions: {

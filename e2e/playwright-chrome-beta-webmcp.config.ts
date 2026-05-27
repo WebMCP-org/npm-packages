@@ -25,7 +25,6 @@ export default defineConfig({
     baseURL: tabTransportBaseUrl,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
     launchOptions: {
       args: [
         // In current Chrome Beta builds, this switch is still required for native exposure.
