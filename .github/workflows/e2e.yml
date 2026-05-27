@@ -45,7 +45,7 @@ jobs:
         run: pnpm build
 
       - name: Install Playwright Browsers
-        run: pnpm --filter mcp-e2e-tests exec playwright install --with-deps chromium
+        run: pnpm --filter mcp-e2e-tests exec playwright install chromium
 
       - name: Install Puppeteer Chrome (for chrome-devtools-mcp e2e)
         run: pnpm --filter @mcp-b/chrome-devtools-mcp exec puppeteer browsers install chrome
@@ -106,7 +106,7 @@ jobs:
         run: pnpm build
 
       - name: Install Playwright Browsers
-        run: pnpm --filter mcp-e2e-tests exec playwright install --with-deps chromium
+        run: pnpm --filter mcp-e2e-tests exec playwright install chromium
 
       - name: Install Google Chrome Beta
         if: matrix.mode == 'chrome-beta'
