@@ -55,6 +55,7 @@ export type {
   ModelContextTestingExecuteToolOptions,
   ModelContextTestingPolyfillExtensions,
   ModelContextTestingToolInfo,
+  ModelContextToolInfo,
   ModelContextToolReference,
   ModelContextToolRegistrationHandle,
   ModelContextWithExtensions,
@@ -92,7 +93,7 @@ declare global {
      * associated ModelContext. This is the canonical install location as of
      * Chrome 150. Prefer `document.modelContext` for new code.
      */
-    modelContext: ModelContext;
+    readonly modelContext: ModelContext;
   }
 
   interface Navigator {
@@ -104,12 +105,13 @@ declare global {
      * `document.modelContext` instead. `navigator.modelContext` is kept as a
      * backward-compatible alias and will be removed in a future Chrome release.
      */
-    modelContext: ModelContext;
+    readonly modelContext: ModelContext;
 
     /**
      * Web Model Context testing API surface (Chromium early preview).
-     * @deprecated Prefer navigator.modelContext.callTool(...) and toolchange events
-     * for in-page consumers. Chromium still exposes this API for testing flows.
+     * @deprecated Chromium still exposes this API for testing flows. Producer
+     * discovery/execution should prefer document.modelContext.getTools() and
+     * document.modelContext.executeTool(...).
      */
     modelContextTesting?: ModelContextTesting;
   }

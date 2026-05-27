@@ -46,6 +46,32 @@ describe('@mcp-b/webmcp-polyfill', () => {
     expect((document.modelContext as unknown as { callTool?: unknown }).callTool).toBeUndefined();
   });
 
+  it('installs readonly document descriptor and deprecated navigator accessor', () => {
+    initializeWebMCPPolyfill();
+
+    const documentDescriptor = Object.getOwnPropertyDescriptor(document, 'modelContext');
+    const navigatorDescriptor = Object.getOwnPropertyDescriptor(navigator, 'modelContext');
+
+    expect(documentDescriptor).toMatchObject({
+      configurable: true,
+      enumerable: true,
+      writable: false,
+      value: document.modelContext,
+    });
+    expect(navigatorDescriptor?.configurable).toBe(true);
+    expect(navigatorDescriptor?.enumerable).toBe(true);
+    expect(typeof navigatorDescriptor?.get).toBe('function');
+    expect(navigatorDescriptor?.set).toBeUndefined();
+    expect('value' in (navigatorDescriptor ?? {})).toBe(false);
+    expect('writable' in (navigatorDescriptor ?? {})).toBe(false);
+
+    const originalDocumentModelContext = document.modelContext;
+    expect(() => {
+      (document as unknown as { modelContext: unknown }).modelContext = { fake: true };
+    }).toThrow();
+    expect(document.modelContext).toBe(originalDocumentModelContext);
+  });
+
   it('document.modelContext and navigator.modelContext share the same instance', () => {
     initializeWebMCPPolyfill();
 
@@ -107,10 +133,10 @@ describe('@mcp-b/webmcp-polyfill', () => {
     }
   });
 
-  it('registerTool returns undefined and throws on duplicates', () => {
+  it('document.modelContext registerTool returns undefined and throws on duplicates', () => {
     initializeWebMCPPolyfill();
 
-    const firstResult = navigator.modelContext.registerTool({
+    const firstResult = document.modelContext.registerTool({
       name: 'echo',
       description: 'Echo back input',
       inputSchema: { type: 'object', properties: { message: { type: 'string' } } },
@@ -119,7 +145,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
     expect(firstResult).toBeUndefined();
     expect(() =>
-      navigator.modelContext.registerTool({
+      document.modelContext.registerTool({
         name: 'echo',
         description: 'Echo back input again',
         inputSchema: { type: 'object', properties: {} },
@@ -131,14 +157,14 @@ describe('@mcp-b/webmcp-polyfill', () => {
   it('provideContext clears previous dynamic tools', async () => {
     initializeWebMCPPolyfill();
 
-    navigator.modelContext.registerTool({
+    document.modelContext.registerTool({
       name: 'dynamic_tool',
       description: 'Dynamic tool',
       inputSchema: { type: 'object', properties: {} },
       execute: async () => ({ content: [{ type: 'text', text: 'dynamic' }] }),
     });
 
-    navigator.modelContext.provideContext({
+    document.modelContext.provideContext({
       tools: [
         {
           name: 'context_tool',
@@ -404,11 +430,12 @@ describe('@mcp-b/webmcp-polyfill', () => {
     expect(count).toBe(4);
   });
 
-  it('exposes native-shaped getTools on navigator.modelContext', () => {
+  it('exposes native-shaped getTools on document.modelContext', async () => {
     initializeWebMCPPolyfill();
 
-    navigator.modelContext.registerTool({
+    document.modelContext.registerTool({
       name: 'native_get_tools_shape',
+      title: 'Native Tool',
       description: 'Native getTools shape',
       inputSchema: {
         type: 'object',
@@ -418,30 +445,54 @@ describe('@mcp-b/webmcp-polyfill', () => {
       execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
     });
 
-    expect(navigator.modelContext.getTools()).toEqual([
+    await expect(document.modelContext.getTools()).resolves.toEqual([
       {
         name: 'native_get_tools_shape',
+        title: 'Native Tool',
         description: 'Native getTools shape',
         inputSchema:
           '{"type":"object","properties":{"value":{"type":"number"}},"required":["value"]}',
+        origin: window.location.origin,
+        window,
       },
     ]);
   });
 
-  it('fires producer toolchange events and ontoolchange for registry mutations', async () => {
+  it('executes registered tool objects from document.modelContext.getTools', async () => {
+    initializeWebMCPPolyfill();
+
+    document.modelContext.registerTool({
+      name: 'native_execute_tool_shape',
+      title: 'Native Execute Tool',
+      description: 'Native executeTool shape',
+      inputSchema: {
+        type: 'object',
+        properties: { value: { type: 'string' } },
+        required: ['value'],
+      },
+      execute: async (args) => ({ echoed: args.value }),
+    });
+
+    const [tool] = await document.modelContext.getTools();
+    const result = await document.modelContext.executeTool(tool!, JSON.stringify({ value: 'ok' }));
+
+    expect(result).toBe('{"echoed":"ok"}');
+  });
+
+  it('fires producer toolchange events and ontoolchange for document registry mutations', async () => {
     initializeWebMCPPolyfill();
 
     let listenerCount = 0;
     let handlerCount = 0;
-    navigator.modelContext.addEventListener('toolchange', () => {
+    document.modelContext.addEventListener('toolchange', () => {
       listenerCount += 1;
     });
-    navigator.modelContext.ontoolchange = () => {
+    document.modelContext.ontoolchange = () => {
       handlerCount += 1;
     };
 
     const controller = new AbortController();
-    navigator.modelContext.registerTool(
+    document.modelContext.registerTool(
       {
         name: 'producer_event_tool',
         description: 'Producer event tool',
@@ -464,25 +515,75 @@ describe('@mcp-b/webmcp-polyfill', () => {
   // =========================================================================
 
   describe('initializeWebMCPPolyfill options', () => {
-    it('does not override existing modelContext when one already exists', () => {
+    it('does not override existing document.modelContext when one already exists', () => {
       // First install
       initializeWebMCPPolyfill();
       // Cleanup and manually set something
       cleanupWebMCPPolyfill();
 
       // Set a fake modelContext
-      const fakeContext = { fake: true } as unknown as Navigator['modelContext'];
-      Object.defineProperty(navigator, 'modelContext', {
+      const fakeContext = { fake: true } as unknown as Document['modelContext'];
+      Object.defineProperty(document, 'modelContext', {
         configurable: true,
         enumerable: true,
-        writable: true,
+        writable: false,
         value: fakeContext,
       });
 
       initializeWebMCPPolyfill();
-      expect((navigator.modelContext as unknown as { fake?: boolean }).fake).toBe(true);
+      expect((document.modelContext as unknown as { fake?: boolean }).fake).toBe(true);
+      expect('modelContext' in navigator).toBe(false);
 
       // Cleanup manually
+      delete (document as unknown as Record<string, unknown>).modelContext;
+    });
+
+    it('aliases legacy native navigator.modelContext onto document.modelContext', () => {
+      const fakeContext = { fake: true } as unknown as Navigator['modelContext'];
+      Object.defineProperty(navigator, 'modelContext', {
+        configurable: true,
+        enumerable: true,
+        get: () => fakeContext,
+      });
+
+      initializeWebMCPPolyfill();
+
+      expect(document.modelContext).toBe(fakeContext);
+      expect(navigator.modelContext).toBe(fakeContext);
+      expect(navigator.modelContextTesting).toBeUndefined();
+
+      cleanupWebMCPPolyfill();
+      expect('modelContext' in document).toBe(false);
+      expect(navigator.modelContext).toBe(fakeContext);
+
+      delete (navigator as unknown as Record<string, unknown>).modelContext;
+    });
+
+    it('does not override native document and navigator modelContext when both exist', () => {
+      const documentContext = { documentNative: true } as unknown as Document['modelContext'];
+      const navigatorContext = { navigatorNative: true } as unknown as Navigator['modelContext'];
+      Object.defineProperty(document, 'modelContext', {
+        configurable: true,
+        enumerable: true,
+        get: () => documentContext,
+      });
+      Object.defineProperty(navigator, 'modelContext', {
+        configurable: true,
+        enumerable: true,
+        get: () => navigatorContext,
+      });
+
+      initializeWebMCPPolyfill();
+
+      expect(document.modelContext).toBe(documentContext);
+      expect(navigator.modelContext).toBe(navigatorContext);
+      expect(navigator.modelContextTesting).toBeUndefined();
+
+      cleanupWebMCPPolyfill();
+      expect(document.modelContext).toBe(documentContext);
+      expect(navigator.modelContext).toBe(navigatorContext);
+
+      delete (document as unknown as Record<string, unknown>).modelContext;
       delete (navigator as unknown as Record<string, unknown>).modelContext;
     });
 
@@ -583,6 +684,47 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
       // Final cleanup
       delete (navigator as unknown as Record<string, unknown>).modelContext;
+      delete (navigator as unknown as Record<string, unknown>).modelContextTesting;
+    });
+
+    it('removes installed document and navigator surfaces after a full polyfill install', () => {
+      initializeWebMCPPolyfill();
+      expect(document.modelContext).toBeDefined();
+      expect(navigator.modelContext).toBeDefined();
+
+      cleanupWebMCPPolyfill();
+
+      expect('modelContext' in document).toBe(false);
+      expect('modelContext' in navigator).toBe(false);
+    });
+
+    it('restores a pre-existing modelContextTesting descriptor after forced override', () => {
+      const existingTesting = {
+        existing: true,
+      } as unknown as Navigator['modelContextTesting'];
+      Object.defineProperty(navigator, 'modelContextTesting', {
+        configurable: true,
+        enumerable: false,
+        writable: false,
+        value: existingTesting,
+      });
+      const originalTestingDescriptor = Object.getOwnPropertyDescriptor(
+        navigator,
+        'modelContextTesting'
+      );
+
+      initializeWebMCPPolyfill({ installTestingShim: 'always' });
+      expect(navigator.modelContextTesting).not.toBe(existingTesting);
+
+      cleanupWebMCPPolyfill();
+
+      expect('modelContext' in document).toBe(false);
+      expect('modelContext' in navigator).toBe(false);
+      expect(Object.getOwnPropertyDescriptor(navigator, 'modelContextTesting')).toEqual(
+        originalTestingDescriptor
+      );
+      expect(navigator.modelContextTesting).toBe(existingTesting);
+
       delete (navigator as unknown as Record<string, unknown>).modelContextTesting;
     });
   });

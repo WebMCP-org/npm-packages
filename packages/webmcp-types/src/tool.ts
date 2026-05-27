@@ -120,6 +120,11 @@ export interface ToolDescriptor<
   name: TName;
 
   /**
+   * Optional user-facing label.
+   */
+  title?: string;
+
+  /**
    * Human-readable summary of what the tool does.
    */
   description: string;

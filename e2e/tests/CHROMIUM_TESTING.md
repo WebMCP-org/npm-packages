@@ -4,7 +4,7 @@ This guide covers the native Chromium WebMCP validation lanes in this repo.
 
 ## Definitions
 
-- **Canonical native contract**: validates the real browser API surface directly through `navigator.modelContext` and `navigator.modelContextTesting`.
+- **Canonical native contract**: validates the real browser API surface directly through `document.modelContext`, the deprecated `navigator.modelContext` alias, and `navigator.modelContextTesting`.
 - **Native parity / showcase integration**: keeps broader compatibility and demo coverage, but is not the canonical E2E gate.
 
 ## Quick Run
@@ -39,8 +39,10 @@ For tab, iframe, relay, DevTools, and extension runtimes, the canonical caller i
 
 For native Chromium, the real public boundary is the browser API itself. The canonical contract therefore uses:
 
-- `navigator.modelContext.registerTool(...)`
-- `navigator.modelContext.unregisterTool(...)`
+- `document.modelContext.registerTool(...)`
+- `document.modelContext.getTools()`
+- `document.modelContext.executeTool(...)`
+- deprecated `navigator.modelContext` alias reads during the Chrome M150 transition
 - `navigator.modelContextTesting.listTools()`
 - `navigator.modelContextTesting.executeTool(...)`
 
@@ -51,9 +53,11 @@ That is intentional and is the only exception to the SDK-client rule.
 The native contract lane proves that:
 
 1. tool registration is visible through the browser API
-2. tool execution works through `modelContextTesting.executeTool(...)`
-3. dynamic registration and unregistration are reflected in `listTools()`
-4. runtime-thrown tool errors propagate through the native browser API
+2. producer discovery works through async `document.modelContext.getTools()`
+3. producer execution works through `document.modelContext.executeTool(toolFromGetTools, inputArgsJson)`
+4. testing execution works through `modelContextTesting.executeTool(...)`
+5. dynamic registration and abort-signal unregistration are reflected in `listTools()`
+6. runtime-thrown tool errors propagate through the native browser API
 
 ## Integration Lanes
 
@@ -75,13 +79,18 @@ They cover suites such as:
 
 ## API Surface Validated
 
+### `document.modelContext`
+
+- Canonical WebMCP core surface as of Chrome M150.
+- Native M150 exposes the same instance through `navigator.modelContext` during the transition.
+- `registerTool(tool, options?)`
+- `getTools() => Promise<Array<{ name; title; description; inputSchema?; origin; window }>>`
+- `executeTool(toolFromGetTools, inputArgsJson) => Promise<string | null>`
+- `ontoolchange`
+
 ### `navigator.modelContext`
 
-- `provideContext(context)`
-- `registerTool(tool)`
-- `unregisterTool(name)`
-- `clearContext()`
-- `listTools()`
+Deprecated alias retained during the Chrome M150 transition.
 
 ### `navigator.modelContextTesting`
 

@@ -10,6 +10,7 @@ import type {
   ModelContextTestingExecuteToolOptions,
   ModelContextTestingPolyfillExtensions,
   ModelContextTestingToolInfo,
+  ModelContextToolInfo,
   ModelContextToolRegistrationHandle,
   ModelContextWithExtensions,
   ToolCallEvent,
@@ -20,6 +21,7 @@ import type { ToolDescriptor, ToolListItem } from './tool.js';
 test('ModelContext.registerTool accepts ToolDescriptor and returns void', () => {
   const tool: ToolDescriptor & { inputSchema: InputSchema } = {
     name: 'health',
+    title: 'Health',
     description: 'Health check',
     inputSchema: {
       type: 'object',
@@ -35,6 +37,22 @@ test('ModelContext.registerTool accepts ToolDescriptor and returns void', () => 
 
   expectTypeOf<ModelContext['registerTool']>().toBeCallableWith(tool);
   expectTypeOf<ModelContext['registerTool']>().returns.toEqualTypeOf<void>();
+});
+
+test('ModelContext.registerTool accepts exposedTo options', () => {
+  expectTypeOf<ModelContext['registerTool']>()
+    .parameter(1)
+    .toMatchTypeOf<{ signal?: AbortSignal; exposedTo?: string[] } | undefined>();
+});
+
+test('ModelContext.getTools returns native registered tool objects asynchronously', () => {
+  expectTypeOf<ModelContext['getTools']>().returns.toEqualTypeOf<Promise<ModelContextToolInfo[]>>();
+});
+
+test('ModelContext.executeTool uses registered tool objects and JSON-string input', () => {
+  expectTypeOf<ModelContext['executeTool']>().parameter(0).toEqualTypeOf<ModelContextToolInfo>();
+  expectTypeOf<ModelContext['executeTool']>().parameter(1).toEqualTypeOf<string>();
+  expectTypeOf<ModelContext['executeTool']>().returns.toEqualTypeOf<Promise<string | null>>();
 });
 
 test('ModelContext.unregisterTool accepts legacy string names', () => {
@@ -115,8 +133,23 @@ test('ToolCallEvent extends Event with name, arguments, respondWith', () => {
 });
 
 // === Global augmentation ===
-test('navigator.modelContext is typed as ModelContext', () => {
+test('document.modelContext is typed as ModelContext', () => {
+  expectTypeOf<Document['modelContext']>().toEqualTypeOf<ModelContext>();
+});
+
+test('navigator.modelContext is typed as deprecated ModelContext alias', () => {
   expectTypeOf<Navigator['modelContext']>().toEqualTypeOf<ModelContext>();
+});
+
+test('global modelContext properties are readonly', () => {
+  const assertReadonlyGlobals = (documentRef: Document, navigatorRef: Navigator) => {
+    // @ts-expect-error modelContext is a readonly Web IDL attribute.
+    documentRef.modelContext = {} as ModelContext;
+    // @ts-expect-error modelContext is a readonly Web IDL attribute.
+    navigatorRef.modelContext = {} as ModelContext;
+  };
+
+  expectTypeOf(assertReadonlyGlobals).toBeFunction();
 });
 
 test('ModelContextWithExtensions composes strict core and extension methods', () => {

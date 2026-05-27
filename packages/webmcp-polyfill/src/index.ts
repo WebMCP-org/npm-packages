@@ -9,6 +9,7 @@ import type {
   ModelContextTesting,
   ModelContextTestingExecuteToolOptions,
   ModelContextTestingToolInfo,
+  ModelContextToolInfo,
   ModelContextToolReference,
   ToolDescriptor,
   ToolResponse,
@@ -77,6 +78,9 @@ interface InstallState {
   previousNavigatorModelContextDescriptor: PropertyDescriptor | undefined;
   previousNavigatorModelContextTestingDescriptor: PropertyDescriptor | undefined;
   previousDocumentModelContextDescriptor: PropertyDescriptor | undefined;
+  installedNavigatorModelContext: boolean;
+  installedNavigatorModelContextTesting: boolean;
+  installedDocumentModelContext: boolean;
 }
 
 const installState: InstallState = {
@@ -84,6 +88,9 @@ const installState: InstallState = {
   previousNavigatorModelContextDescriptor: undefined,
   previousNavigatorModelContextTestingDescriptor: undefined,
   previousDocumentModelContextDescriptor: undefined,
+  installedNavigatorModelContext: false,
+  installedNavigatorModelContextTesting: false,
+  installedDocumentModelContext: false,
 };
 
 export interface WebMCPPolyfillInitOptions {
@@ -185,8 +192,16 @@ class StrictWebMCPContext extends EventTarget {
     }
   }
 
-  getTools(): ModelContextTestingToolInfo[] {
-    return this.getToolInfos();
+  getTools(): Promise<ModelContextToolInfo[]> {
+    return Promise.resolve(this.getRegisteredToolInfos());
+  }
+
+  executeTool(
+    tool: ModelContextToolInfo,
+    inputArgsJson: string,
+    options?: ModelContextTestingExecuteToolOptions
+  ): Promise<string | null> {
+    return this.executeToolByName(tool.name, inputArgsJson, options, false);
   }
 
   getTestingShim(): PolyfillTestingShim {
@@ -209,11 +224,33 @@ class StrictWebMCPContext extends EventTarget {
     });
   }
 
+  /** @internal Used by getTools() */
+  getRegisteredToolInfos(): ModelContextToolInfo[] {
+    return this.getToolInfos().map((toolInfo) => {
+      const tool = this.tools.get(toolInfo.name);
+      return {
+        ...toolInfo,
+        title: tool?.title ?? '',
+        origin: globalThis.location?.origin ?? '',
+        window: globalThis.window,
+      };
+    });
+  }
+
   /** @internal Used by PolyfillTestingShim */
   async executeToolForTesting(
     toolName: string,
     inputArgsJson: string,
     options?: ModelContextTestingExecuteToolOptions
+  ): Promise<string | null> {
+    return this.executeToolByName(toolName, inputArgsJson, options, true);
+  }
+
+  private async executeToolByName(
+    toolName: string,
+    inputArgsJson: string,
+    options: ModelContextTestingExecuteToolOptions | undefined,
+    normalizeResult: boolean
   ): Promise<string | null> {
     if (options?.signal?.aborted) {
       throw createUnknownError(TOOL_CANCELLED_MESSAGE);
@@ -250,7 +287,11 @@ class StrictWebMCPContext extends EventTarget {
     try {
       const execution = tool.execute(args, client);
       const rawResult = await withAbortSignal(Promise.resolve(execution), options?.signal);
-      return toSerializedTestingResult(normalizeToolResponse(rawResult));
+      if (normalizeResult) {
+        return toSerializedTestingResult(normalizeToolResponse(rawResult));
+      }
+      const serialized = JSON.stringify(rawResult);
+      return serialized === undefined ? null : serialized;
     } catch (error) {
       const detail =
         error instanceof Error
@@ -971,17 +1012,33 @@ export function initializeWebMCPPolyfill(options?: WebMCPPolyfillInitOptions): v
     return;
   }
 
-  // Either surface having a native ModelContext means the browser already
-  // provides WebMCP — skip the polyfill entirely. Chromium currently exposes
-  // both during the transition; checking either is sufficient.
-  const hasNativeModelContext = Boolean(doc?.modelContext) || Boolean(nav?.modelContext);
+  const documentModelContext = doc?.modelContext;
+  const hasDocumentModelContext = Boolean(documentModelContext);
 
-  if (hasNativeModelContext) {
+  if (hasDocumentModelContext) {
     return;
   }
 
+  const navigatorModelContext = nav?.modelContext;
+  const hasNavigatorModelContext = Boolean(navigatorModelContext);
+
   if (installState.installed) {
     cleanupWebMCPPolyfill();
+  }
+
+  if (doc && navigatorModelContext) {
+    installState.previousDocumentModelContextDescriptor = Object.getOwnPropertyDescriptor(
+      doc,
+      'modelContext'
+    );
+    defineDocumentModelContextProperty(doc, navigatorModelContext);
+    installState.installedDocumentModelContext = true;
+    installState.installed = true;
+    return;
+  }
+
+  if (hasNavigatorModelContext) {
+    return;
   }
 
   const context = new StrictWebMCPContext();
@@ -994,6 +1051,7 @@ export function initializeWebMCPPolyfill(options?: WebMCPPolyfillInitOptions): v
       'modelContext'
     );
     defineDocumentModelContextProperty(doc, modelContext as ModelContext);
+    installState.installedDocumentModelContext = true;
   }
 
   if (nav) {
@@ -1009,6 +1067,7 @@ export function initializeWebMCPPolyfill(options?: WebMCPPolyfillInitOptions): v
     // Reset the one-shot warning flag so a fresh install warns again on first access.
     navigatorModelContextDeprecationWarned = false;
     defineDeprecatedNavigatorModelContext(nav, modelContext as ModelContext);
+    installState.installedNavigatorModelContext = true;
 
     const installTestingShim = options?.installTestingShim ?? 'if-missing';
     const hasModelContextTesting = Boolean(nav.modelContextTesting);
@@ -1023,6 +1082,7 @@ export function initializeWebMCPPolyfill(options?: WebMCPPolyfillInitOptions): v
         'modelContextTesting',
         context.getTestingShim() as Navigator['modelContextTesting']
       );
+      installState.installedNavigatorModelContextTesting = true;
     }
   }
 
@@ -1050,11 +1110,13 @@ export function cleanupWebMCPPolyfill(): void {
   const nav = getNavigator();
   const doc = getDocument();
 
-  if (doc) {
+  if (doc && installState.installedDocumentModelContext) {
     restore(doc, 'modelContext', installState.previousDocumentModelContextDescriptor);
   }
-  if (nav) {
+  if (nav && installState.installedNavigatorModelContext) {
     restore(nav, 'modelContext', installState.previousNavigatorModelContextDescriptor);
+  }
+  if (nav && installState.installedNavigatorModelContextTesting) {
     restore(
       nav,
       'modelContextTesting',
@@ -1066,6 +1128,9 @@ export function cleanupWebMCPPolyfill(): void {
   installState.previousDocumentModelContextDescriptor = undefined;
   installState.previousNavigatorModelContextDescriptor = undefined;
   installState.previousNavigatorModelContextTestingDescriptor = undefined;
+  installState.installedDocumentModelContext = false;
+  installState.installedNavigatorModelContext = false;
+  installState.installedNavigatorModelContextTesting = false;
   navigatorModelContextDeprecationWarned = false;
 }
 

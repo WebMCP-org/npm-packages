@@ -29,6 +29,7 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
         .modelContextTesting;
 
       return {
+        hasDocumentModelContext: typeof document.modelContext !== 'undefined',
         hasModelContext: typeof navigator.modelContext !== 'undefined',
         hasTesting: Boolean(testing),
         hasExecuteTool: typeof testing?.executeTool === 'function',
@@ -39,7 +40,7 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
       };
     });
 
-    expect(surface.hasModelContext).toBe(true);
+    expect(surface.hasDocumentModelContext || surface.hasModelContext).toBe(true);
     expect(surface.hasTesting).toBe(true);
     expect(surface.hasExecuteTool).toBe(true);
     expect(surface.hasListTools).toBe(true);
@@ -48,6 +49,37 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
 
     // Diagnostics only: current Chrome Beta may not yet expose this method.
     console.log('hasCrossDocumentResult:', surface.hasCrossDocumentResult);
+  });
+
+  test('exposes Chrome M150 document.modelContext transition surface', async ({ page }) => {
+    const warnings: string[] = [];
+    page.on('console', (message) => {
+      if (message.type() === 'warning') {
+        warnings.push(message.text());
+      }
+    });
+
+    const surface = await page.evaluate(() => {
+      const documentModelContext = document.modelContext;
+      const warningsBeforeNavigatorRead = performance.now();
+      void warningsBeforeNavigatorRead;
+      const navigatorModelContext = navigator.modelContext;
+
+      return {
+        hasDocumentModelContext: typeof documentModelContext !== 'undefined',
+        hasNavigatorModelContext: typeof navigatorModelContext !== 'undefined',
+        sameInstance: documentModelContext === navigatorModelContext,
+      };
+    });
+
+    test.skip(
+      !surface.hasDocumentModelContext,
+      'Chrome before M150 exposes only the legacy navigator.modelContext preview surface'
+    );
+
+    expect(surface.hasNavigatorModelContext).toBe(true);
+    expect(surface.sameInstance).toBe(true);
+    expect(warnings.some((text) => /navigator\.modelContext is deprecated/i.test(text))).toBe(true);
   });
 
   test('listTools returns valid RegisteredTool entries for every tool', async ({ page }) => {

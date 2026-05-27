@@ -40,6 +40,15 @@ export interface ModelContextTestingToolInfo {
 }
 
 /**
+ * Tool info returned by Chromium's producer-facing ModelContext.getTools().
+ */
+export interface ModelContextToolInfo extends ModelContextTestingToolInfo {
+  title: string;
+  origin: string;
+  window: Window;
+}
+
+/**
  * Options supported by ModelContextTesting.executeTool().
  */
 export interface ModelContextTestingExecuteToolOptions {
@@ -204,6 +213,11 @@ export interface ModelContextRegisterToolOptions {
    * An `AbortSignal` whose abortion unregisters the tool. A pre-aborted signal short-circuits registration.
    */
   signal?: AbortSignal;
+
+  /**
+   * Origins that can observe this tool from other documents in the same tree.
+   */
+  exposedTo?: string[];
 }
 
 // ============================================================================
@@ -211,7 +225,7 @@ export interface ModelContextRegisterToolOptions {
 // ============================================================================
 
 /**
- * Strict WebMCP core interface on navigator.modelContext.
+ * Strict WebMCP core interface on document.modelContext.
  */
 export interface ModelContextCore {
   // ==================== CONTEXT ====================
@@ -276,7 +290,19 @@ export interface ModelContextCore {
    * shape. Current Chromium returns JSON-stringified schemas here, matching
    * ModelContextTesting.listTools().
    */
-  getTools(): ModelContextTestingToolInfo[];
+  getTools(): Promise<ModelContextToolInfo[]>;
+
+  /**
+   * Executes a registered tool object returned from getTools().
+   *
+   * This mirrors Chromium's current producer-facing preview API. The testing API
+   * still executes by `(toolName, inputArgsJson)`.
+   */
+  executeTool(
+    tool: ModelContextToolInfo,
+    inputArgsJson: string,
+    options?: ModelContextTestingExecuteToolOptions
+  ): Promise<string | null>;
 
   /**
    * Handler invoked when the producer tool list changes.
@@ -395,7 +421,7 @@ export interface ModelContextExtensions {
 }
 
 /**
- * Public navigator.modelContext type (strict core only).
+ * Public document.modelContext type (strict core only).
  */
 export type ModelContext = ModelContextCore;
 
