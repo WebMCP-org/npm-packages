@@ -56,12 +56,21 @@ jobs:
       - name: Install Puppeteer Chrome (for chrome-devtools-mcp e2e)
         run: pnpm --filter @mcp-b/chrome-devtools-mcp exec puppeteer browsers install chrome
 
-      - name: Run E2E tests
+      - name: Run runtime contract E2E tests
         env:
           PLAYWRIGHT_CHROMIUM_CHANNEL: chrome
+        run: pnpm --filter mcp-e2e-tests run test:runtime-contract
+
+      - name: Run local relay E2E tests
+        env:
+          PLAYWRIGHT_CHROMIUM_CHANNEL: chrome
+        run: pnpm --filter @mcp-b/webmcp-local-relay test:e2e
+
+      - name: Run extension E2E tests
+        env:
           PLAYWRIGHT_EXTENSION_CHROMIUM_CHANNEL: chrome
           PLAYWRIGHT_EXTENSION_HEADLESS: 'false'
-        run: xvfb-run -a pnpm test:e2e
+        run: timeout 120s xvfb-run -a pnpm --filter @mcp-b/extension-tools test:e2e
 
       - name: Run framework integration E2E tests
         env:
