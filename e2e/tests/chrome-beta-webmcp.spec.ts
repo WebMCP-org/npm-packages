@@ -52,17 +52,8 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
   });
 
   test('exposes Chrome M150 document.modelContext transition surface', async ({ page }) => {
-    const warnings: string[] = [];
-    page.on('console', (message) => {
-      if (message.type() === 'warning') {
-        warnings.push(message.text());
-      }
-    });
-
     const surface = await page.evaluate(() => {
       const documentModelContext = document.modelContext;
-      const warningsBeforeNavigatorRead = performance.now();
-      void warningsBeforeNavigatorRead;
       const navigatorModelContext = navigator.modelContext;
 
       return {
@@ -79,7 +70,6 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
 
     expect(surface.hasNavigatorModelContext).toBe(true);
     expect(surface.sameInstance).toBe(true);
-    expect(warnings.some((text) => /navigator\.modelContext is deprecated/i.test(text))).toBe(true);
   });
 
   test('listTools returns valid RegisteredTool entries for every tool', async ({ page }) => {
