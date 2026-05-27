@@ -74,14 +74,16 @@ interface NormalizedInputSchema {
 
 interface InstallState {
   installed: boolean;
-  previousModelContextDescriptor: PropertyDescriptor | undefined;
-  previousModelContextTestingDescriptor: PropertyDescriptor | undefined;
+  previousNavigatorModelContextDescriptor: PropertyDescriptor | undefined;
+  previousNavigatorModelContextTestingDescriptor: PropertyDescriptor | undefined;
+  previousDocumentModelContextDescriptor: PropertyDescriptor | undefined;
 }
 
 const installState: InstallState = {
   installed: false,
-  previousModelContextDescriptor: undefined,
-  previousModelContextTestingDescriptor: undefined,
+  previousNavigatorModelContextDescriptor: undefined,
+  previousNavigatorModelContextTestingDescriptor: undefined,
+  previousDocumentModelContextDescriptor: undefined,
 };
 
 export interface WebMCPPolyfillInitOptions {
@@ -909,6 +911,14 @@ function getNavigator(): Navigator | null {
   return null;
 }
 
+function getDocument(): Document | null {
+  if (typeof document !== 'undefined') {
+    return document;
+  }
+
+  return null;
+}
+
 function defineNavigatorProperty<K extends keyof Navigator>(
   target: Navigator,
   key: K,
@@ -922,15 +932,51 @@ function defineNavigatorProperty<K extends keyof Navigator>(
   });
 }
 
+function defineDocumentModelContextProperty(target: Document, value: ModelContext): void {
+  Object.defineProperty(target, 'modelContext', {
+    configurable: true,
+    enumerable: true,
+    writable: false,
+    value,
+  });
+}
+
+let navigatorModelContextDeprecationWarned = false;
+
+// Per webmachinelearning/webmcp#173 / PR #184, the modelContext getter moved
+// from Navigator to Document. We install on document.modelContext as the
+// primary surface and expose navigator.modelContext as a deprecated alias that
+// returns the same instance and logs a one-time console warning on first
+// access. This mirrors the deprecation behavior shipped in Chrome 150.
+function defineDeprecatedNavigatorModelContext(target: Navigator, value: ModelContext): void {
+  Object.defineProperty(target, 'modelContext', {
+    configurable: true,
+    enumerable: true,
+    get() {
+      if (!navigatorModelContextDeprecationWarned) {
+        navigatorModelContextDeprecationWarned = true;
+        console.warn(
+          '[WebMCPPolyfill] navigator.modelContext is deprecated. The May 27, 2026 WebMCP draft moved the modelContext getter from Navigator to Document — use document.modelContext instead. See https://github.com/webmachinelearning/webmcp/pull/184.'
+        );
+      }
+      return value;
+    },
+  });
+}
+
 export function initializeWebMCPPolyfill(options?: WebMCPPolyfillInitOptions): void {
   const nav = getNavigator();
-  if (!nav) {
+  const doc = getDocument();
+  if (!nav && !doc) {
     return;
   }
 
-  const hasModelContext = Boolean(nav.modelContext);
+  // Either surface having a native ModelContext means the browser already
+  // provides WebMCP — skip the polyfill entirely. Chromium currently exposes
+  // both during the transition; checking either is sufficient.
+  const hasNativeModelContext = Boolean(doc?.modelContext) || Boolean(nav?.modelContext);
 
-  if (hasModelContext) {
+  if (hasNativeModelContext) {
     return;
   }
 
@@ -942,59 +988,85 @@ export function initializeWebMCPPolyfill(options?: WebMCPPolyfillInitOptions): v
   const modelContext = context as unknown as PolyfillModelContext;
   modelContext[POLYFILL_MARKER_PROPERTY] = true;
 
-  installState.previousModelContextDescriptor = Object.getOwnPropertyDescriptor(
-    nav,
-    'modelContext'
-  );
-  installState.previousModelContextTestingDescriptor = Object.getOwnPropertyDescriptor(
-    nav,
-    'modelContextTesting'
-  );
-
-  defineNavigatorProperty(nav, 'modelContext', modelContext as Navigator['modelContext']);
-
-  const installTestingShim = options?.installTestingShim ?? 'if-missing';
-  const hasModelContextTesting = Boolean(nav.modelContextTesting);
-  const shouldInstallTestingShim =
-    installTestingShim === 'always' ||
-    ((installTestingShim === true || installTestingShim === 'if-missing') &&
-      !hasModelContextTesting);
-
-  if (shouldInstallTestingShim) {
-    defineNavigatorProperty(
-      nav,
-      'modelContextTesting',
-      context.getTestingShim() as Navigator['modelContextTesting']
+  if (doc) {
+    installState.previousDocumentModelContextDescriptor = Object.getOwnPropertyDescriptor(
+      doc,
+      'modelContext'
     );
+    defineDocumentModelContextProperty(doc, modelContext as ModelContext);
+  }
+
+  if (nav) {
+    installState.previousNavigatorModelContextDescriptor = Object.getOwnPropertyDescriptor(
+      nav,
+      'modelContext'
+    );
+    installState.previousNavigatorModelContextTestingDescriptor = Object.getOwnPropertyDescriptor(
+      nav,
+      'modelContextTesting'
+    );
+
+    // Reset the one-shot warning flag so a fresh install warns again on first access.
+    navigatorModelContextDeprecationWarned = false;
+    defineDeprecatedNavigatorModelContext(nav, modelContext as ModelContext);
+
+    const installTestingShim = options?.installTestingShim ?? 'if-missing';
+    const hasModelContextTesting = Boolean(nav.modelContextTesting);
+    const shouldInstallTestingShim =
+      installTestingShim === 'always' ||
+      ((installTestingShim === true || installTestingShim === 'if-missing') &&
+        !hasModelContextTesting);
+
+    if (shouldInstallTestingShim) {
+      defineNavigatorProperty(
+        nav,
+        'modelContextTesting',
+        context.getTestingShim() as Navigator['modelContextTesting']
+      );
+    }
   }
 
   installState.installed = true;
 }
 
 export function cleanupWebMCPPolyfill(): void {
-  const nav = getNavigator();
-  if (!nav || !installState.installed) {
+  if (!installState.installed) {
     return;
   }
 
-  const restore = <K extends keyof Navigator>(
-    key: K,
+  const restore = (
+    target: Navigator | Document,
+    key: string,
     previousDescriptor: PropertyDescriptor | undefined
   ) => {
     if (previousDescriptor) {
-      Object.defineProperty(nav, key, previousDescriptor);
+      Object.defineProperty(target, key, previousDescriptor);
       return;
     }
 
-    delete (nav as unknown as Record<string, unknown>)[key as string];
+    delete (target as unknown as Record<string, unknown>)[key];
   };
 
-  restore('modelContext', installState.previousModelContextDescriptor);
-  restore('modelContextTesting', installState.previousModelContextTestingDescriptor);
+  const nav = getNavigator();
+  const doc = getDocument();
+
+  if (doc) {
+    restore(doc, 'modelContext', installState.previousDocumentModelContextDescriptor);
+  }
+  if (nav) {
+    restore(nav, 'modelContext', installState.previousNavigatorModelContextDescriptor);
+    restore(
+      nav,
+      'modelContextTesting',
+      installState.previousNavigatorModelContextTestingDescriptor
+    );
+  }
 
   installState.installed = false;
-  installState.previousModelContextDescriptor = undefined;
-  installState.previousModelContextTestingDescriptor = undefined;
+  installState.previousDocumentModelContextDescriptor = undefined;
+  installState.previousNavigatorModelContextDescriptor = undefined;
+  installState.previousNavigatorModelContextTestingDescriptor = undefined;
+  navigatorModelContextDeprecationWarned = false;
 }
 
 export { initializeWebMCPPolyfill as initializeWebModelContextPolyfill };

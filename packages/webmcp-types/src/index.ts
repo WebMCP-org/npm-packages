@@ -84,9 +84,25 @@ export type {
 // ============================================================================
 
 declare global {
+  interface Document {
+    /**
+     * Web Model Context API strict core surface.
+     *
+     * Per WebMCP spec PR webmachinelearning/webmcp#184, each Document owns its
+     * associated ModelContext. This is the canonical install location as of
+     * Chrome 150. Prefer `document.modelContext` for new code.
+     */
+    modelContext: ModelContext;
+  }
+
   interface Navigator {
     /**
      * Web Model Context API strict core surface.
+     *
+     * @deprecated The modelContext getter moved from Navigator to Document in
+     * Chrome 150 (see webmachinelearning/webmcp#173 / PR #184). Use
+     * `document.modelContext` instead. `navigator.modelContext` is kept as a
+     * backward-compatible alias and will be removed in a future Chrome release.
      */
     modelContext: ModelContext;
 

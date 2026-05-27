@@ -34,6 +34,79 @@ describe('@mcp-b/webmcp-polyfill', () => {
     expect((navigator.modelContext as unknown as { callTool?: unknown }).callTool).toBeUndefined();
   });
 
+  it('installs strict core methods on document.modelContext', () => {
+    initializeWebMCPPolyfill();
+
+    expect(typeof document.modelContext.provideContext).toBe('function');
+    expect(typeof document.modelContext.clearContext).toBe('function');
+    expect(typeof document.modelContext.registerTool).toBe('function');
+    expect(typeof document.modelContext.getTools).toBe('function');
+    expect(typeof document.modelContext.unregisterTool).toBe('function');
+    expect(typeof document.modelContext.ontoolchange).toBe('object');
+    expect((document.modelContext as unknown as { callTool?: unknown }).callTool).toBeUndefined();
+  });
+
+  it('document.modelContext and navigator.modelContext share the same instance', () => {
+    initializeWebMCPPolyfill();
+
+    // Per WebMCP PR #184, document.modelContext is canonical and
+    // navigator.modelContext is a deprecated alias to the same registry.
+    // Tools registered on either surface must be observable on the other.
+    expect(document.modelContext).toBe(navigator.modelContext);
+
+    document.modelContext.registerTool({
+      name: 'shared_registry_tool',
+      description: 'Tool registered via document.modelContext',
+      inputSchema: { type: 'object', properties: {} },
+      execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+    });
+
+    expect(() =>
+      navigator.modelContext.registerTool({
+        name: 'shared_registry_tool',
+        description: 'Conflicting registration via navigator.modelContext',
+        inputSchema: { type: 'object', properties: {} },
+        execute: async () => ({ content: [{ type: 'text', text: 'second' }] }),
+      })
+    ).toThrow('Tool already registered: shared_registry_tool');
+  });
+
+  it('logs a one-time deprecation warning when navigator.modelContext is accessed', () => {
+    initializeWebMCPPolyfill();
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      // First read triggers the warning.
+      void navigator.modelContext;
+      // Subsequent reads must not re-warn.
+      void navigator.modelContext;
+      void navigator.modelContext;
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        '[WebMCPPolyfill] navigator.modelContext is deprecated. The May 27, 2026 WebMCP draft moved the modelContext getter from Navigator to Document — use document.modelContext instead. See https://github.com/webmachinelearning/webmcp/pull/184.'
+      );
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('does not warn when accessing document.modelContext', () => {
+    initializeWebMCPPolyfill();
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      void document.modelContext;
+      void document.modelContext;
+
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
   it('registerTool returns undefined and throws on duplicates', () => {
     initializeWebMCPPolyfill();
 
@@ -90,8 +163,10 @@ describe('@mcp-b/webmcp-polyfill', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     try {
-      navigator.modelContext.provideContext();
-      navigator.modelContext.provideContext();
+      // Use document.modelContext (the canonical surface per WebMCP PR #184) so the
+      // navigator.modelContext access deprecation warning does not pollute this test.
+      document.modelContext.provideContext();
+      document.modelContext.provideContext();
 
       expect(warnSpy).toHaveBeenCalledWith(
         '[WebMCPPolyfill] navigator.modelContext.provideContext() is deprecated and will be removed in the next major version. Register tools individually with registerTool() instead.'
@@ -201,6 +276,11 @@ describe('@mcp-b/webmcp-polyfill', () => {
       'Tool already registered: deprecation_tool'
     );
 
+    // Drain the one-shot navigator.modelContext deprecation warning before the spy
+    // is installed — the surface under test here is the unregisterTool deprecation,
+    // not the navigator-vs-document migration warning.
+    void navigator.modelContext;
+
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     try {
@@ -274,8 +354,10 @@ describe('@mcp-b/webmcp-polyfill', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     try {
-      navigator.modelContext.clearContext();
-      navigator.modelContext.clearContext();
+      // Use document.modelContext to isolate the clearContext deprecation warning
+      // from the navigator.modelContext access deprecation.
+      document.modelContext.clearContext();
+      document.modelContext.clearContext();
 
       expect(warnSpy).toHaveBeenCalledWith(
         '[WebMCPPolyfill] navigator.modelContext.clearContext() is deprecated and will be removed in the next major version. Unregister individual tools instead.'
