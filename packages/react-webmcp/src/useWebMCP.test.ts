@@ -150,7 +150,9 @@ describe('useWebMCP', () => {
           })
         );
 
-        const descriptor = registerToolSpy.mock.calls.at(-1)?.[0] as {
+        const descriptor = registerToolSpy.mock.calls.find(
+          ([tool]) => (tool as { name?: string }).name === 'zod_like_tool'
+        )?.[0] as {
           name: string;
           inputSchema?: {
             type?: string;
@@ -185,7 +187,9 @@ describe('useWebMCP', () => {
           })
         );
 
-        const descriptor = registerToolSpy.mock.calls.at(-1)?.[0] as {
+        const descriptor = registerToolSpy.mock.calls.find(
+          ([tool]) => (tool as { name?: string }).name === 'zod_output_tool'
+        )?.[0] as {
           name: string;
           outputSchema?: {
             type?: string;
