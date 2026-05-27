@@ -89,6 +89,34 @@ jobs:
           path: e2e/test-results/
           retention-days: 7
 
+  extension-e2e:
+    name: Extension E2E (Playwright Chromium)
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.58.0-noble
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@8912a9102ac27614460f54aedde9e1e7f9aec20d # v6.0.5
+
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: '24'
+          cache: true
+
+      - name: Install dependencies
+        run: vp install
+
+      - name: Run extension E2E tests
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
+        run: pnpm --filter @mcp-b/extension-tools test:e2e
+
   native-parity:
     name: Native API Parity (${{ matrix.mode }})
     runs-on: ubuntu-latest
