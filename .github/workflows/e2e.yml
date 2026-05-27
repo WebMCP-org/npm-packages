@@ -50,6 +50,9 @@ jobs:
           chrome-version: stable
           install-dependencies: true
 
+      - name: Install Playwright Chromium (for extension E2E)
+        run: pnpm exec playwright install chromium
+
       - name: Install Puppeteer Chrome (for chrome-devtools-mcp e2e)
         run: pnpm --filter @mcp-b/chrome-devtools-mcp exec puppeteer browsers install chrome
 

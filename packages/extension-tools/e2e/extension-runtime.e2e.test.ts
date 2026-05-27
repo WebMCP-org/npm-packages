@@ -25,7 +25,7 @@ async function launchExtensionContext(): Promise<{ context: BrowserContext; exte
   USER_DATA_DIRS.push(userDataDir);
 
   const context = await chromium.launchPersistentContext(userDataDir, {
-    channel: process.env.PLAYWRIGHT_CHROMIUM_CHANNEL,
+    channel: 'chromium',
     headless: true,
     args: [`--disable-extensions-except=${EXTENSION_DIR}`, `--load-extension=${EXTENSION_DIR}`],
   });
