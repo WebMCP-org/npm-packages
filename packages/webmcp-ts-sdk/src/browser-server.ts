@@ -5,7 +5,6 @@ import type {
   ModelContextClient,
   ModelContextCore,
   ModelContextExtensions,
-  ModelContextOptions,
   ModelContextRegisterToolOptions,
   ModelContextTestingToolInfo,
   ModelContextToolReference,
@@ -204,8 +203,8 @@ interface NativeToolCleanup {
  * (resources, prompts, elicitation, sampling) via BaseMcpServer.
  *
  * Deprecated compatibility (kept for Chrome Beta 147 and existing wrappers,
- * removed in the next major): `unregisterTool(name)`, `provideContext()`,
- * `clearContext()`, and the `{ unregister }` handle returned from `registerTool`.
+ * removed in the next major): `unregisterTool(name)` and the `{ unregister }`
+ * handle returned from `registerTool`.
  *
  * When `native` is provided, tool operations are mirrored so that
  * navigator.modelContextTesting stays in sync.
@@ -217,8 +216,6 @@ export class BrowserMcpServer extends BaseMcpServer {
   private _promptSchemas = new Map<string, InputSchema>();
   private _jsonValidator: PolyfillJsonSchemaValidator;
   private _publicMethodsBound = false;
-  private _provideContextDeprecationWarned = false;
-  private _clearContextDeprecationWarned = false;
   private _unregisterToolDeprecationWarned = false;
   private _nativeToolCleanups = new Map<string, NativeToolCleanup>();
   private _producerEventTarget = new EventTarget();
@@ -252,8 +249,6 @@ export class BrowserMcpServer extends BaseMcpServer {
 
     this.registerTool = this.registerTool.bind(this);
     this.unregisterTool = this.unregisterTool.bind(this);
-    this.provideContext = this.provideContext.bind(this);
-    this.clearContext = this.clearContext.bind(this);
     this.listTools = this.listTools.bind(this);
     this.getTools = this.getTools.bind(this);
     this.callTool = this.callTool.bind(this);
@@ -652,24 +647,6 @@ export class BrowserMcpServer extends BaseMcpServer {
     }
   }
 
-  private clearRegisteredTools(): void {
-    let changed = false;
-    for (const name of Object.keys(this._parentTools)) {
-      this._parentTools[name]?.remove();
-      changed = true;
-      if (this.native) {
-        try {
-          this.unregisterNativeToolMirror(name);
-        } catch (error) {
-          console.warn('[BrowserMcpServer] Native unregister during clear failed:', error);
-        }
-      }
-    }
-    if (changed) {
-      this.notifyProducerToolsChanged();
-    }
-  }
-
   // @ts-expect-error -- WebMCP API: (descriptor) vs MCP SDK: (name, uri, config, readCallback)
   override registerResource(descriptor: {
     uri: string;
@@ -727,23 +704,6 @@ export class BrowserMcpServer extends BaseMcpServer {
     };
   }
 
-  provideContext(options?: ModelContextOptions): void {
-    this.warnProvideContextDeprecationOnce();
-    this.clearRegisteredTools();
-
-    for (const tool of options?.tools ?? []) {
-      this.registerTool(tool);
-    }
-  }
-
-  clearContext(): void {
-    this.warnClearContextDeprecationOnce();
-    this.clearRegisteredTools();
-    // Note: _promptSchemas is NOT cleared here. clearContext() is a WebMCP standard
-    // method that only handles tools. Prompt schemas are cleaned up individually
-    // via the unregister() callback returned by registerPrompt().
-  }
-
   private resolveToolNameForUnregister(nameOrTool: string | ModelContextToolReference): string {
     if (typeof nameOrTool === 'string') {
       return nameOrTool;
@@ -755,28 +715,6 @@ export class BrowserMcpServer extends BaseMcpServer {
 
     throw new TypeError(
       "Failed to execute 'unregisterTool' on 'ModelContext': parameter 1 must be a string or an object with a string name."
-    );
-  }
-
-  private warnProvideContextDeprecationOnce(): void {
-    if (this._provideContextDeprecationWarned) {
-      return;
-    }
-
-    this._provideContextDeprecationWarned = true;
-    console.warn(
-      '[BrowserMcpServer] navigator.modelContext.provideContext() is deprecated and will be removed in the next major version. Register tools individually with registerTool() instead.'
-    );
-  }
-
-  private warnClearContextDeprecationOnce(): void {
-    if (this._clearContextDeprecationWarned) {
-      return;
-    }
-
-    this._clearContextDeprecationWarned = true;
-    console.warn(
-      '[BrowserMcpServer] navigator.modelContext.clearContext() is deprecated and will be removed in the next major version. Unregister individual tools instead.'
     );
   }
 

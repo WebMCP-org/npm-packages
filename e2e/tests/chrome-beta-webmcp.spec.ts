@@ -112,7 +112,7 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
     expect(result.invalidEntries).toEqual([]);
   });
 
-  test('listTools tracks register/unregister operations', async ({ page }) => {
+  test('listTools tracks registerTool signal lifecycle operations', async ({ page }) => {
     const result = await page.evaluate(() => {
       const context = navigator.modelContext;
       const testing = navigator.modelContextTesting;
@@ -121,22 +121,26 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
       }
 
       const toolName = `beta_list_tracking_${Date.now()}`;
+      const controller = new AbortController();
       const before = testing.listTools().length;
-      context.registerTool({
-        name: toolName,
-        description: 'Tracking test tool',
-        inputSchema: { type: 'object', properties: {} },
-        async execute() {
-          return { content: [{ type: 'text', text: 'ok' }] };
+      context.registerTool(
+        {
+          name: toolName,
+          description: 'Tracking test tool',
+          inputSchema: { type: 'object', properties: {} },
+          async execute() {
+            return { content: [{ type: 'text', text: 'ok' }] };
+          },
         },
-      });
+        { signal: controller.signal }
+      );
 
       const afterRegister = testing.listTools().length;
       const hasToolAfterRegister = testing
         .listTools()
         .some((tool: { name: string }) => tool.name === toolName);
 
-      context.unregisterTool(toolName);
+      controller.abort();
       const afterUnregister = testing.listTools().length;
       const hasToolAfterUnregister = testing
         .listTools()
@@ -172,28 +176,35 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
       }
 
       const nativeContext = context as unknown as {
-        registerTool: (tool: unknown) => unknown;
-        unregisterTool: (name: string) => void;
+        registerTool: (tool: unknown, options?: { signal?: AbortSignal }) => unknown;
       };
 
       const noSchemaName = `beta_no_schema_${Date.now()}`;
       const undefinedSchemaName = `beta_undefined_schema_${Date.now()}`;
+      const noSchemaController = new AbortController();
+      const undefinedSchemaController = new AbortController();
 
-      nativeContext.registerTool({
-        name: noSchemaName,
-        description: 'No explicit schema',
-        async execute() {
-          return { content: [{ type: 'text', text: 'ok' }] };
+      nativeContext.registerTool(
+        {
+          name: noSchemaName,
+          description: 'No explicit schema',
+          async execute() {
+            return { content: [{ type: 'text', text: 'ok' }] };
+          },
         },
-      });
-      nativeContext.registerTool({
-        name: undefinedSchemaName,
-        description: 'Undefined schema',
-        inputSchema: undefined,
-        async execute() {
-          return { content: [{ type: 'text', text: 'ok' }] };
+        { signal: noSchemaController.signal }
+      );
+      nativeContext.registerTool(
+        {
+          name: undefinedSchemaName,
+          description: 'Undefined schema',
+          inputSchema: undefined,
+          async execute() {
+            return { content: [{ type: 'text', text: 'ok' }] };
+          },
         },
-      });
+        { signal: undefinedSchemaController.signal }
+      );
 
       try {
         const tools = testing.listTools();
@@ -225,8 +236,8 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
           undefinedSchemaParseable: parseableOrEmpty(undefinedSchemaTool?.inputSchema),
         };
       } finally {
-        nativeContext.unregisterTool(noSchemaName);
-        nativeContext.unregisterTool(undefinedSchemaName);
+        noSchemaController.abort();
+        undefinedSchemaController.abort();
       }
     });
 
@@ -246,18 +257,22 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
       }
 
       const toolName = `beta_exec_ok_${Date.now()}`;
-      context.registerTool({
-        name: toolName,
-        description: 'executeTool happy path',
-        inputSchema: {
-          type: 'object',
-          properties: { value: { type: 'number' } },
-          required: ['value'],
+      const controller = new AbortController();
+      context.registerTool(
+        {
+          name: toolName,
+          description: 'executeTool happy path',
+          inputSchema: {
+            type: 'object',
+            properties: { value: { type: 'number' } },
+            required: ['value'],
+          },
+          async execute(args: { value: number }) {
+            return { content: [{ type: 'text', text: `beta:${args.value}` }] };
+          },
         },
-        async execute(args: { value: number }) {
-          return { content: [{ type: 'text', text: `beta:${args.value}` }] };
-        },
-      });
+        { signal: controller.signal }
+      );
 
       try {
         const withoutOptions = await testing.executeTool(toolName, JSON.stringify({ value: 7 }));
@@ -268,7 +283,7 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
         );
         return { missingApi: false, withoutOptions, withEmptyOptions };
       } finally {
-        context.unregisterTool(toolName);
+        controller.abort();
       }
     });
 
@@ -377,14 +392,18 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
       }
 
       const toolName = `beta_exec_throw_${Date.now()}`;
-      context.registerTool({
-        name: toolName,
-        description: 'Always throws',
-        inputSchema: { type: 'object', properties: {} },
-        async execute() {
-          throw new Error('boom');
+      const controller = new AbortController();
+      context.registerTool(
+        {
+          name: toolName,
+          description: 'Always throws',
+          inputSchema: { type: 'object', properties: {} },
+          async execute() {
+            throw new Error('boom');
+          },
         },
-      });
+        { signal: controller.signal }
+      );
 
       try {
         await testing.executeTool(toolName, '{}');
@@ -397,7 +416,7 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
           message: error instanceof Error ? error.message : String(error),
         };
       } finally {
-        context.unregisterTool(toolName);
+        controller.abort();
       }
     });
 
@@ -450,15 +469,19 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
       }
 
       const toolName = `beta_exec_abort_${Date.now()}`;
-      context.registerTool({
-        name: toolName,
-        description: 'Slow abortable tool',
-        inputSchema: { type: 'object', properties: {} },
-        async execute() {
-          await new Promise((resolve) => setTimeout(resolve, 200));
-          return { content: [{ type: 'text', text: 'done' }] };
+      const registrationController = new AbortController();
+      context.registerTool(
+        {
+          name: toolName,
+          description: 'Slow abortable tool',
+          inputSchema: { type: 'object', properties: {} },
+          async execute() {
+            await new Promise((resolve) => setTimeout(resolve, 200));
+            return { content: [{ type: 'text', text: 'done' }] };
+          },
         },
-      });
+        { signal: registrationController.signal }
+      );
 
       try {
         const controller = new AbortController();
@@ -474,7 +497,7 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
         setTimeout(() => controller.abort(), 10);
         return { missingApi: false, ...(await pending) };
       } finally {
-        context.unregisterTool(toolName);
+        registrationController.abort();
       }
     });
 
@@ -514,30 +537,22 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
       });
 
       const dynamicName = `beta_cb_dynamic_${Date.now()}`;
-      const providedName = `beta_cb_provided_${Date.now()}`;
+      const throwingName = `beta_cb_throw_${Date.now()}`;
+      const dynamicController = new AbortController();
+      const throwingController = new AbortController();
 
-      context.registerTool({
-        name: dynamicName,
-        description: 'dynamic callback test',
-        inputSchema: { type: 'object', properties: {} },
-        async execute() {
-          return { content: [{ type: 'text', text: 'ok' }] };
-        },
-      });
-      context.unregisterTool(dynamicName);
-      context.provideContext({
-        tools: [
-          {
-            name: providedName,
-            description: 'provided callback test',
-            inputSchema: { type: 'object', properties: {} },
-            async execute() {
-              return { content: [{ type: 'text', text: 'ok' }] };
-            },
+      context.registerTool(
+        {
+          name: dynamicName,
+          description: 'dynamic callback test',
+          inputSchema: { type: 'object', properties: {} },
+          async execute() {
+            return { content: [{ type: 'text', text: 'ok' }] };
           },
-        ],
-      });
-      context.clearContext();
+        },
+        { signal: dynamicController.signal }
+      );
+      dynamicController.abort();
 
       await new Promise((resolve) => setTimeout(resolve, 100));
 
@@ -546,16 +561,21 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
         throw new Error('intentional listener failure');
       });
       try {
-        context.registerTool({
-          name: `beta_cb_throw_${Date.now()}`,
-          description: 'throwing listener operation',
-          inputSchema: { type: 'object', properties: {} },
-          async execute() {
-            return { content: [{ type: 'text', text: 'ok' }] };
+        context.registerTool(
+          {
+            name: throwingName,
+            description: 'throwing listener operation',
+            inputSchema: { type: 'object', properties: {} },
+            async execute() {
+              return { content: [{ type: 'text', text: 'ok' }] };
+            },
           },
-        });
+          { signal: throwingController.signal }
+        );
       } catch {
         throwsListenerOperationsSucceeded = false;
+      } finally {
+        throwingController.abort();
       }
 
       return {
@@ -569,8 +589,8 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
     expect(result.missingApi).toBe(false);
     // Chrome Beta may coalesce adjacent context mutations, but both listeners
     // should still observe the same stream of toolchange notifications.
-    expect(result.firstCount).toBeGreaterThanOrEqual(3);
-    expect(result.secondCount).toBeGreaterThanOrEqual(3);
+    expect(result.firstCount).toBeGreaterThanOrEqual(2);
+    expect(result.secondCount).toBeGreaterThanOrEqual(2);
     expect(result.firstCount).toBe(result.secondCount);
     expect(result.throwsListenerOperationsSucceeded).toBe(true);
   });
@@ -625,20 +645,24 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
       }
 
       const toolName = `beta_schema_tool_${Date.now()}`;
-      context.registerTool({
-        name: toolName,
-        description: 'Schema verification tool',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            query: { type: 'string' },
+      const controller = new AbortController();
+      context.registerTool(
+        {
+          name: toolName,
+          description: 'Schema verification tool',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              query: { type: 'string' },
+            },
+            required: ['query'],
           },
-          required: ['query'],
+          async execute() {
+            return { content: [{ type: 'text', text: 'ok' }] };
+          },
         },
-        async execute() {
-          return { content: [{ type: 'text', text: 'ok' }] };
-        },
-      });
+        { signal: controller.signal }
+      );
 
       try {
         const tools = testing.listTools();
@@ -661,11 +685,7 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
           parsedSchemaType,
         };
       } finally {
-        try {
-          context.unregisterTool(toolName);
-        } catch {
-          // no-op
-        }
+        controller.abort();
       }
     });
 

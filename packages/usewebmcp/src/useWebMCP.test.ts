@@ -1,5 +1,8 @@
 import { initializeWebModelContext } from '@mcp-b/global';
-import type { ModelContextWithExtensions } from '@mcp-b/webmcp-types';
+import type {
+  ModelContextTestingPolyfillExtensions,
+  ModelContextWithExtensions,
+} from '@mcp-b/webmcp-types';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
 
@@ -39,7 +42,11 @@ describe('useWebMCP', () => {
   });
 
   beforeEach(() => {
-    navigator.modelContext?.clearContext();
+    (
+      navigator.modelContextTesting as
+        | (Navigator['modelContextTesting'] & Partial<ModelContextTestingPolyfillExtensions>)
+        | undefined
+    )?.reset?.();
   });
 
   describe('initial state', () => {

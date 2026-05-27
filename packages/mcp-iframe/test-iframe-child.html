@@ -36,28 +36,24 @@
         },
       });
 
-      navigator.modelContext?.provideContext({
-        tools: [
-          {
-            name: 'add',
-            description: 'Add two numbers from iframe',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                a: { type: 'number' },
-                b: { type: 'number' },
-              },
-              required: ['a', 'b'],
-            },
-            execute: async ({ a, b }) => {
-              const sum = Number(a) + Number(b);
-              return {
-                content: [{ type: 'text', text: String(sum) }],
-                structuredContent: { sum },
-              };
-            },
+      navigator.modelContext?.registerTool({
+        name: 'add',
+        description: 'Add two numbers from iframe',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            a: { type: 'number' },
+            b: { type: 'number' },
           },
-        ],
+          required: ['a', 'b'],
+        },
+        execute: async ({ a, b }) => {
+          const sum = Number(a) + Number(b);
+          return {
+            content: [{ type: 'text', text: String(sum) }],
+            structuredContent: { sum },
+          };
+        },
       });
     </script>
   </body>

@@ -25,8 +25,6 @@ if (modelContext) {
 - `getTools()` — async Chromium producer-preview discovery API
 - `executeTool(toolFromGetTools, inputArgsJson, options?)` — Chromium producer-preview execution API
 - `unregisterTool(nameOrTool)` (deprecated compatibility API)
-- `provideContext(options?)` (deprecated compatibility API)
-- `clearContext()` (deprecated compatibility API)
 
 It does not install MCP bridge extensions like `callTool`, resources, or prompts.
 
@@ -35,7 +33,7 @@ Important:
 - `document.modelContext` is the canonical install location. `navigator.modelContext` is kept as a backward-compatible alias that returns the same instance and logs a one-time deprecation warning on first access. The upstream WebMCP draft moved the getter from Navigator to Document on May 27, 2026 ([webmachinelearning/webmcp#184](https://github.com/webmachinelearning/webmcp/pull/184)) and Chrome 150 deprecates `navigator.modelContext`. The polyfill will remove the Navigator alias in the next major version.
 - `document.modelContext` in this package does not provide `listTools()` or `callTool(...)`; producer discovery/execution uses `getTools()` and `executeTool(...)`.
 - For list/execute test flows, use `navigator.modelContextTesting` (when `installTestingShim` is enabled).
-- `provideContext()` and `clearContext()` still work for now, but the upstream WebMCP spec removed them on March 5, 2026. The polyfill logs a deprecation warning and will remove them in the next major version.
+- `provideContext()` and `clearContext()` were removed from the upstream WebMCP spec on March 5, 2026 and are not exposed by this polyfill.
 - `unregisterTool(name)` was removed from the WebMCP draft on April 23, 2026 in favor of `AbortSignal`-driven unregistration. The polyfill keeps it functional with a one-time deprecation warning; it will be removed in the next major version.
 
 ## Type Safety First
@@ -163,12 +161,6 @@ Restores previous `document.modelContext`, `navigator.modelContext`, and `naviga
 
 ## Strict Core Behavior
 
-### `provideContext(options?)`
-
-- Deprecated compatibility API.
-- Replaces the active tool registry with `options.tools`.
-- Clears previously registered tools before applying new tools.
-
 ### `registerTool(tool, options?)`
 
 - Requires a non-empty `name`, non-empty `description`, and `execute` function.
@@ -199,11 +191,6 @@ ac.abort();
 - Removes a tool by name. MCP-B compatibility runtimes also accept the originally registered tool object.
 - Unknown names are a no-op.
 - Logs a one-time deprecation warning. Prefer the `AbortSignal` form on `registerTool(tool, options)`.
-
-### `clearContext()`
-
-- Deprecated compatibility API.
-- Removes all registered tools.
 
 ## Listing and Executing Tools
 

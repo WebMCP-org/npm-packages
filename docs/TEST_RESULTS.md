@@ -8,7 +8,7 @@ All Chromium-compatible APIs have been successfully implemented and the code com
 
 1. **ModelContext APIs** (`global/src/global.ts`)
    - `unregisterTool(name: string)` - Unregister tools by name
-   - `clearContext()` - Clear all registered tools
+   - `registerTool(tool, { signal })` - Register tools with spec-aligned cleanup
 
 2. **ModelContextTesting APIs** (`global/src/global.ts`)
    - `executeTool(toolName, inputArgsJson)` - Execute with JSON string
@@ -115,13 +115,11 @@ pnpm playwright test chromium-native-api.spec.ts
 
 The test suite includes:
 
-### ModelContext Tests (7 tests)
+### ModelContext Tests
 
-- ✓ Method availability (unregisterTool, clearContext)
+- ✓ Method availability
 - ✓ Unregister dynamic tools
 - ✓ Unregister base tools
-- ✓ Clear all tools
-- ✓ Clear both buckets
 - ✓ Handle non-existent tools gracefully
 
 ### ModelContextTesting Tests (16 tests)
@@ -135,8 +133,6 @@ The test suite includes:
 - ✓ Return proper ToolInfo structure
 - ✓ Callbacks fire on registerTool
 - ✓ Callbacks fire on unregisterTool
-- ✓ Callbacks fire on provideContext
-- ✓ Callbacks fire on clearContext
 - ✓ Callback replacement semantics (latest callback wins)
 - ✓ Error handling in callbacks
 

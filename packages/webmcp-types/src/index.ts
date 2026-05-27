@@ -48,8 +48,6 @@ export type {
   ModelContext,
   ModelContextCore,
   ModelContextExtensions,
-  ModelContextInput,
-  ModelContextOptions,
   ModelContextRegisterToolOptions,
   ModelContextTesting,
   ModelContextTestingExecuteToolOptions,

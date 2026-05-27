@@ -5,7 +5,6 @@ import type {
   ElicitationResult as GlobalElicitationResult,
   InputSchema as GlobalInputSchema,
   ModelContext as GlobalModelContext,
-  ModelContextInput as GlobalModelContextInput,
   ModelContextTesting as GlobalModelContextTesting,
   ModelContextTestingExecuteToolOptions as GlobalModelContextTestingExecuteToolOptions,
   ToolInfo as GlobalTestingToolInfo,
@@ -22,7 +21,6 @@ import type {
 import type {
   ModelContext,
   ModelContextExtensions,
-  ModelContextInput,
   ModelContextTesting,
   ModelContextTestingExecuteToolOptions,
   ModelContextTestingToolInfo,
@@ -57,7 +55,6 @@ export type GlobalConformanceChecks = [
   Assert<IsAssignable<ToolListItem, GlobalToolListItem>>,
   Assert<IsAssignable<ElicitationParams, GlobalElicitationParams>>,
   Assert<IsAssignable<ElicitationResult, GlobalElicitationResult>>,
-  Assert<IsAssignable<ModelContextInput, GlobalModelContextInput>>,
   Assert<IsAssignable<ToolCallEvent['name'], GlobalToolCallEvent['name']>>,
   Assert<IsAssignable<ToolCallEvent['arguments'], GlobalToolCallEvent['arguments']>>,
   Assert<

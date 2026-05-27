@@ -17,13 +17,43 @@ let modelContextTesting: ModelContextTesting;
 
 // Bucket tracking
 let bucketATools: string[] = [];
+const bucketARegistrations = new Map<string, { unregister: () => void }>();
 const bucketBRegistrations = new Map<string, { unregister: () => void }>();
 
 // Iframe context tracking
 let iframeReady = false;
 let iframeTools: string[] = [];
 let iframeBucketBTools: string[] = [];
+const iframeBucketARegistrations = new Map<string, { unregister: () => void }>();
 const iframeBucketBRegistrations = new Map<string, { unregister: () => void }>();
+
+function unregisterBucketA(): void {
+  for (const registration of bucketARegistrations.values()) {
+    registration.unregister();
+  }
+  bucketARegistrations.clear();
+  bucketATools = [];
+}
+
+function registerBucketATools(tools: Tool[]): void {
+  unregisterBucketA();
+  for (const tool of tools) {
+    bucketARegistrations.set(tool.name, modelContext.registerTool(tool));
+  }
+  bucketATools = tools.map((tool) => tool.name);
+}
+
+function clearIframeParentRegistrations(): void {
+  for (const registration of iframeBucketARegistrations.values()) {
+    registration.unregister();
+  }
+  iframeBucketARegistrations.clear();
+
+  for (const registration of iframeBucketBRegistrations.values()) {
+    registration.unregister();
+  }
+  iframeBucketBRegistrations.clear();
+}
 
 // Iframe event log
 class IframeEventLog {
@@ -204,8 +234,8 @@ function setupEventListeners(): void {
  * Setup tool change listener
  */
 function setupToolChangeListener(): void {
-  modelContext.addEventListener('toolschange', () => {
-    eventLog.info('Event: toolschange', 'Tools have changed');
+  modelContext.addEventListener('toolchange', () => {
+    eventLog.info('Event: toolchange', 'Tools have changed');
     refreshToolDisplay();
   });
 }
@@ -369,10 +399,9 @@ function provideCounterTools(): void {
     },
   ];
 
-  modelContext.provideContext({ tools });
-  bucketATools = tools.map((t) => t.name);
+  registerBucketATools(tools);
 
-  eventLog.success('Bucket A updated', 'Counter tools registered via provideContext()');
+  eventLog.success('Bucket A updated', 'Counter tools registered via registerTool()');
   refreshToolDisplay();
 }
 
@@ -392,8 +421,7 @@ function replaceBucketA(): void {
     },
   };
 
-  modelContext.provideContext({ tools: [greetTool] });
-  bucketATools = ['greet'];
+  registerBucketATools([greetTool]);
 
   eventLog.success('Bucket A replaced', 'Old counter tools removed, greet tool added');
   refreshToolDisplay();
@@ -507,23 +535,27 @@ async function executeToolDemo(): Promise<void> {
 
 function unregisterToolDemo(): void {
   if (bucketATools.length === 0) {
-    eventLog.warning('No Bucket A tools', 'Use provideContext() first');
+    eventLog.warning('No Bucket A tools', 'Register Bucket A tools first');
     return;
   }
 
   const toolName = bucketATools[0];
   modelContext.unregisterTool(toolName);
+  bucketARegistrations.delete(toolName);
+  bucketATools = bucketATools.filter((name) => name !== toolName);
 
   eventLog.success('unregisterTool() called', `Removed "${toolName}" (native method)`);
   refreshToolDisplay();
 }
 
 function clearContextDemo(): void {
-  modelContext.clearContext();
-  bucketATools = [];
+  unregisterBucketA();
+  for (const registration of bucketBRegistrations.values()) {
+    registration.unregister();
+  }
   bucketBRegistrations.clear();
 
-  eventLog.success('clearContext() called', 'All tools cleared (native method)');
+  eventLog.success('Tools cleared', 'All showcase registrations were unregistered');
   refreshToolDisplay();
 }
 
@@ -957,12 +989,15 @@ function reloadIframe(): void {
 // ==================== Parent Context for Iframe Demo ====================
 
 /**
- * Register a tool in parent context via provideContext (Bucket A)
+ * Register a tool in parent context via registerTool (Bucket A)
  */
 function iframeParentRegisterBucketA(): void {
+  iframeBucketARegistrations.get('parent_greet')?.unregister();
+  iframeBucketARegistrations.delete('parent_greet');
+
   const tool: Tool = {
     name: 'parent_greet',
-    description: 'Greeting tool registered in parent via provideContext (Bucket A)',
+    description: 'Greeting tool registered in parent via registerTool (Bucket A)',
     inputSchema: {
       type: 'object',
       properties: {
@@ -975,9 +1010,9 @@ function iframeParentRegisterBucketA(): void {
     },
   };
 
-  modelContext.provideContext({ tools: [tool] });
+  iframeBucketARegistrations.set('parent_greet', modelContext.registerTool(tool));
 
-  iframeEventLog.log('success', 'Parent: Registered parent_greet via provideContext (Bucket A)');
+  iframeEventLog.log('success', 'Parent: Registered parent_greet via registerTool (Bucket A)');
   eventLog.info('Iframe Demo', 'Registered parent_greet in parent context (Bucket A)');
   updateParentToolsDisplay();
 }
@@ -1040,16 +1075,15 @@ function iframeParentUnregisterBucketB(): void {
  * Clear parent context
  */
 function iframeParentClearContext(): void {
-  modelContext.clearContext();
-  iframeBucketBRegistrations.clear();
+  clearIframeParentRegistrations();
 
   const btn = document.getElementById('iframe-parent-unregister-b') as HTMLButtonElement;
   if (btn) {
     btn.disabled = true;
   }
 
-  iframeEventLog.log('info', 'Parent: Context cleared (Bucket A removed)');
-  eventLog.info('Iframe Demo', 'Parent context cleared');
+  iframeEventLog.log('info', 'Parent: Iframe demo registrations cleared');
+  eventLog.info('Iframe Demo', 'Parent iframe demo registrations cleared');
   updateParentToolsDisplay();
 }
 

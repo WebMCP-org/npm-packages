@@ -36,27 +36,23 @@
 
         try {
           // Register a test tool
-          window.navigator.modelContext.provideContext({
-            tools: [
-              {
-                name: 'get-page-title',
-                description: 'Get the current page title',
-                inputSchema: {
-                  type: 'object',
-                  properties: {},
-                },
-                async execute() {
-                  return {
-                    content: [
-                      {
-                        type: 'text',
-                        text: document.title,
-                      },
-                    ],
-                  };
-                },
-              },
-            ],
+          window.navigator.modelContext.registerTool({
+            name: 'get-page-title',
+            description: 'Get the current page title',
+            inputSchema: {
+              type: 'object',
+              properties: {},
+            },
+            async execute() {
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: document.title,
+                  },
+                ],
+              };
+            },
           });
 
           log('✓ Tool registered successfully');

@@ -5,7 +5,6 @@ import type {
   MaybePromise,
   ModelContext,
   ModelContextExtensions,
-  ModelContextInput,
   ModelContextTesting,
   ModelContextTestingExecuteToolOptions,
   ModelContextTestingPolyfillExtensions,
@@ -71,12 +70,6 @@ test('ModelContextExtensions.listTools returns ToolListItem[]', () => {
   expectTypeOf<ModelContextExtensions['listTools']>().returns.toEqualTypeOf<ToolListItem[]>();
 });
 
-test('ModelContext.provideContext accepts optional ModelContextInput', () => {
-  expectTypeOf<ModelContext['provideContext']>()
-    .parameter(0)
-    .toEqualTypeOf<ModelContextInput | undefined>();
-});
-
 // === Consumer API ===
 test('ModelContextExtensions.callTool returns Promise<CallToolResult>', () => {
   expectTypeOf<ModelContextExtensions['callTool']>().returns.toEqualTypeOf<
@@ -119,11 +112,6 @@ test('ModelContextTesting.getCrossDocumentScriptToolResult returns Promise<strin
   >();
 });
 
-// === General ===
-test('ModelContext.clearContext returns void', () => {
-  expectTypeOf<ModelContext['clearContext']>().returns.toEqualTypeOf<void>();
-});
-
 // === Events ===
 test('ToolCallEvent extends Event with name, arguments, respondWith', () => {
   expectTypeOf<ToolCallEvent>().toMatchTypeOf<Event>();
@@ -153,7 +141,9 @@ test('global modelContext properties are readonly', () => {
 });
 
 test('ModelContextWithExtensions composes strict core and extension methods', () => {
-  expectTypeOf<ModelContextWithExtensions['provideContext']>().toBeCallableWith(undefined);
+  expectTypeOf<ModelContextWithExtensions['registerTool']>().toEqualTypeOf<
+    ModelContext['registerTool']
+  >();
   expectTypeOf<ModelContextWithExtensions['listTools']>().returns.toEqualTypeOf<ToolListItem[]>();
 });
 

@@ -19,13 +19,46 @@ function requireElement<T extends HTMLElement>(id: string): T {
 }
 
 const modelContext = navigator.modelContext;
+const baseContextControllers: AbortController[] = [];
+let dynamicToolController: AbortController | null = null;
 
 function getTestingAPI(): ExtendedModelContextTesting | undefined {
   return navigator.modelContextTesting as ExtendedModelContextTesting | undefined;
 }
 
-function provideExtendedContext(options: unknown): void {
-  (modelContext as unknown as { provideContext: (value: unknown) => void }).provideContext(options);
+type RegisterableContext = {
+  tools?: unknown[];
+  resources?: unknown[];
+  prompts?: unknown[];
+};
+
+function provideExtendedContext(options: RegisterableContext): void {
+  for (const controller of baseContextControllers.splice(0)) {
+    controller.abort();
+  }
+
+  const register = (
+    item: unknown,
+    methodName: 'registerTool' | 'registerResource' | 'registerPrompt'
+  ) => {
+    const controller = new AbortController();
+    baseContextControllers.push(controller);
+    const registerMethod = (modelContext as unknown as Record<string, unknown>)[methodName];
+    if (typeof registerMethod !== 'function') {
+      throw new Error(`${methodName} is not available`);
+    }
+    registerMethod.call(modelContext, item, { signal: controller.signal });
+  };
+
+  for (const tool of options.tools ?? []) {
+    register(tool, 'registerTool');
+  }
+  for (const resource of options.resources ?? []) {
+    register(resource, 'registerResource');
+  }
+  for (const prompt of options.prompts ?? []) {
+    register(prompt, 'registerPrompt');
+  }
 }
 
 // Counter state
@@ -129,10 +162,10 @@ function checkAPIAvailability() {
   return false;
 }
 
-// Register base tools (Bucket A) using provideContext
+// Register base tools using AbortSignal-scoped registerTool calls.
 function registerBaseTools() {
   try {
-    log('Registering base tools via provideContext()...');
+    log('Registering base tools via registerTool()...');
 
     provideExtendedContext({
       tools: [
@@ -239,27 +272,31 @@ function registerDynamicTool() {
 
     log('Registering dynamic tool via registerTool()...');
 
-    modelContext.registerTool({
-      name: DYNAMIC_TOOL_NAME,
-      description: 'A dynamically registered tool',
-      inputSchema: {
-        type: 'object',
-        properties: {},
+    dynamicToolController = new AbortController();
+    modelContext.registerTool(
+      {
+        name: DYNAMIC_TOOL_NAME,
+        description: 'A dynamically registered tool',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+        },
+        async execute() {
+          log('Dynamic tool executed!', 'success');
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'Dynamic tool executed successfully!',
+              },
+            ],
+          };
+        },
       },
-      async execute() {
-        log('Dynamic tool executed!', 'success');
-        return {
-          content: [
-            {
-              type: 'text',
-              text: 'Dynamic tool executed successfully! (Bucket B)',
-            },
-          ],
-        };
-      },
-    });
+      { signal: dynamicToolController.signal }
+    );
 
-    log('Dynamic tool registered successfully (Bucket B)', 'success');
+    log('Dynamic tool registered successfully', 'success');
     dynamicStatusEl.textContent = 'Dynamic tool status: Registered ✅';
     dynamicStatusEl.style.background = '#d4edda';
     registerDynamicBtn.disabled = true;
@@ -280,7 +317,12 @@ function unregisterDynamicTool() {
     }
 
     log('Unregistering dynamic tool...');
-    modelContext.unregisterTool(DYNAMIC_TOOL_NAME);
+    if (dynamicToolController) {
+      dynamicToolController.abort();
+      dynamicToolController = null;
+    } else {
+      modelContext.unregisterTool(DYNAMIC_TOOL_NAME);
+    }
 
     log('Dynamic tool unregistered successfully', 'success');
     dynamicStatusEl.textContent = 'Dynamic tool status: Not registered';
@@ -359,12 +401,9 @@ function replaceBaseTools() {
 
     log('Base tools replaced! Old tools (increment, decrement, etc.) are gone.', 'success');
     if (hasRegisteredTool(DYNAMIC_TOOL_NAME)) {
-      log(
-        '⚠️ Dynamic tool still registered (unexpected under strict provideContext() replacement)',
-        'error'
-      );
+      log('Dynamic tool still registered after base tool replacement', 'info');
     } else {
-      log('ℹ️ Dynamic tool cleared by strict provideContext() replacement behavior', 'info');
+      log('Dynamic tool cleared by AbortSignal cleanup', 'info');
       dynamicStatusEl.textContent = 'Dynamic tool status: Not registered';
       dynamicStatusEl.style.background = '#f5f5f5';
       registerDynamicBtn.disabled = false;
@@ -403,7 +442,7 @@ function listAllTools() {
 // Register base resources (Bucket A)
 function registerBaseResources() {
   try {
-    log('Registering base resources via provideContext()...', 'info');
+    log('Registering base resources via registerResource()...', 'info');
 
     provideExtendedContext({
       resources: [
@@ -490,7 +529,7 @@ function registerDynamicResource() {
     dynamicResourceRegistration = modelContext.registerResource({
       uri: 'dynamic://status',
       name: 'Dynamic Status',
-      description: 'A dynamically registered resource that persists across provideContext calls',
+      description: 'A dynamically registered resource',
       mimeType: 'application/json',
       async read() {
         log('Reading dynamic status resource', 'info');
@@ -661,7 +700,7 @@ async function readTemplateResource() {
 // Register base prompts (Bucket A)
 function registerBasePrompts() {
   try {
-    log('Registering base prompts via provideContext()...', 'info');
+    log('Registering base prompts via registerPrompt()...', 'info');
 
     provideExtendedContext({
       prompts: [
@@ -1319,7 +1358,12 @@ function testChromiumUnregisterTool() {
     }
 
     const toolName = DYNAMIC_TOOL_NAME;
-    modelContext.unregisterTool(toolName);
+    if (dynamicToolController) {
+      dynamicToolController.abort();
+      dynamicToolController = null;
+    } else {
+      modelContext.unregisterTool(toolName);
+    }
 
     dynamicStatusEl.textContent = 'Dynamic tool status: Not registered';
     dynamicStatusEl.style.background = '#f5f5f5';
@@ -1327,18 +1371,24 @@ function testChromiumUnregisterTool() {
     unregisterDynamicBtn.disabled = true;
     callDynamicBtn.disabled = true;
 
-    log(`Tool unregistered via unregisterTool(): ${toolName}`, 'success');
+    log(`Tool unregistered via AbortSignal cleanup: ${toolName}`, 'success');
   } catch (error) {
     log(`unregisterTool() failed: ${error}`, 'error');
   }
 }
 
-// Test clearContext (Chromium native API)
+// Test AbortSignal cleanup.
 function testChromiumClearContext() {
   try {
-    log('Testing clearContext() (Chromium native API)...', 'info');
+    log('Testing AbortSignal cleanup...', 'info');
 
-    modelContext.clearContext();
+    for (const controller of baseContextControllers.splice(0)) {
+      controller.abort();
+    }
+    if (dynamicToolController) {
+      dynamicToolController.abort();
+      dynamicToolController = null;
+    }
 
     dynamicStatusEl.textContent = 'Dynamic tool status: Not registered';
     dynamicStatusEl.style.background = '#f5f5f5';
@@ -1346,9 +1396,9 @@ function testChromiumClearContext() {
     unregisterDynamicBtn.disabled = true;
     callDynamicBtn.disabled = true;
 
-    log('All tools cleared via clearContext()', 'success');
+    log('All tools cleared via AbortSignal cleanup', 'success');
   } catch (error) {
-    log(`clearContext() failed: ${error}`, 'error');
+    log(`AbortSignal cleanup failed: ${error}`, 'error');
   }
 }
 
@@ -1502,7 +1552,12 @@ function testChromiumCallbackUnregister() {
 
     // Unregister the dynamic tool to trigger callback
     if (hasRegisteredTool(DYNAMIC_TOOL_NAME)) {
-      modelContext.unregisterTool(DYNAMIC_TOOL_NAME);
+      if (dynamicToolController) {
+        dynamicToolController.abort();
+        dynamicToolController = null;
+      } else {
+        modelContext.unregisterTool(DYNAMIC_TOOL_NAME);
+      }
 
       setTimeout(() => {
         if (callbackFired) {
@@ -1521,7 +1576,7 @@ function testChromiumCallbackUnregister() {
   }
 }
 
-// Test registerToolsChangedCallback on provideContext
+// Test registerToolsChangedCallback on registerTool.
 function testChromiumCallbackProvide() {
   if (!('modelContextTesting' in navigator)) {
     log('modelContextTesting API not available', 'error');
@@ -1535,16 +1590,16 @@ function testChromiumCallbackProvide() {
   }
 
   try {
-    log('Testing registerToolsChangedCallback() on provideContext...', 'info');
+    log('Testing registerToolsChangedCallback() on registerTool...', 'info');
 
     let callbackFired = false;
     testingAPI.registerToolsChangedCallback(() => {
       callbackFired = true;
-      log('Callback fired on provideContext!', 'success');
+      log('Callback fired on registerTool!', 'success');
     });
 
-    // Call provideContext to trigger callback
-    modelContext.provideContext({
+    // Register a tool to trigger callback
+    provideExtendedContext({
       tools: [
         {
           name: 'callbackTest2',
@@ -1571,7 +1626,7 @@ function testChromiumCallbackProvide() {
   }
 }
 
-// Test registerToolsChangedCallback on clearContext
+// Test registerToolsChangedCallback on AbortSignal cleanup.
 function testChromiumCallbackClear() {
   if (!('modelContextTesting' in navigator)) {
     log('modelContextTesting API not available', 'error');
@@ -1585,16 +1640,18 @@ function testChromiumCallbackClear() {
   }
 
   try {
-    log('Testing registerToolsChangedCallback() on clearContext...', 'info');
+    log('Testing registerToolsChangedCallback() on AbortSignal cleanup...', 'info');
 
     let callbackFired = false;
     testingAPI.registerToolsChangedCallback(() => {
       callbackFired = true;
-      log('Callback fired on clearContext!', 'success');
+      log('Callback fired on AbortSignal cleanup!', 'success');
     });
 
-    // Call clearContext to trigger callback
-    modelContext.clearContext();
+    // Abort base registrations to trigger callback
+    for (const controller of baseContextControllers.splice(0)) {
+      controller.abort();
+    }
 
     setTimeout(() => {
       if (callbackFired) {

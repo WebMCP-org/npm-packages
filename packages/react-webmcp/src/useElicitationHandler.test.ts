@@ -20,7 +20,11 @@ describe('useElicitation', () => {
   });
 
   beforeEach(() => {
-    navigator.modelContext?.clearContext();
+    (
+      navigator.modelContextTesting as
+        | (Navigator['modelContextTesting'] & { reset?: () => void })
+        | undefined
+    )?.reset?.();
   });
 
   describe('initial state', () => {

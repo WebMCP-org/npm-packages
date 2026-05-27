@@ -18,27 +18,23 @@
 
         try {
           // Register tools with AI agents
-          window.navigator.modelContext.provideContext({
-            tools: [
-              {
-                name: 'get-page-title',
-                description: 'Get the current page title',
-                inputSchema: {
-                  type: 'object',
-                  properties: {},
-                },
-                async execute() {
-                  return {
-                    content: [
-                      {
-                        type: 'text',
-                        text: document.title,
-                      },
-                    ],
-                  };
-                },
-              },
-            ],
+          window.navigator.modelContext.registerTool({
+            name: 'get-page-title',
+            description: 'Get the current page title',
+            inputSchema: {
+              type: 'object',
+              properties: {},
+            },
+            async execute() {
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: document.title,
+                  },
+                ],
+              };
+            },
           });
 
           statusEl.innerHTML += '<p style="color: green;">✅ Tool registered successfully!</p>';

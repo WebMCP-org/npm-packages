@@ -4,7 +4,6 @@ import type {
   JsonObject,
   ModelContext,
   ModelContextClient,
-  ModelContextOptions,
   ModelContextRegisterToolOptions,
   ModelContextTesting,
   ModelContextTestingExecuteToolOptions,
@@ -120,8 +119,6 @@ class StrictWebMCPContext extends EventTarget {
   private tools = new Map<string, PolyfillToolDescriptor>();
   private testingShim: PolyfillTestingShim | null = null;
   private _ontoolchange: ((this: ModelContext, ev: Event) => unknown) | null = null;
-  private provideContextDeprecationWarned = false;
-  private clearContextDeprecationWarned = false;
   private unregisterToolDeprecationWarned = false;
 
   get ontoolchange(): ((this: ModelContext, ev: Event) => unknown) | null {
@@ -130,27 +127,6 @@ class StrictWebMCPContext extends EventTarget {
 
   set ontoolchange(handler: ((this: ModelContext, ev: Event) => unknown) | null) {
     this._ontoolchange = handler;
-  }
-
-  provideContext(options: ModelContextOptions = {}): void {
-    this.warnProvideContextDeprecationOnce();
-
-    const nextTools = new Map<string, PolyfillToolDescriptor>();
-
-    for (const tool of options.tools ?? []) {
-      const normalized = normalizeToolDescriptor(tool, nextTools);
-      nextTools.set(normalized.name, normalized);
-    }
-
-    this.tools = nextTools;
-    this.notifyToolsChanged();
-  }
-
-  clearContext(): void {
-    this.warnClearContextDeprecationOnce();
-
-    this.tools.clear();
-    this.notifyToolsChanged();
   }
 
   registerTool(tool: ToolDescriptor, options?: ModelContextRegisterToolOptions): void {
@@ -314,28 +290,6 @@ class StrictWebMCPContext extends EventTarget {
       this.dispatchEvent(event);
       this.testingShim?.dispatchToolChange();
     });
-  }
-
-  private warnProvideContextDeprecationOnce(): void {
-    if (this.provideContextDeprecationWarned) {
-      return;
-    }
-
-    this.provideContextDeprecationWarned = true;
-    console.warn(
-      '[WebMCPPolyfill] navigator.modelContext.provideContext() is deprecated and will be removed in the next major version. Register tools individually with registerTool() instead.'
-    );
-  }
-
-  private warnClearContextDeprecationOnce(): void {
-    if (this.clearContextDeprecationWarned) {
-      return;
-    }
-
-    this.clearContextDeprecationWarned = true;
-    console.warn(
-      '[WebMCPPolyfill] navigator.modelContext.clearContext() is deprecated and will be removed in the next major version. Unregister individual tools instead.'
-    );
   }
 
   private warnUnregisterToolDeprecationOnce(): void {

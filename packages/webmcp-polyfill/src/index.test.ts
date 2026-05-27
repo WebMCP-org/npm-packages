@@ -25,8 +25,12 @@ describe('@mcp-b/webmcp-polyfill', () => {
   it('installs strict core methods on navigator.modelContext', () => {
     initializeWebMCPPolyfill();
 
-    expect(typeof navigator.modelContext.provideContext).toBe('function');
-    expect(typeof navigator.modelContext.clearContext).toBe('function');
+    expect(
+      typeof (navigator.modelContext as unknown as { provideContext?: unknown }).provideContext
+    ).toBe('undefined');
+    expect(
+      typeof (navigator.modelContext as unknown as { clearContext?: unknown }).clearContext
+    ).toBe('undefined');
     expect(typeof navigator.modelContext.registerTool).toBe('function');
     expect(typeof navigator.modelContext.getTools).toBe('function');
     expect(typeof navigator.modelContext.unregisterTool).toBe('function');
@@ -37,8 +41,12 @@ describe('@mcp-b/webmcp-polyfill', () => {
   it('installs strict core methods on document.modelContext', () => {
     initializeWebMCPPolyfill();
 
-    expect(typeof document.modelContext.provideContext).toBe('function');
-    expect(typeof document.modelContext.clearContext).toBe('function');
+    expect(
+      typeof (document.modelContext as unknown as { provideContext?: unknown }).provideContext
+    ).toBe('undefined');
+    expect(
+      typeof (document.modelContext as unknown as { clearContext?: unknown }).clearContext
+    ).toBe('undefined');
     expect(typeof document.modelContext.registerTool).toBe('function');
     expect(typeof document.modelContext.getTools).toBe('function');
     expect(typeof document.modelContext.unregisterTool).toBe('function');
@@ -152,55 +160,6 @@ describe('@mcp-b/webmcp-polyfill', () => {
         execute: async () => ({ content: [{ type: 'text', text: 'second' }] }),
       })
     ).toThrow('Tool already registered: echo');
-  });
-
-  it('provideContext clears previous dynamic tools', async () => {
-    initializeWebMCPPolyfill();
-
-    document.modelContext.registerTool({
-      name: 'dynamic_tool',
-      description: 'Dynamic tool',
-      inputSchema: { type: 'object', properties: {} },
-      execute: async () => ({ content: [{ type: 'text', text: 'dynamic' }] }),
-    });
-
-    document.modelContext.provideContext({
-      tools: [
-        {
-          name: 'context_tool',
-          description: 'Context tool',
-          inputSchema: { type: 'object', properties: {} },
-          execute: async () => ({ content: [{ type: 'text', text: 'context' }] }),
-        },
-      ],
-    });
-
-    await expect(navigator.modelContextTesting?.executeTool('dynamic_tool', '{}')).rejects.toThrow(
-      'Tool not found: dynamic_tool'
-    );
-
-    const serialized = await navigator.modelContextTesting?.executeTool('context_tool', '{}');
-    expect(serialized).toContain('context');
-  });
-
-  it('warns that provideContext is deprecated while preserving behavior', () => {
-    initializeWebMCPPolyfill();
-
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-    try {
-      // Use document.modelContext (the canonical surface per WebMCP PR #184) so the
-      // navigator.modelContext access deprecation warning does not pollute this test.
-      document.modelContext.provideContext();
-      document.modelContext.provideContext();
-
-      expect(warnSpy).toHaveBeenCalledWith(
-        '[WebMCPPolyfill] navigator.modelContext.provideContext() is deprecated and will be removed in the next major version. Register tools individually with registerTool() instead.'
-      );
-      expect(warnSpy).toHaveBeenCalledTimes(1);
-    } finally {
-      warnSpy.mockRestore();
-    }
   });
 
   it('throws on invalid inputSchema during registration', () => {
@@ -374,26 +333,6 @@ describe('@mcp-b/webmcp-polyfill', () => {
     expect(() => navigator.modelContext.registerTool(tool)).not.toThrow();
   });
 
-  it('warns that clearContext is deprecated while preserving behavior', () => {
-    initializeWebMCPPolyfill();
-
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-    try {
-      // Use document.modelContext to isolate the clearContext deprecation warning
-      // from the navigator.modelContext access deprecation.
-      document.modelContext.clearContext();
-      document.modelContext.clearContext();
-
-      expect(warnSpy).toHaveBeenCalledWith(
-        '[WebMCPPolyfill] navigator.modelContext.clearContext() is deprecated and will be removed in the next major version. Unregister individual tools instead.'
-      );
-      expect(warnSpy).toHaveBeenCalledTimes(1);
-    } finally {
-      warnSpy.mockRestore();
-    }
-  });
-
   it('fires toolchange event for registry mutations', async () => {
     initializeWebMCPPolyfill();
 
@@ -411,23 +350,10 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
     navigator.modelContext.unregisterTool('t1');
 
-    navigator.modelContext.provideContext({
-      tools: [
-        {
-          name: 't2',
-          description: 'tool 2',
-          inputSchema: { type: 'object', properties: {} },
-          execute: async () => ({ content: [{ type: 'text', text: 'ok2' }] }),
-        },
-      ],
-    });
-
-    navigator.modelContext.clearContext();
-
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(count).toBe(4);
+    expect(count).toBe(2);
   });
 
   it('exposes native-shaped getTools on document.modelContext', async () => {
@@ -2163,50 +2089,6 @@ describe('@mcp-b/webmcp-polyfill', () => {
   });
 
   // =========================================================================
-  // provideContext edge cases
-  // =========================================================================
-
-  describe('provideContext edge cases', () => {
-    it('provideContext with no options or tools', () => {
-      initializeWebMCPPolyfill();
-      // Should not throw
-      navigator.modelContext.provideContext();
-      navigator.modelContext.provideContext({});
-
-      const tools = navigator.modelContextTesting?.listTools();
-      expect(tools).toEqual([]);
-    });
-
-    it('provideContext with empty tools array', () => {
-      initializeWebMCPPolyfill();
-      navigator.modelContext.provideContext({ tools: [] });
-
-      const tools = navigator.modelContextTesting?.listTools();
-      expect(tools).toEqual([]);
-    });
-
-    it('provideContext throws on duplicate tool names in options', () => {
-      initializeWebMCPPolyfill();
-      expect(() =>
-        navigator.modelContext.provideContext({
-          tools: [
-            {
-              name: 'dup',
-              description: 'First',
-              execute: async () => ({ content: [] }),
-            },
-            {
-              name: 'dup',
-              description: 'Second',
-              execute: async () => ({ content: [] }),
-            },
-          ],
-        })
-      ).toThrow('Tool already registered: dup');
-    });
-  });
-
-  // =========================================================================
   // notifyToolsChanged edge cases
   // =========================================================================
 
@@ -2446,30 +2328,6 @@ describe('@mcp-b/webmcp-polyfill', () => {
         initializeWebMCPPolyfill({ disableIframeTransportByDefault: true })
       ).not.toThrow();
       expect(navigator.modelContext).toBeDefined();
-    });
-  });
-
-  // =========================================================================
-  // clearContext
-  // =========================================================================
-
-  describe('clearContext', () => {
-    it('clears all tools', async () => {
-      initializeWebMCPPolyfill();
-
-      navigator.modelContext.registerTool({
-        name: 'temp_tool',
-        description: 'Temp tool',
-        execute: async () => ({ content: [{ type: 'text', text: 'temp' }] }),
-      });
-
-      let tools = navigator.modelContextTesting?.listTools();
-      expect(tools).toHaveLength(1);
-
-      navigator.modelContext.clearContext();
-
-      tools = navigator.modelContextTesting?.listTools();
-      expect(tools).toHaveLength(0);
     });
   });
 

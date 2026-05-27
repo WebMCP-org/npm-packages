@@ -8,25 +8,6 @@ import type {
 } from './tool.js';
 
 // ============================================================================
-// Model Context Input
-// ============================================================================
-
-/**
- * Context provided to models via provideContext().
- */
-export interface ModelContextInput<TTools extends readonly ToolDescriptor[] = ToolDescriptor[]> {
-  /**
-   * Base tool descriptors to expose.
-   */
-  tools?: TTools;
-}
-
-/**
- * Public options accepted by provideContext().
- */
-export type ModelContextOptions = ModelContextInput;
-
-// ============================================================================
 // Model Context Testing
 // ============================================================================
 
@@ -228,14 +209,6 @@ export interface ModelContextRegisterToolOptions {
  * Strict WebMCP core interface on document.modelContext.
  */
 export interface ModelContextCore {
-  // ==================== CONTEXT ====================
-
-  /**
-   * Replaces base context with provided tools.
-   * @deprecated Removed from the upstream WebMCP spec on March 5, 2026. Kept only as a temporary compatibility API.
-   */
-  provideContext(options?: ModelContextOptions): void;
-
   // ==================== TOOLS ====================
 
   /**
@@ -329,12 +302,6 @@ export interface ModelContextCore {
    * @deprecated Removed from the WebMCP spec on April 23, 2026. Use `registerTool(tool, { signal })`. Will be removed in the next major.
    */
   unregisterTool(nameOrTool: string | ModelContextToolReference): void;
-
-  /**
-   * Clears all context (base + dynamic registrations).
-   * @deprecated Removed from the upstream WebMCP spec on March 5, 2026. Kept only as a temporary compatibility API.
-   */
-  clearContext(): void;
 }
 
 /**

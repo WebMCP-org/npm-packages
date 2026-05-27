@@ -228,7 +228,7 @@ void result;
 - This package does not install any runtime behavior.
 - Runtime validation/execution behavior depends on your WebMCP runtime package.
 - Prefer `document.modelContext` for new code. `navigator.modelContext` is retained as a deprecated backward-compatible alias during the WebMCP migration.
-- `provideContext()` and `clearContext()` remain typed for compatibility, but are deprecated because the upstream WebMCP spec removed them on March 5, 2026.
+- `provideContext()` and `clearContext()` were removed from the upstream WebMCP spec on March 5, 2026 and are intentionally not typed.
 - `unregisterTool(name)` is `@deprecated`. The April 23, 2026 WebMCP draft removed it from the spec in favor of an `AbortSignal` passed via `registerTool(tool, { signal })`. The type is retained for compatibility with older native previews and existing MCP-B wrappers; it will be removed in the next major version.
 - `registerTool(tool, options?)` accepts a `ModelContextRegisterToolOptions` dictionary with an optional `signal: AbortSignal`. Aborting the signal unregisters the tool.
 - `ToolAnnotations.untrustedContentHint` was added to the spec on April 23, 2026 to flag tools whose output may include externally-sourced content.

@@ -10,7 +10,16 @@ import type { ModelContext, Tool } from './types';
 // State tracking
 let modelContext: ModelContext;
 let bucketATools: string[] = [];
+const bucketARegistrations = new Map<string, { unregister: () => void }>();
 const bucketBRegistrations = new Map<string, { unregister: () => void }>();
+
+function unregisterBucketA(): void {
+  for (const registration of bucketARegistrations.values()) {
+    registration.unregister();
+  }
+  bucketARegistrations.clear();
+  bucketATools = [];
+}
 
 /**
  * Initialize the iframe application
@@ -85,7 +94,7 @@ function setupEventListeners(): void {
  * Setup tool change listener
  */
 function setupToolChangeListener(): void {
-  modelContext.addEventListener('toolschange', () => {
+  modelContext.addEventListener('toolchange', () => {
     logEvent('info', 'Tools changed event');
     refreshToolDisplay();
     notifyParent('tools-changed', { tools: getToolNames() });
@@ -129,12 +138,14 @@ function notifyParent(type: string, data: unknown): void {
 }
 
 /**
- * Register a tool via provideContext (Bucket A)
+ * Register a tool via registerTool (Bucket A)
  */
 function registerBucketATool(): void {
+  unregisterBucketA();
+
   const tool: Tool = {
     name: 'iframe_echo',
-    description: 'Echo tool registered in iframe via provideContext (Bucket A)',
+    description: 'Echo tool registered in iframe via registerTool (Bucket A)',
     inputSchema: {
       type: 'object',
       properties: {
@@ -147,10 +158,10 @@ function registerBucketATool(): void {
     },
   };
 
-  modelContext.provideContext({ tools: [tool] });
+  bucketARegistrations.set('iframe_echo', modelContext.registerTool(tool));
   bucketATools = ['iframe_echo'];
 
-  logEvent('success', 'Registered iframe_echo via provideContext (Bucket A)');
+  logEvent('success', 'Registered iframe_echo via registerTool (Bucket A)');
   notifyParent('tool-registered', { name: 'iframe_echo', bucket: 'A' });
   refreshToolDisplay();
 }
@@ -210,11 +221,13 @@ function unregisterBucketBTool(): void {
 }
 
 /**
- * Clear context (removes Bucket A tools)
+ * Clear iframe showcase registrations
  */
 function clearContext(): void {
-  modelContext.clearContext();
-  bucketATools = [];
+  unregisterBucketA();
+  for (const registration of bucketBRegistrations.values()) {
+    registration.unregister();
+  }
   bucketBRegistrations.clear();
 
   const unregisterBtn = document.getElementById('unregister-iframe-tool-b') as HTMLButtonElement;
@@ -222,7 +235,7 @@ function clearContext(): void {
     unregisterBtn.disabled = true;
   }
 
-  logEvent('success', 'Context cleared (Bucket A tools removed)');
+  logEvent('success', 'Iframe showcase registrations cleared');
   notifyParent('context-cleared', {});
   refreshToolDisplay();
 }
