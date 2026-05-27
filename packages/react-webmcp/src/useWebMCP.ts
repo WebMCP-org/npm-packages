@@ -153,6 +153,14 @@ function toStructuredContent(value: unknown): StructuredContent | null {
 
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+  return (
+    Boolean(value) &&
+    (typeof value === 'object' || typeof value === 'function') &&
+    typeof (value as { then?: unknown }).then === 'function'
+  );
+}
+
 /**
  * On Chrome Beta 147 native (which ignores the second arg), aborting
  * the controller cannot remove the tool. Install `@mcp-b/global`
@@ -163,9 +171,22 @@ function registerToolWithCleanup(
   toolDescriptor: ToolDescriptor
 ): AbortController {
   const controller = new AbortController();
-  (
-    modelContext.registerTool as (tool: ToolDescriptor, options?: { signal?: AbortSignal }) => void
+  const result = (
+    modelContext.registerTool as (
+      tool: ToolDescriptor,
+      options?: { signal?: AbortSignal }
+    ) => unknown
   ).call(modelContext, toolDescriptor, { signal: controller.signal });
+
+  if (isPromiseLike(result)) {
+    result.then(undefined, (error: unknown) => {
+      console.warn(
+        `[ReactWebMCP:useWebMCP] registerTool("${toolDescriptor.name}") rejected:`,
+        error
+      );
+    });
+  }
+
   return controller;
 }
 

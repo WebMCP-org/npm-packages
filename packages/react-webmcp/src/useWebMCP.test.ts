@@ -1,5 +1,9 @@
 import { initializeWebModelContext } from '@mcp-b/global';
-import type { ModelContextWithExtensions } from '@mcp-b/webmcp-types';
+import type {
+  ModelContextRegisterToolOptions,
+  ModelContextWithExtensions,
+  ToolDescriptor,
+} from '@mcp-b/webmcp-types';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
 import { z } from 'zod';
@@ -896,6 +900,40 @@ describe('useWebMCP', () => {
       unmount();
 
       expect(listRegisteredToolNames()).not.toContain('cleanup_registry_tool');
+    });
+
+    it('should observe async registerTool rejections without throwing', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const originalRegisterTool = navigator.modelContext.registerTool.bind(navigator.modelContext);
+      const registerError = new Error('async registration failed');
+      const registerSpy = vi.spyOn(navigator.modelContext, 'registerTool').mockImplementation(((
+        tool: ToolDescriptor,
+        options?: ModelContextRegisterToolOptions
+      ) => {
+        originalRegisterTool(tool, options);
+        return Promise.reject(registerError);
+      }) as Navigator['modelContext']['registerTool']);
+
+      try {
+        await renderHook(() =>
+          useWebMCP({
+            name: 'async_reject_tool',
+            description: 'Async rejection tool',
+            handler: async () => 'result',
+          })
+        );
+
+        await Promise.resolve();
+
+        expect(warnSpy).toHaveBeenCalledWith(
+          '[ReactWebMCP:useWebMCP] registerTool("async_reject_tool") rejected:',
+          registerError
+        );
+        expect(listRegisteredToolNames()).toContain('async_reject_tool');
+      } finally {
+        registerSpy.mockRestore();
+        warnSpy.mockRestore();
+      }
     });
   });
 

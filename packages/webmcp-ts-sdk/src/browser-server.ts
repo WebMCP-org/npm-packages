@@ -99,6 +99,14 @@ function toStructuredContent(value: unknown): JsonObject | undefined {
   return value as JsonObject;
 }
 
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+  return (
+    Boolean(value) &&
+    (typeof value === 'object' || typeof value === 'function') &&
+    typeof (value as { then?: unknown }).then === 'function'
+  );
+}
+
 function serializeTextContent(value: unknown): string {
   if (typeof value === 'string') {
     return value;
@@ -186,10 +194,11 @@ type ParentRegisterPromptFn = (
 
 type NativeToolsApi = ModelContextCore & Pick<ModelContextExtensions, 'listTools' | 'callTool'>;
 type RegisteredToolHandle = { unregister: () => void };
+type MaybePromise<T> = T | PromiseLike<T>;
 type NativeRegisterToolFn = (
   tool: ToolDescriptor,
   options?: ModelContextRegisterToolOptions
-) => void;
+) => MaybePromise<void>;
 type NativeUnregisterToolFn = (nameOrTool: string | ModelContextToolReference) => void;
 interface NativeToolCleanup {
   abort: () => void;
@@ -403,12 +412,13 @@ export class BrowserMcpServer extends BaseMcpServer {
     const nativeUnregisterTool = this.getNativeUnregisterTool();
     const shouldPassSignal = Boolean(signal) || !nativeUnregisterTool;
     const cleanup = shouldPassSignal ? this.createNativeToolCleanup(signal) : undefined;
+    let nativeRegisterResult: MaybePromise<void>;
 
     try {
       if (cleanup) {
-        nativeRegister.call(this.native, tool, cleanup.options);
+        nativeRegisterResult = nativeRegister.call(this.native, tool, cleanup.options);
       } else {
-        nativeRegister.call(this.native, tool);
+        nativeRegisterResult = nativeRegister.call(this.native, tool);
       }
     } catch (error) {
       cleanup?.abort();
@@ -432,6 +442,28 @@ export class BrowserMcpServer extends BaseMcpServer {
       nativeSignalAccepted: nativeRegister.length >= 2 || !nativeUnregisterTool,
     };
     this._nativeToolCleanups.set(tool.name, nativeToolCleanup);
+
+    if (isPromiseLike(nativeRegisterResult)) {
+      nativeRegisterResult.then(undefined, (error: unknown) => {
+        cleanup.abort();
+        if (this._nativeToolCleanups.get(tool.name) === nativeToolCleanup) {
+          this._nativeToolCleanups.delete(tool.name);
+        }
+
+        if (isPermissionsPolicySecurityError(error)) {
+          console.warn(
+            '[BrowserMcpServer] Native WebMCP tool mirror is blocked by permissions policy; continuing with WebMCP transport registration only.'
+          );
+          return;
+        }
+
+        console.warn(
+          '[BrowserMcpServer] Native WebMCP tool mirror registration rejected; continuing with WebMCP transport registration only.',
+          error
+        );
+      });
+    }
+
     return nativeToolCleanup;
   }
 

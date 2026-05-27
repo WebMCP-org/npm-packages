@@ -23,6 +23,14 @@ type LegacyCompatTracker = {
 
 const legacyCompatTrackers = new WeakMap<ModelContext, LegacyCompatTracker>();
 
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+  return (
+    Boolean(value) &&
+    (typeof value === 'object' || typeof value === 'function') &&
+    typeof (value as { then?: unknown }).then === 'function'
+  );
+}
+
 function setContextMethod<K extends keyof ModelContext>(
   context: ModelContext,
   key: K,
@@ -96,6 +104,11 @@ function ensureLegacyCompatTracker(context: ModelContext): LegacyCompatTracker {
     options?: ModelContextRegisterToolOptions
   ) => {
     const rawRegistration = tracker.originalRegisterTool(tool, options);
+    if (isPromiseLike(rawRegistration)) {
+      rawRegistration.then(undefined, (error: unknown) => {
+        console.warn(`[WebMCP Showcase] registerTool("${tool.name}") rejected:`, error);
+      });
+    }
     const registration =
       rawRegistration && typeof rawRegistration.unregister === 'function'
         ? rawRegistration
