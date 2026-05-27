@@ -317,7 +317,7 @@ describe('global adapter', () => {
   it('backfills tools registered before initializeWebModelContext', async () => {
     initializeWebMCPPolyfill();
 
-    const nativeContext = navigator.modelContext as unknown as {
+    const nativeContext = document.modelContext as unknown as {
       registerTool: (tool: {
         name: string;
         description: string;

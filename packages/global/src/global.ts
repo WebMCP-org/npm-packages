@@ -20,6 +20,8 @@ interface RuntimeState {
   native: ModelContextCore;
   server: BrowserMcpServer;
   transport: Transport;
+  previousDocumentModelContextDescriptor: PropertyDescriptor | undefined;
+  previousNavigatorModelContextDescriptor: PropertyDescriptor | undefined;
 }
 
 let runtime: RuntimeState | null = null;
@@ -28,14 +30,43 @@ function isBrowserEnvironment(): boolean {
   return typeof window !== 'undefined' && typeof window.navigator !== 'undefined';
 }
 
-/**
- * Replace navigator.modelContext with the given value.
- * Tries an own-property on the navigator instance first. If the native browser
- * defines modelContext as a non-configurable property (common in Chromium), this
- * will throw — in that case we fall back to redefining the getter on
- * Navigator.prototype so that `navigator.modelContext` resolves to our value.
- */
-function replaceModelContext(value: unknown): void {
+function readCurrentModelContext(): unknown {
+  const navigatorDescriptor = Object.getOwnPropertyDescriptor(navigator, 'modelContext');
+  if (navigatorDescriptor) {
+    return navigator.modelContext;
+  }
+
+  return document.modelContext ?? navigator.modelContext;
+}
+
+function replaceDocumentModelContext(value: unknown): void {
+  try {
+    Object.defineProperty(document, 'modelContext', {
+      configurable: true,
+      enumerable: true,
+      writable: false,
+      value,
+    });
+  } catch {
+    Object.defineProperty(Object.getPrototypeOf(document), 'modelContext', {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return value;
+      },
+    });
+  }
+
+  if (document.modelContext !== value) {
+    console.error(
+      '[WebModelContext] Failed to replace document.modelContext.',
+      'Descriptor:',
+      Object.getOwnPropertyDescriptor(document, 'modelContext')
+    );
+  }
+}
+
+function replaceNavigatorModelContext(value: unknown): void {
   try {
     Object.defineProperty(navigator, 'modelContext', {
       configurable: true,
@@ -64,6 +95,18 @@ function replaceModelContext(value: unknown): void {
       Object.getOwnPropertyDescriptor(navigator, 'modelContext')
     );
   }
+}
+
+/**
+ * Replace both modelContext surfaces with the given value.
+ *
+ * Chrome 150 makes document.modelContext canonical and keeps navigator.modelContext
+ * as a deprecated alias. @mcp-b/global still supports old navigator-first users, so
+ * the bridge exposes the BrowserMcpServer wrapper through both properties.
+ */
+function replaceModelContext(value: unknown): void {
+  replaceDocumentModelContext(value);
+  replaceNavigatorModelContext(value);
 }
 
 function createTransport(config: WebModelContextInitOptions['transport']): Transport {
@@ -198,9 +241,9 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
     return;
   }
 
-  // Cross-bundle guard: if navigator.modelContext is already a BrowserMcpServer
+  // Cross-bundle guard: if modelContext is already a BrowserMcpServer
   // (set by another bundle in this window), skip initialization.
-  const existingContext = navigator.modelContext as unknown as Record<string, unknown> | undefined;
+  const existingContext = readCurrentModelContext() as Record<string, unknown> | undefined;
   if (existingContext?.[SERVER_MARKER_PROPERTY]) {
     return;
   }
@@ -211,9 +254,9 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
   });
 
   // 2. Save reference to the polyfill's (or native) context
-  const native = navigator.modelContext as unknown as ModelContextCore;
+  const native = readCurrentModelContext() as ModelContextCore | undefined;
   if (!native) {
-    throw new Error('navigator.modelContext is not available');
+    throw new Error('modelContext is not available');
   }
 
   // 3. Create server with native mirroring
@@ -225,11 +268,25 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
   // 4. Replace navigator.modelContext with the server.
   // Try own-property on the navigator instance first (works for polyfill and most cases).
   // Fall back to a prototype getter if the native property is non-configurable.
+  const previousDocumentModelContextDescriptor = Object.getOwnPropertyDescriptor(
+    document,
+    'modelContext'
+  );
+  const previousNavigatorModelContextDescriptor = Object.getOwnPropertyDescriptor(
+    navigator,
+    'modelContext'
+  );
   replaceModelContext(server);
 
   // 5. Create transport and connect
   const transport = createTransport(options?.transport);
-  runtime = { native, server, transport };
+  runtime = {
+    native,
+    server,
+    transport,
+    previousDocumentModelContextDescriptor,
+    previousNavigatorModelContextDescriptor,
+  };
 
   void server.connect(transport).catch((error: unknown) => {
     console.error('[WebModelContext] Failed to connect MCP transport:', error);
@@ -241,14 +298,29 @@ export function cleanupWebModelContext(): void {
     return;
   }
 
-  const { native, server, transport } = runtime;
+  const {
+    server,
+    transport,
+    previousDocumentModelContextDescriptor,
+    previousNavigatorModelContextDescriptor,
+  } = runtime;
   runtime = null;
 
   void server.close();
   void transport.close();
 
-  // Restore the context that existed before we wrapped it with BrowserMcpServer.
+  // Restore the descriptors that existed before we wrapped with BrowserMcpServer.
   // We intentionally do NOT call cleanupWebMCPPolyfill() here — the polyfill
   // manages its own lifecycle (auto-init, testing shim) independently.
-  replaceModelContext(native);
+  if (previousDocumentModelContextDescriptor) {
+    Object.defineProperty(document, 'modelContext', previousDocumentModelContextDescriptor);
+  } else {
+    delete (document as unknown as Record<string, unknown>).modelContext;
+  }
+
+  if (previousNavigatorModelContextDescriptor) {
+    Object.defineProperty(navigator, 'modelContext', previousNavigatorModelContextDescriptor);
+  } else {
+    delete (navigator as unknown as Record<string, unknown>).modelContext;
+  }
 }
