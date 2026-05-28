@@ -7,6 +7,8 @@ import { defineConfig, devices } from '@playwright/test';
 const tabTransportPort = Number.parseInt(process.env.PLAYWRIGHT_TAB_TRANSPORT_PORT ?? '4173', 10);
 const tabTransportBaseUrl = `http://localhost:${tabTransportPort}`;
 const reuseExistingServer = process.env.PLAYWRIGHT_REUSE_SERVER === '1';
+const chromeExecutablePath =
+  process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ?? process.env.CHROME_BIN;
 
 export default defineConfig({
   testDir: './tests',
@@ -26,6 +28,7 @@ export default defineConfig({
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     launchOptions: {
+      ...(chromeExecutablePath ? { executablePath: chromeExecutablePath } : {}),
       args: [
         // In current Chrome Beta builds, this switch is still required for native exposure.
         '--enable-experimental-web-platform-features',
@@ -39,7 +42,7 @@ export default defineConfig({
       name: 'chrome-beta-webmcp',
       use: {
         ...devices['Desktop Chrome'],
-        channel: 'chrome-beta',
+        ...(!chromeExecutablePath ? { channel: 'chrome-beta' } : {}),
       },
     },
   ],

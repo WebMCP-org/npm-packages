@@ -127,6 +127,7 @@ jobs:
         mode:
           - default
           - chrome-beta
+          - chrome-canary
 
     steps:
       - name: Checkout code
@@ -153,6 +154,18 @@ jobs:
         with:
           chrome-version: stable
           install-dependencies: true
+
+      - name: Setup Chrome Canary
+        if: matrix.mode == 'chrome-canary'
+        id: chrome_canary
+        uses: browser-actions/setup-chrome@2e1d749697dd1612b833dba4a722266286fbefcd
+        with:
+          chrome-version: canary
+          install-dependencies: true
+
+      - name: Print Chrome Canary version
+        if: matrix.mode == 'chrome-canary'
+        run: '"${{ steps.chrome_canary.outputs.chrome-path }}" --version'
 
       - name: Install Google Chrome Beta
         if: matrix.mode == 'chrome-beta'
@@ -185,6 +198,20 @@ jobs:
       - name: Run Chrome Beta WebMCP Smoke
         if: matrix.mode == 'chrome-beta'
         run: pnpm --filter mcp-e2e-tests run test:chrome-beta:webmcp:smoke
+
+      - name: Run Native Runtime Contract (Chrome Canary)
+        if: matrix.mode == 'chrome-canary'
+        env:
+          CHROME_BIN: ${{ steps.chrome_canary.outputs.chrome-path }}
+          PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: ${{ steps.chrome_canary.outputs.chrome-path }}
+        run: pnpm --filter mcp-e2e-tests run test:native-contract:default
+
+      - name: Run Native Runtime API Integration (Chrome Canary)
+        if: matrix.mode == 'chrome-canary'
+        env:
+          CHROME_BIN: ${{ steps.chrome_canary.outputs.chrome-path }}
+          PLAYWRIGHT_NATIVE_SHOWCASE_EXECUTABLE_PATH: ${{ steps.chrome_canary.outputs.chrome-path }}
+        run: pnpm --filter mcp-e2e-tests run test:native-showcase
 
       - name: Upload Parity Playwright Report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

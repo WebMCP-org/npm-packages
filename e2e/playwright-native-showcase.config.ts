@@ -10,6 +10,8 @@ const tabTransportPort = Number.parseInt(process.env.PLAYWRIGHT_NATIVE_SHOWCASE_
 const nativeShowcaseBaseUrl = `http://localhost:${tabTransportPort}`;
 const reuseExistingServer = process.env.PLAYWRIGHT_REUSE_SERVER === '1';
 const nativeShowcaseChannel = process.env.PLAYWRIGHT_NATIVE_SHOWCASE_CHANNEL;
+const nativeShowcaseExecutablePath =
+  process.env.PLAYWRIGHT_NATIVE_SHOWCASE_EXECUTABLE_PATH ?? process.env.CHROME_BIN;
 
 export default defineConfig({
   testDir: './tests',
@@ -27,6 +29,7 @@ export default defineConfig({
 
     // CRITICAL: Launch with experimental web platform features enabled
     launchOptions: {
+      ...(nativeShowcaseExecutablePath ? { executablePath: nativeShowcaseExecutablePath } : {}),
       args: ['--enable-experimental-web-platform-features', '--enable-features=WebMCPTesting'],
     },
   },
@@ -36,7 +39,9 @@ export default defineConfig({
       name: 'chromium-native',
       use: {
         ...devices['Desktop Chrome'],
-        ...(nativeShowcaseChannel ? { channel: nativeShowcaseChannel } : {}),
+        ...(nativeShowcaseChannel && !nativeShowcaseExecutablePath
+          ? { channel: nativeShowcaseChannel }
+          : {}),
       },
     },
   ],

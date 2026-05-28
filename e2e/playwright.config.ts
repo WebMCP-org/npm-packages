@@ -7,6 +7,8 @@ const tabTransportPort = Number.parseInt(process.env.PLAYWRIGHT_TAB_TRANSPORT_PO
 const tabTransportBaseUrl = `http://localhost:${tabTransportPort}`;
 const reuseExistingServer = process.env.PLAYWRIGHT_REUSE_SERVER === '1';
 const chromiumChannel = process.env.PLAYWRIGHT_CHROMIUM_CHANNEL;
+const chromiumExecutablePath =
+  process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ?? process.env.CHROME_BIN;
 
 export default defineConfig({
   testDir: './tests',
@@ -36,7 +38,10 @@ export default defineConfig({
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
-        ...(chromiumChannel ? { channel: chromiumChannel } : {}),
+        ...(chromiumChannel && !chromiumExecutablePath ? { channel: chromiumChannel } : {}),
+        ...(chromiumExecutablePath
+          ? { launchOptions: { executablePath: chromiumExecutablePath } }
+          : {}),
       },
     },
 
