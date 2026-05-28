@@ -4,6 +4,13 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Prerelease dist-tag and version suffix (e.g. "beta", "canary", "alpha")'
+        required: false
+        default: 'beta'
+        type: string
 
 env:
   CI: true
@@ -14,8 +21,13 @@ permissions:
 jobs:
   release:
     name: Release
+    if: github.event_name == 'push' && github.repository == 'WebMCP-org/npm-packages'
     timeout-minutes: 15
     runs-on: ubuntu-latest
+    environment:
+      name: npm-publish
+    env:
+      NPM_CONFIG_PROVENANCE: 'true'
     permissions:
       contents: write
       pull-requests: write
@@ -43,6 +55,9 @@ jobs:
         with:
           registry-url: 'https://registry.npmjs.org'
 
+      - name: Use npm with trusted publishing support
+        run: npm install --global npm@11.14.1
+
       - name: Install dependencies
         run: vp install
 
@@ -64,12 +79,6 @@ jobs:
           # Use PAT if available (allows triggering other workflows)
           # Falls back to GITHUB_TOKEN (won't trigger other workflows)
           GITHUB_TOKEN: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
-          # npm authentication - uses NPM_TOKEN until OIDC is configured
-          # To use OIDC: configure trusted publisher on npmjs.com and remove these
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          # Enable provenance attestations
-          NPM_CONFIG_PROVENANCE: true
 
       - name: Generate SBOM
         if: steps.changesets.outputs.published == 'true'
@@ -194,3 +203,127 @@ jobs:
               echo "⚠ No release found for $TAG, skipping"
             fi
           done
+
+  prerelease:
+    name: Publish Prerelease
+    if: github.event_name == 'workflow_dispatch' && github.repository == 'WebMCP-org/npm-packages'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: npm-publish
+    env:
+      NPM_CONFIG_PROVENANCE: 'true'
+    permissions:
+      contents: write # For creating GitHub releases
+      id-token: write # For npm trusted publishing and sigstore signing
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: '24'
+          cache: true
+
+      - name: Setup Node.js (for npm registry)
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
+        with:
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Use npm with trusted publishing support
+        run: npm install --global npm@11.14.1
+
+      - name: Install dependencies
+        run: vp install
+
+      - name: Build packages
+        run: pnpm build
+
+      - name: Create prerelease versions
+        id: versions
+        run: |
+          TIMESTAMP=$(date +%Y%m%d%H%M%S)
+          TAG_SUFFIX="${{ inputs.tag || 'beta' }}"
+
+          PACKAGES_JSON="[]"
+          for pkg in packages/*/; do
+            if [ -f "$pkg/package.json" ]; then
+              name=$(jq -r '.name' "$pkg/package.json")
+              current_version=$(jq -r '.version' "$pkg/package.json")
+              if [ "$name" != "null" ] && [ "$current_version" != "null" ]; then
+                prerelease_version="${current_version}-${TAG_SUFFIX}.${TIMESTAMP}"
+                jq --arg v "$prerelease_version" '.version = $v' "$pkg/package.json" > "$pkg/package.json.tmp"
+                mv "$pkg/package.json.tmp" "$pkg/package.json"
+                echo "Updated $name to $prerelease_version"
+                PACKAGES_JSON=$(echo "$PACKAGES_JSON" | jq -c --arg n "$name" --arg v "$prerelease_version" '. + [{"name": $n, "version": $v}]')
+              fi
+            fi
+          done
+          echo "packages=$PACKAGES_JSON" >> "$GITHUB_OUTPUT"
+
+      - name: Publish prerelease packages
+        run: |
+          pnpm publish -r --access public --tag "${{ inputs.tag || 'beta' }}" --no-git-checks
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22 # v3.8.0
+
+      - name: Create GitHub releases and sign artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PACKAGES: ${{ steps.versions.outputs.packages }}
+          TAG_SUFFIX: ${{ inputs.tag || 'beta' }}
+        run: |
+          echo "## Published Prerelease Versions" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          echo "$PACKAGES" | jq -c '.[]' | while read -r pkg; do
+            PKG_NAME=$(echo "$pkg" | jq -r '.name')
+            PKG_VERSION=$(echo "$pkg" | jq -r '.version')
+            TAG="${PKG_NAME}@${PKG_VERSION}"
+
+            echo "- ${PKG_NAME}@${PKG_VERSION}" >> "$GITHUB_STEP_SUMMARY"
+
+            SAFE_NAME=$(echo "${PKG_NAME}-${PKG_VERSION}" | sed 's/@//g' | sed 's/\//-/g')
+            PKG_DIR=$(echo "$PKG_NAME" | sed 's/@mcp-b\//packages\//')
+            if [ -d "$PKG_DIR" ]; then
+              tar -czf "/tmp/${SAFE_NAME}.tar.gz" -C "$(dirname "$PKG_DIR")" "$(basename "$PKG_DIR")"
+
+              cosign sign-blob "/tmp/${SAFE_NAME}.tar.gz" \
+                --yes \
+                --output-signature "/tmp/${SAFE_NAME}.tar.gz.sig" \
+                --output-certificate "/tmp/${SAFE_NAME}.tar.gz.pem" \
+                --bundle "/tmp/${SAFE_NAME}.tar.gz.sigstore"
+
+              cat > /tmp/release-notes.md << NOTES_EOF
+          Prerelease of ${PKG_NAME}
+
+          **Install:** npm install ${PKG_NAME}@${TAG_SUFFIX}
+
+          **Verify signature:**
+          cosign verify-blob ${SAFE_NAME}.tar.gz --signature ${SAFE_NAME}.tar.gz.sig --certificate ${SAFE_NAME}.tar.gz.pem --certificate-identity-regexp https://github.com/WebMCP-org/npm-packages --certificate-oidc-issuer https://token.actions.githubusercontent.com
+          NOTES_EOF
+
+              gh release create "$TAG" \
+                --title "${PKG_NAME} ${PKG_VERSION}" \
+                --notes-file /tmp/release-notes.md \
+                --prerelease \
+                "/tmp/${SAFE_NAME}.tar.gz" \
+                "/tmp/${SAFE_NAME}.tar.gz.sig" \
+                "/tmp/${SAFE_NAME}.tar.gz.pem" \
+                "/tmp/${SAFE_NAME}.tar.gz.sigstore" \
+                2>/dev/null || echo "  Warning: Release may already exist for $TAG"
+
+              echo "  Created signed release for $TAG"
+            fi
+          done
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "All packages signed with sigstore (keyless OIDC)" >> "$GITHUB_STEP_SUMMARY"
