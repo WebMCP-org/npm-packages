@@ -246,6 +246,11 @@ function getToolBridge(): ToolBridge | null {
 }
 
 let pushScheduled = false;
+// Snapshot of sorted tool names (joined by \0) used to deduplicate push notifications
+// between event-driven and poll-driven paths.
+let lastToolsSnapshot = '';
+let pollTimer: ReturnType<typeof setInterval> | null = null;
+const POLL_INTERVAL_MS = 2000;
 
 function onToolsChanged(): void {
   if (pushScheduled || !widgetWindow) return;
@@ -258,11 +263,13 @@ function onToolsChanged(): void {
     toolsPromise
       .then((tools) => {
         if (!widgetWindow) return;
+        const toolList = Array.isArray(tools) ? tools : [];
+        lastToolsSnapshot = toolList
+          .map((t) => t.name)
+          .sort()
+          .join('\0');
         widgetWindow.postMessage(
-          {
-            type: 'webmcp.tools.changed',
-            tools: Array.isArray(tools) ? tools : [],
-          },
+          { type: 'webmcp.tools.changed', tools: toolList },
           config.widgetOrigin
         );
       })
@@ -272,60 +279,116 @@ function onToolsChanged(): void {
   }, 0);
 }
 
+/**
+ * Subscribe to tool changes on ALL available targets simultaneously (non-exclusive).
+ * Chrome native fires toolchange on modelContextTesting for registerTool but NOT for
+ * unregisterTool/signal-abort. By subscribing on both modelContext and modelContextTesting,
+ * we catch events regardless of which target fires them. The `pushScheduled` debounce in
+ * onToolsChanged prevents duplicate pushes when both targets fire for the same mutation.
+ */
 function trySubscribe(): boolean {
+  let subscribed = false;
+
+  // Path A: W3C standard — addEventListener('toolchange') on the extended modelContext.
+  // Works when @mcp-b/global (BrowserMcpServer) or a patched modelContext is present.
   const mc = getExtendedModelContext();
   if (mc) {
     try {
       mc.addEventListener('toolchange', onToolsChanged);
-      return true;
+      subscribed = true;
     } catch (error) {
-      debugWarn('addEventListener threw:', error);
+      debugWarn('addEventListener on modelContext threw:', error);
     }
   }
+
+  // Path B: Chrome native / polyfill — subscribe on modelContextTesting.
+  // Prefer addEventListener (W3C standard); fall back to deprecated registerToolsChangedCallback.
   const testing = navigator.modelContextTesting as
     | (typeof navigator.modelContextTesting & Partial<ModelContextTestingPolyfillExtensions>)
     | undefined;
-  if (testing && typeof testing.registerToolsChangedCallback === 'function') {
-    try {
-      testing.registerToolsChangedCallback(onToolsChanged);
-      return true;
-    } catch (error) {
-      debugWarn('Failed to subscribe via registerToolsChangedCallback:', error);
+  if (testing) {
+    if (typeof testing.addEventListener === 'function') {
+      try {
+        testing.addEventListener('toolchange', onToolsChanged);
+        subscribed = true;
+      } catch (error) {
+        debugWarn('addEventListener on modelContextTesting threw:', error);
+      }
+    } else if (typeof testing.registerToolsChangedCallback === 'function') {
+      try {
+        testing.registerToolsChangedCallback(onToolsChanged);
+        subscribed = true;
+      } catch (error) {
+        debugWarn('Failed to subscribe via registerToolsChangedCallback:', error);
+      }
     }
   }
-  return false;
+
+  return subscribed;
+}
+
+/**
+ * Fallback polling for environments where toolchange events are unreliable
+ * (Chrome native does not fire toolchange on unregisterTool or signal abort).
+ * Compares sorted tool names against the last known snapshot; triggers
+ * onToolsChanged() only when a real difference is detected.
+ */
+function startToolListPolling(): void {
+  if (pollTimer) return;
+  pollTimer = setInterval(() => {
+    if (!widgetWindow) return;
+    const bridge = getToolBridge();
+    if (!bridge) return;
+    Promise.resolve(bridge.listTools())
+      .then((tools) => {
+        const names = Array.isArray(tools)
+          ? tools
+              .map((t) => t.name)
+              .sort()
+              .join('\0')
+          : '';
+        if (names !== lastToolsSnapshot) {
+          lastToolsSnapshot = names;
+          onToolsChanged();
+        }
+      })
+      .catch(() => {});
+  }, POLL_INTERVAL_MS);
 }
 
 function subscribeToToolChanges(): void {
-  if (trySubscribe()) {
+  if (!trySubscribe()) {
+    let retries = 0;
+    let retryDelayMs = 100;
+    const MAX_RETRIES = 40;
+    const MAX_RETRY_DELAY_MS = 1000;
+
+    const scheduleRetry = (): void => {
+      setTimeout(() => {
+        retries++;
+        if (trySubscribe()) {
+          startToolListPolling();
+          return;
+        }
+
+        if (retries >= MAX_RETRIES) {
+          debugWarn(
+            `Could not subscribe to tool changes after ${MAX_RETRIES} retries. Dynamic tool updates will not be relayed.`
+          );
+          startToolListPolling();
+          return;
+        }
+
+        retryDelayMs = Math.min(Math.round(retryDelayMs * 1.5), MAX_RETRY_DELAY_MS);
+        scheduleRetry();
+      }, retryDelayMs);
+    };
+
+    scheduleRetry();
     return;
   }
 
-  let retries = 0;
-  let retryDelayMs = 100;
-  const MAX_RETRIES = 40;
-  const MAX_RETRY_DELAY_MS = 1000;
-
-  const scheduleRetry = (): void => {
-    setTimeout(() => {
-      retries++;
-      if (trySubscribe()) {
-        return;
-      }
-
-      if (retries >= MAX_RETRIES) {
-        debugWarn(
-          `Could not subscribe to tool changes after ${MAX_RETRIES} retries. Dynamic tool updates will not be relayed.`
-        );
-        return;
-      }
-
-      retryDelayMs = Math.min(Math.round(retryDelayMs * 1.5), MAX_RETRY_DELAY_MS);
-      scheduleRetry();
-    }, retryDelayMs);
-  };
-
-  scheduleRetry();
+  startToolListPolling();
 }
 
 function respondToSource(
