@@ -887,8 +887,15 @@ export class RelayBridgeServer extends EventEmitter {
 
   /**
    * Handles source disconnection and rejects in-flight calls owned by that source.
+   *
+   * Guarded against double-call: both 'error' and 'close' events fire on
+   * socket failure, but cleanup (and the stateChanged emission) runs only once.
    */
   private onSocketClose(connectionId: string): void {
+    if (!this.socketByConnectionId.has(connectionId)) {
+      return;
+    }
+
     this.stopHeartbeat(connectionId);
     this.relayClientConnectionIds.delete(connectionId);
     this.registry.removeConnection(connectionId);
