@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
+import { getModelContext, type ModelContextSurface } from './model-context.js';
 import type { ResourceContents, WebMCPResourceConfig, WebMCPResourceReturn } from './types.js';
 
-type ResourceModelContext = Navigator['modelContext'] & {
+type ResourceModelContext = ModelContextSurface & {
   registerResource: (descriptor: {
     uri: string;
     name: string;
@@ -15,7 +16,7 @@ type ResourceModelContext = Navigator['modelContext'] & {
  * React hook for registering Model Context Protocol (MCP) resources.
  *
  * This hook handles the complete lifecycle of an MCP resource:
- * - Registers the resource with `window.navigator.modelContext`
+ * - Registers the resource with `window.document.modelContext`
  * - Supports both static URIs and URI templates with parameters
  * - Automatically unregisters on component unmount
  *
@@ -82,13 +83,13 @@ export function useWebMCPResource(config: WebMCPResourceConfig): WebMCPResourceR
   }, [read]);
 
   useEffect(() => {
-    if (typeof window === 'undefined' || !window.navigator?.modelContext) {
+    const modelContext = getModelContext() as ResourceModelContext | undefined;
+    if (!modelContext) {
       console.warn(
-        `[ReactWebMCP] window.navigator.modelContext is not available. Resource "${uri}" will not be registered.`
+        `[ReactWebMCP] window.document.modelContext is not available. Resource "${uri}" will not be registered.`
       );
       return;
     }
-    const modelContext = window.navigator.modelContext as ResourceModelContext;
 
     const resourceHandler = async (
       resolvedUri: URL,

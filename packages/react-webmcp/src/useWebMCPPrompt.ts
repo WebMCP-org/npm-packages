@@ -6,9 +6,10 @@ import type {
   WebMCPPromptConfig,
   WebMCPPromptReturn,
 } from './types.js';
+import { getModelContext, type ModelContextSurface } from './model-context.js';
 import { isZodSchema, zodToJsonSchema } from './zod-utils.js';
 
-type PromptModelContext = Navigator['modelContext'] & {
+type PromptModelContext = ModelContextSurface & {
   registerPrompt: (descriptor: {
     name: string;
     description?: string;
@@ -21,7 +22,7 @@ type PromptModelContext = Navigator['modelContext'] & {
  * React hook for registering Model Context Protocol (MCP) prompts.
  *
  * This hook handles the complete lifecycle of an MCP prompt:
- * - Registers the prompt with `window.navigator.modelContext`
+ * - Registers the prompt with `window.document.modelContext`
  * - Converts Zod schemas to JSON Schema for argument validation
  * - Automatically unregisters on component unmount
  *
@@ -95,13 +96,13 @@ export function useWebMCPPrompt<TArgsSchema extends ReactWebMCPInputSchema = Inp
   }, [get]);
 
   useEffect(() => {
-    if (typeof window === 'undefined' || !window.navigator?.modelContext) {
+    const modelContext = getModelContext() as PromptModelContext | undefined;
+    if (!modelContext) {
       console.warn(
-        `[ReactWebMCP] window.navigator.modelContext is not available. Prompt "${name}" will not be registered.`
+        `[ReactWebMCP] window.document.modelContext is not available. Prompt "${name}" will not be registered.`
       );
       return;
     }
-    const modelContext = window.navigator.modelContext as PromptModelContext;
 
     const promptHandler = async (
       args: Record<string, unknown>

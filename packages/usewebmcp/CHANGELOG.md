@@ -5,6 +5,7 @@
 ### Major Changes
 
 - Align standalone React hooks with the WebMCP v3 document-first API through `@mcp-b/webmcp-polyfill` and `@mcp-b/webmcp-types`.
+- Hooks now register against `document.modelContext` first while retaining a `navigator.modelContext` fallback for older preview runtimes.
 
 ### Patch Changes
 
