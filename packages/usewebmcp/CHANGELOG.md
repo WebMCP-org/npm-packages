@@ -2,6 +2,10 @@
 
 ## 3.0.0
 
+### Major Changes
+
+- Align standalone React hooks with the WebMCP v3 document-first API through `@mcp-b/webmcp-polyfill` and `@mcp-b/webmcp-types`.
+
 ### Patch Changes
 
 - Updated dependencies [4f3cc5e]

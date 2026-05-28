@@ -2,6 +2,10 @@
 
 ## 3.0.0
 
+### Major Changes
+
+- Align browser transports with the WebMCP v3 release train and consume `@mcp-b/webmcp-ts-sdk@3.0.0`. This package has no direct API changes in this release.
+
 ### Patch Changes
 
 - @mcp-b/webmcp-ts-sdk@3.0.0

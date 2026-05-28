@@ -2,6 +2,10 @@
 
 ## 3.0.0
 
+### Major Changes
+
+- Align with the WebMCP v3 release train and consume the document-first WebMCP type, SDK, and transport packages. This package has no direct API changes in this release.
+
 ### Patch Changes
 
 - Updated dependencies [4f3cc5e]

@@ -2,6 +2,10 @@
 
 ## 3.0.0
 
+### Major Changes
+
+- Align the global bundle with the WebMCP v3 document-first API. `document.modelContext` is the canonical surface through the bundled polyfill; `navigator.modelContext` remains available as a deprecated migration fallback.
+
 ### Patch Changes
 
 - Updated dependencies [4f3cc5e]
