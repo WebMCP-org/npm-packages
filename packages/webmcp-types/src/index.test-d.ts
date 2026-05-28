@@ -54,12 +54,17 @@ test('ModelContext.executeTool uses registered tool objects and JSON-string inpu
   expectTypeOf<ModelContext['executeTool']>().returns.toEqualTypeOf<Promise<string | null>>();
 });
 
-test('ModelContext.unregisterTool accepts legacy string names', () => {
-  expectTypeOf<ModelContext['unregisterTool']>().toBeCallableWith('health');
+test('ModelContext does not expose legacy unregisterTool on the strict core surface', () => {
+  // @ts-expect-error unregisterTool is an MCP-B compatibility extension, not strict WebMCP core.
+  expectTypeOf<ModelContext['unregisterTool']>().toBeNever();
 });
 
-test('ModelContext.unregisterTool also accepts tool-like objects for compatibility', () => {
-  expectTypeOf<ModelContext['unregisterTool']>().toBeCallableWith({ name: 'health' });
+test('ModelContextExtensions.unregisterTool accepts legacy string names', () => {
+  expectTypeOf<ModelContextExtensions['unregisterTool']>().toBeCallableWith('health');
+});
+
+test('ModelContextExtensions.unregisterTool also accepts tool-like objects for compatibility', () => {
+  expectTypeOf<ModelContextExtensions['unregisterTool']>().toBeCallableWith({ name: 'health' });
 });
 
 test('ModelContextToolRegistrationHandle exposes unregister()', () => {

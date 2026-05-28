@@ -304,7 +304,7 @@ test('global registerTool implementation-first examples compile', () => {
     }
   }
 
-  navigator.modelContext.unregisterTool('feature_toggle_summary');
+  modelContext.unregisterTool('feature_toggle_summary');
 });
 
 test('global registerTool accepts widened-schema tools returning raw values', () => {

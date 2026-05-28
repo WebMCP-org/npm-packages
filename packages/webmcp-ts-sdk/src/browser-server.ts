@@ -6,7 +6,8 @@ import type {
   ModelContextCore,
   ModelContextExtensions,
   ModelContextRegisterToolOptions,
-  ModelContextTestingToolInfo,
+  ModelContextTestingExecuteToolOptions,
+  ModelContextToolInfo,
   ModelContextToolReference,
   ResourceContents,
   ToolDescriptor,
@@ -855,7 +856,14 @@ export class BrowserMcpServer extends BaseMcpServer {
       });
   }
 
-  getTools(): ModelContextTestingToolInfo[] {
+  async getTools(): Promise<ModelContextToolInfo[]> {
+    const origin =
+      typeof globalThis.location === 'object' && typeof globalThis.location?.origin === 'string'
+        ? globalThis.location.origin
+        : '';
+    const currentWindow =
+      typeof globalThis.window === 'object' ? globalThis.window : (undefined as unknown as Window);
+
     return this.listTools().map((tool) => {
       let inputSchema: string;
       try {
@@ -866,8 +874,14 @@ export class BrowserMcpServer extends BaseMcpServer {
 
       return {
         name: tool.name,
+        title:
+          typeof tool.annotations?.title === 'string'
+            ? tool.annotations.title
+            : (tool.description ?? ''),
         description: tool.description ?? '',
         inputSchema,
+        origin,
+        window: currentWindow,
       };
     });
   }
@@ -955,8 +969,35 @@ export class BrowserMcpServer extends BaseMcpServer {
     return tool.handler(params.arguments ?? {}, {});
   }
 
-  async executeTool(name: string, args: Record<string, unknown> = {}): Promise<ToolResponse> {
-    return this.callTool({ name, arguments: args });
+  executeTool(
+    tool: ModelContextToolInfo,
+    inputArgsJson: string,
+    options?: ModelContextTestingExecuteToolOptions
+  ): Promise<string | null>;
+  executeTool(name: string, args?: Record<string, unknown>): Promise<ToolResponse>;
+  async executeTool(
+    toolOrName: ModelContextToolInfo | string,
+    inputArgsJsonOrArgs: string | Record<string, unknown> = {}
+  ): Promise<string | null | ToolResponse> {
+    if (typeof toolOrName === 'string') {
+      return this.callTool({
+        name: toolOrName,
+        arguments:
+          typeof inputArgsJsonOrArgs === 'string'
+            ? JSON.parse(inputArgsJsonOrArgs)
+            : inputArgsJsonOrArgs,
+      });
+    }
+
+    const result = await this.callTool({
+      name: toolOrName.name,
+      arguments:
+        typeof inputArgsJsonOrArgs === 'string'
+          ? (JSON.parse(inputArgsJsonOrArgs) as Record<string, unknown>)
+          : inputArgsJsonOrArgs,
+    });
+    const serialized = JSON.stringify(result);
+    return serialized === undefined ? null : serialized;
   }
 
   /**

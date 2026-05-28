@@ -44,6 +44,7 @@ export type ModelContext = ModelContextCore & {
     tool: Tool,
     options?: ModelContextRegisterToolOptions
   ): ModelContextToolRegistrationHandle;
+  unregisterTool: ModelContextExtensions['unregisterTool'];
   listTools: ModelContextExtensions['listTools'];
   addEventListener(
     type: 'toolchange' | 'toolschange',

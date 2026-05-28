@@ -9,6 +9,11 @@ const reuseExistingServer = process.env.PLAYWRIGHT_REUSE_SERVER === '1';
 const chromiumChannel = process.env.PLAYWRIGHT_CHROMIUM_CHANNEL;
 const chromiumExecutablePath =
   process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ?? process.env.CHROME_BIN;
+const enableWebMCPFlags = process.env.PLAYWRIGHT_ENABLE_WEBMCP_FLAGS === '1';
+const webMCPFlags = [
+  '--enable-experimental-web-platform-features',
+  '--enable-features=WebMCPTesting,DevToolsWebMCPSupport',
+];
 
 export default defineConfig({
   testDir: './tests',
@@ -39,8 +44,13 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         ...(chromiumChannel && !chromiumExecutablePath ? { channel: chromiumChannel } : {}),
-        ...(chromiumExecutablePath
-          ? { launchOptions: { executablePath: chromiumExecutablePath } }
+        ...(chromiumExecutablePath || enableWebMCPFlags
+          ? {
+              launchOptions: {
+                ...(chromiumExecutablePath ? { executablePath: chromiumExecutablePath } : {}),
+                ...(enableWebMCPFlags ? { args: webMCPFlags } : {}),
+              },
+            }
           : {}),
       },
     },

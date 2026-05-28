@@ -9,29 +9,20 @@ This guide covers the native Chromium WebMCP validation lanes in this repo.
 
 ## Quick Run
 
-### Default Chromium Canonical Contract
+### Chrome Canary Canonical Contract
 
 ```bash
 cd e2e
+CHROME_BIN="/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary" \
+PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH="/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary" \
+PLAYWRIGHT_ENABLE_WEBMCP_FLAGS=1 \
 pnpm test:native-contract:default
 ```
 
-### Chrome Beta Canonical Contract
-
-1. Open `chrome://flags/#enable-webmcp-testing`
-2. Enable **WebMCP for testing**
-3. Restart Chrome Beta
-4. Run:
-
-```bash
-cd e2e
-pnpm test:native-contract:beta
-```
-
-This uses `playwright-chrome-beta-webmcp.config.ts` with:
+CI installs Chrome Canary and runs the native contract with:
 
 - `--enable-experimental-web-platform-features`
-- `--enable-features=WebMCPTesting`
+- `--enable-features=WebMCPTesting,DevToolsWebMCPSupport`
 
 ## Why Native Is Different
 
@@ -61,12 +52,10 @@ The native contract lane proves that:
 
 ## Integration Lanes
 
-These lanes still exist and are useful for broader compatibility checks:
+These lanes still exist locally and are useful for broader compatibility checks:
 
 ```bash
 cd e2e
-pnpm test:native-parity:default
-pnpm test:native-parity:beta
 pnpm test:native-showcase
 pnpm test:integration:runtime-api
 ```
@@ -102,11 +91,11 @@ Deprecated alias retained during the Chrome M150 transition.
 ## Debug Tips
 
 ```bash
-# Headed Chrome Beta run
+# Headed native showcase run
 cd e2e
-pnpm test:chrome-beta:webmcp:headed
+pnpm test:native-showcase:headed
 
-# Playwright UI for Chrome Beta integration lane
+# Playwright UI for native showcase integration lane
 cd e2e
-pnpm test:chrome-beta:webmcp:ui
+pnpm test:native-showcase:ui
 ```

@@ -71,10 +71,92 @@ test.describe('Runtime Contract - Browser API Caller', () => {
     await waitForRuntimePage(page, '/runtime-contract.html');
   });
 
+  test('runs against native modelContextTesting instead of the polyfill shim', async ({ page }) => {
+    test.skip(
+      process.env.PLAYWRIGHT_ENABLE_WEBMCP_FLAGS !== '1',
+      'Native-only assertion is only meaningful in the flagged Chrome Canary parity lane.'
+    );
+
+    const runtime = await page.evaluate(() => {
+      const testing = navigator.modelContextTesting as
+        | (Navigator['modelContextTesting'] & {
+            __isWebMCPPolyfill?: boolean;
+            reset?: unknown;
+            getToolCalls?: unknown;
+          })
+        | undefined;
+      const modelContext = document.modelContext as unknown as {
+        __isWebMCPPolyfill?: boolean;
+        __isBrowserMcpServer?: boolean;
+      };
+
+      return {
+        hasDocumentModelContext: typeof document.modelContext !== 'undefined',
+        documentNavigatorSameInstance: document.modelContext === navigator.modelContext,
+        testingConstructorName: testing?.constructor.name ?? '',
+        testingHasPolyfillMarker: testing?.__isWebMCPPolyfill === true,
+        modelContextHasPolyfillMarker: modelContext.__isWebMCPPolyfill === true,
+        testingHasPolyfillReset: typeof testing?.reset === 'function',
+        testingHasPolyfillCallLog: typeof testing?.getToolCalls === 'function',
+      };
+    });
+
+    expect(runtime.hasDocumentModelContext).toBe(true);
+    expect(runtime.documentNavigatorSameInstance).toBe(true);
+    expect(runtime.testingConstructorName).toBeTruthy();
+    expect(runtime.testingConstructorName).not.toBe('PolyfillTestingShim');
+    expect(runtime.testingHasPolyfillMarker).toBe(false);
+    expect(runtime.modelContextHasPolyfillMarker).toBe(false);
+    expect(runtime.testingHasPolyfillReset).toBe(false);
+    expect(runtime.testingHasPolyfillCallLog).toBe(false);
+  });
+
   test('discovers the canonical base tool set through browser APIs', async ({ page }) => {
     const toolNames = await listNativeToolNames(page);
     expect(toolNames).toEqual(expect.arrayContaining(getCanonicalToolNames(false)));
     expect(toolNames).toHaveLength(getCanonicalToolNames(false).length);
+  });
+
+  test('supports producer getTools and executeTool shape on document.modelContext', async ({
+    page,
+  }) => {
+    const result = await page.evaluate(async () => {
+      const toolsPromise = document.modelContext.getTools();
+      const tools = await toolsPromise;
+      const sumTool = tools.find((tool) => tool.name === 'sum');
+      if (!sumTool) {
+        return { missingSumTool: true, toolsArePromise: false };
+      }
+
+      const execution = await document.modelContext.executeTool(
+        sumTool,
+        JSON.stringify({ a: 4, b: 7 })
+      );
+
+      return {
+        missingSumTool: false,
+        toolsArePromise: typeof toolsPromise.then === 'function',
+        toolInfo: {
+          name: sumTool.name,
+          title: sumTool.title,
+          description: sumTool.description,
+          inputSchemaType: typeof sumTool.inputSchema,
+          originType: typeof sumTool.origin,
+          hasWindow: typeof sumTool.window === 'object',
+        },
+        execution,
+      };
+    });
+
+    expect(result.missingSumTool).toBe(false);
+    expect(result.toolsArePromise).toBe(true);
+    expect(result.toolInfo).toMatchObject({
+      name: 'sum',
+      inputSchemaType: 'string',
+      originType: 'string',
+      hasWindow: true,
+    });
+    expect(result.execution).toContain('sum:11');
   });
 
   test('executes a registered tool through modelContextTesting and records the invocation', async ({
@@ -122,8 +204,8 @@ test.describe('Runtime Contract - Browser API Caller', () => {
     await resetInvocations(page);
 
     const errorMessage = await executeNativeToolError(page, 'always_fail', { reason: 'native' });
-    if (testInfo.project.name === 'chrome-beta-webmcp') {
-      // Current Chrome Beta normalizes thrown tool errors into a generic native failure string.
+    if (testInfo.project.name === 'chrome-beta-webmcp' || testInfo.project.name === 'chromium') {
+      // Current native Chrome builds normalize thrown tool errors into a generic failure string.
       expect(errorMessage).toMatch(/always_fail:native|invocation failed/i);
     } else {
       expect(errorMessage).toContain('always_fail:native');

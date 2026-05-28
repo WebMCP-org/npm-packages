@@ -137,7 +137,7 @@ describe('global adapter', () => {
     ).toBe(false);
   });
 
-  it('getTools returns the native producer tool-list shape', () => {
+  it('getTools returns the native producer tool-list shape', async () => {
     initializeWebModelContext();
 
     const modelContext = getModelContext();
@@ -154,13 +154,16 @@ describe('global adapter', () => {
       },
     });
 
-    expect(modelContext.getTools()).toEqual([
-      {
+    await expect(modelContext.getTools()).resolves.toEqual([
+      expect.objectContaining({
         name: 'native_shape_tool',
+        title: 'Native shape tool',
         description: 'Native shape tool',
         inputSchema:
           '{"type":"object","properties":{"value":{"type":"number"}},"required":["value"]}',
-      },
+        origin: expect.any(String),
+        window: expect.any(Object),
+      }),
     ]);
   });
 
@@ -568,7 +571,7 @@ describe('global adapter', () => {
     }
   });
 
-  it('falls back to transport registration when native registerTool is blocked by permissions policy', () => {
+  it('falls back to transport registration when native registerTool is blocked by permissions policy', async () => {
     const nativeRegisterTool = vi.fn(() => {
       throw new DOMException(
         "Failed to execute 'registerTool' on 'ModelContext': Access to the feature \"tools\" is disallowed by permissions policy.",
@@ -606,12 +609,80 @@ describe('global adapter', () => {
       expect(server.listTools().some((tool) => tool.name === 'iframe_blocked_native_tool')).toBe(
         true
       );
-      expect(server.getTools().some((tool) => tool.name === 'iframe_blocked_native_tool')).toBe(
-        true
+      await expect(server.getTools()).resolves.toEqual(
+        expect.arrayContaining([expect.objectContaining({ name: 'iframe_blocked_native_tool' })])
       );
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining('Native WebMCP tool mirror is blocked by permissions policy')
       );
+    } finally {
+      warnSpy.mockRestore();
+      void server.close();
+    }
+  });
+
+  it('keeps transport registration alive when async native registerTool rejects', async () => {
+    let nativeCleanupSignal: AbortSignal | undefined;
+    let nativeCleanupAbortCount = 0;
+    const nativeRegisterTool = vi.fn(
+      (_tool: unknown, options?: { signal?: AbortSignal }): Promise<void> => {
+        nativeCleanupSignal = options?.signal;
+        nativeCleanupSignal?.addEventListener(
+          'abort',
+          () => {
+            nativeCleanupAbortCount++;
+          },
+          { once: true }
+        );
+        return Promise.reject(new Error('native async registration rejected'));
+      }
+    );
+    const nativeContext = {
+      registerTool: nativeRegisterTool,
+      listTools: () => [],
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => true,
+    } as unknown as Navigator['modelContext'];
+    const server = new BrowserMcpServer(
+      { name: 'native-async-rejection-test', version: '1.0.0' },
+      {
+        native: nativeContext,
+      }
+    );
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      server.registerTool({
+        name: 'async_rejected_native_tool',
+        description: 'Native registration rejects asynchronously',
+        inputSchema: { type: 'object', properties: {} },
+        async execute() {
+          return { content: [{ type: 'text', text: 'transport-ok' }] };
+        },
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(nativeRegisterTool).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'async_rejected_native_tool' }),
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
+      );
+      expect(nativeCleanupSignal?.aborted).toBe(true);
+      expect(nativeCleanupAbortCount).toBe(1);
+      expect(server.listTools().some((tool) => tool.name === 'async_rejected_native_tool')).toBe(
+        true
+      );
+      await expect(server.executeTool('async_rejected_native_tool', {})).resolves.toMatchObject({
+        content: [{ type: 'text', text: 'transport-ok' }],
+      });
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Native WebMCP tool mirror registration rejected'),
+        expect.any(Error)
+      );
+
+      expect(() => server.unregisterTool('async_rejected_native_tool')).not.toThrow();
+      expect(nativeCleanupAbortCount).toBe(1);
     } finally {
       warnSpy.mockRestore();
       void server.close();

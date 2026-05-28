@@ -295,13 +295,6 @@ export interface ModelContextCore {
   ): void;
 
   dispatchEvent(event: Event): boolean;
-
-  /**
-   * Unregisters a dynamic tool by name or tool reference.
-   *
-   * @deprecated Removed from the WebMCP spec on April 23, 2026. Use `registerTool(tool, { signal })`. Will be removed in the next major.
-   */
-  unregisterTool(nameOrTool: string | ModelContextToolReference): void;
 }
 
 /**
@@ -309,6 +302,13 @@ export interface ModelContextCore {
  * These members are intentionally non-standard.
  */
 export interface ModelContextExtensions {
+  /**
+   * Unregisters a dynamic tool by name or tool reference.
+   *
+   * @deprecated Removed from the WebMCP spec on April 23, 2026. Use `registerTool(tool, { signal })`. Will be removed in the next major.
+   */
+  unregisterTool(nameOrTool: string | ModelContextToolReference): void;
+
   /**
    * Lists currently registered tools.
    */

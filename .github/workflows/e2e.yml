@@ -155,6 +155,7 @@ jobs:
         env:
           CHROME_BIN: ${{ steps.chrome_canary.outputs.chrome-path }}
           PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: ${{ steps.chrome_canary.outputs.chrome-path }}
+          PLAYWRIGHT_ENABLE_WEBMCP_FLAGS: '1'
         run: pnpm --filter mcp-e2e-tests run test:native-contract:default
 
       - name: Run Native Runtime API Integration (Chrome Canary)

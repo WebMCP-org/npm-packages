@@ -7,8 +7,16 @@ import {
   initializeWebModelContextPolyfill,
 } from './index.js';
 
+type CompatModelContext = Navigator['modelContext'] & {
+  unregisterTool(nameOrTool: string | { name: string }): void;
+};
+
 function asPolyfillInputSchema(schema: unknown): InputSchema {
   return schema as InputSchema;
+}
+
+function getCompatModelContext(): CompatModelContext {
+  return navigator.modelContext as CompatModelContext;
 }
 
 describe('@mcp-b/webmcp-polyfill', () => {
@@ -33,7 +41,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
     ).toBe('undefined');
     expect(typeof navigator.modelContext.registerTool).toBe('function');
     expect(typeof navigator.modelContext.getTools).toBe('function');
-    expect(typeof navigator.modelContext.unregisterTool).toBe('function');
+    expect(typeof getCompatModelContext().unregisterTool).toBe('function');
     expect(typeof navigator.modelContext.ontoolchange).toBe('object');
     expect((navigator.modelContext as unknown as { callTool?: unknown }).callTool).toBeUndefined();
   });
@@ -49,7 +57,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
     ).toBe('undefined');
     expect(typeof document.modelContext.registerTool).toBe('function');
     expect(typeof document.modelContext.getTools).toBe('function');
-    expect(typeof document.modelContext.unregisterTool).toBe('function');
+    expect(typeof (document.modelContext as CompatModelContext).unregisterTool).toBe('function');
     expect(typeof document.modelContext.ontoolchange).toBe('object');
     expect((document.modelContext as unknown as { callTool?: unknown }).callTool).toBeUndefined();
   });
@@ -216,7 +224,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
   it('unregisterTool on unknown names is a no-op', () => {
     initializeWebMCPPolyfill();
-    expect(() => navigator.modelContext.unregisterTool('missing')).not.toThrow();
+    expect(() => getCompatModelContext().unregisterTool('missing')).not.toThrow();
   });
 
   it('unregisterTool accepts the originally registered tool object for compatibility', async () => {
@@ -230,7 +238,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
     };
 
     navigator.modelContext.registerTool(tool);
-    navigator.modelContext.unregisterTool(tool);
+    getCompatModelContext().unregisterTool(tool);
 
     await expect(
       navigator.modelContextTesting?.executeTool('compat_unregister_tool', '{}')
@@ -240,7 +248,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
   it('throws when unregisterTool receives an invalid compatibility value', () => {
     initializeWebMCPPolyfill();
 
-    expect(() => navigator.modelContext.unregisterTool({} as never)).toThrow(
+    expect(() => getCompatModelContext().unregisterTool({} as never)).toThrow(
       "Failed to execute 'unregisterTool' on 'ModelContext': parameter 1 must be a string or an object with a string name."
     );
   });
@@ -269,8 +277,8 @@ describe('@mcp-b/webmcp-polyfill', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     try {
-      navigator.modelContext.unregisterTool('deprecation_tool');
-      navigator.modelContext.unregisterTool('deprecation_tool');
+      getCompatModelContext().unregisterTool('deprecation_tool');
+      getCompatModelContext().unregisterTool('deprecation_tool');
 
       expect(warnSpy).toHaveBeenCalledWith(
         '[WebMCPPolyfill] navigator.modelContext.unregisterTool() is deprecated. The April 23, 2026 WebMCP draft removed it in favor of registerTool(tool, { signal }) — pass an AbortSignal and abort it to unregister.'
@@ -348,7 +356,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
       execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
     });
 
-    navigator.modelContext.unregisterTool('t1');
+    getCompatModelContext().unregisterTool('t1');
 
     await Promise.resolve();
     await Promise.resolve();
