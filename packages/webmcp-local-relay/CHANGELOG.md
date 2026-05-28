@@ -1,5 +1,7 @@
 # @mcp-b/webmcp-local-relay
 
+## 3.0.0
+
 ## 2.3.1
 
 ## 2.3.0
