@@ -257,6 +257,10 @@ jobs:
             if [ -f "$pkg/package.json" ]; then
               name=$(jq -r '.name' "$pkg/package.json")
               current_version=$(jq -r '.version' "$pkg/package.json")
+              if [ "$name" = "agent-skills-ts-sdk" ]; then
+                echo "Skipping $name; not part of the WebMCP prerelease stack"
+                continue
+              fi
               if [ "$name" != "null" ] && [ "$current_version" != "null" ]; then
                 prerelease_version="${current_version}-${TAG_SUFFIX}.${TIMESTAMP}"
                 jq --arg v "$prerelease_version" '.version = $v' "$pkg/package.json" > "$pkg/package.json.tmp"
@@ -270,7 +274,7 @@ jobs:
 
       - name: Publish prerelease packages
         run: |
-          pnpm publish -r --access public --tag "${{ inputs.tag || 'beta' }}" --no-git-checks
+          pnpm --filter '!agent-skills-ts-sdk' publish -r --access public --tag "${{ inputs.tag || 'beta' }}" --no-git-checks
 
       - name: Install cosign
         uses: sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22 # v3.8.0

@@ -15,8 +15,7 @@
       "@mcp-b/react-webmcp",
       "usewebmcp",
       "@mcp-b/webmcp-local-relay",
-      "@mcp-b/chrome-devtools-mcp",
-      "agent-skills-ts-sdk"
+      "@mcp-b/chrome-devtools-mcp"
     ]
   ],
   "linked": [],
