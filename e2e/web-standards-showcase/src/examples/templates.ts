@@ -26,7 +26,7 @@ const tool = {
 };
 
 // Register the tool
-navigator.modelContext.provideContext({ tools: [tool] });`,
+navigator.modelContext.registerTool(tool);`,
 
   calculator: `// Calculator Tools
 const calculatorTools = [
@@ -64,7 +64,9 @@ const calculatorTools = [
   }
 ];
 
-navigator.modelContext.provideContext({ tools: calculatorTools });`,
+for (const tool of calculatorTools) {
+  navigator.modelContext.registerTool(tool);
+}`,
 
   todo: `// Todo List Manager
 const todos = [];
@@ -132,7 +134,9 @@ const todoTools = [
   }
 ];
 
-navigator.modelContext.provideContext({ tools: todoTools });`,
+for (const tool of todoTools) {
+  navigator.modelContext.registerTool(tool);
+}`,
 
   timer: `// Timer Tool (demonstrates registerTool for persistent tools)
 let startTime = null;

@@ -1,5 +1,9 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import type { InputSchema, ModelContext } from '@mcp-b/webmcp-types';
+import type {
+  InputSchema,
+  ModelContext,
+  ModelContextTestingPolyfillExtensions,
+} from '@mcp-b/webmcp-types';
 import { cleanupWebModelContext, initializeWebModelContext } from '../global.js';
 import type { WebModelContextInitOptions } from '../types.js';
 
@@ -69,6 +73,14 @@ function requireModelContext(): ModelContext {
   return modelContext as unknown as ModelContext;
 }
 
+function resetTestingShim(): void {
+  (
+    navigator.modelContextTesting as
+      | (Navigator['modelContextTesting'] & Partial<ModelContextTestingPolyfillExtensions>)
+      | undefined
+  )?.reset?.();
+}
+
 export function runRuntimeCoreConformanceSuite(options: RuntimeConformanceOptions): void {
   describe(options.suiteName, () => {
     beforeAll(async () => {
@@ -94,45 +106,19 @@ export function runRuntimeCoreConformanceSuite(options: RuntimeConformanceOption
     });
 
     beforeEach(async () => {
-      const modelContext = requireModelContext();
-      modelContext.clearContext();
+      resetTestingShim();
       await flushMicrotasks(2);
     });
 
-    it('supports provideContext() replacement semantics', async () => {
+    it('does not expose removed context APIs', () => {
       const modelContext = requireModelContext();
 
-      modelContext.provideContext({ tools: [] });
-      await flushMicrotasks(2);
-
-      modelContext.registerTool({
-        name: 'dynamic_before_provide',
-        description: 'Dynamic tool',
-        inputSchema: { type: 'object', properties: {} },
-        async execute() {
-          return { content: [{ type: 'text', text: 'dynamic' }] };
-        },
-      });
-      await flushMicrotasks(2);
-      expect(modelContext.listTools().map((tool) => tool.name)).toContain('dynamic_before_provide');
-
-      modelContext.provideContext({
-        tools: [
-          {
-            name: 'base_after_provide',
-            description: 'Base tool',
-            inputSchema: { type: 'object', properties: {} },
-            async execute() {
-              return { content: [{ type: 'text', text: 'base' }] };
-            },
-          },
-        ],
-      });
-      await flushMicrotasks(2);
-
-      const toolNames = modelContext.listTools().map((tool) => tool.name);
-      expect(toolNames).toContain('base_after_provide');
-      expect(toolNames).not.toContain('dynamic_before_provide');
+      expect(typeof (modelContext as unknown as { provideContext?: unknown }).provideContext).toBe(
+        'undefined'
+      );
+      expect(typeof (modelContext as unknown as { clearContext?: unknown }).clearContext).toBe(
+        'undefined'
+      );
     });
 
     it('registerTool() return shape matches the runtime contract and duplicate names throw', () => {
@@ -201,6 +187,11 @@ export function runRuntimeCoreConformanceSuite(options: RuntimeConformanceOption
 
     it('unregisterTool(name) removes tools; unknown-name behavior is runtime-defined', async () => {
       const modelContext = requireModelContext();
+
+      if (typeof modelContext.unregisterTool !== 'function') {
+        expect(typeof modelContext.unregisterTool).toBe('undefined');
+        return;
+      }
 
       modelContext.registerTool({
         name: 'remove_me',

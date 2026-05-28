@@ -5,9 +5,9 @@ import type {
   ModelContextClient,
   ModelContextCore,
   ModelContextExtensions,
-  ModelContextOptions,
   ModelContextRegisterToolOptions,
-  ModelContextTestingToolInfo,
+  ModelContextTestingExecuteToolOptions,
+  ModelContextToolInfo,
   ModelContextToolReference,
   ResourceContents,
   ToolDescriptor,
@@ -100,6 +100,14 @@ function toStructuredContent(value: unknown): JsonObject | undefined {
   return value as JsonObject;
 }
 
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+  return (
+    Boolean(value) &&
+    (typeof value === 'object' || typeof value === 'function') &&
+    typeof (value as { then?: unknown }).then === 'function'
+  );
+}
+
 function serializeTextContent(value: unknown): string {
   if (typeof value === 'string') {
     return value;
@@ -187,10 +195,11 @@ type ParentRegisterPromptFn = (
 
 type NativeToolsApi = ModelContextCore & Pick<ModelContextExtensions, 'listTools' | 'callTool'>;
 type RegisteredToolHandle = { unregister: () => void };
+type MaybePromise<T> = T | PromiseLike<T>;
 type NativeRegisterToolFn = (
   tool: ToolDescriptor,
   options?: ModelContextRegisterToolOptions
-) => void;
+) => MaybePromise<void>;
 type NativeUnregisterToolFn = (nameOrTool: string | ModelContextToolReference) => void;
 interface NativeToolCleanup {
   abort: () => void;
@@ -204,8 +213,8 @@ interface NativeToolCleanup {
  * (resources, prompts, elicitation, sampling) via BaseMcpServer.
  *
  * Deprecated compatibility (kept for Chrome Beta 147 and existing wrappers,
- * removed in the next major): `unregisterTool(name)`, `provideContext()`,
- * `clearContext()`, and the `{ unregister }` handle returned from `registerTool`.
+ * removed in the next major): `unregisterTool(name)` and the `{ unregister }`
+ * handle returned from `registerTool`.
  *
  * When `native` is provided, tool operations are mirrored so that
  * navigator.modelContextTesting stays in sync.
@@ -217,8 +226,6 @@ export class BrowserMcpServer extends BaseMcpServer {
   private _promptSchemas = new Map<string, InputSchema>();
   private _jsonValidator: PolyfillJsonSchemaValidator;
   private _publicMethodsBound = false;
-  private _provideContextDeprecationWarned = false;
-  private _clearContextDeprecationWarned = false;
   private _unregisterToolDeprecationWarned = false;
   private _nativeToolCleanups = new Map<string, NativeToolCleanup>();
   private _producerEventTarget = new EventTarget();
@@ -252,8 +259,6 @@ export class BrowserMcpServer extends BaseMcpServer {
 
     this.registerTool = this.registerTool.bind(this);
     this.unregisterTool = this.unregisterTool.bind(this);
-    this.provideContext = this.provideContext.bind(this);
-    this.clearContext = this.clearContext.bind(this);
     this.listTools = this.listTools.bind(this);
     this.getTools = this.getTools.bind(this);
     this.callTool = this.callTool.bind(this);
@@ -408,12 +413,13 @@ export class BrowserMcpServer extends BaseMcpServer {
     const nativeUnregisterTool = this.getNativeUnregisterTool();
     const shouldPassSignal = Boolean(signal) || !nativeUnregisterTool;
     const cleanup = shouldPassSignal ? this.createNativeToolCleanup(signal) : undefined;
+    let nativeRegisterResult: MaybePromise<void>;
 
     try {
       if (cleanup) {
-        nativeRegister.call(this.native, tool, cleanup.options);
+        nativeRegisterResult = nativeRegister.call(this.native, tool, cleanup.options);
       } else {
-        nativeRegister.call(this.native, tool);
+        nativeRegisterResult = nativeRegister.call(this.native, tool);
       }
     } catch (error) {
       cleanup?.abort();
@@ -437,6 +443,28 @@ export class BrowserMcpServer extends BaseMcpServer {
       nativeSignalAccepted: nativeRegister.length >= 2 || !nativeUnregisterTool,
     };
     this._nativeToolCleanups.set(tool.name, nativeToolCleanup);
+
+    if (isPromiseLike(nativeRegisterResult)) {
+      nativeRegisterResult.then(undefined, (error: unknown) => {
+        cleanup.abort();
+        if (this._nativeToolCleanups.get(tool.name) === nativeToolCleanup) {
+          this._nativeToolCleanups.delete(tool.name);
+        }
+
+        if (isPermissionsPolicySecurityError(error)) {
+          console.warn(
+            '[BrowserMcpServer] Native WebMCP tool mirror is blocked by permissions policy; continuing with WebMCP transport registration only.'
+          );
+          return;
+        }
+
+        console.warn(
+          '[BrowserMcpServer] Native WebMCP tool mirror registration rejected; continuing with WebMCP transport registration only.',
+          error
+        );
+      });
+    }
+
     return nativeToolCleanup;
   }
 
@@ -652,24 +680,6 @@ export class BrowserMcpServer extends BaseMcpServer {
     }
   }
 
-  private clearRegisteredTools(): void {
-    let changed = false;
-    for (const name of Object.keys(this._parentTools)) {
-      this._parentTools[name]?.remove();
-      changed = true;
-      if (this.native) {
-        try {
-          this.unregisterNativeToolMirror(name);
-        } catch (error) {
-          console.warn('[BrowserMcpServer] Native unregister during clear failed:', error);
-        }
-      }
-    }
-    if (changed) {
-      this.notifyProducerToolsChanged();
-    }
-  }
-
   // @ts-expect-error -- WebMCP API: (descriptor) vs MCP SDK: (name, uri, config, readCallback)
   override registerResource(descriptor: {
     uri: string;
@@ -727,23 +737,6 @@ export class BrowserMcpServer extends BaseMcpServer {
     };
   }
 
-  provideContext(options?: ModelContextOptions): void {
-    this.warnProvideContextDeprecationOnce();
-    this.clearRegisteredTools();
-
-    for (const tool of options?.tools ?? []) {
-      this.registerTool(tool);
-    }
-  }
-
-  clearContext(): void {
-    this.warnClearContextDeprecationOnce();
-    this.clearRegisteredTools();
-    // Note: _promptSchemas is NOT cleared here. clearContext() is a WebMCP standard
-    // method that only handles tools. Prompt schemas are cleaned up individually
-    // via the unregister() callback returned by registerPrompt().
-  }
-
   private resolveToolNameForUnregister(nameOrTool: string | ModelContextToolReference): string {
     if (typeof nameOrTool === 'string') {
       return nameOrTool;
@@ -755,28 +748,6 @@ export class BrowserMcpServer extends BaseMcpServer {
 
     throw new TypeError(
       "Failed to execute 'unregisterTool' on 'ModelContext': parameter 1 must be a string or an object with a string name."
-    );
-  }
-
-  private warnProvideContextDeprecationOnce(): void {
-    if (this._provideContextDeprecationWarned) {
-      return;
-    }
-
-    this._provideContextDeprecationWarned = true;
-    console.warn(
-      '[BrowserMcpServer] navigator.modelContext.provideContext() is deprecated and will be removed in the next major version. Register tools individually with registerTool() instead.'
-    );
-  }
-
-  private warnClearContextDeprecationOnce(): void {
-    if (this._clearContextDeprecationWarned) {
-      return;
-    }
-
-    this._clearContextDeprecationWarned = true;
-    console.warn(
-      '[BrowserMcpServer] navigator.modelContext.clearContext() is deprecated and will be removed in the next major version. Unregister individual tools instead.'
     );
   }
 
@@ -885,7 +856,14 @@ export class BrowserMcpServer extends BaseMcpServer {
       });
   }
 
-  getTools(): ModelContextTestingToolInfo[] {
+  async getTools(): Promise<ModelContextToolInfo[]> {
+    const origin =
+      typeof globalThis.location === 'object' && typeof globalThis.location?.origin === 'string'
+        ? globalThis.location.origin
+        : '';
+    const currentWindow =
+      typeof globalThis.window === 'object' ? globalThis.window : (undefined as unknown as Window);
+
     return this.listTools().map((tool) => {
       let inputSchema: string;
       try {
@@ -896,8 +874,14 @@ export class BrowserMcpServer extends BaseMcpServer {
 
       return {
         name: tool.name,
+        title:
+          typeof tool.annotations?.title === 'string'
+            ? tool.annotations.title
+            : (tool.description ?? ''),
         description: tool.description ?? '',
         inputSchema,
+        origin,
+        window: currentWindow,
       };
     });
   }
@@ -985,8 +969,35 @@ export class BrowserMcpServer extends BaseMcpServer {
     return tool.handler(params.arguments ?? {}, {});
   }
 
-  async executeTool(name: string, args: Record<string, unknown> = {}): Promise<ToolResponse> {
-    return this.callTool({ name, arguments: args });
+  executeTool(
+    tool: ModelContextToolInfo,
+    inputArgsJson: string,
+    options?: ModelContextTestingExecuteToolOptions
+  ): Promise<string | null>;
+  executeTool(name: string, args?: Record<string, unknown>): Promise<ToolResponse>;
+  async executeTool(
+    toolOrName: ModelContextToolInfo | string,
+    inputArgsJsonOrArgs: string | Record<string, unknown> = {}
+  ): Promise<string | null | ToolResponse> {
+    if (typeof toolOrName === 'string') {
+      return this.callTool({
+        name: toolOrName,
+        arguments:
+          typeof inputArgsJsonOrArgs === 'string'
+            ? JSON.parse(inputArgsJsonOrArgs)
+            : inputArgsJsonOrArgs,
+      });
+    }
+
+    const result = await this.callTool({
+      name: toolOrName.name,
+      arguments:
+        typeof inputArgsJsonOrArgs === 'string'
+          ? (JSON.parse(inputArgsJsonOrArgs) as Record<string, unknown>)
+          : inputArgsJsonOrArgs,
+    });
+    const serialized = JSON.stringify(result);
+    return serialized === undefined ? null : serialized;
   }
 
   /**

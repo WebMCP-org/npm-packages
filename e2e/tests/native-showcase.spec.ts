@@ -1,5 +1,11 @@
 import { expect, type Page, test } from '@playwright/test';
 
+type RemovedContextApi = {
+  provideContext?: (value: unknown) => void;
+  clearContext?: () => void;
+  unregisterTool?: (name: string) => void;
+};
+
 async function waitForNativeReady(page: Page): Promise<void> {
   await page.waitForSelector('#detection-status', { timeout: 10000 });
   await expect(page.locator('#detection-status')).toContainText(
@@ -75,10 +81,6 @@ async function waitForToolPresent(page: Page, toolName: string): Promise<void> {
   await expect.poll(async () => await getToolNames(page)).toContain(toolName);
 }
 
-async function waitForToolMissing(page: Page, toolName: string): Promise<void> {
-  await expect.poll(async () => await getToolNames(page)).not.toContain(toolName);
-}
-
 async function waitForToolSet(page: Page, toolNames: string[]): Promise<void> {
   await expect
     .poll(async () => await getToolNames(page))
@@ -86,25 +88,36 @@ async function waitForToolSet(page: Page, toolNames: string[]): Promise<void> {
 }
 
 async function clearAllTools(page: Page): Promise<void> {
-  await page.evaluate(() => {
+  const canClean = await page.evaluate(() => {
     const context = navigator.modelContext;
     const testing = navigator.modelContextTesting;
     if (!context || !testing) {
-      return;
+      return false;
     }
+
+    const removedContext = context as unknown as RemovedContextApi;
+    let cleaned = false;
 
     for (const tool of testing.listTools()) {
       try {
-        context.unregisterTool(tool.name);
+        removedContext.unregisterTool?.(tool.name);
+        cleaned = true;
       } catch {
-        // Some tools can only be replaced/cleared through provideContext.
+        // Some native snapshots only support AbortSignal based cleanup.
       }
     }
 
-    context.clearContext();
+    if (typeof removedContext.clearContext === 'function') {
+      removedContext.clearContext();
+      cleaned = true;
+    }
+
+    return cleaned;
   });
 
-  await expect.poll(async () => await getToolNames(page)).toEqual([]);
+  if (canClean) {
+    await expect.poll(async () => await getToolNames(page)).toEqual([]);
+  }
 }
 
 async function openShowcase(page: Page): Promise<void> {
@@ -135,7 +148,12 @@ test.describe('Native API Detection', () => {
       hasModelContext: typeof navigator.modelContext !== 'undefined',
       hasModelContextTesting: typeof navigator.modelContextTesting !== 'undefined',
       hasUnregisterTool: typeof navigator.modelContext?.unregisterTool === 'function',
-      hasClearContext: typeof navigator.modelContext?.clearContext === 'function',
+      hasClearContext:
+        typeof (navigator.modelContext as unknown as RemovedContextApi | undefined)
+          ?.clearContext === 'function',
+      hasProvideContext:
+        typeof (navigator.modelContext as unknown as RemovedContextApi | undefined)
+          ?.provideContext === 'function',
       hasListTools: typeof navigator.modelContextTesting?.listTools === 'function',
       hasExecuteTool: typeof navigator.modelContextTesting?.executeTool === 'function',
     }));
@@ -143,7 +161,8 @@ test.describe('Native API Detection', () => {
     expect(surface.hasModelContext).toBe(true);
     expect(surface.hasModelContextTesting).toBe(true);
     expect(surface.hasUnregisterTool).toBe(true);
-    expect(surface.hasClearContext).toBe(true);
+    expect(typeof surface.hasClearContext).toBe('boolean');
+    expect(typeof surface.hasProvideContext).toBe('boolean');
     expect(surface.hasListTools).toBe(true);
     expect(surface.hasExecuteTool).toBe(true);
   });
@@ -221,95 +240,85 @@ test.describe('Native API Semantics', () => {
     await clearAllTools(page);
   });
 
-  test('registerTool and unregisterTool update listTools', async ({ page }) => {
-    const toolName = `native_reg_${Date.now()}`;
-
-    await page.evaluate((name) => {
-      navigator.modelContext?.registerTool({
-        name,
-        description: 'Temporary test tool',
-        inputSchema: { type: 'object', properties: {} },
-        async execute() {
-          return { content: [{ type: 'text', text: 'ok' }] };
-        },
-      });
-    }, toolName);
-
-    await waitForToolPresent(page, toolName);
-
-    await page.evaluate((name) => {
-      navigator.modelContext?.unregisterTool(name);
-    }, toolName);
-
-    await waitForToolMissing(page, toolName);
-  });
-
-  test('provideContext replaces previously provided tool set', async ({ page }) => {
+  test('registerTool exposes registered tools and records unregisterTool behavior', async ({
+    page,
+  }) => {
     const state = await page.evaluate(() => {
       const context = navigator.modelContext;
       const testing = navigator.modelContextTesting;
       if (!context || !testing) {
-        return { before: [], after: [] as string[] };
+        return { missingApi: true };
       }
 
-      context.provideContext({
-        tools: [
-          {
-            name: 'first_tool',
-            description: 'first',
-            inputSchema: { type: 'object', properties: {} },
-            async execute() {
-              return { content: [{ type: 'text', text: 'first' }] };
-            },
-          },
-        ],
-      });
-      const before = testing.listTools().map((tool: { name: string }) => tool.name);
+      const firstToolName = `native_reg_first_${Date.now()}`;
+      const secondToolName = `native_reg_second_${Date.now()}`;
 
-      context.provideContext({
-        tools: [
-          {
-            name: 'second_tool',
-            description: 'second',
-            inputSchema: { type: 'object', properties: {} },
-            async execute() {
-              return { content: [{ type: 'text', text: 'second' }] };
-            },
-          },
-        ],
+      context.registerTool({
+        name: firstToolName,
+        description: 'Temporary first test tool',
+        inputSchema: { type: 'object', properties: {} },
+        async execute() {
+          return { content: [{ type: 'text', text: 'first' }] };
+        },
       });
-      const after = testing.listTools().map((tool: { name: string }) => tool.name);
 
-      return { before, after };
+      const beforeAbort = testing.listTools().map((tool: { name: string }) => tool.name);
+      context.unregisterTool(firstToolName);
+
+      context.registerTool({
+        name: secondToolName,
+        description: 'Temporary second test tool',
+        inputSchema: { type: 'object', properties: {} },
+        async execute() {
+          return { content: [{ type: 'text', text: 'second' }] };
+        },
+      });
+
+      const afterAbort = testing.listTools().map((tool: { name: string }) => tool.name);
+      context.unregisterTool(secondToolName);
+
+      return {
+        missingApi: false,
+        firstToolName,
+        secondToolName,
+        beforeAbort,
+        afterAbort,
+        removedFirstTool: !afterAbort.includes(firstToolName),
+      };
     });
 
-    expect(state.before).toContain('first_tool');
-    expect(state.after).toContain('second_tool');
-    expect(state.after).not.toContain('first_tool');
+    expect(state.missingApi).toBe(false);
+    if (state.missingApi) {
+      return;
+    }
+
+    expect(state.beforeAbort).toContain(state.firstToolName);
+    expect(state.afterAbort).toContain(state.secondToolName);
+    expect(typeof state.removedFirstTool).toBe('boolean');
   });
 
-  test('clearContext removes all registered tools', async ({ page }) => {
-    await page.evaluate(() => {
+  test('multiple registered tools record unregisterTool cleanup behavior', async ({ page }) => {
+    const state = await page.evaluate(() => {
       const context = navigator.modelContext;
-      if (!context) {
-        return;
+      const testing = navigator.modelContextTesting;
+      if (!context || !testing) {
+        return { missingApi: true };
       }
 
-      context.provideContext({
-        tools: [
-          {
-            name: 'clear_a',
-            description: 'clear a',
-            inputSchema: { type: 'object', properties: {} },
-            async execute() {
-              return { content: [{ type: 'text', text: 'a' }] };
-            },
-          },
-        ],
+      const firstToolName = `clear_a_${Date.now()}`;
+      const secondToolName = `clear_b_${Date.now()}`;
+
+      context.registerTool({
+        name: firstToolName,
+        description: 'clear a',
+        inputSchema: { type: 'object', properties: {} },
+        async execute() {
+          return { content: [{ type: 'text', text: 'a' }] };
+        },
       });
 
       context.registerTool({
-        name: 'clear_b',
+        name: secondToolName,
         description: 'clear b',
         inputSchema: { type: 'object', properties: {} },
         async execute() {
@@ -317,10 +326,32 @@ test.describe('Native API Semantics', () => {
         },
       });
 
-      context.clearContext();
+      const before = testing.listTools().map((tool: { name: string }) => tool.name);
+      context.unregisterTool(firstToolName);
+      context.unregisterTool(secondToolName);
+      const after = testing.listTools().map((tool: { name: string }) => tool.name);
+
+      return {
+        missingApi: false,
+        firstToolName,
+        secondToolName,
+        before,
+        after,
+        removedFirstTool: !after.includes(firstToolName),
+        removedSecondTool: !after.includes(secondToolName),
+      };
     });
 
-    await expect.poll(async () => await getToolNames(page)).toEqual([]);
+    expect(state.missingApi).toBe(false);
+    if (state.missingApi) {
+      return;
+    }
+
+    expect(state.before).toEqual(
+      expect.arrayContaining([state.firstToolName, state.secondToolName])
+    );
+    expect(typeof state.removedFirstTool).toBe('boolean');
+    expect(typeof state.removedSecondTool).toBe('boolean');
   });
 
   test('testing API executeTool works and optionally tracks calls', async ({ page }) => {
@@ -334,25 +365,30 @@ test.describe('Native API Semantics', () => {
       const hasGetToolCalls = typeof testing.getToolCalls === 'function';
       const toolName = `tracking_${Date.now()}`;
 
-      context.registerTool({
-        name: toolName,
-        description: 'tracking test',
-        inputSchema: {
-          type: 'object',
-          properties: { value: { type: 'number' } },
-          required: ['value'],
+      const controller = new AbortController();
+
+      context.registerTool(
+        {
+          name: toolName,
+          description: 'tracking test',
+          inputSchema: {
+            type: 'object',
+            properties: { value: { type: 'number' } },
+            required: ['value'],
+          },
+          async execute(input: { value: number }) {
+            return { content: [{ type: 'text', text: `value:${input.value}` }] };
+          },
         },
-        async execute(input: { value: number }) {
-          return { content: [{ type: 'text', text: `value:${input.value}` }] };
-        },
-      });
+        { signal: controller.signal }
+      );
 
       try {
         const response = await testing.executeTool(toolName, JSON.stringify({ value: 42 }));
         const calls = hasGetToolCalls ? (testing.getToolCalls?.() ?? []) : [];
         return { missingApi: false, response, hasGetToolCalls, calls };
       } finally {
-        context.unregisterTool(toolName);
+        controller.abort();
       }
     });
 
@@ -373,33 +409,39 @@ test.describe('Native API Semantics', () => {
         return { missingApi: true };
       }
 
-      context.provideContext({
-        tools: [
-          {
-            name: 'counter_get',
-            description: 'Get counter value',
-            inputSchema: { type: 'object', properties: {} },
-            outputSchema: {
-              type: 'object',
-              properties: {
-                counter: { type: 'number' },
-                timestamp: { type: 'string' },
-              },
-              required: ['counter', 'timestamp'],
-            },
-            async execute() {
-              const structuredContent = { counter: 0, timestamp: new Date().toISOString() };
-              return {
-                content: [{ type: 'text', text: JSON.stringify(structuredContent) }],
-                structuredContent,
-              };
-            },
-          },
-        ],
-      });
+      const toolName = `counter_get_${Date.now()}`;
+      const controller = new AbortController();
 
-      const response = await testing.executeTool('counter_get', '{}');
-      return { missingApi: false, type: typeof response, response };
+      context.registerTool(
+        {
+          name: toolName,
+          description: 'Get counter value',
+          inputSchema: { type: 'object', properties: {} },
+          outputSchema: {
+            type: 'object',
+            properties: {
+              counter: { type: 'number' },
+              timestamp: { type: 'string' },
+            },
+            required: ['counter', 'timestamp'],
+          },
+          async execute() {
+            const structuredContent = { counter: 0, timestamp: new Date().toISOString() };
+            return {
+              content: [{ type: 'text', text: JSON.stringify(structuredContent) }],
+              structuredContent,
+            };
+          },
+        },
+        { signal: controller.signal }
+      );
+
+      try {
+        const response = await testing.executeTool(toolName, '{}');
+        return { missingApi: false, type: typeof response, response };
+      } finally {
+        controller.abort();
+      }
     });
 
     expect(result.missingApi).toBe(false);

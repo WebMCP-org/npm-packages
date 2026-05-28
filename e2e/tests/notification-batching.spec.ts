@@ -93,25 +93,28 @@ test.describe('Notification Batching Tests', () => {
       }
 
       // Register and immediately unregister multiple tools synchronously
-      const registrations: Array<{ unregister: () => void }> = [];
+      const controllers: AbortController[] = [];
 
       // First, register 5 tools
       for (let i = 0; i < 5; i++) {
-        registrations.push(
-          navigator.modelContext.registerTool({
+        const controller = new AbortController();
+        controllers.push(controller);
+        navigator.modelContext.registerTool(
+          {
             name: `rapidCycleTool_${i}`,
             description: `Rapid cycle test tool ${i}`,
             inputSchema: { type: 'object', properties: {} },
             async execute() {
               return { content: [{ type: 'text', text: 'test' }] };
             },
-          })
+          },
+          { signal: controller.signal }
         );
       }
 
       // Then immediately unregister all 5
-      registrations.forEach((reg) => {
-        reg.unregister();
+      controllers.forEach((controller) => {
+        controller.abort();
       });
 
       // Wait for microtask to complete
@@ -128,7 +131,7 @@ test.describe('Notification Batching Tests', () => {
     expect(result.notificationCount).toBeLessThanOrEqual(2);
   });
 
-  test('should correctly batch provideContext calls', async ({ page }) => {
+  test('should correctly batch abort-driven cleanup calls', async ({ page }) => {
     const result = await page.evaluate(async () => {
       let notificationCount = 0;
 
@@ -139,45 +142,26 @@ test.describe('Notification Batching Tests', () => {
         });
       }
 
-      // Multiple provideContext calls in the same task should batch
-      navigator.modelContext.provideContext({
-        tools: [
+      const controllers = Array.from({ length: 3 }, (_, index) => {
+        const controller = new AbortController();
+        navigator.modelContext.registerTool(
           {
-            name: 'batchProvide1',
+            name: `batchAbort${index + 1}`,
             description: 'test',
             inputSchema: { type: 'object', properties: {} },
             async execute() {
               return { content: [{ type: 'text', text: 'test' }] };
             },
           },
-        ],
+          { signal: controller.signal }
+        );
+        return controller;
       });
 
-      navigator.modelContext.provideContext({
-        tools: [
-          {
-            name: 'batchProvide2',
-            description: 'test',
-            inputSchema: { type: 'object', properties: {} },
-            async execute() {
-              return { content: [{ type: 'text', text: 'test' }] };
-            },
-          },
-        ],
-      });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      notificationCount = 0;
 
-      navigator.modelContext.provideContext({
-        tools: [
-          {
-            name: 'batchProvide3',
-            description: 'test',
-            inputSchema: { type: 'object', properties: {} },
-            async execute() {
-              return { content: [{ type: 'text', text: 'test' }] };
-            },
-          },
-        ],
-      });
+      controllers.forEach((controller) => controller.abort());
 
       // Wait for microtask
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -185,7 +169,7 @@ test.describe('Notification Batching Tests', () => {
       return { notificationCount };
     });
 
-    // All 3 provideContext calls should batch into 1 notification
+    // All 3 abort calls should batch into 1 notification
     expect(result.notificationCount).toBe(1);
   });
 
@@ -203,19 +187,22 @@ test.describe('Notification Batching Tests', () => {
         });
       }
 
-      const registrations: Array<{ unregister: () => void }> = [];
+      const controllers: AbortController[] = [];
 
       // Simulate a React app mounting with 100 useWebMCP hooks
       for (let i = 0; i < 100; i++) {
-        registrations.push(
-          navigator.modelContext.registerTool({
+        const controller = new AbortController();
+        controllers.push(controller);
+        navigator.modelContext.registerTool(
+          {
             name: `reactHookTool_${i}`,
             description: `Simulated React hook tool ${i}`,
             inputSchema: { type: 'object', properties: {} },
             async execute() {
               return { content: [{ type: 'text', text: 'test' }] };
             },
-          })
+          },
+          { signal: controller.signal }
         );
       }
 
@@ -223,8 +210,8 @@ test.describe('Notification Batching Tests', () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
 
       // Cleanup
-      registrations.forEach((reg) => {
-        reg.unregister();
+      controllers.forEach((controller) => {
+        controller.abort();
       });
 
       // Wait for cleanup notifications
@@ -260,18 +247,22 @@ test.describe('Notification Batching - Edge Cases', () => {
         });
       }
 
-      const reg = navigator.modelContext.registerTool({
-        name: 'singleTool',
-        description: 'Single tool test',
-        inputSchema: { type: 'object', properties: {} },
-        async execute() {
-          return { content: [{ type: 'text', text: 'test' }] };
+      const controller = new AbortController();
+      navigator.modelContext.registerTool(
+        {
+          name: 'singleTool',
+          description: 'Single tool test',
+          inputSchema: { type: 'object', properties: {} },
+          async execute() {
+            return { content: [{ type: 'text', text: 'test' }] };
+          },
         },
-      });
+        { signal: controller.signal }
+      );
 
       await new Promise((resolve) => setTimeout(resolve, 50));
 
-      reg.unregister();
+      controller.abort();
 
       await new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -282,20 +273,26 @@ test.describe('Notification Batching - Edge Cases', () => {
     expect(result.notificationCount).toBe(2);
   });
 
-  test('should handle clearContext batching', async ({ page }) => {
+  test('should handle synchronous abort batching', async ({ page }) => {
     const result = await page.evaluate(async () => {
       let notificationCount = 0;
 
       // Register some tools first
+      const controllers: AbortController[] = [];
       for (let i = 0; i < 5; i++) {
-        navigator.modelContext.registerTool({
-          name: `clearContextTool_${i}`,
-          description: 'test',
-          inputSchema: { type: 'object', properties: {} },
-          async execute() {
-            return { content: [{ type: 'text', text: 'test' }] };
+        const controller = new AbortController();
+        controllers.push(controller);
+        navigator.modelContext.registerTool(
+          {
+            name: `abortCleanupTool_${i}`,
+            description: 'test',
+            inputSchema: { type: 'object', properties: {} },
+            async execute() {
+              return { content: [{ type: 'text', text: 'test' }] };
+            },
           },
-        });
+          { signal: controller.signal }
+        );
       }
 
       // Wait for registration notifications
@@ -309,17 +306,14 @@ test.describe('Notification Batching - Edge Cases', () => {
         });
       }
 
-      // Call clearContext multiple times synchronously (edge case)
-      navigator.modelContext.clearContext();
-      navigator.modelContext.clearContext();
-      navigator.modelContext.clearContext();
+      controllers.forEach((controller) => controller.abort());
 
       await new Promise((resolve) => setTimeout(resolve, 50));
 
       return { notificationCount };
     });
 
-    // Multiple clearContext calls should batch to 1 notification
+    // Multiple synchronous abort calls should batch to 1 notification
     expect(result.notificationCount).toBe(1);
   });
 });

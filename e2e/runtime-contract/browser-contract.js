@@ -14,23 +14,25 @@ function installHook(controller) {
 }
 
 export function installBrowserRuntimeContract(modelContext, options = {}) {
-  if (!modelContext || typeof modelContext.provideContext !== 'function') {
+  if (!modelContext || typeof modelContext.registerTool !== 'function') {
     throw new Error(
-      'navigator.modelContext.provideContext is required for the browser runtime contract'
+      'navigator.modelContext.registerTool is required for the browser runtime contract'
     );
   }
 
   const state = createRuntimeContractState();
   const descriptors = createBrowserToolDescriptors(state, options);
   const dynamicToolName = options.dynamicToolName ?? DYNAMIC_TOOL_NAME;
-  const registrationMode = options.registrationMode ?? 'context';
+  const dynamicRegistrations = new Map();
 
-  if (registrationMode === 'dynamic') {
-    for (const tool of descriptors.baseTools) {
-      modelContext.registerTool(tool);
-    }
-  } else {
-    modelContext.provideContext({ tools: descriptors.baseTools });
+  function registerTool(tool) {
+    const controller = new AbortController();
+    const registration = modelContext.registerTool(tool, { signal: controller.signal });
+    return { controller, registration };
+  }
+
+  for (const tool of descriptors.baseTools) {
+    registerTool(tool);
   }
   state.ready = true;
 
@@ -40,8 +42,9 @@ export function installBrowserRuntimeContract(modelContext, options = {}) {
       if (state.dynamicHandle) {
         return false;
       }
-      const registration = modelContext.registerTool(descriptors.createDynamicTool());
-      state.dynamicHandle = registration ?? { name: dynamicToolName };
+      const registration = registerTool(descriptors.createDynamicTool());
+      dynamicRegistrations.set(dynamicToolName, registration);
+      state.dynamicHandle = registration.registration ?? { name: dynamicToolName };
       return true;
     },
     (name = dynamicToolName) => {
@@ -49,7 +52,11 @@ export function installBrowserRuntimeContract(modelContext, options = {}) {
         return false;
       }
 
-      if (typeof state.dynamicHandle.unregister === 'function') {
+      const registration = dynamicRegistrations.get(dynamicToolName);
+      if (registration) {
+        registration.controller.abort();
+        dynamicRegistrations.delete(dynamicToolName);
+      } else if (typeof state.dynamicHandle.unregister === 'function') {
         state.dynamicHandle.unregister();
       } else if (typeof modelContext.unregisterTool === 'function') {
         modelContext.unregisterTool(dynamicToolName);

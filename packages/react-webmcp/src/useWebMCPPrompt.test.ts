@@ -36,7 +36,11 @@ describe('useWebMCPPrompt', () => {
   });
 
   beforeEach(() => {
-    navigator.modelContext?.clearContext();
+    (
+      navigator.modelContextTesting as
+        | (Navigator['modelContextTesting'] & { reset?: () => void })
+        | undefined
+    )?.reset?.();
     window.localStorage.removeItem(DEBUG_CONFIG_KEY);
   });
 

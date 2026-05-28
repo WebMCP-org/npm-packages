@@ -32,11 +32,11 @@ test.describe('Web Model Context API E2E Tests', () => {
     await expect(page.locator('#api-status')).toHaveAttribute('data-status', 'ready');
   });
 
-  test('should register base tools via provideContext', async ({ page }) => {
+  test('should register base tools via registerTool', async ({ page }) => {
     // Check the log for base tools registration
     const logEntries = await page.locator('#log .log-entry').allTextContents();
     expect(
-      logEntries.some((entry) => entry.includes('Registering base tools via provideContext'))
+      logEntries.some((entry) => entry.includes('Registering base tools via registerTool'))
     ).toBe(true);
     expect(
       logEntries.some((entry) => entry.includes('Base tools registered successfully (Bucket A)'))
@@ -77,9 +77,9 @@ test.describe('Web Model Context API E2E Tests', () => {
 
     // Check log
     const logEntries = await page.locator('#log .log-entry').allTextContents();
-    expect(
-      logEntries.some((entry) => entry.includes('Dynamic tool registered successfully (Bucket B)'))
-    ).toBe(true);
+    expect(logEntries.some((entry) => entry.includes('Dynamic tool registered successfully'))).toBe(
+      true
+    );
   });
 
   test('should unregister dynamic tool', async ({ page }) => {
@@ -106,9 +106,7 @@ test.describe('Web Model Context API E2E Tests', () => {
     ).toBe(true);
   });
 
-  test('should replace dynamic tools on provideContext calls (strict core behavior)', async ({
-    page,
-  }) => {
+  test('should replace base tools without removing dynamic tools', async ({ page }) => {
     // Register dynamic tool
     await page.click('#register-dynamic');
     await page.waitForTimeout(500);
@@ -120,17 +118,17 @@ test.describe('Web Model Context API E2E Tests', () => {
     expect(toolNames).toHaveLength(5);
     expect(toolNames).toContain('dynamicTool');
 
-    // Replace base tools (strict mode replaces all registered tools)
+    // Replace the locally tracked base tool group without touching dynamic tools.
     await page.click('#replace-base-tools');
     await page.waitForTimeout(500);
 
     toolNames = await page.evaluate(() =>
       navigator.modelContext.listTools().map((tool: { name: string }) => tool.name)
     );
-    expect(toolNames).toHaveLength(2);
+    expect(toolNames).toHaveLength(3);
     expect(toolNames).toContain('doubleCounter');
     expect(toolNames).toContain('halveCounter');
-    expect(toolNames).not.toContain('dynamicTool');
+    expect(toolNames).toContain('dynamicTool');
   });
 
   test('should expose tools via public modelContext API', async ({ page }) => {
@@ -190,7 +188,7 @@ test.describe('Resources API Tests', () => {
     await expect(page.locator('h1')).toContainText('Web Model Context API E2E Test');
   });
 
-  test('should register base resources via provideContext (Bucket A)', async ({ page }) => {
+  test('should register base resources via registerResource (Bucket A)', async ({ page }) => {
     await page.click('#register-base-resources');
     await page.waitForTimeout(500);
 
@@ -249,7 +247,7 @@ test.describe('Prompts API Tests', () => {
     await expect(page.locator('h1')).toContainText('Web Model Context API E2E Test');
   });
 
-  test('should register base prompts via provideContext (Bucket A)', async ({ page }) => {
+  test('should register base prompts via registerPrompt (Bucket A)', async ({ page }) => {
     await page.click('#register-base-prompts');
     await page.waitForTimeout(500);
 

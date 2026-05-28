@@ -111,10 +111,7 @@ const tool = {
   },
 };
 
-// Register using provideContext (Bucket A - replaceable)
-navigator.modelContext.provideContext({ tools: [tool] });
-
-// OR register using registerTool (Bucket B - persistent)
+// Register using registerTool
 navigator.modelContext.registerTool(tool);
 ```
 
@@ -136,41 +133,40 @@ Load a template from the dropdown, modify it, and click **▶ Register Tool**.
 
 ### Two-Bucket Tool Management
 
-The showcase keeps its historical **two-bucket** demo by installing a
-local compatibility layer on top of the current native API.
+The showcase keeps its historical **two-bucket** demo by tracking
+registration handles on top of the current native API.
 
 Important:
 
-- Current Chrome Beta 147 and Chromium `main` expose `registerTool(...)` and `unregisterTool(name)`.
-- Current native Chromium does **not** expose `provideContext()` or `clearContext()`.
-- The showcase backfills those removed methods locally so the older Bucket A / Bucket B UI still works for exploration.
+- Current Chrome Beta 147 and Chromium `main` expose `registerTool(...)`, `getTools()`, and the testing-only `navigator.modelContextTesting.listTools()`.
+- `provideContext()` and `clearContext()` were removed from the WebMCP spec. The showcase does not call them.
+- The Bucket A / Bucket B UI is implemented with ordinary `registerTool(...)` calls plus local registration tracking.
 
-#### Bucket A - `provideContext()`
+#### Bucket A - Replaceable Registration Group
 
-- Tools registered via the showcase compatibility `provideContext({ tools: [...] })`
-- **Completely replaced** when `provideContext()` is called again
+- Tools registered through the showcase's local Bucket A helper
+- **Completely replaced** when Bucket A is registered again
 - Ideal for dynamic tool sets that need full replacement
 - Color-coded **blue** in the UI
 
 **Example:**
 
 ```javascript
-// First call - registers 3 tools
-navigator.modelContext.provideContext({
-  tools: [tool1, tool2, tool3],
-});
+const controllers = [new AbortController(), new AbortController(), new AbortController()];
+navigator.modelContext.registerTool(tool1, { signal: controllers[0].signal });
+navigator.modelContext.registerTool(tool2, { signal: controllers[1].signal });
+navigator.modelContext.registerTool(tool3, { signal: controllers[2].signal });
 
-// Second call - REPLACES all tools in Bucket A
-navigator.modelContext.provideContext({
-  tools: [tool4], // tool1, tool2, tool3 are now gone!
-});
+// Later, replace the group
+controllers.forEach((controller) => controller.abort());
+navigator.modelContext.registerTool(tool4);
 ```
 
 #### Bucket B - `registerTool()`
 
 - Tools registered via `registerTool(tool)`
-- **Persist across** `provideContext()` calls
-- Must be individually unregistered via `unregisterTool(name)`
+- **Persist until their own registration is removed**
+- Can be individually unregistered in native snapshots that expose `unregisterTool(name)`
 - Suitable for long-lived tools
 - Color-coded **green** in the UI
 
@@ -179,8 +175,6 @@ navigator.modelContext.provideContext({
 ```javascript
 // Register a persistent tool
 navigator.modelContext.registerTool(myTool);
-
-// This tool will SURVIVE provideContext() calls!
 
 // Later, when you want to remove it:
 navigator.modelContext.unregisterTool(myTool.name);
@@ -303,8 +297,8 @@ The test suite covers:
 - Native API detection and validation
 - Live code editor functionality
 - Template loading and execution
-- Two-bucket system behavior
-- All native methods (listTools, executeTool, unregisterTool)
+- Replaceable and persistent registration behavior
+- Native/testing methods (`getTools`, `listTools`, `executeTool`, `unregisterTool`)
 - Testing API methods
 - Tool executor with various inputs
 - Event logging
@@ -468,8 +462,7 @@ tools in the same context.
 
 **Real-world analogy:**
 
-- **Bucket A (provideContext):** Like a whiteboard—erase everything
-  and write new content.
+- **Bucket A:** Like a whiteboard, erase the locally tracked group and write new content.
 - **Bucket B (registerTool):** Like sticky notes—they stay until you
   peel them off individually.
 
@@ -487,13 +480,12 @@ tools in the same context.
 ### Example: Chat Application with Tools
 
 ```javascript
-// Bucket A: Message-specific tools (change with each message)
-navigator.modelContext.provideContext({
-  tools: [
-    { name: 'edit_message', ... },
-    { name: 'delete_message', ... },
-    { name: 'reply_to_message', ... }
-  ]
+// Bucket A: message-specific tools (change with each message)
+const messageToolControllers = messageTools.map(() => new AbortController());
+messageTools.forEach((tool, index) => {
+  navigator.modelContext.registerTool(tool, {
+    signal: messageToolControllers[index].signal,
+  });
 });
 
 // Bucket B: App-wide tools (persistent across messages)

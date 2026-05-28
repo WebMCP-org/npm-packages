@@ -1,8 +1,10 @@
 import type { RuntimeContractController, RuntimeContractOptions } from './core.js';
 
 export interface BrowserRuntimeContractModelContext {
-  provideContext(value: unknown): void;
-  registerTool(tool: unknown): void | { unregister?: () => void };
+  registerTool(
+    tool: unknown,
+    options?: { signal?: AbortSignal }
+  ): void | { unregister?: () => void };
   unregisterTool?(name: string): void;
 }
 

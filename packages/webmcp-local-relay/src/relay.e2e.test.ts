@@ -441,7 +441,10 @@ async function setupE2EHarness(options: {
     );
     await client.connect(stdioTransport);
 
-    browser = await chromium.launch({ headless: true });
+    browser = await chromium.launch({
+      headless: true,
+      channel: process.env.PLAYWRIGHT_CHROMIUM_CHANNEL,
+    });
     page = await browser.newPage();
     page.on('pageerror', (runtimeError) => {
       pageErrors.push(runtimeError.message);

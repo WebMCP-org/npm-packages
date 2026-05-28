@@ -1,7 +1,7 @@
 {
   "name": "@mcp-b/webmcp-polyfill",
   "version": "2.3.1",
-  "description": "Strict WebMCP core runtime polyfill for navigator.modelContext",
+  "description": "Strict WebMCP core runtime polyfill for document.modelContext (with deprecated navigator.modelContext alias)",
   "keywords": [
     "browser",
     "model-context",

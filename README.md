@@ -27,11 +27,10 @@
 The [Web Model Context API](https://webmachinelearning.github.io/webmcp/) is a [W3C Community Group](https://www.w3.org/community/webmachinelearning/) draft spec. It makes every browser tab a **tool source** — web pages register tools that AI agents can discover and call:
 
 ```
-navigator.modelContext
-├── .registerTool(tool)       Register a tool for AI agents
-├── .unregisterTool(name)     Remove a tool
-├── .provideContext(options)   Set tools (replaces existing)
-└── .clearContext()            Remove all tools
+document.modelContext
+├── .registerTool(tool, { signal })  Register a tool for AI agents
+├── .getTools()                      Discover registered tools
+└── .executeTool(tool, inputJson)     Execute a discovered tool
 ```
 
 MCP-b **polyfills** that API for all browsers today, and **bridges** it to the full [Model Context Protocol](https://modelcontextprotocol.io/) — turning that tool source into a complete MCP server with prompts, resources, sampling, and transports.
@@ -303,7 +302,7 @@ pnpm add @mcp-b/smart-dom-reader
 ├────────────── @mcp-b/webmcp-ts-sdk ──────────────────────┤
 │  BrowserMcpServer — wraps native/polyfill context        │
 ├────────────── @mcp-b/webmcp-polyfill ────────────────────┤
-│  Strict WebMCP core (registerTool, provideContext, …)    │
+│  Strict WebMCP core (registerTool, getTools, executeTool)│
 ├──────────────────────────────────────────────────────────┤
 │  Native browser API (when available)                     │
 └──────────────────────────────────────────────────────────┘

@@ -1,4 +1,5 @@
 import { initializeWebModelContext } from '@mcp-b/global';
+import type { ModelContextTestingPolyfillExtensions } from '@mcp-b/webmcp-types';
 import { beforeAll, beforeEach } from 'vitest';
 
 // Navigator type is extended by @mcp-b/global/src/types.ts
@@ -26,11 +27,8 @@ export function setupPolyfill() {
 
   // Clear context before each test to ensure clean state
   beforeEach(() => {
-    navigator.modelContext?.clearContext();
     const testing = navigator.modelContextTesting as
-      | {
-          reset?: () => void;
-        }
+      | (Navigator['modelContextTesting'] & Partial<ModelContextTestingPolyfillExtensions>)
       | undefined;
     testing?.reset?.();
   });

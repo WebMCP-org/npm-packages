@@ -8,25 +8,6 @@ import type {
 } from './tool.js';
 
 // ============================================================================
-// Model Context Input
-// ============================================================================
-
-/**
- * Context provided to models via provideContext().
- */
-export interface ModelContextInput<TTools extends readonly ToolDescriptor[] = ToolDescriptor[]> {
-  /**
-   * Base tool descriptors to expose.
-   */
-  tools?: TTools;
-}
-
-/**
- * Public options accepted by provideContext().
- */
-export type ModelContextOptions = ModelContextInput;
-
-// ============================================================================
 // Model Context Testing
 // ============================================================================
 
@@ -37,6 +18,15 @@ export interface ModelContextTestingToolInfo {
   name: string;
   description: string;
   inputSchema?: string;
+}
+
+/**
+ * Tool info returned by Chromium's producer-facing ModelContext.getTools().
+ */
+export interface ModelContextToolInfo extends ModelContextTestingToolInfo {
+  title: string;
+  origin: string;
+  window: Window;
 }
 
 /**
@@ -204,6 +194,11 @@ export interface ModelContextRegisterToolOptions {
    * An `AbortSignal` whose abortion unregisters the tool. A pre-aborted signal short-circuits registration.
    */
   signal?: AbortSignal;
+
+  /**
+   * Origins that can observe this tool from other documents in the same tree.
+   */
+  exposedTo?: string[];
 }
 
 // ============================================================================
@@ -211,17 +206,9 @@ export interface ModelContextRegisterToolOptions {
 // ============================================================================
 
 /**
- * Strict WebMCP core interface on navigator.modelContext.
+ * Strict WebMCP core interface on document.modelContext.
  */
 export interface ModelContextCore {
-  // ==================== CONTEXT ====================
-
-  /**
-   * Replaces base context with provided tools.
-   * @deprecated Removed from the upstream WebMCP spec on March 5, 2026. Kept only as a temporary compatibility API.
-   */
-  provideContext(options?: ModelContextOptions): void;
-
   // ==================== TOOLS ====================
 
   /**
@@ -276,7 +263,19 @@ export interface ModelContextCore {
    * shape. Current Chromium returns JSON-stringified schemas here, matching
    * ModelContextTesting.listTools().
    */
-  getTools(): ModelContextTestingToolInfo[];
+  getTools(): Promise<ModelContextToolInfo[]>;
+
+  /**
+   * Executes a registered tool object returned from getTools().
+   *
+   * This mirrors Chromium's current producer-facing preview API. The testing API
+   * still executes by `(toolName, inputArgsJson)`.
+   */
+  executeTool(
+    tool: ModelContextToolInfo,
+    inputArgsJson: string,
+    options?: ModelContextTestingExecuteToolOptions
+  ): Promise<string | null>;
 
   /**
    * Handler invoked when the producer tool list changes.
@@ -296,19 +295,6 @@ export interface ModelContextCore {
   ): void;
 
   dispatchEvent(event: Event): boolean;
-
-  /**
-   * Unregisters a dynamic tool by name or tool reference.
-   *
-   * @deprecated Removed from the WebMCP spec on April 23, 2026. Use `registerTool(tool, { signal })`. Will be removed in the next major.
-   */
-  unregisterTool(nameOrTool: string | ModelContextToolReference): void;
-
-  /**
-   * Clears all context (base + dynamic registrations).
-   * @deprecated Removed from the upstream WebMCP spec on March 5, 2026. Kept only as a temporary compatibility API.
-   */
-  clearContext(): void;
 }
 
 /**
@@ -316,6 +302,13 @@ export interface ModelContextCore {
  * These members are intentionally non-standard.
  */
 export interface ModelContextExtensions {
+  /**
+   * Unregisters a dynamic tool by name or tool reference.
+   *
+   * @deprecated Removed from the WebMCP spec on April 23, 2026. Use `registerTool(tool, { signal })`. Will be removed in the next major.
+   */
+  unregisterTool(nameOrTool: string | ModelContextToolReference): void;
+
   /**
    * Lists currently registered tools.
    */
@@ -395,7 +388,7 @@ export interface ModelContextExtensions {
 }
 
 /**
- * Public navigator.modelContext type (strict core only).
+ * Public document.modelContext type (strict core only).
  */
 export type ModelContext = ModelContextCore;
 

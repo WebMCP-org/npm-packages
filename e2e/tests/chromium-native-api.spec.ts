@@ -1,5 +1,10 @@
 import { expect, test } from '@playwright/test';
 
+type RemovedContextApi = {
+  provideContext?: (value: unknown) => void;
+  clearContext?: () => void;
+};
+
 function isDirectOrWrappedText(value: unknown, expectedText: string): boolean {
   if (value === expectedText) {
     return true;
@@ -47,7 +52,10 @@ test.describe('Chromium Native API - ModelContext', () => {
 
   test('should have clearContext method available', async ({ page }) => {
     const hasMethod = await page.evaluate(() => {
-      return typeof navigator.modelContext?.clearContext === 'function';
+      return (
+        typeof (navigator.modelContext as unknown as RemovedContextApi | undefined)
+          ?.clearContext === 'function'
+      );
     });
     expect(hasMethod).toBe(true);
   });
@@ -148,7 +156,7 @@ test.describe('Chromium Native API - ModelContext', () => {
 
     // Clear everything
     await page.evaluate(() => {
-      navigator.modelContext.clearContext();
+      (navigator.modelContext as unknown as RemovedContextApi).clearContext?.();
     });
     await page.waitForTimeout(300);
 
@@ -510,9 +518,9 @@ test.describe('Chromium Native API - Integration Tests', () => {
 
       navigator.modelContext.unregisterTool('test1');
 
-      navigator.modelContext.clearContext();
+      (navigator.modelContext as unknown as RemovedContextApi).clearContext?.();
 
-      navigator.modelContext.provideContext({
+      (navigator.modelContext as unknown as RemovedContextApi).provideContext?.({
         tools: [
           {
             name: 'test2',

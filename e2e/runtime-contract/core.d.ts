@@ -14,7 +14,6 @@ export interface RuntimeContractController {
 export interface RuntimeContractOptions {
   runtimeLabel?: string;
   dynamicToolName?: string;
-  registrationMode?: 'context' | 'dynamic';
 }
 
 export interface BrowserRuntimeContractToolDescriptor {

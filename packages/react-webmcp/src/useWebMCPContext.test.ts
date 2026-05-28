@@ -29,7 +29,11 @@ describe('useWebMCPContext', () => {
   });
 
   beforeEach(() => {
-    navigator.modelContext?.clearContext();
+    (
+      navigator.modelContextTesting as
+        | (Navigator['modelContextTesting'] & { reset?: () => void })
+        | undefined
+    )?.reset?.();
   });
 
   describe('tool registration', () => {

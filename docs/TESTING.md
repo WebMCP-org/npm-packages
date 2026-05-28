@@ -32,11 +32,6 @@ pnpm --filter mcp-e2e-tests test:integration:frameworks
 
 # Native contract lanes
 pnpm --filter mcp-e2e-tests test:native-contract:default
-pnpm --filter mcp-e2e-tests test:native-contract:beta
-
-# Native parity / showcase integration lanes
-pnpm --filter mcp-e2e-tests test:native-parity:default
-pnpm --filter mcp-e2e-tests test:native-parity:beta
 pnpm --filter mcp-e2e-tests test:native-showcase
 
 # Runtime-specific canonical E2E packages
@@ -55,15 +50,14 @@ Notes:
 
 ## Runtime Coverage Matrix
 
-| Runtime                   | Canonical caller                                           | Real runtime boundary under test                    | Command                                                    |
-| ------------------------- | ---------------------------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------- |
-| Tab / global              | SDK `Client` + `TabClientTransport`                        | Browser page running `@mcp-b/global`                | `pnpm --filter mcp-e2e-tests test:runtime-contract`        |
-| Iframe                    | SDK `Client` + `IframeParentTransport`                     | Parent/iframe runtime boundary                      | `pnpm --filter mcp-e2e-tests test:runtime-contract`        |
-| Native Chromium           | `navigator.modelContext` / `navigator.modelContextTesting` | Native browser API                                  | `pnpm --filter mcp-e2e-tests test:native-contract:default` |
-| Native Chromium (flagged) | `navigator.modelContext` / `navigator.modelContextTesting` | Chrome Beta with WebMCP flags                       | `pnpm --filter mcp-e2e-tests test:native-contract:beta`    |
-| Local relay               | SDK `Client` over stdio                                    | Real relay server + real browser runtime            | `pnpm --filter @mcp-b/webmcp-local-relay test:e2e`         |
-| DevTools bridge           | SDK `Client` + `WebMCPClientTransport`                     | Real page discovered through DevTools bridge        | `pnpm --filter @mcp-b/chrome-devtools-mcp test:e2e`        |
-| Extension transport       | SDK `Client` + `ExtensionClientTransport`                  | Real MV3 extension using `ExtensionServerTransport` | `pnpm --filter @mcp-b/extension-tools test:e2e`            |
+| Runtime             | Canonical caller                                          | Real runtime boundary under test                    | Command                                                    |
+| ------------------- | --------------------------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------- |
+| Tab / global        | SDK `Client` + `TabClientTransport`                       | Browser page running `@mcp-b/global`                | `pnpm --filter mcp-e2e-tests test:runtime-contract`        |
+| Iframe              | SDK `Client` + `IframeParentTransport`                    | Parent/iframe runtime boundary                      | `pnpm --filter mcp-e2e-tests test:runtime-contract`        |
+| Native Chromium     | `document.modelContext` / `navigator.modelContextTesting` | Chrome Canary with WebMCP flags in CI               | `pnpm --filter mcp-e2e-tests test:native-contract:default` |
+| Local relay         | SDK `Client` over stdio                                   | Real relay server + real browser runtime            | `pnpm --filter @mcp-b/webmcp-local-relay test:e2e`         |
+| DevTools bridge     | SDK `Client` + `WebMCPClientTransport`                    | Real page discovered through DevTools bridge        | `pnpm --filter @mcp-b/chrome-devtools-mcp test:e2e`        |
+| Extension transport | SDK `Client` + `ExtensionClientTransport`                 | Real MV3 extension using `ExtensionServerTransport` | `pnpm --filter @mcp-b/extension-tools test:e2e`            |
 
 ## Canonical E2E Assertions
 
@@ -127,10 +121,9 @@ The canonical runtime gate lives in `.github/workflows/e2e.yml`.
 The workflow runs:
 
 1. `pnpm test:e2e`
-2. Native contract on default Chromium
-3. Native contract on Chrome Beta with WebMCP flags
-4. Native showcase integration coverage
-5. Tarball validation for `@mcp-b/global`
+2. Native contract on Chrome Canary with WebMCP flags
+3. Native showcase integration coverage on Chrome Canary
+4. Tarball validation for `@mcp-b/global`
 
 `pnpm test` at the repo root includes this gate by default.
 

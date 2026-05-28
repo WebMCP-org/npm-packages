@@ -12,12 +12,8 @@ function getModelContext(): BrowserMcpServer {
   return navigator.modelContext as unknown as BrowserMcpServer;
 }
 
-function createNativeModelContextStub(options?: {
-  includeClearContext?: boolean;
-}): Navigator['modelContext'] {
-  const includeClearContext = options?.includeClearContext ?? true;
+function createNativeModelContextStub(): Navigator['modelContext'] {
   const nativeContext: Record<string, unknown> = {
-    provideContext: () => {},
     registerTool: () => {},
     unregisterTool: () => {},
     listTools: () => [],
@@ -25,10 +21,6 @@ function createNativeModelContextStub(options?: {
     removeEventListener: () => {},
     dispatchEvent: () => true,
   };
-
-  if (includeClearContext) {
-    nativeContext.clearContext = () => {};
-  }
 
   return nativeContext as unknown as Navigator['modelContext'];
 }
@@ -94,77 +86,20 @@ describe('global adapter', () => {
     delete (navigator as unknown as Record<string, unknown>).modelContext;
   });
 
-  it('falls back to unregisterTool when native clearContext is unavailable', () => {
-    const nativeContext = {
-      provideContext: vi.fn(),
-      registerTool: vi.fn(),
-      unregisterTool: vi.fn(),
-      listTools: () => [],
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      dispatchEvent: () => true,
-    };
-
-    Object.defineProperty(navigator, 'modelContext', {
-      configurable: true,
-      enumerable: true,
-      writable: true,
-      value: nativeContext as unknown as Navigator['modelContext'],
-    });
-    setTestingShim({
-      listTools: () => [],
-      executeTool: vi.fn(async () => JSON.stringify({ content: [] })),
-    });
-
-    try {
-      initializeWebModelContext();
-      const modelContext = getModelContext();
-
-      modelContext.registerTool({
-        name: 'existing_native_tool',
-        description: 'Existing native tool',
-        inputSchema: { type: 'object', properties: {} },
-        async execute() {
-          return { content: [{ type: 'text', text: 'existing' }] };
-        },
-      });
-
-      expect(() =>
-        modelContext.provideContext({
-          tools: [
-            {
-              name: 'replacement_native_tool',
-              description: 'Replacement native tool',
-              inputSchema: { type: 'object', properties: {} },
-              async execute() {
-                return { content: [{ type: 'text', text: 'replacement' }] };
-              },
-            },
-          ],
-        })
-      ).not.toThrow();
-
-      expect(nativeContext.unregisterTool).toHaveBeenCalledWith('existing_native_tool');
-
-      expect(() => modelContext.clearContext()).not.toThrow();
-      expect(nativeContext.unregisterTool).toHaveBeenCalledWith('replacement_native_tool');
-    } finally {
-      clearTestingShim();
-      cleanupWebModelContext();
-      delete (navigator as unknown as Record<string, unknown>).modelContext;
-    }
-  });
-
   it('init replaces navigator.modelContext with BrowserMcpServer', () => {
     initializeWebModelContext();
     initializeWebModelContext(); // second call is no-op
 
     const modelContext = getModelContext();
 
-    expect(typeof modelContext.provideContext).toBe('function');
+    expect(typeof (modelContext as unknown as { provideContext?: unknown }).provideContext).toBe(
+      'undefined'
+    );
     expect(typeof modelContext.registerTool).toBe('function');
     expect(typeof modelContext.unregisterTool).toBe('function');
-    expect(typeof modelContext.clearContext).toBe('function');
+    expect(typeof (modelContext as unknown as { clearContext?: unknown }).clearContext).toBe(
+      'undefined'
+    );
     expect(typeof modelContext.listTools).toBe('function');
     expect(typeof modelContext.getTools).toBe('function');
     expect(typeof modelContext.callTool).toBe('function');
@@ -202,7 +137,7 @@ describe('global adapter', () => {
     ).toBe(false);
   });
 
-  it('getTools returns the native producer tool-list shape', () => {
+  it('getTools returns the native producer tool-list shape', async () => {
     initializeWebModelContext();
 
     const modelContext = getModelContext();
@@ -219,13 +154,16 @@ describe('global adapter', () => {
       },
     });
 
-    expect(modelContext.getTools()).toEqual([
-      {
+    await expect(modelContext.getTools()).resolves.toEqual([
+      expect.objectContaining({
         name: 'native_shape_tool',
+        title: 'Native shape tool',
         description: 'Native shape tool',
         inputSchema:
           '{"type":"object","properties":{"value":{"type":"number"}},"required":["value"]}',
-      },
+        origin: expect.any(String),
+        window: expect.any(Object),
+      }),
     ]);
   });
 
@@ -317,7 +255,7 @@ describe('global adapter', () => {
   it('backfills tools registered before initializeWebModelContext', async () => {
     initializeWebMCPPolyfill();
 
-    const nativeContext = navigator.modelContext as unknown as {
+    const nativeContext = document.modelContext as unknown as {
       registerTool: (tool: {
         name: string;
         description: string;
@@ -496,39 +434,7 @@ describe('global adapter', () => {
     }
   });
 
-  it('provideContext replaces all tools on both sides', () => {
-    initializeWebModelContext();
-
-    const modelContext = getModelContext();
-
-    modelContext.registerTool({
-      name: 'dynamic_tool',
-      description: 'dynamic',
-      inputSchema: { type: 'object', properties: {} },
-      async execute() {
-        return { content: [{ type: 'text', text: 'dynamic' }] };
-      },
-    });
-
-    modelContext.provideContext({
-      tools: [
-        {
-          name: 'context_tool',
-          description: 'context',
-          inputSchema: { type: 'object', properties: {} },
-          async execute() {
-            return { content: [{ type: 'text', text: 'context' }] };
-          },
-        },
-      ],
-    });
-
-    const tools = navigator.modelContextTesting?.listTools() ?? [];
-    expect(tools.some((tool) => tool.name === 'context_tool')).toBe(true);
-    expect(tools.some((tool) => tool.name === 'dynamic_tool')).toBe(false);
-  });
-
-  it('unregisterTool and clearContext remove mirrored tools', () => {
+  it('unregisterTool removes mirrored tools', () => {
     initializeWebModelContext();
 
     const modelContext = getModelContext();
@@ -546,20 +452,6 @@ describe('global adapter', () => {
 
     let tools = navigator.modelContextTesting?.listTools() ?? [];
     expect(tools.some((tool) => tool.name === 'remove_me')).toBe(false);
-
-    modelContext.registerTool({
-      name: 'clear_me',
-      description: 'clear me',
-      inputSchema: { type: 'object', properties: {} },
-      async execute() {
-        return { content: [{ type: 'text', text: 'clear' }] };
-      },
-    });
-
-    modelContext.clearContext();
-
-    tools = navigator.modelContextTesting?.listTools() ?? [];
-    expect(tools.some((tool) => tool.name === 'clear_me')).toBe(false);
   });
 
   it('unregisterTool accepts the originally registered tool object for compatibility', () => {
@@ -641,9 +533,7 @@ describe('global adapter', () => {
       }
     );
     const nativeContext = {
-      provideContext: vi.fn(),
       registerTool: nativeRegisterTool,
-      clearContext: vi.fn(),
       listTools: () => [...nativeToolNames].map((name) => ({ name })),
       addEventListener: () => {},
       removeEventListener: () => {},
@@ -681,7 +571,7 @@ describe('global adapter', () => {
     }
   });
 
-  it('falls back to transport registration when native registerTool is blocked by permissions policy', () => {
+  it('falls back to transport registration when native registerTool is blocked by permissions policy', async () => {
     const nativeRegisterTool = vi.fn(() => {
       throw new DOMException(
         "Failed to execute 'registerTool' on 'ModelContext': Access to the feature \"tools\" is disallowed by permissions policy.",
@@ -689,9 +579,7 @@ describe('global adapter', () => {
       );
     });
     const nativeContext = {
-      provideContext: vi.fn(),
       registerTool: nativeRegisterTool,
-      clearContext: vi.fn(),
       listTools: () => [],
       addEventListener: () => {},
       removeEventListener: () => {},
@@ -721,12 +609,80 @@ describe('global adapter', () => {
       expect(server.listTools().some((tool) => tool.name === 'iframe_blocked_native_tool')).toBe(
         true
       );
-      expect(server.getTools().some((tool) => tool.name === 'iframe_blocked_native_tool')).toBe(
-        true
+      await expect(server.getTools()).resolves.toEqual(
+        expect.arrayContaining([expect.objectContaining({ name: 'iframe_blocked_native_tool' })])
       );
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining('Native WebMCP tool mirror is blocked by permissions policy')
       );
+    } finally {
+      warnSpy.mockRestore();
+      void server.close();
+    }
+  });
+
+  it('keeps transport registration alive when async native registerTool rejects', async () => {
+    let nativeCleanupSignal: AbortSignal | undefined;
+    let nativeCleanupAbortCount = 0;
+    const nativeRegisterTool = vi.fn(
+      (_tool: unknown, options?: { signal?: AbortSignal }): Promise<void> => {
+        nativeCleanupSignal = options?.signal;
+        nativeCleanupSignal?.addEventListener(
+          'abort',
+          () => {
+            nativeCleanupAbortCount++;
+          },
+          { once: true }
+        );
+        return Promise.reject(new Error('native async registration rejected'));
+      }
+    );
+    const nativeContext = {
+      registerTool: nativeRegisterTool,
+      listTools: () => [],
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => true,
+    } as unknown as Navigator['modelContext'];
+    const server = new BrowserMcpServer(
+      { name: 'native-async-rejection-test', version: '1.0.0' },
+      {
+        native: nativeContext,
+      }
+    );
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      server.registerTool({
+        name: 'async_rejected_native_tool',
+        description: 'Native registration rejects asynchronously',
+        inputSchema: { type: 'object', properties: {} },
+        async execute() {
+          return { content: [{ type: 'text', text: 'transport-ok' }] };
+        },
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(nativeRegisterTool).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'async_rejected_native_tool' }),
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
+      );
+      expect(nativeCleanupSignal?.aborted).toBe(true);
+      expect(nativeCleanupAbortCount).toBe(1);
+      expect(server.listTools().some((tool) => tool.name === 'async_rejected_native_tool')).toBe(
+        true
+      );
+      await expect(server.executeTool('async_rejected_native_tool', {})).resolves.toMatchObject({
+        content: [{ type: 'text', text: 'transport-ok' }],
+      });
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Native WebMCP tool mirror registration rejected'),
+        expect.any(Error)
+      );
+
+      expect(() => server.unregisterTool('async_rejected_native_tool')).not.toThrow();
+      expect(nativeCleanupAbortCount).toBe(1);
     } finally {
       warnSpy.mockRestore();
       void server.close();
@@ -751,9 +707,7 @@ describe('global adapter', () => {
       }
     );
     const nativeContext = {
-      provideContext: vi.fn(),
       registerTool: nativeRegisterTool,
-      clearContext: vi.fn(),
       listTools: () => [...nativeToolNames].map((name) => ({ name })),
       addEventListener: () => {},
       removeEventListener: () => {},
@@ -808,10 +762,8 @@ describe('global adapter', () => {
     // Simulate another bundle having already set up a BrowserMcpServer
     const fakeServer = {
       __isBrowserMcpServer: true,
-      provideContext: () => {},
       registerTool: () => {},
       unregisterTool: () => {},
-      clearContext: () => {},
     };
     Object.defineProperty(navigator, 'modelContext', {
       configurable: true,

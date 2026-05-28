@@ -1,21 +1,39 @@
 # @mcp-b/webmcp-polyfill
 
-Strict WebMCP core runtime polyfill for `navigator.modelContext`.
+Strict WebMCP core runtime polyfill for `document.modelContext` (with a
+backward-compatible `navigator.modelContext` alias).
+
+> **Heads up — WebMCP spec migration.** The `modelContext` getter moved from
+> `Navigator` to `Document` in
+> [webmachinelearning/webmcp#184](https://github.com/webmachinelearning/webmcp/pull/184)
+> and Chrome 150 deprecates `navigator.modelContext`. The polyfill installs on
+> both surfaces today: `document.modelContext` is the canonical install
+> location, and `navigator.modelContext` remains as a deprecated alias that
+> resolves to the same instance and logs a one-time console warning on first
+> access. Prefer `document.modelContext` for new code.
+
+```js
+const modelContext = document.modelContext || navigator.modelContext;
+if (modelContext) {
+  // Register tools…
+}
+```
 
 `@mcp-b/webmcp-polyfill` installs only the strict core API:
 
 - `registerTool(tool, options?)` — pass `options.signal` (`AbortSignal`) to unregister when aborted
+- `getTools()` — async Chromium producer-preview discovery API
+- `executeTool(toolFromGetTools, inputArgsJson, options?)` — Chromium producer-preview execution API
 - `unregisterTool(nameOrTool)` (deprecated compatibility API)
-- `provideContext(options?)` (deprecated compatibility API)
-- `clearContext()` (deprecated compatibility API)
 
 It does not install MCP bridge extensions like `callTool`, resources, or prompts.
 
 Important:
 
-- `navigator.modelContext` in this package does not provide `listTools()` or `callTool(...)`.
+- `document.modelContext` is the canonical install location. `navigator.modelContext` is kept as a backward-compatible alias that returns the same instance and logs a one-time deprecation warning on first access. The upstream WebMCP draft moved the getter from Navigator to Document on May 27, 2026 ([webmachinelearning/webmcp#184](https://github.com/webmachinelearning/webmcp/pull/184)) and Chrome 150 deprecates `navigator.modelContext`. The polyfill will remove the Navigator alias in the next major version.
+- `document.modelContext` in this package does not provide `listTools()` or `callTool(...)`; producer discovery/execution uses `getTools()` and `executeTool(...)`.
 - For list/execute test flows, use `navigator.modelContextTesting` (when `installTestingShim` is enabled).
-- `provideContext()` and `clearContext()` still work for now, but the upstream WebMCP spec removed them on March 5, 2026. The polyfill logs a deprecation warning and will remove them in the next major version.
+- `provideContext()` and `clearContext()` were removed from the upstream WebMCP spec on March 5, 2026 and are not exposed by this polyfill.
 - `unregisterTool(name)` was removed from the WebMCP draft on April 23, 2026 in favor of `AbortSignal`-driven unregistration. The polyfill keeps it functional with a one-time deprecation warning; it will be removed in the next major version.
 
 ## Type Safety First
@@ -30,11 +48,11 @@ Recommended setup:
 
 ## Package Selection
 
-| Package                  | Use When                                                   |
-| ------------------------ | ---------------------------------------------------------- |
-| `@mcp-b/webmcp-types`    | You only need compile-time types (no runtime)              |
-| `@mcp-b/webmcp-polyfill` | You need strict `navigator.modelContext` core runtime only |
-| `@mcp-b/global`          | You want full MCPB runtime (core + bridge extensions)      |
+| Package                  | Use When                                                  |
+| ------------------------ | --------------------------------------------------------- |
+| `@mcp-b/webmcp-types`    | You only need compile-time types (no runtime)             |
+| `@mcp-b/webmcp-polyfill` | You need strict `document.modelContext` core runtime only |
+| `@mcp-b/global`          | You want full MCPB runtime (core + bridge extensions)     |
 
 ## Install
 
@@ -51,7 +69,7 @@ import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
 
 initializeWebMCPPolyfill();
 
-navigator.modelContext.registerTool({
+document.modelContext.registerTool({
   name: 'get-page-title',
   description: 'Get the current page title',
   inputSchema: { type: 'object', properties: {} },
@@ -96,7 +114,7 @@ const inputSchema = {
   additionalProperties: false,
 } as const satisfies JsonSchemaForInference;
 
-navigator.modelContext.registerTool({
+document.modelContext.registerTool({
   name: 'search',
   description: 'Search indexed docs',
   inputSchema,
@@ -119,7 +137,7 @@ Inference notes:
 
 ### `initializeWebMCPPolyfill(options?)`
 
-Installs the strict core polyfill on `navigator.modelContext`.
+Installs the strict core polyfill on `document.modelContext` (canonical) and `navigator.modelContext` (deprecated alias to the same instance).
 
 | Option                            | Type                                  | Default        | Notes                                                                                                        |
 | --------------------------------- | ------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------ |
@@ -130,7 +148,7 @@ Installs the strict core polyfill on `navigator.modelContext`.
 Behavior:
 
 - No-op in non-browser environments.
-- Non-destructive by default: if `navigator.modelContext` already exists, initialization is skipped.
+- Non-destructive by default: if either `document.modelContext` or `navigator.modelContext` already exists (e.g. native Chromium support), initialization is skipped.
 - Safe to call repeatedly.
 
 ### `initializeWebModelContextPolyfill(options?)`
@@ -139,15 +157,9 @@ Alias of `initializeWebMCPPolyfill`.
 
 ### `cleanupWebMCPPolyfill()`
 
-Restores previous `navigator.modelContext` and `navigator.modelContextTesting` descriptors and resets polyfill install state.
+Restores previous `document.modelContext`, `navigator.modelContext`, and `navigator.modelContextTesting` descriptors and resets polyfill install state.
 
 ## Strict Core Behavior
-
-### `provideContext(options?)`
-
-- Deprecated compatibility API.
-- Replaces the active tool registry with `options.tools`.
-- Clears previously registered tools before applying new tools.
 
 ### `registerTool(tool, options?)`
 
@@ -180,15 +192,10 @@ ac.abort();
 - Unknown names are a no-op.
 - Logs a one-time deprecation warning. Prefer the `AbortSignal` form on `registerTool(tool, options)`.
 
-### `clearContext()`
-
-- Deprecated compatibility API.
-- Removes all registered tools.
-
 ## Listing and Executing Tools
 
 In `@mcp-b/webmcp-polyfill`, listing and execution helpers are exposed on
-`navigator.modelContextTesting` (not `navigator.modelContext`) when the testing shim is enabled.
+`navigator.modelContextTesting` (not `document.modelContext`) when the testing shim is enabled.
 
 ```ts
 import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
@@ -205,7 +212,7 @@ void tools;
 void result;
 ```
 
-If you want `callTool(...)` / extension-style runtime methods on `navigator.modelContext`, use
+If you want `callTool(...)` / extension-style runtime methods on `document.modelContext`, use
 `@mcp-b/global`.
 
 ## Input Schema Support
