@@ -127,10 +127,9 @@ The canonical runtime gate lives in `.github/workflows/e2e.yml`.
 The workflow runs:
 
 1. `pnpm test:e2e`
-2. Native contract on default Chromium
-3. Native contract on Chrome Beta with WebMCP flags
-4. Native showcase integration coverage
-5. Tarball validation for `@mcp-b/global`
+2. Native contract on Chrome Canary with WebMCP flags
+3. Native showcase integration coverage on Chrome Canary
+4. Tarball validation for `@mcp-b/global`
 
 `pnpm test` at the repo root includes this gate by default.
 

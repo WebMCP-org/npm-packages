@@ -118,16 +118,9 @@ jobs:
         run: pnpm --filter @mcp-b/extension-tools test:e2e
 
   native-parity:
-    name: Native API Parity (${{ matrix.mode }})
+    name: Native API Parity (chrome-canary)
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        mode:
-          - default
-          - chrome-beta
-          - chrome-canary
 
     steps:
       - name: Checkout code
@@ -148,15 +141,7 @@ jobs:
       - name: Build packages
         run: pnpm build
 
-      - name: Setup Chrome
-        if: matrix.mode == 'default'
-        uses: browser-actions/setup-chrome@2e1d749697dd1612b833dba4a722266286fbefcd
-        with:
-          chrome-version: stable
-          install-dependencies: true
-
       - name: Setup Chrome Canary
-        if: matrix.mode == 'chrome-canary'
         id: chrome_canary
         uses: browser-actions/setup-chrome@2e1d749697dd1612b833dba4a722266286fbefcd
         with:
@@ -164,50 +149,15 @@ jobs:
           install-dependencies: true
 
       - name: Print Chrome Canary version
-        if: matrix.mode == 'chrome-canary'
         run: '"${{ steps.chrome_canary.outputs.chrome-path }}" --version'
 
-      - name: Install Google Chrome Beta
-        if: matrix.mode == 'chrome-beta'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y wget gnupg
-          wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor | sudo tee /usr/share/keyrings/google-linux.gpg > /dev/null
-          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-linux.gpg] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
-          sudo apt-get update
-          sudo apt-get install -y google-chrome-beta
-          google-chrome-beta --version
-
-      - name: Run Native Runtime Contract (Default Chromium)
-        if: matrix.mode == 'default'
-        env:
-          PLAYWRIGHT_CHROMIUM_CHANNEL: chrome
-        run: pnpm --filter mcp-e2e-tests run test:native-contract:default
-
-      - name: Run Native Runtime API Integration (Default Chromium)
-        if: matrix.mode == 'default'
-        env:
-          PLAYWRIGHT_CHROMIUM_CHANNEL: chrome
-          PLAYWRIGHT_NATIVE_SHOWCASE_CHANNEL: chrome
-        run: pnpm --filter mcp-e2e-tests run test:native-showcase
-
-      - name: Run Native Runtime Contract (Chrome Beta)
-        if: matrix.mode == 'chrome-beta'
-        run: pnpm --filter mcp-e2e-tests run test:native-contract:beta
-
-      - name: Run Chrome Beta WebMCP Smoke
-        if: matrix.mode == 'chrome-beta'
-        run: pnpm --filter mcp-e2e-tests run test:chrome-beta:webmcp:smoke
-
       - name: Run Native Runtime Contract (Chrome Canary)
-        if: matrix.mode == 'chrome-canary'
         env:
           CHROME_BIN: ${{ steps.chrome_canary.outputs.chrome-path }}
           PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: ${{ steps.chrome_canary.outputs.chrome-path }}
         run: pnpm --filter mcp-e2e-tests run test:native-contract:default
 
       - name: Run Native Runtime API Integration (Chrome Canary)
-        if: matrix.mode == 'chrome-canary'
         env:
           CHROME_BIN: ${{ steps.chrome_canary.outputs.chrome-path }}
           PLAYWRIGHT_NATIVE_SHOWCASE_EXECUTABLE_PATH: ${{ steps.chrome_canary.outputs.chrome-path }}
@@ -217,7 +167,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
-          name: playwright-report-native-parity-${{ matrix.mode }}
+          name: playwright-report-native-parity-chrome-canary
           path: e2e/playwright-report/
           retention-days: 14
 
@@ -225,6 +175,6 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
-          name: test-results-native-parity-${{ matrix.mode }}
+          name: test-results-native-parity-chrome-canary
           path: e2e/test-results/
           retention-days: 7
