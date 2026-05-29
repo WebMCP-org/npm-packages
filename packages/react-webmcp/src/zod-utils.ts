@@ -17,7 +17,12 @@ function isZodLikeValue(value: unknown): boolean {
 type ZodDefinitionCarrier = {
   _def: {
     typeName: unknown;
+    type?: unknown;
   };
+};
+
+type ZodJsonSchemaCarrier = {
+  toJSONSchema: () => unknown;
 };
 
 function hasZodTypeName(schema: unknown): schema is ZodDefinitionCarrier {
@@ -38,11 +43,19 @@ export function isZodSchema(schema: unknown): schema is ZodSchemaObject {
 
 function isOptionalSchema(schema: unknown): boolean {
   if (!hasZodTypeName(schema)) {
-    return false;
+    if (!isRecord(schema) || !isRecord(schema._def)) {
+      return false;
+    }
+
+    return schema._def.type === 'optional' || schema._def.type === 'default';
   }
 
   const { typeName } = schema._def;
   return typeName === 'ZodOptional' || typeName === 'ZodDefault';
+}
+
+function hasNativeJsonSchema(schema: unknown): schema is ZodJsonSchemaCarrier {
+  return isRecord(schema) && typeof schema.toJSONSchema === 'function';
 }
 
 function stripSchemaMeta(schema: InputSchema): InputSchema {
@@ -68,10 +81,15 @@ export function zodToJsonSchema(schema: ZodSchemaObject): InputSchema {
     }
 
     const zodSchema = rawValue as z.ZodTypeAny;
-    const propSchema = zodToJsonSchemaLib(zodSchema, {
+    let propSchema: unknown = zodToJsonSchemaLib(zodSchema, {
       strictUnions: true,
       $refStrategy: 'none',
     });
+
+    if (isRecord(propSchema) && !('type' in propSchema) && hasNativeJsonSchema(zodSchema)) {
+      propSchema = zodSchema.toJSONSchema();
+    }
+
     properties[key] = stripSchemaMeta(propSchema as InputSchema);
     if (!isOptionalSchema(zodSchema)) {
       required.push(key);
