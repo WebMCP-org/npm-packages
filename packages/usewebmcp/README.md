@@ -1,6 +1,6 @@
 # usewebmcp
 
-Standalone React hooks for strict core WebMCP tool registration via `navigator.modelContext`.
+Standalone React hooks for strict core WebMCP tool registration via `document.modelContext`.
 
 `usewebmcp` is intentionally separate from `@mcp-b/react-webmcp`:
 
@@ -17,12 +17,12 @@ Standalone React hooks for strict core WebMCP tool registration via `navigator.m
 
 ## Package Selection
 
-| Package                  | Use When                                                   |
-| ------------------------ | ---------------------------------------------------------- |
-| `usewebmcp`              | React hooks for strict core `navigator.modelContext` tools |
-| `@mcp-b/react-webmcp`    | React hooks for full MCP-B runtime surface                 |
-| `@mcp-b/webmcp-polyfill` | You need a strict core runtime polyfill                    |
-| `@mcp-b/global`          | You need full MCP-B runtime (core + extensions)            |
+| Package                  | Use When                                                  |
+| ------------------------ | --------------------------------------------------------- |
+| `usewebmcp`              | React hooks for strict core `document.modelContext` tools |
+| `@mcp-b/react-webmcp`    | React hooks for full MCP-B runtime surface                |
+| `@mcp-b/webmcp-polyfill` | You need a strict core runtime polyfill                   |
+| `@mcp-b/global`          | You need full MCP-B runtime (core + extensions)           |
 
 ## Install
 
@@ -40,7 +40,7 @@ pnpm add zod
 
 ## Runtime Prerequisite
 
-`usewebmcp` expects `window.navigator.modelContext` to exist.
+`usewebmcp` expects `window.document.modelContext` to exist.
 
 You can provide it via:
 
@@ -48,7 +48,7 @@ You can provide it via:
 - `@mcp-b/webmcp-polyfill`, or
 - `@mcp-b/global`
 
-If `navigator.modelContext` is missing, the hook logs a warning and skips registration.
+If `document.modelContext` is missing, the hook falls back to older preview `navigator.modelContext` runtimes. If both are missing, the hook logs a warning and skips registration.
 
 ## Quick Start
 
@@ -100,7 +100,7 @@ export function CounterTool() {
 
 ## How `useWebMCP` Works
 
-- Registers a tool on mount with `navigator.modelContext.registerTool(tool, { signal })` and aborts the controller on unmount.
+- Registers a tool on mount with `document.modelContext.registerTool(tool, { signal })` and aborts the controller on unmount.
 - On Chrome Beta 147 native (which ignores the second arg) cleanup cannot remove the tool. Install `@mcp-b/global` or `@mcp-b/webmcp-polyfill` for spec-aligned behavior.
 - Exposes local execution state:
   - `state.isExecuting`
@@ -266,7 +266,7 @@ Return value:
 - `reset()`
 
 `execute(input)` is a local direct call to your configured tool implementation for in-app control/testing.
-Tool calls coming from MCP clients still go through `navigator.modelContext`.
+Tool calls coming from MCP clients still go through the page `document.modelContext` surface.
 
 ## Important Notes
 

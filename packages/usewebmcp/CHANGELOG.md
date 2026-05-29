@@ -1,5 +1,18 @@
 # usewebmcp
 
+## 3.0.0
+
+### Major Changes
+
+- Align standalone React hooks with the WebMCP v3 document-first API through `@mcp-b/webmcp-polyfill` and `@mcp-b/webmcp-types`.
+- Hooks now register against `document.modelContext` first while retaining a `navigator.modelContext` fallback for older preview runtimes.
+
+### Patch Changes
+
+- Updated dependencies [4f3cc5e]
+  - @mcp-b/webmcp-types@3.0.0
+  - @mcp-b/webmcp-polyfill@3.0.0
+
 ## 2.3.1
 
 ### Patch Changes

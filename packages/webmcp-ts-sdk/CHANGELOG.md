@@ -1,5 +1,17 @@
 # @mcp-b/webmcp-ts-sdk
 
+## 3.0.0
+
+### Major Changes
+
+- Align the browser-adapted SDK with the WebMCP v3 document-first API through `@mcp-b/webmcp-types@3.0.0` and `@mcp-b/webmcp-polyfill@3.0.0`.
+
+### Patch Changes
+
+- Updated dependencies [4f3cc5e]
+  - @mcp-b/webmcp-types@3.0.0
+  - @mcp-b/webmcp-polyfill@3.0.0
+
 ## 2.3.1
 
 ### Patch Changes

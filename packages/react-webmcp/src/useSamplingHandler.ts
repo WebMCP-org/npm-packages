@@ -1,7 +1,8 @@
 import type { SamplingRequestParams, SamplingResult } from '@mcp-b/webmcp-ts-sdk';
 import { useCallback, useState } from 'react';
+import { getModelContext, type ModelContextSurface } from './model-context.js';
 
-type SamplingModelContext = Navigator['modelContext'] & {
+type SamplingModelContext = ModelContextSurface & {
   createMessage: (params: SamplingRequestParams) => Promise<SamplingResult>;
 };
 
@@ -106,10 +107,10 @@ export function useSampling(config: UseSamplingConfig = {}): UseSamplingReturn {
 
   const createMessage = useCallback(
     async (params: SamplingRequestParams): Promise<SamplingResult> => {
-      if (typeof window === 'undefined' || !window.navigator?.modelContext) {
-        throw new Error('navigator.modelContext is not available');
+      const modelContext = getModelContext() as SamplingModelContext | undefined;
+      if (!modelContext) {
+        throw new Error('document.modelContext is not available');
       }
-      const modelContext = window.navigator.modelContext as SamplingModelContext;
 
       setState((prev) => ({
         ...prev,

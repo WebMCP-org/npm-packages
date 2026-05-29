@@ -36,9 +36,9 @@ For client functionality, you'll also need:
 pnpm add @mcp-b/transports @modelcontextprotocol/sdk
 ```
 
-**Prerequisites:** Provider hooks require the `navigator.modelContext` API. Install `@mcp-b/global` or use a browser that implements the Web Model Context API.
+**Prerequisites:** Provider hooks require the `document.modelContext` API. Install `@mcp-b/global` or use a browser that implements the Web Model Context API.
 
-Provider hooks register tools with `navigator.modelContext.registerTool(tool, { signal })` and abort the controller on unmount. On Chrome Beta 147 native (which ignores the second arg) cleanup cannot remove the tool. Install `@mcp-b/global` for spec-aligned behavior.
+Provider hooks register tools with `document.modelContext.registerTool(tool, { signal })` and abort the controller on unmount. The hooks retain a `navigator.modelContext` fallback for older preview runtimes, but `document.modelContext` is the canonical v3 surface. On Chrome Beta 147 native (which ignores the second arg) cleanup cannot remove the tool. Install `@mcp-b/global` for spec-aligned behavior.
 
 ## Quick Start - Provider (Registering Tools)
 

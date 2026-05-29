@@ -15,6 +15,7 @@ import type {
   WebMCPConfig,
   WebMCPReturn,
 } from './types.js';
+import { getModelContext, type ModelContextSurface } from './model-context.js';
 
 /**
  * Default output formatter that converts values to formatted JSON strings.
@@ -118,7 +119,7 @@ function isDev(): boolean {
  * or `@mcp-b/webmcp-polyfill` there.
  */
 function registerToolWithCleanup(
-  modelContext: Navigator['modelContext'],
+  modelContext: ModelContextSurface,
   toolDescriptor: ToolDescriptor
 ): AbortController {
   const controller = new AbortController();
@@ -177,7 +178,7 @@ function toRegisteredOutputSchema(
  * React hook for registering and managing Model Context Protocol (MCP) tools.
  *
  * This hook handles the complete lifecycle of an MCP tool:
- * - Registers the tool with `window.navigator.modelContext`
+ * - Registers the tool with `window.document.modelContext`
  * - Manages execution state (loading, results, errors)
  * - Handles tool execution and lifecycle callbacks
  * - Automatically unregisters on component unmount
@@ -475,9 +476,10 @@ export function useWebMCP<
   }, []);
 
   useEffect(() => {
-    if (typeof window === 'undefined' || !window.navigator?.modelContext) {
+    const modelContext = getModelContext();
+    if (!modelContext) {
       console.warn(
-        `[useWebMCP] window.navigator.modelContext is not available. Tool "${name}" will not be registered.`
+        `[useWebMCP] window.document.modelContext is not available. Tool "${name}" will not be registered.`
       );
       return;
     }
@@ -529,7 +531,6 @@ export function useWebMCP<
     };
 
     const ownerToken = Symbol(name);
-    const modelContext = window.navigator.modelContext;
     const resolvedInputSchema = toRegisteredInputSchema(inputSchema);
     const resolvedOutputSchema = toRegisteredOutputSchema(outputSchema);
     const toolDescriptor: ToolDescriptor = {
