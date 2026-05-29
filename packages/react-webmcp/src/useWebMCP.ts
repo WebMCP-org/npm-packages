@@ -16,6 +16,7 @@ import type {
   WebMCPConfig,
   WebMCPReturn,
 } from './types.js';
+import { getModelContext, type ModelContextSurface } from './model-context.js';
 import { isZodSchema, zodToJsonSchema } from './zod-utils.js';
 
 /**
@@ -167,7 +168,7 @@ function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
  * or `@mcp-b/webmcp-polyfill` there.
  */
 function registerToolWithCleanup(
-  modelContext: Navigator['modelContext'],
+  modelContext: ModelContextSurface,
   toolDescriptor: ToolDescriptor
 ): AbortController {
   const controller = new AbortController();
@@ -244,7 +245,7 @@ function toRegisteredOutputSchema(
  * React hook for registering and managing Model Context Protocol (MCP) tools.
  *
  * This hook handles the complete lifecycle of an MCP tool:
- * - Registers the tool with `window.navigator.modelContext`
+ * - Registers the tool with `window.document.modelContext`
  * - Manages execution state (loading, results, errors)
  * - Handles tool execution and lifecycle callbacks
  * - Automatically unregisters on component unmount
@@ -415,14 +416,14 @@ export function useWebMCP<
   }, []);
 
   useEffect(() => {
-    if (typeof window === 'undefined' || !window.navigator?.modelContext) {
+    const modelContext = getModelContext();
+    if (!modelContext) {
       console.warn(
         '[ReactWebMCP:useWebMCP]',
         `Tool "${name}" skipped: modelContext is not available`
       );
       return;
     }
-    const modelContext = window.navigator.modelContext;
 
     /**
      * Handles MCP tool execution by running the handler and formatting the response.

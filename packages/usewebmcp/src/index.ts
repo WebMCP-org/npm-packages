@@ -4,7 +4,7 @@
  * usewebmcp
  *
  * Standalone React hooks for the Web Model Context Protocol.
- * Registers tools with `navigator.modelContext` directly.
+ * Registers tools with `document.modelContext` directly.
  *
  * @packageDocumentation
  */
