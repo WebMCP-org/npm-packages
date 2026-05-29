@@ -18,21 +18,14 @@ import type {
   ToolListItem,
 } from '@mcp-b/webmcp-types';
 import { isJsonObject } from './shared.js';
+import {
+  createToolReconciler,
+  type RelayToolDescriptor,
+  type ToolReconciler,
+} from './reconciler.js';
 
 /** Loose JSON object — values aren't recursively typed since we just forward them. */
 type JsonObject = Record<string, unknown>;
-
-/**
- * Minimal tool shape sent to the relay widget — just name, description, and
- * a JSON-object inputSchema. Intentionally looser than ToolListItem so both
- * modelContext (ToolListItem) and modelContextTesting (string schema) can
- * be normalised into the same shape.
- */
-interface RelayToolDescriptor {
-  name: string;
-  description?: string;
-  inputSchema?: JsonObject;
-}
 
 interface ToolBridge {
   listTools: () => RelayToolDescriptor[] | Promise<RelayToolDescriptor[]>;
@@ -245,78 +238,49 @@ function getToolBridge(): ToolBridge | null {
   return null;
 }
 
-let pushScheduled = false;
-// Snapshot of sorted tool names (joined by \0) used to deduplicate push notifications
-// between event-driven and poll-driven paths.
-let lastToolsSnapshot = '';
-let pollTimer: ReturnType<typeof setInterval> | null = null;
-const POLL_INTERVAL_MS = 2000;
+let reconciler: ToolReconciler | null = null;
 
-function onToolsChanged(): void {
-  if (pushScheduled || !widgetWindow) return;
-  pushScheduled = true;
-  setTimeout(() => {
-    pushScheduled = false;
-    if (!widgetWindow) return;
-    const bridge = getToolBridge();
-    const toolsPromise = bridge ? Promise.resolve(bridge.listTools()) : Promise.resolve([]);
-    toolsPromise
-      .then((tools) => {
-        if (!widgetWindow) return;
-        const toolList = Array.isArray(tools) ? tools : [];
-        lastToolsSnapshot = toolList
-          .map((t) => t.name)
-          .sort()
-          .join('\0');
-        widgetWindow.postMessage(
-          { type: 'webmcp.tools.changed', tools: toolList },
-          config.widgetOrigin
-        );
-      })
-      .catch((err: unknown) => {
-        debugWarn('Failed to push tool changes:', err);
-      });
-  }, 0);
+function initReconciler(): void {
+  reconciler = createToolReconciler({
+    listTools() {
+      const bridge = getToolBridge();
+      return bridge ? bridge.listTools() : [];
+    },
+    onChanged(tools) {
+      if (!widgetWindow) return;
+      widgetWindow.postMessage({ type: 'webmcp.tools.changed', tools }, config.widgetOrigin);
+    },
+  });
 }
 
-/**
- * Subscribe to tool changes on ALL available targets simultaneously (non-exclusive).
- * Chrome native fires toolchange on modelContextTesting for registerTool but NOT for
- * unregisterTool/signal-abort. By subscribing on both modelContext and modelContextTesting,
- * we catch events regardless of which target fires them. The `pushScheduled` debounce in
- * onToolsChanged prevents duplicate pushes when both targets fire for the same mutation.
- */
 function trySubscribe(): boolean {
+  if (!reconciler) return false;
   let subscribed = false;
 
-  // Path A: W3C standard — addEventListener('toolchange') on the extended modelContext.
-  // Works when @mcp-b/global (BrowserMcpServer) or a patched modelContext is present.
   const mc = getExtendedModelContext();
   if (mc) {
     try {
-      mc.addEventListener('toolchange', onToolsChanged);
+      mc.addEventListener('toolchange', () => reconciler!.scheduleReconcile());
       subscribed = true;
     } catch (error) {
       debugWarn('addEventListener on modelContext threw:', error);
     }
   }
 
-  // Path B: Chrome native / polyfill — subscribe on modelContextTesting.
-  // Prefer addEventListener (W3C standard); fall back to deprecated registerToolsChangedCallback.
   const testing = navigator.modelContextTesting as
     | (typeof navigator.modelContextTesting & Partial<ModelContextTestingPolyfillExtensions>)
     | undefined;
   if (testing) {
     if (typeof testing.addEventListener === 'function') {
       try {
-        testing.addEventListener('toolchange', onToolsChanged);
+        testing.addEventListener('toolchange', () => reconciler!.scheduleReconcile());
         subscribed = true;
       } catch (error) {
         debugWarn('addEventListener on modelContextTesting threw:', error);
       }
     } else if (typeof testing.registerToolsChangedCallback === 'function') {
       try {
-        testing.registerToolsChangedCallback(onToolsChanged);
+        testing.registerToolsChangedCallback(() => reconciler!.scheduleReconcile());
         subscribed = true;
       } catch (error) {
         debugWarn('Failed to subscribe via registerToolsChangedCallback:', error);
@@ -327,36 +291,9 @@ function trySubscribe(): boolean {
   return subscribed;
 }
 
-/**
- * Fallback polling for environments where toolchange events are unreliable
- * (Chrome native does not fire toolchange on unregisterTool or signal abort).
- * Compares sorted tool names against the last known snapshot; triggers
- * onToolsChanged() only when a real difference is detected.
- */
-function startToolListPolling(): void {
-  if (pollTimer) return;
-  pollTimer = setInterval(() => {
-    if (!widgetWindow) return;
-    const bridge = getToolBridge();
-    if (!bridge) return;
-    Promise.resolve(bridge.listTools())
-      .then((tools) => {
-        const names = Array.isArray(tools)
-          ? tools
-              .map((t) => t.name)
-              .sort()
-              .join('\0')
-          : '';
-        if (names !== lastToolsSnapshot) {
-          lastToolsSnapshot = names;
-          onToolsChanged();
-        }
-      })
-      .catch(() => {});
-  }, POLL_INTERVAL_MS);
-}
-
 function subscribeToToolChanges(): void {
+  initReconciler();
+
   if (!trySubscribe()) {
     let retries = 0;
     let retryDelayMs = 100;
@@ -367,7 +304,8 @@ function subscribeToToolChanges(): void {
       setTimeout(() => {
         retries++;
         if (trySubscribe()) {
-          startToolListPolling();
+          reconciler!.startPolling();
+          reconciler!.scheduleReconcile();
           return;
         }
 
@@ -375,7 +313,8 @@ function subscribeToToolChanges(): void {
           debugWarn(
             `Could not subscribe to tool changes after ${MAX_RETRIES} retries. Dynamic tool updates will not be relayed.`
           );
-          startToolListPolling();
+          reconciler!.startPolling();
+          reconciler!.scheduleReconcile();
           return;
         }
 
@@ -388,7 +327,8 @@ function subscribeToToolChanges(): void {
     return;
   }
 
-  startToolListPolling();
+  reconciler!.startPolling();
+  reconciler!.scheduleReconcile();
 }
 
 function respondToSource(
