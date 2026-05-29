@@ -324,14 +324,20 @@ export function useWebMCP<
   const onSuccessRef = useRef(onSuccess);
   const onErrorRef = useRef(onError);
   const formatOutputRef = useRef(formatOutput);
+  const inputSchemaRef = useRef(inputSchema);
+  const outputSchemaRef = useRef(outputSchema);
+  const annotationsRef = useRef(annotations);
   const isMountedRef = useRef(true);
-  // Update refs when callbacks change (doesn't trigger re-registration)
+  // Update refs when callbacks or static descriptors are recreated during render.
   useIsomorphicLayoutEffect(() => {
     handlerRef.current = handler;
     onSuccessRef.current = onSuccess;
     onErrorRef.current = onError;
     formatOutputRef.current = formatOutput;
-  }, [handler, onSuccess, onError, formatOutput]);
+    inputSchemaRef.current = inputSchema;
+    outputSchemaRef.current = outputSchema;
+    annotationsRef.current = annotations;
+  }, [annotations, handler, inputSchema, onSuccess, onError, outputSchema, formatOutput]);
 
   // Cleanup: mark component as unmounted
   useEffect(() => {
@@ -445,7 +451,7 @@ export function useWebMCP<
           ],
         };
 
-        if (isObjectOutputSchema(outputSchema)) {
+        if (isObjectOutputSchema(outputSchemaRef.current)) {
           const structuredContent = toStructuredContent(result);
           if (!structuredContent) {
             throw new Error(
@@ -471,8 +477,9 @@ export function useWebMCP<
       }
     };
 
-    const resolvedInputSchema = toRegisteredInputSchema(inputSchema);
-    const resolvedOutputSchema = toRegisteredOutputSchema(outputSchema);
+    const resolvedInputSchema = toRegisteredInputSchema(inputSchemaRef.current);
+    const resolvedOutputSchema = toRegisteredOutputSchema(outputSchemaRef.current);
+    const resolvedAnnotations = annotationsRef.current;
 
     const ownerToken = Symbol(name);
     const toolDescriptor: ToolDescriptor = {
@@ -480,7 +487,7 @@ export function useWebMCP<
       description,
       ...(resolvedInputSchema && { inputSchema: resolvedInputSchema }),
       ...(resolvedOutputSchema && { outputSchema: resolvedOutputSchema }),
-      ...(annotations && { annotations }),
+      ...(resolvedAnnotations && { annotations: resolvedAnnotations }),
       execute: mcpHandler,
     };
     const controller = registerToolWithCleanup(modelContext, toolDescriptor);
@@ -497,7 +504,7 @@ export function useWebMCP<
     };
     // Spread operator in dependencies intentionally allows consumers to trigger
     // re-registration with custom reactive inputs.
-  }, [name, description, inputSchema, outputSchema, annotations, ...(deps ?? [])]);
+  }, [name, description, ...(deps ?? [])]);
 
   return {
     state,
