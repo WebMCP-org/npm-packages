@@ -1,133 +1,24 @@
-/**
- * Tests for embed.ts tool list synchronization mechanism:
- * - trySubscribe subscribes on both modelContext and modelContextTesting (non-exclusive)
- * - Poll-based fallback detects tool changes when events are unreliable
- * - onToolsChanged updates lastToolsSnapshot to prevent duplicate pushes from polling
- */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createToolReconciler, type RelayToolDescriptor } from './reconciler.js';
 
-// Minimal mock types matching what embed.ts expects
-interface MockModelContext {
-  listTools: ReturnType<typeof vi.fn>;
-  callTool: ReturnType<typeof vi.fn>;
-  addEventListener: ReturnType<typeof vi.fn>;
-}
+/**
+ * Integration tests for the embed tool-sync wiring.
+ *
+ * embed.ts is a side-effect module that runs on import and depends on
+ * document.currentScript (only valid during script parsing). Rather than
+ * fighting these constraints with brittle import mocks, we test the
+ * integration contract:
+ *
+ * 1. The reconciler (tested exhaustively in reconciler.test.ts) is the
+ *    single source of truth for tool list changes.
+ * 2. embed.ts wires event sources → reconciler.scheduleReconcile()
+ * 3. embed.ts wires reconciler.onChanged → postMessage to widget
+ *
+ * Tests below verify the wiring logic that embed.ts performs, using the
+ * real reconciler and simulated event sources.
+ */
 
-interface MockModelContextTesting {
-  listTools: ReturnType<typeof vi.fn>;
-  executeTool: ReturnType<typeof vi.fn>;
-  addEventListener: ReturnType<typeof vi.fn>;
-  registerToolsChangedCallback?: ReturnType<typeof vi.fn>;
-}
-
-// We test the logic by reimplementing the core functions in isolation
-// since embed.ts is a side-effect module that runs on import.
-
-describe('embed tool sync: trySubscribe (non-exclusive subscription)', () => {
-  let originalModelContext: unknown;
-  let originalModelContextTesting: unknown;
-
-  beforeEach(() => {
-    originalModelContext = (navigator as Record<string, unknown>).modelContext;
-    originalModelContextTesting = (navigator as Record<string, unknown>).modelContextTesting;
-  });
-
-  afterEach(() => {
-    (navigator as Record<string, unknown>).modelContext = originalModelContext;
-    (navigator as Record<string, unknown>).modelContextTesting = originalModelContextTesting;
-  });
-
-  it('subscribes on both modelContext AND modelContextTesting when both available', () => {
-    const mcAddEventListener = vi.fn();
-    const testingAddEventListener = vi.fn();
-
-    const mc: MockModelContext = {
-      listTools: vi.fn(() => []),
-      callTool: vi.fn(),
-      addEventListener: mcAddEventListener,
-    };
-    const testing: MockModelContextTesting = {
-      listTools: vi.fn(() => []),
-      executeTool: vi.fn(),
-      addEventListener: testingAddEventListener,
-    };
-
-    (navigator as Record<string, unknown>).modelContext = mc;
-    (navigator as Record<string, unknown>).modelContextTesting = testing;
-
-    // Simulate trySubscribe logic
-    let subscribed = false;
-
-    // Path A: modelContext
-    if (
-      mc &&
-      typeof mc.listTools === 'function' &&
-      typeof mc.callTool === 'function' &&
-      typeof mc.addEventListener === 'function'
-    ) {
-      mc.addEventListener('toolchange', expect.any(Function));
-      subscribed = true;
-    }
-
-    // Path B: testing (non-exclusive — always attempted regardless of Path A)
-    if (testing && typeof testing.addEventListener === 'function') {
-      testing.addEventListener('toolchange', expect.any(Function));
-      subscribed = true;
-    }
-
-    expect(subscribed).toBe(true);
-    expect(mcAddEventListener).toHaveBeenCalledWith('toolchange', expect.any(Function));
-    expect(testingAddEventListener).toHaveBeenCalledWith('toolchange', expect.any(Function));
-  });
-
-  it('subscribes only on modelContextTesting when modelContext lacks listTools/callTool', () => {
-    const testingAddEventListener = vi.fn();
-
-    // Chrome native: modelContext has registerTool but no listTools/callTool
-    (navigator as Record<string, unknown>).modelContext = {
-      registerTool: vi.fn(),
-    };
-    const testing: MockModelContextTesting = {
-      listTools: vi.fn(() => []),
-      executeTool: vi.fn(),
-      addEventListener: testingAddEventListener,
-    };
-    (navigator as Record<string, unknown>).modelContextTesting = testing;
-
-    // Simulate: getExtendedModelContext returns undefined (no listTools/callTool)
-    const mc = navigator.modelContext as Record<string, unknown>;
-    const hasListTools = typeof mc.listTools === 'function';
-    const hasCallTool = typeof mc.callTool === 'function';
-
-    expect(hasListTools).toBe(false);
-    expect(hasCallTool).toBe(false);
-
-    // Path B should still succeed
-    testing.addEventListener('toolchange', () => {});
-    expect(testingAddEventListener).toHaveBeenCalledWith('toolchange', expect.any(Function));
-  });
-
-  it('falls back to registerToolsChangedCallback when testing lacks addEventListener', () => {
-    const callback = vi.fn();
-    const testing = {
-      listTools: vi.fn(() => []),
-      executeTool: vi.fn(),
-      registerToolsChangedCallback: callback,
-    };
-
-    (navigator as Record<string, unknown>).modelContext = undefined;
-    (navigator as Record<string, unknown>).modelContextTesting = testing;
-
-    // No addEventListener on testing
-    expect(typeof (testing as Record<string, unknown>).addEventListener).toBe('undefined');
-
-    // Should use registerToolsChangedCallback
-    testing.registerToolsChangedCallback(() => {});
-    expect(callback).toHaveBeenCalled();
-  });
-});
-
-describe('embed tool sync: polling fallback', () => {
+describe('embed integration: event-to-reconciler wiring', () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -136,136 +27,150 @@ describe('embed tool sync: polling fallback', () => {
     vi.useRealTimers();
   });
 
-  it('detects tool list changes via polling and triggers notification', async () => {
-    let lastToolsSnapshot = '';
-    const onToolsChanged = vi.fn();
-    let currentTools = [{ name: 'tool-a' }, { name: 'tool-b' }];
+  it('toolchange event triggers reconcile and notifies on change', async () => {
+    const postMessage = vi.fn();
+    let tools: RelayToolDescriptor[] = [{ name: 'initial', description: 'Already registered' }];
 
-    const listTools = vi.fn(() => currentTools);
+    const reconciler = createToolReconciler({
+      listTools: () => tools,
+      onChanged: (t) => postMessage({ type: 'webmcp.tools.changed', tools: t }),
+    });
 
-    // Simulate one poll cycle
-    const pollOnce = (): void => {
-      const tools = listTools();
-      const names = tools
-        .map((t) => t.name)
-        .sort()
-        .join('\0');
-      if (names !== lastToolsSnapshot) {
-        lastToolsSnapshot = names;
-        onToolsChanged();
-      }
-    };
+    // Simulate what embed.ts does: bind event → scheduleReconcile
+    const toolchangeHandler = () => reconciler.scheduleReconcile();
 
-    // First poll — detects initial tools
-    pollOnce();
-    expect(onToolsChanged).toHaveBeenCalledTimes(1);
-    expect(lastToolsSnapshot).toBe('tool-a\0tool-b');
+    // Initial reconcile (embed.ts calls this on startup)
+    reconciler.scheduleReconcile();
+    await vi.advanceTimersByTimeAsync(1);
+    // Non-empty initial list differs from internal "" snapshot — triggers onChanged
+    expect(postMessage).toHaveBeenCalledTimes(1);
 
-    // Same tools — no notification
-    pollOnce();
-    expect(onToolsChanged).toHaveBeenCalledTimes(1);
-
-    // Tool removed — should detect change
-    currentTools = [{ name: 'tool-a' }];
-    pollOnce();
-    expect(onToolsChanged).toHaveBeenCalledTimes(2);
-    expect(lastToolsSnapshot).toBe('tool-a');
-
-    // Tool added — should detect change
-    currentTools = [{ name: 'tool-a' }, { name: 'tool-c' }];
-    pollOnce();
-    expect(onToolsChanged).toHaveBeenCalledTimes(3);
-    expect(lastToolsSnapshot).toBe('tool-a\0tool-c');
+    // Tool registered — event fires
+    tools = [
+      { name: 'initial', description: 'Already registered' },
+      { name: 'search', description: 'Search the web', inputSchema: { type: 'object' } },
+    ];
+    toolchangeHandler();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(postMessage).toHaveBeenCalledTimes(2);
+    expect(postMessage).toHaveBeenLastCalledWith({
+      type: 'webmcp.tools.changed',
+      tools: [
+        { name: 'initial', description: 'Already registered' },
+        { name: 'search', description: 'Search the web', inputSchema: { type: 'object' } },
+      ],
+    });
   });
 
-  it('does not trigger notification when tool list is unchanged', () => {
-    let lastToolsSnapshot = 'tool-x\0tool-y';
-    const onToolsChanged = vi.fn();
-    const tools = [{ name: 'tool-x' }, { name: 'tool-y' }];
+  it('tool unregistered via AbortSignal detected by polling', async () => {
+    const postMessage = vi.fn();
+    let tools: RelayToolDescriptor[] = [
+      { name: 'tool-a', description: 'A' },
+      { name: 'tool-b', description: 'B' },
+    ];
 
-    const names = tools
-      .map((t) => t.name)
-      .sort()
-      .join('\0');
-    if (names !== lastToolsSnapshot) {
-      lastToolsSnapshot = names;
-      onToolsChanged();
-    }
+    const reconciler = createToolReconciler({
+      listTools: () => tools,
+      onChanged: (t) => postMessage({ type: 'webmcp.tools.changed', tools: t }),
+      pollInterval: 2000,
+    });
 
-    expect(onToolsChanged).not.toHaveBeenCalled();
+    // Startup
+    reconciler.startPolling();
+    reconciler.scheduleReconcile();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(postMessage).toHaveBeenCalledTimes(1);
+
+    // Tool removed (AbortSignal — no event fires)
+    tools = [{ name: 'tool-a', description: 'A' }];
+
+    // Poll fires after 2000ms
+    await vi.advanceTimersByTimeAsync(2001);
+    expect(postMessage).toHaveBeenCalledTimes(2);
+    expect(postMessage).toHaveBeenLastCalledWith({
+      type: 'webmcp.tools.changed',
+      tools: [{ name: 'tool-a', description: 'A' }],
+    });
+
+    reconciler.dispose();
   });
 
-  it('snapshot comparison is order-independent (sorted)', () => {
-    let lastToolsSnapshot = '';
-    const onToolsChanged = vi.fn();
+  it('description/schema change detected without name change', async () => {
+    const postMessage = vi.fn();
+    let tools: RelayToolDescriptor[] = [
+      { name: 'api', description: 'v1', inputSchema: { type: 'object', properties: {} } },
+    ];
 
-    const pollWith = (tools: Array<{ name: string }>): void => {
-      const names = tools
-        .map((t) => t.name)
-        .sort()
-        .join('\0');
-      if (names !== lastToolsSnapshot) {
-        lastToolsSnapshot = names;
-        onToolsChanged();
-      }
-    };
+    const reconciler = createToolReconciler({
+      listTools: () => tools,
+      onChanged: (t) => postMessage({ type: 'webmcp.tools.changed', tools: t }),
+      pollInterval: 2000,
+    });
 
-    // Register in order [b, a]
-    pollWith([{ name: 'tool-b' }, { name: 'tool-a' }]);
-    expect(onToolsChanged).toHaveBeenCalledTimes(1);
-    expect(lastToolsSnapshot).toBe('tool-a\0tool-b');
+    reconciler.startPolling();
+    reconciler.scheduleReconcile();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(postMessage).toHaveBeenCalledTimes(1);
 
-    // Same tools in different order [a, b] — should NOT trigger
-    pollWith([{ name: 'tool-a' }, { name: 'tool-b' }]);
-    expect(onToolsChanged).toHaveBeenCalledTimes(1);
-  });
-});
+    // Same name, different description and schema
+    tools = [
+      {
+        name: 'api',
+        description: 'v2',
+        inputSchema: { type: 'object', properties: { query: { type: 'string' } } },
+      },
+    ];
 
-describe('embed tool sync: onToolsChanged snapshot synchronization', () => {
-  it('onToolsChanged updates snapshot so polling does not re-push', () => {
-    // Simulates the scenario: event fires -> onToolsChanged pushes -> poll checks
-    let lastToolsSnapshot = '';
-    const onToolsChanged = vi.fn();
+    await vi.advanceTimersByTimeAsync(2001);
+    expect(postMessage).toHaveBeenCalledTimes(2);
 
-    const tools = [{ name: 'alpha' }, { name: 'beta' }];
-
-    // Simulate onToolsChanged updating the snapshot (as the real implementation does)
-    const toolList = tools;
-    lastToolsSnapshot = toolList
-      .map((t) => t.name)
-      .sort()
-      .join('\0');
-
-    // Now simulate a poll cycle with the same tools
-    const pollNames = tools
-      .map((t) => t.name)
-      .sort()
-      .join('\0');
-    if (pollNames !== lastToolsSnapshot) {
-      onToolsChanged();
-    }
-
-    // Should NOT have been called — snapshot was already up to date
-    expect(onToolsChanged).not.toHaveBeenCalled();
+    reconciler.dispose();
   });
 
-  it('polling detects change after snapshot was set by a prior push', () => {
-    let lastToolsSnapshot = 'alpha\0beta';
-    const onToolsChanged = vi.fn();
+  it('debounces multiple scheduleReconcile calls within the same tick', async () => {
+    const listTools = vi.fn(() => [{ name: 'x', description: 'd' }] as RelayToolDescriptor[]);
+    const postMessage = vi.fn();
 
-    // Tools changed (gamma added, beta removed)
-    const newTools = [{ name: 'alpha' }, { name: 'gamma' }];
-    const pollNames = newTools
-      .map((t) => t.name)
-      .sort()
-      .join('\0');
+    const reconciler = createToolReconciler({
+      listTools,
+      onChanged: (t) => postMessage({ type: 'webmcp.tools.changed', tools: t }),
+    });
 
-    if (pollNames !== lastToolsSnapshot) {
-      lastToolsSnapshot = pollNames;
-      onToolsChanged();
-    }
+    // Multiple events fire in the same tick (before setTimeout resolves)
+    reconciler.scheduleReconcile();
+    reconciler.scheduleReconcile();
+    reconciler.scheduleReconcile();
+    await vi.advanceTimersByTimeAsync(1);
 
-    expect(onToolsChanged).toHaveBeenCalledTimes(1);
-    expect(lastToolsSnapshot).toBe('alpha\0gamma');
+    // listTools should only be called once due to debounce
+    expect(listTools).toHaveBeenCalledTimes(1);
+    expect(postMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it('non-exclusive subscription: both modelContext and modelContextTesting can trigger reconcile', async () => {
+    const postMessage = vi.fn();
+    let callCount = 0;
+    const tools: RelayToolDescriptor[] = [{ name: 'tool', description: 'test' }];
+
+    const reconciler = createToolReconciler({
+      listTools: () => {
+        callCount++;
+        return tools;
+      },
+      onChanged: (t) => postMessage({ type: 'webmcp.tools.changed', tools: t }),
+    });
+
+    // Simulate two independent event sources (what embed.ts does)
+    const mcHandler = () => reconciler.scheduleReconcile();
+    const testingHandler = () => reconciler.scheduleReconcile();
+
+    // Both fire in the same tick (as would happen with non-exclusive subscription)
+    mcHandler();
+    testingHandler();
+    await vi.advanceTimersByTimeAsync(1);
+
+    // Debounce ensures only one reconcile
+    expect(callCount).toBe(1);
+    expect(postMessage).toHaveBeenCalledTimes(1);
   });
 });
