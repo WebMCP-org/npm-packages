@@ -1,4 +1,7 @@
-// packages/webmcp-local-relay/src/browser/reconciler.ts
+// Tool list reconciler — single source of truth for detecting tool changes.
+// All event surfaces and the poll timer funnel into scheduleReconcile().
+// Compares full tool descriptors (name + description + inputSchema) via stable
+// JSON serialization, so schema-only changes are detected.
 
 type JsonObject = Record<string, unknown>;
 
@@ -20,6 +23,9 @@ export interface ToolReconciler {
   dispose(): void;
 }
 
+// Deterministic JSON: recursively sorts object keys so property insertion order
+// doesn't affect the output. Required because inputSchema objects from different
+// sources may have identical content but different key ordering.
 export function stableStringify(value: unknown): string {
   if (value === null || typeof value !== 'object') {
     return JSON.stringify(value);
@@ -50,6 +56,8 @@ export function createToolReconciler(options: ReconcilerOptions): ToolReconciler
 
   function reconcile(): void {
     scheduled = false;
+    // Outer try-catch: Promise.resolve(fn()) evaluates fn() synchronously,
+    // so a synchronous throw from listTools() escapes the .catch() handler.
     try {
       Promise.resolve(options.listTools())
         .then((tools) => {
@@ -60,12 +68,13 @@ export function createToolReconciler(options: ReconcilerOptions): ToolReconciler
             options.onChanged(list);
           }
         })
-        .catch(() => {});
+        .catch(() => {}); // listTools rejected asynchronously — skip this cycle
     } catch {
-      // listTools threw synchronously — swallow to avoid crashing the reconcile loop
+      // listTools threw synchronously — skip this cycle
     }
   }
 
+  // Debounce: multiple event firings in the same tick collapse into one reconcile.
   function scheduleReconcile(): void {
     if (scheduled) return;
     scheduled = true;

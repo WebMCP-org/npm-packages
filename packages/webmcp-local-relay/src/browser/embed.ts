@@ -253,6 +253,9 @@ function initReconciler(): void {
   });
 }
 
+// Subscribe on BOTH modelContext and modelContextTesting (non-exclusive).
+// Chrome native fires toolchange on modelContextTesting; the polyfill fires on
+// modelContext. We subscribe to all available surfaces so no event is missed.
 function trySubscribe(): boolean {
   if (!reconciler) return false;
   let subscribed = false;
@@ -291,6 +294,9 @@ function trySubscribe(): boolean {
   return subscribed;
 }
 
+// Polling fallback: Chrome 148+ removed unregisterTool(); tools are removed via
+// AbortSignal only, which does NOT fire a toolchange event. Polling every 2s
+// ensures we still detect those silent removals within a bounded delay.
 function subscribeToToolChanges(): void {
   initReconciler();
 
@@ -300,6 +306,8 @@ function subscribeToToolChanges(): void {
     const MAX_RETRIES = 40;
     const MAX_RETRY_DELAY_MS = 1000;
 
+    // Runtime may not be initialized yet (e.g. async script loading). Retry
+    // with exponential backoff until modelContext/modelContextTesting appears.
     const scheduleRetry = (): void => {
       setTimeout(() => {
         retries++;
