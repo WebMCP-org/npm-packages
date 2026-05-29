@@ -641,6 +641,57 @@ describe('useWebMCP', () => {
       }
     });
 
+    it('should not re-register when schema or annotations references change without deps', async () => {
+      const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
+
+      try {
+        const { rerender } = await renderHook(
+          ({ inputSchema, outputSchema, annotations }) =>
+            useWebMCP({
+              name: 'stable_descriptor_tool',
+              description: 'Stable descriptor tool',
+              inputSchema,
+              outputSchema,
+              annotations,
+              handler: async () => ({ value: 'test' }),
+            }),
+          {
+            initialProps: {
+              inputSchema: {
+                type: 'object',
+                properties: { name: { type: 'string' } },
+                required: ['name'],
+              } as const,
+              outputSchema: {
+                type: 'object',
+                properties: { value: { type: 'string' } },
+              } as const,
+              annotations: { readOnlyHint: true } as const,
+            },
+          }
+        );
+
+        const initialCallCount = registerToolSpy.mock.calls.length;
+
+        await rerender({
+          inputSchema: {
+            type: 'object',
+            properties: { name: { type: 'string' } },
+            required: ['name'],
+          } as const,
+          outputSchema: {
+            type: 'object',
+            properties: { value: { type: 'string' } },
+          } as const,
+          annotations: { readOnlyHint: true },
+        });
+
+        expect(registerToolSpy.mock.calls.length).toBe(initialCallCount);
+      } finally {
+        registerToolSpy.mockRestore();
+      }
+    });
+
     it('should re-register when name changes', async () => {
       const { rerender } = await renderHook(
         ({ name }) =>
