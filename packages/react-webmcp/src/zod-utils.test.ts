@@ -132,5 +132,39 @@ describe('zod-utils', () => {
       });
       expect(result.required).toBeUndefined();
     });
+
+    it('falls back to native Zod v4 JSON Schema conversion when zod-to-json-schema omits type', () => {
+      const schema = {
+        count: {
+          _def: { type: 'number' },
+          toJSONSchema: () => ({
+            $schema: 'https://json-schema.org/draft/2020-12/schema',
+            type: 'number',
+          }),
+        },
+        maybe: {
+          _def: { type: 'optional' },
+          toJSONSchema: () => ({
+            $schema: 'https://json-schema.org/draft/2020-12/schema',
+            type: 'string',
+          }),
+        },
+      };
+
+      zodToJsonSchemaMock.mockReturnValue({
+        $schema: 'http://json-schema.org/draft-07/schema#',
+      });
+
+      const result = zodToJsonSchema(schema as never);
+
+      expect(result).toEqual({
+        type: 'object',
+        properties: {
+          count: { type: 'number' },
+          maybe: { type: 'string' },
+        },
+        required: ['count'],
+      });
+    });
   });
 });
