@@ -50,16 +50,20 @@ export function createToolReconciler(options: ReconcilerOptions): ToolReconciler
 
   function reconcile(): void {
     scheduled = false;
-    Promise.resolve(options.listTools())
-      .then((tools) => {
-        const list = Array.isArray(tools) ? tools : [];
-        const snapshot = createSnapshot(list);
-        if (snapshot !== lastSnapshot) {
-          lastSnapshot = snapshot;
-          options.onChanged(list);
-        }
-      })
-      .catch(() => {});
+    try {
+      Promise.resolve(options.listTools())
+        .then((tools) => {
+          const list = Array.isArray(tools) ? tools : [];
+          const snapshot = createSnapshot(list);
+          if (snapshot !== lastSnapshot) {
+            lastSnapshot = snapshot;
+            options.onChanged(list);
+          }
+        })
+        .catch(() => {});
+    } catch {
+      // listTools threw synchronously — swallow to avoid crashing the reconcile loop
+    }
   }
 
   function scheduleReconcile(): void {
