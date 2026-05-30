@@ -83,6 +83,7 @@ export class LocalRelayMcpServer {
 
   private syncing = false;
   private syncRequested = false;
+  private syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private connected = false;
 
   /**
@@ -97,9 +98,7 @@ export class LocalRelayMcpServer {
     });
 
     this.bridge.on('stateChanged', () => {
-      void this.syncDynamicTools().catch((err) => {
-        this.logSyncError(err);
-      });
+      this.debouncedSyncDynamicTools();
     });
 
     // Forward elicitation requests from browser tool handlers to the MCP client.
@@ -175,6 +174,12 @@ export class LocalRelayMcpServer {
    */
   async stop(): Promise<void> {
     this.connected = false;
+
+    if (this.syncDebounceTimer) {
+      clearTimeout(this.syncDebounceTimer);
+      this.syncDebounceTimer = null;
+    }
+
     let mcpCloseError: unknown;
     try {
       await this.mcpServer.close();
@@ -554,6 +559,27 @@ export class LocalRelayMcpServer {
   }
 
   /**
+   * Debounces rapid stateChanged events into a single sync pass.
+   *
+   * Browser reconnections emit multiple stateChanged events in quick
+   * succession (hello, tools/list). Without debouncing, each triggers a
+   * full sync that removes and re-registers tools — sending per-operation
+   * notifications through the stdio transport and overwhelming the agent.
+   */
+  private debouncedSyncDynamicTools(): void {
+    if (this.syncDebounceTimer) {
+      return;
+    }
+
+    this.syncDebounceTimer = setTimeout(() => {
+      this.syncDebounceTimer = null;
+      void this.syncDynamicTools().catch((err) => {
+        this.logSyncError(err);
+      });
+    }, 16);
+  }
+
+  /**
    * Coalesces concurrent sync requests into a single serialized sync loop.
    */
   private async syncDynamicTools(): Promise<void> {
@@ -733,6 +759,10 @@ export class LocalRelayMcpServer {
 
   /**
    * Produces a stable signature for change detection of dynamic tool metadata.
+   *
+   * Deliberately excludes `sourceId` (which is a per-connection UUID that
+   * changes on every browser reconnect) so that a reconnecting tab with the
+   * same tools does not trigger a needless remove+re-register cycle.
    */
   private toolSignature(tool: AggregatedTool): string {
     return JSON.stringify({
@@ -747,7 +777,6 @@ export class LocalRelayMcpServer {
       _meta: tool._meta,
       icons: tool.icons,
       sources: tool.sources.map((source) => ({
-        sourceId: source.sourceId,
         tabId: source.tabId,
       })),
     });
