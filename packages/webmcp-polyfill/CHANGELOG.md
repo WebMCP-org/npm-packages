@@ -1,5 +1,12 @@
 # @mcp-b/webmcp-polyfill
 
+## 3.0.1
+
+### Patch Changes
+
+- 6b60264: Validate `registerTool()` tool names per WebMCP §4.2 and throw `InvalidStateError` for invalid names and descriptions (fixes #224).
+  - @mcp-b/webmcp-types@3.0.1
+
 ## 3.0.0
 
 ### Major Changes
