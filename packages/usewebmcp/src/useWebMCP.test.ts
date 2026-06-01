@@ -438,6 +438,57 @@ describe('useWebMCP', () => {
       }
     });
 
+    it('should not re-register when schema or annotations references change without deps', async () => {
+      const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
+
+      try {
+        const { rerender } = await renderHook(
+          ({ inputSchema, outputSchema, annotations }) =>
+            useWebMCP({
+              name: 'stable_descriptor_tool',
+              description: 'Stable descriptor tool',
+              inputSchema,
+              outputSchema,
+              annotations,
+              handler: async () => ({ value: 'test' }),
+            }),
+          {
+            initialProps: {
+              inputSchema: {
+                type: 'object',
+                properties: { name: { type: 'string' } },
+                required: ['name'],
+              } as const,
+              outputSchema: {
+                type: 'object',
+                properties: { value: { type: 'string' } },
+              } as const,
+              annotations: { readOnlyHint: true } as const,
+            },
+          }
+        );
+
+        const initialCallCount = registerToolSpy.mock.calls.length;
+
+        await rerender({
+          inputSchema: {
+            type: 'object',
+            properties: { name: { type: 'string' } },
+            required: ['name'],
+          } as const,
+          outputSchema: {
+            type: 'object',
+            properties: { value: { type: 'string' } },
+          } as const,
+          annotations: { readOnlyHint: true },
+        });
+
+        expect(registerToolSpy.mock.calls.length).toBe(initialCallCount);
+      } finally {
+        registerToolSpy.mockRestore();
+      }
+    });
+
     it('should re-register when name changes', async () => {
       const { rerender } = await renderHook(
         ({ name }) =>
@@ -797,97 +848,50 @@ describe('useWebMCP', () => {
       (globalThis as Record<string, unknown>).process = originalProcess;
     });
 
-    it('should warn when inputSchema reference changes in dev mode', async () => {
+    it('should not warn when schema or annotations references change in dev mode', async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
       try {
         const { rerender } = await renderHook(
-          ({ schema }) =>
+          ({ inputSchema, outputSchema, annotations }) =>
             useWebMCP({
-              name: 'dev_input_warn_tool',
+              name: 'dev_descriptor_ref_tool',
               description: 'Test',
-              inputSchema: schema,
-              handler: async () => 'result',
-            }),
-          {
-            initialProps: {
-              schema: {
-                type: 'object',
-                properties: { name: { type: 'string' } },
-                required: ['name'],
-              } as const,
-            },
-          }
-        );
-
-        // Rerender with new inputSchema reference
-        await rerender({
-          schema: {
-            type: 'object',
-            properties: { name: { type: 'string' } },
-            required: ['name'],
-          } as const,
-        });
-
-        expect(warnSpy).toHaveBeenCalledWith(
-          expect.stringContaining('inputSchema reference changed')
-        );
-      } finally {
-        warnSpy.mockRestore();
-      }
-    });
-
-    it('should warn when outputSchema reference changes in dev mode', async () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-      try {
-        const { rerender } = await renderHook(
-          ({ schema }) =>
-            useWebMCP({
-              name: 'dev_output_warn_tool',
-              description: 'Test',
-              outputSchema: schema,
+              inputSchema,
+              outputSchema,
+              annotations,
               handler: async () => ({ value: 'test' }),
             }),
           {
             initialProps: {
-              schema: { type: 'object', properties: { value: { type: 'string' } } } as const,
+              inputSchema: {
+                type: 'object',
+                properties: { name: { type: 'string' } },
+                required: ['name'],
+              } as const,
+              outputSchema: {
+                type: 'object',
+                properties: { value: { type: 'string' } },
+              } as const,
+              annotations: { destructiveHint: true } as const,
             },
           }
         );
 
         await rerender({
-          schema: { type: 'object', properties: { value: { type: 'string' } } } as const,
+          inputSchema: {
+            type: 'object',
+            properties: { name: { type: 'string' } },
+            required: ['name'],
+          } as const,
+          outputSchema: {
+            type: 'object',
+            properties: { value: { type: 'string' } },
+          } as const,
+          annotations: { destructiveHint: true },
         });
 
-        expect(warnSpy).toHaveBeenCalledWith(
-          expect.stringContaining('outputSchema reference changed')
-        );
-      } finally {
-        warnSpy.mockRestore();
-      }
-    });
-
-    it('should warn when annotations reference changes in dev mode', async () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-      try {
-        const { rerender } = await renderHook(
-          ({ annotations }) =>
-            useWebMCP({
-              name: 'dev_annot_warn_tool',
-              description: 'Test',
-              annotations,
-              handler: async () => 'result',
-            }),
-          { initialProps: { annotations: { destructiveHint: true as boolean } } }
-        );
-
-        await rerender({ annotations: { destructiveHint: true } });
-
-        expect(warnSpy).toHaveBeenCalledWith(
-          expect.stringContaining('annotations reference changed')
-        );
+        expect(warnSpy).not.toHaveBeenCalledWith(expect.stringContaining('reference changed'));
       } finally {
         warnSpy.mockRestore();
       }
