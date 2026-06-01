@@ -19,6 +19,18 @@ function getCompatModelContext(): CompatModelContext {
   return navigator.modelContext as CompatModelContext;
 }
 
+function expectInvalidStateError(register: () => void, message?: string | RegExp): void {
+  try {
+    register();
+    expect.fail('Expected registerTool to throw InvalidStateError');
+  } catch (error) {
+    expect(error).toMatchObject({ name: 'InvalidStateError' });
+    if (message !== undefined) {
+      expect((error as Error).message).toEqual(expect.stringMatching(message));
+    }
+  }
+}
+
 describe('@mcp-b/webmcp-polyfill', () => {
   afterEach(() => {
     cleanupWebMCPPolyfill();
@@ -677,48 +689,146 @@ describe('@mcp-b/webmcp-polyfill', () => {
       ).toThrow('registerTool(tool) requires a tool object');
     });
 
-    it('throws when tool name is empty', () => {
+    it('throws InvalidStateError when tool name is empty', () => {
+      initializeWebMCPPolyfill();
+      expectInvalidStateError(
+        () =>
+          navigator.modelContext.registerTool({
+            name: '',
+            description: 'test',
+            execute: async () => ({ content: [] }),
+          }),
+        'Tool "name" must be a non-empty string'
+      );
+    });
+
+    it('throws InvalidStateError when tool name is not a string', () => {
+      initializeWebMCPPolyfill();
+      expectInvalidStateError(
+        () =>
+          navigator.modelContext.registerTool({
+            name: 42 as unknown as string,
+            description: 'test',
+            execute: async () => ({ content: [] }),
+          }),
+        'Tool "name" must be a non-empty string'
+      );
+    });
+
+    it('throws InvalidStateError when tool description is empty', () => {
+      initializeWebMCPPolyfill();
+      expectInvalidStateError(
+        () =>
+          navigator.modelContext.registerTool({
+            name: 'test',
+            description: '',
+            execute: async () => ({ content: [] }),
+          }),
+        'Tool "description" must be a non-empty string'
+      );
+    });
+
+    it('throws InvalidStateError when tool description is not a string', () => {
+      initializeWebMCPPolyfill();
+      expectInvalidStateError(
+        () =>
+          navigator.modelContext.registerTool({
+            name: 'test',
+            description: 123 as unknown as string,
+            execute: async () => ({ content: [] }),
+          }),
+        'Tool "description" must be a non-empty string'
+      );
+    });
+
+    const invalidToolNameMessage =
+      /Tool "name" must be 1–128 characters and contain only ASCII alphanumeric, underscore, hyphen, or period/;
+
+    it('throws InvalidStateError for tool name with zero-width space', () => {
+      initializeWebMCPPolyfill();
+      expectInvalidStateError(
+        () =>
+          navigator.modelContext.registerTool({
+            name: 'tool\u200Bname',
+            description: 'test',
+            execute: async () => ({ content: [] }),
+          }),
+        invalidToolNameMessage
+      );
+    });
+
+    it('throws InvalidStateError for tool name with cyrillic homoglyph', () => {
+      initializeWebMCPPolyfill();
+      expectInvalidStateError(
+        () =>
+          navigator.modelContext.registerTool({
+            name: 't\u043Eo\u043Bl',
+            description: 'test',
+            execute: async () => ({ content: [] }),
+          }),
+        invalidToolNameMessage
+      );
+    });
+
+    it('throws InvalidStateError for tool name with ASCII space', () => {
+      initializeWebMCPPolyfill();
+      expectInvalidStateError(
+        () =>
+          navigator.modelContext.registerTool({
+            name: 'tool name',
+            description: 'test',
+            execute: async () => ({ content: [] }),
+          }),
+        invalidToolNameMessage
+      );
+    });
+
+    it('throws InvalidStateError for tool name with colon', () => {
+      initializeWebMCPPolyfill();
+      expectInvalidStateError(
+        () =>
+          navigator.modelContext.registerTool({
+            name: 'tool:name',
+            description: 'test',
+            execute: async () => ({ content: [] }),
+          }),
+        invalidToolNameMessage
+      );
+    });
+
+    it('throws InvalidStateError for tool name longer than 128 characters', () => {
+      initializeWebMCPPolyfill();
+      expectInvalidStateError(
+        () =>
+          navigator.modelContext.registerTool({
+            name: 'a'.repeat(129),
+            description: 'test',
+            execute: async () => ({ content: [] }),
+          }),
+        invalidToolNameMessage
+      );
+    });
+
+    it('accepts tool name with underscore, period, and hyphen', () => {
       initializeWebMCPPolyfill();
       expect(() =>
         navigator.modelContext.registerTool({
-          name: '',
+          name: 'a._-b',
           description: 'test',
           execute: async () => ({ content: [] }),
         })
-      ).toThrow('Tool "name" must be a non-empty string');
+      ).not.toThrow();
     });
 
-    it('throws when tool name is not a string', () => {
+    it('accepts tool name with exactly 128 characters', () => {
       initializeWebMCPPolyfill();
       expect(() =>
         navigator.modelContext.registerTool({
-          name: 42 as unknown as string,
+          name: 'a'.repeat(128),
           description: 'test',
           execute: async () => ({ content: [] }),
         })
-      ).toThrow('Tool "name" must be a non-empty string');
-    });
-
-    it('throws when tool description is empty', () => {
-      initializeWebMCPPolyfill();
-      expect(() =>
-        navigator.modelContext.registerTool({
-          name: 'test',
-          description: '',
-          execute: async () => ({ content: [] }),
-        })
-      ).toThrow('Tool "description" must be a non-empty string');
-    });
-
-    it('throws when tool description is not a string', () => {
-      initializeWebMCPPolyfill();
-      expect(() =>
-        navigator.modelContext.registerTool({
-          name: 'test',
-          description: 123 as unknown as string,
-          execute: async () => ({ content: [] }),
-        })
-      ).toThrow('Tool "description" must be a non-empty string');
+      ).not.toThrow();
     });
 
     it('throws when tool execute is not a function', () => {
