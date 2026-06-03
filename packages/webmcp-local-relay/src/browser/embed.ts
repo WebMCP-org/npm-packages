@@ -619,4 +619,13 @@ if (!document.querySelector(RELAY_IFRAME_SELECTOR)) {
   }
 
   subscribeToToolChanges();
+
+  // Blob URL iframes do not receive visibilitychange events from the browser.
+  // Listen on the host page and forward to the widget iframe via postMessage
+  // so it can wake from dormant state when the tab becomes visible again.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && widgetWindow) {
+      widgetWindow.postMessage({ type: 'webmcp.connect' }, config.widgetOrigin);
+    }
+  });
 }
