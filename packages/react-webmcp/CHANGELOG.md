@@ -1,5 +1,21 @@
 # @mcp-b/react-webmcp
 
+## 3.0.0
+
+### Major Changes
+
+- Align React integrations with the WebMCP v3 document-first API through `@mcp-b/global`, `@mcp-b/webmcp-polyfill`, and `@mcp-b/webmcp-types`.
+- Provider hooks now register against `document.modelContext` first while retaining a `navigator.modelContext` fallback for older preview runtimes.
+
+### Patch Changes
+
+- Updated dependencies [4f3cc5e]
+  - @mcp-b/webmcp-types@3.0.0
+  - @mcp-b/webmcp-polyfill@3.0.0
+  - @mcp-b/global@3.0.0
+  - @mcp-b/webmcp-ts-sdk@3.0.0
+  - @mcp-b/transports@3.0.0
+
 ## 2.3.1
 
 ### Patch Changes

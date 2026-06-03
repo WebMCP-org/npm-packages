@@ -13,7 +13,7 @@
     "check": "vp check --fix",
     "check:ci": "vp check",
     "check-all": "pnpm -r --filter '!@mcp-b/example-*' --filter '!@mcp-b/chrome-devtools-mcp' run typecheck && vp check",
-    "ci:publish": "pnpm publish -r --access public",
+    "ci:publish": "pnpm publish -r --access public --no-git-checks",
     "clean": "git clean -xdf .cache .vite node_modules",
     "format": "vp fmt --write",
     "format:check": "vp fmt --check",

@@ -99,7 +99,7 @@ describe('useWebMCP', () => {
   });
 
   describe('tool registration', () => {
-    it('should register tool with navigator.modelContext', async () => {
+    it('should register tool with document.modelContext', async () => {
       await renderHook(() =>
         useWebMCP({
           name: 'my_tool',
@@ -641,6 +641,57 @@ describe('useWebMCP', () => {
       }
     });
 
+    it('should not re-register when schema or annotations references change without deps', async () => {
+      const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
+
+      try {
+        const { rerender } = await renderHook(
+          ({ inputSchema, outputSchema, annotations }) =>
+            useWebMCP({
+              name: 'stable_descriptor_tool',
+              description: 'Stable descriptor tool',
+              inputSchema,
+              outputSchema,
+              annotations,
+              handler: async () => ({ value: 'test' }),
+            }),
+          {
+            initialProps: {
+              inputSchema: {
+                type: 'object',
+                properties: { name: { type: 'string' } },
+                required: ['name'],
+              } as const,
+              outputSchema: {
+                type: 'object',
+                properties: { value: { type: 'string' } },
+              } as const,
+              annotations: { readOnlyHint: true } as const,
+            },
+          }
+        );
+
+        const initialCallCount = registerToolSpy.mock.calls.length;
+
+        await rerender({
+          inputSchema: {
+            type: 'object',
+            properties: { name: { type: 'string' } },
+            required: ['name'],
+          } as const,
+          outputSchema: {
+            type: 'object',
+            properties: { value: { type: 'string' } },
+          } as const,
+          annotations: { readOnlyHint: true },
+        });
+
+        expect(registerToolSpy.mock.calls.length).toBe(initialCallCount);
+      } finally {
+        registerToolSpy.mockRestore();
+      }
+    });
+
     it('should re-register when name changes', async () => {
       const { rerender } = await renderHook(
         ({ name }) =>
@@ -849,16 +900,73 @@ describe('useWebMCP', () => {
   });
 
   describe('cleanup edge cases', () => {
+    it('prefers document.modelContext over navigator.modelContext', async () => {
+      const originalDocumentDescriptor = Object.getOwnPropertyDescriptor(document, 'modelContext');
+      const originalNavigatorDescriptor = Object.getOwnPropertyDescriptor(
+        navigator,
+        'modelContext'
+      );
+      const documentRegisterTool = vi.fn();
+      const navigatorRegisterTool = vi.fn();
+
+      Object.defineProperty(document, 'modelContext', {
+        configurable: true,
+        enumerable: true,
+        writable: true,
+        value: { registerTool: documentRegisterTool },
+      });
+      Object.defineProperty(navigator, 'modelContext', {
+        configurable: true,
+        enumerable: true,
+        writable: true,
+        value: { registerTool: navigatorRegisterTool },
+      });
+
+      try {
+        const { unmount } = await renderHook(() =>
+          useWebMCP({
+            name: 'document_preferred_tool',
+            description: 'Uses document surface',
+            handler: async () => 'result',
+          })
+        );
+
+        expect(documentRegisterTool).toHaveBeenCalledTimes(1);
+        expect(navigatorRegisterTool).not.toHaveBeenCalled();
+        unmount();
+      } finally {
+        if (originalDocumentDescriptor) {
+          Object.defineProperty(document, 'modelContext', originalDocumentDescriptor);
+        } else {
+          delete (document as unknown as Record<string, unknown>).modelContext;
+        }
+        if (originalNavigatorDescriptor) {
+          Object.defineProperty(navigator, 'modelContext', originalNavigatorDescriptor);
+        } else {
+          delete (navigator as unknown as Record<string, unknown>).modelContext;
+        }
+      }
+    });
+
     it('should call registerTool with an AbortSignal and abort on unmount', async () => {
+      const originalDocumentDescriptor = Object.getOwnPropertyDescriptor(document, 'modelContext');
       const originalDescriptor = Object.getOwnPropertyDescriptor(navigator, 'modelContext');
       const registerTool = vi.fn();
       const unregisterTool = vi.fn();
+      const modelContext = { registerTool, unregisterTool };
+
+      Object.defineProperty(document, 'modelContext', {
+        configurable: true,
+        enumerable: true,
+        writable: true,
+        value: modelContext,
+      });
 
       Object.defineProperty(navigator, 'modelContext', {
         configurable: true,
         enumerable: true,
         writable: true,
-        value: { registerTool, unregisterTool },
+        value: modelContext,
       });
 
       try {
@@ -882,6 +990,11 @@ describe('useWebMCP', () => {
         expect(passedSignal?.aborted).toBe(true);
         expect(unregisterTool).not.toHaveBeenCalled();
       } finally {
+        if (originalDocumentDescriptor) {
+          Object.defineProperty(document, 'modelContext', originalDocumentDescriptor);
+        } else {
+          delete (document as unknown as Record<string, unknown>).modelContext;
+        }
         if (originalDescriptor) {
           Object.defineProperty(navigator, 'modelContext', originalDescriptor);
         } else {
@@ -944,9 +1057,15 @@ describe('useWebMCP', () => {
   describe('modelContext unavailability', () => {
     it('should warn when modelContext is not available', async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const savedModelContext = navigator.modelContext;
+      const savedDocumentModelContext = document.modelContext;
+      const savedNavigatorModelContext = navigator.modelContext;
 
       try {
+        Object.defineProperty(document, 'modelContext', {
+          value: undefined,
+          writable: true,
+          configurable: true,
+        });
         Object.defineProperty(navigator, 'modelContext', {
           value: undefined,
           writable: true,
@@ -966,8 +1085,13 @@ describe('useWebMCP', () => {
           expect.stringContaining('modelContext is not available')
         );
       } finally {
+        Object.defineProperty(document, 'modelContext', {
+          value: savedDocumentModelContext,
+          writable: true,
+          configurable: true,
+        });
         Object.defineProperty(navigator, 'modelContext', {
-          value: savedModelContext,
+          value: savedNavigatorModelContext,
           writable: true,
           configurable: true,
         });

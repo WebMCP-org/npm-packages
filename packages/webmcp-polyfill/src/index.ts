@@ -21,6 +21,8 @@ const TOOL_INVOCATION_FAILED_MESSAGE =
 const TOOL_CANCELLED_MESSAGE = 'Tool was cancelled';
 const DEFAULT_INPUT_SCHEMA: InputSchema = { type: 'object', properties: {} };
 const STANDARD_JSON_SCHEMA_TARGETS = ['draft-2020-12', 'draft-07'] as const;
+/** WebMCP §4.2 tool name: ASCII alnum, underscore, hyphen, period; 1–128 code points. */
+const VALID_TOOL_NAME_RE = /^[A-Za-z0-9_\-.]{1,128}$/u;
 
 const POLYFILL_MARKER_PROPERTY = '__isWebMCPPolyfill' as const;
 const STANDARD_VALIDATOR_SYMBOL = Symbol('standardValidator');
@@ -381,6 +383,16 @@ function createUnknownError(message: string): Error {
   }
 }
 
+function createInvalidStateError(message: string): DOMException | Error {
+  try {
+    return new DOMException(message, 'InvalidStateError');
+  } catch {
+    const error = new Error(message);
+    error.name = 'InvalidStateError';
+    return error;
+  }
+}
+
 function parseInputArgsJson(inputArgsJson: string): Record<string, unknown> {
   let parsed: unknown;
 
@@ -634,11 +646,17 @@ function normalizeToolDescriptor(
   }
 
   if (typeof tool.name !== 'string' || tool.name.length === 0) {
-    throw new TypeError('Tool "name" must be a non-empty string');
+    throw createInvalidStateError('Tool "name" must be a non-empty string');
+  }
+
+  if (!VALID_TOOL_NAME_RE.test(tool.name) || Array.from(tool.name).length > 128) {
+    throw createInvalidStateError(
+      'Tool "name" must be 1–128 characters and contain only ASCII alphanumeric, underscore, hyphen, or period'
+    );
   }
 
   if (typeof tool.description !== 'string' || tool.description.length === 0) {
-    throw new TypeError('Tool "description" must be a non-empty string');
+    throw createInvalidStateError('Tool "description" must be a non-empty string');
   }
 
   if (typeof tool.execute !== 'function') {
