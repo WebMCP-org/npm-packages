@@ -1915,4 +1915,47 @@ describe('RelayBridgeServer client mode', () => {
       await bridge.stop();
     }
   });
+
+  it('rejects pending invocations with payload-exceeded error when browser sends oversized result', async () => {
+    // Use a tiny maxPayloadBytes to trigger the 1009 close code.
+    const server = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+      maxPayloadBytes: 256,
+      invokeTimeoutMs: 5000,
+    });
+
+    try {
+      await server.start();
+
+      const ws = await connectAndRegister(server, {
+        tabId: 'tab-payload',
+        url: 'https://example.com',
+        tools: [{ name: 'big_response', description: 'Returns large data' }],
+      });
+
+      // When invoked, respond with a payload that exceeds maxPayloadBytes.
+      ws.on('message', (raw) => {
+        const msg = JSON.parse(String(raw));
+        if (msg.type !== 'invoke') return;
+        const oversizedText = 'x'.repeat(1024);
+        ws.send(
+          JSON.stringify({
+            type: 'result',
+            callId: msg.callId,
+            result: { content: [{ type: 'text', text: oversizedText }] },
+          })
+        );
+      });
+
+      await waitFor(() => (server.registry.listTools().length >= 1 ? true : undefined));
+
+      const invokePromise = server.invokeTool('big_response', {});
+
+      await expect(invokePromise).rejects.toThrow(/exceeded maximum payload size/);
+    } finally {
+      await server.stop();
+    }
+  });
 });

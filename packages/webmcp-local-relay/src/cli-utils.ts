@@ -9,6 +9,7 @@ export interface CliOptions {
   label?: string;
   workspace?: string;
   relayId?: string;
+  maxPayloadBytes?: number;
 }
 
 /**
@@ -88,6 +89,17 @@ export function parseCliOptions(argv: string[]): CliOptions {
       continue;
     }
 
+    if (token === '--max-payload') {
+      const raw = readFlagValue(token, i);
+      i += 1;
+      const value = Number.parseInt(raw, 10);
+      if (!Number.isFinite(value) || value <= 0) {
+        throw new Error(`Invalid max-payload "${raw}". Must be a positive integer (bytes).`);
+      }
+      options.maxPayloadBytes = value;
+      continue;
+    }
+
     if (token === '--help' || token === '-h') {
       printHelp();
       process.exit(0);
@@ -125,6 +137,7 @@ export function printHelp(): void {
       '  --label                  Human-readable relay label reported during discovery',
       '  --workspace              Optional workspace name reported during discovery',
       '  --relay-id               Stable relay identifier reported during discovery',
+      '  --max-payload            Maximum WebSocket payload size in bytes (default: 10000000)',
       '  --help, -h               Show help',
       '',
     ].join('\n')
