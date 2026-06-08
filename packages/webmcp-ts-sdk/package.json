@@ -72,10 +72,10 @@
   },
   "dependencies": {
     "@mcp-b/webmcp-polyfill": "workspace:*",
-    "@mcp-b/webmcp-types": "workspace:*"
+    "@mcp-b/webmcp-types": "workspace:*",
+    "@modelcontextprotocol/sdk": "catalog:"
   },
   "devDependencies": {
-    "@modelcontextprotocol/sdk": "catalog:",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vite-plus": "catalog:"
