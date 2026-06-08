@@ -1,461 +1,357 @@
-/**
- * Injects a hidden relay widget iframe and bridges widget messages to host tools.
- *
- * Usage:
- * `<script src=".../embed.js" data-relay-host="127.0.0.1" data-relay-port="9333"></script>`
- *
- * @typedef {{ [key: string]: unknown }} JsonObject
- * @typedef {{ name: string; description?: string; inputSchema?: JsonObject }} ToolDescriptor
- * @typedef {{ isError?: boolean; content?: Array<{ type: string; text: string }>; [key: string]: unknown }} ToolInvokeResult
- * @typedef {{ listTools: () => ToolDescriptor[] | Promise<ToolDescriptor[]>; invoke: (name: string, args: JsonObject) => ToolInvokeResult | Promise<ToolInvokeResult> }} ToolBridge
- * @typedef {{ requestId: string; type: string; toolName?: unknown; args?: unknown }} WidgetRequestMessage
- * @typedef {{ relayHost: string; relayPort: string; tabId: string; widgetUrl: string; widgetOrigin: string }} RelayConfig
- */
-(() => {
-  const RELAY_IFRAME_SELECTOR = '[data-webmcp-relay]';
-  const TAB_ID_STORAGE_KEY = '__webmcp_relay_tab_id';
-  const FALLBACK_WIDGET_URL =
-    'https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay/dist/browser/widget.html';
-
-  /** @type {Window | null} */
-  let widgetWindow = null;
-
-  /** @returns {HTMLScriptElement | null} */
-  function getCurrentScriptElement() {
+/* eslint-disable */
+(function () {
+  function e(e) {
+    return !!e && typeof e == `object` && !Array.isArray(e);
+  }
+  let t = `[data-webmcp-relay]`,
+    n = `__webmcp_relay_tab_id`,
+    r = null,
+    i;
+  function a() {
     return document.currentScript instanceof HTMLScriptElement ? document.currentScript : null;
   }
-
-  /**
-   * @param {unknown} value
-   * @returns {value is JsonObject}
-   */
-  function isJsonObject(value) {
-    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+  let o = a(),
+    s = o ? o.hasAttribute(`data-debug`) : !1;
+  function c(...e) {
+    s && console.warn(`[webmcp-relay-embed]`, ...e);
   }
-
-  /** @returns {string} */
-  function createTabId() {
-    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-      return crypto.randomUUID();
-    }
-    return `${String(Date.now())}_${String(Math.random()).slice(2, 10)}`;
+  function l() {
+    return typeof crypto < `u` && typeof crypto.randomUUID == `function`
+      ? crypto.randomUUID()
+      : `${String(Date.now())}_${String(Math.random()).slice(2, 10)}`;
   }
-
-  /** @returns {string} */
-  function readOrCreateTabId() {
+  function u() {
     try {
-      const storedTabId = sessionStorage.getItem(TAB_ID_STORAGE_KEY);
-      if (storedTabId) {
-        return storedTabId;
-      }
-    } catch (err) {
-      console.warn(
-        '[webmcp-relay-embed] sessionStorage read failed, tab ID will not persist:',
-        err
-      );
+      let e = sessionStorage.getItem(n);
+      if (e) return e;
+    } catch (e) {
+      c(`sessionStorage read failed, tab ID will not persist:`, e);
     }
-
-    const tabId = createTabId();
+    let e = l();
     try {
-      sessionStorage.setItem(TAB_ID_STORAGE_KEY, tabId);
-    } catch (err) {
-      console.warn('[webmcp-relay-embed] sessionStorage write failed:', err);
+      sessionStorage.setItem(n, e);
+    } catch (e) {
+      c(`sessionStorage write failed:`, e);
     }
-
-    return tabId;
+    return e;
   }
-
-  /**
-   * @param {HTMLScriptElement | null} script
-   * @returns {string}
-   */
-  function resolveWidgetUrl(script) {
-    if (script?.src) {
+  function d(e) {
+    if (e?.src)
       try {
-        return new URL('widget.html', script.src).href;
-      } catch (err) {
-        console.warn(
-          '[webmcp-relay-embed] Failed to resolve widget URL from script src, falling back to CDN:',
-          err
-        );
+        return new URL(`widget.html`, e.src).href;
+      } catch (e) {
+        c(`Failed to resolve widget URL from script src, falling back to CDN:`, e);
       }
-    } else {
-      console.warn(
-        '[webmcp-relay-embed] Script element has no src attribute, falling back to CDN widget URL'
-      );
-    }
-    return FALLBACK_WIDGET_URL;
+    else c(`Script element has no src attribute, falling back to CDN widget URL.`);
+    return `https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay/dist/browser/widget.html`;
   }
-
-  /**
-   * @param {HTMLScriptElement | null} script
-   * @returns {RelayConfig}
-   */
-  function buildRelayConfig(script) {
-    const widgetUrl = resolveWidgetUrl(script);
+  function f(e) {
+    let t = d(e),
+      n = e?.getAttribute(`data-relay-id`) || void 0,
+      r = e?.getAttribute(`data-relay-workspace`) || void 0,
+      i = e?.getAttribute(`data-request-timeout`) || void 0;
     return {
-      relayHost: script?.getAttribute('data-relay-host') || '127.0.0.1',
-      relayPort: script?.getAttribute('data-relay-port') || '9333',
-      tabId: readOrCreateTabId(),
-      widgetUrl,
-      widgetOrigin: new URL(widgetUrl).origin,
+      autoConnect: e?.getAttribute(`data-auto-connect`) !== `false`,
+      relayHost: e?.getAttribute(`data-relay-host`) || `127.0.0.1`,
+      relayPort: e?.getAttribute(`data-relay-port`) || `9333`,
+      ...(n ? { relayId: n } : {}),
+      ...(r ? { relayWorkspace: r } : {}),
+      ...(i ? { requestTimeout: i } : {}),
+      tabId: u(),
+      widgetUrl: t,
+      widgetOrigin: new URL(t).origin,
     };
   }
-
-  /**
-   * @param {unknown} rawSchema
-   * @returns {JsonObject}
-   */
-  function parseTestingSchema(rawSchema) {
-    if (typeof rawSchema !== 'string' || rawSchema.length === 0) {
-      return { type: 'object', properties: {} };
-    }
+  function p(t) {
+    if (typeof t != `string` || t.length === 0) return { type: `object`, properties: {} };
     try {
-      const parsed = JSON.parse(rawSchema);
-      return isJsonObject(parsed) ? parsed : { type: 'object', properties: {} };
-    } catch (err) {
-      console.warn(
-        '[webmcp-relay-embed] Failed to parse tool inputSchema, using permissive default:',
-        err
-      );
-      return { type: 'object', properties: {} };
-    }
-  }
-
-  /**
-   * @param {unknown} value
-   * @returns {JsonObject}
-   */
-  function toInvokeArgs(value) {
-    if (isJsonObject(value)) return value;
-    if (value !== undefined && value !== null) {
-      console.warn(
-        '[webmcp-relay-embed] Tool invocation args was not an object, defaulting to {}:',
-        typeof value
+      let n = JSON.parse(t);
+      return e(n) ? n : { type: `object`, properties: {} };
+    } catch (e) {
+      return (
+        c(`Tool inputSchema is not valid JSON:`, typeof t == `string` ? t.slice(0, 200) : t, e),
+        { type: `object`, properties: {} }
       );
     }
-    return {};
   }
-
-  /** @returns {ToolBridge | null} */
-  function getToolBridge() {
-    const modelContext = navigator.modelContext;
-    if (
-      modelContext &&
-      typeof modelContext.listTools === 'function' &&
-      typeof modelContext.callTool === 'function'
-    ) {
+  function m(t) {
+    return e(t) ? t : (t != null && c(`Tool invocation args must be an object, got`, typeof t), {});
+  }
+  function h(e) {
+    return { name: e.name, description: e.description, inputSchema: e.inputSchema };
+  }
+  function g(e) {
+    return { name: e.name, description: e.description, inputSchema: p(e.inputSchema) };
+  }
+  function _() {
+    let e = navigator.modelContext;
+    if (e && typeof e.listTools == `function` && typeof e.callTool == `function`) return e;
+  }
+  function v() {
+    let t = _();
+    if (t)
       return {
         listTools() {
-          return modelContext.listTools().map((tool) => ({
-            name: tool.name,
-            description: tool.description,
-            inputSchema: isJsonObject(tool.inputSchema)
-              ? tool.inputSchema
-              : { type: 'object', properties: {} },
-          }));
+          return t.listTools().map(h);
         },
-        invoke(name, args) {
-          return modelContext.callTool({ name, arguments: args });
+        invoke(e, n) {
+          return t.callTool({ name: e, arguments: n });
         },
       };
-    }
-
-    const testing = navigator.modelContextTesting;
-    if (
-      testing &&
-      typeof testing.listTools === 'function' &&
-      typeof testing.executeTool === 'function'
-    ) {
-      return {
-        listTools() {
-          return testing.listTools().map((tool) => ({
-            name: tool.name,
-            description: tool.description,
-            inputSchema: parseTestingSchema(tool.inputSchema),
-          }));
-        },
-        async invoke(name, args) {
-          const serialized = await testing.executeTool(name, JSON.stringify(args));
-          if (serialized === null) {
-            return {
-              isError: true,
-              content: [{ type: 'text', text: 'Tool execution interrupted by navigation' }],
-            };
-          }
-          let parsed;
-          try {
-            parsed = JSON.parse(serialized);
-          } catch {
-            throw new Error(
-              `Testing tool returned invalid JSON: ${String(serialized).slice(0, 200)}`
-            );
-          }
-          if (!isJsonObject(parsed)) {
-            throw new Error('Testing tool response was not an object');
-          }
-          return parsed;
-        },
-      };
-    }
-
-    return null;
+    let n = navigator.modelContextTesting;
+    return n && typeof n.listTools == `function` && typeof n.executeTool == `function`
+      ? {
+          listTools() {
+            return n.listTools().map(g);
+          },
+          async invoke(t, r) {
+            let i = await n.executeTool(t, JSON.stringify(r));
+            if (i === null)
+              return {
+                isError: !0,
+                content: [{ type: `text`, text: `Tool execution interrupted by navigation` }],
+              };
+            let a;
+            try {
+              a = JSON.parse(i);
+            } catch {
+              throw Error(`Testing tool returned invalid JSON: ${String(i).slice(0, 200)}`);
+            }
+            if (!e(a)) throw Error(`Testing tool response was not an object`);
+            return a;
+          },
+        }
+      : (c(`No WebMCP runtime found (navigator.modelContext or navigator.modelContextTesting).`),
+        null);
   }
-
-  let pushScheduled = false;
-
-  /**
-   * Coalesced handler for tool change events.
-   * Uses flag + setTimeout(0) to batch rapid registrations into a single push.
-   */
-  function onToolsChanged() {
-    if (pushScheduled || !widgetWindow) return;
-    pushScheduled = true;
-    setTimeout(() => {
-      pushScheduled = false;
-      if (!widgetWindow) return;
-      const bridge = getToolBridge();
-      const toolsPromise = bridge ? Promise.resolve(bridge.listTools()) : Promise.resolve([]);
-      toolsPromise
-        .then((tools) => {
-          if (!widgetWindow) return;
-          widgetWindow.postMessage(
-            {
-              type: 'webmcp.tools.changed',
-              tools: Array.isArray(tools) ? tools : [],
-            },
-            config.widgetOrigin
-          );
+  let y = !1;
+  function b() {
+    y ||
+      !r ||
+      ((y = !0),
+      setTimeout(() => {
+        if (((y = !1), !r)) return;
+        let e = v();
+        (e ? Promise.resolve(e.listTools()) : Promise.resolve([]))
+          .then((e) => {
+            r &&
+              r.postMessage(
+                { type: `webmcp.tools.changed`, tools: Array.isArray(e) ? e : [] },
+                i.widgetOrigin
+              );
+          })
+          .catch((e) => {
+            c(`Failed to push tool changes:`, e);
+          });
+      }, 0));
+  }
+  function x() {
+    let e = _();
+    if (e)
+      try {
+        return (e.addEventListener(`toolchange`, b), !0);
+      } catch (e) {
+        c(`addEventListener threw:`, e);
+      }
+    let t = navigator.modelContextTesting;
+    if (t && typeof t.registerToolsChangedCallback == `function`)
+      try {
+        return (t.registerToolsChangedCallback(b), !0);
+      } catch (e) {
+        c(`Failed to subscribe via registerToolsChangedCallback:`, e);
+      }
+    return !1;
+  }
+  function S() {
+    if (x()) return;
+    let e = 0,
+      t = 100,
+      n = () => {
+        setTimeout(() => {
+          if ((e++, !x())) {
+            if (e >= 40) {
+              c(
+                `Could not subscribe to tool changes after 40 retries. Dynamic tool updates will not be relayed.`
+              );
+              return;
+            }
+            ((t = Math.min(Math.round(t * 1.5), 1e3)), n());
+          }
+        }, t);
+      };
+    n();
+  }
+  function C(e, t, n) {
+    !e || typeof e != `object` || !(`postMessage` in e) || e.postMessage(n, t);
+  }
+  function w(t) {
+    return !e(t) || typeof t.requestId != `string` || typeof t.type != `string`
+      ? null
+      : { requestId: t.requestId, type: t.type, toolName: t.toolName, args: t.args };
+  }
+  function T(e, t) {
+    let n = v();
+    (n ? Promise.resolve(n.listTools()) : Promise.resolve([]))
+      .then((n) => {
+        C(t.source, t.origin, {
+          type: `webmcp.tools.list.response`,
+          requestId: e.requestId,
+          tools: Array.isArray(n) ? n : [],
+        });
+      })
+      .catch((n) => {
+        (c(`Failed to list tools:`, n),
+          C(t.source, t.origin, {
+            type: `webmcp.tools.list.response`,
+            requestId: e.requestId,
+            tools: [],
+            error: `Failed to list tools: ${n instanceof Error ? n.message : String(n)}`,
+          }));
+      });
+  }
+  let E = !1;
+  function D(t, n) {
+    if (E) return;
+    let r = _();
+    if (!r || typeof r.elicitInput != `function`) {
+      c(`Elicitation bridge not installed: elicitInput not available on modelContext`);
+      return;
+    }
+    ((r.elicitInput = (r, i) => {
+      let a = k();
+      return new Promise((i) => {
+        let o = () => {
+            (window.removeEventListener(`message`, l), clearTimeout(s));
+          },
+          s = setTimeout(() => {
+            (o(),
+              c(`Elicitation request timed out after 60s`),
+              i({ action: `decline`, content: null }));
+          }, 6e4),
+          l = (t) => {
+            if (t.origin !== n) return;
+            let r = t.data;
+            !e(r) ||
+              r.type !== `webmcp.elicitation.response` ||
+              r.callId !== a ||
+              (o(), i(e(r.result) ? r.result : { action: `decline`, content: null }));
+          };
+        (window.addEventListener(`message`, l),
+          t.postMessage({ type: `webmcp.elicitation.request`, callId: a, params: r }, n));
+      });
+    }),
+      (E = !0),
+      c(`Elicitation bridge installed`));
+  }
+  let O = 0;
+  function k() {
+    return ((O += 1), `elicit_${String(Date.now())}_${String(O)}`);
+  }
+  function A(t, n) {
+    let r = v();
+    if (!r) {
+      C(n.source, n.origin, {
+        type: `webmcp.tools.invoke.error`,
+        requestId: t.requestId,
+        error: `No WebMCP runtime found on this page`,
+      });
+      return;
+    }
+    (n.source && D(n.source, n.origin),
+      Promise.resolve(r.invoke(String(t.toolName ?? ``), m(t.args)))
+        .then((r) => {
+          C(n.source, n.origin, {
+            type: `webmcp.tools.invoke.response`,
+            requestId: t.requestId,
+            result: e(r) ? r : {},
+          });
         })
-        .catch((err) => {
-          console.warn('[webmcp-relay-embed] Failed to push tool changes:', err);
-        });
-    }, 0);
+        .catch((e) => {
+          C(n.source, n.origin, {
+            type: `webmcp.tools.invoke.error`,
+            requestId: t.requestId,
+            error: String(e instanceof Error ? e.message : e),
+          });
+        }));
   }
-
-  /**
-   * Subscribes to tool change events.
-   * Uses the testing API's toolchange event (EventTarget) which is supported
-   * by both native Chromium and the polyfill.
-   */
-  function subscribeToToolChanges() {
-    const testing = navigator.modelContextTesting;
-    if (testing && typeof testing.addEventListener === 'function') {
-      try {
-        testing.addEventListener('toolchange', onToolsChanged);
-        return;
-      } catch (error) {
-        console.warn('[webmcp-relay-embed] Failed to subscribe via addEventListener:', error);
-      }
-    }
-    console.warn(
-      '[webmcp-relay-embed] Could not subscribe to tool changes. Dynamic tool updates will not be relayed.'
-    );
-  }
-
-  /**
-   * @param {MessageEventSource | null} source
-   * @param {string} origin
-   * @param {JsonObject} payload
-   */
-  function respondToSource(source, origin, payload) {
-    if (!source || typeof source !== 'object' || !('postMessage' in source)) {
-      return;
-    }
-
-    const { postMessage } = source;
-    if (typeof postMessage !== 'function') {
-      return;
-    }
-
-    postMessage.call(source, payload, origin);
-  }
-
-  /**
-   * @param {unknown} value
-   * @returns {WidgetRequestMessage | null}
-   */
-  function parseWidgetRequest(value) {
-    if (
-      !isJsonObject(value) ||
-      typeof value.requestId !== 'string' ||
-      typeof value.type !== 'string'
-    ) {
-      return null;
-    }
-
-    return {
-      requestId: value.requestId,
-      type: value.type,
-      toolName: value.toolName,
-      args: value.args,
-    };
-  }
-
-  /**
-   * @param {WidgetRequestMessage} request
-   * @param {MessageEvent} event
-   */
-  function handleListRequest(request, event) {
-    const bridge = getToolBridge();
-    const toolsPromise = bridge ? Promise.resolve(bridge.listTools()) : Promise.resolve([]);
-
-    toolsPromise
-      .then((tools) => {
-        respondToSource(event.source, event.origin, {
-          type: 'webmcp.tools.list.response',
-          requestId: request.requestId,
-          tools: Array.isArray(tools) ? tools : [],
-        });
-      })
-      .catch((error) => {
-        console.warn('[webmcp-relay-embed] Failed to list tools:', error);
-        respondToSource(event.source, event.origin, {
-          type: 'webmcp.tools.list.response',
-          requestId: request.requestId,
-          tools: [],
-          error: `Failed to list tools: ${error instanceof Error ? error.message : String(error)}`,
-        });
-      });
-  }
-
-  /**
-   * @param {WidgetRequestMessage} request
-   * @param {MessageEvent} event
-   */
-  function handleInvokeRequest(request, event) {
-    const bridge = getToolBridge();
-    if (!bridge) {
-      respondToSource(event.source, event.origin, {
-        type: 'webmcp.tools.invoke.error',
-        requestId: request.requestId,
-        error: 'No WebMCP runtime found on this page',
-      });
-      return;
-    }
-
-    Promise.resolve(bridge.invoke(String(request.toolName ?? ''), toInvokeArgs(request.args)))
-      .then((result) => {
-        respondToSource(event.source, event.origin, {
-          type: 'webmcp.tools.invoke.response',
-          requestId: request.requestId,
-          result: isJsonObject(result) ? result : {},
-        });
-      })
-      .catch((error) => {
-        respondToSource(event.source, event.origin, {
-          type: 'webmcp.tools.invoke.error',
-          requestId: request.requestId,
-          error: String(error instanceof Error ? error.message : error),
-        });
-      });
-  }
-
-  /** @param {RelayConfig} cfg */
-  async function injectRelayWidget(cfg) {
-    if (document.querySelector(RELAY_IFRAME_SELECTOR)) {
-      return;
-    }
-
-    const searchParams = new URLSearchParams();
-    searchParams.set('tabId', cfg.tabId);
-    searchParams.set('hostOrigin', window.location.origin);
-    const cleanUrl = new URL(window.location.href);
-    cleanUrl.search = '';
-    cleanUrl.hash = '';
-    searchParams.set('hostUrl', cleanUrl.href);
-    searchParams.set('hostTitle', document.title || '');
-    searchParams.set('relayHost', cfg.relayHost);
-    searchParams.set('relayPort', cfg.relayPort);
-
-    // Try fetch + blob URL to work around CDNs serving .html as text/plain.
-    /** @type {string | null} */
-    let blobUrl = null;
+  async function j(e) {
+    if (document.querySelector(t)) return;
+    let n = new URLSearchParams();
+    (n.set(`tabId`, e.tabId), n.set(`hostOrigin`, window.location.origin));
+    let a = new URL(window.location.href);
+    ((a.search = ``),
+      (a.hash = ``),
+      n.set(`hostUrl`, a.href),
+      n.set(`hostTitle`, document.title || ``),
+      n.set(`relayHost`, e.relayHost),
+      n.set(`relayPort`, e.relayPort),
+      n.set(`autoConnect`, e.autoConnect ? `true` : `false`),
+      e.relayId && n.set(`relayId`, e.relayId),
+      e.relayWorkspace && n.set(`relayWorkspace`, e.relayWorkspace),
+      e.requestTimeout && n.set(`requestTimeout`, e.requestTimeout));
+    let o = null;
     try {
-      const response = await fetch(cfg.widgetUrl);
-      if (response.ok) {
-        const html = await response.text();
-        const configScript =
-          '<script>window.__WEBMCP_RELAY_CONFIG=' +
-          JSON.stringify(Object.fromEntries(searchParams)) +
-          ';</script>';
-        const blob = new Blob([html.replace('</head>', configScript + '</head>')], {
-          type: 'text/html',
-        });
-        blobUrl = URL.createObjectURL(blob);
-        config.widgetOrigin = window.location.origin;
+      let t = await fetch(e.widgetUrl);
+      if (!t.ok)
+        console.warn(
+          `[webmcp-relay-embed] Widget HTML fetch returned ${String(t.status)}; falling back to direct iframe src.`
+        );
+      else if (t.ok) {
+        let e = await t.text(),
+          r = `<script>window.__WEBMCP_RELAY_CONFIG=${JSON.stringify(Object.fromEntries(n))};</script>`,
+          a = new Blob([e.replace(`</head>`, `${r}</head>`)], { type: `text/html` });
+        ((o = URL.createObjectURL(a)), (i.widgetOrigin = window.location.origin));
       }
-    } catch (err) {
-      console.warn('[webmcp-relay-embed] Failed to fetch widget HTML for blob URL:', err);
+    } catch (e) {
+      c(`Failed to fetch widget HTML for blob URL:`, e);
     }
-
-    const iframe = document.createElement('iframe');
-    // Fallback: direct iframe src (works when widget.html is served as text/html).
-    iframe.src = blobUrl ?? cfg.widgetUrl + '?' + searchParams.toString();
-    iframe.style.display = 'none';
-    iframe.setAttribute('aria-hidden', 'true');
-    iframe.setAttribute('data-webmcp-relay', '1');
-    document.body.appendChild(iframe);
-    widgetWindow = iframe.contentWindow;
-    iframe.addEventListener('load', () => {
-      widgetWindow = iframe.contentWindow;
-      if (blobUrl) {
-        URL.revokeObjectURL(blobUrl);
+    let s = document.createElement(`iframe`);
+    ((s.src = o ?? `${e.widgetUrl}?${n.toString()}`),
+      (s.style.display = `none`),
+      s.setAttribute(`aria-hidden`, `true`),
+      s.setAttribute(`data-webmcp-relay`, `1`),
+      s.setAttribute(`allow`, `loopback-network; local-network; local-network-access`),
+      document.body.appendChild(s),
+      (r = s.contentWindow),
+      s.addEventListener(`load`, () => {
+        ((r = s.contentWindow), o && URL.revokeObjectURL(o));
+      }),
+      s.addEventListener(`error`, () => {
+        (console.error(
+          `[webmcp-relay-embed] Failed to load relay widget iframe from:`,
+          s.src,
+          `-- WebMCP tools will NOT be relayed. Check network connectivity and widget URL.`
+        ),
+          o && URL.revokeObjectURL(o));
+      }));
+  }
+  if (!document.querySelector(t)) {
+    try {
+      i = f(o);
+    } catch (e) {
+      throw (console.error(`[webmcp-relay-embed] Failed to initialize relay configuration:`, e), e);
+    }
+    window.addEventListener(`message`, (t) => {
+      if (t.origin !== i.widgetOrigin || !r || t.source !== r) return;
+      let n = t.data;
+      if (e(n) && n.type === `webmcp.reload`) {
+        window.location.reload();
+        return;
+      }
+      let a = w(t.data);
+      if (a) {
+        if (a.type === `webmcp.tools.list.request`) {
+          T(a, t);
+          return;
+        }
+        a.type === `webmcp.tools.invoke.request` && A(a, t);
       }
     });
-    iframe.addEventListener('error', () => {
-      console.error('[webmcp-relay-embed] Failed to load relay widget iframe from:', iframe.src);
-      if (blobUrl) {
-        URL.revokeObjectURL(blobUrl);
-      }
-    });
+    let t = () => {
+      j(i).catch((e) => {
+        console.error(`[webmcp-relay-embed] Failed to inject relay widget:`, e);
+      });
+    };
+    (document.body ? t() : document.addEventListener(`DOMContentLoaded`, t, { once: !0 }), S());
   }
-
-  if (document.querySelector(RELAY_IFRAME_SELECTOR)) {
-    return;
-  }
-
-  let config;
-  try {
-    config = buildRelayConfig(getCurrentScriptElement());
-  } catch (err) {
-    console.error('[webmcp-relay-embed] Failed to initialize relay configuration:', err);
-    return;
-  }
-
-  window.addEventListener('message', (event) => {
-    if (event.origin !== config.widgetOrigin) {
-      return;
-    }
-
-    const data = event.data;
-    if (isJsonObject(data) && data.type === 'webmcp.reload') {
-      window.location.reload();
-      return;
-    }
-
-    const request = parseWidgetRequest(event.data);
-    if (!request) {
-      return;
-    }
-
-    if (request.type === 'webmcp.tools.list.request') {
-      handleListRequest(request, event);
-      return;
-    }
-
-    if (request.type === 'webmcp.tools.invoke.request') {
-      handleInvokeRequest(request, event);
-    }
-  });
-
-  if (document.body) {
-    void injectRelayWidget(config);
-  } else {
-    document.addEventListener('DOMContentLoaded', () => void injectRelayWidget(config), {
-      once: true,
-    });
-  }
-
-  subscribeToToolChanges();
 })();

@@ -136,4 +136,28 @@ describe('parseCliOptions', () => {
     const options = parseCliOptions(argv);
     expect(options.host).toBe('0.0.0.0');
   });
+
+  it('parses --max-payload flag', () => {
+    const options = parseCliOptions(['--max-payload', '20000000']);
+    expect(options.maxPayloadBytes).toBe(20000000);
+  });
+
+  it('throws for non-numeric --max-payload', () => {
+    expect(() => parseCliOptions(['--max-payload', 'abc'])).toThrow('Invalid max-payload "abc"');
+  });
+
+  it('throws for zero --max-payload', () => {
+    expect(() => parseCliOptions(['--max-payload', '0'])).toThrow('Invalid max-payload "0"');
+  });
+
+  it('throws for negative --max-payload', () => {
+    expect(() => parseCliOptions(['--max-payload', '-5'])).toThrow(
+      'Missing value for --max-payload'
+    );
+  });
+
+  it('returns undefined maxPayloadBytes when --max-payload is not provided', () => {
+    const options = parseCliOptions([]);
+    expect(options.maxPayloadBytes).toBeUndefined();
+  });
 });

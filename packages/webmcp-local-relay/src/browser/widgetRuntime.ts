@@ -85,7 +85,8 @@ type RelayRuntimeState =
   | 'discovering'
   | 'connected'
   | 'retry-same-endpoint'
-  | 'rediscover';
+  | 'rediscover'
+  | 'dormant';
 
 const RECONNECT_INITIAL_DELAY_MS = 500;
 const RECONNECT_MAX_DELAY_MS = 3000;
@@ -93,6 +94,12 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 60000;
 const RELAY_SERVER_HELLO_TIMEOUT_MS = 1200;
 const RELAY_HELLO_ACK_TIMEOUT_MS = 250;
 const MAX_ENDPOINT_FAILURES_BEFORE_REDISCOVERY = 5;
+
+/** Delay between rediscovery attempts (ms). */
+const REDISCOVERY_DELAYS_MS = [10000, 20000, 30000];
+const MAX_DISCOVERY_CYCLES_BEFORE_DORMANT = REDISCOVERY_DELAYS_MS.length;
+/** Heartbeat probe interval while dormant (ms). */
+const DORMANT_HEARTBEAT_INTERVAL_MS = 120000;
 
 export function parseConfig(search = window.location.search): WidgetConfig | null {
   const params = new URLSearchParams(search);
@@ -433,6 +440,8 @@ export function runWidget(cfg: WidgetConfig): void {
   let reconnectDelayMs = RECONNECT_INITIAL_DELAY_MS;
   let scheduledReconnect: ReturnType<typeof setTimeout> | null = null;
   let state: RelayRuntimeState = 'idle';
+  let discoveryCycleCount = 0;
+  let dormantHeartbeatTimer: ReturnType<typeof setInterval> | null = null;
 
   const rejectPendingRequests = (reason: string): void => {
     for (const [requestId, pending] of pendingRequests) {
@@ -493,6 +502,7 @@ export function runWidget(cfg: WidgetConfig): void {
     activeEndpoint = endpoint;
     activeSocket = socket;
     reconnectDelayMs = RECONNECT_INITIAL_DELAY_MS;
+    discoveryCycleCount = 0;
     helloAccepted = false;
     setState('connected');
 
@@ -553,7 +563,6 @@ export function runWidget(cfg: WidgetConfig): void {
       }
 
       if (!isJsonObject(relayMessage) || typeof relayMessage.type !== 'string') {
-        console.debug('[webmcp-relay-widget] Ignoring non-object or untyped relay message');
         return;
       }
 
@@ -767,26 +776,136 @@ export function runWidget(cfg: WidgetConfig): void {
     }, delay);
   };
 
+  /**
+   * Schedules a full-range rediscovery attempt with increasing delays.
+   * After {@link MAX_DISCOVERY_CYCLES_BEFORE_DORMANT} failed cycles,
+   * transitions to dormant state.
+   */
   const scheduleRediscovery = (): void => {
     if (scheduledReconnect) {
       return;
     }
 
+    if (discoveryCycleCount >= MAX_DISCOVERY_CYCLES_BEFORE_DORMANT) {
+      enterDormant();
+      return;
+    }
+
     setState('rediscover');
-    const delay = Math.min(
-      RECONNECT_MAX_DELAY_MS,
-      Math.round(reconnectDelayMs * (0.85 + Math.random() * 0.3))
-    );
-    reconnectDelayMs = Math.min(Math.round(reconnectDelayMs * 1.5), RECONNECT_MAX_DELAY_MS);
+    const delay = REDISCOVERY_DELAYS_MS[discoveryCycleCount]!;
 
     scheduledReconnect = setTimeout(() => {
       scheduledReconnect = null;
       void discoverRelay().then((connected) => {
         if (!connected) {
+          discoveryCycleCount += 1;
           scheduleRediscovery();
         }
       });
     }, delay);
+  };
+
+  const onDormantVisibilityChange = (): void => {
+    if (document.visibilityState === 'visible' && state === 'dormant') {
+      wakeFromDormant();
+    }
+  };
+
+  const cleanupDormantListeners = (): void => {
+    document.removeEventListener('visibilitychange', onDormantVisibilityChange);
+    if (dormantHeartbeatTimer !== null) {
+      clearInterval(dormantHeartbeatTimer);
+      dormantHeartbeatTimer = null;
+    }
+  };
+
+  /**
+   * Enters dormant state — stops active reconnection and relies on
+   * visibilitychange events and periodic heartbeat probes to detect
+   * a relay that comes online later.
+   */
+  const enterDormant = (): void => {
+    if (state === 'dormant') {
+      return;
+    }
+
+    setState('dormant');
+
+    if (scheduledReconnect) {
+      clearTimeout(scheduledReconnect);
+      scheduledReconnect = null;
+    }
+
+    document.addEventListener('visibilitychange', onDormantVisibilityChange);
+
+    dormantHeartbeatTimer = setInterval(() => {
+      void heartbeatProbe();
+    }, DORMANT_HEARTBEAT_INTERVAL_MS);
+  };
+
+  /**
+   * Lightweight probe: only checks the configured port and cached endpoint,
+   * skipping a full-range discovery scan.
+   */
+  const heartbeatProbe = async (): Promise<void> => {
+    if (state !== 'dormant') {
+      return;
+    }
+
+    const seen = new Set<string>();
+    const candidates: Array<{ host: string; port: number }> = [];
+
+    const pushCandidate = (host: string, port: number): void => {
+      const key = `${host}:${String(port)}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      candidates.push({ host, port });
+    };
+
+    if (cfg.relayPortHint !== undefined) {
+      pushCandidate(cfg.relayHostHint, cfg.relayPortHint);
+    }
+
+    const cached = readCachedEndpoint(cfg);
+    if (cached) {
+      pushCandidate(cached.host, cached.port);
+    }
+
+    if (candidates.length === 0) {
+      return;
+    }
+
+    // Transition state and remove listeners to prevent concurrent event-driven wakes.
+    setState('discovering');
+    cleanupDormantListeners();
+
+    for (const candidate of candidates) {
+      const connected = await connectToEndpoint(candidate);
+      if (connected) {
+        discoveryCycleCount = 0;
+        return;
+      }
+    }
+
+    // Probe failed — go back to dormant.
+    enterDormant();
+  };
+
+  /**
+   * Wakes from dormant state: cleans up listeners, resets backoff
+   * counters, and runs a full-range discovery. Falls back to dormant
+   * again if discovery fails.
+   */
+  const wakeFromDormant = (): void => {
+    cleanupDormantListeners();
+    reconnectDelayMs = RECONNECT_INITIAL_DELAY_MS;
+    discoveryCycleCount = 0;
+
+    void discoverRelay().then((connected) => {
+      if (!connected) {
+        enterDormant();
+      }
+    });
   };
 
   window.addEventListener('message', (event: MessageEvent) => {
@@ -809,7 +928,9 @@ export function runWidget(cfg: WidgetConfig): void {
     }
 
     if (isJsonObject(data) && data.type === 'webmcp.connect') {
-      if (!activeSocket && state !== 'discovering') {
+      if (state === 'dormant') {
+        wakeFromDormant();
+      } else if (!activeSocket && state !== 'discovering') {
         void discoverRelay();
       }
       return;

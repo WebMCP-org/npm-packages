@@ -677,13 +677,6 @@ describe('widget runtime', () => {
       );
     });
 
-    connection.client.send(JSON.stringify(42));
-    await vi.waitFor(() => {
-      expect(debug).toHaveBeenCalledWith(
-        '[webmcp-relay-widget] Ignoring non-object or untyped relay message'
-      );
-    });
-
     connection.client.send(JSON.stringify({ type: 'ping' }));
     await vi.waitFor(() => {
       expect(connection.messages).toContainEqual({ type: 'pong' });
@@ -920,5 +913,277 @@ describe('widget runtime', () => {
     await waitForConnection(env);
 
     expect(warn).toHaveBeenCalledTimes(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Dormant reconnection tests
+// ---------------------------------------------------------------------------
+
+describe('dormant reconnection', () => {
+  /**
+   * Saves the original WebSocket constructor for restoration in afterEach.
+   * This describe block replaces WebSocket with a mock that always fails
+   * immediately, paired with fake timers to control delay progression.
+   */
+  let savedWebSocket: typeof WebSocket;
+  let wsUrls: string[];
+
+  /**
+   * Creates a MockWebSocket that always fails immediately.
+   * Fires error + close via queueMicrotask after construction so
+   * probeRelayEndpoint resolves to null without waiting.
+   */
+  function createFailingWebSocket(): typeof WebSocket {
+    return class MockWebSocket {
+      static readonly CONNECTING = 0;
+      static readonly OPEN = 1;
+      static readonly CLOSING = 2;
+      static readonly CLOSED = 3;
+      readonly CONNECTING = 0;
+      readonly OPEN = 1;
+      readonly CLOSING = 2;
+      readonly CLOSED = 3;
+      url: string;
+      readyState = 0;
+      protocol = '';
+      private _map = new Map<string, Array<{ fn: Function; once?: boolean }>>();
+
+      constructor(url: string, _protocols?: string | string[]) {
+        this.url = url;
+        wsUrls.push(url);
+        queueMicrotask(() => {
+          this.readyState = 3;
+          this._emit('error', new Event('error'));
+          this._emit('close', new CloseEvent('close'));
+        });
+      }
+
+      addEventListener(t: string, fn: Function, opts?: { once?: boolean }): void {
+        if (!this._map.has(t)) this._map.set(t, []);
+        this._map.get(t)!.push({ fn, once: opts?.once });
+      }
+
+      removeEventListener(t: string, fn: Function): void {
+        const arr = this._map.get(t);
+        if (!arr) return;
+        const i = arr.findIndex((e) => e.fn === fn);
+        if (i >= 0) arr.splice(i, 1);
+      }
+
+      close(): void {
+        this.readyState = 3;
+      }
+
+      send(_d: string): void {}
+
+      private _emit(t: string, ev: Event): void {
+        for (const e of [...(this._map.get(t) ?? [])]) {
+          e.fn(ev);
+          if (e.once) {
+            const arr = this._map.get(t)!;
+            const i = arr.indexOf(e);
+            if (i >= 0) arr.splice(i, 1);
+          }
+        }
+      }
+    } as unknown as typeof WebSocket;
+  }
+
+  interface DormantEnv {
+    docListeners: Map<string, Set<Function>>;
+    winListeners: Map<string, Set<Function>>;
+    setVisibility: (v: DocumentVisibilityState) => void;
+    fireDocEvent: (type: string) => void;
+    fireWinEvent: (type: string) => void;
+  }
+
+  /**
+   * Sets up a mock environment for dormant tests.
+   * Extends installEnvironment with:
+   * - document.addEventListener / removeEventListener (visibilitychange)
+   * - document.visibilityState getter
+   */
+  function setupDormantEnv(port = 9333): DormantEnv {
+    wsUrls = [];
+    const docListeners = new Map<string, Set<Function>>();
+    const winListeners = new Map<string, Set<Function>>();
+    let vis: DocumentVisibilityState = 'visible';
+
+    Object.defineProperty(globalThis, 'document', {
+      configurable: true,
+      writable: true,
+      value: {
+        referrer: '',
+        get visibilityState() {
+          return vis;
+        },
+        addEventListener(t: string, fn: Function) {
+          if (!docListeners.has(t)) docListeners.set(t, new Set());
+          docListeners.get(t)!.add(fn);
+        },
+        removeEventListener(t: string, fn: Function) {
+          docListeners.get(t)?.delete(fn);
+        },
+      },
+    });
+
+    const store = new Map<string, string>();
+    Object.defineProperty(globalThis, 'sessionStorage', {
+      configurable: true,
+      writable: true,
+      value: {
+        getItem: (k: string) => store.get(k) ?? null,
+        setItem: (k: string, v: string) => store.set(k, v),
+        removeItem: (k: string) => store.delete(k),
+        clear: () => store.clear(),
+      },
+    });
+
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      writable: true,
+      value: {
+        addEventListener(t: string, fn: Function) {
+          if (!winListeners.has(t)) winListeners.set(t, new Set());
+          winListeners.get(t)!.add(fn);
+        },
+        removeEventListener(t: string, fn: Function) {
+          winListeners.get(t)?.delete(fn);
+        },
+        location: {
+          search: buildSearch({
+            hostOrigin: APP_ORIGIN,
+            relayHost: '127.0.0.1',
+            relayPort: String(port),
+            tabId: 'tab-dormant',
+          }),
+        },
+        parent: { postMessage: vi.fn() },
+      },
+    });
+
+    return {
+      docListeners,
+      winListeners,
+      setVisibility(v: DocumentVisibilityState) {
+        vis = v;
+      },
+      fireDocEvent(type: string) {
+        for (const fn of docListeners.get(type) ?? []) fn(new Event(type));
+      },
+      fireWinEvent(type: string) {
+        for (const fn of winListeners.get(type) ?? []) fn(new Event(type));
+      },
+    };
+  }
+
+  /**
+   * Fast-forwards to dormant state.
+   * Initial discovery + 3 rediscovery rounds (10s + 20s + 30s delays) all fail → dormant.
+   * Mock WebSocket fails immediately via microtask; advanceTimersByTimeAsync advances delays.
+   */
+  async function fastForwardToDormant(): Promise<void> {
+    startWidgetRuntime();
+    // Total delay ≈ 60s (10 + 20 + 30); use 70s to ensure margin
+    await vi.advanceTimersByTimeAsync(70000);
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    savedWebSocket = globalThis.WebSocket;
+    globalThis.WebSocket = createFailingWebSocket();
+  });
+
+  afterEach(() => {
+    globalThis.WebSocket = savedWebSocket;
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    restoreGlobal('document', originalDescriptors.document);
+    restoreGlobal('sessionStorage', originalDescriptors.sessionStorage);
+    restoreGlobal('window', originalDescriptors.window);
+  });
+
+  it('enters dormant after 3 failed rediscovery cycles and stops connections', async () => {
+    setupDormantEnv();
+    await fastForwardToDormant();
+
+    // After entering dormant, no new connections within 60s (heartbeat interval is 120s)
+    wsUrls.length = 0;
+    await vi.advanceTimersByTimeAsync(60000);
+    expect(wsUrls).toHaveLength(0);
+  });
+
+  it('registers visibilitychange listener in dormant state', async () => {
+    const env = setupDormantEnv();
+    await fastForwardToDormant();
+
+    expect(env.docListeners.get('visibilitychange')?.size).toBe(1);
+  });
+
+  it('heartbeat only probes configured port, not full range', async () => {
+    setupDormantEnv(9333);
+    await fastForwardToDormant();
+
+    wsUrls.length = 0;
+    // Advance to heartbeat interval (120s) to trigger heartbeatProbe
+    await vi.advanceTimersByTimeAsync(120000);
+
+    // Heartbeat only probes configured port (1-2 connections), not full range scan (32)
+    expect(wsUrls.length).toBeGreaterThan(0);
+    expect(wsUrls.length).toBeLessThanOrEqual(2);
+    expect(wsUrls[0]).toContain('9333');
+  });
+
+  it('wakes from dormant on visibilitychange and re-enters dormant on failure', async () => {
+    const env = setupDormantEnv();
+    await fastForwardToDormant();
+
+    wsUrls.length = 0;
+    env.setVisibility('visible');
+    env.fireDocEvent('visibilitychange');
+    // After wake, runs full-range discovery
+    await vi.advanceTimersByTimeAsync(500);
+
+    // wakeFromDormant runs full-range discovery (32 candidate endpoints)
+    expect(wsUrls.length).toBeGreaterThan(2);
+    // After discovery failure, re-enters dormant; visibilitychange listener restored
+    expect(env.docListeners.get('visibilitychange')?.size).toBe(1);
+  });
+
+  it('wakes from dormant on webmcp.connect message', async () => {
+    const env = setupDormantEnv();
+    await fastForwardToDormant();
+
+    wsUrls.length = 0;
+    // Simulate host page sending webmcp.connect message
+    for (const fn of env.winListeners.get('message') ?? []) {
+      (fn as (event: { origin: string; data: unknown }) => void)({
+        origin: APP_ORIGIN,
+        data: { type: 'webmcp.connect' },
+      });
+    }
+    await vi.advanceTimersByTimeAsync(500);
+
+    expect(wsUrls.length).toBeGreaterThan(2);
+  });
+
+  it('does not duplicate listeners when re-entering dormant after wake failure', async () => {
+    const env = setupDormantEnv();
+    await fastForwardToDormant();
+
+    // First wake → discovery fails → re-enters dormant
+    env.setVisibility('visible');
+    env.fireDocEvent('visibilitychange');
+    await vi.advanceTimersByTimeAsync(500);
+
+    // Second wake → discovery fails → re-enters dormant
+    env.setVisibility('hidden');
+    env.setVisibility('visible');
+    env.fireDocEvent('visibilitychange');
+    await vi.advanceTimersByTimeAsync(500);
+
+    // visibilitychange listener should be exactly 1, not accumulated
+    expect(env.docListeners.get('visibilitychange')?.size).toBe(1);
   });
 });
