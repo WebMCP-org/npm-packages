@@ -114,9 +114,9 @@ function isDev(): boolean {
 }
 
 /**
- * On Chrome Beta 147 native (which ignores the second arg), aborting
- * the controller cannot remove the tool. Install `@mcp-b/global`
- * or `@mcp-b/webmcp-polyfill` there.
+ * On Chrome 147/148, aborting the controller does not remove the tool.
+ * Install `@mcp-b/global` or `@mcp-b/webmcp-polyfill` for those versions.
+ * Chrome 149+ works natively.
  */
 function registerToolWithCleanup(
   modelContext: ModelContextSurface,
