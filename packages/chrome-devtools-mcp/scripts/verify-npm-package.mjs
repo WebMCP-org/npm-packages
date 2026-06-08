@@ -4,19 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {execSync} from 'node:child_process';
+import { execSync } from 'node:child_process';
 
 // Checks that the selected build files are present using `npm pack --dry-run`.
 function verifyPackageContents() {
   try {
-    const output = execSync(
-      'npm pack --dry-run --json --silent --ignore-scripts',
-      {
-        encoding: 'utf8',
-      },
-    );
+    const output = execSync('npm pack --dry-run --json --silent --ignore-scripts', {
+      encoding: 'utf8',
+    });
     const data = JSON.parse(output.substring(output.indexOf('[')))[0];
-    const files = data.files.map(f => f.path);
+    const files = data.files.map((f) => f.path);
     // Check some important files.
     const requiredPaths = [
       'build/src/bin/chrome-devtools.js',
@@ -26,15 +23,11 @@ function verifyPackageContents() {
     ];
     for (const requiredPath of requiredPaths) {
       if (!files.includes(requiredPath)) {
-        console.error(
-          `Assertion Failed: "${requiredPath}" not found in tarball.`,
-        );
+        console.error(`Assertion Failed: "${requiredPath}" not found in tarball.`);
         process.exit(1);
       }
     }
-    console.log(
-      `npm pack --dry-run contained ${JSON.stringify(requiredPaths)}`,
-    );
+    console.log(`npm pack --dry-run contained ${JSON.stringify(requiredPaths)}`);
   } catch (err) {
     console.error('failed to parse npm pack output', err);
     process.exit(1);
