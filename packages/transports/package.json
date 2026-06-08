@@ -79,6 +79,7 @@
   },
   "dependencies": {
     "@mcp-b/webmcp-ts-sdk": "workspace:*",
+    "@modelcontextprotocol/sdk": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
