@@ -966,7 +966,7 @@ describe('dormant reconnection', () => {
       send(_d: string): void {}
 
       private _emit(t: string, ev: Event): void {
-        for (const e of [...(this.listeners.get(t) ?? [])]) {
+        for (const e of this.listeners.get(t) ?? []) {
           e.fn(ev);
           if (e.once) {
             const arr = this.listeners.get(t)!;
