@@ -101,7 +101,7 @@ export function CounterTool() {
 ## How `useWebMCP` Works
 
 - Registers a tool on mount with `document.modelContext.registerTool(tool, { signal })` and aborts the controller on unmount.
-- On Chrome 147/148, aborting the controller does not remove the tool. Install `@mcp-b/global` or `@mcp-b/webmcp-polyfill` for those versions. Chrome 149+ works natively.
+- On Chrome 147/148, aborting the controller does not remove the tool. Install `@mcp-b/global` or `@mcp-b/webmcp-polyfill` for those versions. Chrome 149+ removes the tool on abort in the native implementation.
 - Exposes local execution state:
   - `state.isExecuting`
   - `state.lastResult`
