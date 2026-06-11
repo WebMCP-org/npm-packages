@@ -240,6 +240,15 @@ function getToolBridge(): ToolBridge | null {
   return null;
 }
 
+function listRelayTools(): Promise<RelayToolDescriptor[]> {
+  const bridge = getToolBridge();
+  if (!bridge) {
+    return Promise.resolve([]);
+  }
+
+  return Promise.resolve(bridge.listTools()).then((tools) => (Array.isArray(tools) ? tools : []));
+}
+
 let toolSyncScheduled = false;
 let toolSyncPollTimer: ReturnType<typeof setInterval> | null = null;
 let lastToolsSnapshot = '';
@@ -264,16 +273,13 @@ function toolsSnapshot(tools: RelayToolDescriptor[]): string {
 
 function pushToolsIfChanged(): void {
   toolSyncScheduled = false;
-  const bridge = getToolBridge();
-  const toolsPromise = bridge ? Promise.resolve(bridge.listTools()) : Promise.resolve([]);
 
-  toolsPromise
+  listRelayTools()
     .then((tools) => {
-      const list = Array.isArray(tools) ? tools : [];
-      const nextSnapshot = toolsSnapshot(list);
+      const nextSnapshot = toolsSnapshot(tools);
       if (nextSnapshot === lastToolsSnapshot || !widgetWindow) return;
       lastToolsSnapshot = nextSnapshot;
-      widgetWindow.postMessage({ type: 'webmcp.tools.changed', tools: list }, config.widgetOrigin);
+      widgetWindow.postMessage({ type: 'webmcp.tools.changed', tools }, config.widgetOrigin);
     })
     .catch((err: unknown) => {
       debugWarn('Failed to sync tool changes:', err);
@@ -399,15 +405,12 @@ function parseWidgetRequest(value: unknown): WidgetRequestMessage | null {
 }
 
 function handleListRequest(request: WidgetRequestMessage, event: MessageEvent): void {
-  const bridge = getToolBridge();
-  const toolsPromise = bridge ? Promise.resolve(bridge.listTools()) : Promise.resolve([]);
-
-  toolsPromise
+  listRelayTools()
     .then((tools) => {
       respondToSource(event.source, event.origin, {
         type: 'webmcp.tools.list.response',
         requestId: request.requestId,
-        tools: Array.isArray(tools) ? tools : [],
+        tools,
       });
     })
     .catch((error: unknown) => {
@@ -486,10 +489,11 @@ function installElicitBridge(widgetSource: MessageEventSource, widgetOrigin: str
       };
       window.addEventListener('message', handler);
 
-      (widgetSource as Window).postMessage(
-        { type: 'webmcp.elicitation.request', callId, params },
-        widgetOrigin
-      );
+      respondToSource(widgetSource, widgetOrigin, {
+        type: 'webmcp.elicitation.request',
+        callId,
+        params,
+      });
     });
   };
 
@@ -571,14 +575,14 @@ async function injectRelayWidget(cfg: RelayConfig): Promise<void> {
       console.warn(
         `[webmcp-relay-embed] Widget HTML fetch returned ${String(response.status)}; falling back to direct iframe src.`
       );
-    } else if (response.ok) {
+    } else {
       const html = await response.text();
       const configScript = `<script>window.__WEBMCP_RELAY_CONFIG=${JSON.stringify(Object.fromEntries(searchParams))};</script>`;
       const blob = new Blob([html.replace('</head>', `${configScript}</head>`)], {
         type: 'text/html',
       });
       blobUrl = URL.createObjectURL(blob);
-      config.widgetOrigin = window.location.origin;
+      cfg.widgetOrigin = window.location.origin;
     }
   } catch (err) {
     debugWarn('Failed to fetch widget HTML for blob URL:', err);
