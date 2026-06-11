@@ -1881,4 +1881,38 @@ describe('RelayBridgeServer client mode', () => {
       await server.stop();
     }
   });
+
+  it('emits stateChanged only once when socket error triggers both error and close', async () => {
+    const bridge = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+    });
+
+    try {
+      await bridge.start();
+
+      const ws = await connectAndRegister(bridge, {
+        tabId: 'tab-double-close',
+        url: 'https://example.com',
+        tools: [{ name: 'tool_a', description: 'A tool' }],
+      });
+
+      await waitFor(() => bridge.registry.listTools()[0]?.name);
+
+      let stateChangedCount = 0;
+      bridge.on('stateChanged', () => {
+        stateChangedCount++;
+      });
+
+      ws.terminate();
+
+      await waitFor(() => (bridge.registry.listSources().length === 0 ? true : undefined));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(stateChangedCount).toBe(1);
+    } finally {
+      await bridge.stop();
+    }
+  });
 });
