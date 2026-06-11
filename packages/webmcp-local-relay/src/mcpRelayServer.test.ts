@@ -30,6 +30,25 @@ async function waitFor<T>(
   throw new Error('Timed out waiting for condition');
 }
 
+type ClientToolList = Awaited<ReturnType<Client['listTools']>>;
+type ClientTool = ClientToolList['tools'][number];
+
+async function waitForClientToolList(client: Client, toolName: string): Promise<ClientToolList> {
+  return waitFor(async () => {
+    const list = await client.listTools();
+    return list.tools.some((tool) => tool.name === toolName) ? list : undefined;
+  });
+}
+
+async function waitForClientTool(client: Client, toolName: string): Promise<ClientTool> {
+  const list = await waitForClientToolList(client, toolName);
+  const tool = list.tools.find((entry) => entry.name === toolName);
+  if (!tool) {
+    throw new Error(`Timed out waiting for client-visible tool ${toolName}`);
+  }
+  return tool;
+}
+
 /**
  * Extracts text items from MCP call tool result content.
  */
@@ -494,9 +513,7 @@ describe('LocalRelayMcpServer', () => {
 
     const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
 
-    const list = await client.listTools();
-    const tool = list.tools.find((t) => t.name === toolName);
-    expect(tool).toBeTruthy();
+    const tool = await waitForClientTool(client, toolName);
     expect(tool?.annotations?.readOnlyHint).toBe(true);
 
     ws.close();
@@ -527,9 +544,7 @@ describe('LocalRelayMcpServer', () => {
 
     const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
 
-    const list = await client.listTools();
-    const tool = list.tools.find((t) => t.name === toolName);
-    expect(tool).toBeTruthy();
+    const tool = await waitForClientTool(client, toolName);
     expect(tool?.inputSchema).toEqual({
       type: 'object',
       properties: {
@@ -943,9 +958,7 @@ describe('LocalRelayMcpServer', () => {
 
       const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
 
-      const list = await client.listTools();
-      const tool = list.tools.find((t) => t.name === toolName);
-      expect(tool).toBeTruthy();
+      const tool = await waitForClientTool(client, toolName);
       expect(tool?.inputSchema).toEqual({
         type: 'object',
         properties: {},
@@ -989,9 +1002,7 @@ describe('LocalRelayMcpServer', () => {
 
       const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
 
-      const list = await client.listTools();
-      const tool = list.tools.find((t) => t.name === toolName);
-      expect(tool).toBeTruthy();
+      const tool = await waitForClientTool(client, toolName);
       expect(tool?.inputSchema).toEqual(complexSchema);
 
       ws.close();
@@ -1018,9 +1029,7 @@ describe('LocalRelayMcpServer', () => {
 
       const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
 
-      const list = await client.listTools();
-      const tool = list.tools.find((t) => t.name === toolName);
-      expect(tool).toBeTruthy();
+      const tool = await waitForClientTool(client, toolName);
       expect(tool?.inputSchema).toEqual(inputSchema);
       expect((tool as Record<string, unknown>).outputSchema).toEqual(outputSchema);
 
@@ -1089,7 +1098,7 @@ describe('LocalRelayMcpServer', () => {
 
       const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
 
-      const list = await client.listTools();
+      const list = await waitForClientToolList(client, toolName);
 
       const expectedStaticSchemas: Record<string, Record<string, unknown>> = {
         webmcp_list_sources: publicInputSchemaFromZodShape(EMPTY_STATIC_TOOL_INPUT_SHAPE),
@@ -1107,7 +1116,6 @@ describe('LocalRelayMcpServer', () => {
 
       // Dynamic tool present with real schema
       const dynamicTool = list.tools.find((t) => t.name === toolName);
-      expect(dynamicTool).toBeTruthy();
       expect(dynamicTool?.inputSchema).toEqual(dynamicSchema);
 
       // Total count: 4 static + 1 dynamic
@@ -1138,8 +1146,7 @@ describe('LocalRelayMcpServer', () => {
       const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
 
       // Verify initial schema
-      const list1 = await client.listTools();
-      const tool1 = list1.tools.find((t) => t.name === toolName);
+      const tool1 = await waitForClientTool(client, toolName);
       expect(tool1?.inputSchema).toEqual(initialSchema);
 
       // Send updated schema
@@ -1184,7 +1191,10 @@ describe('LocalRelayMcpServer', () => {
       await waitFor(() => bridge.registry.listTools()[0]?.name);
 
       // Verify tool is listed
-      const list1 = await client.listTools();
+      const list1 = await waitFor(async () => {
+        const list = await client.listTools();
+        return list.tools.some((tool) => !tool.name.startsWith('webmcp_')) ? list : undefined;
+      });
       expect(list1.tools.find((t) => !t.name.startsWith('webmcp_'))).toBeTruthy();
 
       // Disconnect browser
@@ -1278,9 +1288,7 @@ describe('LocalRelayMcpServer', () => {
 
       const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
 
-      const list = await client.listTools();
-      const tool = list.tools.find((t) => t.name === toolName);
-      expect(tool).toBeTruthy();
+      const tool = await waitForClientTool(client, toolName);
       expect(tool?.inputSchema).toEqual(inputSchema);
       expect((tool as Record<string, unknown>).outputSchema).toEqual(outputSchema);
       expect(tool?.annotations?.readOnlyHint).toBe(true);
@@ -1301,9 +1309,7 @@ describe('LocalRelayMcpServer', () => {
 
       const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
 
-      const list = await client.listTools();
-      const tool = list.tools.find((t) => t.name === toolName);
-      expect(tool).toBeTruthy();
+      const tool = await waitForClientTool(client, toolName);
       expect(tool?.inputSchema).toEqual({
         type: 'object',
         properties: {},
@@ -1353,10 +1359,9 @@ describe('LocalRelayMcpServer', () => {
 
       const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
 
-      const list = await client.listTools();
+      const list = await waitForClientToolList(client, toolName);
       expect(list.tools).toHaveLength(5); // 4 static + 1 dynamic
       const tool = list.tools.find((t) => t.name === toolName);
-      expect(tool).toBeTruthy();
       expect(tool?.inputSchema).toEqual(finalSchema);
 
       ws.close();
