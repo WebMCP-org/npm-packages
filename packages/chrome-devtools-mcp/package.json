@@ -40,6 +40,7 @@
     "format": "eslint --cache --fix . && prettier --write --cache .",
     "gen": "npm run build && npm run docs:generate && npm run cli:generate && npm run format",
     "prepare": "node --experimental-strip-types scripts/prepare.ts",
+    "prepublishOnly": "npm run prepare && npm run bundle && npm run verify-npm-package",
     "start": "npm run build && node build/src/index.js",
     "start-debug": "DEBUG=mcp:* DEBUG_COLORS=false npm run build && node build/src/index.js",
     "test": "npm run build && node scripts/test.mjs",
