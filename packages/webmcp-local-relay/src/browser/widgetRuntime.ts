@@ -80,13 +80,7 @@ interface CachedRelayEndpoint {
   port: number;
 }
 
-type RelayRuntimeState =
-  | 'idle'
-  | 'discovering'
-  | 'connected'
-  | 'retry-same-endpoint'
-  | 'rediscover'
-  | 'dormant';
+type RelayRuntimePhase = 'idle' | 'discovering' | 'dormant';
 
 const RECONNECT_INITIAL_DELAY_MS = 500;
 const RECONNECT_MAX_DELAY_MS = 3000;
@@ -439,7 +433,7 @@ export function runWidget(cfg: WidgetConfig): void {
   let helloAckTimer: ReturnType<typeof setTimeout> | null = null;
   let reconnectDelayMs = RECONNECT_INITIAL_DELAY_MS;
   let scheduledReconnect: ReturnType<typeof setTimeout> | null = null;
-  let state: RelayRuntimeState = 'idle';
+  let phase: RelayRuntimePhase = 'idle';
   let discoveryCycleCount = 0;
   let dormantHeartbeatTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -449,10 +443,6 @@ export function runWidget(cfg: WidgetConfig): void {
       pendingRequests.delete(requestId);
       pending.reject(new Error(reason));
     }
-  };
-
-  const setState = (nextState: RelayRuntimeState): void => {
-    state = nextState;
   };
 
   function requestHost(baseType: string, payload: Record<string, unknown>): Promise<HostMessage> {
@@ -504,7 +494,7 @@ export function runWidget(cfg: WidgetConfig): void {
     reconnectDelayMs = RECONNECT_INITIAL_DELAY_MS;
     discoveryCycleCount = 0;
     helloAccepted = false;
-    setState('connected');
+    phase = 'idle';
 
     socket.addEventListener('message', (event) => {
       let relayMessage: Record<string, unknown>;
@@ -728,17 +718,23 @@ export function runWidget(cfg: WidgetConfig): void {
   };
 
   const discoverRelay = async (): Promise<boolean> => {
-    setState('discovering');
+    phase = 'discovering';
 
-    for (const candidate of buildDiscoveryCandidates(cfg)) {
-      const connected = await connectToEndpoint(candidate);
-      if (connected) {
-        consecutiveEndpointFailures = 0;
-        return true;
+    try {
+      for (const candidate of buildDiscoveryCandidates(cfg)) {
+        const connected = await connectToEndpoint(candidate);
+        if (connected) {
+          consecutiveEndpointFailures = 0;
+          return true;
+        }
+      }
+
+      return false;
+    } finally {
+      if (phase === 'discovering') {
+        phase = 'idle';
       }
     }
-
-    return false;
   };
 
   const scheduleRetrySameEndpoint = (): void => {
@@ -746,7 +742,6 @@ export function runWidget(cfg: WidgetConfig): void {
       return;
     }
 
-    setState('retry-same-endpoint');
     const retryEndpoint = {
       host: activeEndpoint.host,
       port: activeEndpoint.port,
@@ -791,7 +786,6 @@ export function runWidget(cfg: WidgetConfig): void {
       return;
     }
 
-    setState('rediscover');
     const delay = REDISCOVERY_DELAYS_MS[discoveryCycleCount]!;
 
     scheduledReconnect = setTimeout(() => {
@@ -806,7 +800,7 @@ export function runWidget(cfg: WidgetConfig): void {
   };
 
   const onDormantVisibilityChange = (): void => {
-    if (document.visibilityState === 'visible' && state === 'dormant') {
+    if (document.visibilityState === 'visible' && phase === 'dormant') {
       wakeFromDormant();
     }
   };
@@ -825,11 +819,11 @@ export function runWidget(cfg: WidgetConfig): void {
    * a relay that comes online later.
    */
   const enterDormant = (): void => {
-    if (state === 'dormant') {
+    if (phase === 'dormant') {
       return;
     }
 
-    setState('dormant');
+    phase = 'dormant';
 
     if (scheduledReconnect) {
       clearTimeout(scheduledReconnect);
@@ -848,7 +842,7 @@ export function runWidget(cfg: WidgetConfig): void {
    * skipping a full-range discovery scan.
    */
   const heartbeatProbe = async (): Promise<void> => {
-    if (state !== 'dormant') {
+    if (phase !== 'dormant') {
       return;
     }
 
@@ -876,7 +870,7 @@ export function runWidget(cfg: WidgetConfig): void {
     }
 
     // Transition state and remove listeners to prevent concurrent event-driven wakes.
-    setState('discovering');
+    phase = 'discovering';
     cleanupDormantListeners();
 
     for (const candidate of candidates) {
@@ -928,9 +922,9 @@ export function runWidget(cfg: WidgetConfig): void {
     }
 
     if (isJsonObject(data) && data.type === 'webmcp.connect') {
-      if (state === 'dormant') {
+      if (phase === 'dormant') {
         wakeFromDormant();
-      } else if (!activeSocket && state !== 'discovering') {
+      } else if (!activeSocket && phase !== 'discovering') {
         void discoverRelay();
       }
       return;
@@ -981,7 +975,5 @@ export function runWidget(cfg: WidgetConfig): void {
         scheduleRediscovery();
       }
     });
-  } else {
-    setState('idle');
   }
 }
