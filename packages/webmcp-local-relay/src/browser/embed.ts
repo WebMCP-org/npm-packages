@@ -18,14 +18,15 @@ import type {
   ToolListItem,
 } from '@mcp-b/webmcp-types';
 import { isJsonObject } from './shared.js';
-import {
-  createToolReconciler,
-  type RelayToolDescriptor,
-  type ToolReconciler,
-} from './reconciler.js';
 
 /** Loose JSON object: values aren't recursively typed since we just forward them. */
 type JsonObject = Record<string, unknown>;
+
+interface RelayToolDescriptor {
+  name: string;
+  description?: string;
+  inputSchema?: JsonObject;
+}
 
 interface ToolBridge {
   listTools: () => RelayToolDescriptor[] | Promise<RelayToolDescriptor[]>;
@@ -53,6 +54,7 @@ interface RelayConfig {
 
 const RELAY_IFRAME_SELECTOR = '[data-webmcp-relay]';
 const TAB_ID_STORAGE_KEY = '__webmcp_relay_tab_id';
+const TOOL_SYNC_POLL_INTERVAL_MS = 2000;
 const FALLBACK_WIDGET_URL =
   'https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay/dist/browser/widget.html';
 
@@ -238,36 +240,67 @@ function getToolBridge(): ToolBridge | null {
   return null;
 }
 
-let reconciler: ToolReconciler | null = null;
+let toolSyncScheduled = false;
+let toolSyncPollTimer: ReturnType<typeof setInterval> | null = null;
+let lastToolsSnapshot = '';
 
-function scheduleToolReconcile(): void {
-  reconciler?.scheduleReconcile();
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== 'object') {
+    return JSON.stringify(value) ?? 'undefined';
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(stableStringify).join(',')}]`;
+  }
+  const object = value as Record<string, unknown>;
+  return `{${Object.keys(object)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${stableStringify(object[key])}`)
+    .join(',')}}`;
 }
 
-function initReconciler(): void {
-  reconciler = createToolReconciler({
-    listTools() {
-      const bridge = getToolBridge();
-      return bridge ? bridge.listTools() : [];
-    },
-    onChanged(tools) {
-      if (!widgetWindow) return;
-      widgetWindow.postMessage({ type: 'webmcp.tools.changed', tools }, config.widgetOrigin);
-    },
-  });
+function toolsSnapshot(tools: RelayToolDescriptor[]): string {
+  return tools.map(stableStringify).sort().join('\n');
+}
+
+function pushToolsIfChanged(): void {
+  toolSyncScheduled = false;
+  const bridge = getToolBridge();
+  const toolsPromise = bridge ? Promise.resolve(bridge.listTools()) : Promise.resolve([]);
+
+  toolsPromise
+    .then((tools) => {
+      const list = Array.isArray(tools) ? tools : [];
+      const nextSnapshot = toolsSnapshot(list);
+      if (nextSnapshot === lastToolsSnapshot || !widgetWindow) return;
+      lastToolsSnapshot = nextSnapshot;
+      widgetWindow.postMessage({ type: 'webmcp.tools.changed', tools: list }, config.widgetOrigin);
+    })
+    .catch((err: unknown) => {
+      debugWarn('Failed to sync tool changes:', err);
+    });
+}
+
+function scheduleToolSync(): void {
+  if (toolSyncScheduled) return;
+  toolSyncScheduled = true;
+  setTimeout(pushToolsIfChanged, 0);
+}
+
+function startToolSyncPolling(): void {
+  if (toolSyncPollTimer) return;
+  toolSyncPollTimer = setInterval(scheduleToolSync, TOOL_SYNC_POLL_INTERVAL_MS);
 }
 
 // Subscribe on BOTH modelContext and modelContextTesting (non-exclusive).
 // Chrome native fires toolchange on modelContextTesting; the polyfill fires on
 // modelContext. We subscribe to all available surfaces so no event is missed.
 function trySubscribe(): boolean {
-  if (!reconciler) return false;
   let subscribed = false;
 
   const mc = getExtendedModelContext();
   if (mc) {
     try {
-      mc.addEventListener('toolchange', scheduleToolReconcile);
+      mc.addEventListener('toolchange', scheduleToolSync);
       subscribed = true;
     } catch (error) {
       debugWarn('addEventListener on modelContext threw:', error);
@@ -280,14 +313,14 @@ function trySubscribe(): boolean {
   if (testing) {
     if (typeof testing.addEventListener === 'function') {
       try {
-        testing.addEventListener('toolchange', scheduleToolReconcile);
+        testing.addEventListener('toolchange', scheduleToolSync);
         subscribed = true;
       } catch (error) {
         debugWarn('addEventListener on modelContextTesting threw:', error);
       }
     } else if (typeof testing.registerToolsChangedCallback === 'function') {
       try {
-        testing.registerToolsChangedCallback(scheduleToolReconcile);
+        testing.registerToolsChangedCallback(scheduleToolSync);
         subscribed = true;
       } catch (error) {
         debugWarn('Failed to subscribe via registerToolsChangedCallback:', error);
@@ -302,9 +335,8 @@ function trySubscribe(): boolean {
 // AbortSignal only, which does NOT fire a toolchange event. Polling every 2s
 // ensures we still detect those silent removals within a bounded delay.
 function subscribeToToolChanges(): void {
-  initReconciler();
-  reconciler!.startPolling();
-  reconciler!.scheduleReconcile();
+  startToolSyncPolling();
+  scheduleToolSync();
 
   if (trySubscribe()) {
     return;
