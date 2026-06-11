@@ -27,6 +27,7 @@ const bridgeOptions = {
   ...(options.label ? { label: options.label } : {}),
   ...(options.relayId ? { relayId: options.relayId } : {}),
   ...(options.workspace ? { workspace: options.workspace } : {}),
+  ...(options.maxPayloadBytes ? { maxPayloadBytes: options.maxPayloadBytes } : {}),
 };
 
 const relay = new LocalRelayMcpServer({
