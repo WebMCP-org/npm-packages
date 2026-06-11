@@ -18,21 +18,14 @@ import type {
   ToolListItem,
 } from '@mcp-b/webmcp-types';
 import { isJsonObject } from './shared.js';
+import {
+  createToolReconciler,
+  type RelayToolDescriptor,
+  type ToolReconciler,
+} from './reconciler.js';
 
-/** Loose JSON object — values aren't recursively typed since we just forward them. */
+/** Loose JSON object: values aren't recursively typed since we just forward them. */
 type JsonObject = Record<string, unknown>;
-
-/**
- * Minimal tool shape sent to the relay widget — just name, description, and
- * a JSON-object inputSchema. Intentionally looser than ToolListItem so both
- * modelContext (ToolListItem) and modelContextTesting (string schema) can
- * be normalised into the same shape.
- */
-interface RelayToolDescriptor {
-  name: string;
-  description?: string;
-  inputSchema?: JsonObject;
-}
 
 interface ToolBridge {
   listTools: () => RelayToolDescriptor[] | Promise<RelayToolDescriptor[]>;
@@ -245,58 +238,74 @@ function getToolBridge(): ToolBridge | null {
   return null;
 }
 
-let pushScheduled = false;
+let reconciler: ToolReconciler | null = null;
 
-function onToolsChanged(): void {
-  if (pushScheduled || !widgetWindow) return;
-  pushScheduled = true;
-  setTimeout(() => {
-    pushScheduled = false;
-    if (!widgetWindow) return;
-    const bridge = getToolBridge();
-    const toolsPromise = bridge ? Promise.resolve(bridge.listTools()) : Promise.resolve([]);
-    toolsPromise
-      .then((tools) => {
-        if (!widgetWindow) return;
-        widgetWindow.postMessage(
-          {
-            type: 'webmcp.tools.changed',
-            tools: Array.isArray(tools) ? tools : [],
-          },
-          config.widgetOrigin
-        );
-      })
-      .catch((err: unknown) => {
-        debugWarn('Failed to push tool changes:', err);
-      });
-  }, 0);
+function scheduleToolReconcile(): void {
+  reconciler?.scheduleReconcile();
 }
 
+function initReconciler(): void {
+  reconciler = createToolReconciler({
+    listTools() {
+      const bridge = getToolBridge();
+      return bridge ? bridge.listTools() : [];
+    },
+    onChanged(tools) {
+      if (!widgetWindow) return;
+      widgetWindow.postMessage({ type: 'webmcp.tools.changed', tools }, config.widgetOrigin);
+    },
+  });
+}
+
+// Subscribe on BOTH modelContext and modelContextTesting (non-exclusive).
+// Chrome native fires toolchange on modelContextTesting; the polyfill fires on
+// modelContext. We subscribe to all available surfaces so no event is missed.
 function trySubscribe(): boolean {
+  if (!reconciler) return false;
+  let subscribed = false;
+
   const mc = getExtendedModelContext();
   if (mc) {
     try {
-      mc.addEventListener('toolchange', onToolsChanged);
-      return true;
+      mc.addEventListener('toolchange', scheduleToolReconcile);
+      subscribed = true;
     } catch (error) {
-      debugWarn('addEventListener threw:', error);
+      debugWarn('addEventListener on modelContext threw:', error);
     }
   }
+
   const testing = navigator.modelContextTesting as
     | (typeof navigator.modelContextTesting & Partial<ModelContextTestingPolyfillExtensions>)
     | undefined;
-  if (testing && typeof testing.registerToolsChangedCallback === 'function') {
-    try {
-      testing.registerToolsChangedCallback(onToolsChanged);
-      return true;
-    } catch (error) {
-      debugWarn('Failed to subscribe via registerToolsChangedCallback:', error);
+  if (testing) {
+    if (typeof testing.addEventListener === 'function') {
+      try {
+        testing.addEventListener('toolchange', scheduleToolReconcile);
+        subscribed = true;
+      } catch (error) {
+        debugWarn('addEventListener on modelContextTesting threw:', error);
+      }
+    } else if (typeof testing.registerToolsChangedCallback === 'function') {
+      try {
+        testing.registerToolsChangedCallback(scheduleToolReconcile);
+        subscribed = true;
+      } catch (error) {
+        debugWarn('Failed to subscribe via registerToolsChangedCallback:', error);
+      }
     }
   }
-  return false;
+
+  return subscribed;
 }
 
+// Polling fallback: Chrome 148+ removed unregisterTool(); tools are removed via
+// AbortSignal only, which does NOT fire a toolchange event. Polling every 2s
+// ensures we still detect those silent removals within a bounded delay.
 function subscribeToToolChanges(): void {
+  initReconciler();
+  reconciler!.startPolling();
+  reconciler!.scheduleReconcile();
+
   if (trySubscribe()) {
     return;
   }
@@ -315,7 +324,7 @@ function subscribeToToolChanges(): void {
 
       if (retries >= MAX_RETRIES) {
         debugWarn(
-          `Could not subscribe to tool changes after ${MAX_RETRIES} retries. Dynamic tool updates will not be relayed.`
+          `Could not subscribe to tool changes after ${MAX_RETRIES} retries. Dynamic tool updates will rely on polling.`
         );
         return;
       }
@@ -619,4 +628,10 @@ if (!document.querySelector(RELAY_IFRAME_SELECTOR)) {
   }
 
   subscribeToToolChanges();
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && widgetWindow) {
+      widgetWindow.postMessage({ type: 'webmcp.connect' }, config.widgetOrigin);
+    }
+  });
 }
