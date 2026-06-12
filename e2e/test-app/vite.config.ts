@@ -9,6 +9,11 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, 'index.html'),
         'runtime-contract': resolve(__dirname, 'runtime-contract.html'),
+        'runtime-contract-image-polyfill': resolve(
+          __dirname,
+          'runtime-contract-image-polyfill.html'
+        ),
+        'runtime-contract-image-native': resolve(__dirname, 'runtime-contract-image-native.html'),
         'runtime-contract-iframe-child': resolve(__dirname, 'runtime-contract-iframe-child.html'),
         'runtime-contract-iframe-client': resolve(__dirname, 'runtime-contract-iframe-client.html'),
         'codemode-webmcp': resolve(__dirname, 'codemode-webmcp.html'),

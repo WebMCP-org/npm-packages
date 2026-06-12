@@ -20,6 +20,7 @@ const TOOL_INVOCATION_FAILED_MESSAGE =
   'Tool was executed but the invocation failed. For example, the script function threw an error';
 const TOOL_CANCELLED_MESSAGE = 'Tool was cancelled';
 const DEFAULT_INPUT_SCHEMA: InputSchema = { type: 'object', properties: {} };
+const DEFAULT_IMAGE_MIME_TYPE = 'image/png';
 const STANDARD_JSON_SCHEMA_TARGETS = ['draft-2020-12', 'draft-07'] as const;
 /** WebMCP §4.2 tool name: ASCII alnum, underscore, hyphen, period; 1–128 code points. */
 const VALID_TOOL_NAME_RE = /^[A-Za-z0-9_\-.]{1,128}$/u;
@@ -268,7 +269,8 @@ class StrictWebMCPContext extends EventTarget {
       if (normalizeResult) {
         return toSerializedTestingResult(normalizeToolResponse(rawResult));
       }
-      const serialized = JSON.stringify(rawResult);
+      const webMCPResult = await normalizeWebMCPExecutionResult(rawResult);
+      const serialized = JSON.stringify(webMCPResult);
       return serialized === undefined ? null : serialized;
     } catch (error) {
       const detail =
@@ -832,6 +834,158 @@ function serializeTextContent(value: unknown): string {
   } catch {
     return String(value);
   }
+}
+
+interface SerializedImageValue {
+  type: 'image';
+  data: string;
+  mimeType: string;
+}
+
+function isBlobValue(value: unknown): value is Blob {
+  return typeof Blob !== 'undefined' && value instanceof Blob;
+}
+
+function isCanvasElement(value: unknown): value is HTMLCanvasElement {
+  return typeof HTMLCanvasElement !== 'undefined' && value instanceof HTMLCanvasElement;
+}
+
+function isImageElement(value: unknown): value is HTMLImageElement {
+  return typeof HTMLImageElement !== 'undefined' && value instanceof HTMLImageElement;
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  const chunkSize = 0x8000;
+  let binary = '';
+
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+  }
+
+  return btoa(binary);
+}
+
+function getImageMimeType(value: Record<string, unknown>): string | undefined {
+  // Mirrors native IDL dictionary conversion: the member is absent when
+  // undefined, and any other value stringifies.
+  const mimeType = value.mimeType;
+  if (mimeType === undefined) {
+    return undefined;
+  }
+
+  return String(mimeType).trim() || undefined;
+}
+
+async function blobToSerializedImage(
+  blob: Blob,
+  explicitMimeType?: string
+): Promise<SerializedImageValue> {
+  const mimeType = explicitMimeType || blob.type;
+  if (!mimeType) {
+    throw new TypeError('Image Blob output requires a mimeType or Blob.type');
+  }
+
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  return {
+    type: 'image',
+    data: bytesToBase64(bytes),
+    mimeType,
+  };
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement, mimeType: string): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    try {
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          reject(new Error('Canvas image serialization returned no Blob'));
+          return;
+        }
+        resolve(blob);
+      }, mimeType);
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
+async function canvasToSerializedImage(
+  canvas: HTMLCanvasElement,
+  mimeType = DEFAULT_IMAGE_MIME_TYPE
+): Promise<SerializedImageValue> {
+  const blob = await canvasToBlob(canvas, mimeType);
+  return blobToSerializedImage(blob, blob.type || DEFAULT_IMAGE_MIME_TYPE);
+}
+
+async function imageElementToSerializedImage(
+  image: HTMLImageElement,
+  mimeType = DEFAULT_IMAGE_MIME_TYPE
+): Promise<SerializedImageValue> {
+  if (typeof image.decode === 'function') {
+    await image.decode();
+  }
+
+  if (!image.complete || image.naturalWidth <= 0 || image.naturalHeight <= 0) {
+    throw new Error('Image element output must be loaded before serialization');
+  }
+
+  const canvas = image.ownerDocument.createElement('canvas');
+  canvas.width = image.naturalWidth;
+  canvas.height = image.naturalHeight;
+  const context = canvas.getContext('2d');
+  if (!context) {
+    throw new Error('2D canvas context is unavailable for image serialization');
+  }
+  context.drawImage(image, 0, 0);
+  return canvasToSerializedImage(canvas, mimeType);
+}
+
+async function normalizeWebMCPImageValue(value: Record<string, unknown>): Promise<unknown> {
+  // The accepted input shapes mirror the native implementation: the
+  // serialized MCP-style {type, data, mimeType} form passes through, and the
+  // Prompt-API-style {type, value, mimeType?} form carries a live browser
+  // source to serialize.
+  const data = value.data;
+  const mimeType = getImageMimeType(value);
+
+  if (data !== undefined) {
+    if (!mimeType) {
+      throw new TypeError('Image output value must include data and mimeType');
+    }
+    return {
+      type: 'image',
+      data: String(data),
+      mimeType,
+    } satisfies SerializedImageValue;
+  }
+
+  const source = value.value;
+  if (source === undefined) {
+    throw new TypeError(
+      'Image output value must include data and mimeType, or a Blob, HTMLCanvasElement, or ' +
+        'HTMLImageElement value'
+    );
+  }
+
+  if (isBlobValue(source)) {
+    return blobToSerializedImage(source, mimeType);
+  }
+  if (isCanvasElement(source)) {
+    return canvasToSerializedImage(source, mimeType ?? DEFAULT_IMAGE_MIME_TYPE);
+  }
+  if (isImageElement(source)) {
+    return imageElementToSerializedImage(source, mimeType ?? DEFAULT_IMAGE_MIME_TYPE);
+  }
+
+  throw new TypeError('Image output value must be a Blob, HTMLCanvasElement, or HTMLImageElement');
+}
+
+async function normalizeWebMCPExecutionResult(value: unknown): Promise<unknown> {
+  if (isPlainObject(value) && value.type === 'image') {
+    return normalizeWebMCPImageValue(value);
+  }
+
+  return value;
 }
 
 function normalizeToolResponse(value: unknown): ToolResponse {

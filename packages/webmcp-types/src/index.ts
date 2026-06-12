@@ -21,9 +21,12 @@ export type {
   RegistrationHandle,
   ResourceContents,
   ResourceLink,
+  SerializedImageValue,
+  SourceImageValue,
   TextContent,
   TextResourceContents,
   ToolResponse,
+  WebMCPImageValue,
 } from './common.js';
 export type {
   InferArgsFromInputSchema,

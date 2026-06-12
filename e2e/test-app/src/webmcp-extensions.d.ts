@@ -7,6 +7,7 @@ declare module '@mcp-b/webmcp-types' {
     listTools(): ToolListItem[];
     executeTool(name: string, args?: Record<string, unknown>): Promise<ToolResponse>;
     callTool(params: { name: string; arguments?: Record<string, unknown> }): Promise<ToolResponse>;
+    unregisterTool(name: string): void;
     createMessage(params: unknown): Promise<unknown>;
     elicitInput(params: unknown): Promise<unknown>;
     registerResource(descriptor: {

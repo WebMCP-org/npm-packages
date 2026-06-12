@@ -286,6 +286,9 @@ importers:
       '@mcp-b/transports':
         specifier: workspace:*
         version: link:../../packages/transports
+      '@mcp-b/webmcp-polyfill':
+        specifier: workspace:*
+        version: link:../../packages/webmcp-polyfill
       '@mcp-b/webmcp-ts-sdk':
         specifier: workspace:*
         version: link:../../packages/webmcp-ts-sdk
