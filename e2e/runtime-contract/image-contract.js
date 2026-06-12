@@ -4,7 +4,9 @@ export const IMAGE_TEXT_SMOKE_TOOL_NAME = 'image_text_smoke';
 export const GET_SERIALIZED_PNG_TOOL_NAME = 'get_serialized_png';
 export const GET_BLOB_PNG_TOOL_NAME = 'get_blob_png';
 export const GET_CANVAS_PNG_TOOL_NAME = 'get_canvas_png';
+export const GET_CANVAS_JPEG_TOOL_NAME = 'get_canvas_jpeg';
 export const GET_CANVAS_UNSUPPORTED_MIME_TYPE_TOOL_NAME = 'get_canvas_unsupported_mime_type';
+export const GET_IMAGE_ARRAY_TOOL_NAME = 'get_image_array';
 export const GET_IMAGE_ELEMENT_PNG_TOOL_NAME = 'get_image_element_png';
 export const DESCRIBE_INPUT_IMAGE_TOOL_NAME = 'describe_input_image';
 export const GET_UNSUPPORTED_IMAGE_SOURCE_TOOL_NAME = 'get_unsupported_image_source';
@@ -38,6 +40,19 @@ function base64ToBytes(base64) {
     bytes[index] = binary.charCodeAt(index);
   }
   return bytes;
+}
+
+function createFilledCanvas(fillStyle) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1;
+  canvas.height = 1;
+  const context = canvas.getContext('2d');
+  if (!context) {
+    throw new Error('2D canvas context is unavailable');
+  }
+  context.fillStyle = fillStyle;
+  context.fillRect(0, 0, 1, 1);
+  return canvas;
 }
 
 function loadImageFromBase64(base64) {
@@ -131,18 +146,25 @@ export function createImageToolDescriptors(state, options = {}) {
         },
         async execute(args) {
           recordInvocation(state, GET_CANVAS_PNG_TOOL_NAME, normalizeArguments(args));
-          const canvas = document.createElement('canvas');
-          canvas.width = 1;
-          canvas.height = 1;
-          const context = canvas.getContext('2d');
-          if (!context) {
-            throw new Error('2D canvas context is unavailable');
-          }
-          context.fillStyle = '#ff0000';
-          context.fillRect(0, 0, 1, 1);
           return {
             type: 'image',
-            value: canvas,
+            value: createFilledCanvas('#ff0000'),
+          };
+        },
+      },
+      {
+        name: GET_CANVAS_JPEG_TOOL_NAME,
+        description: 'Return a canvas image value with a requested JPEG MIME type.',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+        },
+        async execute(args) {
+          recordInvocation(state, GET_CANVAS_JPEG_TOOL_NAME, normalizeArguments(args));
+          return {
+            type: 'image',
+            value: createFilledCanvas('#0000ff'),
+            mimeType: 'image/jpeg',
           };
         },
       },
@@ -159,20 +181,30 @@ export function createImageToolDescriptors(state, options = {}) {
             GET_CANVAS_UNSUPPORTED_MIME_TYPE_TOOL_NAME,
             normalizeArguments(args)
           );
-          const canvas = document.createElement('canvas');
-          canvas.width = 1;
-          canvas.height = 1;
-          const context = canvas.getContext('2d');
-          if (!context) {
-            throw new Error('2D canvas context is unavailable');
-          }
-          context.fillStyle = '#00ff00';
-          context.fillRect(0, 0, 1, 1);
           return {
             type: 'image',
-            value: canvas,
+            value: createFilledCanvas('#00ff00'),
             mimeType: 'image/unsupported',
           };
+        },
+      },
+      {
+        name: GET_IMAGE_ARRAY_TOOL_NAME,
+        description: 'Return an array containing an image value.',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+        },
+        async execute(args) {
+          recordInvocation(state, GET_IMAGE_ARRAY_TOOL_NAME, normalizeArguments(args));
+          return [
+            {
+              type: 'image',
+              value: new Blob([base64ToBytes(ONE_BY_ONE_PNG_BASE64)], {
+                type: 'image/png',
+              }),
+            },
+          ];
         },
       },
       {

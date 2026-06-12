@@ -3,8 +3,10 @@ import {
   DESCRIBE_INPUT_IMAGE_TOOL_NAME,
   GET_BLOB_PNG_TOOL_NAME,
   GET_BLOB_WITHOUT_MIME_TYPE_TOOL_NAME,
+  GET_CANVAS_JPEG_TOOL_NAME,
   GET_CANVAS_PNG_TOOL_NAME,
   GET_CANVAS_UNSUPPORTED_MIME_TYPE_TOOL_NAME,
+  GET_IMAGE_ARRAY_TOOL_NAME,
   GET_IMAGE_ELEMENT_PNG_TOOL_NAME,
   GET_SERIALIZED_PNG_TOOL_NAME,
   GET_SERIALIZED_WITHOUT_MIME_TYPE_TOOL_NAME,
@@ -217,6 +219,22 @@ test.describe('Runtime Contract - Image Values', () => {
     expectPngImageValue(result);
   });
 
+  test('honors a supported requested MIME type for canvas-backed image values', async ({
+    page,
+  }) => {
+    await skipUnlessBrowserSourceImages(page);
+
+    const result = await executeDocumentTool(page, GET_CANVAS_JPEG_TOOL_NAME, {});
+
+    expect(result).toMatchObject({
+      type: 'image',
+      mimeType: 'image/jpeg',
+    });
+    const data = (result as { data: string }).data;
+    const bytes = Buffer.from(data, 'base64');
+    expect([...bytes.subarray(0, 3)]).toEqual([255, 216, 255]);
+  });
+
   test('reports the actual encoded MIME type for unsupported canvas MIME requests', async ({
     page,
   }) => {
@@ -251,6 +269,17 @@ test.describe('Runtime Contract - Image Values', () => {
       mimeType: 'image/png',
       dataLength: ONE_BY_ONE_PNG_BASE64.length,
     });
+  });
+
+  test('serializes only top-level image values, not values nested in arrays', async ({ page }) => {
+    const result = await executeDocumentTool(page, GET_IMAGE_ARRAY_TOOL_NAME, {});
+
+    // Image detection applies to the top-level result value only; nested
+    // values go through ordinary JSON serialization (a Blob serializes to
+    // an empty object). This holds whether or not the runtime supports
+    // browser-source image serialization.
+    expect(Array.isArray(result)).toBe(true);
+    expect(result).toEqual([{ type: 'image', value: {} }]);
   });
 
   test('rejects unsupported image source values with a clear execution error', async ({ page }) => {
