@@ -50,7 +50,7 @@ Do not bypass validation with assertion chains (`as any`, `as unknown as`, blind
 ### 2.3 Contracts stay synchronized
 
 - If exported types or runtime behavior change in one package, update all dependent package boundaries in the same change.
-- If `navigator.modelContext` or testing helper behavior changes, update type surfaces, docs, and conformance tests together.
+- If `document.modelContext` (or its deprecated `navigator.modelContext` alias) or testing helper behavior changes, update type surfaces, docs, and conformance tests together.
 - If shared definitions cross package boundaries, move them into the canonical package rather than cloning.
 
 ### 2.4 Bounded behavior over implicit behavior

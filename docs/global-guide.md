@@ -61,7 +61,7 @@ The Web Model Context API follows the same patterns as other browser APIs.
       // Feature detection (like navigator.geolocation)
       if ('modelContext' in navigator) {
         // Register tools with the Web Model Context API
-        navigator.modelContext.provideContext({
+        document.modelContext.provideContext({
           tools: [
             {
               name: 'counter_get',
@@ -124,7 +124,7 @@ Like `navigator.permissions.query()`, you can register tools one at a time:
 
 ```javascript
 if ('modelContext' in navigator) {
-  navigator.modelContext.registerTool({
+  document.modelContext.registerTool({
     name: 'get_page_info',
     description: 'Get information about the current page',
     inputSchema: { type: 'object', properties: {} },
@@ -154,7 +154,7 @@ Similar to other DOM events, you can listen for tool calls:
 
 ```javascript
 if ('modelContext' in navigator) {
-  navigator.modelContext.addEventListener('toolcall', (event) => {
+  document.modelContext.addEventListener('toolcall', (event) => {
     console.log(`Tool "${event.name}" called with:`, event.arguments);
 
     if (event.name === 'custom_handler') {
@@ -259,7 +259,7 @@ Save this as `index.html` and open in a browser:
       };
 
       if ('modelContext' in navigator) {
-        navigator.modelContext.provideContext({
+        document.modelContext.provideContext({
           tools: [
             {
               name: 'notes_list',
@@ -357,12 +357,12 @@ The polyfill exposes `initializeWebModelContext(options?)` to control transport 
 
 `initializeWebModelContext()` is run-once and safe to call multiple times on the same page.
 
-| Page state before inject                   | Result                                       |
-| ------------------------------------------ | -------------------------------------------- |
-| `@mcp-b/global` already initialized        | No-op (first init wins)                      |
-| Native WebMCP available                    | Native adapter mode (single bridge instance) |
-| `@mcp-b/webmcp-polyfill` already installed | Attach-only bridge mode                      |
-| Custom existing `navigator.modelContext`   | Attach-only bridge mode                      |
+| Page state before inject                                                                   | Result                                       |
+| ------------------------------------------------------------------------------------------ | -------------------------------------------- |
+| `@mcp-b/global` already initialized                                                        | No-op (first init wins)                      |
+| Native WebMCP available                                                                    | Native adapter mode (single bridge instance) |
+| `@mcp-b/webmcp-polyfill` already installed                                                 | Attach-only bridge mode                      |
+| Custom existing model context (`document.modelContext` or legacy `navigator.modelContext`) | Attach-only bridge mode                      |
 
 ### Dual-Server Mode (Tab + Iframe)
 
@@ -401,7 +401,7 @@ This package automatically detects and integrates with Chromium's native Web Mod
 
 When `initializeWebModelContext()` runs:
 
-1. **Native API detected** (both `navigator.modelContext` and `navigator.modelContextTesting` present): Uses native implementation, creates MCP bridge, syncs tools automatically.
+1. **Native API detected** (`document.modelContext` — or the deprecated `navigator.modelContext` alias — plus `navigator.modelContextTesting` present): Uses native implementation, creates MCP bridge, syncs tools automatically.
 2. **No native API detected**: Installs full polyfill with identical API surface.
 
 ### Native API Features
@@ -435,7 +435,7 @@ When the native API is active, tools from embedded iframes are automatically col
 <!-- parent.html -->
 <script type="module">
   import '@mcp-b/global';
-  navigator.modelContext.registerTool({
+  document.modelContext.registerTool({
     name: 'parent-tool',
     description: 'Tool from parent page',
     inputSchema: { type: 'object', properties: {} },
@@ -451,7 +451,7 @@ When the native API is active, tools from embedded iframes are automatically col
 <!-- child.html -->
 <script type="module">
   import '@mcp-b/global';
-  navigator.modelContext.registerTool({
+  document.modelContext.registerTool({
     name: 'child-tool',
     description: 'Tool from iframe',
     inputSchema: { type: 'object', properties: {} },
@@ -480,7 +480,7 @@ MCPB also exposes non-standard extension methods (`callTool`, resources/prompts 
 Registers context and replaces the currently registered tool set.
 
 ```javascript
-window.navigator.modelContext.provideContext({
+document.modelContext.provideContext({
   tools: [
     {
       name: 'add-todo',
@@ -509,7 +509,7 @@ window.navigator.modelContext.provideContext({
 Registers a single tool. Names must be unique at registration time.
 
 ```javascript
-window.navigator.modelContext.registerTool({
+document.modelContext.registerTool({
   name: 'get-timestamp',
   description: 'Get the current timestamp',
   inputSchema: { type: 'object', properties: {} },
@@ -517,7 +517,7 @@ window.navigator.modelContext.registerTool({
     return { content: [{ type: 'text', text: new Date().toISOString() }] };
   },
 });
-window.navigator.modelContext.unregisterTool('get-timestamp');
+document.modelContext.unregisterTool('get-timestamp');
 ```
 
 ### Tool Descriptor
@@ -543,13 +543,13 @@ window.navigator.modelContext.unregisterTool('get-timestamp');
 ### Name Collision Protection
 
 ```javascript
-window.navigator.modelContext.provideContext({
+document.modelContext.provideContext({
   tools: [{ name: 'my-tool', description: 'Base', inputSchema: {}, async execute() {} }],
 });
 
 // This will throw an error (name already registered)
 try {
-  window.navigator.modelContext.registerTool({
+  document.modelContext.registerTool({
     name: 'my-tool',
     description: 'Dynamic',
     inputSchema: {},
@@ -567,7 +567,7 @@ Output schemas enable type-safe structured responses from tools. Many AI provide
 ### Basic Output Schema
 
 ```javascript
-window.navigator.modelContext.provideContext({
+document.modelContext.provideContext({
   tools: [
     {
       name: 'get-user-profile',
@@ -611,7 +611,7 @@ Zod schemas are automatically converted to JSON Schema:
 ```typescript
 import { z } from 'zod';
 
-window.navigator.modelContext.provideContext({
+document.modelContext.provideContext({
   tools: [
     {
       name: 'search-products',
@@ -653,7 +653,7 @@ import { useEffect } from 'react';
 
 function MyComponent() {
   useEffect(() => {
-    window.navigator.modelContext.registerTool({
+    document.modelContext.registerTool({
       name: 'component-action',
       description: 'Action specific to this component',
       inputSchema: { type: 'object', properties: {} },
@@ -663,7 +663,7 @@ function MyComponent() {
     });
 
     return () => {
-      window.navigator.modelContext.unregisterTool('component-action');
+      document.modelContext.unregisterTool('component-action');
     };
   }, []);
 
@@ -674,7 +674,7 @@ function MyComponent() {
 ### `provideContext()` Replacement Behavior
 
 ```javascript
-window.navigator.modelContext.registerTool({
+document.modelContext.registerTool({
   name: 'dynamic-tool',
   description: 'Dynamic tool',
   async execute() {
@@ -682,7 +682,7 @@ window.navigator.modelContext.registerTool({
   },
 });
 
-window.navigator.modelContext.provideContext({
+document.modelContext.provideContext({
   tools: [{ name: 'base-tool-2', description: 'New base tool', async execute() {} }],
 });
 
@@ -694,7 +694,7 @@ window.navigator.modelContext.provideContext({
 For manifest-based or advanced scenarios, handle tool calls as events:
 
 ```javascript
-window.navigator.modelContext.addEventListener('toolcall', async (event) => {
+document.modelContext.addEventListener('toolcall', async (event) => {
   console.log(`Tool called: ${event.name}`, event.arguments);
 
   if (event.name === 'custom-tool') {
@@ -714,18 +714,18 @@ window.navigator.modelContext.addEventListener('toolcall', async (event) => {
 
 ## Testing API (`navigator.modelContextTesting`)
 
-> **Note:** `navigator.modelContextTesting` is deprecated and kept for compatibility. For in-page consumers, use `navigator.modelContext.callTool({ name, arguments })` and `navigator.modelContext.addEventListener("toolschanged", ...)`.
+> **Note:** `navigator.modelContextTesting` is deprecated and kept for compatibility. For in-page consumers, use `document.modelContext.callTool({ name, arguments })` and `document.modelContext.addEventListener("toolschanged", ...)`.
 
 ### Unified Consumer API (Recommended)
 
 ```javascript
-const result = await navigator.modelContext.callTool({
+const result = await document.modelContext.callTool({
   name: 'greet',
   arguments: { name: 'Alice' },
 });
 
-navigator.modelContext.addEventListener('toolschanged', () => {
-  console.log('Tools changed:', navigator.modelContext.listTools());
+document.modelContext.addEventListener('toolschanged', () => {
+  console.log('Tools changed:', document.modelContext.listTools());
 });
 ```
 
@@ -753,7 +753,7 @@ These methods are provided by the polyfill runtime. Native Chromium testing APIs
 
 ```javascript
 // 1. Register tools
-window.navigator.modelContext.provideContext({
+document.modelContext.provideContext({
   tools: [
     {
       name: 'add-todo',
@@ -786,7 +786,7 @@ window.navigator.modelContextTesting.reset();
 ```javascript
 let todos = [];
 
-window.navigator.modelContext.provideContext({
+document.modelContext.provideContext({
   tools: [
     {
       name: 'add-todo',
@@ -833,7 +833,7 @@ window.navigator.modelContext.provideContext({
 ### E-commerce Product Search
 
 ```javascript
-window.navigator.modelContext.provideContext({
+document.modelContext.provideContext({
   tools: [
     {
       name: 'search-products',

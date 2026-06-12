@@ -9,7 +9,7 @@ For type-surface rules and the repo-wide no-cast policy, see [TYPE_TESTING.md](.
 
 - **Canonical E2E**: tools are registered inside the real runtime, discovered through that runtime's public boundary, and called through that same boundary with zero mocked transports or fake servers.
 - **Runtime API integration**: direct `page.evaluate(...)`, `navigator.modelContextTesting`, demo flows, and other browser-accurate checks that do not use the same public caller boundary as production clients.
-- **Native Chromium exception**: for native WebMCP, the real public boundary is `navigator.modelContext` / `navigator.modelContextTesting`, not an SDK `Client`.
+- **Native Chromium exception**: for native WebMCP, the real public boundary is `document.modelContext` (plus the deprecated `navigator.modelContext` alias during the Chrome M150 transition) / `navigator.modelContextTesting`, not an SDK `Client`.
 
 ## Default Commands
 

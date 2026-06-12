@@ -387,7 +387,7 @@ Error: Request timeout - server may have navigated or become unresponsive
 
 1. HTTP server is running on port 8080
 2. Console shows `[Demo] WebMCP Navigation Demo Ready!`
-3. Tools are registered: Check `navigator.modelContext.listTools()`
+3. Tools are registered: Check `document.modelContext.listTools()`
 
 ### Issue: Navigation happens but no response
 

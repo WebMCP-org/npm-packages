@@ -67,7 +67,7 @@ Examples of banned patterns:
 
 ```ts
 const registerTool = mc.registerTool as unknown as (tool: unknown) => void;
-const ctx = navigator.modelContext as ModelContextWithExtensions;
+const ctx = document.modelContext as ModelContextWithExtensions;
 const testing = navigator.modelContextTesting as unknown as {
   executeTool: (name: string, inputArgsJson: string) => Promise<string | null>;
 };
@@ -77,7 +77,8 @@ const testing = navigator.modelContextTesting as unknown as {
 
 Do not locally invent weaker versions of:
 
-- `navigator.modelContext`
+- `document.modelContext`
+- `navigator.modelContext` (deprecated alias — still a public boundary)
 - `navigator.modelContextTesting`
 - `window`
 - `globalThis`
@@ -90,7 +91,7 @@ Do not hide repo-owned globals or public boundaries behind local aliases unless 
 Bad:
 
 ```ts
-const mc = navigator.modelContext;
+const mc = document.modelContext;
 const registerTool = mc.registerTool;
 const testing = navigator.modelContextTesting;
 ```
@@ -98,7 +99,7 @@ const testing = navigator.modelContextTesting;
 Preferred:
 
 ```ts
-navigator.modelContext.registerTool({
+document.modelContext.registerTool({
   name: 'ping',
   description: 'Ping',
   execute() {
