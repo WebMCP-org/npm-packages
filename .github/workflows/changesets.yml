@@ -76,9 +76,7 @@ jobs:
           # Create GitHub releases for each published package
           createGithubReleases: true
         env:
-          # Use PAT if available (allows triggering other workflows)
-          # Falls back to GITHUB_TOKEN (won't trigger other workflows)
-          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Generate SBOM
         if: steps.changesets.outputs.published == 'true'
