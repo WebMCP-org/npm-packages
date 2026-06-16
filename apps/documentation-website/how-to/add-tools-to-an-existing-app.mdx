@@ -1,8 +1,17 @@
 ---
-title: "Add Tools to an Existing App"
-description: "Expose existing product functionality as WebMCP tools without rewriting your application."
-keywords: ["registerTool", "unregisterTool", "@mcp-b/global", "document.modelContext", "tool registration", "inputSchema", "annotations"]
-icon: "puzzle-piece"
+title: 'Add Tools to an Existing App'
+description: 'Expose existing product functionality as WebMCP tools without rewriting your application.'
+keywords:
+  [
+    'registerTool',
+    'unregisterTool',
+    '@mcp-b/global',
+    'document.modelContext',
+    'tool registration',
+    'inputSchema',
+    'annotations',
+  ]
+icon: 'puzzle-piece'
 ---
 
 Expose existing application functionality to AI agents while keeping your app's own UI and state model intact. For framework-specific lifecycle patterns (React hooks, Vue composables, Svelte actions), see [Integrate with your framework](/how-to/frameworks).
@@ -28,7 +37,8 @@ If you do not have a build step, add a single script tag. Place it before any co
 Both approaches auto-initialize `document.modelContext` on load.
 
 <Note>
-  If you only need the strict core API (no MCP bridge, no transports), use `@mcp-b/webmcp-polyfill` instead. See [Choose a Runtime](/how-to/choose-runtime) for guidance.
+  If you only need the strict core API (no MCP bridge, no transports), use `@mcp-b/webmcp-polyfill`
+  instead. See [Choose a Runtime](/how-to/choose-runtime) for guidance.
 </Note>
 
 ## Register tools that wrap existing functions
@@ -216,7 +226,10 @@ Use `navigator.modelContextTesting` to list registered tools and execute them pr
 
 ```ts
 const tools = navigator.modelContextTesting?.listTools();
-console.log('Registered tools:', tools?.map(t => t.name));
+console.log(
+  'Registered tools:',
+  tools?.map((t) => t.name)
+);
 
 const result = await navigator.modelContextTesting?.executeTool(
   'search-products',

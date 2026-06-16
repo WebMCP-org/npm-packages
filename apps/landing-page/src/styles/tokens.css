@@ -6,79 +6,75 @@
  */
 
 @layer tokens {
-
   /* ========================================
    * PRIMITIVE TOKENS
    * Raw values with no implied usage
    * ======================================== */
 
   :root {
-
     /* --- Color: Slate neutrals (OKLCH) --- */
-    --slate-50:  oklch(0.984 0.003 265);
+    --slate-50: oklch(0.984 0.003 265);
     --slate-100: oklch(0.968 0.005 265);
-    --slate-150: oklch(0.940 0.007 265);
-    --slate-200: oklch(0.905 0.010 265);
-    --slate-300: oklch(0.810 0.015 265);
-    --slate-400: oklch(0.680 0.018 265);
-    --slate-500: oklch(0.560 0.018 265);
-    --slate-600: oklch(0.450 0.018 260);
-    --slate-700: oklch(0.360 0.015 255);
-    --slate-800: oklch(0.270 0.012 255);
-    --slate-900: oklch(0.180 0.008 250);
-    --slate-950: oklch(0.100 0.006 250);
+    --slate-150: oklch(0.94 0.007 265);
+    --slate-200: oklch(0.905 0.01 265);
+    --slate-300: oklch(0.81 0.015 265);
+    --slate-400: oklch(0.68 0.018 265);
+    --slate-500: oklch(0.56 0.018 265);
+    --slate-600: oklch(0.45 0.018 260);
+    --slate-700: oklch(0.36 0.015 255);
+    --slate-800: oklch(0.27 0.012 255);
+    --slate-900: oklch(0.18 0.008 250);
+    --slate-950: oklch(0.1 0.006 250);
 
     /* --- Color: Accent — SigVelo brand blue (hue 239) --- */
     /* sky #006d9f, action #005f8f, hover #004d73 */
     --accent-hue: 239;
     --accent-chroma: 0.114;
-    --accent:       oklch(0.508 var(--accent-chroma) var(--accent-hue)); /* sv-sky */
-    --accent-light: oklch(0.7 0.10 235);
-    --accent-dark:  oklch(0.464 0.108 241); /* sv-blue */
-    --accent-pale:  oklch(0.93 0.04 var(--accent-hue));
-    --accent-deep:  oklch(0.40 0.091 var(--accent-hue)); /* sv-blue-dark */
+    --accent: oklch(0.508 var(--accent-chroma) var(--accent-hue)); /* sv-sky */
+    --accent-light: oklch(0.7 0.1 235);
+    --accent-dark: oklch(0.464 0.108 241); /* sv-blue */
+    --accent-pale: oklch(0.93 0.04 var(--accent-hue));
+    --accent-deep: oklch(0.4 0.091 var(--accent-hue)); /* sv-blue-dark */
 
     /* --- Typography: Fluid scale (Utopia) --- */
-    --text-xs:   clamp(0.7813rem, 0.7736rem + 0.0341vw, 0.8rem);
-    --text-sm:   clamp(0.9375rem, 0.9119rem + 0.1136vw, 1rem);
+    --text-xs: clamp(0.7813rem, 0.7736rem + 0.0341vw, 0.8rem);
+    --text-sm: clamp(0.9375rem, 0.9119rem + 0.1136vw, 1rem);
     --text-base: clamp(1.125rem, 1.0739rem + 0.2273vw, 1.25rem);
-    --text-lg:   clamp(1.35rem, 1.2631rem + 0.3864vw, 1.5625rem);
-    --text-xl:   clamp(1.62rem, 1.4837rem + 0.6057vw, 1.9531rem);
-    --text-2xl:  clamp(1.944rem, 1.7405rem + 0.9044vw, 2.4414rem);
-    --text-3xl:  clamp(2.3328rem, 2.0387rem + 1.3072vw, 3.0518rem);
-    --text-4xl:  clamp(2.7994rem, 2.384rem + 1.8461vw, 3.8147rem);
+    --text-lg: clamp(1.35rem, 1.2631rem + 0.3864vw, 1.5625rem);
+    --text-xl: clamp(1.62rem, 1.4837rem + 0.6057vw, 1.9531rem);
+    --text-2xl: clamp(1.944rem, 1.7405rem + 0.9044vw, 2.4414rem);
+    --text-3xl: clamp(2.3328rem, 2.0387rem + 1.3072vw, 3.0518rem);
+    --text-4xl: clamp(2.7994rem, 2.384rem + 1.8461vw, 3.8147rem);
 
     /* --- Spacing: Fluid scale (Utopia) --- */
     --space-3xs: clamp(0.3125rem, 0.3125rem + 0vw, 0.3125rem);
     --space-2xs: clamp(0.5625rem, 0.5369rem + 0.1136vw, 0.625rem);
-    --space-xs:  clamp(0.875rem, 0.8494rem + 0.1136vw, 0.9375rem);
-    --space-s:   clamp(1.125rem, 1.0739rem + 0.2273vw, 1.25rem);
-    --space-m:   clamp(1.6875rem, 1.6108rem + 0.3409vw, 1.875rem);
-    --space-l:   clamp(2.25rem, 2.1477rem + 0.4545vw, 2.5rem);
-    --space-xl:  clamp(3.375rem, 3.2216rem + 0.6818vw, 3.75rem);
+    --space-xs: clamp(0.875rem, 0.8494rem + 0.1136vw, 0.9375rem);
+    --space-s: clamp(1.125rem, 1.0739rem + 0.2273vw, 1.25rem);
+    --space-m: clamp(1.6875rem, 1.6108rem + 0.3409vw, 1.875rem);
+    --space-l: clamp(2.25rem, 2.1477rem + 0.4545vw, 2.5rem);
+    --space-xl: clamp(3.375rem, 3.2216rem + 0.6818vw, 3.75rem);
     --space-2xl: clamp(4.5rem, 4.2955rem + 0.9091vw, 5rem);
     --space-3xl: clamp(6.75rem, 6.4432rem + 1.3636vw, 7.5rem);
 
     /* One-up pairs */
-    --space-s-m:  clamp(1.125rem, 0.8182rem + 1.3636vw, 1.875rem);
-    --space-m-l:  clamp(1.6875rem, 1.3551rem + 1.4773vw, 2.5rem);
+    --space-s-m: clamp(1.125rem, 0.8182rem + 1.3636vw, 1.875rem);
+    --space-m-l: clamp(1.6875rem, 1.3551rem + 1.4773vw, 2.5rem);
     --space-l-xl: clamp(2.25rem, 1.6364rem + 2.7273vw, 3.75rem);
-    --space-s-l:  clamp(1.125rem, 0.5625rem + 2.5vw, 2.5rem);
+    --space-s-l: clamp(1.125rem, 0.5625rem + 2.5vw, 2.5rem);
 
     /* --- Radii --- */
-    --radius-sm:   0.25rem;
-    --radius-md:   0.5rem;
-    --radius-lg:   0.875rem;
+    --radius-sm: 0.25rem;
+    --radius-md: 0.5rem;
+    --radius-lg: 0.875rem;
     --radius-full: 9999px;
 
     /* --- Shadows --- */
     --shadow-color: 260 8% 15%;
     --shadow-sm:
-      0 1px 2px -1px hsl(var(--shadow-color) / 0.08),
-      0 1px 1px -1px hsl(var(--shadow-color) / 0.04);
+      0 1px 2px -1px hsl(var(--shadow-color) / 0.08), 0 1px 1px -1px hsl(var(--shadow-color) / 0.04);
     --shadow-md:
-      0 3px 8px -2px hsl(var(--shadow-color) / 0.10),
-      0 2px 4px -2px hsl(var(--shadow-color) / 0.06);
+      0 3px 8px -2px hsl(var(--shadow-color) / 0.1), 0 2px 4px -2px hsl(var(--shadow-color) / 0.06);
     --shadow-lg:
       0 8px 24px -4px hsl(var(--shadow-color) / 0.12),
       0 4px 10px -4px hsl(var(--shadow-color) / 0.07);
@@ -87,12 +83,24 @@
       0 8px 16px -4px hsl(var(--shadow-color) / 0.08);
 
     /* --- Motion --- */
-    --ease-out:    cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
     --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
     --ease-spring: linear(
-      0, 0.006, 0.025 2.8%, 0.101 6.1%, 0.539 18.9%, 0.721 25.3%, 0.849 31.5%,
-      0.937 38.1%, 0.968 41.8%, 0.991 45.7%, 1.006 50.1%, 1.015 55%, 1.017 63.9%,
-      1.001 85.1%, 1
+      0,
+      0.006,
+      0.025 2.8%,
+      0.101 6.1%,
+      0.539 18.9%,
+      0.721 25.3%,
+      0.849 31.5%,
+      0.937 38.1%,
+      0.968 41.8%,
+      0.991 45.7%,
+      1.006 50.1%,
+      1.015 55%,
+      1.017 63.9%,
+      1.001 85.1%,
+      1
     );
     --duration-fast: 120ms;
     --duration-base: 200ms;
@@ -100,13 +108,13 @@
     --duration-slower: 600ms;
 
     /* --- Measure (line lengths) --- */
-    --measure-narrow:  45ch;
-    --measure-base:    60ch;
-    --measure-wide:    75ch;
+    --measure-narrow: 45ch;
+    --measure-base: 60ch;
+    --measure-wide: 75ch;
 
     /* --- Layout --- */
     --page-max-width: 70rem;
-    --page-gutter:    var(--space-m);
+    --page-gutter: var(--space-m);
 
     /* --- Font fallbacks (overridden by Astro Fonts API via --font-sans / --font-mono) --- */
     --font-sans: var(--font-sans, system-ui, -apple-system, 'Segoe UI', sans-serif);
@@ -117,7 +125,6 @@
     --section-padding-mobile: var(--space-2xl);
   }
 
-
   /* ========================================
    * SEMANTIC TOKENS
    * Theme-aware, intent-based
@@ -127,43 +134,46 @@
     color-scheme: light dark;
 
     /* --- Surfaces --- */
-    --color-bg:             light-dark(var(--slate-50), var(--slate-950));
-    --color-bg-secondary:   light-dark(var(--slate-100), oklch(0.12 0.005 250));
-    --color-bg-elevated:    light-dark(white, var(--slate-900));
-    --color-bg-surface:     light-dark(var(--slate-150), oklch(0.14 0.006 250));
-    --color-bg-overlay:     light-dark(white, var(--slate-800));
+    --color-bg: light-dark(var(--slate-50), var(--slate-950));
+    --color-bg-secondary: light-dark(var(--slate-100), oklch(0.12 0.005 250));
+    --color-bg-elevated: light-dark(white, var(--slate-900));
+    --color-bg-surface: light-dark(var(--slate-150), oklch(0.14 0.006 250));
+    --color-bg-overlay: light-dark(white, var(--slate-800));
 
     /* --- Text --- */
-    --color-text:           light-dark(var(--slate-900), var(--slate-100));
+    --color-text: light-dark(var(--slate-900), var(--slate-100));
     --color-text-secondary: light-dark(var(--slate-600), var(--slate-400));
-    --color-text-muted:     light-dark(var(--slate-400), var(--slate-500));
+    --color-text-muted: light-dark(var(--slate-400), var(--slate-500));
 
     /* --- Accent --- */
-    --color-accent:         var(--accent);
-    --color-accent-hover:   light-dark(var(--accent-dark), var(--accent-light));
-    --color-accent-subtle:  light-dark(var(--accent-pale), oklch(0.20 0.05 var(--accent-hue)));
-    --color-accent-text:    light-dark(var(--accent-dark), var(--accent-light));
-    --color-accent-glow:    light-dark(oklch(0.508 0.114 239 / 0.10), oklch(0.7 0.11 235 / 0.16));
-    --color-accent-glow-strong: light-dark(oklch(0.508 0.114 239 / 0.18), oklch(0.7 0.11 235 / 0.3));
+    --color-accent: var(--accent);
+    --color-accent-hover: light-dark(var(--accent-dark), var(--accent-light));
+    --color-accent-subtle: light-dark(var(--accent-pale), oklch(0.2 0.05 var(--accent-hue)));
+    --color-accent-text: light-dark(var(--accent-dark), var(--accent-light));
+    --color-accent-glow: light-dark(oklch(0.508 0.114 239 / 0.1), oklch(0.7 0.11 235 / 0.16));
+    --color-accent-glow-strong: light-dark(
+      oklch(0.508 0.114 239 / 0.18),
+      oklch(0.7 0.11 235 / 0.3)
+    );
 
     /* --- Borders --- */
-    --color-border:         light-dark(var(--slate-200), var(--slate-800));
-    --color-border-subtle:  light-dark(var(--slate-150), var(--slate-900));
+    --color-border: light-dark(var(--slate-200), var(--slate-800));
+    --color-border-subtle: light-dark(var(--slate-150), var(--slate-900));
 
     /* --- Interactive --- */
-    --color-hover-bg:       light-dark(oklch(0 0 0 / 0.03), oklch(1 0 0 / 0.04));
-    --color-focus:          oklch(0.65 0.15 var(--accent-hue));
-    --color-link:           var(--color-accent-text);
-    --color-link-hover:     var(--color-accent-hover);
+    --color-hover-bg: light-dark(oklch(0 0 0 / 0.03), oklch(1 0 0 / 0.04));
+    --color-focus: oklch(0.65 0.15 var(--accent-hue));
+    --color-link: var(--color-accent-text);
+    --color-link-hover: var(--color-accent-hover);
 
     /* --- Status --- */
-    --color-red:            oklch(0.63 0.21 25);
-    --color-red-muted:      light-dark(oklch(0.63 0.21 25 / 0.08), oklch(0.63 0.21 25 / 0.15));
-    --color-green:          oklch(0.72 0.19 155);
-    --color-green-muted:    light-dark(oklch(0.72 0.19 155 / 0.08), oklch(0.72 0.19 155 / 0.15));
-    --color-purple:         oklch(0.65 0.20 300);
-    --color-purple-muted:   light-dark(oklch(0.65 0.20 300 / 0.08), oklch(0.65 0.20 300 / 0.15));
-    --color-orange:         oklch(0.70 0.17 55);
-    --color-orange-muted:   light-dark(oklch(0.70 0.17 55 / 0.08), oklch(0.70 0.17 55 / 0.15));
+    --color-red: oklch(0.63 0.21 25);
+    --color-red-muted: light-dark(oklch(0.63 0.21 25 / 0.08), oklch(0.63 0.21 25 / 0.15));
+    --color-green: oklch(0.72 0.19 155);
+    --color-green-muted: light-dark(oklch(0.72 0.19 155 / 0.08), oklch(0.72 0.19 155 / 0.15));
+    --color-purple: oklch(0.65 0.2 300);
+    --color-purple-muted: light-dark(oklch(0.65 0.2 300 / 0.08), oklch(0.65 0.2 300 / 0.15));
+    --color-orange: oklch(0.7 0.17 55);
+    --color-orange-muted: light-dark(oklch(0.7 0.17 55 / 0.08), oklch(0.7 0.17 55 / 0.15));
   }
 }

@@ -1,8 +1,18 @@
 ---
-title: "Choose a Runtime"
-description: "Decide when to use the native browser API, the strict polyfill, or the full @mcp-b/global runtime for your project."
-keywords: ["@mcp-b/global", "@mcp-b/webmcp-polyfill", "@mcp-b/webmcp-types", "usewebmcp", "@mcp-b/react-webmcp", "runtime", "polyfill", "native api"]
-icon: "code-branch"
+title: 'Choose a Runtime'
+description: 'Decide when to use the native browser API, the strict polyfill, or the full @mcp-b/global runtime for your project.'
+keywords:
+  [
+    '@mcp-b/global',
+    '@mcp-b/webmcp-polyfill',
+    '@mcp-b/webmcp-types',
+    'usewebmcp',
+    '@mcp-b/react-webmcp',
+    'runtime',
+    'polyfill',
+    'native api',
+  ]
+icon: 'code-branch'
 ---
 
 Start with the browser standard. Add MCP-B packages only when you need behavior beyond that standard.
@@ -23,13 +33,13 @@ Ask these questions in order:
 
 ## Package comparison
 
-| Package | Runtime | Core API | MCP extensions | Transport | React |
-|---------|---------|----------|----------------|-----------|-------|
-| `@mcp-b/webmcp-types` | No | Types only | Types only | No | No |
-| `@mcp-b/webmcp-polyfill` | Yes | `registerTool`, `unregisterTool` | No | No | No |
-| `@mcp-b/global` | Yes | All core methods | `callTool`, `listTools`, prompts, resources, elicitation, sampling | Tab + iframe | No |
-| `usewebmcp` | Yes | Via hook | No | No | Yes |
-| `@mcp-b/react-webmcp` | Yes | Via hook | Full MCP-B surface | Via `@mcp-b/global` | Yes |
+| Package                  | Runtime | Core API                         | MCP extensions                                                     | Transport           | React |
+| ------------------------ | ------- | -------------------------------- | ------------------------------------------------------------------ | ------------------- | ----- |
+| `@mcp-b/webmcp-types`    | No      | Types only                       | Types only                                                         | No                  | No    |
+| `@mcp-b/webmcp-polyfill` | Yes     | `registerTool`, `unregisterTool` | No                                                                 | No                  | No    |
+| `@mcp-b/global`          | Yes     | All core methods                 | `callTool`, `listTools`, prompts, resources, elicitation, sampling | Tab + iframe        | No    |
+| `usewebmcp`              | Yes     | Via hook                         | No                                                                 | No                  | Yes   |
+| `@mcp-b/react-webmcp`    | Yes     | Via hook                         | Full MCP-B surface                                                 | Via `@mcp-b/global` | Yes   |
 
 ## If you want the WebMCP standard only
 
@@ -140,6 +150,7 @@ If you need to customize before initialization (for example, to restrict allowed
     ```
 
     `usewebmcp` expects `document.modelContext` to exist. Provide it with `@mcp-b/webmcp-polyfill` or `@mcp-b/global`.
+
   </Tab>
   <Tab title="Full MCP-B (@mcp-b/react-webmcp)">
     ```bash
@@ -172,6 +183,7 @@ If you need to customize before initialization (for example, to restrict allowed
     ```
 
     `@mcp-b/react-webmcp` requires `@mcp-b/global` for the underlying runtime.
+
   </Tab>
 </Tabs>
 

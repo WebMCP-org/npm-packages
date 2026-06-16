@@ -1,8 +1,17 @@
 ---
-title: "@mcp-b/webmcp-polyfill"
-description: "Reference for the strict WebMCP core polyfill that installs document.modelContext."
-keywords: ["@mcp-b/webmcp-polyfill", "polyfill", "document.modelContext", "initializeWebMCPPolyfill", "registerTool", "modelContextTesting", "strict core"]
-icon: "puzzle-piece"
+title: '@mcp-b/webmcp-polyfill'
+description: 'Reference for the strict WebMCP core polyfill that installs document.modelContext.'
+keywords:
+  [
+    '@mcp-b/webmcp-polyfill',
+    'polyfill',
+    'document.modelContext',
+    'initializeWebMCPPolyfill',
+    'registerTool',
+    'modelContextTesting',
+    'strict core',
+  ]
+icon: 'puzzle-piece'
 ---
 
 `@mcp-b/webmcp-polyfill` installs the strict WebMCP runtime on `document.modelContext` when no native implementation exists. It is the package to use when you want the browser standard in browsers today without MCP-B extensions.
@@ -13,11 +22,11 @@ npm install @mcp-b/webmcp-polyfill
 
 ## Package selection
 
-| Package | Use When |
-|---------|----------|
-| `@mcp-b/webmcp-types` | You need compile-time types only (no runtime) |
-| **`@mcp-b/webmcp-polyfill`** | You want the WebMCP standard path in browsers today |
-| `@mcp-b/global` | You want the MCP-B runtime layer on top of that path |
+| Package                      | Use When                                             |
+| ---------------------------- | ---------------------------------------------------- |
+| `@mcp-b/webmcp-types`        | You need compile-time types only (no runtime)        |
+| **`@mcp-b/webmcp-polyfill`** | You want the WebMCP standard path in browsers today  |
+| `@mcp-b/global`              | You want the MCP-B runtime layer on top of that path |
 
 ---
 
@@ -45,19 +54,19 @@ initializeWebMCPPolyfill();
 
 #### Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `autoInitialize` | `boolean` | `true` | Set `false` to disable auto-init from IIFE/import side effect. |
-| `installTestingShim` | `boolean \| 'always' \| 'if-missing'` | `'if-missing'` | Controls whether `navigator.modelContextTesting` is installed. |
-| `disableIframeTransportByDefault` | `boolean` | - | Deprecated no-op, kept for backward compatibility. |
+| Option                            | Type                                  | Default        | Description                                                    |
+| --------------------------------- | ------------------------------------- | -------------- | -------------------------------------------------------------- |
+| `autoInitialize`                  | `boolean`                             | `true`         | Set `false` to disable auto-init from IIFE/import side effect. |
+| `installTestingShim`              | `boolean \| 'always' \| 'if-missing'` | `'if-missing'` | Controls whether `navigator.modelContextTesting` is installed. |
+| `disableIframeTransportByDefault` | `boolean`                             | -              | Deprecated no-op, kept for backward compatibility.             |
 
 #### `installTestingShim` values
 
-| Value | Behavior |
-|-------|----------|
+| Value                    | Behavior                                                       |
+| ------------------------ | -------------------------------------------------------------- |
 | `true` or `'if-missing'` | Install only when `modelContextTesting` is not already present |
-| `'always'` | Install even when `modelContextTesting` already exists |
-| `false` | Do not install |
+| `'always'`               | Install even when `modelContextTesting` already exists         |
+| `false`                  | Do not install                                                 |
 
 ### `initializeWebModelContextPolyfill(options?)`
 
@@ -107,7 +116,9 @@ Adds a single tool to the registry.
 Removes a tool by name. Unknown names are a no-op.
 
 <Note>
-The polyfill does not provide `listTools()` or `callTool()` on `document.modelContext`. For tool listing and execution, use `navigator.modelContextTesting` (when the testing shim is enabled) or switch to [`@mcp-b/global`](/packages/global/reference).
+  The polyfill does not provide `listTools()` or `callTool()` on `document.modelContext`. For tool
+  listing and execution, use `navigator.modelContextTesting` (when the testing shim is enabled) or
+  switch to [`@mcp-b/global`](/packages/global/reference).
 </Note>
 
 ---
@@ -116,12 +127,12 @@ The polyfill does not provide `listTools()` or `callTool()` on `document.modelCo
 
 When `installTestingShim` is enabled, the polyfill installs `navigator.modelContextTesting` with the standard testing API:
 
-| Method | Returns |
-|--------|---------|
-| `listTools()` | `ModelContextTestingToolInfo[]` |
-| `executeTool(toolName, inputArgsJson, options?)` | `Promise<string \| null>` |
-| `registerToolsChangedCallback(callback)` | `void` |
-| `getCrossDocumentScriptToolResult()` | `Promise<string>` (always `"[]"` in polyfill) |
+| Method                                           | Returns                                       |
+| ------------------------------------------------ | --------------------------------------------- |
+| `listTools()`                                    | `ModelContextTestingToolInfo[]`               |
+| `executeTool(toolName, inputArgsJson, options?)` | `Promise<string \| null>`                     |
+| `registerToolsChangedCallback(callback)`         | `void`                                        |
+| `getCrossDocumentScriptToolResult()`             | `Promise<string>` (always `"[]"` in polyfill) |
 
 ```ts
 initializeWebMCPPolyfill({ installTestingShim: true });
@@ -141,11 +152,11 @@ For full details on the testing API, see [WebMCP standard API](/reference/webmcp
 
 The polyfill accepts three formats for `inputSchema`:
 
-| Format | Description |
-|--------|-------------|
-| Plain JSON Schema | `InputSchema` object |
+| Format                       | Description                                      |
+| ---------------------------- | ------------------------------------------------ |
+| Plain JSON Schema            | `InputSchema` object                             |
 | Standard Schema v1 validator | Object with `~standard.validate()` (e.g., Zod 4) |
-| Standard JSON Schema v1 | Object with `~standard.jsonSchema.input()` |
+| Standard JSON Schema v1      | Object with `~standard.jsonSchema.input()`       |
 
 Standard JSON Schema conversion is attempted with targets `draft-2020-12` first, then `draft-07`. When both Standard validator and Standard JSON Schema are present on the same object, JSON conversion is preferred.
 
@@ -155,15 +166,15 @@ Standard JSON Schema conversion is attempted with targets `draft-2020-12` first,
 
 The polyfill validates tool descriptors on registration:
 
-| Condition | Error |
-|-----------|-------|
-| `tool` is not an object | `TypeError: registerTool(tool) requires a tool object` |
-| `name` is empty or not a string | `TypeError: Tool "name" must be a non-empty string` |
-| `description` is empty or not a string | `TypeError: Tool "description" must be a non-empty string` |
-| `execute` is not a function | `TypeError: Tool "execute" must be a function` |
-| Duplicate tool name | `Error: Tool already registered: <name>` |
-| Invalid JSON Schema structure | `Error: Invalid JSON Schema at <path>: <details>` |
-| Schema not JSON-serializable | `Error: Invalid JSON Schema at <path>: schema must be JSON-serializable` |
+| Condition                              | Error                                                                    |
+| -------------------------------------- | ------------------------------------------------------------------------ |
+| `tool` is not an object                | `TypeError: registerTool(tool) requires a tool object`                   |
+| `name` is empty or not a string        | `TypeError: Tool "name" must be a non-empty string`                      |
+| `description` is empty or not a string | `TypeError: Tool "description" must be a non-empty string`               |
+| `execute` is not a function            | `TypeError: Tool "execute" must be a function`                           |
+| Duplicate tool name                    | `Error: Tool already registered: <name>`                                 |
+| Invalid JSON Schema structure          | `Error: Invalid JSON Schema at <path>: <details>`                        |
+| Schema not JSON-serializable           | `Error: Invalid JSON Schema at <path>: schema must be JSON-serializable` |
 
 Input arguments are validated at execution time using JSON Schema validation (via `@cfworker/json-schema`). Standard Schema validators are used when available.
 

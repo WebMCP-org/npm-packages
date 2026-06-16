@@ -4,7 +4,6 @@
  */
 
 @layer layouts {
-
   /* --- Page wrapper: constrained + centered --- */
 
   .page {
@@ -20,9 +19,15 @@
     flex-direction: column;
     gap: var(--stack-gap, var(--space-m));
 
-    &[data-gap="s"] { --stack-gap: var(--space-s); }
-    &[data-gap="l"] { --stack-gap: var(--space-l); }
-    &[data-gap="xl"] { --stack-gap: var(--space-xl); }
+    &[data-gap='s'] {
+      --stack-gap: var(--space-s);
+    }
+    &[data-gap='l'] {
+      --stack-gap: var(--space-l);
+    }
+    &[data-gap='xl'] {
+      --stack-gap: var(--space-xl);
+    }
   }
 
   /* --- Cluster: horizontal wrapping group --- */
@@ -45,10 +50,7 @@
 
   .auto-grid {
     display: grid;
-    grid-template-columns: repeat(
-      auto-fill,
-      minmax(min(100%, var(--grid-min, 16rem)), 1fr)
-    );
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--grid-min, 16rem)), 1fr));
     gap: var(--grid-gap, var(--space-m));
   }
 

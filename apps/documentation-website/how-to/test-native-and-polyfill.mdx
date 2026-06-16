@@ -1,8 +1,18 @@
 ---
-title: "Test Native and Polyfill Behavior"
-description: "Choose the right testing path for native Chromium, polyfill, and framework integrations of WebMCP tools."
-keywords: ["testing", "playwright", "native api", "polyfill", "e2e", "chrome flags", "modelContextTesting", "runtime contract"]
-icon: "flask-vial"
+title: 'Test Native and Polyfill Behavior'
+description: 'Choose the right testing path for native Chromium, polyfill, and framework integrations of WebMCP tools.'
+keywords:
+  [
+    'testing',
+    'playwright',
+    'native api',
+    'polyfill',
+    'e2e',
+    'chrome flags',
+    'modelContextTesting',
+    'runtime contract',
+  ]
+icon: 'flask-vial'
 ---
 
 This guide shows you how to test WebMCP tools against both the native Chromium implementation and the polyfill runtime, and when to use each testing lane.
@@ -11,14 +21,14 @@ This guide shows you how to test WebMCP tools against both the native Chromium i
 
 The monorepo provides several testing lanes organized by runtime:
 
-| Runtime | Canonical caller | Command |
-|---------|-----------------|---------|
-| Tab / global (polyfill) | SDK `Client` + `TabClientTransport` | `pnpm --filter mcp-e2e-tests test:runtime-contract` |
-| Iframe | SDK `Client` + `IframeParentTransport` | `pnpm --filter mcp-e2e-tests test:runtime-contract` |
-| Native Chromium (default) | `document.modelContext` / `modelContextTesting` | `pnpm --filter mcp-e2e-tests test:native-contract:default` |
-| Native Chromium (Chrome Beta) | `document.modelContext` / `modelContextTesting` | `pnpm --filter mcp-e2e-tests test:native-contract:beta` |
-| Local relay | SDK `Client` over stdio | `pnpm --filter @mcp-b/webmcp-local-relay test:e2e` |
-| DevTools bridge | SDK `Client` + `WebMCPClientTransport` | `pnpm --filter @mcp-b/chrome-devtools-mcp test:e2e` |
+| Runtime                       | Canonical caller                                | Command                                                    |
+| ----------------------------- | ----------------------------------------------- | ---------------------------------------------------------- |
+| Tab / global (polyfill)       | SDK `Client` + `TabClientTransport`             | `pnpm --filter mcp-e2e-tests test:runtime-contract`        |
+| Iframe                        | SDK `Client` + `IframeParentTransport`          | `pnpm --filter mcp-e2e-tests test:runtime-contract`        |
+| Native Chromium (default)     | `document.modelContext` / `modelContextTesting` | `pnpm --filter mcp-e2e-tests test:native-contract:default` |
+| Native Chromium (Chrome Beta) | `document.modelContext` / `modelContextTesting` | `pnpm --filter mcp-e2e-tests test:native-contract:beta`    |
+| Local relay                   | SDK `Client` over stdio                         | `pnpm --filter @mcp-b/webmcp-local-relay test:e2e`         |
+| DevTools bridge               | SDK `Client` + `WebMCPClientTransport`          | `pnpm --filter @mcp-b/chrome-devtools-mcp test:e2e`        |
 
 Every canonical E2E suite proves the same six assertions against the real runtime:
 
@@ -67,6 +77,7 @@ pnpm --filter mcp-e2e-tests test:native-contract:default
     This uses the Playwright config that passes:
     - `--enable-experimental-web-platform-features`
     - `--enable-features=WebMCPTesting`
+
   </Step>
 </Steps>
 
@@ -95,10 +106,7 @@ To launch Chromium with the native API enabled in your own Playwright tests:
 export default defineConfig({
   use: {
     launchOptions: {
-      args: [
-        '--enable-experimental-web-platform-features',
-        '--enable-features=WebModelContext',
-      ],
+      args: ['--enable-experimental-web-platform-features', '--enable-features=WebModelContext'],
     },
   },
 });
@@ -115,7 +123,7 @@ chromium \
 ```
 
 <Warning>
-`--no-sandbox` disables critical security features. Use it only in trusted CI environments.
+  `--no-sandbox` disables critical security features. Use it only in trusted CI environments.
 </Warning>
 
 ## Run integration and framework tests
@@ -150,22 +158,22 @@ cd e2e && pnpm test:chrome-beta:webmcp:headed
 
 ### Troubleshoot common issues
 
-| Problem | Fix |
-|---------|-----|
+| Problem                                | Fix                                                                                                                                      |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | `document.modelContext` is `undefined` | Verify the experimental flag is enabled. Check `chrome://version` for `--enable-experimental-web-platform-features` in the command line. |
-| Polyfill detected instead of native | Remove `@mcp-b/global` imports from the test page. Launch in incognito mode to rule out extensions. |
-| Port already in use | The tab/global lane defaults to port 4173. Kill the process: `lsof -ti:4173 \| xargs kill` |
-| Playwright browsers not installed | Run `pnpm --filter mcp-e2e-tests exec playwright install chromium` |
+| Polyfill detected instead of native    | Remove `@mcp-b/global` imports from the test page. Launch in incognito mode to rule out extensions.                                      |
+| Port already in use                    | The tab/global lane defaults to port 4173. Kill the process: `lsof -ti:4173 \| xargs kill`                                               |
+| Playwright browsers not installed      | Run `pnpm --filter mcp-e2e-tests exec playwright install chromium`                                                                       |
 
 ## Choose the right testing approach
 
-| If you are... | Use this lane |
-|---------------|--------------|
-| Building tools with `@mcp-b/global` | `test:runtime-contract` (polyfill) |
+| If you are...                             | Use this lane                                                 |
+| ----------------------------------------- | ------------------------------------------------------------- |
+| Building tools with `@mcp-b/global`       | `test:runtime-contract` (polyfill)                            |
 | Validating against the native browser API | `test:native-contract:default` or `test:native-contract:beta` |
-| Testing the local relay end-to-end | `pnpm --filter @mcp-b/webmcp-local-relay test:e2e` |
-| Testing the DevTools bridge end-to-end | `pnpm --filter @mcp-b/chrome-devtools-mcp test:e2e` |
-| Running the full canonical gate | `pnpm test:e2e` |
+| Testing the local relay end-to-end        | `pnpm --filter @mcp-b/webmcp-local-relay test:e2e`            |
+| Testing the DevTools bridge end-to-end    | `pnpm --filter @mcp-b/chrome-devtools-mcp test:e2e`           |
+| Running the full canonical gate           | `pnpm test:e2e`                                               |
 
 ## Related pages
 

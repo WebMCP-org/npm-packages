@@ -1,8 +1,18 @@
 ---
-title: "Connect a Desktop Agent with the Relay"
-description: "Set up one web page, one local relay, and one MCP client so a desktop AI agent can call tools on your page."
-keywords: ["webmcp-local-relay", "desktop agent", "claude desktop", "cursor", "websocket", "mcp client", "stdio", "bridge"]
-icon: "plug"
+title: 'Connect a Desktop Agent with the Relay'
+description: 'Set up one web page, one local relay, and one MCP client so a desktop AI agent can call tools on your page.'
+keywords:
+  [
+    'webmcp-local-relay',
+    'desktop agent',
+    'claude desktop',
+    'cursor',
+    'websocket',
+    'mcp client',
+    'stdio',
+    'bridge',
+  ]
+icon: 'plug'
 ---
 
 In this tutorial, we will set up a web page with a WebMCP tool, run the local relay, and connect a desktop MCP client so the AI agent can discover and call the tool. By the end, you will have a working pipeline from a browser tab to Claude Desktop (or any MCP client).
@@ -47,38 +57,39 @@ Create a file called `relay-demo.html`:
 ```html relay-demo.html
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Relay Demo Page</title>
-  <script src="https://cdn.jsdelivr.net/npm/@mcp-b/global@latest/dist/index.iife.js"></script>
-</head>
-<body>
-  <h1>Relay Demo</h1>
-  <p id="status">Registering tool...</p>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Relay Demo Page</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mcp-b/global@latest/dist/index.iife.js"></script>
+  </head>
+  <body>
+    <h1>Relay Demo</h1>
+    <p id="status">Registering tool...</p>
 
-  <script>
-    document.modelContext.registerTool({
-      name: "get_page_title",
-      description: "Get the current page title",
-      inputSchema: { type: "object", properties: {} },
-      execute: async () => ({
-        content: [{ type: "text", text: document.title }]
-      }),
-    });
+    <script>
+      document.modelContext.registerTool({
+        name: 'get_page_title',
+        description: 'Get the current page title',
+        inputSchema: { type: 'object', properties: {} },
+        execute: async () => ({
+          content: [{ type: 'text', text: document.title }],
+        }),
+      });
 
-    document.getElementById("status").textContent =
-      'Tool "get_page_title" registered. Waiting for relay connection...';
-  </script>
+      document.getElementById('status').textContent =
+        'Tool "get_page_title" registered. Waiting for relay connection...';
+    </script>
 
-  <script src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@latest/dist/browser/embed.js"></script>
-</body>
+    <script src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@latest/dist/browser/embed.js"></script>
+  </body>
 </html>
 ```
 
 The first script tag loads `@mcp-b/global`, which sets up `document.modelContext`. The tool registration is the same pattern from the [first tool tutorial](/tutorials/first-tool). The last script tag loads `embed.js`, which creates a hidden iframe that connects the page's tools to the local relay via WebSocket.
 
 <Note>
-The `embed.js` script must appear after your tools are registered, so the relay can discover them on connection.
+  The `embed.js` script must appear after your tools are registered, so the relay can discover them
+  on connection.
 </Note>
 
 </Step>
@@ -101,6 +112,7 @@ Add the relay to your MCP client's configuration. The exact location depends on 
       }
     }
     ```
+
   </Tab>
   <Tab title="Cursor">
     Open Cursor settings, go to the MCP section, and add the same configuration:
@@ -115,6 +127,7 @@ Add the relay to your MCP client's configuration. The exact location depends on 
       }
     }
     ```
+
   </Tab>
   <Tab title="Claude Code">
     Run the following command in your terminal:
@@ -122,6 +135,7 @@ Add the relay to your MCP client's configuration. The exact location depends on 
     ```bash
     claude mcp add webmcp-local-relay -- npx -y @mcp-b/webmcp-local-relay@latest
     ```
+
   </Tab>
 </Tabs>
 
@@ -182,7 +196,10 @@ You have called a browser-side tool from a desktop AI agent through the local re
 Open [webmcp.sh](https://webmcp.sh) in a separate tab. It has WebMCP tools for navigation, SQL queries, entity management, and more. Ask the agent to list sources again. You will see tools from both tabs. The relay aggregates tools from all connected pages.
 
 <Frame caption="webmcp.sh dashboard: a production app with WebMCP tools the relay can discover">
-  <img src="/images/webmcp-sh-dashboard.png" alt="webmcp.sh dashboard showing memory stats, charts, and audit log" />
+  <img
+    src="/images/webmcp-sh-dashboard.png"
+    alt="webmcp.sh dashboard showing memory stats, charts, and audit log"
+  />
 </Frame>
 
 </Step>

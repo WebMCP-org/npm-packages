@@ -1,8 +1,17 @@
 ---
-title: "@mcp-b/mcp-iframe"
-description: "Reference for the iframe bridge custom element and its event contract."
-keywords: ["@mcp-b/mcp-iframe", "mcp-iframe", "iframe bridge", "web component", "custom element", "cross-origin", "tool bridging"]
-icon: "frame"
+title: '@mcp-b/mcp-iframe'
+description: 'Reference for the iframe bridge custom element and its event contract.'
+keywords:
+  [
+    '@mcp-b/mcp-iframe',
+    'mcp-iframe',
+    'iframe bridge',
+    'web component',
+    'custom element',
+    'cross-origin',
+    'tool bridging',
+  ]
+icon: 'frame'
 ---
 
 A Web Component that wraps an iframe and bridges its MCP tools, resources, and prompts to the parent page's `document.modelContext`. Items from the iframe are namespaced with the element's `id` to prevent collisions.
@@ -41,14 +50,14 @@ Importing `@mcp-b/mcp-iframe` auto-registers the `<mcp-iframe>` custom element. 
 
 ## Attributes
 
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `src` | `string` | -- | URL of the iframe page. |
-| `id` | `string` | `"iframe"` | Used as the tool name prefix. Sanitized to match `[a-zA-Z0-9_-]`. |
-| `target-origin` | `string` | Inferred from `src` | Override the `postMessage` target origin. If omitted, the origin is extracted from the `src` URL. |
-| `channel` | `string` | `"mcp-iframe"` | Channel ID for the underlying `IframeParentTransport`. |
-| `call-timeout` | `number` | `30000` | Timeout in milliseconds for tool calls, resource reads, and prompt gets. |
-| `prefix-separator` | `string` | `"_"` | Separator between the prefix and the item name. Must contain only `[a-zA-Z0-9_-]` characters. |
+| Attribute          | Type     | Default             | Description                                                                                       |
+| ------------------ | -------- | ------------------- | ------------------------------------------------------------------------------------------------- |
+| `src`              | `string` | --                  | URL of the iframe page.                                                                           |
+| `id`               | `string` | `"iframe"`          | Used as the tool name prefix. Sanitized to match `[a-zA-Z0-9_-]`.                                 |
+| `target-origin`    | `string` | Inferred from `src` | Override the `postMessage` target origin. If omitted, the origin is extracted from the `src` URL. |
+| `channel`          | `string` | `"mcp-iframe"`      | Channel ID for the underlying `IframeParentTransport`.                                            |
+| `call-timeout`     | `number` | `30000`             | Timeout in milliseconds for tool calls, resource reads, and prompt gets.                          |
+| `prefix-separator` | `string` | `"_"`               | Separator between the prefix and the item name. Must contain only `[a-zA-Z0-9_-]` characters.     |
 
 Standard iframe attributes (`sandbox`, `allow`, `width`, `height`, `loading`, `referrerpolicy`, `name`, `srcdoc`, `allowfullscreen`, `credentialless`) are mirrored to the internal `<iframe>` element.
 
@@ -56,11 +65,11 @@ Standard iframe attributes (`sandbox`, `allow`, `width`, `height`, `loading`, `r
 
 ## Events
 
-| Event | Detail type | Fired when |
-|-------|-------------|------------|
-| `mcp-iframe-ready` | `{ tools: string[], resources: string[], prompts: string[] }` | The element connects to the iframe's MCP server and registers all items on the parent. |
-| `mcp-iframe-error` | `{ error: unknown }` | Connection to the iframe's MCP server fails. |
-| `mcp-iframe-tools-changed` | `{ tools: string[], resources: string[], prompts: string[] }` | Items are refreshed via the `refresh()` method. |
+| Event                      | Detail type                                                   | Fired when                                                                             |
+| -------------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `mcp-iframe-ready`         | `{ tools: string[], resources: string[], prompts: string[] }` | The element connects to the iframe's MCP server and registers all items on the parent. |
+| `mcp-iframe-error`         | `{ error: unknown }`                                          | Connection to the iframe's MCP server fails.                                           |
+| `mcp-iframe-tools-changed` | `{ tools: string[], resources: string[], prompts: string[] }` | Items are refreshed via the `refresh()` method.                                        |
 
 All `tools`, `resources`, and `prompts` arrays contain the prefixed names as registered on the parent.
 
@@ -70,11 +79,11 @@ All `tools`, `resources`, and `prompts` arrays contain the prefixed names as reg
 
 Tools and prompts from the iframe are registered on the parent as `{id}{separator}{name}`:
 
-| Iframe tool name | Element `id` | Separator | Parent tool name |
-|------------------|-------------|-----------|-----------------|
-| `calculate` | `my-app` | `_` (default) | `my-app_calculate` |
-| `get_data` | `billing` | `_` | `billing_get_data` |
-| `help` | `assistant` | `-` | `assistant-help` |
+| Iframe tool name | Element `id` | Separator     | Parent tool name   |
+| ---------------- | ------------ | ------------- | ------------------ |
+| `calculate`      | `my-app`     | `_` (default) | `my-app_calculate` |
+| `get_data`       | `billing`    | `_`           | `billing_get_data` |
+| `help`           | `assistant`  | `-`           | `assistant-help`   |
 
 Prefixed names must match the MCP name pattern `^[a-zA-Z0-9_-]{1,128}$`. Names that exceed 128 characters or contain invalid characters are skipped with a console error.
 
@@ -84,25 +93,25 @@ Resource URIs are prefixed the same way: a resource `config://settings` in an if
 
 ## Properties
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `iframe` | `HTMLIFrameElement \| null` | The wrapped iframe element. |
-| `client` | `Client \| null` | The MCP client connected to the iframe's server. |
-| `ready` | `boolean` | Whether the element is connected to the iframe's MCP server. |
-| `exposedTools` | `string[]` | Prefixed tool names registered on the parent. |
-| `exposedResources` | `string[]` | Prefixed resource URIs registered on the parent. |
-| `exposedPrompts` | `string[]` | Prefixed prompt names registered on the parent. |
-| `mcpTools` | `Tool[]` | Raw tools from the iframe (without prefix). |
-| `mcpResources` | `Resource[]` | Raw resources from the iframe (without prefix). |
-| `mcpPrompts` | `Prompt[]` | Raw prompts from the iframe (without prefix). |
-| `itemPrefix` | `string` | The computed prefix string (`{id}{separator}`). |
+| Property           | Type                        | Description                                                  |
+| ------------------ | --------------------------- | ------------------------------------------------------------ |
+| `iframe`           | `HTMLIFrameElement \| null` | The wrapped iframe element.                                  |
+| `client`           | `Client \| null`            | The MCP client connected to the iframe's server.             |
+| `ready`            | `boolean`                   | Whether the element is connected to the iframe's MCP server. |
+| `exposedTools`     | `string[]`                  | Prefixed tool names registered on the parent.                |
+| `exposedResources` | `string[]`                  | Prefixed resource URIs registered on the parent.             |
+| `exposedPrompts`   | `string[]`                  | Prefixed prompt names registered on the parent.              |
+| `mcpTools`         | `Tool[]`                    | Raw tools from the iframe (without prefix).                  |
+| `mcpResources`     | `Resource[]`                | Raw resources from the iframe (without prefix).              |
+| `mcpPrompts`       | `Prompt[]`                  | Raw prompts from the iframe (without prefix).                |
+| `itemPrefix`       | `string`                    | The computed prefix string (`{id}{separator}`).              |
 
 ---
 
 ## Methods
 
-| Method | Returns | Description |
-|--------|---------|-------------|
+| Method      | Returns         | Description                                                                                                                                                          |
+| ----------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `refresh()` | `Promise<void>` | Re-fetches all tools, resources, and prompts from the iframe, unregisters the old items, and registers the new ones. Fires `mcp-iframe-tools-changed` on completion. |
 
 ---

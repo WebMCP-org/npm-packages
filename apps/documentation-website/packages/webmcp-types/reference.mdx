@@ -1,8 +1,18 @@
 ---
-title: "@mcp-b/webmcp-types"
-description: "Reference for WebMCP TypeScript type definitions, schema inference, and Navigator augmentation."
-keywords: ["@mcp-b/webmcp-types", "typescript", "ModelContext", "ModelContextCore", "ToolDescriptor", "InferArgsFromInputSchema", "JsonSchemaForInference", "type inference"]
-icon: "brackets-curly"
+title: '@mcp-b/webmcp-types'
+description: 'Reference for WebMCP TypeScript type definitions, schema inference, and Navigator augmentation.'
+keywords:
+  [
+    '@mcp-b/webmcp-types',
+    'typescript',
+    'ModelContext',
+    'ModelContextCore',
+    'ToolDescriptor',
+    'InferArgsFromInputSchema',
+    'JsonSchemaForInference',
+    'type inference',
+  ]
+icon: 'brackets-curly'
 ---
 
 `@mcp-b/webmcp-types` provides TypeScript type definitions for the WebMCP API. Zero runtime. Zero side effects. Install as a dev dependency.
@@ -49,10 +59,10 @@ After activation, `document.modelContext` is typed as `ModelContext` and `naviga
 
 ## Navigator augmentation
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `document.modelContext` | `ModelContext` | Strict core WebMCP surface |
-| `navigator.modelContextTesting` | `ModelContextTesting \| undefined` | Testing API (optional) |
+| Property                        | Type                               | Description                |
+| ------------------------------- | ---------------------------------- | -------------------------- |
+| `document.modelContext`         | `ModelContext`                     | Strict core WebMCP surface |
+| `navigator.modelContextTesting` | `ModelContextTesting \| undefined` | Testing API (optional)     |
 
 ---
 
@@ -66,22 +76,22 @@ Alias for `ModelContextCore`. This is the type of `document.modelContext`.
 
 The strict specification surface.
 
-| Method | Signature |
-|--------|-----------|
-| `registerTool` | Multiple overloads (see below) |
-| `unregisterTool` | `(name: string) => void` |
+| Method           | Signature                      |
+| ---------------- | ------------------------------ |
+| `registerTool`   | Multiple overloads (see below) |
+| `unregisterTool` | `(name: string) => void`       |
 
 ### `ModelContextExtensions`
 
 MCP-B extension methods. Not part of the WebMCP specification.
 
-| Method | Signature |
-|--------|-----------|
-| `listTools` | `() => ToolListItem[]` |
-| `callTool` | `(params: { name: string; arguments?: Record<string, unknown> }) => Promise<ToolResponse>` |
-| `addEventListener` | `(type: 'toolcall' \| 'toolschanged', listener, options?) => void` |
-| `removeEventListener` | `(type: 'toolcall' \| 'toolschanged', listener, options?) => void` |
-| `dispatchEvent` | `(event: Event) => boolean` |
+| Method                | Signature                                                                                  |
+| --------------------- | ------------------------------------------------------------------------------------------ |
+| `listTools`           | `() => ToolListItem[]`                                                                     |
+| `callTool`            | `(params: { name: string; arguments?: Record<string, unknown> }) => Promise<ToolResponse>` |
+| `addEventListener`    | `(type: 'toolcall' \| 'toolschanged', listener, options?) => void`                         |
+| `removeEventListener` | `(type: 'toolcall' \| 'toolschanged', listener, options?) => void`                         |
+| `dispatchEvent`       | `(event: Event) => boolean`                                                                |
 
 ### `ModelContextWithExtensions`
 
@@ -102,15 +112,15 @@ const tools = ctx.listTools();
 
 Explicitly typed tool descriptor.
 
-| Property | Type | Required |
-|----------|------|----------|
-| `name` | `TName` | Yes |
-| `description` | `string` | Yes |
-| `inputSchema` | `InputSchema` | No |
-| `outputSchema` | `InputSchema` | No |
-| `annotations` | `ToolAnnotations` | No |
-| `stream` | `boolean` | No |
-| `execute` | `(args: TArgs, client: ModelContextClient) => MaybePromise<ToolExecuteResult<TResult>>` | Yes |
+| Property       | Type                                                                                    | Required |
+| -------------- | --------------------------------------------------------------------------------------- | -------- |
+| `name`         | `TName`                                                                                 | Yes      |
+| `description`  | `string`                                                                                | Yes      |
+| `inputSchema`  | `InputSchema`                                                                           | No       |
+| `outputSchema` | `InputSchema`                                                                           | No       |
+| `annotations`  | `ToolAnnotations`                                                                       | No       |
+| `stream`       | `boolean`                                                                               | No       |
+| `execute`      | `(args: TArgs, client: ModelContextClient) => MaybePromise<ToolExecuteResult<TResult>>` | Yes      |
 
 ### `StreamedToolDescriptor<TArgs, TResult, TName>`
 
@@ -122,13 +132,13 @@ Tool metadata returned by `listTools()`. Same shape as `ToolDescriptor` without 
 
 ### `ToolAnnotations`
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `title` | `string?` | Display title |
-| `readOnlyHint` | `boolean \| 'true' \| 'false'` | Read-only indicator |
-| `destructiveHint` | `boolean \| 'true' \| 'false'` | Destructive action indicator |
-| `idempotentHint` | `boolean \| 'true' \| 'false'` | Idempotent action indicator |
-| `openWorldHint` | `boolean \| 'true' \| 'false'` | External system access indicator |
+| Property          | Type                           | Description                      |
+| ----------------- | ------------------------------ | -------------------------------- |
+| `title`           | `string?`                      | Display title                    |
+| `readOnlyHint`    | `boolean \| 'true' \| 'false'` | Read-only indicator              |
+| `destructiveHint` | `boolean \| 'true' \| 'false'` | Destructive action indicator     |
+| `idempotentHint`  | `boolean \| 'true' \| 'false'` | Idempotent action indicator      |
+| `openWorldHint`   | `boolean \| 'true' \| 'false'` | External system access indicator |
 
 ### `CallToolResult` / `ToolResponse`
 
@@ -179,27 +189,27 @@ type Args = InferArgsFromInputSchema<typeof schema>;
 
 Supported JSON Schema keywords for inference:
 
-| Keyword | Effect |
-|---------|--------|
-| `type` | Determines base TypeScript type |
-| `properties` | Creates named fields |
-| `required` | Marks fields as non-optional |
-| `items` | Array element type |
-| `enum` | Union of literal values |
-| `const` | Single literal value |
-| `nullable` | Adds `null` to the type |
-| `additionalProperties` | Controls extra key acceptance |
+| Keyword                | Effect                          |
+| ---------------------- | ------------------------------- |
+| `type`                 | Determines base TypeScript type |
+| `properties`           | Creates named fields            |
+| `required`             | Marks fields as non-optional    |
+| `items`                | Array element type              |
+| `enum`                 | Union of literal values         |
+| `const`                | Single literal value            |
+| `nullable`             | Adds `null` to the type         |
+| `additionalProperties` | Controls extra key acceptance   |
 
 Other keywords are accepted as metadata but do not affect inferred types.
 
 ### `additionalProperties` behavior
 
-| Schema Shape | Inferred Extras |
-|-------------|----------------|
-| `additionalProperties: false` | No extra keys |
-| `additionalProperties` omitted or `true` | Extra keys as `unknown` |
-| `additionalProperties: { ... }` with no named `properties` | `Record<string, ...>` |
-| `additionalProperties: { ... }` with named `properties` | Named properties inferred, extras as `unknown` |
+| Schema Shape                                               | Inferred Extras                                |
+| ---------------------------------------------------------- | ---------------------------------------------- |
+| `additionalProperties: false`                              | No extra keys                                  |
+| `additionalProperties` omitted or `true`                   | Extra keys as `unknown`                        |
+| `additionalProperties: { ... }` with no named `properties` | `Record<string, ...>`                          |
+| `additionalProperties: { ... }` with named `properties`    | Named properties inferred, extras as `unknown` |
 
 ### Widened schemas
 
@@ -235,8 +245,8 @@ document.modelContext.registerTool({
     return {
       content: [{ type: 'text', text: 'done' }],
       structuredContent: {
-        total: 1,            // required, inferred as number
-        items: ['result'],   // optional, inferred as string[]
+        total: 1, // required, inferred as number
+        items: ['result'], // optional, inferred as string[]
       },
     };
   },
@@ -279,15 +289,15 @@ await ctx.callTool({ name: 'ping' });
 
 ### Helper types
 
-| Type | Description |
-|------|-------------|
-| `InferToolArgs<T>` | Extract args type from a tool descriptor |
-| `InferToolResult<T>` | Extract result type from a tool descriptor |
-| `ToolName<TTools>` | Union of tool names from a descriptor array |
-| `ToolByName<TTools, TName>` | Extract a descriptor by name |
-| `ToolArgsByName<TTools, TName>` | Args type by tool name |
-| `ToolResultByName<TTools, TName>` | Result type by tool name |
-| `ToolCallParams<TName, TArgs>` | Typed parameters for `callTool` |
+| Type                              | Description                                 |
+| --------------------------------- | ------------------------------------------- |
+| `InferToolArgs<T>`                | Extract args type from a tool descriptor    |
+| `InferToolResult<T>`              | Extract result type from a tool descriptor  |
+| `ToolName<TTools>`                | Union of tool names from a descriptor array |
+| `ToolByName<TTools, TName>`       | Extract a descriptor by name                |
+| `ToolArgsByName<TTools, TName>`   | Args type by tool name                      |
+| `ToolResultByName<TTools, TName>` | Result type by tool name                    |
+| `ToolCallParams<TName, TArgs>`    | Typed parameters for `callTool`             |
 
 ---
 
@@ -295,39 +305,39 @@ await ctx.callTool({ name: 'ping' });
 
 ### `ModelContextTesting`
 
-| Method | Signature |
-|--------|-----------|
-| `listTools` | `() => ModelContextTestingToolInfo[]` |
-| `executeTool` | Overloaded: JSON string or streamed source |
-| `registerToolsChangedCallback` | `(callback: () => void) => void` |
-| `getCrossDocumentScriptToolResult` | `() => Promise<string>` |
+| Method                             | Signature                                  |
+| ---------------------------------- | ------------------------------------------ |
+| `listTools`                        | `() => ModelContextTestingToolInfo[]`      |
+| `executeTool`                      | Overloaded: JSON string or streamed source |
+| `registerToolsChangedCallback`     | `(callback: () => void) => void`           |
+| `getCrossDocumentScriptToolResult` | `() => Promise<string>`                    |
 
 ### `ModelContextTestingToolInfo`
 
-| Property | Type |
-|----------|------|
-| `name` | `string` |
-| `description` | `string` |
+| Property      | Type                        |
+| ------------- | --------------------------- |
+| `name`        | `string`                    |
+| `description` | `string`                    |
 | `inputSchema` | `string?` (JSON-serialized) |
-| `stream` | `boolean?` |
+| `stream`      | `boolean?`                  |
 
 ---
 
 ## Other exports
 
-| Export | Description |
-|--------|-------------|
-| `InputSchema` | JSON Schema interface for tool parameters |
-| `ContentBlock` | Discriminated union of content types |
-| `LooseContentBlock` | Permissive content block type |
-| `MaybePromise<T>` | `T \| Promise<T>` |
-| `ModelContextClient` | Execute callback client with `requestUserInteraction` |
-| `ToolExecutionContext` | Extended client with `elicitInput` |
-| `ModelContextInput` | Legacy options type (kept for backwards compatibility) |
-| `ModelContextOptions` | Alias for `ModelContextInput` |
-| `ElicitationParams` | Elicitation request parameters |
-| `ElicitationResult` | Elicitation response |
-| `ToolCallEvent` | Event dispatched on tool invocation |
+| Export                 | Description                                            |
+| ---------------------- | ------------------------------------------------------ |
+| `InputSchema`          | JSON Schema interface for tool parameters              |
+| `ContentBlock`         | Discriminated union of content types                   |
+| `LooseContentBlock`    | Permissive content block type                          |
+| `MaybePromise<T>`      | `T \| Promise<T>`                                      |
+| `ModelContextClient`   | Execute callback client with `requestUserInteraction`  |
+| `ToolExecutionContext` | Extended client with `elicitInput`                     |
+| `ModelContextInput`    | Legacy options type (kept for backwards compatibility) |
+| `ModelContextOptions`  | Alias for `ModelContextInput`                          |
+| `ElicitationParams`    | Elicitation request parameters                         |
+| `ElicitationResult`    | Elicitation response                                   |
+| `ToolCallEvent`        | Event dispatched on tool invocation                    |
 
 ---
 

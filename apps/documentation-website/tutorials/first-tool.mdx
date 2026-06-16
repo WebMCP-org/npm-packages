@@ -1,8 +1,18 @@
 ---
-title: "Build Your First Tool"
-description: "Create a single WebMCP tool on a plain HTML page and verify it works, with no build step or framework."
-keywords: ["webmcp", "registertool", "navigator.modelcontext", "webmcp-polyfill", "html", "vanilla", "first tool", "beginner"]
-icon: "wrench"
+title: 'Build Your First Tool'
+description: 'Create a single WebMCP tool on a plain HTML page and verify it works, with no build step or framework.'
+keywords:
+  [
+    'webmcp',
+    'registertool',
+    'navigator.modelcontext',
+    'webmcp-polyfill',
+    'html',
+    'vanilla',
+    'first tool',
+    'beginner',
+  ]
+icon: 'wrench'
 ---
 
 In this tutorial, we will create a plain HTML page that registers one WebMCP tool and then verify that the tool works by calling it from the browser console. By the end, you will have a working page with a tool that any AI agent can discover and call.
@@ -31,19 +41,19 @@ Create a new file called `index.html` and paste in this starting point:
 ```html index.html
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>My First WebMCP Tool</title>
-  <script src="https://unpkg.com/@mcp-b/webmcp-polyfill@latest/dist/index.iife.js"></script>
-</head>
-<body>
-  <h1>My First WebMCP Tool</h1>
-  <p id="status">Loading...</p>
+  <head>
+    <meta charset="UTF-8" />
+    <title>My First WebMCP Tool</title>
+    <script src="https://unpkg.com/@mcp-b/webmcp-polyfill@latest/dist/index.iife.js"></script>
+  </head>
+  <body>
+    <h1>My First WebMCP Tool</h1>
+    <p id="status">Loading...</p>
 
-  <script>
-    // We will register our tool here in the next step.
-  </script>
-</body>
+    <script>
+      // We will register our tool here in the next step.
+    </script>
+  </body>
 </html>
 ```
 
@@ -58,18 +68,17 @@ Replace the empty `<script>` block at the bottom of the page with:
 ```html index.html
 <script>
   document.modelContext.registerTool({
-    name: "get-page-title",
-    description: "Get the current page title",
-    inputSchema: { type: "object", properties: {} },
+    name: 'get-page-title',
+    description: 'Get the current page title',
+    inputSchema: { type: 'object', properties: {} },
     async execute() {
       return {
-        content: [{ type: "text", text: document.title }]
+        content: [{ type: 'text', text: document.title }],
       };
-    }
+    },
   });
 
-  document.getElementById("status").textContent =
-    'Tool "get-page-title" registered.';
+  document.getElementById('status').textContent = 'Tool "get-page-title" registered.';
 </script>
 ```
 
@@ -102,16 +111,13 @@ console.log(tools);
 You should see an array containing your tool:
 
 ```javascript
-[{ name: "get-page-title", description: "Get the current page title", inputSchema: "..." }]
+[{ name: 'get-page-title', description: 'Get the current page title', inputSchema: '...' }];
 ```
 
 Now call the tool:
 
 ```javascript
-const result = await navigator.modelContextTesting.executeTool(
-  "get-page-title",
-  "{}"
-);
+const result = await navigator.modelContextTesting.executeTool('get-page-title', '{}');
 console.log(JSON.parse(result));
 ```
 
@@ -153,31 +159,30 @@ Here is the full `index.html` for reference:
 ```html index.html
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>My First WebMCP Tool</title>
-  <script src="https://unpkg.com/@mcp-b/webmcp-polyfill@latest/dist/index.iife.js"></script>
-</head>
-<body>
-  <h1>My First WebMCP Tool</h1>
-  <p id="status">Loading...</p>
+  <head>
+    <meta charset="UTF-8" />
+    <title>My First WebMCP Tool</title>
+    <script src="https://unpkg.com/@mcp-b/webmcp-polyfill@latest/dist/index.iife.js"></script>
+  </head>
+  <body>
+    <h1>My First WebMCP Tool</h1>
+    <p id="status">Loading...</p>
 
-  <script>
-    document.modelContext.registerTool({
-      name: "get-page-title",
-      description: "Get the current page title",
-      inputSchema: { type: "object", properties: {} },
-      async execute() {
-        return {
-          content: [{ type: "text", text: document.title }]
-        };
-      }
-    });
+    <script>
+      document.modelContext.registerTool({
+        name: 'get-page-title',
+        description: 'Get the current page title',
+        inputSchema: { type: 'object', properties: {} },
+        async execute() {
+          return {
+            content: [{ type: 'text', text: document.title }],
+          };
+        },
+      });
 
-    document.getElementById("status").textContent =
-      'Tool "get-page-title" registered.';
-  </script>
-</body>
+      document.getElementById('status').textContent = 'Tool "get-page-title" registered.';
+    </script>
+  </body>
 </html>
 ```
 

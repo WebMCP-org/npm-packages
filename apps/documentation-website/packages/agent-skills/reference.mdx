@@ -1,8 +1,17 @@
 ---
-title: "agent-skills-ts-sdk"
-description: "TypeScript parser, validator, prompt builder, and patch utilities for the AgentSkills specification."
-keywords: ["agent-skills-ts-sdk", "agentskills", "SKILL.md", "parseSkillContent", "validateSkillContent", "toPrompt", "skill patch"]
-icon: "wand-magic-sparkles"
+title: 'agent-skills-ts-sdk'
+description: 'TypeScript parser, validator, prompt builder, and patch utilities for the AgentSkills specification.'
+keywords:
+  [
+    'agent-skills-ts-sdk',
+    'agentskills',
+    'SKILL.md',
+    'parseSkillContent',
+    'validateSkillContent',
+    'toPrompt',
+    'skill patch',
+  ]
+icon: 'wand-magic-sparkles'
 ---
 
 `agent-skills-ts-sdk` is a TypeScript implementation of the [AgentSkills specification](https://agentskills.io/specification). It parses `SKILL.md` files, validates frontmatter, generates prompt blocks, and applies patches. This package sits adjacent to the core WebMCP runtime and does not depend on it.
@@ -116,23 +125,23 @@ Mirrors the reference library's `skills-ref validate` for in-memory file lists. 
 
 ### Validation rules
 
-| Rule | Constraint |
-|------|-----------|
-| `name` | Required. Max 64 characters. Lowercase only. Hyphens allowed (not at start/end, no consecutive). Unicode normalized (NFKC). |
-| `description` | Required. Max 1024 characters. |
-| `compatibility` | Optional. Max 500 characters. |
-| `license` | Optional. |
-| `metadata` | Optional. Key-value pairs. |
-| `allowed-tools` | Optional. Experimental. |
+| Rule            | Constraint                                                                                                                  |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `name`          | Required. Max 64 characters. Lowercase only. Hyphens allowed (not at start/end, no consecutive). Unicode normalized (NFKC). |
+| `description`   | Required. Max 1024 characters.                                                                                              |
+| `compatibility` | Optional. Max 500 characters.                                                                                               |
+| `license`       | Optional.                                                                                                                   |
+| `metadata`      | Optional. Key-value pairs.                                                                                                  |
+| `allowed-tools` | Optional. Experimental.                                                                                                     |
 
 ### Validation constants
 
-| Constant | Value |
-|----------|-------|
-| `MAX_SKILL_NAME_LENGTH` | `64` |
-| `MAX_DESCRIPTION_LENGTH` | `1024` |
-| `MAX_COMPATIBILITY_LENGTH` | `500` |
-| `ALLOWED_FIELDS` | Set of valid frontmatter field names |
+| Constant                   | Value                                |
+| -------------------------- | ------------------------------------ |
+| `MAX_SKILL_NAME_LENGTH`    | `64`                                 |
+| `MAX_DESCRIPTION_LENGTH`   | `1024`                               |
+| `MAX_COMPATIBILITY_LENGTH` | `500`                                |
+| `ALLOWED_FIELDS`           | Set of valid frontmatter field names |
 
 ## Prompt utilities
 
@@ -143,9 +152,7 @@ Builds an `<available_skills>` XML block from parsed entries or raw `SKILL.md` c
 ```typescript
 import { toPrompt } from 'agent-skills-ts-sdk';
 
-const promptBlock = toPrompt([
-  { content: skillMarkdown, location: 'skills/my-skill/SKILL.md' },
-]);
+const promptBlock = toPrompt([{ content: skillMarkdown, location: 'skills/my-skill/SKILL.md' }]);
 ```
 
 ### `toDisclosurePrompt(entries)`
@@ -177,10 +184,7 @@ Builds a strict JSON Schema declaration for a read tool.
 ```typescript
 import { toReadToolSchema } from 'agent-skills-ts-sdk';
 
-const schema = toReadToolSchema(
-  [{ name: 'pizza-maker' }],
-  { toolName: 'read_site_context' }
-);
+const schema = toReadToolSchema([{ name: 'pizza-maker' }], { toolName: 'read_site_context' });
 ```
 
 ### `handleSkillRead(args)`
@@ -220,75 +224,75 @@ Runtime validation for model-provided patch payloads.
 
 ## Utilities
 
-| Function | Description |
-|----------|-------------|
-| `normalizeNFKC(str)` | Matches Python's `unicodedata.normalize("NFKC", ...)` for name validation |
-| `estimateTokens(text)` | Conservative heuristic for context budgeting |
+| Function               | Description                                                               |
+| ---------------------- | ------------------------------------------------------------------------- |
+| `normalizeNFKC(str)`   | Matches Python's `unicodedata.normalize("NFKC", ...)` for name validation |
+| `estimateTokens(text)` | Conservative heuristic for context budgeting                              |
 
 ## Types
 
 ### Core types
 
-| Type | Description |
-|------|-------------|
-| `SkillProperties` | CamelCased JS view of skill frontmatter |
-| `SkillFrontmatter` | Spec-key (`allowed-tools`) frontmatter shape |
-| `SkillParseResult` | Result of `parseSkillContent`: `{ properties, body }` |
-| `SkillFrontmatterParseResult` | Result of `parseFrontmatter` |
-| `SkillContent` | Raw skill content string |
-| `SkillBody` | Markdown body after frontmatter removal |
-| `SkillId` | Branded string for skill identifiers |
+| Type                          | Description                                           |
+| ----------------------------- | ----------------------------------------------------- |
+| `SkillProperties`             | CamelCased JS view of skill frontmatter               |
+| `SkillFrontmatter`            | Spec-key (`allowed-tools`) frontmatter shape          |
+| `SkillParseResult`            | Result of `parseSkillContent`: `{ properties, body }` |
+| `SkillFrontmatterParseResult` | Result of `parseFrontmatter`                          |
+| `SkillContent`                | Raw skill content string                              |
+| `SkillBody`                   | Markdown body after frontmatter removal               |
+| `SkillId`                     | Branded string for skill identifiers                  |
 
 ### Storage types
 
-| Type | Description |
-|------|-------------|
-| `SkillFile` | `{ name: string, content: string }` for in-memory file lists |
-| `SkillMetadata` | Storage-friendly wrapper for persisted skills |
-| `SkillMetadataMap` | Map of skill ID to metadata |
-| `SkillContentEntry` | Entry for prompt generation |
-| `ResolvedSkill` | Fully resolved skill with properties, body, and metadata |
-| `SkillResource` | A skill resource reference |
+| Type                | Description                                                  |
+| ------------------- | ------------------------------------------------------------ |
+| `SkillFile`         | `{ name: string, content: string }` for in-memory file lists |
+| `SkillMetadata`     | Storage-friendly wrapper for persisted skills                |
+| `SkillMetadataMap`  | Map of skill ID to metadata                                  |
+| `SkillContentEntry` | Entry for prompt generation                                  |
+| `ResolvedSkill`     | Fully resolved skill with properties, body, and metadata     |
+| `SkillResource`     | A skill resource reference                                   |
 
 ### Prompt types
 
-| Type | Description |
-|------|-------------|
-| `SkillPromptEntry` | Entry passed to `toPrompt` |
-| `SkillPromptSource` | Source location for a skill |
-| `DisclosurePromptEntry` | Entry passed to `toDisclosurePrompt` |
+| Type                           | Description                            |
+| ------------------------------ | -------------------------------------- |
+| `SkillPromptEntry`             | Entry passed to `toPrompt`             |
+| `SkillPromptSource`            | Source location for a skill            |
+| `DisclosurePromptEntry`        | Entry passed to `toDisclosurePrompt`   |
 | `DisclosureInstructionOptions` | Options for `toDisclosureInstructions` |
 
 ### Patch types
 
-| Type | Description |
-|------|-------------|
-| `SkillPatch` | A patch object with operations |
-| `SkillPatchOperation` | A single add/remove/replace operation |
-| `SkillPatchOperationType` | `'add' \| 'remove' \| 'replace'` |
-| `SkillPatchApplyResult` | Result with `ok`, `content`, and `errors` |
-| `SkillPatchValidationResult` | Validation result for model-provided patches |
-| `SkillPatchIssue` | A specific issue found during patch validation |
-| `SkillPatchIssueCode` | Error code enum for patch issues |
-| `SkillDiffSegment` | A segment in a line-based diff |
-| `SkillLineDiff` | Full line-based diff result |
+| Type                         | Description                                    |
+| ---------------------------- | ---------------------------------------------- |
+| `SkillPatch`                 | A patch object with operations                 |
+| `SkillPatchOperation`        | A single add/remove/replace operation          |
+| `SkillPatchOperationType`    | `'add' \| 'remove' \| 'replace'`               |
+| `SkillPatchApplyResult`      | Result with `ok`, `content`, and `errors`      |
+| `SkillPatchValidationResult` | Validation result for model-provided patches   |
+| `SkillPatchIssue`            | A specific issue found during patch validation |
+| `SkillPatchIssueCode`        | Error code enum for patch issues               |
+| `SkillDiffSegment`           | A segment in a line-based diff                 |
+| `SkillLineDiff`              | Full line-based diff result                    |
 
 ### Read tool types
 
-| Type | Description |
-|------|-------------|
-| `ReadToolSchema` | JSON Schema for a read tool |
-| `ReadToolSchemaOptions` | Options for `toReadToolSchema` |
-| `SkillReadArgs` | Arguments for `handleSkillRead` |
-| `SkillReadResult` | Successful read result |
-| `SkillReadError` | Error from a read operation |
-| `SkillReadErrorCode` | Error code enum |
+| Type                    | Description                     |
+| ----------------------- | ------------------------------- |
+| `ReadToolSchema`        | JSON Schema for a read tool     |
+| `ReadToolSchemaOptions` | Options for `toReadToolSchema`  |
+| `SkillReadArgs`         | Arguments for `handleSkillRead` |
+| `SkillReadResult`       | Successful read result          |
+| `SkillReadError`        | Error from a read operation     |
+| `SkillReadErrorCode`    | Error code enum                 |
 
 ### Error classes
 
-| Class | Description |
-|-------|-------------|
-| `ParseError` | Thrown when parsing fails |
+| Class             | Description                  |
+| ----------------- | ---------------------------- |
+| `ParseError`      | Thrown when parsing fails    |
 | `ValidationError` | Thrown when validation fails |
 
 ## Specification compliance

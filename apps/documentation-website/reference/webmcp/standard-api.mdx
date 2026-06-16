@@ -1,8 +1,8 @@
 ---
-title: "WebMCP standard API"
-description: "Quick lookup for the document-first WebMCP surface and its compatibility APIs."
-keywords: ["document.modelContext", "registerTool", "getTools", "executeTool"]
-icon: "brackets-curly"
+title: 'WebMCP standard API'
+description: 'Quick lookup for the document-first WebMCP surface and its compatibility APIs.'
+keywords: ['document.modelContext', 'registerTool', 'getTools', 'executeTool']
+icon: 'brackets-curly'
 ---
 
 The authoritative API definition is the
@@ -12,12 +12,12 @@ The authoritative API definition is the
 
 New code uses `document.modelContext`.
 
-| Member | Purpose |
-| --- | --- |
-| `registerTool(tool, { signal })` | Publish a tool and bind its lifetime to an optional abort signal |
-| `getTools()` | Discover registered tool objects |
-| `executeTool(tool, inputJson, options?)` | Execute a tool object returned by `getTools()` |
-| `toolchange` | Notify consumers that available tools changed |
+| Member                                   | Purpose                                                          |
+| ---------------------------------------- | ---------------------------------------------------------------- |
+| `registerTool(tool, { signal })`         | Publish a tool and bind its lifetime to an optional abort signal |
+| `getTools()`                             | Discover registered tool objects                                 |
+| `executeTool(tool, inputJson, options?)` | Execute a tool object returned by `getTools()`                   |
+| `toolchange`                             | Notify consumers that available tools changed                    |
 
 ```ts
 const controller = new AbortController();

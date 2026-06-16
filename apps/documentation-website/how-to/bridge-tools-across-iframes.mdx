@@ -1,8 +1,17 @@
 ---
-title: "Bridge Tools Across Iframes"
-description: "Surface child-frame WebMCP tools in a parent page using the mcp-iframe custom element with automatic namespacing and routing."
-keywords: ["mcp-iframe", "iframe", "cross-origin", "namespacing", "@mcp-b/mcp-iframe", "postMessage", "custom element"]
-icon: "object-group"
+title: 'Bridge Tools Across Iframes'
+description: 'Surface child-frame WebMCP tools in a parent page using the mcp-iframe custom element with automatic namespacing and routing.'
+keywords:
+  [
+    'mcp-iframe',
+    'iframe',
+    'cross-origin',
+    'namespacing',
+    '@mcp-b/mcp-iframe',
+    'postMessage',
+    'custom element',
+  ]
+icon: 'object-group'
 ---
 
 This guide shows you how to expose tools, resources, and prompts registered inside an iframe to the parent page's `document.modelContext` using the `<mcp-iframe>` custom element.
@@ -42,11 +51,11 @@ A tool named `calculate` in the iframe appears on the parent as `my-app_calculat
 
 The prefix is built from the element's `id` (or `name` attribute, or `"iframe"` as fallback) plus a separator character.
 
-| Child tool name | Element `id` | Parent tool name |
-|----------------|-------------|-----------------|
-| `calculate` | `my-app` | `my-app_calculate` |
-| `search` | `widget` | `widget_search` |
-| `greet` | (none) | `iframe_greet` |
+| Child tool name | Element `id` | Parent tool name   |
+| --------------- | ------------ | ------------------ |
+| `calculate`     | `my-app`     | `my-app_calculate` |
+| `search`        | `widget`     | `widget_search`    |
+| `greet`         | (none)       | `iframe_greet`     |
 
 Tool and prompt names must match the MCP pattern `^[a-zA-Z0-9_-]{1,128}$`. If the `id` contains invalid characters, they are sanitized to underscores automatically.
 
@@ -59,24 +68,24 @@ To change the separator character, set the `prefix-separator` attribute:
 
 ## Configure the element
 
-| Attribute | Description | Default |
-|-----------|-------------|---------|
-| `src` | URL of the iframe page | (required) |
-| `id` | Used as the tool name prefix | `"iframe"` |
-| `target-origin` | Override the `postMessage` target origin | Inferred from `src` |
-| `channel` | Channel ID for the transport | `mcp-iframe` |
-| `call-timeout` | Timeout in ms for tool calls | `30000` |
-| `prefix-separator` | Separator between prefix and tool name | `_` |
+| Attribute          | Description                              | Default             |
+| ------------------ | ---------------------------------------- | ------------------- |
+| `src`              | URL of the iframe page                   | (required)          |
+| `id`               | Used as the tool name prefix             | `"iframe"`          |
+| `target-origin`    | Override the `postMessage` target origin | Inferred from `src` |
+| `channel`          | Channel ID for the transport             | `mcp-iframe`        |
+| `call-timeout`     | Timeout in ms for tool calls             | `30000`             |
+| `prefix-separator` | Separator between prefix and tool name   | `_`                 |
 
 Standard iframe attributes (`sandbox`, `allow`, `width`, `height`) are mirrored to the internal iframe.
 
 ## Listen for events
 
-| Event | Detail | When |
-|-------|--------|------|
-| `mcp-iframe-ready` | `{ tools, resources, prompts }` | Connected to the iframe's MCP server |
-| `mcp-iframe-error` | `{ error }` | Connection failed |
-| `mcp-iframe-tools-changed` | `{ tools, resources, prompts }` | After calling `refresh()` |
+| Event                      | Detail                          | When                                 |
+| -------------------------- | ------------------------------- | ------------------------------------ |
+| `mcp-iframe-ready`         | `{ tools, resources, prompts }` | Connected to the iframe's MCP server |
+| `mcp-iframe-error`         | `{ error }`                     | Connection failed                    |
+| `mcp-iframe-tools-changed` | `{ tools, resources, prompts }` | After calling `refresh()`            |
 
 ## Refresh tools after dynamic changes
 

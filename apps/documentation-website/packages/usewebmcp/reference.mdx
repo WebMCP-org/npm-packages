@@ -1,8 +1,8 @@
 ---
-title: "usewebmcp reference"
-description: "Reference for the strict-core React hook: installation, useWebMCP, config fields, state, and type inference."
-keywords: ["usewebmcp", "useWebMCP", "react", "strict core", "tool registration", "reference"]
-icon: "react"
+title: 'usewebmcp reference'
+description: 'Reference for the strict-core React hook: installation, useWebMCP, config fields, state, and type inference.'
+keywords: ['usewebmcp', 'useWebMCP', 'react', 'strict core', 'tool registration', 'reference']
+icon: 'react'
 ---
 
 `usewebmcp` is the strict-core React package. It registers tools with `document.modelContext` on mount and unregisters them on unmount without adding MCP-B-only hooks.
@@ -27,44 +27,44 @@ pnpm add usewebmcp react
 import { useWebMCP } from 'usewebmcp';
 ```
 
-| Parameter | Type | Description |
-|---|---|---|
-| `config` | `WebMCPConfig` | Tool configuration object |
-| `deps` | `DependencyList` | Optional dependency array that triggers tool re-registration when values change |
+| Parameter | Type             | Description                                                                     |
+| --------- | ---------------- | ------------------------------------------------------------------------------- |
+| `config`  | `WebMCPConfig`   | Tool configuration object                                                       |
+| `deps`    | `DependencyList` | Optional dependency array that triggers tool re-registration when values change |
 
 **Returns:** `WebMCPReturn`
 
-| Field | Type | Description |
-|---|---|---|
-| `state` | `ToolExecutionState` | Current execution state |
+| Field            | Type                 | Description                                    |
+| ---------------- | -------------------- | ---------------------------------------------- |
+| `state`          | `ToolExecutionState` | Current execution state                        |
 | `execute(input)` | `(input) => Promise` | Manually invoke the tool from your UI or tests |
-| `reset()` | `() => void` | Reset state to initial values |
+| `reset()`        | `() => void`         | Reset state to initial values                  |
 
 ## Config fields
 
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `name` | `string` | Yes | Unique tool identifier (lowercase with underscores) |
-| `description` | `string` | Yes | Human-readable description for AI assistants |
-| `inputSchema` | JSON Schema or Standard Schema v1 | No | Defines input parameters. Use `as const` for inference. |
-| `outputSchema` | `JsonSchemaObject` | No | Defines output structure and enables `structuredContent`. |
-| `annotations` | `ToolAnnotations` | No | Metadata hints such as `readOnlyHint` and `idempotentHint` |
-| `execute(input)` | `(input) => T \| Promise<T>` | Yes* | Preferred tool implementation function |
-| `handler(input)` | `(input) => T \| Promise<T>` | Yes* | Backward-compatible alias for `execute` |
-| `formatOutput(output)` | `(output) => string` | No | Deprecated. Prefer `outputSchema`. |
-| `onSuccess(result, input)` | `(result, input) => void` | No | Callback after successful execution |
-| `onError(error, input)` | `(error, input) => void` | No | Callback after failed execution |
+| Field                      | Type                              | Required | Description                                                |
+| -------------------------- | --------------------------------- | -------- | ---------------------------------------------------------- |
+| `name`                     | `string`                          | Yes      | Unique tool identifier (lowercase with underscores)        |
+| `description`              | `string`                          | Yes      | Human-readable description for AI assistants               |
+| `inputSchema`              | JSON Schema or Standard Schema v1 | No       | Defines input parameters. Use `as const` for inference.    |
+| `outputSchema`             | `JsonSchemaObject`                | No       | Defines output structure and enables `structuredContent`.  |
+| `annotations`              | `ToolAnnotations`                 | No       | Metadata hints such as `readOnlyHint` and `idempotentHint` |
+| `execute(input)`           | `(input) => T \| Promise<T>`      | Yes\*    | Preferred tool implementation function                     |
+| `handler(input)`           | `(input) => T \| Promise<T>`      | Yes\*    | Backward-compatible alias for `execute`                    |
+| `formatOutput(output)`     | `(output) => string`              | No       | Deprecated. Prefer `outputSchema`.                         |
+| `onSuccess(result, input)` | `(result, input) => void`         | No       | Callback after successful execution                        |
+| `onError(error, input)`    | `(error, input) => void`          | No       | Callback after failed execution                            |
 
-*One of `execute` or `handler` is required. If both are present, `execute` wins.*
+_One of `execute` or `handler` is required. If both are present, `execute` wins._
 
 ## `ToolExecutionState`
 
-| Field | Type | Description |
-|---|---|---|
-| `isExecuting` | `boolean` | Whether the tool is currently running |
-| `lastResult` | `TOutput \| null` | Result from the most recent successful execution |
-| `error` | `Error \| null` | Error from the most recent failed execution |
-| `executionCount` | `number` | Total successful executions |
+| Field            | Type              | Description                                      |
+| ---------------- | ----------------- | ------------------------------------------------ |
+| `isExecuting`    | `boolean`         | Whether the tool is currently running            |
+| `lastResult`     | `TOutput \| null` | Result from the most recent successful execution |
+| `error`          | `Error \| null`   | Error from the most recent failed execution      |
+| `executionCount` | `number`          | Total successful executions                      |
 
 ## Type inference
 
@@ -117,7 +117,8 @@ These callbacks are stored in refs and do not trigger re-registration:
 - `formatOutput`
 
 <Warning>
-Define `inputSchema`, `outputSchema`, and `annotations` outside the component or memoize them. Fresh object references on every render force unnecessary re-registration.
+  Define `inputSchema`, `outputSchema`, and `annotations` outside the component or memoize them.
+  Fresh object references on every render force unnecessary re-registration.
 </Warning>
 
 ## Output schema contract
@@ -126,14 +127,14 @@ When `outputSchema` is defined, the implementation must return a JSON-serializab
 
 ## Exported types
 
-| Type | Description |
-|---|---|
-| `WebMCPConfig` | Configuration object type |
-| `WebMCPReturn` | Return value type |
-| `ToolExecutionState` | Execution state shape |
+| Type                  | Description                            |
+| --------------------- | -------------------------------------- |
+| `WebMCPConfig`        | Configuration object type              |
+| `WebMCPReturn`        | Return value type                      |
+| `ToolExecutionState`  | Execution state shape                  |
 | `ToolExecuteFunction` | Tool implementation function signature |
-| `InferToolInput` | Infer input type from schema |
-| `InferOutput` | Infer output type from schema |
+| `InferToolInput`      | Infer input type from schema           |
+| `InferOutput`         | Infer output type from schema          |
 
 ## Related pages
 

@@ -4,7 +4,6 @@
  */
 
 @layer utilities {
-
   /* --- Accessibility --- */
 
   .sr-only {
@@ -59,15 +58,31 @@
     margin-block-start: var(--flow-space, 1em);
   }
 
-  .flow > h2 + * { --flow-space: var(--space-s); }
-  .flow > h3 + * { --flow-space: var(--space-xs); }
-  .flow > * + h2 { --flow-space: var(--space-xl); }
-  .flow > * + h3 { --flow-space: var(--space-l); }
-  .flow > * + h4 { --flow-space: var(--space-m); }
+  .flow > h2 + * {
+    --flow-space: var(--space-s);
+  }
+  .flow > h3 + * {
+    --flow-space: var(--space-xs);
+  }
+  .flow > * + h2 {
+    --flow-space: var(--space-xl);
+  }
+  .flow > * + h3 {
+    --flow-space: var(--space-l);
+  }
+  .flow > * + h4 {
+    --flow-space: var(--space-m);
+  }
 
   /* --- Text utilities --- */
 
-  .text-secondary { color: var(--color-text-secondary); }
-  .text-sm        { font-size: var(--text-sm); }
-  .text-lg        { font-size: var(--text-lg); }
+  .text-secondary {
+    color: var(--color-text-secondary);
+  }
+  .text-sm {
+    font-size: var(--text-sm);
+  }
+  .text-lg {
+    font-size: var(--text-lg);
+  }
 }

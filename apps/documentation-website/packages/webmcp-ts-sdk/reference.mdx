@@ -1,8 +1,17 @@
 ---
-title: "@mcp-b/webmcp-ts-sdk"
-description: "Reference for BrowserMcpServer, the browser-adapted MCP TypeScript SDK with dynamic tool registration."
-keywords: ["@mcp-b/webmcp-ts-sdk", "BrowserMcpServer", "McpServer", "dynamic tool registration", "mcp sdk", "registerTool", "transport connection"]
-icon: "layer-group"
+title: '@mcp-b/webmcp-ts-sdk'
+description: 'Reference for BrowserMcpServer, the browser-adapted MCP TypeScript SDK with dynamic tool registration.'
+keywords:
+  [
+    '@mcp-b/webmcp-ts-sdk',
+    'BrowserMcpServer',
+    'McpServer',
+    'dynamic tool registration',
+    'mcp sdk',
+    'registerTool',
+    'transport connection',
+  ]
+icon: 'layer-group'
 ---
 
 `@mcp-b/webmcp-ts-sdk` adapts the official [@modelcontextprotocol/sdk](https://www.npmjs.com/package/@modelcontextprotocol/sdk) for browser environments. It provides `BrowserMcpServer`, a class that extends the upstream `McpServer` to support dynamic tool registration after transport connection.
@@ -12,7 +21,9 @@ npm install @mcp-b/webmcp-ts-sdk
 ```
 
 <Note>
-Most applications should use `@mcp-b/global` instead of this package directly. `@mcp-b/global` creates and manages a `BrowserMcpServer` internally. Use this package only when you need direct control over the MCP server instance.
+  Most applications should use `@mcp-b/global` instead of this package directly. `@mcp-b/global`
+  creates and manages a `BrowserMcpServer` internally. Use this package only when you need direct
+  control over the MCP server instance.
 </Note>
 
 ---
@@ -47,20 +58,20 @@ In browser environments, tools arrive dynamically as pages load. The transport m
 new BrowserMcpServer(serverInfo: Implementation, options?: BrowserMcpServerOptions)
 ```
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `serverInfo` | `Implementation` | Server name and version. `{ name: string; version: string }` |
-| `options` | `BrowserMcpServerOptions` | Server configuration |
+| Parameter    | Type                      | Description                                                  |
+| ------------ | ------------------------- | ------------------------------------------------------------ |
+| `serverInfo` | `Implementation`          | Server name and version. `{ name: string; version: string }` |
+| `options`    | `BrowserMcpServerOptions` | Server configuration                                         |
 
 #### `BrowserMcpServerOptions`
 
 Extends `ServerOptions` from the upstream SDK.
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `native` | `ModelContextCore?` | Reference to the native/polyfill `modelContext`. When provided, core tool operations (`registerTool`, `unregisterTool`) are mirrored to it. |
-| `capabilities` | `ServerCapabilities?` | Additional MCP capabilities. Tools, resources, and prompts with `listChanged: true` are pre-registered. |
-| `jsonSchemaValidator` | `JsonSchemaValidator?` | Custom JSON Schema validator. Defaults to `PolyfillJsonSchemaValidator`. |
+| Property              | Type                   | Description                                                                                                                                 |
+| --------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `native`              | `ModelContextCore?`    | Reference to the native/polyfill `modelContext`. When provided, core tool operations (`registerTool`, `unregisterTool`) are mirrored to it. |
+| `capabilities`        | `ServerCapabilities?`  | Additional MCP capabilities. Tools, resources, and prompts with `listChanged: true` are pre-registered.                                     |
+| `jsonSchemaValidator` | `JsonSchemaValidator?` | Custom JSON Schema validator. Defaults to `PolyfillJsonSchemaValidator`.                                                                    |
 
 ```ts
 import { BrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
@@ -161,13 +172,13 @@ const handle = server.registerResource({
 });
 ```
 
-| Property | Type | Required |
-|----------|------|----------|
-| `uri` | `string` | Yes |
-| `name` | `string` | Yes |
-| `description` | `string` | No |
-| `mimeType` | `string` | No |
-| `read` | `(uri: URL) => Promise<{ contents: ResourceContents[] }>` | Yes |
+| Property      | Type                                                      | Required |
+| ------------- | --------------------------------------------------------- | -------- |
+| `uri`         | `string`                                                  | Yes      |
+| `name`        | `string`                                                  | Yes      |
+| `description` | `string`                                                  | No       |
+| `mimeType`    | `string`                                                  | No       |
+| `read`        | `(uri: URL) => Promise<{ contents: ResourceContents[] }>` | Yes      |
 
 ### `listResources()`
 
@@ -202,12 +213,12 @@ const handle = server.registerPrompt({
 });
 ```
 
-| Property | Type | Required |
-|----------|------|----------|
-| `name` | `string` | Yes |
-| `description` | `string` | No |
-| `argsSchema` | `InputSchema` | No |
-| `get` | `(args) => Promise<{ messages: PromptMessage[] }>` | Yes |
+| Property      | Type                                               | Required |
+| ------------- | -------------------------------------------------- | -------- |
+| `name`        | `string`                                           | Yes      |
+| `description` | `string`                                           | No       |
+| `argsSchema`  | `InputSchema`                                      | No       |
+| `get`         | `(args) => Promise<{ messages: PromptMessage[] }>` | Yes      |
 
 ### `listPrompts()`
 
@@ -276,10 +287,10 @@ The `connect` method:
 
 `BrowserMcpServer` accepts both Zod schemas and plain JSON Schema objects. The handling depends on the schema format:
 
-| Schema Format | Validation Method |
-|--------------|-------------------|
-| Zod schema (`_zod` or `_def` present) | `safeParseAsync` from the upstream SDK |
-| Plain JSON Schema | `PolyfillJsonSchemaValidator` (built-in) |
+| Schema Format                         | Validation Method                        |
+| ------------------------------------- | ---------------------------------------- |
+| Zod schema (`_zod` or `_def` present) | `safeParseAsync` from the upstream SDK   |
+| Plain JSON Schema                     | `PolyfillJsonSchemaValidator` (built-in) |
 
 Input schemas without a `type` field receive `type: "object"` automatically. Empty `{}` schemas default to `{ type: "object", properties: {} }`.
 

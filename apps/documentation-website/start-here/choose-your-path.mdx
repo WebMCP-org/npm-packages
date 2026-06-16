@@ -1,9 +1,18 @@
 ---
-title: "Start Here"
-description: "Choose the right path through the docs based on what you want to build with WebMCP and MCP-B."
-keywords: ["getting started", "webmcp", "choose runtime", "react", "mcp-b packages", "tutorials", "quickstart"]
-icon: "signs-post"
-mode: "wide"
+title: 'Start Here'
+description: 'Choose the right path through the docs based on what you want to build with WebMCP and MCP-B.'
+keywords:
+  [
+    'getting started',
+    'webmcp',
+    'choose runtime',
+    'react',
+    'mcp-b packages',
+    'tutorials',
+    'quickstart',
+  ]
+icon: 'signs-post'
+mode: 'wide'
 ---
 
 # Start Here
@@ -11,7 +20,8 @@ mode: "wide"
 Use this page when you want help choosing the right docs path. If you want the overview first, start on the [homepage](/).
 
 <Note>
-  Start with the smallest layer that fits the job. If you are unsure, read [Choose a runtime](/how-to/choose-runtime).
+  Start with the smallest layer that fits the job. If you are unsure, read [Choose a
+  runtime](/how-to/choose-runtime).
 </Note>
 
 ## Pick a starting point by role
@@ -24,6 +34,7 @@ Use this page when you want help choosing the right docs path. If you want the o
     - [Build your first tool](/tutorials/first-tool) (tutorial)
     - [Add tools to an existing app](/how-to/add-tools-to-an-existing-app) (how-to)
     - [Choose a runtime](/how-to/choose-runtime) (how-to)
+
   </Card>
   <Card title="React developer" icon="react">
     You build React apps and want hook-based registration with automatic cleanup.
@@ -32,6 +43,7 @@ Use this page when you want help choosing the right docs path. If you want the o
     - [Build your first React tool](/tutorials/first-react-tool) (tutorial)
     - [Framework integration guide](/how-to/frameworks) (how-to)
     - [@mcp-b/react-webmcp reference](/packages/react-webmcp/reference) (reference)
+
   </Card>
   <Card title="AI agent builder" icon="robot">
     You build AI agents or MCP clients and want to call tools from websites.
@@ -40,6 +52,7 @@ Use this page when you want help choosing the right docs path. If you want the o
     - [Connect desktop agents with local relay](/tutorials/desktop-agent-relay) (tutorial)
     - [Use DevTools MCP](/how-to/use-devtools-mcp) (how-to)
     - [Transports reference](/packages/transports/reference) (reference)
+
   </Card>
 </Columns>
 
@@ -124,7 +137,8 @@ Use this page when you want help choosing the right docs path. If you want the o
     arrow={true}
     horizontal
   >
-    Start with package overviews and package references before diving into the standard-only reference pages.
+    Start with package overviews and package references before diving into the standard-only
+    reference pages.
   </Card>
 </Columns>
 
@@ -141,6 +155,7 @@ Pick the smallest layer that fits the job. For more background on the boundary, 
     ```
 
     [Reference](/packages/webmcp-types/reference)
+
   </Step>
   <Step title="Strict core polyfill: @mcp-b/webmcp-polyfill">
     Install the WebMCP surface on `document.modelContext` without MCP-B extensions. Use this when you want the browser proposal draft in browsers today.
@@ -150,6 +165,7 @@ Pick the smallest layer that fits the job. For more background on the boundary, 
     ```
 
     [Reference](/packages/webmcp-polyfill/reference)
+
   </Step>
   <Step title="Full runtime: @mcp-b/global">
     Add the MCP-B runtime layer on top of the core. Use this when you need transport, `listTools()`, `callTool()`, prompts, resources, or browser-to-desktop connectivity.
@@ -159,6 +175,7 @@ Pick the smallest layer that fits the job. For more background on the boundary, 
     ```
 
     [Reference](/packages/global/reference) | [Choose a runtime](/how-to/choose-runtime)
+
   </Step>
   <Step title="React hooks: @mcp-b/react-webmcp or usewebmcp">
     **`@mcp-b/react-webmcp`** provides hooks for the full MCP-B runtime, including provider and client patterns, Zod schema support, and execution state tracking.
@@ -174,11 +191,13 @@ Pick the smallest layer that fits the job. For more background on the boundary, 
     ```
 
     [react-webmcp reference](/packages/react-webmcp/reference) | [usewebmcp reference](/packages/usewebmcp/reference) | [Framework guide](/how-to/frameworks)
+
   </Step>
 </Steps>
 
 <Note>
-  Not sure which package to pick? Read [Choose a runtime](/how-to/choose-runtime) for the detailed comparison.
+  Not sure which package to pick? Read [Choose a runtime](/how-to/choose-runtime) for the detailed
+  comparison.
 </Note>
 
 ## Use the main docs tabs

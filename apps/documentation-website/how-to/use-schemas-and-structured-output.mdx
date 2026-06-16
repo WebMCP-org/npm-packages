@@ -1,8 +1,18 @@
 ---
-title: "Use Schemas and Structured Output"
-description: "Define tool input schemas with JSON Schema, Standard Schema, or Zod, and add output schemas for typed agent responses."
-keywords: ["inputSchema", "outputSchema", "json schema", "zod", "standard schema", "structured output", "type inference", "validation"]
-icon: "brackets-curly"
+title: 'Use Schemas and Structured Output'
+description: 'Define tool input schemas with JSON Schema, Standard Schema, or Zod, and add output schemas for typed agent responses.'
+keywords:
+  [
+    'inputSchema',
+    'outputSchema',
+    'json schema',
+    'zod',
+    'standard schema',
+    'structured output',
+    'type inference',
+    'validation',
+  ]
+icon: 'brackets-curly'
 ---
 
 ## Define input schemas
@@ -108,7 +118,9 @@ document.modelContext.registerTool({
 **Use this when** you want runtime validation (not just compile-time types) and already use a Standard Schema-compatible library.
 
 <Note>
-  When both a Standard Schema validator and Standard JSON Schema are present on the same object, JSON Schema conversion is preferred for validation parity. The runtime attempts conversion with `draft-2020-12` first, then falls back to `draft-07`.
+  When both a Standard Schema validator and Standard JSON Schema are present on the same object,
+  JSON Schema conversion is preferred for validation parity. The runtime attempts conversion with
+  `draft-2020-12` first, then falls back to `draft-07`.
 </Note>
 
 ### Zod with `@mcp-b/react-webmcp`
@@ -139,11 +151,11 @@ function SearchTool() {
 
 ### Choosing a schema style
 
-| Style | Dependencies | Runtime validation | Type inference | Best for |
-|-------|-------------|-------------------|----------------|----------|
-| Plain JSON Schema | None | No | No | Quick prototyping, zero-dep projects |
-| JSON Schema + `as const` | `@mcp-b/webmcp-types` (dev) | No | Yes | TypeScript projects without a schema library |
-| Standard Schema (Zod, etc.) | Schema library | Yes | Yes | Production apps that need runtime validation |
+| Style                       | Dependencies                | Runtime validation | Type inference | Best for                                     |
+| --------------------------- | --------------------------- | ------------------ | -------------- | -------------------------------------------- |
+| Plain JSON Schema           | None                        | No                 | No             | Quick prototyping, zero-dep projects         |
+| JSON Schema + `as const`    | `@mcp-b/webmcp-types` (dev) | No                 | Yes            | TypeScript projects without a schema library |
+| Standard Schema (Zod, etc.) | Schema library              | Yes                | Yes            | Production apps that need runtime validation |
 
 ## Define output schemas
 
@@ -210,7 +222,8 @@ export function CounterTool() {
 ```
 
 <Warning>
-  If `outputSchema` is defined, the tool implementation must return a JSON-serializable object. Returning a non-object value (`string`, `null`, array) causes an error response.
+  If `outputSchema` is defined, the tool implementation must return a JSON-serializable object.
+  Returning a non-object value (`string`, `null`, array) causes an error response.
 </Warning>
 
 ### Keep text and structure aligned
@@ -232,6 +245,7 @@ If you omit `content` and return only the structured data, the runtime wraps it 
 ### When to use output schemas
 
 Add `outputSchema` when:
+
 - The AI agent needs to pass your tool's result to another tool (structured data enables chaining).
 - You want compile-time type checking on the return value.
 - You need the agent to parse specific fields from the response rather than interpreting free text.

@@ -1,8 +1,18 @@
 ---
-title: "Connect Desktop Agents with the Local Relay"
-description: "Expose website WebMCP tools to Claude, Cursor, Windsurf, and other desktop MCP clients through a local relay server."
-keywords: ["@mcp-b/webmcp-local-relay", "local relay", "desktop agent", "claude desktop", "cursor", "websocket", "stdio", "embed.js"]
-icon: "tower-broadcast"
+title: 'Connect Desktop Agents with the Local Relay'
+description: 'Expose website WebMCP tools to Claude, Cursor, Windsurf, and other desktop MCP clients through a local relay server.'
+keywords:
+  [
+    '@mcp-b/webmcp-local-relay',
+    'local relay',
+    'desktop agent',
+    'claude desktop',
+    'cursor',
+    'websocket',
+    'stdio',
+    'embed.js',
+  ]
+icon: 'tower-broadcast'
 ---
 
 This guide shows you how to bridge WebMCP tools from browser tabs to desktop AI agents using `@mcp-b/webmcp-local-relay`.
@@ -45,10 +55,13 @@ Add the relay server to your MCP client configuration. This works with Claude De
 ```bash "Claude Code"
 claude mcp add webmcp-local-relay npx @mcp-b/webmcp-local-relay@latest
 ```
+
 </CodeGroup>
 
 <Note>
-For Claude Desktop, you can also download the `.mcpb` bundle from [GitHub Releases](https://github.com/WebMCP-org/npm-packages/releases) and double-click to install. No terminal required.
+  For Claude Desktop, you can also download the `.mcpb` bundle from [GitHub
+  Releases](https://github.com/WebMCP-org/npm-packages/releases) and double-click to install. No
+  terminal required.
 </Note>
 
 ## Add the embed script to your page
@@ -80,19 +93,22 @@ If you are new to WebMCP, register tools first with `@mcp-b/global`, then load t
 
 Once the relay is running and your page has loaded `embed.js`, your AI agent has access to four management tools:
 
-| Tool | What it does |
-|------|-------------|
-| `webmcp_list_sources` | Lists connected browser tabs with metadata (tab ID, origin, URL, title, tool count) |
-| `webmcp_list_tools` | Lists all relayed tools with source info |
-| `webmcp_call_tool` | Invokes a relayed tool by name (for clients that do not support dynamic tool registration) |
-| `webmcp_open_page` | Opens a URL in the default browser or refreshes a connected source page by matching origin |
+| Tool                  | What it does                                                                               |
+| --------------------- | ------------------------------------------------------------------------------------------ |
+| `webmcp_list_sources` | Lists connected browser tabs with metadata (tab ID, origin, URL, title, tool count)        |
+| `webmcp_list_tools`   | Lists all relayed tools with source info                                                   |
+| `webmcp_call_tool`    | Invokes a relayed tool by name (for clients that do not support dynamic tool registration) |
+| `webmcp_open_page`    | Opens a URL in the default browser or refreshes a connected source page by matching origin |
 
 Tools also register as first-class MCP tools using their original name. When multiple tabs register a tool with the same name, the relay appends a short tab-ID suffix for disambiguation (e.g. `search_ed93`, `search_a1b2`).
 
 Ask your agent to list sources or tools to confirm the connection is working. Try [webmcp.sh](https://webmcp.sh) as a test target; it registers tools for SQL queries, entity management, navigation, and more.
 
 <Frame caption="webmcp.sh: a live demo app with WebMCP tools you can relay to any desktop agent">
-  <img src="/images/webmcp-sh-homepage.png" alt="webmcp.sh landing page showing registered WebMCP tools" />
+  <img
+    src="/images/webmcp-sh-homepage.png"
+    alt="webmcp.sh landing page showing registered WebMCP tools"
+  />
 </Frame>
 
 ## Use a custom port
@@ -136,12 +152,12 @@ If the server relay stops, the client promotes itself back to server mode. This 
 
 ## Troubleshoot common issues
 
-| Problem | Fix |
-|---------|-----|
-| `No sources connected` | Confirm the page loaded `embed.js` and the relay process is running |
-| `No tools listed` | Confirm tools are registered on the page before `embed.js` loads. If tools register after load, ensure your runtime emits tool-change notifications |
-| `Tool not found` | The tab reloaded or disconnected. Call `webmcp_list_tools` to refresh |
-| Connection blocked | Verify `--widget-origin` matches your host page origin and the relay port matches `data-relay-port` |
+| Problem                | Fix                                                                                                                                                 |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `No sources connected` | Confirm the page loaded `embed.js` and the relay process is running                                                                                 |
+| `No tools listed`      | Confirm tools are registered on the page before `embed.js` loads. If tools register after load, ensure your runtime emits tool-change notifications |
+| `Tool not found`       | The tab reloaded or disconnected. Call `webmcp_list_tools` to refresh                                                                               |
+| Connection blocked     | Verify `--widget-origin` matches your host page origin and the relay port matches `data-relay-port`                                                 |
 
 If the relay is temporarily unavailable, the embed widget reconnects automatically with exponential backoff (500 ms to 3 s, up to 100 attempts).
 

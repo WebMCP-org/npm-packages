@@ -1,16 +1,24 @@
 ---
-title: "Try the Native Chrome Preview"
+title: 'Try the Native Chrome Preview'
 description: "Enable Chrome's experimental WebMCP flag, open an official Chrome demo, and inspect it with the Chrome team's extension."
-keywords: ["chrome", "native", "browser flag", "document.modelcontext", "model context tool inspector", "experimental"]
-icon: "chrome"
+keywords:
+  [
+    'chrome',
+    'native',
+    'browser flag',
+    'document.modelcontext',
+    'model context tool inspector',
+    'experimental',
+  ]
+icon: 'chrome'
 ---
 
 In this tutorial, we will enable Chrome's native WebMCP preview, open one of the Chrome team's live demos, and inspect its tools with the official Model Context Tool Inspector. By the end, you will have seen the native `document.modelContext` API running in Chrome without any MCP-B runtime involved.
 
 <Note>
-WebMCP is an experimental browser preview. The flag name and API can change
-between Chrome releases. For production use, follow the polyfill path in
-[Build Your First Tool](/tutorials/first-tool).
+  WebMCP is an experimental browser preview. The flag name and API can change between Chrome
+  releases. For production use, follow the polyfill path in [Build Your First
+  Tool](/tutorials/first-tool).
 </Note>
 
 ## Prerequisites
@@ -61,8 +69,8 @@ You are now on a page that registers tools through Chrome's native preview.
 Run:
 
 ```javascript
-console.log("modelContext:", !!document.modelContext);
-console.log("modelContextTesting:", !!navigator.modelContextTesting);
+console.log('modelContext:', !!document.modelContext);
+console.log('modelContextTesting:', !!navigator.modelContextTesting);
 ```
 
 You should see:
@@ -103,8 +111,8 @@ Run this in the console:
 
 ```javascript
 const result = await navigator.modelContextTesting.executeTool(
-  "add_topping",
-  JSON.stringify({ topping: "🍄" })
+  'add_topping',
+  JSON.stringify({ topping: '🍄' })
 );
 console.log(result);
 ```
@@ -118,7 +126,7 @@ You should see the pizza update in the page, and the console should show the too
 Run:
 
 ```javascript
-console.log("Constructor:", document.modelContext.constructor.name);
+console.log('Constructor:', document.modelContext.constructor.name);
 ```
 
 On this Chrome-team demo, there is no `@mcp-b/global` or `@mcp-b/webmcp-polyfill` involved. You are looking at the browser preview itself.

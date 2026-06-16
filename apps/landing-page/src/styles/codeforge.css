@@ -1,8 +1,8 @@
-@import "tailwindcss";
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
-@import "./sigvelo-public.css";
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+@import '@fontsource-variable/geist';
+@import './sigvelo-public.css';
 
 @custom-variant dark (&:is(.dark *));
 

@@ -1,8 +1,9 @@
 ---
-title: "@mcp-b/webmcp-ts-sdk overview"
-description: "When to use BrowserMcpServer directly, why the browser-adapted SDK exists, and where it fits between the polyfill and application runtime."
-keywords: ["@mcp-b/webmcp-ts-sdk", "overview", "BrowserMcpServer", "dynamic tool registration", "SDK"]
-icon: "layer-group"
+title: '@mcp-b/webmcp-ts-sdk overview'
+description: 'When to use BrowserMcpServer directly, why the browser-adapted SDK exists, and where it fits between the polyfill and application runtime.'
+keywords:
+  ['@mcp-b/webmcp-ts-sdk', 'overview', 'BrowserMcpServer', 'dynamic tool registration', 'SDK']
+icon: 'layer-group'
 ---
 
 `@mcp-b/webmcp-ts-sdk` exposes `BrowserMcpServer`, the browser-adapted SDK layer that keeps the MCP transport model working even when tools register after the connection is already open.
@@ -32,7 +33,11 @@ Create a `BrowserMcpServer`, connect a transport, then register tools as your pa
   <Card title="Reference" icon="book-open" href="/packages/webmcp-ts-sdk/reference">
     BrowserMcpServer APIs, dynamic registration behavior, and backfill helpers.
   </Card>
-  <Card title="Runtime layering" icon="bars-staggered" href="/explanation/architecture/runtime-layering">
+  <Card
+    title="Runtime layering"
+    icon="bars-staggered"
+    href="/explanation/architecture/runtime-layering"
+  >
     See how this layer fits between the polyfill and @mcp-b/global.
   </Card>
   <Card title="WebMCP vs MCP" icon="arrows-left-right" href="/explanation/webmcp-vs-mcp">

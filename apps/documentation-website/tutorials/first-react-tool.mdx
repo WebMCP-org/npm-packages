@@ -1,8 +1,8 @@
 ---
-title: "Build Your First React Tool"
-description: "Register a WebMCP tool from a React component using the useWebMCP hook, and verify it from the browser console."
-keywords: ["react", "usewebmcp", "hook", "webmcp-polyfill", "vite", "registertool", "component"]
-icon: "react"
+title: 'Build Your First React Tool'
+description: 'Register a WebMCP tool from a React component using the useWebMCP hook, and verify it from the browser console.'
+keywords: ['react', 'usewebmcp', 'hook', 'webmcp-polyfill', 'vite', 'registertool', 'component']
+icon: 'react'
 ---
 
 In this tutorial, we will create a minimal React app that registers one WebMCP tool using the `useWebMCP` hook. The hook handles registration on mount and cleanup on unmount automatically. By the end, you will have a React component that exposes a tool to AI agents and shows execution state in the UI.
@@ -95,15 +95,14 @@ export function App() {
       <h1>My First React WebMCP Tool</h1>
       <p>Tool "say_hello" registered.</p>
       <p>Executions: {helloTool.state.executionCount}</p>
-      <p>Last result: {helloTool.state.lastResult
-        ? JSON.stringify(helloTool.state.lastResult)
-        : 'none'}</p>
+      <p>
+        Last result:{' '}
+        {helloTool.state.lastResult ? JSON.stringify(helloTool.state.lastResult) : 'none'}
+      </p>
       {helloTool.state.error && (
         <p style={{ color: 'red' }}>Error: {helloTool.state.error.message}</p>
       )}
-      <button onClick={() => helloTool.execute({ name: 'React' })}>
-        Run Tool Locally
-      </button>
+      <button onClick={() => helloTool.execute({ name: 'React' })}>Run Tool Locally</button>
     </div>
   );
 }
@@ -156,8 +155,8 @@ You should see an array containing your `say_hello` tool. Now call it through th
 
 ```javascript
 const result = await navigator.modelContextTesting.executeTool(
-  "say_hello",
-  JSON.stringify({ name: "Console" })
+  'say_hello',
+  JSON.stringify({ name: 'Console' })
 );
 console.log(JSON.parse(result));
 ```
@@ -188,11 +187,11 @@ import { App } from './App';
 initializeWebMCPPolyfill();
 
 createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>
-);
-```
+
+<StrictMode>
+  <App />
+</StrictMode>
+); ```
 
 ```tsx src/App.tsx
 import { useWebMCP } from 'usewebmcp';
@@ -219,19 +218,19 @@ export function App() {
       <h1>My First React WebMCP Tool</h1>
       <p>Tool "say_hello" registered.</p>
       <p>Executions: {helloTool.state.executionCount}</p>
-      <p>Last result: {helloTool.state.lastResult
-        ? JSON.stringify(helloTool.state.lastResult)
-        : 'none'}</p>
+      <p>
+        Last result:{' '}
+        {helloTool.state.lastResult ? JSON.stringify(helloTool.state.lastResult) : 'none'}
+      </p>
       {helloTool.state.error && (
         <p style={{ color: 'red' }}>Error: {helloTool.state.error.message}</p>
       )}
-      <button onClick={() => helloTool.execute({ name: 'React' })}>
-        Run Tool Locally
-      </button>
+      <button onClick={() => helloTool.execute({ name: 'React' })}>Run Tool Locally</button>
     </div>
   );
 }
 ```
+
 </CodeGroup>
 
 ## What you learned

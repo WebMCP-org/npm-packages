@@ -1,7 +1,8 @@
 ---
-title: "Integrate with your framework"
-description: "Register WebMCP tools in React, Vue, Svelte, Angular, Next.js, Astro, or vanilla JS using framework-native lifecycle patterns."
-keywords: ["react", "vue", "svelte", "angular", "nextjs", "astro", "vanilla", "framework", "integration"]
+title: 'Integrate with your framework'
+description: 'Register WebMCP tools in React, Vue, Svelte, Angular, Next.js, Astro, or vanilla JS using framework-native lifecycle patterns.'
+keywords:
+  ['react', 'vue', 'svelte', 'angular', 'nextjs', 'astro', 'vanilla', 'framework', 'integration']
 ---
 
 Register WebMCP tools in any frontend framework by following its native lifecycle patterns. For cross-cutting patterns like conditional registration, error handling, and annotations, see [Add Tools to an Existing App](/how-to/add-tools-to-an-existing-app).
@@ -29,6 +30,7 @@ Register WebMCP tools in any frontend framework by following its native lifecycl
     </CodeGroup>
 
     `@mcp-b/global` accesses browser APIs on import. If you use SSR, see [Handle SSR](#handle-ssr) for required guards.
+
   </Tab>
   <Tab title="@mcp-b/webmcp-polyfill (strict core)">
     Strict-core only: installs `document.modelContext` with `registerTool` and `unregisterTool`. No MCP extensions, no transports.
@@ -40,11 +42,13 @@ Register WebMCP tools in any frontend framework by following its native lifecycl
     The polyfill checks for a browser environment internally and is SSR-safe. No client guards needed.
 
     For details on when to use the polyfill vs the full runtime, see [Choose a Runtime](/how-to/choose-runtime).
+
   </Tab>
 </Tabs>
 
 <Note>
-React users also need a hook package. Install `@mcp-b/react-webmcp` (recommended) or `usewebmcp` alongside your chosen runtime. See [Choose a hook package](#choose-a-react-hook-package) below.
+  React users also need a hook package. Install `@mcp-b/react-webmcp` (recommended) or `usewebmcp`
+  alongside your chosen runtime. See [Choose a hook package](#choose-a-react-hook-package) below.
 </Note>
 
 ## Initialize at your entry point
@@ -60,6 +64,7 @@ Import `@mcp-b/global` once before any component mounts. The import is a side ef
 
     createRoot(document.getElementById('root')!).render(<App />);
     ```
+
   </Tab>
   <Tab title="Vue">
     ```typescript "src/main.ts"
@@ -69,6 +74,7 @@ Import `@mcp-b/global` once before any component mounts. The import is a side ef
 
     createApp(App).mount('#app');
     ```
+
   </Tab>
   <Tab title="Svelte">
     ```typescript "src/main.ts"
@@ -78,6 +84,7 @@ Import `@mcp-b/global` once before any component mounts. The import is a side ef
     const app = new App({ target: document.getElementById('app')! });
     export default app;
     ```
+
   </Tab>
   <Tab title="Angular">
     ```typescript "src/main.ts"
@@ -87,6 +94,7 @@ Import `@mcp-b/global` once before any component mounts. The import is a side ef
 
     bootstrapApplication(AppComponent);
     ```
+
   </Tab>
   <Tab title="Next.js">
     Next.js App Router defaults to Server Components. Import `@mcp-b/global` in a Client Component layout, not the root layout.
@@ -106,6 +114,7 @@ Import `@mcp-b/global` once before any component mounts. The import is a side ef
     <Warning>
     Do not make your root layout a Client Component. This disables SSR for your entire application.
     </Warning>
+
   </Tab>
   <Tab title="Astro">
     Import inside a `<script>` tag. Astro processes these through its bundler and runs them on the client.
@@ -123,6 +132,7 @@ Import `@mcp-b/global` once before any component mounts. The import is a side ef
       <script src="https://unpkg.com/@mcp-b/global@latest/dist/index.iife.js"></script>
     </head>
     ```
+
   </Tab>
   <Tab title="Vanilla JS">
     ```typescript "src/main.ts"
@@ -134,6 +144,7 @@ Import `@mcp-b/global` once before any component mounts. The import is a side ef
     ```html "index.html"
     <script src="https://unpkg.com/@mcp-b/global@latest/dist/index.iife.js"></script>
     ```
+
   </Tab>
 </Tabs>
 
@@ -184,6 +195,7 @@ Each framework has its own lifecycle hooks for mount and unmount. Register tools
       );
     }
     ```
+
   </Tab>
   <Tab title="Vue">
     Call `registerTool()` in `onMounted` and `unregisterTool()` in `onUnmounted`. The `execute` function can read and write Vue reactive state through `.value` access.
@@ -222,6 +234,7 @@ Each framework has its own lifecycle hooks for mount and unmount. Register tools
       <p>Count: {{ count }}</p>
     </template>
     ```
+
   </Tab>
   <Tab title="Svelte">
     Use `onMount` to register and `onDestroy` to unregister. Svelte 5 runes work in the execute handler.
@@ -258,6 +271,7 @@ Each framework has its own lifecycle hooks for mount and unmount. Register tools
 
     <p>Count: {count}</p>
     ```
+
   </Tab>
   <Tab title="Angular">
     Use `ngOnInit` to register and `ngOnDestroy` to unregister.
@@ -299,6 +313,7 @@ Each framework has its own lifecycle hooks for mount and unmount. Register tools
       }
     }
     ```
+
   </Tab>
   <Tab title="Next.js">
     Mark tool components with `'use client'` and use the same React hooks.
@@ -326,6 +341,7 @@ Each framework has its own lifecycle hooks for mount and unmount. Register tools
       return null;
     }
     ```
+
   </Tab>
   <Tab title="Astro">
     Register tools inside a `<script>` tag. Astro bundles and deduplicates these scripts automatically.
@@ -354,6 +370,7 @@ Each framework has its own lifecycle hooks for mount and unmount. Register tools
       document.modelContext.unregisterTool('get_page_title');
     });
     ```
+
   </Tab>
   <Tab title="Vanilla JS">
     Call `registerTool()` directly after importing the runtime.
@@ -378,6 +395,7 @@ Each framework has its own lifecycle hooks for mount and unmount. Register tools
     ```typescript
     document.modelContext.unregisterTool('get-page-title');
     ```
+
   </Tab>
 </Tabs>
 
@@ -417,6 +435,7 @@ React already has dedicated hook packages (`@mcp-b/react-webmcp` and `usewebmcp`
     });
     </script>
     ```
+
   </Tab>
   <Tab title="Svelte action">
     ```typescript "src/lib/actions/webmcp.ts"
@@ -450,6 +469,7 @@ React already has dedicated hook packages (`@mcp-b/react-webmcp` and `usewebmcp`
       Content here
     </div>
     ```
+
   </Tab>
   <Tab title="Angular service">
     ```typescript "src/app/webmcp.service.ts"
@@ -508,6 +528,7 @@ React already has dedicated hook packages (`@mcp-b/react-webmcp` and `usewebmcp`
       }
     }
     ```
+
   </Tab>
 </Tabs>
 
@@ -523,6 +544,7 @@ React already has dedicated hook packages (`@mcp-b/react-webmcp` and `usewebmcp`
     import dynamic from 'next/dynamic';
     const BrowserOnly = dynamic(() => import('./BrowserOnly'), { ssr: false });
     ```
+
   </Tab>
   <Tab title="Nuxt / Vue SSR">
     In Nuxt, guard with `import.meta.client`:
@@ -553,6 +575,7 @@ React already has dedicated hook packages (`@mcp-b/react-webmcp` and `usewebmcp`
     });
     </script>
     ```
+
   </Tab>
   <Tab title="SvelteKit">
     Guard with `browser` from `$app/environment`:
@@ -585,6 +608,7 @@ React already has dedicated hook packages (`@mcp-b/react-webmcp` and `usewebmcp`
     ```
 
     To persist tools across route navigations in SvelteKit, register them in `+layout.svelte` instead of `+page.svelte`.
+
   </Tab>
   <Tab title="Angular Universal">
     Guard with `isPlatformBrowser`:
@@ -622,6 +646,7 @@ React already has dedicated hook packages (`@mcp-b/react-webmcp` and `usewebmcp`
       }
     }
     ```
+
   </Tab>
   <Tab title="Astro">
     Astro renders pages as static HTML by default. Code inside `<script>` tags runs on the client only, so no guard is needed for standard Astro pages. For framework islands, use `client:load` or `client:only`:
@@ -633,6 +658,7 @@ React already has dedicated hook packages (`@mcp-b/react-webmcp` and `usewebmcp`
 
     <DashboardTools client:load />
     ```
+
   </Tab>
 </Tabs>
 

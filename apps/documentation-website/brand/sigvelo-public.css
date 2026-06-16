@@ -3,8 +3,8 @@
  */
 
 :root,
-:root[data-theme="light"],
-html[data-theme="light"],
+:root[data-theme='light'],
+html[data-theme='light'],
 html:not(.dark) {
   --sigvelo-public-canvas: #f8fafc;
   --sigvelo-public-panel: #eef2f4;
@@ -20,8 +20,8 @@ html:not(.dark) {
   --sigvelo-public-focus: #111827;
 }
 
-:root[data-theme="dark"],
-html[data-theme="dark"],
+:root[data-theme='dark'],
+html[data-theme='dark'],
 html.dark {
   --sigvelo-public-canvas: #081117;
   --sigvelo-public-panel: #0e1b23;

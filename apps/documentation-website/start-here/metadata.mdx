@@ -1,8 +1,8 @@
 ---
-title: "Project metadata"
-description: "MCP endpoint, files, versioning policy, and changelog for WebMCP packages."
-keywords: ["mcp endpoint", "changelog", "versioning", "releases"]
-sidebarTitle: "Project metadata"
+title: 'Project metadata'
+description: 'MCP endpoint, files, versioning policy, and changelog for WebMCP packages.'
+keywords: ['mcp endpoint', 'changelog', 'versioning', 'releases']
+sidebarTitle: 'Project metadata'
 ---
 
 ## Docs MCP endpoint
@@ -98,9 +98,7 @@ Restart Windsurf after saving.
 
 <Accordion title="ChatGPT">
 
-<Note>
-MCP support in ChatGPT requires a paid plan with Developer Mode enabled.
-</Note>
+<Note>MCP support in ChatGPT requires a paid plan with Developer Mode enabled.</Note>
 
 1. Enable **Developer Mode** in ChatGPT settings.
 2. Go to **Settings**, then **Connectors**.
@@ -138,10 +136,10 @@ Mintlify automatically generates and hosts two files at the root of the document
 
 ### Files
 
-| File | URL | Contents |
-|------|-----|----------|
-| `llms.txt` | [docs.mcp-b.ai/llms.txt](https://docs.mcp-b.ai/llms.txt) | Site overview, quick start, package table, sitemap with page titles |
-| `llms-full.txt` | [docs.mcp-b.ai/llms-full.txt](https://docs.mcp-b.ai/llms-full.txt) | Full rendered content of every page, concatenated into one file |
+| File            | URL                                                                | Contents                                                            |
+| --------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------- |
+| `llms.txt`      | [docs.mcp-b.ai/llms.txt](https://docs.mcp-b.ai/llms.txt)           | Site overview, quick start, package table, sitemap with page titles |
+| `llms-full.txt` | [docs.mcp-b.ai/llms-full.txt](https://docs.mcp-b.ai/llms-full.txt) | Full rendered content of every page, concatenated into one file     |
 
 ### How they are generated
 
@@ -174,41 +172,41 @@ WebMCP uses [Changesets](https://github.com/changesets/changesets) for versionin
 
 ### Where to find changelogs
 
-| Source | What it covers |
-|--------|---------------|
-| [GitHub Releases](https://github.com/WebMCP-org/npm-packages/releases) | Per-release notes with links to PRs and commits |
-| [npm version history](https://www.npmjs.com/package/@mcp-b/global?activeTab=versions) | Published versions for any `@mcp-b/*` package |
-| Git log (`chore(release): version packages`) | Changeset-generated version bumps in the monorepo |
+| Source                                                                                | What it covers                                    |
+| ------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| [GitHub Releases](https://github.com/WebMCP-org/npm-packages/releases)                | Per-release notes with links to PRs and commits   |
+| [npm version history](https://www.npmjs.com/package/@mcp-b/global?activeTab=versions) | Published versions for any `@mcp-b/*` package     |
+| Git log (`chore(release): version packages`)                                          | Changeset-generated version bumps in the monorepo |
 
 ### Versioning policy
 
 All packages follow [Semantic Versioning](https://semver.org/):
 
-| Increment | Meaning |
-|-----------|---------|
-| Major (X.0.0) | Breaking API changes |
+| Increment     | Meaning                           |
+| ------------- | --------------------------------- |
+| Major (X.0.0) | Breaking API changes              |
 | Minor (0.X.0) | New features, backward compatible |
-| Patch (0.0.X) | Bug fixes, backward compatible |
+| Patch (0.0.X) | Bug fixes, backward compatible    |
 
 ### Package scope
 
 The monorepo publishes the following packages. Each has its own version number.
 
-| Package | Purpose |
-|---------|---------|
-| `@mcp-b/global` | Entry point, auto-initializes polyfill and server |
-| `@mcp-b/webmcp-polyfill` | Polyfills `document.modelContext` |
-| `@mcp-b/webmcp-ts-sdk` | BrowserMcpServer with MCP extensions |
-| `@mcp-b/webmcp-types` | Zero-runtime TypeScript types |
-| `@mcp-b/react-webmcp` | React hooks for tool registration |
-| `usewebmcp` | Strict-core React hook |
-| `@mcp-b/transports` | Tab and iframe transports |
-| `@mcp-b/mcp-iframe` | Iframe MCP communication |
-| `@mcp-b/chrome-devtools-mcp` | DevTools Protocol bridge |
-| `@mcp-b/extension-tools` | Browser extension utilities |
-| `@mcp-b/smart-dom-reader` | DOM content extraction |
-| `agent-skills-ts-sdk` | Skill parser and validator |
-| `@mcp-b/webmcp-local-relay` | Local relay server for desktop agents |
+| Package                      | Purpose                                           |
+| ---------------------------- | ------------------------------------------------- |
+| `@mcp-b/global`              | Entry point, auto-initializes polyfill and server |
+| `@mcp-b/webmcp-polyfill`     | Polyfills `document.modelContext`                 |
+| `@mcp-b/webmcp-ts-sdk`       | BrowserMcpServer with MCP extensions              |
+| `@mcp-b/webmcp-types`        | Zero-runtime TypeScript types                     |
+| `@mcp-b/react-webmcp`        | React hooks for tool registration                 |
+| `usewebmcp`                  | Strict-core React hook                            |
+| `@mcp-b/transports`          | Tab and iframe transports                         |
+| `@mcp-b/mcp-iframe`          | Iframe MCP communication                          |
+| `@mcp-b/chrome-devtools-mcp` | DevTools Protocol bridge                          |
+| `@mcp-b/extension-tools`     | Browser extension utilities                       |
+| `@mcp-b/smart-dom-reader`    | DOM content extraction                            |
+| `agent-skills-ts-sdk`        | Skill parser and validator                        |
+| `@mcp-b/webmcp-local-relay`  | Local relay server for desktop agents             |
 
 ### Reporting issues
 

@@ -1,8 +1,8 @@
 ---
-title: "@mcp-b/mcp-iframe overview"
-description: "When to use the iframe custom element, how it differs from raw transports, and what assumptions it makes about the child page."
-keywords: ["@mcp-b/mcp-iframe", "overview", "iframe bridge", "custom element", "tool forwarding"]
-icon: "frame"
+title: '@mcp-b/mcp-iframe overview'
+description: 'When to use the iframe custom element, how it differs from raw transports, and what assumptions it makes about the child page.'
+keywords: ['@mcp-b/mcp-iframe', 'overview', 'iframe bridge', 'custom element', 'tool forwarding']
+icon: 'frame'
 ---
 
 `@mcp-b/mcp-iframe` wraps the iframe transport flow in a custom element. It is the package to use when you want to expose an iframe's tools, prompts, or resources to the parent page without manually wiring transport classes.
@@ -32,13 +32,21 @@ Expose `document.modelContext` inside the iframe, then import `@mcp-b/mcp-iframe
   <Card title="Reference" icon="book-open" href="/packages/mcp-iframe/reference">
     Element registration, attributes, methods, and event contract.
   </Card>
-  <Card title="Bridge tools across iframes" icon="bridge" href="/how-to/bridge-tools-across-iframes">
+  <Card
+    title="Bridge tools across iframes"
+    icon="bridge"
+    href="/how-to/bridge-tools-across-iframes"
+  >
     Set up a parent-child iframe bridge step by step.
   </Card>
   <Card title="Transports overview" icon="network-wired" href="/packages/transports/overview">
     Inspect the underlying iframe transport classes.
   </Card>
-  <Card title="Spec status and limitations" icon="flag" href="/explanation/design/spec-status-and-limitations">
+  <Card
+    title="Spec status and limitations"
+    icon="flag"
+    href="/explanation/design/spec-status-and-limitations"
+  >
     Background on cross-document exposure questions that still affect iframe behavior.
   </Card>
 </CardGroup>
