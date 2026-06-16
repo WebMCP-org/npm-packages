@@ -1,7 +1,7 @@
 {
   "name": "@mcp-b/global",
   "version": "3.0.0",
-  "description": "W3C Web Model Context API polyfill - Let AI agents like Claude, ChatGPT, and Gemini interact with your website via navigator.modelContext",
+  "description": "W3C Web Model Context Protocol (WebMCP) API polyfill. Let AI agents like Claude, ChatGPT, and Gemini interact with your website via document.modelContext.",
   "keywords": [
     "ai-agents",
     "ai-assistant",
@@ -30,7 +30,7 @@
     "web-standard",
     "webmcp"
   ],
-  "homepage": "https://docs.mcp-b.ai/packages/global",
+  "homepage": "https://docs.mcp-b.ai/packages/global/reference",
   "bugs": {
     "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },

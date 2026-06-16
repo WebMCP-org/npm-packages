@@ -1,0 +1,23 @@
+---
+title: "What is WebMCP?"
+description: "Why WebMCP exists, what the browser standard defines, and where MCP-B adds tooling."
+keywords: ["webmcp", "document.modelContext", "web standard", "mcp-b"]
+icon: "circle-question"
+---
+
+WebMCP gives websites a browser-native way to publish structured tools through
+`document.modelContext`. The tools run inside the page's origin, authenticated
+session, application state, and visible browser context.
+
+That location is the point of the design. Agents get an explicit capability
+contract from the site instead of inferring intent from screenshots, DOM shape,
+or brittle automation scripts.
+
+The [W3C WebMCP specification](https://webmachinelearning.github.io/webmcp/) is
+authoritative for the standard surface. MCP-B supplies implementation and
+integration tooling, including the strict polyfill, React bindings, browser
+transports, iframe bridges, local relays, and extension tooling. MCP-B
+capabilities beyond the standard tool surface are extensions.
+
+For implementation, follow [Build your first tool](/tutorials/first-tool) and
+[Choose a runtime](/how-to/choose-runtime).

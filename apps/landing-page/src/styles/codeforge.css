@@ -1,0 +1,191 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
+@import "./sigvelo-public.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--sigvelo-public-font-sans);
+  --font-mono: var(--sigvelo-public-font-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-gradient-primary: var(--gradient-primary);
+  --color-gradient-secondary: var(--gradient-secondary);
+  --shadow-badge: var(--shadow-badge);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-xl);
+  --animate-marquee: marquee var(--duration) infinite linear;
+  --animate-marquee-vertical: marquee-vertical var(--duration) linear infinite;
+  --animate-blink-cursor: blink-cursor 1.2s step-end infinite;
+
+  @keyframes marquee {
+    from {
+      transform: translateX(0);
+    }
+
+    to {
+      transform: translateX(calc(-100% - var(--gap)));
+    }
+  }
+
+  @keyframes marquee-vertical {
+    from {
+      transform: translateY(0);
+    }
+
+    to {
+      transform: translateY(calc(-100% - var(--gap)));
+    }
+  }
+
+  @keyframes blink-cursor {
+    0%,
+    49% {
+      opacity: 1;
+    }
+
+    50%,
+    100% {
+      opacity: 0;
+    }
+  }
+}
+
+:root {
+  /* Palette ported from SigVelo landing: brand blue on a bone canvas.
+   * sky #006d9f, blue/action #005f8f, blue-dark #004d73, ink #111827. */
+  --radius: 0.125rem;
+  --background: var(--sigvelo-public-canvas);
+  --foreground: var(--sigvelo-public-ink);
+  --card: var(--sigvelo-public-card);
+  --card-foreground: var(--sigvelo-public-ink);
+  --popover: var(--sigvelo-public-card);
+  --popover-foreground: var(--sigvelo-public-ink);
+  --primary: var(--sigvelo-public-action);
+  --primary-foreground: #ffffff;
+  --secondary: var(--sigvelo-public-panel);
+  --secondary-foreground: var(--sigvelo-public-ink);
+  --muted: var(--sigvelo-public-panel);
+  --muted-foreground: var(--sigvelo-public-ink-muted);
+  --accent: var(--sigvelo-public-panel);
+  --accent-foreground: var(--sigvelo-public-ink);
+  --destructive: oklch(0.577 0.245 27.325);
+  --success: oklch(0.72 0.19 142);
+  --border: var(--sigvelo-public-rule);
+  --input: var(--sigvelo-public-rule);
+  --ring: var(--sigvelo-public-focus);
+  --chart-1: oklch(0.508 0.114 239);
+  --chart-2: oklch(0.72 0.19 142);
+  --chart-3: oklch(0.83 0.16 84);
+  --chart-4: oklch(0.68 0.12 230);
+  --chart-5: oklch(0.66 0.18 260);
+  --sidebar: oklch(1 0 0);
+  --sidebar-foreground: oklch(0.21 0.032 265);
+  --sidebar-primary: oklch(0.464 0.108 241);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.959 0.005 229);
+  --sidebar-accent-foreground: oklch(0.21 0.032 265);
+  --sidebar-border: oklch(0.92 0.008 240);
+  --sidebar-ring: oklch(0.508 0.114 239);
+  --gradient-primary: oklch(0.508 0.114 239); /* sv-sky */
+  --gradient-secondary: oklch(0.464 0.108 241); /* sv-blue */
+  --color-accent-glow: oklch(0.508 0.114 239 / 0.12);
+  --color-accent-glow-strong: oklch(0.508 0.114 239 / 0.24);
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --shadow-badge: var(--shadow-md);
+}
+
+.dark {
+  --background: var(--sigvelo-public-canvas);
+  --foreground: var(--sigvelo-public-ink);
+  --card: var(--sigvelo-public-card);
+  --card-foreground: var(--sigvelo-public-ink);
+  --popover: var(--sigvelo-public-card);
+  --popover-foreground: var(--sigvelo-public-ink);
+  --primary: var(--sigvelo-public-action);
+  --primary-foreground: var(--sigvelo-public-canvas);
+  --secondary: var(--sigvelo-public-panel);
+  --secondary-foreground: var(--sigvelo-public-ink);
+  --muted: var(--sigvelo-public-panel);
+  --muted-foreground: var(--sigvelo-public-ink-muted);
+  --accent: var(--sigvelo-public-panel);
+  --accent-foreground: var(--sigvelo-public-ink);
+  --destructive: oklch(0.65 0.2 27);
+  --success: oklch(0.72 0.19 142);
+  --border: var(--sigvelo-public-rule);
+  --input: var(--sigvelo-public-rule);
+  --ring: var(--sigvelo-public-focus);
+  --chart-1: oklch(0.7 0.11 235);
+  --chart-2: oklch(0.72 0.19 142);
+  --chart-3: oklch(0.83 0.16 84);
+  --chart-4: oklch(0.68 0.12 230);
+  --chart-5: oklch(0.66 0.18 260);
+  --sidebar: oklch(0.22 0.032 248);
+  --sidebar-foreground: oklch(0.97 0.006 248);
+  --sidebar-primary: oklch(0.7 0.11 235);
+  --sidebar-primary-foreground: oklch(0.18 0.03 248);
+  --sidebar-accent: oklch(0.26 0.03 248);
+  --sidebar-accent-foreground: oklch(0.97 0.006 248);
+  --sidebar-border: oklch(0.32 0.03 248);
+  --sidebar-ring: oklch(0.7 0.11 235);
+  --gradient-primary: oklch(0.7 0.11 235);
+  --gradient-secondary: oklch(0.62 0.11 240);
+  --color-accent-glow: oklch(0.7 0.11 235 / 0.16);
+  --color-accent-glow-strong: oklch(0.7 0.11 235 / 0.3);
+  --shadow-badge: var(--shadow-md);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    @apply font-sans;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}

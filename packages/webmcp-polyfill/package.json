@@ -9,7 +9,7 @@
     "polyfill",
     "webmcp"
   ],
-  "homepage": "https://docs.mcp-b.ai/packages/webmcp-polyfill",
+  "homepage": "https://docs.mcp-b.ai/packages/webmcp-polyfill/reference",
   "bugs": {
     "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },

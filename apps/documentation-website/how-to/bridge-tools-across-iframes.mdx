@@ -1,0 +1,139 @@
+---
+title: "Bridge Tools Across Iframes"
+description: "Surface child-frame WebMCP tools in a parent page using the mcp-iframe custom element with automatic namespacing and routing."
+keywords: ["mcp-iframe", "iframe", "cross-origin", "namespacing", "@mcp-b/mcp-iframe", "postMessage", "custom element"]
+icon: "object-group"
+---
+
+This guide shows you how to expose tools, resources, and prompts registered inside an iframe to the parent page's `document.modelContext` using the `<mcp-iframe>` custom element.
+
+## Prerequisites
+
+- The **parent page** must have `@mcp-b/global` (or any `document.modelContext` implementation) installed.
+- The **iframe page** must also have `@mcp-b/global` installed and must register tools on `document.modelContext`.
+
+## Install the package
+
+```bash
+npm install @mcp-b/mcp-iframe @modelcontextprotocol/sdk
+```
+
+## Add the custom element to the parent page
+
+Replace a standard `<iframe>` with `<mcp-iframe>`. Set the `id` attribute to control the tool name prefix.
+
+```html
+<mcp-iframe src="./child-app.html" id="my-app"></mcp-iframe>
+
+<script type="module">
+  import '@mcp-b/mcp-iframe';
+
+  const el = document.querySelector('mcp-iframe');
+  el.addEventListener('mcp-iframe-ready', (e) => {
+    console.log('Exposed tools:', e.detail.tools);
+    // e.g. ["my-app_calculate", "my-app_get_data"]
+  });
+</script>
+```
+
+A tool named `calculate` in the iframe appears on the parent as `my-app_calculate`. This namespacing prevents collisions when multiple iframes register tools with the same name.
+
+## Understand namespacing
+
+The prefix is built from the element's `id` (or `name` attribute, or `"iframe"` as fallback) plus a separator character.
+
+| Child tool name | Element `id` | Parent tool name |
+|----------------|-------------|-----------------|
+| `calculate` | `my-app` | `my-app_calculate` |
+| `search` | `widget` | `widget_search` |
+| `greet` | (none) | `iframe_greet` |
+
+Tool and prompt names must match the MCP pattern `^[a-zA-Z0-9_-]{1,128}$`. If the `id` contains invalid characters, they are sanitized to underscores automatically.
+
+To change the separator character, set the `prefix-separator` attribute:
+
+```html
+<mcp-iframe src="./child.html" id="app" prefix-separator="-"></mcp-iframe>
+<!-- Child tool "search" becomes "app-search" -->
+```
+
+## Configure the element
+
+| Attribute | Description | Default |
+|-----------|-------------|---------|
+| `src` | URL of the iframe page | (required) |
+| `id` | Used as the tool name prefix | `"iframe"` |
+| `target-origin` | Override the `postMessage` target origin | Inferred from `src` |
+| `channel` | Channel ID for the transport | `mcp-iframe` |
+| `call-timeout` | Timeout in ms for tool calls | `30000` |
+| `prefix-separator` | Separator between prefix and tool name | `_` |
+
+Standard iframe attributes (`sandbox`, `allow`, `width`, `height`) are mirrored to the internal iframe.
+
+## Listen for events
+
+| Event | Detail | When |
+|-------|--------|------|
+| `mcp-iframe-ready` | `{ tools, resources, prompts }` | Connected to the iframe's MCP server |
+| `mcp-iframe-error` | `{ error }` | Connection failed |
+| `mcp-iframe-tools-changed` | `{ tools, resources, prompts }` | After calling `refresh()` |
+
+## Refresh tools after dynamic changes
+
+If the iframe registers new tools after the initial connection, call `refresh()` to re-sync:
+
+```javascript
+const el = document.querySelector('mcp-iframe');
+await el.refresh();
+// Fires "mcp-iframe-tools-changed" with updated tool list
+```
+
+## Bridge multiple iframes
+
+Use a distinct `id` for each `<mcp-iframe>` to keep tool names unique:
+
+```html
+<mcp-iframe src="./calculator.html" id="calc"></mcp-iframe>
+<mcp-iframe src="./search.html" id="search"></mcp-iframe>
+```
+
+The parent page now sees tools like `calc_add`, `calc_multiply`, `search_query`, and `search_filter`.
+
+## Verify tools surface in the parent
+
+Use the browser console to inspect registered tools:
+
+```javascript
+const el = document.querySelector('mcp-iframe');
+console.log('Ready:', el.ready);
+console.log('Exposed tools:', el.exposedTools);
+console.log('Exposed resources:', el.exposedResources);
+console.log('Exposed prompts:', el.exposedPrompts);
+```
+
+If you have `@mcp-b/global` installed on the parent, you can also list tools through the standard API:
+
+```javascript
+const tools = await document.modelContext.listTools();
+console.log(tools);
+```
+
+## Handle cross-origin iframes
+
+For iframes served from a different domain, set `target-origin` explicitly:
+
+```html
+<mcp-iframe
+  src="https://external-app.com/widget"
+  id="external"
+  target-origin="https://external-app.com"
+></mcp-iframe>
+```
+
+The iframe page must also allow the parent's origin in its transport configuration. If you control the iframe app, ensure `@mcp-b/global` is loaded with appropriate origin settings.
+
+## Related pages
+
+- [mcp-iframe Reference](/packages/mcp-iframe/reference) for the full API surface
+- [Transports Reference](/packages/transports/reference) for the underlying `IframeParentTransport` and `IframeChildTransport`
+- [Transports and Bridges](/explanation/architecture/transports-and-bridges) for how iframe bridging fits into the architecture

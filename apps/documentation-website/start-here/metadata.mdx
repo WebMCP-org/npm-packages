@@ -1,0 +1,218 @@
+---
+title: "Project metadata"
+description: "MCP endpoint, files, versioning policy, and changelog for WebMCP packages."
+keywords: ["mcp endpoint", "changelog", "versioning", "releases"]
+sidebarTitle: "Project metadata"
+---
+
+## Docs MCP endpoint
+
+The documentation site exposes an MCP server at:
+
+```
+https://docs.mcp-b.ai/mcp
+```
+
+This endpoint is provided by Mintlify and serves the published documentation content. It supports the [Model Context Protocol](https://modelcontextprotocol.io) over HTTP.
+
+### Direct URL (streamable HTTP)
+
+Clients that accept an MCP server URL directly:
+
+```
+https://docs.mcp-b.ai/mcp
+```
+
+### Command-based (stdio via mcp-remote)
+
+Clients that require a command and arguments:
+
+```json
+{
+  "mcpServers": {
+    "WebMCP Docs": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://docs.mcp-b.ai/mcp"]
+    }
+  }
+}
+```
+
+### Setup by client
+
+<AccordionGroup>
+
+<Accordion title="Claude Code">
+
+```bash
+claude mcp add --transport http "WebMCP Docs" "https://docs.mcp-b.ai/mcp"
+```
+
+</Accordion>
+
+<Accordion title="Claude Desktop">
+
+1. Open **Settings** then **Connectors**.
+2. Click **Add custom connector**.
+3. Set the name to "WebMCP Docs" and the URL to `https://docs.mcp-b.ai/mcp`.
+4. Click **Save**, then **Connect**.
+
+</Accordion>
+
+<Accordion title="Cursor">
+
+Add to `.cursor/mcp.json` in your project root:
+
+```json
+{
+  "mcpServers": {
+    "WebMCP Docs": {
+      "url": "https://docs.mcp-b.ai/mcp"
+    }
+  }
+}
+```
+
+Restart Cursor after saving.
+
+</Accordion>
+
+<Accordion title="Windsurf">
+
+Add to `mcp_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "WebMCP Docs": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://docs.mcp-b.ai/mcp"]
+    }
+  }
+}
+```
+
+Restart Windsurf after saving.
+
+</Accordion>
+
+<Accordion title="ChatGPT">
+
+<Note>
+MCP support in ChatGPT requires a paid plan with Developer Mode enabled.
+</Note>
+
+1. Enable **Developer Mode** in ChatGPT settings.
+2. Go to **Settings**, then **Connectors**.
+3. Click **Add MCP server**.
+4. Enter `https://docs.mcp-b.ai/mcp` as the server URL.
+5. Name it "WebMCP Docs" and click **Save**.
+
+</Accordion>
+
+<Accordion title="Codex">
+
+Add to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.webmcp_docs]
+command = "npx"
+args = ["-y", "mcp-remote", "https://docs.mcp-b.ai/mcp"]
+```
+
+Restart Codex after saving.
+
+</Accordion>
+
+</AccordionGroup>
+
+### What the server provides
+
+The MCP server gives connected agents read access to the full documentation site. Agents can search for pages, retrieve page content, and browse the site structure.
+
+---
+
+## llms.txt
+
+Mintlify automatically generates and hosts two files at the root of the documentation site. These files follow the [llmstxt.org](https://llmstxt.org) convention for AI-readable site indexing.
+
+### Files
+
+| File | URL | Contents |
+|------|-----|----------|
+| `llms.txt` | [docs.mcp-b.ai/llms.txt](https://docs.mcp-b.ai/llms.txt) | Site overview, quick start, package table, sitemap with page titles |
+| `llms-full.txt` | [docs.mcp-b.ai/llms-full.txt](https://docs.mcp-b.ai/llms-full.txt) | Full rendered content of every page, concatenated into one file |
+
+### How they are generated
+
+Both files are derived from `docs.json` and the published `.mdx` pages. Mintlify rebuilds them on every deployment. There is no manual authoring step.
+
+The `llms.txt` file includes:
+
+- A top-level description (from the `description` field in `docs.json`)
+- A quick start code snippet
+- A package summary table
+- A flat sitemap of every page with its title and relative URL
+
+The `llms-full.txt` file contains the full markdown-rendered body of every page, separated by page headers.
+
+### Maintenance
+
+Because these files are auto-generated, the only way to change their content is to update the source pages or `docs.json`. You do not edit `llms.txt` or `llms-full.txt` directly.
+
+### Usage
+
+AI assistants (Claude, ChatGPT, Gemini, Perplexity, and others) fetch `llms.txt` to understand what the site covers before retrieving specific pages. If your agent supports URL-based context, point it at `https://docs.mcp-b.ai/llms.txt`.
+
+The MCP endpoint and `llms.txt` serve different purposes. `llms.txt` is a static file that agents fetch over plain HTTP. The MCP endpoint is an interactive server that agents connect to as an MCP client, allowing structured queries against the documentation.
+
+---
+
+## Versioning and changelog
+
+WebMCP uses [Changesets](https://github.com/changesets/changesets) for versioning. Each package in the `@mcp-b/*` scope is versioned independently and published to npm.
+
+### Where to find changelogs
+
+| Source | What it covers |
+|--------|---------------|
+| [GitHub Releases](https://github.com/WebMCP-org/npm-packages/releases) | Per-release notes with links to PRs and commits |
+| [npm version history](https://www.npmjs.com/package/@mcp-b/global?activeTab=versions) | Published versions for any `@mcp-b/*` package |
+| Git log (`chore(release): version packages`) | Changeset-generated version bumps in the monorepo |
+
+### Versioning policy
+
+All packages follow [Semantic Versioning](https://semver.org/):
+
+| Increment | Meaning |
+|-----------|---------|
+| Major (X.0.0) | Breaking API changes |
+| Minor (0.X.0) | New features, backward compatible |
+| Patch (0.0.X) | Bug fixes, backward compatible |
+
+### Package scope
+
+The monorepo publishes the following packages. Each has its own version number.
+
+| Package | Purpose |
+|---------|---------|
+| `@mcp-b/global` | Entry point, auto-initializes polyfill and server |
+| `@mcp-b/webmcp-polyfill` | Polyfills `document.modelContext` |
+| `@mcp-b/webmcp-ts-sdk` | BrowserMcpServer with MCP extensions |
+| `@mcp-b/webmcp-types` | Zero-runtime TypeScript types |
+| `@mcp-b/react-webmcp` | React hooks for tool registration |
+| `usewebmcp` | Strict-core React hook |
+| `@mcp-b/transports` | Tab and iframe transports |
+| `@mcp-b/mcp-iframe` | Iframe MCP communication |
+| `@mcp-b/chrome-devtools-mcp` | DevTools Protocol bridge |
+| `@mcp-b/extension-tools` | Browser extension utilities |
+| `@mcp-b/smart-dom-reader` | DOM content extraction |
+| `agent-skills-ts-sdk` | Skill parser and validator |
+| `@mcp-b/webmcp-local-relay` | Local relay server for desktop agents |
+
+### Reporting issues
+
+If you find a bug or regression after upgrading:
+
+1. Check [existing issues](https://github.com/WebMCP-org/npm-packages/issues).
+2. Open a [new issue](https://github.com/WebMCP-org/npm-packages/issues/new) with the package name, version numbers, steps to reproduce, and expected versus actual behavior.

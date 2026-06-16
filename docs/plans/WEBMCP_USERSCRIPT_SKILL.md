@@ -1,7 +1,7 @@
 # WebMCP Development Skill
 
 > **Status:** Implemented
-> **Implemented in:** `skills/webmcp/` (SKILL.md + reference docs)
+> **Implemented in:** `.agents/skills/webmcp/` (SKILL.md + reference docs)
 > **Chrome API:** WebMCP available behind flag in Chrome 146+. Skill works with both native and polyfill runtimes.
 
 ## Executive Summary
@@ -1163,10 +1163,10 @@ See [reference/examples.md](reference/examples.md)
 
 **Goal**: Complete self-contained template for tools + skill
 
-1. Create `templates/site-package/` (self-contained structure)
+1. Create `.agents/skills/webmcp/assets/site-package/` (self-contained structure)
 
    ```
-   templates/site-package/
+   .agents/skills/webmcp/assets/site-package/
    ├── SKILL.md                    # Template with Setup section
    │   ├── ## Setup ← Points to tools/src/{{site}}.ts
    │   ├── ## Available Tools

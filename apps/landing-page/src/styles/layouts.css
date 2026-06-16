@@ -1,0 +1,74 @@
+/*
+ * Layout primitives
+ * Composable, intrinsic layouts via Every Layout patterns
+ */
+
+@layer layouts {
+
+  /* --- Page wrapper: constrained + centered --- */
+
+  .page {
+    max-inline-size: var(--page-max-width);
+    margin-inline: auto;
+    padding-inline: var(--page-gutter);
+  }
+
+  /* --- Stack: vertical rhythm --- */
+
+  .stack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--stack-gap, var(--space-m));
+
+    &[data-gap="s"] { --stack-gap: var(--space-s); }
+    &[data-gap="l"] { --stack-gap: var(--space-l); }
+    &[data-gap="xl"] { --stack-gap: var(--space-xl); }
+  }
+
+  /* --- Cluster: horizontal wrapping group --- */
+
+  .cluster {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--cluster-gap, var(--space-s));
+    align-items: center;
+  }
+
+  /* --- Center: narrow content column --- */
+
+  .center {
+    max-inline-size: var(--center-width, var(--measure-base));
+    margin-inline: auto;
+  }
+
+  /* --- Auto grid: responsive columns --- */
+
+  .auto-grid {
+    display: grid;
+    grid-template-columns: repeat(
+      auto-fill,
+      minmax(min(100%, var(--grid-min, 16rem)), 1fr)
+    );
+    gap: var(--grid-gap, var(--space-m));
+  }
+
+  /* --- Section: vertical page section --- */
+
+  .section {
+    padding-block: var(--section-space, var(--space-xl));
+  }
+
+  /* --- Container: legacy compat --- */
+
+  .container {
+    max-width: var(--max-width);
+    margin: 0 auto;
+    padding: 0 1.5rem;
+  }
+
+  .container-wide {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+  }
+}

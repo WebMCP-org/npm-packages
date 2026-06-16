@@ -6,11 +6,11 @@
 [![npm downloads](https://img.shields.io/npm/dm/@mcp-b/global?style=flat-square)](https://www.npmjs.com/package/@mcp-b/global)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![Bundle Size](https://img.shields.io/badge/IIFE-285KB-blue?style=flat-square)](https://bundlephobia.com/package/@mcp-b/global)
-[![W3C](https://img.shields.io/badge/W3C-Web_Model_Context-005A9C?style=flat-square)](https://github.com/nicolo-ribaudo/model-context-protocol-api)
+[![W3C](https://img.shields.io/badge/W3C-Web_Model_Context-005A9C?style=flat-square)](https://webmachinelearning.github.io/webmcp/)
 
-**[Full Documentation](https://docs.mcp-b.ai/packages/global)** | **[Quick Start](https://docs.mcp-b.ai/quickstart)** | **[Tool Registration](https://docs.mcp-b.ai/concepts/tool-registration)**
+**[Reference](https://docs.mcp-b.ai/packages/global/reference)** | **[First Tool Tutorial](https://docs.mcp-b.ai/tutorials/first-tool)** | **[Add Tools to an App](https://docs.mcp-b.ai/how-to/add-tools-to-an-existing-app)**
 
-**@mcp-b/global** implements the [W3C Web Model Context API](https://github.com/nicolo-ribaudo/model-context-protocol-api) (`navigator.modelContext`) specification, allowing AI agents like Claude, ChatGPT, Gemini, Cursor, and Copilot to discover and call functions on your website.
+**@mcp-b/global** implements the [W3C Web Model Context API](https://webmachinelearning.github.io/webmcp/) (`document.modelContext`) specification, allowing AI agents like Claude, ChatGPT, Gemini, Cursor, and Copilot to discover and call functions on your website.
 
 ## Why Use @mcp-b/global?
 
@@ -43,7 +43,7 @@
     <h1>My AI-Powered App</h1>
 
     <script>
-      navigator.modelContext.registerTool({
+      document.modelContext.registerTool({
         name: 'get-page-title',
         description: 'Get the current page title',
         inputSchema: { type: 'object', properties: {} },
@@ -59,7 +59,7 @@
 ```
 
 - **Self-contained** - All dependencies bundled (285KB minified)
-- **Auto-initializes** - `navigator.modelContext` ready immediately
+- **Auto-initializes** - `document.modelContext` ready immediately
 - **No build step** - Just drop it in your HTML
 
 ### Via ES Module
@@ -67,7 +67,7 @@
 ```html
 <script type="module">
   import '@mcp-b/global';
-  navigator.modelContext.registerTool({
+  document.modelContext.registerTool({
     /* your tool */
   });
 </script>
@@ -84,7 +84,7 @@ npm install @mcp-b/global
 ```javascript
 import '@mcp-b/global';
 
-navigator.modelContext.registerTool({
+document.modelContext.registerTool({
   /* your tool */
 });
 ```
@@ -95,7 +95,7 @@ navigator.modelContext.registerTool({
 
 #### `initializeWebModelContext(options?)`
 
-Initializes the global adapter. Replaces `navigator.modelContext` with a `BrowserMcpServer` instance that bridges WebMCP tools to the MCP protocol layer.
+Initializes the global adapter. Replaces `document.modelContext` with a `BrowserMcpServer` instance that bridges WebMCP tools to the MCP protocol layer.
 
 ```typescript
 import { initializeWebModelContext } from '@mcp-b/global';
@@ -112,12 +112,12 @@ initializeWebModelContext({
 
 - Only operates in browser environments
 - Idempotent - calling multiple times is a no-op after first initialization
-- Preserves native `navigator.modelContext` by default (configurable)
+- Preserves native `document.modelContext` by default (configurable)
 - Auto-called on import unless `window.__webModelContextOptions.autoInitialize` is `false`
 
 #### `cleanupWebModelContext()`
 
-Tears down the adapter and restores `navigator.modelContext` to its original state. Allows re-initialization.
+Tears down the adapter and restores `document.modelContext` to its original state. Allows re-initialization.
 
 ```typescript
 import { cleanupWebModelContext, initializeWebModelContext } from '@mcp-b/global';
@@ -130,9 +130,9 @@ cleanupWebModelContext();
 initializeWebModelContext();
 ```
 
-### `navigator.modelContext` Methods
+### `document.modelContext` Methods
 
-After initialization, `navigator.modelContext` exposes these methods:
+After initialization, `document.modelContext` exposes these methods:
 
 #### `registerTool(tool, options?)`
 
@@ -140,7 +140,7 @@ Registers a single tool. The tool name must be unique, otherwise throws if a too
 
 ```typescript
 const ac = new AbortController();
-navigator.modelContext.registerTool(
+document.modelContext.registerTool(
   {
     name: 'add-to-cart',
     description: 'Add a product to the shopping cart',
@@ -173,7 +173,7 @@ For backwards compatibility, `@mcp-b/global` also returns a deprecated `{ unregi
 Removes a tool by name. The April 23, 2026 WebMCP draft removed `unregisterTool` from the spec in favor of `AbortSignal` on `registerTool`. `@mcp-b/global` keeps `unregisterTool` functional for compatibility with older native previews and existing MCP-B integrations, and emits a one-time deprecation warning when called. It will be removed in the next major version.
 
 ```typescript
-navigator.modelContext.unregisterTool('add-to-cart');
+document.modelContext.unregisterTool('add-to-cart');
 ```
 
 #### `listTools()`
@@ -181,7 +181,7 @@ navigator.modelContext.unregisterTool('add-to-cart');
 Returns metadata for all registered tools (without execute functions).
 
 ```typescript
-const tools = navigator.modelContext.listTools();
+const tools = document.modelContext.listTools();
 // [{ name: 'search-products', description: '...', inputSchema: {...} }, ...]
 ```
 
@@ -190,7 +190,7 @@ const tools = navigator.modelContext.listTools();
 Executes a registered tool by name.
 
 ```typescript
-const result = await navigator.modelContext.callTool({
+const result = await document.modelContext.callTool({
   name: 'search-products',
   arguments: { query: 'laptop', limit: 5 },
 });
@@ -325,7 +325,7 @@ const result = await navigator.modelContextTesting?.executeTool(
 
 ```javascript
 if ('modelContext' in navigator) {
-  navigator.modelContext.registerTool({
+  document.modelContext.registerTool({
     /* your tool */
   });
 }
@@ -338,7 +338,7 @@ if ('modelContext' in navigator) {
 ```typescript
 import '@mcp-b/global';
 
-navigator.modelContext.registerTool({
+document.modelContext.registerTool({
   name: 'search-products',
   description: 'Search products by keyword, category, or price range',
   inputSchema: {
@@ -358,7 +358,7 @@ navigator.modelContext.registerTool({
   },
 });
 
-navigator.modelContext.registerTool({
+document.modelContext.registerTool({
   name: 'add-to-cart',
   description: 'Add a product to the shopping cart',
   inputSchema: {
@@ -385,7 +385,7 @@ navigator.modelContext.registerTool({
 import '@mcp-b/global';
 
 // Start with base tools
-navigator.modelContext.registerTool({
+document.modelContext.registerTool({
   name: 'get-user',
   description: 'Get current user info',
   inputSchema: { type: 'object', properties: {} },
@@ -396,7 +396,7 @@ navigator.modelContext.registerTool({
 
 // Add tools dynamically based on user role
 if (currentUser.isAdmin) {
-  navigator.modelContext.registerTool({
+  document.modelContext.registerTool({
     name: 'delete-user',
     description: 'Delete a user account (admin only)',
     inputSchema: {
@@ -413,7 +413,7 @@ if (currentUser.isAdmin) {
 
 // Remove tools when permissions change
 function onLogout() {
-  navigator.modelContext.unregisterTool('get-user');
+  document.modelContext.unregisterTool('get-user');
 }
 ```
 
@@ -422,7 +422,7 @@ function onLogout() {
 ```typescript
 import '@mcp-b/global';
 
-navigator.modelContext.registerTool({
+document.modelContext.registerTool({
   name: 'fill-contact-form',
   description: 'Fill the contact form with provided details',
   inputSchema: {
@@ -442,7 +442,7 @@ navigator.modelContext.registerTool({
   },
 });
 
-navigator.modelContext.registerTool({
+document.modelContext.registerTool({
   name: 'submit-form',
   description: 'Submit the contact form',
   inputSchema: { type: 'object', properties: {} },
@@ -493,15 +493,15 @@ import type {
 
 ## Related Packages
 
-- [`@mcp-b/transports`](https://docs.mcp-b.ai/packages/transports) - MCP transport implementations
-- [`@mcp-b/react-webmcp`](https://docs.mcp-b.ai/packages/react-webmcp) - React hooks for MCP
-- [`@mcp-b/extension-tools`](https://docs.mcp-b.ai/packages/extension-tools) - Chrome Extension API tools
-- [`@mcp-b/chrome-devtools-mcp`](https://docs.mcp-b.ai/packages/chrome-devtools-mcp) - Connect desktop AI agents to browser tools
+- [`@mcp-b/transports`](https://docs.mcp-b.ai/packages/transports/reference) - MCP transport implementations
+- [`@mcp-b/react-webmcp`](https://docs.mcp-b.ai/packages/react-webmcp/reference) - React hooks for MCP
+- [`@mcp-b/extension-tools`](https://docs.mcp-b.ai/packages/extension-tools/reference) - Chrome Extension API tools
+- [`@mcp-b/chrome-devtools-mcp`](https://docs.mcp-b.ai/packages/chrome-devtools-mcp/reference) - Connect desktop AI agents to browser tools
 
 ## Resources
 
 - [WebMCP Documentation](https://docs.mcp-b.ai)
-- [Web Model Context API Explainer](https://github.com/nicolo-ribaudo/model-context-protocol-api)
+- [Web Model Context API Explainer](https://webmachinelearning.github.io/webmcp/)
 - [Model Context Protocol Spec](https://modelcontextprotocol.io/)
 
 ## License

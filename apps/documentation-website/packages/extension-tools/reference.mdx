@@ -1,0 +1,279 @@
+---
+title: "@mcp-b/extension-tools"
+description: "62+ Chrome Extension API tool classes for MCP. Expose tabs, bookmarks, history, storage, scripting, and more to AI agents."
+keywords: ["@mcp-b/extension-tools", "chrome extension", "MCP tools", "TabsApiTools", "BookmarksApiTools", "StorageApiTools", "BaseApiTools", "chrome api"]
+icon: "puzzle-piece"
+---
+
+`@mcp-b/extension-tools` wraps Chrome Extension APIs as MCP tool classes. Each API is a dedicated class that handles permission checking, error formatting, and tool registration against an `McpServer` instance.
+
+```
+npm: @mcp-b/extension-tools
+license: MIT
+dependencies: @mcp-b/smart-dom-reader, @mcp-b/webmcp-ts-sdk, zod
+peer: @types/chrome (dev)
+```
+
+## Installation
+
+```bash
+npm install @mcp-b/extension-tools @modelcontextprotocol/sdk
+```
+
+## Minimal example
+
+<Snippet file="snippets/packages/extension-tools-quickstart.ts" />
+
+## Usage
+
+Register tool classes in your Chrome extension's background script:
+
+```typescript "background.ts"
+import { TabsApiTools, BookmarksApiTools, StorageApiTools } from '@mcp-b/extension-tools';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+
+const server = new McpServer({
+  name: 'chrome-extension-server',
+  version: '1.0.0',
+});
+
+const tabsTools = new TabsApiTools(server, {
+  listActiveTabs: true,
+  createTab: true,
+  closeTabs: true,
+});
+tabsTools.register();
+
+const bookmarksTools = new BookmarksApiTools(server, {
+  getBookmarks: true,
+  createBookmark: true,
+});
+bookmarksTools.register();
+```
+
+Each tool class constructor takes two arguments:
+
+1. An `McpServer` instance
+2. An options object where each key corresponds to a tool method. Set a key to `true` to register that tool, or `false` (or omit it) to skip it.
+
+## BaseApiTools
+
+All API tool classes extend `BaseApiTools<TOptions>`:
+
+```typescript
+abstract class BaseApiTools<TOptions> {
+  protected abstract apiName: string;
+
+  constructor(server: McpServer, options: TOptions);
+
+  abstract checkAvailability(): ApiAvailability;
+  abstract registerTools(): void;
+
+  register(): void;
+
+  protected shouldRegisterTool(toolName: string): boolean;
+  protected formatError(error: unknown): CallToolResult;
+  protected formatSuccess(message: string, data?: unknown): CallToolResult;
+  protected formatJson(data: unknown): CallToolResult;
+}
+```
+
+| Method | Description |
+|--------|-------------|
+| `register()` | Checks API availability, then calls `registerTools()` if available |
+| `checkAvailability()` | Returns `{ available: boolean, message: string }` |
+| `shouldRegisterTool(name)` | Returns `false` if the option for that tool is explicitly `false` |
+| `formatError(error)` | Wraps an error into a structured `CallToolResult` with `isError: true` |
+| `formatSuccess(message, data?)` | Returns a success `CallToolResult` with optional JSON data |
+
+## Available API tool classes (62)
+
+Each class name follows the pattern `<ApiName>ApiTools`. The table below lists all implemented classes grouped by category.
+
+### Core browser
+
+| Class | Chrome Permission | Description |
+|-------|-------------------|-------------|
+| `TabsApiTools` | `tabs` | Create, update, query, close, group, move tabs |
+| `WindowsApiTools` | (none) | Control browser windows |
+| `TabGroupsApiTools` | `tabGroups` | Manage tab groups |
+| `BookmarksApiTools` | `bookmarks` | CRUD operations on bookmarks |
+| `HistoryApiTools` | `history` | Search and manage browsing history |
+| `SessionsApiTools` | `sessions` | Query and restore browser sessions |
+| `TopSitesApiTools` | `topSites` | Access most-visited sites |
+| `ReadingListApiTools` | `readingList` | Access the reading list |
+
+### Content and scripting
+
+| Class | Chrome Permission | Description |
+|-------|-------------------|-------------|
+| `ScriptingApiTools` | `scripting` | Execute scripts and inject CSS |
+| `UserScriptsApiTools` | `userScripts` | Execute user scripts |
+| `DomApiTools` | (none) | Access DOM from extensions |
+| `ContentSettingsApiTools` | `contentSettings` | Manage content settings |
+| `DeclarativeContentApiTools` | `declarativeContent` | Take actions based on page content |
+
+### Storage and data
+
+| Class | Chrome Permission | Description |
+|-------|-------------------|-------------|
+| `StorageApiTools` | `storage` | Get, set, remove, clear extension storage (local, sync, session) |
+| `CookiesApiTools` | `cookies` | Manage browser cookies |
+| `BrowsingDataApiTools` | `browsingData` | Clear browsing data |
+
+### Network
+
+| Class | Chrome Permission | Description |
+|-------|-------------------|-------------|
+| `WebRequestApiTools` | `webRequest` | Intercept and modify requests |
+| `WebNavigationApiTools` | `webNavigation` | Monitor web navigation events |
+| `DeclarativeNetRequestApiTools` | `declarativeNetRequest` | Modify network requests declaratively |
+| `ProxyApiTools` | `proxy` | Manage proxy settings |
+
+### Downloads and capture
+
+| Class | Chrome Permission | Description |
+|-------|-------------------|-------------|
+| `DownloadsApiTools` | `downloads` | Control file downloads |
+| `PageCaptureApiTools` | `pageCapture` | Save pages as MHTML |
+| `TabCaptureApiTools` | `tabCapture` | Capture tab media streams |
+| `DesktopCaptureApiTools` | `desktopCapture` | Capture desktop content |
+
+### UI and interaction
+
+| Class | Chrome Permission | Description |
+|-------|-------------------|-------------|
+| `NotificationsApiTools` | `notifications` | Create system notifications |
+| `OmniboxApiTools` | (none) | Customize the address bar |
+| `ContextMenusApiTools` | `contextMenus` | Create context menu items |
+| `SidePanelApiTools` | `sidePanel` | Control the side panel |
+| `CommandsApiTools` | (none) | Manage keyboard shortcuts |
+
+### DevTools
+
+| Class | Chrome Permission | Description |
+|-------|-------------------|-------------|
+| `DevtoolsInspectedWindowApiTools` | (none) | Interact with inspected window |
+| `DevtoolsNetworkApiTools` | (none) | Retrieve network information |
+| `DevtoolsPanelsApiTools` | (none) | Create DevTools panels |
+
+### Identity and auth
+
+| Class | Chrome Permission | Description |
+|-------|-------------------|-------------|
+| `IdentityApiTools` | `identity` | OAuth2 authentication |
+| `WebAuthenticationProxyApiTools` | `webAuthenticationProxy` | Web authentication proxy |
+| `CertificateProviderApiTools` | `certificateProvider` | Provide certificates for TLS |
+| `PlatformKeysApiTools` | `platformKeys` | Platform-specific keys |
+
+### System
+
+| Class | Chrome Permission | Description |
+|-------|-------------------|-------------|
+| `AlarmsApiTools` | `alarms` | Set and manage alarms |
+| `IdleApiTools` | `idle` | Detect idle state |
+| `PowerApiTools` | `power` | Power management |
+| `SystemCpuApiTools` | `system.cpu` | Query CPU information |
+| `SystemMemoryApiTools` | `system.memory` | Get memory information |
+| `SystemStorageApiTools` | `system.storage` | Query storage devices |
+| `SystemLogApiTools` | `systemLog` | Add system log entries (ChromeOS) |
+
+### Extension management
+
+| Class | Chrome Permission | Description |
+|-------|-------------------|-------------|
+| `RuntimeApiTools` | (none) | Access extension runtime information |
+| `ExtensionApiTools` | (none) | Extension utilities |
+| `ManagementApiTools` | `management` | Manage installed extensions |
+| `PermissionsApiTools` | (none) | Request optional permissions at runtime |
+| `OffscreenApiTools` | `offscreen` | Manage offscreen documents |
+
+### Media and output
+
+| Class | Chrome Permission | Description |
+|-------|-------------------|-------------|
+| `AudioApiTools` | `audio` | Audio device management (ChromeOS) |
+| `TtsApiTools` | `tts` | Text-to-speech |
+| `TtsEngineApiTools` | `ttsEngine` | Implement a TTS engine |
+| `FontSettingsApiTools` | `fontSettings` | Manage font settings |
+| `PrintingApiTools` | `printing` | Print documents (ChromeOS) |
+| `PrintingMetricsApiTools` | `printingMetrics` | Printing metrics (ChromeOS) |
+
+### Internationalization and messaging
+
+| Class | Chrome Permission | Description |
+|-------|-------------------|-------------|
+| `I18nApiTools` | (none) | Internationalization utilities |
+| `GcmApiTools` | `gcm` | Google Cloud Messaging |
+| `InstanceIDApiTools` | (none) | Instance ID operations |
+| `SearchApiTools` | `search` | Search via default provider |
+
+### Enterprise and platform
+
+| Class | Chrome Permission | Description |
+|-------|-------------------|-------------|
+| `EnterpriseDeviceAttributesApiTools` | (policy required) | Access enterprise device attributes |
+| `EnterpriseHardwarePlatformApiTools` | (policy required) | Access enterprise hardware info |
+| `EnterpriseNetworkingAttributesApiTools` | (policy required) | Access enterprise network attributes |
+| `EnterprisePlatformKeysApiTools` | (policy required) | Enterprise platform keys |
+| `LoginStateApiTools` | `loginState` | Read login state (ChromeOS) |
+| `VpnProviderApiTools` | `vpnProvider` | Implement VPN client (ChromeOS) |
+| `WallpaperApiTools` | `wallpaper` | Set wallpaper (ChromeOS) |
+| `DocumentScanApiTools` | `documentScan` | Scan documents (ChromeOS) |
+| `InputImeApiTools` | (none) | Input method editor (ChromeOS) |
+| `FileBrowserHandlerApiTools` | `fileBrowserHandler` | Handle file browser events (ChromeOS) |
+| `FileSystemProviderApiTools` | `fileSystemProvider` | Provide file systems (ChromeOS) |
+| `DebuggerApiTools` | `debugger` | Debug network and JavaScript |
+
+### DOM extraction
+
+| Class | Chrome Permission | Description |
+|-------|-------------------|-------------|
+| `DomExtractionTools` | `scripting` | Token-efficient DOM extraction using `@mcp-b/smart-dom-reader` |
+
+## Chrome API registry
+
+The `ChromeApi` enum and `CHROME_API_REGISTRY` constant map every Chrome Extension API to its metadata:
+
+```typescript
+interface ChromeApiMetadata {
+  minChromeVersion?: number;
+  platform: 'all' | 'chromeos';
+  channel: 'stable' | 'dev';
+  manifestVersions: (2 | 3)[];
+  requiresPolicy: boolean;
+  foregroundOnly: boolean;
+  contexts: ('background' | 'content' | 'devtools' | 'all')[];
+  namespace: string;
+}
+```
+
+Helper functions:
+
+| Function | Description |
+|----------|-------------|
+| `isApiAvailable(api, context, manifestVersion, platform?, chromeVersion?)` | Check if an API is available in the current context |
+| `getAvailableApis(context, manifestVersion, platform?, chromeVersion?)` | Get all available APIs for a context |
+| `getChromeApiReference(api)` | Get the runtime `chrome.*` object for an API |
+
+## Permission requirements
+
+Declare required permissions in your extension's `manifest.json`. APIs like `i18n`, `runtime`, and `extension` work without explicit permissions. Enterprise APIs require force-install via enterprise policy.
+
+```json "manifest.json (subset)"
+{
+  "manifest_version": 3,
+  "permissions": ["tabs", "bookmarks", "storage", "scripting"],
+  "host_permissions": ["<all_urls>"]
+}
+```
+
+## APIs under development (12)
+
+The following APIs are not yet implemented: `AccessibilityFeatures`, `Action`, `DevtoolsPerformance`, `DevtoolsRecorder`, `Dns`, `Events`, `ExtensionTypes`, `PrinterProvider`, `Privacy`, `Processes`, `SystemDisplay`, `Types`.
+
+## Related
+
+- [@mcp-b/smart-dom-reader](/packages/smart-dom-reader/reference) (DOM extraction used by `DomExtractionTools`)
+- [@mcp-b/transports](/packages/transports/reference) (browser MCP transports)
+- [@mcp-b/chrome-devtools-mcp](/packages/chrome-devtools-mcp/reference) (DevTools Protocol bridge)

@@ -1,0 +1,44 @@
+---
+title: "agent-skills-ts-sdk overview"
+description: "When to use the AgentSkills parser and validator package, how it relates to the WebMCP repo, and what it does not cover."
+keywords: ["agent-skills-ts-sdk", "overview", "AgentSkills", "SKILL.md", "parser", "validator"]
+icon: "wand-magic-sparkles"
+---
+
+`agent-skills-ts-sdk` is a tooling package for the AgentSkills `SKILL.md` format. It parses and validates skill files, builds prompt blocks, and applies patch operations. It lives in this monorepo, but it is adjacent to the WebMCP runtime packages rather than part of the browser runtime stack.
+
+## When to use this package
+
+- You are reading, validating, or transforming `SKILL.md` files.
+- You need prompt construction or patch utilities around the AgentSkills format.
+- You want to reuse the file-format tooling outside a WebMCP runtime.
+
+## When not to use this package
+
+- You need `document.modelContext` in the browser. Use the WebMCP runtime packages.
+- You are looking for browser transport or relay behavior. That is separate tooling.
+
+## Where it sits in the package graph
+
+This package stands on its own in the tooling layer. It shares the monorepo but does not depend on the WebMCP runtime stack.
+
+## First step
+
+Parse a `SKILL.md` file and inspect its extracted frontmatter and markdown body. The [reference page](/packages/agent-skills/reference) documents parsing, validation, prompt generation, and patch helpers.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Reference" icon="book-open" href="/packages/agent-skills/reference">
+    Parsing APIs, validation output, prompt helpers, and patch utilities.
+  </Card>
+  <Card title="Packages index" icon="boxes-stacked" href="/packages/index">
+    Browse the rest of the packages in this monorepo.
+  </Card>
+  <Card title="What is WebMCP?" icon="circle-question" href="/explanation/what-is-webmcp">
+    Background on the browser runtime packages that share the repo.
+  </Card>
+  <Card title="WebMCP vs MCP" icon="arrows-left-right" href="/explanation/webmcp-vs-mcp">
+    Conceptual background on the MCP side of the project.
+  </Card>
+</CardGroup>

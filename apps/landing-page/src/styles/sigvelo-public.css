@@ -1,0 +1,40 @@
+/*
+ * Vendored SigVelo public-brand snapshot.
+ * Source repository: WebMCP-org/sigvelo
+ * Reviewed base commit: cdacb96e504f5f5481fb8433549a3341d3895920
+ */
+
+:root {
+  --sigvelo-public-canvas: #f8fafc;
+  --sigvelo-public-panel: #eef2f4;
+  --sigvelo-public-card: #ffffff;
+  --sigvelo-public-blue: #006d9f;
+  --sigvelo-public-action: #005f8f;
+  --sigvelo-public-action-hover: #004d73;
+  --sigvelo-public-highlight: #9ed8ea;
+  --sigvelo-public-ink: #111827;
+  --sigvelo-public-ink-muted: #475569;
+  --sigvelo-public-rule: rgb(0 109 159 / 0.28);
+  --sigvelo-public-rule-strong: rgb(0 95 143 / 0.42);
+  --sigvelo-public-focus: #111827;
+  --sigvelo-public-font-sans:
+    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  --sigvelo-public-font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.dark {
+  --sigvelo-public-canvas: #081117;
+  --sigvelo-public-panel: #0e1b23;
+  --sigvelo-public-card: #12232d;
+  --sigvelo-public-blue: #63c7e8;
+  --sigvelo-public-action: #8bd9f0;
+  --sigvelo-public-action-hover: #b7eafa;
+  --sigvelo-public-highlight: #174f63;
+  --sigvelo-public-ink: #f3f7f9;
+  --sigvelo-public-ink-muted: #b2c1c9;
+  --sigvelo-public-rule: rgb(99 199 232 / 0.22);
+  --sigvelo-public-rule-strong: rgb(99 199 232 / 0.38);
+  --sigvelo-public-focus: #b7eafa;
+}

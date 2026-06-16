@@ -1,0 +1,28 @@
+---
+import HeaderBadge from "@/components/header-badge.astro";
+import { StatefulButton } from "@/components/ui/stateful-button";
+import { siteConfig } from "@/lib/config";
+
+const { hero } = siteConfig;
+---
+
+<section id="hero" class="relative flex flex-col items-center justify-center px-4 py-16 md:py-24">
+  <div class="absolute inset-0 -z-1 h-full w-full bg-radial-[at_45%_85%] from-[#2CD5FF]/40 via-[#2C30FF]/4 mask-[linear-gradient(to_bottom,transparent,black_100%)]"></div>
+  <div class="absolute inset-0 -z-1 h-full w-full bg-radial-[at_45%_68%] from-[#2CD5FF]/68 via-[#2C30FF]/3 mask-[linear-gradient(to_bottom,transparent,black_100%)] blur-[50px]"></div>
+  <div class="relative z-10 mx-auto flex max-w-4xl flex-col items-center justify-center space-y-6 text-center">
+    <HeaderBadge icon={hero.badge.icon} text={hero.badge.text} className="max-[350px]:hidden" />
+    <h1 class="text-4xl font-semibold tracking-tighter text-balance md:text-5xl lg:text-6xl">
+      {hero.title}
+    </h1>
+    <p class="mx-auto max-w-2xl text-center text-balance text-lg text-secondary-foreground/70">
+      {hero.description}
+    </p>
+    <StatefulButton
+      client:visible
+      href={hero.cta.primary.href}
+      className="px-8 py-3.5"
+    >
+      {hero.cta.primary.text}
+    </StatefulButton>
+  </div>
+</section>

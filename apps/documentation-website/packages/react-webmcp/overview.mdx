@@ -1,0 +1,51 @@
+---
+title: "@mcp-b/react-webmcp overview"
+description: "When to use the full React integration package, how it differs from usewebmcp, and which runtime stack it expects."
+keywords: ["@mcp-b/react-webmcp", "overview", "react", "MCP-B", "useWebMCP", "McpClientProvider"]
+icon: "react"
+---
+
+`@mcp-b/react-webmcp` is the full React surface for MCP-B. It covers tool registration, prompt and resource hooks, sampling and elicitation helpers, and client/provider APIs for consuming MCP servers from a React tree.
+
+## Version
+
+Current release: **v3.0.0**, aligned with the WebMCP v3 document-first API. Provider hooks register tools against `document.modelContext` (the canonical v3 surface) while retaining a `navigator.modelContext` fallback for older preview runtimes.
+
+## When to use this package
+
+- You want the full MCP-B feature set from React (tools, prompts, resources, sampling, elicitation).
+- You want Zod v3 object-map support and Standard Schema v1 (e.g., Zod v4 `~standard`) in hook configuration.
+- You need client/provider hooks (`McpClientProvider`, `useMcpClient`) in addition to browser-exposed tools.
+
+## When not to use this package
+
+- You only need strict-core `registerTool` behavior. Use [`usewebmcp`](/packages/usewebmcp/overview).
+- You are not using a BrowserMcpServer-based runtime. Install [`@mcp-b/global`](/packages/global/overview) first.
+
+## Where it sits in the package graph
+
+This package sits above the full runtime stack. It expects `document.modelContext` to come from a browser-native implementation or from the MCP-B runtime that wraps the strict core with `BrowserMcpServer`.
+
+React peer dependency: `^17.0.0 || ^18.0.0 || ^19.0.0`.
+Zod peer dependency (optional): `^3.25 || ^4.0`.
+
+## First step
+
+Initialize the runtime with [`@mcp-b/global`](/packages/global/overview), then add the hook or provider that matches your React use case. The [reference page](/packages/react-webmcp/reference) covers tool hooks, prompt/resource hooks, and client/provider APIs.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Reference" icon="book-open" href="/packages/react-webmcp/reference">
+    Hook APIs, provider APIs, Zod support, and return types.
+  </Card>
+  <Card title="Your first React tool" icon="graduation-cap" href="/tutorials/first-react-tool">
+    Guided tutorial for registering a React tool.
+  </Card>
+  <Card title="Register prompts and resources" icon="folder-tree" href="/how-to/register-prompts-and-resources">
+    Apply the full MCP-B React surface.
+  </Card>
+  <Card title="Strict core vs MCP-B extensions" icon="diagram-venn" href="/explanation/strict-core-vs-mcp-b-extensions">
+    Decide whether the full React surface is necessary.
+  </Card>
+</CardGroup>

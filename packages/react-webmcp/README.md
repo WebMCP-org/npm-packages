@@ -8,7 +8,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue?style=flat-square)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-18+-61DAFB?style=flat-square&logo=react)](https://reactjs.org/)
 
-**[Full Documentation](https://docs.mcp-b.ai/packages/react-webmcp)** | **[Quick Start](https://docs.mcp-b.ai/quickstart)** | **[AI Framework Integration](https://docs.mcp-b.ai/ai-frameworks)**
+**[Reference](https://docs.mcp-b.ai/packages/react-webmcp/reference)** | **[React Tutorial](https://docs.mcp-b.ai/tutorials/first-react-tool)** | **[Framework Guides](https://docs.mcp-b.ai/how-to/frameworks)**
 
 **@mcp-b/react-webmcp** provides React hooks that expose your components as AI-callable tools via the Model Context Protocol. Build AI-powered React applications where Claude, ChatGPT, Gemini, Cursor, and Copilot can interact with your app's functionality.
 
@@ -38,7 +38,11 @@ pnpm add @mcp-b/transports @modelcontextprotocol/sdk
 
 **Prerequisites:** Provider hooks require the `document.modelContext` API. Install `@mcp-b/global` or use a browser that implements the Web Model Context API.
 
-Provider hooks register tools with `document.modelContext.registerTool(tool, { signal })` and abort the controller on unmount. The hooks retain a `navigator.modelContext` fallback for older preview runtimes, but `document.modelContext` is the canonical v3 surface. On Chrome Beta 147 native (which ignores the second arg) cleanup cannot remove the tool. Install `@mcp-b/global` for spec-aligned behavior.
+Provider hooks register tools with `document.modelContext.registerTool(tool, {
+signal })` and abort the controller on unmount. The hooks retain a
+`navigator.modelContext` fallback for older preview runtimes, but
+`document.modelContext` is the canonical v3 surface. Install `@mcp-b/global`
+when you need a portable runtime with spec-aligned cleanup behavior.
 
 ## Quick Start - Provider (Registering Tools)
 
@@ -138,9 +142,9 @@ For full API reference, output schemas, memoization patterns, migration guide, b
 
 ## Related Packages
 
-- [`@mcp-b/global`](https://docs.mcp-b.ai/packages/global) - W3C Web Model Context API polyfill (required for provider hooks)
-- [`@mcp-b/transports`](https://docs.mcp-b.ai/packages/transports) - Browser-specific MCP transports
-- [`@mcp-b/chrome-devtools-mcp`](https://docs.mcp-b.ai/packages/chrome-devtools-mcp) - Connect desktop AI agents to browser tools
+- [`@mcp-b/global`](https://docs.mcp-b.ai/packages/global/reference) - Full MCP-B browser runtime (required for provider hooks)
+- [`@mcp-b/transports`](https://docs.mcp-b.ai/packages/transports/reference) - Browser-specific MCP transports
+- [`@mcp-b/chrome-devtools-mcp`](https://docs.mcp-b.ai/packages/chrome-devtools-mcp/reference) - Connect desktop AI agents to browser tools
 - [`usewebmcp`](../usewebmcp) - React hooks for strict core WebMCP API only
 
 ## Resources

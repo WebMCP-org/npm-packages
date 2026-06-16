@@ -1,0 +1,21 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "mcp-b-landing-page",
+	"compatibility_date": "2026-03-12",
+	"compatibility_flags": ["global_fetch_strictly_public", "nodejs_compat"],
+	"main": "@astrojs/cloudflare/entrypoints/server",
+	"routes": [
+		{ "pattern": "mcp-b.ai", "custom_domain": true },
+		{ "pattern": "www.mcp-b.ai", "custom_domain": true }
+	],
+	"assets": {
+		"directory": "./dist",
+		"binding": "ASSETS"
+	},
+	"observability": {
+		"enabled": true
+	},
+	"vars": {
+		"SENTRY_DSN": "https://deeac9265a27366ab55cf0007ab9f4b9@o4510053563891712.ingest.us.sentry.io/4511057049026560"
+	}
+}

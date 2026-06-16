@@ -1,0 +1,44 @@
+---
+title: "@mcp-b/mcp-iframe overview"
+description: "When to use the iframe custom element, how it differs from raw transports, and what assumptions it makes about the child page."
+keywords: ["@mcp-b/mcp-iframe", "overview", "iframe bridge", "custom element", "tool forwarding"]
+icon: "frame"
+---
+
+`@mcp-b/mcp-iframe` wraps the iframe transport flow in a custom element. It is the package to use when you want to expose an iframe's tools, prompts, or resources to the parent page without manually wiring transport classes.
+
+## When to use this package
+
+- You want a parent page to surface capabilities from an iframe.
+- You prefer a declarative element over manual `IframeParentTransport` and `IframeChildTransport` setup.
+- You want namespaced tool forwarding tied to an element ID.
+
+## When not to use this package
+
+- You need low-level control over message flow or custom transport wiring. Use [`@mcp-b/transports`](/packages/transports/overview).
+- The iframe content does not expose `document.modelContext` or a compatible runtime.
+
+## Where it sits in the package graph
+
+This package sits on top of the iframe transport pair from [`@mcp-b/transports`](/packages/transports/overview). It is a browser-facing convenience layer, not a separate transport protocol.
+
+## First step
+
+Expose `document.modelContext` inside the iframe, then import `@mcp-b/mcp-iframe` in the parent page and add the `<mcp-iframe>` element. The [reference page](/packages/mcp-iframe/reference) documents events, attributes, methods, and namespacing behavior.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Reference" icon="book-open" href="/packages/mcp-iframe/reference">
+    Element registration, attributes, methods, and event contract.
+  </Card>
+  <Card title="Bridge tools across iframes" icon="bridge" href="/how-to/bridge-tools-across-iframes">
+    Set up a parent-child iframe bridge step by step.
+  </Card>
+  <Card title="Transports overview" icon="network-wired" href="/packages/transports/overview">
+    Inspect the underlying iframe transport classes.
+  </Card>
+  <Card title="Spec status and limitations" icon="flag" href="/explanation/design/spec-status-and-limitations">
+    Background on cross-document exposure questions that still affect iframe behavior.
+  </Card>
+</CardGroup>

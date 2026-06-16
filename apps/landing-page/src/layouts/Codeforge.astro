@@ -1,0 +1,61 @@
+---
+import '../styles/codeforge.css';
+import BaseHead from '../components/BaseHead.astro';
+import Footer from '../components/section/footer.astro';
+import { Navbar } from '../components/section/navbar.tsx';
+import { SITE_TITLE } from '../consts';
+
+interface Props {
+  title: string;
+  description: string;
+  image?: string;
+  article?: {
+    publishedTime?: string;
+    modifiedTime?: string;
+    authors?: string[];
+    tags?: string[];
+  };
+}
+
+const { title, description, image, article } = Astro.props;
+const pageTitle = title === SITE_TITLE ? title : `${title} | ${SITE_TITLE}`;
+---
+
+<!doctype html>
+<html lang="en" dir="ltr">
+  <head>
+    <BaseHead title={pageTitle} description={description} image={image} article={article} />
+    <slot name="head" />
+  </head>
+  <body class="antialiased font-sans overflow-x-hidden">
+    <a href="#main" class="sr-only skip-link">Skip to main content</a>
+    <div class="max-w-7xl mx-auto border-x border-border">
+      <Navbar client:only="react" />
+      <main id="main" class="flex flex-col divide-y divide-border pt-16">
+        <slot />
+      </main>
+      <Footer />
+    </div>
+  </body>
+</html>
+
+<style>
+  .skip-link:focus {
+    position: fixed;
+    inset-block-start: 1rem;
+    inset-inline-start: 1rem;
+    z-index: 999;
+    padding: 0.5rem 0.75rem;
+    background: var(--color-card);
+    color: var(--color-foreground);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-badge);
+    width: auto;
+    height: auto;
+    clip-path: none;
+    white-space: normal;
+    overflow: visible;
+    margin: 0;
+  }
+</style>

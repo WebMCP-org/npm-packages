@@ -1,0 +1,282 @@
+---
+title: "@mcp-b/smart-dom-reader"
+description: "Token-efficient DOM extraction for AI agents. Two extraction approaches, ranked selectors, and zero runtime dependencies."
+keywords: ["@mcp-b/smart-dom-reader", "dom extraction", "SmartDOMReader", "ProgressiveExtractor", "css selectors", "ai agents", "token efficient"]
+icon: "code"
+---
+
+`@mcp-b/smart-dom-reader` extracts DOM structure optimized for AI/LLM consumption. It provides stable CSS selectors, interactive element maps, and semantic page structure while minimizing token usage. Zero runtime dependencies.
+
+```
+npm: @mcp-b/smart-dom-reader
+license: MIT
+dependencies: none
+optional peer: @modelcontextprotocol/sdk ^1.26.0 (for MCP server)
+```
+
+## Installation
+
+```bash
+npm install @mcp-b/smart-dom-reader
+```
+
+## Minimal example
+
+<Snippet file="snippets/packages/smart-dom-reader-quickstart.ts" />
+
+## Two extraction approaches
+
+### Full extraction (`SmartDOMReader`)
+
+Single-pass extraction of all elements. Use when you need everything upfront.
+
+```typescript
+import { SmartDOMReader } from '@mcp-b/smart-dom-reader';
+
+// Interactive mode: UI elements only
+const interactive = SmartDOMReader.extractInteractive(document);
+
+// Full mode: interactive + semantic elements
+const full = SmartDOMReader.extractFull(document);
+
+// From a specific element
+const region = SmartDOMReader.extractFromElement(element, 'interactive');
+```
+
+Instance-based usage with options:
+
+```typescript
+const reader = new SmartDOMReader({
+  mode: 'interactive',
+  mainContentOnly: true,
+  viewportOnly: false,
+});
+const result = reader.extract(document);
+```
+
+### Progressive extraction (`ProgressiveExtractor`)
+
+Step-by-step extraction for token-sensitive AI workflows.
+
+```typescript
+import { ProgressiveExtractor } from '@mcp-b/smart-dom-reader';
+
+// Step 1: Page structure overview (minimal tokens)
+const structure = ProgressiveExtractor.extractStructure(document);
+
+// Step 2: Extract a specific region
+const region = ProgressiveExtractor.extractRegion(
+  structure.summary.mainContentSelector,
+  document,
+  { mode: 'interactive' }
+);
+
+// Step 3: Extract readable content
+const content = ProgressiveExtractor.extractContent(
+  'article.main-article',
+  document,
+  { includeHeadings: true, includeLists: true }
+);
+```
+
+`extractStructure` accepts a `Document` or an `Element` to scope the extraction.
+
+## Extraction modes
+
+| Mode | Includes |
+|------|----------|
+| `interactive` | Buttons, links, form inputs, clickable elements, form structures |
+| `full` | Everything in `interactive` plus headings, images, tables, lists, articles, metadata |
+
+## Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `mode` | `'interactive' \| 'full'` | `'interactive'` | Extraction mode |
+| `maxDepth` | `number` | `5` | Maximum DOM traversal depth |
+| `includeHidden` | `boolean` | `false` | Include hidden elements |
+| `includeShadowDOM` | `boolean` | `true` | Traverse shadow DOM roots |
+| `includeIframes` | `boolean` | `false` | Traverse iframes |
+| `viewportOnly` | `boolean` | `false` | Only extract elements in the visible viewport |
+| `mainContentOnly` | `boolean` | `false` | Focus on the detected main content area |
+| `customSelectors` | `string[]` | `[]` | Additional CSS selectors to extract |
+
+## Output structure
+
+### `SmartDOMResult`
+
+```typescript
+interface SmartDOMResult {
+  mode: 'interactive' | 'full';
+  timestamp: number;
+
+  page: {
+    url: string;
+    title: string;
+    hasErrors: boolean;
+    isLoading: boolean;
+    hasModals: boolean;
+    hasFocus?: string;
+  };
+
+  landmarks: {
+    navigation: string[];
+    main: string[];
+    forms: string[];
+    headers: string[];
+    footers: string[];
+    articles: string[];
+    sections: string[];
+  };
+
+  interactive: {
+    buttons: ExtractedElement[];
+    links: ExtractedElement[];
+    inputs: ExtractedElement[];
+    forms: FormInfo[];
+    clickable: ExtractedElement[];
+  };
+
+  semantic?: {           // full mode only
+    headings: ExtractedElement[];
+    images: ExtractedElement[];
+    tables: ExtractedElement[];
+    lists: ExtractedElement[];
+    articles: ExtractedElement[];
+  };
+
+  metadata?: {           // full mode only
+    totalElements: number;
+    extractedElements: number;
+    mainContent?: string;
+    language?: string;
+  };
+}
+```
+
+### `ExtractedElement`
+
+```typescript
+interface ExtractedElement {
+  tag: string;
+  text: string;
+
+  selector: {
+    css: string;
+    xpath: string;
+    textBased?: string;
+    dataTestId?: string;
+    ariaLabel?: string;
+    candidates?: Array<{
+      type: 'id' | 'data-testid' | 'role-aria' | 'name' | 'class-path' | 'css-path' | 'xpath' | 'text';
+      value: string;
+      score: number;
+    }>;
+  };
+
+  attributes: Record<string, string>;
+
+  context: {
+    nearestForm?: string;
+    nearestSection?: string;
+    nearestMain?: string;
+    nearestNav?: string;
+    parentChain: string[];
+  };
+
+  interaction: {
+    click?: boolean;
+    change?: boolean;
+    submit?: boolean;
+    nav?: boolean;
+    disabled?: boolean;
+    hidden?: boolean;
+    role?: string;
+    form?: string;
+  };
+}
+```
+
+Interaction flags are only present when `true`, saving tokens.
+
+## Selector ranking
+
+Selectors are ranked by stability (higher score = more reliable):
+
+| Strategy | Score | Example |
+|----------|-------|---------|
+| ID | 100 | `#unique-id` |
+| `data-testid` | 90 | `[data-testid="submit"]` |
+| ARIA (role + label) | 80 | `[role="button"][aria-label="Submit"]` |
+| Name/ID attributes | 70 | `input[name="email"]` |
+| Class paths | 50 | `.form-container .submit-btn` |
+
+## Exported modules
+
+| Export | Kind | Description |
+|--------|------|-------------|
+| `SmartDOMReader` | Class | Full single-pass extraction |
+| `ProgressiveExtractor` | Class | Step-by-step extraction |
+| `SelectorGenerator` | Class | CSS/XPath selector generation with ranking |
+| `ContentDetection` | Class | Landmark detection and main content identification |
+| `MarkdownFormatter` | Class | Format extraction results as Markdown |
+| `MarkdownFormatOptions` | Type | Options for Markdown formatting |
+| `SmartDOMResult` | Type | Full extraction result shape |
+| `ExtractedElement` | Type | Single extracted element |
+| `ExtractionOptions` | Type | Options accepted by the reader |
+| `ExtractionMode` | Type | `'interactive' \| 'full'` |
+| `FormInfo` | Type | Form metadata (selector, inputs, buttons, action, method) |
+| `PageState` | Type | Current page state (URL, title, loading, errors) |
+| `PageLandmarks` | Type | Detected page landmarks |
+
+### Bundle string export
+
+A self-contained IIFE bundle is available for injection into pages (e.g. via `chrome.userScripts.execute`):
+
+```typescript
+import { SMART_DOM_READER_BUNDLE } from '@mcp-b/smart-dom-reader/bundle-string';
+
+const code = `(() => {
+  ${SMART_DOM_READER_BUNDLE}
+  return SmartDOMReaderBundle.executeExtraction('extractStructure', {
+    selector: undefined,
+    formatOptions: { detail: 'summary' }
+  });
+})()`;
+```
+
+The bundle contains guarded fallbacks for non-browser environments and has no runtime imports.
+
+## MCP server
+
+An optional MCP server returns XML-wrapped Markdown. Output format:
+
+```xml
+<page title="..." url="...">
+  <outline><![CDATA[ ...markdown... ]]></outline>
+</page>
+```
+
+Server tools:
+
+| Tool | Parameters |
+|------|-----------|
+| `browser_connect` | `headless?`, `executablePath?` |
+| `browser_navigate` | `url` |
+| `dom_extract_structure` | `selector?`, `detail?`, `maxTextLength?`, `maxElements?` |
+| `dom_extract_region` | `selector`, `options?` |
+| `dom_extract_content` | `selector`, `options?` |
+| `dom_extract_interactive` | `selector?`, `options?` |
+| `browser_screenshot` | `path?`, `fullPage?` |
+| `browser_close` | (none) |
+
+Golden path sequence:
+1. `dom_extract_structure` to get the page outline
+2. `dom_extract_region` to get selectors for a target area
+3. Write a script using those selectors
+4. Optionally `dom_extract_content` for readable text
+
+## Related
+
+- [@mcp-b/extension-tools](/packages/extension-tools/reference) (uses `smart-dom-reader` for DOM extraction tools)
+- [@mcp-b/chrome-devtools-mcp](/packages/chrome-devtools-mcp/reference) (DevTools-based browser automation)

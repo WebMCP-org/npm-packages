@@ -1,0 +1,10 @@
+<mcp-iframe src="./child-app.html" id="my-app"></mcp-iframe>
+
+<script type="module">
+  import '@mcp-b/mcp-iframe';
+
+  const el = document.querySelector('mcp-iframe');
+  el.addEventListener('mcp-iframe-ready', (event) => {
+    console.log('Exposed tools:', event.detail.tools);
+  });
+</script>

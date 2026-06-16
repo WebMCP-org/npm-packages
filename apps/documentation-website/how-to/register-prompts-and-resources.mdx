@@ -1,0 +1,202 @@
+---
+title: "Register Prompts and Resources"
+description: "Use MCP-B extension APIs to register prompts, resources, and use sampling and elicitation."
+keywords: ["registerPrompt", "registerResource", "sampling", "elicitation", "mcp-b extensions", "@mcp-b/react-webmcp", "BrowserMcpServer"]
+icon: "layer-plus"
+---
+
+Prompts, resources, sampling, and elicitation are MCP-B extension features, not part of the strict WebMCP core. They require [`@mcp-b/global`](/packages/global/reference) (which installs `BrowserMcpServer` as `document.modelContext`). For background on this distinction, see [Strict Core vs MCP-B Extensions](/explanation/strict-core-vs-mcp-b-extensions).
+
+## Register a prompt
+
+A prompt is a reusable message template that AI clients can discover and invoke with arguments.
+
+<Steps>
+  <Step title="Import @mcp-b/global">
+    ```typescript
+    import '@mcp-b/global';
+    ```
+  </Step>
+  <Step title="Register the prompt">
+    ```typescript
+    const { unregister } = document.modelContext.registerPrompt({
+      name: 'greeting',
+      description: 'Generate a greeting message',
+      argsSchema: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Name to greet' }
+        },
+        required: ['name']
+      },
+      get: async ({ name }) => ({
+        messages: [
+          { role: 'user', content: { type: 'text', text: `Hello, ${name}!` } }
+        ]
+      })
+    });
+    ```
+  </Step>
+  <Step title="Unregister when done">
+    ```typescript
+    unregister();
+    ```
+  </Step>
+</Steps>
+
+### React
+
+Use the `useWebMCPPrompt` hook from `@mcp-b/react-webmcp`. It handles registration and cleanup on unmount.
+
+```tsx
+import { useWebMCPPrompt } from '@mcp-b/react-webmcp';
+
+function CodeReviewPrompt() {
+  const { isRegistered } = useWebMCPPrompt({
+    name: 'review_code',
+    description: 'Review code for best practices',
+    argsSchema: {
+      type: 'object',
+      properties: {
+        code: { type: 'string', description: 'The code to review' },
+        language: { type: 'string', description: 'Programming language' },
+      },
+      required: ['code'],
+    } as const,
+    get: async ({ code, language }) => ({
+      messages: [{
+        role: 'user',
+        content: {
+          type: 'text',
+          text: `Please review this ${language ?? ''} code:\n\n${code}`
+        }
+      }]
+    }),
+  });
+
+  return <div>Code review prompt {isRegistered ? 'ready' : 'loading'}</div>;
+}
+```
+
+## Register a resource
+
+A resource exposes readable data (configuration, documents, state) to AI clients.
+
+<Steps>
+  <Step title="Import @mcp-b/global">
+    ```typescript
+    import '@mcp-b/global';
+    ```
+  </Step>
+  <Step title="Register the resource">
+    ```typescript
+    const { unregister } = document.modelContext.registerResource({
+      uri: 'app://config',
+      name: 'App Configuration',
+      description: 'Current application configuration',
+      mimeType: 'application/json',
+      read: async () => ({
+        contents: [{ uri: 'app://config', text: JSON.stringify(appConfig) }]
+      })
+    });
+    ```
+  </Step>
+  <Step title="Unregister when done">
+    ```typescript
+    unregister();
+    ```
+  </Step>
+</Steps>
+
+### React
+
+Use the `useWebMCPResource` hook from `@mcp-b/react-webmcp`.
+
+```tsx
+import { useWebMCPResource } from '@mcp-b/react-webmcp';
+
+function AppSettingsResource() {
+  const { isRegistered } = useWebMCPResource({
+    uri: 'config://app-settings',
+    name: 'App Settings',
+    description: 'Application configuration',
+    mimeType: 'application/json',
+    read: async (uri) => ({
+      contents: [{
+        uri: uri.href,
+        text: JSON.stringify({ theme: 'dark', language: 'en' })
+      }]
+    }),
+  });
+
+  return <div>Settings resource {isRegistered ? 'ready' : 'loading'}</div>;
+}
+```
+
+## Use sampling and elicitation
+
+Sampling lets your page request LLM completions from the connected client. Elicitation lets your page request structured input from the user through the client.
+
+Both methods delegate to the MCP SDK and require an active transport connection. See the [`@mcp-b/webmcp-ts-sdk` reference](/packages/webmcp-ts-sdk/reference) for parameter and return type details.
+
+### React
+
+`@mcp-b/react-webmcp` provides `useSampling` and `useElicitation` hooks that manage loading state, errors, and request counts.
+
+<CodeGroup>
+```tsx "Sampling"
+import { useSampling } from '@mcp-b/react-webmcp';
+
+function AIAssistant() {
+  const { state, createMessage } = useSampling();
+
+  const handleAsk = async () => {
+    const result = await createMessage({
+      messages: [
+        { role: 'user', content: { type: 'text', text: 'Summarize this page.' } }
+      ],
+      maxTokens: 200,
+    });
+    console.log(result.content);
+  };
+
+  return (
+    <button onClick={handleAsk} disabled={state.isLoading}>
+      Ask AI
+    </button>
+  );
+}
+```
+
+```tsx "Elicitation"
+import { useElicitation } from '@mcp-b/react-webmcp';
+
+function ConfigForm() {
+  const { state, elicitInput } = useElicitation();
+
+  const handleConfigure = async () => {
+    const result = await elicitInput({
+      message: 'Please provide your configuration',
+      requestedSchema: {
+        type: 'object',
+        properties: {
+          apiKey: { type: 'string', title: 'API Key' },
+          model: { type: 'string', enum: ['gpt-4', 'gpt-3.5'], title: 'Model' }
+        },
+        required: ['apiKey']
+      }
+    });
+
+    if (result.action === 'accept') {
+      console.log('Config:', result.content);
+    }
+  };
+
+  return (
+    <button onClick={handleConfigure} disabled={state.isLoading}>
+      Configure
+    </button>
+  );
+}
+```
+</CodeGroup>

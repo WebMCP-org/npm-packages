@@ -1,0 +1,269 @@
+---
+import { SITE_TITLE } from '../consts';
+---
+
+<header>
+  <div class="header-inner">
+    <a href="/" class="logo" aria-label={`${SITE_TITLE} home`}>
+      <img src="/mcp-b-logo.svg" alt="" width="28" height="28" aria-hidden="true" />
+      <span>{SITE_TITLE}</span>
+      <span class="by-line">by <a href="https://sigvelo.com" target="_blank" rel="noopener">SigVelo</a></span>
+    </a>
+
+    <nav class="desktop-nav" aria-label="Main navigation">
+      <a href="https://docs.mcp-b.ai" target="_blank" rel="noopener">Docs</a>
+      <a href="https://chromewebstore.google.com/detail/mcp-b-extension/daohopfhkdelnpemnhlekblhnikhdhfa" target="_blank" rel="noopener">Extension</a>
+      <a href="https://github.com/WebMCP-org" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://docs.mcp-b.ai" class="btn btn-header" target="_blank" rel="noopener">Read the docs</a>
+    </nav>
+
+    <button class="menu-toggle" aria-label="Toggle menu" aria-expanded="false">
+      <svg class="icon-open" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <line x1="4" y1="7" x2="20" y2="7" />
+        <line x1="4" y1="12" x2="20" y2="12" />
+        <line x1="4" y1="17" x2="20" y2="17" />
+      </svg>
+      <svg class="icon-close" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <line x1="18" y1="6" x2="6" y2="18" />
+        <line x1="6" y1="6" x2="18" y2="18" />
+      </svg>
+    </button>
+  </div>
+
+  <nav class="mobile-nav" aria-label="Mobile navigation">
+    <a href="https://docs.mcp-b.ai" target="_blank" rel="noopener">Docs</a>
+    <a href="https://chromewebstore.google.com/detail/mcp-b-extension/daohopfhkdelnpemnhlekblhnikhdhfa" target="_blank" rel="noopener">Extension</a>
+    <a href="https://github.com/WebMCP-org" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://docs.mcp-b.ai" class="btn btn-primary mobile-cta" target="_blank" rel="noopener">Read the docs</a>
+  </nav>
+</header>
+
+<script>
+  const toggle = document.querySelector('.menu-toggle');
+  const header = document.querySelector('header');
+  const mobileNav = document.querySelector('.mobile-nav');
+
+  toggle?.addEventListener('click', () => {
+    const open = header?.classList.toggle('open');
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+
+  mobileNav?.querySelectorAll('a').forEach((link) => {
+    link.addEventListener('click', () => {
+      header?.classList.remove('open');
+      toggle?.setAttribute('aria-expanded', 'false');
+    });
+  });
+</script>
+
+<style>
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    border-bottom: 1px solid var(--color-border);
+    background-color: var(--color-bg);
+  }
+
+  @supports (backdrop-filter: blur(12px)) {
+    header {
+      background-color: color-mix(in srgb, var(--color-bg) 80%, transparent);
+      backdrop-filter: blur(12px);
+    }
+  }
+
+  .header-inner {
+    position: relative;
+    max-width: var(--max-width);
+    margin: 0 auto;
+    padding: 0 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: var(--header-height);
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+    color: var(--color-text);
+    font-weight: 700;
+    font-size: 1.125rem;
+    letter-spacing: -0.02em;
+  }
+
+  .logo:hover {
+    text-decoration: none;
+  }
+
+  .by-line {
+    font-weight: 400;
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+    letter-spacing: 0;
+  }
+
+  .by-line a {
+    color: inherit;
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+
+  .by-line a:hover {
+    color: var(--color-text);
+  }
+
+  .desktop-nav {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .desktop-nav :global(a) {
+    padding: 0.5rem 0.875rem;
+    color: var(--color-text-secondary);
+    text-decoration: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border-radius: 6px;
+    transition: color 0.15s, background-color 0.15s;
+  }
+
+  .desktop-nav :global(a:hover) {
+    color: var(--color-text);
+    background-color: var(--color-hover-bg);
+    text-decoration: none;
+  }
+
+  .desktop-nav :global(a.active) {
+    color: var(--color-accent);
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .nav-link {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem;
+    color: var(--color-text-secondary);
+    border-radius: 6px;
+    transition: color 0.15s, background-color 0.15s;
+    text-decoration: none;
+  }
+
+  .nav-link:hover {
+    color: var(--color-text);
+    background-color: var(--color-hover-bg);
+    text-decoration: none;
+  }
+
+  .btn-header {
+    padding: 0.5rem 1.25rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    border-radius: var(--radius-md);
+    background-color: var(--color-accent);
+    color: #fff;
+    text-decoration: none;
+    transition: background-color 0.15s, transform 0.15s;
+  }
+
+  .btn-header:hover {
+    background-color: var(--color-accent-hover);
+    text-decoration: none;
+    transform: translateY(-1px);
+  }
+
+  .mobile-cta {
+    margin-top: 0.5rem;
+    text-align: center;
+    justify-content: center;
+  }
+
+  .menu-toggle {
+    display: none;
+    background: none;
+    border: none;
+    color: var(--color-text);
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 6px;
+  }
+
+  .menu-toggle:hover {
+    background-color: var(--color-hover-bg);
+  }
+
+  .icon-close {
+    display: none;
+  }
+
+  header.open .icon-open {
+    display: none;
+  }
+
+  header.open .icon-close {
+    display: block;
+  }
+
+  .mobile-nav {
+    display: none;
+    flex-direction: column;
+    padding: 0 1.5rem 1rem;
+    gap: 0.125rem;
+  }
+
+  header.open .mobile-nav {
+    display: flex;
+  }
+
+  .mobile-nav :global(a) {
+    display: block;
+    padding: 0.75rem 1rem;
+    color: var(--color-text-secondary);
+    text-decoration: none;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    border-radius: 6px;
+    transition: color 0.15s, background-color 0.15s;
+  }
+
+  .mobile-nav :global(a:hover) {
+    color: var(--color-text);
+    background-color: var(--color-hover-bg);
+    text-decoration: none;
+  }
+
+  .mobile-nav :global(a.active) {
+    color: var(--color-accent);
+  }
+
+  @media (max-width: 768px) {
+    .desktop-nav {
+      display: none;
+    }
+
+    .desktop-only {
+      display: none;
+    }
+
+    .btn-header {
+      display: none;
+    }
+
+    .menu-toggle {
+      display: block;
+    }
+
+    .header-inner {
+      height: 56px;
+    }
+  }
+</style>

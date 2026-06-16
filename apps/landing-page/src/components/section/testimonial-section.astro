@@ -1,0 +1,28 @@
+---
+import HeaderBadge from "@/components/header-badge.astro";
+import SectionHeader from "@/components/section-header.astro";
+import SocialProofTestimonials from "@/components/animations/testimonial-scroll.astro";
+import TextHighlight from "@/components/text-highlight.astro";
+import { siteConfig } from "@/lib/config";
+
+const { testimonialSection } = siteConfig;
+---
+
+<section id="testimonials" class="flex w-full flex-col items-center justify-center">
+  <SectionHeader>
+    <div class="flex flex-col items-center justify-center">
+      <HeaderBadge icon={testimonialSection.badge.icon} text={testimonialSection.badge.text} />
+      <div class="mt-4 flex flex-col items-center justify-center gap-4">
+        <h2 class="text-3xl font-medium tracking-tighter text-center text-balance md:text-4xl lg:text-6xl">
+          {testimonialSection.title.before}
+          <TextHighlight>{testimonialSection.title.highlight}</TextHighlight>
+          {testimonialSection.title.after}
+        </h2>
+        <p class="mx-auto text-center text-balance text-muted-foreground md:text-lg">
+          {testimonialSection.description}
+        </p>
+      </div>
+    </div>
+  </SectionHeader>
+  <SocialProofTestimonials testimonials={testimonialSection.testimonials} />
+</section>

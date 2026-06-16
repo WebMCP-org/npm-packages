@@ -1,0 +1,39 @@
+# Web MCP (MCP-B)
+
+> Browser-based Model Context Protocol implementation that enables AI agents to interact with web applications using existing authentication and structured data access instead of screen scraping.
+
+Web MCP (also known as MCP-B) brings the power of the Model Context Protocol to browsers, solving two critical problems: authentication complexity and poor agent experience with visual content parsing. Instead of bypassing browsers entirely, it leverages existing browser authentication (cookies, sessions, OAuth) and provides structured API access through MCP tools.
+
+The project includes custom transport layers for browser communication, React hooks for easy integration, and a full-stack demo application with todo management functionality. Built with React 18, TypeScript, and Cloudflare Workers, it demonstrates how to create production-ready MCP-enabled web applications.
+
+## Core Documentation
+
+- [Architecture Overview](/docs): Complete system architecture and how MCP-B works
+- [Quick Start Guide](/docs#quick-start): Get started with Web MCP in minutes
+- [API Reference](/docs#api-reference): Detailed API documentation for all transports and hooks
+
+## Implementation Guides
+
+- [Tab Transport Guide](/docs#tab-transport): In-page MCP communication setup
+- [Extension Transport Guide](/docs#extension-transport): Cross-context browser extension integration
+- [React Hooks Documentation](/docs#react-hooks): @mcp-b/mcp-react-hooks usage and examples
+
+## Source Code
+
+- [MCP Server Implementation](https://github.com/WebMCP-org/web/blob/main/src/services/MCP.ts): Core MCP server with todo management tools
+- [React Hooks](https://github.com/WebMCP-org/web/blob/main/src/hooks/useAssistantMCP.tsx): Assistant UI integration with MCP
+- Backend API: TanStack Start server route `/api/chat` implemented in `src/routes/api/chat.ts`
+- [Transport Library](https://npmjs.com/package/@mcp-b/transports): NPM package for MCP browser transports
+
+## Examples
+
+- [Todo Application Demo](https://github.com/WebMCP-org/web/blob/main/src/components/Todos.tsx): Complete CRUD application with MCP tool exposure
+- [Assistant Integration](/docs#examples): E-commerce and product search examples
+- [Live Demo](https://web-mcp.pages.dev/): Interactive demonstration of Web MCP capabilities
+
+## Optional
+
+- [Model Context Protocol Specification](https://modelcontextprotocol.io/): Official MCP documentation from Anthropic
+- [WebMCP Main Repository](https://github.com/WebMCP-org/WebMCP): Core WebMCP project and ecosystem
+- [Chrome Extension](https://chromewebstore.google.com/detail/mcp-b/daohopfhkdelnpemnhlekblhnikhdhfa): Browser extension for testing MCP-B enabled sites
+- [Package Registry](https://npmjs.com/package/@mcp-b/mcp-react-hooks): React hooks package on NPM

@@ -1,0 +1,44 @@
+---
+title: "@mcp-b/transports overview"
+description: "When to use the transport classes directly, which browser boundaries they cover, and when to prefer higher-level packages."
+keywords: ["@mcp-b/transports", "overview", "postMessage", "iframe", "extension", "transport"]
+icon: "network-wired"
+---
+
+`@mcp-b/transports` provides the transport classes that move MCP messages through browser boundaries such as tabs, iframes, extensions, and user scripts. It is the package you use when you need to choose or control the message path directly.
+
+## When to use this package
+
+- You are connecting an MCP server or client across `postMessage`, iframe, or extension boundaries.
+- You need direct access to transport options such as allowed origins or connection IDs.
+- You are building on top of the lower-level browser transport primitives.
+
+## When not to use this package
+
+- You want the runtime wired up automatically. Use [`@mcp-b/global`](/packages/global/overview).
+- You want the high-level iframe custom element instead of raw iframe transports. Use [`@mcp-b/mcp-iframe`](/packages/mcp-iframe/overview).
+
+## Where it sits in the package graph
+
+The transport classes sit beside the SDK layer and under several higher-level packages. `@mcp-b/global`, `@mcp-b/react-webmcp`, and `@mcp-b/mcp-iframe` all depend on transport behavior.
+
+## First step
+
+Choose the transport pair that matches your boundary, then connect it to a server or client. The [reference page](/packages/transports/reference) lists every class, option surface, and security boundary.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Reference" icon="book-open" href="/packages/transports/reference">
+    Transport classes, option tables, and connection examples.
+  </Card>
+  <Card title="Bridge tools across iframes" icon="bridge" href="/how-to/bridge-tools-across-iframes">
+    Practical iframe transport setup.
+  </Card>
+  <Card title="Transports and bridges" icon="bridge" href="/explanation/architecture/transports-and-bridges">
+    Conceptual background on how tools move between boundaries.
+  </Card>
+  <Card title="mcp-iframe overview" icon="frame" href="/packages/mcp-iframe/overview">
+    The higher-level wrapper built on the iframe transports.
+  </Card>
+</CardGroup>

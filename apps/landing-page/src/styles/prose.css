@@ -1,0 +1,16 @@
+/*
+ * Prose styles for rendered MDX blog content
+ * Most styling now lives in [slug].astro via scoped :global() selectors.
+ * This file provides minimal fallback defaults.
+ */
+
+@layer components {
+
+  .prose {
+    max-width: none;
+  }
+
+  .prose > * + * {
+    margin-block-start: 1.25em;
+  }
+}

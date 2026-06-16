@@ -1,0 +1,44 @@
+---
+title: "@mcp-b/global overview"
+description: "When to use the full MCP-B runtime entry point, what it adds on top of WebMCP, and how it relates to the lower layers."
+keywords: ["@mcp-b/global", "overview", "BrowserMcpServer", "transport", "MCP-B runtime"]
+icon: "globe"
+---
+
+`@mcp-b/global` is the full runtime entry point for browser applications. It installs or adopts the strict WebMCP surface, creates a `BrowserMcpServer`, connects transport, and exposes MCP-B extension methods on `document.modelContext`.
+
+## When to use this package
+
+- You want prompts, resources, sampling, elicitation, or transport-facing helpers.
+- You want browser tools to be reachable by extensions, relays, or desktop MCP clients.
+- You want one import that wires the runtime stack together.
+
+## When not to use this package
+
+- You only need strict-core `registerTool` behavior. Use [`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/overview).
+- You are building a lower-level runtime integration. Use [`@mcp-b/webmcp-ts-sdk`](/packages/webmcp-ts-sdk/overview) directly.
+
+## Where it sits in the package graph
+
+`@mcp-b/global` is the top of the runtime stack. It wraps the strict-core layer from [`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/overview), uses [`@mcp-b/webmcp-ts-sdk`](/packages/webmcp-ts-sdk/overview) internally, and starts transports from [`@mcp-b/transports`](/packages/transports/overview).
+
+## First step
+
+Import the package as early as possible in the browser entry point, then register tools on `document.modelContext`. Use the [reference page](/packages/global/reference) when you need configuration, cleanup, or transport details.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Reference" icon="book-open" href="/packages/global/reference">
+    Initialization, cleanup, transport configuration, and exported types.
+  </Card>
+  <Card title="Register prompts and resources" icon="folder-tree" href="/how-to/register-prompts-and-resources">
+    Use the MCP-B extension surface in an app.
+  </Card>
+  <Card title="Runtime layering" icon="bars-staggered" href="/explanation/architecture/runtime-layering">
+    Understand how the runtime stack is assembled.
+  </Card>
+  <Card title="Connect desktop agents with local relay" icon="tower-broadcast" href="/how-to/connect-desktop-agents-with-local-relay">
+    Bridge browser tools into desktop MCP clients.
+  </Card>
+</CardGroup>

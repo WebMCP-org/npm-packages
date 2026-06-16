@@ -11,7 +11,7 @@
     "web-standard",
     "webmcp"
   ],
-  "homepage": "https://docs.mcp-b.ai/packages/webmcp-types",
+  "homepage": "https://docs.mcp-b.ai/packages/webmcp-types/reference",
   "bugs": {
     "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },

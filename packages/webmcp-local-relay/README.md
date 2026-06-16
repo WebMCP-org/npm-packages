@@ -58,14 +58,14 @@ Add one script tag to expose your page's WebMCP tools to the relay:
 <script src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@latest/dist/browser/embed.js"></script>
 ```
 
-That's it. If your page already registers tools on `navigator.modelContext`, they'll be picked up automatically.
+That's it. If your page already registers tools on `document.modelContext`, they'll be picked up automatically.
 
 New to WebMCP? Here's the full setup:
 
 ```html
 <script src="https://cdn.jsdelivr.net/npm/@mcp-b/global@latest/dist/index.iife.js"></script>
 <script>
-  navigator.modelContext.registerTool({
+  document.modelContext.registerTool({
     name: 'get_page_title',
     description: 'Get the current page title',
     inputSchema: { type: 'object', properties: {} },
@@ -199,14 +199,14 @@ npx @mcp-b/webmcp-local-relay --widget-origin https://myapp.com
 │        Widget iframe                 │
 │   embed.js injects widget.html       │
 └──────────────────┬───────────────────┘
-                   │ navigator.modelContext
+                   │ document.modelContext
 ┌──────────────────▼───────────────────┐
 │        Host page                     │
 │   WebMCP runtime + registered tools  │
 └──────────────────────────────────────┘
 ```
 
-**How it connects:** The embed script injects a hidden iframe into the host page. The iframe opens a WebSocket to the relay on `localhost`. Tools are discovered via `navigator.modelContext` (or `navigator.modelContextTesting` as fallback) and forwarded to the relay, which registers them as standard MCP tools over stdio.
+**How it connects:** The embed script injects a hidden iframe into the host page. The iframe opens a WebSocket to the relay on `localhost`. Tools are discovered via `document.modelContext` (or `navigator.modelContextTesting` as fallback) and forwarded to the relay, which registers them as standard MCP tools over stdio.
 If the relay is temporarily unavailable, the widget reconnects automatically using exponential backoff (1.5x multiplier) from `500ms` up to `3000ms`, stopping after 100 attempts.
 
 **Client mode:** When a second relay instance starts and the port is already in use (`EADDRINUSE`), it automatically falls back to **client mode**. In client mode the relay connects as a WebSocket client to the existing server relay and proxies tool operations through it. If the server relay later stops, the client attempts to promote itself back to server mode. This enables multiple MCP clients to share the same browser connections without manual configuration.
@@ -220,7 +220,7 @@ Supported page runtimes:
 
 Runtime dispatch behavior in the browser embed/widget layer:
 
-- Uses `navigator.modelContext.listTools` + `callTool` when present.
+- Uses `document.modelContext.listTools` + `callTool` when present.
 - Falls back to `navigator.modelContextTesting.listTools` + `executeTool`.
 
 ### WebMCP Standard Status
@@ -229,7 +229,7 @@ WebMCP is an emerging web platform proposal. This relay works today with polyfil
 
 - [W3C WebML CG draft](https://webmachinelearning.github.io/webmcp/)
 - [Proposal repository](https://github.com/webmachinelearning/webmcp)
-- [Proposal details (`navigator.modelContext`, `registerTool`, etc.)](https://github.com/webmachinelearning/webmcp/blob/main/docs/proposal.md)
+- [Proposal details (`document.modelContext`, `registerTool`, etc.)](https://github.com/webmachinelearning/webmcp/blob/main/docs/proposal.md)
 
 For Chromium/Chrome Canary native preview testing:
 
@@ -294,13 +294,13 @@ Produces `webmcp-local-relay-<version>.mcpb` for distribution via Claude Desktop
 
 ### Plugin and Skill Files
 
-| File                                 | Purpose                         |
-| ------------------------------------ | ------------------------------- |
-| `.claude-plugin/plugin.json`         | Claude Code plugin definition   |
-| `.claude-plugin/marketplace.json`    | Plugin marketplace metadata     |
-| `.mcp.json`                          | MCP server configuration        |
-| `skills/webmcp-local-relay/SKILL.md` | Claude Code skill documentation |
-| `manifest.json`                      | MCPB bundle manifest            |
+| File                                         | Purpose                            |
+| -------------------------------------------- | ---------------------------------- |
+| `.claude-plugin/plugin.json`                 | Claude Code plugin definition      |
+| `.claude-plugin/marketplace.json`            | Plugin marketplace metadata        |
+| `.mcp.json`                                  | MCP server configuration           |
+| `.agents/skills/webmcp-local-relay/SKILL.md` | Claude Code skill workspace source |
+| `manifest.json`                              | MCPB bundle manifest               |
 
 ### References
 

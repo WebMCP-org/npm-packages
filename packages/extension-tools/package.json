@@ -32,7 +32,7 @@
     "tabs-api",
     "webmcp"
   ],
-  "homepage": "https://docs.mcp-b.ai/packages/extension-tools",
+  "homepage": "https://docs.mcp-b.ai/packages/extension-tools/reference",
   "bugs": {
     "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },

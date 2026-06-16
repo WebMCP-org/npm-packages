@@ -1,0 +1,200 @@
+---
+title: Design System
+description: Internal guide for documentation styling and component usage
+---
+
+# WebMCP Documentation Design System
+
+This guide documents the styling conventions and component patterns used throughout our documentation.
+
+## Color Palette
+
+The docs use the vendored SigVelo public-brand token snapshot. The current
+snapshot was reviewed from SigVelo commit
+`cdacb96e504f5f5481fb8433549a3341d3895920`.
+
+<Columns cols={3}>
+  <div>
+    **Primary**
+    <Color value="#005F8F" />
+    Primary actions and links
+  </div>
+  <div>
+    **Light**
+    <Color value="#9ED8EA" />
+    Highlights and supporting accents
+  </div>
+  <div>
+    **Dark**
+    <Color value="#004D73" />
+    Hover and active states
+  </div>
+</Columns>
+
+## Typography
+
+| Element  | Font              | Weight         |
+| -------- | ----------------- | -------------- |
+| Headings | System sans-serif | 600 (semibold) |
+| Body     | System sans-serif | 400 (regular)  |
+| Code     | System monospace  | 400 (regular)  |
+
+## Component Usage
+
+### Callouts
+
+Use callouts to highlight important information:
+
+<Tabs>
+  <Tab title="Note">
+    <Note>Use for supplementary information that enhances understanding.</Note>
+    ```jsx
+    <Note>Your message here</Note>
+    ```
+  </Tab>
+  <Tab title="Warning">
+    <Warning>Use for cautionary information that could prevent issues.</Warning>
+    ```jsx
+    <Warning>Your message here</Warning>
+    ```
+  </Tab>
+  <Tab title="Tip">
+    <Tip>Use for best practices and helpful suggestions.</Tip>
+    ```jsx
+    <Tip>Your message here</Tip>
+    ```
+  </Tab>
+  <Tab title="Check">
+    <Check>Use for success states or confirmation messages.</Check>
+    ```jsx
+    <Check>Your message here</Check>
+    ```
+  </Tab>
+</Tabs>
+
+### Cards
+
+Use cards for navigation and feature highlights:
+
+<Columns cols={2}>
+  <Card title="Basic Card" icon="square">
+    Simple card with icon and description.
+  </Card>
+  <Card title="Link Card" icon="arrow-right" href="/start-here">
+    Card that links to another page.
+  </Card>
+</Columns>
+
+```jsx
+<Card title="Title" icon="icon-name" href="/start-here">
+  Card content here
+</Card>
+```
+
+### Steps
+
+Use steps for sequential procedures:
+
+<Steps>
+  <Step title="First Step">Describe what the user needs to do.</Step>
+  <Step title="Second Step">Continue with the next action.</Step>
+  <Step title="Third Step">Complete the procedure.</Step>
+</Steps>
+
+```jsx
+<Steps>
+  <Step title="Step Title">Step content</Step>
+</Steps>
+```
+
+### Code Blocks
+
+Always specify the language for syntax highlighting:
+
+```typescript
+// TypeScript example
+document.modelContext.registerTool({
+  name: 'example_tool',
+  description: 'An example tool',
+  inputSchema: { type: 'object', properties: {} },
+  handler: async () => ({ content: [{ type: 'text', text: 'Hello' }] }),
+});
+```
+
+```bash
+# Shell commands
+npm install @mcp-b/global
+```
+
+### Tabs for Multi-Framework Examples
+
+<Tabs>
+  <Tab title="React">
+    ```tsx
+    import { useWebMCP } from '@mcp-b/react-webmcp';
+
+    function MyComponent() {
+      useWebMCP({
+        name: 'my_tool',
+        description: 'Does something',
+        handler: async () => ({ content: [{ type: 'text', text: 'Done' }] })
+      });
+    }
+    ```
+
+  </Tab>
+  <Tab title="Vue">
+    ```vue
+    <script setup>
+    import { onMounted } from 'vue';
+
+    onMounted(() => {
+      document.modelContext.registerTool({
+        name: 'my_tool',
+        description: 'Does something',
+        handler: async () => ({ content: [{ type: 'text', text: 'Done' }] })
+      });
+    });
+    </script>
+    ```
+
+  </Tab>
+  <Tab title="Vanilla JS">
+    ```javascript
+    document.modelContext.registerTool({
+      name: 'my_tool',
+      description: 'Does something',
+      handler: async () => ({ content: [{ type: 'text', text: 'Done' }] })
+    });
+    ```
+  </Tab>
+</Tabs>
+
+## Using Snippets
+
+Import reusable content from the `/snippets` folder:
+
+```jsx
+<Snippet file="snippets/packages/global-quickstart.ts" />
+```
+
+## Page Frontmatter
+
+Every page should include proper frontmatter:
+
+```yaml
+---
+title: Page Title
+description: Brief description for SEO and navigation
+icon: optional-icon-name
+---
+```
+
+## Writing Guidelines
+
+1. **Be concise**: Get to the point quickly
+2. **Use active voice**: "Register a tool" not "A tool can be registered"
+3. **Provide examples**: Show code before explaining it
+4. **Link liberally**: Cross-reference related content
+5. **Test code**: Ensure all examples work
+6. **Follow Diataxis**: Don't mix tutorials, how-tos, explanations, and reference

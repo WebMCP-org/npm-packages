@@ -1,0 +1,20 @@
+---
+export const prerender = true;
+
+import CTASection from '../components/section/cta-section.astro';
+import { CompanyShowcase } from '../components/section/company-showcase';
+import DemoSection from '../components/section/demo-section.astro';
+import HeroSection from '../components/section/hero-section.astro';
+import Base from '../layouts/Codeforge.astro';
+import { SITE_TITLE } from '../consts';
+---
+
+<Base
+  title={SITE_TITLE}
+  description="Open-source WebMCP packages and a browser extension for publishing and calling tools on the web."
+>
+  <HeroSection />
+  <CompanyShowcase client:visible />
+  <DemoSection />
+  <CTASection />
+</Base>
