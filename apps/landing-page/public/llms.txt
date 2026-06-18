@@ -1,39 +1,36 @@
-# Web MCP (MCP-B)
+# MCP-B
 
-> Browser-based Model Context Protocol implementation that enables AI agents to interact with web applications using existing authentication and structured data access instead of screen scraping.
+> MCP-B makes browser applications accessible to AI agents through WebMCP tools, existing browser authentication, and structured runtime APIs.
 
-Web MCP (also known as MCP-B) brings the power of the Model Context Protocol to browsers, solving two critical problems: authentication complexity and poor agent experience with visual content parsing. Instead of bypassing browsers entirely, it leverages existing browser authentication (cookies, sessions, OAuth) and provides structured API access through MCP tools.
+MCP-B is maintained in the WebMCP npm packages monorepo. The public landing page lives in `apps/landing-page`, and the documentation site lives in `apps/documentation-website`.
 
-The project includes custom transport layers for browser communication, React hooks for easy integration, and a full-stack demo application with todo management functionality. Built with React 18, TypeScript, and Cloudflare Workers, it demonstrates how to create production-ready MCP-enabled web applications.
+## Documentation
 
-## Core Documentation
-
-- [Architecture Overview](/docs): Complete system architecture and how MCP-B works
-- [Quick Start Guide](/docs#quick-start): Get started with Web MCP in minutes
-- [API Reference](/docs#api-reference): Detailed API documentation for all transports and hooks
-
-## Implementation Guides
-
-- [Tab Transport Guide](/docs#tab-transport): In-page MCP communication setup
-- [Extension Transport Guide](/docs#extension-transport): Cross-context browser extension integration
-- [React Hooks Documentation](/docs#react-hooks): @mcp-b/mcp-react-hooks usage and examples
+- [Docs Home](https://docs.mcp-b.ai): Tutorials, how-to guides, package references, and explanation pages
+- [Choose a Runtime](https://docs.mcp-b.ai/how-to/choose-runtime): Pick strict core, full runtime, React hooks, or relay tooling
+- [First Tool Tutorial](https://docs.mcp-b.ai/tutorials/first-tool): Register a browser-native WebMCP tool
+- [Package Reference](https://docs.mcp-b.ai/packages/index): Runtime, React, transport, relay, extension, and tooling packages
+- [WebMCP Standard API](https://docs.mcp-b.ai/reference/webmcp/standard-api): Core `document.modelContext` API reference
 
 ## Source Code
 
-- [MCP Server Implementation](https://github.com/WebMCP-org/web/blob/main/src/services/MCP.ts): Core MCP server with todo management tools
-- [React Hooks](https://github.com/WebMCP-org/web/blob/main/src/hooks/useAssistantMCP.tsx): Assistant UI integration with MCP
-- Backend API: TanStack Start server route `/api/chat` implemented in `src/routes/api/chat.ts`
-- [Transport Library](https://npmjs.com/package/@mcp-b/transports): NPM package for MCP browser transports
+- [Monorepo](https://github.com/WebMCP-org/npm-packages): Packages, landing page, docs site, examples, and tests
+- [Landing Page](https://github.com/WebMCP-org/npm-packages/tree/main/apps/landing-page): mcp-b.ai Astro and Cloudflare Workers app
+- [Documentation Website](https://github.com/WebMCP-org/npm-packages/tree/main/apps/documentation-website): docs.mcp-b.ai Mintlify site
+- [Core Runtime Packages](https://github.com/WebMCP-org/npm-packages/tree/main/packages): WebMCP types, polyfill, full runtime, transports, React hooks, local relay, and tooling
 
-## Examples
+## Packages
 
-- [Todo Application Demo](https://github.com/WebMCP-org/web/blob/main/src/components/Todos.tsx): Complete CRUD application with MCP tool exposure
-- [Assistant Integration](/docs#examples): E-commerce and product search examples
-- [Live Demo](https://web-mcp.pages.dev/): Interactive demonstration of Web MCP capabilities
+- [`@mcp-b/webmcp-types`](https://www.npmjs.com/package/@mcp-b/webmcp-types): TypeScript definitions for WebMCP APIs
+- [`@mcp-b/webmcp-polyfill`](https://www.npmjs.com/package/@mcp-b/webmcp-polyfill): Strict browser polyfill for `document.modelContext`
+- [`@mcp-b/global`](https://www.npmjs.com/package/@mcp-b/global): Full browser MCP-B runtime
+- [`@mcp-b/transports`](https://www.npmjs.com/package/@mcp-b/transports): Browser transport primitives
+- [`usewebmcp`](https://www.npmjs.com/package/usewebmcp): Lightweight React hook
+- [`@mcp-b/react-webmcp`](https://www.npmjs.com/package/@mcp-b/react-webmcp): React hooks and MCP client/provider utilities
+- [`@mcp-b/webmcp-local-relay`](https://www.npmjs.com/package/@mcp-b/webmcp-local-relay): Local relay for desktop agents
 
-## Optional
+## External References
 
-- [Model Context Protocol Specification](https://modelcontextprotocol.io/): Official MCP documentation from Anthropic
-- [WebMCP Main Repository](https://github.com/WebMCP-org/WebMCP): Core WebMCP project and ecosystem
-- [Chrome Extension](https://chromewebstore.google.com/detail/mcp-b/daohopfhkdelnpemnhlekblhnikhdhfa): Browser extension for testing MCP-B enabled sites
-- [Package Registry](https://npmjs.com/package/@mcp-b/mcp-react-hooks): React hooks package on NPM
+- [WebMCP Draft](https://webmachinelearning.github.io/webmcp/)
+- [Model Context Protocol](https://modelcontextprotocol.io/)
+- [Chrome Extension](https://chromewebstore.google.com/detail/mcp-b-extension/daohopfhkdelnpemnhlekblhnikhdhfa)

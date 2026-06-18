@@ -356,7 +356,7 @@ pnpm build
 | Document                                                           | Purpose                                             |
 | ------------------------------------------------------------------ | --------------------------------------------------- |
 | [CONTRIBUTING.md](./CONTRIBUTING.md)                               | How to contribute: setup, PR process, commit format |
-| [CLAUDE.md](./CLAUDE.md)                                           | Quick reference for AI agents working in this repo  |
+| [AGENTS.md](./AGENTS.md)                                           | Quick reference for AI agents working in this repo  |
 | [Package Philosophy](./docs/MCPB_PACKAGE_PHILOSOPHY.md)            | Package boundaries and layering model               |
 | [Testing Philosophy](./docs/TESTING_PHILOSOPHY.md)                 | Test layers, mocking policy, coverage expectations  |
 | [E2E Testing](./docs/TESTING.md)                                   | Playwright setup, test apps, debugging              |
