@@ -170,7 +170,7 @@ Restores previous `document.modelContext`, `navigator.modelContext`, and `naviga
 
 ```ts
 const ac = new AbortController();
-navigator.modelContext.registerTool(
+document.modelContext.registerTool(
   {
     name: 'search',
     description: 'Search docs',

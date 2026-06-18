@@ -2,7 +2,7 @@
 
 # @mcp-b
 
-**Polyfill and MCP bridge for the [Web Model Context API](https://webmachinelearning.github.io/webmcp/) (`navigator.modelContext`)**
+**Polyfill and MCP bridge for the [Web Model Context API](https://webmachinelearning.github.io/webmcp/) (`document.modelContext`)**
 
 <p>
   <a href="https://webmachinelearning.github.io/webmcp/"><img src="https://img.shields.io/badge/W3C-WebMCP%20Spec-005A9C?style=flat-square" alt="W3C WebMCP Spec"></a>
@@ -41,12 +41,12 @@ MCP-b **polyfills** that API for all browsers today, and **bridges** it to the f
 
 ### 1. Use the web standard directly
 
-If you're running Chrome with [`--enable-experimental-web-platform-features`](./e2e/web-standards-showcase/CHROMIUM_FLAGS.md), `navigator.modelContext` is already there. Just use it:
+If you're running Chrome with [`--enable-experimental-web-platform-features`](./e2e/web-standards-showcase/CHROMIUM_FLAGS.md), `document.modelContext` is already there. Just use it:
 
 Add `@mcp-b/webmcp-types` (`pnpm add -D @mcp-b/webmcp-types`) for full input/output schema inference:
 
 ```ts
-navigator.modelContext.registerTool({
+document.modelContext.registerTool({
   name: 'add_todo',
   description: 'Add a new todo item',
   inputSchema: {
@@ -73,7 +73,7 @@ import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill'; // pnpm add @
 
 initializeWebMCPPolyfill(); // no-op if native support exists
 
-navigator.modelContext.registerTool({
+document.modelContext.registerTool({
   name: 'get_page_title',
   description: 'Returns the current page title',
   inputSchema: { type: 'object', properties: {} },
@@ -106,7 +106,7 @@ Need the full [Model Context Protocol](https://modelcontextprotocol.io/) — pro
 import '@mcp-b/global'; // pnpm add @mcp-b/global
 
 // Same registerTool API — now backed by a full MCP server
-navigator.modelContext.registerTool({
+document.modelContext.registerTool({
   name: 'add_todo',
   description: 'Add a new todo item',
   inputSchema: {
@@ -128,7 +128,7 @@ Or as a script tag (zero build step):
 ```html
 <script src="https://unpkg.com/@mcp-b/global/dist/index.iife.js"></script>
 <script>
-  navigator.modelContext.registerTool({
+  document.modelContext.registerTool({
     /* ... */
   });
 </script>
@@ -167,7 +167,7 @@ Three ways for AI agents to discover and call your tools:
 ```
 ┌─────────────────────────────────────────────────────────┐
 │  Your website                                           │
-│  navigator.modelContext.registerTool({ ... })            │
+│  document.modelContext.registerTool({ ... })             │
 └────────┬────────────────────┬───────────────────┬───────┘
          │                    │                   │
     ┌────▼─────┐    ┌────────▼────────┐   ┌─────▼──────┐
@@ -180,7 +180,7 @@ Three ways for AI agents to discover and call your tools:
     browser             built-in agent       Cursor, VS Code
 ```
 
-**MCP-b Extension** — Install from [docs.mcp-b.ai/extension](https://docs.mcp-b.ai/extension). Discovers tools on any page.
+**MCP-B Extension** — [Install it from the Chrome Web Store](https://chromewebstore.google.com/detail/mcp-b-extension/daohopfhkdelnpemnhlekblhnikhdhfa). It discovers tools exposed by pages and connects them to extension-side agent experiences.
 
 **Chrome Native** — Enable at `chrome://flags` → _Experimental Web Platform features_, or:
 
@@ -253,7 +253,7 @@ pnpm add @mcp-b/smart-dom-reader
 
 | Package                                              | Version                                                                                                             | Description                                                         |
 | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| [@mcp-b/webmcp-polyfill](./packages/webmcp-polyfill) | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-polyfill)](https://www.npmjs.com/package/@mcp-b/webmcp-polyfill) | `navigator.modelContext` polyfill — strict spec-aligned surface     |
+| [@mcp-b/webmcp-polyfill](./packages/webmcp-polyfill) | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-polyfill)](https://www.npmjs.com/package/@mcp-b/webmcp-polyfill) | `document.modelContext` polyfill, with a deprecated navigator alias |
 | [@mcp-b/webmcp-types](./packages/webmcp-types)       | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-types)](https://www.npmjs.com/package/@mcp-b/webmcp-types)       | TypeScript definitions for the WebMCP core API                      |
 | [@mcp-b/global](./packages/global)                   | [![npm](https://img.shields.io/npm/v/@mcp-b/global)](https://www.npmjs.com/package/@mcp-b/global)                   | Full runtime — polyfill + MCP bridge (prompts, resources, sampling) |
 | [@mcp-b/webmcp-ts-sdk](./packages/webmcp-ts-sdk)     | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-ts-sdk)](https://www.npmjs.com/package/@mcp-b/webmcp-ts-sdk)     | Browser-adapted MCP TypeScript SDK with dynamic tool registration   |
@@ -296,7 +296,7 @@ pnpm add @mcp-b/smart-dom-reader
 ```
 ┌──────────────────────────────────────────────────────────┐
 │  Your web app                                            │
-│  navigator.modelContext.registerTool({ ... })             │
+│  document.modelContext.registerTool({ ... })              │
 ├────────────── @mcp-b/global ─────────────────────────────┤
 │  MCP bridge: prompts, resources, sampling, elicitation   │
 ├────────────── @mcp-b/webmcp-ts-sdk ──────────────────────┤
@@ -377,7 +377,7 @@ Contributions welcome — see [CONTRIBUTING.md](./CONTRIBUTING.md) for guideline
 ## Links
 
 - [MCP-b Documentation](https://docs.mcp-b.ai)
-- [MCP-b Browser Extension](https://docs.mcp-b.ai/extension)
+- [MCP-B Browser Extension](https://chromewebstore.google.com/detail/mcp-b-extension/daohopfhkdelnpemnhlekblhnikhdhfa)
 - [W3C WebMCP Spec](https://webmachinelearning.github.io/webmcp/)
 - [W3C Web Machine Learning Community Group](https://www.w3.org/community/webmachinelearning/)
 - [Model Context Protocol Specification](https://modelcontextprotocol.io/)

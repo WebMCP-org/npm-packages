@@ -1,0 +1,40 @@
+---
+title: 'WebMCP standard API'
+description: 'Quick lookup for the document-first WebMCP surface and its compatibility APIs.'
+keywords: ['document.modelContext', 'registerTool', 'getTools', 'executeTool']
+icon: 'brackets-curly'
+---
+
+The authoritative API definition is the
+[W3C WebMCP specification](https://webmachinelearning.github.io/webmcp/).
+
+## Canonical surface
+
+New code uses `document.modelContext`.
+
+| Member                                   | Purpose                                                          |
+| ---------------------------------------- | ---------------------------------------------------------------- |
+| `registerTool(tool, { signal })`         | Publish a tool and bind its lifetime to an optional abort signal |
+| `getTools()`                             | Discover registered tool objects                                 |
+| `executeTool(tool, inputJson, options?)` | Execute a tool object returned by `getTools()`                   |
+| `toolchange`                             | Notify consumers that available tools changed                    |
+
+```ts
+const controller = new AbortController();
+
+document.modelContext.registerTool(tool, {
+  signal: controller.signal,
+});
+
+controller.abort();
+```
+
+## Compatibility
+
+- `navigator.modelContext` is a deprecated alias for migration.
+- `navigator.modelContextTesting` is a compatibility surface for testing.
+- `listTools()`, `callTool()`, prompts, resources, sampling, elicitation, and
+  transports are MCP-B extensions.
+
+See [`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/reference) for the
+portable strict runtime.

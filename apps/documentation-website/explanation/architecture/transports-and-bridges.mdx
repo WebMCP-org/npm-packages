@@ -1,0 +1,23 @@
+---
+title: 'Transports and bridges'
+description: 'Why WebMCP needs transports when page-hosted tools cross browser boundaries.'
+keywords: ['transports', 'iframe', 'extension', 'relay', 'chrome devtools']
+icon: 'bridge'
+---
+
+WebMCP tools execute inside a page, while a consumer may run in an iframe,
+browser extension, userscript, or desktop MCP client. A transport carries tool
+discovery, calls, results, and lifecycle notifications across that boundary
+without changing where the tool runs.
+
+`@mcp-b/transports` implements low-level tab, iframe, extension, and userscript
+paths. `@mcp-b/mcp-iframe` wraps iframe forwarding.
+`@mcp-b/webmcp-local-relay` connects browser tools to desktop clients through
+localhost and stdio. `@mcp-b/chrome-devtools-mcp` uses the Chrome DevTools
+Protocol for coding-agent workflows.
+
+Each bridge establishes a security boundary. Origin validation, connection
+identity, extension permissions, and relay exposure must be configured in the
+corresponding package. Tool execution remains in the page.
+
+Start with the [`@mcp-b/transports` reference](/packages/transports/reference).

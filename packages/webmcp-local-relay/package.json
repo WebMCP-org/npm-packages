@@ -12,7 +12,7 @@
     "stdio",
     "webmcp"
   ],
-  "homepage": "https://github.com/WebMCP-org/npm-packages#readme",
+  "homepage": "https://docs.mcp-b.ai/packages/webmcp-local-relay/reference",
   "bugs": {
     "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },
@@ -29,8 +29,7 @@
   "files": [
     ".claude-plugin",
     ".mcp.json",
-    "dist",
-    "skills"
+    "dist"
   ],
   "type": "module",
   "main": "./dist/index.mjs",

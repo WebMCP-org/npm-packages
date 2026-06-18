@@ -1,0 +1,24 @@
+---
+import Codeforge from './Codeforge.astro';
+
+interface Props {
+  title: string;
+  description: string;
+  image?: string;
+  article?: {
+    publishedTime?: string;
+    modifiedTime?: string;
+    authors?: string[];
+    tags?: string[];
+  };
+}
+
+const { title, description, image, article } = Astro.props;
+---
+
+<Codeforge {title} {description} {image} {article}>
+  <Fragment slot="head">
+    <slot name="head" />
+  </Fragment>
+  <slot />
+</Codeforge>

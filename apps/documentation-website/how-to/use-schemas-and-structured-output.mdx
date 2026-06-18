@@ -1,0 +1,276 @@
+---
+title: 'Use Schemas and Structured Output'
+description: 'Define tool input schemas with JSON Schema, Standard Schema, or Zod, and add output schemas for typed agent responses.'
+keywords:
+  [
+    'inputSchema',
+    'outputSchema',
+    'json schema',
+    'zod',
+    'standard schema',
+    'structured output',
+    'type inference',
+    'validation',
+  ]
+icon: 'brackets-curly'
+---
+
+## Define input schemas
+
+Every tool can have an `inputSchema` that describes the arguments it accepts. The runtime uses this schema to validate input from AI agents before calling your `execute` function.
+
+### Literal JSON Schema
+
+Write the schema as a plain object. This works with every WebMCP runtime and requires no additional dependencies.
+
+```ts title="json-schema-tool.ts"
+document.modelContext.registerTool({
+  name: 'search',
+  description: 'Search indexed docs',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      query: { type: 'string' },
+      limit: { type: 'integer', minimum: 1, maximum: 50 },
+    },
+    required: ['query'],
+    additionalProperties: false,
+  },
+  async execute(args) {
+    // args is Record<string, unknown> — no type inference
+    const query = args.query as string;
+    return { content: [{ type: 'text', text: `Searching for ${query}` }] };
+  },
+});
+```
+
+**Use this when** you want zero dependencies and do not need TypeScript inference on the `args` parameter.
+
+### Literal JSON Schema with type inference
+
+Add `as const satisfies JsonSchemaForInference` to preserve the literal schema type. TypeScript then infers `args` from the schema at compile time.
+
+```bash
+npm install --save-dev @mcp-b/webmcp-types
+```
+
+```ts title="inferred-schema-tool.ts"
+import type { JsonSchemaForInference } from '@mcp-b/webmcp-types';
+
+const inputSchema = {
+  type: 'object',
+  properties: {
+    query: { type: 'string' },
+    limit: { type: 'integer', minimum: 1, maximum: 50 },
+  },
+  required: ['query'],
+  additionalProperties: false,
+} as const satisfies JsonSchemaForInference;
+
+document.modelContext.registerTool({
+  name: 'search',
+  description: 'Search indexed docs',
+  inputSchema,
+  async execute(args) {
+    // args is inferred as: { query: string; limit?: number }
+    return {
+      content: [{ type: 'text', text: `Searching for ${args.query} (${args.limit ?? 10})` }],
+    };
+  },
+});
+```
+
+**Use this when** you want compile-time type safety without adding a runtime schema library.
+
+<Note>
+  Inference works only with literal schemas. If the schema type is widened (for example, loaded from an API at runtime), `args` falls back to `Record<string, unknown>`.
+</Note>
+
+### Standard Schema (Zod, Valibot, ArkType)
+
+The polyfill accepts any [Standard Schema v1](https://github.com/standard-schema/standard-schema) object as `inputSchema`. This includes Zod v4, Valibot, and ArkType validators. The runtime extracts JSON Schema for agent discovery and validates input using the schema's `~standard.validate` function.
+
+With Zod v4:
+
+```bash
+npm install zod
+```
+
+```ts title="zod-tool.ts"
+import { z } from 'zod';
+
+document.modelContext.registerTool({
+  name: 'search',
+  description: 'Search indexed docs',
+  inputSchema: z.object({
+    query: z.string(),
+    limit: z.int().min(1).max(50).optional(),
+  }),
+  async execute(args) {
+    // args is validated and typed by Zod
+    return {
+      content: [{ type: 'text', text: `Searching for ${args.query}` }],
+    };
+  },
+});
+```
+
+**Use this when** you want runtime validation (not just compile-time types) and already use a Standard Schema-compatible library.
+
+<Note>
+  When both a Standard Schema validator and Standard JSON Schema are present on the same object,
+  JSON Schema conversion is preferred for validation parity. The runtime attempts conversion with
+  `draft-2020-12` first, then falls back to `draft-07`.
+</Note>
+
+### Zod with `@mcp-b/react-webmcp`
+
+The React hooks in `@mcp-b/react-webmcp` accept Zod schemas in a shorthand form where you pass the shape directly (without wrapping in `z.object`):
+
+```tsx title="SearchTool.tsx"
+import { useWebMCP } from '@mcp-b/react-webmcp';
+import { z } from 'zod';
+
+function SearchTool() {
+  const tool = useWebMCP({
+    name: 'search',
+    description: 'Search indexed docs',
+    inputSchema: {
+      query: z.string().describe('Search terms'),
+      limit: z.int().min(1).max(50).optional(),
+    },
+    handler: async (input) => {
+      // input is { query: string; limit?: number }
+      return { results: await search(input.query, input.limit) };
+    },
+  });
+
+  return <div>Executions: {tool.state.executionCount}</div>;
+}
+```
+
+### Choosing a schema style
+
+| Style                       | Dependencies                | Runtime validation | Type inference | Best for                                     |
+| --------------------------- | --------------------------- | ------------------ | -------------- | -------------------------------------------- |
+| Plain JSON Schema           | None                        | No                 | No             | Quick prototyping, zero-dep projects         |
+| JSON Schema + `as const`    | `@mcp-b/webmcp-types` (dev) | No                 | Yes            | TypeScript projects without a schema library |
+| Standard Schema (Zod, etc.) | Schema library              | Yes                | Yes            | Production apps that need runtime validation |
+
+## Define output schemas
+
+An `outputSchema` describes the shape of the structured data your tool returns. When present, the tool response includes both a human-readable `content` array and a machine-readable `structuredContent` object.
+
+### Add an output schema
+
+```ts title="output-schema-tool.ts"
+import type { JsonSchemaForInference } from '@mcp-b/webmcp-types';
+
+const outputSchema = {
+  type: 'object',
+  properties: {
+    counter: { type: 'number' },
+    timestamp: { type: 'string' },
+  },
+  required: ['counter', 'timestamp'],
+} as const satisfies JsonSchemaForInference;
+
+document.modelContext.registerTool({
+  name: 'counter_get',
+  description: 'Get counter value',
+  inputSchema: { type: 'object', properties: {} },
+  outputSchema,
+  async execute() {
+    const structuredContent = { counter: 0, timestamp: new Date().toISOString() };
+    return {
+      content: [{ type: 'text', text: JSON.stringify(structuredContent) }],
+      structuredContent,
+    };
+  },
+});
+```
+
+When `outputSchema` is a literal object schema and you use `@mcp-b/webmcp-types`, `structuredContent` is type-checked against the schema at compile time.
+
+### Output schemas with `usewebmcp`
+
+The `usewebmcp` hook infers `state.lastResult` from the output schema:
+
+```tsx title="CounterTool.tsx"
+import { useWebMCP } from 'usewebmcp';
+
+const OUTPUT_SCHEMA = {
+  type: 'object',
+  properties: {
+    count: { type: 'integer' },
+  },
+  required: ['count'],
+  additionalProperties: false,
+} as const;
+
+export function CounterTool() {
+  const tool = useWebMCP({
+    name: 'counter_get',
+    description: 'Get current count',
+    outputSchema: OUTPUT_SCHEMA,
+    execute: async () => ({ count: 42 }),
+  });
+
+  // tool.state.lastResult is inferred as { count: number } | null
+  return <p>Count: {tool.state.lastResult?.count ?? 'none'}</p>;
+}
+```
+
+<Warning>
+  If `outputSchema` is defined, the tool implementation must return a JSON-serializable object.
+  Returning a non-object value (`string`, `null`, array) causes an error response.
+</Warning>
+
+### Keep text and structure aligned
+
+Always return both `content` and `structuredContent`. The text in `content` is for display in chat UIs. The `structuredContent` is for programmatic consumption by the AI agent.
+
+```ts
+async execute() {
+  const data = { total: 5, items: ['a', 'b', 'c', 'd', 'e'] };
+  return {
+    content: [{ type: 'text', text: `Found ${data.total} items` }],
+    structuredContent: data,
+  };
+}
+```
+
+If you omit `content` and return only the structured data, the runtime wraps it in a text content block with pretty-printed JSON.
+
+### When to use output schemas
+
+Add `outputSchema` when:
+
+- The AI agent needs to pass your tool's result to another tool (structured data enables chaining).
+- You want compile-time type checking on the return value.
+- You need the agent to parse specific fields from the response rather than interpreting free text.
+
+Skip `outputSchema` when the tool returns simple text responses where structured parsing adds no value.
+
+## Tool design checklist
+
+Before publishing a tool:
+
+- Give it one clear job and use a stable, action-oriented name.
+- State when an agent should use it, including important exclusions.
+- Keep required inputs minimal and describe every property.
+- Use enums, bounds, formats, and `additionalProperties: false` where they
+  reduce ambiguity.
+- Return concise human-readable `content` and machine-readable
+  `structuredContent` when another tool may consume the result.
+- Mark destructive or externally visible actions with appropriate annotations
+  and require confirmation in the product UI.
+- Test success, validation failure, permission failure, and cancellation paths.
+
+For the editorial rationale behind these choices, read
+[Designing effective WebMCP tools](https://sigvelo.com/blog/designing-effective-webmcp-tools).
+
+## Further reading
+
+- [`@mcp-b/webmcp-types` reference](/packages/webmcp-types/reference) for the full list of schema types and inference utilities.
+- [Add Tools to an Existing App](/how-to/add-tools-to-an-existing-app) for the broader pattern of integrating tools into a working application.

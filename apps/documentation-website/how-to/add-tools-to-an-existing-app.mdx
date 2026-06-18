@@ -1,0 +1,256 @@
+---
+title: 'Add Tools to an Existing App'
+description: 'Expose existing product functionality as WebMCP tools without rewriting your application.'
+keywords:
+  [
+    'registerTool',
+    'unregisterTool',
+    '@mcp-b/global',
+    'document.modelContext',
+    'tool registration',
+    'inputSchema',
+    'annotations',
+  ]
+icon: 'puzzle-piece'
+---
+
+Expose existing application functionality to AI agents while keeping your app's own UI and state model intact. For framework-specific lifecycle patterns (React hooks, Vue composables, Svelte actions), see [Integrate with your framework](/how-to/frameworks).
+
+## Install the runtime
+
+If you have a build step, install `@mcp-b/global` from npm:
+
+```bash
+npm install @mcp-b/global
+```
+
+```ts title="main.ts"
+import '@mcp-b/global';
+```
+
+If you do not have a build step, add a single script tag. Place it before any code that registers tools:
+
+```html
+<script src="https://unpkg.com/@mcp-b/global@latest/dist/index.iife.js"></script>
+```
+
+Both approaches auto-initialize `document.modelContext` on load.
+
+<Note>
+  If you only need the strict core API (no MCP bridge, no transports), use `@mcp-b/webmcp-polyfill`
+  instead. See [Choose a Runtime](/how-to/choose-runtime) for guidance.
+</Note>
+
+## Register tools that wrap existing functions
+
+Identify functions in your app that an AI agent would find useful (search, add to cart, submit a form, fetch data). Wrap each one as a tool descriptor and register it.
+
+### Register tools with `registerTool`
+
+Call `registerTool` for each tool you want to expose. You can register them all at startup or add them incrementally (for example, after user login or after a feature flag check).
+
+```ts title="tools.ts"
+import '@mcp-b/global';
+
+document.modelContext.registerTool({
+  name: 'search-products',
+  description: 'Search products by keyword, category, or price range',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      query: { type: 'string', description: 'Search terms' },
+      category: { type: 'string', description: 'Product category' },
+      maxPrice: { type: 'number', description: 'Maximum price filter' },
+    },
+    required: ['query'],
+  },
+  async execute(args) {
+    const results = await fetch(
+      `/api/products?q=${args.query}&cat=${args.category ?? ''}&max=${args.maxPrice ?? ''}`
+    );
+    return { content: [{ type: 'text', text: await results.text() }] };
+  },
+});
+
+document.modelContext.registerTool({
+  name: 'add-to-cart',
+  description: 'Add a product to the shopping cart',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      productId: { type: 'string' },
+      quantity: { type: 'integer' },
+    },
+    required: ['productId'],
+  },
+  async execute(args) {
+    await fetch('/api/cart', {
+      method: 'POST',
+      body: JSON.stringify({ productId: args.productId, quantity: args.quantity ?? 1 }),
+    });
+    return { content: [{ type: 'text', text: 'Added to cart' }] };
+  },
+});
+```
+
+### Register tools conditionally
+
+```ts title="admin-tools.ts"
+import '@mcp-b/global';
+
+if (currentUser.isAdmin) {
+  document.modelContext.registerTool({
+    name: 'delete-user',
+    description: 'Delete a user account (admin only)',
+    inputSchema: {
+      type: 'object',
+      properties: { userId: { type: 'string' } },
+      required: ['userId'],
+    },
+    async execute(args) {
+      await fetch(`/api/users/${args.userId}`, { method: 'DELETE' });
+      return { content: [{ type: 'text', text: 'User deleted' }] };
+    },
+  });
+}
+```
+
+`registerTool` throws if a tool with the same name already exists. To update a tool, call `unregisterTool` first, then register the new version.
+
+## Update tools when app state changes
+
+If your available tools depend on state (logged in vs. guest, current page, feature flags), update the registry when that state changes.
+
+```ts title="auth.ts"
+function onLogin(user: User) {
+  // Register tools appropriate for the user's role
+  for (const tool of getToolsForRole(user.role)) {
+    document.modelContext.registerTool(tool);
+  }
+}
+
+function onLogout() {
+  // Unregister each tool by name
+  for (const name of registeredToolNames) {
+    document.modelContext.unregisterTool(name);
+  }
+}
+```
+
+Use `registerTool` and `unregisterTool` to add or remove individual tools:
+
+```ts
+document.modelContext.registerTool(adminTool);
+// later:
+document.modelContext.unregisterTool('delete-user');
+```
+
+## Interact with the DOM
+
+Tools can read from and write to the DOM. This is useful for form-filling, page navigation, or surfacing visible content.
+
+```ts title="form-tools.ts"
+document.modelContext.registerTool({
+  name: 'fill-contact-form',
+  description: 'Fill the contact form with provided details',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      name: { type: 'string' },
+      email: { type: 'string' },
+      message: { type: 'string' },
+    },
+    required: ['name', 'email', 'message'],
+  },
+  async execute(args) {
+    document.querySelector('#name').value = args.name;
+    document.querySelector('#email').value = args.email;
+    document.querySelector('#message').value = args.message;
+    return { content: [{ type: 'text', text: 'Form filled' }] };
+  },
+});
+
+document.modelContext.registerTool({
+  name: 'submit-form',
+  description: 'Submit the contact form',
+  inputSchema: { type: 'object', properties: {} },
+  async execute() {
+    document.querySelector('#contact-form').submit();
+    return { content: [{ type: 'text', text: 'Form submitted' }] };
+  },
+});
+```
+
+## Return errors from tools
+
+If a tool execution fails, return an error response instead of throwing. This gives the AI agent a structured signal to retry or adjust its approach.
+
+```ts
+async execute(args) {
+  try {
+    const result = await riskyOperation(args);
+    return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+  } catch (error) {
+    return {
+      content: [{ type: 'text', text: `Operation failed: ${error.message}` }],
+      isError: true,
+    };
+  }
+}
+```
+
+## Add annotations for AI planning
+
+Tool annotations give the AI agent hints about side effects. They do not change execution behavior, but help the agent decide when and how to call the tool.
+
+```ts
+document.modelContext.registerTool({
+  name: 'get-cart',
+  description: 'Get the current shopping cart contents',
+  inputSchema: { type: 'object', properties: {} },
+  annotations: {
+    readOnlyHint: true,
+    idempotentHint: true,
+  },
+  async execute() {
+    return { content: [{ type: 'text', text: JSON.stringify(getCart()) }] };
+  },
+});
+```
+
+Available annotation fields: `title`, `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`. See the [`@mcp-b/webmcp-types` reference](/packages/webmcp-types/reference) for the full `ToolAnnotations` interface.
+
+## Verify tools are registered
+
+Use `navigator.modelContextTesting` to list registered tools and execute them programmatically. This API is available when the testing shim is installed (the default for both `@mcp-b/global` and `@mcp-b/webmcp-polyfill`).
+
+```ts
+const tools = navigator.modelContextTesting?.listTools();
+console.log(
+  'Registered tools:',
+  tools?.map((t) => t.name)
+);
+
+const result = await navigator.modelContextTesting?.executeTool(
+  'search-products',
+  '{"query": "laptop"}'
+);
+console.log('Result:', result);
+```
+
+If you installed `@mcp-b/global`, you can also use the extension methods directly:
+
+```ts
+const tools = document.modelContext.listTools();
+const result = await document.modelContext.callTool({
+  name: 'search-products',
+  arguments: { query: 'laptop' },
+});
+```
+
+## Next steps
+
+- [Use Schemas and Structured Output](/how-to/use-schemas-and-structured-output) to add type-safe input validation and structured responses.
+- [Choose a Runtime](/how-to/choose-runtime) if you are unsure whether `@mcp-b/global` is the right package.
+- [Framework integration guide](/how-to/frameworks) for framework-specific patterns.
+- [Debug and Troubleshoot](/how-to/debug-and-troubleshoot) if tools are not appearing to AI agents.

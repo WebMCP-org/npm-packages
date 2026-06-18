@@ -1,0 +1,23 @@
+---
+import IconGlyph from "@/components/icon-glyph.astro";
+
+interface Props {
+  icon: string;
+  text: string;
+  className?: string;
+}
+
+const { icon, text, className = "" } = Astro.props as Props;
+---
+
+<div
+  class:list={[
+    "flex items-center gap-2 rounded-full bg-card px-4 py-1.5 shadow-badge max-w-full overflow-hidden",
+    className,
+  ]}
+>
+  <span class="flex size-4 shrink-0 items-center justify-center text-muted-foreground">
+    <IconGlyph name={icon} className="size-4" />
+  </span>
+  <span class="truncate text-sm font-medium text-foreground">{text}</span>
+</div>

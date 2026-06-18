@@ -1,0 +1,49 @@
+---
+title: '@mcp-b/chrome-devtools-mcp overview'
+description: 'When to use the DevTools MCP bridge, what it adds on top of the upstream project, and how it relates to page-hosted WebMCP tools.'
+keywords:
+  ['@mcp-b/chrome-devtools-mcp', 'overview', 'chrome devtools', 'MCP server', 'browser automation']
+icon: 'chrome'
+---
+
+`@mcp-b/chrome-devtools-mcp` is the DevTools bridge for coding-agent workflows. It lets an MCP client control Chrome through the Chrome DevTools Protocol and adds WebMCP integration so the same agent can discover and call tools registered on the page.
+
+## When to use this package
+
+- You need browser automation, console inspection, traces, screenshots, or DOM access.
+- You want an MCP server that can both debug Chrome and discover WebMCP tools.
+- You are integrating with coding agents that already speak MCP over stdio.
+
+## When not to use this package
+
+- You only need to forward site tools into a desktop client. Use [`@mcp-b/webmcp-local-relay`](/packages/webmcp-local-relay/overview).
+- You are building a Chrome extension rather than a DevTools-based bridge. Use [`@mcp-b/extension-tools`](/packages/extension-tools/overview) for extension-side APIs.
+
+## Where it sits in the package graph
+
+This package is adjacent to the browser runtime packages. It does not replace them. Instead, it reaches into a live browser session and can interact with pages that expose WebMCP tools.
+
+## First step
+
+Add the server to your MCP client config, then connect it to a Chrome instance. The [reference page](/packages/chrome-devtools-mcp/reference) covers setup, tool groups, configuration, and the WebMCP integration surface.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Reference" icon="book-open" href="/packages/chrome-devtools-mcp/reference">
+    Configuration, tool groups, DevTools behavior, and WebMCP integration details.
+  </Card>
+  <Card title="Use DevTools MCP" icon="wrench" href="/how-to/use-devtools-mcp">
+    Run the bridge in practical debugging workflows.
+  </Card>
+  <Card
+    title="Transports and bridges"
+    icon="bridge"
+    href="/explanation/architecture/transports-and-bridges"
+  >
+    Compare DevTools-based access to relay and transport-based access.
+  </Card>
+  <Card title="@mcp-b/global overview" icon="globe" href="/packages/global/overview">
+    Runtime setup for pages whose tools are discovered through DevTools.
+  </Card>
+</CardGroup>

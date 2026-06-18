@@ -1,0 +1,17 @@
+---
+import { Feature } from "@/components/animations/feature-slide";
+import { siteConfig } from "@/lib/config";
+
+const { items } = siteConfig.demoSection;
+---
+
+<section id="demo" class="relative w-full">
+  <Feature
+    client:visible
+    collapseDelay={5000}
+    linePosition="bottom"
+    featureItems={items}
+    lineColor="bg-[#006d9f]"
+    sectionId="demo"
+  />
+</section>

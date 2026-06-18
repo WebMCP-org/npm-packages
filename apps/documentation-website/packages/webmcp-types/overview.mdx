@@ -1,0 +1,53 @@
+---
+title: '@mcp-b/webmcp-types overview'
+description: 'When to use the WebMCP type package, what it covers, and how it fits under the runtime stack.'
+keywords:
+  ['@mcp-b/webmcp-types', 'overview', 'typescript', 'schema inference', 'document.modelContext']
+icon: 'brackets-curly'
+---
+
+`@mcp-b/webmcp-types` is the lowest-level package in the MCP-B stack. It gives you the type contracts for `document.modelContext`, schema inference utilities, and the global `Navigator` augmentation without shipping any runtime code.
+
+## When to use this package
+
+- You are authoring a library that wants to type against the WebMCP core surface.
+- You want compile-time inference from JSON Schema literals.
+- You need `document.modelContext` types in TypeScript without choosing a runtime yet.
+
+## When not to use this package
+
+- You need a runtime implementation in the browser. Use [`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/overview) or [`@mcp-b/global`](/packages/global/overview).
+- You want prompts, resources, or transport features. Those live higher in the stack.
+
+## Where it sits in the package graph
+
+`@mcp-b/webmcp-types` sits under the runtime packages. `@mcp-b/webmcp-polyfill`, `@mcp-b/webmcp-ts-sdk`, `@mcp-b/global`, `usewebmcp`, and `@mcp-b/react-webmcp` all build on these contracts.
+
+## First step
+
+Install the package as a dev dependency, then choose one activation path from the [reference page](/packages/webmcp-types/reference): `types` in `tsconfig.json`, a triple-slash reference, or a side-effect type import.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Reference" icon="book-open" href="/packages/webmcp-types/reference">
+    Type contracts, schema inference helpers, and activation patterns.
+  </Card>
+  <Card
+    title="Use schemas and structured output"
+    icon="list-check"
+    href="/how-to/use-schemas-and-structured-output"
+  >
+    Practical guidance for schema-driven tool inputs and outputs.
+  </Card>
+  <Card
+    title="Strict core vs MCP-B extensions"
+    icon="diagram-venn"
+    href="/explanation/strict-core-vs-mcp-b-extensions"
+  >
+    Background on where the standard surface ends.
+  </Card>
+  <Card title="Choose a runtime" icon="compass" href="/how-to/choose-runtime">
+    Pick the runtime layer that pairs with these types.
+  </Card>
+</CardGroup>

@@ -1,0 +1,53 @@
+---
+title: '@mcp-b/extension-tools overview'
+description: 'When to use the Chrome extension tool classes, how they differ from browser-page runtimes, and how they relate to other tooling packages.'
+keywords:
+  ['@mcp-b/extension-tools', 'overview', 'chrome extension', 'MCP tools', 'tabs', 'bookmarks']
+icon: 'puzzle-piece'
+---
+
+`@mcp-b/extension-tools` packages Chrome Extension APIs as MCP tool classes. It is the package to use when you are writing a Chrome extension and want to expose tabs, bookmarks, history, storage, or scripting capabilities to an MCP client.
+
+## When to use this package
+
+- You are building an extension background script or related extension runtime.
+- You want prebuilt tool classes instead of manually wrapping Chrome APIs.
+- You need extension-specific capabilities that a webpage runtime cannot provide.
+
+## When not to use this package
+
+- You are exposing tools from a normal webpage. Use [`@mcp-b/global`](/packages/global/overview) or [`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/overview).
+- You need DOM extraction only. Use [`@mcp-b/smart-dom-reader`](/packages/smart-dom-reader/overview).
+
+## Where it sits in the package graph
+
+This package is part of the tooling layer rather than the page runtime stack. Some classes depend on [`@mcp-b/smart-dom-reader`](/packages/smart-dom-reader/overview) for DOM-focused extraction behavior.
+
+## First step
+
+Create an MCP server in your extension runtime, then register only the tool classes you want to expose. The [reference page](/packages/extension-tools/reference) groups the API tool classes and their option surfaces.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Reference" icon="book-open" href="/packages/extension-tools/reference">
+    Tool classes, option tables, and extension integration details.
+  </Card>
+  <Card
+    title="@mcp-b/smart-dom-reader overview"
+    icon="code"
+    href="/packages/smart-dom-reader/overview"
+  >
+    DOM extraction utility used by several extension workflows.
+  </Card>
+  <Card
+    title="@mcp-b/chrome-devtools-mcp overview"
+    icon="chrome"
+    href="/packages/chrome-devtools-mcp/overview"
+  >
+    Alternative tooling when you want a DevTools bridge instead of an extension.
+  </Card>
+  <Card title="Framework guide" icon="code" href="/how-to/frameworks">
+    Runtime guidance for webpage-facing packages when you are not in an extension context.
+  </Card>
+</CardGroup>

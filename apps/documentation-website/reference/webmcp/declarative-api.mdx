@@ -1,0 +1,29 @@
+---
+title: 'WebMCP declarative API'
+description: 'Short reference and upstream links for the evolving HTML form integration.'
+keywords: ['declarative webmcp', 'html forms', 'toolname', 'toolautosubmit']
+icon: 'file-code'
+---
+
+The declarative API explores how HTML workflows, especially forms, can become
+agent-readable tools while preserving browser validation and user review.
+
+```html
+<form toolname="search_catalog" tooldescription="Search the product catalog">
+  <label>
+    Query
+    <input name="query" required />
+  </label>
+  <button type="submit">Search</button>
+</form>
+```
+
+The attribute names, schema synthesis rules, constraint mapping, submission
+behavior, and iframe model are still evolving. Use the
+[official explainer](https://github.com/webmachinelearning/webmcp/blob/main/docs/explainer.md)
+and [declarative draft](https://github.com/webmachinelearning/webmcp/blob/main/docs/declarative.md)
+as the current authorities. Do not treat this example as a stable compatibility
+contract.
+
+For production JavaScript integrations, use
+[`document.modelContext.registerTool()`](/reference/webmcp/standard-api).

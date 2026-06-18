@@ -8,7 +8,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue?style=flat-square)](https://www.typescriptlang.org/)
 [![Minimal Code](https://img.shields.io/badge/Custom_Code-~50_lines-green?style=flat-square)](https://github.com/WebMCP-org/npm-packages)
 
-**[Full Documentation](https://docs.mcp-b.ai/packages/webmcp-ts-sdk)** | **[Quick Start](https://docs.mcp-b.ai/quickstart)**
+**[Reference](https://docs.mcp-b.ai/packages/webmcp-ts-sdk/reference)** | **[First Tool Tutorial](https://docs.mcp-b.ai/tutorials/first-tool)**
 
 **@mcp-b/webmcp-ts-sdk** adapts the official MCP TypeScript SDK for browser environments, enabling dynamic tool registration required by the W3C Web Model Context API. This allows AI agents like Claude, ChatGPT, Gemini, Cursor, and Copilot to interact with browser-based applications.
 
@@ -24,7 +24,7 @@
 
 ## Overview
 
-This package adapts the official [@modelcontextprotocol/sdk](https://www.npmjs.com/package/@modelcontextprotocol/sdk) for browser environments with modifications to support dynamic tool registration required by the [W3C Web Model Context API](https://github.com/nicolo-ribaudo/model-context-protocol-api) (`window.navigator.modelContext`).
+This package adapts the official [@modelcontextprotocol/sdk](https://www.npmjs.com/package/@modelcontextprotocol/sdk) for browser environments with modifications to support dynamic tool registration required by the [W3C Web Model Context API](https://webmachinelearning.github.io/webmcp/) (`document.modelContext`).
 
 ## Why This Package Exists
 
@@ -41,7 +41,7 @@ public registerCapabilities(capabilities: ServerCapabilities): void {
 
 For the Web Model Context API, this restriction is incompatible because:
 
-1. **Tools arrive dynamically** - Web pages call `window.navigator.modelContext.registerTool(...)` at any time
+1. **Tools arrive dynamically** - Web pages call `document.modelContext.registerTool(...)` at any time
 2. **Transport must be ready immediately** - The MCP server/transport needs to be connected when the page loads
 3. **Asynchronous registration** - Tools are registered as the page's JavaScript executes, potentially long after initialization
 
@@ -235,20 +235,20 @@ Unlikely. The modification is minimal and isolated. When upstream updates, just 
 
 ### When should I use this vs `@mcp-b/global`?
 
-Use `@mcp-b/global` for the standard `navigator.modelContext` API. Use this package directly only if you need low-level control over the MCP server.
+Use `@mcp-b/global` for the standard `document.modelContext` API. Use this package directly only if you need low-level control over the MCP server.
 
 ## Related Packages
 
-- [`@mcp-b/global`](https://docs.mcp-b.ai/packages/global) - W3C Web Model Context API polyfill (uses this package internally)
-- [`@mcp-b/transports`](https://docs.mcp-b.ai/packages/transports) - Browser-specific MCP transports
-- [`@mcp-b/react-webmcp`](https://docs.mcp-b.ai/packages/react-webmcp) - React hooks for MCP
-- [`@mcp-b/chrome-devtools-mcp`](https://docs.mcp-b.ai/packages/chrome-devtools-mcp) - Connect desktop AI agents to browser tools
+- [`@mcp-b/global`](https://docs.mcp-b.ai/packages/global/reference) - Full MCP-B browser runtime (uses this package internally)
+- [`@mcp-b/transports`](https://docs.mcp-b.ai/packages/transports/reference) - Browser-specific MCP transports
+- [`@mcp-b/react-webmcp`](https://docs.mcp-b.ai/packages/react-webmcp/reference) - React hooks for MCP
+- [`@mcp-b/chrome-devtools-mcp`](https://docs.mcp-b.ai/packages/chrome-devtools-mcp/reference) - Connect desktop AI agents to browser tools
 - [`@modelcontextprotocol/sdk`](https://www.npmjs.com/package/@modelcontextprotocol/sdk) - Official MCP SDK
 
 ## Resources
 
 - [WebMCP Documentation](https://docs.mcp-b.ai)
-- [Web Model Context API Explainer](https://github.com/nicolo-ribaudo/model-context-protocol-api)
+- [Web Model Context API Explainer](https://webmachinelearning.github.io/webmcp/)
 - [Model Context Protocol Spec](https://modelcontextprotocol.io/)
 - [Official MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk)
 - [MCP GitHub Repository](https://github.com/modelcontextprotocol)

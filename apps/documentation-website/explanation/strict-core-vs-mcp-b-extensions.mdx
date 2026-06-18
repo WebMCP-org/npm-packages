@@ -1,0 +1,27 @@
+---
+title: 'Strict core vs MCP-B extensions'
+description: 'Why the WebMCP core stays small and which capabilities MCP-B layers around it.'
+keywords: ['webmcp core', 'mcp-b extensions', 'document.modelContext']
+icon: 'diagram-venn'
+---
+
+The standards-owned WebMCP core publishes tools through
+`document.modelContext`. Keeping that core small makes it portable across
+native browser implementations, strict polyfills, and libraries that only need
+to expose tools.
+
+`@mcp-b/webmcp-types`, `@mcp-b/webmcp-polyfill`, and `usewebmcp` stay close to
+this portable surface.
+
+MCP-B adds capabilities from the broader MCP model, including `listTools()`,
+`callTool()`, prompts, resources, sampling, elicitation, and browser
+transports. These capabilities are exposed by `BrowserMcpServer`,
+`@mcp-b/global`, and related packages. They are MCP-B extensions, not standard
+WebMCP methods.
+
+Libraries and sites that only publish tools should target the strict core.
+Applications that require iframe, extension, relay, desktop-client, prompt, or
+resource integration require the MCP-B extension layer.
+This boundary preserves runtime portability.
+
+Use [Choose a runtime](/how-to/choose-runtime) for package selection.

@@ -1,0 +1,173 @@
+---
+title: '@mcp-b/react-webmcp reference'
+description: 'Reference for the full React integration: useWebMCP, prompt and resource hooks, client providers, and Zod support.'
+keywords:
+  [
+    '@mcp-b/react-webmcp',
+    'useWebMCP',
+    'useWebMCPPrompt',
+    'McpClientProvider',
+    'useMcpClient',
+    'reference',
+  ]
+icon: 'react'
+---
+
+`@mcp-b/react-webmcp` is the full React surface for MCP-B. It supports tool registration, prompt and resource hooks, sampling and elicitation helpers, and client/provider hooks for consuming MCP servers from a React tree.
+
+Provider hooks register against `document.modelContext` (the canonical WebMCP v3 surface) while retaining a `navigator.modelContext` fallback for older preview runtimes.
+
+## Installation
+
+```bash
+pnpm add @mcp-b/react-webmcp zod
+```
+
+For client functionality:
+
+```bash
+pnpm add @mcp-b/transports @modelcontextprotocol/sdk
+```
+
+<Note>
+  `zod` and `zod-to-json-schema` are optional peer dependencies. They are required only when you
+  pass Zod v3 object maps or Zod v4 (via Standard Schema v1) as `inputSchema` or `outputSchema`.
+</Note>
+
+## Minimal example
+
+<Snippet file="snippets/packages/react-webmcp-quickstart.ts" />
+
+## Provider hooks
+
+### `useWebMCP(config, deps?)`
+
+```ts
+import { useWebMCP } from '@mcp-b/react-webmcp';
+```
+
+The signature matches the strict-core hook from [`usewebmcp`](/packages/usewebmcp/reference) with two package-specific differences:
+
+1. The implementation field is named `handler`.
+2. `inputSchema` and `outputSchema` also accept Zod v3 object maps and any Standard Schema v1-compliant schema (e.g., Zod v4 via `~standard`).
+
+| Field                      | Type                                                  | Required | Description                        |
+| -------------------------- | ----------------------------------------------------- | -------- | ---------------------------------- |
+| `name`                     | `string`                                              | Yes      | Unique tool identifier             |
+| `description`              | `string`                                              | Yes      | Human-readable description         |
+| `inputSchema`              | JSON Schema, Standard Schema v1, or Zod v3 object map | No       | Input parameters                   |
+| `outputSchema`             | JSON Schema, Standard Schema v1, or Zod v3 object map | No       | Output structure                   |
+| `annotations`              | `ToolAnnotations`                                     | No       | Metadata hints                     |
+| `handler(input)`           | `(input) => T \| Promise<T>`                          | Yes      | Tool implementation function       |
+| `formatOutput(output)`     | `(output) => string`                                  | No       | Deprecated. Prefer `outputSchema`. |
+| `onSuccess(result, input)` | `(result, input) => void`                             | No       | Success callback                   |
+| `onError(error, input)`    | `(error, input) => void`                              | No       | Error callback                     |
+
+**Returns:** `WebMCPReturn`
+
+### `useWebMCPContext(name, description, getValue)`
+
+```ts
+import { useWebMCPContext } from '@mcp-b/react-webmcp';
+```
+
+Convenience wrapper around `useWebMCP` for read-only context tools. It automatically sets `readOnlyHint: true`, `idempotentHint: true`, `destructiveHint: false`, and `openWorldHint: false`.
+
+| Parameter     | Type      | Description                                  |
+| ------------- | --------- | -------------------------------------------- |
+| `name`        | `string`  | Tool identifier                              |
+| `description` | `string`  | Description for AI assistants                |
+| `getValue`    | `() => T` | Function returning the current context value |
+
+### `useWebMCPPrompt(config)`
+
+```ts
+import { useWebMCPPrompt } from '@mcp-b/react-webmcp';
+```
+
+Registers an MCP prompt on `document.modelContext`.
+
+| Config field  | Type                                                  | Required | Description                |
+| ------------- | ----------------------------------------------------- | -------- | -------------------------- |
+| `name`        | `string`                                              | Yes      | Prompt identifier          |
+| `description` | `string`                                              | No       | Human-readable description |
+| `argsSchema`  | JSON Schema, Standard Schema v1, or Zod v3 object map | No       | Argument schema            |
+| `get(args)`   | `(args) => { messages: PromptMessage[] }`             | Yes      | Message generator          |
+
+### `useWebMCPResource(config)`
+
+```ts
+import { useWebMCPResource } from '@mcp-b/react-webmcp';
+```
+
+Registers an MCP resource on `document.modelContext`.
+
+| Config field         | Type                                                               | Required | Description                       |
+| -------------------- | ------------------------------------------------------------------ | -------- | --------------------------------- |
+| `uri`                | `string`                                                           | Yes      | Resource URI or URI template      |
+| `name`               | `string`                                                           | Yes      | Human-readable name               |
+| `description`        | `string`                                                           | No       | Resource description              |
+| `mimeType`           | `string`                                                           | No       | MIME type of the resource content |
+| `read(uri, params?)` | `(uri: URL, params?) => Promise<{ contents: ResourceContents[] }>` | Yes      | Read handler                      |
+
+### `useElicitation(config)` / `useElicitationHandler(config)`
+
+Request user input from the connected MCP client.
+
+### `useSampling(config)` / `useSamplingHandler(config)`
+
+Request LLM completions from the connected MCP client.
+
+## Client hooks
+
+### `McpClientProvider`
+
+```tsx
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { McpClientProvider } from '@mcp-b/react-webmcp';
+import { TabClientTransport } from '@mcp-b/transports';
+```
+
+Provider component that manages an MCP client connection and shares tools, resources, capabilities, and connection state with descendant components.
+
+| Prop        | Type             | Required | Description                |
+| ----------- | ---------------- | -------- | -------------------------- |
+| `children`  | `ReactNode`      | Yes      | Child components           |
+| `client`    | `Client`         | Yes      | MCP client instance        |
+| `transport` | `Transport`      | Yes      | Transport instance         |
+| `opts`      | `RequestOptions` | No       | Connection request options |
+
+### `useMcpClient()`
+
+```ts
+import { useMcpClient } from '@mcp-b/react-webmcp';
+```
+
+Accesses the client context. It must be used inside `McpClientProvider`.
+
+| Field          | Type                         | Description                                 |
+| -------------- | ---------------------------- | ------------------------------------------- |
+| `client`       | `Client`                     | MCP client instance                         |
+| `tools`        | `Tool[]`                     | Available tools from the server             |
+| `resources`    | `Resource[]`                 | Available resources from the server         |
+| `isConnected`  | `boolean`                    | Whether the client is connected             |
+| `isLoading`    | `boolean`                    | Whether a connection attempt is in progress |
+| `error`        | `Error \| null`              | Connection error, if any                    |
+| `capabilities` | `ServerCapabilities \| null` | Server-reported capabilities                |
+| `reconnect()`  | `() => Promise<void>`        | Manually reconnect to the server            |
+
+## Zod compatibility
+
+`@mcp-b/react-webmcp` supports Zod `^3.25 || ^4.0` as an optional peer dependency.
+
+- Zod v3 object maps are converted to JSON Schema at registration time via `zod-to-json-schema`.
+- Zod v4 schemas work through the Standard Schema v1 `~standard` interface.
+
+## Related pages
+
+- [@mcp-b/react-webmcp overview](/packages/react-webmcp/overview)
+- [usewebmcp reference](/packages/usewebmcp/reference)
+- [Register prompts and resources](/how-to/register-prompts-and-resources)
+- [Your first React tool](/tutorials/first-react-tool)
+- [@mcp-b/global reference](/packages/global/reference)
+- [@mcp-b/transports reference](/packages/transports/reference)

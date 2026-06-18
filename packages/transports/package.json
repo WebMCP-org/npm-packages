@@ -31,7 +31,7 @@
     "web-ai",
     "webmcp"
   ],
-  "homepage": "https://docs.mcp-b.ai/packages/transports",
+  "homepage": "https://docs.mcp-b.ai/packages/transports/reference",
   "bugs": {
     "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },

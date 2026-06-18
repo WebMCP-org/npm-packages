@@ -8,7 +8,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue?style=flat-square)](https://www.typescriptlang.org/)
 [![Chrome APIs](https://img.shields.io/badge/Chrome_APIs-62+-4285F4?style=flat-square&logo=googlechrome)](https://developer.chrome.com/docs/extensions/reference/)
 
-**[Full Documentation](https://docs.mcp-b.ai/packages/extension-tools)** | **[Quick Start](https://docs.mcp-b.ai/quickstart)**
+**[Reference](https://docs.mcp-b.ai/packages/extension-tools/reference)** | **[Tutorials](https://docs.mcp-b.ai/tutorials/index)**
 
 **@mcp-b/extension-tools** exposes Chrome Extension APIs as MCP tools, enabling AI agents like Claude, ChatGPT, Gemini, Cursor, and Copilot to control browser tabs, manage bookmarks, access history, execute scripts, and more.
 
@@ -589,9 +589,9 @@ The APIs target Chrome, but many also work in Firefox (via WebExtensions) and Ed
 
 ## Related Packages
 
-- [`@mcp-b/transports`](https://docs.mcp-b.ai/packages/transports) - Browser-specific MCP transports
-- [`@mcp-b/global`](https://docs.mcp-b.ai/packages/global) - W3C Web Model Context API polyfill
-- [`@mcp-b/chrome-devtools-mcp`](https://docs.mcp-b.ai/packages/chrome-devtools-mcp) - Connect desktop AI agents to browser
+- [`@mcp-b/transports`](https://docs.mcp-b.ai/packages/transports/reference) - Browser-specific MCP transports
+- [`@mcp-b/global`](https://docs.mcp-b.ai/packages/global/reference) - Full MCP-B browser runtime
+- [`@mcp-b/chrome-devtools-mcp`](https://docs.mcp-b.ai/packages/chrome-devtools-mcp/reference) - Connect desktop AI agents to browser
 - [`@modelcontextprotocol/sdk`](https://www.npmjs.com/package/@modelcontextprotocol/sdk) - Official MCP SDK
 
 ## Resources

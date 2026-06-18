@@ -1,0 +1,70 @@
+---
+import { SITE_TITLE, SITE_URL } from '../consts';
+
+interface Props {
+  title: string;
+  description: string;
+  image?: string;
+  article?: {
+    publishedTime?: string;
+    modifiedTime?: string;
+    authors?: string[];
+    tags?: string[];
+  };
+}
+
+const canonicalURL = new URL(Astro.url.pathname, Astro.site ?? SITE_URL);
+const { title, description, image = '/og-default.png', article } = Astro.props;
+const imageUrl = new URL(image, Astro.site ?? SITE_URL).toString();
+---
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>{title}</title>
+<meta name="description" content={description} />
+<link rel="canonical" href={canonicalURL.toString()} />
+
+<!-- Open Graph -->
+<meta property="og:title" content={title} />
+<meta property="og:description" content={description} />
+<meta property="og:type" content={article ? 'article' : 'website'} />
+<meta property="og:url" content={canonicalURL.toString()} />
+<meta property="og:image" content={imageUrl} />
+<meta property="og:image:alt" content={title} />
+<meta property="og:site_name" content={SITE_TITLE} />
+{article?.publishedTime && <meta property="article:published_time" content={article.publishedTime} />}
+{article?.modifiedTime && <meta property="article:modified_time" content={article.modifiedTime} />}
+{article?.authors?.map((author) => <meta property="article:author" content={author} />)}
+{article?.tags?.map((tag) => <meta property="article:tag" content={tag} />)}
+
+<!-- Twitter -->
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content={title} />
+<meta name="twitter:description" content={description} />
+<meta name="twitter:image" content={imageUrl} />
+<meta name="twitter:image:alt" content={title} />
+
+<!-- Theme -->
+<meta name="theme-color" content="#f4f4f6" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#161619" media="(prefers-color-scheme: dark)" />
+
+<!-- Favicons & Sitemap -->
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="icon" href="/favicon.ico" sizes="32x32" />
+<link rel="apple-touch-icon" href="/images/logos/logo-192.png" />
+<link rel="manifest" href="/site.webmanifest" />
+<link rel="sitemap" href="/sitemap-index.xml" />
+<meta name="generator" content={Astro.generator} />
+
+<!-- Structured Data -->
+<script is:inline type="application/ld+json" set:html={JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "MCP-B",
+  "url": "https://mcp-b.ai",
+  "description": "MCP-B brings the Model Context Protocol to browsers, enabling structured AI agent interaction with web applications.",
+  "sameAs": [
+    "https://github.com/WebMCP-org",
+    "https://docs.mcp-b.ai"
+  ]
+})} />

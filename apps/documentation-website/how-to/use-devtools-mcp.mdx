@@ -1,0 +1,292 @@
+---
+title: 'Use Chrome DevTools MCP'
+description: 'Set up chrome-devtools-mcp to let AI agents control Chrome, discover website tools, and build WebMCP tools through an AI-driven development loop.'
+keywords:
+  [
+    '@mcp-b/chrome-devtools-mcp',
+    'chrome devtools protocol',
+    'browser automation',
+    'list_webmcp_tools',
+    'ai development workflow',
+    'remote debugging',
+  ]
+icon: 'bug'
+---
+
+This guide shows you how to use `@mcp-b/chrome-devtools-mcp` to connect desktop AI agents to a live Chrome browser. The server gives your agent 27 browser automation tools plus the ability to discover and call WebMCP tools registered on any page.
+
+## Install the MCP server
+
+Add the server to your MCP client configuration:
+
+<CodeGroup>
+```json "Claude Desktop / Cursor / Windsurf"
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["-y", "@mcp-b/chrome-devtools-mcp@latest"]
+    }
+  }
+}
+```
+
+```bash "Claude Code"
+claude mcp add chrome-devtools npx @mcp-b/chrome-devtools-mcp@latest
+```
+
+```bash "VS Code CLI"
+code --add-mcp '{"name":"@mcp-b/chrome-devtools-mcp","command":"npx","args":["-y","@mcp-b/chrome-devtools-mcp@latest"],"env":{}}'
+```
+
+```bash "Gemini CLI"
+gemini mcp add chrome-devtools npx @mcp-b/chrome-devtools-mcp@latest
+```
+
+</CodeGroup>
+
+The server launches Chrome automatically when the agent first uses a browser tool. Connecting to the MCP server alone does not start the browser.
+
+## Test the connection
+
+Enter this prompt in your MCP client:
+
+```
+Navigate to https://webmcp.sh and take a screenshot
+```
+
+Your agent should open Chrome, navigate to the page, and return a screenshot. This confirms the browser connection works before you start discovering tools.
+
+## Discover WebMCP tools on a page
+
+When a webpage has `@mcp-b/global` installed, the server detects its tools through the Chrome DevTools Protocol. Ask your agent:
+
+```
+Navigate to https://webmcp.sh and list the available tools
+```
+
+The agent uses `list_webmcp_tools` to discover tools, then registers them as first-class MCP tools with prefixed names like `webmcp_webmcp_sh_page0_tool_name`. You can call them directly.
+
+<Frame caption="webmcp.sh registers tools for navigation, data management, SQL queries, and more">
+  <img
+    src="/images/webmcp-sh-homepage.png"
+    alt="webmcp.sh landing page showing registered WebMCP tools organized by category"
+  />
+</Frame>
+
+Try calling a discovered tool directly:
+
+```
+Navigate to the SQL REPL page on webmcp.sh and run: SELECT name, category, importance_score FROM memory_entities ORDER BY importance_score DESC LIMIT 5
+```
+
+The agent calls the `sql_query` tool and returns structured query results from the in-browser database.
+
+<Frame caption="The agent called the sql_query tool to query the in-browser PostgreSQL database">
+  <img
+    src="/images/webmcp-sh-sql-repl-with-results.png"
+    alt="SQL REPL showing query results returned by the agent via the sql_query WebMCP tool"
+  />
+</Frame>
+
+<Note>
+  `list_webmcp_tools` is diff-aware. The first call returns the full tool list. Subsequent calls
+  return only added or removed tools. Pass `full: true` to force the complete list.
+</Note>
+
+### Client compatibility for dynamic tool updates
+
+| Client         | Dynamic updates | Notes                                    |
+| -------------- | --------------- | ---------------------------------------- |
+| Claude Code    | Yes             | Full `tools/list_changed` support        |
+| GitHub Copilot | Yes             | Supports list changed notifications      |
+| Gemini CLI     | Yes             | Recently added support                   |
+| Cursor         | No              | Use `list_webmcp_tools` to poll manually |
+| Cline          | Partial         | May need manual polling                  |
+
+## Use the AI-driven development workflow
+
+The most powerful use case is building WebMCP tools with your AI agent in a tight feedback loop. Clone the [Chrome DevTools Quickstart](https://github.com/WebMCP-org/chrome-devtools-quickstart) for a minimal project with `@mcp-b/global` pre-installed, or use your own app.
+
+<Tip>
+  Claude Code is the best client for this workflow. It can write tool code in your project AND test
+  it via chrome-devtools-mcp in the same session, without switching windows.
+</Tip>
+
+<Steps>
+  <Step title="Ask your agent to create a tool">
+    ```
+    Create a WebMCP tool called "search_products" that searches our product catalog
+    ```
+  </Step>
+  <Step title="The agent writes the code in your app">
+    ```typescript
+    import '@mcp-b/global';
+
+    document.modelContext.registerTool({
+      name: 'search_products',
+      description: 'Search for products by name or category',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          query: { type: 'string' },
+          category: { type: 'string' }
+        },
+        required: ['query']
+      },
+      async execute({ query, category }) {
+        const results = await searchProducts(query, category);
+        return {
+          content: [{ type: 'text', text: JSON.stringify(results) }]
+        };
+      }
+    });
+    ```
+
+  </Step>
+  <Step title="Your dev server hot-reloads the change">
+  </Step>
+  <Step title="The agent discovers the new tool">
+    ```
+    Navigate to http://localhost:3000 and list the available tools
+    ```
+  </Step>
+  <Step title="The agent tests the tool">
+    ```
+    Use the search_products tool to search for "headphones"
+    ```
+  </Step>
+  <Step title="The agent iterates if something fails">
+    The agent sees the actual response, fixes bugs, and repeats until the tool works.
+  </Step>
+</Steps>
+
+### Built-in prompts
+
+The server includes prompts that guide agents through common workflows:
+
+| Prompt                | Use when                                                                                                                       |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `webmcp-dev-workflow` | Starting a new tool. Walks through write, hot-reload, discover, test, iterate.                                                 |
+| `test-webmcp-tool`    | Verifying a tool handles valid data, edge cases, and invalid inputs. Accepts optional `toolName` and `devServerUrl` arguments. |
+| `debug-webmcp`        | Tools are not appearing or connections fail. Accepts an optional `url` argument.                                               |
+
+Example:
+
+```
+Use the test-webmcp-tool prompt with toolName=search_products devServerUrl=http://localhost:5173
+```
+
+## Connect to an existing Chrome instance
+
+By default, the server launches its own Chrome with a dedicated profile. If you want to use an existing Chrome session (to preserve login state or avoid WebDriver restrictions):
+
+### Auto-connect (Chrome 144+)
+
+<Steps>
+  <Step title="Enable remote debugging in Chrome">
+    Navigate to `chrome://inspect/#remote-debugging` and follow the dialog to allow debugging connections.
+  </Step>
+  <Step title="Use the autoConnect flag (enabled by default)">
+    ```json
+    {
+      "mcpServers": {
+        "chrome-devtools": {
+          "command": "npx",
+          "args": ["@mcp-b/chrome-devtools-mcp@latest", "--autoConnect"]
+        }
+      }
+    }
+    ```
+  </Step>
+</Steps>
+
+### Manual connection via remote debugging port
+
+<Steps>
+  <Step title="Configure the MCP server with a browser URL">
+    ```json
+    {
+      "mcpServers": {
+        "chrome-devtools": {
+          "command": "npx",
+          "args": [
+            "@mcp-b/chrome-devtools-mcp@latest",
+            "--browser-url=http://127.0.0.1:9222"
+          ]
+        }
+      }
+    }
+    ```
+  </Step>
+  <Step title="Start Chrome with remote debugging enabled">
+    <CodeGroup>
+    ```bash "macOS"
+    /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
+      --remote-debugging-port=9222 \
+      --user-data-dir=/tmp/chrome-profile-stable
+    ```
+
+    ```bash "Linux"
+    google-chrome --remote-debugging-port=9222 \
+      --user-data-dir=/tmp/chrome-profile-stable
+    ```
+
+    ```bash "Windows"
+    "C:\Program Files\Google\Chrome\Application\chrome.exe" ^
+      --remote-debugging-port=9222 ^
+      --user-data-dir="%TEMP%\chrome-profile-stable"
+    ```
+    </CodeGroup>
+
+    <Warning>
+    The remote debugging port is accessible to any process on your machine. Do not browse sensitive websites while it is open.
+    </Warning>
+
+  </Step>
+</Steps>
+
+## Common configuration options
+
+Pass options through the `args` array in your MCP client config:
+
+```json
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": [
+        "@mcp-b/chrome-devtools-mcp@latest",
+        "--channel=canary",
+        "--headless=true",
+        "--isolated=true"
+      ]
+    }
+  }
+}
+```
+
+| Option             | What it does                                      |
+| ------------------ | ------------------------------------------------- |
+| `--channel`        | Chrome channel: `stable`, `canary`, `beta`, `dev` |
+| `--headless`       | Run without a visible browser window              |
+| `--isolated`       | Use a temporary profile, cleaned up on close      |
+| `--viewport`       | Initial viewport size (e.g. `1280x720`)           |
+| `--executablePath` | Path to a custom Chrome binary                    |
+
+For the full list of options, see the [chrome-devtools-mcp Reference](/packages/chrome-devtools-mcp/reference).
+
+## Troubleshoot common issues
+
+| Problem                           | Fix                                                                                                                                      |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| "WebMCP not detected"             | The page does not have `@mcp-b/global` loaded or no tools are registered                                                                 |
+| Tool call fails                   | Check the tool's input schema with `list_webmcp_tools` and verify your parameters match                                                  |
+| Tools missing after navigation    | WebMCP auto-reconnects on navigation. Call `list_webmcp_tools` to see the new page's tools                                               |
+| Browser does not start in sandbox | Some MCP clients sandbox the server process. Disable sandboxing for this server, or use `--browser-url` to connect to an external Chrome |
+
+## Related pages
+
+- [chrome-devtools-mcp Reference](/packages/chrome-devtools-mcp/reference) for the full tool list and all CLI options
+- [Connect Desktop Agents with the Local Relay](/how-to/connect-desktop-agents-with-local-relay) for an alternative approach that works with any website
+- [Debug and Troubleshoot](/how-to/debug-and-troubleshoot) for general debugging strategies

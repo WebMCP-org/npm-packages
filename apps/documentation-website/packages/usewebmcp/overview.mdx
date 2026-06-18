@@ -1,0 +1,44 @@
+---
+title: 'usewebmcp overview'
+description: 'When to use the strict-core React hook, how it differs from @mcp-b/react-webmcp, and what runtime it expects.'
+keywords: ['usewebmcp', 'overview', 'react', 'strict core', 'useWebMCP']
+icon: 'react'
+---
+
+`usewebmcp` is the strict-core React package. It gives React components a hook-based way to register WebMCP tools without taking a dependency on the broader MCP-B runtime surface.
+
+## When to use this package
+
+- You are building a React app that only needs `registerTool`.
+- You want React ergonomics while staying on the standard-owned browser surface.
+- You want to pair React components with [`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/overview) or native support.
+
+## When not to use this package
+
+- You need prompt, resource, sampling, elicitation, or client-provider hooks. Use [`@mcp-b/react-webmcp`](/packages/react-webmcp/overview).
+- You are not using React.
+
+## Where it sits in the package graph
+
+`usewebmcp` sits on top of the strict-core runtime and types. It does not depend on `BrowserMcpServer`, prompts, or transport helpers.
+
+## First step
+
+Ensure `document.modelContext` exists through native support, [`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/overview), or [`@mcp-b/global`](/packages/global/overview), then register a hook in a client component. The [reference page](/packages/usewebmcp/reference) covers the hook signature, state model, and inference behavior.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Reference" icon="book-open" href="/packages/usewebmcp/reference">
+    Hook signature, config fields, re-registration rules, and types.
+  </Card>
+  <Card title="Your first React tool" icon="graduation-cap" href="/tutorials/first-react-tool">
+    Guided React tutorial using WebMCP hooks.
+  </Card>
+  <Card title="Framework guide" icon="code" href="/how-to/frameworks">
+    Runtime setup patterns across React and other frameworks.
+  </Card>
+  <Card title="@mcp-b/react-webmcp overview" icon="react" href="/packages/react-webmcp/overview">
+    Compare the full React package to the strict-core hook.
+  </Card>
+</CardGroup>

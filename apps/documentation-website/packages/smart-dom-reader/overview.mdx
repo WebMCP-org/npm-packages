@@ -1,0 +1,53 @@
+---
+title: '@mcp-b/smart-dom-reader overview'
+description: 'When to use the DOM extraction library, how it differs from runtime packages, and where it fits in agent-oriented browser tooling.'
+keywords:
+  ['@mcp-b/smart-dom-reader', 'overview', 'dom extraction', 'selectors', 'browser automation']
+icon: 'code'
+---
+
+`@mcp-b/smart-dom-reader` is a DOM extraction library for agent workflows. It turns a live document into structured data, interactive element maps, and stable selectors while keeping token usage low.
+
+## When to use this package
+
+- You are building DOM-aware tools for agents or browser automation.
+- You need structured page summaries or ranked selectors.
+- You want DOM extraction without bringing in a full MCP runtime.
+
+## When not to use this package
+
+- You only need to expose browser-page tools. Use the runtime packages instead.
+- You need Chrome extension API tools rather than DOM extraction. Use [`@mcp-b/extension-tools`](/packages/extension-tools/overview).
+
+## Where it sits in the package graph
+
+This package sits in the tooling layer and can be used standalone. Other tooling packages, including [`@mcp-b/extension-tools`](/packages/extension-tools/overview), can build on top of it.
+
+## First step
+
+Choose whether you need one-shot extraction or staged extraction. The [reference page](/packages/smart-dom-reader/reference) documents both approaches, selector outputs, and the optional MCP integration.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Reference" icon="book-open" href="/packages/smart-dom-reader/reference">
+    Extraction APIs, selector ranking, and result shapes.
+  </Card>
+  <Card
+    title="@mcp-b/extension-tools overview"
+    icon="puzzle-piece"
+    href="/packages/extension-tools/overview"
+  >
+    Tool classes that build on smart-dom-reader in extension contexts.
+  </Card>
+  <Card
+    title="@mcp-b/chrome-devtools-mcp overview"
+    icon="chrome"
+    href="/packages/chrome-devtools-mcp/overview"
+  >
+    Tooling path when you want DevTools-based automation instead.
+  </Card>
+  <Card title="Tool design" icon="pencil-ruler" href="/how-to/use-schemas-and-structured-output">
+    Design guidance for tools that expose DOM-derived capabilities.
+  </Card>
+</CardGroup>

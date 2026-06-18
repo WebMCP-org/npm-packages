@@ -1,0 +1,218 @@
+---
+title: '@mcp-b/chrome-devtools-mcp'
+description: 'MCP server for Chrome DevTools with WebMCP integration. 27 tools for browser automation, performance analysis, and website tool discovery.'
+keywords:
+  [
+    '@mcp-b/chrome-devtools-mcp',
+    'chrome devtools',
+    'browser automation',
+    'mcp server',
+    'devtools protocol',
+    'webmcp tools',
+    'list_webmcp_tools',
+  ]
+icon: 'chrome'
+---
+
+`@mcp-b/chrome-devtools-mcp` is an MCP server that lets AI agents control and inspect a live Chrome browser via the Chrome DevTools Protocol. It is a fork of [ChromeDevTools/chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp) with added WebMCP integration for discovering and calling tools registered on webpages.
+
+```
+npm: @mcp-b/chrome-devtools-mcp
+license: Apache-2.0
+node: ^20.19.0 || ^22.12.0 || >=23
+upstream: ChromeDevTools/chrome-devtools-mcp
+```
+
+## Requirements
+
+- [Node.js](https://nodejs.org/) v20.19 or a newer maintenance LTS version
+- [Chrome](https://www.google.com/chrome/) current stable or newer
+
+## Installation
+
+```json "MCP client config"
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["-y", "@mcp-b/chrome-devtools-mcp@latest"]
+    }
+  }
+}
+```
+
+For Claude Code:
+
+```bash
+claude mcp add chrome-devtools npx @mcp-b/chrome-devtools-mcp@latest
+```
+
+## Minimal example
+
+<Snippet file="snippets/packages/chrome-devtools-mcp-quickstart.json" />
+
+For a minimal working example, see the [Chrome DevTools Quickstart](https://github.com/WebMCP-org/chrome-devtools-quickstart).
+
+## Configuration options
+
+Pass options via the `args` array in your MCP client config.
+
+| Option                     | Type                                    | Default                                           | Description                                                                                               |
+| -------------------------- | --------------------------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `--autoConnect`            | boolean                                 | `true`                                            | Automatically connect to a running Chrome instance (Chrome 144+) via `chrome://inspect/#remote-debugging` |
+| `--browserUrl`, `-u`       | string                                  |                                                   | URL of a running debuggable Chrome instance (e.g. `http://127.0.0.1:9222`)                                |
+| `--wsEndpoint`, `-w`       | string                                  |                                                   | WebSocket endpoint for a running Chrome instance                                                          |
+| `--wsHeaders`              | string                                  |                                                   | Custom headers for WebSocket connection in JSON format. Only works with `--wsEndpoint`                    |
+| `--headless`               | boolean                                 | `false`                                           | Run Chrome in headless mode                                                                               |
+| `--executablePath`, `-e`   | string                                  |                                                   | Path to a custom Chrome executable                                                                        |
+| `--isolated`               | boolean                                 | `false`                                           | Use a temporary user-data-dir, cleaned up on close                                                        |
+| `--userDataDir`            | string                                  | `$HOME/.cache/chrome-devtools-mcp/chrome-profile` | Path to the Chrome user data directory                                                                    |
+| `--channel`                | `stable` \| `canary` \| `beta` \| `dev` | `stable`                                          | Chrome channel to use                                                                                     |
+| `--logFile`                | string                                  |                                                   | Path to write debug logs. Set `DEBUG=*` for verbose output                                                |
+| `--viewport`               | string                                  |                                                   | Initial viewport size (e.g. `1280x720`). Max 3840x2160 in headless mode                                   |
+| `--proxyServer`            | string                                  |                                                   | Proxy server passed as `--proxy-server` to Chrome                                                         |
+| `--acceptInsecureCerts`    | boolean                                 | `false`                                           | Ignore self-signed and expired certificate errors                                                         |
+| `--chromeArg`              | array                                   |                                                   | Additional Chrome launch arguments                                                                        |
+| `--ignoreDefaultChromeArg` | array                                   |                                                   | Disable specific default Chrome launch arguments                                                          |
+| `--categoryEmulation`      | boolean                                 | `true`                                            | Set to `false` to exclude emulation tools                                                                 |
+| `--categoryPerformance`    | boolean                                 | `true`                                            | Set to `false` to exclude performance tools                                                               |
+| `--categoryNetwork`        | boolean                                 | `true`                                            | Set to `false` to exclude network tools                                                                   |
+
+```json "Example: headless with canary channel"
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": [
+        "@mcp-b/chrome-devtools-mcp@latest",
+        "--channel=canary",
+        "--headless=true",
+        "--isolated=true"
+      ]
+    }
+  }
+}
+```
+
+## Tools (27)
+
+### Input automation (8 tools)
+
+| Tool            | Description                                   | Required Parameters              |
+| --------------- | --------------------------------------------- | -------------------------------- |
+| `click`         | Click on an element                           | `uid`                            |
+| `drag`          | Drag an element onto another                  | `from_uid`, `to_uid`             |
+| `fill`          | Type text into an input, textarea, or select  | `uid`, `value`                   |
+| `fill_form`     | Fill multiple form elements at once           | `elements` (array)               |
+| `handle_dialog` | Accept or dismiss a browser dialog            | `action` (`accept` or `dismiss`) |
+| `hover`         | Hover over an element                         | `uid`                            |
+| `press_key`     | Press a key or combination (e.g. `Control+A`) | `key`                            |
+| `upload_file`   | Upload a file through a file input            | `uid`, `filePath`                |
+
+### Navigation automation (6 tools)
+
+| Tool            | Description                                        | Required Parameters |
+| --------------- | -------------------------------------------------- | ------------------- |
+| `close_page`    | Close a page by index                              | `pageIdx`           |
+| `list_pages`    | List open browser pages                            | (none)              |
+| `navigate_page` | Navigate current page (URL, back, forward, reload) | (varies by `type`)  |
+| `new_page`      | Open a new page                                    | `url`               |
+| `select_page`   | Select a page as context for future tool calls     | `pageIdx`           |
+| `wait_for`      | Wait for text to appear on the page                | `text`              |
+
+### Emulation (2 tools)
+
+| Tool          | Description                                                | Required Parameters |
+| ------------- | ---------------------------------------------------------- | ------------------- |
+| `emulate`     | Emulate CPU throttling, geolocation, or network conditions | (all optional)      |
+| `resize_page` | Resize the page viewport                                   | `width`, `height`   |
+
+### Performance (3 tools)
+
+| Tool                          | Description                                   | Required Parameters           |
+| ----------------------------- | --------------------------------------------- | ----------------------------- |
+| `performance_start_trace`     | Start a performance trace recording           | `autoStop`, `reload`          |
+| `performance_stop_trace`      | Stop the active performance trace             | (none)                        |
+| `performance_analyze_insight` | Get details on a specific performance insight | `insightSetId`, `insightName` |
+
+### Network (2 tools)
+
+| Tool                    | Description                                     | Required Parameters |
+| ----------------------- | ----------------------------------------------- | ------------------- |
+| `list_network_requests` | List all network requests since last navigation | (all optional)      |
+| `get_network_request`   | Get a specific network request by ID            | (optional `reqid`)  |
+
+### Debugging (5 tools)
+
+| Tool                    | Description                                 | Required Parameters |
+| ----------------------- | ------------------------------------------- | ------------------- |
+| `evaluate_script`       | Execute JavaScript in the current page      | `function`          |
+| `list_console_messages` | List console messages                       | (all optional)      |
+| `get_console_message`   | Get a console message by ID                 | `msgid`             |
+| `take_screenshot`       | Take a screenshot (PNG, JPEG, or WebP)      | (all optional)      |
+| `take_snapshot`         | Take a text snapshot based on the a11y tree | (all optional)      |
+
+### WebMCP (1 tool)
+
+| Tool                | Description                                          | Required Parameters |
+| ------------------- | ---------------------------------------------------- | ------------------- |
+| `list_webmcp_tools` | List website MCP tools across all pages (diff-aware) | (all optional)      |
+
+When a page has WebMCP tools registered via `@mcp-b/global`, those tools are automatically registered as first-class MCP tools with prefixed names (e.g. `webmcp_localhost_3000_page0_search_products`).
+
+## Prompts
+
+| Prompt                | Description                                          | Arguments                                        |
+| --------------------- | ---------------------------------------------------- | ------------------------------------------------ |
+| `webmcp-dev-workflow` | Step-by-step guide for building WebMCP tools with AI | (none)                                           |
+| `test-webmcp-tool`    | Systematically test a tool with edge cases           | `toolName` (optional), `devServerUrl` (optional) |
+| `debug-webmcp`        | Diagnose WebMCP connection and registration issues   | `url` (optional)                                 |
+
+## Dynamic tool registration
+
+WebMCP tools from webpages are registered as first-class MCP tools. Client support for `tools/list_changed` notifications:
+
+| Client         | Dynamic Updates                      |
+| -------------- | ------------------------------------ |
+| Claude Code    | Yes                                  |
+| GitHub Copilot | Yes                                  |
+| Gemini CLI     | Yes                                  |
+| Cursor         | No (use `list_webmcp_tools` to poll) |
+| Cline          | Partial                              |
+
+The `list_webmcp_tools` tool is diff-aware: the first call returns the full list, subsequent calls return only changes. Pass `full: true` to force the complete list.
+
+## Connecting to a running Chrome instance
+
+Two approaches:
+
+1. **Automatic (Chrome 144+)**: Enable remote debugging at `chrome://inspect/#remote-debugging`. The server connects automatically with `--autoConnect` (enabled by default).
+
+2. **Manual via port**: Start Chrome with `--remote-debugging-port=9222` and a non-default `--user-data-dir`, then pass `--browserUrl=http://127.0.0.1:9222` to the MCP server.
+
+<Warning>
+  Enabling the remote debugging port allows any local application to control the browser. Do not
+  browse sensitive websites while the debugging port is open.
+</Warning>
+
+## User data directory
+
+Default paths:
+
+| Platform      | Path                                                            |
+| ------------- | --------------------------------------------------------------- |
+| Linux / macOS | `$HOME/.cache/chrome-devtools-mcp/chrome-profile-$CHANNEL`      |
+| Windows       | `%HOMEPATH%/.cache/chrome-devtools-mcp/chrome-profile-$CHANNEL` |
+
+The directory persists between runs. Set `--isolated=true` to use a temporary directory that is cleaned up when the browser closes.
+
+## Known limitations
+
+- Operating system sandboxes (macOS Seatbelt, Linux containers) can prevent Chrome from launching. Use `--browserUrl` to connect to an externally started Chrome instance.
+- The MCP server exposes browser content to MCP clients. Avoid browsing sensitive data during a session.
+
+## Related
+
+- [Use DevTools MCP](/how-to/use-devtools-mcp) (how-to guide)
+- [@mcp-b/global](/packages/global/reference) (runtime reference)
+- [Chrome DevTools Quickstart](https://github.com/WebMCP-org/chrome-devtools-quickstart) (external)

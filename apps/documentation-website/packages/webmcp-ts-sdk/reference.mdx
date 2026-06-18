@@ -1,0 +1,336 @@
+---
+title: '@mcp-b/webmcp-ts-sdk'
+description: 'Reference for BrowserMcpServer, the browser-adapted MCP TypeScript SDK with dynamic tool registration.'
+keywords:
+  [
+    '@mcp-b/webmcp-ts-sdk',
+    'BrowserMcpServer',
+    'McpServer',
+    'dynamic tool registration',
+    'mcp sdk',
+    'registerTool',
+    'transport connection',
+  ]
+icon: 'layer-group'
+---
+
+`@mcp-b/webmcp-ts-sdk` adapts the official [@modelcontextprotocol/sdk](https://www.npmjs.com/package/@modelcontextprotocol/sdk) for browser environments. It provides `BrowserMcpServer`, a class that extends the upstream `McpServer` to support dynamic tool registration after transport connection.
+
+```
+npm install @mcp-b/webmcp-ts-sdk
+```
+
+<Note>
+  Most applications should use `@mcp-b/global` instead of this package directly. `@mcp-b/global`
+  creates and manages a `BrowserMcpServer` internally. Use this package only when you need direct
+  control over the MCP server instance.
+</Note>
+
+---
+
+## Minimal example
+
+<Snippet file="snippets/packages/webmcp-ts-sdk-quickstart.ts" />
+
+---
+
+## Why this package exists
+
+The official MCP SDK throws an error when registering server capabilities after a transport connection:
+
+```ts
+// Official SDK behavior:
+server.registerCapabilities(capabilities);
+// Error: "Cannot register capabilities after connecting to transport"
+```
+
+In browser environments, tools arrive dynamically as pages load. The transport must be connected at startup, but tools are registered later via `document.modelContext.registerTool()`.
+
+`BrowserMcpServer` solves this by pre-registering tool capabilities in the constructor, before the transport connects.
+
+---
+
+## `BrowserMcpServer`
+
+### Constructor
+
+```ts
+new BrowserMcpServer(serverInfo: Implementation, options?: BrowserMcpServerOptions)
+```
+
+| Parameter    | Type                      | Description                                                  |
+| ------------ | ------------------------- | ------------------------------------------------------------ |
+| `serverInfo` | `Implementation`          | Server name and version. `{ name: string; version: string }` |
+| `options`    | `BrowserMcpServerOptions` | Server configuration                                         |
+
+#### `BrowserMcpServerOptions`
+
+Extends `ServerOptions` from the upstream SDK.
+
+| Property              | Type                   | Description                                                                                                                                 |
+| --------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `native`              | `ModelContextCore?`    | Reference to the native/polyfill `modelContext`. When provided, core tool operations (`registerTool`, `unregisterTool`) are mirrored to it. |
+| `capabilities`        | `ServerCapabilities?`  | Additional MCP capabilities. Tools, resources, and prompts with `listChanged: true` are pre-registered.                                     |
+| `jsonSchemaValidator` | `JsonSchemaValidator?` | Custom JSON Schema validator. Defaults to `PolyfillJsonSchemaValidator`.                                                                    |
+
+```ts
+import { BrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
+
+const server = new BrowserMcpServer(
+  { name: 'my-app', version: '1.0.0' },
+  { native: document.modelContext }
+);
+```
+
+---
+
+## WebMCP standard methods
+
+These methods implement the [document.modelContext API](/reference/webmcp/standard-api). When a `native` context is provided, operations mirror to it.
+
+### `registerTool(tool)`
+
+Registers a single tool. Returns `{ unregister: () => void }`.
+
+```ts
+const handle = server.registerTool({
+  name: 'search',
+  description: 'Search products',
+  inputSchema: {
+    type: 'object',
+    properties: { query: { type: 'string' } },
+    required: ['query'],
+  },
+  async execute(args) {
+    return { content: [{ type: 'text', text: `Found: ${args.query}` }] };
+  },
+});
+
+// Later:
+handle.unregister();
+```
+
+- Mirrors to `native.registerTool()` first (if `native` is provided).
+- Rolls back the native registration if the server-side registration fails.
+- Streamed tools (`stream: true`) are not yet supported and throw an error.
+
+### `unregisterTool(name)`
+
+Removes a tool by name. Also calls `native.unregisterTool(name)` when `native` is provided.
+
+---
+
+## Extension methods
+
+These methods are not part of the WebMCP specification. They are MCP-B extensions.
+
+### `listTools()`
+
+Returns `ToolListItem[]` for all enabled registered tools.
+
+```ts
+const tools = server.listTools();
+// [{ name: 'search', description: '...', inputSchema: {...} }]
+```
+
+### `callTool(params)`
+
+Executes a registered tool by name. Returns `Promise<ToolResponse>`.
+
+```ts
+const result = await server.callTool({
+  name: 'search',
+  arguments: { query: 'laptop' },
+});
+```
+
+### `executeTool(name, args?)`
+
+Convenience wrapper for `callTool`. Returns `Promise<ToolResponse>`.
+
+```ts
+const result = await server.executeTool('search', { query: 'laptop' });
+```
+
+---
+
+## Resource methods
+
+### `registerResource(descriptor)`
+
+Registers an MCP resource. Returns `{ unregister: () => void }`.
+
+```ts
+const handle = server.registerResource({
+  uri: 'app://settings',
+  name: 'App Settings',
+  description: 'Current application settings',
+  mimeType: 'application/json',
+  async read(uri) {
+    return { contents: [{ uri: uri.toString(), text: JSON.stringify(settings) }] };
+  },
+});
+```
+
+| Property      | Type                                                      | Required |
+| ------------- | --------------------------------------------------------- | -------- |
+| `uri`         | `string`                                                  | Yes      |
+| `name`        | `string`                                                  | Yes      |
+| `description` | `string`                                                  | No       |
+| `mimeType`    | `string`                                                  | No       |
+| `read`        | `(uri: URL) => Promise<{ contents: ResourceContents[] }>` | Yes      |
+
+### `listResources()`
+
+Returns metadata for all enabled resources.
+
+### `readResource(uri)`
+
+Reads a resource by URI. Throws if the resource is not found.
+
+---
+
+## Prompt methods
+
+### `registerPrompt(descriptor)`
+
+Registers an MCP prompt. Returns `{ unregister: () => void }`.
+
+```ts
+const handle = server.registerPrompt({
+  name: 'summarize',
+  description: 'Summarize a document',
+  argsSchema: {
+    type: 'object',
+    properties: { url: { type: 'string', description: 'Document URL' } },
+    required: ['url'],
+  },
+  async get(args) {
+    return {
+      messages: [{ role: 'user', content: { type: 'text', text: `Summarize: ${args.url}` } }],
+    };
+  },
+});
+```
+
+| Property      | Type                                               | Required |
+| ------------- | -------------------------------------------------- | -------- |
+| `name`        | `string`                                           | Yes      |
+| `description` | `string`                                           | No       |
+| `argsSchema`  | `InputSchema`                                      | No       |
+| `get`         | `(args) => Promise<{ messages: PromptMessage[] }>` | Yes      |
+
+### `listPrompts()`
+
+Returns metadata for all enabled prompts, including argument schemas.
+
+### `getPrompt(name, args?)`
+
+Retrieves a prompt by name. Validates args against the schema if present.
+
+---
+
+## Sampling and elicitation
+
+### `createMessage(params, options?)`
+
+Requests LLM sampling from the connected client. Returns `Promise<CreateMessageResult>`.
+
+```ts
+const response = await server.createMessage({
+  messages: [{ role: 'user', content: { type: 'text', text: 'Hello' } }],
+  maxTokens: 100,
+});
+```
+
+Default timeout: 10 seconds (via `AbortSignal.timeout`).
+
+### `elicitInput(params, options?)`
+
+Requests user input from the connected client. Returns `Promise<ElicitResult>`.
+
+```ts
+const result = await server.elicitInput({
+  message: 'Please confirm the order',
+  requestedSchema: {
+    type: 'object',
+    properties: { confirm: { type: 'boolean' } },
+    required: ['confirm'],
+  },
+});
+```
+
+---
+
+## Transport connection
+
+### `connect(transport)`
+
+Connects to an MCP transport. Sets up request handlers before connection to avoid the "cannot register after connect" restriction.
+
+```ts
+import { TabServerTransport } from '@mcp-b/transports';
+
+const transport = new TabServerTransport({ allowedOrigins: ['*'] });
+await server.connect(transport);
+```
+
+The `connect` method:
+
+1. Sets up tool, resource, and prompt request handlers.
+2. Replaces upstream handlers that expect Zod schemas with handlers that support plain JSON Schema.
+3. Calls `super.connect(transport)` to establish the connection.
+
+---
+
+## Schema handling
+
+`BrowserMcpServer` accepts both Zod schemas and plain JSON Schema objects. The handling depends on the schema format:
+
+| Schema Format                         | Validation Method                        |
+| ------------------------------------- | ---------------------------------------- |
+| Zod schema (`_zod` or `_def` present) | `safeParseAsync` from the upstream SDK   |
+| Plain JSON Schema                     | `PolyfillJsonSchemaValidator` (built-in) |
+
+Input schemas without a `type` field receive `type: "object"` automatically. Empty `{}` schemas default to `{ type: "object", properties: {} }`.
+
+---
+
+## `backfillTools(tools, execute)`
+
+Registers tools that were already present on the native/polyfill context before this server was created. Skips tools that are already registered on the server.
+
+```ts
+const synced = server.backfillTools(existingTools, async (name, args) => {
+  return await existingContext.callTool({ name, arguments: args });
+});
+```
+
+Returns the number of tools synced.
+
+### `syncNativeTools()`
+
+Convenience method that calls `backfillTools` using the `native` context's `listTools()` and `callTool()`.
+
+---
+
+## Re-exports
+
+This package re-exports types, classes, and utilities from `@modelcontextprotocol/sdk`:
+
+- All MCP protocol types (`Tool`, `Resource`, `Prompt`, etc.)
+- `Server` (base server class, unchanged)
+- `McpServer` aliased to `BrowserMcpServer`
+- `Transport` interface
+- `mergeCapabilities` helper
+- Protocol version constants
+- Request/response schemas
+
+---
+
+## Related packages
+
+- [`@mcp-b/global`](/packages/global/reference) -- Uses `BrowserMcpServer` internally
+- [`@mcp-b/transports`](/packages/transports/reference) -- Tab and iframe transports
+- [`@mcp-b/webmcp-types`](/packages/webmcp-types/reference) -- Type definitions
+- [`@modelcontextprotocol/sdk`](https://www.npmjs.com/package/@modelcontextprotocol/sdk) -- Upstream MCP SDK

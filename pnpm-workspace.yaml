@@ -1,7 +1,6 @@
 packages:
   - packages/*
   - packages/smart-dom-reader/mcp-server
-  - skills/webmcp-setup
   - e2e
   - e2e/test-app
   - e2e/react-webmcp-test-app
@@ -11,6 +10,7 @@ packages:
   - e2e/vanilla-esm-zod3
   - e2e/react18-zod3
   - examples/frameworks/*
+  - apps/*
 
 catalog:
   '@cfworker/json-schema': ^4.1.1

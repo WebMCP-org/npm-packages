@@ -28,7 +28,7 @@
     "web-model-context",
     "webmcp"
   ],
-  "homepage": "https://docs.mcp-b.ai/packages/webmcp-ts-sdk",
+  "homepage": "https://docs.mcp-b.ai/packages/webmcp-ts-sdk/reference",
   "bugs": {
     "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },
