@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-Guidance for Claude Code when working with this repository.
+Guidance for AI agents when working with this repository.
 
 ## Commands
 
