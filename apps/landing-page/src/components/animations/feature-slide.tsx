@@ -170,7 +170,6 @@ const packageGroups = [
       '@mcp-b/chrome-devtools-mcp',
       '@mcp-b/extension-tools',
       '@mcp-b/smart-dom-reader',
-      'agent-skills-ts-sdk',
     ],
   },
 ];

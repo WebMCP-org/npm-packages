@@ -163,10 +163,6 @@
                   "packages/smart-dom-reader/overview",
                   "packages/smart-dom-reader/reference"
                 ]
-              },
-              {
-                "group": "agent-skills-ts-sdk",
-                "pages": ["packages/agent-skills/overview", "packages/agent-skills/reference"]
               }
             ]
           }

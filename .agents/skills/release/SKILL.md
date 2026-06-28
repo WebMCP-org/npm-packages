@@ -98,13 +98,12 @@ topological order (dependencies before dependents).
 
 ```bash
 # Quick check: all published versions match local
-for pkg in webmcp-types webmcp-polyfill webmcp-ts-sdk transports global mcp-iframe extension-tools react-webmcp smart-dom-reader webmcp-local-relay chrome-devtools-mcp agent-skills; do
+for pkg in webmcp-types webmcp-polyfill webmcp-ts-sdk transports global mcp-iframe extension-tools react-webmcp smart-dom-reader webmcp-local-relay chrome-devtools-mcp; do
   LOCAL=$(node -p "require('./packages/$pkg/package.json').version" 2>/dev/null)
   NPM=$(npm view @mcp-b/$pkg version 2>/dev/null)
   echo "@mcp-b/$pkg: local=$LOCAL npm=$NPM"
 done
 echo "usewebmcp: local=$(node -p "require('./packages/usewebmcp/package.json').version") npm=$(npm view usewebmcp version 2>/dev/null)"
-echo "agent-skills-ts-sdk: local=$(node -p "require('./packages/agent-skills/package.json').version") npm=$(npm view agent-skills-ts-sdk version 2>/dev/null)"
 ```
 
 With fixed versioning, ALL versions should be the SAME number.
@@ -230,7 +229,7 @@ Tier 5 (← Tier 4):
   @mcp-b/react-webmcp, usewebmcp
 
 Independent (no internal deps):
-  @mcp-b/webmcp-local-relay, @mcp-b/chrome-devtools-mcp, agent-skills-ts-sdk
+  @mcp-b/webmcp-local-relay, @mcp-b/chrome-devtools-mcp
 ```
 
 ## Complete Dependency Graph
@@ -240,8 +239,6 @@ Independent (no internal deps):
 @mcp-b/smart-dom-reader      (no internal deps)
 @mcp-b/webmcp-local-relay    (no internal deps)
 @mcp-b/chrome-devtools-mcp   (no internal deps)
-agent-skills-ts-sdk           (no internal deps)
-
 @mcp-b/webmcp-polyfill       → webmcp-types
 @mcp-b/webmcp-ts-sdk         → webmcp-polyfill, webmcp-types
 @mcp-b/transports            → webmcp-ts-sdk
@@ -270,7 +267,6 @@ If you discover a stale dependency after publishing:
 | `@mcp-b/global`              | Dual build (ESM + IIFE). Most internal deps. Most vulnerable to chain issues. |
 | `@mcp-b/chrome-devtools-mcp` | Complex build — always `rm -rf build/` before building.                       |
 | `usewebmcp`                  | Standalone package. NOT an alias for react-webmcp.                            |
-| `agent-skills-ts-sdk`        | Published as `agent-skills-ts-sdk` (NOT `@mcp-b/agent-skills`).               |
 
 ## NPM Authentication
 

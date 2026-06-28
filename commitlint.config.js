@@ -6,7 +6,6 @@ export default {
       'always',
       [
         // Packages (in packages/)
-        'agent-skills',
         'chrome-devtools-mcp',
         'codemode',
         'extension-tools',

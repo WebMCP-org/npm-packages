@@ -167,17 +167,5 @@
     "referencePath": "/packages/smart-dom-reader/reference",
     "quickstartSnippet": "packages/smart-dom-reader-quickstart.ts",
     "sourcePackagePath": "packages/smart-dom-reader"
-  },
-  {
-    "id": "agent-skills",
-    "packageName": "agent-skills-ts-sdk",
-    "sidebarLabel": "agent-skills",
-    "category": "Tooling",
-    "summary": "Parser, validator, prompt builder, and patch utilities for the AgentSkills SKILL.md format.",
-    "installCommand": "npm install agent-skills-ts-sdk",
-    "overviewPath": "/packages/agent-skills/overview",
-    "referencePath": "/packages/agent-skills/reference",
-    "quickstartSnippet": "packages/agent-skills-quickstart.ts",
-    "sourcePackagePath": "packages/agent-skills"
   }
 ]
