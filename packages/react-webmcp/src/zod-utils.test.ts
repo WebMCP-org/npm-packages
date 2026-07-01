@@ -1,170 +1,70 @@
-import type { InputSchema } from '@mcp-b/webmcp-types';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 
-const { zodToJsonSchemaMock } = vi.hoisted(() => ({
-  zodToJsonSchemaMock: vi.fn(),
-}));
-
-vi.mock('zod-to-json-schema', () => ({
-  zodToJsonSchema: zodToJsonSchemaMock,
-}));
-
-import { isZodSchema, zodToJsonSchema } from './zod-utils.js';
+import { isZodSchema, isZodType, zodToJsonSchema } from './zod-utils.js';
 
 describe('zod-utils', () => {
-  beforeEach(() => {
-    zodToJsonSchemaMock.mockReset();
+  describe('isZodSchema', () => {
+    it('accepts raw Zod shape objects only', () => {
+      expect(isZodSchema({ username: z.string(), age: z.number().optional() })).toBe(true);
+      expect(isZodSchema({ type: 'object', username: z.string() })).toBe(false);
+      expect(isZodSchema(z.object({ username: z.string() }))).toBe(false);
+      expect(isZodSchema({ type: 'object', properties: {} })).toBe(false);
+      expect(isZodSchema(null)).toBe(false);
+    });
   });
 
-  describe('isZodSchema', () => {
-    it('returns false for non-zod-like values and JSON Schema objects', () => {
-      expect(isZodSchema(null)).toBe(false);
-      expect(isZodSchema([])).toBe(false);
-      expect(isZodSchema({})).toBe(false);
-      expect(isZodSchema({ type: 'object', properties: {} })).toBe(false);
-      expect(isZodSchema({ username: { type: 'string' } })).toBe(false);
-    });
-
-    it('returns true for zod-like schema records', () => {
-      expect(
-        isZodSchema({
-          username: { _def: { typeName: 'ZodString' } },
-          age: { _def: { typeName: 'ZodNumber' } },
-        })
-      ).toBe(true);
-    });
-
-    it('returns true for zod-like schema records with non-zod keys', () => {
-      expect(
-        isZodSchema({
-          type: 'object',
-          username: { _def: { typeName: 'ZodString' } },
-        })
-      ).toBe(true);
+  describe('isZodType', () => {
+    it('detects constructed Zod schemas', () => {
+      expect(isZodType(z.string())).toBe(true);
+      expect(isZodType(z.object({ username: z.string() }))).toBe(true);
+      expect(isZodType({ username: z.string() })).toBe(false);
     });
   });
 
   describe('zodToJsonSchema', () => {
-    it('converts zod-like fields, strips schema metadata, and infers required keys', () => {
-      const schema = {
-        type: 'object',
-        requiredField: { _def: { typeName: 'ZodString' } },
-        optionalField: { _def: { typeName: 'ZodOptional' } },
-        defaultField: { _def: { typeName: 'ZodDefault' } },
-        malformedDefField: { _def: 'not-an-object' },
-      };
-
-      zodToJsonSchemaMock.mockImplementation((value: unknown): InputSchema => {
-        if (value === schema.requiredField) {
-          return {
-            $schema: 'https://json-schema.org/draft/2020-12/schema',
-            type: 'string',
-          };
-        }
-
-        if (value === schema.optionalField) {
-          return {
-            type: 'number',
-            $schema: 'https://json-schema.org/draft/2020-12/schema',
-          };
-        }
-
-        if (value === schema.defaultField) {
-          return {
-            $schema: 'https://json-schema.org/draft/2020-12/schema',
-            type: 'object',
-            properties: {
-              nested: {
-                $schema: 'https://json-schema.org/draft/2020-12/schema',
-                type: 'string',
-              },
-            },
-          };
-        }
-
-        return {
-          type: 'boolean',
-          $schema: 'https://json-schema.org/draft/2020-12/schema',
-        };
+    it('delegates raw Zod shape conversion to the SDK compat helpers', () => {
+      const result = zodToJsonSchema({
+        username: z.string(),
+        age: z.number().optional(),
       });
 
-      const result = zodToJsonSchema(schema as never);
-
-      expect(zodToJsonSchemaMock).toHaveBeenCalledTimes(4);
-      expect(result).toEqual({
+      expect(result).toMatchObject({
         type: 'object',
         properties: {
-          requiredField: { type: 'string' },
-          optionalField: { type: 'number' },
-          defaultField: {
-            type: 'object',
-            properties: {
-              nested: { type: 'string' },
-            },
-          },
-          malformedDefField: { type: 'boolean' },
+          username: { type: 'string' },
+          age: { type: 'number' },
         },
-        required: ['requiredField', 'malformedDefField'],
+        required: ['username'],
       });
     });
 
-    it('omits required when every field is optional or defaulted', () => {
-      const schema = {
-        optionalField: { _def: { typeName: 'ZodOptional' } },
-        defaultField: { _def: { typeName: 'ZodDefault' } },
-      };
+    it('converts constructed Zod schemas', () => {
+      const result = zodToJsonSchema(
+        z.object({
+          ok: z.boolean(),
+        })
+      );
 
-      zodToJsonSchemaMock.mockImplementation((value: unknown): InputSchema => {
-        if (value === schema.optionalField) {
-          return { type: 'string' };
-        }
-        return { type: 'number' };
-      });
-
-      const result = zodToJsonSchema(schema as never);
-
-      expect(result).toEqual({
+      expect(result).toMatchObject({
         type: 'object',
         properties: {
-          optionalField: { type: 'string' },
-          defaultField: { type: 'number' },
+          ok: { type: 'boolean' },
         },
+        required: ['ok'],
       });
-      expect(result.required).toBeUndefined();
     });
 
-    it('falls back to native Zod v4 JSON Schema conversion when zod-to-json-schema omits type', () => {
-      const schema = {
-        count: {
-          _def: { type: 'number' },
-          toJSONSchema: () => ({
-            $schema: 'https://json-schema.org/draft/2020-12/schema',
-            type: 'number',
-          }),
-        },
-        maybe: {
-          _def: { type: 'optional' },
-          toJSONSchema: () => ({
-            $schema: 'https://json-schema.org/draft/2020-12/schema',
-            type: 'string',
-          }),
-        },
-      };
+    it('leaves unsupported unions as schemas without a root type', () => {
+      const result = zodToJsonSchema(
+        z.union([
+          z.object({ kind: z.literal('page'), url: z.string() }),
+          z.object({ kind: z.literal('section'), id: z.string() }),
+        ])
+      );
 
-      zodToJsonSchemaMock.mockReturnValue({
-        $schema: 'http://json-schema.org/draft-07/schema#',
-      });
-
-      const result = zodToJsonSchema(schema as never);
-
-      expect(result).toEqual({
-        type: 'object',
-        properties: {
-          count: { type: 'number' },
-          maybe: { type: 'string' },
-        },
-        required: ['count'],
-      });
+      expect(result.type).toBeUndefined();
+      expect(result.anyOf).toHaveLength(2);
     });
   });
 });

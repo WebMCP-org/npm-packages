@@ -1,4 +1,5 @@
 import type { InputSchema } from '@mcp-b/webmcp-types';
+import { normalizeInputSchema } from '@mcp-b/webmcp-polyfill/schema';
 import { useEffect, useRef, useState } from 'react';
 import type {
   PromptMessage,
@@ -113,7 +114,7 @@ export function useWebMCPPrompt<TArgsSchema extends ReactWebMCPInputSchema = Inp
     const resolvedArgsSchema = argsSchema
       ? isZodSchema(argsSchema)
         ? zodToJsonSchema(argsSchema)
-        : (argsSchema as InputSchema)
+        : normalizeInputSchema(argsSchema).inputSchema
       : undefined;
 
     let registration: { unregister: () => void } | undefined;

@@ -1,7 +1,5 @@
-import { type Schema, Validator } from '@cfworker/json-schema';
 import type {
   InputSchema,
-  JsonObject,
   ModelContext,
   ModelContextClient,
   ModelContextRegisterToolOptions,
@@ -13,47 +11,31 @@ import type {
   ToolDescriptor,
   ToolResponse,
 } from '@mcp-b/webmcp-types';
-import type { StandardSchemaV1 } from '@standard-schema/spec';
+import { isPlainObject, normalizeInputSchema, toJsonObject } from './schema.js';
+import type { StandardInputValidatorSchema } from './schema.js';
+export {
+  isPlainObject,
+  normalizeInputSchema,
+  toJsonObject,
+  validateArgsWithSchema,
+} from './schema.js';
+export type {
+  StandardInputJsonSchema,
+  StandardInputValidatorSchema,
+  StandardJSONSchemaV1,
+  ToolInputSchema,
+  ToolOutputSchema,
+} from './schema.js';
 
 const FAILED_TO_PARSE_INPUT_ARGUMENTS_MESSAGE = 'Failed to parse input arguments';
 const TOOL_INVOCATION_FAILED_MESSAGE =
   'Tool was executed but the invocation failed. For example, the script function threw an error';
 const TOOL_CANCELLED_MESSAGE = 'Tool was cancelled';
-const DEFAULT_INPUT_SCHEMA: InputSchema = { type: 'object', properties: {} };
-const STANDARD_JSON_SCHEMA_TARGETS = ['draft-2020-12', 'draft-07'] as const;
 /** WebMCP §4.2 tool name: ASCII alnum, underscore, hyphen, period; 1–128 code points. */
 const VALID_TOOL_NAME_RE = /^[A-Za-z0-9_\-.]{1,128}$/u;
 
 const POLYFILL_MARKER_PROPERTY = '__isWebMCPPolyfill' as const;
 const STANDARD_VALIDATOR_SYMBOL = Symbol('standardValidator');
-
-export type StandardInputValidatorSchema = StandardSchemaV1<
-  Record<string, unknown>,
-  Record<string, unknown>
->;
-export interface StandardJSONSchemaV1<Input = unknown, Output = Input> {
-  readonly '~standard': {
-    readonly version: 1;
-    readonly vendor: string;
-    readonly types?: { readonly input: Input; readonly output: Output } | undefined;
-    readonly jsonSchema: {
-      readonly input: (options: {
-        readonly target: 'draft-2020-12' | 'draft-07' | 'openapi-3.0' | ({} & string);
-        readonly libraryOptions?: Record<string, unknown> | undefined;
-      }) => Record<string, unknown>;
-      readonly output: (options: {
-        readonly target: 'draft-2020-12' | 'draft-07' | 'openapi-3.0' | ({} & string);
-        readonly libraryOptions?: Record<string, unknown> | undefined;
-      }) => Record<string, unknown>;
-    };
-  };
-}
-export type StandardInputJsonSchema = StandardJSONSchemaV1<
-  Record<string, unknown>,
-  Record<string, unknown>
->;
-export type ToolInputSchema = InputSchema | StandardInputValidatorSchema | StandardInputJsonSchema;
-export type ToolOutputSchema = InputSchema | StandardInputJsonSchema;
 
 type StandardValidationResult = Awaited<
   ReturnType<StandardInputValidatorSchema['~standard']['validate']>
@@ -67,11 +49,6 @@ interface PolyfillModelContext extends ModelContext {
 interface PolyfillToolDescriptor extends ToolDescriptor<Record<string, unknown>, unknown, string> {
   inputSchema: InputSchema;
   [STANDARD_VALIDATOR_SYMBOL]: StandardInputValidatorSchema;
-}
-
-interface NormalizedInputSchema {
-  inputSchema: InputSchema;
-  standardValidator: StandardInputValidatorSchema;
 }
 
 interface InstallState {
@@ -423,220 +400,6 @@ function getToolNameForUnregister(nameOrTool: string | ModelContextToolReference
   );
 }
 
-export function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function getStandardProps(value: unknown): Record<string, unknown> | null {
-  if (!isPlainObject(value)) {
-    return null;
-  }
-
-  const standard = value['~standard'];
-  if (!isPlainObject(standard)) {
-    return null;
-  }
-
-  return standard;
-}
-
-function isStandardInputValidatorSchema(value: unknown): value is StandardInputValidatorSchema {
-  const standard = getStandardProps(value);
-  return Boolean(standard && standard.version === 1 && typeof standard.validate === 'function');
-}
-
-function isStandardInputJsonSchema(value: unknown): value is StandardInputJsonSchema {
-  const standard = getStandardProps(value);
-  if (!standard || standard.version !== 1 || !isPlainObject(standard.jsonSchema)) {
-    return false;
-  }
-
-  return typeof standard.jsonSchema.input === 'function';
-}
-
-function createStandardValidatorFromJsonSchema(schema: InputSchema): StandardInputValidatorSchema {
-  return {
-    '~standard': {
-      version: 1,
-      vendor: '@mcp-b/webmcp-polyfill-json-schema',
-      validate(value: unknown): StandardValidationResult {
-        if (!isPlainObject(value)) {
-          return {
-            issues: [{ message: 'expected object arguments' }],
-          };
-        }
-
-        const issue = validateArgsWithSchema(value, schema);
-        if (issue) {
-          return {
-            issues: [issue],
-          };
-        }
-
-        return {
-          value,
-        };
-      },
-    },
-  };
-}
-
-function convertStandardInputSchema(schema: StandardInputJsonSchema): InputSchema {
-  for (const target of STANDARD_JSON_SCHEMA_TARGETS) {
-    try {
-      const converted = schema['~standard'].jsonSchema.input({ target });
-      validateInputSchema(converted);
-      return converted;
-    } catch (error) {
-      console.warn(
-        `[WebMCPPolyfill] Standard JSON Schema conversion failed for target "${target}":`,
-        error
-      );
-    }
-  }
-
-  throw new Error('Failed to convert Standard JSON Schema inputSchema to a JSON Schema object');
-}
-
-function normalizeInputSchema(inputSchema: ToolInputSchema | undefined): NormalizedInputSchema {
-  if (inputSchema === undefined) {
-    const normalized = DEFAULT_INPUT_SCHEMA;
-    return {
-      inputSchema: normalized,
-      standardValidator: createStandardValidatorFromJsonSchema(normalized),
-    };
-  }
-
-  if (isStandardInputJsonSchema(inputSchema)) {
-    // Prefer JSON conversion for parity across JSON and Standard Schema inputs.
-    const converted = convertStandardInputSchema(inputSchema);
-    return {
-      inputSchema: converted,
-      standardValidator: createStandardValidatorFromJsonSchema(converted),
-    };
-  }
-
-  if (isStandardInputValidatorSchema(inputSchema)) {
-    return {
-      inputSchema: DEFAULT_INPUT_SCHEMA,
-      standardValidator: inputSchema,
-    };
-  }
-
-  validateInputSchema(inputSchema);
-
-  // Empty {} is valid JSON Schema but lacks type:"object" required by MCP.
-  if (Object.keys(inputSchema as Record<string, unknown>).length === 0) {
-    return {
-      inputSchema: DEFAULT_INPUT_SCHEMA,
-      standardValidator: createStandardValidatorFromJsonSchema(DEFAULT_INPUT_SCHEMA),
-    };
-  }
-
-  const normalizedSchema =
-    inputSchema.type === undefined
-      ? ({ type: 'object', ...inputSchema } as InputSchema)
-      : inputSchema;
-  return {
-    inputSchema: normalizedSchema,
-    standardValidator: createStandardValidatorFromJsonSchema(normalizedSchema),
-  };
-}
-
-function validateInputSchema(schema: unknown): asserts schema is InputSchema {
-  if (!isPlainObject(schema)) {
-    throw new Error('inputSchema must be a JSON Schema object');
-  }
-
-  validateJsonSchemaNode(schema, '$');
-}
-
-function validateJsonSchemaNode(node: Record<string, unknown>, path: string): void {
-  const typeValue = node.type;
-  if (
-    typeValue !== undefined &&
-    typeof typeValue !== 'string' &&
-    !(
-      Array.isArray(typeValue) &&
-      typeValue.every((entry) => typeof entry === 'string' && entry.length > 0)
-    )
-  ) {
-    throw new Error(`Invalid JSON Schema at ${path}: "type" must be a string or string[]`);
-  }
-
-  const requiredValue = node.required;
-  if (
-    requiredValue !== undefined &&
-    !(Array.isArray(requiredValue) && requiredValue.every((entry) => typeof entry === 'string'))
-  ) {
-    throw new Error(`Invalid JSON Schema at ${path}: "required" must be an array of strings`);
-  }
-
-  const propertiesValue = node.properties;
-  if (propertiesValue !== undefined) {
-    if (!isPlainObject(propertiesValue)) {
-      throw new Error(`Invalid JSON Schema at ${path}: "properties" must be an object`);
-    }
-
-    for (const [key, value] of Object.entries(propertiesValue)) {
-      if (!isPlainObject(value)) {
-        throw new Error(`Invalid JSON Schema at ${path}.properties.${key}: expected object schema`);
-      }
-      validateJsonSchemaNode(value, `${path}.properties.${key}`);
-    }
-  }
-
-  const itemsValue = node.items;
-  if (itemsValue !== undefined) {
-    if (Array.isArray(itemsValue)) {
-      for (const [index, value] of itemsValue.entries()) {
-        if (!isPlainObject(value)) {
-          throw new Error(`Invalid JSON Schema at ${path}.items[${index}]: expected object schema`);
-        }
-        validateJsonSchemaNode(value, `${path}.items[${index}]`);
-      }
-    } else if (isPlainObject(itemsValue)) {
-      validateJsonSchemaNode(itemsValue, `${path}.items`);
-    } else {
-      throw new Error(`Invalid JSON Schema at ${path}: "items" must be an object or object[]`);
-    }
-  }
-
-  for (const keyword of ['allOf', 'anyOf', 'oneOf'] as const) {
-    const value = node[keyword];
-    if (value === undefined) {
-      continue;
-    }
-
-    if (!Array.isArray(value)) {
-      throw new Error(`Invalid JSON Schema at ${path}: "${keyword}" must be an array`);
-    }
-
-    for (const [index, entry] of value.entries()) {
-      if (!isPlainObject(entry)) {
-        throw new Error(
-          `Invalid JSON Schema at ${path}.${keyword}[${index}]: expected object schema`
-        );
-      }
-      validateJsonSchemaNode(entry, `${path}.${keyword}[${index}]`);
-    }
-  }
-
-  const notValue = node.not;
-  if (notValue !== undefined) {
-    if (!isPlainObject(notValue)) {
-      throw new Error(`Invalid JSON Schema at ${path}: "not" must be an object schema`);
-    }
-    validateJsonSchemaNode(notValue, `${path}.not`);
-  }
-
-  try {
-    JSON.stringify(node);
-  } catch {
-    throw new Error(`Invalid JSON Schema at ${path}: schema must be JSON-serializable`);
-  }
-}
-
 function normalizeToolDescriptor(
   tool: ToolDescriptor,
   existing: Map<string, PolyfillToolDescriptor>
@@ -704,26 +467,6 @@ function normalizeToolDescriptor(
   };
 }
 
-export function validateArgsWithSchema(
-  args: Record<string, unknown>,
-  schema: InputSchema
-): StandardValidationIssue | null {
-  const validator = new Validator(schema as Schema, '2020-12', true);
-  const result = validator.validate(args);
-
-  if (result.valid) {
-    return null;
-  }
-
-  // Use the deepest (last) error for the most specific message.
-  const error = result.errors[result.errors.length - 1];
-  if (!error) {
-    return { message: 'Input validation failed' };
-  }
-
-  return { message: error.error };
-}
-
 function formatStandardIssuePath(path: StandardValidationIssue['path']) {
   if (!path || path.length === 0) {
     return null;
@@ -788,39 +531,6 @@ function isCallToolResult(value: unknown): value is ToolResponse {
   return isPlainObject(value) && Array.isArray(value.content);
 }
 
-function isJsonPrimitive(value: unknown): value is string | number | boolean | null {
-  return (
-    value === null ||
-    typeof value === 'string' ||
-    typeof value === 'number' ||
-    typeof value === 'boolean'
-  );
-}
-
-function isJsonValue(value: unknown): boolean {
-  if (isJsonPrimitive(value)) {
-    return Number.isFinite(value as number) || typeof value !== 'number';
-  }
-
-  if (Array.isArray(value)) {
-    return value.every((entry) => isJsonValue(entry));
-  }
-
-  if (!isPlainObject(value)) {
-    return false;
-  }
-
-  return Object.values(value).every((entry) => isJsonValue(entry));
-}
-
-function toStructuredContent(value: unknown): JsonObject | undefined {
-  if (!isPlainObject(value) || !isJsonValue(value)) {
-    return undefined;
-  }
-
-  return value as JsonObject;
-}
-
 function serializeTextContent(value: unknown): string {
   if (typeof value === 'string') {
     return value;
@@ -839,7 +549,7 @@ function normalizeToolResponse(value: unknown): ToolResponse {
     return value;
   }
 
-  const structuredContent = toStructuredContent(value);
+  const structuredContent = toJsonObject(value);
 
   return {
     content: [

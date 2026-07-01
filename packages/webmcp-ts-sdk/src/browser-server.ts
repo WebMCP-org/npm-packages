@@ -1,6 +1,5 @@
 import type {
   InputSchema,
-  JsonObject,
   JsonSchemaForInference,
   ModelContextClient,
   ModelContextCore,
@@ -14,6 +13,7 @@ import type {
   ToolListItem,
   ToolResponse,
 } from '@mcp-b/webmcp-types';
+import { toJsonObject } from '@mcp-b/webmcp-polyfill/schema';
 import type { ServerOptions } from '@modelcontextprotocol/sdk/server/index.js';
 import { McpServer as BaseMcpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {
@@ -25,6 +25,8 @@ import { toJsonSchemaCompat } from '@modelcontextprotocol/sdk/server/zod-json-sc
 import type { RequestOptions } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import { mergeCapabilities } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import type { jsonSchemaValidator } from '@modelcontextprotocol/sdk/validation';
+import { CfWorkerJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/cfworker';
 import type {
   CreateMessageRequest,
   CreateMessageResult,
@@ -38,7 +40,6 @@ import {
   ListPromptsRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import { PolyfillJsonSchemaValidator } from './polyfill-validator.js';
 
 const DEFAULT_INPUT_SCHEMA: InputSchema = { type: 'object', properties: {} };
 const DEFAULT_CLIENT_REQUEST_TIMEOUT = 10_000;
@@ -53,15 +54,6 @@ function isCallToolResult(value: unknown): value is ToolResponse {
   return isPlainObject(value) && Array.isArray(value.content);
 }
 
-function isJsonPrimitive(value: unknown): value is string | number | boolean | null {
-  return (
-    value === null ||
-    typeof value === 'string' ||
-    typeof value === 'number' ||
-    typeof value === 'boolean'
-  );
-}
-
 function isPermissionsPolicySecurityError(error: unknown): boolean {
   if (!error || typeof error !== 'object') {
     return false;
@@ -74,30 +66,6 @@ function isPermissionsPolicySecurityError(error: unknown): boolean {
     typeof message === 'string' &&
     /permissions policy|feature "tools" is disallowed/i.test(message)
   );
-}
-
-function isJsonValue(value: unknown): boolean {
-  if (isJsonPrimitive(value)) {
-    return Number.isFinite(value as number) || typeof value !== 'number';
-  }
-
-  if (Array.isArray(value)) {
-    return value.every((entry) => isJsonValue(entry));
-  }
-
-  if (!isPlainObject(value)) {
-    return false;
-  }
-
-  return Object.values(value).every((entry) => isJsonValue(entry));
-}
-
-function toStructuredContent(value: unknown): JsonObject | undefined {
-  if (!isPlainObject(value) || !isJsonValue(value)) {
-    return undefined;
-  }
-
-  return value as JsonObject;
 }
 
 function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
@@ -126,7 +94,7 @@ function normalizeToolResponse(value: unknown): ToolResponse {
     return value;
   }
 
-  const structuredContent = toStructuredContent(value);
+  const structuredContent = toJsonObject(value);
 
   return {
     content: [{ type: 'text', text: serializeTextContent(value) }],
@@ -224,7 +192,7 @@ export class BrowserMcpServer extends BaseMcpServer {
 
   private native: ModelContextCore | undefined;
   private _promptSchemas = new Map<string, InputSchema>();
-  private _jsonValidator: PolyfillJsonSchemaValidator;
+  private _jsonValidator: jsonSchemaValidator;
   private _publicMethodsBound = false;
   private _unregisterToolDeprecationWarned = false;
   private _nativeToolCleanups = new Map<string, NativeToolCleanup>();
@@ -232,14 +200,14 @@ export class BrowserMcpServer extends BaseMcpServer {
   private _ontoolchange: ((this: ModelContextCore, ev: Event) => unknown) | null = null;
 
   constructor(serverInfo: Implementation, options?: BrowserMcpServerOptions) {
-    const validator = new PolyfillJsonSchemaValidator();
+    const validator = options?.jsonSchemaValidator ?? new CfWorkerJsonSchemaValidator();
     const enhancedOptions: ServerOptions = {
       capabilities: mergeCapabilities(options?.capabilities || {}, {
         tools: { listChanged: true },
         resources: { listChanged: true },
         prompts: { listChanged: true },
       }),
-      jsonSchemaValidator: options?.jsonSchemaValidator ?? validator,
+      jsonSchemaValidator: validator,
     };
 
     super(serverInfo, enhancedOptions);
@@ -888,7 +856,7 @@ export class BrowserMcpServer extends BaseMcpServer {
 
   /**
    * Override SDK's validateToolInput to handle both Zod schemas and plain JSON Schema.
-   * Zod schemas use the SDK's safeParseAsync; plain JSON Schema uses PolyfillJsonSchemaValidator.
+   * Zod schemas use the SDK's safeParseAsync; plain JSON Schema uses the configured SDK validator.
    */
   override async validateToolInput(
     tool: { inputSchema?: unknown },
@@ -911,7 +879,7 @@ export class BrowserMcpServer extends BaseMcpServer {
       return result.data as Record<string, unknown>;
     }
 
-    // Plain JSON Schema → use PolyfillJsonSchemaValidator
+    // Plain JSON Schema → use the configured SDK validator
     const validator = this._jsonValidator.getValidator(tool.inputSchema);
     const result = validator(args ?? {});
     if (!result.valid) {
@@ -947,7 +915,7 @@ export class BrowserMcpServer extends BaseMcpServer {
       return;
     }
 
-    // Plain JSON Schema → use PolyfillJsonSchemaValidator
+    // Plain JSON Schema → use the configured SDK validator
     const validator = this._jsonValidator.getValidator(tool.outputSchema);
     const validationResult = validator(r.structuredContent);
     if (!validationResult.valid) {
@@ -1027,7 +995,7 @@ export class BrowserMcpServer extends BaseMcpServer {
     }));
 
     // Replace GetPrompt handler — parent calls safeParseAsync on argsSchema.
-    // We validate with PolyfillJsonSchemaValidator instead.
+    // We validate with the configured SDK validator instead.
     this.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
       const prompt = this._parentPrompts[request.params.name];
       if (!prompt) {

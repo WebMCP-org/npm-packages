@@ -1224,7 +1224,7 @@ describe('useWebMCP', () => {
     });
   });
 
-  describe('toStructuredContent edge cases', () => {
+  describe('structured content edge cases', () => {
     it('should handle circular references in handler result with outputSchema', async () => {
       // Create an object with a circular reference - JSON.stringify will throw
       const circular: Record<string, unknown> = { key: 'value' };
@@ -1238,13 +1238,12 @@ describe('useWebMCP', () => {
           // @ts-expect-error - intentionally returning circular for test
           handler: async () => circular,
           // Provide custom formatOutput that handles circular objects
-          // so we reach toStructuredContent instead of throwing in formatOutput
+          // so the structured-content guard sees the handler result.
           formatOutput: () => 'circular object result',
         })
       );
 
-      // toStructuredContent will catch the JSON.stringify error and return null,
-      // which triggers the "outputSchema requires handler to return a JSON object" error.
+      // Circular output is not JSON structured content, so the object outputSchema errors.
       await expect(
         navigator.modelContextTesting?.executeTool('circular_tool', JSON.stringify({}))
       ).rejects.toThrow();

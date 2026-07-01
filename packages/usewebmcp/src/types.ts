@@ -1,4 +1,4 @@
-import type { ToolInputSchema } from '@mcp-b/webmcp-polyfill';
+import type { ToolInputSchema } from '@mcp-b/webmcp-polyfill/schema';
 import type {
   InferArgsFromInputSchema,
   InferJsonSchema,

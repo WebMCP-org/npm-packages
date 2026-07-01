@@ -35,6 +35,11 @@
       "import": "./dist/index.js",
       "default": "./dist/index.js"
     },
+    "./schema": {
+      "types": "./dist/schema.d.ts",
+      "import": "./dist/schema.js",
+      "default": "./dist/schema.js"
+    },
     "./iife": {
       "script": "./dist/index.iife.js",
       "default": "./dist/index.iife.js"

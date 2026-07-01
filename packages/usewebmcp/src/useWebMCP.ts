@@ -1,8 +1,11 @@
-import type { ToolInputSchema } from '@mcp-b/webmcp-polyfill';
+import {
+  normalizeInputSchema,
+  toJsonObject,
+  type ToolInputSchema,
+} from '@mcp-b/webmcp-polyfill/schema';
 import type {
   CallToolResult,
   InputSchema,
-  JsonObject,
   JsonSchemaForInference,
   ToolDescriptor,
 } from '@mcp-b/webmcp-types';
@@ -15,7 +18,7 @@ import type {
   WebMCPConfig,
   WebMCPReturn,
 } from './types.js';
-import { getModelContext, type ModelContextSurface } from './model-context.js';
+import { getModelContext } from './model-context.js';
 
 /**
  * Default output formatter that converts values to formatted JSON strings.
@@ -33,145 +36,12 @@ function defaultFormatOutput(output: unknown): string {
 }
 
 const TOOL_OWNER_BY_NAME = new Map<string, symbol>();
-const DEFAULT_REGISTERED_INPUT_SCHEMA: InputSchema = { type: 'object', properties: {} };
-const STANDARD_JSON_SCHEMA_TARGETS = ['draft-2020-12', 'draft-07'] as const;
-type StructuredContent = Exclude<CallToolResult['structuredContent'], undefined>;
-
-function isObjectOutputSchema(schema: JsonSchemaForInference | undefined): boolean {
-  return schema?.type === 'object';
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isInputSchema(value: unknown): value is InputSchema {
-  if (!isPlainObject(value)) {
-    return false;
-  }
-
-  if ('type' in value && value.type !== undefined && typeof value.type !== 'string') {
-    return false;
-  }
-
-  if ('properties' in value && value.properties !== undefined && !isPlainObject(value.properties)) {
-    return false;
-  }
-
-  if (
-    'required' in value &&
-    value.required !== undefined &&
-    (!Array.isArray(value.required) || value.required.some((entry) => typeof entry !== 'string'))
-  ) {
-    return false;
-  }
-
-  return true;
-}
-
-function isJsonValue(value: unknown): boolean {
-  if (value === null) {
-    return true;
-  }
-
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-    return true;
-  }
-
-  if (Array.isArray(value)) {
-    return value.every(isJsonValue);
-  }
-
-  if (typeof value !== 'object') {
-    return false;
-  }
-
-  return Object.values(value).every(isJsonValue);
-}
-
-function isJsonObject(value: unknown): value is JsonObject {
-  return typeof value === 'object' && value !== null && !Array.isArray(value) && isJsonValue(value);
-}
-
-function toStructuredContent(value: unknown): StructuredContent | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return null;
-  }
-
-  try {
-    const normalized = JSON.parse(JSON.stringify(value));
-    return isJsonObject(normalized) ? normalized : null;
-  } catch {
-    return null;
-  }
-}
 
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 function isDev(): boolean {
   const env = typeof process !== 'undefined' ? process.env?.NODE_ENV : undefined;
   return env !== undefined ? env !== 'production' : false;
-}
-
-/**
- * On Chrome 147/148, aborting the controller does not remove the tool.
- * Install `@mcp-b/global` or `@mcp-b/webmcp-polyfill` for those versions.
- * Chrome 149+ removes the tool on abort in the native implementation.
- */
-function registerToolWithCleanup(
-  modelContext: ModelContextSurface,
-  toolDescriptor: ToolDescriptor
-): AbortController {
-  const controller = new AbortController();
-  (
-    modelContext.registerTool as (tool: ToolDescriptor, options?: { signal?: AbortSignal }) => void
-  ).call(modelContext, toolDescriptor, { signal: controller.signal });
-  return controller;
-}
-
-function toRegisteredInputSchema(
-  inputSchema: ToolInputSchema | undefined
-): InputSchema | undefined {
-  if (inputSchema === undefined) {
-    return undefined;
-  }
-
-  if (!isPlainObject(inputSchema) || !('~standard' in inputSchema)) {
-    return isInputSchema(inputSchema) ? inputSchema : DEFAULT_REGISTERED_INPUT_SCHEMA;
-  }
-
-  const standard = inputSchema['~standard'];
-  if (!isPlainObject(standard)) {
-    return DEFAULT_REGISTERED_INPUT_SCHEMA;
-  }
-
-  const jsonSchema = standard.jsonSchema;
-  if (!isPlainObject(jsonSchema) || typeof jsonSchema.input !== 'function') {
-    return DEFAULT_REGISTERED_INPUT_SCHEMA;
-  }
-
-  for (const target of STANDARD_JSON_SCHEMA_TARGETS) {
-    try {
-      const converted = jsonSchema.input({ target });
-      if (isInputSchema(converted)) {
-        return converted;
-      }
-    } catch {
-      // Try the next target before falling back to the default registration schema.
-    }
-  }
-
-  return DEFAULT_REGISTERED_INPUT_SCHEMA;
-}
-
-function toRegisteredOutputSchema(
-  outputSchema: JsonSchemaForInference | undefined
-): JsonSchemaForInference | undefined {
-  if (outputSchema === undefined) {
-    return undefined;
-  }
-
-  return outputSchema;
 }
 
 /**
@@ -479,8 +349,8 @@ export function useWebMCP<
           ],
         };
 
-        if (isObjectOutputSchema(outputSchemaRef.current)) {
-          const structuredContent = toStructuredContent(result);
+        if (outputSchemaRef.current?.type === 'object') {
+          const structuredContent = toJsonObject(result);
           if (!structuredContent) {
             throw new Error(
               `Tool "${name}" outputSchema requires the tool implementation to return a JSON object result`
@@ -506,19 +376,25 @@ export function useWebMCP<
     };
 
     const ownerToken = Symbol(name);
-    const resolvedInputSchema = toRegisteredInputSchema(inputSchemaRef.current);
-    const resolvedOutputSchema = toRegisteredOutputSchema(outputSchemaRef.current);
+    const resolvedInputSchema = normalizeInputSchema(inputSchemaRef.current).inputSchema;
+    const resolvedOutputSchema = outputSchemaRef.current;
     const resolvedAnnotations = annotationsRef.current;
     const toolDescriptor: ToolDescriptor = {
       name,
       description,
-      ...(resolvedInputSchema && { inputSchema: resolvedInputSchema }),
+      inputSchema: resolvedInputSchema,
       ...(resolvedOutputSchema && { outputSchema: resolvedOutputSchema }),
       ...(resolvedAnnotations && { annotations: resolvedAnnotations }),
       execute: mcpHandler,
     };
 
-    const controller = registerToolWithCleanup(modelContext, toolDescriptor);
+    const controller = new AbortController();
+    (
+      modelContext.registerTool as (
+        tool: ToolDescriptor,
+        options?: { signal?: AbortSignal }
+      ) => void
+    ).call(modelContext, toolDescriptor, { signal: controller.signal });
     TOOL_OWNER_BY_NAME.set(name, ownerToken);
 
     return () => {

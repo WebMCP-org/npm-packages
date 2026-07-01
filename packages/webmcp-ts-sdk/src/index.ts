@@ -94,7 +94,10 @@ export {
   SERVER_MARKER_PROPERTY,
 } from './browser-server.js';
 export { NoOpJsonSchemaValidator } from './no-op-validator.js';
-export { PolyfillJsonSchemaValidator } from './polyfill-validator.js';
+export {
+  CfWorkerJsonSchemaValidator,
+  CfWorkerJsonSchemaValidator as PolyfillJsonSchemaValidator,
+} from '@modelcontextprotocol/sdk/validation/cfworker';
 
 // Sampling type aliases (convenience wrappers around MCP SDK types)
 import type { CreateMessageRequest, CreateMessageResult } from '@modelcontextprotocol/sdk/types.js';

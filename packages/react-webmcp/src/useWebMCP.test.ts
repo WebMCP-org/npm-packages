@@ -210,6 +210,59 @@ describe('useWebMCP', () => {
       }
     });
 
+    it('throws for unsupported zod union outputSchema', async () => {
+      const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
+
+      try {
+        const zodOutputSchema = z.union([
+          z.object({ kind: z.literal('page'), url: z.string() }),
+          z.object({ kind: z.literal('section'), id: z.string() }),
+        ]);
+
+        await expect(
+          renderHook(() =>
+            useWebMCP({
+              name: 'zod_union_output_tool',
+              description: 'Tool using zod union output schema',
+              outputSchema: zodOutputSchema,
+              handler: async () => ({ kind: 'page', url: '/docs' }) as const,
+            })
+          )
+        ).rejects.toThrow('Unsupported outputSchema');
+        expect(registerToolSpy).not.toHaveBeenCalled();
+      } finally {
+        registerToolSpy.mockRestore();
+      }
+    });
+
+    it.each([
+      ['unknown type', { type: 'wat' }],
+      ['array without items', { type: 'array' }],
+      ['object property without type', { type: 'object', properties: { count: {} } }],
+      ['combinator schema', { anyOf: [{ type: 'string' }, { type: 'number' }] }],
+    ] as Array<[string, unknown]>)(
+      'throws for unsupported JSON outputSchema: %s',
+      async (_, outputSchema) => {
+        const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
+
+        try {
+          await expect(
+            renderHook(() =>
+              useWebMCP({
+                name: 'unsupported_json_output_tool',
+                description: 'Tool using unsupported JSON output schema',
+                outputSchema: outputSchema as never,
+                handler: async () => ({ count: 1 }),
+              })
+            )
+          ).rejects.toThrow('Unsupported outputSchema');
+          expect(registerToolSpy).not.toHaveBeenCalled();
+        } finally {
+          registerToolSpy.mockRestore();
+        }
+      }
+    );
+
     it('should unregister tool on unmount', async () => {
       const { unmount } = await renderHook(() =>
         useWebMCP({
@@ -401,7 +454,7 @@ describe('useWebMCP', () => {
         })
       );
 
-      // toStructuredContent returns null for strings, causing an error
+      // Structured content requires a JSON object result.
       await expect(
         navigator.modelContextTesting?.executeTool('bad_output_tool', JSON.stringify({}))
       ).rejects.toThrow();

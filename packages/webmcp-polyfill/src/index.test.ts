@@ -6,6 +6,7 @@ import {
   initializeWebMCPPolyfill,
   initializeWebModelContextPolyfill,
 } from './index.js';
+import { toJsonObject } from './schema.js';
 
 type CompatModelContext = Navigator['modelContext'] & {
   unregisterTool(nameOrTool: string | { name: string }): void;
@@ -1151,6 +1152,48 @@ describe('@mcp-b/webmcp-polyfill', () => {
       ).toThrow('Failed to convert Standard JSON Schema inputSchema to a JSON Schema object');
 
       expect(attemptedTargets).toEqual(['draft-2020-12', 'draft-07']);
+    });
+
+    it('does not warn when Standard JSON Schema conversion succeeds on a fallback target', () => {
+      initializeWebMCPPolyfill();
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      try {
+        const draft07OnlySchema = {
+          '~standard': {
+            version: 1 as const,
+            vendor: 'test',
+            jsonSchema: {
+              input: (options: { target: string }) => {
+                if (options.target === 'draft-2020-12') {
+                  throw new Error('unsupported target');
+                }
+
+                return {
+                  type: 'object',
+                  properties: { count: { type: 'number' } },
+                };
+              },
+              output: () => ({ type: 'object', properties: {} }),
+            },
+          },
+        };
+
+        document.modelContext.registerTool({
+          name: 'draft_07_only_standard_json_tool',
+          description: 'Draft 07 only standard json schema tool',
+          inputSchema: asPolyfillInputSchema(draft07OnlySchema),
+          execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+        });
+
+        expect(warnSpy.mock.calls).not.toEqual(
+          expect.arrayContaining([
+            [expect.stringContaining('Standard JSON Schema conversion failed'), expect.anything()],
+          ])
+        );
+      } finally {
+        warnSpy.mockRestore();
+      }
     });
   });
 
@@ -2556,6 +2599,20 @@ describe('@mcp-b/webmcp-polyfill', () => {
       await expect(
         navigator.modelContextTesting?.executeTool('obj_arr_tool', '{"val":[1,2]}')
       ).rejects.toThrow('Instance type "array" is invalid. Expected "object"');
+    });
+  });
+
+  describe('toJsonObject', () => {
+    it('accepts JSON objects and rejects values that would need serialization cleanup', () => {
+      const circular: Record<string, unknown> = { ok: true };
+      circular.self = circular;
+
+      expect(toJsonObject({ ok: true, nested: [1, 'two', null] })).toEqual({
+        ok: true,
+        nested: [1, 'two', null],
+      });
+      expect(toJsonObject({ date: new Date(0) })).toBeUndefined();
+      expect(toJsonObject(circular)).toBeUndefined();
     });
   });
 });
