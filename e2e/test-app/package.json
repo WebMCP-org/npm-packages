@@ -14,6 +14,7 @@
     "@mcp-b/global": "workspace:*",
     "@mcp-b/mcp-iframe": "workspace:*",
     "@mcp-b/transports": "workspace:*",
+    "@mcp-b/webmcp-polyfill": "workspace:*",
     "@mcp-b/webmcp-ts-sdk": "workspace:*",
     "@mcp-b/webmcp-types": "workspace:*",
     "@modelcontextprotocol/sdk": "catalog:",

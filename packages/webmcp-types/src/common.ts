@@ -69,6 +69,62 @@ export interface InputSchema {
 }
 
 // ============================================================================
+// WebMCP Image Values
+// ============================================================================
+
+/**
+ * Serialized image value returned directly from a WebMCP tool.
+ *
+ * `data` is base64 without a `data:` URL prefix.
+ */
+export interface SerializedImageValue {
+  /**
+   * Discriminator for image values.
+   */
+  type: 'image';
+
+  /**
+   * Base64 payload.
+   */
+  data: string;
+
+  /**
+   * MIME type for the encoded image.
+   */
+  mimeType: string;
+}
+
+/**
+ * Browser-sourced image value accepted by the WebMCP polyfill.
+ *
+ * The `{type, value}` shape mirrors the Prompt API's
+ * `LanguageModelToolResultContent`; the browser serializes `value` to the
+ * `{type, data, mimeType}` wire form before the agent sees it.
+ */
+export interface SourceImageValue {
+  /**
+   * Discriminator for image values.
+   */
+  type: 'image';
+
+  /**
+   * Image source to serialize. For a Blob, `blob.type` is used when
+   * `mimeType` is omitted; elements are rasterized (default `image/png`).
+   */
+  value: Blob | HTMLImageElement | HTMLCanvasElement;
+
+  /**
+   * Optional MIME type override for the serialized image.
+   */
+  mimeType?: string;
+}
+
+/**
+ * Image value shape for direct WebMCP tool output.
+ */
+export type WebMCPImageValue = SerializedImageValue | SourceImageValue;
+
+// ============================================================================
 // Content Types (MCP spec shapes, defined inline)
 // ============================================================================
 

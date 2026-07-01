@@ -19,6 +19,7 @@ This package is the type-safety source of truth for WebMCP.
 - Deprecated global `Navigator` augmentation for backward-compatible `navigator.modelContext`
 - Strongly typed tool descriptors and tool responses
 - Literal JSON Schema inference for tool args and `structuredContent`
+- Direct WebMCP image value types for serialized and browser-backed images
 - Name-aware helper types for typed tool registries
 - Runtime-agnostic: works with native implementations, polyfills, or adapters
 
@@ -99,12 +100,9 @@ document.modelContext.registerTool({
   async execute(args) {
     // args is inferred as: { query: string; limit?: number }
     return {
-      content: [{ type: 'text', text: `Searching for ${args.query}` }],
-      structuredContent: {
-        // inferred from outputSchema
-        total: 1,
-        items: [args.query],
-      },
+      // inferred from outputSchema
+      total: 1,
+      items: [args.query],
     };
   },
 });
@@ -159,6 +157,36 @@ This catches enum/type mismatches at compile time.
 ### 6. Explicit typing is still available
 
 You can always provide explicit generic args/results with `ToolDescriptor<TArgs, TResult, TName>` when schema inference is not enough for your use case.
+
+## Direct WebMCP Image Values
+
+`WebMCPImageValue` describes image values returned directly from WebMCP tool
+handlers. These are not MCP `content` blocks.
+
+```ts
+import type { ToolDescriptor, WebMCPImageValue } from '@mcp-b/webmcp-types';
+
+const getImageTool: ToolDescriptor<Record<string, never>, WebMCPImageValue> = {
+  name: 'get_product_image',
+  description: 'Return a product image',
+  inputSchema: { type: 'object', properties: {} },
+  async execute() {
+    const image = document.querySelector<HTMLImageElement>('#product-image');
+    if (!image) {
+      throw new Error('Product image is not available');
+    }
+
+    return { type: 'image', value: image };
+  },
+};
+```
+
+Supported direct image value types:
+
+- `SerializedImageValue` — `{ type: 'image', data, mimeType }`
+- `SourceImageValue` — `{ type: 'image', value, mimeType? }` where `value` is a
+  `Blob`, `HTMLImageElement`, or `HTMLCanvasElement` (the `{type, value}` shape
+  mirrors the Prompt API's `LanguageModelToolResultContent`)
 
 ## Name-Aware Typed Context (Advanced)
 
@@ -219,6 +247,9 @@ void result;
 | `InferArgsFromInputSchema`           | Derive args shape from a schema type                         |
 | `ToolResultFromOutputSchema`         | Derive `structuredContent` type from output schema           |
 | `TypedModelContext`                  | Name-aware typed `callTool`/`listTools` for known registries |
+| `WebMCPImageValue`                   | Direct WebMCP image output value union                       |
+| `SerializedImageValue`               | Direct serialized base64 image output value                  |
+| `SourceImageValue`                   | Direct Blob/element-backed image output value                |
 | `CallToolResult`                     | Tool response type                                           |
 | `ContentBlock` / `LooseContentBlock` | Strict and pragmatic content block typing                    |
 | `ModelContextClient`                 | Tool execution client (`requestUserInteraction`)             |

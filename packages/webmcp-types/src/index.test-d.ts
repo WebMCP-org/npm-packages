@@ -1,5 +1,11 @@
 import { expectTypeOf, test } from 'vitest';
-import type { CallToolResult, InputSchema } from './common.js';
+import type {
+  CallToolResult,
+  InputSchema,
+  SerializedImageValue,
+  SourceImageValue,
+  WebMCPImageValue,
+} from './common.js';
 import type {
   LooseContentBlock,
   MaybePromise,
@@ -14,7 +20,7 @@ import type {
   ModelContextWithExtensions,
   ToolCallEvent,
 } from './index.js';
-import type { ToolDescriptor, ToolListItem } from './tool.js';
+import type { ToolDescriptor, ToolExecuteResult, ToolListItem } from './tool.js';
 
 // === Producer API ===
 test('ModelContext.registerTool accepts ToolDescriptor and returns void', () => {
@@ -52,6 +58,39 @@ test('ModelContext.executeTool uses registered tool objects and JSON-string inpu
   expectTypeOf<ModelContext['executeTool']>().parameter(0).toEqualTypeOf<ModelContextToolInfo>();
   expectTypeOf<ModelContext['executeTool']>().parameter(1).toEqualTypeOf<string>();
   expectTypeOf<ModelContext['executeTool']>().returns.toEqualTypeOf<Promise<string | null>>();
+});
+
+test('WebMCP image values describe direct serialized and browser-source output forms', () => {
+  expectTypeOf<SerializedImageValue>().toMatchObjectType<{
+    type: 'image';
+    data: string;
+    mimeType: string;
+  }>();
+  expectTypeOf<SourceImageValue>().toMatchObjectType<{
+    type: 'image';
+    value: Blob | HTMLImageElement | HTMLCanvasElement;
+    mimeType?: string;
+  }>();
+  expectTypeOf<WebMCPImageValue>().toEqualTypeOf<SerializedImageValue | SourceImageValue>();
+});
+
+test('ToolDescriptor can return direct WebMCP image values without content blocks', () => {
+  const tool: ToolDescriptor<Record<string, never>, WebMCPImageValue> = {
+    name: 'image_tool',
+    description: 'Return an image',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+    execute: async () => ({
+      type: 'image',
+      value: new Blob([], { type: 'image/png' }),
+    }),
+  };
+
+  expectTypeOf(tool.execute).returns.toEqualTypeOf<
+    MaybePromise<ToolExecuteResult<WebMCPImageValue>>
+  >();
 });
 
 test('ModelContext does not expose legacy unregisterTool on the strict core surface', () => {

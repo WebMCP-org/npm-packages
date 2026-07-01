@@ -32,7 +32,7 @@ Important:
 
 - `document.modelContext` is the canonical install location. `navigator.modelContext` is kept as a backward-compatible alias that returns the same instance and logs a one-time deprecation warning on first access. The upstream WebMCP draft moved the getter from Navigator to Document on May 27, 2026 ([webmachinelearning/webmcp#184](https://github.com/webmachinelearning/webmcp/pull/184)) and Chrome 150 deprecates `navigator.modelContext`. The polyfill will remove the Navigator alias in the next major version.
 - `document.modelContext` in this package does not provide `listTools()` or `callTool(...)`; producer discovery/execution uses `getTools()` and `executeTool(...)`.
-- For list/execute test flows, use `navigator.modelContextTesting` (when `installTestingShim` is enabled).
+- Producer discovery/execution uses `document.modelContext.getTools()` and `document.modelContext.executeTool(...)`. `navigator.modelContextTesting` remains available only as an optional compatibility shim for older tests.
 - `provideContext()` and `clearContext()` were removed from the upstream WebMCP spec on March 5, 2026 and are not exposed by this polyfill.
 - `unregisterTool(name)` was removed from the WebMCP draft on April 23, 2026 in favor of `AbortSignal`-driven unregistration. The polyfill keeps it functional with a one-time deprecation warning; it will be removed in the next major version.
 
@@ -75,7 +75,7 @@ document.modelContext.registerTool({
   inputSchema: { type: 'object', properties: {} },
   async execute() {
     return {
-      content: [{ type: 'text', text: document.title }],
+      title: document.title,
     };
   },
 });
@@ -122,7 +122,8 @@ document.modelContext.registerTool({
     // Inferred type:
     // { query: string; limit?: number }
     return {
-      content: [{ type: 'text', text: `Searching for ${args.query} (${args.limit ?? 10})` }],
+      query: args.query,
+      limit: args.limit ?? 10,
     };
   },
 });
@@ -176,7 +177,7 @@ document.modelContext.registerTool(
     description: 'Search docs',
     inputSchema: { type: 'object', properties: {} },
     async execute() {
-      return { content: [{ type: 'text', text: 'ok' }] };
+      return { ok: true };
     },
   },
   { signal: ac.signal }
@@ -194,19 +195,25 @@ ac.abort();
 
 ## Listing and Executing Tools
 
-In `@mcp-b/webmcp-polyfill`, listing and execution helpers are exposed on
-`navigator.modelContextTesting` (not `document.modelContext`) when the testing shim is enabled.
+In `@mcp-b/webmcp-polyfill`, producer discovery and execution are exposed on
+`document.modelContext`.
 
 ```ts
 import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
 
-initializeWebMCPPolyfill({ installTestingShim: true });
+initializeWebMCPPolyfill();
 
-const tools = navigator.modelContextTesting?.listTools();
-const result = await navigator.modelContextTesting?.executeTool(
-  'search',
+const tools = await document.modelContext.getTools();
+const searchTool = tools.find((tool) => tool.name === 'search');
+if (!searchTool) {
+  throw new Error('search tool is not registered');
+}
+
+const resultJson = await document.modelContext.executeTool(
+  searchTool,
   JSON.stringify({ query: 'webmcp' })
 );
+const result = resultJson === null ? null : JSON.parse(resultJson);
 
 void tools;
 void result;
@@ -214,6 +221,48 @@ void result;
 
 If you want `callTool(...)` / extension-style runtime methods on `document.modelContext`, use
 `@mcp-b/global`.
+
+## Direct WebMCP Image Values
+
+Tool handlers may return image values directly. This is a WebMCP value shape, not
+an MCP `content` array.
+
+```ts
+document.modelContext.registerTool({
+  name: 'get_product_image',
+  description: 'Return the product image rendered on the page',
+  inputSchema: { type: 'object', properties: {} },
+  async execute() {
+    const image = document.querySelector<HTMLImageElement>('#product-image');
+    if (!image) {
+      throw new Error('Product image is not available');
+    }
+
+    return { type: 'image', value: image };
+  },
+});
+
+const tools = await document.modelContext.getTools();
+const tool = tools.find((candidate) => candidate.name === 'get_product_image');
+if (!tool) {
+  throw new Error('get_product_image is not registered');
+}
+
+const resultJson = await document.modelContext.executeTool(tool, '{}');
+const image = resultJson === null ? null : JSON.parse(resultJson);
+```
+
+Accepted direct image output values:
+
+- `{ type: 'image', data, mimeType }` — already-serialized base64 image data
+- `{ type: 'image', value, mimeType? }` — a `Blob` (`mimeType` defaults to
+  `blob.type`), an `HTMLCanvasElement`, or a loaded same-origin
+  `HTMLImageElement` (element output defaults to `image/png`)
+
+The `{type, value}` source shape mirrors the Prompt API's
+`LanguageModelToolResultContent`. Serialized values require a non-empty
+`mimeType`. Blob values must provide either `mimeType` or `Blob.type`.
+Unsupported image sources reject the tool execution with a clear error.
 
 ## Input Schema Support
 

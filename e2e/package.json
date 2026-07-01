@@ -20,6 +20,7 @@
     "test:mcp-iframe": "playwright test tests/mcp-iframe-element.spec.ts",
     "test:native-contract:beta": "playwright test --config=playwright-chrome-beta-webmcp.config.ts tests/runtime-contract-native.spec.ts",
     "test:native-contract:default": "playwright test tests/runtime-contract-native.spec.ts",
+    "test:native-image-contract": "WEBMCP_E2E_RUNTIME=native playwright test --config=playwright-webmcp-image-native.config.ts",
     "test:native-parity": "pnpm run test:native-parity:default && pnpm run test:native-parity:beta",
     "test:native-parity:beta": "playwright test --config=playwright-chrome-beta-webmcp.config.ts",
     "test:native-parity:default": "playwright test tests/chrome-beta-webmcp.spec.ts",
