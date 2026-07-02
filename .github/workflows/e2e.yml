@@ -59,11 +59,8 @@ jobs:
 
       - name: Run runtime contract E2E tests
         env:
-          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-          PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: ${{ steps.chrome.outputs.chrome-path }}
           PLAYWRIGHT_CHROMIUM_CHANNEL: chrome
-          PLAYWRIGHT_ENABLE_WEBMCP_FLAGS: '1'
-        run: pnpm --filter mcp-e2e-tests run test:runtime-contract
+        run: pnpm --filter mcp-e2e-tests run test:runtime-contract:transport
 
       - name: Run local relay E2E tests
         env:
