@@ -283,7 +283,7 @@ export const TAB_SET_ZOOM_SETTINGS_OUTPUT_SCHEMA = z.object({
   settings: TAB_ZOOM_SETTINGS_VALUE_SCHEMA,
 });
 
-export const TAB_GROUP_OUTPUT_SCHEMA = z.object({
+export const TAB_GROUP_TABS_OUTPUT_SCHEMA = z.object({
   groupId: z.number(),
 });
 
@@ -334,7 +334,7 @@ export type TabSetZoomOutput = z.infer<typeof TAB_SET_ZOOM_OUTPUT_SCHEMA>;
 export type TabSetZoomSettingsInput = z.infer<typeof TAB_SET_ZOOM_SETTINGS_INPUT_SCHEMA>;
 export type TabSetZoomSettingsOutput = z.infer<typeof TAB_SET_ZOOM_SETTINGS_OUTPUT_SCHEMA>;
 export type TabGroupInput = z.infer<typeof TAB_GROUP_INPUT_SCHEMA>;
-export type TabGroupOutput = z.infer<typeof TAB_GROUP_OUTPUT_SCHEMA>;
+export type TabGroupOutput = z.infer<typeof TAB_GROUP_TABS_OUTPUT_SCHEMA>;
 export type TabUngroupInput = z.infer<typeof TAB_UNGROUP_INPUT_SCHEMA>;
 export type TabUngroupOutput = z.infer<typeof TAB_UNGROUP_OUTPUT_SCHEMA>;
 export type TabHighlightInput = z.infer<typeof TAB_HIGHLIGHT_INPUT_SCHEMA>;
@@ -623,7 +623,7 @@ export const TAB_TOOL_CONTRACTS = {
     title: 'Group Tabs',
     description: 'Groups one or more tabs together',
     inputSchema: TAB_GROUP_INPUT_SCHEMA,
-    outputSchema: TAB_GROUP_OUTPUT_SCHEMA,
+    outputSchema: TAB_GROUP_TABS_OUTPUT_SCHEMA,
     annotations: {
       readOnlyHint: false,
       destructiveHint: false,

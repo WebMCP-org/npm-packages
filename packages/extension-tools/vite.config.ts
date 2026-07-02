@@ -5,6 +5,7 @@ const mainConfig: Options = {
   name: 'main',
   entry: [
     'src/index.ts',
+    'src/executable-tools.ts',
     'src/contracts/index.ts',
     'src/contracts/bookmarks.ts',
     'src/contracts/history.ts',

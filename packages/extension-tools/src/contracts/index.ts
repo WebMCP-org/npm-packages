@@ -60,15 +60,15 @@ export type ExtensionToolName =
   | WindowToolName;
 export type ExtensionToolGroupId = (typeof EXTENSION_TOOL_GROUP_CONTRACTS)[number]['id'];
 export type ExtensionToolActionId = (typeof EXTENSION_TOOL_CONTRACTS)[number]['actionId'];
-export type ExtensionToolGroupActionKey =
-  (typeof EXTENSION_TOOL_CONTRACTS)[number] extends infer TContract
-    ? TContract extends {
-        groupId: infer TGroupId extends string;
-        actionId: infer TActionId extends string;
-      }
-      ? `${TGroupId}.${TActionId}`
-      : never
-    : never;
+type ExtensionToolContractEntry = (typeof EXTENSION_TOOL_CONTRACTS)[number];
+export type ExtensionToolGroupActionKey<
+  TContract extends ExtensionToolContractEntry = ExtensionToolContractEntry,
+> = TContract extends {
+  groupId: infer TGroupId extends string;
+  actionId: infer TActionId extends string;
+}
+  ? `${TGroupId}.${TActionId}`
+  : never;
 
 export const EXTENSION_TOOL_CONTRACTS_BY_NAME = Object.fromEntries(
   EXTENSION_TOOL_CONTRACTS.map((contract) => [contract.name, contract])
@@ -90,7 +90,7 @@ export const EXTENSION_TOOL_GROUP_CONTRACTS_BY_ID = Object.fromEntries(
 
 export const EXTENSION_ACTION_CONTRACTS_BY_GROUP_ACTION_ID = Object.fromEntries(
   EXTENSION_TOOL_CONTRACTS.map((contract) => [
-    `${contract.groupId}.${contract.actionId}` satisfies ExtensionToolGroupActionKey,
+    `${contract.groupId}.${contract.actionId}` as ExtensionToolGroupActionKey<typeof contract>,
     contract,
   ])
 ) as {

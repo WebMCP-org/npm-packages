@@ -327,6 +327,7 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
       id: tab.id,
       title: tab.title,
       url: tab.url,
+      pendingUrl: tab.pendingUrl,
       active: tab.active,
       pinned: tab.pinned,
       windowId: tab.windowId,
