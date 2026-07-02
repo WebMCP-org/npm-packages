@@ -5,7 +5,6 @@
 '@mcp-b/global': major
 '@mcp-b/react-webmcp': major
 'usewebmcp': major
-'@mcp-b/chrome-devtools-mcp': major
 ---
 
 Align the WebMCP runtime surface with Chrome 152 and the current document-first API.

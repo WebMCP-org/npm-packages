@@ -140,10 +140,11 @@ async function evaluateListTools(page: Page): Promise<BrowserListToolsResult> {
       return typeof value === 'object' && value !== null && !Array.isArray(value);
     }
 
-    function normalizeSchema(value: unknown): Record<string, unknown> {
-      if (isObject(value)) {
-        return value;
-      }
+    function normalizeCoreSchema(value: unknown): Record<string, unknown> {
+      return isObject(value) ? value : defaultInputSchema;
+    }
+
+    function normalizeTestingSchema(value: unknown): Record<string, unknown> {
       if (typeof value !== 'string' || value.length === 0) {
         return defaultInputSchema;
       }
@@ -156,33 +157,17 @@ async function evaluateListTools(page: Page): Promise<BrowserListToolsResult> {
       }
     }
 
-    type PageModelContext = {
-      getTools?: () => unknown[] | Promise<unknown[]>;
-      listTools?: () => unknown[] | Promise<unknown[]>;
-    };
-
-    const doc = document as Document & {
-      modelContext?: PageModelContext;
-    };
     const nav = navigator as Navigator & {
-      modelContext?: PageModelContext;
+      modelContext?: {
+        listTools?: () => unknown[] | Promise<unknown[]>;
+      };
       modelContextTesting?: {
         listTools?: () => unknown[] | Promise<unknown[]>;
       };
     };
-    const modelContexts: PageModelContext[] = [];
-    if (doc.modelContext) {
-      modelContexts.push(doc.modelContext);
-    }
-    if (nav.modelContext && nav.modelContext !== doc.modelContext) {
-      modelContexts.push(nav.modelContext);
-    }
 
-    for (const modelContext of modelContexts) {
-      if (typeof modelContext.getTools !== 'function') {
-        continue;
-      }
-      const tools = await modelContext.getTools();
+    if (nav.modelContext && typeof nav.modelContext.listTools === 'function') {
+      const tools = await nav.modelContext.listTools();
       return {
         kind: 'available' as const,
         api: 'modelContext' as const,
@@ -192,28 +177,7 @@ async function evaluateListTools(page: Page): Promise<BrowserListToolsResult> {
               return {
                 name: typeof raw.name === 'string' ? raw.name : '',
                 description: typeof raw.description === 'string' ? raw.description : '',
-                inputSchema: normalizeSchema(raw.inputSchema),
-              };
-            })
-          : [],
-      };
-    }
-
-    for (const modelContext of modelContexts) {
-      if (typeof modelContext.listTools !== 'function') {
-        continue;
-      }
-      const tools = await modelContext.listTools();
-      return {
-        kind: 'available' as const,
-        api: 'modelContext' as const,
-        tools: Array.isArray(tools)
-          ? tools.map((tool) => {
-              const raw = isObject(tool) ? tool : {};
-              return {
-                name: typeof raw.name === 'string' ? raw.name : '',
-                description: typeof raw.description === 'string' ? raw.description : '',
-                inputSchema: normalizeSchema(raw.inputSchema),
+                inputSchema: normalizeCoreSchema(raw.inputSchema),
               };
             })
           : [],
@@ -231,7 +195,7 @@ async function evaluateListTools(page: Page): Promise<BrowserListToolsResult> {
               return {
                 name: typeof raw.name === 'string' ? raw.name : '',
                 description: typeof raw.description === 'string' ? raw.description : '',
-                inputSchema: normalizeSchema(raw.inputSchema),
+                inputSchema: normalizeTestingSchema(raw.inputSchema),
               };
             })
           : [],
@@ -241,7 +205,7 @@ async function evaluateListTools(page: Page): Promise<BrowserListToolsResult> {
     return {
       kind: 'unavailable' as const,
       message:
-        'Page does not expose document.modelContext.getTools(), document.modelContext.listTools(), or navigator.modelContextTesting.listTools().',
+        'Page does not expose navigator.modelContext.listTools() or navigator.modelContextTesting.listTools().',
     };
   }, DEFAULT_INPUT_SCHEMA);
 }
@@ -256,76 +220,17 @@ async function evaluateCallTool(
 
   return page.evaluate(
     async ({ toolName, toolArgs }) => {
-      function isObject(value: unknown): value is Record<string, unknown> {
-        return typeof value === 'object' && value !== null && !Array.isArray(value);
-      }
-
-      function parseSerializedToolResult(
-        serialized: string | null,
-        api: 'modelContext' | 'modelContextTesting'
-      ) {
-        if (serialized === null) {
-          return {
-            kind: 'error' as const,
-            message: 'Tool execution was interrupted by navigation or the page became unavailable.',
-          };
-        }
-
-        const trimmed = serialized.trim();
-        try {
-          return {
-            kind: 'success' as const,
-            api,
-            value: JSON.parse(serialized),
-          };
-        } catch {
-          // Native modelContextTesting can return a plain text string for
-          // simple tool results. Preserve invalid JSON errors for payloads
-          // that look like structured data but fail to parse.
-          if (
-            trimmed.length > 0 &&
-            !['{', '[', '"'].includes(trimmed[0]) &&
-            !/^[-\d]/.test(trimmed[0])
-          ) {
-            return {
-              kind: 'success' as const,
-              api,
-              value: serialized,
-            };
-          }
-          return {
-            kind: 'error' as const,
-            message:
-              api === 'modelContextTesting'
-                ? `Testing tool returned invalid JSON: ${serialized.slice(0, 200)}`
-                : `Tool returned invalid JSON: ${serialized.slice(0, 200)}`,
-          };
-        }
-      }
-
-      type PageModelContext = {
-        getTools?: () => unknown[] | Promise<unknown[]>;
-        executeTool?: (
-          tool: unknown,
-          serializedArgs: string
-        ) => string | null | Promise<string | null>;
-      };
-      type LegacyPageModelContext = {
-        callTool?: (request: {
-          name: string;
-          arguments: Record<string, unknown>;
-        }) => unknown | Promise<unknown>;
-        elicitInput?: (
-          params: Record<string, unknown>,
-          options?: unknown
-        ) => unknown | Promise<unknown>;
-      };
-
-      const doc = document as Document & {
-        modelContext?: PageModelContext & LegacyPageModelContext;
-      };
       const nav = navigator as Navigator & {
-        modelContext?: PageModelContext & LegacyPageModelContext;
+        modelContext?: {
+          callTool?: (request: {
+            name: string;
+            arguments: Record<string, unknown>;
+          }) => unknown | Promise<unknown>;
+          elicitInput?: (
+            params: Record<string, unknown>,
+            options?: unknown
+          ) => unknown | Promise<unknown>;
+        };
         modelContextTesting?: {
           executeTool?: (
             toolName: string,
@@ -333,63 +238,30 @@ async function evaluateCallTool(
           ) => string | null | Promise<string | null>;
         };
       };
-      const modelContexts: Array<PageModelContext & LegacyPageModelContext> = [];
-      if (doc.modelContext) {
-        modelContexts.push(doc.modelContext);
-      }
-      if (nav.modelContext && nav.modelContext !== doc.modelContext) {
-        modelContexts.push(nav.modelContext);
-      }
-
-      function installElicitBridge(modelContext: LegacyPageModelContext): void {
-        const globalWindow = window as unknown as Record<string, unknown>;
-        // If the elicitation bridge is available, monkey-patch elicitInput
-        // so that tool handlers can request user confirmation via the MCP client.
-        if (typeof globalWindow.__mcpElicitBridge === 'function' && modelContext.elicitInput) {
-          const bridge = globalWindow.__mcpElicitBridge as (json: string) => Promise<string>;
-          modelContext.elicitInput = async (params: Record<string, unknown>): Promise<unknown> => {
-            const resultJson = await bridge(JSON.stringify(params));
-            return JSON.parse(resultJson);
-          };
-        }
-      }
 
       try {
-        for (const modelContext of modelContexts) {
+        if (nav.modelContext && typeof nav.modelContext.callTool === 'function') {
+          // If the elicitation bridge is available, monkey-patch elicitInput
+          // so that tool handlers can request user confirmation via the MCP client.
           if (
-            typeof modelContext.getTools !== 'function' ||
-            typeof modelContext.executeTool !== 'function'
+            typeof (window as Record<string, unknown>).__mcpElicitBridge === 'function' &&
+            nav.modelContext.elicitInput
           ) {
-            continue;
-          }
-
-          installElicitBridge(modelContext);
-          const tools = await modelContext.getTools();
-          const tool = Array.isArray(tools)
-            ? tools.find((candidate) => isObject(candidate) && candidate.name === toolName)
-            : undefined;
-
-          if (!tool) {
-            return {
-              kind: 'error' as const,
-              message: `Tool not found: ${toolName}`,
+            const bridge = (window as Record<string, unknown>).__mcpElicitBridge as (
+              json: string
+            ) => Promise<string>;
+            nav.modelContext.elicitInput = async (
+              params: Record<string, unknown>
+            ): Promise<unknown> => {
+              const resultJson = await bridge(JSON.stringify(params));
+              return JSON.parse(resultJson);
             };
           }
 
-          const serialized = await modelContext.executeTool(tool, JSON.stringify(toolArgs));
-          return parseSerializedToolResult(serialized, 'modelContext');
-        }
-
-        for (const modelContext of modelContexts) {
-          if (typeof modelContext.callTool !== 'function') {
-            continue;
-          }
-
-          installElicitBridge(modelContext);
           return {
             kind: 'success' as const,
             api: 'modelContext' as const,
-            value: await modelContext.callTool({
+            value: await nav.modelContext.callTool({
               name: toolName,
               arguments: toolArgs,
             }),
@@ -401,13 +273,47 @@ async function evaluateCallTool(
             toolName,
             JSON.stringify(toolArgs)
           );
-          return parseSerializedToolResult(serialized, 'modelContextTesting');
+          if (serialized === null) {
+            return {
+              kind: 'error' as const,
+              message:
+                'Tool execution was interrupted by navigation or the page became unavailable.',
+            };
+          }
+
+          const trimmed = serialized.trim();
+          try {
+            return {
+              kind: 'success' as const,
+              api: 'modelContextTesting' as const,
+              value: JSON.parse(serialized),
+            };
+          } catch {
+            // Native modelContextTesting can return a plain text string for
+            // simple tool results. Preserve invalid JSON errors for payloads
+            // that look like structured data but fail to parse.
+            if (
+              trimmed.length > 0 &&
+              !['{', '[', '"'].includes(trimmed[0]) &&
+              !/^[-\d]/.test(trimmed[0])
+            ) {
+              return {
+                kind: 'success' as const,
+                api: 'modelContextTesting' as const,
+                value: serialized,
+              };
+            }
+            return {
+              kind: 'error' as const,
+              message: `Testing tool returned invalid JSON: ${serialized.slice(0, 200)}`,
+            };
+          }
         }
 
         return {
           kind: 'error' as const,
           message:
-            'Page does not expose document.modelContext.getTools()/executeTool(), document.modelContext.callTool(), or navigator.modelContextTesting.executeTool().',
+            'Page does not expose navigator.modelContext.callTool() or navigator.modelContextTesting.executeTool().',
         };
       } catch (error) {
         return {
@@ -495,7 +401,6 @@ function normalizeContentBlock(value: unknown): WebMcpContentBlock {
 
 function normalizeToolResult(value: unknown): {
   content: WebMcpContentBlock[];
-  structuredContent?: JsonObject;
   isError: boolean;
 } {
   if (!isJsonObject(value)) {
@@ -525,9 +430,6 @@ function normalizeToolResult(value: unknown): {
 
   return {
     content,
-    ...(isJsonObject(value.structuredContent)
-      ? { structuredContent: value.structuredContent }
-      : {}),
     isError: value.isError === true,
   };
 }
@@ -720,9 +622,6 @@ export const callWebMCPTool = defineTool({
 
     const normalized = normalizeToolResult(result.value);
     response.setToolResultError(normalized.isError);
-    if (normalized.structuredContent) {
-      response.setStructuredContent(normalized.structuredContent);
-    }
     for (const block of normalized.content) {
       response.appendMcpContent(block);
     }

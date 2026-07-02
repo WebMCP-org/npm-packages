@@ -6,7 +6,7 @@ Rebuild Chrome DevTools MCP WebMCP support as a thin, mostly stateless proxy on 
 
 The new design should:
 
-- prefer `document.modelContext.getTools()` and `document.modelContext.executeTool(tool, inputArgsJson)`
+- prefer `navigator.modelContext.listTools()` and `navigator.modelContext.callTool(...)`
 - fall back to `navigator.modelContextTesting.listTools()` and `executeTool(...)`
 - avoid dynamic MCP tool registration
 - avoid WebMCP-specific browser reconnect logic
@@ -78,17 +78,12 @@ Given a target page:
 
 Given a target page and `{ name, arguments }`:
 
-1. If `document.modelContext.getTools()` and `document.modelContext.executeTool(...)` exist:
-   - find the target tool descriptor by name
+1. If `navigator.modelContext.callTool` exists, call it.
+2. Otherwise, if `navigator.modelContextTesting.executeTool` exists:
    - serialize arguments with `JSON.stringify(args ?? {})`
    - parse the returned JSON string
    - treat `null` as interrupted navigation / unavailable execution
-2. Otherwise, if deprecated `navigator.modelContext.callTool` exists, call it as a compatibility fallback.
-3. Otherwise, if `navigator.modelContextTesting.executeTool` exists:
-   - serialize arguments with `JSON.stringify(args ?? {})`
-   - parse the returned JSON string
-   - treat `null` as interrupted navigation / unavailable execution
-4. Normalize output into MCP text/resource/image blocks exactly once.
+3. Normalize output into MCP text/resource/image blocks exactly once.
 
 ### Tool changes
 
@@ -163,7 +158,7 @@ Verification:
 
 Write failing tests first:
 
-1. `call_webmcp_tool` uses `document.modelContext.getTools()` and `executeTool(...)` when available
+1. `call_webmcp_tool` uses `navigator.modelContext.callTool(...)` when available
 2. it falls back to `navigator.modelContextTesting.executeTool(...)`
 3. testing fallback parses serialized JSON results
 4. testing fallback reports invalid JSON cleanly

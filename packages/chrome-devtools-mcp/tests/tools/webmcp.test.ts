@@ -15,93 +15,11 @@ import { getTextContent, html, withMcpContext } from '../utils.js';
 function buildCorePage(): string {
   return html`
     <script>
-      const coreTools = [
-        {
-          name: 'core_sum',
-          description: 'Add two numbers',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              a: { type: 'number' },
-              b: { type: 'number' },
-            },
-            required: ['a', 'b'],
-          },
-        },
-        {
-          name: 'core_blocks',
-          description: 'Return content blocks',
-          inputSchema: { type: 'object', properties: {} },
-        },
-        {
-          name: 'core_throw',
-          description: 'Throw an error',
-          inputSchema: { type: 'object', properties: {} },
-        },
-      ];
-
-      async function runCoreTool(name, args) {
-        if (name === 'core_sum') {
-          return {
-            content: [{ type: 'text', text: String((args.a || 0) + (args.b || 0)) }],
-          };
-        }
-
-        if (name === 'core_blocks') {
-          return [
-            {
-              isError: true,
-              content: [
-                { type: 'text', text: 'primary' },
-                { type: 'image', mimeType: 'image/png', data: 'aGVsbG8=' },
-                {
-                  type: 'resource',
-                  resource: {
-                    uri: 'file:///tmp/webmcp.txt',
-                    text: 'resource-body',
-                    mimeType: 'text/plain',
-                  },
-                },
-              ],
-              structuredContent: { total: 1 },
-            },
-          ][0];
-        }
-
-        if (name === 'core_throw') {
-          throw new Error('core failure');
-        }
-
-        throw new Error('Unknown tool: ' + name);
-      }
-
-      document.modelContext = {
-        async getTools() {
-          return coreTools.map((tool) => ({
-            ...tool,
-            inputSchema: JSON.stringify(tool.inputSchema),
-            title: tool.description,
-            origin: location.origin,
-            window,
-          }));
-        },
-        async executeTool(tool, serializedArgs) {
-          const args = JSON.parse(serializedArgs);
-          return JSON.stringify(await runCoreTool(tool.name, args));
-        },
-      };
-    </script>
-  `;
-}
-
-function buildLegacyModelContextPage(): string {
-  return html`
-    <script>
       navigator.modelContext = {
         async listTools() {
           return [
             {
-              name: 'legacy_sum',
+              name: 'core_sum',
               description: 'Add two numbers',
               inputSchema: {
                 type: 'object',
@@ -115,11 +33,33 @@ function buildLegacyModelContextPage(): string {
           ];
         },
         async callTool(request) {
-          if (request.name === 'legacy_sum') {
+          if (request.name === 'core_sum') {
             const args = request.arguments || {};
             return {
               content: [{ type: 'text', text: String((args.a || 0) + (args.b || 0)) }],
             };
+          }
+
+          if (request.name === 'core_blocks') {
+            return {
+              isError: true,
+              content: [
+                { type: 'text', text: 'primary' },
+                { type: 'image', mimeType: 'image/png', data: 'aGVsbG8=' },
+                {
+                  type: 'resource',
+                  resource: {
+                    uri: 'file:///tmp/webmcp.txt',
+                    text: 'resource-body',
+                    mimeType: 'text/plain',
+                  },
+                },
+              ],
+            };
+          }
+
+          if (request.name === 'core_throw') {
+            throw new Error('core failure');
           }
 
           throw new Error('Unknown tool: ' + request.name);
@@ -235,7 +175,7 @@ async function parseListResponse(
 
 describe('webmcp tools', () => {
   describe('list_webmcp_tools', () => {
-    it('returns tools from document.modelContext.getTools()', async () => {
+    it('returns tools from navigator.modelContext.listTools()', async () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedMcpPage();
         await page.pptrPage.setContent(buildCorePage());
@@ -256,24 +196,6 @@ describe('webmcp tools', () => {
                 b: { type: 'number' },
               },
               required: ['a', 'b'],
-            },
-            pageId: page.id,
-          },
-          {
-            name: 'core_blocks',
-            description: 'Return content blocks',
-            inputSchema: {
-              type: 'object',
-              properties: {},
-            },
-            pageId: page.id,
-          },
-          {
-            name: 'core_throw',
-            description: 'Throw an error',
-            inputSchema: {
-              type: 'object',
-              properties: {},
             },
             pageId: page.id,
           },
@@ -312,7 +234,7 @@ describe('webmcp tools', () => {
         assert.deepStrictEqual(payload.tools, []);
         assert.match(
           payload.message ?? '',
-          /does not expose document\.modelContext\.getTools\(\).*navigator\.modelContextTesting\.listTools\(\)/
+          /does not expose navigator\.modelContext\.listTools\(\) or navigator\.modelContextTesting\.listTools\(\)/
         );
       });
     });
@@ -342,21 +264,11 @@ describe('webmcp tools', () => {
 
         const payload = await parseListResponse(response, context);
         assert.strictEqual(payload.pageId, page.id);
-        assert.strictEqual(payload.count, 3);
+        assert.strictEqual(payload.count, 1);
         assert.deepStrictEqual(payload.tools, [
           {
             name: 'core_sum',
             description: 'Add two numbers',
-            pageId: page.id,
-          },
-          {
-            name: 'core_blocks',
-            description: 'Return content blocks',
-            pageId: page.id,
-          },
-          {
-            name: 'core_throw',
-            description: 'Throw an error',
             pageId: page.id,
           },
         ]);
@@ -368,7 +280,7 @@ describe('webmcp tools', () => {
         const page = context.getSelectedMcpPage();
         await page.pptrPage.setContent(buildCorePage());
 
-        await listWebMCPTools.handler({ params: { pattern: 'core_s*' } }, response, context);
+        await listWebMCPTools.handler({ params: { pattern: 'core_*' } }, response, context);
 
         const payload = await parseListResponse(response, context);
         assert.strictEqual(payload.pageId, page.id);
@@ -395,7 +307,7 @@ describe('webmcp tools', () => {
         const payload = await parseListResponse(response, context);
         assert.strictEqual(payload.selectedPageId, selectedPage.id);
         assert.strictEqual(payload.pagesScanned, 2);
-        assert.strictEqual(payload.count, 4);
+        assert.strictEqual(payload.count, 2);
         assert.deepStrictEqual(
           payload.tools.map((tool) => ({
             name: tool.name,
@@ -403,8 +315,6 @@ describe('webmcp tools', () => {
           })),
           [
             { name: 'core_sum', pageId: selectedPage.id },
-            { name: 'core_blocks', pageId: selectedPage.id },
-            { name: 'core_throw', pageId: selectedPage.id },
             { name: 'testing_echo', pageId: otherPage.id },
           ]
         );
@@ -413,7 +323,7 @@ describe('webmcp tools', () => {
   });
 
   describe('call_webmcp_tool', () => {
-    it('uses document.modelContext.executeTool(...) when available', async () => {
+    it('uses navigator.modelContext.callTool(...) when available', async () => {
       await withMcpContext(async (_response, context) => {
         await context.getSelectedMcpPage().pptrPage.setContent(buildCorePage());
 
@@ -423,27 +333,6 @@ describe('webmcp tools', () => {
             params: {
               name: 'core_sum',
               arguments: { a: 2, b: 5 },
-            },
-          },
-          response,
-          context
-        );
-
-        const result = await response.handle(callWebMCPTool.name, context);
-        assert.deepStrictEqual(stripUndefined(result.content), [{ type: 'text', text: '7' }]);
-      });
-    });
-
-    it('falls back to navigator.modelContext.callTool(...) for older runtimes', async () => {
-      await withMcpContext(async (_response, context) => {
-        await context.getSelectedMcpPage().pptrPage.setContent(buildLegacyModelContextPage());
-
-        const response = new McpResponse({} as ParsedArguments);
-        await callWebMCPTool.handler(
-          {
-            params: {
-              name: 'legacy_sum',
-              arguments: { a: 3, b: 4 },
             },
           },
           response,
@@ -484,7 +373,6 @@ describe('webmcp tools', () => {
             },
           },
         ]);
-        assert.deepStrictEqual(result.structuredContent, { total: 1 });
       });
     });
 

@@ -25,6 +25,7 @@ import type {
   Viewport,
   Target,
 } from './third_party/index.js';
+import { Locator } from './third_party/index.js';
 import { PredefinedNetworkConditions } from './third_party/index.js';
 import { listPages } from './tools/pages.js';
 import { CLOSE_PAGE_ERROR } from './tools/ToolDefinition.js';
@@ -107,11 +108,18 @@ export class McpContext implements Context {
   #nextSnapshotId = 1;
   #traceResults: TraceResult[] = [];
 
+  #locatorClass: typeof Locator;
   #options: McpContextOptions;
 
-  private constructor(browser: Browser, logger: Debugger, options: McpContextOptions) {
+  private constructor(
+    browser: Browser,
+    logger: Debugger,
+    options: McpContextOptions,
+    locatorClass: typeof Locator
+  ) {
     this.browser = browser;
     this.logger = logger;
+    this.#locatorClass = locatorClass;
     this.#options = options;
 
     this.#networkCollector = new NetworkCollector(this.browser);
@@ -154,8 +162,14 @@ export class McpContext implements Context {
     this.#isolatedContexts.clear();
   }
 
-  static async from(browser: Browser, logger: Debugger, opts: McpContextOptions) {
-    const context = new McpContext(browser, logger, opts);
+  static async from(
+    browser: Browser,
+    logger: Debugger,
+    opts: McpContextOptions,
+    /* Let tests use unbundled Locator class to avoid overly strict checks within puppeteer that fail when mixing bundled and unbundled class instances */
+    locatorClass: typeof Locator = Locator
+  ) {
+    const context = new McpContext(browser, logger, opts, locatorClass);
     await context.#init();
     return context;
   }
@@ -785,23 +799,21 @@ export class McpContext implements Context {
     return this.#networkCollector.getIdForResource(request);
   }
 
-  waitForTextOnPage(text: string[], timeout?: number, targetPage?: Page): Promise<void> {
+  waitForTextOnPage(text: string[], timeout?: number, targetPage?: Page): Promise<Element> {
     const page = targetPage ?? this.getSelectedPptrPage();
     const frames = page.frames();
 
-    return Promise.any(
-      frames.map(async (frame) => {
-        await frame.waitForFunction(
-          (values: string[]) => {
-            const pageText = document.body?.innerText ?? document.body?.textContent ?? '';
-            const normalizedPageText = pageText.replace(/\s+/g, ' ');
-            return values.some((value) => normalizedPageText.includes(value.replace(/\s+/g, ' ')));
-          },
-          timeout ? { timeout } : {},
-          text
-        );
-      })
-    ).then(() => undefined);
+    let locator = this.#locatorClass.race(
+      frames.flatMap((frame) =>
+        text.flatMap((value) => [frame.locator(`aria/${value}`), frame.locator(`text/${value}`)])
+      )
+    );
+
+    if (timeout) {
+      locator = locator.setTimeout(timeout);
+    }
+
+    return locator.wait();
   }
 
   /**

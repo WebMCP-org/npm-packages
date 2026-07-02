@@ -9,7 +9,7 @@ import assert from 'node:assert';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import logger from 'debug';
 import type { Browser } from 'puppeteer';
-import puppeteer from 'puppeteer';
+import puppeteer, { Locator } from 'puppeteer';
 import type { Frame, HTTPRequest, HTTPResponse, LaunchOptions, Page } from 'puppeteer-core';
 import sinon from 'sinon';
 
@@ -101,10 +101,15 @@ export async function withMcpContext(
     if (context) {
       context.dispose();
     }
-    context = await McpContext.from(browser, logger('test'), {
-      experimentalDevToolsDebugging: false,
-      performanceCrux: options.performanceCrux ?? true,
-    });
+    context = await McpContext.from(
+      browser,
+      logger('test'),
+      {
+        experimentalDevToolsDebugging: false,
+        performanceCrux: options.performanceCrux ?? true,
+      },
+      Locator
+    );
 
     response.setPage(context.getSelectedMcpPage());
 
@@ -238,9 +243,6 @@ export function stabilizeResponseOutput(text: unknown) {
 
   const userAgentRegEx = /user-agent:.*\n/g;
   output = output.replaceAll(userAgentRegEx, 'user-agent:<user-agent>\n');
-
-  const contentLengthRegEx = /content-length:\d+/g;
-  output = output.replaceAll(contentLengthRegEx, 'content-length:<length>');
 
   const chUaRegEx = /sec-ch-ua:"Chromium";v="\d{3}"/g;
   output = output.replaceAll(chUaRegEx, 'sec-ch-ua:"Chromium";v="<version>"');

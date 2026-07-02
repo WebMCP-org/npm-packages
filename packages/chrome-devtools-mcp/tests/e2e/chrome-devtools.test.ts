@@ -34,7 +34,7 @@ function parseCliJson<T>(stdout: string): T {
     Array.isArray(parsed) &&
     parsed.length === 1 &&
     typeof parsed[0] === 'string' &&
-    /^[{[]/.test(parsed[0].trim())
+    /^[\[{]/.test(parsed[0].trim())
   ) {
     return JSON.parse(parsed[0]) as T;
   }
