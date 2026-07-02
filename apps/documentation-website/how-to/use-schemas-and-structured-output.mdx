@@ -190,7 +190,7 @@ document.modelContext.registerTool({
 });
 ```
 
-When `outputSchema` is a literal schema and you use `@mcp-b/webmcp-types`, `structuredContent` is type-checked against the schema at compile time. WebMCP execution accepts any JSON value that matches the schema. This follows MCP [SEP-2106](https://modelcontextprotocol.io/seps/2106-json-schema-2020-12), which aligns tool output schemas and structured content with JSON Schema 2020-12.
+When `outputSchema` is a literal schema and you use `@mcp-b/webmcp-types`, `structuredContent` is type-checked against the schema at compile time. MCP-B runtime helpers can use it to shape structured MCP responses. Native Chrome WebMCP does not yet define or enforce `outputSchema`; the current W3C and Chrome tool dictionary defines `inputSchema` only. MCP [SEP-2106](https://modelcontextprotocol.io/seps/2106-json-schema-2020-12) applies to MCP tool output schemas and structured content.
 
 ### Non-object output schemas
 
@@ -246,9 +246,10 @@ export function CounterTool() {
 
 <Warning>
   If `outputSchema` is defined, the tool implementation must return a JSON-serializable value that
-  matches the schema. The MCP transport bridge currently forwards object-shaped `structuredContent`;
-  use the WebMCP `executeTool()` path for primitive or array structured outputs until all downstream
-  MCP clients accept SEP-2106 shapes.
+  matches the schema for MCP-B helpers that consume it. Native WebMCP does not enforce this field.
+  The MCP transport bridge currently forwards object-shaped `structuredContent`; use the WebMCP
+  `executeTool()` path for primitive or array structured outputs until downstream MCP clients accept
+  SEP-2106 shapes.
 </Warning>
 
 ### Keep text and structure aligned

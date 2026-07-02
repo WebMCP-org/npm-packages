@@ -133,13 +133,13 @@ server.registerTool(
   {
     description: 'A dynamically registered tool',
     inputSchema: { message: z.string() },
-    // Output schemas enable structured, type-safe AI responses
+    // outputSchema is MCP-B metadata for structured, type-safe responses
     outputSchema: { result: z.string() },
   },
   async ({ message }) => {
     return {
       content: [{ type: 'text', text: `Echo: ${message}` }],
-      // structuredContent must match the outputSchema
+      // structuredContent should match the outputSchema for MCP-B adapters
       structuredContent: { result: `Echo: ${message}` },
     };
   }

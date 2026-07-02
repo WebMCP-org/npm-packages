@@ -56,7 +56,7 @@ The signature matches the strict-core hook from [`usewebmcp`](/packages/usewebmc
 | `name`                     | `string`                                              | Yes      | Unique tool identifier             |
 | `description`              | `string`                                              | Yes      | Human-readable description         |
 | `inputSchema`              | JSON Schema, Standard Schema v1, or Zod v3 object map | No       | Input parameters                   |
-| `outputSchema`             | JSON Schema, Standard Schema v1, or Zod v3 object map | No       | Output structure                   |
+| `outputSchema`             | JSON Schema, Standard Schema v1, or Zod v3 object map | No       | MCP-B output helper metadata       |
 | `annotations`              | `ToolAnnotations`                                     | No       | Metadata hints                     |
 | `handler(input)`           | `(input) => T \| Promise<T>`                          | Yes      | Tool implementation function       |
 | `formatOutput(output)`     | `(output) => string`                                  | No       | Deprecated. Prefer `outputSchema`. |
@@ -64,6 +64,9 @@ The signature matches the strict-core hook from [`usewebmcp`](/packages/usewebmc
 | `onError(error, input)`    | `(error, input) => void`                              | No       | Error callback                     |
 
 **Returns:** `WebMCPReturn`
+
+Native Chrome WebMCP does not currently define or enforce `outputSchema`. The
+React hooks use it for output typing and structured MCP responses.
 
 ### `useWebMCPContext(name, description, getValue)`
 

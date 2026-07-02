@@ -127,10 +127,11 @@ runtimes. New code should use `document.modelContext`.
 ## Output schemas
 
 Tool responses can include `structuredContent` that matches `outputSchema`.
-WebMCP execution accepts JSON objects, arrays, strings, numbers, booleans, and
-null values. MCP transport clients may still accept a narrower object-shaped
-`structuredContent` boundary, so object outputs remain the safest cross-client
-shape until downstream MCP clients fully adopt SEP-2106.
+`outputSchema` is MCP-B helper metadata, not part of the current W3C/Chrome
+WebMCP tool dictionary. Native browser WebMCP does not enforce it. MCP
+transport clients may still accept a narrower object-shaped `structuredContent`
+boundary, so object outputs remain the safest cross-client shape until
+downstream MCP clients fully adopt SEP-2106.
 
 ```ts
 await document.modelContext.registerTool({

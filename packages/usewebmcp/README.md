@@ -212,7 +212,9 @@ function SearchToolPanel() {
 
 ## Output Schema Contract
 
-If `outputSchema` is defined, your tool implementation must return a JSON-serializable value that matches that schema. Object, array, string, number, boolean, and null schemas are supported for WebMCP execution.
+If `outputSchema` is defined, your tool implementation must return a JSON-serializable value that matches that schema for MCP-B helpers that consume it. Object, array, string, number, boolean, and null schemas are supported for type inference and hook result shaping.
+
+Native Chrome WebMCP does not currently define or enforce `outputSchema`; the browser standard tool dictionary defines `inputSchema`.
 
 ## Re-Registration and Performance
 

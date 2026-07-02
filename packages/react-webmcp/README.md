@@ -17,7 +17,7 @@
 | Feature                      | Benefit                                                                      |
 | ---------------------------- | ---------------------------------------------------------------------------- |
 | **React-First Design**       | Hooks follow React patterns with automatic cleanup and StrictMode support    |
-| **Type-Safe with Zod**       | Full TypeScript support with Zod schema validation for inputs/outputs        |
+| **Type-Safe with Zod**       | Full TypeScript support with input validation and output typing              |
 | **Two-Way Integration**      | Both expose tools TO AI agents AND consume tools FROM MCP servers            |
 | **Execution State Tracking** | Built-in loading, success, and error states for UI feedback                  |
 | **Works with Any AI**        | Compatible with Claude, ChatGPT, Gemini, Cursor, Copilot, and any MCP client |
@@ -43,6 +43,9 @@ signal })` and abort the controller on unmount. The hooks retain a
 `navigator.modelContext` fallback for older preview runtimes, but
 `document.modelContext` is the canonical surface. Install `@mcp-b/global`
 when you need a portable runtime with spec-aligned cleanup behavior.
+
+`outputSchema` is MCP-B helper metadata for output typing and structured MCP
+responses. Native Chrome WebMCP does not currently define or enforce it.
 
 ## Quick Start - Provider (Registering Tools)
 

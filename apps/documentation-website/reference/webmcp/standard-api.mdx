@@ -41,6 +41,9 @@ tool cleanup is tied to the optional `AbortSignal` passed at registration time.
 - `navigator.modelContextTesting` is a compatibility surface for testing.
 - `listTools()`, deprecated `callTool()` compatibility helpers, prompts,
   resources, sampling, elicitation, and transports are MCP-B extensions.
+- `outputSchema` is not part of the current W3C/Chrome WebMCP tool
+  dictionary. MCP-B packages expose it as helper metadata for type inference,
+  structured MCP responses, and polyfill/runtime adapters.
 
 See [`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/reference) for the
 portable strict runtime.

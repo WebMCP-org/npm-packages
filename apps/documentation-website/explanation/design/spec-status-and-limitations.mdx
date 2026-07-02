@@ -40,3 +40,8 @@ This release line follows those sources by making `document.modelContext` the
 primary surface, preferring `getTools()` plus `executeTool()`, using
 `AbortSignal` for cleanup, and keeping legacy MCP-B helpers as compatibility
 APIs.
+
+`outputSchema` is not part of the current W3C/Chrome WebMCP tool dictionary.
+MCP-B keeps it as helper metadata for TypeScript inference, structured MCP
+responses, and package/runtime adapters. Do not rely on native browser WebMCP
+to validate tool output against it.

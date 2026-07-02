@@ -213,7 +213,7 @@ These MCP-B compatibility helpers remain available for older integrations. Prefe
 | `name`         | `string`                                  | Yes      | Unique identifier for the tool                                                          |
 | `description`  | `string`                                  | Yes      | Natural language description of what the tool does                                      |
 | `inputSchema`  | `InputSchema`                             | No       | JSON Schema describing accepted input. Defaults to `{ type: 'object', properties: {} }` |
-| `outputSchema` | `InputSchema`                             | No       | JSON Schema describing the output payload shape                                         |
+| `outputSchema` | `InputSchema`                             | No       | MCP-B helper metadata for output typing and structured MCP responses                    |
 | `annotations`  | `ToolAnnotations`                         | No       | Hints about tool behavior for LLM planners                                              |
 | `execute`      | `(args, client) => Promise<ToolResponse>` | Yes      | Async function implementing the tool logic                                              |
 

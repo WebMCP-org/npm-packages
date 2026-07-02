@@ -225,7 +225,8 @@ If schema types are widened (e.g., `InputSchema` loaded at runtime instead of a 
 
 When `outputSchema` is a literal JSON Schema, `structuredContent` is narrowed to
 that schema. Object, array, string, number, boolean, and null schemas are
-supported for WebMCP execution.
+supported for MCP-B type inference. Native Chrome WebMCP does not currently
+define or enforce `outputSchema`.
 
 ```ts
 import type { JsonSchemaForInference } from '@mcp-b/webmcp-types';
