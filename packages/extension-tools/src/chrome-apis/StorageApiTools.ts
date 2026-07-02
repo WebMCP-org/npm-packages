@@ -120,16 +120,7 @@ export class StorageApiTools extends BaseApiTools<StorageApiToolsOptions> {
       return this.formatError(new Error(`Storage area '${area}' is not available`));
     }
 
-    const data = await storage.get(keys || null);
-
-    // Format the response with metadata
-    const response = {
-      area,
-      data,
-      keyCount: Object.keys(data).length,
-    };
-
-    return this.formatJson(response);
+    return this.formatJson(await storage.get(keys ?? null));
   }
 
   private async handleSetStorage({ data, area }: StorageSetInput) {
@@ -140,9 +131,7 @@ export class StorageApiTools extends BaseApiTools<StorageApiToolsOptions> {
 
     await storage.set(data);
 
-    return this.formatSuccess(`Stored ${Object.keys(data).length} key(s) in ${area} storage`, {
-      keys: Object.keys(data),
-    });
+    return this.formatSuccess(`Stored ${Object.keys(data).length} key(s) in ${area} storage`);
   }
 
   private async handleRemoveStorage({ keys, area }: StorageRemoveInput) {
@@ -153,7 +142,7 @@ export class StorageApiTools extends BaseApiTools<StorageApiToolsOptions> {
 
     await storage.remove(keys);
 
-    return this.formatSuccess(`Removed ${keys.length} key(s) from ${area} storage`, { keys });
+    return this.formatSuccess(`Removed key(s) from ${area} storage`);
   }
 
   private async handleClearStorage({ area, confirm }: StorageClearInput) {
@@ -184,41 +173,7 @@ export class StorageApiTools extends BaseApiTools<StorageApiToolsOptions> {
       return this.formatError(new Error(`getBytesInUse is not supported for ${area} storage area`));
     }
 
-    const bytesInUse = await storage.getBytesInUse(keys || null);
-
-    // Get quota info if available
-    let quotaInfo = null;
-    if (area === 'sync' && chrome.storage.sync.QUOTA_BYTES) {
-      quotaInfo = {
-        quotaBytes: chrome.storage.sync.QUOTA_BYTES,
-        quotaBytesPerItem: chrome.storage.sync.QUOTA_BYTES_PER_ITEM,
-        maxItems: chrome.storage.sync.MAX_ITEMS,
-        maxWriteOperationsPerHour: chrome.storage.sync.MAX_WRITE_OPERATIONS_PER_HOUR,
-        maxWriteOperationsPerMinute: chrome.storage.sync.MAX_WRITE_OPERATIONS_PER_MINUTE,
-      };
-    } else if (area === 'local' && chrome.storage.local.QUOTA_BYTES) {
-      quotaInfo = {
-        quotaBytes: chrome.storage.local.QUOTA_BYTES,
-      };
-    }
-
-    return this.formatJson({
-      area,
-      bytesInUse,
-      humanReadable: this.formatBytes(bytesInUse),
-      quota: quotaInfo,
-      percentageUsed: quotaInfo?.quotaBytes
-        ? `${((bytesInUse / quotaInfo.quotaBytes) * 100).toFixed(2)}%`
-        : null,
-    });
-  }
-
-  private formatBytes(bytes: number): string {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${Number.parseFloat((bytes / k ** i).toFixed(2))} ${sizes[i]}`;
+    return this.formatJson(await storage.getBytesInUse(keys ?? null));
   }
 
   private getStorageArea(area: StorageAreaName): WritableStorageArea | undefined {

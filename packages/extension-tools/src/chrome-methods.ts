@@ -15,7 +15,6 @@ import {
 } from './executable-tools';
 
 type ToolInput = Record<string, unknown>;
-type NativeOutputAdapter = (output: unknown, args?: readonly unknown[]) => unknown;
 
 export interface ChromeMethodCall {
   path: string;
@@ -29,7 +28,6 @@ export interface ChromeMethodContract {
   action: AnyExtensionToolContract;
   argsSchema: z.ZodType<unknown[]>;
   toActionInput(args: unknown[]): ToolInput;
-  toNativeOutput?: NativeOutputAdapter;
 }
 
 export interface ChromeApiExecutor {
@@ -57,7 +55,6 @@ export const CHROME_METHOD_CONTRACTS = [
     action: BOOKMARK_TOOL_CONTRACTS.get,
     argsSchema: oneArg,
     toActionInput: ([idOrIdList]) => ({ idOrIdList }),
-    toNativeOutput: pickOutput('bookmarks'),
   }),
   chromeMethod({
     path: 'bookmarks.getChildren',
@@ -65,7 +62,6 @@ export const CHROME_METHOD_CONTRACTS = [
     action: BOOKMARK_TOOL_CONTRACTS.getChildren,
     argsSchema: oneArg,
     toActionInput: ([id]) => ({ id }),
-    toNativeOutput: pickOutput('children'),
   }),
   chromeMethod({
     path: 'bookmarks.getRecent',
@@ -73,7 +69,6 @@ export const CHROME_METHOD_CONTRACTS = [
     action: BOOKMARK_TOOL_CONTRACTS.getRecent,
     argsSchema: oneArg,
     toActionInput: ([numberOfItems]) => ({ numberOfItems }),
-    toNativeOutput: pickOutput('recentBookmarks'),
   }),
   chromeMethod({
     path: 'bookmarks.getSubTree',
@@ -81,7 +76,6 @@ export const CHROME_METHOD_CONTRACTS = [
     action: BOOKMARK_TOOL_CONTRACTS.getSubTree,
     argsSchema: oneArg,
     toActionInput: ([id]) => ({ id }),
-    toNativeOutput: pickOutput('subtree'),
   }),
   chromeMethod({
     path: 'bookmarks.getTree',
@@ -89,7 +83,6 @@ export const CHROME_METHOD_CONTRACTS = [
     action: BOOKMARK_TOOL_CONTRACTS.getTree,
     argsSchema: noArgs,
     toActionInput: () => ({}),
-    toNativeOutput: pickOutput('tree'),
   }),
   chromeMethod({
     path: 'bookmarks.move',
@@ -104,7 +97,6 @@ export const CHROME_METHOD_CONTRACTS = [
     action: BOOKMARK_TOOL_CONTRACTS.remove,
     argsSchema: oneArg,
     toActionInput: ([id]) => ({ id }),
-    toNativeOutput: voidOutput,
   }),
   chromeMethod({
     path: 'bookmarks.removeTree',
@@ -112,7 +104,6 @@ export const CHROME_METHOD_CONTRACTS = [
     action: BOOKMARK_TOOL_CONTRACTS.removeTree,
     argsSchema: oneArg,
     toActionInput: ([id]) => ({ id }),
-    toNativeOutput: voidOutput,
   }),
   chromeMethod({
     path: 'bookmarks.search',
@@ -120,7 +111,6 @@ export const CHROME_METHOD_CONTRACTS = [
     action: BOOKMARK_TOOL_CONTRACTS.search,
     argsSchema: oneArg,
     toActionInput: ([query]) => ({ query }),
-    toNativeOutput: pickOutput('results'),
   }),
   chromeMethod({
     path: 'bookmarks.update',
@@ -135,7 +125,6 @@ export const CHROME_METHOD_CONTRACTS = [
     action: HISTORY_TOOL_CONTRACTS.addUrl,
     argsSchema: oneArg,
     toActionInput: ([details]) => objectInput(details),
-    toNativeOutput: voidOutput,
   }),
   chromeMethod({
     path: 'history.getVisits',
@@ -143,7 +132,6 @@ export const CHROME_METHOD_CONTRACTS = [
     action: HISTORY_TOOL_CONTRACTS.getVisits,
     argsSchema: oneArg,
     toActionInput: ([details]) => objectInput(details),
-    toNativeOutput: pickOutput('visits'),
   }),
   chromeMethod({
     path: 'history.search',
@@ -151,7 +139,6 @@ export const CHROME_METHOD_CONTRACTS = [
     action: HISTORY_TOOL_CONTRACTS.search,
     argsSchema: oneArg,
     toActionInput: ([query]) => objectInput(query),
-    toNativeOutput: pickOutput('results'),
   }),
   ...storageMethods('local'),
   ...storageMethods('session'),
@@ -162,7 +149,6 @@ export const CHROME_METHOD_CONTRACTS = [
     action: TAB_TOOL_CONTRACTS.createTab,
     argsSchema: oneArg,
     toActionInput: ([createProperties]) => objectInput(createProperties),
-    toNativeOutput: normalizeTabOutput,
   }),
   chromeMethod({
     path: 'tabs.get',
@@ -170,7 +156,6 @@ export const CHROME_METHOD_CONTRACTS = [
     action: TAB_TOOL_CONTRACTS.getTab,
     argsSchema: oneArg,
     toActionInput: ([tabId]) => ({ tabId }),
-    toNativeOutput: (output) => normalizeTabOutput(pickOutput('tab')(output)),
   }),
   chromeMethod({
     path: 'tabs.query',
@@ -178,7 +163,6 @@ export const CHROME_METHOD_CONTRACTS = [
     action: TAB_TOOL_CONTRACTS.getAllTabs,
     argsSchema: zeroOrOneArg,
     toActionInput: ([queryInfo]) => objectInput(queryInfo),
-    toNativeOutput: (output) => normalizeTabsOutput(pickOutput('tabs')(output)),
   }),
   chromeMethod({
     path: 'tabs.remove',
@@ -186,7 +170,6 @@ export const CHROME_METHOD_CONTRACTS = [
     action: TAB_TOOL_CONTRACTS.closeTabs,
     argsSchema: oneArg,
     toActionInput: ([tabIds]) => ({ tabIds: normalizeNumberArray(tabIds) }),
-    toNativeOutput: voidOutput,
   }),
   chromeMethod({
     path: 'tabs.update',
@@ -199,7 +182,6 @@ export const CHROME_METHOD_CONTRACTS = [
       }
       return objectInput(tabIdOrProperties);
     },
-    toNativeOutput: (output) => normalizeTabOutput(pickOutput('tab')(output)),
   }),
 ] as const satisfies readonly ChromeMethodContract[];
 
@@ -245,8 +227,7 @@ async function invokeChromeMethod(
     throw new Error(`chrome.${method.path}: ${toolResultText(result)}`);
   }
 
-  const output = result.structuredContent;
-  return method.toNativeOutput ? method.toNativeOutput(output, args) : output;
+  return result.structuredContent;
 }
 
 function parseChromeMethodArgs(method: ChromeMethodContract, args: unknown[]): unknown[] {
@@ -280,7 +261,6 @@ function storageMethods(area: 'local' | 'session' | 'sync'): ChromeMethodContrac
       action: STORAGE_TOOL_CONTRACTS.clearStorage,
       argsSchema: noArgs,
       toActionInput: () => ({ area, confirm: true }),
-      toNativeOutput: voidOutput,
     }),
     chromeMethod({
       path: `storage.${area}.get`,
@@ -288,7 +268,6 @@ function storageMethods(area: 'local' | 'session' | 'sync'): ChromeMethodContrac
       action: STORAGE_TOOL_CONTRACTS.getStorage,
       argsSchema: zeroOrOneArg,
       toActionInput: ([keys]) => ({ area, keys: keys ?? null }),
-      toNativeOutput: pickOutput('data'),
     }),
     chromeMethod({
       path: `storage.${area}.getBytesInUse`,
@@ -296,7 +275,6 @@ function storageMethods(area: 'local' | 'session' | 'sync'): ChromeMethodContrac
       action: STORAGE_TOOL_CONTRACTS.getBytesInUse,
       argsSchema: zeroOrOneArg,
       toActionInput: ([keys]) => ({ area, keys: keys ?? null }),
-      toNativeOutput: pickOutput('bytesInUse'),
     }),
     chromeMethod({
       path: `storage.${area}.remove`,
@@ -304,7 +282,6 @@ function storageMethods(area: 'local' | 'session' | 'sync'): ChromeMethodContrac
       action: STORAGE_TOOL_CONTRACTS.removeStorage,
       argsSchema: oneArg,
       toActionInput: ([keys]) => ({ area, keys: normalizeStringArray(keys) }),
-      toNativeOutput: voidOutput,
     }),
     chromeMethod({
       path: `storage.${area}.set`,
@@ -312,7 +289,6 @@ function storageMethods(area: 'local' | 'session' | 'sync'): ChromeMethodContrac
       action: STORAGE_TOOL_CONTRACTS.setStorage,
       argsSchema: oneArg,
       toActionInput: ([data]) => ({ area, data: objectInput(data) }),
-      toNativeOutput: voidOutput,
     }),
   ];
 }
@@ -336,31 +312,6 @@ function normalizeStringArray(input: unknown): unknown {
 
 function normalizeNumberArray(input: unknown): unknown[] {
   return Array.isArray(input) ? input : [input];
-}
-
-function pickOutput(key: string): NativeOutputAdapter {
-  return (output) => (isRecord(output) ? output[key] : undefined);
-}
-
-function voidOutput(): undefined {
-  return undefined;
-}
-
-function normalizeTabsOutput(output: unknown): unknown[] {
-  return Array.isArray(output) ? output.map(normalizeTabOutput) : [];
-}
-
-function normalizeTabOutput(output: unknown): unknown {
-  if (!isRecord(output)) {
-    return output;
-  }
-  if (
-    (typeof output.url === 'string' && output.url.length > 0) ||
-    typeof output.pendingUrl !== 'string'
-  ) {
-    return output;
-  }
-  return { ...output, url: output.pendingUrl };
 }
 
 function toolResultText(result: CallToolResult): string {

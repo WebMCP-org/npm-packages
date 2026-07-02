@@ -64,18 +64,14 @@ export const STORAGE_GET_BYTES_IN_USE_INPUT_SCHEMA = z.object({
   ),
 });
 
-export const STORAGE_GET_OUTPUT_SCHEMA = z.object({
-  area: STORAGE_AREA_SCHEMA,
-  data: z.record(z.string(), z.unknown()),
-  keyCount: z.number(),
-});
+export const STORAGE_GET_OUTPUT_SCHEMA = z.object({}).catchall(z.unknown());
 
 export const STORAGE_MUTATE_KEYS_OUTPUT_SCHEMA = z.object({
   keys: z.array(z.string()),
 });
 
-export const STORAGE_SET_OUTPUT_SCHEMA = STORAGE_MUTATE_KEYS_OUTPUT_SCHEMA;
-export const STORAGE_REMOVE_OUTPUT_SCHEMA = STORAGE_MUTATE_KEYS_OUTPUT_SCHEMA;
+export const STORAGE_SET_OUTPUT_SCHEMA = z.void();
+export const STORAGE_REMOVE_OUTPUT_SCHEMA = z.void();
 
 export const STORAGE_QUOTA_LOCAL_SCHEMA = z.object({
   quotaBytes: z.number(),
@@ -89,13 +85,7 @@ export const STORAGE_QUOTA_SYNC_SCHEMA = z.object({
   maxWriteOperationsPerMinute: z.number(),
 });
 
-export const STORAGE_BYTES_IN_USE_OUTPUT_SCHEMA = z.object({
-  area: STORAGE_AREA_SCHEMA,
-  bytesInUse: z.number(),
-  humanReadable: z.string(),
-  quota: z.union([STORAGE_QUOTA_LOCAL_SCHEMA, STORAGE_QUOTA_SYNC_SCHEMA, z.null()]),
-  percentageUsed: z.string().nullable(),
-});
+export const STORAGE_BYTES_IN_USE_OUTPUT_SCHEMA = z.number();
 
 export type StorageGetInput = z.infer<typeof STORAGE_GET_INPUT_SCHEMA>;
 export type StorageGetOutput = z.infer<typeof STORAGE_GET_OUTPUT_SCHEMA>;

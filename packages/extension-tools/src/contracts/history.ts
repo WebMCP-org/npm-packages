@@ -117,22 +117,8 @@ export const HISTORY_VISIT_OUTPUT_SCHEMA = z.object({
   transition: z.string(),
 });
 
-export const HISTORY_GET_VISITS_OUTPUT_SCHEMA = z.object({
-  url: z.string(),
-  visitCount: z.number(),
-  visits: z.array(HISTORY_VISIT_OUTPUT_SCHEMA),
-});
-
-export const HISTORY_SEARCH_OUTPUT_SCHEMA = z.object({
-  query: z.object({
-    text: z.string(),
-    startTime: z.number().optional(),
-    endTime: z.number().optional(),
-    maxResults: z.number().optional(),
-  }),
-  resultCount: z.number(),
-  results: z.array(HISTORY_ITEM_OUTPUT_SCHEMA),
-});
+export const HISTORY_GET_VISITS_OUTPUT_SCHEMA = z.array(HISTORY_VISIT_OUTPUT_SCHEMA);
+export const HISTORY_SEARCH_OUTPUT_SCHEMA = z.array(HISTORY_ITEM_OUTPUT_SCHEMA);
 
 export type HistoryAddUrlInput = z.infer<typeof HISTORY_ADD_URL_INPUT_SCHEMA>;
 export type HistoryAddUrlOutput = z.infer<typeof HISTORY_MUTATE_URL_OUTPUT_SCHEMA>;
@@ -194,7 +180,6 @@ export const HISTORY_TOOL_CONTRACTS = {
     title: 'Add History URL',
     description: 'Add a URL to the history at the current time with a transition type of "link"',
     inputSchema: HISTORY_ADD_URL_INPUT_SCHEMA,
-    outputSchema: HISTORY_MUTATE_URL_OUTPUT_SCHEMA,
     annotations: {
       readOnlyHint: false,
       destructiveHint: false,
@@ -222,7 +207,6 @@ export const HISTORY_TOOL_CONTRACTS = {
     description:
       'Remove all items within the specified date range from history. Pages will not be removed unless all visits fall within the range',
     inputSchema: HISTORY_DELETE_RANGE_INPUT_SCHEMA,
-    outputSchema: HISTORY_DELETE_RANGE_OUTPUT_SCHEMA,
     annotations: {
       readOnlyHint: false,
       destructiveHint: true,
@@ -236,7 +220,6 @@ export const HISTORY_TOOL_CONTRACTS = {
     title: 'Delete History URL',
     description: 'Remove all occurrences of the given URL from history',
     inputSchema: HISTORY_DELETE_URL_INPUT_SCHEMA,
-    outputSchema: HISTORY_MUTATE_URL_OUTPUT_SCHEMA,
     annotations: {
       readOnlyHint: false,
       destructiveHint: true,

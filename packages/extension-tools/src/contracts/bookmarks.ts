@@ -100,21 +100,21 @@ export interface BookmarkNodeOutput {
   parentId?: string | undefined;
   index?: number | undefined;
   dateAdded?: number | undefined;
-  dateAddedFormatted?: string | undefined;
-  type: z.infer<typeof BOOKMARK_NODE_TYPE_SCHEMA>;
+  dateGroupModified?: number | undefined;
   children?: BookmarkNodeOutput[] | undefined;
 }
 
-export const BOOKMARK_NODE_BASE_OUTPUT_SCHEMA = z.object({
-  id: z.string(),
-  title: z.string(),
-  url: z.string().optional(),
-  parentId: z.string().optional(),
-  index: z.number().optional(),
-  dateAdded: z.number().optional(),
-  dateAddedFormatted: z.string().optional(),
-  type: BOOKMARK_NODE_TYPE_SCHEMA,
-});
+export const BOOKMARK_NODE_BASE_OUTPUT_SCHEMA = z
+  .object({
+    id: z.string(),
+    title: z.string(),
+    url: z.string().optional(),
+    parentId: z.string().optional(),
+    index: z.number().optional(),
+    dateAdded: z.number().optional(),
+    dateGroupModified: z.number().optional(),
+  })
+  .passthrough();
 
 export const BOOKMARK_NODE_OUTPUT_SCHEMA: z.ZodType<BookmarkNodeOutput> = z.lazy(() =>
   BOOKMARK_NODE_BASE_OUTPUT_SCHEMA.extend({
@@ -122,64 +122,16 @@ export const BOOKMARK_NODE_OUTPUT_SCHEMA: z.ZodType<BookmarkNodeOutput> = z.lazy
   })
 );
 
-export const BOOKMARK_CREATE_OUTPUT_SCHEMA = BOOKMARK_NODE_BASE_OUTPUT_SCHEMA.extend({
-  parentId: z.string(),
-  index: z.number(),
-  dateAdded: z.number(),
-});
-
-export const BOOKMARK_GET_OUTPUT_SCHEMA = z.object({
-  count: z.number(),
-  bookmarks: z.array(BOOKMARK_NODE_BASE_OUTPUT_SCHEMA),
-});
-
-export const BOOKMARK_GET_CHILDREN_OUTPUT_SCHEMA = z.object({
-  parentId: z.string(),
-  count: z.number(),
-  children: z.array(BOOKMARK_NODE_BASE_OUTPUT_SCHEMA),
-});
-
-export const BOOKMARK_GET_RECENT_OUTPUT_SCHEMA = z.object({
-  count: z.number(),
-  recentBookmarks: z.array(
-    BOOKMARK_NODE_BASE_OUTPUT_SCHEMA.extend({
-      type: BOOKMARK_NODE_TYPE_SCHEMA.optional(),
-    })
-  ),
-});
-
-export const BOOKMARK_GET_SUBTREE_OUTPUT_SCHEMA = z.object({
-  rootId: z.string(),
-  subtree: z.array(BOOKMARK_NODE_OUTPUT_SCHEMA),
-});
-
-export const BOOKMARK_GET_TREE_OUTPUT_SCHEMA = z.object({
-  tree: z.array(BOOKMARK_NODE_OUTPUT_SCHEMA),
-});
-
-export const BOOKMARK_MOVE_OUTPUT_SCHEMA = BOOKMARK_NODE_BASE_OUTPUT_SCHEMA.extend({
-  parentId: z.string(),
-  index: z.number(),
-});
-
-export const BOOKMARK_REMOVE_OUTPUT_SCHEMA = z.object({
-  id: z.string(),
-});
-
-export const BOOKMARK_SEARCH_OUTPUT_SCHEMA = z.object({
-  query: z.string(),
-  count: z.number(),
-  results: z.array(BOOKMARK_NODE_BASE_OUTPUT_SCHEMA),
-});
-
-export const BOOKMARK_UPDATE_OUTPUT_SCHEMA = BOOKMARK_NODE_BASE_OUTPUT_SCHEMA.extend({
-  parentId: z.string(),
-  index: z.number(),
-  changes: z.object({
-    title: z.string().optional(),
-    url: z.string().optional(),
-  }),
-});
+export const BOOKMARK_CREATE_OUTPUT_SCHEMA = BOOKMARK_NODE_BASE_OUTPUT_SCHEMA;
+export const BOOKMARK_GET_OUTPUT_SCHEMA = z.array(BOOKMARK_NODE_BASE_OUTPUT_SCHEMA);
+export const BOOKMARK_GET_CHILDREN_OUTPUT_SCHEMA = z.array(BOOKMARK_NODE_BASE_OUTPUT_SCHEMA);
+export const BOOKMARK_GET_RECENT_OUTPUT_SCHEMA = z.array(BOOKMARK_NODE_BASE_OUTPUT_SCHEMA);
+export const BOOKMARK_GET_SUBTREE_OUTPUT_SCHEMA = z.array(BOOKMARK_NODE_OUTPUT_SCHEMA);
+export const BOOKMARK_GET_TREE_OUTPUT_SCHEMA = z.array(BOOKMARK_NODE_OUTPUT_SCHEMA);
+export const BOOKMARK_MOVE_OUTPUT_SCHEMA = BOOKMARK_NODE_BASE_OUTPUT_SCHEMA;
+export const BOOKMARK_REMOVE_OUTPUT_SCHEMA = z.void();
+export const BOOKMARK_SEARCH_OUTPUT_SCHEMA = z.array(BOOKMARK_NODE_BASE_OUTPUT_SCHEMA);
+export const BOOKMARK_UPDATE_OUTPUT_SCHEMA = BOOKMARK_NODE_BASE_OUTPUT_SCHEMA;
 
 export type BookmarkCreateInput = z.infer<typeof BOOKMARK_CREATE_INPUT_SCHEMA>;
 export type BookmarkCreateOutput = z.infer<typeof BOOKMARK_CREATE_OUTPUT_SCHEMA>;

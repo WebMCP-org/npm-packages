@@ -109,7 +109,7 @@ export class HistoryApiTools extends BaseApiTools<HistoryApiToolsOptions> {
   private async handleAddUrl({ url }: HistoryAddUrlInput) {
     await chrome.history.addUrl({ url });
 
-    return this.formatSuccess('URL added to history successfully', { url });
+    return this.formatSuccess('URL added to history successfully');
   }
 
   private async handleDeleteAll() {
@@ -124,35 +124,19 @@ export class HistoryApiTools extends BaseApiTools<HistoryApiToolsOptions> {
     }
     await chrome.history.deleteRange({ startTime, endTime });
 
-    return this.formatSuccess('History range deleted successfully', {
-      startTime,
-      endTime,
-      startTimeFormatted: new Date(startTime).toISOString(),
-      endTimeFormatted: new Date(endTime).toISOString(),
-    });
+    return this.formatSuccess('History range deleted successfully');
   }
 
   private async handleDeleteUrl({ url }: HistoryDeleteUrlInput) {
     await chrome.history.deleteUrl({ url });
 
-    return this.formatSuccess('URL deleted from history successfully', { url });
+    return this.formatSuccess('URL deleted from history successfully');
   }
 
   private async handleGetVisits({ url }: HistoryGetVisitsInput) {
     const visits = await chrome.history.getVisits({ url });
 
-    return this.formatJson({
-      url,
-      visitCount: visits.length,
-      visits: visits.map((visit) => ({
-        id: visit.id,
-        visitId: visit.visitId,
-        visitTime: visit.visitTime,
-        visitTimeFormatted: visit.visitTime ? new Date(visit.visitTime).toISOString() : undefined,
-        referringVisitId: visit.referringVisitId,
-        transition: visit.transition,
-      })),
-    });
+    return this.formatJson(visits);
   }
 
   private async handleSearch({ text, startTime, endTime, maxResults }: HistorySearchInput) {
@@ -172,25 +156,6 @@ export class HistoryApiTools extends BaseApiTools<HistoryApiToolsOptions> {
 
     const results = await chrome.history.search(query);
 
-    return this.formatJson({
-      query: {
-        text,
-        startTime,
-        endTime,
-        maxResults,
-      },
-      resultCount: results.length,
-      results: results.map((item) => ({
-        id: item.id,
-        url: item.url,
-        title: item.title,
-        lastVisitTime: item.lastVisitTime,
-        lastVisitTimeFormatted: item.lastVisitTime
-          ? new Date(item.lastVisitTime).toISOString()
-          : undefined,
-        visitCount: item.visitCount,
-        typedCount: item.typedCount,
-      })),
-    });
+    return this.formatJson(results);
   }
 }

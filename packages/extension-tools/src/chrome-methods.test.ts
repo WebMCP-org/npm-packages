@@ -126,7 +126,7 @@ describe('chrome method facade', () => {
         active: true,
         pinned: false,
         title: 'Pending tab',
-        url: 'https://example.test/pending',
+        url: '',
         pendingUrl: 'https://example.test/pending',
       },
     ]);

@@ -284,7 +284,7 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
 
   private async handleCreateTab({ url, active, pinned }: TabCreateInput) {
     const tab = await chrome.tabs.create({ url, active, pinned });
-    return this.formatSuccess(`Created tab ${tab.id} with URL: ${tab.url || 'about:blank'}`, tab);
+    return this.formatJson(tab);
   }
 
   private async handleUpdateTab({ tabId, url, active, pinned, muted }: TabUpdateInput) {
@@ -310,34 +310,17 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
       return this.formatError(new Error('Tab does not exist'));
     }
 
-    return this.formatSuccess(`Updated tab ${tab.id}`, {
-      tab,
-      changes: updateProperties,
-    });
+    return this.formatJson(tab);
   }
 
   private async handleCloseTabs({ tabIds }: TabCloseInput) {
     await chrome.tabs.remove(tabIds);
-    return this.formatSuccess(`Closed ${tabIds.length} tab(s): ${tabIds.join(', ')}`, { tabIds });
+    return this.formatSuccess('Closed tab(s)');
   }
 
   private async handleGetAllTabs(queryInfo: TabGetAllInput) {
     const tabs = await chrome.tabs.query(queryInfo as chrome.tabs.QueryInfo);
-    const tabInfo = tabs.map((tab) => ({
-      id: tab.id,
-      title: tab.title,
-      url: tab.url,
-      pendingUrl: tab.pendingUrl,
-      active: tab.active,
-      pinned: tab.pinned,
-      windowId: tab.windowId,
-      index: tab.index,
-    }));
-
-    return this.formatJson({
-      count: tabInfo.length,
-      tabs: tabInfo,
-    });
+    return this.formatJson(tabs);
   }
 
   private async handleNavigateHistory({ tabId, direction }: TabNavigateHistoryInput) {
@@ -418,7 +401,7 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
     if (!tab) {
       return this.formatError(new Error('Failed to discard tab'));
     }
-    return this.formatSuccess(`Discarded tab ${tab.id}`, { tab });
+    return this.formatJson(tab);
   }
 
   private async handleDuplicateTab({ tabId }: TabDuplicateInput) {
@@ -426,12 +409,12 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
     if (!tab) {
       return this.formatError(new Error('Failed to duplicate tab'));
     }
-    return this.formatSuccess(`Duplicated tab ${tab.id}`, { tab });
+    return this.formatJson(tab);
   }
 
   private async handleGetTab({ tabId }: TabGetInput) {
     const tab = await chrome.tabs.get(tabId);
-    return this.formatJson({ tab });
+    return this.formatJson(tab);
   }
 
   private async handleGetZoom({ tabId }: TabGetZoomInput) {

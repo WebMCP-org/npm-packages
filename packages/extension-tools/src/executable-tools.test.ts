@@ -92,17 +92,13 @@ describe('executable extension tools', () => {
       data: { theme: 'dark', volume: 7 },
     });
     expect(setResult?.isError).not.toBe(true);
-    expect(setResult?.structuredContent).toEqual({ keys: ['theme', 'volume'] });
+    expect(setResult?.structuredContent).toBeUndefined();
 
     const getResult = await toolsByName.get(STORAGE_TOOL_CONTRACTS.getStorage.name)?.execute({
       area: 'local',
       keys: ['existing', 'theme', 'volume'],
     });
-    expect(getResult?.structuredContent).toEqual({
-      area: 'local',
-      data: { existing: 'value', theme: 'dark', volume: 7 },
-      keyCount: 3,
-    });
+    expect(getResult?.structuredContent).toEqual({ existing: 'value', theme: 'dark', volume: 7 });
   });
 
   it('returns contract validation errors through the existing tool error path', async () => {

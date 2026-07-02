@@ -86,9 +86,7 @@ const setStorageHandler: ExtensionToolHandler<typeof STORAGE_TOOL_CONTRACTS.setS
   input.area satisfies 'local' | 'session' | 'sync';
   input.data satisfies Record<string, unknown>;
 
-  return {
-    keys: Object.keys(input.data),
-  };
+  return undefined;
 };
 
 setStorageHandler satisfies (
@@ -200,11 +198,7 @@ const historySearchHandler: ExtensionToolHandler<typeof HISTORY_TOOL_CONTRACTS.s
 ) => {
   input.maxResults satisfies number | undefined;
 
-  return {
-    query: input,
-    resultCount: 0,
-    results: [],
-  };
+  return [];
 };
 
 historySearchHandler satisfies (

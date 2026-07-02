@@ -57,7 +57,7 @@ describe('extension tool contracts', () => {
     }
   });
 
-  it('uses object-root JSON Schemas and declares complete MCP annotations', () => {
+  it('uses object-root input schemas and declares complete MCP annotations', () => {
     for (const contract of EXTENSION_TOOL_CONTRACTS) {
       const inputSchema = getExtensionToolInputSchema(contract);
       const outputSchema = getExtensionToolOutputSchema(contract);
@@ -66,7 +66,7 @@ describe('extension tool contracts', () => {
       expect(inputSchema).toHaveProperty('properties');
 
       if (outputSchema) {
-        expect(outputSchema.type).toBe('object');
+        expect(outputSchema.type).toEqual(expect.any(String));
       }
 
       expect(contract.annotations).toMatchObject({
@@ -82,110 +82,31 @@ describe('extension tool contracts', () => {
   it('uses sampled concrete output schemas for real-browser storage conformance tools', () => {
     expect(getExtensionToolOutputSchema(STORAGE_TOOL_CONTRACTS.getStorage)).toMatchObject({
       type: 'object',
-      additionalProperties: false,
-      required: ['area', 'data', 'keyCount'],
-      properties: {
-        area: { enum: ['sync', 'local', 'session'] },
-        data: { type: 'object' },
-        keyCount: { type: 'number' },
-      },
     });
-    expect(getExtensionToolOutputSchema(STORAGE_TOOL_CONTRACTS.setStorage)).toMatchObject({
-      type: 'object',
-      additionalProperties: false,
-      required: ['keys'],
-      properties: {
-        keys: {
-          type: 'array',
-          items: { type: 'string' },
-        },
-      },
-    });
-    expect(getExtensionToolOutputSchema(STORAGE_TOOL_CONTRACTS.removeStorage)).toMatchObject({
-      type: 'object',
-      additionalProperties: false,
-      required: ['keys'],
-      properties: {
-        keys: {
-          type: 'array',
-          items: { type: 'string' },
-        },
-      },
-    });
-    expect(getExtensionToolOutputSchema(STORAGE_TOOL_CONTRACTS.getBytesInUse)).toMatchObject({
-      type: 'object',
-      additionalProperties: false,
-      required: ['area', 'bytesInUse', 'humanReadable', 'quota', 'percentageUsed'],
-      properties: {
-        area: { enum: ['sync', 'local', 'session'] },
-        bytesInUse: { type: 'number' },
-        humanReadable: { type: 'string' },
-        quota: {
-          anyOf: expect.arrayContaining([
-            expect.objectContaining({
-              type: 'object',
-              additionalProperties: false,
-              required: ['quotaBytes'],
-            }),
-            expect.objectContaining({
-              type: 'null',
-            }),
-          ]),
-        },
-        percentageUsed: {
-          type: ['string', 'null'],
-        },
-      },
-    });
+    expect(STORAGE_TOOL_CONTRACTS.getBytesInUse.zodOutputSchema?.parse(42)).toBe(42);
+    expect(getExtensionToolOutputSchema(STORAGE_TOOL_CONTRACTS.getBytesInUse)).toBeUndefined();
   });
 
   it('uses sampled concrete output schemas for real-browser bookmark conformance tools', () => {
     expect(getExtensionToolOutputSchema(BOOKMARK_TOOL_CONTRACTS.create)).toMatchObject({
       type: 'object',
-      required: ['id', 'title', 'parentId', 'index', 'dateAdded', 'type'],
+      required: ['id', 'title'],
       properties: {
         id: { type: 'string' },
         title: { type: 'string' },
         parentId: { type: 'string' },
         index: { type: 'number' },
         dateAdded: { type: 'number' },
-        type: { enum: ['bookmark', 'folder'] },
       },
     });
-    expect(getExtensionToolOutputSchema(BOOKMARK_TOOL_CONTRACTS.get)).toMatchObject({
-      type: 'object',
-      required: ['count', 'bookmarks'],
-      properties: {
-        count: { type: 'number' },
-        bookmarks: {
-          type: 'array',
-          items: {
-            required: ['id', 'title', 'type'],
-          },
-        },
-      },
-    });
-    expect(getExtensionToolOutputSchema(BOOKMARK_TOOL_CONTRACTS.search)).toMatchObject({
-      type: 'object',
-      required: ['query', 'count', 'results'],
-      properties: {
-        query: { type: 'string' },
-        count: { type: 'number' },
-        results: {
-          type: 'array',
-          items: {
-            required: ['id', 'title', 'type'],
-          },
-        },
-      },
-    });
-    expect(getExtensionToolOutputSchema(BOOKMARK_TOOL_CONTRACTS.remove)).toMatchObject({
-      type: 'object',
-      required: ['id'],
-      properties: {
-        id: { type: 'string' },
-      },
-    });
+    expect(BOOKMARK_TOOL_CONTRACTS.get.zodOutputSchema?.parse([{ id: '1', title: '' }])).toEqual([
+      { id: '1', title: '' },
+    ]);
+    expect(getExtensionToolOutputSchema(BOOKMARK_TOOL_CONTRACTS.get)).toBeUndefined();
+    expect(BOOKMARK_TOOL_CONTRACTS.search.zodOutputSchema?.parse([{ id: '1', title: '' }])).toEqual(
+      [{ id: '1', title: '' }]
+    );
+    expect(getExtensionToolOutputSchema(BOOKMARK_TOOL_CONTRACTS.search)).toBeUndefined();
   });
 
   it('uses sampled concrete output schemas for real-browser tabs conformance tools', () => {
@@ -200,36 +121,17 @@ describe('extension tool contracts', () => {
         windowId: { type: 'number' },
       },
     });
-    expect(getExtensionToolOutputSchema(TAB_TOOL_CONTRACTS.getAllTabs)).toMatchObject({
-      type: 'object',
-      required: ['count', 'tabs'],
-      properties: {
-        count: { type: 'number' },
-        tabs: {
-          type: 'array',
-          items: {
-            required: ['id', 'index', 'windowId', 'active', 'pinned'],
-          },
-        },
-      },
-    });
-    expect(getExtensionToolOutputSchema(TAB_TOOL_CONTRACTS.closeTabs)).toMatchObject({
-      type: 'object',
-      required: ['tabIds'],
-      properties: {
-        tabIds: {
-          type: 'array',
-          items: { type: 'number' },
-        },
-      },
-    });
+    expect(
+      TAB_TOOL_CONTRACTS.getAllTabs.zodOutputSchema?.parse([
+        { id: 1, index: 0, windowId: 1, active: true, pinned: false },
+      ])
+    ).toEqual([{ id: 1, index: 0, windowId: 1, active: true, pinned: false }]);
+    expect(getExtensionToolOutputSchema(TAB_TOOL_CONTRACTS.getAllTabs)).toBeUndefined();
     expect(getExtensionToolOutputSchema(TAB_TOOL_CONTRACTS.getTab)).toMatchObject({
       type: 'object',
-      required: ['tab'],
       properties: {
-        tab: {
-          required: ['id', 'index', 'windowId', 'active', 'pinned'],
-        },
+        id: { type: 'number' },
+        active: { type: 'boolean' },
       },
     });
     expect(getExtensionToolOutputSchema(TAB_TOOL_CONTRACTS.getZoomSettings)).toMatchObject({
@@ -343,61 +245,19 @@ describe('extension tool contracts', () => {
   });
 
   it('uses sampled concrete output schemas for real-browser history conformance tools', () => {
-    expect(getExtensionToolOutputSchema(HISTORY_TOOL_CONTRACTS.addUrl)).toMatchObject({
-      type: 'object',
-      required: ['url'],
-      properties: {
-        url: { type: 'string' },
-      },
-    });
-    expect(getExtensionToolOutputSchema(HISTORY_TOOL_CONTRACTS.deleteRange)).toMatchObject({
-      type: 'object',
-      required: ['startTime', 'endTime', 'startTimeFormatted', 'endTimeFormatted'],
-      properties: {
-        startTime: { type: 'number' },
-        endTime: { type: 'number' },
-        startTimeFormatted: { type: 'string' },
-        endTimeFormatted: { type: 'string' },
-      },
-    });
-    expect(getExtensionToolOutputSchema(HISTORY_TOOL_CONTRACTS.getVisits)).toMatchObject({
-      type: 'object',
-      required: ['url', 'visitCount', 'visits'],
-      properties: {
-        url: { type: 'string' },
-        visitCount: { type: 'number' },
-        visits: {
-          type: 'array',
-          items: {
-            required: ['id', 'visitId', 'transition'],
-          },
-        },
-      },
-    });
-    expect(getExtensionToolOutputSchema(HISTORY_TOOL_CONTRACTS.search)).toMatchObject({
-      type: 'object',
-      required: ['query', 'resultCount', 'results'],
-      properties: {
-        query: {
-          type: 'object',
-          required: ['text'],
-        },
-        resultCount: { type: 'number' },
-        results: {
-          type: 'array',
-          items: {
-            required: ['id'],
-          },
-        },
-      },
-    });
-    expect(getExtensionToolOutputSchema(HISTORY_TOOL_CONTRACTS.deleteUrl)).toMatchObject({
-      type: 'object',
-      required: ['url'],
-      properties: {
-        url: { type: 'string' },
-      },
-    });
+    expect(getExtensionToolOutputSchema(HISTORY_TOOL_CONTRACTS.addUrl)).toBeUndefined();
+    expect(getExtensionToolOutputSchema(HISTORY_TOOL_CONTRACTS.deleteRange)).toBeUndefined();
+    expect(
+      HISTORY_TOOL_CONTRACTS.getVisits.zodOutputSchema?.parse([
+        { id: '1', visitId: '2', transition: 'link' },
+      ])
+    ).toEqual([{ id: '1', visitId: '2', transition: 'link' }]);
+    expect(getExtensionToolOutputSchema(HISTORY_TOOL_CONTRACTS.getVisits)).toBeUndefined();
+    expect(HISTORY_TOOL_CONTRACTS.search.zodOutputSchema?.parse([{ id: '1' }])).toEqual([
+      { id: '1' },
+    ]);
+    expect(getExtensionToolOutputSchema(HISTORY_TOOL_CONTRACTS.search)).toBeUndefined();
+    expect(getExtensionToolOutputSchema(HISTORY_TOOL_CONTRACTS.deleteUrl)).toBeUndefined();
   });
 
   it('keeps bookmark input schemas aligned with Chrome bookmark parameter constraints', () => {

@@ -80,8 +80,17 @@ export abstract class BaseApiTools<TOptions extends object = Record<string, bool
     contract: AnyExtensionToolContract,
     result: CallToolResult
   ): CallToolResult {
+    if (result.isError) {
+      return result;
+    }
+
+    if (result.structuredContent !== undefined) {
+      this.validateStructuredContent(contract, result.structuredContent);
+      return result;
+    }
+
     const outputSchema = getExtensionToolOutputSchema(contract);
-    if (!outputSchema || result.isError || result.structuredContent !== undefined) {
+    if (!outputSchema) {
       return result;
     }
 
@@ -95,14 +104,21 @@ export abstract class BaseApiTools<TOptions extends object = Record<string, bool
       return result;
     }
 
-    if (isZodExtensionToolContract(contract) && contract.outputSchema) {
-      contract.outputSchema.parse(structuredContent);
-    }
+    this.validateStructuredContent(contract, structuredContent);
 
     return {
       ...result,
       structuredContent,
     };
+  }
+
+  private validateStructuredContent(
+    contract: AnyExtensionToolContract,
+    structuredContent: unknown
+  ): void {
+    if (isZodExtensionToolContract(contract) && contract.outputSchema) {
+      contract.outputSchema.parse(structuredContent);
+    }
   }
 
   private parseStructuredContent(text: string): Record<string, unknown> | undefined {
@@ -150,10 +166,11 @@ export abstract class BaseApiTools<TOptions extends object = Record<string, bool
       content: [
         {
           type: 'text',
-          text: data ? `${message}\n${JSON.stringify(data, null, 2)}` : message,
+          text: data !== undefined ? `${message}\n${JSON.stringify(data, null, 2)}` : message,
         },
       ],
-    };
+      ...(data !== undefined ? { structuredContent: data } : {}),
+    } as CallToolResult;
   }
 
   protected formatJson(data: unknown): CallToolResult {
@@ -164,7 +181,8 @@ export abstract class BaseApiTools<TOptions extends object = Record<string, bool
           text: JSON.stringify(data, null, 2),
         },
       ],
-    };
+      structuredContent: data,
+    } as CallToolResult;
   }
 
   public register(): void {

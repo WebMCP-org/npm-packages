@@ -28,12 +28,7 @@ export type ExtensionRuntimeContext =
 export type ExtensionToolEffect = 'delete' | 'execute' | 'mutate' | 'navigate' | 'read';
 export type ExtensionToolRiskLevel = 'low' | 'medium' | 'high';
 export type ExtensionToolInputSchema = InputSchema;
-export interface ExtensionToolOutputSchema {
-  readonly [key: string]: unknown;
-  readonly type: 'object';
-  readonly properties?: Readonly<Record<string, object>>;
-  readonly required?: readonly string[];
-}
+export type ExtensionToolOutputSchema = InputSchema;
 
 export const GENERIC_EXTENSION_TOOL_OUTPUT_SCHEMA = {
   type: 'object',
@@ -232,11 +227,13 @@ export function getExtensionToolOutputSchema(
     return undefined;
   }
 
-  return isZodExtensionToolContract(contract)
+  const outputSchema = isZodExtensionToolContract(contract)
     ? (toWebMcpJsonSchema(contract.outputSchema, {
-        requireObjectType: true,
+        requireObjectType: false,
       }) as ExtensionToolOutputSchema)
     : contract.outputSchema;
+
+  return outputSchema.type === 'object' ? outputSchema : undefined;
 }
 
 export type InferExtensionToolInput<TContract> =

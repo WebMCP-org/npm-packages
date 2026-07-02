@@ -300,22 +300,14 @@ describe('direct extension action tools', () => {
     });
     expect(setResult.isError).not.toBe(true);
     expect(toolText(setResult)).toContain('Stored 2 key(s) in local storage');
-    expect(setResult.structuredContent).toEqual({ keys: ['theme', 'volume'] });
+    expect(setResult.structuredContent).toBeUndefined();
 
     const getResult = await executeTool(server.getTool('extension_tool_get_storage'), {
       area: 'local',
       keys: ['theme', 'volume'],
     });
-    expect(getResult.structuredContent).toMatchObject({
-      area: 'local',
-      data: { theme: 'dark', volume: 7 },
-      keyCount: 2,
-    });
-    expect(jsonToolResult(getResult)).toMatchObject({
-      area: 'local',
-      data: { theme: 'dark', volume: 7 },
-      keyCount: 2,
-    });
+    expect(getResult.structuredContent).toEqual({ theme: 'dark', volume: 7 });
+    expect(jsonToolResult(getResult)).toEqual({ theme: 'dark', volume: 7 });
 
     const bytesResult = await executeTool(
       server.getTool('extension_tool_get_storage_bytes_in_use'),
@@ -324,33 +316,20 @@ describe('direct extension action tools', () => {
         keys: ['theme'],
       }
     );
-    expect(jsonToolResult(bytesResult)).toMatchObject({
-      area: 'local',
-      humanReadable: expect.any(String),
-      quota: { quotaBytes: 1024 },
-    });
-    expect(bytesResult.structuredContent).toMatchObject({
-      area: 'local',
-      bytesInUse: expect.any(Number),
-      humanReadable: expect.any(String),
-      quota: { quotaBytes: 1024 },
-      percentageUsed: expect.any(String),
-    });
+    expect(jsonToolResult(bytesResult)).toEqual(expect.any(Number));
+    expect(bytesResult.structuredContent).toEqual(expect.any(Number));
 
     const removeResult = await executeTool(server.getTool('extension_tool_remove_storage'), {
       area: 'local',
       keys: ['theme'],
     });
     expect(removeResult.isError).not.toBe(true);
-    expect(removeResult.structuredContent).toEqual({ keys: ['theme'] });
+    expect(removeResult.structuredContent).toBeUndefined();
 
     const afterRemove = await executeTool(server.getTool('extension_tool_get_storage'), {
       area: 'local',
     });
-    expect(jsonToolResult(afterRemove)).toMatchObject({
-      data: { existing: 'value', volume: 7 },
-      keyCount: 2,
-    });
+    expect(jsonToolResult(afterRemove)).toEqual({ existing: 'value', volume: 7 });
 
     const clearWithoutConfirm = await executeTool(server.getTool('extension_tool_clear_storage'), {
       area: 'local',
@@ -368,7 +347,7 @@ describe('direct extension action tools', () => {
     const afterClear = await executeTool(server.getTool('extension_tool_get_storage'), {
       area: 'local',
     });
-    expect(jsonToolResult(afterClear)).toMatchObject({ data: {}, keyCount: 0 });
+    expect(jsonToolResult(afterClear)).toEqual({});
   });
 
   it('returns handler validation failures as tool errors', async () => {

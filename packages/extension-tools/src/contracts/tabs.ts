@@ -248,19 +248,11 @@ export const TAB_LIST_ACTIVE_OUTPUT_SCHEMA = z.object({
 
 export const TAB_CREATE_OUTPUT_SCHEMA = CHROME_TAB_OUTPUT_SCHEMA;
 
-export const TAB_UPDATE_OUTPUT_SCHEMA = z.object({
-  tab: CHROME_TAB_OUTPUT_SCHEMA,
-  changes: z.object({}).passthrough(),
-});
+export const TAB_UPDATE_OUTPUT_SCHEMA = CHROME_TAB_OUTPUT_SCHEMA;
 
-export const TAB_CLOSE_OUTPUT_SCHEMA = z.object({
-  tabIds: z.array(z.number()),
-});
+export const TAB_CLOSE_OUTPUT_SCHEMA = z.void();
 
-export const TAB_GET_ALL_OUTPUT_SCHEMA = z.object({
-  count: z.number(),
-  tabs: z.array(CHROME_TAB_OUTPUT_SCHEMA),
-});
+export const TAB_GET_ALL_OUTPUT_SCHEMA = z.array(CHROME_TAB_OUTPUT_SCHEMA);
 
 export const TAB_HISTORY_OUTPUT_SCHEMA = z.object({
   tabId: z.number(),
@@ -281,9 +273,7 @@ export const TAB_DETECT_LANGUAGE_OUTPUT_SCHEMA = z.object({
   language: z.string(),
 });
 
-export const TAB_SINGLE_TAB_OUTPUT_SCHEMA = z.object({
-  tab: CHROME_TAB_OUTPUT_SCHEMA,
-});
+export const TAB_SINGLE_TAB_OUTPUT_SCHEMA = CHROME_TAB_OUTPUT_SCHEMA;
 
 export const TAB_ZOOM_OUTPUT_SCHEMA = z.object({
   zoomFactor: z.number(),
@@ -367,14 +357,14 @@ function defineTabTool<
   const TName extends string,
   const TActionId extends (typeof TAB_ACTION_IDS)[number],
   const TInputSchema extends z.AnyZodObject,
-  const TOutputSchema extends z.ZodTypeAny,
+  const TOutputSchema extends z.ZodTypeAny | undefined = undefined,
 >(options: {
   actionId: TActionId;
   name: TName;
   title: string;
   description: string;
   inputSchema: TInputSchema;
-  outputSchema: TOutputSchema;
+  outputSchema?: TOutputSchema;
   annotations: ToolAnnotations;
   requiresActiveTab?: boolean;
   hostPermissions?: readonly string[];
@@ -384,7 +374,7 @@ function defineTabTool<
     title: options.title,
     description: options.description,
     inputSchema: options.inputSchema,
-    outputSchema: options.outputSchema,
+    ...(options.outputSchema ? { outputSchema: options.outputSchema } : {}),
     annotations: {
       title: options.title,
       ...options.annotations,
@@ -402,7 +392,7 @@ function defineTabTool<
     groupId: 'tabs',
     actionId: options.actionId,
     zodInputSchema: options.inputSchema,
-    zodOutputSchema: options.outputSchema,
+    ...(options.outputSchema ? { zodOutputSchema: options.outputSchema } : {}),
   };
 }
 

@@ -33,18 +33,6 @@ export interface BookmarksApiToolsOptions {
 
 export const BOOKMARK_ACTIONS = BOOKMARK_ACTION_IDS;
 
-interface SerializedBookmarkNode {
-  id: string;
-  title: string;
-  url?: string | undefined;
-  parentId?: string | undefined;
-  index?: number | undefined;
-  dateAdded?: number | undefined;
-  dateAddedFormatted?: string | undefined;
-  type: 'bookmark' | 'folder';
-  children?: SerializedBookmarkNode[] | undefined;
-}
-
 export class BookmarksApiTools extends BaseApiTools<BookmarksApiToolsOptions> {
   protected apiName = 'Bookmarks';
 
@@ -168,116 +156,37 @@ export class BookmarksApiTools extends BaseApiTools<BookmarksApiToolsOptions> {
 
     const result = await chrome.bookmarks.create(createDetails);
 
-    return this.formatJson({
-      id: result.id,
-      title: result.title,
-      url: result.url,
-      parentId: result.parentId,
-      index: result.index,
-      dateAdded: result.dateAdded,
-      type: result.url ? 'bookmark' : 'folder',
-    });
+    return this.formatJson(result);
   }
 
   private async handleGet({ idOrIdList }: BookmarkGetInput) {
     const results = await chrome.bookmarks.get(this.toBookmarkIdRequest(idOrIdList));
 
-    return this.formatJson({
-      count: results.length,
-      bookmarks: results.map((bookmark) => ({
-        id: bookmark.id,
-        title: bookmark.title,
-        url: bookmark.url,
-        parentId: bookmark.parentId,
-        index: bookmark.index,
-        dateAdded: bookmark.dateAdded,
-        dateAddedFormatted: bookmark.dateAdded
-          ? new Date(bookmark.dateAdded).toISOString()
-          : undefined,
-        type: bookmark.url ? 'bookmark' : 'folder',
-      })),
-    });
+    return this.formatJson(results);
   }
 
   private async handleGetChildren({ id }: BookmarkGetChildrenInput) {
     const results = await chrome.bookmarks.getChildren(id);
 
-    return this.formatJson({
-      parentId: id,
-      count: results.length,
-      children: results.map((bookmark) => ({
-        id: bookmark.id,
-        title: bookmark.title,
-        url: bookmark.url,
-        parentId: bookmark.parentId,
-        index: bookmark.index,
-        dateAdded: bookmark.dateAdded,
-        dateAddedFormatted: bookmark.dateAdded
-          ? new Date(bookmark.dateAdded).toISOString()
-          : undefined,
-        type: bookmark.url ? 'bookmark' : 'folder',
-      })),
-    });
+    return this.formatJson(results);
   }
 
   private async handleGetRecent({ numberOfItems }: BookmarkGetRecentInput) {
     const results = await chrome.bookmarks.getRecent(numberOfItems);
 
-    return this.formatJson({
-      count: results.length,
-      recentBookmarks: results.map((bookmark) => ({
-        id: bookmark.id,
-        title: bookmark.title,
-        url: bookmark.url,
-        parentId: bookmark.parentId,
-        index: bookmark.index,
-        dateAdded: bookmark.dateAdded,
-        dateAddedFormatted: bookmark.dateAdded
-          ? new Date(bookmark.dateAdded).toISOString()
-          : undefined,
-      })),
-    });
+    return this.formatJson(results);
   }
 
   private async handleGetSubTree({ id }: BookmarkGetSubTreeInput) {
     const results = await chrome.bookmarks.getSubTree(id);
 
-    const formatNode = (node: chrome.bookmarks.BookmarkTreeNode): SerializedBookmarkNode => ({
-      id: node.id,
-      title: node.title,
-      url: node.url,
-      parentId: node.parentId,
-      index: node.index,
-      dateAdded: node.dateAdded,
-      dateAddedFormatted: node.dateAdded ? new Date(node.dateAdded).toISOString() : undefined,
-      type: node.url ? 'bookmark' : 'folder',
-      children: node.children ? node.children.map(formatNode) : undefined,
-    });
-
-    return this.formatJson({
-      rootId: id,
-      subtree: results.map(formatNode),
-    });
+    return this.formatJson(results);
   }
 
   private async handleGetTree() {
     const results = await chrome.bookmarks.getTree();
 
-    const formatNode = (node: chrome.bookmarks.BookmarkTreeNode): SerializedBookmarkNode => ({
-      id: node.id,
-      title: node.title,
-      url: node.url,
-      parentId: node.parentId,
-      index: node.index,
-      dateAdded: node.dateAdded,
-      dateAddedFormatted: node.dateAdded ? new Date(node.dateAdded).toISOString() : undefined,
-      type: node.url ? 'bookmark' : 'folder',
-      children: node.children ? node.children.map(formatNode) : undefined,
-    });
-
-    return this.formatJson({
-      tree: results.map(formatNode),
-    });
+    return this.formatJson(results);
   }
 
   private async handleMove({ id, parentId, index }: BookmarkMoveInput) {
@@ -287,45 +196,23 @@ export class BookmarksApiTools extends BaseApiTools<BookmarksApiToolsOptions> {
 
     const result = await chrome.bookmarks.move(id, destination);
 
-    return this.formatSuccess('Bookmark moved successfully', {
-      id: result.id,
-      title: result.title,
-      url: result.url,
-      parentId: result.parentId,
-      index: result.index,
-      type: result.url ? 'bookmark' : 'folder',
-    });
+    return this.formatJson(result);
   }
 
   private async handleRemove({ id }: BookmarkRemoveInput) {
     await chrome.bookmarks.remove(id);
-    return this.formatSuccess('Bookmark removed successfully', { id });
+    return this.formatSuccess('Bookmark removed successfully');
   }
 
   private async handleRemoveTree({ id }: BookmarkRemoveTreeInput) {
     await chrome.bookmarks.removeTree(id);
-    return this.formatSuccess('Bookmark folder and all contents removed successfully', { id });
+    return this.formatSuccess('Bookmark folder and all contents removed successfully');
   }
 
   private async handleSearch({ query }: BookmarkSearchInput) {
     const results = await chrome.bookmarks.search(this.toBookmarkSearchQuery(query));
 
-    return this.formatJson({
-      query: typeof query === 'string' ? query : JSON.stringify(query),
-      count: results.length,
-      results: results.map((bookmark) => ({
-        id: bookmark.id,
-        title: bookmark.title,
-        url: bookmark.url,
-        parentId: bookmark.parentId,
-        index: bookmark.index,
-        dateAdded: bookmark.dateAdded,
-        dateAddedFormatted: bookmark.dateAdded
-          ? new Date(bookmark.dateAdded).toISOString()
-          : undefined,
-        type: bookmark.url ? 'bookmark' : 'folder',
-      })),
-    });
+    return this.formatJson(results);
   }
 
   private async handleUpdate({ id, title, url }: BookmarkUpdateInput) {
@@ -339,15 +226,7 @@ export class BookmarksApiTools extends BaseApiTools<BookmarksApiToolsOptions> {
 
     const result = await chrome.bookmarks.update(id, changes);
 
-    return this.formatSuccess('Bookmark updated successfully', {
-      id: result.id,
-      title: result.title,
-      url: result.url,
-      parentId: result.parentId,
-      index: result.index,
-      type: result.url ? 'bookmark' : 'folder',
-      changes,
-    });
+    return this.formatJson(result);
   }
 
   private toBookmarkIdRequest(idOrIdList: string | string[]): string | [string, ...string[]] {
