@@ -6,6 +6,7 @@ import {
   HISTORY_TOOL_CONTRACTS,
   STORAGE_TOOL_CONTRACTS,
   TAB_TOOL_CONTRACTS,
+  USER_SCRIPTS_TOOL_CONTRACTS,
   type AnyExtensionToolContract,
 } from './contracts';
 import {
@@ -182,6 +183,41 @@ export const CHROME_METHOD_CONTRACTS = [
       }
       return objectInput(tabIdOrProperties);
     },
+  }),
+  chromeMethod({
+    path: 'userScripts.register',
+    signature: 'chrome.userScripts.register(scripts)',
+    action: USER_SCRIPTS_TOOL_CONTRACTS.register,
+    argsSchema: oneArg,
+    toActionInput: ([scripts]) => ({ scripts }),
+  }),
+  chromeMethod({
+    path: 'userScripts.getScripts',
+    signature: 'chrome.userScripts.getScripts(filter?)',
+    action: USER_SCRIPTS_TOOL_CONTRACTS.getScripts,
+    argsSchema: zeroOrOneArg,
+    toActionInput: ([filter]) => objectInput(filter),
+  }),
+  chromeMethod({
+    path: 'userScripts.update',
+    signature: 'chrome.userScripts.update(scripts)',
+    action: USER_SCRIPTS_TOOL_CONTRACTS.update,
+    argsSchema: oneArg,
+    toActionInput: ([scripts]) => ({ scripts }),
+  }),
+  chromeMethod({
+    path: 'userScripts.unregister',
+    signature: 'chrome.userScripts.unregister(filter?)',
+    action: USER_SCRIPTS_TOOL_CONTRACTS.unregister,
+    argsSchema: zeroOrOneArg,
+    toActionInput: ([filter]) => objectInput(filter),
+  }),
+  chromeMethod({
+    path: 'userScripts.execute',
+    signature: 'chrome.userScripts.execute(injection)',
+    action: USER_SCRIPTS_TOOL_CONTRACTS.execute,
+    argsSchema: oneArg,
+    toActionInput: ([injection]) => objectInput(injection),
   }),
 ] as const satisfies readonly ChromeMethodContract[];
 

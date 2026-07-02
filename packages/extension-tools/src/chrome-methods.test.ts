@@ -50,16 +50,45 @@ describe('chrome method facade', () => {
   const globalWithChrome = globalThis as unknown as { chrome?: unknown };
   let previousChrome: unknown;
   let tabQueries: unknown[];
+  let registeredUserScripts: unknown[];
+  let userScriptExecutions: unknown[];
 
   beforeEach(() => {
     previousChrome = globalWithChrome.chrome;
     tabQueries = [];
+    registeredUserScripts = [];
+    userScriptExecutions = [];
     globalWithChrome.chrome = {
       runtime: {},
       storage: {
         local: createStorageArea({ existing: 'value' }),
         session: createStorageArea(),
         sync: createStorageArea(),
+      },
+      userScripts: {
+        async getScripts(filter: { ids?: string[] } | undefined) {
+          const scripts = [
+            {
+              id: 'marker',
+              matches: ['http://127.0.0.1/*'],
+              runAt: 'document_end',
+              world: 'USER_SCRIPT',
+              js: [{ code: 'document.title = "marked";' }],
+            },
+          ];
+          if (filter?.ids) {
+            return scripts.filter((script) => filter.ids?.includes(script.id));
+          }
+          return scripts;
+        },
+        async register(scripts: unknown[]) {
+          registeredUserScripts.push(...scripts);
+        },
+        async unregister() {},
+        async execute(injection: unknown) {
+          userScriptExecutions.push(injection);
+          return [{ frameId: 0, documentId: 'doc-1', result: 'ran' }];
+        },
       },
       tabs: {
         async query(queryInfo: unknown) {
@@ -132,6 +161,64 @@ describe('chrome method facade', () => {
     ]);
 
     expect(tabQueries).toEqual([{ active: true, url: 'https://example.test/pending' }]);
+  });
+
+  it('registers, lists, and executes user scripts through native signatures', async () => {
+    const chromeApi = createChromeApiExecutor();
+
+    await expect(
+      chromeApi.invoke({
+        path: 'userScripts.register',
+        args: [
+          [
+            {
+              id: 'marker',
+              matches: ['http://127.0.0.1/*'],
+              js: [{ code: 'document.title = "marked";' }],
+              runAt: 'document_end',
+            },
+          ],
+        ],
+      })
+    ).resolves.toMatchObject({ scriptIds: ['marker'] });
+    expect(registeredUserScripts).toHaveLength(1);
+
+    await expect(
+      chromeApi.invoke({ path: 'userScripts.getScripts', args: [] })
+    ).resolves.toMatchObject({
+      count: 1,
+      scripts: [{ id: 'marker', jsSourcesCount: 1 }],
+    });
+
+    await expect(
+      chromeApi.invoke({
+        path: 'userScripts.execute',
+        args: [{ target: { tabId: 7 }, js: [{ code: '"ran"' }] }],
+      })
+    ).resolves.toMatchObject({
+      injectionCount: 1,
+      results: [{ frameId: 0, result: 'ran' }],
+    });
+    expect(userScriptExecutions).toEqual([{ target: { tabId: 7 }, js: [{ code: '"ran"' }] }]);
+  });
+
+  it('rejects user script sources that set both code and file', async () => {
+    const chromeApi = createChromeApiExecutor();
+
+    await expect(
+      chromeApi.invoke({
+        path: 'userScripts.register',
+        args: [
+          [
+            {
+              id: 'bad',
+              matches: ['http://127.0.0.1/*'],
+              js: [{ code: 'x', file: 'y.js' }],
+            },
+          ],
+        ],
+      })
+    ).rejects.toThrow('Exactly one of code or file');
   });
 
   it('reports unavailable Chrome paths with the native method name', async () => {

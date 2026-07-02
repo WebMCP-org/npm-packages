@@ -4,6 +4,7 @@ export * from './history';
 export * from './storage';
 export * from './tab-groups';
 export * from './tabs';
+export * from './user-scripts';
 export * from './windows';
 
 import {
@@ -20,6 +21,11 @@ import {
   type TabGroupToolName,
 } from './tab-groups';
 import { TABS_GROUP_CONTRACT, TAB_TOOL_CONTRACTS, type TabToolName } from './tabs';
+import {
+  USER_SCRIPTS_GROUP_CONTRACT,
+  USER_SCRIPTS_TOOL_CONTRACTS,
+  type UserScriptsToolName,
+} from './user-scripts';
 import { WINDOWS_GROUP_CONTRACT, WINDOW_TOOL_CONTRACTS, type WindowToolName } from './windows';
 
 export const EXTENSION_TOOL_GROUP_CONTRACTS = [
@@ -28,6 +34,7 @@ export const EXTENSION_TOOL_GROUP_CONTRACTS = [
   STORAGE_GROUP_CONTRACT,
   TAB_GROUPS_GROUP_CONTRACT,
   TABS_GROUP_CONTRACT,
+  USER_SCRIPTS_GROUP_CONTRACT,
   WINDOWS_GROUP_CONTRACT,
 ] as const;
 
@@ -37,6 +44,7 @@ export const EXTENSION_TOOL_CONTRACT_GROUPS = {
   storage: STORAGE_TOOL_CONTRACTS,
   tabGroups: TAB_GROUP_TOOL_CONTRACTS,
   tabs: TAB_TOOL_CONTRACTS,
+  userScripts: USER_SCRIPTS_TOOL_CONTRACTS,
   windows: WINDOW_TOOL_CONTRACTS,
 } as const;
 
@@ -46,6 +54,7 @@ export const EXTENSION_TOOL_CONTRACTS = [
   ...Object.values(STORAGE_TOOL_CONTRACTS),
   ...Object.values(TAB_GROUP_TOOL_CONTRACTS),
   ...Object.values(TAB_TOOL_CONTRACTS),
+  ...Object.values(USER_SCRIPTS_TOOL_CONTRACTS),
   ...Object.values(WINDOW_TOOL_CONTRACTS),
 ] as const;
 
@@ -57,6 +66,7 @@ export type ExtensionToolName =
   | StorageToolName
   | TabGroupToolName
   | TabToolName
+  | UserScriptsToolName
   | WindowToolName;
 export type ExtensionToolGroupId = (typeof EXTENSION_TOOL_GROUP_CONTRACTS)[number]['id'];
 export type ExtensionToolActionId = (typeof EXTENSION_TOOL_CONTRACTS)[number]['actionId'];

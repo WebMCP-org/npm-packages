@@ -10,6 +10,10 @@ import { HistoryApiTools, type HistoryApiToolsOptions } from './chrome-apis/Hist
 import { StorageApiTools, type StorageApiToolsOptions } from './chrome-apis/StorageApiTools';
 import { TabGroupsApiTools, type TabGroupsApiToolsOptions } from './chrome-apis/TabGroupsApiTools';
 import { TabsApiTools, type TabsApiToolsOptions } from './chrome-apis/TabsApiTools';
+import {
+  UserScriptsApiTools,
+  type UserScriptsApiToolsOptions,
+} from './chrome-apis/UserScriptsApiTools';
 import { WindowsApiTools, type WindowsApiToolsOptions } from './chrome-apis/WindowsApiTools';
 import { EXTENSION_TOOL_CONTRACTS_BY_NAME, type AnyExtensionToolContract } from './contracts';
 
@@ -29,6 +33,7 @@ export interface CreateExecutableExtensionToolsOptions {
   storage?: StorageApiToolsOptions;
   tabGroups?: TabGroupsApiToolsOptions;
   tabs?: TabsApiToolsOptions;
+  userScripts?: UserScriptsApiToolsOptions;
   windows?: WindowsApiToolsOptions;
 }
 
@@ -66,6 +71,14 @@ export function createExecutableExtensionTools(
   new StorageApiTools(server, options.storage).registerTools();
   new TabGroupsApiTools(server, options.tabGroups).registerTools();
   new TabsApiTools(server, options.tabs).registerTools();
+  // World-configuration tools are legacy (no contract), so they stay out of the
+  // contract-mapped executable set.
+  new UserScriptsApiTools(server, {
+    configureWorld: false,
+    getWorldConfigurations: false,
+    resetWorldConfiguration: false,
+    ...options.userScripts,
+  }).registerTools();
   new WindowsApiTools(server, options.windows).registerTools();
 
   const contractsByName = EXTENSION_TOOL_CONTRACTS_BY_NAME as Record<

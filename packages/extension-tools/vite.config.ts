@@ -13,6 +13,7 @@ const mainConfig: Options = {
     'src/contracts/storage.ts',
     'src/contracts/tab-groups.ts',
     'src/contracts/tabs.ts',
+    'src/contracts/user-scripts.ts',
     'src/contracts/windows.ts',
   ],
   format: ['esm'],

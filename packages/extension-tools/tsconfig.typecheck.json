@@ -13,6 +13,7 @@
     "src/chrome-apis/StorageApiTools.ts",
     "src/chrome-apis/TabGroupsApiTools.ts",
     "src/chrome-apis/TabsApiTools.ts",
+    "src/chrome-apis/UserScriptsApiTools.ts",
     "src/chrome-apis/WindowsApiTools.ts",
     "src/storage-contract-types.type-test.ts"
   ],

@@ -89,6 +89,10 @@
       "types": "./dist/contracts/tabs.d.ts",
       "import": "./dist/contracts/tabs.js"
     },
+    "./contracts/user-scripts": {
+      "types": "./dist/contracts/user-scripts.d.ts",
+      "import": "./dist/contracts/user-scripts.js"
+    },
     "./contracts/windows": {
       "types": "./dist/contracts/windows.d.ts",
       "import": "./dist/contracts/windows.js"

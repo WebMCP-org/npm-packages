@@ -6,6 +6,7 @@ import { HistoryApiTools } from './chrome-apis/HistoryApiTools.ts';
 import { StorageApiTools } from './chrome-apis/StorageApiTools.ts';
 import { TabGroupsApiTools } from './chrome-apis/TabGroupsApiTools.ts';
 import { TabsApiTools } from './chrome-apis/TabsApiTools.ts';
+import { UserScriptsApiTools } from './chrome-apis/UserScriptsApiTools.ts';
 import { WindowsApiTools } from './chrome-apis/WindowsApiTools.ts';
 import { EXTENSION_TOOL_CONTRACTS } from './contracts';
 
@@ -74,6 +75,11 @@ const DIRECT_TOOL_NAMES = [
   'extension_tool_delete_all_history',
   'extension_tool_delete_history_range',
   'extension_tool_delete_history_url',
+  'extension_tool_execute_user_script',
+  'extension_tool_get_user_scripts',
+  'extension_tool_register_user_scripts',
+  'extension_tool_unregister_user_scripts',
+  'extension_tool_update_user_scripts',
   'extension_tool_detect_tab_language',
   'extension_tool_discard_tab',
   'extension_tool_duplicate_tab',
@@ -147,6 +153,11 @@ function registerDirectToolGroups(server: CapturingServer): void {
   new StorageApiTools(asMcpServer(server)).registerTools();
   new TabGroupsApiTools(asMcpServer(server)).registerTools();
   new TabsApiTools(asMcpServer(server)).registerTools();
+  new UserScriptsApiTools(asMcpServer(server), {
+    configureWorld: false,
+    getWorldConfigurations: false,
+    resetWorldConfiguration: false,
+  }).registerTools();
   new WindowsApiTools(asMcpServer(server)).registerTools();
 }
 
