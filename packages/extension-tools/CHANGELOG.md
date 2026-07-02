@@ -1,5 +1,15 @@
 # @mcp-b/extension-tools
 
+## 4.0.0
+
+### Patch Changes
+
+- Updated dependencies [abaf5d0]
+- Updated dependencies [d05ea62]
+- Updated dependencies [f096ba6]
+  - @mcp-b/webmcp-ts-sdk@4.0.0
+  - @mcp-b/smart-dom-reader@4.0.0
+
 ## 3.0.0
 
 ### Major Changes

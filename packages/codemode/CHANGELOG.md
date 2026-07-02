@@ -1,5 +1,12 @@
 # @mcp-b/codemode
 
+## 3.0.0
+
+### Patch Changes
+
+- Updated dependencies [abaf5d0]
+  - @mcp-b/webmcp-types@4.0.0
+
 ## 2.0.0
 
 ### Major Changes

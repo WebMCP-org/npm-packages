@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/extension-tools",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "description": "62+ Chrome Extension API tools for Model Context Protocol (MCP) - Let AI agents control tabs, bookmarks, history, storage, and more",
   "keywords": [
     "ai-agents",
