@@ -14,8 +14,7 @@
       "@mcp-b/global",
       "@mcp-b/react-webmcp",
       "usewebmcp",
-      "@mcp-b/webmcp-local-relay",
-      "@mcp-b/chrome-devtools-mcp"
+      "@mcp-b/webmcp-local-relay"
     ]
   ],
   "linked": [],
