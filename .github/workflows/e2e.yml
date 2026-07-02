@@ -45,17 +45,24 @@ jobs:
         run: pnpm build
 
       - name: Setup Chrome
+        id: chrome
         uses: browser-actions/setup-chrome@2e1d749697dd1612b833dba4a722266286fbefcd
         with:
           chrome-version: stable
           install-dependencies: true
+
+      - name: Print Chrome version
+        run: '"${{ steps.chrome.outputs.chrome-path }}" --version'
 
       - name: Install Puppeteer Chrome (for chrome-devtools-mcp e2e)
         run: pnpm --filter @mcp-b/chrome-devtools-mcp exec puppeteer browsers install chrome
 
       - name: Run runtime contract E2E tests
         env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+          PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: ${{ steps.chrome.outputs.chrome-path }}
           PLAYWRIGHT_CHROMIUM_CHANNEL: chrome
+          PLAYWRIGHT_ENABLE_WEBMCP_FLAGS: '1'
         run: pnpm --filter mcp-e2e-tests run test:runtime-contract
 
       - name: Run local relay E2E tests
