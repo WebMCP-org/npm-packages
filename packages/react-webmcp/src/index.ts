@@ -8,7 +8,7 @@
  *
  * This package provides three main use cases:
  *
- * 1. **Provider hooks**: Register and expose tools to AI assistants via `window.navigator.modelContext`
+ * 1. **Provider hooks**: Register and expose tools to AI assistants via `window.document.modelContext`
  * 2. **Client hooks**: Connect to and consume tools from MCP servers
  * 3. **Request hooks**: Make sampling and elicitation requests to connected MCP clients
  *
@@ -50,6 +50,7 @@ export type {
   ToolInputSchema,
   WebMCPConfig,
   WebMCPReturn,
+  ZodSchema,
   ZodSchemaObject,
 } from './types.js';
 /**

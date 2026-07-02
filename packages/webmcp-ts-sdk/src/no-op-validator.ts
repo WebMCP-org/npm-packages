@@ -1,3 +1,8 @@
+import type {
+  JsonSchemaValidatorResult,
+  jsonSchemaValidator,
+} from '@modelcontextprotocol/sdk/validation';
+
 /**
  * No-op JSON Schema validator for browser environments.
  *
@@ -9,21 +14,6 @@
  * internal validation redundant. This no-op validator allows the SDK to function
  * without the ajv dependency issues.
  */
-
-/**
- * Interface for JSON Schema validators.
- * This matches the MCP SDK's jsonSchemaValidator interface.
- */
-interface JsonSchemaValidator {
-  getValidator<T>(schema: unknown): (input: unknown) => JsonSchemaValidatorResult<T>;
-}
-
-/**
- * Result type for JSON Schema validation
- */
-type JsonSchemaValidatorResult<T> =
-  | { valid: true; data: T; errorMessage: undefined }
-  | { valid: false; data: undefined; errorMessage: string };
 
 /**
  * A no-op JSON Schema validator that always returns valid.
@@ -44,7 +34,7 @@ type JsonSchemaValidatorResult<T> =
  * );
  * ```
  */
-export class NoOpJsonSchemaValidator implements JsonSchemaValidator {
+export class NoOpJsonSchemaValidator implements jsonSchemaValidator {
   /**
    * Returns a validator function that always passes.
    * The input data is passed through unchanged.

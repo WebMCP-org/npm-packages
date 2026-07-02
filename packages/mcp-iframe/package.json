@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/mcp-iframe",
-  "version": "2.3.1",
+  "version": "4.0.0",
   "description": "Custom element for exposing iframe MCP tools, resources, and prompts to parent page",
   "keywords": [
     "browser",
@@ -11,7 +11,7 @@
     "web-component",
     "web-model-context"
   ],
-  "homepage": "https://github.com/WebMCP-org/npm-packages#readme",
+  "homepage": "https://docs.mcp-b.ai/packages/mcp-iframe/reference",
   "bugs": {
     "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },

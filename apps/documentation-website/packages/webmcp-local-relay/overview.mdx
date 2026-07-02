@@ -1,0 +1,52 @@
+---
+title: '@mcp-b/webmcp-local-relay overview'
+description: 'When to use the local relay, how it differs from DevTools-based workflows, and how it bridges browser tools to desktop MCP clients.'
+keywords: ['@mcp-b/webmcp-local-relay', 'overview', 'desktop agent', 'relay', 'stdio', 'websocket']
+icon: 'satellite-dish'
+---
+
+`@mcp-b/webmcp-local-relay` connects WebMCP tools running in browser tabs to desktop MCP clients such as Claude Desktop, Cursor, and Claude Code. It is the package to use when you want browser-hosted tools available in local agent workflows.
+
+## When to use this package
+
+- You want desktop MCP clients to call tools from a browser tab.
+- You want a browser-to-localhost relay instead of a DevTools bridge.
+- You are exposing site tools to external agents without requiring an extension-specific integration.
+
+## When not to use this package
+
+- You need browser automation, traces, console access, or DOM inspection. Use upstream [`chrome-devtools-mcp`](/packages/chrome-devtools-mcp/overview).
+- You only need in-browser discovery through a runtime or extension.
+
+## Where it sits in the package graph
+
+This package is adjacent to the runtime stack rather than inside it. Pages still need to expose WebMCP tools, usually through [`@mcp-b/global`](/packages/global/overview) or the embed script, and the relay forwards those tools to desktop clients.
+
+## First step
+
+Start the relay in your MCP client config, then connect a browser tab that exposes WebMCP tools. The [reference page](/packages/webmcp-local-relay/reference) documents CLI options, security controls, and the embed flow.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Reference" icon="book-open" href="/packages/webmcp-local-relay/reference">
+    CLI options, architecture, security model, and embed details.
+  </Card>
+  <Card
+    title="Connect desktop agents with local relay"
+    icon="tower-broadcast"
+    href="/how-to/connect-desktop-agents-with-local-relay"
+  >
+    End-to-end setup for desktop MCP clients.
+  </Card>
+  <Card
+    title="Transports and bridges"
+    icon="bridge"
+    href="/explanation/architecture/transports-and-bridges"
+  >
+    Understand where the relay fits among other bridge options.
+  </Card>
+  <Card title="@mcp-b/global overview" icon="globe" href="/packages/global/overview">
+    Runtime setup for pages that expose tools to the relay.
+  </Card>
+</CardGroup>

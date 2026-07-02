@@ -17,19 +17,32 @@ function isDirectOrWrappedText(value: unknown, expectedText: string): boolean {
   }
 }
 
-test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
+test.describe('Chrome 152 WebMCP Testing Flag Smoke', () => {
   test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      const target = window as Window & {
+        __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'];
+        __WEBMCP_RAW_NAVIGATOR_MODEL_CONTEXT__?: Navigator['modelContext'];
+        __WEBMCP_RAW_MODEL_CONTEXT_TESTING__?: Navigator['modelContextTesting'];
+      };
+      target.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ = document.modelContext;
+      target.__WEBMCP_RAW_NAVIGATOR_MODEL_CONTEXT__ = navigator.modelContext;
+      target.__WEBMCP_RAW_MODEL_CONTEXT_TESTING__ = navigator.modelContextTesting;
+    });
     await page.goto('/');
     await expect(page.locator('h1')).toContainText('Web Model Context API E2E Test');
   });
 
   test('exposes native modelContextTesting core API surface', async ({ page }) => {
     const surface = await page.evaluate(() => {
-      const testing = (navigator as Navigator & { modelContextTesting?: Record<string, unknown> })
-        .modelContextTesting;
+      const raw = window as Window & {
+        __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: unknown;
+        __WEBMCP_RAW_MODEL_CONTEXT_TESTING__?: Record<string, unknown>;
+      };
+      const testing = raw.__WEBMCP_RAW_MODEL_CONTEXT_TESTING__;
 
       return {
-        hasModelContext: typeof navigator.modelContext !== 'undefined',
+        hasDocumentModelContext: typeof raw.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ !== 'undefined',
         hasTesting: Boolean(testing),
         hasExecuteTool: typeof testing?.executeTool === 'function',
         hasListTools: typeof testing?.listTools === 'function',
@@ -39,20 +52,43 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
       };
     });
 
-    expect(surface.hasModelContext).toBe(true);
+    expect(surface.hasDocumentModelContext).toBe(true);
     expect(surface.hasTesting).toBe(true);
     expect(surface.hasExecuteTool).toBe(true);
     expect(surface.hasListTools).toBe(true);
     expect(surface.hasAddEventListener).toBe(true);
+    expect(surface.hasCrossDocumentResult).toBe(true);
     expect(surface.isPolyfill).toBe(false);
+  });
 
-    // Diagnostics only: current Chrome Beta may not yet expose this method.
-    console.log('hasCrossDocumentResult:', surface.hasCrossDocumentResult);
+  test('exposes Chrome M152 document.modelContext surface', async ({ page }) => {
+    const surface = await page.evaluate(() => {
+      const raw = window as Window & {
+        __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: unknown;
+        __WEBMCP_RAW_NAVIGATOR_MODEL_CONTEXT__?: unknown;
+      };
+
+      return {
+        hasDocumentModelContext: typeof raw.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ !== 'undefined',
+        hasNavigatorModelContext: typeof raw.__WEBMCP_RAW_NAVIGATOR_MODEL_CONTEXT__ !== 'undefined',
+        sameInstance:
+          raw.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ === raw.__WEBMCP_RAW_NAVIGATOR_MODEL_CONTEXT__,
+      };
+    });
+
+    expect(surface.hasDocumentModelContext).toBe(true);
+    expect(surface.hasNavigatorModelContext).toBe(true);
+    expect(surface.sameInstance).toBe(true);
   });
 
   test('listTools returns valid RegisteredTool entries for every tool', async ({ page }) => {
     const result = await page.evaluate(() => {
-      const testing = navigator.modelContextTesting;
+      const testing =
+        (
+          window as Window & {
+            __WEBMCP_RAW_MODEL_CONTEXT_TESTING__?: Navigator['modelContextTesting'];
+          }
+        ).__WEBMCP_RAW_MODEL_CONTEXT_TESTING__ ?? navigator.modelContextTesting;
       if (!testing) {
         return { missingApi: true };
       }
@@ -90,31 +126,45 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
     expect(result.invalidEntries).toEqual([]);
   });
 
-  test('listTools tracks register/unregister operations', async ({ page }) => {
-    const result = await page.evaluate(() => {
-      const context = navigator.modelContext;
-      const testing = navigator.modelContextTesting;
+  test('listTools tracks registerTool signal lifecycle operations', async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const raw = window as Window & {
+        __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'];
+        __WEBMCP_RAW_MODEL_CONTEXT_TESTING__?: Navigator['modelContextTesting'];
+      };
+      const context = raw.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
+      const testing = raw.__WEBMCP_RAW_MODEL_CONTEXT_TESTING__ ?? navigator.modelContextTesting;
       if (!context || !testing) {
         return { missingApi: true };
       }
 
       const toolName = `beta_list_tracking_${Date.now()}`;
+      const controller = new AbortController();
       const before = testing.listTools().length;
-      context.registerTool({
-        name: toolName,
-        description: 'Tracking test tool',
-        inputSchema: { type: 'object', properties: {} },
-        async execute() {
-          return { content: [{ type: 'text', text: 'ok' }] };
+      await context.registerTool(
+        {
+          name: toolName,
+          description: 'Tracking test tool',
+          inputSchema: { type: 'object', properties: {} },
+          async execute() {
+            return { content: [{ type: 'text', text: 'ok' }] };
+          },
         },
-      });
+        { signal: controller.signal }
+      );
 
       const afterRegister = testing.listTools().length;
       const hasToolAfterRegister = testing
         .listTools()
         .some((tool: { name: string }) => tool.name === toolName);
 
-      context.unregisterTool(toolName);
+      controller.abort();
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        if (!testing.listTools().some((tool: { name: string }) => tool.name === toolName)) {
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
       const afterUnregister = testing.listTools().length;
       const hasToolAfterUnregister = testing
         .listTools()
@@ -142,36 +192,47 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
   test('listTools returns schema strings for tools registered without explicit inputSchema', async ({
     page,
   }) => {
-    const result = await page.evaluate(() => {
-      const context = navigator.modelContext;
-      const testing = navigator.modelContextTesting;
+    const result = await page.evaluate(async () => {
+      const raw = window as Window & {
+        __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'];
+        __WEBMCP_RAW_MODEL_CONTEXT_TESTING__?: Navigator['modelContextTesting'];
+      };
+      const context = raw.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
+      const testing = raw.__WEBMCP_RAW_MODEL_CONTEXT_TESTING__ ?? navigator.modelContextTesting;
       if (!context || !testing) {
         return { missingApi: true };
       }
 
       const nativeContext = context as unknown as {
-        registerTool: (tool: unknown) => unknown;
-        unregisterTool: (name: string) => void;
+        registerTool: (tool: unknown, options?: { signal?: AbortSignal }) => unknown;
       };
 
       const noSchemaName = `beta_no_schema_${Date.now()}`;
       const undefinedSchemaName = `beta_undefined_schema_${Date.now()}`;
+      const noSchemaController = new AbortController();
+      const undefinedSchemaController = new AbortController();
 
-      nativeContext.registerTool({
-        name: noSchemaName,
-        description: 'No explicit schema',
-        async execute() {
-          return { content: [{ type: 'text', text: 'ok' }] };
+      await nativeContext.registerTool(
+        {
+          name: noSchemaName,
+          description: 'No explicit schema',
+          async execute() {
+            return { content: [{ type: 'text', text: 'ok' }] };
+          },
         },
-      });
-      nativeContext.registerTool({
-        name: undefinedSchemaName,
-        description: 'Undefined schema',
-        inputSchema: undefined,
-        async execute() {
-          return { content: [{ type: 'text', text: 'ok' }] };
+        { signal: noSchemaController.signal }
+      );
+      await nativeContext.registerTool(
+        {
+          name: undefinedSchemaName,
+          description: 'Undefined schema',
+          inputSchema: undefined,
+          async execute() {
+            return { content: [{ type: 'text', text: 'ok' }] };
+          },
         },
-      });
+        { signal: undefinedSchemaController.signal }
+      );
 
       try {
         const tools = testing.listTools();
@@ -203,8 +264,8 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
           undefinedSchemaParseable: parseableOrEmpty(undefinedSchemaTool?.inputSchema),
         };
       } finally {
-        nativeContext.unregisterTool(noSchemaName);
-        nativeContext.unregisterTool(undefinedSchemaName);
+        noSchemaController.abort();
+        undefinedSchemaController.abort();
       }
     });
 
@@ -217,25 +278,33 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
 
   test('executeTool accepts JSON object strings and returns string or null', async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const context = navigator.modelContext;
-      const testing = navigator.modelContextTesting;
+      const raw = window as Window & {
+        __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'];
+        __WEBMCP_RAW_MODEL_CONTEXT_TESTING__?: Navigator['modelContextTesting'];
+      };
+      const context = raw.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
+      const testing = raw.__WEBMCP_RAW_MODEL_CONTEXT_TESTING__ ?? navigator.modelContextTesting;
       if (!context || !testing) {
         return { missingApi: true };
       }
 
       const toolName = `beta_exec_ok_${Date.now()}`;
-      context.registerTool({
-        name: toolName,
-        description: 'executeTool happy path',
-        inputSchema: {
-          type: 'object',
-          properties: { value: { type: 'number' } },
-          required: ['value'],
+      const controller = new AbortController();
+      await context.registerTool(
+        {
+          name: toolName,
+          description: 'executeTool happy path',
+          inputSchema: {
+            type: 'object',
+            properties: { value: { type: 'number' } },
+            required: ['value'],
+          },
+          async execute(args: { value: number }) {
+            return { content: [{ type: 'text', text: `beta:${args.value}` }] };
+          },
         },
-        async execute(args: { value: number }) {
-          return { content: [{ type: 'text', text: `beta:${args.value}` }] };
-        },
-      });
+        { signal: controller.signal }
+      );
 
       try {
         const withoutOptions = await testing.executeTool(toolName, JSON.stringify({ value: 7 }));
@@ -246,7 +315,7 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
         );
         return { missingApi: false, withoutOptions, withEmptyOptions };
       } finally {
-        context.unregisterTool(toolName);
+        controller.abort();
       }
     });
 
@@ -257,7 +326,12 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
 
   test('executeTool rejects invalid JSON with UnknownError', async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const testing = navigator.modelContextTesting;
+      const testing =
+        (
+          window as Window & {
+            __WEBMCP_RAW_MODEL_CONTEXT_TESTING__?: Navigator['modelContextTesting'];
+          }
+        ).__WEBMCP_RAW_MODEL_CONTEXT_TESTING__ ?? navigator.modelContextTesting;
       if (!testing) {
         return { missingApi: true };
       }
@@ -289,7 +363,12 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
 
   test('executeTool rejects non-object JSON payloads with UnknownError', async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const testing = navigator.modelContextTesting;
+      const testing =
+        (
+          window as Window & {
+            __WEBMCP_RAW_MODEL_CONTEXT_TESTING__?: Navigator['modelContextTesting'];
+          }
+        ).__WEBMCP_RAW_MODEL_CONTEXT_TESTING__ ?? navigator.modelContextTesting;
       if (!testing) {
         return { missingApi: true };
       }
@@ -321,7 +400,12 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
 
   test('executeTool rejects missing tools with UnknownError', async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const testing = navigator.modelContextTesting;
+      const testing =
+        (
+          window as Window & {
+            __WEBMCP_RAW_MODEL_CONTEXT_TESTING__?: Navigator['modelContextTesting'];
+          }
+        ).__WEBMCP_RAW_MODEL_CONTEXT_TESTING__ ?? navigator.modelContextTesting;
       if (!testing) {
         return { missingApi: true };
       }
@@ -348,21 +432,29 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
 
   test('executeTool maps thrown tool invocation failures to UnknownError', async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const context = navigator.modelContext;
-      const testing = navigator.modelContextTesting;
+      const raw = window as Window & {
+        __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'];
+        __WEBMCP_RAW_MODEL_CONTEXT_TESTING__?: Navigator['modelContextTesting'];
+      };
+      const context = raw.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
+      const testing = raw.__WEBMCP_RAW_MODEL_CONTEXT_TESTING__ ?? navigator.modelContextTesting;
       if (!context || !testing) {
         return { missingApi: true };
       }
 
       const toolName = `beta_exec_throw_${Date.now()}`;
-      context.registerTool({
-        name: toolName,
-        description: 'Always throws',
-        inputSchema: { type: 'object', properties: {} },
-        async execute() {
-          throw new Error('boom');
+      const controller = new AbortController();
+      await context.registerTool(
+        {
+          name: toolName,
+          description: 'Always throws',
+          inputSchema: { type: 'object', properties: {} },
+          async execute() {
+            throw new Error('boom');
+          },
         },
-      });
+        { signal: controller.signal }
+      );
 
       try {
         await testing.executeTool(toolName, '{}');
@@ -375,7 +467,7 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
           message: error instanceof Error ? error.message : String(error),
         };
       } finally {
-        context.unregisterTool(toolName);
+        controller.abort();
       }
     });
 
@@ -387,7 +479,12 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
 
   test('executeTool with aborted signal before call rejects', async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const testing = navigator.modelContextTesting;
+      const testing =
+        (
+          window as Window & {
+            __WEBMCP_RAW_MODEL_CONTEXT_TESTING__?: Navigator['modelContextTesting'];
+          }
+        ).__WEBMCP_RAW_MODEL_CONTEXT_TESTING__ ?? navigator.modelContextTesting;
       if (!testing) {
         return { missingApi: true };
       }
@@ -421,22 +518,30 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
 
   test('executeTool with aborted signal during pending tool rejects', async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const context = navigator.modelContext;
-      const testing = navigator.modelContextTesting;
+      const raw = window as Window & {
+        __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'];
+        __WEBMCP_RAW_MODEL_CONTEXT_TESTING__?: Navigator['modelContextTesting'];
+      };
+      const context = raw.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
+      const testing = raw.__WEBMCP_RAW_MODEL_CONTEXT_TESTING__ ?? navigator.modelContextTesting;
       if (!context || !testing) {
         return { missingApi: true };
       }
 
       const toolName = `beta_exec_abort_${Date.now()}`;
-      context.registerTool({
-        name: toolName,
-        description: 'Slow abortable tool',
-        inputSchema: { type: 'object', properties: {} },
-        async execute() {
-          await new Promise((resolve) => setTimeout(resolve, 200));
-          return { content: [{ type: 'text', text: 'done' }] };
+      const registrationController = new AbortController();
+      await context.registerTool(
+        {
+          name: toolName,
+          description: 'Slow abortable tool',
+          inputSchema: { type: 'object', properties: {} },
+          async execute() {
+            await new Promise((resolve) => setTimeout(resolve, 200));
+            return { content: [{ type: 'text', text: 'done' }] };
+          },
         },
-      });
+        { signal: registrationController.signal }
+      );
 
       try {
         const controller = new AbortController();
@@ -452,7 +557,7 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
         setTimeout(() => controller.abort(), 10);
         return { missingApi: false, ...(await pending) };
       } finally {
-        context.unregisterTool(toolName);
+        registrationController.abort();
       }
     });
 
@@ -475,14 +580,27 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
     page,
   }) => {
     const result = await page.evaluate(async () => {
-      const context = navigator.modelContext;
-      const testing = navigator.modelContextTesting;
+      const raw = window as Window & {
+        __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'];
+        __WEBMCP_RAW_MODEL_CONTEXT_TESTING__?: Navigator['modelContextTesting'];
+      };
+      const context = raw.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
+      const testing = raw.__WEBMCP_RAW_MODEL_CONTEXT_TESTING__ ?? navigator.modelContextTesting;
       if (!context || !testing) {
         return { missingApi: true };
       }
 
       let firstCount = 0;
       let secondCount = 0;
+      const waitFor = async (predicate: () => boolean) => {
+        for (let attempt = 0; attempt < 20; attempt += 1) {
+          if (predicate()) {
+            return true;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 25));
+        }
+        return false;
+      };
 
       testing.addEventListener('toolchange', () => {
         firstCount += 1;
@@ -492,70 +610,81 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
       });
 
       const dynamicName = `beta_cb_dynamic_${Date.now()}`;
-      const providedName = `beta_cb_provided_${Date.now()}`;
+      const throwingName = `beta_cb_throw_${Date.now()}`;
+      const dynamicController = new AbortController();
+      const throwingController = new AbortController();
 
-      context.registerTool({
-        name: dynamicName,
-        description: 'dynamic callback test',
-        inputSchema: { type: 'object', properties: {} },
-        async execute() {
-          return { content: [{ type: 'text', text: 'ok' }] };
-        },
-      });
-      context.unregisterTool(dynamicName);
-      context.provideContext({
-        tools: [
-          {
-            name: providedName,
-            description: 'provided callback test',
-            inputSchema: { type: 'object', properties: {} },
-            async execute() {
-              return { content: [{ type: 'text', text: 'ok' }] };
-            },
+      await context.registerTool(
+        {
+          name: dynamicName,
+          description: 'dynamic callback test',
+          inputSchema: { type: 'object', properties: {} },
+          async execute() {
+            return { content: [{ type: 'text', text: 'ok' }] };
           },
-        ],
-      });
-      context.clearContext();
-
-      await new Promise((resolve) => setTimeout(resolve, 100));
+        },
+        { signal: dynamicController.signal }
+      );
+      const sawRegisterNotification = await waitFor(() => firstCount >= 1 && secondCount >= 1);
+      const firstCountAfterRegister = firstCount;
+      const secondCountAfterRegister = secondCount;
+      dynamicController.abort();
+      const sawAbortNotification = await waitFor(
+        () => firstCount > firstCountAfterRegister && secondCount > secondCountAfterRegister
+      );
 
       let throwsListenerOperationsSucceeded = true;
       testing.addEventListener('toolchange', () => {
         throw new Error('intentional listener failure');
       });
       try {
-        context.registerTool({
-          name: `beta_cb_throw_${Date.now()}`,
-          description: 'throwing listener operation',
-          inputSchema: { type: 'object', properties: {} },
-          async execute() {
-            return { content: [{ type: 'text', text: 'ok' }] };
+        await context.registerTool(
+          {
+            name: throwingName,
+            description: 'throwing listener operation',
+            inputSchema: { type: 'object', properties: {} },
+            async execute() {
+              return { content: [{ type: 'text', text: 'ok' }] };
+            },
           },
-        });
+          { signal: throwingController.signal }
+        );
       } catch {
         throwsListenerOperationsSucceeded = false;
+      } finally {
+        throwingController.abort();
       }
 
       return {
         missingApi: false,
         firstCount,
         secondCount,
+        sawRegisterNotification,
+        sawAbortNotification,
         throwsListenerOperationsSucceeded,
       };
     });
 
     expect(result.missingApi).toBe(false);
-    // Both listeners should fire for all 4 operations
-    expect(result.firstCount).toBeGreaterThanOrEqual(4);
-    expect(result.secondCount).toBeGreaterThanOrEqual(4);
+    expect(result.sawRegisterNotification).toBe(true);
+    expect(result.sawAbortNotification).toBe(true);
+    expect(result.firstCount).toBe(result.secondCount);
     expect(result.throwsListenerOperationsSucceeded).toBe(true);
   });
 
   test('getCrossDocumentScriptToolResult returns JSON string payload', async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const testing = navigator.modelContextTesting;
+      const testing =
+        (
+          window as Window & {
+            __WEBMCP_RAW_MODEL_CONTEXT_TESTING__?: Navigator['modelContextTesting'];
+          }
+        ).__WEBMCP_RAW_MODEL_CONTEXT_TESTING__ ?? navigator.modelContextTesting;
       if (!testing) {
         return { missingApi: true };
+      }
+      if (typeof testing.getCrossDocumentScriptToolResult !== 'function') {
+        return { missingApi: false, missingMethod: true };
       }
 
       const value = await testing.getCrossDocumentScriptToolResult();
@@ -569,6 +698,7 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
 
       return {
         missingApi: false,
+        missingMethod: false,
         type: typeof value,
         parsedOk,
         valueLength: value.length,
@@ -576,6 +706,7 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
     });
 
     expect(result.missingApi).toBe(false);
+    expect(result.missingMethod).toBe(false);
     expect(result.type).toBe('string');
     expect(result.parsedOk).toBe(true);
     expect(result.valueLength).toBeGreaterThanOrEqual(2);
@@ -583,38 +714,48 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
 
   test('listTools returns stringified inputSchema for registered tools', async ({ page }) => {
     const listResult = await page.evaluate(async () => {
-      const context = navigator.modelContext;
-      const testing = (
-        navigator as Navigator & {
-          modelContextTesting?: {
-            listTools: () => Array<{
-              name: string;
-              description: string;
-              inputSchema?: string;
-            }>;
-          };
-        }
-      ).modelContextTesting;
+      const raw = window as Window & {
+        __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'];
+        __WEBMCP_RAW_MODEL_CONTEXT_TESTING__?: Navigator['modelContextTesting'];
+      };
+      const context = raw.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
+      const testing =
+        raw.__WEBMCP_RAW_MODEL_CONTEXT_TESTING__ ??
+        (
+          navigator as Navigator & {
+            modelContextTesting?: {
+              listTools: () => Array<{
+                name: string;
+                description: string;
+                inputSchema?: string;
+              }>;
+            };
+          }
+        ).modelContextTesting;
 
       if (!context || !testing) {
         return { missingApi: true };
       }
 
       const toolName = `beta_schema_tool_${Date.now()}`;
-      context.registerTool({
-        name: toolName,
-        description: 'Schema verification tool',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            query: { type: 'string' },
+      const controller = new AbortController();
+      await context.registerTool(
+        {
+          name: toolName,
+          description: 'Schema verification tool',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              query: { type: 'string' },
+            },
+            required: ['query'],
           },
-          required: ['query'],
+          async execute() {
+            return { content: [{ type: 'text', text: 'ok' }] };
+          },
         },
-        async execute() {
-          return { content: [{ type: 'text', text: 'ok' }] };
-        },
-      });
+        { signal: controller.signal }
+      );
 
       try {
         const tools = testing.listTools();
@@ -637,11 +778,7 @@ test.describe('Chrome Beta WebMCP Testing Flag Smoke', () => {
           parsedSchemaType,
         };
       } finally {
-        try {
-          context.unregisterTool(toolName);
-        } catch {
-          // no-op
-        }
+        controller.abort();
       }
     });
 

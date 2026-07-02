@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/smart-dom-reader",
-  "version": "2.3.1",
+  "version": "4.0.0",
   "description": "Token-efficient DOM extraction for AI agents - Extract interactive elements, semantic structure, and stable CSS selectors for LLM-powered browser automation",
   "keywords": [
     "ai",
@@ -31,7 +31,7 @@
     "web-scraping",
     "xpath"
   ],
-  "homepage": "https://docs.mcp-b.ai/packages/smart-dom-reader",
+  "homepage": "https://docs.mcp-b.ai/packages/smart-dom-reader/reference",
   "bugs": {
     "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },
@@ -47,18 +47,18 @@
   ],
   "type": "module",
   "sideEffects": true,
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "browser": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "browser": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
     },
     "./bundle-string": {
-      "types": "./dist/bundle-string.d.ts",
-      "import": "./dist/bundle-string.js"
+      "types": "./dist/bundle-string.d.mts",
+      "import": "./dist/bundle-string.mjs"
     }
   },
   "publishConfig": {
@@ -91,7 +91,7 @@
     "vite-plus": "catalog:"
   },
   "peerDependencies": {
-    "@modelcontextprotocol/sdk": "^1.26.0"
+    "@modelcontextprotocol/sdk": "^1.29.0"
   },
   "peerDependenciesMeta": {
     "@modelcontextprotocol/sdk": {

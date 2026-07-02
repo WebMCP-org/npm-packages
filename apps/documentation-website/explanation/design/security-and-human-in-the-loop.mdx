@@ -1,0 +1,25 @@
+---
+title: 'Security and human-in-the-loop'
+description: 'Why WebMCP security starts with browser mediation but still depends on application authorization.'
+keywords: ['security', 'authorization', 'human in the loop', 'prompt injection']
+icon: 'shield-halved'
+---
+
+WebMCP tools can reuse a site's authenticated browser session. That does not
+make the agent trusted. Every call must pass through the same validation and
+authorization rules as the corresponding human workflow.
+
+A tool name, hidden control, or agent instruction is not a permission check.
+
+Side effects should be explicit. Financial, destructive,
+external-communication, and privacy-sensitive operations require stronger
+review or confirmation. Tool metadata, page content, and tool output must be
+treated as untrusted language-model input because each can carry prompt
+injection.
+
+Iframe, tab, extension, and localhost bridges add transport-level boundaries.
+Their origin, connection identity, permissions, and exposure controls must be
+validated separately.
+
+The upstream [security and privacy considerations](https://github.com/webmachinelearning/webmcp/blob/main/docs/security-privacy-considerations.md)
+define the standards threat model.

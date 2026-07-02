@@ -8,25 +8,6 @@ import type {
 } from './tool.js';
 
 // ============================================================================
-// Model Context Input
-// ============================================================================
-
-/**
- * Context provided to models via provideContext().
- */
-export interface ModelContextInput<TTools extends readonly ToolDescriptor[] = ToolDescriptor[]> {
-  /**
-   * Base tool descriptors to expose.
-   */
-  tools?: TTools;
-}
-
-/**
- * Public options accepted by provideContext().
- */
-export type ModelContextOptions = ModelContextInput;
-
-// ============================================================================
 // Model Context Testing
 // ============================================================================
 
@@ -37,6 +18,15 @@ export interface ModelContextTestingToolInfo {
   name: string;
   description: string;
   inputSchema?: string;
+}
+
+/**
+ * Tool info returned by Chromium's producer-facing ModelContext.getTools().
+ */
+export interface ModelContextToolInfo extends ModelContextTestingToolInfo {
+  title: string;
+  origin: string;
+  window: Window;
 }
 
 /**
@@ -58,7 +48,7 @@ export interface ModelContextTesting extends EventTarget {
     inputArgsJson: string,
     options?: ModelContextTestingExecuteToolOptions
   ): Promise<string | null>;
-  getCrossDocumentScriptToolResult(): Promise<string>;
+  getCrossDocumentScriptToolResult?(): Promise<string>;
   ontoolchange: ((this: ModelContextTesting, ev: Event) => unknown) | null;
   /**
    * @deprecated Use `addEventListener('toolchange', ...)` instead.
@@ -142,7 +132,7 @@ export type ToolResultByName<
 > = InferToolResult<ToolByName<TTools, TName>>;
 
 /**
- * Typed parameters for `callTool`.
+ * Typed parameters for MCP-B compatibility `callTool`.
  *
  * When a tool has no args (`Record<string, never>`), `arguments` becomes optional.
  */
@@ -204,6 +194,11 @@ export interface ModelContextRegisterToolOptions {
    * An `AbortSignal` whose abortion unregisters the tool. A pre-aborted signal short-circuits registration.
    */
   signal?: AbortSignal;
+
+  /**
+   * Origins that can observe this tool from other documents in the same tree.
+   */
+  exposedTo?: string[];
 }
 
 // ============================================================================
@@ -211,17 +206,9 @@ export interface ModelContextRegisterToolOptions {
 // ============================================================================
 
 /**
- * Strict WebMCP core interface on navigator.modelContext.
+ * Strict WebMCP core interface on document.modelContext.
  */
 export interface ModelContextCore {
-  // ==================== CONTEXT ====================
-
-  /**
-   * Replaces base context with provided tools.
-   * @deprecated Removed from the upstream WebMCP spec on March 5, 2026. Kept only as a temporary compatibility API.
-   */
-  provideContext(options?: ModelContextOptions): void;
-
   // ==================== TOOLS ====================
 
   /**
@@ -237,7 +224,7 @@ export interface ModelContextCore {
   >(
     tool: ToolDescriptorFromSchema<TInputSchema, TOutputSchema, TName>,
     options?: ModelContextRegisterToolOptions
-  ): void;
+  ): Promise<void>;
 
   /**
    * Registers a dynamic tool with explicitly typed args/result.
@@ -255,7 +242,7 @@ export interface ModelContextCore {
           : never
         : unknown),
     options?: ModelContextRegisterToolOptions
-  ): void;
+  ): Promise<void>;
 
   /**
    * Registers a dynamic tool without an explicit inputSchema.
@@ -269,14 +256,26 @@ export interface ModelContextCore {
       inputSchema?: undefined;
     },
     options?: ModelContextRegisterToolOptions
-  ): void;
+  ): Promise<void>;
 
   /**
    * Lists currently registered producer tools using the native Chromium preview
    * shape. Current Chromium returns JSON-stringified schemas here, matching
    * ModelContextTesting.listTools().
    */
-  getTools(): ModelContextTestingToolInfo[];
+  getTools(): Promise<ModelContextToolInfo[]>;
+
+  /**
+   * Executes a registered tool object returned from getTools().
+   *
+   * This mirrors Chromium's current producer-facing preview API. The testing API
+   * still executes by `(toolName, inputArgsJson)`.
+   */
+  executeTool(
+    tool: ModelContextToolInfo,
+    inputArgsJson: string,
+    options?: ModelContextTestingExecuteToolOptions
+  ): Promise<string | null>;
 
   /**
    * Handler invoked when the producer tool list changes.
@@ -296,19 +295,6 @@ export interface ModelContextCore {
   ): void;
 
   dispatchEvent(event: Event): boolean;
-
-  /**
-   * Unregisters a dynamic tool by name or tool reference.
-   *
-   * @deprecated Removed from the WebMCP spec on April 23, 2026. Use `registerTool(tool, { signal })`. Will be removed in the next major.
-   */
-  unregisterTool(nameOrTool: string | ModelContextToolReference): void;
-
-  /**
-   * Clears all context (base + dynamic registrations).
-   * @deprecated Removed from the upstream WebMCP spec on March 5, 2026. Kept only as a temporary compatibility API.
-   */
-  clearContext(): void;
 }
 
 /**
@@ -317,12 +303,23 @@ export interface ModelContextCore {
  */
 export interface ModelContextExtensions {
   /**
+   * Unregisters a dynamic tool by name or tool reference.
+   *
+   * @deprecated Removed from the WebMCP spec on April 23, 2026. Use `registerTool(tool, { signal })`. Will be removed in the next major.
+   */
+  unregisterTool(nameOrTool: string | ModelContextToolReference): void;
+
+  /**
    * Lists currently registered tools.
    */
   listTools(): ToolListItem[];
 
   /**
-   * Executes a registered tool.
+   * Executes a registered tool by name.
+   *
+   * @deprecated Prefer the WebMCP standard producer path: get a descriptor from
+   * `getTools()` and pass it to `executeTool(tool, inputArgsJson)`. This method
+   * remains as an MCP-B compatibility convenience.
    */
   callTool<
     TName extends string = string,
@@ -395,7 +392,7 @@ export interface ModelContextExtensions {
 }
 
 /**
- * Public navigator.modelContext type (strict core only).
+ * Public document.modelContext type (strict core only).
  */
 export type ModelContext = ModelContextCore;
 
@@ -412,13 +409,17 @@ export type ModelContextWithExtensions = ModelContextCore & ModelContextExtensio
  * Strongly-typed `ModelContext` view derived from known tool descriptors.
  *
  * This is useful when your project has a static tool registry and you want
- * name-aware inference for `callTool`.
+ * name-aware inference for MCP-B compatibility `callTool`.
  */
 export type TypedModelContext<
   TTools extends readonly { name: string }[] = readonly ToolDescriptor[],
 > = ModelContextWithExtensions & {
   /**
    * Executes a known tool with name-aware argument and response inference.
+   *
+   * @deprecated Prefer the WebMCP standard producer path: get a descriptor from
+   * `getTools()` and pass it to `executeTool(tool, inputArgsJson)`. This typed
+   * convenience remains available for MCP-B compatibility.
    */
   callTool<TName extends ToolName<TTools>>(
     params: ToolCallParams<TName, ToolArgsByName<TTools, TName>>
@@ -426,6 +427,10 @@ export type TypedModelContext<
 
   /**
    * Fallback call signature for unknown or dynamically-discovered tools.
+   *
+   * @deprecated Prefer the WebMCP standard producer path: get a descriptor from
+   * `getTools()` and pass it to `executeTool(tool, inputArgsJson)`. This typed
+   * convenience remains available for MCP-B compatibility.
    */
   callTool(params: { name: string; arguments?: Record<string, unknown> }): Promise<ToolResponse>;
 

@@ -34,7 +34,11 @@ describe('useWebMCPResource', () => {
   });
 
   beforeEach(() => {
-    navigator.modelContext?.clearContext();
+    (
+      navigator.modelContextTesting as
+        | (Navigator['modelContextTesting'] & { reset?: () => void })
+        | undefined
+    )?.reset?.();
     window.localStorage.removeItem(DEBUG_CONFIG_KEY);
   });
 
@@ -406,9 +410,15 @@ describe('useWebMCPResource', () => {
   describe('modelContext unavailability', () => {
     it('should warn when modelContext is not available', async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const savedModelContext = navigator.modelContext;
+      const savedDocumentModelContext = document.modelContext;
+      const savedNavigatorModelContext = navigator.modelContext;
 
       try {
+        Object.defineProperty(document, 'modelContext', {
+          value: undefined,
+          writable: true,
+          configurable: true,
+        });
         Object.defineProperty(navigator, 'modelContext', {
           value: undefined,
           writable: true,
@@ -430,8 +440,13 @@ describe('useWebMCPResource', () => {
         );
         expect(result.current.isRegistered).toBe(false);
       } finally {
+        Object.defineProperty(document, 'modelContext', {
+          value: savedDocumentModelContext,
+          writable: true,
+          configurable: true,
+        });
         Object.defineProperty(navigator, 'modelContext', {
-          value: savedModelContext,
+          value: savedNavigatorModelContext,
           writable: true,
           configurable: true,
         });

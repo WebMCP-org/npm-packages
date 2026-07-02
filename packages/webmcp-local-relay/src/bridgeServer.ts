@@ -52,6 +52,17 @@ interface PendingInvocation {
   reject: (error: Error) => void;
 }
 
+interface WebSocketErrorWithCode extends Error {
+  code?: string;
+}
+
+function formatPayloadLimit(bytes: number): string {
+  if (bytes >= 1_000_000 && bytes % 1_000_000 === 0) {
+    return `${String(bytes / 1_000_000)}MB`;
+  }
+  return `${String(bytes)} bytes`;
+}
+
 /**
  * Runtime options for {@link RelayBridgeServer}.
  */
@@ -86,7 +97,7 @@ export interface RelayBridgeServerOptions {
    * Allowed host page origins reported by browser `hello` messages.
    * Use `["*"]` to allow all origins.
    *
-   * Permissive by default for zero-config developer experience — any browser
+   * Permissive by default for zero-config developer experience: any browser
    * page can connect and register tools without additional setup. For production
    * or shared machines, restrict to trusted host origins via the
    * `--widget-origin` CLI flag or by passing explicit origins here.
@@ -96,7 +107,7 @@ export interface RelayBridgeServerOptions {
   allowedOrigins?: string[];
   /**
    * Maximum WebSocket payload size in bytes.
-   * @defaultValue `1000000`
+   * @defaultValue `10000000`
    */
   maxPayloadBytes?: number;
   /**
@@ -192,7 +203,9 @@ export class RelayBridgeServer extends EventEmitter {
       options.portRangeEnd ?? Math.max(DEFAULT_RELAY_PORT_RANGE_END, this.preferredPort);
     this.persistPath = options.persistPath ?? defaultRelayPortPersistPath();
     this.allowedOrigins = options.allowedOrigins ?? ['*'];
-    this.maxPayloadBytes = options.maxPayloadBytes ?? 1_000_000;
+    // 10MB default: large enough for typical JSON API responses while
+    // still protecting the relay process from unbounded memory growth.
+    this.maxPayloadBytes = options.maxPayloadBytes ?? 10_000_000;
     this.invokeTimeoutMs = options.invokeTimeoutMs ?? 25_000;
     this.label = options.label;
     this.workspace = options.workspace;
@@ -209,8 +222,10 @@ export class RelayBridgeServer extends EventEmitter {
         `Invalid port range ${this.preferredPort}-${this.portRangeEnd}. rangeEnd must be greater than or equal to the preferred port.`
       );
     }
-    if (this.maxPayloadBytes <= 0) {
-      throw new Error(`Invalid maxPayloadBytes ${this.maxPayloadBytes}. Must be greater than 0.`);
+    if (!Number.isInteger(this.maxPayloadBytes) || this.maxPayloadBytes <= 0) {
+      throw new Error(
+        `Invalid maxPayloadBytes ${this.maxPayloadBytes}. Must be a positive integer.`
+      );
     }
     if (this.invokeTimeoutMs <= 0) {
       throw new Error(`Invalid invokeTimeoutMs ${this.invokeTimeoutMs}. Must be greater than 0.`);
@@ -505,15 +520,19 @@ export class RelayBridgeServer extends EventEmitter {
         this.onSocketMessage(connectionId, raw);
       });
 
-      socket.on('close', () => {
-        this.onSocketClose(connectionId);
+      socket.on('close', (code: number) => {
+        this.onSocketClose(connectionId, code);
       });
 
       socket.on('error', (err: Error) => {
         process.stderr.write(
           `[webmcp-local-relay] warn: socket error for connection ${connectionId}: ${err.message}\n`
         );
-        this.onSocketClose(connectionId);
+        const code =
+          (err as WebSocketErrorWithCode).code === 'WS_ERR_UNSUPPORTED_MESSAGE_LENGTH'
+            ? 1009
+            : undefined;
+        this.onSocketClose(connectionId, code);
       });
 
       this.startHeartbeat(connectionId);
@@ -759,7 +778,7 @@ export class RelayBridgeServer extends EventEmitter {
     const socket = this.socketByConnectionId.get(connectionId);
     if (!socket || socket.readyState !== WebSocket.OPEN) {
       process.stderr.write(
-        `[webmcp-local-relay] warn: cannot send elicitation response — source ${connectionId} disconnected\n`
+        `[webmcp-local-relay] warn: cannot send elicitation response: source ${connectionId} disconnected\n`
       );
       return;
     }
@@ -887,13 +906,25 @@ export class RelayBridgeServer extends EventEmitter {
 
   /**
    * Handles source disconnection and rejects in-flight calls owned by that source.
+   *
+   * Guarded against double-call: both 'error' and 'close' events fire on
+   * socket failure, but cleanup (and the stateChanged emission) runs only once.
    */
-  private onSocketClose(connectionId: string): void {
+  private onSocketClose(connectionId: string, code?: number): void {
+    // Guard against double invocation: ws fires both 'error' and 'close' for
+    // maxPayload violations. The second call is a no-op.
+    if (!this.socketByConnectionId.has(connectionId)) return;
+
     this.stopHeartbeat(connectionId);
     this.relayClientConnectionIds.delete(connectionId);
     this.registry.removeConnection(connectionId);
     this.socketByConnectionId.delete(connectionId);
     this.emit('stateChanged');
+
+    // WS close code 1009 = "Message Too Big": the browser sent a response
+    // that exceeded maxPayloadBytes. Surface a clear error instead of letting
+    // the invocation time out silently after invokeTimeoutMs.
+    const isPayloadExceeded = code === 1009;
 
     for (const [callId, pending] of this.pendingInvocations.entries()) {
       if (pending.connectionId !== connectionId) {
@@ -902,7 +933,16 @@ export class RelayBridgeServer extends EventEmitter {
 
       clearTimeout(pending.timeoutId);
       this.pendingInvocations.delete(callId);
-      pending.reject(new Error(`Tool source ${connectionId} disconnected during invocation`));
+
+      if (isPayloadExceeded) {
+        pending.reject(
+          new Error(
+            `Tool result exceeded maximum payload size (${formatPayloadLimit(this.maxPayloadBytes)}). Use --max-payload to increase the limit.`
+          )
+        );
+      } else {
+        pending.reject(new Error(`Tool source ${connectionId} disconnected during invocation`));
+      }
     }
   }
 
@@ -916,7 +956,7 @@ export class RelayBridgeServer extends EventEmitter {
         return;
       }
 
-      // Skip heartbeat for relay client connections — they have their own reconnect logic.
+      // Skip heartbeat for relay client connections; they have their own reconnect logic.
       if (this.relayClientConnectionIds.has(connectionId)) {
         return;
       }

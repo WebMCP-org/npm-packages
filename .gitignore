@@ -10,6 +10,8 @@ build
 .turbo
 *.tsbuildinfo
 .wrangler
+.astro
+**/.mintlify
 
 # IDE
 .vscode
@@ -53,7 +55,6 @@ e2e/test-results
 **/__screenshots__
 docs/plans/WEBMCP_SPEC.md
 .codex
-.agents
 .reference
 
 # MCPB build artifacts

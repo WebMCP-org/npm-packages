@@ -1,0 +1,12 @@
+---
+const { className = "" } = Astro.props;
+---
+
+<span
+  class:list={[
+    "bg-radial from-gradient-primary to-gradient-secondary/40 bg-clip-text text-transparent",
+    className,
+  ]}
+>
+  <slot />
+</span>

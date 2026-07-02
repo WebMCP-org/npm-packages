@@ -1805,7 +1805,7 @@ var SmartDOMReaderBundle = (function (exports) {
             doc = iframe.contentDocument;
           }
           const extractOptions = {
-            ...(options || {}),
+            ...options,
             mode: mode || 'interactive',
           };
           const extractResult = ProgressiveExtractor.extractRegion(

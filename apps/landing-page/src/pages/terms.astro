@@ -1,0 +1,122 @@
+---
+export const prerender = true;
+import Base from '../layouts/Base.astro';
+import { SITE_TITLE } from '../consts';
+---
+
+<Base title="Terms of Service" description={`Terms of Service for ${SITE_TITLE}`}>
+  <article class="legal">
+    <div class="container">
+      <h1>Terms of Service</h1>
+      <p class="last-updated">Last updated: March 16, 2026</p>
+
+      <h2>1. Acceptance of Terms</h2>
+      <p>By accessing or using the {SITE_TITLE} website at <a href="https://mcp-b.ai">mcp-b.ai</a> and any related services (collectively, the "Service"), you agree to be bound by these Terms of Service. If you do not agree, do not use the Service.</p>
+
+      <h2>2. Description of Service</h2>
+      <p>{SITE_TITLE} provides open-source tooling and standards for making web applications AI-accessible through the Model Context Protocol (MCP). Our Service includes the website, documentation, and related software packages.</p>
+
+      <h2>3. Use of Service</h2>
+      <p>You agree to use the Service only for lawful purposes and in accordance with these Terms. You shall not:</p>
+      <ul>
+        <li>Use the Service in any way that violates applicable laws or regulations</li>
+        <li>Attempt to interfere with or disrupt the Service or its infrastructure</li>
+        <li>Use automated systems to access the Service in a manner that exceeds reasonable use</li>
+        <li>Impersonate any person or entity, or misrepresent your affiliation</li>
+      </ul>
+
+      <h2>4. Open Source Software</h2>
+      <p>{SITE_TITLE} software packages are released under their respective open-source licenses. Your use of those packages is governed by their individual license terms, which can be found in each package's repository.</p>
+
+      <h2>5. Intellectual Property</h2>
+      <p>The Service and its original content (excluding open-source code), features, and functionality are owned by {SITE_TITLE} and are protected by copyright, trademark, and other applicable laws.</p>
+
+      <h2>6. User Content</h2>
+      <p>If you submit any content through the Service (e.g., feedback, feature requests), you grant us a non-exclusive, royalty-free license to use, reproduce, and distribute that content in connection with the Service.</p>
+
+      <h2>7. Third-Party Services</h2>
+      <p>The Service may contain links to third-party websites or services. We are not responsible for the content, policies, or practices of any third-party services.</p>
+
+      <h2>8. Disclaimer of Warranties</h2>
+      <p>The Service is provided "as is" and "as available" without warranties of any kind, whether express or implied. We do not guarantee that the Service will be uninterrupted, secure, or error-free.</p>
+
+      <h2>9. Limitation of Liability</h2>
+      <p>To the fullest extent permitted by law, {SITE_TITLE} shall not be liable for any indirect, incidental, special, consequential, or punitive damages arising out of or related to your use of the Service.</p>
+
+      <h2>10. Changes to Terms</h2>
+      <p>We reserve the right to modify these Terms at any time. We will notify you of material changes by posting the updated Terms on this page. Continued use of the Service after changes constitutes acceptance of the new Terms.</p>
+
+      <h2>11. Governing Law</h2>
+      <p>These Terms shall be governed by and construed in accordance with applicable law, without regard to conflict of law principles.</p>
+
+      <h2>12. Contact Us</h2>
+      <p>If you have questions about these Terms, contact us at <a href="mailto:hello@mcp-b.ai">hello@mcp-b.ai</a>.</p>
+    </div>
+  </article>
+</Base>
+
+<style>
+  .legal {
+    padding: clamp(4rem, 8vw, 7rem) 1.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .container {
+    width: 100%;
+    max-width: 56rem;
+    margin-inline: auto;
+  }
+
+  .legal h1 {
+    color: var(--foreground);
+    font-size: clamp(2.5rem, 6vw, 4rem);
+    font-weight: 600;
+    letter-spacing: -0.05em;
+    line-height: 1;
+    margin-bottom: 0.75rem;
+  }
+
+  .last-updated {
+    font-size: 0.875rem;
+    color: var(--muted-foreground);
+    margin-bottom: 3rem;
+  }
+
+  .legal h2 {
+    color: var(--foreground);
+    font-size: 1.375rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin-top: 2.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .legal p,
+  .legal ul {
+    font-size: 0.9375rem;
+    line-height: 1.7;
+    color: var(--muted-foreground);
+    margin-bottom: 0.75rem;
+  }
+
+  .legal ul {
+    padding-left: 1.25rem;
+    list-style: disc;
+  }
+
+  .legal li {
+    margin-bottom: 0.375rem;
+  }
+
+  .legal a {
+    color: var(--foreground);
+    text-decoration: underline;
+    text-decoration-color: var(--border);
+    text-underline-offset: 2px;
+    transition: text-decoration-color 0.15s;
+  }
+
+  .legal a:hover {
+    text-decoration-color: currentColor;
+  }
+</style>

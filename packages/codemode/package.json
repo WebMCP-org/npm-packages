@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/codemode",
-  "version": "1.0.1",
+  "version": "3.0.0",
   "description": "Zero-dependency browser-native code sandbox for LLM-generated tool orchestration",
   "keywords": [
     "ai",
@@ -14,7 +14,7 @@
     "webmcp",
     "zero-dependency"
   ],
-  "homepage": "https://docs.mcp-b.ai/packages/codemode",
+  "homepage": "https://github.com/WebMCP-org/npm-packages/tree/main/packages/codemode#readme",
   "bugs": {
     "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },

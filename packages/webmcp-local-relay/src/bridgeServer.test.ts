@@ -1649,7 +1649,7 @@ describe('RelayBridgeServer client mode', () => {
         return sources.length > 0 ? sources : undefined;
       });
 
-      // Stop the server — client should clear source data
+      // Stop the server; client should clear source data
       await server.stop();
       await new Promise((resolve) => setTimeout(resolve, 200));
 
@@ -1702,7 +1702,7 @@ describe('RelayBridgeServer client mode', () => {
       await client.start();
       expect(client.mode).toBe('client');
 
-      // Kill the server — client should eventually promote to server
+      // Kill the server; client should eventually promote to server
       await server.stop();
 
       // Wait for the client to become a server
@@ -1732,6 +1732,9 @@ describe('RelayBridgeServer client mode', () => {
     expect(() => new RelayBridgeServer({ port: 70000 })).toThrow(/Invalid port/);
     expect(() => new RelayBridgeServer({ maxPayloadBytes: 0 })).toThrow(/Invalid maxPayloadBytes/);
     expect(() => new RelayBridgeServer({ maxPayloadBytes: -5 })).toThrow(/Invalid maxPayloadBytes/);
+    expect(() => new RelayBridgeServer({ maxPayloadBytes: 1.5 })).toThrow(
+      /Invalid maxPayloadBytes/
+    );
     expect(() => new RelayBridgeServer({ invokeTimeoutMs: 0 })).toThrow(/Invalid invokeTimeoutMs/);
     expect(() => new RelayBridgeServer({ invokeTimeoutMs: -100 })).toThrow(
       /Invalid invokeTimeoutMs/
@@ -1873,10 +1876,87 @@ describe('RelayBridgeServer client mode', () => {
       // Start an invocation that will never complete
       const invokePromise = client.invokeTool(firstClientTool.name, {});
 
-      // Stop the client — should reject the pending invocation
+      // Stop the client; should reject the pending invocation
       await client.stop();
 
       await expect(invokePromise).rejects.toThrow(/Relay client stopped/);
+    } finally {
+      await server.stop();
+    }
+  });
+
+  it('emits stateChanged only once when socket error triggers both error and close', async () => {
+    const bridge = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+    });
+
+    try {
+      await bridge.start();
+
+      const ws = await connectAndRegister(bridge, {
+        tabId: 'tab-double-close',
+        url: 'https://example.com',
+        tools: [{ name: 'tool_a', description: 'A tool' }],
+      });
+
+      await waitFor(() => bridge.registry.listTools()[0]?.name);
+
+      let stateChangedCount = 0;
+      bridge.on('stateChanged', () => {
+        stateChangedCount++;
+      });
+
+      ws.terminate();
+
+      await waitFor(() => (bridge.registry.listSources().length === 0 ? true : undefined));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(stateChangedCount).toBe(1);
+    } finally {
+      await bridge.stop();
+    }
+  });
+
+  it('rejects pending invocations with payload-exceeded error when browser sends oversized result', async () => {
+    // Use a tiny maxPayloadBytes to trigger the 1009 close code.
+    const server = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+      maxPayloadBytes: 256,
+      invokeTimeoutMs: 5000,
+    });
+
+    try {
+      await server.start();
+
+      const ws = await connectAndRegister(server, {
+        tabId: 'tab-payload',
+        url: 'https://example.com',
+        tools: [{ name: 'big_response', description: 'Returns large data' }],
+      });
+
+      // When invoked, respond with a payload that exceeds maxPayloadBytes.
+      ws.on('message', (raw) => {
+        const msg = JSON.parse(String(raw));
+        if (msg.type !== 'invoke') return;
+        const oversizedText = 'x'.repeat(1024);
+        ws.send(
+          JSON.stringify({
+            type: 'result',
+            callId: msg.callId,
+            result: { content: [{ type: 'text', text: oversizedText }] },
+          })
+        );
+      });
+
+      await waitFor(() => (server.registry.listTools().length >= 1 ? true : undefined));
+
+      const invokePromise = server.invokeTool('big_response', {});
+
+      await expect(invokePromise).rejects.toThrow(/exceeded maximum payload size/);
     } finally {
       await server.stop();
     }

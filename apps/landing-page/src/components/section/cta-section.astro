@@ -1,0 +1,32 @@
+---
+import { siteConfig } from "@/lib/config";
+import { StatefulButton } from "@/components/ui/stateful-button";
+
+const { ctaSection } = siteConfig;
+---
+
+<section
+  id={ctaSection.id}
+  class="relative flex flex-col items-center justify-center overflow-hidden px-4 py-20 md:py-32"
+>
+  <div class="absolute inset-0 -z-1 h-full w-full bg-radial-[at_45%_85%] from-[#2CD5FF]/40 via-[#2C30FF]/4 mask-[linear-gradient(to_bottom,transparent,black_100%)]"></div>
+  <div class="absolute inset-0 -z-1 h-full w-full bg-radial-[at_45%_68%] from-[#2CD5FF]/68 via-[#2C30FF]/3 mask-[linear-gradient(to_bottom,transparent,black_100%)] blur-[50px]"></div>
+
+  <div class="relative z-10 mx-auto flex max-w-4xl flex-col items-center justify-center space-y-6 text-center">
+    <h2 class="text-3xl font-medium tracking-tighter text-balance md:text-4xl lg:text-5xl">
+      {ctaSection.title}
+    </h2>
+    <p class="mx-auto max-w-2xl text-center font-medium text-balance text-muted-foreground">
+      {ctaSection.subtext}
+    </p>
+    <div class="pt-2">
+      <StatefulButton
+        client:visible
+        href={ctaSection.button.href}
+        className="px-8 py-3.5"
+      >
+        {ctaSection.button.text}
+      </StatefulButton>
+    </div>
+  </div>
+</section>

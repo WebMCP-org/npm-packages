@@ -1,8 +1,11 @@
-import type { ToolInputSchema } from '@mcp-b/webmcp-polyfill';
+import {
+  normalizeInputSchema,
+  toJsonValue,
+  type ToolInputSchema,
+} from '@mcp-b/webmcp-polyfill/schema';
 import type {
   CallToolResult,
   InputSchema,
-  JsonObject,
   JsonSchemaForInference,
   ToolDescriptor,
 } from '@mcp-b/webmcp-types';
@@ -15,6 +18,7 @@ import type {
   WebMCPConfig,
   WebMCPReturn,
 } from './types.js';
+import { getModelContext } from './model-context.js';
 
 /**
  * Default output formatter that converts values to formatted JSON strings.
@@ -32,78 +36,6 @@ function defaultFormatOutput(output: unknown): string {
 }
 
 const TOOL_OWNER_BY_NAME = new Map<string, symbol>();
-const DEFAULT_REGISTERED_INPUT_SCHEMA: InputSchema = { type: 'object', properties: {} };
-const STANDARD_JSON_SCHEMA_TARGETS = ['draft-2020-12', 'draft-07'] as const;
-type StructuredContent = Exclude<CallToolResult['structuredContent'], undefined>;
-
-function isObjectOutputSchema(schema: JsonSchemaForInference | undefined): boolean {
-  return schema?.type === 'object';
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isInputSchema(value: unknown): value is InputSchema {
-  if (!isPlainObject(value)) {
-    return false;
-  }
-
-  if ('type' in value && value.type !== undefined && typeof value.type !== 'string') {
-    return false;
-  }
-
-  if ('properties' in value && value.properties !== undefined && !isPlainObject(value.properties)) {
-    return false;
-  }
-
-  if (
-    'required' in value &&
-    value.required !== undefined &&
-    (!Array.isArray(value.required) || value.required.some((entry) => typeof entry !== 'string'))
-  ) {
-    return false;
-  }
-
-  return true;
-}
-
-function isJsonValue(value: unknown): boolean {
-  if (value === null) {
-    return true;
-  }
-
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-    return true;
-  }
-
-  if (Array.isArray(value)) {
-    return value.every(isJsonValue);
-  }
-
-  if (typeof value !== 'object') {
-    return false;
-  }
-
-  return Object.values(value).every(isJsonValue);
-}
-
-function isJsonObject(value: unknown): value is JsonObject {
-  return typeof value === 'object' && value !== null && !Array.isArray(value) && isJsonValue(value);
-}
-
-function toStructuredContent(value: unknown): StructuredContent | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return null;
-  }
-
-  try {
-    const normalized = JSON.parse(JSON.stringify(value));
-    return isJsonObject(normalized) ? normalized : null;
-  } catch {
-    return null;
-  }
-}
 
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
@@ -113,71 +45,10 @@ function isDev(): boolean {
 }
 
 /**
- * On Chrome Beta 147 native (which ignores the second arg), aborting
- * the controller cannot remove the tool. Install `@mcp-b/global`
- * or `@mcp-b/webmcp-polyfill` there.
- */
-function registerToolWithCleanup(
-  modelContext: Navigator['modelContext'],
-  toolDescriptor: ToolDescriptor
-): AbortController {
-  const controller = new AbortController();
-  (
-    modelContext.registerTool as (tool: ToolDescriptor, options?: { signal?: AbortSignal }) => void
-  ).call(modelContext, toolDescriptor, { signal: controller.signal });
-  return controller;
-}
-
-function toRegisteredInputSchema(
-  inputSchema: ToolInputSchema | undefined
-): InputSchema | undefined {
-  if (inputSchema === undefined) {
-    return undefined;
-  }
-
-  if (!isPlainObject(inputSchema) || !('~standard' in inputSchema)) {
-    return isInputSchema(inputSchema) ? inputSchema : DEFAULT_REGISTERED_INPUT_SCHEMA;
-  }
-
-  const standard = inputSchema['~standard'];
-  if (!isPlainObject(standard)) {
-    return DEFAULT_REGISTERED_INPUT_SCHEMA;
-  }
-
-  const jsonSchema = standard.jsonSchema;
-  if (!isPlainObject(jsonSchema) || typeof jsonSchema.input !== 'function') {
-    return DEFAULT_REGISTERED_INPUT_SCHEMA;
-  }
-
-  for (const target of STANDARD_JSON_SCHEMA_TARGETS) {
-    try {
-      const converted = jsonSchema.input({ target });
-      if (isInputSchema(converted)) {
-        return converted;
-      }
-    } catch {
-      // Try the next target before falling back to the default registration schema.
-    }
-  }
-
-  return DEFAULT_REGISTERED_INPUT_SCHEMA;
-}
-
-function toRegisteredOutputSchema(
-  outputSchema: JsonSchemaForInference | undefined
-): JsonSchemaForInference | undefined {
-  if (outputSchema === undefined) {
-    return undefined;
-  }
-
-  return outputSchema;
-}
-
-/**
  * React hook for registering and managing Model Context Protocol (MCP) tools.
  *
  * This hook handles the complete lifecycle of an MCP tool:
- * - Registers the tool with `window.navigator.modelContext`
+ * - Registers the tool with `window.document.modelContext`
  * - Manages execution state (loading, results, errors)
  * - Handles tool execution and lifecycle callbacks
  * - Automatically unregisters on component unmount
@@ -218,28 +89,21 @@ function toRegisteredOutputSchema(
  *
  * This hook is optimized to minimize unnecessary tool re-registrations:
  *
- * - **Ref-based callbacks**: `execute`/`handler`, `onSuccess`, `onError`, and `formatOutput`
- *   are stored in refs, so changing these functions won't trigger re-registration.
+ * - **Ref-based static descriptors and callbacks**: `inputSchema`, `outputSchema`,
+ *   `annotations`, `execute`/`handler`, `onSuccess`, `onError`, and `formatOutput`
+ *   are stored in refs, so recreating them during render won't trigger re-registration.
  *
- * **IMPORTANT**: If `inputSchema`, `outputSchema`, or `annotations` are defined inline
- * or change on every render, the tool will re-register unnecessarily. To avoid this,
- * define them outside your component with `as const`:
+ * If a schema or annotation actually changes and the registered descriptor should change,
+ * include the relevant primitive value in the `deps` array.
  *
  * ```tsx
- * // Good: Static schema defined outside component
- * const OUTPUT_SCHEMA = {
- *   type: 'object',
- *   properties: { count: { type: 'number' } },
- * } as const;
- *
- * // Bad: Inline schema (creates new object every render)
  * useWebMCP({
  *   outputSchema: { type: 'object', properties: { count: { type: 'number' } } } as const,
  * });
  * ```
  *
  * @template TInputSchema - JSON Schema defining input parameter types (use `as const` for inference)
- * @template TOutputSchema - JSON Schema defining output structure (object schemas enable structuredContent)
+ * @template TOutputSchema - JSON Schema defining output structure
  *
  * @param config - Configuration object for the tool
  * @param deps - Optional dependency array that triggers tool re-registration when values change.
@@ -317,22 +181,25 @@ export function useWebMCP<
   const onSuccessRef = useRef(onSuccess);
   const onErrorRef = useRef(onError);
   const formatOutputRef = useRef(formatOutput);
+  const inputSchemaRef = useRef(inputSchema);
+  const outputSchemaRef = useRef(outputSchema);
+  const annotationsRef = useRef(annotations);
   const isMountedRef = useRef(true);
   const warnedRef = useRef(new Set<string>());
   const prevConfigRef = useRef({
-    inputSchema,
-    outputSchema,
-    annotations,
     description,
     deps,
   });
-  // Update refs when callbacks change (doesn't trigger re-registration)
+  // Update refs when callbacks or static descriptors are recreated during render.
   useIsomorphicLayoutEffect(() => {
     toolExecuteRef.current = toolExecute;
     onSuccessRef.current = onSuccess;
     onErrorRef.current = onError;
     formatOutputRef.current = formatOutput;
-  }, [toolExecute, onSuccess, onError, formatOutput]);
+    inputSchemaRef.current = inputSchema;
+    outputSchemaRef.current = outputSchema;
+    annotationsRef.current = annotations;
+  }, [annotations, inputSchema, onSuccess, onError, outputSchema, toolExecute, formatOutput]);
 
   // Cleanup: mark component as unmounted
   useEffect(() => {
@@ -344,7 +211,7 @@ export function useWebMCP<
 
   useEffect(() => {
     if (!isDev()) {
-      prevConfigRef.current = { inputSchema, outputSchema, annotations, description, deps };
+      prevConfigRef.current = { description, deps };
       return;
     }
 
@@ -357,27 +224,6 @@ export function useWebMCP<
     };
 
     const prev = prevConfigRef.current;
-
-    if (inputSchema && prev.inputSchema && prev.inputSchema !== inputSchema) {
-      warnOnce(
-        'inputSchema',
-        `Tool "${name}" inputSchema reference changed; memoize or define it outside the component to avoid re-registration.`
-      );
-    }
-
-    if (outputSchema && prev.outputSchema && prev.outputSchema !== outputSchema) {
-      warnOnce(
-        'outputSchema',
-        `Tool "${name}" outputSchema reference changed; memoize or define it outside the component to avoid re-registration.`
-      );
-    }
-
-    if (annotations && prev.annotations && prev.annotations !== annotations) {
-      warnOnce(
-        'annotations',
-        `Tool "${name}" annotations reference changed; memoize or define it outside the component to avoid re-registration.`
-      );
-    }
 
     if (description !== prev.description) {
       warnOnce(
@@ -397,8 +243,8 @@ export function useWebMCP<
       );
     }
 
-    prevConfigRef.current = { inputSchema, outputSchema, annotations, description, deps };
-  }, [annotations, deps, description, inputSchema, name, outputSchema]);
+    prevConfigRef.current = { description, deps };
+  }, [deps, description, name]);
 
   /**
    * Executes the configured tool implementation with input validation and state management.
@@ -475,9 +321,10 @@ export function useWebMCP<
   }, []);
 
   useEffect(() => {
-    if (typeof window === 'undefined' || !window.navigator?.modelContext) {
+    const modelContext = getModelContext();
+    if (!modelContext) {
       console.warn(
-        `[useWebMCP] window.navigator.modelContext is not available. Tool "${name}" will not be registered.`
+        `[useWebMCP] window.document.modelContext is not available. Tool "${name}" will not be registered.`
       );
       return;
     }
@@ -502,11 +349,11 @@ export function useWebMCP<
           ],
         };
 
-        if (isObjectOutputSchema(outputSchema)) {
-          const structuredContent = toStructuredContent(result);
-          if (!structuredContent) {
+        if (outputSchemaRef.current) {
+          const structuredContent = toJsonValue(result);
+          if (structuredContent === undefined) {
             throw new Error(
-              `Tool "${name}" outputSchema requires the tool implementation to return a JSON object result`
+              `Tool "${name}" outputSchema requires the tool implementation to return a JSON-serializable result`
             );
           }
           response.structuredContent = structuredContent;
@@ -529,35 +376,65 @@ export function useWebMCP<
     };
 
     const ownerToken = Symbol(name);
-    const modelContext = window.navigator.modelContext;
-    const resolvedInputSchema = toRegisteredInputSchema(inputSchema);
-    const resolvedOutputSchema = toRegisteredOutputSchema(outputSchema);
-    const toolDescriptor: ToolDescriptor = {
+    const resolvedInputSchema = normalizeInputSchema(inputSchemaRef.current).inputSchema;
+    const resolvedOutputSchema = outputSchemaRef.current;
+    const resolvedAnnotations = annotationsRef.current;
+    const toolDescriptor: ToolDescriptor & { inputSchema: InputSchema } = {
       name,
       description,
-      ...(resolvedInputSchema && { inputSchema: resolvedInputSchema }),
+      inputSchema: resolvedInputSchema,
       ...(resolvedOutputSchema && { outputSchema: resolvedOutputSchema }),
-      ...(annotations && { annotations }),
+      ...(resolvedAnnotations && { annotations: resolvedAnnotations }),
       execute: mcpHandler,
     };
 
-    const controller = registerToolWithCleanup(modelContext, toolDescriptor);
-    TOOL_OWNER_BY_NAME.set(name, ownerToken);
+    const controller = new AbortController();
+    let registered = false;
+    let disposed = false;
+
+    try {
+      const registerResult = modelContext.registerTool(toolDescriptor, {
+        signal: controller.signal,
+      });
+
+      void Promise.resolve(registerResult).then(
+        () => {
+          if (!disposed && !controller.signal.aborted) {
+            registered = true;
+            TOOL_OWNER_BY_NAME.set(name, ownerToken);
+          }
+        },
+        (error: unknown) => {
+          if (!controller.signal.aborted) {
+            controller.abort();
+            console.warn(`[useWebMCP] registerTool("${name}") rejected:`, error);
+          }
+        }
+      );
+    } catch (error) {
+      controller.abort();
+      console.warn(`[useWebMCP] registerTool("${name}") rejected:`, error);
+      return;
+    }
 
     return () => {
-      const currentOwner = TOOL_OWNER_BY_NAME.get(name);
-      if (currentOwner !== ownerToken) {
+      disposed = true;
+
+      if (registered && TOOL_OWNER_BY_NAME.get(name) === ownerToken) {
+        TOOL_OWNER_BY_NAME.delete(name);
+        controller.abort();
         return;
       }
 
-      TOOL_OWNER_BY_NAME.delete(name);
-      controller.abort();
+      if (!registered) {
+        controller.abort();
+      }
     };
     // Spread operator in dependencies: Allows users to provide additional dependencies
     // via the `deps` parameter. While unconventional, this pattern is intentional to support
     // dynamic dependency injection. The spread is safe because deps is validated and warned
     // about non-primitive values earlier in this hook.
-  }, [name, description, inputSchema, outputSchema, annotations, ...(deps ?? [])]);
+  }, [name, description, ...(deps ?? [])]);
 
   return {
     state,

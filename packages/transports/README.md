@@ -8,7 +8,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue?style=flat-square)](https://www.typescriptlang.org/)
 [![Bundle Size](https://img.shields.io/bundlephobia/minzip/@mcp-b/transports?style=flat-square)](https://bundlephobia.com/package/@mcp-b/transports)
 
-**[Full Documentation](https://docs.mcp-b.ai/packages/transports)** | **[Quick Start](https://docs.mcp-b.ai/quickstart)** | **[Transport Concepts](https://docs.mcp-b.ai/concepts/transports)**
+**[Reference](https://docs.mcp-b.ai/packages/transports/reference)** | **[First Tool Tutorial](https://docs.mcp-b.ai/tutorials/first-tool)** | **[Transport Architecture](https://docs.mcp-b.ai/explanation/architecture/transports-and-bridges)**
 
 **@mcp-b/transports** provides browser-native MCP transport implementations that enable AI agents and LLMs to communicate with web applications. Whether you're building Chrome extensions, embedded iframes, or in-page AI integrations, this library provides the secure messaging layer you need.
 
@@ -533,7 +533,7 @@ MCP is an open protocol that standardizes how AI applications connect to externa
 
 ### Is this compatible with Claude Desktop, Cursor, or VS Code Copilot?
 
-Yes! These transports implement the MCP standard, making them compatible with any MCP client. Use `@mcp-b/chrome-devtools-mcp` to connect desktop AI agents to browser-based tools.
+Yes! These transports implement the MCP standard, making them compatible with any MCP client. Use upstream `chrome-devtools-mcp` to connect desktop AI agents to browser-based tools.
 
 ### How do I handle cross-origin communication?
 
@@ -555,16 +555,16 @@ Yes! `TabServerTransport` and `TabClientTransport` work entirely within a web pa
 
 ## Related Packages
 
-- [`@mcp-b/global`](https://docs.mcp-b.ai/packages/global) - W3C Web Model Context API polyfill for registering tools
-- [`@mcp-b/react-webmcp`](https://docs.mcp-b.ai/packages/react-webmcp) - React hooks for MCP tool registration
-- [`@mcp-b/extension-tools`](https://docs.mcp-b.ai/packages/extension-tools) - 62+ Chrome Extension API tools for MCP
-- [`@mcp-b/chrome-devtools-mcp`](https://docs.mcp-b.ai/packages/chrome-devtools-mcp) - Connect desktop AI agents to browser tools
+- [`@mcp-b/global`](https://docs.mcp-b.ai/packages/global/reference) - Full MCP-B browser runtime
+- [`@mcp-b/react-webmcp`](https://docs.mcp-b.ai/packages/react-webmcp/reference) - React hooks for MCP tool registration
+- [`@mcp-b/extension-tools`](https://docs.mcp-b.ai/packages/extension-tools/reference) - 62+ Chrome Extension API tools for MCP
+- [`chrome-devtools-mcp`](https://github.com/ChromeDevTools/chrome-devtools-mcp) - Upstream Chrome DevTools MCP server
 - [`@modelcontextprotocol/sdk`](https://www.npmjs.com/package/@modelcontextprotocol/sdk) - Official MCP SDK
 
 ## Resources
 
 - [WebMCP Documentation](https://docs.mcp-b.ai)
-- [Transport Concepts](https://docs.mcp-b.ai/concepts/transports)
+- [Transport Architecture](https://docs.mcp-b.ai/explanation/architecture/transports-and-bridges)
 - [Model Context Protocol Spec](https://modelcontextprotocol.io)
 - [MCP GitHub Repository](https://github.com/modelcontextprotocol)
 

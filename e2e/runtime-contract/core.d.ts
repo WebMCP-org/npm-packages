@@ -5,7 +5,7 @@ export interface RuntimeInvocationRecord {
 
 export interface RuntimeContractController {
   isReady(): boolean;
-  registerDynamicTool(): boolean;
+  registerDynamicTool(): boolean | Promise<boolean>;
   unregisterDynamicTool(name?: string): boolean;
   readInvocations(): RuntimeInvocationRecord[];
   resetInvocations(): void;
@@ -14,7 +14,6 @@ export interface RuntimeContractController {
 export interface RuntimeContractOptions {
   runtimeLabel?: string;
   dynamicToolName?: string;
-  registrationMode?: 'context' | 'dynamic';
 }
 
 export interface BrowserRuntimeContractToolDescriptor {
@@ -61,6 +60,6 @@ export declare function createServerToolDefinitions(
 ): ServerRuntimeContractDefinitions;
 export declare function createRuntimeContractController(
   state: ReturnType<typeof createRuntimeContractState>,
-  registerDynamicTool: () => boolean,
+  registerDynamicTool: () => boolean | Promise<boolean>,
   unregisterDynamicTool: (name?: string) => boolean
 ): RuntimeContractController;

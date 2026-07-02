@@ -1,0 +1,228 @@
+---
+title: '@mcp-b/webmcp-polyfill'
+description: 'Reference for the strict WebMCP core polyfill that installs document.modelContext.'
+keywords:
+  [
+    '@mcp-b/webmcp-polyfill',
+    'polyfill',
+    'document.modelContext',
+    'initializeWebMCPPolyfill',
+    'registerTool',
+    'modelContextTesting',
+    'strict core',
+  ]
+icon: 'puzzle-piece'
+---
+
+`@mcp-b/webmcp-polyfill` installs the strict WebMCP runtime on `document.modelContext` when no native implementation exists. It is the package to use when you want the browser standard in browsers today without MCP-B extensions.
+
+```
+npm install @mcp-b/webmcp-polyfill
+```
+
+## Package selection
+
+| Package                      | Use When                                             |
+| ---------------------------- | ---------------------------------------------------- |
+| `@mcp-b/webmcp-types`        | You need compile-time types only (no runtime)        |
+| **`@mcp-b/webmcp-polyfill`** | You want the WebMCP standard path in browsers today  |
+| `@mcp-b/global`              | You want the MCP-B runtime layer on top of that path |
+
+---
+
+## Minimal example
+
+<Snippet file="snippets/packages/webmcp-polyfill-quickstart.ts" />
+
+## Functions
+
+### `initializeWebMCPPolyfill(options?)`
+
+Installs the strict core polyfill on `document.modelContext`.
+
+```ts
+import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
+
+initializeWebMCPPolyfill();
+```
+
+**Behavior:**
+
+- No-op in non-browser environments.
+- Non-destructive: if `document.modelContext` already exists (native or from a previous install), initialization is skipped.
+- Safe to call repeatedly.
+
+#### Options
+
+| Option                            | Type                                  | Default        | Description                                                    |
+| --------------------------------- | ------------------------------------- | -------------- | -------------------------------------------------------------- |
+| `autoInitialize`                  | `boolean`                             | `true`         | Set `false` to disable auto-init from IIFE/import side effect. |
+| `installTestingShim`              | `boolean \| 'always' \| 'if-missing'` | `'if-missing'` | Controls whether `navigator.modelContextTesting` is installed. |
+| `disableIframeTransportByDefault` | `boolean`                             | -              | Deprecated no-op, kept for backward compatibility.             |
+
+#### `installTestingShim` values
+
+| Value                    | Behavior                                                       |
+| ------------------------ | -------------------------------------------------------------- |
+| `true` or `'if-missing'` | Install only when `modelContextTesting` is not already present |
+| `'always'`               | Install even when `modelContextTesting` already exists         |
+| `false`                  | Do not install                                                 |
+
+### `initializeWebModelContextPolyfill(options?)`
+
+Alias for `initializeWebMCPPolyfill`.
+
+### `cleanupWebMCPPolyfill()`
+
+Restores previous `document.modelContext` and `navigator.modelContextTesting` property descriptors and resets the polyfill install state.
+
+```ts
+import { cleanupWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
+
+cleanupWebMCPPolyfill();
+```
+
+---
+
+## IIFE / script tag
+
+The IIFE build auto-initializes on load. Configure via `window.__webMCPPolyfillOptions`:
+
+```html
+<script>
+  window.__webMCPPolyfillOptions = {
+    installTestingShim: 'if-missing',
+  };
+</script>
+<script src="https://unpkg.com/@mcp-b/webmcp-polyfill@latest/dist/index.iife.js"></script>
+```
+
+---
+
+## Methods on `document.modelContext`
+
+After initialization, `document.modelContext` exposes these methods:
+
+### `registerTool(tool, options?)`
+
+Adds a single tool to the registry.
+
+- Requires a non-empty `name`, non-empty `description`, and `execute` function.
+- Throws on duplicate tool names.
+- If `inputSchema` is omitted, defaults to `{ type: "object", properties: {} }`.
+- Pass `options.signal` to remove the tool when the signal aborts.
+
+### `getTools()`
+
+Returns `Promise<ModelContextToolInfo[]>`. Each tool includes a JSON-stringified `inputSchema`, `origin`, and `window`.
+
+### `executeTool(tool, inputArgsJson, options?)`
+
+Executes a tool descriptor returned from `getTools()`. The input arguments are a JSON object string. The return value is `Promise<string | null>`.
+
+### `unregisterTool(name)` (deprecated)
+
+Removes a tool by name for older MCP-B integrations. Unknown names are a no-op. Prefer `registerTool(tool, { signal })`.
+
+<Note>
+  The polyfill does not provide MCP-B extension methods such as `listTools()` or `callTool()` on
+  `document.modelContext`. For those helpers, use [`@mcp-b/global`](/packages/global/reference).
+</Note>
+
+---
+
+## Testing shim
+
+When `installTestingShim` is enabled, the polyfill installs `navigator.modelContextTesting` with the standard testing API:
+
+| Method                                           | Returns                                       |
+| ------------------------------------------------ | --------------------------------------------- |
+| `listTools()`                                    | `ModelContextTestingToolInfo[]`               |
+| `executeTool(toolName, inputArgsJson, options?)` | `Promise<string \| null>`                     |
+| `registerToolsChangedCallback(callback)`         | `void`                                        |
+| `getCrossDocumentScriptToolResult()`             | `Promise<string>` (always `"[]"` in polyfill) |
+
+```ts
+initializeWebMCPPolyfill({ installTestingShim: true });
+
+const tools = navigator.modelContextTesting?.listTools();
+const result = await navigator.modelContextTesting?.executeTool(
+  'search',
+  JSON.stringify({ query: 'webmcp' })
+);
+```
+
+For full details on the testing API, see [WebMCP standard API](/reference/webmcp/standard-api).
+
+---
+
+## Input schema support
+
+The polyfill accepts three formats for `inputSchema`:
+
+| Format                       | Description                                      |
+| ---------------------------- | ------------------------------------------------ |
+| Plain JSON Schema            | `InputSchema` object                             |
+| Standard Schema v1 validator | Object with `~standard.validate()` (e.g., Zod 4) |
+| Standard JSON Schema v1      | Object with `~standard.jsonSchema.input()`       |
+
+Standard JSON Schema conversion is attempted with targets `draft-2020-12` first, then `draft-07`. When both Standard validator and Standard JSON Schema are present on the same object, JSON conversion is preferred.
+
+---
+
+## Validation
+
+The polyfill validates tool descriptors on registration:
+
+| Condition                              | Error                                                                    |
+| -------------------------------------- | ------------------------------------------------------------------------ |
+| `tool` is not an object                | `TypeError: registerTool(tool) requires a tool object`                   |
+| `name` is empty or not a string        | `TypeError: Tool "name" must be a non-empty string`                      |
+| `description` is empty or not a string | `TypeError: Tool "description" must be a non-empty string`               |
+| `execute` is not a function            | `TypeError: Tool "execute" must be a function`                           |
+| Duplicate tool name                    | `Error: Tool already registered: <name>`                                 |
+| Invalid JSON Schema structure          | `Error: Invalid JSON Schema at <path>: <details>`                        |
+| Schema not JSON-serializable           | `Error: Invalid JSON Schema at <path>: schema must be JSON-serializable` |
+
+Input arguments are validated at execution time using JSON Schema validation (via `@cfworker/json-schema`). Standard Schema validators are used when available.
+
+---
+
+## Type inference
+
+For compile-time type inference, pair the polyfill with `@mcp-b/webmcp-types`:
+
+```ts
+import type { JsonSchemaForInference } from '@mcp-b/webmcp-types';
+import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
+
+initializeWebMCPPolyfill();
+
+const inputSchema = {
+  type: 'object',
+  properties: {
+    query: { type: 'string' },
+    limit: { type: 'integer', minimum: 1, maximum: 50 },
+  },
+  required: ['query'],
+  additionalProperties: false,
+} as const satisfies JsonSchemaForInference;
+
+document.modelContext.registerTool({
+  name: 'search',
+  description: 'Search indexed docs',
+  inputSchema,
+  async execute(args) {
+    // args inferred as: { query: string; limit?: number }
+    return { content: [{ type: 'text', text: `Searching for ${args.query}` }] };
+  },
+});
+```
+
+For full inference documentation, see [@mcp-b/webmcp-types](/packages/webmcp-types/reference).
+
+---
+
+## Interop with @mcp-b/global
+
+If the polyfill is installed first, `@mcp-b/global` wraps the existing context with `BrowserMcpServer` to add MCP-B extension APIs without replacing the core object identity. Use `@mcp-b/global` directly when you need `callTool`, resources, prompts, or transport. For guidance on choosing between them, see [Choose a Runtime](/how-to/choose-runtime).

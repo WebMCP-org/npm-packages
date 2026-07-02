@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/transports",
-  "version": "2.3.1",
+  "version": "4.0.0",
   "description": "Browser transport implementations for Model Context Protocol (MCP) - postMessage, Chrome extension messaging, and iframe communication for AI agents and LLMs",
   "keywords": [
     "ai-agents",
@@ -31,7 +31,7 @@
     "web-ai",
     "webmcp"
   ],
-  "homepage": "https://docs.mcp-b.ai/packages/transports",
+  "homepage": "https://docs.mcp-b.ai/packages/transports/reference",
   "bugs": {
     "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },
@@ -79,6 +79,7 @@
   },
   "dependencies": {
     "@mcp-b/webmcp-ts-sdk": "workspace:*",
+    "@modelcontextprotocol/sdk": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

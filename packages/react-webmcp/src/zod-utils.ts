@@ -1,84 +1,37 @@
 import type { InputSchema } from '@mcp-b/webmcp-types';
+import type { AnySchema, ZodRawShapeCompat } from '@modelcontextprotocol/sdk/server/zod-compat.js';
+import { normalizeObjectSchema } from '@modelcontextprotocol/sdk/server/zod-compat.js';
+import { toJsonSchemaCompat } from '@modelcontextprotocol/sdk/server/zod-json-schema-compat.js';
 import type { z } from 'zod';
-import { zodToJsonSchema as zodToJsonSchemaLib } from 'zod-to-json-schema';
 
 export type ZodSchemaObject = Record<string, z.ZodTypeAny>;
+export type ZodSchema = ZodSchemaObject | z.ZodTypeAny;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-function isZodLikeValue(value: unknown): boolean {
-  // `_def` is present on both zod/v3 and zod v4 schema instances.
-  // Restricting detection to `_def` avoids misclassifying non-Zod Standard Schema values.
-  return isRecord(value) && '_def' in value;
-}
-
-type ZodDefinitionCarrier = {
-  _def: {
-    typeName: unknown;
-  };
-};
-
-function hasZodTypeName(schema: unknown): schema is ZodDefinitionCarrier {
-  if (!isRecord(schema)) {
-    return false;
-  }
-
-  const definition = schema._def;
-  return isRecord(definition) && 'typeName' in definition;
+export function isZodType(schema: unknown): schema is z.ZodTypeAny {
+  return isRecord(schema) && ('_def' in schema || '_zod' in schema);
 }
 
 export function isZodSchema(schema: unknown): schema is ZodSchemaObject {
-  if (!isRecord(schema)) return false;
-  const values = Object.values(schema);
-  if (values.length === 0) return false;
-  return values.some((value) => isZodLikeValue(value));
-}
-
-function isOptionalSchema(schema: unknown): boolean {
-  if (!hasZodTypeName(schema)) {
+  if (!isRecord(schema) || isZodType(schema)) {
     return false;
   }
 
-  const { typeName } = schema._def;
-  return typeName === 'ZodOptional' || typeName === 'ZodDefault';
+  return normalizeObjectSchema(schema as ZodRawShapeCompat) !== undefined;
 }
 
-function stripSchemaMeta(schema: InputSchema): InputSchema {
-  const rest = { ...schema } as InputSchema & { $schema?: string };
-  delete rest.$schema;
-  if (rest.properties) {
-    const props: Record<string, InputSchema> = {};
-    for (const [k, v] of Object.entries(rest.properties)) {
-      props[k] = stripSchemaMeta(v as InputSchema);
-    }
-    rest.properties = props;
-  }
-  return rest;
-}
-
-export function zodToJsonSchema(schema: ZodSchemaObject): InputSchema {
-  const properties: Record<string, InputSchema> = {};
-  const required: string[] = [];
-
-  for (const [key, rawValue] of Object.entries(schema)) {
-    if (!isZodLikeValue(rawValue)) {
-      continue;
-    }
-
-    const zodSchema = rawValue as z.ZodTypeAny;
-    const propSchema = zodToJsonSchemaLib(zodSchema, {
-      strictUnions: true,
-      $refStrategy: 'none',
-    });
-    properties[key] = stripSchemaMeta(propSchema as InputSchema);
-    if (!isOptionalSchema(zodSchema)) {
-      required.push(key);
-    }
+export function zodToJsonSchema(schema: ZodSchema): InputSchema {
+  const normalized = normalizeObjectSchema(schema as AnySchema | ZodRawShapeCompat);
+  const zodSchema = normalized ?? (isZodType(schema) ? (schema as AnySchema) : undefined);
+  if (!zodSchema) {
+    throw new Error('Expected a Zod schema or Zod schema object');
   }
 
-  const result: InputSchema = { type: 'object', properties };
-  if (required.length > 0) result.required = required;
-  return result;
+  return toJsonSchemaCompat(zodSchema, {
+    strictUnions: true,
+    pipeStrategy: 'input',
+  }) as InputSchema;
 }

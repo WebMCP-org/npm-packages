@@ -1,0 +1,51 @@
+---
+title: 'Chrome DevTools MCP'
+description: 'The former @mcp-b/chrome-devtools-mcp package is retired. Use the upstream Chrome DevTools MCP package instead.'
+keywords:
+  [
+    'chrome-devtools-mcp',
+    '@mcp-b/chrome-devtools-mcp',
+    'retired package',
+    'chrome devtools',
+    'browser automation',
+  ]
+icon: 'chrome'
+---
+
+`@mcp-b/chrome-devtools-mcp` is retired and no longer maintained from this monorepo.
+
+Use the upstream Chrome DevTools MCP server instead:
+
+- [ChromeDevTools/chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp)
+- [chrome-devtools-mcp on npm](https://www.npmjs.com/package/chrome-devtools-mcp)
+
+```bash "Install from npm"
+npx -y chrome-devtools-mcp@latest
+```
+
+The forked WebMCP changes that used to live in `@mcp-b/chrome-devtools-mcp` have been upstreamed. Treat the upstream package as the source of truth for supported CLI flags, tool behavior, release notes, and Chrome compatibility.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card
+    title="Retired package reference"
+    icon="book-open"
+    href="/packages/chrome-devtools-mcp/reference"
+  >
+    Replacement package names and migration notes for old `@mcp-b/chrome-devtools-mcp` links.
+  </Card>
+  <Card title="Use Chrome DevTools MCP" icon="wrench" href="/how-to/use-devtools-mcp">
+    Configure the upstream server for browser automation and WebMCP development workflows.
+  </Card>
+  <Card
+    title="Transports and bridges"
+    icon="bridge"
+    href="/explanation/architecture/transports-and-bridges"
+  >
+    Compare DevTools-based access to local relay and browser transport options.
+  </Card>
+  <Card title="@mcp-b/global overview" icon="globe" href="/packages/global/overview">
+    Runtime setup for pages whose tools are discovered through DevTools.
+  </Card>
+</CardGroup>

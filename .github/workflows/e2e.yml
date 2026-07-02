@@ -27,10 +27,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
 
       - name: Setup Vite+
         uses: voidzero-dev/setup-vp@v1
@@ -44,23 +44,41 @@ jobs:
       - name: Build packages
         run: pnpm build
 
-      - name: Install Playwright Browsers
-        run: pnpm --filter mcp-e2e-tests exec playwright install --with-deps chromium
+      - name: Setup Chrome
+        id: chrome
+        uses: browser-actions/setup-chrome@2e1d749697dd1612b833dba4a722266286fbefcd
+        with:
+          chrome-version: stable
+          install-dependencies: true
+
+      - name: Print Chrome version
+        run: '"${{ steps.chrome.outputs.chrome-path }}" --version'
 
       - name: Install Puppeteer Chrome (for chrome-devtools-mcp e2e)
         run: pnpm --filter @mcp-b/chrome-devtools-mcp exec puppeteer browsers install chrome
 
-      - name: Run E2E tests
-        run: pnpm test:e2e
+      - name: Run runtime contract E2E tests
+        env:
+          PLAYWRIGHT_CHROMIUM_CHANNEL: chrome
+        run: pnpm --filter mcp-e2e-tests run test:runtime-contract:transport
+
+      - name: Run local relay E2E tests
+        env:
+          PLAYWRIGHT_CHROMIUM_CHANNEL: chrome
+        run: pnpm --filter @mcp-b/webmcp-local-relay test:e2e
 
       - name: Run framework integration E2E tests
+        env:
+          PLAYWRIGHT_CHROMIUM_CHANNEL: chrome
         run: pnpm test:e2e:frameworks
 
       - name: Run tarball E2E validation (@mcp-b/global)
+        env:
+          PLAYWRIGHT_CHROMIUM_CHANNEL: chrome
         run: pnpm test:e2e:tarball:global
 
       - name: Upload Playwright Report
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: playwright-report
@@ -68,30 +86,52 @@ jobs:
           retention-days: 30
 
       - name: Upload Test Results
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: test-results
           path: e2e/test-results/
           retention-days: 7
 
-  native-parity:
-    name: Native API Parity (${{ matrix.mode }})
+  extension-e2e:
+    name: Extension E2E (Playwright Chromium)
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.58.0-noble
     timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        mode:
-          - default
-          - chrome-beta
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: '24'
+          cache: true
+
+      - name: Install dependencies
+        run: vp install
+
+      - name: Run extension E2E tests
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
+        run: pnpm --filter @mcp-b/extension-tools test:e2e
+
+  native-parity:
+    name: Native API Parity (chrome-canary)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
 
       - name: Setup Vite+
         uses: voidzero-dev/setup-vp@v1
@@ -105,48 +145,41 @@ jobs:
       - name: Build packages
         run: pnpm build
 
-      - name: Install Playwright Browsers
-        run: pnpm --filter mcp-e2e-tests exec playwright install --with-deps chromium
+      - name: Setup Chrome Canary
+        id: chrome_canary
+        uses: browser-actions/setup-chrome@2e1d749697dd1612b833dba4a722266286fbefcd
+        with:
+          chrome-version: canary
+          install-dependencies: true
 
-      - name: Install Google Chrome Beta
-        if: matrix.mode == 'chrome-beta'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y wget gnupg
-          wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor | sudo tee /usr/share/keyrings/google-linux.gpg > /dev/null
-          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-linux.gpg] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
-          sudo apt-get update
-          sudo apt-get install -y google-chrome-beta
-          google-chrome-beta --version
+      - name: Print Chrome Canary version
+        run: '"${{ steps.chrome_canary.outputs.chrome-path }}" --version'
 
-      - name: Run Native Runtime Contract (Default Chromium)
-        if: matrix.mode == 'default'
+      - name: Run Native Runtime Contract (Chrome Canary)
+        env:
+          CHROME_BIN: ${{ steps.chrome_canary.outputs.chrome-path }}
+          PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: ${{ steps.chrome_canary.outputs.chrome-path }}
+          PLAYWRIGHT_ENABLE_WEBMCP_FLAGS: '1'
         run: pnpm --filter mcp-e2e-tests run test:native-contract:default
 
-      - name: Run Native Runtime API Integration (Default Chromium)
-        if: matrix.mode == 'default'
+      - name: Run Native Runtime API Integration (Chrome Canary)
+        env:
+          CHROME_BIN: ${{ steps.chrome_canary.outputs.chrome-path }}
+          PLAYWRIGHT_NATIVE_SHOWCASE_EXECUTABLE_PATH: ${{ steps.chrome_canary.outputs.chrome-path }}
         run: pnpm --filter mcp-e2e-tests run test:native-showcase
 
-      - name: Run Native Runtime Contract (Chrome Beta)
-        if: matrix.mode == 'chrome-beta'
-        run: pnpm --filter mcp-e2e-tests run test:native-contract:beta
-
-      - name: Run Chrome Beta WebMCP Smoke
-        if: matrix.mode == 'chrome-beta'
-        run: pnpm --filter mcp-e2e-tests run test:chrome-beta:webmcp:smoke
-
       - name: Upload Parity Playwright Report
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
-          name: playwright-report-native-parity-${{ matrix.mode }}
+          name: playwright-report-native-parity-chrome-canary
           path: e2e/playwright-report/
           retention-days: 14
 
       - name: Upload Parity Test Results
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
-          name: test-results-native-parity-${{ matrix.mode }}
+          name: test-results-native-parity-chrome-canary
           path: e2e/test-results/
           retention-days: 7

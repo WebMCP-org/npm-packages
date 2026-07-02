@@ -1,0 +1,31 @@
+---
+title: 'Tool lifecycle and dynamic registration'
+description: 'Why WebMCP tools must be registered, replaced, and removed as page context changes.'
+keywords: ['tool lifecycle', 'registerTool', 'abortsignal', 'dynamic tools']
+icon: 'arrows-rotate'
+---
+
+A site's valid actions change with route, selected record, permissions, and
+workflow state. The published tool set should change with them.
+
+Agents should see only actions that are currently
+meaningful and authorized, with descriptions and schemas that match the active
+application context.
+
+The current registration pattern ties a tool to an `AbortSignal`:
+
+```ts
+const controller = new AbortController();
+document.modelContext.registerTool(tool, { signal: controller.signal });
+
+// Remove the registration during route or component cleanup.
+controller.abort();
+```
+
+Descriptions and schemas must be replaced when application context changes;
+stale or duplicate registrations make discovery ambiguous. Tool-change
+notifications allow consumers to refresh the catalog after registration or
+cleanup.
+
+See [Build your first React tool](/tutorials/first-react-tool) and the
+[WebMCP standard API](/reference/webmcp/standard-api).

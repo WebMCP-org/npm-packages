@@ -1,0 +1,76 @@
+---
+import Marquee from "@/components/ui/marquee.astro";
+import TextHighlight from "@/components/text-highlight.astro";
+
+interface Testimonial {
+  id: string;
+  name: string;
+  role: string;
+  img: string;
+  description: string;
+  highlight?: string;
+  suffix?: string;
+}
+
+const { testimonials } = Astro.props as { testimonials: Testimonial[] };
+
+const firstRow = testimonials.slice(0, Math.ceil(testimonials.length / 2));
+const secondRow = testimonials.slice(Math.ceil(testimonials.length / 2));
+---
+
+<div class="relative w-full overflow-hidden py-8">
+  <div class="flex flex-col gap-4">
+    <Marquee className="[--duration:40s]" pauseOnHover>
+      {
+        firstRow.map((testimonial) => (
+          <div class="flex w-full max-w-[400px] break-inside-avoid flex-col justify-between gap-6 rounded-xl bg-card p-6 shadow-[var(--shadow-md)]">
+            <p class="select-none leading-relaxed font-normal text-muted-foreground">
+              {testimonial.description}
+              {testimonial.highlight && (
+                <>
+                  {" "}
+                  <TextHighlight>{testimonial.highlight}</TextHighlight>
+                </>
+              )}
+              {testimonial.suffix && ` ${testimonial.suffix}`}
+            </p>
+            <div class="flex w-full select-none items-center justify-start gap-3.5">
+              <img src={testimonial.img} alt={testimonial.name} class="size-10 rounded-full" />
+              <div>
+                <p class="font-medium text-foreground">{testimonial.name}</p>
+                <p class="text-sm font-normal text-muted-foreground">{testimonial.role}</p>
+              </div>
+            </div>
+          </div>
+        ))
+      }
+    </Marquee>
+    <Marquee className="[--duration:40s]" reverse pauseOnHover>
+      {
+        secondRow.map((testimonial) => (
+          <div class="flex w-full max-w-[400px] break-inside-avoid flex-col justify-between gap-6 rounded-xl bg-card p-6 shadow-[var(--shadow-md)]">
+            <p class="select-none leading-relaxed font-normal text-muted-foreground">
+              {testimonial.description}
+              {testimonial.highlight && (
+                <>
+                  {" "}
+                  <TextHighlight>{testimonial.highlight}</TextHighlight>
+                </>
+              )}
+              {testimonial.suffix && ` ${testimonial.suffix}`}
+            </p>
+            <div class="flex w-full select-none items-center justify-start gap-3.5">
+              <img src={testimonial.img} alt={testimonial.name} class="size-10 rounded-full" />
+              <div>
+                <p class="font-medium text-foreground">{testimonial.name}</p>
+                <p class="text-sm font-normal text-muted-foreground">{testimonial.role}</p>
+              </div>
+            </div>
+          </div>
+        ))
+      }
+    </Marquee>
+  </div>
+  <div class="pointer-events-none absolute inset-y-0 left-0 w-1/12 bg-linear-to-r from-background"></div>
+  <div class="pointer-events-none absolute inset-y-0 right-0 w-1/12 bg-linear-to-l from-background"></div>
+</div>

@@ -10,8 +10,33 @@ import '@mcp-b/global';
 
 const modelContext = navigator.modelContext;
 
-function provideExtendedContext(options: unknown): void {
-  (modelContext as unknown as { provideContext: (value: unknown) => void }).provideContext(options);
+type RegisterableContext = {
+  tools?: unknown[];
+  resources?: unknown[];
+  prompts?: unknown[];
+};
+
+function provideExtendedContext(options: RegisterableContext): void {
+  const register = (
+    item: unknown,
+    methodName: 'registerTool' | 'registerResource' | 'registerPrompt'
+  ) => {
+    const registerMethod = (modelContext as unknown as Record<string, unknown>)[methodName];
+    if (typeof registerMethod !== 'function') {
+      throw new Error(`${methodName} is not available`);
+    }
+    registerMethod.call(modelContext, item);
+  };
+
+  for (const tool of options.tools ?? []) {
+    register(tool, 'registerTool');
+  }
+  for (const resource of options.resources ?? []) {
+    register(resource, 'registerResource');
+  }
+  for (const prompt of options.prompts ?? []) {
+    register(prompt, 'registerPrompt');
+  }
 }
 
 const statusEl = document.getElementById('status');
@@ -29,9 +54,6 @@ function updateStatus(text: string) {
 }
 
 // ==================== Register Tools, Resources, and Prompts ====================
-// IMPORTANT: provideContext() clears previous registrations, so we must register
-// all items in a single call.
-
 log('Registering tools, resources, and prompts...');
 
 provideExtendedContext({

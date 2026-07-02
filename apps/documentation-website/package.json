@@ -1,0 +1,15 @@
+{
+  "name": "@mcp-b/documentation-website",
+  "version": "1.0.0",
+  "private": true,
+  "description": "docs.mcp-b.ai documentation, powered by Mintlify",
+  "scripts": {
+    "build": "mintlify validate",
+    "dev": "mintlify dev",
+    "preview": "mintlify dev",
+    "validate": "mintlify validate"
+  },
+  "devDependencies": {
+    "mintlify": "^4.2.415"
+  }
+}

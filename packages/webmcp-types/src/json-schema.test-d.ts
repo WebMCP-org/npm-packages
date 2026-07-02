@@ -397,9 +397,10 @@ test('ToolDescriptorFromSchema requires outputSchema when output generic is prov
     name: 'missing_output_schema',
     description: 'Missing output schema should fail',
     inputSchema: closedSchema,
-    execute(args) {
+    execute() {
       return {
-        content: [{ type: 'text', text: args.query }],
+        total: 1,
+        items: ['a'],
       };
     },
   };

@@ -1,5 +1,28 @@
 # @mcp-b/mcp-iframe
 
+## 4.0.0
+
+### Patch Changes
+
+- Updated dependencies [abaf5d0]
+- Updated dependencies [d05ea62]
+  - @mcp-b/webmcp-types@4.0.0
+  - @mcp-b/webmcp-ts-sdk@4.0.0
+  - @mcp-b/transports@4.0.0
+
+## 3.0.0
+
+### Major Changes
+
+- Align with the WebMCP v3 release train and consume the document-first WebMCP type, SDK, and transport packages. This package has no direct API changes in this release.
+
+### Patch Changes
+
+- Updated dependencies [4f3cc5e]
+  - @mcp-b/webmcp-types@3.0.0
+  - @mcp-b/webmcp-ts-sdk@3.0.0
+  - @mcp-b/transports@3.0.0
+
 ## 2.3.1
 
 ### Patch Changes

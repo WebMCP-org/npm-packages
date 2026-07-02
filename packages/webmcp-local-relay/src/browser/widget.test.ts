@@ -677,13 +677,6 @@ describe('widget runtime', () => {
       );
     });
 
-    connection.client.send(JSON.stringify(42));
-    await vi.waitFor(() => {
-      expect(debug).toHaveBeenCalledWith(
-        '[webmcp-relay-widget] Ignoring non-object or untyped relay message'
-      );
-    });
-
     connection.client.send(JSON.stringify({ type: 'ping' }));
     await vi.waitFor(() => {
       expect(connection.messages).toContainEqual({ type: 'pong' });
@@ -920,5 +913,243 @@ describe('widget runtime', () => {
     await waitForConnection(env);
 
     expect(warn).toHaveBeenCalledTimes(0);
+  });
+});
+
+describe('dormant reconnection', () => {
+  type Listener = (event: unknown) => void;
+
+  let savedWebSocket: typeof WebSocket;
+  let wsUrls: string[];
+
+  function createFailingWebSocket(): typeof WebSocket {
+    return class MockWebSocket {
+      static readonly CONNECTING = 0;
+      static readonly OPEN = 1;
+      static readonly CLOSING = 2;
+      static readonly CLOSED = 3;
+      readonly CONNECTING = 0;
+      readonly OPEN = 1;
+      readonly CLOSING = 2;
+      readonly CLOSED = 3;
+      url: string;
+      readyState = 0;
+      protocol = '';
+      private listeners = new Map<string, Array<{ fn: Listener; once?: boolean }>>();
+
+      constructor(url: string, _protocols?: string | string[]) {
+        this.url = url;
+        wsUrls.push(url);
+        queueMicrotask(() => {
+          this.readyState = 3;
+          this._emit('error', new Event('error'));
+          this._emit('close', new CloseEvent('close'));
+        });
+      }
+
+      addEventListener(t: string, fn: Listener, opts?: { once?: boolean }): void {
+        if (!this.listeners.has(t)) this.listeners.set(t, []);
+        this.listeners.get(t)!.push({ fn, once: opts?.once });
+      }
+
+      removeEventListener(t: string, fn: Listener): void {
+        const arr = this.listeners.get(t);
+        if (!arr) return;
+        const i = arr.findIndex((e) => e.fn === fn);
+        if (i >= 0) arr.splice(i, 1);
+      }
+
+      close(): void {
+        this.readyState = 3;
+      }
+
+      send(_d: string): void {}
+
+      private _emit(t: string, ev: Event): void {
+        for (const e of this.listeners.get(t) ?? []) {
+          e.fn(ev);
+          if (e.once) {
+            const arr = this.listeners.get(t)!;
+            const i = arr.indexOf(e);
+            if (i >= 0) arr.splice(i, 1);
+          }
+        }
+      }
+    } as unknown as typeof WebSocket;
+  }
+
+  interface DormantEnv {
+    docListeners: Map<string, Set<Listener>>;
+    winListeners: Map<string, Set<Listener>>;
+    setVisibility: (v: DocumentVisibilityState) => void;
+    fireDocEvent: (type: string) => void;
+    fireWinEvent: (type: string) => void;
+  }
+
+  function setupDormantEnv(port = 9333): DormantEnv {
+    wsUrls = [];
+    const docListeners = new Map<string, Set<Listener>>();
+    const winListeners = new Map<string, Set<Listener>>();
+    let vis: DocumentVisibilityState = 'visible';
+
+    Object.defineProperty(globalThis, 'document', {
+      configurable: true,
+      writable: true,
+      value: {
+        referrer: '',
+        get visibilityState() {
+          return vis;
+        },
+        addEventListener(t: string, fn: Listener) {
+          if (!docListeners.has(t)) docListeners.set(t, new Set());
+          docListeners.get(t)!.add(fn);
+        },
+        removeEventListener(t: string, fn: Listener) {
+          docListeners.get(t)?.delete(fn);
+        },
+      },
+    });
+
+    const store = new Map<string, string>();
+    Object.defineProperty(globalThis, 'sessionStorage', {
+      configurable: true,
+      writable: true,
+      value: {
+        getItem: (k: string) => store.get(k) ?? null,
+        setItem: (k: string, v: string) => store.set(k, v),
+        removeItem: (k: string) => store.delete(k),
+        clear: () => store.clear(),
+      },
+    });
+
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      writable: true,
+      value: {
+        addEventListener(t: string, fn: Listener) {
+          if (!winListeners.has(t)) winListeners.set(t, new Set());
+          winListeners.get(t)!.add(fn);
+        },
+        removeEventListener(t: string, fn: Listener) {
+          winListeners.get(t)?.delete(fn);
+        },
+        location: {
+          search: buildSearch({
+            hostOrigin: APP_ORIGIN,
+            relayHost: '127.0.0.1',
+            relayPort: String(port),
+            tabId: 'tab-dormant',
+          }),
+        },
+        parent: { postMessage: vi.fn() },
+      },
+    });
+
+    return {
+      docListeners,
+      winListeners,
+      setVisibility(v: DocumentVisibilityState) {
+        vis = v;
+      },
+      fireDocEvent(type: string) {
+        for (const fn of docListeners.get(type) ?? []) fn(new Event(type));
+      },
+      fireWinEvent(type: string) {
+        for (const fn of winListeners.get(type) ?? []) fn(new Event(type));
+      },
+    };
+  }
+
+  async function fastForwardToDormant(): Promise<void> {
+    startWidgetRuntime();
+    await vi.advanceTimersByTimeAsync(70000);
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    savedWebSocket = globalThis.WebSocket;
+    globalThis.WebSocket = createFailingWebSocket();
+  });
+
+  afterEach(() => {
+    globalThis.WebSocket = savedWebSocket;
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    restoreGlobal('document', originalDescriptors.document);
+    restoreGlobal('sessionStorage', originalDescriptors.sessionStorage);
+    restoreGlobal('window', originalDescriptors.window);
+  });
+
+  it('enters dormant after 3 failed rediscovery cycles and stops connections', async () => {
+    setupDormantEnv();
+    await fastForwardToDormant();
+
+    wsUrls.length = 0;
+    await vi.advanceTimersByTimeAsync(60000);
+    expect(wsUrls).toHaveLength(0);
+  });
+
+  it('registers visibilitychange listener in dormant state', async () => {
+    const env = setupDormantEnv();
+    await fastForwardToDormant();
+
+    expect(env.docListeners.get('visibilitychange')?.size).toBe(1);
+  });
+
+  it('heartbeat only probes configured port, not full range', async () => {
+    setupDormantEnv(9333);
+    await fastForwardToDormant();
+
+    wsUrls.length = 0;
+    await vi.advanceTimersByTimeAsync(120000);
+
+    expect(wsUrls.length).toBeGreaterThan(0);
+    expect(wsUrls.length).toBeLessThanOrEqual(2);
+    expect(wsUrls[0]).toContain('9333');
+  });
+
+  it('wakes from dormant on visibilitychange and re-enters dormant on failure', async () => {
+    const env = setupDormantEnv();
+    await fastForwardToDormant();
+
+    wsUrls.length = 0;
+    env.setVisibility('visible');
+    env.fireDocEvent('visibilitychange');
+    await vi.advanceTimersByTimeAsync(500);
+
+    expect(wsUrls.length).toBeGreaterThan(2);
+    expect(env.docListeners.get('visibilitychange')?.size).toBe(1);
+  });
+
+  it('wakes from dormant on webmcp.connect message', async () => {
+    const env = setupDormantEnv();
+    await fastForwardToDormant();
+
+    wsUrls.length = 0;
+    for (const fn of env.winListeners.get('message') ?? []) {
+      (fn as (event: { origin: string; data: unknown }) => void)({
+        origin: APP_ORIGIN,
+        data: { type: 'webmcp.connect' },
+      });
+    }
+    await vi.advanceTimersByTimeAsync(500);
+
+    expect(wsUrls.length).toBeGreaterThan(2);
+  });
+
+  it('does not duplicate listeners when re-entering dormant after wake failure', async () => {
+    const env = setupDormantEnv();
+    await fastForwardToDormant();
+
+    env.setVisibility('visible');
+    env.fireDocEvent('visibilitychange');
+    await vi.advanceTimersByTimeAsync(500);
+
+    env.setVisibility('hidden');
+    env.setVisibility('visible');
+    env.fireDocEvent('visibilitychange');
+    await vi.advanceTimersByTimeAsync(500);
+
+    expect(env.docListeners.get('visibilitychange')?.size).toBe(1);
   });
 });

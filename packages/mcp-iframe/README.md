@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue?style=flat-square)](https://www.typescriptlang.org/)
 
-**@mcp-b/mcp-iframe** provides `<mcp-iframe>`, a Web Component that wraps an iframe and automatically bridges its MCP tools, resources, and prompts to the parent page's `navigator.modelContext`. Items are namespaced with the element's `id` to avoid collisions.
+**@mcp-b/mcp-iframe** provides `<mcp-iframe>`, a Web Component that wraps an iframe and automatically bridges its MCP tools, resources, and prompts to the parent page's `document.modelContext`. Items are namespaced with the element's `id` to avoid collisions.
 
 ## Installation
 
@@ -14,7 +14,7 @@
 pnpm add @mcp-b/mcp-iframe @modelcontextprotocol/sdk
 ```
 
-The iframe page must have `@mcp-b/global` (or any `navigator.modelContext` implementation) installed.
+The iframe page must have `@mcp-b/global` (or any `document.modelContext` implementation) installed.
 
 ## Usage
 
@@ -57,8 +57,8 @@ Standard iframe attributes (`sandbox`, `allow`, `width`, `height`, etc.) are als
 
 ## Related Packages
 
-- [`@mcp-b/global`](https://docs.mcp-b.ai/packages/global) - W3C Web Model Context API polyfill (required in the iframe)
-- [`@mcp-b/transports`](https://docs.mcp-b.ai/packages/transports) - Transport layer used internally
+- [`@mcp-b/global`](https://docs.mcp-b.ai/packages/global/reference) - Full MCP-B browser runtime (required in the iframe)
+- [`@mcp-b/transports`](https://docs.mcp-b.ai/packages/transports/reference) - Transport layer used internally
 
 ## License
 

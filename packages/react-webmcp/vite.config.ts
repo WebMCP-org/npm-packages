@@ -15,7 +15,7 @@ export default defineConfig({
     treeshake: true,
     // We don't want to bundle these with the library,
     // as the consuming project will provide them.
-    external: ['react', 'react/jsx-runtime', 'react-dom', 'zod'],
+    external: ['react', 'react/jsx-runtime', 'react-dom', 'zod', /^@modelcontextprotocol\/sdk/],
     tsconfig: './tsconfig.json',
   },
   test: {

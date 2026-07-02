@@ -1,6 +1,6 @@
 # @mcp-b/webmcp-types
 
-Strict TypeScript type definitions for the WebMCP core API (`navigator.modelContext`).
+Strict TypeScript type definitions for the WebMCP core API (`document.modelContext`).
 
 Zero runtime. Zero side effects. Just `.d.ts` types.
 
@@ -15,7 +15,8 @@ This package is the type-safety source of truth for WebMCP.
 
 ## Why This Package
 
-- Global `Navigator` augmentation for `navigator.modelContext`
+- Global `Document` augmentation for `document.modelContext`
+- Deprecated global `Navigator` augmentation for backward-compatible `navigator.modelContext`
 - Strongly typed tool descriptors and tool responses
 - Literal JSON Schema inference for tool args and `structuredContent`
 - Name-aware helper types for typed tool registries
@@ -90,7 +91,7 @@ const outputSchema = {
   additionalProperties: false,
 } as const satisfies JsonSchemaForInference;
 
-navigator.modelContext.registerTool({
+document.modelContext.registerTool({
   name: 'search',
   description: 'Search indexed docs',
   inputSchema,
@@ -151,7 +152,9 @@ If `required` is widened (for example a runtime `string[]`), fields are treated 
 
 ### 5. Output inference from `outputSchema`
 
-When `outputSchema` is a literal object schema, `structuredContent` is inferred automatically via `ToolResultFromOutputSchema`.
+When `outputSchema` is a literal JSON Schema, `structuredContent` is inferred automatically via `ToolResultFromOutputSchema`. Object, array, string, number, boolean, and null schemas are supported for MCP-B type inference.
+
+Native Chrome WebMCP does not currently define or enforce `outputSchema`; treat it as helper metadata unless a specific MCP-B runtime or adapter consumes it.
 
 This catches enum/type mismatches at compile time.
 
@@ -188,14 +191,15 @@ await modelContext.callTool({ name: 'ping' });
 
 ## Core and Extension Surfaces
 
-`Navigator['modelContext']` is typed as strict core WebMCP methods only.
+`Document['modelContext']` is typed as strict core WebMCP methods only.
+`Navigator['modelContext']` remains typed as a deprecated backward-compatible alias.
 
 Extension methods are available via `ModelContextExtensions` and `ModelContextWithExtensions`:
 
 ```ts
 import type { ModelContextExtensions } from '@mcp-b/webmcp-types';
 
-const modelContext = navigator.modelContext as Navigator['modelContext'] & ModelContextExtensions;
+const modelContext = document.modelContext as Document['modelContext'] & ModelContextExtensions;
 const tools = modelContext.listTools();
 const result = await modelContext.callTool({
   name: 'search',
@@ -210,7 +214,7 @@ void result;
 
 | Export                               | Purpose                                                      |
 | ------------------------------------ | ------------------------------------------------------------ |
-| `ModelContext`                       | Strict core `navigator.modelContext` type                    |
+| `ModelContext`                       | Strict core `document.modelContext` type                     |
 | `ToolDescriptor`                     | Explicitly typed tool descriptor                             |
 | `ToolDescriptorFromSchema`           | Schema-driven descriptor with inferred args/result           |
 | `JsonSchemaForInference`             | Supported JSON Schema subset for inference                   |
@@ -225,7 +229,8 @@ void result;
 
 - This package does not install any runtime behavior.
 - Runtime validation/execution behavior depends on your WebMCP runtime package.
-- `provideContext()` and `clearContext()` remain typed for compatibility, but are deprecated because the upstream WebMCP spec removed them on March 5, 2026.
+- Prefer `document.modelContext` for new code. `navigator.modelContext` is retained as a deprecated backward-compatible alias during the WebMCP migration.
+- `provideContext()` and `clearContext()` were removed from the upstream WebMCP spec on March 5, 2026 and are intentionally not typed.
 - `unregisterTool(name)` is `@deprecated`. The April 23, 2026 WebMCP draft removed it from the spec in favor of an `AbortSignal` passed via `registerTool(tool, { signal })`. The type is retained for compatibility with older native previews and existing MCP-B wrappers; it will be removed in the next major version.
 - `registerTool(tool, options?)` accepts a `ModelContextRegisterToolOptions` dictionary with an optional `signal: AbortSignal`. Aborting the signal unregisters the tool.
 - `ToolAnnotations.untrustedContentHint` was added to the spec on April 23, 2026 to flag tools whose output may include externally-sourced content.

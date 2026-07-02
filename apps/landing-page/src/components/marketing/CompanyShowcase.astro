@@ -1,0 +1,104 @@
+---
+const companies = [
+  'Amazon',
+  'Google Chrome',
+  'Microsoft Edge',
+  'W3C',
+  'Okta',
+  'OpenAI',
+  'Anthropic',
+  'Enterprise IT',
+];
+---
+
+<section id="company" class="company-showcase">
+  <div class="company-shell">
+    <p class="company-copy">
+      Trusted by <span>browser teams</span>, standards groups, and enterprise platforms.
+    </p>
+
+    <div class="company-grid" aria-label="Organizations and ecosystems MCP-B works with">
+      {
+        companies.map((company) => (
+          <div class="company-cell">
+            <span>{company}</span>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<style>
+  .company-showcase {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .company-shell {
+    width: min(100%, 84rem);
+    display: grid;
+    grid-template-columns: minmax(18rem, 24rem) 1fr;
+    border-block: 1px solid var(--color-border);
+  }
+
+  .company-copy {
+    min-height: 5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    text-align: center;
+    color: var(--color-text-secondary);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    padding: 0 var(--space-l);
+    border-inline-end: 1px solid var(--color-border);
+  }
+
+  .company-copy span {
+    color: var(--color-accent-text);
+  }
+
+  .company-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1px;
+    background: var(--color-border);
+  }
+
+  .company-cell {
+    min-height: 5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-s);
+    background: var(--color-bg);
+  }
+
+  .company-cell span {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    text-align: center;
+  }
+
+  @media (max-width: 900px) {
+    .company-shell {
+      grid-template-columns: 1fr;
+    }
+
+    .company-copy {
+      border-inline-end: none;
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .company-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+</style>

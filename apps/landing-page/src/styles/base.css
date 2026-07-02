@@ -1,0 +1,120 @@
+/*
+ * Base element styles
+ * Typography, links, code, media
+ */
+
+@layer base {
+  body {
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: 1.6;
+    color: var(--color-text);
+    background-color: var(--color-bg);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* --- Headings --- */
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    line-height: 1.15;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--color-text);
+  }
+
+  /* --- Links --- */
+
+  a {
+    color: var(--color-accent);
+    text-decoration: none;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.15em;
+    transition: color var(--duration-fast) var(--ease-out);
+  }
+
+  a:hover {
+    text-decoration: underline;
+  }
+
+  /* --- Code --- */
+
+  code {
+    font-family: var(--font-mono);
+    font-size: 0.875em;
+    padding: 0.15em 0.35em;
+    border-radius: var(--radius-sm);
+    background: var(--color-bg-surface);
+  }
+
+  pre {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    line-height: 1.65;
+    padding: var(--space-s-m);
+    border-radius: var(--radius-lg);
+    background: var(--color-bg-surface);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+
+    & code {
+      padding: 0;
+      background: none;
+      font-size: inherit;
+    }
+  }
+
+  /* --- Blockquotes --- */
+
+  blockquote {
+    padding-inline-start: var(--space-s);
+    border-inline-start: 3px solid var(--color-accent);
+    color: var(--color-text-secondary);
+    font-style: italic;
+  }
+
+  /* --- Horizontal rules --- */
+
+  hr {
+    border: none;
+    block-size: 1px;
+    background: var(--color-border);
+    margin-block: var(--space-l-xl);
+  }
+
+  /* --- Media --- */
+
+  img {
+    height: auto;
+  }
+
+  /* --- Selection --- */
+
+  ::selection {
+    background: var(--color-accent-subtle);
+  }
+
+  /* --- Focus --- */
+
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 3px;
+    border-radius: var(--radius-sm);
+  }
+
+  /* --- Strong --- */
+
+  strong,
+  b {
+    font-weight: 650;
+  }
+
+  /* --- Small --- */
+
+  small {
+    font-size: var(--text-sm);
+  }
+}

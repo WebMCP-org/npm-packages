@@ -1,0 +1,44 @@
+---
+title: '@mcp-b/webmcp-polyfill overview'
+description: 'When to use the strict WebMCP polyfill, where it fits in the stack, and when to move up to the full runtime.'
+keywords: ['@mcp-b/webmcp-polyfill', 'overview', 'polyfill', 'document.modelContext', 'strict core']
+icon: 'puzzle-piece'
+---
+
+`@mcp-b/webmcp-polyfill` installs the strict WebMCP core on `document.modelContext` when the browser does not ship it yet. It is the runtime choice for teams that want the browser-facing standard surface without MCP-B-only extensions.
+
+## When to use this package
+
+- You want `registerTool`, `getTools`, and `executeTool` in browsers today.
+- You are building a site or reusable library that wants to stay close to the W3C surface.
+- You want to pair runtime behavior with [`@mcp-b/webmcp-types`](/packages/webmcp-types/overview) for type inference.
+
+## When not to use this package
+
+- You need prompts, resources, transport, sampling, or elicitation. Use [`@mcp-b/global`](/packages/global/overview).
+- You only need types at build time. Use [`@mcp-b/webmcp-types`](/packages/webmcp-types/overview).
+
+## Where it sits in the package graph
+
+This package sits directly above `@mcp-b/webmcp-types`. The full runtime in [`@mcp-b/global`](/packages/global/overview) wraps the polyfill when it initializes.
+
+## First step
+
+Initialize the polyfill before your app registers tools. The [reference page](/packages/webmcp-polyfill/reference) documents the initialization options, testing shim behavior, and the strict-core lifecycle.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Reference" icon="book-open" href="/packages/webmcp-polyfill/reference">
+    Initialization options, testing shim details, and runtime behavior.
+  </Card>
+  <Card title="First tool tutorial" icon="graduation-cap" href="/tutorials/first-tool">
+    Build your first strict-core tool.
+  </Card>
+  <Card title="Choose a runtime" icon="layer-group" href="/how-to/choose-runtime">
+    Compare the three runtime strategies.
+  </Card>
+  <Card title="Test native and polyfill" icon="flask-vial" href="/how-to/test-native-and-polyfill">
+    Validate your code against both native and polyfilled paths.
+  </Card>
+</CardGroup>

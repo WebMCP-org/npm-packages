@@ -29,20 +29,22 @@ function useWebMCP<
 ```
 
 `InferOutput<TOutputSchema>` is the output type inferred from `outputSchema`.
+Native Chrome WebMCP does not currently define or enforce `outputSchema`; the
+React hook uses it for output typing and structured MCP responses.
 
 #### Configuration Options
 
-| Option         | Type                          | Required | Description                                          |
-| -------------- | ----------------------------- | -------- | ---------------------------------------------------- |
-| `name`         | `string`                      | Yes      | Unique tool identifier (e.g., 'posts_like')          |
-| `description`  | `string`                      | Yes      | Human-readable description for AI                    |
-| `inputSchema`  | `Record<string, ZodType>`     | -        | Input validation using Zod schemas                   |
-| `outputSchema` | `Record<string, ZodType>`     | -        | Output schema for structured responses (recommended) |
-| `annotations`  | `ToolAnnotations`             | -        | Metadata hints for the AI                            |
-| `handler`      | `(input) => Promise<TOutput>` | Yes      | Function that executes the tool                      |
-| `formatOutput` | `(output) => string`          | -        | Custom output formatter                              |
-| `onSuccess`    | `(result, input) => void`     | -        | Success callback                                     |
-| `onError`      | `(error, input) => void`      | -        | Error handler callback                               |
+| Option         | Type                          | Required | Description                                 |
+| -------------- | ----------------------------- | -------- | ------------------------------------------- |
+| `name`         | `string`                      | Yes      | Unique tool identifier (e.g., 'posts_like') |
+| `description`  | `string`                      | Yes      | Human-readable description for AI           |
+| `inputSchema`  | `Record<string, ZodType>`     | -        | Input validation using Zod schemas          |
+| `outputSchema` | `Record<string, ZodType>`     | -        | MCP-B output helper metadata                |
+| `annotations`  | `ToolAnnotations`             | -        | Metadata hints for the AI                   |
+| `handler`      | `(input) => Promise<TOutput>` | Yes      | Function that executes the tool             |
+| `formatOutput` | `(output) => string`          | -        | Custom output formatter                     |
+| `onSuccess`    | `(result, input) => void`     | -        | Success callback                            |
+| `onError`      | `(error, input) => void`      | -        | Error handler callback                      |
 
 #### Memoization and `deps` (important)
 
@@ -388,7 +390,7 @@ Any MCP-compatible client: Claude Desktop, ChatGPT (via plugins/GPTs), Cursor, V
 
 ### How do AI agents connect to my React app?
 
-Via browser extensions or the `@mcp-b/chrome-devtools-mcp` server, which bridges desktop AI clients to browser-based MCP tools.
+Via browser extensions or upstream `chrome-devtools-mcp`, which bridges desktop AI clients to browser-based MCP tools.
 
 ### Can I use this with Next.js / Remix / Gatsby?
 

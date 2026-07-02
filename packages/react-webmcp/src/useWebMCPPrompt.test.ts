@@ -36,7 +36,11 @@ describe('useWebMCPPrompt', () => {
   });
 
   beforeEach(() => {
-    navigator.modelContext?.clearContext();
+    (
+      navigator.modelContextTesting as
+        | (Navigator['modelContextTesting'] & { reset?: () => void })
+        | undefined
+    )?.reset?.();
     window.localStorage.removeItem(DEBUG_CONFIG_KEY);
   });
 
@@ -166,6 +170,54 @@ describe('useWebMCPPrompt', () => {
         expect(descriptor.argsSchema?.type).toBe('object');
         expect(descriptor.argsSchema?.properties).toHaveProperty('code');
         expect(descriptor.argsSchema?.required).toContain('code');
+      } finally {
+        registerPromptSpy.mockRestore();
+      }
+    });
+
+    it('converts Standard JSON argsSchema before prompt registration', async () => {
+      const registerPromptSpy = vi.spyOn(navigator.modelContext, 'registerPrompt');
+
+      try {
+        const input = vi.fn(() => ({
+          type: 'object',
+          properties: { query: { type: 'string' } },
+          required: ['query'],
+        }));
+        const standardJsonSchema = {
+          '~standard': {
+            version: 1 as const,
+            vendor: 'test',
+            jsonSchema: {
+              input,
+              output: () => ({ type: 'object', properties: {} }),
+            },
+          },
+        };
+
+        await renderHook(() =>
+          useWebMCPPrompt({
+            name: 'standard_args_prompt',
+            argsSchema: standardJsonSchema as never,
+            get: async () => ({
+              messages: [{ role: 'user', content: { type: 'text', text: 'ok' } }],
+            }),
+          })
+        );
+
+        const descriptor = registerPromptSpy.mock.calls.at(-1)?.[0] as {
+          argsSchema?: {
+            type?: string;
+            properties?: Record<string, { type?: string }>;
+            required?: string[];
+          };
+        };
+        expect(input).toHaveBeenCalledWith({ target: 'draft-2020-12' });
+        expect(descriptor.argsSchema).toEqual({
+          type: 'object',
+          properties: { query: { type: 'string' } },
+          required: ['query'],
+        });
       } finally {
         registerPromptSpy.mockRestore();
       }
@@ -397,9 +449,15 @@ describe('useWebMCPPrompt', () => {
   describe('modelContext unavailability', () => {
     it('should warn when modelContext is not available', async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const savedModelContext = navigator.modelContext;
+      const savedDocumentModelContext = document.modelContext;
+      const savedNavigatorModelContext = navigator.modelContext;
 
       try {
+        Object.defineProperty(document, 'modelContext', {
+          value: undefined,
+          writable: true,
+          configurable: true,
+        });
         Object.defineProperty(navigator, 'modelContext', {
           value: undefined,
           writable: true,
@@ -420,8 +478,13 @@ describe('useWebMCPPrompt', () => {
         );
         expect(result.current.isRegistered).toBe(false);
       } finally {
+        Object.defineProperty(document, 'modelContext', {
+          value: savedDocumentModelContext,
+          writable: true,
+          configurable: true,
+        });
         Object.defineProperty(navigator, 'modelContext', {
-          value: savedModelContext,
+          value: savedNavigatorModelContext,
           writable: true,
           configurable: true,
         });

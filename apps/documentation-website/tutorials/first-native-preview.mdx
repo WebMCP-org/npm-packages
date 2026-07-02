@@ -1,0 +1,149 @@
+---
+title: 'Try the Native Chrome Preview'
+description: "Enable Chrome's experimental WebMCP flag, open an official Chrome demo, and inspect it with the Chrome team's extension."
+keywords:
+  [
+    'chrome',
+    'native',
+    'browser flag',
+    'document.modelcontext',
+    'model context tool inspector',
+    'experimental',
+  ]
+icon: 'chrome'
+---
+
+In this tutorial, we will enable Chrome's native WebMCP preview, open one of the Chrome team's live demos, and inspect its tools with the official Model Context Tool Inspector. By the end, you will have seen the native `document.modelContext` API running in Chrome without any MCP-B runtime involved.
+
+<Note>
+  WebMCP is an experimental browser preview. The flag name and API can change between Chrome
+  releases. For production use, follow the polyfill path in [Build Your First
+  Tool](/tutorials/first-tool).
+</Note>
+
+## Prerequisites
+
+- A current Chrome channel that exposes the WebMCP testing flag
+- The ability to install a Chrome extension
+
+## What we will use
+
+- the Chrome flag that enables the preview
+- the [Model Context Tool Inspector](https://chromewebstore.google.com/detail/model-context-tool-inspec/gbpdfapgefenggkahomfgkhfehlcenpd)
+- the [pizza-maker demo](https://googlechromelabs.github.io/webmcp-tools/demos/pizza-maker/)
+
+<Steps>
+
+<Step title="Enable the WebMCP flag">
+
+1. Open Chrome and navigate to `chrome://flags/#enable-webmcp-testing`
+2. Set **WebMCP for testing** to **Enabled**
+3. Click **Relaunch**
+
+Chrome restarts with the native WebMCP preview enabled.
+
+</Step>
+
+<Step title="Install the Model Context Tool Inspector">
+
+1. Open the [Model Context Tool Inspector](https://chromewebstore.google.com/detail/model-context-tool-inspec/gbpdfapgefenggkahomfgkhfehlcenpd) in the Chrome Web Store
+2. Click **Add to Chrome**
+3. Pin the extension so you can open it quickly
+
+This is the Chrome team's own inspection tool for native WebMCP pages.
+
+</Step>
+
+<Step title="Open the official demo">
+
+1. Open the [pizza-maker demo](https://googlechromelabs.github.io/webmcp-tools/demos/pizza-maker/)
+2. Wait for the page to finish loading
+3. Open DevTools and switch to the console
+
+You are now on a page that registers tools through Chrome's native preview.
+
+</Step>
+
+<Step title="Verify the native APIs are available">
+
+Run:
+
+```javascript
+console.log('modelContext:', !!document.modelContext);
+console.log('modelContextTesting:', !!navigator.modelContextTesting);
+```
+
+You should see:
+
+```text
+modelContext: true
+modelContextTesting: true
+```
+
+</Step>
+
+<Step title="List the demo tools">
+
+Run:
+
+```javascript
+const tools = navigator.modelContextTesting.listTools();
+console.log(tools);
+```
+
+You should see tool metadata from the demo. On the pizza demo, the list includes tools such as `set_pizza_size`, `set_pizza_style`, `toggle_layer`, and `add_topping`.
+
+</Step>
+
+<Step title="Inspect the same tools in the extension">
+
+1. Click the Model Context Tool Inspector while the demo tab is active
+2. Open its panel
+3. Confirm that the same tool list appears there
+
+The extension and `navigator.modelContextTesting` are now showing the same native tool surface.
+
+</Step>
+
+<Step title="Execute a tool">
+
+Run this in the console:
+
+```javascript
+const result = await navigator.modelContextTesting.executeTool(
+  'add_topping',
+  JSON.stringify({ topping: '🍄' })
+);
+console.log(result);
+```
+
+You should see the pizza update in the page, and the console should show the tool result. Now execute the same tool from the extension panel and compare the output.
+
+</Step>
+
+<Step title="Confirm that no MCP-B runtime is involved">
+
+Run:
+
+```javascript
+console.log('Constructor:', document.modelContext.constructor.name);
+```
+
+On this Chrome-team demo, there is no `@mcp-b/global` or `@mcp-b/webmcp-polyfill` involved. You are looking at the browser preview itself.
+
+</Step>
+
+</Steps>
+
+## What you learned
+
+- Chrome preview builds can expose `document.modelContext` behind the `chrome://flags/#enable-webmcp-testing` flag
+- Chrome also exposes `navigator.modelContextTesting` for inspection and execution during the preview
+- The Model Context Tool Inspector is the official Chrome-side inspection tool
+- The Chrome demos are the best place to see current native behavior without local setup drift
+
+## Next steps
+
+- [Build Your First Tool](/tutorials/first-tool) to take the polyfill path for browsers people actually use today
+- [Test Native and Polyfill Runtimes](/how-to/test-native-and-polyfill) for repeatable browser test setup
+- [What Is WebMCP?](/explanation/what-is-webmcp) for the standard-level picture

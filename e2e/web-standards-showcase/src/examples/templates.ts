@@ -26,7 +26,7 @@ const tool = {
 };
 
 // Register the tool
-navigator.modelContext.provideContext({ tools: [tool] });`,
+document.modelContext.registerTool(tool);`,
 
   calculator: `// Calculator Tools
 const calculatorTools = [
@@ -64,7 +64,9 @@ const calculatorTools = [
   }
 ];
 
-navigator.modelContext.provideContext({ tools: calculatorTools });`,
+for (const tool of calculatorTools) {
+  document.modelContext.registerTool(tool);
+}`,
 
   todo: `// Todo List Manager
 const todos = [];
@@ -132,7 +134,9 @@ const todoTools = [
   }
 ];
 
-navigator.modelContext.provideContext({ tools: todoTools });`,
+for (const tool of todoTools) {
+  document.modelContext.registerTool(tool);
+}`,
 
   timer: `// Timer Tool (demonstrates registerTool for persistent tools)
 let startTime = null;
@@ -184,7 +188,7 @@ const timerTool = {
 };
 
 // Use registerTool for persistent registration
-navigator.modelContext.registerTool(timerTool);`,
+document.modelContext.registerTool(timerTool);`,
 
   'output-schema': `// Tool with Output Schema (structuredContent demo)
 // This demonstrates how outputSchema enables structuredContent in MCP responses
@@ -236,7 +240,7 @@ const counterTool = {
   }
 };
 
-navigator.modelContext.registerTool(counterTool);`,
+document.modelContext.registerTool(counterTool);`,
 
   'state-machine': `// State Machine Tool
 const states = ['idle', 'processing', 'completed', 'error'];
@@ -297,5 +301,5 @@ const stateMachineTool = {
   }
 };
 
-navigator.modelContext.registerTool(stateMachineTool);`,
+document.modelContext.registerTool(stateMachineTool);`,
 };

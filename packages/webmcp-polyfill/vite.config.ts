@@ -5,6 +5,7 @@ import { defineConfig } from 'vite-plus';
 const esmConfig: Options = {
   entry: {
     index: 'src/index.ts',
+    schema: 'src/schema.ts',
   },
   format: ['esm'],
   dts: true,
@@ -46,6 +47,7 @@ const iifeConfig: Options = {
 export default defineConfig({
   pack: [esmConfig, iifeConfig],
   test: {
+    exclude: ['conformance/**/*', 'dist', 'node_modules'],
     globals: true,
   },
 });

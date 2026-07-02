@@ -1,0 +1,57 @@
+---
+title: 'Chrome DevTools MCP retired package reference'
+sidebarTitle: 'Chrome DevTools MCP'
+description: 'Reference note for the retired @mcp-b/chrome-devtools-mcp package and the upstream replacement.'
+keywords:
+  [
+    'chrome-devtools-mcp',
+    '@mcp-b/chrome-devtools-mcp',
+    'retired package',
+    'mcp server',
+    'browser automation',
+  ]
+icon: 'chrome'
+---
+
+`@mcp-b/chrome-devtools-mcp` is retired.
+
+| Field               | Value                                                                                       |
+| ------------------- | ------------------------------------------------------------------------------------------- |
+| Former package      | `@mcp-b/chrome-devtools-mcp`                                                                |
+| Replacement package | `chrome-devtools-mcp`                                                                       |
+| Upstream source     | [ChromeDevTools/chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp) |
+| npm package         | [chrome-devtools-mcp](https://www.npmjs.com/package/chrome-devtools-mcp)                    |
+| Monorepo status     | No source, build, tests, or publish pipeline remain in `WebMCP-org/npm-packages`            |
+
+## MCP client config
+
+Use the upstream npm package in new MCP client configs:
+
+```json "MCP client config"
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["-y", "chrome-devtools-mcp@latest"]
+    }
+  }
+}
+```
+
+For Claude Code:
+
+```bash "Claude Code"
+claude mcp add chrome-devtools npx chrome-devtools-mcp@latest
+```
+
+## Migration
+
+Replace `@mcp-b/chrome-devtools-mcp` with `chrome-devtools-mcp` anywhere you configure an MCP server.
+
+The WebMCP-specific changes from the old fork have been upstreamed, so this repo does not vendor, build, test, or release a Chrome DevTools MCP fork. Use the upstream README and release notes for CLI options and tool reference details.
+
+## Related
+
+- [Use Chrome DevTools MCP](/how-to/use-devtools-mcp) (how-to guide)
+- [@mcp-b/global](/packages/global/reference) (runtime reference)
+- [Transports and bridges](/explanation/architecture/transports-and-bridges) (architecture explanation)

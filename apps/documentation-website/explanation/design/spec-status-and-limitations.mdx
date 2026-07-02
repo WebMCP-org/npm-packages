@@ -1,0 +1,47 @@
+---
+title: 'Spec status and limitations'
+description: 'What the WebMCP proposal offers today and where implementations have room to grow.'
+keywords: ['webmcp spec', 'w3c', 'preview', 'limitations']
+icon: 'flag'
+---
+
+WebMCP is an active community-group proposal, not a completed W3C
+standard. It defines the direction of the browser API, but several
+details are still a work in progress.
+
+Browser APIs, declarative attributes, testing surfaces, iframe policy,
+concurrency, cancellation, and output-schema behavior may continue to change.
+
+Implementations should track the current [W3C draft](https://webmachinelearning.github.io/webmcp/),
+keep domain operations separate from the browser registration adapter, use
+feature detection, and test both native and polyfill paths. MCP-B extensions
+must remain clearly distinguished from the standard surface.
+
+New code uses `document.modelContext`. `navigator.modelContext` remains a
+deprecated compatibility alias, while `navigator.modelContextTesting` is a
+testing and inspection surface. Adapter boundaries reduce migration cost.
+
+See [Try the native Chrome preview](/tutorials/first-native-preview) and
+[Test native and polyfill](/how-to/test-native-and-polyfill).
+
+## Upstream sources to track
+
+Use first-party sources for compatibility decisions:
+
+| Source                                                                                       | Owns                                                                                                                               |
+| -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| [W3C WebMCP draft](https://webmachinelearning.github.io/webmcp/)                             | Standard API shape, `document.modelContext`, `registerTool()`, permissions policy, security model                                  |
+| [Chrome WebMCP imperative API](https://developer.chrome.com/docs/ai/webmcp/imperative-api)   | Current Chrome preview behavior for `getTools()`, `executeTool()`, `AbortSignal` cleanup, and `navigator.modelContext` deprecation |
+| [Chrome WebMCP declarative API](https://developer.chrome.com/docs/ai/webmcp/declarative-api) | Form annotation behavior and declarative schema synthesis                                                                          |
+| [Chrome WebMCP tool security](https://developer.chrome.com/docs/ai/webmcp/security)          | Browser-facing tool security guidance                                                                                              |
+| [MCP SEP-2106](https://modelcontextprotocol.io/seps/2106-json-schema-2020-12)                | MCP schema changes for JSON Schema 2020-12, output schemas, and `structuredContent`                                                |
+
+This release line follows those sources by making `document.modelContext` the
+primary surface, preferring `getTools()` plus `executeTool()`, using
+`AbortSignal` for cleanup, and keeping legacy MCP-B helpers as compatibility
+APIs.
+
+`outputSchema` is not part of the current W3C/Chrome WebMCP tool dictionary.
+MCP-B keeps it as helper metadata for TypeScript inference, structured MCP
+responses, and package/runtime adapters. Do not rely on native browser WebMCP
+to validate tool output against it.

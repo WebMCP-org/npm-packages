@@ -1,57 +1,50 @@
-import { type Schema, Validator } from '@cfworker/json-schema';
 import type {
   InputSchema,
-  JsonObject,
   ModelContext,
   ModelContextClient,
-  ModelContextOptions,
   ModelContextRegisterToolOptions,
   ModelContextTesting,
   ModelContextTestingExecuteToolOptions,
   ModelContextTestingToolInfo,
+  ModelContextToolInfo,
   ModelContextToolReference,
   ToolDescriptor,
   ToolResponse,
 } from '@mcp-b/webmcp-types';
-import type { StandardSchemaV1 } from '@standard-schema/spec';
+import {
+  isPlainObject,
+  normalizeInputSchema,
+  toJsonValue,
+  validateValueWithSchema,
+} from './schema.js';
+import type { StandardInputValidatorSchema } from './schema.js';
+export {
+  isPlainObject,
+  normalizeInputSchema,
+  toJsonValue,
+  validateValueWithSchema,
+} from './schema.js';
+export type {
+  StandardInputJsonSchema,
+  StandardInputValidatorSchema,
+  StandardJSONSchemaV1,
+  ToolInputSchema,
+  ToolOutputSchema,
+} from './schema.js';
 
 const FAILED_TO_PARSE_INPUT_ARGUMENTS_MESSAGE = 'Failed to parse input arguments';
 const TOOL_INVOCATION_FAILED_MESSAGE =
   'Tool was executed but the invocation failed. For example, the script function threw an error';
 const TOOL_CANCELLED_MESSAGE = 'Tool was cancelled';
-const DEFAULT_INPUT_SCHEMA: InputSchema = { type: 'object', properties: {} };
-const STANDARD_JSON_SCHEMA_TARGETS = ['draft-2020-12', 'draft-07'] as const;
+/** WebMCP §4.2 tool name: ASCII alnum, underscore, hyphen, period; 1–128 code points. */
+const VALID_TOOL_NAME_RE = /^[A-Za-z0-9_\-.]{1,128}$/u;
 
 const POLYFILL_MARKER_PROPERTY = '__isWebMCPPolyfill' as const;
 const STANDARD_VALIDATOR_SYMBOL = Symbol('standardValidator');
 
-export type StandardInputValidatorSchema = StandardSchemaV1<
-  Record<string, unknown>,
-  Record<string, unknown>
->;
-export interface StandardJSONSchemaV1<Input = unknown, Output = Input> {
-  readonly '~standard': {
-    readonly version: 1;
-    readonly vendor: string;
-    readonly types?: { readonly input: Input; readonly output: Output } | undefined;
-    readonly jsonSchema: {
-      readonly input: (options: {
-        readonly target: 'draft-2020-12' | 'draft-07' | 'openapi-3.0' | ({} & string);
-        readonly libraryOptions?: Record<string, unknown> | undefined;
-      }) => Record<string, unknown>;
-      readonly output: (options: {
-        readonly target: 'draft-2020-12' | 'draft-07' | 'openapi-3.0' | ({} & string);
-        readonly libraryOptions?: Record<string, unknown> | undefined;
-      }) => Record<string, unknown>;
-    };
-  };
+function createAbortError(): Error {
+  return new DOMException('signal is aborted without reason', 'AbortError');
 }
-export type StandardInputJsonSchema = StandardJSONSchemaV1<
-  Record<string, unknown>,
-  Record<string, unknown>
->;
-export type ToolInputSchema = InputSchema | StandardInputValidatorSchema | StandardInputJsonSchema;
-export type ToolOutputSchema = InputSchema | StandardInputJsonSchema;
 
 type StandardValidationResult = Awaited<
   ReturnType<StandardInputValidatorSchema['~standard']['validate']>
@@ -67,21 +60,24 @@ interface PolyfillToolDescriptor extends ToolDescriptor<Record<string, unknown>,
   [STANDARD_VALIDATOR_SYMBOL]: StandardInputValidatorSchema;
 }
 
-interface NormalizedInputSchema {
-  inputSchema: InputSchema;
-  standardValidator: StandardInputValidatorSchema;
-}
-
 interface InstallState {
   installed: boolean;
-  previousModelContextDescriptor: PropertyDescriptor | undefined;
-  previousModelContextTestingDescriptor: PropertyDescriptor | undefined;
+  previousNavigatorModelContextDescriptor: PropertyDescriptor | undefined;
+  previousNavigatorModelContextTestingDescriptor: PropertyDescriptor | undefined;
+  previousDocumentModelContextDescriptor: PropertyDescriptor | undefined;
+  installedNavigatorModelContext: boolean;
+  installedNavigatorModelContextTesting: boolean;
+  installedDocumentModelContext: boolean;
 }
 
 const installState: InstallState = {
   installed: false,
-  previousModelContextDescriptor: undefined,
-  previousModelContextTestingDescriptor: undefined,
+  previousNavigatorModelContextDescriptor: undefined,
+  previousNavigatorModelContextTestingDescriptor: undefined,
+  previousDocumentModelContextDescriptor: undefined,
+  installedNavigatorModelContext: false,
+  installedNavigatorModelContextTesting: false,
+  installedDocumentModelContext: false,
 };
 
 export interface WebMCPPolyfillInitOptions {
@@ -111,9 +107,8 @@ class StrictWebMCPContext extends EventTarget {
   private tools = new Map<string, PolyfillToolDescriptor>();
   private testingShim: PolyfillTestingShim | null = null;
   private _ontoolchange: ((this: ModelContext, ev: Event) => unknown) | null = null;
-  private provideContextDeprecationWarned = false;
-  private clearContextDeprecationWarned = false;
   private unregisterToolDeprecationWarned = false;
+  private toolsChangedQueued = false;
 
   get ontoolchange(): ((this: ModelContext, ev: Event) => unknown) | null {
     return this._ontoolchange;
@@ -123,37 +118,11 @@ class StrictWebMCPContext extends EventTarget {
     this._ontoolchange = handler;
   }
 
-  provideContext(options: ModelContextOptions = {}): void {
-    this.warnProvideContextDeprecationOnce();
-
-    const nextTools = new Map<string, PolyfillToolDescriptor>();
-
-    for (const tool of options.tools ?? []) {
-      const normalized = normalizeToolDescriptor(tool, nextTools);
-      nextTools.set(normalized.name, normalized);
-    }
-
-    this.tools = nextTools;
-    this.notifyToolsChanged();
-  }
-
-  clearContext(): void {
-    this.warnClearContextDeprecationOnce();
-
-    this.tools.clear();
-    this.notifyToolsChanged();
-  }
-
-  registerTool(tool: ToolDescriptor, options?: ModelContextRegisterToolOptions): void {
+  registerTool(tool: ToolDescriptor, options?: ModelContextRegisterToolOptions): Promise<void> {
     const signal = options?.signal;
 
     if (signal?.aborted) {
-      console.warn(
-        `[WebMCPPolyfill] registerTool("${
-          tool?.name ?? '<unknown>'
-        }") skipped: options.signal was already aborted.`
-      );
-      return;
+      return Promise.reject(createAbortError());
     }
 
     const normalized = normalizeToolDescriptor(tool, this.tools);
@@ -171,6 +140,8 @@ class StrictWebMCPContext extends EventTarget {
         { once: true }
       );
     }
+
+    return Promise.resolve();
   }
 
   unregisterTool(nameOrTool: string | ModelContextToolReference): void {
@@ -183,8 +154,16 @@ class StrictWebMCPContext extends EventTarget {
     }
   }
 
-  getTools(): ModelContextTestingToolInfo[] {
-    return this.getToolInfos();
+  getTools(): Promise<ModelContextToolInfo[]> {
+    return Promise.resolve(this.getRegisteredToolInfos());
+  }
+
+  executeTool(
+    tool: ModelContextToolInfo,
+    inputArgsJson: string,
+    options?: ModelContextTestingExecuteToolOptions
+  ): Promise<string | null> {
+    return this.executeToolByName(tool.name, inputArgsJson, options, false);
   }
 
   getTestingShim(): PolyfillTestingShim {
@@ -207,11 +186,33 @@ class StrictWebMCPContext extends EventTarget {
     });
   }
 
+  /** @internal Used by getTools() */
+  getRegisteredToolInfos(): ModelContextToolInfo[] {
+    return this.getToolInfos().map((toolInfo) => {
+      const tool = this.tools.get(toolInfo.name);
+      return {
+        ...toolInfo,
+        title: tool?.title ?? '',
+        origin: globalThis.location?.origin ?? '',
+        window: globalThis.window,
+      };
+    });
+  }
+
   /** @internal Used by PolyfillTestingShim */
   async executeToolForTesting(
     toolName: string,
     inputArgsJson: string,
     options?: ModelContextTestingExecuteToolOptions
+  ): Promise<string | null> {
+    return this.executeToolByName(toolName, inputArgsJson, options, true);
+  }
+
+  private async executeToolByName(
+    toolName: string,
+    inputArgsJson: string,
+    options: ModelContextTestingExecuteToolOptions | undefined,
+    normalizeResult: boolean
   ): Promise<string | null> {
     if (options?.signal?.aborted) {
       throw createUnknownError(TOOL_CANCELLED_MESSAGE);
@@ -248,7 +249,16 @@ class StrictWebMCPContext extends EventTarget {
     try {
       const execution = tool.execute(args, client);
       const rawResult = await withAbortSignal(Promise.resolve(execution), options?.signal);
-      return toSerializedTestingResult(normalizeToolResponse(rawResult));
+      const normalizedResult = normalizeToolResponse(rawResult);
+      const outputValidationError = validateOutputForTool(normalizedResult, tool);
+      if (outputValidationError) {
+        throw new Error(outputValidationError);
+      }
+      if (normalizeResult) {
+        return toSerializedTestingResult(normalizedResult);
+      }
+      const serialized = JSON.stringify(rawResult);
+      return serialized === undefined ? null : serialized;
     } catch (error) {
       const detail =
         error instanceof Error
@@ -261,7 +271,13 @@ class StrictWebMCPContext extends EventTarget {
   }
 
   private notifyToolsChanged(): void {
+    if (this.toolsChangedQueued) {
+      return;
+    }
+    this.toolsChangedQueued = true;
+
     queueMicrotask(() => {
+      this.toolsChangedQueued = false;
       const event = new Event('toolchange');
       try {
         this._ontoolchange?.call(this as unknown as ModelContext, event);
@@ -271,28 +287,6 @@ class StrictWebMCPContext extends EventTarget {
       this.dispatchEvent(event);
       this.testingShim?.dispatchToolChange();
     });
-  }
-
-  private warnProvideContextDeprecationOnce(): void {
-    if (this.provideContextDeprecationWarned) {
-      return;
-    }
-
-    this.provideContextDeprecationWarned = true;
-    console.warn(
-      '[WebMCPPolyfill] navigator.modelContext.provideContext() is deprecated and will be removed in the next major version. Register tools individually with registerTool() instead.'
-    );
-  }
-
-  private warnClearContextDeprecationOnce(): void {
-    if (this.clearContextDeprecationWarned) {
-      return;
-    }
-
-    this.clearContextDeprecationWarned = true;
-    console.warn(
-      '[WebMCPPolyfill] navigator.modelContext.clearContext() is deprecated and will be removed in the next major version. Unregister individual tools instead.'
-    );
   }
 
   private warnUnregisterToolDeprecationOnce(): void {
@@ -384,6 +378,16 @@ function createUnknownError(message: string): Error {
   }
 }
 
+function createInvalidStateError(message: string): DOMException | Error {
+  try {
+    return new DOMException(message, 'InvalidStateError');
+  } catch {
+    const error = new Error(message);
+    error.name = 'InvalidStateError';
+    return error;
+  }
+}
+
 function parseInputArgsJson(inputArgsJson: string): Record<string, unknown> {
   let parsed: unknown;
 
@@ -414,220 +418,6 @@ function getToolNameForUnregister(nameOrTool: string | ModelContextToolReference
   );
 }
 
-export function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function getStandardProps(value: unknown): Record<string, unknown> | null {
-  if (!isPlainObject(value)) {
-    return null;
-  }
-
-  const standard = value['~standard'];
-  if (!isPlainObject(standard)) {
-    return null;
-  }
-
-  return standard;
-}
-
-function isStandardInputValidatorSchema(value: unknown): value is StandardInputValidatorSchema {
-  const standard = getStandardProps(value);
-  return Boolean(standard && standard.version === 1 && typeof standard.validate === 'function');
-}
-
-function isStandardInputJsonSchema(value: unknown): value is StandardInputJsonSchema {
-  const standard = getStandardProps(value);
-  if (!standard || standard.version !== 1 || !isPlainObject(standard.jsonSchema)) {
-    return false;
-  }
-
-  return typeof standard.jsonSchema.input === 'function';
-}
-
-function createStandardValidatorFromJsonSchema(schema: InputSchema): StandardInputValidatorSchema {
-  return {
-    '~standard': {
-      version: 1,
-      vendor: '@mcp-b/webmcp-polyfill-json-schema',
-      validate(value: unknown): StandardValidationResult {
-        if (!isPlainObject(value)) {
-          return {
-            issues: [{ message: 'expected object arguments' }],
-          };
-        }
-
-        const issue = validateArgsWithSchema(value, schema);
-        if (issue) {
-          return {
-            issues: [issue],
-          };
-        }
-
-        return {
-          value,
-        };
-      },
-    },
-  };
-}
-
-function convertStandardInputSchema(schema: StandardInputJsonSchema): InputSchema {
-  for (const target of STANDARD_JSON_SCHEMA_TARGETS) {
-    try {
-      const converted = schema['~standard'].jsonSchema.input({ target });
-      validateInputSchema(converted);
-      return converted;
-    } catch (error) {
-      console.warn(
-        `[WebMCPPolyfill] Standard JSON Schema conversion failed for target "${target}":`,
-        error
-      );
-    }
-  }
-
-  throw new Error('Failed to convert Standard JSON Schema inputSchema to a JSON Schema object');
-}
-
-function normalizeInputSchema(inputSchema: ToolInputSchema | undefined): NormalizedInputSchema {
-  if (inputSchema === undefined) {
-    const normalized = DEFAULT_INPUT_SCHEMA;
-    return {
-      inputSchema: normalized,
-      standardValidator: createStandardValidatorFromJsonSchema(normalized),
-    };
-  }
-
-  if (isStandardInputJsonSchema(inputSchema)) {
-    // Prefer JSON conversion for parity across JSON and Standard Schema inputs.
-    const converted = convertStandardInputSchema(inputSchema);
-    return {
-      inputSchema: converted,
-      standardValidator: createStandardValidatorFromJsonSchema(converted),
-    };
-  }
-
-  if (isStandardInputValidatorSchema(inputSchema)) {
-    return {
-      inputSchema: DEFAULT_INPUT_SCHEMA,
-      standardValidator: inputSchema,
-    };
-  }
-
-  validateInputSchema(inputSchema);
-
-  // Empty {} is valid JSON Schema but lacks type:"object" required by MCP.
-  if (Object.keys(inputSchema as Record<string, unknown>).length === 0) {
-    return {
-      inputSchema: DEFAULT_INPUT_SCHEMA,
-      standardValidator: createStandardValidatorFromJsonSchema(DEFAULT_INPUT_SCHEMA),
-    };
-  }
-
-  const normalizedSchema =
-    inputSchema.type === undefined
-      ? ({ type: 'object', ...inputSchema } as InputSchema)
-      : inputSchema;
-  return {
-    inputSchema: normalizedSchema,
-    standardValidator: createStandardValidatorFromJsonSchema(normalizedSchema),
-  };
-}
-
-function validateInputSchema(schema: unknown): asserts schema is InputSchema {
-  if (!isPlainObject(schema)) {
-    throw new Error('inputSchema must be a JSON Schema object');
-  }
-
-  validateJsonSchemaNode(schema, '$');
-}
-
-function validateJsonSchemaNode(node: Record<string, unknown>, path: string): void {
-  const typeValue = node.type;
-  if (
-    typeValue !== undefined &&
-    typeof typeValue !== 'string' &&
-    !(
-      Array.isArray(typeValue) &&
-      typeValue.every((entry) => typeof entry === 'string' && entry.length > 0)
-    )
-  ) {
-    throw new Error(`Invalid JSON Schema at ${path}: "type" must be a string or string[]`);
-  }
-
-  const requiredValue = node.required;
-  if (
-    requiredValue !== undefined &&
-    !(Array.isArray(requiredValue) && requiredValue.every((entry) => typeof entry === 'string'))
-  ) {
-    throw new Error(`Invalid JSON Schema at ${path}: "required" must be an array of strings`);
-  }
-
-  const propertiesValue = node.properties;
-  if (propertiesValue !== undefined) {
-    if (!isPlainObject(propertiesValue)) {
-      throw new Error(`Invalid JSON Schema at ${path}: "properties" must be an object`);
-    }
-
-    for (const [key, value] of Object.entries(propertiesValue)) {
-      if (!isPlainObject(value)) {
-        throw new Error(`Invalid JSON Schema at ${path}.properties.${key}: expected object schema`);
-      }
-      validateJsonSchemaNode(value, `${path}.properties.${key}`);
-    }
-  }
-
-  const itemsValue = node.items;
-  if (itemsValue !== undefined) {
-    if (Array.isArray(itemsValue)) {
-      for (const [index, value] of itemsValue.entries()) {
-        if (!isPlainObject(value)) {
-          throw new Error(`Invalid JSON Schema at ${path}.items[${index}]: expected object schema`);
-        }
-        validateJsonSchemaNode(value, `${path}.items[${index}]`);
-      }
-    } else if (isPlainObject(itemsValue)) {
-      validateJsonSchemaNode(itemsValue, `${path}.items`);
-    } else {
-      throw new Error(`Invalid JSON Schema at ${path}: "items" must be an object or object[]`);
-    }
-  }
-
-  for (const keyword of ['allOf', 'anyOf', 'oneOf'] as const) {
-    const value = node[keyword];
-    if (value === undefined) {
-      continue;
-    }
-
-    if (!Array.isArray(value)) {
-      throw new Error(`Invalid JSON Schema at ${path}: "${keyword}" must be an array`);
-    }
-
-    for (const [index, entry] of value.entries()) {
-      if (!isPlainObject(entry)) {
-        throw new Error(
-          `Invalid JSON Schema at ${path}.${keyword}[${index}]: expected object schema`
-        );
-      }
-      validateJsonSchemaNode(entry, `${path}.${keyword}[${index}]`);
-    }
-  }
-
-  const notValue = node.not;
-  if (notValue !== undefined) {
-    if (!isPlainObject(notValue)) {
-      throw new Error(`Invalid JSON Schema at ${path}: "not" must be an object schema`);
-    }
-    validateJsonSchemaNode(notValue, `${path}.not`);
-  }
-
-  try {
-    JSON.stringify(node);
-  } catch {
-    throw new Error(`Invalid JSON Schema at ${path}: schema must be JSON-serializable`);
-  }
-}
-
 function normalizeToolDescriptor(
   tool: ToolDescriptor,
   existing: Map<string, PolyfillToolDescriptor>
@@ -637,11 +427,17 @@ function normalizeToolDescriptor(
   }
 
   if (typeof tool.name !== 'string' || tool.name.length === 0) {
-    throw new TypeError('Tool "name" must be a non-empty string');
+    throw createInvalidStateError('Tool "name" must be a non-empty string');
+  }
+
+  if (!VALID_TOOL_NAME_RE.test(tool.name) || Array.from(tool.name).length > 128) {
+    throw createInvalidStateError(
+      'Tool "name" must be 1–128 characters and contain only ASCII alphanumeric, underscore, hyphen, or period'
+    );
   }
 
   if (typeof tool.description !== 'string' || tool.description.length === 0) {
-    throw new TypeError('Tool "description" must be a non-empty string');
+    throw createInvalidStateError('Tool "description" must be a non-empty string');
   }
 
   if (typeof tool.execute !== 'function') {
@@ -687,26 +483,6 @@ function normalizeToolDescriptor(
     inputSchema: normalizedInputSchema.inputSchema,
     [STANDARD_VALIDATOR_SYMBOL]: normalizedInputSchema.standardValidator,
   };
-}
-
-export function validateArgsWithSchema(
-  args: Record<string, unknown>,
-  schema: InputSchema
-): StandardValidationIssue | null {
-  const validator = new Validator(schema as Schema, '2020-12', true);
-  const result = validator.validate(args);
-
-  if (result.valid) {
-    return null;
-  }
-
-  // Use the deepest (last) error for the most specific message.
-  const error = result.errors[result.errors.length - 1];
-  if (!error) {
-    return { message: 'Input validation failed' };
-  }
-
-  return { message: error.error };
 }
 
 function formatStandardIssuePath(path: StandardValidationIssue['path']) {
@@ -769,41 +545,21 @@ async function validateArgsForTool(
   return validateArgsWithStandardSchema(args, tool[STANDARD_VALIDATOR_SYMBOL]);
 }
 
+function validateOutputForTool(result: ToolResponse, tool: PolyfillToolDescriptor): string | null {
+  if (!tool.outputSchema || result.isError) {
+    return null;
+  }
+
+  if (result.structuredContent === undefined) {
+    return `Output validation error: Tool ${tool.name} has an output schema but no structured content was provided`;
+  }
+
+  const issue = validateValueWithSchema(result.structuredContent, tool.outputSchema);
+  return issue ? `Output validation error: ${issue.message}` : null;
+}
+
 function isCallToolResult(value: unknown): value is ToolResponse {
   return isPlainObject(value) && Array.isArray(value.content);
-}
-
-function isJsonPrimitive(value: unknown): value is string | number | boolean | null {
-  return (
-    value === null ||
-    typeof value === 'string' ||
-    typeof value === 'number' ||
-    typeof value === 'boolean'
-  );
-}
-
-function isJsonValue(value: unknown): boolean {
-  if (isJsonPrimitive(value)) {
-    return Number.isFinite(value as number) || typeof value !== 'number';
-  }
-
-  if (Array.isArray(value)) {
-    return value.every((entry) => isJsonValue(entry));
-  }
-
-  if (!isPlainObject(value)) {
-    return false;
-  }
-
-  return Object.values(value).every((entry) => isJsonValue(entry));
-}
-
-function toStructuredContent(value: unknown): JsonObject | undefined {
-  if (!isPlainObject(value) || !isJsonValue(value)) {
-    return undefined;
-  }
-
-  return value as JsonObject;
 }
 
 function serializeTextContent(value: unknown): string {
@@ -824,7 +580,7 @@ function normalizeToolResponse(value: unknown): ToolResponse {
     return value;
   }
 
-  const structuredContent = toStructuredContent(value);
+  const structuredContent = toJsonValue(value);
 
   return {
     content: [
@@ -833,7 +589,7 @@ function normalizeToolResponse(value: unknown): ToolResponse {
         text: serializeTextContent(value),
       },
     ],
-    ...(structuredContent ? { structuredContent } : {}),
+    ...(structuredContent !== undefined ? { structuredContent } : {}),
     isError: false,
   };
 }
@@ -909,6 +665,14 @@ function getNavigator(): Navigator | null {
   return null;
 }
 
+function getDocument(): Document | null {
+  if (typeof document !== 'undefined') {
+    return document;
+  }
+
+  return null;
+}
+
 function defineNavigatorProperty<K extends keyof Navigator>(
   target: Navigator,
   key: K,
@@ -922,79 +686,165 @@ function defineNavigatorProperty<K extends keyof Navigator>(
   });
 }
 
+function defineDocumentModelContextProperty(target: Document, value: ModelContext): void {
+  Object.defineProperty(target, 'modelContext', {
+    configurable: true,
+    enumerable: true,
+    writable: false,
+    value,
+  });
+}
+
+let navigatorModelContextDeprecationWarned = false;
+
+// Per webmachinelearning/webmcp#173 / PR #184, the modelContext getter moved
+// from Navigator to Document. We install on document.modelContext as the
+// primary surface and expose navigator.modelContext as a deprecated alias that
+// returns the same instance and logs a one-time console warning on first
+// access. This mirrors the deprecation behavior shipped in Chrome 150.
+function defineDeprecatedNavigatorModelContext(target: Navigator, value: ModelContext): void {
+  Object.defineProperty(target, 'modelContext', {
+    configurable: true,
+    enumerable: true,
+    get() {
+      if (!navigatorModelContextDeprecationWarned) {
+        navigatorModelContextDeprecationWarned = true;
+        console.warn(
+          '[WebMCPPolyfill] navigator.modelContext is deprecated. The May 27, 2026 WebMCP draft moved the modelContext getter from Navigator to Document — use document.modelContext instead. See https://github.com/webmachinelearning/webmcp/pull/184.'
+        );
+      }
+      return value;
+    },
+  });
+}
+
 export function initializeWebMCPPolyfill(options?: WebMCPPolyfillInitOptions): void {
   const nav = getNavigator();
-  if (!nav) {
+  const doc = getDocument();
+  if (!nav && !doc) {
     return;
   }
 
-  const hasModelContext = Boolean(nav.modelContext);
+  const documentModelContext = doc?.modelContext;
+  const hasDocumentModelContext = Boolean(documentModelContext);
 
-  if (hasModelContext) {
+  if (hasDocumentModelContext) {
     return;
   }
+
+  const navigatorModelContext = nav?.modelContext;
+  const hasNavigatorModelContext = Boolean(navigatorModelContext);
 
   if (installState.installed) {
     cleanupWebMCPPolyfill();
+  }
+
+  if (doc && navigatorModelContext) {
+    installState.previousDocumentModelContextDescriptor = Object.getOwnPropertyDescriptor(
+      doc,
+      'modelContext'
+    );
+    defineDocumentModelContextProperty(doc, navigatorModelContext);
+    installState.installedDocumentModelContext = true;
+    installState.installed = true;
+    return;
+  }
+
+  if (hasNavigatorModelContext) {
+    return;
   }
 
   const context = new StrictWebMCPContext();
   const modelContext = context as unknown as PolyfillModelContext;
   modelContext[POLYFILL_MARKER_PROPERTY] = true;
 
-  installState.previousModelContextDescriptor = Object.getOwnPropertyDescriptor(
-    nav,
-    'modelContext'
-  );
-  installState.previousModelContextTestingDescriptor = Object.getOwnPropertyDescriptor(
-    nav,
-    'modelContextTesting'
-  );
-
-  defineNavigatorProperty(nav, 'modelContext', modelContext as Navigator['modelContext']);
-
-  const installTestingShim = options?.installTestingShim ?? 'if-missing';
-  const hasModelContextTesting = Boolean(nav.modelContextTesting);
-  const shouldInstallTestingShim =
-    installTestingShim === 'always' ||
-    ((installTestingShim === true || installTestingShim === 'if-missing') &&
-      !hasModelContextTesting);
-
-  if (shouldInstallTestingShim) {
-    defineNavigatorProperty(
-      nav,
-      'modelContextTesting',
-      context.getTestingShim() as Navigator['modelContextTesting']
+  if (doc) {
+    installState.previousDocumentModelContextDescriptor = Object.getOwnPropertyDescriptor(
+      doc,
+      'modelContext'
     );
+    defineDocumentModelContextProperty(doc, modelContext as ModelContext);
+    installState.installedDocumentModelContext = true;
+  }
+
+  if (nav) {
+    installState.previousNavigatorModelContextDescriptor = Object.getOwnPropertyDescriptor(
+      nav,
+      'modelContext'
+    );
+    installState.previousNavigatorModelContextTestingDescriptor = Object.getOwnPropertyDescriptor(
+      nav,
+      'modelContextTesting'
+    );
+
+    // Reset the one-shot warning flag so a fresh install warns again on first access.
+    navigatorModelContextDeprecationWarned = false;
+    defineDeprecatedNavigatorModelContext(nav, modelContext as ModelContext);
+    installState.installedNavigatorModelContext = true;
+
+    const installTestingShim = options?.installTestingShim ?? 'if-missing';
+    const hasModelContextTesting = Boolean(nav.modelContextTesting);
+    const shouldInstallTestingShim =
+      installTestingShim === 'always' ||
+      ((installTestingShim === true || installTestingShim === 'if-missing') &&
+        !hasModelContextTesting);
+
+    if (shouldInstallTestingShim) {
+      defineNavigatorProperty(
+        nav,
+        'modelContextTesting',
+        context.getTestingShim() as Navigator['modelContextTesting']
+      );
+      installState.installedNavigatorModelContextTesting = true;
+    }
   }
 
   installState.installed = true;
 }
 
 export function cleanupWebMCPPolyfill(): void {
-  const nav = getNavigator();
-  if (!nav || !installState.installed) {
+  if (!installState.installed) {
     return;
   }
 
-  const restore = <K extends keyof Navigator>(
-    key: K,
+  const restore = (
+    target: Navigator | Document,
+    key: string,
     previousDescriptor: PropertyDescriptor | undefined
   ) => {
     if (previousDescriptor) {
-      Object.defineProperty(nav, key, previousDescriptor);
+      Object.defineProperty(target, key, previousDescriptor);
       return;
     }
 
-    delete (nav as unknown as Record<string, unknown>)[key as string];
+    delete (target as unknown as Record<string, unknown>)[key];
   };
 
-  restore('modelContext', installState.previousModelContextDescriptor);
-  restore('modelContextTesting', installState.previousModelContextTestingDescriptor);
+  const nav = getNavigator();
+  const doc = getDocument();
+
+  if (doc && installState.installedDocumentModelContext) {
+    restore(doc, 'modelContext', installState.previousDocumentModelContextDescriptor);
+  }
+  if (nav && installState.installedNavigatorModelContext) {
+    restore(nav, 'modelContext', installState.previousNavigatorModelContextDescriptor);
+  }
+  if (nav && installState.installedNavigatorModelContextTesting) {
+    restore(
+      nav,
+      'modelContextTesting',
+      installState.previousNavigatorModelContextTestingDescriptor
+    );
+  }
 
   installState.installed = false;
-  installState.previousModelContextDescriptor = undefined;
-  installState.previousModelContextTestingDescriptor = undefined;
+  installState.previousDocumentModelContextDescriptor = undefined;
+  installState.previousNavigatorModelContextDescriptor = undefined;
+  installState.previousNavigatorModelContextTestingDescriptor = undefined;
+  installState.installedDocumentModelContext = false;
+  installState.installedNavigatorModelContext = false;
+  installState.installedNavigatorModelContextTesting = false;
+  navigatorModelContextDeprecationWarned = false;
 }
 
 export { initializeWebMCPPolyfill as initializeWebModelContextPolyfill };

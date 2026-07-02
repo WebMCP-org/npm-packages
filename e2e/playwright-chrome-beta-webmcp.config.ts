@@ -1,12 +1,57 @@
+import { execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * Playwright configuration for Chrome Beta native WebMCP verification.
- * Targets Chrome Beta with the current early-preview WebMCP testing feature flag.
+ * Playwright configuration for Chrome 152 native WebMCP verification.
  */
 const tabTransportPort = Number.parseInt(process.env.PLAYWRIGHT_TAB_TRANSPORT_PORT ?? '4173', 10);
 const tabTransportBaseUrl = `http://localhost:${tabTransportPort}`;
 const reuseExistingServer = process.env.PLAYWRIGHT_REUSE_SERVER === '1';
+const MIN_NATIVE_CHROME_MAJOR = 152;
+const chromeCandidates = [
+  process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
+  process.env.CHROME_BIN,
+  '/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary',
+  '/Applications/Google Chrome Dev.app/Contents/MacOS/Google Chrome Dev',
+  '/Applications/Google Chrome Beta.app/Contents/MacOS/Google Chrome Beta',
+  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+].filter((candidate): candidate is string => Boolean(candidate));
+
+function readChromeVersion(executablePath: string): string | undefined {
+  try {
+    return execFileSync(executablePath, ['--version'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+  } catch {
+    return undefined;
+  }
+}
+
+function majorFromVersion(version: string | undefined): number | undefined {
+  const match = version?.match(/\b(\d+)\./);
+  const major = match?.[1];
+  return major ? Number.parseInt(major, 10) : undefined;
+}
+
+function resolveNativeChrome(): string {
+  for (const executablePath of chromeCandidates) {
+    if (!existsSync(executablePath)) {
+      continue;
+    }
+
+    if ((majorFromVersion(readChromeVersion(executablePath)) ?? 0) >= MIN_NATIVE_CHROME_MAJOR) {
+      return executablePath;
+    }
+  }
+
+  throw new Error(
+    `Native WebMCP tests require Chrome ${MIN_NATIVE_CHROME_MAJOR}+. Set CHROME_BIN or PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH.`
+  );
+}
+
+const chromeExecutablePath = resolveNativeChrome();
 
 export default defineConfig({
   testDir: './tests',
@@ -25,22 +70,20 @@ export default defineConfig({
     baseURL: tabTransportBaseUrl,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
     launchOptions: {
+      executablePath: chromeExecutablePath,
       args: [
-        // In current Chrome Beta builds, this switch is still required for native exposure.
         '--enable-experimental-web-platform-features',
-        '--enable-features=WebMCPTesting',
+        '--enable-features=WebMCPTesting,DevToolsWebMCPSupport',
       ],
     },
   },
 
   projects: [
     {
-      name: 'chrome-beta-webmcp',
+      name: 'chrome-m152-webmcp',
       use: {
         ...devices['Desktop Chrome'],
-        channel: 'chrome-beta',
       },
     },
   ],

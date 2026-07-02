@@ -1,0 +1,84 @@
+---
+title: 'Packages'
+description: 'Package-first entry point for the WebMCP runtime, React packages, and tooling in this monorepo.'
+keywords: ['packages', 'webmcp', 'mcp-b', 'runtime', 'tooling', 'reference']
+icon: 'boxes-stacked'
+---
+
+Packages are the primary entry point for this documentation. Start with a package overview when you need to choose the right building block, then move into that package's reference page for API details.
+
+Cross-package concepts stay in [Explanation](/explanation/index). Task-oriented setup stays in [Tutorials](/tutorials/index) and [How-To Guides](/how-to/index).
+
+## Core runtime
+
+<CardGroup cols={2}>
+  <Card title="@mcp-b/webmcp-types" icon="boxes-stacked" href="/packages/webmcp-types/overview">
+    Zero-runtime TypeScript types for the WebMCP core surface, schema inference, Document
+    augmentation, and deprecated Navigator compatibility.
+  </Card>
+  <Card
+    title="@mcp-b/webmcp-polyfill"
+    icon="boxes-stacked"
+    href="/packages/webmcp-polyfill/overview"
+  >
+    Strict WebMCP runtime polyfill for document.modelContext in browsers that do not ship the API
+    yet.
+  </Card>
+  <Card title="@mcp-b/global" icon="boxes-stacked" href="/packages/global/overview">
+    Full MCP-B runtime entry point that layers transport and extension APIs on top of the strict
+    WebMCP surface.
+  </Card>
+  <Card title="@mcp-b/webmcp-ts-sdk" icon="boxes-stacked" href="/packages/webmcp-ts-sdk/overview">
+    Browser-adapted MCP TypeScript SDK that provides BrowserMcpServer and supports dynamic tool
+    registration.
+  </Card>
+  <Card title="@mcp-b/transports" icon="boxes-stacked" href="/packages/transports/overview">
+    Tab, iframe, extension, and user-script transport classes for moving MCP messages through
+    browser boundaries.
+  </Card>
+  <Card title="@mcp-b/mcp-iframe" icon="boxes-stacked" href="/packages/mcp-iframe/overview">
+    Custom element that exposes tools, prompts, and resources from an iframe to its parent page.
+  </Card>
+</CardGroup>
+
+## React
+
+<CardGroup cols={2}>
+  <Card title="usewebmcp" icon="boxes-stacked" href="/packages/usewebmcp/overview">
+    Strict-core React hook for registering document.modelContext tools without the broader MCP-B
+    runtime layer.
+  </Card>
+  <Card title="@mcp-b/react-webmcp" icon="boxes-stacked" href="/packages/react-webmcp/overview">
+    Full React integration for MCP-B, including tool hooks, prompts, resources, sampling,
+    elicitation, and client providers.
+  </Card>
+</CardGroup>
+
+## Tooling
+
+<CardGroup cols={2}>
+  <Card
+    title="@mcp-b/webmcp-local-relay"
+    icon="boxes-stacked"
+    href="/packages/webmcp-local-relay/overview"
+  >
+    Local relay server that connects browser-hosted WebMCP tools to desktop MCP clients over stdio
+    and WebSocket.
+  </Card>
+  <Card
+    title="@mcp-b/extension-tools"
+    icon="boxes-stacked"
+    href="/packages/extension-tools/overview"
+  >
+    Chrome Extension API tool classes for tabs, bookmarks, history, storage, scripting, and related
+    agent workflows.
+  </Card>
+  <Card
+    title="@mcp-b/smart-dom-reader"
+    icon="boxes-stacked"
+    href="/packages/smart-dom-reader/overview"
+  >
+    Token-efficient DOM extraction library for AI agents, selector generation, and structured page
+    understanding.
+  </Card>
+</CardGroup>

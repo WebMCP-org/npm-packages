@@ -1,0 +1,158 @@
+[
+  {
+    "id": "webmcp-types",
+    "packageName": "@mcp-b/webmcp-types",
+    "sidebarLabel": "webmcp-types",
+    "category": "Core runtime",
+    "summary": "Zero-runtime TypeScript types for the WebMCP core surface, schema inference, and Navigator augmentation.",
+    "installCommand": "npm install --save-dev @mcp-b/webmcp-types",
+    "overviewPath": "/packages/webmcp-types/overview",
+    "referencePath": "/packages/webmcp-types/reference",
+    "quickstartSnippet": "packages/webmcp-types-quickstart.ts",
+    "sourcePackagePath": "packages/webmcp-types"
+  },
+  {
+    "id": "webmcp-polyfill",
+    "packageName": "@mcp-b/webmcp-polyfill",
+    "sidebarLabel": "webmcp-polyfill",
+    "category": "Core runtime",
+    "summary": "Strict WebMCP runtime polyfill for document.modelContext in browsers that do not ship the API yet.",
+    "installCommand": "npm install @mcp-b/webmcp-polyfill",
+    "overviewPath": "/packages/webmcp-polyfill/overview",
+    "referencePath": "/packages/webmcp-polyfill/reference",
+    "quickstartSnippet": "packages/webmcp-polyfill-quickstart.ts",
+    "sourcePackagePath": "packages/webmcp-polyfill"
+  },
+  {
+    "id": "global",
+    "packageName": "@mcp-b/global",
+    "sidebarLabel": "global",
+    "category": "Core runtime",
+    "summary": "Full MCP-B runtime entry point that layers transport and extension APIs on top of the strict WebMCP surface.",
+    "installCommand": "npm install @mcp-b/global",
+    "overviewPath": "/packages/global/overview",
+    "referencePath": "/packages/global/reference",
+    "quickstartSnippet": "packages/global-quickstart.ts",
+    "sourcePackagePath": "packages/global",
+    "skill": {
+      "name": "mcp-b-global",
+      "description": "Use when writing code that registers AI tools on a webpage using document.modelContext, registerTool, provideContext, or the WebMCP / MCP-B browser runtime. Covers initialization, transport configuration, cleanup, and the full BrowserMcpServer API."
+    }
+  },
+  {
+    "id": "webmcp-ts-sdk",
+    "packageName": "@mcp-b/webmcp-ts-sdk",
+    "sidebarLabel": "webmcp-ts-sdk",
+    "category": "Core runtime",
+    "summary": "Browser-adapted MCP TypeScript SDK that provides BrowserMcpServer and supports dynamic tool registration.",
+    "installCommand": "npm install @mcp-b/webmcp-ts-sdk",
+    "overviewPath": "/packages/webmcp-ts-sdk/overview",
+    "referencePath": "/packages/webmcp-ts-sdk/reference",
+    "quickstartSnippet": "packages/webmcp-ts-sdk-quickstart.ts",
+    "sourcePackagePath": "packages/webmcp-ts-sdk",
+    "note": "Most apps should use @mcp-b/global instead. Reach for this package when you need direct control over BrowserMcpServer."
+  },
+  {
+    "id": "transports",
+    "packageName": "@mcp-b/transports",
+    "sidebarLabel": "transports",
+    "category": "Core runtime",
+    "summary": "Tab, iframe, extension, and user-script transport classes for moving MCP messages through browser boundaries.",
+    "installCommand": "npm install @mcp-b/transports",
+    "overviewPath": "/packages/transports/overview",
+    "referencePath": "/packages/transports/reference",
+    "quickstartSnippet": "packages/transports-quickstart.ts",
+    "sourcePackagePath": "packages/transports"
+  },
+  {
+    "id": "mcp-iframe",
+    "packageName": "@mcp-b/mcp-iframe",
+    "sidebarLabel": "mcp-iframe",
+    "category": "Core runtime",
+    "summary": "Custom element that exposes tools, prompts, and resources from an iframe to its parent page.",
+    "installCommand": "npm install @mcp-b/mcp-iframe @modelcontextprotocol/sdk",
+    "overviewPath": "/packages/mcp-iframe/overview",
+    "referencePath": "/packages/mcp-iframe/reference",
+    "quickstartSnippet": "packages/mcp-iframe-quickstart.html",
+    "sourcePackagePath": "packages/mcp-iframe",
+    "note": "The iframe content must already expose document.modelContext through @mcp-b/global or another compatible implementation.",
+    "skill": {
+      "name": "mcp-iframe",
+      "description": "Use when bridging MCP tools, prompts, or resources from an iframe to its parent page using the <mcp-iframe> custom element. Covers attributes, events, name prefixing, lifecycle, and programmatic registration."
+    }
+  },
+  {
+    "id": "usewebmcp",
+    "packageName": "usewebmcp",
+    "sidebarLabel": "usewebmcp",
+    "category": "React",
+    "summary": "Strict-core React hook for registering document.modelContext tools without the broader MCP-B runtime layer.",
+    "installCommand": "npm install usewebmcp react",
+    "overviewPath": "/packages/usewebmcp/overview",
+    "referencePath": "/packages/usewebmcp/reference",
+    "quickstartSnippet": "packages/usewebmcp-quickstart.ts",
+    "sourcePackagePath": "packages/usewebmcp",
+    "note": "usewebmcp requires document.modelContext at runtime. Pair it with native browser support, @mcp-b/webmcp-polyfill, or @mcp-b/global.",
+    "skill": {
+      "name": "usewebmcp",
+      "description": "Use when registering WebMCP tools from React components using the useWebMCP hook. Lightweight strict-core hook for document.modelContext tool registration without MCP-B extensions."
+    }
+  },
+  {
+    "id": "react-webmcp",
+    "packageName": "@mcp-b/react-webmcp",
+    "sidebarLabel": "react-webmcp",
+    "category": "React",
+    "summary": "Full React integration for MCP-B, including tool hooks, prompts, resources, sampling, elicitation, and client providers.",
+    "installCommand": "npm install @mcp-b/react-webmcp zod",
+    "overviewPath": "/packages/react-webmcp/overview",
+    "referencePath": "/packages/react-webmcp/reference",
+    "quickstartSnippet": "packages/react-webmcp-quickstart.ts",
+    "sourcePackagePath": "packages/react-webmcp",
+    "note": "Provider and client hooks assume @mcp-b/global or another BrowserMcpServer-based runtime is present.",
+    "skill": {
+      "name": "react-webmcp",
+      "description": "Use when building React apps with full MCP-B features: useWebMCP hook, prompts, resources, sampling, elicitation, and McpClientProvider. Supports Zod v3 object maps for input/output schemas."
+    }
+  },
+  {
+    "id": "webmcp-local-relay",
+    "packageName": "@mcp-b/webmcp-local-relay",
+    "sidebarLabel": "webmcp-local-relay",
+    "category": "Tooling",
+    "summary": "Local relay server that connects browser-hosted WebMCP tools to desktop MCP clients over stdio and WebSocket.",
+    "installCommand": "npx -y @mcp-b/webmcp-local-relay@latest",
+    "overviewPath": "/packages/webmcp-local-relay/overview",
+    "referencePath": "/packages/webmcp-local-relay/reference",
+    "quickstartSnippet": "packages/webmcp-local-relay-quickstart.json",
+    "sourcePackagePath": "packages/webmcp-local-relay",
+    "skill": {
+      "name": "webmcp-local-relay",
+      "description": "Use when connecting browser-hosted WebMCP tools to desktop MCP clients like Claude Code, Claude Desktop, or Cursor via the local relay server. Covers CLI options, embed script, static management tools, security, and troubleshooting."
+    }
+  },
+  {
+    "id": "extension-tools",
+    "packageName": "@mcp-b/extension-tools",
+    "sidebarLabel": "extension-tools",
+    "category": "Tooling",
+    "summary": "Chrome Extension API tool classes for tabs, bookmarks, history, storage, scripting, and related agent workflows.",
+    "installCommand": "npm install @mcp-b/extension-tools @modelcontextprotocol/sdk",
+    "overviewPath": "/packages/extension-tools/overview",
+    "referencePath": "/packages/extension-tools/reference",
+    "quickstartSnippet": "packages/extension-tools-quickstart.ts",
+    "sourcePackagePath": "packages/extension-tools"
+  },
+  {
+    "id": "smart-dom-reader",
+    "packageName": "@mcp-b/smart-dom-reader",
+    "sidebarLabel": "smart-dom-reader",
+    "category": "Tooling",
+    "summary": "Token-efficient DOM extraction library for AI agents, selector generation, and structured page understanding.",
+    "installCommand": "npm install @mcp-b/smart-dom-reader",
+    "overviewPath": "/packages/smart-dom-reader/overview",
+    "referencePath": "/packages/smart-dom-reader/reference",
+    "quickstartSnippet": "packages/smart-dom-reader-quickstart.ts",
+    "sourcePackagePath": "packages/smart-dom-reader"
+  }
+]

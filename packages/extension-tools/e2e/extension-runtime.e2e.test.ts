@@ -23,10 +23,12 @@ async function launchExtensionContext(): Promise<{ context: BrowserContext; exte
 
   const userDataDir = mkdtempSync(resolve(tmpdir(), 'webmcp-extension-runtime-'));
   USER_DATA_DIRS.push(userDataDir);
+  const channel = process.env.PLAYWRIGHT_EXTENSION_CHROMIUM_CHANNEL ?? 'chromium';
+  const headless = process.env.PLAYWRIGHT_EXTENSION_HEADLESS !== 'false';
 
   const context = await chromium.launchPersistentContext(userDataDir, {
-    channel: 'chromium',
-    headless: true,
+    channel,
+    headless,
     args: [`--disable-extensions-except=${EXTENSION_DIR}`, `--load-extension=${EXTENSION_DIR}`],
   });
 

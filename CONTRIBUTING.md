@@ -149,7 +149,6 @@ We follow the [Conventional Commits](https://www.conventionalcommits.org/) speci
 
 Package scopes (all in `packages/` directory):
 
-- `chrome-devtools-mcp` - @mcp-b/chrome-devtools-mcp
 - `extension-tools` - @mcp-b/extension-tools
 - `global` - @mcp-b/global
 - `mcp-iframe` - @mcp-b/mcp-iframe
@@ -219,7 +218,6 @@ git commit -m "refactor(*): update to new MCP SDK types"
 ```
 npm-packages/
 ├── packages/                    # All NPM packages
-│   ├── chrome-devtools-mcp/     # Chrome DevTools MCP server
 │   ├── extension-tools/         # Chrome Extension API tools
 │   ├── global/                  # Full MCP-B runtime (core + extensions)
 │   ├── mcp-iframe/              # Iframe MCP element
@@ -280,13 +278,6 @@ When contributing to a specific package:
 - Test in various DOM structures
 - Handle shadow DOM and iframes
 - Maintain stateless architecture
-
-### @mcp-b/chrome-devtools-mcp
-
-- Test with Chrome DevTools Protocol
-- Handle browser window lifecycle
-- Support WebMCP tool integration
-- Test auto-connect and session management
 
 ### @mcp-b/mcp-iframe
 

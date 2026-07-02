@@ -1,7 +1,7 @@
 {
   "name": "usewebmcp",
-  "version": "2.3.1",
-  "description": "Standalone React hooks for strict core WebMCP tool registration with navigator.modelContext",
+  "version": "4.0.0",
+  "description": "Standalone React hooks for strict core WebMCP tool registration with document.modelContext",
   "keywords": [
     "ai",
     "assistant",
@@ -14,7 +14,7 @@
     "tools",
     "usewebmcp"
   ],
-  "homepage": "https://github.com/WebMCP-org/npm-packages#readme",
+  "homepage": "https://docs.mcp-b.ai/packages/usewebmcp/reference",
   "bugs": {
     "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },

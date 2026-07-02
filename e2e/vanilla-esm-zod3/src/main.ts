@@ -22,6 +22,22 @@ function getFirstText(result: { content?: Array<{ type?: string; text?: string }
   return textBlock?.text ?? '';
 }
 
+async function expectRejected(label: string, invoke: () => Promise<{ isError?: boolean }>) {
+  let rejected = false;
+
+  try {
+    const result = await invoke();
+    rejected = Boolean(result.isError);
+  } catch {
+    rejected = true;
+  }
+
+  log(
+    `${label}: ${rejected ? 'PASSED (rejected)' : 'FAILED (should reject)'}`,
+    rejected ? 'success' : 'error'
+  );
+}
+
 // Check Zod version
 const testSchema = z.string();
 const isZod4 = '_zod' in testSchema;
@@ -135,92 +151,80 @@ async function runTests() {
 
     // Test 3: Missing required field
     log('Test 3: Missing required field (email)...', 'info');
-    const r3 = await mc.callTool({
-      name: 'esm-zod3-validator',
-      arguments: {
-        name: 'Test User',
-        score: 50,
-      },
-    });
-    log(
-      `Missing email: ${r3.isError ? 'PASSED (rejected)' : 'FAILED (should reject)'}`,
-      r3.isError ? 'success' : 'error'
+    await expectRejected('Missing email', () =>
+      mc.callTool({
+        name: 'esm-zod3-validator',
+        arguments: {
+          name: 'Test User',
+          score: 50,
+        },
+      })
     );
 
     // Test 4: Invalid type
     log('Test 4: Invalid type (score as string)...', 'info');
-    const r4 = await mc.callTool({
-      name: 'esm-zod3-validator',
-      arguments: {
-        name: 'Test User',
-        email: 'test@example.com',
-        score: 'high',
-      },
-    });
-    log(
-      `Invalid type: ${r4.isError ? 'PASSED (rejected)' : 'FAILED (should reject)'}`,
-      r4.isError ? 'success' : 'error'
+    await expectRejected('Invalid type', () =>
+      mc.callTool({
+        name: 'esm-zod3-validator',
+        arguments: {
+          name: 'Test User',
+          email: 'test@example.com',
+          score: 'high',
+        },
+      })
     );
 
     // Test 5: Value out of range
     log('Test 5: Value out of range (score=150)...', 'info');
-    const r5 = await mc.callTool({
-      name: 'esm-zod3-validator',
-      arguments: {
-        name: 'Test User',
-        email: 'test@example.com',
-        score: 150,
-      },
-    });
-    log(
-      `Score too high: ${r5.isError ? 'PASSED (rejected)' : 'FAILED (should reject)'}`,
-      r5.isError ? 'success' : 'error'
+    await expectRejected('Score too high', () =>
+      mc.callTool({
+        name: 'esm-zod3-validator',
+        arguments: {
+          name: 'Test User',
+          email: 'test@example.com',
+          score: 150,
+        },
+      })
     );
 
     // Test 6: String too short
     log('Test 6: String too short (name="A")...', 'info');
-    const r6 = await mc.callTool({
-      name: 'esm-zod3-validator',
-      arguments: {
-        name: 'A',
-        email: 'test@example.com',
-        score: 50,
-      },
-    });
-    log(
-      `Name too short: ${r6.isError ? 'PASSED (rejected)' : 'FAILED (should reject)'}`,
-      r6.isError ? 'success' : 'error'
+    await expectRejected('Name too short', () =>
+      mc.callTool({
+        name: 'esm-zod3-validator',
+        arguments: {
+          name: 'A',
+          email: 'test@example.com',
+          score: 50,
+        },
+      })
     );
 
     // Test 7: Invalid email
     log('Test 7: Invalid email format...', 'info');
-    const r7 = await mc.callTool({
-      name: 'esm-zod3-validator',
-      arguments: {
-        name: 'Test User',
-        email: 'not-an-email',
-        score: 50,
-      },
-    });
-    log(
-      `Invalid email: ${r7.isError ? 'PASSED (rejected)' : 'FAILED (should reject)'}`,
-      r7.isError ? 'success' : 'error'
+    await expectRejected('Invalid email', () =>
+      mc.callTool({
+        name: 'esm-zod3-validator',
+        arguments: {
+          name: 'Test User',
+          email: 'not-an-email',
+          score: 50,
+        },
+      })
     );
 
     // Test 8: Invalid boolean type
     log('Test 8: Invalid boolean type (active="yes")...', 'info');
-    const r8 = await mc.callTool({
-      name: 'esm-zod3-validator',
-      arguments: {
-        name: 'Test User',
-        email: 'test@example.com',
-        score: 50,
-        active: 'yes',
-      },
-    });
-    log(
-      `Invalid boolean: ${r8.isError ? 'PASSED (rejected)' : 'FAILED (should reject)'}`,
-      r8.isError ? 'success' : 'error'
+    await expectRejected('Invalid boolean', () =>
+      mc.callTool({
+        name: 'esm-zod3-validator',
+        arguments: {
+          name: 'Test User',
+          email: 'test@example.com',
+          score: 50,
+          active: 'yes',
+        },
+      })
     );
 
     statusEl.textContent = 'All tests completed!';

@@ -1,0 +1,147 @@
+---
+title: 'usewebmcp reference'
+description: 'Reference for the strict-core React hook: installation, useWebMCP, config fields, state, and type inference.'
+keywords: ['usewebmcp', 'useWebMCP', 'react', 'strict core', 'tool registration', 'reference']
+icon: 'react'
+---
+
+`usewebmcp` is the strict-core React package. It registers tools with `document.modelContext` on mount and unregisters them on unmount without adding MCP-B-only hooks.
+
+`document.modelContext` must already exist at runtime through native browser support, [`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/overview), or [`@mcp-b/global`](/packages/global/overview).
+
+## Installation
+
+```bash
+pnpm add usewebmcp react
+```
+
+## Minimal example
+
+<Snippet file="snippets/packages/usewebmcp-quickstart.ts" />
+
+## Hook
+
+### `useWebMCP(config, deps?)`
+
+```ts
+import { useWebMCP } from 'usewebmcp';
+```
+
+| Parameter | Type             | Description                                                                     |
+| --------- | ---------------- | ------------------------------------------------------------------------------- |
+| `config`  | `WebMCPConfig`   | Tool configuration object                                                       |
+| `deps`    | `DependencyList` | Optional dependency array that triggers tool re-registration when values change |
+
+**Returns:** `WebMCPReturn`
+
+| Field            | Type                 | Description                                    |
+| ---------------- | -------------------- | ---------------------------------------------- |
+| `state`          | `ToolExecutionState` | Current execution state                        |
+| `execute(input)` | `(input) => Promise` | Manually invoke the tool from your UI or tests |
+| `reset()`        | `() => void`         | Reset state to initial values                  |
+
+## Config fields
+
+| Field                      | Type                              | Required | Description                                                      |
+| -------------------------- | --------------------------------- | -------- | ---------------------------------------------------------------- |
+| `name`                     | `string`                          | Yes      | Unique tool identifier (lowercase with underscores)              |
+| `description`              | `string`                          | Yes      | Human-readable description for AI assistants                     |
+| `inputSchema`              | JSON Schema or Standard Schema v1 | No       | Defines input parameters. Use `as const` for inference.          |
+| `outputSchema`             | JSON Schema                       | No       | MCP-B helper metadata for output typing and `structuredContent`. |
+| `annotations`              | `ToolAnnotations`                 | No       | Metadata hints such as `readOnlyHint` and `idempotentHint`       |
+| `execute(input)`           | `(input) => T \| Promise<T>`      | Yes\*    | Preferred tool implementation function                           |
+| `handler(input)`           | `(input) => T \| Promise<T>`      | Yes\*    | Backward-compatible alias for `execute`                          |
+| `formatOutput(output)`     | `(output) => string`              | No       | Deprecated. Prefer `outputSchema`.                               |
+| `onSuccess(result, input)` | `(result, input) => void`         | No       | Callback after successful execution                              |
+| `onError(error, input)`    | `(error, input) => void`          | No       | Callback after failed execution                                  |
+
+_One of `execute` or `handler` is required. If both are present, `execute` wins._
+
+## `ToolExecutionState`
+
+| Field            | Type              | Description                                      |
+| ---------------- | ----------------- | ------------------------------------------------ |
+| `isExecuting`    | `boolean`         | Whether the tool is currently running            |
+| `lastResult`     | `TOutput \| null` | Result from the most recent successful execution |
+| `error`          | `Error \| null`   | Error from the most recent failed execution      |
+| `executionCount` | `number`          | Total successful executions                      |
+
+## Type inference
+
+Input inference works with two schema formats:
+
+- JSON Schema literals with `as const`
+- Standard Schema v1 implementations such as Zod v4, Valibot, and ArkType
+
+Output inference comes from `outputSchema` when you pass a JSON Schema literal:
+
+- the `execute` or `handler` return type is inferred from the schema
+- `state.lastResult` is typed accordingly
+- the MCP response includes `structuredContent`
+
+```tsx
+const OUTPUT_SCHEMA = {
+  type: 'object',
+  properties: {
+    total: { type: 'integer' },
+  },
+  required: ['total'],
+  additionalProperties: false,
+} as const;
+
+const tool = useWebMCP({
+  name: 'count_items',
+  description: 'Count items',
+  outputSchema: OUTPUT_SCHEMA,
+  execute: () => ({ total: 3 }),
+});
+```
+
+## Re-registration triggers
+
+The hook unregisters and re-registers when any of these values change:
+
+- `name`
+- `description`
+- `inputSchema` reference
+- `outputSchema` reference
+- `annotations` reference
+- values in `deps`
+
+These callbacks are stored in refs and do not trigger re-registration:
+
+- `execute`
+- `handler`
+- `onSuccess`
+- `onError`
+- `formatOutput`
+
+<Warning>
+  Define `inputSchema`, `outputSchema`, and `annotations` outside the component or memoize them.
+  Fresh object references on every render force unnecessary re-registration.
+</Warning>
+
+## Output schema contract
+
+When `outputSchema` is defined, the implementation must return a JSON-serializable value that matches that schema for MCP-B helpers that consume it. Object, array, string, number, boolean, and null schemas are supported for type inference and hook result shaping.
+
+Native Chrome WebMCP does not currently define or enforce `outputSchema`; the browser standard tool dictionary defines `inputSchema`.
+
+## Exported types
+
+| Type                  | Description                            |
+| --------------------- | -------------------------------------- |
+| `WebMCPConfig`        | Configuration object type              |
+| `WebMCPReturn`        | Return value type                      |
+| `ToolExecutionState`  | Execution state shape                  |
+| `ToolExecuteFunction` | Tool implementation function signature |
+| `InferToolInput`      | Infer input type from schema           |
+| `InferOutput`         | Infer output type from schema          |
+
+## Related pages
+
+- [usewebmcp overview](/packages/usewebmcp/overview)
+- [Your first React tool](/tutorials/first-react-tool)
+- [Framework guide](/how-to/frameworks)
+- [@mcp-b/react-webmcp reference](/packages/react-webmcp/reference)
+- [@mcp-b/webmcp-types reference](/packages/webmcp-types/reference)

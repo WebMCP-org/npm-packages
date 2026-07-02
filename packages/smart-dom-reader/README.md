@@ -8,7 +8,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue?style=flat-square)](https://www.typescriptlang.org/)
 [![Zero Dependencies](https://img.shields.io/badge/Dependencies-0-green?style=flat-square)](https://bundlephobia.com/package/@mcp-b/smart-dom-reader)
 
-**[Full Documentation](https://docs.mcp-b.ai/packages/smart-dom-reader)** | **[Quick Start](https://docs.mcp-b.ai/quickstart)**
+**[Reference](https://docs.mcp-b.ai/packages/smart-dom-reader/reference)** | **[How-To Guides](https://docs.mcp-b.ai/how-to/index)**
 
 **@mcp-b/smart-dom-reader** extracts DOM structure optimized for AI/LLM consumption. Get stable CSS selectors, interactive elements, and semantic page structure while minimizing token usage. Perfect for AI-powered browser automation, userscript generation, and web scraping with Claude, ChatGPT, or any LLM.
 
@@ -465,9 +465,9 @@ Inspired by:
 
 ## Related Packages
 
-- [`@mcp-b/global`](https://docs.mcp-b.ai/packages/global) - W3C Web Model Context API polyfill
-- [`@mcp-b/transports`](https://docs.mcp-b.ai/packages/transports) - Browser-specific MCP transports
-- [`@mcp-b/chrome-devtools-mcp`](https://docs.mcp-b.ai/packages/chrome-devtools-mcp) - Connect desktop AI agents to browser
+- [`@mcp-b/global`](https://docs.mcp-b.ai/packages/global/reference) - Full MCP-B browser runtime
+- [`@mcp-b/transports`](https://docs.mcp-b.ai/packages/transports/reference) - Browser-specific MCP transports
+- [`chrome-devtools-mcp`](https://github.com/ChromeDevTools/chrome-devtools-mcp) - Upstream Chrome DevTools MCP server
 - [`@modelcontextprotocol/sdk`](https://www.npmjs.com/package/@modelcontextprotocol/sdk) - Official MCP SDK
 
 ## Resources

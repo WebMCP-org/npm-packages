@@ -1,0 +1,36 @@
+# MCP-B
+
+> MCP-B makes browser applications accessible to AI agents through WebMCP tools, existing browser authentication, and structured runtime APIs.
+
+MCP-B is maintained in the WebMCP npm packages monorepo. The public landing page lives in `apps/landing-page`, and the documentation site lives in `apps/documentation-website`.
+
+## Documentation
+
+- [Docs Home](https://docs.mcp-b.ai): Tutorials, how-to guides, package references, and explanation pages
+- [Choose a Runtime](https://docs.mcp-b.ai/how-to/choose-runtime): Pick strict core, full runtime, React hooks, or relay tooling
+- [First Tool Tutorial](https://docs.mcp-b.ai/tutorials/first-tool): Register a browser-native WebMCP tool
+- [Package Reference](https://docs.mcp-b.ai/packages/index): Runtime, React, transport, relay, extension, and tooling packages
+- [WebMCP Standard API](https://docs.mcp-b.ai/reference/webmcp/standard-api): Core `document.modelContext` API reference
+
+## Source Code
+
+- [Monorepo](https://github.com/WebMCP-org/npm-packages): Packages, landing page, docs site, examples, and tests
+- [Landing Page](https://github.com/WebMCP-org/npm-packages/tree/main/apps/landing-page): mcp-b.ai Astro and Cloudflare Workers app
+- [Documentation Website](https://github.com/WebMCP-org/npm-packages/tree/main/apps/documentation-website): docs.mcp-b.ai Mintlify site
+- [Core Runtime Packages](https://github.com/WebMCP-org/npm-packages/tree/main/packages): WebMCP types, polyfill, full runtime, transports, React hooks, local relay, and tooling
+
+## Packages
+
+- [`@mcp-b/webmcp-types`](https://www.npmjs.com/package/@mcp-b/webmcp-types): TypeScript definitions for WebMCP APIs
+- [`@mcp-b/webmcp-polyfill`](https://www.npmjs.com/package/@mcp-b/webmcp-polyfill): Strict browser polyfill for `document.modelContext`
+- [`@mcp-b/global`](https://www.npmjs.com/package/@mcp-b/global): Full browser MCP-B runtime
+- [`@mcp-b/transports`](https://www.npmjs.com/package/@mcp-b/transports): Browser transport primitives
+- [`usewebmcp`](https://www.npmjs.com/package/usewebmcp): Lightweight React hook
+- [`@mcp-b/react-webmcp`](https://www.npmjs.com/package/@mcp-b/react-webmcp): React hooks and MCP client/provider utilities
+- [`@mcp-b/webmcp-local-relay`](https://www.npmjs.com/package/@mcp-b/webmcp-local-relay): Local relay for desktop agents
+
+## External References
+
+- [WebMCP Draft](https://webmachinelearning.github.io/webmcp/)
+- [Model Context Protocol](https://modelcontextprotocol.io/)
+- [Chrome Extension](https://chromewebstore.google.com/detail/mcp-b-extension/daohopfhkdelnpemnhlekblhnikhdhfa)

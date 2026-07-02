@@ -1,5 +1,26 @@
 # @mcp-b/extension-tools
 
+## 4.0.0
+
+### Patch Changes
+
+- Updated dependencies [abaf5d0]
+- Updated dependencies [d05ea62]
+- Updated dependencies [f096ba6]
+  - @mcp-b/webmcp-ts-sdk@4.0.0
+  - @mcp-b/smart-dom-reader@4.0.0
+
+## 3.0.0
+
+### Major Changes
+
+- Align with the WebMCP v3 release train and consume the v3 SDK and smart DOM reader packages. This package has no direct API changes in this release.
+
+### Patch Changes
+
+- @mcp-b/webmcp-ts-sdk@3.0.0
+- @mcp-b/smart-dom-reader@3.0.0
+
 ## 2.3.1
 
 ### Patch Changes

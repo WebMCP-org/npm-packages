@@ -1,5 +1,13 @@
 # @mcp-b/webmcp-local-relay
 
+## 4.0.0
+
+## 3.0.0
+
+### Major Changes
+
+- Align this package with the WebMCP v3 release train. This package has no direct API changes in this release.
+
 ## 2.3.1
 
 ## 2.3.0

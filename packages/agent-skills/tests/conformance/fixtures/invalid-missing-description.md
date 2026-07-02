@@ -1,5 +1,0 @@
----
-name: my-skill
----
-
-Body

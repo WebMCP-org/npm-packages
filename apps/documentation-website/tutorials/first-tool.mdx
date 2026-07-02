@@ -1,0 +1,201 @@
+---
+title: 'Build Your First Tool'
+description: 'Create a single WebMCP tool on a plain HTML page and verify it works, with no build step or framework.'
+keywords:
+  [
+    'webmcp',
+    'registertool',
+    'navigator.modelcontext',
+    'webmcp-polyfill',
+    'html',
+    'vanilla',
+    'first tool',
+    'beginner',
+  ]
+icon: 'wrench'
+---
+
+In this tutorial, we will create a plain HTML page that registers one WebMCP tool and then verify that the tool works by calling it from the browser console. By the end, you will have a working page with a tool that any AI agent can discover and call.
+
+## Prerequisites
+
+- A text editor
+- A modern web browser (Chrome, Edge, Firefox, or Safari)
+
+No build tools, no Node.js, no framework.
+
+## What we will build
+
+A single HTML page that:
+
+1. Loads the strict `@mcp-b/webmcp-polyfill` runtime via a script tag
+2. Registers a tool called `get-page-title`
+3. Displays confirmation in the page when the tool is ready
+
+<Steps>
+
+<Step title="Create the HTML file">
+
+Create a new file called `index.html` and paste in this starting point:
+
+```html index.html
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>My First WebMCP Tool</title>
+    <script src="https://unpkg.com/@mcp-b/webmcp-polyfill@latest/dist/index.iife.js"></script>
+  </head>
+  <body>
+    <h1>My First WebMCP Tool</h1>
+    <p id="status">Loading...</p>
+
+    <script>
+      // We will register our tool here in the next step.
+    </script>
+  </body>
+</html>
+```
+
+The `<script>` tag in the `<head>` loads `@mcp-b/webmcp-polyfill`, which installs the strict WebMCP surface on `document.modelContext`. No import statements or bundler needed.
+
+</Step>
+
+<Step title="Register a tool">
+
+Replace the empty `<script>` block at the bottom of the page with:
+
+```html index.html
+<script>
+  document.modelContext.registerTool({
+    name: 'get-page-title',
+    description: 'Get the current page title',
+    inputSchema: { type: 'object', properties: {} },
+    async execute() {
+      return {
+        content: [{ type: 'text', text: document.title }],
+      };
+    },
+  });
+
+  document.getElementById('status').textContent = 'Tool "get-page-title" registered.';
+</script>
+```
+
+This registers a single tool on `document.modelContext`. The tool returns the current page title. The `execute` function is what runs when an AI agent, or you through the testing API, calls the tool.
+
+</Step>
+
+<Step title="Open the page in your browser">
+
+Open `index.html` directly in your browser (double-click the file, or drag it into a browser window). You should see:
+
+```
+My First WebMCP Tool
+Tool "get-page-title" registered.
+```
+
+If the status still says "Loading...", open the browser console (F12) and check for errors.
+
+</Step>
+
+<Step title="Verify the tool from the console">
+
+Open the browser console (F12, then click the Console tab). Type the following:
+
+```javascript
+const tools = navigator.modelContextTesting.listTools();
+console.log(tools);
+```
+
+You should see an array containing your tool:
+
+```javascript
+[{ name: 'get-page-title', description: 'Get the current page title', inputSchema: '...' }];
+```
+
+Now call the tool:
+
+```javascript
+const result = await navigator.modelContextTesting.executeTool('get-page-title', '{}');
+console.log(JSON.parse(result));
+```
+
+The output should be an object containing your tool's response:
+
+```json
+{
+  "content": [{ "type": "text", "text": "My First WebMCP Tool" }],
+  "isError": false
+}
+```
+
+You have registered a WebMCP tool and executed it through the testing API.
+
+</Step>
+
+<Step title="Try changing the tool">
+
+Back in your editor, change the tool so it returns a fixed message instead of `document.title`:
+
+```javascript
+async execute() {
+  return {
+    content: [{ type: "text", text: "Tool is working" }]
+  };
+}
+```
+
+Refresh the browser and run the `executeTool` call again from the console. Notice the text field in the response now says `"Tool is working"` instead of the page title.
+
+</Step>
+
+</Steps>
+
+## The complete page
+
+Here is the full `index.html` for reference:
+
+```html index.html
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>My First WebMCP Tool</title>
+    <script src="https://unpkg.com/@mcp-b/webmcp-polyfill@latest/dist/index.iife.js"></script>
+  </head>
+  <body>
+    <h1>My First WebMCP Tool</h1>
+    <p id="status">Loading...</p>
+
+    <script>
+      document.modelContext.registerTool({
+        name: 'get-page-title',
+        description: 'Get the current page title',
+        inputSchema: { type: 'object', properties: {} },
+        async execute() {
+          return {
+            content: [{ type: 'text', text: document.title }],
+          };
+        },
+      });
+
+      document.getElementById('status').textContent = 'Tool "get-page-title" registered.';
+    </script>
+  </body>
+</html>
+```
+
+## What you learned
+
+- `@mcp-b/webmcp-polyfill` installs the strict WebMCP surface when loaded via a script tag
+- `registerTool()` registers a single tool with a name, description, input schema, and execute function
+- `navigator.modelContextTesting` provides `listTools()` and `executeTool()` for verifying tools from the console
+- Tools return a `content` array with `{ type: "text", text: "..." }` objects
+
+## Next steps
+
+- [Build Your First React Tool](/tutorials/first-react-tool) to register tools from React components
+- [Choose a Runtime](/how-to/choose-runtime) to see when to move from the strict core to the full MCP-B runtime
+- [Try the Native Chrome Preview](/tutorials/first-native-preview) to use the browser's built-in WebMCP API
+- [Connect a Desktop Agent](/tutorials/desktop-agent-relay) to let Claude or Cursor call your tools

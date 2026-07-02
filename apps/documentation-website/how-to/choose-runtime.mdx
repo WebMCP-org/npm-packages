@@ -1,0 +1,212 @@
+---
+title: 'Choose a Runtime'
+description: 'Decide when to use the native browser API, the strict polyfill, or the full @mcp-b/global runtime for your project.'
+keywords:
+  [
+    '@mcp-b/global',
+    '@mcp-b/webmcp-polyfill',
+    '@mcp-b/webmcp-types',
+    'usewebmcp',
+    '@mcp-b/react-webmcp',
+    'runtime',
+    'polyfill',
+    'native api',
+  ]
+icon: 'code-branch'
+---
+
+Start with the browser standard. Add MCP-B packages only when you need behavior beyond that standard.
+
+## Decision flowchart
+
+Ask these questions in order:
+
+1. **Does the target browser ship `document.modelContext` natively?** If yes, and that covers your use case, you may not need any package at all.
+
+2. **Do you need compile-time types without any runtime?** Install `@mcp-b/webmcp-types` as a dev dependency.
+
+3. **Do you need the WebMCP standard in browsers that lack native support, and nothing else?** Install `@mcp-b/webmcp-polyfill`.
+
+4. **Do you need MCP bridge transport, `callTool`, `listTools`, prompts, resources, elicitation, or sampling?** Install `@mcp-b/global`.
+
+5. **Do you need React hooks?** Choose `usewebmcp` for strict core, or `@mcp-b/react-webmcp` for the full MCP-B surface.
+
+## Package comparison
+
+| Package                  | Runtime | Core API                                  | MCP extensions                                                     | Transport           | React |
+| ------------------------ | ------- | ----------------------------------------- | ------------------------------------------------------------------ | ------------------- | ----- |
+| `@mcp-b/webmcp-types`    | No      | Types only                                | Types only                                                         | No                  | No    |
+| `@mcp-b/webmcp-polyfill` | Yes     | `registerTool`, `getTools`, `executeTool` | No                                                                 | No                  | No    |
+| `@mcp-b/global`          | Yes     | `registerTool`, `getTools`, `executeTool` | `callTool`, `listTools`, prompts, resources, elicitation, sampling | Tab + iframe        | No    |
+| `usewebmcp`              | Yes     | Via hook                                  | No                                                                 | No                  | Yes   |
+| `@mcp-b/react-webmcp`    | Yes     | Via hook                                  | Full MCP-B surface                                                 | Via `@mcp-b/global` | Yes   |
+
+## If you want the WebMCP standard only
+
+Install the polyfill. It adds `document.modelContext` and stays on the strict WebMCP path. It does not add MCP-B extension methods.
+
+```bash
+npm install @mcp-b/webmcp-polyfill
+```
+
+```ts title="main.ts"
+import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
+
+initializeWebMCPPolyfill();
+
+document.modelContext.registerTool({
+  name: 'get-page-title',
+  description: 'Get the current page title',
+  inputSchema: { type: 'object', properties: {} },
+  async execute() {
+    return {
+      content: [{ type: 'text', text: document.title }],
+    };
+  },
+});
+```
+
+The polyfill is non-destructive. If `document.modelContext` already exists natively, initialization is a no-op.
+
+For type inference on tool arguments, pair the polyfill with `@mcp-b/webmcp-types`:
+
+```bash
+npm install --save-dev @mcp-b/webmcp-types
+```
+
+See [Use Schemas and Structured Output](/how-to/use-schemas-and-structured-output) for details.
+
+## If you want the full MCP-B runtime
+
+Install `@mcp-b/global`. It layers the MCP-B runtime on top of the WebMCP surface.
+
+```bash
+npm install @mcp-b/global
+```
+
+```ts title="main.ts"
+import '@mcp-b/global';
+
+document.modelContext.registerTool({
+  name: 'search-products',
+  description: 'Search the product catalog by query',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      query: { type: 'string', description: 'Search query' },
+      limit: { type: 'integer', description: 'Max results' },
+    },
+    required: ['query'],
+  },
+  async execute(args) {
+    const results = await searchProducts(args.query, args.limit ?? 10);
+    return {
+      content: [{ type: 'text', text: JSON.stringify(results) }],
+    };
+  },
+});
+```
+
+`@mcp-b/global` auto-initializes on import. It installs the polyfill first, then replaces `document.modelContext` with a `BrowserMcpServer` that keeps the core behavior and adds MCP-B-only methods such as `callTool`, `listTools`, prompts, resources, and transport support.
+
+If you need to customize before initialization (for example, to restrict allowed origins), set options on `window.__webModelContextOptions` before loading the script:
+
+```html
+<script>
+  window.__webModelContextOptions = {
+    transport: {
+      tabServer: { allowedOrigins: ['https://myapp.com'] },
+    },
+  };
+</script>
+<script src="https://unpkg.com/@mcp-b/global@latest/dist/index.iife.js"></script>
+```
+
+## If you want React hooks
+
+<Tabs>
+  <Tab title="Strict core (usewebmcp)">
+    ```bash
+    npm install usewebmcp react
+    ```
+
+    ```tsx title="CounterTool.tsx"
+    import { useWebMCP } from 'usewebmcp';
+
+    export function CounterTool() {
+      const counterTool = useWebMCP({
+        name: 'counter_get',
+        description: 'Get current count',
+        inputSchema: { type: 'object', properties: {} } as const,
+        execute: async () => ({ count: 42 }),
+      });
+
+      return (
+        <div>
+          <p>Executions: {counterTool.state.executionCount}</p>
+        </div>
+      );
+    }
+    ```
+
+    `usewebmcp` expects `document.modelContext` to exist. Provide it with `@mcp-b/webmcp-polyfill` or `@mcp-b/global`.
+
+  </Tab>
+  <Tab title="Full MCP-B (@mcp-b/react-webmcp)">
+    ```bash
+    npm install @mcp-b/react-webmcp @mcp-b/global zod
+    ```
+
+    ```tsx title="LikeTool.tsx"
+    import { useWebMCP } from '@mcp-b/react-webmcp';
+    import { z } from 'zod';
+
+    function LikeTool() {
+      const likeTool = useWebMCP({
+        name: 'posts_like',
+        description: 'Like a post by ID',
+        inputSchema: {
+          postId: z.string().uuid().describe('The post ID to like'),
+        },
+        handler: async (input) => {
+          await api.posts.like(input.postId);
+          return { success: true, postId: input.postId };
+        },
+      });
+
+      return (
+        <div>
+          {likeTool.state.isExecuting && <p>Loading...</p>}
+        </div>
+      );
+    }
+    ```
+
+    `@mcp-b/react-webmcp` requires `@mcp-b/global` for the underlying runtime.
+
+  </Tab>
+</Tabs>
+
+## If you only need types
+
+Install `@mcp-b/webmcp-types` as a dev dependency. It has no runtime code and no side effects.
+
+```bash
+npm install --save-dev @mcp-b/webmcp-types
+```
+
+Add it to your `tsconfig.json` to get `document.modelContext` typing:
+
+```json title="tsconfig.json"
+{
+  "compilerOptions": {
+    "types": ["@mcp-b/webmcp-types"]
+  }
+}
+```
+
+This is useful when you are writing against a native browser implementation or a third-party polyfill and want type-safe tool descriptors without adding any runtime dependency.
+
+## How the layers relate
+
+For a deeper look at the layering rationale, see [Runtime Layering](/explanation/architecture/runtime-layering). The [Strict Core vs MCP-B Extensions](/explanation/strict-core-vs-mcp-b-extensions) page covers the boundary between the specification surface and MCP-B additions.

@@ -1,0 +1,66 @@
+---
+import { AgentWorkflowBlock } from "@/components/animations/sections/agent-workflow-block";
+import { IntegrationBlock } from "@/components/animations/sections/integration-block";
+import { LazyDither } from "@/components/animations/lazy-dither";
+import IconGlyph from "@/components/icon-glyph.astro";
+import { siteConfig } from "@/lib/config";
+
+const workflowConnectConfig = siteConfig.workflowConnectSection;
+const secondaryButtonClass =
+  "inline-flex h-9 w-fit items-center gap-1.5 rounded-lg border border-border bg-secondary px-2.5 text-sm font-medium text-secondary-foreground transition-colors hover:bg-secondary/80";
+---
+
+<section id="workflow" class="relative flex w-full flex-col divide-y divide-border">
+  <div class="relative h-14 overflow-hidden">
+    <div class="absolute inset-0">
+      <LazyDither client:visible enableMouseInteraction={false} />
+    </div>
+  </div>
+
+  <div class="mx-auto">
+    <div class="grid grid-cols-1 md:grid-cols-6">
+      <div class="col-span-1 flex flex-col gap-7 p-8 md:sticky md:top-20 md:col-span-2 md:self-start md:p-10 lg:p-14">
+        <h3 class="text-3xl font-medium tracking-tighter text-left text-balance lg:text-4xl">
+          {workflowConnectConfig.title}
+        </h3>
+        <p class="text-left text-balance text-muted-foreground">
+          {workflowConnectConfig.description}
+        </p>
+        <a href={workflowConnectConfig.ctaButton.href} class={secondaryButtonClass}>
+          {workflowConnectConfig.ctaButton.text}
+          <IconGlyph name="arrow-right" className="size-4 text-foreground" />
+        </a>
+      </div>
+
+      <div class="relative col-span-1 w-full border-t border-border md:col-span-4 md:border-l md:border-t-0">
+        <div class="w-full divide-y divide-border">
+          <div>
+            <IntegrationBlock client:visible popoverPosition="top" />
+            <div class="max-w-xl items-start p-6 text-left">
+              <p class="flex items-center justify-start gap-2 text-sm text-muted-foreground">
+                <IconGlyph name={workflowConnectConfig.blocks[0].icon} className="size-4" />
+                {workflowConnectConfig.blocks[0].title}
+              </p>
+              <p class="mt-2 text-base leading-relaxed text-foreground">
+                {workflowConnectConfig.blocks[0].description}
+              </p>
+            </div>
+          </div>
+
+          <div class="relative">
+            <AgentWorkflowBlock client:visible />
+            <div class="max-w-xl items-start p-6 text-left">
+              <p class="flex items-center justify-start gap-2 text-sm text-muted-foreground">
+                <IconGlyph name={workflowConnectConfig.blocks[1].icon} className="size-4" />
+                {workflowConnectConfig.blocks[1].title}
+              </p>
+              <p class="mt-2 text-base leading-relaxed text-foreground">
+                {workflowConnectConfig.blocks[1].description}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

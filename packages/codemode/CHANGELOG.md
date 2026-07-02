@@ -1,5 +1,23 @@
 # @mcp-b/codemode
 
+## 3.0.0
+
+### Patch Changes
+
+- Updated dependencies [abaf5d0]
+  - @mcp-b/webmcp-types@4.0.0
+
+## 2.0.0
+
+### Major Changes
+
+- Align with the WebMCP v3 release train and consume `@mcp-b/webmcp-types@3.0.0`.
+
+### Patch Changes
+
+- Updated dependencies [4f3cc5e]
+  - @mcp-b/webmcp-types@3.0.0
+
 ## 1.0.1
 
 ### Patch Changes

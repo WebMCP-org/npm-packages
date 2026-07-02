@@ -1,0 +1,42 @@
+---
+interface Props {
+  className?: string;
+  reverse?: boolean;
+  pauseOnHover?: boolean;
+  vertical?: boolean;
+  repeat?: number;
+}
+
+const {
+  className = "",
+  reverse = false,
+  pauseOnHover = false,
+  vertical = false,
+  repeat = 4,
+} = Astro.props as Props;
+
+const repeats = Array.from({ length: repeat });
+---
+
+<div
+  class:list={[
+    "group flex overflow-hidden p-2 [--duration:40s] [--gap:1rem]",
+    vertical ? "flex-col" : "flex-row",
+    className,
+  ]}
+>
+  {
+    repeats.map(() => (
+      <div
+        class:list={[
+          "flex shrink-0 justify-around [gap:var(--gap)]",
+          vertical ? "animate-marquee-vertical flex-col" : "animate-marquee flex-row",
+          reverse && "[animation-direction:reverse]",
+          pauseOnHover && "group-hover:[animation-play-state:paused]",
+        ]}
+      >
+        <slot />
+      </div>
+    ))
+  }
+</div>

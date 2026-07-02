@@ -8,7 +8,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue?style=flat-square)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-18+-61DAFB?style=flat-square&logo=react)](https://reactjs.org/)
 
-**[Full Documentation](https://docs.mcp-b.ai/packages/react-webmcp)** | **[Quick Start](https://docs.mcp-b.ai/quickstart)** | **[AI Framework Integration](https://docs.mcp-b.ai/ai-frameworks)**
+**[Reference](https://docs.mcp-b.ai/packages/react-webmcp/reference)** | **[React Tutorial](https://docs.mcp-b.ai/tutorials/first-react-tool)** | **[Framework Guides](https://docs.mcp-b.ai/how-to/frameworks)**
 
 **@mcp-b/react-webmcp** provides React hooks that expose your components as AI-callable tools via the Model Context Protocol. Build AI-powered React applications where Claude, ChatGPT, Gemini, Cursor, and Copilot can interact with your app's functionality.
 
@@ -17,7 +17,7 @@
 | Feature                      | Benefit                                                                      |
 | ---------------------------- | ---------------------------------------------------------------------------- |
 | **React-First Design**       | Hooks follow React patterns with automatic cleanup and StrictMode support    |
-| **Type-Safe with Zod**       | Full TypeScript support with Zod schema validation for inputs/outputs        |
+| **Type-Safe with Zod**       | Full TypeScript support with input validation and output typing              |
 | **Two-Way Integration**      | Both expose tools TO AI agents AND consume tools FROM MCP servers            |
 | **Execution State Tracking** | Built-in loading, success, and error states for UI feedback                  |
 | **Works with Any AI**        | Compatible with Claude, ChatGPT, Gemini, Cursor, Copilot, and any MCP client |
@@ -36,9 +36,16 @@ For client functionality, you'll also need:
 pnpm add @mcp-b/transports @modelcontextprotocol/sdk
 ```
 
-**Prerequisites:** Provider hooks require the `navigator.modelContext` API. Install `@mcp-b/global` or use a browser that implements the Web Model Context API.
+**Prerequisites:** Provider hooks require the `document.modelContext` API. Install `@mcp-b/global` or use a browser that implements the WebMCP API.
 
-Provider hooks register tools with `navigator.modelContext.registerTool(tool, { signal })` and abort the controller on unmount. On Chrome Beta 147 native (which ignores the second arg) cleanup cannot remove the tool. Install `@mcp-b/global` for spec-aligned behavior.
+Provider hooks register tools with `document.modelContext.registerTool(tool, {
+signal })` and abort the controller on unmount. The hooks retain a
+`navigator.modelContext` fallback for older preview runtimes, but
+`document.modelContext` is the canonical surface. Install `@mcp-b/global`
+when you need a portable runtime with spec-aligned cleanup behavior.
+
+`outputSchema` is MCP-B helper metadata for output typing and structured MCP
+responses. Native Chrome WebMCP does not currently define or enforce it.
 
 ## Quick Start - Provider (Registering Tools)
 
@@ -130,7 +137,7 @@ function ToolConsumer() {
 
 ## Zod Version Compatibility
 
-This package supports **Zod 3.25.76+** (3.x only).
+This package supports **Zod `^3.25 || ^4.0`** as an optional peer dependency.
 
 ## Documentation
 
@@ -138,9 +145,9 @@ For full API reference, output schemas, memoization patterns, migration guide, b
 
 ## Related Packages
 
-- [`@mcp-b/global`](https://docs.mcp-b.ai/packages/global) - W3C Web Model Context API polyfill (required for provider hooks)
-- [`@mcp-b/transports`](https://docs.mcp-b.ai/packages/transports) - Browser-specific MCP transports
-- [`@mcp-b/chrome-devtools-mcp`](https://docs.mcp-b.ai/packages/chrome-devtools-mcp) - Connect desktop AI agents to browser tools
+- [`@mcp-b/global`](https://docs.mcp-b.ai/packages/global/reference) - Full MCP-B browser runtime (required for provider hooks)
+- [`@mcp-b/transports`](https://docs.mcp-b.ai/packages/transports/reference) - Browser-specific MCP transports
+- [`chrome-devtools-mcp`](https://github.com/ChromeDevTools/chrome-devtools-mcp) - Upstream Chrome DevTools MCP server
 - [`usewebmcp`](../usewebmcp) - React hooks for strict core WebMCP API only
 
 ## Resources

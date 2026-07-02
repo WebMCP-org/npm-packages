@@ -62,7 +62,7 @@ export function executeExtraction<M extends ExtractionMethod>(
         }
 
         const extractOptions: ExtractionOptions = {
-          ...(options || {}),
+          ...options,
           mode: mode || 'interactive',
         };
         const extractResult = ProgressiveExtractor.extractRegion(

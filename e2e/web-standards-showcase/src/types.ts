@@ -5,7 +5,6 @@
 
 export type {
   InputSchema as ToolInputSchema,
-  ModelContextOptions as ProvideContextOptions,
   ModelContextTestingToolInfo as ToolInfo,
   ModelContextToolRegistrationHandle as ToolRegistration,
 } from '@mcp-b/webmcp-types';
@@ -15,6 +14,7 @@ export type { CallToolResult } from '@mcp-b/webmcp-types';
 import type {
   ModelContextCore,
   ModelContextExtensions,
+  ModelContextRegisterToolOptions,
   ModelContextTesting as PackageModelContextTesting,
   ModelContextTestingPolyfillExtensions,
   ModelContextToolRegistrationHandle,
@@ -32,19 +32,29 @@ export type Tool = ToolDescriptor;
 /**
  * The showcase patches the native `ModelContext` with legacy compatibility
  * helpers via `installLegacyContextCompat` — most notably, a wrapped
- * `registerTool` that returns a registration handle (the native API returns
- * `void`).  The patched surface also adds `listTools()` from the MCPB
- * extension layer and standard `EventTarget` methods for `toolschange`.
+ * `registerTool` that returns a registration handle for the showcase. The
+ * patched surface also adds `listTools()` from the testing API and normalizes
+ * toolchange listener methods when the native preview does not expose them on
+ * `modelContext`.
  *
  * This type captures the full patched surface the showcase code relies on.
  */
-export type ModelContext = ModelContextCore & {
-  registerTool(tool: Tool): ModelContextToolRegistrationHandle;
+export type ModelContext = Omit<ModelContextCore, 'registerTool'> & {
+  registerTool(
+    tool: Tool,
+    options?: ModelContextRegisterToolOptions
+  ): ModelContextToolRegistrationHandle;
+  unregisterTool: ModelContextExtensions['unregisterTool'];
   listTools: ModelContextExtensions['listTools'];
   addEventListener(
-    type: string,
+    type: 'toolchange' | 'toolschange',
     listener: EventListenerOrEventListenerObject,
     options?: boolean | AddEventListenerOptions
+  ): void;
+  removeEventListener(
+    type: 'toolchange' | 'toolschange',
+    listener: EventListenerOrEventListenerObject,
+    options?: boolean | EventListenerOptions
   ): void;
 };
 
