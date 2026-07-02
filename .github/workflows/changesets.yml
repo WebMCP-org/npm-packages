@@ -247,20 +247,20 @@ jobs:
       - name: Create prerelease versions
         id: versions
         run: |
-          TIMESTAMP=$(date +%Y%m%d%H%M%S)
           TAG_SUFFIX="${{ inputs.tag || 'beta' }}"
+
+          pnpm exec changeset version \
+            --snapshot "$TAG_SUFFIX" \
+            --snapshot-prerelease-template "{tag}.{datetime}"
 
           PACKAGES_JSON="[]"
           for pkg in packages/*/; do
             if [ -f "$pkg/package.json" ]; then
               name=$(jq -r '.name' "$pkg/package.json")
-              current_version=$(jq -r '.version' "$pkg/package.json")
-              if [ "$name" != "null" ] && [ "$current_version" != "null" ]; then
-                prerelease_version="${current_version}-${TAG_SUFFIX}.${TIMESTAMP}"
-                jq --arg v "$prerelease_version" '.version = $v' "$pkg/package.json" > "$pkg/package.json.tmp"
-                mv "$pkg/package.json.tmp" "$pkg/package.json"
-                echo "Updated $name to $prerelease_version"
-                PACKAGES_JSON=$(echo "$PACKAGES_JSON" | jq -c --arg n "$name" --arg v "$prerelease_version" '. + [{"name": $n, "version": $v}]')
+              version=$(jq -r '.version' "$pkg/package.json")
+              if [[ "$name" != "null" && "$version" == *"-${TAG_SUFFIX}."* ]]; then
+                echo "Prepared $name@$version"
+                PACKAGES_JSON=$(echo "$PACKAGES_JSON" | jq -c --arg n "$name" --arg v "$version" '. + [{"name": $n, "version": $v}]')
               fi
             fi
           done
@@ -268,7 +268,7 @@ jobs:
 
       - name: Publish prerelease packages
         run: |
-          pnpm publish -r --access public --tag "${{ inputs.tag || 'beta' }}" --no-git-checks
+          pnpm exec changeset publish --tag "${{ inputs.tag || 'beta' }}" --no-git-tag
 
       - name: Install cosign
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v3.8.0

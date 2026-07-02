@@ -23,6 +23,10 @@
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
   "ignore": [],
+  "snapshot": {
+    "prereleaseTemplate": "{tag}.{datetime}",
+    "useCalculatedVersion": true
+  },
   "privatePackages": {
     "version": false,
     "tag": false
