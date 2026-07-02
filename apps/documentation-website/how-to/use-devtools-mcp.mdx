@@ -3,7 +3,7 @@ title: 'Use Chrome DevTools MCP'
 description: 'Set up chrome-devtools-mcp to let AI agents control Chrome, discover website tools, and build WebMCP tools through an AI-driven development loop.'
 keywords:
   [
-    '@mcp-b/chrome-devtools-mcp',
+    'chrome-devtools-mcp',
     'chrome devtools protocol',
     'browser automation',
     'list_webmcp_tools',
@@ -13,7 +13,9 @@ keywords:
 icon: 'bug'
 ---
 
-This guide shows you how to use `@mcp-b/chrome-devtools-mcp` to connect desktop AI agents to a live Chrome browser. The server gives your agent 27 browser automation tools plus the ability to discover and call WebMCP tools registered on any page.
+This guide shows you how to use the upstream `chrome-devtools-mcp` package to connect desktop AI agents to a live Chrome browser. The server gives your agent browser automation tools plus the ability to discover and call WebMCP tools registered on any page.
+
+The former `@mcp-b/chrome-devtools-mcp` fork is retired. Use `chrome-devtools-mcp@latest` in new MCP client configs.
 
 ## Install the MCP server
 
@@ -25,22 +27,22 @@ Add the server to your MCP client configuration:
   "mcpServers": {
     "chrome-devtools": {
       "command": "npx",
-      "args": ["-y", "@mcp-b/chrome-devtools-mcp@latest"]
+      "args": ["-y", "chrome-devtools-mcp@latest"]
     }
   }
 }
 ```
 
 ```bash "Claude Code"
-claude mcp add chrome-devtools npx @mcp-b/chrome-devtools-mcp@latest
+claude mcp add chrome-devtools npx chrome-devtools-mcp@latest
 ```
 
 ```bash "VS Code CLI"
-code --add-mcp '{"name":"@mcp-b/chrome-devtools-mcp","command":"npx","args":["-y","@mcp-b/chrome-devtools-mcp@latest"],"env":{}}'
+code --add-mcp '{"name":"chrome-devtools-mcp","command":"npx","args":["-y","chrome-devtools-mcp@latest"],"env":{}}'
 ```
 
 ```bash "Gemini CLI"
-gemini mcp add chrome-devtools npx @mcp-b/chrome-devtools-mcp@latest
+gemini mcp add chrome-devtools npx chrome-devtools-mcp@latest
 ```
 
 </CodeGroup>
@@ -193,7 +195,7 @@ By default, the server launches its own Chrome with a dedicated profile. If you 
       "mcpServers": {
         "chrome-devtools": {
           "command": "npx",
-          "args": ["@mcp-b/chrome-devtools-mcp@latest", "--autoConnect"]
+          "args": ["chrome-devtools-mcp@latest", "--autoConnect"]
         }
       }
     }
@@ -211,7 +213,7 @@ By default, the server launches its own Chrome with a dedicated profile. If you 
         "chrome-devtools": {
           "command": "npx",
           "args": [
-            "@mcp-b/chrome-devtools-mcp@latest",
+            "chrome-devtools-mcp@latest",
             "--browser-url=http://127.0.0.1:9222"
           ]
         }
@@ -256,7 +258,7 @@ Pass options through the `args` array in your MCP client config:
     "chrome-devtools": {
       "command": "npx",
       "args": [
-        "@mcp-b/chrome-devtools-mcp@latest",
+        "chrome-devtools-mcp@latest",
         "--channel=canary",
         "--headless=true",
         "--isolated=true"
@@ -274,7 +276,7 @@ Pass options through the `args` array in your MCP client config:
 | `--viewport`       | Initial viewport size (e.g. `1280x720`)           |
 | `--executablePath` | Path to a custom Chrome binary                    |
 
-For the full list of options, see the [chrome-devtools-mcp Reference](/packages/chrome-devtools-mcp/reference).
+For the full list of options, see the upstream [Chrome DevTools MCP repository](https://github.com/ChromeDevTools/chrome-devtools-mcp).
 
 ## Troubleshoot common issues
 
@@ -287,6 +289,7 @@ For the full list of options, see the [chrome-devtools-mcp Reference](/packages/
 
 ## Related pages
 
-- [chrome-devtools-mcp Reference](/packages/chrome-devtools-mcp/reference) for the full tool list and all CLI options
+- [Chrome DevTools MCP retired package note](/packages/chrome-devtools-mcp/reference) for migration from the old `@mcp-b` fork
+- [ChromeDevTools/chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp) for the full upstream tool list and CLI options
 - [Connect Desktop Agents with the Local Relay](/how-to/connect-desktop-agents-with-local-relay) for an alternative approach that works with any website
 - [Debug and Troubleshoot](/how-to/debug-and-troubleshoot) for general debugging strategies

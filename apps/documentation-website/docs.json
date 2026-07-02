@@ -147,7 +147,7 @@
                 ]
               },
               {
-                "group": "@mcp-b/chrome-devtools-mcp",
+                "group": "Chrome DevTools MCP (upstream)",
                 "pages": [
                   "packages/chrome-devtools-mcp/overview",
                   "packages/chrome-devtools-mcp/reference"

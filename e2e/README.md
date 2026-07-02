@@ -15,7 +15,6 @@ This package also keeps non-canonical integration lanes for direct runtime APIs,
 Other canonical runtime E2E lanes live in package-specific commands:
 
 - `pnpm --filter @mcp-b/webmcp-local-relay test:e2e`
-- `pnpm --filter @mcp-b/chrome-devtools-mcp test:e2e`
 - `pnpm --filter @mcp-b/extension-tools test:e2e`
 
 ## Canonical E2E Definition

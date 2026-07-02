@@ -207,15 +207,15 @@ Any website running `@mcp-b/global` becomes callable from your desktop AI agent.
 
 ## Which Package?
 
-| I want to…                          | Package                                                        |
-| ----------------------------------- | -------------------------------------------------------------- |
-| Add tools to my site (simplest)     | [`@mcp-b/global`](./packages/global)                           |
-| Just the polyfill, no MCP bridge    | [`@mcp-b/webmcp-polyfill`](./packages/webmcp-polyfill)         |
-| Register tools from React           | [`@mcp-b/react-webmcp`](./packages/react-webmcp)               |
-| Forward tools to local AI agents    | [`@mcp-b/webmcp-local-relay`](./packages/webmcp-local-relay)   |
-| Build a Chrome extension with tools | [`@mcp-b/extension-tools`](./packages/extension-tools)         |
-| Control Chrome from an AI agent     | [`@mcp-b/chrome-devtools-mcp`](./packages/chrome-devtools-mcp) |
-| Just the TypeScript types           | [`@mcp-b/webmcp-types`](./packages/webmcp-types)               |
+| I want to…                          | Package                                                                        |
+| ----------------------------------- | ------------------------------------------------------------------------------ |
+| Add tools to my site (simplest)     | [`@mcp-b/global`](./packages/global)                                           |
+| Just the polyfill, no MCP bridge    | [`@mcp-b/webmcp-polyfill`](./packages/webmcp-polyfill)                         |
+| Register tools from React           | [`@mcp-b/react-webmcp`](./packages/react-webmcp)                               |
+| Forward tools to local AI agents    | [`@mcp-b/webmcp-local-relay`](./packages/webmcp-local-relay)                   |
+| Build a Chrome extension with tools | [`@mcp-b/extension-tools`](./packages/extension-tools)                         |
+| Control Chrome from an AI agent     | [`chrome-devtools-mcp`](https://github.com/ChromeDevTools/chrome-devtools-mcp) |
+| Just the TypeScript types           | [`@mcp-b/webmcp-types`](./packages/webmcp-types)                               |
 
 ---
 
@@ -275,11 +275,10 @@ pnpm add @mcp-b/smart-dom-reader
 
 ### Browser Tooling
 
-| Package                                                      | Version                                                                                                                     | Description                                                                 |
-| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| [@mcp-b/extension-tools](./packages/extension-tools)         | [![npm](https://img.shields.io/npm/v/@mcp-b/extension-tools)](https://www.npmjs.com/package/@mcp-b/extension-tools)         | Pre-built MCP tools for Chrome Extension APIs (tabs, bookmarks, history, …) |
-| [@mcp-b/smart-dom-reader](./packages/smart-dom-reader)       | [![npm](https://img.shields.io/npm/v/@mcp-b/smart-dom-reader)](https://www.npmjs.com/package/@mcp-b/smart-dom-reader)       | Token-efficient DOM extraction for AI agents                                |
-| [@mcp-b/chrome-devtools-mcp](./packages/chrome-devtools-mcp) | [![npm](https://img.shields.io/npm/v/@mcp-b/chrome-devtools-mcp)](https://www.npmjs.com/package/@mcp-b/chrome-devtools-mcp) | MCP server for Chrome DevTools with WebMCP integration                      |
+| Package                                                | Version                                                                                                               | Description                                                                 |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| [@mcp-b/extension-tools](./packages/extension-tools)   | [![npm](https://img.shields.io/npm/v/@mcp-b/extension-tools)](https://www.npmjs.com/package/@mcp-b/extension-tools)   | Pre-built MCP tools for Chrome Extension APIs (tabs, bookmarks, history, …) |
+| [@mcp-b/smart-dom-reader](./packages/smart-dom-reader) | [![npm](https://img.shields.io/npm/v/@mcp-b/smart-dom-reader)](https://www.npmjs.com/package/@mcp-b/smart-dom-reader) | Token-efficient DOM extraction for AI agents                                |
 
 <details>
 <summary>Deprecated packages</summary>
@@ -326,7 +325,7 @@ webmcp-types          (canonical type definitions)
 └── usewebmcp         (React hooks for strict core)
 ```
 
-Standalone packages: `extension-tools`, `smart-dom-reader`, `chrome-devtools-mcp`, `webmcp-local-relay`.
+Standalone packages: `extension-tools`, `smart-dom-reader`, `webmcp-local-relay`.
 
 ## Development
 

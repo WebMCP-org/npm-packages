@@ -6,7 +6,6 @@ export default {
       'always',
       [
         // Packages (in packages/)
-        'chrome-devtools-mcp',
         'codemode',
         'extension-tools',
         'global',

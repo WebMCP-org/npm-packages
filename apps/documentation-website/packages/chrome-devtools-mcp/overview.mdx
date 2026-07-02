@@ -1,47 +1,49 @@
 ---
-title: '@mcp-b/chrome-devtools-mcp overview'
-description: 'When to use the DevTools MCP bridge, what it adds on top of the upstream project, and how it relates to page-hosted WebMCP tools.'
+title: 'Chrome DevTools MCP'
+description: 'The former @mcp-b/chrome-devtools-mcp package is retired. Use the upstream Chrome DevTools MCP package instead.'
 keywords:
-  ['@mcp-b/chrome-devtools-mcp', 'overview', 'chrome devtools', 'MCP server', 'browser automation']
+  [
+    'chrome-devtools-mcp',
+    '@mcp-b/chrome-devtools-mcp',
+    'retired package',
+    'chrome devtools',
+    'browser automation',
+  ]
 icon: 'chrome'
 ---
 
-`@mcp-b/chrome-devtools-mcp` is the DevTools bridge for coding-agent workflows. It lets an MCP client control Chrome through the Chrome DevTools Protocol and adds WebMCP integration so the same agent can discover and call tools registered on the page.
+`@mcp-b/chrome-devtools-mcp` is retired and no longer maintained from this monorepo.
 
-## When to use this package
+Use the upstream Chrome DevTools MCP server instead:
 
-- You need browser automation, console inspection, traces, screenshots, or DOM access.
-- You want an MCP server that can both debug Chrome and discover WebMCP tools.
-- You are integrating with coding agents that already speak MCP over stdio.
+- [ChromeDevTools/chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp)
+- [chrome-devtools-mcp on npm](https://www.npmjs.com/package/chrome-devtools-mcp)
 
-## When not to use this package
+```bash "Install from npm"
+npx -y chrome-devtools-mcp@latest
+```
 
-- You only need to forward site tools into a desktop client. Use [`@mcp-b/webmcp-local-relay`](/packages/webmcp-local-relay/overview).
-- You are building a Chrome extension rather than a DevTools-based bridge. Use [`@mcp-b/extension-tools`](/packages/extension-tools/overview) for extension-side APIs.
-
-## Where it sits in the package graph
-
-This package is adjacent to the browser runtime packages. It does not replace them. Instead, it reaches into a live browser session and can interact with pages that expose WebMCP tools.
-
-## First step
-
-Add the server to your MCP client config, then connect it to a Chrome instance. The [reference page](/packages/chrome-devtools-mcp/reference) covers setup, tool groups, configuration, and the WebMCP integration surface.
+The forked WebMCP changes that used to live in `@mcp-b/chrome-devtools-mcp` have been upstreamed. Treat the upstream package as the source of truth for supported CLI flags, tool behavior, release notes, and Chrome compatibility.
 
 ## Related pages
 
 <CardGroup cols={2}>
-  <Card title="Reference" icon="book-open" href="/packages/chrome-devtools-mcp/reference">
-    Configuration, tool groups, DevTools behavior, and WebMCP integration details.
+  <Card
+    title="Retired package reference"
+    icon="book-open"
+    href="/packages/chrome-devtools-mcp/reference"
+  >
+    Replacement package names and migration notes for old `@mcp-b/chrome-devtools-mcp` links.
   </Card>
-  <Card title="Use DevTools MCP" icon="wrench" href="/how-to/use-devtools-mcp">
-    Run the bridge in practical debugging workflows.
+  <Card title="Use Chrome DevTools MCP" icon="wrench" href="/how-to/use-devtools-mcp">
+    Configure the upstream server for browser automation and WebMCP development workflows.
   </Card>
   <Card
     title="Transports and bridges"
     icon="bridge"
     href="/explanation/architecture/transports-and-bridges"
   >
-    Compare DevTools-based access to relay and transport-based access.
+    Compare DevTools-based access to local relay and browser transport options.
   </Card>
   <Card title="@mcp-b/global overview" icon="globe" href="/packages/global/overview">
     Runtime setup for pages whose tools are discovered through DevTools.

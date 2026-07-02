@@ -12,7 +12,6 @@ export default defineConfig({
       '.cache/',
       'coverage/',
       'chromium/',
-      'packages/chrome-devtools-mcp/**',
       'packages/smart-dom-reader/**/lib/**',
     ],
   },

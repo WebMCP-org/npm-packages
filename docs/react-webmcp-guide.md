@@ -390,7 +390,7 @@ Any MCP-compatible client: Claude Desktop, ChatGPT (via plugins/GPTs), Cursor, V
 
 ### How do AI agents connect to my React app?
 
-Via browser extensions or the `@mcp-b/chrome-devtools-mcp` server, which bridges desktop AI clients to browser-based MCP tools.
+Via browser extensions or upstream `chrome-devtools-mcp`, which bridges desktop AI clients to browser-based MCP tools.
 
 ### Can I use this with Next.js / Remix / Gatsby?
 

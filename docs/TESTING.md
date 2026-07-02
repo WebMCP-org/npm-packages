@@ -36,7 +36,6 @@ pnpm --filter mcp-e2e-tests test:native-showcase
 
 # Runtime-specific canonical E2E packages
 pnpm --filter @mcp-b/webmcp-local-relay test:e2e
-pnpm --filter @mcp-b/chrome-devtools-mcp test:e2e
 pnpm --filter @mcp-b/extension-tools test:e2e
 
 # Tarball validation
@@ -56,7 +55,6 @@ Notes:
 | Iframe              | SDK `Client` + `IframeParentTransport`                    | Parent/iframe runtime boundary                      | `pnpm --filter mcp-e2e-tests test:runtime-contract`        |
 | Native Chromium     | `document.modelContext` / `navigator.modelContextTesting` | Chrome 152+ with WebMCP flags in CI                 | `pnpm --filter mcp-e2e-tests test:native-contract:default` |
 | Local relay         | SDK `Client` over stdio                                   | Real relay server + real browser runtime            | `pnpm --filter @mcp-b/webmcp-local-relay test:e2e`         |
-| DevTools bridge     | SDK `Client` + `WebMCPClientTransport`                    | Real page discovered through DevTools bridge        | `pnpm --filter @mcp-b/chrome-devtools-mcp test:e2e`        |
 | Extension transport | SDK `Client` + `ExtensionClientTransport`                 | Real MV3 extension using `ExtensionServerTransport` | `pnpm --filter @mcp-b/extension-tools test:e2e`            |
 
 ## Canonical E2E Assertions
@@ -152,7 +150,6 @@ These target the Playwright `e2e/` package only.
 
 ```bash
 pnpm --filter @mcp-b/webmcp-local-relay test:e2e
-pnpm --filter @mcp-b/chrome-devtools-mcp test:e2e
 pnpm --filter @mcp-b/extension-tools test:e2e
 ```
 

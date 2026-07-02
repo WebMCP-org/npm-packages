@@ -165,12 +165,7 @@ const packageGroups = [
   },
   {
     label: 'Agent and browser tooling',
-    packages: [
-      '@mcp-b/webmcp-local-relay',
-      '@mcp-b/chrome-devtools-mcp',
-      '@mcp-b/extension-tools',
-      '@mcp-b/smart-dom-reader',
-    ],
+    packages: ['@mcp-b/webmcp-local-relay', '@mcp-b/extension-tools', '@mcp-b/smart-dom-reader'],
   },
 ];
 
