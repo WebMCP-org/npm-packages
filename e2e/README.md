@@ -27,7 +27,7 @@ A test is canonical E2E only if it proves:
 3. tools are called through that same boundary
 4. no mocked transports or fake servers are used
 
-Native Chromium is the one exception to the SDK-client rule: its real public boundary is `navigator.modelContext` / `navigator.modelContextTesting`, so the canonical native tests use those APIs directly.
+Native Chromium is the one exception to the SDK-client rule: its real public boundary is `document.modelContext` / `navigator.modelContextTesting`. `navigator.modelContext` is only checked as the deprecated compatibility alias.
 
 ## Structure
 
@@ -104,7 +104,7 @@ pnpm test:e2e:debug
 pnpm test
 pnpm test:runtime-contract
 
-# Native contract
+# Native contract (Chrome 152+ WebMCP config)
 pnpm test:native-contract:default
 pnpm test:native-contract:beta
 
@@ -150,7 +150,7 @@ These suites remain valuable, but they are not the default E2E definition:
 Focused codemode coverage:
 
 - `pnpm test:codemode:webmcp` verifies the codemode page flow in Chromium and records whether the page ran against the native or polyfill runtime path.
-- `pnpm test:codemode:webmcp:beta` verifies that same page flow against Chrome Beta with the native `navigator.modelContextTesting` API enabled.
+- `pnpm test:codemode:webmcp:beta` verifies that same page flow against Chrome 152+ with the native `document.modelContext` and `navigator.modelContextTesting` APIs enabled.
 
 ## Manual Runtime Pages
 
@@ -188,4 +188,4 @@ pnpm --filter mcp-e2e-tests exec playwright install chromium
 
 ### Native Chromium Details
 
-See [tests/CHROMIUM_TESTING.md](./tests/CHROMIUM_TESTING.md) for the canonical native contract lanes and the Chrome Beta flagged lane.
+See [tests/CHROMIUM_TESTING.md](./tests/CHROMIUM_TESTING.md) for the canonical native contract lanes and the Chrome 152 flagged lane.

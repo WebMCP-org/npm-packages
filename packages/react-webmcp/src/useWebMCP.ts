@@ -4,7 +4,7 @@ import type {
   JsonSchemaForInference,
   ToolDescriptor,
 } from '@mcp-b/webmcp-types';
-import { isPlainObject, normalizeInputSchema, toJsonObject } from '@mcp-b/webmcp-polyfill/schema';
+import { isPlainObject, normalizeInputSchema, toJsonValue } from '@mcp-b/webmcp-polyfill/schema';
 import type { DependencyList } from 'react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type {
@@ -165,7 +165,7 @@ const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffec
  * ```
  *
  * @template TInputSchema - JSON Schema defining input parameter types (use `as const` for inference)
- * @template TOutputSchema - JSON Schema defining output structure (object schemas enable structuredContent)
+ * @template TOutputSchema - JSON Schema defining output structure
  *
  * @param config - Configuration object for the tool
  * @param deps - Optional dependency array that triggers tool re-registration when values change.
@@ -319,8 +319,6 @@ export function useWebMCP<
       assertInferableJsonSchema(jsonSchema);
       resolvedOutputSchema = jsonSchema;
     }
-    const returnsStructuredContent = resolvedOutputSchema?.type === 'object';
-
     const mcpHandler = async (input: unknown): Promise<CallToolResult> => {
       try {
         const result = await Reflect.apply(executeRef.current, undefined, [input]);
@@ -335,11 +333,11 @@ export function useWebMCP<
           ],
         };
 
-        if (returnsStructuredContent) {
-          const structuredContent = toJsonObject(result);
-          if (!structuredContent) {
+        if (resolvedOutputSchema) {
+          const structuredContent = toJsonValue(result);
+          if (structuredContent === undefined) {
             throw new Error(
-              `Tool "${name}" outputSchema requires the handler to return a JSON object result`
+              `Tool "${name}" outputSchema requires the handler to return a JSON-serializable result`
             );
           }
           response.structuredContent = structuredContent;
@@ -362,7 +360,7 @@ export function useWebMCP<
     };
 
     const ownerToken = Symbol(name);
-    const toolDescriptor: ToolDescriptor = {
+    const toolDescriptor: ToolDescriptor & { inputSchema: InputSchema } = {
       name,
       description,
       inputSchema: resolvedInputSchema,
@@ -371,26 +369,46 @@ export function useWebMCP<
       execute: mcpHandler,
     };
     const controller = new AbortController();
-    const registerResult = (
-      modelContext.registerTool as (
-        tool: ToolDescriptor,
-        options?: { signal?: AbortSignal }
-      ) => unknown
-    ).call(modelContext, toolDescriptor, { signal: controller.signal });
+    let registered = false;
+    let disposed = false;
 
-    void Promise.resolve(registerResult).catch((error: unknown) => {
+    try {
+      const registerResult = modelContext.registerTool(toolDescriptor, {
+        signal: controller.signal,
+      });
+
+      void Promise.resolve(registerResult).then(
+        () => {
+          if (!disposed && !controller.signal.aborted) {
+            registered = true;
+            TOOL_OWNER_BY_NAME.set(name, ownerToken);
+          }
+        },
+        (error: unknown) => {
+          if (!controller.signal.aborted) {
+            controller.abort();
+            console.warn(`[ReactWebMCP:useWebMCP] registerTool("${name}") rejected:`, error);
+          }
+        }
+      );
+    } catch (error) {
+      controller.abort();
       console.warn(`[ReactWebMCP:useWebMCP] registerTool("${name}") rejected:`, error);
-    });
-    TOOL_OWNER_BY_NAME.set(name, ownerToken);
+      return;
+    }
 
     return () => {
-      const currentOwner = TOOL_OWNER_BY_NAME.get(name);
-      if (currentOwner !== ownerToken) {
+      disposed = true;
+
+      if (registered && TOOL_OWNER_BY_NAME.get(name) === ownerToken) {
+        TOOL_OWNER_BY_NAME.delete(name);
+        controller.abort();
         return;
       }
 
-      TOOL_OWNER_BY_NAME.delete(name);
-      controller.abort();
+      if (!registered) {
+        controller.abort();
+      }
     };
     // Spread operator in dependencies intentionally allows consumers to trigger
     // re-registration with custom reactive inputs.

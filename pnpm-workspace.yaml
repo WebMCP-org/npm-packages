@@ -17,7 +17,8 @@ catalog:
   '@cloudflare/vite-plugin': ^1.13.18
   '@composio/json-schema-to-zod': ^0.1.19
   '@hookform/resolvers': ^5.2.2
-  '@modelcontextprotocol/sdk': 1.26.0
+  '@mcp-b/global': file:/var/folders/5y/ysfq1x7s50lc168yy1gvvf4m0000gn/T/mcpb-global-tarball-1NFVbD/mcp-b-global-3.0.0.tgz
+  '@modelcontextprotocol/sdk': 1.29.0
   '@radix-ui/react-collapsible': ^1.1.12
   '@sentry/cloudflare': ^10.22.0
   '@sentry/react': ^10.22.0

@@ -57,6 +57,7 @@ export class McpResponse implements Response {
   #attachedLighthouseResult?: LighthouseData;
   #textResponseLines: string[] = [];
   #mcpContent: Array<TextContent | ImageContent | EmbeddedResource> = [];
+  #structuredContent?: object;
   #images: ImageContentData[] = [];
   #isError = false;
   #networkRequestsOptions?: {
@@ -197,6 +198,10 @@ export class McpResponse implements Response {
 
   appendMcpContent(value: TextContent | ImageContent | EmbeddedResource): void {
     this.#mcpContent.push(value);
+  }
+
+  setStructuredContent(value: object): void {
+    this.#structuredContent = value;
   }
 
   setToolResultError(value: boolean): void {
@@ -473,6 +478,7 @@ export class McpResponse implements Response {
     structuredContent: object;
   } {
     const structuredContent: {
+      [key: string]: unknown;
       snapshot?: object;
       snapshotFilePath?: string;
       tabId?: string;
@@ -500,7 +506,9 @@ export class McpResponse implements Response {
       pagination?: object;
       extensionServiceWorkers?: object[];
       extensionPages?: object[];
-    } = {};
+    } = {
+      ...(this.#structuredContent as Record<string, unknown> | undefined),
+    };
 
     const response = [];
     if (this.#textResponseLines.length) {

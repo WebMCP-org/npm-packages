@@ -102,7 +102,7 @@ export type ToolExecuteFunction<
  * Uses JSON Schema for type inference via `as const`.
  *
  * @template TInputSchema - JSON Schema defining input parameters
- * @template TOutputSchema - JSON Schema defining output structure (object schemas enable structuredContent)
+ * @template TOutputSchema - JSON Schema defining output structure
  *
  * @public
  *
@@ -282,7 +282,7 @@ type WebMCPConfigImplementation<
  * If both are provided, `execute` is used.
  *
  * @template TInputSchema - JSON Schema defining input parameters
- * @template TOutputSchema - JSON Schema defining output structure (object schemas enable structuredContent)
+ * @template TOutputSchema - JSON Schema defining output structure
  *
  * @public
  */

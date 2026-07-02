@@ -8,6 +8,7 @@
 // Node 20 does not support --experimental-strip-types flag.
 
 import { spawn, execSync } from 'node:child_process';
+import { existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 
@@ -16,6 +17,7 @@ const userArgs = args.filter((arg) => !arg.startsWith('-'));
 const flags = args.filter((arg) => arg.startsWith('-'));
 
 const files = [];
+const isNode20 = process.version.startsWith('v20.');
 
 let shouldRetry = false;
 const retryIndex = flags.indexOf('--retry');
@@ -34,10 +36,13 @@ if (userArgs.length > 0) {
         testPath = path.join('build', testPath);
       }
     }
-    files.push(testPath);
+    if (existsSync(testPath) && statSync(testPath).isDirectory() && !isNode20) {
+      files.push(path.join(testPath, '**/*.test.js'));
+    } else {
+      files.push(testPath);
+    }
   }
 } else {
-  const isNode20 = process.version.startsWith('v20.');
   if (isNode20) {
     files.push('build/tests');
   } else {

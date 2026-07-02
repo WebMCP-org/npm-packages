@@ -9,7 +9,7 @@ For type-surface rules and the repo-wide no-cast policy, see [TYPE_TESTING.md](.
 
 - **Canonical E2E**: tools are registered inside the real runtime, discovered through that runtime's public boundary, and called through that same boundary with zero mocked transports or fake servers.
 - **Runtime API integration**: direct `page.evaluate(...)`, `navigator.modelContextTesting`, demo flows, and other browser-accurate checks that do not use the same public caller boundary as production clients.
-- **Native Chromium exception**: for native WebMCP, the real public boundary is `document.modelContext` (plus the deprecated `navigator.modelContext` alias during the Chrome M150 transition) / `navigator.modelContextTesting`, not an SDK `Client`.
+- **Native Chromium exception**: for native WebMCP, the real public boundary is `document.modelContext` / `navigator.modelContextTesting`, not an SDK `Client`. `navigator.modelContext` is only checked as a deprecated alias.
 
 ## Default Commands
 
@@ -30,7 +30,7 @@ pnpm --filter mcp-e2e-tests test:codemode:webmcp
 pnpm --filter mcp-e2e-tests test:codemode:webmcp:beta
 pnpm --filter mcp-e2e-tests test:integration:frameworks
 
-# Native contract lanes
+# Native contract lanes (Chrome 152+ WebMCP config)
 pnpm --filter mcp-e2e-tests test:native-contract:default
 pnpm --filter mcp-e2e-tests test:native-showcase
 
@@ -54,7 +54,7 @@ Notes:
 | ------------------- | --------------------------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------- |
 | Tab / global        | SDK `Client` + `TabClientTransport`                       | Browser page running `@mcp-b/global`                | `pnpm --filter mcp-e2e-tests test:runtime-contract`        |
 | Iframe              | SDK `Client` + `IframeParentTransport`                    | Parent/iframe runtime boundary                      | `pnpm --filter mcp-e2e-tests test:runtime-contract`        |
-| Native Chromium     | `document.modelContext` / `navigator.modelContextTesting` | Chrome Canary with WebMCP flags in CI               | `pnpm --filter mcp-e2e-tests test:native-contract:default` |
+| Native Chromium     | `document.modelContext` / `navigator.modelContextTesting` | Chrome 152+ with WebMCP flags in CI                 | `pnpm --filter mcp-e2e-tests test:native-contract:default` |
 | Local relay         | SDK `Client` over stdio                                   | Real relay server + real browser runtime            | `pnpm --filter @mcp-b/webmcp-local-relay test:e2e`         |
 | DevTools bridge     | SDK `Client` + `WebMCPClientTransport`                    | Real page discovered through DevTools bridge        | `pnpm --filter @mcp-b/chrome-devtools-mcp test:e2e`        |
 | Extension transport | SDK `Client` + `ExtensionClientTransport`                 | Real MV3 extension using `ExtensionServerTransport` | `pnpm --filter @mcp-b/extension-tools test:e2e`            |
@@ -106,7 +106,7 @@ This lane keeps direct runtime and demo validation for:
 Focused codemode commands:
 
 - `pnpm --filter mcp-e2e-tests test:codemode:webmcp` runs the codemode page flow in Playwright Chromium and reports whether that browser instance resolved to the native or polyfill runtime path.
-- `pnpm --filter mcp-e2e-tests test:codemode:webmcp:beta` runs that same codemode page flow in Chrome Beta with the WebMCP testing flags and asserts the native `navigator.modelContextTesting` surface.
+- `pnpm --filter mcp-e2e-tests test:codemode:webmcp:beta` runs that same codemode page flow in Chrome 152+ with the WebMCP testing flags and asserts the native `document.modelContext` / `navigator.modelContextTesting` surface.
 
 ### Framework Integration
 
@@ -174,11 +174,11 @@ If the configured port is in use:
 lsof -ti:4173 | xargs kill
 ```
 
-### Chrome Beta Native Contract Lane
+### Chrome 152 Native Contract Lane
 
-The flagged native lane requires Chrome Beta with:
+The flagged native lane requires Chrome 152+ with:
 
 - `--enable-experimental-web-platform-features`
-- `--enable-features=WebMCPTesting`
+- `--enable-features=WebMCPTesting,DevToolsWebMCPSupport`
 
 See [e2e/tests/CHROMIUM_TESTING.md](../e2e/tests/CHROMIUM_TESTING.md) for the native contract details.

@@ -714,18 +714,25 @@ document.modelContext.addEventListener('toolcall', async (event) => {
 
 ## Testing API (`navigator.modelContextTesting`)
 
-> **Note:** `navigator.modelContextTesting` is deprecated and kept for compatibility. For in-page consumers, use `document.modelContext.callTool({ name, arguments })` and `document.modelContext.addEventListener("toolschanged", ...)`.
+> **Note:** `navigator.modelContextTesting` is deprecated and kept for compatibility. For in-page consumers, use `document.modelContext.getTools()`, `document.modelContext.executeTool(tool, inputArgsJson)`, and `document.modelContext.addEventListener("toolchange", ...)`.
 
 ### Unified Consumer API (Recommended)
 
 ```javascript
-const result = await document.modelContext.callTool({
-  name: 'greet',
-  arguments: { name: 'Alice' },
-});
+const tools = await document.modelContext.getTools();
+const greetTool = tools.find((tool) => tool.name === 'greet');
+if (!greetTool) {
+  throw new Error('greet tool is not available');
+}
 
-document.modelContext.addEventListener('toolschanged', () => {
-  console.log('Tools changed:', document.modelContext.listTools());
+const resultJson = await document.modelContext.executeTool(
+  greetTool,
+  JSON.stringify({ name: 'Alice' })
+);
+const result = resultJson === null ? null : JSON.parse(resultJson);
+
+document.modelContext.addEventListener('toolchange', async () => {
+  console.log('Tools changed:', await document.modelContext.getTools());
 });
 ```
 

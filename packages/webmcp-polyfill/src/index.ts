@@ -11,13 +11,18 @@ import type {
   ToolDescriptor,
   ToolResponse,
 } from '@mcp-b/webmcp-types';
-import { isPlainObject, normalizeInputSchema, toJsonObject } from './schema.js';
+import {
+  isPlainObject,
+  normalizeInputSchema,
+  toJsonValue,
+  validateValueWithSchema,
+} from './schema.js';
 import type { StandardInputValidatorSchema } from './schema.js';
 export {
   isPlainObject,
   normalizeInputSchema,
-  toJsonObject,
-  validateArgsWithSchema,
+  toJsonValue,
+  validateValueWithSchema,
 } from './schema.js';
 export type {
   StandardInputJsonSchema,
@@ -36,6 +41,10 @@ const VALID_TOOL_NAME_RE = /^[A-Za-z0-9_\-.]{1,128}$/u;
 
 const POLYFILL_MARKER_PROPERTY = '__isWebMCPPolyfill' as const;
 const STANDARD_VALIDATOR_SYMBOL = Symbol('standardValidator');
+
+function createAbortError(): Error {
+  return new DOMException('signal is aborted without reason', 'AbortError');
+}
 
 type StandardValidationResult = Awaited<
   ReturnType<StandardInputValidatorSchema['~standard']['validate']>
@@ -99,6 +108,7 @@ class StrictWebMCPContext extends EventTarget {
   private testingShim: PolyfillTestingShim | null = null;
   private _ontoolchange: ((this: ModelContext, ev: Event) => unknown) | null = null;
   private unregisterToolDeprecationWarned = false;
+  private toolsChangedQueued = false;
 
   get ontoolchange(): ((this: ModelContext, ev: Event) => unknown) | null {
     return this._ontoolchange;
@@ -108,16 +118,11 @@ class StrictWebMCPContext extends EventTarget {
     this._ontoolchange = handler;
   }
 
-  registerTool(tool: ToolDescriptor, options?: ModelContextRegisterToolOptions): void {
+  registerTool(tool: ToolDescriptor, options?: ModelContextRegisterToolOptions): Promise<void> {
     const signal = options?.signal;
 
     if (signal?.aborted) {
-      console.warn(
-        `[WebMCPPolyfill] registerTool("${
-          tool?.name ?? '<unknown>'
-        }") skipped: options.signal was already aborted.`
-      );
-      return;
+      return Promise.reject(createAbortError());
     }
 
     const normalized = normalizeToolDescriptor(tool, this.tools);
@@ -135,6 +140,8 @@ class StrictWebMCPContext extends EventTarget {
         { once: true }
       );
     }
+
+    return Promise.resolve();
   }
 
   unregisterTool(nameOrTool: string | ModelContextToolReference): void {
@@ -242,8 +249,13 @@ class StrictWebMCPContext extends EventTarget {
     try {
       const execution = tool.execute(args, client);
       const rawResult = await withAbortSignal(Promise.resolve(execution), options?.signal);
+      const normalizedResult = normalizeToolResponse(rawResult);
+      const outputValidationError = validateOutputForTool(normalizedResult, tool);
+      if (outputValidationError) {
+        throw new Error(outputValidationError);
+      }
       if (normalizeResult) {
-        return toSerializedTestingResult(normalizeToolResponse(rawResult));
+        return toSerializedTestingResult(normalizedResult);
       }
       const serialized = JSON.stringify(rawResult);
       return serialized === undefined ? null : serialized;
@@ -259,7 +271,13 @@ class StrictWebMCPContext extends EventTarget {
   }
 
   private notifyToolsChanged(): void {
+    if (this.toolsChangedQueued) {
+      return;
+    }
+    this.toolsChangedQueued = true;
+
     queueMicrotask(() => {
+      this.toolsChangedQueued = false;
       const event = new Event('toolchange');
       try {
         this._ontoolchange?.call(this as unknown as ModelContext, event);
@@ -527,6 +545,19 @@ async function validateArgsForTool(
   return validateArgsWithStandardSchema(args, tool[STANDARD_VALIDATOR_SYMBOL]);
 }
 
+function validateOutputForTool(result: ToolResponse, tool: PolyfillToolDescriptor): string | null {
+  if (!tool.outputSchema || result.isError) {
+    return null;
+  }
+
+  if (result.structuredContent === undefined) {
+    return `Output validation error: Tool ${tool.name} has an output schema but no structured content was provided`;
+  }
+
+  const issue = validateValueWithSchema(result.structuredContent, tool.outputSchema);
+  return issue ? `Output validation error: ${issue.message}` : null;
+}
+
 function isCallToolResult(value: unknown): value is ToolResponse {
   return isPlainObject(value) && Array.isArray(value.content);
 }
@@ -549,7 +580,7 @@ function normalizeToolResponse(value: unknown): ToolResponse {
     return value;
   }
 
-  const structuredContent = toJsonObject(value);
+  const structuredContent = toJsonValue(value);
 
   return {
     content: [
@@ -558,7 +589,7 @@ function normalizeToolResponse(value: unknown): ToolResponse {
         text: serializeTextContent(value),
       },
     ],
-    ...(structuredContent ? { structuredContent } : {}),
+    ...(structuredContent !== undefined ? { structuredContent } : {}),
     isError: false,
   };
 }

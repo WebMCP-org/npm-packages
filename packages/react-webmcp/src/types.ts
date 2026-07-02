@@ -120,7 +120,7 @@ export interface ToolExecutionState<TOutput = unknown> {
  * Defines a tool's metadata, schema, handler, and lifecycle callbacks.
  *
  * @template TInputSchema - Schema defining input parameters
- * @template TOutputSchema - Output schema defining output structure (object schemas enable structuredContent)
+ * @template TOutputSchema - Output schema defining output structure
  *
  * @public
  *

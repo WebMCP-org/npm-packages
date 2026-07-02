@@ -68,15 +68,18 @@ async function executeNativeToolError(
 
 test.describe('Runtime Contract - Browser API Caller', () => {
   test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      const target = window as Window & {
+        __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'];
+        __WEBMCP_RAW_MODEL_CONTEXT_TESTING__?: Navigator['modelContextTesting'];
+      };
+      target.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ = document.modelContext;
+      target.__WEBMCP_RAW_MODEL_CONTEXT_TESTING__ = navigator.modelContextTesting;
+    });
     await waitForRuntimePage(page, '/runtime-contract.html');
   });
 
   test('runs against native modelContextTesting instead of the polyfill shim', async ({ page }) => {
-    test.skip(
-      process.env.PLAYWRIGHT_ENABLE_WEBMCP_FLAGS !== '1',
-      'Native-only assertion is only meaningful in the flagged Chrome Canary parity lane.'
-    );
-
     const runtime = await page.evaluate(() => {
       const testing = navigator.modelContextTesting as
         | (Navigator['modelContextTesting'] & {
@@ -85,6 +88,14 @@ test.describe('Runtime Contract - Browser API Caller', () => {
             getToolCalls?: unknown;
           })
         | undefined;
+      const rawModelContext = (
+        window as Window & {
+          __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: {
+            __isWebMCPPolyfill?: boolean;
+            __isBrowserMcpServer?: boolean;
+          };
+        }
+      ).__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
       const modelContext = document.modelContext as unknown as {
         __isWebMCPPolyfill?: boolean;
         __isBrowserMcpServer?: boolean;
@@ -93,8 +104,11 @@ test.describe('Runtime Contract - Browser API Caller', () => {
       return {
         hasDocumentModelContext: typeof document.modelContext !== 'undefined',
         documentNavigatorSameInstance: document.modelContext === navigator.modelContext,
+        hasRawDocumentModelContext: typeof rawModelContext !== 'undefined',
         testingConstructorName: testing?.constructor.name ?? '',
         testingHasPolyfillMarker: testing?.__isWebMCPPolyfill === true,
+        rawModelContextHasPolyfillMarker: rawModelContext?.__isWebMCPPolyfill === true,
+        rawModelContextHasBrowserServerMarker: rawModelContext?.__isBrowserMcpServer === true,
         modelContextHasPolyfillMarker: modelContext.__isWebMCPPolyfill === true,
         testingHasPolyfillReset: typeof testing?.reset === 'function',
         testingHasPolyfillCallLog: typeof testing?.getToolCalls === 'function',
@@ -103,9 +117,12 @@ test.describe('Runtime Contract - Browser API Caller', () => {
 
     expect(runtime.hasDocumentModelContext).toBe(true);
     expect(runtime.documentNavigatorSameInstance).toBe(true);
+    expect(runtime.hasRawDocumentModelContext).toBe(true);
     expect(runtime.testingConstructorName).toBeTruthy();
     expect(runtime.testingConstructorName).not.toBe('PolyfillTestingShim');
     expect(runtime.testingHasPolyfillMarker).toBe(false);
+    expect(runtime.rawModelContextHasPolyfillMarker).toBe(false);
+    expect(runtime.rawModelContextHasBrowserServerMarker).toBe(false);
     expect(runtime.modelContextHasPolyfillMarker).toBe(false);
     expect(runtime.testingHasPolyfillReset).toBe(false);
     expect(runtime.testingHasPolyfillCallLog).toBe(false);
@@ -121,19 +138,25 @@ test.describe('Runtime Contract - Browser API Caller', () => {
     page,
   }) => {
     const result = await page.evaluate(async () => {
-      const toolsPromise = document.modelContext.getTools();
+      const modelContext = (
+        window as Window & {
+          __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'];
+        }
+      ).__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
+      if (!modelContext) {
+        return { missingRawModelContext: true, missingSumTool: false, toolsArePromise: false };
+      }
+      const toolsPromise = modelContext.getTools();
       const tools = await toolsPromise;
       const sumTool = tools.find((tool) => tool.name === 'sum');
       if (!sumTool) {
-        return { missingSumTool: true, toolsArePromise: false };
+        return { missingRawModelContext: false, missingSumTool: true, toolsArePromise: false };
       }
 
-      const execution = await document.modelContext.executeTool(
-        sumTool,
-        JSON.stringify({ a: 4, b: 7 })
-      );
+      const execution = await modelContext.executeTool(sumTool, JSON.stringify({ a: 4, b: 7 }));
 
       return {
+        missingRawModelContext: false,
         missingSumTool: false,
         toolsArePromise: typeof toolsPromise.then === 'function',
         toolInfo: {
@@ -148,6 +171,7 @@ test.describe('Runtime Contract - Browser API Caller', () => {
       };
     });
 
+    expect(result.missingRawModelContext).toBe(false);
     expect(result.missingSumTool).toBe(false);
     expect(result.toolsArePromise).toBe(true);
     expect(result.toolInfo).toMatchObject({
@@ -204,7 +228,7 @@ test.describe('Runtime Contract - Browser API Caller', () => {
     await resetInvocations(page);
 
     const errorMessage = await executeNativeToolError(page, 'always_fail', { reason: 'native' });
-    if (testInfo.project.name === 'chrome-beta-webmcp' || testInfo.project.name === 'chromium') {
+    if (testInfo.project.name === 'chrome-m152-webmcp' || testInfo.project.name === 'chromium') {
       // Current native Chrome builds normalize thrown tool errors into a generic failure string.
       expect(errorMessage).toMatch(/always_fail:native|invocation failed/i);
     } else {

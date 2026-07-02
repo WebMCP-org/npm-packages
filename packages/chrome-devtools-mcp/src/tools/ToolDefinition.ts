@@ -89,6 +89,7 @@ export interface DevToolsData {
 export interface Response {
   appendResponseLine(value: string): void;
   appendMcpContent(value: TextContent | ImageContent | EmbeddedResource): void;
+  setStructuredContent(value: object): void;
   setToolResultError(value: boolean): void;
   setIncludePages(value: boolean): void;
   setIncludeNetworkRequests(
@@ -156,7 +157,7 @@ export type Context = Readonly<{
     action: () => Promise<unknown>,
     options?: { timeout?: number }
   ): Promise<void>;
-  waitForTextOnPage(text: string[], timeout?: number, page?: Page): Promise<Element>;
+  waitForTextOnPage(text: string[], timeout?: number, page?: Page): Promise<void>;
   getDevToolsData(page: ContextPage): Promise<DevToolsData>;
   /**
    * Returns a reqid for a cdpRequestId.

@@ -147,6 +147,22 @@
         resultsEl.scrollTop = resultsEl.scrollHeight;
       }
 
+      async function expectRejected(label, invoke) {
+        let rejected = false;
+
+        try {
+          const result = await invoke();
+          rejected = Boolean(result?.isError);
+        } catch {
+          rejected = true;
+        }
+
+        log(
+          `${label}: ${rejected ? 'PASSED (rejected)' : 'FAILED (should reject)'}`,
+          rejected ? 'success' : 'error'
+        );
+      }
+
       // Check Zod version
       const testSchema = z.string();
       const isZod4 = '_zod' in testSchema;
@@ -241,74 +257,62 @@
 
           // Test 3: Missing required field
           log('Test 3: Missing required field (email)...', 'info');
-          const r3 = await mc.executeTool('zod3-user-validator', {
-            username: 'testuser',
-            age: 30,
-          });
-          log(
-            `Missing email: ${r3.isError ? 'PASSED (rejected)' : 'FAILED (should reject)'}`,
-            r3.isError ? 'success' : 'error'
+          await expectRejected('Missing email', () =>
+            mc.executeTool('zod3-user-validator', {
+              username: 'testuser',
+              age: 30,
+            })
           );
 
           // Test 4: Invalid type (age as string)
           log('Test 4: Invalid type (age as string)...', 'info');
-          const r4 = await mc.executeTool('zod3-user-validator', {
-            username: 'testuser',
-            email: 'test@example.com',
-            age: 'twenty-five',
-          });
-          log(
-            `Invalid type: ${r4.isError ? 'PASSED (rejected)' : 'FAILED (should reject)'}`,
-            r4.isError ? 'success' : 'error'
+          await expectRejected('Invalid type', () =>
+            mc.executeTool('zod3-user-validator', {
+              username: 'testuser',
+              email: 'test@example.com',
+              age: 'twenty-five',
+            })
           );
 
           // Test 5: Value out of range (age too low)
           log('Test 5: Value out of range (age=15)...', 'info');
-          const r5 = await mc.executeTool('zod3-user-validator', {
-            username: 'testuser',
-            email: 'test@example.com',
-            age: 15,
-          });
-          log(
-            `Age too low: ${r5.isError ? 'PASSED (rejected)' : 'FAILED (should reject)'}`,
-            r5.isError ? 'success' : 'error'
+          await expectRejected('Age too low', () =>
+            mc.executeTool('zod3-user-validator', {
+              username: 'testuser',
+              email: 'test@example.com',
+              age: 15,
+            })
           );
 
           // Test 6: String too short (username)
           log('Test 6: String too short (username="ab")...', 'info');
-          const r6 = await mc.executeTool('zod3-user-validator', {
-            username: 'ab',
-            email: 'test@example.com',
-            age: 25,
-          });
-          log(
-            `Username too short: ${r6.isError ? 'PASSED (rejected)' : 'FAILED (should reject)'}`,
-            r6.isError ? 'success' : 'error'
+          await expectRejected('Username too short', () =>
+            mc.executeTool('zod3-user-validator', {
+              username: 'ab',
+              email: 'test@example.com',
+              age: 25,
+            })
           );
 
           // Test 7: Invalid email format
           log('Test 7: Invalid email format...', 'info');
-          const r7 = await mc.executeTool('zod3-user-validator', {
-            username: 'testuser',
-            email: 'not-an-email',
-            age: 25,
-          });
-          log(
-            `Invalid email: ${r7.isError ? 'PASSED (rejected)' : 'FAILED (should reject)'}`,
-            r7.isError ? 'success' : 'error'
+          await expectRejected('Invalid email', () =>
+            mc.executeTool('zod3-user-validator', {
+              username: 'testuser',
+              email: 'not-an-email',
+              age: 25,
+            })
           );
 
           // Test 8: Invalid array item type
           log('Test 8: Invalid array item type (tags with number)...', 'info');
-          const r8 = await mc.executeTool('zod3-user-validator', {
-            username: 'testuser',
-            email: 'test@example.com',
-            age: 25,
-            tags: ['valid', 123],
-          });
-          log(
-            `Invalid array item: ${r8.isError ? 'PASSED (rejected)' : 'FAILED (should reject)'}`,
-            r8.isError ? 'success' : 'error'
+          await expectRejected('Invalid array item', () =>
+            mc.executeTool('zod3-user-validator', {
+              username: 'testuser',
+              email: 'test@example.com',
+              age: 25,
+              tags: ['valid', 123],
+            })
           );
 
           statusEl.textContent = 'All tests completed!';

@@ -100,9 +100,10 @@ function replaceNavigatorModelContext(value: unknown): void {
 /**
  * Replace both modelContext surfaces with the given value.
  *
- * Chrome 150 makes document.modelContext canonical and keeps navigator.modelContext
- * as a deprecated alias. @mcp-b/global still supports old navigator-first users, so
- * the bridge exposes the BrowserMcpServer wrapper through both properties.
+ * The Chrome 152 baseline uses document.modelContext as canonical and keeps
+ * navigator.modelContext as a deprecated alias. @mcp-b/global still supports
+ * old navigator-first users, so the bridge exposes the BrowserMcpServer wrapper
+ * through both properties.
  */
 function replaceModelContext(value: unknown): void {
   replaceDocumentModelContext(value);

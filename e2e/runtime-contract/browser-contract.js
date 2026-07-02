@@ -13,10 +13,22 @@ function installHook(controller) {
   return controller;
 }
 
-export function installBrowserRuntimeContract(modelContext, options = {}) {
+function isRegistrationHandle(value) {
+  return Boolean(value) && typeof value === 'object' && typeof value.unregister === 'function';
+}
+
+async function settleRegistration(result) {
+  if (isRegistrationHandle(result)) {
+    return result;
+  }
+  await result;
+  return undefined;
+}
+
+export async function installBrowserRuntimeContract(modelContext, options = {}) {
   if (!modelContext || typeof modelContext.registerTool !== 'function') {
     throw new Error(
-      'navigator.modelContext.registerTool is required for the browser runtime contract'
+      'document.modelContext.registerTool is required for the browser runtime contract'
     );
   }
 
@@ -25,26 +37,28 @@ export function installBrowserRuntimeContract(modelContext, options = {}) {
   const dynamicToolName = options.dynamicToolName ?? DYNAMIC_TOOL_NAME;
   const dynamicRegistrations = new Map();
 
-  function registerTool(tool) {
+  async function registerTool(tool) {
     const controller = new AbortController();
-    const registration = modelContext.registerTool(tool, { signal: controller.signal });
+    const result = modelContext.registerTool(tool, { signal: controller.signal });
+    const registration = await settleRegistration(result);
     return { controller, registration };
   }
 
   for (const tool of descriptors.baseTools) {
-    registerTool(tool);
+    await registerTool(tool);
   }
   state.ready = true;
 
   const controller = createRuntimeContractController(
     state,
-    () => {
+    async () => {
       if (state.dynamicHandle) {
         return false;
       }
       const registration = registerTool(descriptors.createDynamicTool());
-      dynamicRegistrations.set(dynamicToolName, registration);
-      state.dynamicHandle = registration.registration ?? { name: dynamicToolName };
+      const settledRegistration = await registration;
+      dynamicRegistrations.set(dynamicToolName, settledRegistration);
+      state.dynamicHandle = settledRegistration.registration ?? { name: dynamicToolName };
       return true;
     },
     (name = dynamicToolName) => {

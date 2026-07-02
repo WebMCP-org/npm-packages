@@ -1,6 +1,6 @@
 import {
   normalizeInputSchema,
-  toJsonObject,
+  toJsonValue,
   type ToolInputSchema,
 } from '@mcp-b/webmcp-polyfill/schema';
 import type {
@@ -103,7 +103,7 @@ function isDev(): boolean {
  * ```
  *
  * @template TInputSchema - JSON Schema defining input parameter types (use `as const` for inference)
- * @template TOutputSchema - JSON Schema defining output structure (object schemas enable structuredContent)
+ * @template TOutputSchema - JSON Schema defining output structure
  *
  * @param config - Configuration object for the tool
  * @param deps - Optional dependency array that triggers tool re-registration when values change.
@@ -349,11 +349,11 @@ export function useWebMCP<
           ],
         };
 
-        if (outputSchemaRef.current?.type === 'object') {
-          const structuredContent = toJsonObject(result);
-          if (!structuredContent) {
+        if (outputSchemaRef.current) {
+          const structuredContent = toJsonValue(result);
+          if (structuredContent === undefined) {
             throw new Error(
-              `Tool "${name}" outputSchema requires the tool implementation to return a JSON object result`
+              `Tool "${name}" outputSchema requires the tool implementation to return a JSON-serializable result`
             );
           }
           response.structuredContent = structuredContent;
@@ -379,7 +379,7 @@ export function useWebMCP<
     const resolvedInputSchema = normalizeInputSchema(inputSchemaRef.current).inputSchema;
     const resolvedOutputSchema = outputSchemaRef.current;
     const resolvedAnnotations = annotationsRef.current;
-    const toolDescriptor: ToolDescriptor = {
+    const toolDescriptor: ToolDescriptor & { inputSchema: InputSchema } = {
       name,
       description,
       inputSchema: resolvedInputSchema,
@@ -389,22 +389,46 @@ export function useWebMCP<
     };
 
     const controller = new AbortController();
-    (
-      modelContext.registerTool as (
-        tool: ToolDescriptor,
-        options?: { signal?: AbortSignal }
-      ) => void
-    ).call(modelContext, toolDescriptor, { signal: controller.signal });
-    TOOL_OWNER_BY_NAME.set(name, ownerToken);
+    let registered = false;
+    let disposed = false;
+
+    try {
+      const registerResult = modelContext.registerTool(toolDescriptor, {
+        signal: controller.signal,
+      });
+
+      void Promise.resolve(registerResult).then(
+        () => {
+          if (!disposed && !controller.signal.aborted) {
+            registered = true;
+            TOOL_OWNER_BY_NAME.set(name, ownerToken);
+          }
+        },
+        (error: unknown) => {
+          if (!controller.signal.aborted) {
+            controller.abort();
+            console.warn(`[useWebMCP] registerTool("${name}") rejected:`, error);
+          }
+        }
+      );
+    } catch (error) {
+      controller.abort();
+      console.warn(`[useWebMCP] registerTool("${name}") rejected:`, error);
+      return;
+    }
 
     return () => {
-      const currentOwner = TOOL_OWNER_BY_NAME.get(name);
-      if (currentOwner !== ownerToken) {
+      disposed = true;
+
+      if (registered && TOOL_OWNER_BY_NAME.get(name) === ownerToken) {
+        TOOL_OWNER_BY_NAME.delete(name);
+        controller.abort();
         return;
       }
 
-      TOOL_OWNER_BY_NAME.delete(name);
-      controller.abort();
+      if (!registered) {
+        controller.abort();
+      }
     };
     // Spread operator in dependencies: Allows users to provide additional dependencies
     // via the `deps` parameter. While unconventional, this pattern is intentional to support

@@ -151,7 +151,7 @@ inputSchema: {
 
 ### Duplicate tool names
 
-Calling `registerTool` with a `name` that is already registered throws an error. To replace a tool, call `unregisterTool` with the existing name first, then register the new version. Use unique, descriptive names like `search_products` or `search_docs` to avoid collisions across components.
+Calling `registerTool` with a `name` that is already registered throws an error. To replace a tool, abort the previous registration signal first, then register the new version. Use unique, descriptive names like `search_products` or `search_docs` to avoid collisions across components.
 
 ### Local relay not discovered
 

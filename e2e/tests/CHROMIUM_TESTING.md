@@ -15,11 +15,10 @@ This guide covers the native Chromium WebMCP validation lanes in this repo.
 cd e2e
 CHROME_BIN="/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary" \
 PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH="/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary" \
-PLAYWRIGHT_ENABLE_WEBMCP_FLAGS=1 \
 pnpm test:native-contract:default
 ```
 
-CI installs Chrome Canary and runs the native contract with:
+`test:native-contract:default` uses `playwright-chrome-beta-webmcp.config.ts`, requires Chrome 152 or newer, and launches Chrome with:
 
 - `--enable-experimental-web-platform-features`
 - `--enable-features=WebMCPTesting,DevToolsWebMCPSupport`
@@ -30,10 +29,10 @@ For tab, iframe, relay, DevTools, and extension runtimes, the canonical caller i
 
 For native Chromium, the real public boundary is the browser API itself. The canonical contract therefore uses:
 
-- `document.modelContext.registerTool(...)`
+- `await document.modelContext.registerTool(...)`
 - `document.modelContext.getTools()`
 - `document.modelContext.executeTool(...)`
-- deprecated `navigator.modelContext` alias reads during the Chrome M150 transition
+- deprecated `navigator.modelContext` alias reads
 - `navigator.modelContextTesting.listTools()`
 - `navigator.modelContextTesting.executeTool(...)`
 
@@ -70,8 +69,8 @@ They cover suites such as:
 
 ### `document.modelContext`
 
-- Canonical WebMCP core surface as of Chrome M150.
-- Native M150 exposes the same instance through `navigator.modelContext` during the transition.
+- Canonical WebMCP core surface as of Chrome M152.
+- Native M152 exposes the same instance through deprecated `navigator.modelContext`.
 - `registerTool(tool, options?)`
 - `getTools() => Promise<Array<{ name; title; description; inputSchema?; origin; window }>>`
 - `executeTool(toolFromGetTools, inputArgsJson) => Promise<string | null>`
@@ -79,7 +78,7 @@ They cover suites such as:
 
 ### `navigator.modelContext`
 
-Deprecated alias retained during the Chrome M150 transition.
+Deprecated alias retained for compatibility.
 
 ### `navigator.modelContextTesting`
 

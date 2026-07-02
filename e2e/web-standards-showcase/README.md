@@ -138,7 +138,7 @@ registration handles on top of the current native API.
 
 Important:
 
-- Current Chrome Beta 147 and Chromium `main` expose `registerTool(...)`, `getTools()`, and the testing-only `navigator.modelContextTesting.listTools()`.
+- Current Chrome 152+ exposes `registerTool(...)`, `getTools()`, and the testing-only `navigator.modelContextTesting.listTools()`.
 - `provideContext()` and `clearContext()` were removed from the WebMCP spec. The showcase does not call them.
 - The Bucket A / Bucket B UI is implemented with ordinary `registerTool(...)` calls plus local registration tracking.
 
@@ -246,7 +246,7 @@ navigator.modelContextTesting.registerToolsChangedCallback(() => {
   console.log('Tools changed!');
 });
 
-// Chrome Beta 147 also exposes an EventTarget-style property
+// Chrome also exposes an EventTarget-style property
 navigator.modelContextTesting.ontoolchange = () => {
   console.log('Tools changed!');
 };

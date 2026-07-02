@@ -12,7 +12,7 @@ export default defineConfig({
       }),
       instances: [{ browser: 'chromium' }],
     },
-    include: ['src/conformance/polyfill-runtime.e2e.test.ts'],
+    include: ['conformance/global-runtime.e2e.test.ts'],
     exclude: ['dist', 'node_modules'],
     globals: true,
     maxConcurrency: isCI ? 1 : 2,

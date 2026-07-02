@@ -15,7 +15,10 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 type LegacyCompatTracker = {
-  originalRegisterTool: ModelContext['registerTool'];
+  originalRegisterTool: (
+    tool: Tool,
+    options?: ModelContextRegisterToolOptions
+  ) => Promise<void> | ToolRegistration;
   originalUnregisterTool?: ModelContext['unregisterTool'];
   registrations: Map<string, ToolRegistration>;
   listeners: Map<EventListenerOrEventListenerObject, () => void>;
@@ -28,6 +31,22 @@ function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
     Boolean(value) &&
     (typeof value === 'object' || typeof value === 'function') &&
     typeof (value as { then?: unknown }).then === 'function'
+  );
+}
+
+function isToolRegistration(value: unknown): value is ToolRegistration {
+  return (
+    Boolean(value) &&
+    (typeof value === 'object' || typeof value === 'function') &&
+    typeof (value as { unregister?: unknown }).unregister === 'function'
+  );
+}
+
+function isAbortError(error: unknown): boolean {
+  return (
+    Boolean(error) &&
+    typeof error === 'object' &&
+    (error as { name?: unknown }).name === 'AbortError'
   );
 }
 
@@ -93,7 +112,9 @@ function ensureLegacyCompatTracker(context: ModelContext): LegacyCompatTracker {
   }
 
   const tracker: LegacyCompatTracker = {
-    originalRegisterTool: context.registerTool.bind(context),
+    originalRegisterTool: context.registerTool.bind(
+      context
+    ) as LegacyCompatTracker['originalRegisterTool'],
     originalUnregisterTool: context.unregisterTool?.bind(context),
     registrations: new Map(),
     listeners: new Map(),
@@ -106,17 +127,19 @@ function ensureLegacyCompatTracker(context: ModelContext): LegacyCompatTracker {
     const rawRegistration = tracker.originalRegisterTool(tool, options);
     if (isPromiseLike(rawRegistration)) {
       rawRegistration.then(undefined, (error: unknown) => {
+        if (isAbortError(error)) {
+          return;
+        }
         console.warn(`[WebMCP Showcase] registerTool("${tool.name}") rejected:`, error);
       });
     }
-    const registration =
-      rawRegistration && typeof rawRegistration.unregister === 'function'
-        ? rawRegistration
-        : {
-            unregister() {
-              tracker.originalUnregisterTool?.(tool.name);
-            },
-          };
+    const registration = isToolRegistration(rawRegistration)
+      ? rawRegistration
+      : {
+          unregister() {
+            tracker.originalUnregisterTool?.(tool.name);
+          },
+        };
 
     const wrapped = buildWrappedRegistration(tracker, tool.name, registration);
     tracker.registrations.set(tool.name, wrapped);

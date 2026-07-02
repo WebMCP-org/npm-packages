@@ -33,7 +33,7 @@ Register WebMCP tools in any frontend framework by following its native lifecycl
 
   </Tab>
   <Tab title="@mcp-b/webmcp-polyfill (strict core)">
-    Strict-core only: installs `document.modelContext` with `registerTool` and `unregisterTool`. No MCP extensions, no transports.
+    Strict-core only: installs `document.modelContext` with `registerTool`, `getTools`, and `executeTool`. No MCP extensions, no transports.
 
     ```bash
     npm install @mcp-b/webmcp-polyfill
@@ -198,35 +198,40 @@ Each framework has its own lifecycle hooks for mount and unmount. Register tools
 
   </Tab>
   <Tab title="Vue">
-    Call `registerTool()` in `onMounted` and `unregisterTool()` in `onUnmounted`. The `execute` function can read and write Vue reactive state through `.value` access.
+    Call `registerTool()` in `onMounted` and abort the registration signal in `onUnmounted`. The `execute` function can read and write Vue reactive state through `.value` access.
 
     ```vue "src/components/CounterTool.vue"
     <script setup lang="ts">
     import { ref, onMounted, onUnmounted } from 'vue';
 
     const count = ref(0);
+    let controller: AbortController | undefined;
 
     onMounted(() => {
-      document.modelContext.registerTool({
-        name: 'increment',
-        description: 'Increment the counter by a given amount',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            amount: { type: 'number', description: 'Amount to add' },
+      controller = new AbortController();
+      document.modelContext.registerTool(
+        {
+          name: 'increment',
+          description: 'Increment the counter by a given amount',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              amount: { type: 'number', description: 'Amount to add' },
+            },
+          },
+          async execute({ amount = 1 }) {
+            count.value += amount as number;
+            return {
+              content: [{ type: 'text', text: `Count: ${count.value}` }],
+            };
           },
         },
-        async execute({ amount = 1 }) {
-          count.value += amount as number;
-          return {
-            content: [{ type: 'text', text: `Count: ${count.value}` }],
-          };
-        },
-      });
+        { signal: controller.signal }
+      );
     });
 
     onUnmounted(() => {
-      document.modelContext.unregisterTool('increment');
+      controller?.abort();
     });
     </script>
 
@@ -244,28 +249,33 @@ Each framework has its own lifecycle hooks for mount and unmount. Register tools
       import { onMount, onDestroy } from 'svelte';
 
       let count = $state(0);
+      let controller: AbortController | undefined;
 
       onMount(() => {
-        document.modelContext.registerTool({
-          name: 'increment',
-          description: 'Increment the counter by a given amount',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              amount: { type: 'number', description: 'Amount to add' },
+        controller = new AbortController();
+        document.modelContext.registerTool(
+          {
+            name: 'increment',
+            description: 'Increment the counter by a given amount',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                amount: { type: 'number', description: 'Amount to add' },
+              },
+            },
+            async execute({ amount = 1 }) {
+              count += amount as number;
+              return {
+                content: [{ type: 'text', text: `Count: ${count}` }],
+              };
             },
           },
-          async execute({ amount = 1 }) {
-            count += amount as number;
-            return {
-              content: [{ type: 'text', text: `Count: ${count}` }],
-            };
-          },
-        });
+          { signal: controller.signal }
+        );
       });
 
       onDestroy(() => {
-        document.modelContext.unregisterTool('increment');
+        controller?.abort();
       });
     </script>
 
@@ -274,7 +284,7 @@ Each framework has its own lifecycle hooks for mount and unmount. Register tools
 
   </Tab>
   <Tab title="Angular">
-    Use `ngOnInit` to register and `ngOnDestroy` to unregister.
+    Use `ngOnInit` to register and `ngOnDestroy` to abort the registration signal.
 
     ```typescript "src/app/counter.component.ts"
     import { Component, OnInit, OnDestroy } from '@angular/core';
@@ -286,30 +296,35 @@ Each framework has its own lifecycle hooks for mount and unmount. Register tools
     })
     export class CounterComponent implements OnInit, OnDestroy {
       count = 0;
+      private toolController?: AbortController;
 
       ngOnInit() {
         if (!('modelContext' in navigator)) return;
 
-        document.modelContext.registerTool({
-          name: 'increment',
-          description: 'Increment the counter by a given amount',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              amount: { type: 'number', description: 'Amount to add' },
+        this.toolController = new AbortController();
+        document.modelContext.registerTool(
+          {
+            name: 'increment',
+            description: 'Increment the counter by a given amount',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                amount: { type: 'number', description: 'Amount to add' },
+              },
+            },
+            execute: async ({ amount = 1 }) => {
+              this.count += amount as number;
+              return {
+                content: [{ type: 'text', text: `Count: ${this.count}` }],
+              };
             },
           },
-          execute: async ({ amount = 1 }) => {
-            this.count += amount as number;
-            return {
-              content: [{ type: 'text', text: `Count: ${this.count}` }],
-            };
-          },
-        });
+          { signal: this.toolController.signal }
+        );
       }
 
       ngOnDestroy() {
-        document.modelContext?.unregisterTool('increment');
+        this.toolController?.abort();
       }
     }
     ```
@@ -350,24 +365,28 @@ Each framework has its own lifecycle hooks for mount and unmount. Register tools
     <script>
       import '@mcp-b/global';
 
-      document.modelContext.registerTool({
-        name: 'get_page_title',
-        description: 'Get the current page title',
-        inputSchema: { type: 'object', properties: {} },
-        async execute() {
-          return {
-            content: [{ type: 'text', text: document.title }],
-          };
+      const controller = new AbortController();
+      document.modelContext.registerTool(
+        {
+          name: 'get_page_title',
+          description: 'Get the current page title',
+          inputSchema: { type: 'object', properties: {} },
+          async execute() {
+            return {
+              content: [{ type: 'text', text: document.title }],
+            };
+          },
         },
-      });
+        { signal: controller.signal }
+      );
     </script>
     ```
 
-    If you use View Transitions, unregister tools before navigation:
+    If you use View Transitions, abort the registration before navigation:
 
     ```javascript
     document.addEventListener('astro:before-preparation', () => {
-      document.modelContext.unregisterTool('get_page_title');
+      controller.abort();
     });
     ```
 
@@ -378,22 +397,27 @@ Each framework has its own lifecycle hooks for mount and unmount. Register tools
     ```typescript "src/main.ts"
     import '@mcp-b/global';
 
-    document.modelContext.registerTool({
-      name: 'get-page-title',
-      description: 'Get the current page title',
-      inputSchema: { type: 'object', properties: {} },
-      async execute() {
-        return {
-          content: [{ type: 'text', text: document.title }],
-        };
+    const controller = new AbortController();
+
+    document.modelContext.registerTool(
+      {
+        name: 'get-page-title',
+        description: 'Get the current page title',
+        inputSchema: { type: 'object', properties: {} },
+        async execute() {
+          return {
+            content: [{ type: 'text', text: document.title }],
+          };
+        },
       },
-    });
+      { signal: controller.signal }
+    );
     ```
 
-    Unregister by name when the tool is no longer needed:
+    Abort the registration when the tool is no longer needed:
 
     ```typescript
-    document.modelContext.unregisterTool('get-page-title');
+    controller.abort();
     ```
 
   </Tab>
@@ -401,7 +425,7 @@ Each framework has its own lifecycle hooks for mount and unmount. Register tools
 
 ## Create a reusable abstraction
 
-React already has dedicated hook packages (`@mcp-b/react-webmcp` and `usewebmcp`), so no custom abstraction is needed. For other frameworks, extract the register/unregister lifecycle into a reusable pattern.
+React already has dedicated hook packages (`@mcp-b/react-webmcp` and `usewebmcp`), so no custom abstraction is needed. For other frameworks, extract the register/abort lifecycle into a reusable pattern.
 
 <Tabs>
   <Tab title="Vue composable">
@@ -411,12 +435,15 @@ React already has dedicated hook packages (`@mcp-b/react-webmcp` and `usewebmcp`
     export function useWebMCPTool(
       tool: Parameters<typeof document.modelContext.registerTool>[0]
     ) {
+      let controller: AbortController | undefined;
+
       onMounted(() => {
-        document.modelContext.registerTool(tool);
+        controller = new AbortController();
+        document.modelContext.registerTool(tool, { signal: controller.signal });
       });
 
       onUnmounted(() => {
-        document.modelContext.unregisterTool(tool.name);
+        controller?.abort();
       });
     }
     ```
@@ -443,11 +470,12 @@ React already has dedicated hook packages (`@mcp-b/react-webmcp` and `usewebmcp`
       node: HTMLElement,
       tool: Parameters<typeof document.modelContext.registerTool>[0]
     ) {
-      document.modelContext.registerTool(tool);
+      const controller = new AbortController();
+      document.modelContext.registerTool(tool, { signal: controller.signal });
 
       return {
         destroy() {
-          document.modelContext.unregisterTool(tool.name);
+          controller.abort();
         },
       };
     }
@@ -478,25 +506,28 @@ React already has dedicated hook packages (`@mcp-b/react-webmcp` and `usewebmcp`
 
     @Injectable({ providedIn: 'root' })
     export class WebMCPService implements OnDestroy {
-      private registeredTools: string[] = [];
+      private controllers = new Map<string, AbortController>();
 
       registerTool(tool: Parameters<typeof document.modelContext.registerTool>[0]) {
         if (!('modelContext' in navigator)) return;
 
-        document.modelContext.registerTool(tool);
-        this.registeredTools.push(tool.name);
+        this.controllers.get(tool.name)?.abort();
+
+        const controller = new AbortController();
+        this.controllers.set(tool.name, controller);
+        document.modelContext.registerTool(tool, { signal: controller.signal });
       }
 
-      unregisterTool(name: string) {
-        document.modelContext?.unregisterTool(name);
-        this.registeredTools = this.registeredTools.filter((n) => n !== name);
+      removeTool(name: string) {
+        this.controllers.get(name)?.abort();
+        this.controllers.delete(name);
       }
 
       ngOnDestroy() {
-        for (const name of this.registeredTools) {
-          document.modelContext?.unregisterTool(name);
+        for (const controller of this.controllers.values()) {
+          controller.abort();
         }
-        this.registeredTools = [];
+        this.controllers.clear();
       }
     }
     ```
@@ -524,7 +555,7 @@ React already has dedicated hook packages (`@mcp-b/react-webmcp` and `usewebmcp`
       }
 
       ngOnDestroy() {
-        this.webmcp.unregisterTool('get_greeting');
+        this.webmcp.removeTool('get_greeting');
       }
     }
     ```
@@ -553,25 +584,29 @@ React already has dedicated hook packages (`@mcp-b/react-webmcp` and `usewebmcp`
     <script setup lang="ts">
     import { onMounted, onUnmounted } from 'vue';
 
+    let controller: AbortController | undefined;
+
     onMounted(() => {
       if (!import.meta.client) return;
 
       import('@mcp-b/global').then(() => {
-        document.modelContext.registerTool({
-          name: 'my_tool',
-          description: 'A tool that only runs on the client',
-          inputSchema: { type: 'object', properties: {} },
-          async execute() {
-            return { content: [{ type: 'text', text: 'Done' }] };
+        controller = new AbortController();
+        document.modelContext.registerTool(
+          {
+            name: 'my_tool',
+            description: 'A tool that only runs on the client',
+            inputSchema: { type: 'object', properties: {} },
+            async execute() {
+              return { content: [{ type: 'text', text: 'Done' }] };
+            },
           },
-        });
+          { signal: controller.signal }
+        );
       });
     });
 
     onUnmounted(() => {
-      if (import.meta.client) {
-        document.modelContext?.unregisterTool('my_tool');
-      }
+      controller?.abort();
     });
     </script>
     ```
@@ -586,23 +621,27 @@ React already has dedicated hook packages (`@mcp-b/react-webmcp` and `usewebmcp`
       import { onMount, onDestroy } from 'svelte';
       import '@mcp-b/global';
 
+      let controller: AbortController | undefined;
+
       onMount(() => {
         if (!browser) return;
 
-        document.modelContext.registerTool({
-          name: 'my_tool',
-          description: 'A tool that only runs on the client',
-          inputSchema: { type: 'object', properties: {} },
-          async execute() {
-            return { content: [{ type: 'text', text: 'Done' }] };
+        controller = new AbortController();
+        document.modelContext.registerTool(
+          {
+            name: 'my_tool',
+            description: 'A tool that only runs on the client',
+            inputSchema: { type: 'object', properties: {} },
+            async execute() {
+              return { content: [{ type: 'text', text: 'Done' }] };
+            },
           },
-        });
+          { signal: controller.signal }
+        );
       });
 
       onDestroy(() => {
-        if (browser) {
-          document.modelContext?.unregisterTool('my_tool');
-        }
+        controller?.abort();
       });
     </script>
     ```
@@ -621,6 +660,7 @@ React already has dedicated hook packages (`@mcp-b/react-webmcp` and `usewebmcp`
     @Component({ selector: 'app-my', template: '' })
     export class MyComponent implements OnInit, OnDestroy {
       private isBrowser: boolean;
+      private controller?: AbortController;
 
       constructor(@Inject(PLATFORM_ID) platformId: object) {
         this.isBrowser = isPlatformBrowser(platformId);
@@ -629,20 +669,22 @@ React already has dedicated hook packages (`@mcp-b/react-webmcp` and `usewebmcp`
       ngOnInit() {
         if (!this.isBrowser || !('modelContext' in navigator)) return;
 
-        document.modelContext.registerTool({
-          name: 'my_tool',
-          description: 'A tool that only runs on the client',
-          inputSchema: { type: 'object', properties: {} },
-          execute: async () => ({
-            content: [{ type: 'text', text: 'Done' }],
-          }),
-        });
+        this.controller = new AbortController();
+        document.modelContext.registerTool(
+          {
+            name: 'my_tool',
+            description: 'A tool that only runs on the client',
+            inputSchema: { type: 'object', properties: {} },
+            execute: async () => ({
+              content: [{ type: 'text', text: 'Done' }],
+            }),
+          },
+          { signal: this.controller.signal }
+        );
       }
 
       ngOnDestroy() {
-        if (this.isBrowser) {
-          document.modelContext?.unregisterTool('my_tool');
-        }
+        this.controller?.abort();
       }
     }
     ```

@@ -8,7 +8,6 @@ import type {
   InferArgsFromInputSchema,
   InferJsonSchema,
   JsonSchemaForInference,
-  JsonSchemaObject,
 } from './json-schema.js';
 
 // ============================================================================
@@ -160,8 +159,10 @@ export interface ToolDescriptor<
  */
 export type ToolResultFromOutputSchema<
   TOutputSchema extends JsonSchemaForInference | undefined = undefined,
-> = TOutputSchema extends JsonSchemaObject
-  ? CallToolResult & { structuredContent?: InferJsonSchema<TOutputSchema> }
+> = TOutputSchema extends JsonSchemaForInference
+  ? Omit<CallToolResult, 'structuredContent'> & {
+      structuredContent: InferJsonSchema<TOutputSchema>;
+    }
   : CallToolResult;
 
 /**
@@ -169,11 +170,9 @@ export type ToolResultFromOutputSchema<
  */
 export type ToolExecuteResultFromOutputSchema<
   TOutputSchema extends JsonSchemaForInference | undefined = undefined,
-> = TOutputSchema extends JsonSchemaObject
+> = TOutputSchema extends JsonSchemaForInference
   ? InferJsonSchema<TOutputSchema> | ToolResultFromOutputSchema<TOutputSchema>
-  : TOutputSchema extends JsonSchemaForInference
-    ? InferJsonSchema<TOutputSchema> | CallToolResult
-    : ToolExecuteResult;
+  : ToolExecuteResult;
 
 /**
  * Tool descriptor whose `execute` args are inferred from a JSON Schema.
@@ -196,9 +195,13 @@ export type ToolDescriptorFromSchema<
     ToolExecuteResultFromOutputSchema<TOutputSchema>,
     TName
   >,
-  'inputSchema' | 'outputSchema'
+  'execute' | 'inputSchema' | 'outputSchema'
 > & {
   inputSchema: TInputSchema;
+  execute: (
+    args: InferArgsFromInputSchema<TInputSchema>,
+    client: ModelContextClient
+  ) => MaybePromise<ToolExecuteResultFromOutputSchema<TOutputSchema>>;
 } & (TOutputSchema extends JsonSchemaForInference
     ? {
         outputSchema: TOutputSchema;

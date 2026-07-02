@@ -13,7 +13,7 @@ import type {
   ToolListItem,
   ToolResponse,
 } from '@mcp-b/webmcp-types';
-import { toJsonObject } from '@mcp-b/webmcp-polyfill/schema';
+import { toJsonValue } from '@mcp-b/webmcp-polyfill/schema';
 import type { ServerOptions } from '@modelcontextprotocol/sdk/server/index.js';
 import { McpServer as BaseMcpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {
@@ -24,10 +24,12 @@ import {
 import { toJsonSchemaCompat } from '@modelcontextprotocol/sdk/server/zod-json-schema-compat.js';
 import type { RequestOptions } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import { mergeCapabilities } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import { validateAndWarnToolName } from '@modelcontextprotocol/sdk/shared/toolNameValidation.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type { jsonSchemaValidator } from '@modelcontextprotocol/sdk/validation';
 import { CfWorkerJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/cfworker';
 import type {
+  CallToolResult as McpCallToolResult,
   CreateMessageRequest,
   CreateMessageResult,
   ElicitRequest,
@@ -36,6 +38,7 @@ import type {
   PromptMessage,
 } from '@modelcontextprotocol/sdk/types.js';
 import {
+  CallToolRequestSchema,
   GetPromptRequestSchema,
   ListPromptsRequestSchema,
   ListToolsRequestSchema,
@@ -68,6 +71,24 @@ function isPermissionsPolicySecurityError(error: unknown): boolean {
   );
 }
 
+function isAbortError(error: unknown): boolean {
+  return (
+    Boolean(error) &&
+    typeof error === 'object' &&
+    (error as { name?: unknown }).name === 'AbortError'
+  );
+}
+
+function createAbortError(): Error {
+  if (typeof DOMException === 'function') {
+    return new DOMException('signal is aborted without reason', 'AbortError');
+  }
+
+  const error = new Error('signal is aborted without reason');
+  error.name = 'AbortError';
+  return error;
+}
+
 function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
   return (
     Boolean(value) &&
@@ -94,13 +115,60 @@ function normalizeToolResponse(value: unknown): ToolResponse {
     return value;
   }
 
-  const structuredContent = toJsonObject(value);
+  const structuredContent = toJsonValue(value);
 
   return {
     content: [{ type: 'text', text: serializeTextContent(value) }],
-    ...(structuredContent ? { structuredContent } : {}),
+    ...(structuredContent !== undefined ? { structuredContent } : {}),
     isError: false,
   };
+}
+
+function parseNativeToolInputSchema(inputSchema: string | undefined): InputSchema {
+  if (!inputSchema) {
+    return DEFAULT_INPUT_SCHEMA;
+  }
+
+  try {
+    const parsed = JSON.parse(inputSchema) as unknown;
+    if (isPlainObject(parsed)) {
+      return parsed as InputSchema;
+    }
+  } catch {
+    // Fall through to the default schema. Native previews have returned invalid
+    // schema strings during development; a bad imported tool schema should not
+    // prevent the wrapper from initializing.
+  }
+
+  return DEFAULT_INPUT_SCHEMA;
+}
+
+function toToolListItemFromNativeToolInfo(tool: ModelContextToolInfo): ToolListItem {
+  return {
+    name: tool.name,
+    description: tool.description ?? '',
+    inputSchema: parseNativeToolInputSchema(tool.inputSchema),
+  };
+}
+
+function parseNativeToolResult(toolName: string, serialized: string | null): ToolResponse {
+  if (serialized === null) {
+    return {
+      content: [{ type: 'text', text: 'Tool execution interrupted by navigation' }],
+      isError: true,
+    };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(serialized);
+  } catch (parseError) {
+    throw new Error(
+      `Failed to parse serialized tool response for ${toolName}: ${parseError instanceof Error ? parseError.message : String(parseError)}`
+    );
+  }
+
+  return normalizeToolResponse(parsed);
 }
 
 function withDefaultTimeout(options?: RequestOptions): RequestOptions {
@@ -108,14 +176,13 @@ function withDefaultTimeout(options?: RequestOptions): RequestOptions {
   return { ...options, signal: AbortSignal.timeout(DEFAULT_CLIENT_REQUEST_TIMEOUT) };
 }
 
-interface ParentRegisteredTool {
+interface RegisteredWebMcpTool {
+  title?: string;
   description?: string;
-  inputSchema?: unknown;
-  outputSchema?: unknown;
-  annotations?: unknown;
-  handler: (args: Record<string, unknown>, extra: unknown) => Promise<ToolResponse>;
-  enabled: boolean;
-  remove: () => void;
+  inputSchema: InputSchema;
+  outputSchema?: JsonSchemaForInference;
+  annotations?: ToolListItem['annotations'];
+  handler: (args: Record<string, unknown>) => Promise<ToolResponse>;
 }
 
 interface ParentRegisteredResource {
@@ -142,12 +209,6 @@ export interface BrowserMcpServerOptions extends ServerOptions {
   native?: ModelContextCore;
 }
 
-type ParentRegisterToolFn = (
-  name: string,
-  config: Record<string, unknown>,
-  cb: (args: Record<string, unknown>, extra: unknown) => Promise<ToolResponse>
-) => void;
-
 type ParentRegisterResourceFn = (
   name: string,
   uri: string,
@@ -161,8 +222,9 @@ type ParentRegisterPromptFn = (
   cb: (args: Record<string, unknown>, extra: unknown) => Promise<{ messages: PromptMessage[] }>
 ) => { remove: () => void };
 
-type NativeToolsApi = ModelContextCore & Pick<ModelContextExtensions, 'listTools' | 'callTool'>;
-type RegisteredToolHandle = { unregister: () => void };
+type NativeLegacyToolsApi = ModelContextCore &
+  Pick<ModelContextExtensions, 'listTools' | 'callTool'>;
+type NativeStandardToolsApi = Pick<ModelContextCore, 'getTools' | 'executeTool'>;
 type MaybePromise<T> = T | PromiseLike<T>;
 type NativeRegisterToolFn = (
   tool: ToolDescriptor,
@@ -181,8 +243,7 @@ interface NativeToolCleanup {
  * (resources, prompts, elicitation, sampling) via BaseMcpServer.
  *
  * Deprecated compatibility (kept for Chrome Beta 147 and existing wrappers,
- * removed in the next major): `unregisterTool(name)` and the `{ unregister }`
- * handle returned from `registerTool`.
+ * removed in the next major): `unregisterTool(name)`.
  *
  * When `native` is provided, tool operations are mirrored so that
  * navigator.modelContextTesting stays in sync.
@@ -196,8 +257,10 @@ export class BrowserMcpServer extends BaseMcpServer {
   private _publicMethodsBound = false;
   private _unregisterToolDeprecationWarned = false;
   private _nativeToolCleanups = new Map<string, NativeToolCleanup>();
+  private _tools = new Map<string, RegisteredWebMcpTool>();
   private _producerEventTarget = new EventTarget();
   private _ontoolchange: ((this: ModelContextCore, ev: Event) => unknown) | null = null;
+  private _producerToolsChangedQueued = false;
 
   constructor(serverInfo: Implementation, options?: BrowserMcpServerOptions) {
     const validator = options?.jsonSchemaValidator ?? new CfWorkerJsonSchemaValidator();
@@ -214,6 +277,7 @@ export class BrowserMcpServer extends BaseMcpServer {
     this._jsonValidator = validator;
     this.native = options?.native;
     this.bindPublicApiMethods();
+    this.installToolRequestHandlers();
   }
 
   /**
@@ -249,11 +313,6 @@ export class BrowserMcpServer extends BaseMcpServer {
     this._publicMethodsBound = true;
   }
 
-  private get _parentTools(): Record<string, ParentRegisteredTool> {
-    return (this as unknown as { _registeredTools: Record<string, ParentRegisteredTool> })
-      ._registeredTools;
-  }
-
   private get _parentResources(): Record<string, ParentRegisteredResource> {
     return (this as unknown as { _registeredResources: Record<string, ParentRegisteredResource> })
       ._registeredResources;
@@ -264,44 +323,36 @@ export class BrowserMcpServer extends BaseMcpServer {
       ._registeredPrompts;
   }
 
-  /**
-   * Converts a schema (Zod or plain JSON Schema) to a transport-ready JSON Schema.
-   * When `requireObjectType` is true (the default, for inputSchema), empty `{}` schemas
-   * are normalized to `{ type: "object", properties: {} }` and schemas missing a root
-   * `type` get `type: "object"` prepended — per MCP spec requirements.
-   * When false (for outputSchema), no object-type normalization is applied.
-   */
-  private toTransportSchema(schema: unknown, requireObjectType = true): InputSchema {
+  private toJsonSchema(schema: unknown, pipeStrategy: 'input' | 'output'): Record<string, unknown> {
     if (!schema || typeof schema !== 'object') {
-      if (requireObjectType) {
-        console.warn(
-          `[BrowserMcpServer] toTransportSchema received non-object schema (${typeof schema}), using default`
-        );
-        return DEFAULT_INPUT_SCHEMA;
-      }
-      return {} as InputSchema;
+      return {};
     }
 
     const normalized = normalizeObjectSchema(schema as Parameters<typeof normalizeObjectSchema>[0]);
-    const jsonSchema = normalized
+    return normalized
       ? (toJsonSchemaCompat(normalized, {
           strictUnions: true,
-          pipeStrategy: 'input',
+          pipeStrategy,
         }) as unknown as Record<string, unknown>)
       : (schema as Record<string, unknown>);
+  }
+
+  private toInputTransportSchema(schema: unknown): InputSchema {
+    const jsonSchema = this.toJsonSchema(schema, 'input');
 
     if (Object.keys(jsonSchema).length === 0) {
-      if (requireObjectType) {
-        return DEFAULT_INPUT_SCHEMA;
-      }
-      return jsonSchema as InputSchema;
+      return DEFAULT_INPUT_SCHEMA;
     }
 
-    if (requireObjectType && jsonSchema.type === undefined) {
+    if (jsonSchema.type === undefined) {
       return { type: 'object', ...jsonSchema } as InputSchema;
     }
 
     return jsonSchema as InputSchema;
+  }
+
+  private toOutputTransportSchema(schema: unknown): JsonSchemaForInference {
+    return this.toJsonSchema(schema, 'output') as unknown as JsonSchemaForInference;
   }
 
   private isZodSchema(schema: unknown): boolean {
@@ -310,7 +361,7 @@ export class BrowserMcpServer extends BaseMcpServer {
     return '_zod' in s || '_def' in s;
   }
 
-  private getNativeToolsApi(): NativeToolsApi | undefined {
+  private getNativeLegacyToolsApi(): NativeLegacyToolsApi | undefined {
     if (!this.native) {
       return undefined;
     }
@@ -321,7 +372,20 @@ export class BrowserMcpServer extends BaseMcpServer {
       return undefined;
     }
 
-    return candidate as NativeToolsApi;
+    return candidate as NativeLegacyToolsApi;
+  }
+
+  private getNativeStandardToolsApi(): NativeStandardToolsApi | undefined {
+    if (!this.native) {
+      return undefined;
+    }
+
+    const candidate = this.native as Partial<NativeStandardToolsApi>;
+    if (typeof candidate.getTools !== 'function' || typeof candidate.executeTool !== 'function') {
+      return undefined;
+    }
+
+    return candidate as NativeStandardToolsApi;
   }
 
   private getNativeUnregisterTool(): NativeUnregisterToolFn | undefined {
@@ -426,6 +490,10 @@ export class BrowserMcpServer extends BaseMcpServer {
           return;
         }
 
+        if (isAbortError(error)) {
+          return;
+        }
+
         console.warn(
           '[BrowserMcpServer] Native WebMCP tool mirror registration rejected; continuing with WebMCP transport registration only.',
           error
@@ -458,29 +526,65 @@ export class BrowserMcpServer extends BaseMcpServer {
     }
   }
 
-  private registerToolInServer(tool: ToolDescriptor): RegisteredToolHandle {
-    const inputSchema = this.toTransportSchema(tool.inputSchema);
+  private installToolRequestHandlers(): void {
+    this.server.setRequestHandler(ListToolsRequestSchema, () => ({
+      tools: this.listToolsForMcpTransport(),
+    }));
 
-    // Cast needed: parent expects Zod-compatible schemas, we pass JSON Schema objects.
-    (super.registerTool as unknown as ParentRegisterToolFn)(
-      tool.name,
-      {
-        description: tool.description,
-        inputSchema,
-        ...(tool.outputSchema ? { outputSchema: tool.outputSchema } : {}),
-        ...(tool.annotations ? { annotations: tool.annotations } : {}),
-      },
-      async (args: Record<string, unknown>) => {
+    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+      try {
+        const params =
+          request.params.arguments === undefined
+            ? { name: request.params.name }
+            : {
+                name: request.params.name,
+                arguments: request.params.arguments,
+              };
+        const result = await this.callTool(params);
+        return this.toMcpCallToolResult(result);
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: error instanceof Error ? error.message : String(error),
+            },
+          ],
+          isError: true,
+        } satisfies McpCallToolResult;
+      }
+    });
+  }
+
+  private registerToolInServer(tool: ToolDescriptor): void {
+    validateAndWarnToolName(tool.name);
+
+    const inputSchema = this.toInputTransportSchema(tool.inputSchema);
+    const outputSchema = tool.outputSchema
+      ? this.toOutputTransportSchema(tool.outputSchema)
+      : undefined;
+
+    if (this._tools.has(tool.name)) {
+      throw new Error(`Tool ${tool.name} is already registered`);
+    }
+
+    const registeredTool: RegisteredWebMcpTool = {
+      ...(tool.title ? { title: tool.title } : {}),
+      description: tool.description,
+      inputSchema,
+      ...(outputSchema ? { outputSchema } : {}),
+      ...(tool.annotations ? { annotations: tool.annotations } : {}),
+      handler: async (args: Record<string, unknown>) => {
         const client: ModelContextClient = {
           requestUserInteraction: async (cb: () => Promise<unknown>) => cb(),
         };
         return normalizeToolResponse(await tool.execute(args, client));
-      }
-    );
-    this.notifyProducerToolsChanged();
-    return {
-      unregister: () => this.unregisterTool(tool.name),
+      },
     };
+
+    this._tools.set(tool.name, registeredTool);
+    this.sendToolListChanged();
+    this.notifyProducerToolsChanged();
   }
 
   get ontoolchange(): ((this: ModelContextCore, ev: Event) => unknown) | null {
@@ -512,7 +616,13 @@ export class BrowserMcpServer extends BaseMcpServer {
   }
 
   private notifyProducerToolsChanged(): void {
+    if (this._producerToolsChangedQueued) {
+      return;
+    }
+    this._producerToolsChangedQueued = true;
+
     queueMicrotask(() => {
+      this._producerToolsChangedQueued = false;
       const event = new Event('toolchange');
       try {
         this._ontoolchange?.call(this as unknown as ModelContextCore, event);
@@ -533,7 +643,7 @@ export class BrowserMcpServer extends BaseMcpServer {
     let synced = 0;
 
     for (const sourceTool of tools) {
-      if (!sourceTool?.name || this._parentTools[sourceTool.name]) {
+      if (!sourceTool?.name || this._tools.has(sourceTool.name)) {
         continue;
       }
 
@@ -564,21 +674,17 @@ export class BrowserMcpServer extends BaseMcpServer {
   override registerTool(
     tool: ToolDescriptor,
     options?: ModelContextRegisterToolOptions
-  ): RegisteredToolHandle {
+  ): Promise<void> {
     const signal = options?.signal;
 
     if (signal?.aborted) {
-      console.warn(
-        `[BrowserMcpServer] registerTool("${tool?.name ?? '<unknown>'}") skipped: options.signal was already aborted.`
-      );
-      return { unregister: () => {} };
+      return Promise.reject(createAbortError());
     }
 
     this.registerNativeToolMirror(tool, signal);
 
-    let handle: RegisteredToolHandle;
     try {
-      handle = this.registerToolInServer(tool);
+      this.registerToolInServer(tool);
     } catch (error) {
       if (this.native) {
         try {
@@ -597,20 +703,24 @@ export class BrowserMcpServer extends BaseMcpServer {
       signal.addEventListener(
         'abort',
         () => {
-          const existing = this._parentTools[tool.name];
-          existing?.remove();
+          const removed = this._tools.delete(tool.name);
+          if (removed) {
+            this.sendToolListChanged();
+          }
           try {
             this.unregisterNativeToolMirror(tool.name, { preferAbortSignal: true });
           } catch (error) {
             console.warn('[BrowserMcpServer] Native unregister via abort fallback failed:', error);
           }
-          this.notifyProducerToolsChanged();
+          if (removed) {
+            this.notifyProducerToolsChanged();
+          }
         },
         { once: true }
       );
     }
 
-    return handle;
+    return Promise.resolve();
   }
 
   /**
@@ -618,32 +728,64 @@ export class BrowserMcpServer extends BaseMcpServer {
    * before this BrowserMcpServer wrapper was installed.
    */
   syncNativeTools(): number {
-    const nativeToolsApi = this.getNativeToolsApi();
-    if (!nativeToolsApi) {
-      return 0;
+    let synced = 0;
+    const nativeLegacyToolsApi = this.getNativeLegacyToolsApi();
+    if (nativeLegacyToolsApi) {
+      const nativeCallTool = nativeLegacyToolsApi.callTool.bind(nativeLegacyToolsApi);
+      synced += this.backfillTools(
+        nativeLegacyToolsApi.listTools(),
+        async (name: string, args: Record<string, unknown>) =>
+          nativeCallTool({
+            name,
+            arguments: args,
+          })
+      );
     }
 
-    const nativeCallTool = nativeToolsApi.callTool.bind(nativeToolsApi);
+    const nativeStandardToolsApi = this.getNativeStandardToolsApi();
+    if (nativeStandardToolsApi) {
+      void this.backfillNativeStandardTools(nativeStandardToolsApi).catch((error: unknown) => {
+        console.warn('[BrowserMcpServer] Native WebMCP tool backfill failed:', error);
+      });
+    }
+
+    return synced;
+  }
+
+  private async backfillNativeStandardTools(
+    nativeToolsApi: NativeStandardToolsApi
+  ): Promise<number> {
+    const nativeTools = await nativeToolsApi.getTools.call(this.native);
     return this.backfillTools(
-      nativeToolsApi.listTools(),
-      async (name: string, args: Record<string, unknown>) =>
-        nativeCallTool({
-          name,
-          arguments: args,
-        })
+      nativeTools.map(toToolListItemFromNativeToolInfo),
+      async (name: string, args: Record<string, unknown>) => {
+        const nativeTool = nativeTools.find((tool) => tool.name === name);
+        if (!nativeTool) {
+          throw new Error(`Native tool not found: ${name}`);
+        }
+
+        const serialized = await nativeToolsApi.executeTool.call(
+          this.native,
+          nativeTool,
+          JSON.stringify(args ?? {})
+        );
+        return parseNativeToolResult(name, serialized);
+      }
     );
   }
 
   unregisterTool(nameOrTool: string | ModelContextToolReference): void {
     this.warnUnregisterToolDeprecationOnce();
     const name = this.resolveToolNameForUnregister(nameOrTool);
-    const existing = this._parentTools[name];
-    existing?.remove();
+    const removed = this._tools.delete(name);
+    if (removed) {
+      this.sendToolListChanged();
+    }
 
     if (this.native) {
       this.unregisterNativeToolMirror(name);
     }
-    if (existing) {
+    if (removed) {
       this.notifyProducerToolsChanged();
     }
   }
@@ -805,23 +947,49 @@ export class BrowserMcpServer extends BaseMcpServer {
   }
 
   listTools(): ToolListItem[] {
-    return Object.entries(this._parentTools)
-      .filter(([, tool]) => tool.enabled)
-      .map(([name, tool]) => {
-        const item: ToolListItem = {
-          name,
-          description: tool.description ?? '',
-          inputSchema: this.toTransportSchema(tool.inputSchema ?? DEFAULT_INPUT_SCHEMA),
+    return [...this._tools.entries()].map(([name, tool]) => {
+      const item: ToolListItem = {
+        name,
+        description: tool.description ?? '',
+        inputSchema: tool.inputSchema,
+      };
+      if (tool.outputSchema) item.outputSchema = tool.outputSchema;
+      if (tool.annotations) item.annotations = tool.annotations;
+      return item;
+    });
+  }
+
+  private listToolsForMcpTransport(): ToolListItem[] {
+    return this.listTools().map((tool) => {
+      if (!tool.outputSchema || tool.outputSchema.type === 'object') {
+        return tool;
+      }
+
+      if (tool.outputSchema.type === undefined) {
+        return {
+          ...tool,
+          outputSchema: {
+            ...(tool.outputSchema as Record<string, unknown>),
+            type: 'object',
+          } as JsonSchemaForInference,
         };
-        if (tool.outputSchema)
-          item.outputSchema = this.toTransportSchema(
-            tool.outputSchema,
-            false
-          ) as JsonSchemaForInference;
-        if (tool.annotations)
-          item.annotations = tool.annotations as NonNullable<ToolListItem['annotations']>;
-        return item;
-      });
+      }
+
+      const { outputSchema: _outputSchema, ...mcpTool } = tool;
+      return mcpTool;
+    });
+  }
+
+  private toMcpCallToolResult(result: ToolResponse): McpCallToolResult {
+    return {
+      content: result.content as McpCallToolResult['content'],
+      ...(isPlainObject(result.structuredContent)
+        ? {
+            structuredContent: result.structuredContent as McpCallToolResult['structuredContent'],
+          }
+        : {}),
+      ...(result.isError !== undefined ? { isError: result.isError } : {}),
+    };
   }
 
   async getTools(): Promise<ModelContextToolInfo[]> {
@@ -842,10 +1010,7 @@ export class BrowserMcpServer extends BaseMcpServer {
 
       return {
         name: tool.name,
-        title:
-          typeof tool.annotations?.title === 'string'
-            ? tool.annotations.title
-            : (tool.description ?? ''),
+        title: this._tools.get(tool.name)?.title ?? tool.description ?? '',
         description: tool.description ?? '',
         inputSchema,
         origin,
@@ -898,8 +1063,13 @@ export class BrowserMcpServer extends BaseMcpServer {
   ): Promise<void> {
     if (!tool.outputSchema) return;
 
-    const r = result as Record<string, unknown>;
-    if (!('content' in r) || r.isError || !r.structuredContent) return;
+    const r = result as { content?: unknown; isError?: unknown; structuredContent?: unknown };
+    if (!('content' in r) || r.isError) return;
+    if (r.structuredContent === undefined) {
+      throw new Error(
+        `Output validation error: Tool ${toolName} has an output schema but no structured content was provided`
+      );
+    }
 
     // Zod schemas → use SDK's safeParseAsync
     if (this.isZodSchema(tool.outputSchema)) {
@@ -925,23 +1095,42 @@ export class BrowserMcpServer extends BaseMcpServer {
     }
   }
 
+  /**
+   * Executes a registered tool by name.
+   *
+   * @deprecated Prefer the WebMCP standard producer path: get a descriptor from
+   * `getTools()` and pass it to `executeTool(tool, inputArgsJson)`. This method
+   * remains as an MCP-B compatibility convenience and MCP transport bridge.
+   */
   async callTool(params: {
     name: string;
     arguments?: Record<string, unknown>;
   }): Promise<ToolResponse> {
-    const tool = this._parentTools[params.name];
+    const tool = this._tools.get(params.name);
     if (!tool) {
       throw new Error(`Tool not found: ${params.name}`);
     }
 
-    return tool.handler(params.arguments ?? {}, {});
+    const args = await this.validateToolInput(tool, params.arguments, params.name);
+    const result = await tool.handler(args ?? {});
+    await this.validateToolOutput(tool, result, params.name);
+    return result;
   }
 
+  /**
+   * Executes a tool descriptor returned from getTools().
+   */
   executeTool(
     tool: ModelContextToolInfo,
     inputArgsJson: string,
     options?: ModelContextTestingExecuteToolOptions
   ): Promise<string | null>;
+  /**
+   * Executes a registered tool by name.
+   *
+   * @deprecated Prefer the WebMCP standard producer path: get a descriptor from
+   * `getTools()` and pass it to `executeTool(tool, inputArgsJson)`.
+   */
   executeTool(name: string, args?: Record<string, unknown>): Promise<ToolResponse>;
   async executeTool(
     toolOrName: ModelContextToolInfo | string,
@@ -973,20 +1162,13 @@ export class BrowserMcpServer extends BaseMcpServer {
    * This prevents "Cannot register capabilities after connecting to transport" errors
    * when tools are registered dynamically after connection.
    *
-   * After the parent sets up its Zod-based handlers, we replace the ones that break
-   * with plain JSON Schema objects (ListTools, ListPrompts, GetPrompt).
+   * Tool handlers are installed with the public low-level Server API in the constructor.
+   * Prompt/resource handlers still come from the parent, then prompt handlers are replaced
+   * where the parent expects Zod shapes instead of plain JSON Schema.
    */
   override async connect(transport: Transport): Promise<void> {
-    // Let parent set up its handlers (including CallTool which uses our validateToolInput override)
-    (this as unknown as { setToolRequestHandlers: () => void }).setToolRequestHandlers();
     (this as unknown as { setResourceRequestHandlers: () => void }).setResourceRequestHandlers();
     (this as unknown as { setPromptRequestHandlers: () => void }).setPromptRequestHandlers();
-
-    // Replace ListTools handler — parent tries toJsonSchemaCompat (Zod → JSON Schema) on
-    // inputSchema, but ours are already JSON Schema, so it falls back to empty {}.
-    this.server.setRequestHandler(ListToolsRequestSchema, () => ({
-      tools: this.listTools(),
-    }));
 
     // Replace ListPrompts handler — parent calls promptArgumentsFromSchema which expects
     // Zod shapes. We use _promptSchemas which has the real JSON Schema.

@@ -18,7 +18,7 @@ Status: 200
 - sec-fetch-user:?1
 ### Response Headers
 - connection:keep-alive
-- content-length:239
+- content-length:<length>
 - content-type:text/html; charset=utf-8
 - date:<long date>
 - keep-alive:timeout=5

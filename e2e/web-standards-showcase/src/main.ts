@@ -107,7 +107,25 @@ function init(): void {
   }
 
   // Get API references
-  modelContext = navigator.modelContext as ModelContext;
+  const rawModelContext = document.modelContext as unknown as
+    | (ModelContext & {
+        provideContext?: unknown;
+        clearContext?: unknown;
+        getTools?: unknown;
+        executeTool?: unknown;
+      })
+    | undefined;
+  (
+    window as Window & { __WEBMCP_SHOWCASE_RAW_SURFACE__?: Record<string, boolean> }
+  ).__WEBMCP_SHOWCASE_RAW_SURFACE__ = {
+    hasModelContext: Boolean(rawModelContext),
+    hasGetTools: typeof rawModelContext?.getTools === 'function',
+    hasExecuteTool: typeof rawModelContext?.executeTool === 'function',
+    hasUnregisterTool: typeof rawModelContext?.unregisterTool === 'function',
+    hasClearContext: typeof rawModelContext?.clearContext === 'function',
+    hasProvideContext: typeof rawModelContext?.provideContext === 'function',
+  };
+  modelContext = rawModelContext as ModelContext;
   installLegacyContextCompat(modelContext);
   modelContextTesting = navigator.modelContextTesting as unknown as ModelContextTesting;
 

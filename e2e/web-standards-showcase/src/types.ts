@@ -39,7 +39,7 @@ export type Tool = ToolDescriptor;
  *
  * This type captures the full patched surface the showcase code relies on.
  */
-export type ModelContext = ModelContextCore & {
+export type ModelContext = Omit<ModelContextCore, 'registerTool'> & {
   registerTool(
     tool: Tool,
     options?: ModelContextRegisterToolOptions

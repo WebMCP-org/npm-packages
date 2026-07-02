@@ -47,6 +47,7 @@ const iifeConfig: Options = {
 export default defineConfig({
   pack: [esmConfig, iifeConfig],
   test: {
+    exclude: ['conformance/**/*', 'dist', 'node_modules'],
     globals: true,
   },
 });

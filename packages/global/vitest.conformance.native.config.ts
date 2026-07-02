@@ -4,7 +4,7 @@ import { playwright } from 'vite-plus/test/browser-playwright';
 import { defineConfig } from 'vite-plus';
 
 const isCI = process.env.CI === 'true';
-const MIN_NATIVE_CHROME_MAJOR = 149;
+const MIN_NATIVE_CHROME_MAJOR = 152;
 const REQUIRED_WEBMCP_FEATURES = ['WebMCPTesting', 'DevToolsWebMCPSupport'];
 
 const chromeCandidates = [
@@ -32,10 +32,11 @@ function readChromeVersion(executablePath: string): string | undefined {
 
 function majorFromVersion(version: string | undefined): number | undefined {
   const match = version?.match(/\b(\d+)\./);
-  return match ? Number.parseInt(match[1], 10) : undefined;
+  const major = match?.[1];
+  return major ? Number.parseInt(major, 10) : undefined;
 }
 
-function resolveChrome149(): { executablePath: string; version: string } {
+function resolveChrome152(): { executablePath: string; version: string } {
   const explicitChromeBin = process.env.CHROME_BIN;
 
   for (const executablePath of chromeCandidates) {
@@ -82,7 +83,7 @@ function resolveChromeFlags(): string[] {
   return [...passthroughFlags, `--enable-features=${[...features].join(',')}`];
 }
 
-const nativeChrome = resolveChrome149();
+const nativeChrome = resolveChrome152();
 const chromeFlags = resolveChromeFlags();
 
 export default defineConfig({

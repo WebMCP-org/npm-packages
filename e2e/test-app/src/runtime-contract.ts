@@ -56,12 +56,12 @@ async function renderTools(client: Client) {
 }
 
 async function bootstrap() {
-  const modelContext = navigator.modelContext;
+  const modelContext = document.modelContext ?? navigator.modelContext;
   if (!modelContext) {
-    throw new Error('navigator.modelContext is unavailable');
+    throw new Error('document.modelContext is unavailable');
   }
 
-  installBrowserRuntimeContract(modelContext, { runtimeLabel: 'tab' });
+  await installBrowserRuntimeContract(modelContext, { runtimeLabel: 'tab' });
   setStatus(runtimeStatusEl, 'ready', 'Runtime ready');
   renderInvocations();
 
@@ -77,12 +77,12 @@ async function bootstrap() {
   setStatus(clientStatusEl, 'ready', 'MCP client connected');
 
   registerDynamicBtn.addEventListener('click', async () => {
-    getRuntimeHook().registerDynamicTool();
+    await getRuntimeHook().registerDynamicTool();
     await renderTools(client);
   });
 
   unregisterDynamicBtn.addEventListener('click', async () => {
-    getRuntimeHook().unregisterDynamicTool();
+    await getRuntimeHook().unregisterDynamicTool();
     await renderTools(client);
   });
 

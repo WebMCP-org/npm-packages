@@ -1,5 +1,5 @@
 import { type Schema, Validator } from '@cfworker/json-schema';
-import type { InputSchema, JsonObject, JsonValue } from '@mcp-b/webmcp-types';
+import type { InputSchema, JsonSchemaForInference, JsonValue } from '@mcp-b/webmcp-types';
 import type { StandardJSONSchemaV1, StandardSchemaV1 } from '@standard-schema/spec';
 export type { StandardJSONSchemaV1 } from '@standard-schema/spec';
 
@@ -72,12 +72,8 @@ function isJsonValue(value: unknown, seen = new WeakSet<object>()): value is Jso
   }
 }
 
-export function toJsonObject(value: unknown): JsonObject | undefined {
-  if (!isJsonObjectRecord(value) || !isJsonValue(value)) {
-    return undefined;
-  }
-
-  return value;
+export function toJsonValue(value: unknown): JsonValue | undefined {
+  return isJsonValue(value) ? value : undefined;
 }
 
 function getStandardProps(value: unknown): Record<string, unknown> | null {
@@ -119,7 +115,7 @@ function createStandardValidatorFromJsonSchema(schema: InputSchema): StandardInp
           };
         }
 
-        const issue = validateArgsWithSchema(value, schema);
+        const issue = validateValueWithSchema(value, schema);
         if (issue) {
           return {
             issues: [issue],
@@ -293,12 +289,12 @@ function validateJsonSchemaNode(node: Record<string, unknown>, path: string): vo
   }
 }
 
-export function validateArgsWithSchema(
-  args: Record<string, unknown>,
-  schema: InputSchema
+export function validateValueWithSchema(
+  value: unknown,
+  schema: InputSchema | JsonSchemaForInference
 ): StandardValidationIssue | null {
   const validator = new Validator(schema as Schema, '2020-12', true);
-  const result = validator.validate(args);
+  const result = validator.validate(value);
 
   if (result.valid) {
     return null;

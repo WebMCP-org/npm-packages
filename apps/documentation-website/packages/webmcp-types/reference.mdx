@@ -76,22 +76,24 @@ Alias for `ModelContextCore`. This is the type of `document.modelContext`.
 
 The strict specification surface.
 
-| Method           | Signature                      |
-| ---------------- | ------------------------------ |
-| `registerTool`   | Multiple overloads (see below) |
-| `unregisterTool` | `(name: string) => void`       |
+| Method                | Signature                                                                                  |
+| --------------------- | ------------------------------------------------------------------------------------------ |
+| `registerTool`        | Multiple overloads (see below)                                                             |
+| `getTools`            | `() => Promise<ModelContextToolInfo[]>`                                                    |
+| `executeTool`         | `(tool: ModelContextToolInfo, inputArgsJson: string, options?) => Promise<string \| null>` |
+| `addEventListener`    | `(type: 'toolchange', listener, options?) => void`                                         |
+| `removeEventListener` | `(type: 'toolchange', listener, options?) => void`                                         |
+| `dispatchEvent`       | `(event: Event) => boolean`                                                                |
 
 ### `ModelContextExtensions`
 
 MCP-B extension methods. Not part of the WebMCP specification.
 
-| Method                | Signature                                                                                  |
-| --------------------- | ------------------------------------------------------------------------------------------ |
-| `listTools`           | `() => ToolListItem[]`                                                                     |
-| `callTool`            | `(params: { name: string; arguments?: Record<string, unknown> }) => Promise<ToolResponse>` |
-| `addEventListener`    | `(type: 'toolcall' \| 'toolschanged', listener, options?) => void`                         |
-| `removeEventListener` | `(type: 'toolcall' \| 'toolschanged', listener, options?) => void`                         |
-| `dispatchEvent`       | `(event: Event) => boolean`                                                                |
+| Method           | Signature                                                                                  |
+| ---------------- | ------------------------------------------------------------------------------------------ |
+| `unregisterTool` | `(nameOrTool: string \| ModelContextToolReference) => void`                                |
+| `listTools`      | `() => ToolListItem[]`                                                                     |
+| `callTool`       | `(params: { name: string; arguments?: Record<string, unknown> }) => Promise<ToolResponse>` |
 
 ### `ModelContextWithExtensions`
 
@@ -280,12 +282,14 @@ type AppContext = TypedModelContext<readonly [SearchTool, PingTool]>;
 
 declare const ctx: AppContext;
 
-// name is narrowed; arguments are inferred
+// Deprecated MCP-B compatibility helper: name is narrowed; arguments are inferred
 await ctx.callTool({ name: 'search', arguments: { query: 'webmcp' } });
 
-// arguments optional for Record<string, never> tools
+// Deprecated MCP-B compatibility helper: arguments optional for Record<string, never> tools
 await ctx.callTool({ name: 'ping' });
 ```
+
+For WebMCP DOM callers, prefer `getTools()` and `executeTool(tool, inputArgsJson)`. The standard execution method accepts JSON strings and returns JSON strings, so it does not provide the name-aware argument inference that the compatibility `callTool` overloads provide.
 
 ### Helper types
 

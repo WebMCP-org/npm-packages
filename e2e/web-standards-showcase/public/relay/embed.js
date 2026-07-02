@@ -136,7 +136,44 @@
    * @returns {ToolBridge | null}
    */
   function getToolBridge() {
-    const modelContext = navigator.modelContext;
+    const modelContext = document.modelContext || navigator.modelContext;
+    if (
+      modelContext &&
+      typeof modelContext.getTools === 'function' &&
+      typeof modelContext.executeTool === 'function'
+    ) {
+      return {
+        async listTools() {
+          const tools = await modelContext.getTools();
+          return tools.map((tool) => ({
+            name: tool.name,
+            description: tool.description,
+            inputSchema: parseTestingSchema(tool.inputSchema),
+          }));
+        },
+        async invoke(name, args) {
+          const tools = await modelContext.getTools();
+          const tool = tools.find((candidate) => candidate.name === name);
+          if (!tool) {
+            throw new Error(`Tool not found: ${name}`);
+          }
+
+          const serialized = await modelContext.executeTool(tool, JSON.stringify(args));
+          if (serialized === null) {
+            return {
+              isError: true,
+              content: [{ type: 'text', text: 'Tool execution interrupted by navigation' }],
+            };
+          }
+          const parsed = JSON.parse(serialized);
+          if (!isJsonObject(parsed)) {
+            throw new Error('Producer tool response was not an object');
+          }
+          return parsed;
+        },
+      };
+    }
+
     if (
       modelContext &&
       typeof modelContext.listTools === 'function' &&
@@ -229,6 +266,16 @@
    * by both native Chromium and the polyfill.
    */
   function subscribeToToolChanges() {
+    var modelContext = document.modelContext || navigator.modelContext;
+    if (modelContext && typeof modelContext.addEventListener === 'function') {
+      try {
+        modelContext.addEventListener('toolchange', onToolsChanged);
+        return;
+      } catch (e) {
+        console.warn('[webmcp-relay-embed] Failed to subscribe via modelContext:', e);
+      }
+    }
+
     var testing = navigator.modelContextTesting;
     if (testing && typeof testing.addEventListener === 'function') {
       try {

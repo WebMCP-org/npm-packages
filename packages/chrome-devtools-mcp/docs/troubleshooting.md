@@ -136,7 +136,7 @@ If you are using the `--autoConnect` flag and tools like `list_pages`, `new_page
 If `list_webmcp_tools` returns an empty result:
 
 1. Confirm you are targeting the right tab with `list_pages`, then retry with `--pageId` if needed.
-2. Check whether the page exposes `navigator.modelContext.listTools()` or only the testing fallback by running `evaluate_script '() => ({ hasModelContext: !!navigator.modelContext, hasTesting: !!navigator.modelContextTesting })' --output-format=json`.
+2. Check whether the page exposes `document.modelContext.getTools()` or only the testing fallback by running `evaluate_script 'async () => ({ hasModelContext: !!document.modelContext, hasGetTools: typeof document.modelContext?.getTools === "function", toolCount: document.modelContext?.getTools ? (await document.modelContext.getTools()).length : 0, hasTesting: !!navigator.modelContextTesting })' --output-format=json`.
 3. If the page is route-driven, navigate first and then re-run `list_webmcp_tools`. Some sites expose different WebMCP inventories on different routes.
 4. Inspect `list_console_messages`, `list_network_requests`, and `take_snapshot` on the same page to confirm the page loaded correctly and to catch app-side failures.
 

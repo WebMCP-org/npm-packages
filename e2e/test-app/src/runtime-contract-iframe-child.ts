@@ -19,7 +19,7 @@ function setStatus(status: 'booting' | 'ready' | 'error', text: string) {
 }
 
 function renderTools() {
-  const modelContext = navigator.modelContext;
+  const modelContext = document.modelContext ?? navigator.modelContext;
   const names =
     modelContext
       ?.listTools()
@@ -29,17 +29,19 @@ function renderTools() {
   toolListEl.dataset.count = String(names.length);
 }
 
-try {
-  const modelContext = navigator.modelContext;
+async function bootstrap() {
+  const modelContext = document.modelContext ?? navigator.modelContext;
   if (!modelContext) {
-    throw new Error('navigator.modelContext is unavailable');
+    throw new Error('document.modelContext is unavailable');
   }
 
-  installBrowserRuntimeContract(modelContext, { runtimeLabel: 'iframe' });
+  await installBrowserRuntimeContract(modelContext, { runtimeLabel: 'iframe' });
   renderTools();
   setStatus('ready', 'Iframe runtime ready');
-} catch (error) {
+}
+
+void bootstrap().catch((error) => {
   const message = error instanceof Error ? error.message : String(error);
   setStatus('error', message);
   console.error('[runtime-contract][iframe-child]', error);
-}
+});

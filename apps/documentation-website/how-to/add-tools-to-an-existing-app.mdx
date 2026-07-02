@@ -4,7 +4,6 @@ description: 'Expose existing product functionality as WebMCP tools without rewr
 keywords:
   [
     'registerTool',
-    'unregisterTool',
     '@mcp-b/global',
     'document.modelContext',
     'tool registration',
@@ -115,34 +114,49 @@ if (currentUser.isAdmin) {
 }
 ```
 
-`registerTool` throws if a tool with the same name already exists. To update a tool, call `unregisterTool` first, then register the new version.
+`registerTool` throws if a tool with the same name already exists. To update a tool, abort the previous registration signal, then register the new version.
 
 ## Update tools when app state changes
 
 If your available tools depend on state (logged in vs. guest, current page, feature flags), update the registry when that state changes.
 
 ```ts title="auth.ts"
+import type { ToolDescriptor } from '@mcp-b/webmcp-types';
+
+const registeredToolControllers = new Map<string, AbortController>();
+
+function registerRoleTool(tool: ToolDescriptor) {
+  registeredToolControllers.get(tool.name)?.abort();
+
+  const controller = new AbortController();
+  registeredToolControllers.set(tool.name, controller);
+  document.modelContext.registerTool(tool, { signal: controller.signal });
+}
+
 function onLogin(user: User) {
   // Register tools appropriate for the user's role
   for (const tool of getToolsForRole(user.role)) {
-    document.modelContext.registerTool(tool);
+    registerRoleTool(tool);
   }
 }
 
 function onLogout() {
-  // Unregister each tool by name
-  for (const name of registeredToolNames) {
-    document.modelContext.unregisterTool(name);
+  // Abort each registration signal
+  for (const controller of registeredToolControllers.values()) {
+    controller.abort();
   }
+  registeredToolControllers.clear();
 }
 ```
 
-Use `registerTool` and `unregisterTool` to add or remove individual tools:
+Use `registerTool` and an `AbortController` to add or remove individual tools:
 
 ```ts
-document.modelContext.registerTool(adminTool);
+const controller = new AbortController();
+document.modelContext.registerTool(adminTool, { signal: controller.signal });
+
 // later:
-document.modelContext.unregisterTool('delete-user');
+controller.abort();
 ```
 
 ## Interact with the DOM
@@ -238,14 +252,18 @@ const result = await navigator.modelContextTesting?.executeTool(
 console.log('Result:', result);
 ```
 
-If you installed `@mcp-b/global`, you can also use the extension methods directly:
+If you installed `@mcp-b/global`, use the standard in-page consumer methods directly:
 
 ```ts
-const tools = document.modelContext.listTools();
-const result = await document.modelContext.callTool({
-  name: 'search-products',
-  arguments: { query: 'laptop' },
-});
+const tools = await document.modelContext.getTools();
+const searchTool = tools.find((tool) => tool.name === 'search-products');
+if (!searchTool) throw new Error('search-products is not available');
+
+const resultJson = await document.modelContext.executeTool(
+  searchTool,
+  JSON.stringify({ query: 'laptop' })
+);
+const result = resultJson === null ? null : JSON.parse(resultJson);
 ```
 
 ## Next steps

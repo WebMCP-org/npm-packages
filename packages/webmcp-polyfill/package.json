@@ -61,6 +61,7 @@
     "test": "vp test run",
     "test:browser": "vp test run --config vitest.browser.config.ts --browser.headless",
     "test:browser:ui": "vp test --config vitest.browser.config.ts --browser",
+    "test:conformance": "vp test run --config vitest.conformance.config.ts --browser.headless",
     "typecheck": "pnpm --filter @mcp-b/webmcp-types build && tsc --noEmit && vp test run --typecheck --silent"
   },
   "dependencies": {

@@ -1,0 +1,17 @@
+---
+'@mcp-b/webmcp-types': major
+'@mcp-b/webmcp-polyfill': major
+'@mcp-b/webmcp-ts-sdk': major
+'@mcp-b/global': major
+'@mcp-b/react-webmcp': major
+'usewebmcp': major
+'@mcp-b/chrome-devtools-mcp': major
+---
+
+Align the WebMCP runtime surface with Chrome 152 and the current document-first API.
+
+`registerTool` now resolves `undefined`; use `registerTool(tool, { signal })` and abort the signal to unregister tools. `unregisterTool` remains as deprecated compatibility where present.
+
+The standard producer path is `document.modelContext.getTools()` plus `document.modelContext.executeTool(tool, inputArgsJson)`. Deprecated name-based helpers remain MCP-B compatibility APIs.
+
+Native tool backfill now supports current `getTools`/`executeTool` contexts, MCP transport output schemas preserve rootless object schemas by adding `type: "object"` on the MCP boundary, and Chrome DevTools WebMCP calls preserve `structuredContent` alongside MCP content blocks.

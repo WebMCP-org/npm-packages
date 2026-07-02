@@ -103,22 +103,30 @@ The IIFE build auto-initializes on load. Configure via `window.__webMCPPolyfillO
 
 After initialization, `document.modelContext` exposes these methods:
 
-### `registerTool(tool)`
+### `registerTool(tool, options?)`
 
 Adds a single tool to the registry.
 
 - Requires a non-empty `name`, non-empty `description`, and `execute` function.
 - Throws on duplicate tool names.
 - If `inputSchema` is omitted, defaults to `{ type: "object", properties: {} }`.
+- Pass `options.signal` to remove the tool when the signal aborts.
 
-### `unregisterTool(name)`
+### `getTools()`
 
-Removes a tool by name. Unknown names are a no-op.
+Returns `Promise<ModelContextToolInfo[]>`. Each tool includes a JSON-stringified `inputSchema`, `origin`, and `window`.
+
+### `executeTool(tool, inputArgsJson, options?)`
+
+Executes a tool descriptor returned from `getTools()`. The input arguments are a JSON object string. The return value is `Promise<string | null>`.
+
+### `unregisterTool(name)` (deprecated)
+
+Removes a tool by name for older MCP-B integrations. Unknown names are a no-op. Prefer `registerTool(tool, { signal })`.
 
 <Note>
-  The polyfill does not provide `listTools()` or `callTool()` on `document.modelContext`. For tool
-  listing and execution, use `navigator.modelContextTesting` (when the testing shim is enabled) or
-  switch to [`@mcp-b/global`](/packages/global/reference).
+  The polyfill does not provide MCP-B extension methods such as `listTools()` or `callTool()` on
+  `document.modelContext`. For those helpers, use [`@mcp-b/global`](/packages/global/reference).
 </Note>
 
 ---
