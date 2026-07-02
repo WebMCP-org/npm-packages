@@ -101,7 +101,7 @@ export function CounterTool() {
 ## How `useWebMCP` Works
 
 - Registers a tool on mount with `document.modelContext.registerTool(tool, { signal })` and aborts the controller on unmount.
-- On Chrome 147/148, aborting the controller does not remove the tool. Install `@mcp-b/global` or `@mcp-b/webmcp-polyfill` for those versions. Chrome 149+ removes the tool on abort in the native implementation.
+- Older Chrome preview builds may not remove tools when the controller aborts. Install `@mcp-b/global` or `@mcp-b/webmcp-polyfill` when you need consistent cleanup across preview versions.
 - Exposes local execution state:
   - `state.isExecuting`
   - `state.lastResult`
@@ -154,7 +154,7 @@ useWebMCP({
 
 ### Output inference
 
-When `outputSchema` is provided as a literal JSON object schema:
+When `outputSchema` is provided as a literal JSON Schema:
 
 - implementation return type is inferred from `outputSchema`
 - `state.lastResult` is inferred to the same type
@@ -212,9 +212,9 @@ function SearchToolPanel() {
 
 ## Output Schema Contract
 
-If `outputSchema` is defined, your tool implementation must return a JSON-serializable object result.
+If `outputSchema` is defined, your tool implementation must return a JSON-serializable value that matches that schema for MCP-B helpers that consume it. Object, array, string, number, boolean, and null schemas are supported for type inference and hook result shaping.
 
-Returning a non-object value (`string`, `null`, array, etc.) causes an error response from the registered MCP tool.
+Native Chrome WebMCP does not currently define or enforce `outputSchema`; the browser standard tool dictionary defines `inputSchema`.
 
 ## Re-Registration and Performance
 

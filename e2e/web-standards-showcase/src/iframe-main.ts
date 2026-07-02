@@ -34,7 +34,7 @@ function init(): void {
     return;
   }
 
-  modelContext = navigator.modelContext as ModelContext;
+  modelContext = document.modelContext as unknown as ModelContext;
   installLegacyContextCompat(modelContext);
 
   setupEventListeners();

@@ -123,7 +123,7 @@ console.log('Exposed prompts:', el.exposedPrompts);
 If you have `@mcp-b/global` installed on the parent, you can also list tools through the standard API:
 
 ```javascript
-const tools = await document.modelContext.listTools();
+const tools = await document.modelContext.getTools();
 console.log(tools);
 ```
 

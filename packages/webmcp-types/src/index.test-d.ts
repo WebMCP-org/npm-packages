@@ -17,7 +17,7 @@ import type {
 import type { ToolDescriptor, ToolListItem } from './tool.js';
 
 // === Producer API ===
-test('ModelContext.registerTool accepts ToolDescriptor and returns void', () => {
+test('ModelContext.registerTool accepts ToolDescriptor and returns Promise<void>', () => {
   const tool: ToolDescriptor & { inputSchema: InputSchema } = {
     name: 'health',
     title: 'Health',
@@ -35,7 +35,7 @@ test('ModelContext.registerTool accepts ToolDescriptor and returns void', () => 
   };
 
   expectTypeOf<ModelContext['registerTool']>().toBeCallableWith(tool);
-  expectTypeOf<ModelContext['registerTool']>().returns.toEqualTypeOf<void>();
+  expectTypeOf<ModelContext['registerTool']>().returns.toEqualTypeOf<Promise<void>>();
 });
 
 test('ModelContext.registerTool accepts exposedTo options', () => {
@@ -111,9 +111,9 @@ test('ModelContextTesting.ontoolchange is nullable event handler', () => {
   >();
 });
 
-test('ModelContextTesting.getCrossDocumentScriptToolResult returns Promise<string>', () => {
-  expectTypeOf<ModelContextTesting['getCrossDocumentScriptToolResult']>().returns.toEqualTypeOf<
-    Promise<string>
+test('ModelContextTesting.getCrossDocumentScriptToolResult is optional', () => {
+  expectTypeOf<ModelContextTesting['getCrossDocumentScriptToolResult']>().toEqualTypeOf<
+    (() => Promise<string>) | undefined
   >();
 });
 

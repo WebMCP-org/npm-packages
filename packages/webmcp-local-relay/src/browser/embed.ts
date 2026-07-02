@@ -429,7 +429,7 @@ function handleListRequest(request: WidgetRequestMessage, event: MessageEvent): 
  * requests through the relay widget iframe to the local relay server, which
  * forwards them to the MCP client (e.g. Claude Code).
  *
- * This is the same pattern used in `@mcp-b/chrome-devtools-mcp` for CDP-based
+ * This is the same pattern used by Chrome DevTools MCP for CDP-based
  * elicitation forwarding. The relay widget and server handle the new
  * `elicitation-request` / `elicitation-response` message types.
  */

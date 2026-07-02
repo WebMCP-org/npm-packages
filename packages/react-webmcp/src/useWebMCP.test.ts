@@ -1,5 +1,6 @@
 import { initializeWebModelContext } from '@mcp-b/global';
 import type {
+  JsonValue,
   ModelContextRegisterToolOptions,
   ModelContextWithExtensions,
   ToolDescriptor,
@@ -19,14 +20,14 @@ const DEBUG_CONFIG_KEY = 'WEBMCP_DEBUG';
 
 function parseSerializedToolResponse(result: string | null | undefined): {
   content: Array<{ type: string; text?: string }>;
-  structuredContent?: Record<string, unknown>;
+  structuredContent?: JsonValue;
 } {
   if (!result) {
     throw new Error('Expected serialized tool response, received null/undefined');
   }
   return JSON.parse(result) as {
     content: Array<{ type: string; text?: string }>;
-    structuredContent?: Record<string, unknown>;
+    structuredContent?: JsonValue;
   };
 }
 
@@ -209,6 +210,59 @@ describe('useWebMCP', () => {
         registerToolSpy.mockRestore();
       }
     });
+
+    it('throws for unsupported zod union outputSchema', async () => {
+      const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
+
+      try {
+        const zodOutputSchema = z.union([
+          z.object({ kind: z.literal('page'), url: z.string() }),
+          z.object({ kind: z.literal('section'), id: z.string() }),
+        ]);
+
+        await expect(
+          renderHook(() =>
+            useWebMCP({
+              name: 'zod_union_output_tool',
+              description: 'Tool using zod union output schema',
+              outputSchema: zodOutputSchema,
+              handler: async () => ({ kind: 'page', url: '/docs' }) as const,
+            })
+          )
+        ).rejects.toThrow('Unsupported outputSchema');
+        expect(registerToolSpy).not.toHaveBeenCalled();
+      } finally {
+        registerToolSpy.mockRestore();
+      }
+    });
+
+    it.each([
+      ['unknown type', { type: 'wat' }],
+      ['array without items', { type: 'array' }],
+      ['object property without type', { type: 'object', properties: { count: {} } }],
+      ['combinator schema', { anyOf: [{ type: 'string' }, { type: 'number' }] }],
+    ] as Array<[string, unknown]>)(
+      'throws for unsupported JSON outputSchema: %s',
+      async (_, outputSchema) => {
+        const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
+
+        try {
+          await expect(
+            renderHook(() =>
+              useWebMCP({
+                name: 'unsupported_json_output_tool',
+                description: 'Tool using unsupported JSON output schema',
+                outputSchema: outputSchema as never,
+                handler: async () => ({ count: 1 }),
+              })
+            )
+          ).rejects.toThrow('Unsupported outputSchema');
+          expect(registerToolSpy).not.toHaveBeenCalled();
+        } finally {
+          registerToolSpy.mockRestore();
+        }
+      }
+    );
 
     it('should unregister tool on unmount', async () => {
       const { unmount } = await renderHook(() =>
@@ -401,7 +455,7 @@ describe('useWebMCP', () => {
         })
       );
 
-      // toStructuredContent returns null for strings, causing an error
+      // Structured content requires a JSON object result.
       await expect(
         navigator.modelContextTesting?.executeTool('bad_output_tool', JSON.stringify({}))
       ).rejects.toThrow();
@@ -441,7 +495,7 @@ describe('useWebMCP', () => {
       );
       const parsed = parseSerializedToolResponse(result);
       expect(parsed.isError).not.toBe(true);
-      expect(parsed.structuredContent).toBeUndefined();
+      expect(parsed.structuredContent).toBe('ready');
     });
 
     it('should allow array outputs when outputSchema is array', async () => {
@@ -460,7 +514,7 @@ describe('useWebMCP', () => {
       );
       const parsed = parseSerializedToolResponse(result);
       expect(parsed.isError).not.toBe(true);
-      expect(parsed.structuredContent).toBeUndefined();
+      expect(parsed.structuredContent).toEqual([1, 2, 3]);
     });
     it('should throw when outputSchema is defined but handler returns null', async () => {
       await renderHook(() =>
@@ -1046,10 +1100,90 @@ describe('useWebMCP', () => {
           '[ReactWebMCP:useWebMCP] registerTool("async_reject_tool") rejected:',
           registerError
         );
-        expect(listRegisteredToolNames()).toContain('async_reject_tool');
+        expect(listRegisteredToolNames()).not.toContain('async_reject_tool');
       } finally {
         registerSpy.mockRestore();
         warnSpy.mockRestore();
+      }
+    });
+
+    it('does not remove a newer same-name registration when the older hook unmounts', async () => {
+      const originalDocumentDescriptor = Object.getOwnPropertyDescriptor(document, 'modelContext');
+      const originalDescriptor = Object.getOwnPropertyDescriptor(navigator, 'modelContext');
+      const registry = new Map<string, { description: string }>();
+      const capturedSignals: AbortSignal[] = [];
+      const registerTool = vi.fn(
+        (tool: { name: string; description: string }, options?: { signal?: AbortSignal }) => {
+          registry.set(tool.name, tool);
+          if (options?.signal) {
+            capturedSignals.push(options.signal);
+            options.signal.addEventListener(
+              'abort',
+              () => {
+                registry.delete(tool.name);
+              },
+              { once: true }
+            );
+          }
+        }
+      );
+      const modelContext = { registerTool, unregisterTool: vi.fn() };
+
+      Object.defineProperty(document, 'modelContext', {
+        configurable: true,
+        enumerable: true,
+        writable: true,
+        value: modelContext,
+      });
+
+      Object.defineProperty(navigator, 'modelContext', {
+        configurable: true,
+        enumerable: true,
+        writable: true,
+        value: modelContext,
+      });
+
+      try {
+        const { unmount: unmount1 } = await renderHook(() =>
+          useWebMCP({
+            name: 'owner_clash_tool',
+            description: 'First instance',
+            handler: async () => 'first',
+          })
+        );
+
+        const { unmount: unmount2 } = await renderHook(() =>
+          useWebMCP({
+            name: 'owner_clash_tool',
+            description: 'Second instance',
+            handler: async () => 'second',
+          })
+        );
+        await Promise.resolve();
+
+        expect(capturedSignals).toHaveLength(2);
+        const [firstSignal, secondSignal] = capturedSignals;
+        expect(registry.get('owner_clash_tool')?.description).toBe('Second instance');
+
+        unmount1();
+        expect(registry.get('owner_clash_tool')?.description).toBe('Second instance');
+        expect(firstSignal?.aborted).toBe(false);
+        expect(secondSignal?.aborted).toBe(false);
+
+        unmount2();
+        expect(registry.has('owner_clash_tool')).toBe(false);
+        expect(secondSignal?.aborted).toBe(true);
+      } finally {
+        if (originalDocumentDescriptor) {
+          Object.defineProperty(document, 'modelContext', originalDocumentDescriptor);
+        } else {
+          delete (document as unknown as Record<string, unknown>).modelContext;
+        }
+        if (originalDescriptor) {
+          Object.defineProperty(navigator, 'modelContext', originalDescriptor);
+        } else {
+          delete (navigator as unknown as Record<string, unknown>).modelContext;
+        }
       }
     });
   });

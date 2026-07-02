@@ -13,11 +13,11 @@ to expose tools.
 `@mcp-b/webmcp-types`, `@mcp-b/webmcp-polyfill`, and `usewebmcp` stay close to
 this portable surface.
 
-MCP-B adds capabilities from the broader MCP model, including `listTools()`,
-`callTool()`, prompts, resources, sampling, elicitation, and browser
-transports. These capabilities are exposed by `BrowserMcpServer`,
-`@mcp-b/global`, and related packages. They are MCP-B extensions, not standard
-WebMCP methods.
+MCP-B adds capabilities from the broader MCP model, including compatibility
+helpers such as `listTools()` and deprecated `callTool()`, plus prompts,
+resources, sampling, elicitation, and browser transports. These capabilities
+are exposed by `BrowserMcpServer`, `@mcp-b/global`, and related packages. They
+are MCP-B extensions, not standard WebMCP methods.
 
 Libraries and sites that only publish tools should target the strict core.
 Applications that require iframe, extension, relay, desktop-client, prompt, or

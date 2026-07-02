@@ -143,13 +143,10 @@ test('ToolResultFromOutputSchema infers structuredContent for object output sche
 
   expectTypeOf(structuredContent.total).toEqualTypeOf<number>();
   expectTypeOf(structuredContent.status).toEqualTypeOf<'ok' | 'error' | undefined>();
-  expectTypeOf<StructuredContent>().toMatchTypeOf<
-    | {
-        total: number;
-        status?: 'ok' | 'error';
-      }
-    | undefined
-  >();
+  expectTypeOf<StructuredContent>().toEqualTypeOf<{
+    total: number;
+    status?: 'ok' | 'error';
+  }>();
 });
 
 test('ToolDescriptor.annotations is optional ToolAnnotations', () => {
@@ -183,56 +180,56 @@ test('ToolListItem supports literal tool names via generics', () => {
 // Non-object outputSchema support
 // ============================================================================
 
-test('ToolResultFromOutputSchema returns plain CallToolResult for string schema', () => {
+test('ToolResultFromOutputSchema requires string structuredContent for string schema', () => {
   type StringSchema = { type: 'string' };
   type Result = ToolResultFromOutputSchema<StringSchema>;
-  expectTypeOf<Result>().toEqualTypeOf<CallToolResult>();
+  expectTypeOf<Result['structuredContent']>().toEqualTypeOf<string>();
 });
 
-test('ToolResultFromOutputSchema returns plain CallToolResult for array schema', () => {
+test('ToolResultFromOutputSchema requires array structuredContent for array schema', () => {
   type ArraySchema = { type: 'array'; items: { type: 'number' } };
   type Result = ToolResultFromOutputSchema<ArraySchema>;
-  expectTypeOf<Result>().toEqualTypeOf<CallToolResult>();
+  expectTypeOf<Result['structuredContent']>().toEqualTypeOf<number[]>();
 });
 
-test('ToolResultFromOutputSchema returns plain CallToolResult for number schema', () => {
+test('ToolResultFromOutputSchema requires number structuredContent for number schema', () => {
   type NumberSchema = { type: 'number' };
   type Result = ToolResultFromOutputSchema<NumberSchema>;
-  expectTypeOf<Result>().toEqualTypeOf<CallToolResult>();
+  expectTypeOf<Result['structuredContent']>().toEqualTypeOf<number>();
 });
 
-test('ToolResultFromOutputSchema returns plain CallToolResult for boolean schema', () => {
+test('ToolResultFromOutputSchema requires boolean structuredContent for boolean schema', () => {
   type BooleanSchema = { type: 'boolean' };
   type Result = ToolResultFromOutputSchema<BooleanSchema>;
-  expectTypeOf<Result>().toEqualTypeOf<CallToolResult>();
+  expectTypeOf<Result['structuredContent']>().toEqualTypeOf<boolean>();
 });
 
 test('ToolExecuteResultFromOutputSchema allows string return for string schema', () => {
   type StringSchema = { type: 'string' };
   type Result = ToolExecuteResultFromOutputSchema<StringSchema>;
   expectTypeOf<string>().toMatchTypeOf<Result>();
-  expectTypeOf<CallToolResult>().toMatchTypeOf<Result>();
+  expectTypeOf<ToolResultFromOutputSchema<StringSchema>>().toMatchTypeOf<Result>();
 });
 
 test('ToolExecuteResultFromOutputSchema allows number return for number schema', () => {
   type NumberSchema = { type: 'number' };
   type Result = ToolExecuteResultFromOutputSchema<NumberSchema>;
   expectTypeOf<number>().toMatchTypeOf<Result>();
-  expectTypeOf<CallToolResult>().toMatchTypeOf<Result>();
+  expectTypeOf<ToolResultFromOutputSchema<NumberSchema>>().toMatchTypeOf<Result>();
 });
 
 test('ToolExecuteResultFromOutputSchema allows boolean return for boolean schema', () => {
   type BooleanSchema = { type: 'boolean' };
   type Result = ToolExecuteResultFromOutputSchema<BooleanSchema>;
   expectTypeOf<boolean>().toMatchTypeOf<Result>();
-  expectTypeOf<CallToolResult>().toMatchTypeOf<Result>();
+  expectTypeOf<ToolResultFromOutputSchema<BooleanSchema>>().toMatchTypeOf<Result>();
 });
 
 test('ToolExecuteResultFromOutputSchema allows array return for array schema', () => {
   type ArraySchema = { type: 'array'; items: { type: 'number' } };
   type Result = ToolExecuteResultFromOutputSchema<ArraySchema>;
   expectTypeOf<number[]>().toMatchTypeOf<Result>();
-  expectTypeOf<CallToolResult>().toMatchTypeOf<Result>();
+  expectTypeOf<ToolResultFromOutputSchema<ArraySchema>>().toMatchTypeOf<Result>();
 });
 
 test('ToolExecuteResultFromOutputSchema rejects wrapped object results missing structuredContent', () => {
@@ -247,7 +244,7 @@ test('ToolExecuteResultFromOutputSchema rejects wrapped object results missing s
 
   type Result = ToolExecuteResultFromOutputSchema<OutputSchema>;
 
-  // structuredContent is optional even with an object outputSchema — omitting it is valid
+  // @ts-expect-error - outputSchema requires structuredContent when returning a wrapped result
   const wrappedWithoutStructured: Result = { content: [{ type: 'text', text: 'ok' }] };
   void wrappedWithoutStructured;
 });

@@ -247,32 +247,31 @@ jobs:
       - name: Create prerelease versions
         id: versions
         run: |
-          TIMESTAMP=$(date +%Y%m%d%H%M%S)
           TAG_SUFFIX="${{ inputs.tag || 'beta' }}"
+
+          pnpm exec changeset version \
+            --snapshot "$TAG_SUFFIX" \
+            --snapshot-prerelease-template "{tag}.{datetime}"
 
           PACKAGES_JSON="[]"
           for pkg in packages/*/; do
             if [ -f "$pkg/package.json" ]; then
               name=$(jq -r '.name' "$pkg/package.json")
-              current_version=$(jq -r '.version' "$pkg/package.json")
-              if [ "$name" = "agent-skills-ts-sdk" ]; then
-                echo "Skipping $name; not part of the WebMCP prerelease stack"
-                continue
-              fi
-              if [ "$name" != "null" ] && [ "$current_version" != "null" ]; then
-                prerelease_version="${current_version}-${TAG_SUFFIX}.${TIMESTAMP}"
-                jq --arg v "$prerelease_version" '.version = $v' "$pkg/package.json" > "$pkg/package.json.tmp"
-                mv "$pkg/package.json.tmp" "$pkg/package.json"
-                echo "Updated $name to $prerelease_version"
-                PACKAGES_JSON=$(echo "$PACKAGES_JSON" | jq -c --arg n "$name" --arg v "$prerelease_version" '. + [{"name": $n, "version": $v}]')
+              version=$(jq -r '.version' "$pkg/package.json")
+              if [[ "$name" != "null" && "$version" == *"-${TAG_SUFFIX}."* ]]; then
+                echo "Prepared $name@$version"
+                PACKAGES_JSON=$(echo "$PACKAGES_JSON" | jq -c --arg n "$name" --arg v "$version" --arg d "${pkg%/}" '. + [{"name": $n, "version": $v, "dir": $d}]')
               fi
             fi
           done
           echo "packages=$PACKAGES_JSON" >> "$GITHUB_OUTPUT"
 
+      - name: Build prerelease packages
+        run: pnpm build
+
       - name: Publish prerelease packages
         run: |
-          pnpm --filter '!agent-skills-ts-sdk' publish -r --access public --tag "${{ inputs.tag || 'beta' }}" --no-git-checks
+          pnpm -r --filter './packages/*' publish --access public --tag "${{ inputs.tag || 'beta' }}" --no-git-checks
 
       - name: Install cosign
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v3.8.0
@@ -289,42 +288,43 @@ jobs:
           echo "$PACKAGES" | jq -c '.[]' | while read -r pkg; do
             PKG_NAME=$(echo "$pkg" | jq -r '.name')
             PKG_VERSION=$(echo "$pkg" | jq -r '.version')
-            TAG="${PKG_NAME}@${PKG_VERSION}"
+            PKG_DIR=$(echo "$pkg" | jq -r '.dir')
 
             echo "- ${PKG_NAME}@${PKG_VERSION}" >> "$GITHUB_STEP_SUMMARY"
 
             SAFE_NAME=$(echo "${PKG_NAME}-${PKG_VERSION}" | sed 's/@//g' | sed 's/\//-/g')
-            PKG_DIR=$(echo "$PKG_NAME" | sed 's/@mcp-b\//packages\//')
-            if [ -d "$PKG_DIR" ]; then
-              tar -czf "/tmp/${SAFE_NAME}.tar.gz" -C "$(dirname "$PKG_DIR")" "$(basename "$PKG_DIR")"
+            GITHUB_TAG="$SAFE_NAME"
 
-              cosign sign-blob "/tmp/${SAFE_NAME}.tar.gz" \
-                --yes \
-                --output-signature "/tmp/${SAFE_NAME}.tar.gz.sig" \
-                --output-certificate "/tmp/${SAFE_NAME}.tar.gz.pem" \
-                --bundle "/tmp/${SAFE_NAME}.tar.gz.sigstore"
+            if [ ! -d "$PKG_DIR" ]; then
+              echo "::error::Package directory not found for ${PKG_NAME}: ${PKG_DIR}"
+              exit 1
+            fi
 
-              cat > /tmp/release-notes.md << NOTES_EOF
+            tar -czf "/tmp/${SAFE_NAME}.tar.gz" -C "$(dirname "$PKG_DIR")" "$(basename "$PKG_DIR")"
+
+            cosign sign-blob "/tmp/${SAFE_NAME}.tar.gz" \
+              --yes \
+              --bundle "/tmp/${SAFE_NAME}.tar.gz.sigstore"
+
+            cat > /tmp/release-notes.md << NOTES_EOF
           Prerelease of ${PKG_NAME}
 
           **Install:** npm install ${PKG_NAME}@${TAG_SUFFIX}
 
           **Verify signature:**
-          cosign verify-blob ${SAFE_NAME}.tar.gz --signature ${SAFE_NAME}.tar.gz.sig --certificate ${SAFE_NAME}.tar.gz.pem --certificate-identity-regexp https://github.com/WebMCP-org/npm-packages --certificate-oidc-issuer https://token.actions.githubusercontent.com
+          cosign verify-blob ${SAFE_NAME}.tar.gz --bundle ${SAFE_NAME}.tar.gz.sigstore --certificate-identity-regexp https://github.com/WebMCP-org/npm-packages --certificate-oidc-issuer https://token.actions.githubusercontent.com
           NOTES_EOF
 
-              gh release create "$TAG" \
-                --title "${PKG_NAME} ${PKG_VERSION}" \
-                --notes-file /tmp/release-notes.md \
-                --prerelease \
-                "/tmp/${SAFE_NAME}.tar.gz" \
-                "/tmp/${SAFE_NAME}.tar.gz.sig" \
-                "/tmp/${SAFE_NAME}.tar.gz.pem" \
-                "/tmp/${SAFE_NAME}.tar.gz.sigstore" \
-                2>/dev/null || echo "  Warning: Release may already exist for $TAG"
+            gh release create "$GITHUB_TAG" \
+              --title "${PKG_NAME} ${PKG_VERSION}" \
+              --notes-file /tmp/release-notes.md \
+              --prerelease \
+              --latest=false \
+              --target "$GITHUB_SHA" \
+              "/tmp/${SAFE_NAME}.tar.gz" \
+              "/tmp/${SAFE_NAME}.tar.gz.sigstore"
 
-              echo "  Created signed release for $TAG"
-            fi
+            echo "  Created signed release ${GITHUB_TAG} for ${PKG_NAME}@${PKG_VERSION}"
           done
 
           echo "" >> "$GITHUB_STEP_SUMMARY"

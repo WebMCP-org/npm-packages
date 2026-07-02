@@ -16,7 +16,7 @@ To keep integration predictable, this repo separates:
 ### 1) `@mcp-b/webmcp-types` (Canonical Core Types)
 
 - Canonical source for strict WebMCP TypeScript contracts.
-- Focused on core `navigator.modelContext` semantics and type inference quality.
+- Focused on core `document.modelContext` semantics and type inference quality.
 - Does not define MCP-B-only convenience/extensions as part of the core global surface.
 
 Use when you want:
@@ -59,7 +59,7 @@ Use when you want:
 ### 5) `usewebmcp` (React for Strict Core API)
 
 - Standalone React hooks for strict core WebMCP usage.
-- Designed for `navigator.modelContext` core-only workflows.
+- Designed for `document.modelContext` core-only workflows.
 - Not an alias package and not a re-export of `@mcp-b/react-webmcp`.
 
 Use when you want:
@@ -78,7 +78,7 @@ Core layering:
 
 ## Contribution Rules for This Boundary
 
-1. Do not broaden `@mcp-b/webmcp-types` global `navigator.modelContext` to MCP-B-only extensions.
+1. Do not broaden `@mcp-b/webmcp-types` global `document.modelContext` to MCP-B-only extensions.
 2. Put MCP-B extension typings and extension runtime behavior in `@mcp-b/global`.
 3. Keep `@mcp-b/react-webmcp` aligned with MCP-B extension types from `@mcp-b/global`.
 4. Keep `usewebmcp` aligned with strict core types from `@mcp-b/webmcp-types`.

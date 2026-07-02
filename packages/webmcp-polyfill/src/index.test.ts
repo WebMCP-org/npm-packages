@@ -6,6 +6,7 @@ import {
   initializeWebMCPPolyfill,
   initializeWebModelContextPolyfill,
 } from './index.js';
+import { toJsonValue } from './schema.js';
 
 type CompatModelContext = Navigator['modelContext'] & {
   unregisterTool(nameOrTool: string | { name: string }): void;
@@ -161,7 +162,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
     }
   });
 
-  it('document.modelContext registerTool returns undefined and throws on duplicates', () => {
+  it('document.modelContext registerTool resolves undefined and throws on duplicates', async () => {
     initializeWebMCPPolyfill();
 
     const firstResult = document.modelContext.registerTool({
@@ -171,7 +172,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
       execute: async (args) => ({ content: [{ type: 'text', text: String(args.message ?? '') }] }),
     });
 
-    expect(firstResult).toBeUndefined();
+    await expect(firstResult).resolves.toBeUndefined();
     expect(() =>
       document.modelContext.registerTool({
         name: 'echo',
@@ -325,7 +326,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
     expect(() => navigator.modelContext.registerTool(tool)).not.toThrow();
   });
 
-  it('registerTool with a pre-aborted signal does not register the tool', () => {
+  it('registerTool with a pre-aborted signal rejects and does not register the tool', async () => {
     initializeWebMCPPolyfill();
 
     const ac = new AbortController();
@@ -338,17 +339,9 @@ describe('@mcp-b/webmcp-polyfill', () => {
       execute: async () => ({ content: [{ type: 'text', text: 'never' }] }),
     };
 
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-    try {
-      navigator.modelContext.registerTool(tool, { signal: ac.signal });
-
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('options.signal was already aborted')
-      );
-    } finally {
-      warnSpy.mockRestore();
-    }
+    await expect(navigator.modelContext.registerTool(tool, { signal: ac.signal })).rejects.toThrow(
+      /aborted/i
+    );
 
     expect(() => navigator.modelContext.registerTool(tool)).not.toThrow();
   });
@@ -373,7 +366,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(count).toBe(2);
+    expect(count).toBe(1);
   });
 
   it('exposes native-shaped getTools on document.modelContext', async () => {
@@ -452,8 +445,8 @@ describe('@mcp-b/webmcp-polyfill', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(listenerCount).toBe(2);
-    expect(handlerCount).toBe(2);
+    expect(listenerCount).toBe(1);
+    expect(handlerCount).toBe(1);
   });
 
   // =========================================================================
@@ -1151,6 +1144,48 @@ describe('@mcp-b/webmcp-polyfill', () => {
       ).toThrow('Failed to convert Standard JSON Schema inputSchema to a JSON Schema object');
 
       expect(attemptedTargets).toEqual(['draft-2020-12', 'draft-07']);
+    });
+
+    it('does not warn when Standard JSON Schema conversion succeeds on a fallback target', () => {
+      initializeWebMCPPolyfill();
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      try {
+        const draft07OnlySchema = {
+          '~standard': {
+            version: 1 as const,
+            vendor: 'test',
+            jsonSchema: {
+              input: (options: { target: string }) => {
+                if (options.target === 'draft-2020-12') {
+                  throw new Error('unsupported target');
+                }
+
+                return {
+                  type: 'object',
+                  properties: { count: { type: 'number' } },
+                };
+              },
+              output: () => ({ type: 'object', properties: {} }),
+            },
+          },
+        };
+
+        document.modelContext.registerTool({
+          name: 'draft_07_only_standard_json_tool',
+          description: 'Draft 07 only standard json schema tool',
+          inputSchema: asPolyfillInputSchema(draft07OnlySchema),
+          execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+        });
+
+        expect(warnSpy.mock.calls).not.toEqual(
+          expect.arrayContaining([
+            [expect.stringContaining('Standard JSON Schema conversion failed'), expect.anything()],
+          ])
+        );
+      } finally {
+        warnSpy.mockRestore();
+      }
     });
   });
 
@@ -1900,6 +1935,41 @@ describe('@mcp-b/webmcp-polyfill', () => {
       expect(parsed.structuredContent).toEqual({ ok: true, nested: { count: 2 } });
     });
 
+    it('executeTool validates structuredContent against outputSchema', async () => {
+      initializeWebMCPPolyfill();
+      navigator.modelContext.registerTool({
+        name: 'invalid_output_schema_tool',
+        description: 'Invalid output schema tool',
+        outputSchema: {
+          type: 'object',
+          properties: { count: { type: 'number' } },
+          required: ['count'],
+        },
+        execute: async () => ({ count: 'wrong' }),
+      });
+
+      await expect(
+        navigator.modelContextTesting?.executeTool('invalid_output_schema_tool', '{}')
+      ).rejects.toThrow('Output validation error');
+    });
+
+    it('executeTool validates primitive structuredContent against outputSchema', async () => {
+      initializeWebMCPPolyfill();
+      navigator.modelContext.registerTool({
+        name: 'primitive_output_schema_tool',
+        description: 'Primitive output schema tool',
+        outputSchema: { type: 'string' },
+        execute: async () => 'ready',
+      });
+
+      const result = await navigator.modelContextTesting?.executeTool(
+        'primitive_output_schema_tool',
+        '{}'
+      );
+      const parsed = JSON.parse(result ?? '{}');
+      expect(parsed.structuredContent).toBe('ready');
+    });
+
     it('executeTool does not set structuredContent for non-json-safe objects', async () => {
       initializeWebMCPPolyfill();
       navigator.modelContext.registerTool({
@@ -1935,7 +2005,11 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
     it('getCrossDocumentScriptToolResult returns empty array string', async () => {
       initializeWebMCPPolyfill();
-      const result = await navigator.modelContextTesting?.getCrossDocumentScriptToolResult();
+      const getResult = navigator.modelContextTesting?.getCrossDocumentScriptToolResult;
+      if (!getResult || !navigator.modelContextTesting) {
+        throw new Error('Expected getCrossDocumentScriptToolResult to be available');
+      }
+      const result = await getResult.call(navigator.modelContextTesting);
       expect(result).toBe('[]');
     });
   });
@@ -2244,10 +2318,10 @@ describe('@mcp-b/webmcp-polyfill', () => {
   });
 
   // =========================================================================
-  // validateArgsWithSchema edge cases
+  // JSON Schema validation edge cases
   // =========================================================================
 
-  describe('validateArgsWithSchema edge cases', () => {
+  describe('JSON Schema validation edge cases', () => {
     it('validates with no properties defined in schema', async () => {
       initializeWebMCPPolyfill();
       navigator.modelContext.registerTool({
@@ -2556,6 +2630,29 @@ describe('@mcp-b/webmcp-polyfill', () => {
       await expect(
         navigator.modelContextTesting?.executeTool('obj_arr_tool', '{"val":[1,2]}')
       ).rejects.toThrow('Instance type "array" is invalid. Expected "object"');
+    });
+  });
+
+  describe('toJsonValue', () => {
+    it('accepts JSON objects and rejects values that would need serialization cleanup', () => {
+      const circular: Record<string, unknown> = { ok: true };
+      circular.self = circular;
+
+      expect(toJsonValue({ ok: true, nested: [1, 'two', null] })).toEqual({
+        ok: true,
+        nested: [1, 'two', null],
+      });
+      expect(toJsonValue({ date: new Date(0) })).toBeUndefined();
+      expect(toJsonValue(circular)).toBeUndefined();
+    });
+
+    it('accepts JSON primitives and arrays', () => {
+      expect(toJsonValue('ok')).toBe('ok');
+      expect(toJsonValue(1)).toBe(1);
+      expect(toJsonValue(false)).toBe(false);
+      expect(toJsonValue(null)).toBeNull();
+      expect(toJsonValue(['ok', 1])).toEqual(['ok', 1]);
+      expect(toJsonValue(Number.NaN)).toBeUndefined();
     });
   });
 });

@@ -42,18 +42,18 @@ import { useWebMCP } from 'usewebmcp';
 
 ## Config fields
 
-| Field                      | Type                              | Required | Description                                                |
-| -------------------------- | --------------------------------- | -------- | ---------------------------------------------------------- |
-| `name`                     | `string`                          | Yes      | Unique tool identifier (lowercase with underscores)        |
-| `description`              | `string`                          | Yes      | Human-readable description for AI assistants               |
-| `inputSchema`              | JSON Schema or Standard Schema v1 | No       | Defines input parameters. Use `as const` for inference.    |
-| `outputSchema`             | `JsonSchemaObject`                | No       | Defines output structure and enables `structuredContent`.  |
-| `annotations`              | `ToolAnnotations`                 | No       | Metadata hints such as `readOnlyHint` and `idempotentHint` |
-| `execute(input)`           | `(input) => T \| Promise<T>`      | Yes\*    | Preferred tool implementation function                     |
-| `handler(input)`           | `(input) => T \| Promise<T>`      | Yes\*    | Backward-compatible alias for `execute`                    |
-| `formatOutput(output)`     | `(output) => string`              | No       | Deprecated. Prefer `outputSchema`.                         |
-| `onSuccess(result, input)` | `(result, input) => void`         | No       | Callback after successful execution                        |
-| `onError(error, input)`    | `(error, input) => void`          | No       | Callback after failed execution                            |
+| Field                      | Type                              | Required | Description                                                      |
+| -------------------------- | --------------------------------- | -------- | ---------------------------------------------------------------- |
+| `name`                     | `string`                          | Yes      | Unique tool identifier (lowercase with underscores)              |
+| `description`              | `string`                          | Yes      | Human-readable description for AI assistants                     |
+| `inputSchema`              | JSON Schema or Standard Schema v1 | No       | Defines input parameters. Use `as const` for inference.          |
+| `outputSchema`             | JSON Schema                       | No       | MCP-B helper metadata for output typing and `structuredContent`. |
+| `annotations`              | `ToolAnnotations`                 | No       | Metadata hints such as `readOnlyHint` and `idempotentHint`       |
+| `execute(input)`           | `(input) => T \| Promise<T>`      | Yes\*    | Preferred tool implementation function                           |
+| `handler(input)`           | `(input) => T \| Promise<T>`      | Yes\*    | Backward-compatible alias for `execute`                          |
+| `formatOutput(output)`     | `(output) => string`              | No       | Deprecated. Prefer `outputSchema`.                               |
+| `onSuccess(result, input)` | `(result, input) => void`         | No       | Callback after successful execution                              |
+| `onError(error, input)`    | `(error, input) => void`          | No       | Callback after failed execution                                  |
 
 _One of `execute` or `handler` is required. If both are present, `execute` wins._
 
@@ -123,7 +123,9 @@ These callbacks are stored in refs and do not trigger re-registration:
 
 ## Output schema contract
 
-When `outputSchema` is defined, the implementation must return a JSON-serializable object. Returning a non-object value causes an error response from the registered MCP tool.
+When `outputSchema` is defined, the implementation must return a JSON-serializable value that matches that schema for MCP-B helpers that consume it. Object, array, string, number, boolean, and null schemas are supported for type inference and hook result shaping.
+
+Native Chrome WebMCP does not currently define or enforce `outputSchema`; the browser standard tool dictionary defines `inputSchema`.
 
 ## Exported types
 

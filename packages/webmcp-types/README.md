@@ -152,7 +152,9 @@ If `required` is widened (for example a runtime `string[]`), fields are treated 
 
 ### 5. Output inference from `outputSchema`
 
-When `outputSchema` is a literal object schema, `structuredContent` is inferred automatically via `ToolResultFromOutputSchema`.
+When `outputSchema` is a literal JSON Schema, `structuredContent` is inferred automatically via `ToolResultFromOutputSchema`. Object, array, string, number, boolean, and null schemas are supported for MCP-B type inference.
+
+Native Chrome WebMCP does not currently define or enforce `outputSchema`; treat it as helper metadata unless a specific MCP-B runtime or adapter consumes it.
 
 This catches enum/type mismatches at compile time.
 

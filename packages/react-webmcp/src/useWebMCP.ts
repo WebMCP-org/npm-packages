@@ -1,10 +1,10 @@
 import type {
   CallToolResult,
   InputSchema,
-  JsonObject,
   JsonSchemaForInference,
   ToolDescriptor,
 } from '@mcp-b/webmcp-types';
+import { isPlainObject, normalizeInputSchema, toJsonValue } from '@mcp-b/webmcp-polyfill/schema';
 import type { DependencyList } from 'react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type {
@@ -16,8 +16,8 @@ import type {
   WebMCPConfig,
   WebMCPReturn,
 } from './types.js';
-import { getModelContext, type ModelContextSurface } from './model-context.js';
-import { isZodSchema, zodToJsonSchema } from './zod-utils.js';
+import { getModelContext } from './model-context.js';
+import { isZodSchema, isZodType, zodToJsonSchema } from './zod-utils.js';
 
 /**
  * Default output formatter that converts values to formatted JSON strings.
@@ -35,211 +35,93 @@ function defaultFormatOutput(output: unknown): string {
 }
 
 const TOOL_OWNER_BY_NAME = new Map<string, symbol>();
-const DEFAULT_REGISTERED_INPUT_SCHEMA: InputSchema = { type: 'object', properties: {} };
-const STANDARD_JSON_SCHEMA_TARGETS = ['draft-2020-12', 'draft-07'] as const;
-type StructuredContent = Exclude<CallToolResult['structuredContent'], undefined>;
+const INFERABLE_JSON_SCHEMA_TYPES = [
+  'array',
+  'boolean',
+  'integer',
+  'null',
+  'number',
+  'object',
+  'string',
+] as const;
+const UNSUPPORTED_OUTPUT_SCHEMA_KEYS = ['$ref', 'allOf', 'anyOf', 'oneOf', 'not'] as const;
 
-function isObjectOutputSchema(schema: ReactWebMCPOutputSchema | undefined): boolean {
-  if (!schema) {
-    return false;
-  }
-
-  if (isZodSchema(schema)) {
-    return true;
-  }
-
-  return 'type' in schema && schema.type === 'object';
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isInputSchema(value: unknown): value is InputSchema {
-  if (!isPlainObject(value)) {
-    return false;
-  }
-
-  if ('type' in value && value.type !== undefined && typeof value.type !== 'string') {
-    return false;
-  }
-
-  if ('properties' in value && value.properties !== undefined && !isPlainObject(value.properties)) {
-    return false;
-  }
-
-  if (
-    'required' in value &&
-    value.required !== undefined &&
-    (!Array.isArray(value.required) || value.required.some((entry) => typeof entry !== 'string'))
-  ) {
-    return false;
-  }
-
-  return true;
-}
-
-function isJsonSchemaForInference(value: unknown): value is JsonSchemaForInference {
-  if (!isPlainObject(value) || !('type' in value)) {
-    return false;
-  }
-
-  const schemaType = value.type;
-  if (typeof schemaType === 'string') {
-    if (
-      !['array', 'boolean', 'integer', 'null', 'number', 'object', 'string'].includes(schemaType)
-    ) {
-      return false;
-    }
-
-    if (schemaType === 'array') {
-      return 'items' in value && isJsonSchemaForInference(value.items);
-    }
-
-    if (schemaType === 'object' && 'properties' in value && value.properties !== undefined) {
-      return (
-        isPlainObject(value.properties) &&
-        Object.values(value.properties).every(isJsonSchemaForInference)
-      );
-    }
-
-    return true;
-  }
-
+function isInferableJsonSchemaType(
+  value: unknown
+): value is (typeof INFERABLE_JSON_SCHEMA_TYPES)[number] {
   return (
-    Array.isArray(schemaType) &&
-    schemaType.length > 0 &&
-    schemaType.every((entry) =>
-      ['array', 'boolean', 'integer', 'null', 'number', 'object', 'string'].includes(entry)
-    )
+    typeof value === 'string' &&
+    INFERABLE_JSON_SCHEMA_TYPES.includes(value as (typeof INFERABLE_JSON_SCHEMA_TYPES)[number])
   );
 }
 
-function isJsonValue(value: unknown): boolean {
-  if (value === null) {
-    return true;
-  }
-
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-    return true;
-  }
-
-  if (Array.isArray(value)) {
-    return value.every(isJsonValue);
-  }
-
-  if (typeof value !== 'object') {
-    return false;
-  }
-
-  return Object.values(value).every(isJsonValue);
+function unsupportedOutputSchema(detail: string): never {
+  throw new Error(`Unsupported outputSchema: ${detail}`);
 }
 
-function isJsonObject(value: unknown): value is JsonObject {
-  return typeof value === 'object' && value !== null && !Array.isArray(value) && isJsonValue(value);
-}
-
-function toStructuredContent(value: unknown): StructuredContent | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return null;
+function assertInferableJsonSchema(
+  value: unknown,
+  path = '$'
+): asserts value is JsonSchemaForInference {
+  if (!isPlainObject(value)) {
+    unsupportedOutputSchema(`${path} must be a JSON Schema object`);
   }
 
-  try {
-    const normalized = JSON.parse(JSON.stringify(value));
-    return isJsonObject(normalized) ? normalized : null;
-  } catch {
-    return null;
+  for (const key of UNSUPPORTED_OUTPUT_SCHEMA_KEYS) {
+    if (key in value) {
+      unsupportedOutputSchema(`${path}.${key} is outside the inferable JSON Schema subset`);
+    }
+  }
+
+  const schemaTypes =
+    typeof value.type === 'string'
+      ? [value.type]
+      : Array.isArray(value.type)
+        ? value.type
+        : undefined;
+  if (
+    !schemaTypes?.length ||
+    !schemaTypes.every((schemaType) => isInferableJsonSchemaType(schemaType))
+  ) {
+    unsupportedOutputSchema(`${path} must declare an inferable JSON Schema type`);
+  }
+
+  const requiredValue = value.required;
+  if (
+    requiredValue !== undefined &&
+    (!Array.isArray(requiredValue) || requiredValue.some((entry) => typeof entry !== 'string'))
+  ) {
+    unsupportedOutputSchema(`${path}.required must be an array of strings`);
+  }
+
+  if (schemaTypes.includes('array')) {
+    if (!isPlainObject(value.items)) {
+      unsupportedOutputSchema(`${path}.items must be an inferable schema for array outputs`);
+    }
+    assertInferableJsonSchema(value.items, `${path}.items`);
+  }
+
+  if (schemaTypes.includes('object')) {
+    if (value.properties !== undefined && !isPlainObject(value.properties)) {
+      unsupportedOutputSchema(`${path}.properties must be an object`);
+    }
+
+    if (isPlainObject(value.properties)) {
+      for (const [key, propertySchema] of Object.entries(value.properties)) {
+        assertInferableJsonSchema(propertySchema, `${path}.properties.${key}`);
+      }
+    }
+
+    if (
+      value.additionalProperties !== undefined &&
+      typeof value.additionalProperties !== 'boolean'
+    ) {
+      assertInferableJsonSchema(value.additionalProperties, `${path}.additionalProperties`);
+    }
   }
 }
 
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
-
-function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
-  return (
-    Boolean(value) &&
-    (typeof value === 'object' || typeof value === 'function') &&
-    typeof (value as { then?: unknown }).then === 'function'
-  );
-}
-
-/**
- * On Chrome Beta 147 native (which ignores the second arg), aborting
- * the controller cannot remove the tool. Install `@mcp-b/global`
- * or `@mcp-b/webmcp-polyfill` there.
- */
-function registerToolWithCleanup(
-  modelContext: ModelContextSurface,
-  toolDescriptor: ToolDescriptor
-): AbortController {
-  const controller = new AbortController();
-  const result = (
-    modelContext.registerTool as (
-      tool: ToolDescriptor,
-      options?: { signal?: AbortSignal }
-    ) => unknown
-  ).call(modelContext, toolDescriptor, { signal: controller.signal });
-
-  if (isPromiseLike(result)) {
-    result.then(undefined, (error: unknown) => {
-      console.warn(
-        `[ReactWebMCP:useWebMCP] registerTool("${toolDescriptor.name}") rejected:`,
-        error
-      );
-    });
-  }
-
-  return controller;
-}
-
-function toRegisteredInputSchema(
-  schema: ReactWebMCPInputSchema | undefined
-): InputSchema | undefined {
-  if (!schema) {
-    return undefined;
-  }
-
-  if (isZodSchema(schema)) {
-    return zodToJsonSchema(schema);
-  }
-
-  if (!isPlainObject(schema) || !('~standard' in schema)) {
-    return isInputSchema(schema) ? schema : DEFAULT_REGISTERED_INPUT_SCHEMA;
-  }
-
-  const standard = schema['~standard'];
-  if (!isPlainObject(standard)) {
-    return DEFAULT_REGISTERED_INPUT_SCHEMA;
-  }
-
-  const jsonSchema = standard.jsonSchema;
-  if (!isPlainObject(jsonSchema) || typeof jsonSchema.input !== 'function') {
-    return DEFAULT_REGISTERED_INPUT_SCHEMA;
-  }
-
-  for (const target of STANDARD_JSON_SCHEMA_TARGETS) {
-    try {
-      const converted = jsonSchema.input({ target });
-      if (isInputSchema(converted)) {
-        return converted;
-      }
-    } catch {
-      // Try the next target before falling back to the default registration schema.
-    }
-  }
-
-  return DEFAULT_REGISTERED_INPUT_SCHEMA;
-}
-
-function toRegisteredOutputSchema(
-  schema: ReactWebMCPOutputSchema | undefined
-): JsonSchemaForInference | undefined {
-  if (!schema) {
-    return undefined;
-  }
-
-  const jsonSchema = isZodSchema(schema) ? zodToJsonSchema(schema) : schema;
-  return isJsonSchemaForInference(jsonSchema) ? jsonSchema : undefined;
-}
 
 /**
  * React hook for registering and managing Model Context Protocol (MCP) tools.
@@ -283,7 +165,7 @@ function toRegisteredOutputSchema(
  * ```
  *
  * @template TInputSchema - JSON Schema defining input parameter types (use `as const` for inference)
- * @template TOutputSchema - JSON Schema defining output structure (object schemas enable structuredContent)
+ * @template TOutputSchema - JSON Schema defining output structure
  *
  * @param config - Configuration object for the tool
  * @param deps - Optional dependency array that triggers tool re-registration when values change.
@@ -324,20 +206,14 @@ export function useWebMCP<
   const onSuccessRef = useRef(onSuccess);
   const onErrorRef = useRef(onError);
   const formatOutputRef = useRef(formatOutput);
-  const inputSchemaRef = useRef(inputSchema);
-  const outputSchemaRef = useRef(outputSchema);
-  const annotationsRef = useRef(annotations);
   const isMountedRef = useRef(true);
-  // Update refs when callbacks or static descriptors are recreated during render.
+  // Keep the registered handler current without re-registering the tool.
   useIsomorphicLayoutEffect(() => {
     handlerRef.current = handler;
     onSuccessRef.current = onSuccess;
     onErrorRef.current = onError;
     formatOutputRef.current = formatOutput;
-    inputSchemaRef.current = inputSchema;
-    outputSchemaRef.current = outputSchema;
-    annotationsRef.current = annotations;
-  }, [annotations, handler, inputSchema, onSuccess, onError, outputSchema, formatOutput]);
+  }, [handler, onSuccess, onError, formatOutput]);
 
   // Cleanup: mark component as unmounted
   useEffect(() => {
@@ -431,12 +307,18 @@ export function useWebMCP<
       return;
     }
 
-    /**
-     * Handles MCP tool execution by running the handler and formatting the response.
-     *
-     * @param input - The input parameters from the MCP client
-     * @returns CallToolResult with text content and optional structuredContent
-     */
+    const resolvedInputSchema = isZodSchema(inputSchema)
+      ? zodToJsonSchema(inputSchema)
+      : normalizeInputSchema(inputSchema).inputSchema;
+    let resolvedOutputSchema: JsonSchemaForInference | undefined;
+    if (outputSchema) {
+      const jsonSchema =
+        isZodSchema(outputSchema) || isZodType(outputSchema)
+          ? zodToJsonSchema(outputSchema)
+          : outputSchema;
+      assertInferableJsonSchema(jsonSchema);
+      resolvedOutputSchema = jsonSchema;
+    }
     const mcpHandler = async (input: unknown): Promise<CallToolResult> => {
       try {
         const result = await Reflect.apply(executeRef.current, undefined, [input]);
@@ -451,11 +333,11 @@ export function useWebMCP<
           ],
         };
 
-        if (isObjectOutputSchema(outputSchemaRef.current)) {
-          const structuredContent = toStructuredContent(result);
-          if (!structuredContent) {
+        if (resolvedOutputSchema) {
+          const structuredContent = toJsonValue(result);
+          if (structuredContent === undefined) {
             throw new Error(
-              `Tool "${name}" outputSchema requires the handler to return a JSON object result`
+              `Tool "${name}" outputSchema requires the handler to return a JSON-serializable result`
             );
           }
           response.structuredContent = structuredContent;
@@ -477,30 +359,56 @@ export function useWebMCP<
       }
     };
 
-    const resolvedInputSchema = toRegisteredInputSchema(inputSchemaRef.current);
-    const resolvedOutputSchema = toRegisteredOutputSchema(outputSchemaRef.current);
-    const resolvedAnnotations = annotationsRef.current;
-
     const ownerToken = Symbol(name);
-    const toolDescriptor: ToolDescriptor = {
+    const toolDescriptor: ToolDescriptor & { inputSchema: InputSchema } = {
       name,
       description,
-      ...(resolvedInputSchema && { inputSchema: resolvedInputSchema }),
+      inputSchema: resolvedInputSchema,
       ...(resolvedOutputSchema && { outputSchema: resolvedOutputSchema }),
-      ...(resolvedAnnotations && { annotations: resolvedAnnotations }),
+      ...(annotations && { annotations }),
       execute: mcpHandler,
     };
-    const controller = registerToolWithCleanup(modelContext, toolDescriptor);
-    TOOL_OWNER_BY_NAME.set(name, ownerToken);
+    const controller = new AbortController();
+    let registered = false;
+    let disposed = false;
+
+    try {
+      const registerResult = modelContext.registerTool(toolDescriptor, {
+        signal: controller.signal,
+      });
+
+      void Promise.resolve(registerResult).then(
+        () => {
+          if (!disposed && !controller.signal.aborted) {
+            registered = true;
+            TOOL_OWNER_BY_NAME.set(name, ownerToken);
+          }
+        },
+        (error: unknown) => {
+          if (!controller.signal.aborted) {
+            controller.abort();
+            console.warn(`[ReactWebMCP:useWebMCP] registerTool("${name}") rejected:`, error);
+          }
+        }
+      );
+    } catch (error) {
+      controller.abort();
+      console.warn(`[ReactWebMCP:useWebMCP] registerTool("${name}") rejected:`, error);
+      return;
+    }
 
     return () => {
-      const currentOwner = TOOL_OWNER_BY_NAME.get(name);
-      if (currentOwner !== ownerToken) {
+      disposed = true;
+
+      if (registered && TOOL_OWNER_BY_NAME.get(name) === ownerToken) {
+        TOOL_OWNER_BY_NAME.delete(name);
+        controller.abort();
         return;
       }
 
-      TOOL_OWNER_BY_NAME.delete(name);
-      controller.abort();
+      if (!registered) {
+        controller.abort();
+      }
     };
     // Spread operator in dependencies intentionally allows consumers to trigger
     // re-registration with custom reactive inputs.

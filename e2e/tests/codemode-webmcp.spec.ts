@@ -11,7 +11,7 @@ test.describe('Codemode WebMCP E2E', () => {
     const runtime = await page.locator('#codemode-runtime').getAttribute('data-runtime');
     expect(['native', 'polyfill']).toContain(runtime);
 
-    if (test.info().project.name === 'chrome-beta-webmcp') {
+    if (test.info().project.name === 'chrome-m152-webmcp') {
       expect(runtime).toBe('native');
     }
 

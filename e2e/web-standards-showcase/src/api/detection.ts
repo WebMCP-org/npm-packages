@@ -15,9 +15,9 @@ export function detectNativeAPI(): DetectionResult {
   };
 
   // Check if modelContext exists
-  if (!navigator.modelContext) {
+  if (!document.modelContext) {
     result.message =
-      'navigator.modelContext not found. Please launch Chromium with --enable-experimental-web-platform-features';
+      'document.modelContext not found. Please launch Chromium with --enable-experimental-web-platform-features';
     return result;
   }
 
@@ -49,7 +49,7 @@ export function detectNativeAPI(): DetectionResult {
  * Get detailed API information for debugging
  */
 export function getAPIInfo(): Record<string, unknown> {
-  const ctx = navigator.modelContext;
+  const ctx = document.modelContext;
   const testing = navigator.modelContextTesting;
 
   return {

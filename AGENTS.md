@@ -78,7 +78,7 @@ the Diataxis framework.
 
 ### Commit Scopes
 
-Package scopes: `agent-skills`, `chrome-devtools-mcp`, `codemode`, `extension-tools`, `global`, `mcp-iframe`, `react-webmcp`, `smart-dom-reader`, `transports`, `usewebmcp`, `webmcp-local-relay`, `webmcp-polyfill`, `webmcp-ts-sdk`, `webmcp-types`
+Package scopes: `codemode`, `extension-tools`, `global`, `mcp-iframe`, `react-webmcp`, `smart-dom-reader`, `transports`, `usewebmcp`, `webmcp-local-relay`, `webmcp-polyfill`, `webmcp-ts-sdk`, `webmcp-types`
 
 Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 

@@ -3,7 +3,7 @@
 Strict WebMCP core runtime polyfill for `document.modelContext` (with a
 backward-compatible `navigator.modelContext` alias).
 
-> **Heads up — WebMCP spec migration.** The `modelContext` getter moved from
+> **Heads up - WebMCP spec migration.** The `modelContext` getter moved from
 > `Navigator` to `Document` in
 > [webmachinelearning/webmcp#184](https://github.com/webmachinelearning/webmcp/pull/184)
 > and Chrome 150 deprecates `navigator.modelContext`. The polyfill installs on
@@ -13,17 +13,17 @@ backward-compatible `navigator.modelContext` alias).
 > access. Prefer `document.modelContext` for new code.
 
 ```js
-const modelContext = document.modelContext || navigator.modelContext;
+const modelContext = document.modelContext;
 if (modelContext) {
-  // Register tools…
+  // Register tools...
 }
 ```
 
 `@mcp-b/webmcp-polyfill` installs only the strict core API:
 
-- `registerTool(tool, options?)` — pass `options.signal` (`AbortSignal`) to unregister when aborted
-- `getTools()` — async Chromium producer-preview discovery API
-- `executeTool(toolFromGetTools, inputArgsJson, options?)` — Chromium producer-preview execution API
+- `registerTool(tool, options?)` - pass `options.signal` (`AbortSignal`) to unregister when aborted
+- `getTools()` - async Chromium producer-preview discovery API
+- `executeTool(toolFromGetTools, inputArgsJson, options?)` - Chromium producer-preview execution API
 - `unregisterTool(nameOrTool)` (deprecated compatibility API)
 
 It does not install MCP bridge extensions like `callTool`, resources, or prompts.
@@ -166,7 +166,7 @@ Restores previous `document.modelContext`, `navigator.modelContext`, and `naviga
 - Requires a non-empty `name`, non-empty `description`, and `execute` function.
 - Throws on duplicate tool names.
 - If `inputSchema` is omitted, runtime defaults to `{ type: 'object', properties: {} }`.
-- `options.signal` (optional `AbortSignal`) — when the signal aborts, the tool is unregistered. If the signal is already aborted at registration time, the polyfill skips the registration and logs a warning (matching the April 23, 2026 spec step).
+- `options.signal` (optional `AbortSignal`) - when the signal aborts, the tool is unregistered. If the signal is already aborted at registration time, the polyfill skips the registration and logs a warning (matching the April 23, 2026 spec step).
 
 ```ts
 const ac = new AbortController();
@@ -182,7 +182,7 @@ document.modelContext.registerTool(
   { signal: ac.signal }
 );
 
-// Later — unregister cleanly:
+// Later - unregister cleanly:
 ac.abort();
 ```
 

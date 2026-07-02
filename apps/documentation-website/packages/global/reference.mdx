@@ -191,21 +191,23 @@ After initialization, `document.modelContext` is a `BrowserMcpServer` instance. 
 
 **Strict WebMCP methods** (mirrored to native/polyfill):
 
-| Method                 | Description           |
-| ---------------------- | --------------------- |
-| `registerTool(tool)`   | Add a single tool     |
-| `unregisterTool(name)` | Remove a tool by name |
+| Method                             | Description                        |
+| ---------------------------------- | ---------------------------------- |
+| `registerTool(tool, options?)`     | Add a single tool                  |
+| `getTools()`                       | List producer tool descriptors     |
+| `executeTool(tool, inputArgsJson)` | Execute a producer tool descriptor |
 
 **Extension methods** (MCP-B only):
 
-| Method                         | Description              |
-| ------------------------------ | ------------------------ |
-| `listTools()`                  | List registered tools    |
-| `callTool(params)`             | Execute a tool by name   |
-| `registerResource(descriptor)` | Register an MCP resource |
-| `registerPrompt(descriptor)`   | Register an MCP prompt   |
-| `createMessage(params)`        | Request LLM sampling     |
-| `elicitInput(params)`          | Request user input       |
+| Method                         | Description                               |
+| ------------------------------ | ----------------------------------------- |
+| `listTools()`                  | List registered tools                     |
+| `callTool(params)`             | Deprecated compatibility execution helper |
+| `unregisterTool(name)`         | Deprecated compatibility removal helper   |
+| `registerResource(descriptor)` | Register an MCP resource                  |
+| `registerPrompt(descriptor)`   | Register an MCP prompt                    |
+| `createMessage(params)`        | Request LLM sampling                      |
+| `elicitInput(params)`          | Request user input                        |
 
 For the MCP-B-only methods on `document.modelContext`, see [`@mcp-b/webmcp-ts-sdk` reference](/packages/webmcp-ts-sdk/reference). For the standard-owned browser surface, see [WebMCP standard API](/reference/webmcp/standard-api).
 

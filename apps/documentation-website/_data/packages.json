@@ -132,19 +132,6 @@
     }
   },
   {
-    "id": "chrome-devtools-mcp",
-    "packageName": "@mcp-b/chrome-devtools-mcp",
-    "sidebarLabel": "chrome-devtools-mcp",
-    "category": "Tooling",
-    "summary": "Chrome DevTools Protocol bridge that lets MCP clients inspect browsers and discover WebMCP tools from live pages.",
-    "installCommand": "npx -y @mcp-b/chrome-devtools-mcp@latest",
-    "overviewPath": "/packages/chrome-devtools-mcp/overview",
-    "referencePath": "/packages/chrome-devtools-mcp/reference",
-    "quickstartSnippet": "packages/chrome-devtools-mcp-quickstart.json",
-    "sourcePackagePath": "packages/chrome-devtools-mcp",
-    "note": "This package is a fork of ChromeDevTools/chrome-devtools-mcp with WebMCP integration layered on top."
-  },
-  {
     "id": "extension-tools",
     "packageName": "@mcp-b/extension-tools",
     "sidebarLabel": "extension-tools",
@@ -167,17 +154,5 @@
     "referencePath": "/packages/smart-dom-reader/reference",
     "quickstartSnippet": "packages/smart-dom-reader-quickstart.ts",
     "sourcePackagePath": "packages/smart-dom-reader"
-  },
-  {
-    "id": "agent-skills",
-    "packageName": "agent-skills-ts-sdk",
-    "sidebarLabel": "agent-skills",
-    "category": "Tooling",
-    "summary": "Parser, validator, prompt builder, and patch utilities for the AgentSkills SKILL.md format.",
-    "installCommand": "npm install agent-skills-ts-sdk",
-    "overviewPath": "/packages/agent-skills/overview",
-    "referencePath": "/packages/agent-skills/reference",
-    "quickstartSnippet": "packages/agent-skills-quickstart.ts",
-    "sourcePackagePath": "packages/agent-skills"
   }
 ]

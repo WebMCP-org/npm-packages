@@ -6,25 +6,22 @@
 [![npm downloads](https://img.shields.io/npm/dm/@mcp-b/webmcp-ts-sdk?style=flat-square)](https://www.npmjs.com/package/@mcp-b/webmcp-ts-sdk)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue?style=flat-square)](https://www.typescriptlang.org/)
-[![Minimal Code](https://img.shields.io/badge/Custom_Code-~50_lines-green?style=flat-square)](https://github.com/WebMCP-org/npm-packages)
-
 **[Reference](https://docs.mcp-b.ai/packages/webmcp-ts-sdk/reference)** | **[First Tool Tutorial](https://docs.mcp-b.ai/tutorials/first-tool)**
 
-**@mcp-b/webmcp-ts-sdk** adapts the official MCP TypeScript SDK for browser environments, enabling dynamic tool registration required by the W3C Web Model Context API. This allows AI agents like Claude, ChatGPT, Gemini, Cursor, and Copilot to interact with browser-based applications.
+**@mcp-b/webmcp-ts-sdk** adapts the official MCP TypeScript SDK for browser environments, enabling dynamic tool registration required by the WebMCP API. This allows AI agents like Claude, ChatGPT, Gemini, Cursor, and Copilot to interact with browser-based applications.
 
 ## Why Use @mcp-b/webmcp-ts-sdk?
 
 | Feature                       | Benefit                                                               |
 | ----------------------------- | --------------------------------------------------------------------- |
 | **Dynamic Tool Registration** | Register tools after transport connection - required for browser apps |
-| **Minimal Overhead**          | Only ~50 lines of custom code on top of official SDK                  |
 | **Full SDK Compatibility**    | Re-exports all types, classes, and utilities from official SDK        |
 | **Type-Safe**                 | No prototype hacks - clean TypeScript extension                       |
 | **Auto-Updates**              | Types and protocol follow official SDK automatically                  |
 
 ## Overview
 
-This package adapts the official [@modelcontextprotocol/sdk](https://www.npmjs.com/package/@modelcontextprotocol/sdk) for browser environments with modifications to support dynamic tool registration required by the [W3C Web Model Context API](https://webmachinelearning.github.io/webmcp/) (`document.modelContext`).
+This package adapts the official [@modelcontextprotocol/sdk](https://www.npmjs.com/package/@modelcontextprotocol/sdk) for browser environments with modifications to support dynamic tool registration required by the [WebMCP API](https://webmachinelearning.github.io/webmcp/) (`document.modelContext`).
 
 ## Why This Package Exists
 
@@ -39,7 +36,7 @@ public registerCapabilities(capabilities: ServerCapabilities): void {
 }
 ```
 
-For the Web Model Context API, this restriction is incompatible because:
+For WebMCP, this restriction is incompatible because:
 
 1. **Tools arrive dynamically** - Web pages call `document.modelContext.registerTool(...)` at any time
 2. **Transport must be ready immediately** - The MCP server/transport needs to be connected when the page loads
@@ -50,8 +47,8 @@ This package solves the problem by **pre-registering tool capabilities** before 
 Compatibility note:
 
 - `BrowserMcpServer.registerTool(tool, options?)` accepts the WebMCP April 23, 2026 draft signature, including `options.signal` (`AbortSignal`) for unregistration. When the signal aborts, both the server-side registration and the mirrored native registration are removed.
-- The same call still returns a deprecated `{ unregister }` compatibility handle so existing MCP-B integrations do not break, even though spec/native runtimes return `undefined`. The handle will be removed in the next major version — prefer `options.signal`.
-- `unregisterTool(name)` was removed from the WebMCP draft on April 23, 2026 in favor of the `AbortSignal` flow. It is kept on `BrowserMcpServer` with a one-time deprecation warning to interoperate with current Chrome Beta 147 (which still ships the string-name API). It will be removed in the next major version.
+- The same call resolves `undefined`, matching current Chromium and the WebMCP spec.
+- `unregisterTool(name)` was removed from the WebMCP draft on April 23, 2026 in favor of the `AbortSignal` flow. It is kept on `BrowserMcpServer` with a one-time deprecation warning for older MCP-B integrations. It will be removed in the next major version.
 - `provideContext()` and `clearContext()` were removed from the WebMCP draft on March 5, 2026 and are not exposed by `BrowserMcpServer`.
 
 ## Modifications from Official SDK
@@ -136,13 +133,13 @@ server.registerTool(
   {
     description: 'A dynamically registered tool',
     inputSchema: { message: z.string() },
-    // Output schemas enable structured, type-safe AI responses
+    // outputSchema is MCP-B metadata for structured, type-safe responses
     outputSchema: { result: z.string() },
   },
   async ({ message }) => {
     return {
       content: [{ type: 'text', text: `Echo: ${message}` }],
-      // structuredContent must match the outputSchema
+      // structuredContent should match the outputSchema for MCP-B adapters
       structuredContent: { result: `Echo: ${message}` },
     };
   }
@@ -203,9 +200,8 @@ server.registerTool(
 
 This package is designed for **minimal maintenance**:
 
-- **~50 lines** of custom code
 - **Automatic updates** for types, protocol, validation via official SDK dependency
-- **Single modification point** - only capability registration behavior
+- **Small modification surface** - capability registration and browser runtime adaptation
 - **Type-safe** - no prototype hacks or unsafe casts
 
 ### Syncing with Upstream
@@ -217,7 +213,8 @@ When the official SDK updates:
 3. Test that capability registration still works
 4. Update this README if SDK behavior changes
 
-The modification is minimal and unlikely to conflict with upstream changes.
+The modification surface is intentionally small and should be checked whenever
+the upstream SDK changes capability registration behavior.
 
 ## Frequently Asked Questions
 
@@ -227,11 +224,11 @@ The official SDK throws an error if you try to register tools after connecting a
 
 ### Is this a fork of the official SDK?
 
-No - it's a thin adapter (~50 lines) that extends the official SDK. All types, protocol handling, and validation come from the upstream package.
+No. It is an adapter that extends the official SDK. Core protocol handling and most SDK types come from the upstream package.
 
 ### Will this break when the official SDK updates?
 
-Unlikely. The modification is minimal and isolated. When upstream updates, just update your dependencies - the wrapper adapts automatically.
+Unlikely. The modification surface is isolated. When upstream updates, update the dependency and run the conformance tests.
 
 ### When should I use this vs `@mcp-b/global`?
 
@@ -242,13 +239,13 @@ Use `@mcp-b/global` for the standard `document.modelContext` API. Use this packa
 - [`@mcp-b/global`](https://docs.mcp-b.ai/packages/global/reference) - Full MCP-B browser runtime (uses this package internally)
 - [`@mcp-b/transports`](https://docs.mcp-b.ai/packages/transports/reference) - Browser-specific MCP transports
 - [`@mcp-b/react-webmcp`](https://docs.mcp-b.ai/packages/react-webmcp/reference) - React hooks for MCP
-- [`@mcp-b/chrome-devtools-mcp`](https://docs.mcp-b.ai/packages/chrome-devtools-mcp/reference) - Connect desktop AI agents to browser tools
+- [`chrome-devtools-mcp`](https://github.com/ChromeDevTools/chrome-devtools-mcp) - Upstream Chrome DevTools MCP server
 - [`@modelcontextprotocol/sdk`](https://www.npmjs.com/package/@modelcontextprotocol/sdk) - Official MCP SDK
 
 ## Resources
 
 - [WebMCP Documentation](https://docs.mcp-b.ai)
-- [Web Model Context API Explainer](https://webmachinelearning.github.io/webmcp/)
+- [WebMCP specification](https://webmachinelearning.github.io/webmcp/)
 - [Model Context Protocol Spec](https://modelcontextprotocol.io/)
 - [Official MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk)
 - [MCP GitHub Repository](https://github.com/modelcontextprotocol)

@@ -1,6 +1,6 @@
 # @mcp-b/global
 
-> W3C Web Model Context API polyfill - Let Claude, ChatGPT, Gemini, and other AI agents interact with your website
+> WebMCP runtime - Let Claude, ChatGPT, Gemini, and other AI agents interact with your website
 
 [![npm version](https://img.shields.io/npm/v/@mcp-b/global?style=flat-square)](https://www.npmjs.com/package/@mcp-b/global)
 [![npm downloads](https://img.shields.io/npm/dm/@mcp-b/global?style=flat-square)](https://www.npmjs.com/package/@mcp-b/global)
@@ -10,18 +10,18 @@
 
 **[Reference](https://docs.mcp-b.ai/packages/global/reference)** | **[First Tool Tutorial](https://docs.mcp-b.ai/tutorials/first-tool)** | **[Add Tools to an App](https://docs.mcp-b.ai/how-to/add-tools-to-an-existing-app)**
 
-**@mcp-b/global** implements the [W3C Web Model Context API](https://webmachinelearning.github.io/webmcp/) (`document.modelContext`) specification, allowing AI agents like Claude, ChatGPT, Gemini, Cursor, and Copilot to discover and call functions on your website.
+**@mcp-b/global** implements the [WebMCP API](https://webmachinelearning.github.io/webmcp/) (`document.modelContext`) specification, allowing AI agents like Claude, ChatGPT, Gemini, Cursor, and Copilot to discover and call functions on your website.
 
 ## Why Use @mcp-b/global?
 
-| Feature                      | Benefit                                                                                                                                                                                                                                                                                           |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **W3C Standard**             | Implements the emerging Web Model Context API specification                                                                                                                                                                                                                                       |
-| **Drop-in IIFE**             | Add AI capabilities with a single `<script>` tag - no build step                                                                                                                                                                                                                                  |
-| **Native Chromium Support**  | Auto-detects and uses native browser implementation when available                                                                                                                                                                                                                                |
-| **Dual Transport**           | Works with both same-window clients AND parent pages (iframe support)                                                                                                                                                                                                                             |
-| **Spec-Aware Compatibility** | Tracks the current WebMCP draft (`document.modelContext`, `registerTool(tool, { signal })`, `getTools()`, and `executeTool(...)`). Deprecated `unregisterTool(name)` and the `{ unregister }` return handle remain for existing MCP-B integrations and will be removed in the next major version. |
-| **Works with Any AI**        | Claude, ChatGPT, Gemini, Cursor, Copilot, and any MCP client                                                                                                                                                                                                                                      |
+| Feature                      | Benefit                                                                                                                                                                                                                                                     |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **W3C Standard**             | Implements the emerging WebMCP API specification                                                                                                                                                                                                            |
+| **Drop-in IIFE**             | Add AI capabilities with a single `<script>` tag - no build step                                                                                                                                                                                            |
+| **Native Chromium Support**  | Auto-detects and uses native browser implementation when available                                                                                                                                                                                          |
+| **Dual Transport**           | Works with both same-window clients AND parent pages (iframe support)                                                                                                                                                                                       |
+| **Spec-Aware Compatibility** | Tracks the current WebMCP draft (`document.modelContext`, `registerTool(tool, { signal })`, `getTools()`, and `executeTool(...)`). Deprecated `unregisterTool(name)` remains for existing MCP-B integrations and will be removed in the next major version. |
+| **Works with Any AI**        | Claude, ChatGPT, Gemini, Cursor, Copilot, and any MCP client                                                                                                                                                                                                |
 
 ## Package Selection
 
@@ -162,11 +162,11 @@ document.modelContext.registerTool(
   { signal: ac.signal }
 );
 
-// Later — clean up:
+// Later - clean up:
 ac.abort();
 ```
 
-For backwards compatibility, `@mcp-b/global` also returns a deprecated `{ unregister }` handle so existing MCP-B integrations do not break, even though current Chromium and the WebMCP spec return `undefined`. The handle will be removed in the next major version.
+`registerTool` resolves `undefined`, matching current Chromium and the WebMCP spec. Use `AbortSignal` cleanup for dynamic tools.
 
 #### `unregisterTool(nameOrTool)` (deprecated)
 
@@ -176,26 +176,35 @@ Removes a tool by name. The April 23, 2026 WebMCP draft removed `unregisterTool`
 document.modelContext.unregisterTool('add-to-cart');
 ```
 
-#### `listTools()`
+#### `getTools()`
 
-Returns metadata for all registered tools (without execute functions).
+Returns WebMCP tool descriptors for all registered tools.
 
 ```typescript
-const tools = document.modelContext.listTools();
-// [{ name: 'search-products', description: '...', inputSchema: {...} }, ...]
+const tools = await document.modelContext.getTools();
+// [{ name: 'search-products', inputSchema: '{"type":"object",...}', ... }, ...]
 ```
 
-#### `callTool(params)`
+#### `executeTool(tool, inputArgsJson)`
 
-Executes a registered tool by name.
+Executes a tool descriptor returned from `getTools()`.
 
 ```typescript
-const result = await document.modelContext.callTool({
-  name: 'search-products',
-  arguments: { query: 'laptop', limit: 5 },
-});
+const tools = await document.modelContext.getTools();
+const searchTool = tools.find((tool) => tool.name === 'search-products');
+if (!searchTool) throw new Error('search-products is not available');
+
+const resultJson = await document.modelContext.executeTool(
+  searchTool,
+  JSON.stringify({ query: 'laptop', limit: 5 })
+);
+const result = resultJson === null ? null : JSON.parse(resultJson);
 // { content: [{ type: 'text', text: '...' }] }
 ```
+
+#### `listTools()` and `callTool(params)` (deprecated)
+
+These MCP-B compatibility helpers remain available for older integrations. Prefer `getTools()` and `executeTool(tool, inputArgsJson)` for in-page WebMCP consumers.
 
 ### Tool Descriptor
 
@@ -204,7 +213,7 @@ const result = await document.modelContext.callTool({
 | `name`         | `string`                                  | Yes      | Unique identifier for the tool                                                          |
 | `description`  | `string`                                  | Yes      | Natural language description of what the tool does                                      |
 | `inputSchema`  | `InputSchema`                             | No       | JSON Schema describing accepted input. Defaults to `{ type: 'object', properties: {} }` |
-| `outputSchema` | `InputSchema`                             | No       | JSON Schema describing the output payload shape                                         |
+| `outputSchema` | `InputSchema`                             | No       | MCP-B helper metadata for output typing and structured MCP responses                    |
 | `annotations`  | `ToolAnnotations`                         | No       | Hints about tool behavior for LLM planners                                              |
 | `execute`      | `(args, client) => Promise<ToolResponse>` | Yes      | Async function implementing the tool logic                                              |
 
@@ -385,35 +394,57 @@ document.modelContext.registerTool({
 import '@mcp-b/global';
 
 // Start with base tools
-document.modelContext.registerTool({
-  name: 'get-user',
-  description: 'Get current user info',
-  inputSchema: { type: 'object', properties: {} },
-  async execute() {
-    return { content: [{ type: 'text', text: JSON.stringify(currentUser) }] };
+const userToolController = new AbortController();
+document.modelContext.registerTool(
+  {
+    name: 'get-user',
+    description: 'Get current user info',
+    inputSchema: { type: 'object', properties: {} },
+    async execute() {
+      return { content: [{ type: 'text', text: JSON.stringify(currentUser) }] };
+    },
   },
-});
+  { signal: userToolController.signal }
+);
+
+let adminToolController: AbortController | undefined;
+
+function registerAdminTool() {
+  adminToolController?.abort();
+  adminToolController = new AbortController();
+
+  document.modelContext.registerTool(
+    {
+      name: 'delete-user',
+      description: 'Delete a user account (admin only)',
+      inputSchema: {
+        type: 'object',
+        properties: { userId: { type: 'string' } },
+        required: ['userId'],
+      },
+      async execute(args) {
+        await fetch(`/api/users/${args.userId}`, { method: 'DELETE' });
+        return { content: [{ type: 'text', text: 'User deleted' }] };
+      },
+    },
+    { signal: adminToolController.signal }
+  );
+}
+
+function unregisterAdminTool() {
+  adminToolController?.abort();
+  adminToolController = undefined;
+}
 
 // Add tools dynamically based on user role
 if (currentUser.isAdmin) {
-  document.modelContext.registerTool({
-    name: 'delete-user',
-    description: 'Delete a user account (admin only)',
-    inputSchema: {
-      type: 'object',
-      properties: { userId: { type: 'string' } },
-      required: ['userId'],
-    },
-    async execute(args) {
-      await fetch(`/api/users/${args.userId}`, { method: 'DELETE' });
-      return { content: [{ type: 'text', text: 'User deleted' }] };
-    },
-  });
+  registerAdminTool();
 }
 
 // Remove tools when permissions change
 function onLogout() {
-  document.modelContext.unregisterTool('get-user');
+  userToolController.abort();
+  unregisterAdminTool();
 }
 ```
 
@@ -464,7 +495,7 @@ document.modelContext.registerTool({
 
 ## Zod Version Compatibility
 
-This package supports **Zod 3.25.76+** (3.x only). JSON Schema is also supported if you prefer not to use Zod.
+This package supports **Zod `^3.25 || ^4.0`** where Zod is used by higher-level helpers. Plain JSON Schema is also supported.
 
 ## Type Exports
 
@@ -488,20 +519,20 @@ import type {
 
 ## Tool Routing Contract
 
-- MCP `tools/list`, `tools/call`, and tool list update notifications are sourced from `navigator.modelContextTesting`.
-- `@mcp-b/global` requires `navigator.modelContextTesting` to be available at initialization time.
+- MCP `tools/list`, `tools/call`, and tool list update notifications are sourced from the `BrowserMcpServer` registry.
+- Native and polyfill tool backfill use `getTools()` plus `executeTool()` when present, with `navigator.modelContextTesting` kept for preview/testing compatibility.
 
 ## Related Packages
 
 - [`@mcp-b/transports`](https://docs.mcp-b.ai/packages/transports/reference) - MCP transport implementations
 - [`@mcp-b/react-webmcp`](https://docs.mcp-b.ai/packages/react-webmcp/reference) - React hooks for MCP
 - [`@mcp-b/extension-tools`](https://docs.mcp-b.ai/packages/extension-tools/reference) - Chrome Extension API tools
-- [`@mcp-b/chrome-devtools-mcp`](https://docs.mcp-b.ai/packages/chrome-devtools-mcp/reference) - Connect desktop AI agents to browser tools
+- [`chrome-devtools-mcp`](https://github.com/ChromeDevTools/chrome-devtools-mcp) - Upstream Chrome DevTools MCP server
 
 ## Resources
 
 - [WebMCP Documentation](https://docs.mcp-b.ai)
-- [Web Model Context API Explainer](https://webmachinelearning.github.io/webmcp/)
+- [WebMCP specification](https://webmachinelearning.github.io/webmcp/)
 - [Model Context Protocol Spec](https://modelcontextprotocol.io/)
 
 ## License

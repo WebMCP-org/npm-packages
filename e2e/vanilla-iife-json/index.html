@@ -161,6 +161,22 @@
         resultsEl.scrollTop = resultsEl.scrollHeight;
       }
 
+      async function expectRejected(label, invoke) {
+        let rejected = false;
+
+        try {
+          const result = await invoke();
+          rejected = Boolean(result?.isError);
+        } catch {
+          rejected = true;
+        }
+
+        log(
+          `${label}: ${rejected ? 'PASSED (rejected)' : 'FAILED (should reject)'}`,
+          rejected ? 'success' : 'error'
+        );
+      }
+
       async function runTests() {
         if (!window.navigator.modelContext) {
           statusEl.className = 'error';
@@ -245,74 +261,62 @@
 
           // Test 2: Missing required field
           log('Test 2: Missing required field (email)...', 'info');
-          const r2 = await mc.executeTool('json-user-validator', {
-            username: 'testuser',
-            age: 30,
-          });
-          log(
-            `Missing email: ${r2.isError ? 'PASSED (rejected)' : 'FAILED (should reject)'}`,
-            r2.isError ? 'success' : 'error'
+          await expectRejected('Missing email', () =>
+            mc.executeTool('json-user-validator', {
+              username: 'testuser',
+              age: 30,
+            })
           );
 
           // Test 3: Invalid type (age as string)
           log('Test 3: Invalid type (age as string)...', 'info');
-          const r3 = await mc.executeTool('json-user-validator', {
-            username: 'testuser',
-            email: 'test@example.com',
-            age: 'twenty-five',
-          });
-          log(
-            `Invalid type: ${r3.isError ? 'PASSED (rejected)' : 'FAILED (should reject)'}`,
-            r3.isError ? 'success' : 'error'
+          await expectRejected('Invalid type', () =>
+            mc.executeTool('json-user-validator', {
+              username: 'testuser',
+              email: 'test@example.com',
+              age: 'twenty-five',
+            })
           );
 
           // Test 4: Value out of range (age too low)
           log('Test 4: Value out of range (age=15)...', 'info');
-          const r4 = await mc.executeTool('json-user-validator', {
-            username: 'testuser',
-            email: 'test@example.com',
-            age: 15,
-          });
-          log(
-            `Age too low: ${r4.isError ? 'PASSED (rejected)' : 'FAILED (should reject)'}`,
-            r4.isError ? 'success' : 'error'
+          await expectRejected('Age too low', () =>
+            mc.executeTool('json-user-validator', {
+              username: 'testuser',
+              email: 'test@example.com',
+              age: 15,
+            })
           );
 
           // Test 5: String too short (username)
           log('Test 5: String too short (username="ab")...', 'info');
-          const r5 = await mc.executeTool('json-user-validator', {
-            username: 'ab',
-            email: 'test@example.com',
-            age: 25,
-          });
-          log(
-            `Username too short: ${r5.isError ? 'PASSED (rejected)' : 'FAILED (should reject)'}`,
-            r5.isError ? 'success' : 'error'
+          await expectRejected('Username too short', () =>
+            mc.executeTool('json-user-validator', {
+              username: 'ab',
+              email: 'test@example.com',
+              age: 25,
+            })
           );
 
           // Test 6: Invalid enum value
           log('Test 6: Invalid enum value (role="superuser")...', 'info');
-          const r6 = await mc.executeTool('json-user-validator', {
-            username: 'testuser',
-            email: 'test@example.com',
-            age: 25,
-            role: 'superuser',
-          });
-          log(
-            `Invalid enum: ${r6.isError ? 'PASSED (rejected)' : 'FAILED (should reject)'}`,
-            r6.isError ? 'success' : 'error'
+          await expectRejected('Invalid enum', () =>
+            mc.executeTool('json-user-validator', {
+              username: 'testuser',
+              email: 'test@example.com',
+              age: 25,
+              role: 'superuser',
+            })
           );
 
           // Test 7: Invalid email format
           log('Test 7: Invalid email format...', 'info');
-          const r7 = await mc.executeTool('json-user-validator', {
-            username: 'testuser',
-            email: 'not-an-email',
-            age: 25,
-          });
-          log(
-            `Invalid email: ${r7.isError ? 'PASSED (rejected)' : 'FAILED (should reject)'}`,
-            r7.isError ? 'success' : 'error'
+          await expectRejected('Invalid email', () =>
+            mc.executeTool('json-user-validator', {
+              username: 'testuser',
+              email: 'not-an-email',
+              age: 25,
+            })
           );
 
           statusEl.textContent = 'All tests completed!';

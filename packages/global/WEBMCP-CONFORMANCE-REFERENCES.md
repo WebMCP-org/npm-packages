@@ -71,7 +71,7 @@ Goal: keep one place to track standards decisions and implementation details bef
 
 ## Conformance Test Backlog (Planned)
 
-- [ ] API shape conformance for `navigator.modelContext` (producer + consumer methods)
+- [ ] API shape conformance for `document.modelContext` (producer methods plus deprecated `navigator.modelContext` alias)
 - [ ] Event conformance for `toolcall` and `toolschanged` dispatch timing
 - [ ] Consumer conformance for `callTool({ name, arguments })` request/result semantics
 - [ ] Elicitation conformance for current WebMCP behavior (`elicitInput` form/url modes)
@@ -81,36 +81,41 @@ Goal: keep one place to track standards decisions and implementation details bef
 
 ## Runtime Conformance Matrix (Implemented)
 
-- Shared suite: `src/conformance/runtime-core-conformance.shared.ts`
-- Polyfill runtime entry: `src/conformance/polyfill-runtime.e2e.test.ts`
-- Native Chrome 149+ runtime entry: `conformance/native-runtime.e2e.test.ts`
+- Shared suite: `conformance/runtime-core-conformance.shared.ts`
+- Global runtime entry: `packages/global/conformance/global-runtime.e2e.test.ts`
+- Polyfill runtime entry: `packages/webmcp-polyfill/conformance/polyfill-runtime.e2e.test.ts`
+- Native Chrome 152+ runtime entry: `conformance/native-runtime.e2e.test.ts`
 
 Current MCP-B alignment note:
 
-- Strict core `@mcp-b/webmcp-types` / `@mcp-b/webmcp-polyfill` model `registerTool(tool, options?)` per the April 23, 2026 WebMCP draft. The polyfill registers an `abort` listener on `options.signal` and removes the tool when the signal aborts; pre-aborted signals short-circuit registration with a console warning.
-- `BrowserMcpServer.registerTool(tool, options?)` accepts the same shape and forwards `options.signal` to the underlying native context when the caller provides one. It still returns a deprecated `{ unregister }` handle for back-compat; the handle will be removed in the next major version.
+- Strict core `@mcp-b/webmcp-types` / `@mcp-b/webmcp-polyfill` model `registerTool(tool, options?)` per the April 23, 2026 WebMCP draft. The polyfill registers an `abort` listener on `options.signal` and removes the tool when the signal aborts; pre-aborted signals reject with `AbortError`.
+- `BrowserMcpServer.registerTool(tool, options?)` accepts the same shape, resolves `undefined`, and forwards `options.signal` to the underlying native context when the caller provides one.
 - `unregisterTool(name)` is preserved in MCP-B compatibility runtimes for existing wrappers, but is `@deprecated` in types and emits a one-time runtime deprecation warning.
-- Current Chrome 149 native preview exposes `registerTool(tool, options?)` with `AbortSignal` unregistration but still reports `navigator.modelContext.registerTool.length === 1`; conformance must validate behavior instead of gating on function arity.
+- Current Chrome 152 native preview exposes async `document.modelContext.registerTool(tool, options?)` with `AbortSignal` unregistration; conformance must validate behavior instead of gating on function arity.
 - Keep browser-surface tests explicit so we do not mistake current Chromium behavior for a finalized spec guarantee.
-- The shared conformance suite is parameterized: strict-core/native lanes should assert `undefined` for the legacy single-arg path; the `@mcp-b/global` polyfill wrapper lane asserts the deprecated compatibility handle intentionally preserved by MCP-B. Shared cases cover AbortSignal registration and pre-aborted signals behaviorally, without relying on `registerTool.length`.
+- The shared conformance suite asserts the standard producer/testing API shape for both `@mcp-b/webmcp-polyfill` and `@mcp-b/global`. Shared cases cover `registerTool()` return shape, producer `getTools()/executeTool()`, testing `executeTool()`, AbortSignal cleanup, and pre-aborted signals without relying on `registerTool.length`.
 
 Run commands:
 
-- Polyfill runtime (non-beta Chromium):
+- WebMCP polyfill runtime (non-native Chromium):
+  - `pnpm --filter @mcp-b/webmcp-polyfill run test:conformance`
+- Global runtime (non-native Chromium):
+  - `pnpm --filter @mcp-b/global run test:conformance:global`
+- WebMCP polyfill runtime through the global matrix alias:
   - `pnpm --filter @mcp-b/global run test:conformance:polyfill`
-- Native runtime (Chrome 149+ Dev/Canary + flags):
-  - `CHROME_BIN=\"/path/to/chrome-149-or-newer\" CHROME_FLAGS=\"--enable-features=WebMCPTesting,DevToolsWebMCPSupport\" pnpm --filter @mcp-b/global run test:conformance:native`
+- Native runtime (Chrome 152+ Dev/Canary + flags):
+  - `CHROME_BIN=\"/path/to/chrome-152-or-newer\" CHROME_FLAGS=\"--enable-features=WebMCPTesting,DevToolsWebMCPSupport\" pnpm --filter @mcp-b/global run test:conformance:native`
 - Matrix:
-  - `CHROME_BIN=\"/path/to/chrome-149-or-newer\" CHROME_FLAGS=\"--enable-features=WebMCPTesting,DevToolsWebMCPSupport\" pnpm --filter @mcp-b/global run test:conformance:matrix`
+  - `CHROME_BIN=\"/path/to/chrome-152-or-newer\" CHROME_FLAGS=\"--enable-features=WebMCPTesting,DevToolsWebMCPSupport\" pnpm --filter @mcp-b/global run test:conformance:matrix`
 
-`vitest.conformance.native.config.ts` auto-detects Chrome Canary/Dev on macOS and common Linux Chrome binaries when `CHROME_BIN` is not set, but it rejects any executable below Chrome 149.
+`vitest.conformance.native.config.ts` auto-detects Chrome Canary/Dev on macOS and common Linux Chrome binaries when `CHROME_BIN` is not set, but it rejects any executable below Chrome 152.
 
-## Native Validation Behavior Note (Updated April 29, 2026)
+## Native Validation Behavior Note (Updated July 2, 2026)
 
-- In current Chrome 149 Dev/Canary native mode (`--enable-features=WebMCPTesting,DevToolsWebMCPSupport`), `navigator.modelContext.callTool` and `navigator.modelContext.listTools` are not exposed on the producer surface; use `navigator.modelContextTesting` for native test discovery/execution.
-- Current Chrome 149 native preview exposes `navigator.modelContext.registerTool(tool, options?)` and supports `options.signal` for unregistration, including pre-aborted-signal short-circuit behavior. Its Web IDL arity still reports `registerTool.length === 1`, so arity is not a reliable feature detector.
-- Current Chrome 149 native preview does not expose `navigator.modelContext.unregisterTool(name)`, `provideContext()`, or `clearContext()`.
-- Current Chrome 149 exposes `navigator.modelContextTesting.listTools()`, `executeTool(...)`, and EventTarget-style `addEventListener('toolchange', ...)`.
+- In current Chrome 152 Canary native mode (`--enable-features=WebMCPTesting,DevToolsWebMCPSupport`), producer discovery/execution lives on `document.modelContext.getTools()` and `document.modelContext.executeTool(...)`.
+- Current Chrome 152 native preview exposes async `document.modelContext.registerTool(tool, options?)` and supports `options.signal` for unregistration, including pre-aborted-signal rejection.
+- Current Chrome 152 native conformance does not rely on `unregisterTool(name)`, `provideContext()`, or `clearContext()`.
+- Current Chrome 152 exposes `navigator.modelContextTesting.listTools()`, `executeTool(...)`, and EventTarget-style `addEventListener('toolchange', ...)`.
 - Tool execution goes through `navigator.modelContextTesting.executeTool(toolName, inputArgsJson)`.
 - Native `modelContextTesting.executeTool(...)` currently appears to validate malformed JSON parsing (throws `UnknownError: Failed to parse input arguments`) but may not enforce tool `inputSchema` type/required constraints in the same way as the polyfill path.
 - `@mcp-b/webmcp-polyfill` does enforce schema checks in its testing shim path and rejects schema-invalid args.

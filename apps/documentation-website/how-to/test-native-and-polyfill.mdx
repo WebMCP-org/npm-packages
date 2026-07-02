@@ -26,9 +26,8 @@ The monorepo provides several testing lanes organized by runtime:
 | Tab / global (polyfill)       | SDK `Client` + `TabClientTransport`             | `pnpm --filter mcp-e2e-tests test:runtime-contract`        |
 | Iframe                        | SDK `Client` + `IframeParentTransport`          | `pnpm --filter mcp-e2e-tests test:runtime-contract`        |
 | Native Chromium (default)     | `document.modelContext` / `modelContextTesting` | `pnpm --filter mcp-e2e-tests test:native-contract:default` |
-| Native Chromium (Chrome Beta) | `document.modelContext` / `modelContextTesting` | `pnpm --filter mcp-e2e-tests test:native-contract:beta`    |
+| Native Chromium (Chrome 152+) | `document.modelContext` / `modelContextTesting` | `pnpm --filter mcp-e2e-tests test:native-contract:beta`    |
 | Local relay                   | SDK `Client` over stdio                         | `pnpm --filter @mcp-b/webmcp-local-relay test:e2e`         |
-| DevTools bridge               | SDK `Client` + `WebMCPClientTransport`          | `pnpm --filter @mcp-b/chrome-devtools-mcp test:e2e`        |
 
 Every canonical E2E suite proves the same six assertions against the real runtime:
 
@@ -63,11 +62,11 @@ Native Chromium tests use the browser's built-in `document.modelContext` and `na
 pnpm --filter mcp-e2e-tests test:native-contract:default
 ```
 
-### Chrome Beta with WebMCP flags
+### Chrome 152+ with WebMCP flags
 
 <Steps>
-  <Step title="Enable the WebMCP testing flag">
-    Open Chrome Beta and navigate to `chrome://flags/#enable-webmcp-testing`. Enable **WebMCP for testing** and restart the browser.
+  <Step title="Install Chrome 152 or newer">
+    Use Chrome Canary, Dev, Beta, or Stable at major version 152 or newer. If Playwright cannot find it automatically, set `CHROME_BIN` to the executable path.
   </Step>
   <Step title="Run the flagged native contract lane">
     ```bash
@@ -76,7 +75,7 @@ pnpm --filter mcp-e2e-tests test:native-contract:default
 
     This uses the Playwright config that passes:
     - `--enable-experimental-web-platform-features`
-    - `--enable-features=WebMCPTesting`
+    - `--enable-features=WebMCPTesting,DevToolsWebMCPSupport`
 
   </Step>
 </Steps>
@@ -106,7 +105,10 @@ To launch Chromium with the native API enabled in your own Playwright tests:
 export default defineConfig({
   use: {
     launchOptions: {
-      args: ['--enable-experimental-web-platform-features', '--enable-features=WebModelContext'],
+      args: [
+        '--enable-experimental-web-platform-features',
+        '--enable-features=WebMCPTesting,DevToolsWebMCPSupport',
+      ],
     },
   },
 });
@@ -118,6 +120,7 @@ For headless CI environments, add `--headless=new`, `--disable-gpu`, and `--no-s
 chromium \
   --headless=new \
   --enable-experimental-web-platform-features \
+  --enable-features=WebMCPTesting,DevToolsWebMCPSupport \
   --disable-gpu \
   --no-sandbox
 ```
@@ -152,7 +155,7 @@ pnpm test:e2e:ui
 # Debug mode (step through)
 pnpm test:e2e:debug
 
-# Headed Chrome Beta run
+# Headed Chrome 152+ run
 cd e2e && pnpm test:chrome-beta:webmcp:headed
 ```
 
@@ -172,7 +175,6 @@ cd e2e && pnpm test:chrome-beta:webmcp:headed
 | Building tools with `@mcp-b/global`       | `test:runtime-contract` (polyfill)                            |
 | Validating against the native browser API | `test:native-contract:default` or `test:native-contract:beta` |
 | Testing the local relay end-to-end        | `pnpm --filter @mcp-b/webmcp-local-relay test:e2e`            |
-| Testing the DevTools bridge end-to-end    | `pnpm --filter @mcp-b/chrome-devtools-mcp test:e2e`           |
 | Running the full canonical gate           | `pnpm test:e2e`                                               |
 
 ## Related pages

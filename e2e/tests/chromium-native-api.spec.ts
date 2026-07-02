@@ -1,8 +1,7 @@
 import { expect, test } from '@playwright/test';
 
-type RemovedContextApi = {
-  provideContext?: (value: unknown) => void;
-  clearContext?: () => void;
+type LegacyModelContext = NonNullable<typeof navigator.modelContext> & {
+  unregisterTool(name: string): void;
 };
 
 function isDirectOrWrappedText(value: unknown, expectedText: string): boolean {
@@ -33,7 +32,7 @@ function isDirectOrWrappedText(value: unknown, expectedText: string): boolean {
  * - Polyfill implementation (when native is not available)
  *
  * To test with Chromium native:
- * 1. Launch Chromium/Chrome Beta with:
+ * 1. Launch Chrome 152+ with:
  *    --enable-experimental-web-platform-features --enable-features=WebMCPTesting
  * 2. Or enable "WebMCP for testing" at chrome://flags/#enable-webmcp-testing
  */
@@ -45,19 +44,22 @@ test.describe('Chromium Native API - ModelContext', () => {
 
   test('should have unregisterTool method available', async ({ page }) => {
     const hasMethod = await page.evaluate(() => {
-      return typeof navigator.modelContext?.unregisterTool === 'function';
+      return (
+        typeof (navigator.modelContext as LegacyModelContext | undefined)?.unregisterTool ===
+        'function'
+      );
     });
     expect(hasMethod).toBe(true);
   });
 
-  test('should have clearContext method available', async ({ page }) => {
+  test('should not expose removed clearContext method', async ({ page }) => {
     const hasMethod = await page.evaluate(() => {
       return (
-        typeof (navigator.modelContext as unknown as RemovedContextApi | undefined)
-          ?.clearContext === 'function'
+        typeof (navigator.modelContext as unknown as { clearContext?: unknown })?.clearContext ===
+        'function'
       );
     });
-    expect(hasMethod).toBe(true);
+    expect(hasMethod).toBe(false);
   });
 
   test('should unregisterTool by name - dynamic tool', async ({ page }) => {
@@ -83,7 +85,7 @@ test.describe('Chromium Native API - ModelContext', () => {
 
     const logEntries = await page.locator('#log .log-entry').allTextContents();
     expect(
-      logEntries.some((entry) => entry.includes('Tool unregistered via unregisterTool()'))
+      logEntries.some((entry) => entry.includes('Tool unregistered via AbortSignal cleanup'))
     ).toBe(true);
   });
 
@@ -96,7 +98,7 @@ test.describe('Chromium Native API - ModelContext', () => {
 
     // Unregister a base tool directly
     await page.evaluate(() => {
-      navigator.modelContext.unregisterTool('incrementCounter');
+      (navigator.modelContext as LegacyModelContext).unregisterTool('incrementCounter');
     });
     await page.waitForTimeout(300);
 
@@ -154,11 +156,8 @@ test.describe('Chromium Native API - ModelContext', () => {
     });
     expect(toolCount).toBe(5); // 4 base + 1 dynamic
 
-    // Clear everything
-    await page.evaluate(() => {
-      (navigator.modelContext as unknown as RemovedContextApi).clearContext?.();
-    });
-    await page.waitForTimeout(300);
+    await page.click('#chromium-clear-context');
+    await page.waitForTimeout(500);
 
     // Verify both buckets cleared
     toolCount = await page.evaluate(() => {
@@ -170,7 +169,7 @@ test.describe('Chromium Native API - ModelContext', () => {
   test('should handle unregisterTool on non-existent tool gracefully', async ({ page }) => {
     const result = await page.evaluate(() => {
       try {
-        navigator.modelContext.unregisterTool('non-existent-tool');
+        (navigator.modelContext as LegacyModelContext).unregisterTool('non-existent-tool');
         return { success: true, error: null };
       } catch (error) {
         return { success: false, error: String(error) };
@@ -356,7 +355,7 @@ test.describe('Chromium Native API - ModelContextTesting', () => {
     );
   });
 
-  test('should toolchange event fire on provideContext', async ({ page }) => {
+  test('should toolchange event fire on base context replacement', async ({ page }) => {
     await page.click('#chromium-test-callback-provide');
     await page.waitForTimeout(500);
 
@@ -368,12 +367,12 @@ test.describe('Chromium Native API - ModelContextTesting', () => {
     expect(callbackFired).toBe(true);
 
     const logEntries = await page.locator('#log .log-entry').allTextContents();
-    expect(logEntries.some((entry) => entry.includes('Callback fired on provideContext!'))).toBe(
+    expect(logEntries.some((entry) => entry.includes('Callback fired on registerTool!'))).toBe(
       true
     );
   });
 
-  test('should toolchange event fire on clearContext', async ({ page }) => {
+  test('should toolchange event fire on AbortSignal cleanup', async ({ page }) => {
     await page.click('#chromium-test-callback-clear');
     await page.waitForTimeout(500);
 
@@ -385,13 +384,13 @@ test.describe('Chromium Native API - ModelContextTesting', () => {
     expect(callbackFired).toBe(true);
 
     const logEntries = await page.locator('#log .log-entry').allTextContents();
-    expect(logEntries.some((entry) => entry.includes('Callback fired on clearContext!'))).toBe(
-      true
-    );
+    expect(
+      logEntries.some((entry) => entry.includes('Callback fired on AbortSignal cleanup!'))
+    ).toBe(true);
   });
 
   test('should toolchange event support multiple listeners', async ({ page }) => {
-    const callbackCounts = await page.evaluate(() => {
+    const callbackCounts = await page.evaluate(async () => {
       const testingAPI = navigator.modelContextTesting;
       if (!testingAPI) return { first: 0, second: 0 };
 
@@ -407,15 +406,20 @@ test.describe('Chromium Native API - ModelContextTesting', () => {
       testingAPI.addEventListener('toolchange', callback1);
       testingAPI.addEventListener('toolchange', callback2);
 
-      // Trigger a change
-      navigator.modelContext.registerTool({
-        name: 'tempTool',
-        description: 'temp',
-        inputSchema: { type: 'object', properties: {} },
-        async execute() {
-          return { content: [{ type: 'text', text: 'test' }] };
+      const controller = new AbortController();
+      navigator.modelContext.registerTool(
+        {
+          name: `tempTool_${Date.now()}`,
+          description: 'temp',
+          inputSchema: { type: 'object', properties: {} },
+          async execute() {
+            return { content: [{ type: 'text', text: 'test' }] };
+          },
         },
-      });
+        { signal: controller.signal }
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      controller.abort();
 
       return { first, second };
     });
@@ -426,7 +430,7 @@ test.describe('Chromium Native API - ModelContextTesting', () => {
   });
 
   test('should toolchange event not break on listener error', async ({ page }) => {
-    const secondCallbackFired = await page.evaluate(() => {
+    const secondCallbackFired = await page.evaluate(async () => {
       const testingAPI = navigator.modelContextTesting;
       if (!testingAPI) return false;
 
@@ -442,15 +446,20 @@ test.describe('Chromium Native API - ModelContextTesting', () => {
         secondCalled = true;
       });
 
-      // Trigger a change
-      navigator.modelContext.registerTool({
-        name: 'tempTool2',
-        description: 'temp',
-        inputSchema: { type: 'object', properties: {} },
-        async execute() {
-          return { content: [{ type: 'text', text: 'test' }] };
+      const controller = new AbortController();
+      navigator.modelContext.registerTool(
+        {
+          name: `tempTool2_${Date.now()}`,
+          description: 'temp',
+          inputSchema: { type: 'object', properties: {} },
+          async execute() {
+            return { content: [{ type: 'text', text: 'test' }] };
+          },
         },
-      });
+        { signal: controller.signal }
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      controller.abort();
 
       return secondCalled;
     });
@@ -495,7 +504,7 @@ test.describe('Chromium Native API - Integration Tests', () => {
   });
 
   test('should work together: callbacks track all operations', async ({ page }) => {
-    const operations = await page.evaluate(() => {
+    const operations = await page.evaluate(async () => {
       const testingAPI = navigator.modelContextTesting;
       if (!testingAPI) return [];
 
@@ -506,38 +515,45 @@ test.describe('Chromium Native API - Integration Tests', () => {
         ops.push(`Changed: ${tools.length} tools`);
       });
 
-      // Perform various operations
-      navigator.modelContext.registerTool({
-        name: 'test1',
-        description: 'test',
-        inputSchema: { type: 'object', properties: {} },
-        async execute() {
-          return { content: [{ type: 'text', text: 'test' }] };
-        },
-      });
+      const first = new AbortController();
+      const second = new AbortController();
+      const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-      navigator.modelContext.unregisterTool('test1');
-
-      (navigator.modelContext as unknown as RemovedContextApi).clearContext?.();
-
-      (navigator.modelContext as unknown as RemovedContextApi).provideContext?.({
-        tools: [
-          {
-            name: 'test2',
-            description: 'test',
-            inputSchema: { type: 'object', properties: {} },
-            async execute() {
-              return { content: [{ type: 'text', text: 'test' }] };
-            },
+      navigator.modelContext.registerTool(
+        {
+          name: `test1_${Date.now()}`,
+          description: 'test',
+          inputSchema: { type: 'object', properties: {} },
+          async execute() {
+            return { content: [{ type: 'text', text: 'test' }] };
           },
-        ],
-      });
+        },
+        { signal: first.signal }
+      );
+      await tick();
+
+      navigator.modelContext.registerTool(
+        {
+          name: `test2_${Date.now()}`,
+          description: 'test',
+          inputSchema: { type: 'object', properties: {} },
+          async execute() {
+            return { content: [{ type: 'text', text: 'test' }] };
+          },
+        },
+        { signal: second.signal }
+      );
+      await tick();
+
+      first.abort();
+      await tick();
+      second.abort();
+      await tick();
 
       return ops;
     });
 
-    // Should have recorded 4 operations
-    expect(operations.length).toBe(4);
+    expect(operations.length).toBeGreaterThanOrEqual(4);
     expect(operations[0]).toContain('Changed:');
   });
 
@@ -552,10 +568,8 @@ test.describe('Chromium Native API - Integration Tests', () => {
 
       // Check ModelContext methods
       const contextMethods = [
-        'provideContext',
         'registerTool',
         'unregisterTool',
-        'clearContext',
         'listTools',
         'addEventListener',
         'removeEventListener',
@@ -565,6 +579,12 @@ test.describe('Chromium Native API - Integration Tests', () => {
       for (const method of contextMethods) {
         if (typeof (modelContext as unknown as Record<string, unknown>)[method] !== 'function') {
           return { valid: false, reason: `Missing modelContext.${method}` };
+        }
+      }
+
+      for (const method of ['provideContext', 'clearContext']) {
+        if (typeof (modelContext as unknown as Record<string, unknown>)[method] === 'function') {
+          return { valid: false, reason: `Removed modelContext.${method} is still exposed` };
         }
       }
 

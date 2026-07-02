@@ -366,9 +366,9 @@ test.describe('Model Context Testing API Tests', () => {
   });
 
   test('should fire toolchange event on tool registration', async ({ page }) => {
-    const callbackCount = await page.evaluate(async () => {
+    const result = await page.evaluate(async () => {
       const testingAPI = navigator.modelContextTesting;
-      if (!testingAPI) return 0;
+      if (!testingAPI) return { count: 0, toolName: null };
 
       let count = 0;
       testingAPI.addEventListener('toolchange', () => {
@@ -376,22 +376,39 @@ test.describe('Model Context Testing API Tests', () => {
       });
 
       const toolName = `testingCallbackTool_${Date.now()}`;
-      navigator.modelContext.registerTool({
-        name: toolName,
-        description: 'Callback test tool',
-        inputSchema: { type: 'object', properties: {} },
-        async execute() {
-          return { content: [{ type: 'text', text: 'ok' }] };
+      const controller = new AbortController();
+      navigator.modelContext.registerTool(
+        {
+          name: toolName,
+          description: 'Callback test tool',
+          inputSchema: { type: 'object', properties: {} },
+          async execute() {
+            return { content: [{ type: 'text', text: 'ok' }] };
+          },
         },
-      });
+        { signal: controller.signal }
+      );
 
       await new Promise((resolve) => setTimeout(resolve, 200));
-      navigator.modelContext.unregisterTool(toolName);
+      controller.abort();
 
-      return count;
+      return { count, toolName };
     });
 
-    expect(callbackCount).toBeGreaterThan(0);
+    expect(result.count).toBeGreaterThan(0);
+    if (result.toolName) {
+      await expect
+        .poll(async () =>
+          page.evaluate(
+            (toolName) =>
+              navigator.modelContextTesting
+                ?.listTools()
+                .some((tool: { name: string }) => tool.name === toolName) ?? false,
+            result.toolName
+          )
+        )
+        .toBe(false);
+    }
   });
 });
 

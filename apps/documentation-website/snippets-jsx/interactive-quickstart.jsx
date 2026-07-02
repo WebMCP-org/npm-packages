@@ -2,7 +2,7 @@
 // A tool builder that shows code being generated in real-time with syntax highlighting
 
 export const InteractiveQuickstart = () => {
-  const { useState, useEffect, useRef, useMemo } = React;
+  const { useState, useEffect, useRef } = React;
   // Simple syntax highlighter for JavaScript/TypeScript - defined inside component for Mintlify compatibility
   const highlightCode = (code) => {
     const patterns = [
@@ -39,7 +39,7 @@ export const InteractiveQuickstart = () => {
   const [activeTab, setActiveTab] = useState('react');
   const [copied, setCopied] = useState(false);
   const containerRef = useRef(null);
-  const registrationRef = useRef(null);
+  const registrationControllerRef = useRef(null);
 
   // Tool configuration state
   const [toolConfig, setToolConfig] = useState({
@@ -60,13 +60,15 @@ export const InteractiveQuickstart = () => {
     };
     checkPolyfill();
     window.addEventListener('webmcp-loaded', checkPolyfill);
-    return () => window.removeEventListener('webmcp-loaded', checkPolyfill);
+    return () => {
+      window.removeEventListener('webmcp-loaded', checkPolyfill);
+      registrationControllerRef.current?.abort();
+    };
   }, []);
 
   // Generate code for different frameworks
   const generateCode = (framework) => {
     const paramName = toolConfig.parameters[0]?.name || 'input';
-    const paramDesc = toolConfig.parameters[0]?.description || 'Input parameter';
 
     if (framework === 'react') {
       const zodSchema = toolConfig.parameters
@@ -160,10 +162,9 @@ ${schemaProps}
       return;
     }
 
-    // Unregister previous if exists
-    try {
-      document.modelContext.unregisterTool(toolConfig.name);
-    } catch (e) {}
+    // Abort previous registration if it exists.
+    registrationControllerRef.current?.abort();
+    registrationControllerRef.current = null;
 
     setRegistrationError(null);
     setIsRegistered(false);
@@ -181,27 +182,32 @@ ${schemaProps}
         if (p.required) schema.required.push(p.name);
       });
 
-      registrationRef.current = await document.modelContext.registerTool({
-        name: toolConfig.name,
-        description: toolConfig.description,
-        inputSchema: schema,
-        execute: async (args) => {
-          // Show execution modal
-          setIsExecuting(true);
-          setShowSuccessModal(true);
+      const controller = new AbortController();
+      registrationControllerRef.current = controller;
+      await document.modelContext.registerTool(
+        {
+          name: toolConfig.name,
+          description: toolConfig.description,
+          inputSchema: schema,
+          execute: async (args) => {
+            // Show execution modal
+            setIsExecuting(true);
+            setShowSuccessModal(true);
 
-          const paramName = toolConfig.parameters[0]?.name || 'input';
-          const result = `Hello, ${args[paramName] || 'friend'}!`;
-          setTestResult({ success: true, result, input: args[paramName] });
+            const paramName = toolConfig.parameters[0]?.name || 'input';
+            const result = `Hello, ${args[paramName] || 'friend'}!`;
+            setTestResult({ success: true, result, input: args[paramName] });
 
-          setTimeout(() => {
-            setIsExecuting(false);
-            setShowSuccessModal(false);
-          }, 3000);
+            setTimeout(() => {
+              setIsExecuting(false);
+              setShowSuccessModal(false);
+            }, 3000);
 
-          return { content: [{ type: 'text', text: result }] };
+            return { content: [{ type: 'text', text: result }] };
+          },
         },
-      });
+        { signal: controller.signal }
+      );
 
       setIsRegistered(true);
     } catch (error) {

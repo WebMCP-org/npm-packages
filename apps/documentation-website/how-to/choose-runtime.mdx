@@ -33,13 +33,13 @@ Ask these questions in order:
 
 ## Package comparison
 
-| Package                  | Runtime | Core API                         | MCP extensions                                                     | Transport           | React |
-| ------------------------ | ------- | -------------------------------- | ------------------------------------------------------------------ | ------------------- | ----- |
-| `@mcp-b/webmcp-types`    | No      | Types only                       | Types only                                                         | No                  | No    |
-| `@mcp-b/webmcp-polyfill` | Yes     | `registerTool`, `unregisterTool` | No                                                                 | No                  | No    |
-| `@mcp-b/global`          | Yes     | All core methods                 | `callTool`, `listTools`, prompts, resources, elicitation, sampling | Tab + iframe        | No    |
-| `usewebmcp`              | Yes     | Via hook                         | No                                                                 | No                  | Yes   |
-| `@mcp-b/react-webmcp`    | Yes     | Via hook                         | Full MCP-B surface                                                 | Via `@mcp-b/global` | Yes   |
+| Package                  | Runtime | Core API                                  | MCP extensions                                                     | Transport           | React |
+| ------------------------ | ------- | ----------------------------------------- | ------------------------------------------------------------------ | ------------------- | ----- |
+| `@mcp-b/webmcp-types`    | No      | Types only                                | Types only                                                         | No                  | No    |
+| `@mcp-b/webmcp-polyfill` | Yes     | `registerTool`, `getTools`, `executeTool` | No                                                                 | No                  | No    |
+| `@mcp-b/global`          | Yes     | `registerTool`, `getTools`, `executeTool` | `callTool`, `listTools`, prompts, resources, elicitation, sampling | Tab + iframe        | No    |
+| `usewebmcp`              | Yes     | Via hook                                  | No                                                                 | No                  | Yes   |
+| `@mcp-b/react-webmcp`    | Yes     | Via hook                                  | Full MCP-B surface                                                 | Via `@mcp-b/global` | Yes   |
 
 ## If you want the WebMCP standard only
 

@@ -57,13 +57,13 @@ function detectRuntimeMode(
 }
 
 async function bootstrap() {
-  const modelContext = navigator.modelContext;
+  const modelContext = document.modelContext ?? navigator.modelContext;
   const modelContextTesting = navigator.modelContextTesting as
     | ExtendedModelContextTesting
     | undefined;
 
   if (!modelContext) {
-    throw new Error('navigator.modelContext is unavailable');
+    throw new Error('document.modelContext is unavailable');
   }
 
   if (!modelContextTesting) {
@@ -82,7 +82,7 @@ async function bootstrap() {
     arguments: Record<string, unknown>;
   }> = [];
 
-  modelContext.registerTool({
+  await modelContext.registerTool({
     name: 'sumNumbers',
     description: 'Add two numbers together',
     inputSchema: {
@@ -99,7 +99,7 @@ async function bootstrap() {
     },
   });
 
-  modelContext.registerTool({
+  await modelContext.registerTool({
     name: 'greetPerson',
     description: 'Create a greeting for a person',
     inputSchema: {
@@ -152,8 +152,8 @@ async function bootstrap() {
       const sum = await codemode.sumNumbers({ a: 7, b: 5 });
       const greeting = await codemode.greetPerson({ name: "WebMCP" });
       return {
-        total: sum.structuredContent?.total ?? null,
-        greeting: greeting.structuredContent?.message ?? null
+        total: sum.total ?? null,
+        greeting: greeting.message ?? null
       };
     }`,
   });
@@ -164,7 +164,7 @@ async function bootstrap() {
   callsEl.textContent = JSON.stringify(recordedCalls, null, 2);
   callsEl.dataset.count = String(recordedCalls.length);
 
-  setStatus(`Codemode executed against navigator.modelContextTesting (${runtimeMode})`, 'ready');
+  setStatus(`Codemode executed against document.modelContext (${runtimeMode})`, 'ready');
 }
 
 setStatus('Booting codemode...', 'booting');
