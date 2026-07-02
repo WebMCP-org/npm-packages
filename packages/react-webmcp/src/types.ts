@@ -8,8 +8,7 @@ import type {
   JsonSchemaForInference,
   ToolAnnotations,
 } from '@mcp-b/webmcp-types';
-import type { z } from 'zod';
-import type { ZodSchema, ZodSchemaObject } from './zod-utils.js';
+import type { ZodSchema, ZodSchemaObject, ZodTypeLike } from './zod-utils.js';
 
 export type { PromptMessage, ResourceContents };
 export type { ToolAnnotations, CallToolResult };
@@ -30,6 +29,22 @@ export type ReactWebMCPInputSchema = ToolInputSchema | ZodSchemaObject;
  */
 export type ReactWebMCPOutputSchema = JsonSchemaForInference | ZodSchema;
 
+type ZodTypeOutput<T> = T extends { readonly _output: infer Output }
+  ? Output
+  : T extends { readonly _zod: { readonly output: infer Output } }
+    ? Output
+    : never;
+
+type OptionalZodShapeKeys<T extends ZodSchemaObject> = {
+  [K in keyof T]: undefined extends ZodTypeOutput<T[K]> ? K : never;
+}[keyof T];
+
+type ZodShapeOutput<T extends ZodSchemaObject> = {
+  [K in Exclude<keyof T, OptionalZodShapeKeys<T>>]: ZodTypeOutput<T[K]>;
+} & {
+  [K in OptionalZodShapeKeys<T>]?: ZodTypeOutput<T[K]>;
+};
+
 /**
  * Infers handler input type from a Standard Schema, Zod v3 schema, or JSON Schema.
  *
@@ -44,8 +59,8 @@ export type ReactWebMCPOutputSchema = JsonSchemaForInference | ZodSchema;
 export type InferToolInput<T> =
   // Zod v3 schema object. Check this before Standard Schema because newer Zod
   // versions also expose `~standard` metadata.
-  T extends Record<string, z.ZodTypeAny>
-    ? z.infer<z.ZodObject<T>>
+  T extends ZodSchemaObject
+    ? ZodShapeOutput<T>
     : // Standard Schema v1 (Zod v4, Valibot, ArkType)
       T extends { readonly '~standard': { readonly types?: infer Types } }
       ? NonNullable<Types> extends { readonly input: infer I }
@@ -72,10 +87,10 @@ export type InferOutput<
   TFallback = unknown,
 > = TOutputSchema extends undefined
   ? TFallback
-  : TOutputSchema extends z.ZodTypeAny
-    ? z.infer<TOutputSchema>
-    : TOutputSchema extends Record<string, z.ZodTypeAny> // Zod v3 schema object
-      ? z.infer<z.ZodObject<TOutputSchema>>
+  : TOutputSchema extends ZodTypeLike
+    ? ZodTypeOutput<TOutputSchema>
+    : TOutputSchema extends ZodSchemaObject
+      ? ZodShapeOutput<TOutputSchema>
       : // JSON Schema
         TOutputSchema extends JsonSchemaForInference
         ? InferJsonSchema<TOutputSchema>
