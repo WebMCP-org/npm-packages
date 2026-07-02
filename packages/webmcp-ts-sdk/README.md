@@ -6,25 +6,22 @@
 [![npm downloads](https://img.shields.io/npm/dm/@mcp-b/webmcp-ts-sdk?style=flat-square)](https://www.npmjs.com/package/@mcp-b/webmcp-ts-sdk)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue?style=flat-square)](https://www.typescriptlang.org/)
-[![Minimal Code](https://img.shields.io/badge/Custom_Code-~50_lines-green?style=flat-square)](https://github.com/WebMCP-org/npm-packages)
-
 **[Reference](https://docs.mcp-b.ai/packages/webmcp-ts-sdk/reference)** | **[First Tool Tutorial](https://docs.mcp-b.ai/tutorials/first-tool)**
 
-**@mcp-b/webmcp-ts-sdk** adapts the official MCP TypeScript SDK for browser environments, enabling dynamic tool registration required by the W3C Web Model Context API. This allows AI agents like Claude, ChatGPT, Gemini, Cursor, and Copilot to interact with browser-based applications.
+**@mcp-b/webmcp-ts-sdk** adapts the official MCP TypeScript SDK for browser environments, enabling dynamic tool registration required by the WebMCP API. This allows AI agents like Claude, ChatGPT, Gemini, Cursor, and Copilot to interact with browser-based applications.
 
 ## Why Use @mcp-b/webmcp-ts-sdk?
 
 | Feature                       | Benefit                                                               |
 | ----------------------------- | --------------------------------------------------------------------- |
 | **Dynamic Tool Registration** | Register tools after transport connection - required for browser apps |
-| **Minimal Overhead**          | Only ~50 lines of custom code on top of official SDK                  |
 | **Full SDK Compatibility**    | Re-exports all types, classes, and utilities from official SDK        |
 | **Type-Safe**                 | No prototype hacks - clean TypeScript extension                       |
 | **Auto-Updates**              | Types and protocol follow official SDK automatically                  |
 
 ## Overview
 
-This package adapts the official [@modelcontextprotocol/sdk](https://www.npmjs.com/package/@modelcontextprotocol/sdk) for browser environments with modifications to support dynamic tool registration required by the [W3C Web Model Context API](https://webmachinelearning.github.io/webmcp/) (`document.modelContext`).
+This package adapts the official [@modelcontextprotocol/sdk](https://www.npmjs.com/package/@modelcontextprotocol/sdk) for browser environments with modifications to support dynamic tool registration required by the [WebMCP API](https://webmachinelearning.github.io/webmcp/) (`document.modelContext`).
 
 ## Why This Package Exists
 
@@ -39,7 +36,7 @@ public registerCapabilities(capabilities: ServerCapabilities): void {
 }
 ```
 
-For the Web Model Context API, this restriction is incompatible because:
+For WebMCP, this restriction is incompatible because:
 
 1. **Tools arrive dynamically** - Web pages call `document.modelContext.registerTool(...)` at any time
 2. **Transport must be ready immediately** - The MCP server/transport needs to be connected when the page loads
@@ -203,9 +200,8 @@ server.registerTool(
 
 This package is designed for **minimal maintenance**:
 
-- **~50 lines** of custom code
 - **Automatic updates** for types, protocol, validation via official SDK dependency
-- **Single modification point** - only capability registration behavior
+- **Small modification surface** - capability registration and browser runtime adaptation
 - **Type-safe** - no prototype hacks or unsafe casts
 
 ### Syncing with Upstream
@@ -217,7 +213,8 @@ When the official SDK updates:
 3. Test that capability registration still works
 4. Update this README if SDK behavior changes
 
-The modification is minimal and unlikely to conflict with upstream changes.
+The modification surface is intentionally small and should be checked whenever
+the upstream SDK changes capability registration behavior.
 
 ## Frequently Asked Questions
 
@@ -227,11 +224,11 @@ The official SDK throws an error if you try to register tools after connecting a
 
 ### Is this a fork of the official SDK?
 
-No - it's a thin adapter (~50 lines) that extends the official SDK. All types, protocol handling, and validation come from the upstream package.
+No. It is an adapter that extends the official SDK. Core protocol handling and most SDK types come from the upstream package.
 
 ### Will this break when the official SDK updates?
 
-Unlikely. The modification is minimal and isolated. When upstream updates, just update your dependencies - the wrapper adapts automatically.
+Unlikely. The modification surface is isolated. When upstream updates, update the dependency and run the conformance tests.
 
 ### When should I use this vs `@mcp-b/global`?
 
@@ -248,7 +245,7 @@ Use `@mcp-b/global` for the standard `document.modelContext` API. Use this packa
 ## Resources
 
 - [WebMCP Documentation](https://docs.mcp-b.ai)
-- [Web Model Context API Explainer](https://webmachinelearning.github.io/webmcp/)
+- [WebMCP specification](https://webmachinelearning.github.io/webmcp/)
 - [Model Context Protocol Spec](https://modelcontextprotocol.io/)
 - [Official MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk)
 - [MCP GitHub Repository](https://github.com/modelcontextprotocol)

@@ -1,6 +1,6 @@
 # @mcp-b/global
 
-> W3C Web Model Context API polyfill - Let Claude, ChatGPT, Gemini, and other AI agents interact with your website
+> WebMCP runtime - Let Claude, ChatGPT, Gemini, and other AI agents interact with your website
 
 [![npm version](https://img.shields.io/npm/v/@mcp-b/global?style=flat-square)](https://www.npmjs.com/package/@mcp-b/global)
 [![npm downloads](https://img.shields.io/npm/dm/@mcp-b/global?style=flat-square)](https://www.npmjs.com/package/@mcp-b/global)
@@ -10,13 +10,13 @@
 
 **[Reference](https://docs.mcp-b.ai/packages/global/reference)** | **[First Tool Tutorial](https://docs.mcp-b.ai/tutorials/first-tool)** | **[Add Tools to an App](https://docs.mcp-b.ai/how-to/add-tools-to-an-existing-app)**
 
-**@mcp-b/global** implements the [W3C Web Model Context API](https://webmachinelearning.github.io/webmcp/) (`document.modelContext`) specification, allowing AI agents like Claude, ChatGPT, Gemini, Cursor, and Copilot to discover and call functions on your website.
+**@mcp-b/global** implements the [WebMCP API](https://webmachinelearning.github.io/webmcp/) (`document.modelContext`) specification, allowing AI agents like Claude, ChatGPT, Gemini, Cursor, and Copilot to discover and call functions on your website.
 
 ## Why Use @mcp-b/global?
 
 | Feature                      | Benefit                                                                                                                                                                                                                                                     |
 | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **W3C Standard**             | Implements the emerging Web Model Context API specification                                                                                                                                                                                                 |
+| **W3C Standard**             | Implements the emerging WebMCP API specification                                                                                                                                                                                                            |
 | **Drop-in IIFE**             | Add AI capabilities with a single `<script>` tag - no build step                                                                                                                                                                                            |
 | **Native Chromium Support**  | Auto-detects and uses native browser implementation when available                                                                                                                                                                                          |
 | **Dual Transport**           | Works with both same-window clients AND parent pages (iframe support)                                                                                                                                                                                       |
@@ -162,7 +162,7 @@ document.modelContext.registerTool(
   { signal: ac.signal }
 );
 
-// Later — clean up:
+// Later - clean up:
 ac.abort();
 ```
 
@@ -495,7 +495,7 @@ document.modelContext.registerTool({
 
 ## Zod Version Compatibility
 
-This package supports **Zod 3.25.76+** (3.x only). JSON Schema is also supported if you prefer not to use Zod.
+This package supports **Zod `^3.25 || ^4.0`** where Zod is used by higher-level helpers. Plain JSON Schema is also supported.
 
 ## Type Exports
 
@@ -519,8 +519,8 @@ import type {
 
 ## Tool Routing Contract
 
-- MCP `tools/list`, `tools/call`, and tool list update notifications are sourced from `navigator.modelContextTesting`.
-- `@mcp-b/global` requires `navigator.modelContextTesting` to be available at initialization time.
+- MCP `tools/list`, `tools/call`, and tool list update notifications are sourced from the `BrowserMcpServer` registry.
+- Native and polyfill tool backfill use `getTools()` plus `executeTool()` when present, with `navigator.modelContextTesting` kept for preview/testing compatibility.
 
 ## Related Packages
 
@@ -532,7 +532,7 @@ import type {
 ## Resources
 
 - [WebMCP Documentation](https://docs.mcp-b.ai)
-- [Web Model Context API Explainer](https://webmachinelearning.github.io/webmcp/)
+- [WebMCP specification](https://webmachinelearning.github.io/webmcp/)
 - [Model Context Protocol Spec](https://modelcontextprotocol.io/)
 
 ## License

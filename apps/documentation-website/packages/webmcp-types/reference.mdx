@@ -1,6 +1,6 @@
 ---
 title: '@mcp-b/webmcp-types'
-description: 'Reference for WebMCP TypeScript type definitions, schema inference, and Navigator augmentation.'
+description: 'Reference for WebMCP TypeScript type definitions, schema inference, and document.modelContext augmentation.'
 keywords:
   [
     '@mcp-b/webmcp-types',
@@ -57,7 +57,7 @@ After activation, `document.modelContext` is typed as `ModelContext` and `naviga
 
 ---
 
-## Navigator augmentation
+## Global augmentation
 
 | Property                        | Type                               | Description                |
 | ------------------------------- | ---------------------------------- | -------------------------- |
@@ -223,7 +223,9 @@ If schema types are widened (e.g., `InputSchema` loaded at runtime instead of a 
 
 ### `ToolResultFromOutputSchema<T>`
 
-When `outputSchema` is a literal object schema, `structuredContent` is narrowed.
+When `outputSchema` is a literal JSON Schema, `structuredContent` is narrowed to
+that schema. Object, array, string, number, boolean, and null schemas are
+supported for WebMCP execution.
 
 ```ts
 import type { JsonSchemaForInference } from '@mcp-b/webmcp-types';

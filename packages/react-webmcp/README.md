@@ -36,12 +36,12 @@ For client functionality, you'll also need:
 pnpm add @mcp-b/transports @modelcontextprotocol/sdk
 ```
 
-**Prerequisites:** Provider hooks require the `document.modelContext` API. Install `@mcp-b/global` or use a browser that implements the Web Model Context API.
+**Prerequisites:** Provider hooks require the `document.modelContext` API. Install `@mcp-b/global` or use a browser that implements the WebMCP API.
 
 Provider hooks register tools with `document.modelContext.registerTool(tool, {
 signal })` and abort the controller on unmount. The hooks retain a
 `navigator.modelContext` fallback for older preview runtimes, but
-`document.modelContext` is the canonical v3 surface. Install `@mcp-b/global`
+`document.modelContext` is the canonical surface. Install `@mcp-b/global`
 when you need a portable runtime with spec-aligned cleanup behavior.
 
 ## Quick Start - Provider (Registering Tools)
@@ -134,7 +134,7 @@ function ToolConsumer() {
 
 ## Zod Version Compatibility
 
-This package supports **Zod 3.25.76+** (3.x only).
+This package supports **Zod `^3.25 || ^4.0`** as an optional peer dependency.
 
 ## Documentation
 

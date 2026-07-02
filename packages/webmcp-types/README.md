@@ -152,7 +152,7 @@ If `required` is widened (for example a runtime `string[]`), fields are treated 
 
 ### 5. Output inference from `outputSchema`
 
-When `outputSchema` is a literal object schema, `structuredContent` is inferred automatically via `ToolResultFromOutputSchema`.
+When `outputSchema` is a literal JSON Schema, `structuredContent` is inferred automatically via `ToolResultFromOutputSchema`. Object, array, string, number, boolean, and null schemas are supported.
 
 This catches enum/type mismatches at compile time.
 

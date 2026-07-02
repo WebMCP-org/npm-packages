@@ -78,7 +78,7 @@ const testing = navigator.modelContextTesting as unknown as {
 Do not locally invent weaker versions of:
 
 - `document.modelContext`
-- `navigator.modelContext` (deprecated alias — still a public boundary)
+- `navigator.modelContext` (deprecated alias, still a public boundary)
 - `navigator.modelContextTesting`
 - `window`
 - `globalThis`
@@ -228,7 +228,7 @@ If the test is about runtime behavior, use the runtime we publish.
 
 - use `@mcp-b/webmcp-polyfill` when testing strict core runtime behavior
 - use `@mcp-b/global` when testing MCP-B runtime and extension behavior
-- let those packages install `navigator.modelContext` / `navigator.modelContextTesting`
+- let those packages install `document.modelContext`, the deprecated `navigator.modelContext` alias, and `navigator.modelContextTesting`
 
 Do not manually assign globals in runtime tests when the package under test already owns that setup.
 
@@ -342,7 +342,7 @@ Fix it so the nearest example matches the canonical package story:
 - `@mcp-b/webmcp-types` provides the type contract
 - `@mcp-b/webmcp-polyfill` installs strict core runtime globals
 - `@mcp-b/global` installs MCP-B runtime/extension globals
-- native Chromium tests use the real `navigator.modelContext` / `navigator.modelContextTesting` browser APIs directly
+- native Chromium tests use the real `document.modelContext` / `navigator.modelContextTesting` browser APIs directly, with `navigator.modelContext` checked only as a deprecated alias
 
 When you encounter local code that manually wires globals, casts to extension shapes, or invents helper aliases around repo-owned boundaries, do not normalize it. Update the code or docs so the local example teaches the same contract as the package docs.
 

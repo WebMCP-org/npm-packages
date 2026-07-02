@@ -37,7 +37,7 @@ document.modelContext.registerTool({
     additionalProperties: false,
   },
   async execute(args) {
-    // args is Record<string, unknown> — no type inference
+    // args is Record<string, unknown> - no type inference
     const query = args.query as string;
     return { content: [{ type: 'text', text: `Searching for ${query}` }] };
   },
@@ -159,7 +159,7 @@ function SearchTool() {
 
 ## Define output schemas
 
-An `outputSchema` describes the shape of the structured data your tool returns. When present, the tool response includes both a human-readable `content` array and a machine-readable `structuredContent` object.
+An `outputSchema` describes the shape of the structured data your tool returns. When present, the tool response includes both a human-readable `content` array and a machine-readable `structuredContent` value.
 
 ### Add an output schema
 
@@ -190,7 +190,30 @@ document.modelContext.registerTool({
 });
 ```
 
-When `outputSchema` is a literal object schema and you use `@mcp-b/webmcp-types`, `structuredContent` is type-checked against the schema at compile time.
+When `outputSchema` is a literal schema and you use `@mcp-b/webmcp-types`, `structuredContent` is type-checked against the schema at compile time. WebMCP execution accepts any JSON value that matches the schema. This follows MCP [SEP-2106](https://modelcontextprotocol.io/seps/2106-json-schema-2020-12), which aligns tool output schemas and structured content with JSON Schema 2020-12.
+
+### Non-object output schemas
+
+Use array or primitive output schemas when the natural result is not an object:
+
+```ts title="array-output-tool.ts"
+import type { JsonSchemaForInference } from '@mcp-b/webmcp-types';
+
+const outputSchema = {
+  type: 'array',
+  items: { type: 'string' },
+} as const satisfies JsonSchemaForInference;
+
+document.modelContext.registerTool({
+  name: 'tags_list',
+  description: 'List tags on the current document',
+  inputSchema: { type: 'object', properties: {} },
+  outputSchema,
+  async execute() {
+    return ['webmcp', 'docs'];
+  },
+});
+```
 
 ### Output schemas with `usewebmcp`
 
@@ -222,8 +245,10 @@ export function CounterTool() {
 ```
 
 <Warning>
-  If `outputSchema` is defined, the tool implementation must return a JSON-serializable object.
-  Returning a non-object value (`string`, `null`, array) causes an error response.
+  If `outputSchema` is defined, the tool implementation must return a JSON-serializable value that
+  matches the schema. The MCP transport bridge currently forwards object-shaped `structuredContent`;
+  use the WebMCP `executeTool()` path for primitive or array structured outputs until all downstream
+  MCP clients accept SEP-2106 shapes.
 </Warning>
 
 ### Keep text and structure aligned

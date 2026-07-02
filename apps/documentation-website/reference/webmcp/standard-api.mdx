@@ -7,6 +7,8 @@ icon: 'brackets-curly'
 
 The authoritative API definition is the
 [W3C WebMCP specification](https://webmachinelearning.github.io/webmcp/).
+Chrome's current implementation notes live in the
+[Chrome WebMCP imperative API docs](https://developer.chrome.com/docs/ai/webmcp/imperative-api).
 
 ## Canonical surface
 
@@ -28,6 +30,10 @@ document.modelContext.registerTool(tool, {
 
 controller.abort();
 ```
+
+`getTools()` and `executeTool()` are the producer-facing discovery and execution
+path in Chrome's current preview. `registerTool()` returns `Promise<void>`, and
+tool cleanup is tied to the optional `AbortSignal` passed at registration time.
 
 ## Compatibility
 
