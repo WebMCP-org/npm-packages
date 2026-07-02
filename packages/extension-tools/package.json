@@ -65,6 +65,10 @@
       "types": "./dist/executable-tools.d.ts",
       "import": "./dist/executable-tools.js"
     },
+    "./chrome-methods": {
+      "types": "./dist/chrome-methods.d.ts",
+      "import": "./dist/chrome-methods.js"
+    },
     "./contracts/bookmarks": {
       "types": "./dist/contracts/bookmarks.d.ts",
       "import": "./dist/contracts/bookmarks.js"
@@ -104,7 +108,7 @@
     "prepublishOnly": "node ../../scripts/validate-publish.js && pnpm run build",
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
-    "test": "pnpm --filter @mcp-b/webmcp-ts-sdk build && vp test run src/contracts.test.ts src/direct-action-tools.test.ts src/executable-tools.test.ts",
+    "test": "pnpm --filter @mcp-b/webmcp-ts-sdk build && vp test run src/contracts.test.ts src/direct-action-tools.test.ts src/executable-tools.test.ts src/chrome-methods.test.ts",
     "test:e2e": "pnpm --filter @mcp-b/transports build && pnpm --filter @mcp-b/webmcp-ts-sdk build && vp pack --filter e2e-extension && node e2e/build-extension.mjs && node --experimental-strip-types --test e2e/extension-runtime.e2e.test.ts",
     "typecheck": "pnpm --filter @mcp-b/webmcp-types build && pnpm --filter @mcp-b/webmcp-ts-sdk build && tsc -p tsconfig.typecheck.json --noEmit",
     "version:major": "pnpm version major --no-git-tag-version",

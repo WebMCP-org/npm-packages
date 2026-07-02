@@ -26,7 +26,10 @@ export const STORAGE_ACTION_IDS = [
 export const STORAGE_AREA_SCHEMA = z.enum(['sync', 'local', 'session']);
 
 export const STORAGE_GET_INPUT_SCHEMA = z.object({
-  keys: z.array(z.string()).optional().describe('Specific keys to retrieve (omit for all)'),
+  keys: z
+    .union([z.string(), z.array(z.string()), z.record(z.string(), z.unknown()), z.null()])
+    .optional()
+    .describe('Specific keys to retrieve, defaults object to merge, or null/omit for all'),
   area: STORAGE_AREA_SCHEMA.default('local').describe(
     'Storage area to use. Available: sync, local, session (default: local)'
   ),
@@ -52,7 +55,10 @@ export const STORAGE_CLEAR_INPUT_SCHEMA = z.object({
 });
 
 export const STORAGE_GET_BYTES_IN_USE_INPUT_SCHEMA = z.object({
-  keys: z.array(z.string()).optional().describe('Specific keys to check (omit for total)'),
+  keys: z
+    .union([z.string(), z.array(z.string()), z.null()])
+    .optional()
+    .describe('Specific keys to check (omit or null for total)'),
   area: STORAGE_AREA_SCHEMA.default('local').describe(
     'Storage area to check. Available: sync, local, session (default: local)'
   ),

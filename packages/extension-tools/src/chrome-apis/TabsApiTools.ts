@@ -321,8 +321,8 @@ export class TabsApiTools extends BaseApiTools<TabsApiToolsOptions> {
     return this.formatSuccess(`Closed ${tabIds.length} tab(s): ${tabIds.join(', ')}`, { tabIds });
   }
 
-  private async handleGetAllTabs({ currentWindow }: TabGetAllInput) {
-    const tabs = await chrome.tabs.query(currentWindow ? { currentWindow: true } : {});
+  private async handleGetAllTabs(queryInfo: TabGetAllInput) {
+    const tabs = await chrome.tabs.query(queryInfo as chrome.tabs.QueryInfo);
     const tabInfo = tabs.map((tab) => ({
       id: tab.id,
       title: tab.title,

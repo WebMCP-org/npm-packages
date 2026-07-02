@@ -71,6 +71,23 @@ export const TAB_CLOSE_INPUT_SCHEMA = z.object({
 
 export const TAB_GET_ALL_INPUT_SCHEMA = z.object({
   currentWindow: z.boolean().optional().describe('Only get tabs from current window'),
+  active: z.boolean().optional().describe('Whether the tabs are active in their windows'),
+  pinned: z.boolean().optional().describe('Whether the tabs are pinned'),
+  url: z
+    .union([z.string(), z.array(z.string())])
+    .optional()
+    .describe('URL patterns to match, following chrome.tabs.query'),
+  title: z.string().optional().describe('Page title pattern to match'),
+  windowId: chromeWindowIdSchema.optional().describe('Window ID to query'),
+  index: chromeTabIndexSchema.optional().describe('Tab index within its window'),
+  highlighted: z.boolean().optional().describe('Whether the tabs are highlighted'),
+  status: z.enum(['loading', 'complete']).optional().describe('Tab loading status'),
+  audible: z.boolean().optional().describe('Whether the tabs are audible'),
+  muted: z.boolean().optional().describe('Whether the tabs are muted'),
+  lastFocusedWindow: z.boolean().optional().describe('Whether tabs are in the last focused window'),
+  discarded: z.boolean().optional().describe('Whether tabs are discarded'),
+  autoDiscardable: z.boolean().optional().describe('Whether tabs can be automatically discarded'),
+  groupId: z.number().int().optional().describe('Tab group ID to query'),
 });
 
 export const TAB_NAVIGATE_HISTORY_INPUT_SCHEMA = z.object({

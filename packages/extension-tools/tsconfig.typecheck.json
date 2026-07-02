@@ -6,6 +6,7 @@
   },
   "include": [
     "src/BaseApiTools.ts",
+    "src/chrome-methods.ts",
     "src/executable-tools.ts",
     "src/chrome-apis/BookmarksApiTools.ts",
     "src/chrome-apis/HistoryApiTools.ts",
