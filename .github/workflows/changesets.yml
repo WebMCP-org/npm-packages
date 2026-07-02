@@ -266,9 +266,12 @@ jobs:
           done
           echo "packages=$PACKAGES_JSON" >> "$GITHUB_OUTPUT"
 
+      - name: Build prerelease packages
+        run: pnpm build
+
       - name: Publish prerelease packages
         run: |
-          pnpm exec changeset publish --tag "${{ inputs.tag || 'beta' }}" --no-git-tag
+          pnpm -r --filter './packages/*' publish --access public --tag "${{ inputs.tag || 'beta' }}" --no-git-checks
 
       - name: Install cosign
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v3.8.0
