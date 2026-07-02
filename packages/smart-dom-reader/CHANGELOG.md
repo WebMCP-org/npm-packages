@@ -1,5 +1,11 @@
 # @mcp-b/smart-dom-reader
 
+## 4.0.0
+
+### Patch Changes
+
+- f096ba6: Fix package exports to reference the emitted `.mjs` and `.d.mts` files.
+
 ## 3.0.0
 
 ### Major Changes

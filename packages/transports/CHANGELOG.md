@@ -1,5 +1,14 @@
 # @mcp-b/transports
 
+## 4.0.0
+
+### Patch Changes
+
+- d05ea62: Declare the MCP TypeScript SDK as a runtime dependency for browser packages that emit runtime SDK imports.
+- Updated dependencies [abaf5d0]
+- Updated dependencies [d05ea62]
+  - @mcp-b/webmcp-ts-sdk@4.0.0
+
 ## 3.0.0
 
 ### Major Changes
