@@ -304,8 +304,6 @@ jobs:
 
             cosign sign-blob "/tmp/${SAFE_NAME}.tar.gz" \
               --yes \
-              --output-signature "/tmp/${SAFE_NAME}.tar.gz.sig" \
-              --output-certificate "/tmp/${SAFE_NAME}.tar.gz.pem" \
               --bundle "/tmp/${SAFE_NAME}.tar.gz.sigstore"
 
             cat > /tmp/release-notes.md << NOTES_EOF
@@ -314,7 +312,7 @@ jobs:
           **Install:** npm install ${PKG_NAME}@${TAG_SUFFIX}
 
           **Verify signature:**
-          cosign verify-blob ${SAFE_NAME}.tar.gz --signature ${SAFE_NAME}.tar.gz.sig --certificate ${SAFE_NAME}.tar.gz.pem --certificate-identity-regexp https://github.com/WebMCP-org/npm-packages --certificate-oidc-issuer https://token.actions.githubusercontent.com
+          cosign verify-blob ${SAFE_NAME}.tar.gz --bundle ${SAFE_NAME}.tar.gz.sigstore --certificate-identity-regexp https://github.com/WebMCP-org/npm-packages --certificate-oidc-issuer https://token.actions.githubusercontent.com
           NOTES_EOF
 
             gh release create "$GITHUB_TAG" \
@@ -324,8 +322,6 @@ jobs:
               --latest=false \
               --target "$GITHUB_SHA" \
               "/tmp/${SAFE_NAME}.tar.gz" \
-              "/tmp/${SAFE_NAME}.tar.gz.sig" \
-              "/tmp/${SAFE_NAME}.tar.gz.pem" \
               "/tmp/${SAFE_NAME}.tar.gz.sigstore"
 
             echo "  Created signed release ${GITHUB_TAG} for ${PKG_NAME}@${PKG_VERSION}"
