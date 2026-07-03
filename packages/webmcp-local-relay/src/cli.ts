@@ -56,6 +56,67 @@ try {
   process.exit(1);
 }
 
+// --- Auto-exit when the MCP client disconnects, preventing zombie processes ---
+
+let parentCheckInterval: NodeJS.Timeout | undefined;
+let shuttingDown = false;
+
+/**
+ * Gracefully shuts down bridge and MCP server for process termination signals.
+ * Force-exits after 5 seconds if graceful shutdown does not complete, preventing hangs.
+ */
+const shutdown = async (signal: string) => {
+  if (shuttingDown) {
+    return;
+  }
+  shuttingDown = true;
+  if (parentCheckInterval) {
+    clearInterval(parentCheckInterval);
+    parentCheckInterval = undefined;
+  }
+
+  // Safety net: force-exit if graceful shutdown hangs (e.g. SDK writing to a broken stdio pipe)
+  const forceExitTimer = setTimeout(() => {
+    process.stderr.write('[webmcp-local-relay] warn: graceful shutdown timed out, force exiting\n');
+    process.exit(1);
+  }, 5_000);
+
+  process.stderr.write(`[webmcp-local-relay] received ${signal}, shutting down\n`);
+
+  try {
+    await relay.stop();
+  } catch (err) {
+    process.stderr.write(
+      `[webmcp-local-relay] error during shutdown: ${err instanceof Error ? err.message : String(err)}\n`
+    );
+    clearTimeout(forceExitTimer);
+    process.exit(1);
+  }
+  clearTimeout(forceExitTimer);
+  process.exit(0);
+};
+
+process.stdin.on('end', () => {
+  void shutdown('stdin-closed');
+});
+process.stdin.on('error', () => {
+  void shutdown('stdin-error');
+});
+process.stdout.on('error', () => {
+  void shutdown('stdout-error');
+});
+
+if (process.platform !== 'win32') {
+  parentCheckInterval = setInterval(() => {
+    if (process.ppid === 1) {
+      clearInterval(parentCheckInterval);
+      parentCheckInterval = undefined;
+      void shutdown('parent-exited');
+    }
+  }, 30_000);
+  parentCheckInterval.unref();
+}
+
 if (relay.bridge.mode === 'server') {
   process.stderr.write(
     `[webmcp-local-relay] server mode: listening on ws://${options.host}:${relay.bridge.port} (allowed origins: ${options.allowedOrigins.join(', ')})\n`
@@ -65,28 +126,6 @@ if (relay.bridge.mode === 'server') {
     `[webmcp-local-relay] client mode: proxying through existing relay at ws://${options.host}:${relay.bridge.port}\n`
   );
 }
-
-/**
- * Gracefully shuts down bridge and MCP server for process termination signals.
- */
-const shutdown = async (signal: string) => {
-  if (shuttingDown) {
-    return;
-  }
-  shuttingDown = true;
-  process.stderr.write(`[webmcp-local-relay] received ${signal}, shutting down\n`);
-  try {
-    await relay.stop();
-  } catch (err) {
-    process.stderr.write(
-      `[webmcp-local-relay] error during shutdown: ${err instanceof Error ? err.message : err}\n`
-    );
-    process.exit(1);
-  }
-  process.exit(0);
-};
-
-let shuttingDown = false;
 
 process.on('uncaughtException', (err) => {
   process.stderr.write(
