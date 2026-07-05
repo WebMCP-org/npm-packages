@@ -107,7 +107,7 @@ jobs:
           echo "Chrome path: ${{ steps.setup-chrome.outputs.chrome-path }}"
 
       - name: Run Claude WebMCP Integration Test
-        uses: anthropics/claude-code-action@6c0083bb7289c31716797a039b6367b3079cc46e # v1
+        uses: anthropics/claude-code-action@558b1d6cab4085c7753fe402c10bef0fbb92ac7a # v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           allowed_bots: '*'
