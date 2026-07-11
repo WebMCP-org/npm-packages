@@ -5,11 +5,22 @@
   "description": "docs.mcp-b.ai documentation, powered by Mintlify",
   "scripts": {
     "build": "mintlify validate",
+    "deploy:persona-proxy": "wrangler deploy --config wrangler.jsonc",
     "dev": "mintlify dev",
+    "dev:persona-proxy": "wrangler dev --config wrangler.jsonc",
     "preview": "mintlify dev",
+    "typecheck:persona-proxy": "tsc --noEmit -p tsconfig.worker.json",
+    "types:persona-proxy": "wrangler types --config wrangler.jsonc",
     "validate": "mintlify validate"
   },
+  "dependencies": {
+    "@runtypelabs/persona-proxy": "catalog:",
+    "hono": "catalog:"
+  },
   "devDependencies": {
-    "mintlify": "^4.2.415"
+    "@types/node": "catalog:",
+    "mintlify": "^4.2.415",
+    "typescript": "catalog:",
+    "wrangler": "^4.110.0"
   }
 }

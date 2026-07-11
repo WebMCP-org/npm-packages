@@ -20,6 +20,7 @@ catalog:
   '@mcp-b/global': file:/var/folders/5y/ysfq1x7s50lc168yy1gvvf4m0000gn/T/mcpb-global-tarball-1NFVbD/mcp-b-global-3.0.0.tgz
   '@modelcontextprotocol/sdk': 1.29.0
   '@radix-ui/react-collapsible': ^1.1.12
+  '@runtypelabs/persona-proxy': 4.6.0
   '@sentry/cloudflare': ^10.22.0
   '@sentry/react': ^10.22.0
   '@sentry/vite-plugin': ^4.6.0
@@ -32,6 +33,7 @@ catalog:
   ai: ^5.0.83
   babel-plugin-react-compiler: ^1.0.0
   fast-check: ^4.0.0
+  hono: ^4.12.29
   playwright: ^1.60.0
   react: ^19.1.0
   react-dom: ^19.1.0

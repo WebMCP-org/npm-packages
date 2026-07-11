@@ -11,6 +11,10 @@
     {
       "src": "/load-webmcp.js",
       "defer": true
+    },
+    {
+      "src": "/load-persona.js",
+      "defer": true
     }
   ],
   "description": "Task-focused WebMCP documentation with package references, tutorials, how-to guides, and concise implementation concepts.",

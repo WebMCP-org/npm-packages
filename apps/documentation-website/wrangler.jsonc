@@ -1,0 +1,28 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "webmcp-docs-persona-proxy",
+  "account_id": "ad0d45931959d888de55865d02260ef8",
+  "main": "src/persona-proxy.ts",
+  "compatibility_date": "2026-07-10",
+  "compatibility_flags": ["nodejs_compat"],
+  "dev": {
+    "port": 8787,
+  },
+  "routes": [
+    {
+      "pattern": "docs.mcp-b.ai/api/chat/*",
+      "zone_name": "mcp-b.ai",
+    },
+  ],
+  "secrets_store_secrets": [
+    {
+      "binding": "RUNTYPE_API_KEY_SECRET",
+      "store_id": "0cc2c43e572443708e741b98db4806e0",
+      "secret_name": "RUNTYPE_API_KEY",
+    },
+  ],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+  },
+}

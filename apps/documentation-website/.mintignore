@@ -1,0 +1,7 @@
+# Cloudflare Persona proxy
+src/
+wrangler.jsonc
+worker-configuration.d.ts
+tsconfig.json
+tsconfig.worker.json
+.dev.vars*
