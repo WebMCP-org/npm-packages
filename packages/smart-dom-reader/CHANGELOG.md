@@ -1,5 +1,7 @@
 # @mcp-b/smart-dom-reader
 
+## 4.0.1
+
 ## 4.0.0
 
 ### Patch Changes

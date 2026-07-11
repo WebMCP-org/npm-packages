@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/global",
-  "version": "4.0.0",
+  "version": "4.0.1",
   "description": "W3C Web Model Context Protocol (WebMCP) API polyfill. Let AI agents like Claude, ChatGPT, and Gemini interact with your website via document.modelContext.",
   "keywords": [
     "ai-agents",

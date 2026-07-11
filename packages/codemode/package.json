@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/codemode",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "Zero-dependency browser-native code sandbox for LLM-generated tool orchestration",
   "keywords": [
     "ai",
