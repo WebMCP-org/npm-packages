@@ -22,6 +22,7 @@ yarn-error.log*
 .env.development.local
 .env.test.local
 .env.production.local
+.dev.vars
 
 # IDE
 .vscode/
@@ -31,3 +32,6 @@ yarn-error.log*
 
 # Mintlify
 .mintlify/
+
+# Cloudflare
+.wrangler/

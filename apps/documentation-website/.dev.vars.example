@@ -1,0 +1,2 @@
+# Copy this file to .dev.vars for local proxy development.
+RUNTYPE_API_KEY=replace-with-your-runtype-api-key
