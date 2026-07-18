@@ -7,9 +7,9 @@
     "start": "ng serve"
   },
   "dependencies": {
-    "@angular/common": "^21.1.0",
-    "@angular/compiler": "^21.2.4",
-    "@angular/core": "^21.2.4",
+    "@angular/common": "^21.2.17",
+    "@angular/compiler": "^21.2.17",
+    "@angular/core": "^21.2.17",
     "@angular/platform-browser": "^21.1.0",
     "@mcp-b/webmcp-polyfill": "workspace:*",
     "rxjs": "^7.8.0",
