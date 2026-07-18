@@ -40,7 +40,7 @@ catalog:
   typescript: ^5.8.3
   vite: npm:@voidzero-dev/vite-plus-core@latest
   vite-plugin-monkey: ^6.0.1
-  vite-plus: ^0.1.22
+  vite-plus: ^0.2.5
   vitest: npm:@voidzero-dev/vite-plus-test@latest
   wrangler: ^4.45.3
   zod: 3.25.76
