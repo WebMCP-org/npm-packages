@@ -254,7 +254,7 @@ jobs:
             --snapshot-prerelease-template "{tag}.{datetime}"
 
           PACKAGES_JSON="[]"
-          for pkg in packages/*/; do
+          for pkg in packages/*/ packages/*/*/; do
             if [ -f "$pkg/package.json" ]; then
               name=$(jq -r '.name' "$pkg/package.json")
               version=$(jq -r '.version' "$pkg/package.json")
@@ -271,7 +271,7 @@ jobs:
 
       - name: Publish prerelease packages
         run: |
-          pnpm -r --filter './packages/*' publish --access public --tag "${{ inputs.tag || 'beta' }}" --no-git-checks
+          pnpm -r --filter './packages/**' publish --access public --tag "${{ inputs.tag || 'beta' }}" --no-git-checks
 
       - name: Install cosign
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v3.8.0
