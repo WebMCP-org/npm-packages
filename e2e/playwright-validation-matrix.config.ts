@@ -5,10 +5,7 @@ const chromiumChannel = process.env.PLAYWRIGHT_CHROMIUM_CHANNEL;
 /**
  * Playwright config for Validation Matrix tests
  *
- * This config starts all test apps and runs validation tests across
- * all Zod 3/build/framework combinations.
- *
- * Note: Only Zod 3.25+ is supported. Zod 4 is NOT supported.
+ * This config starts the JSON Schema and React WebMCP test apps.
  */
 export default defineConfig({
   testDir: './tests',
@@ -44,36 +41,9 @@ export default defineConfig({
 
   /* Run all test app servers before starting the tests */
   webServer: [
-    // IIFE apps (serve static HTML via Vite)
     {
       command: 'pnpm --filter vanilla-iife-json-test-app dev',
       url: 'http://localhost:3010',
-      reuseExistingServer: !process.env.CI,
-      timeout: 60 * 1000,
-      stdout: 'ignore',
-      stderr: 'pipe',
-    },
-    {
-      command: 'pnpm --filter vanilla-iife-zod3-test-app dev',
-      url: 'http://localhost:3011',
-      reuseExistingServer: !process.env.CI,
-      timeout: 60 * 1000,
-      stdout: 'ignore',
-      stderr: 'pipe',
-    },
-    // ESM apps (Vite with bundling)
-    {
-      command: 'pnpm --filter vanilla-esm-zod3-test-app dev',
-      url: 'http://localhost:3013',
-      reuseExistingServer: !process.env.CI,
-      timeout: 60 * 1000,
-      stdout: 'ignore',
-      stderr: 'pipe',
-    },
-    // React apps
-    {
-      command: 'pnpm --filter react18-zod3-test-app dev',
-      url: 'http://localhost:3015',
       reuseExistingServer: !process.env.CI,
       timeout: 60 * 1000,
       stdout: 'ignore',

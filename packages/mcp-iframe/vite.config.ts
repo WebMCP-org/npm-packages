@@ -12,7 +12,6 @@ export default defineConfig({
     minify: true,
     target: 'esnext',
     platform: 'browser',
-    external: ['@modelcontextprotocol/sdk'],
     tsconfig: './tsconfig.json',
   },
 });

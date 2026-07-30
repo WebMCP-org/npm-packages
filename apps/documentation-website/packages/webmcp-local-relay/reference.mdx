@@ -111,14 +111,13 @@ npx @mcp-b/webmcp-local-relay --label "dev" --workspace "myapp" --relay-id "rela
 
 ## Static management tools
 
-The relay always exposes four management tools:
+The relay always exposes three management tools:
 
-| Tool                  | Description                                                                                                    |
-| --------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `webmcp_list_sources` | Lists connected browser tabs with metadata: tab ID, origin, URL, title, icon, tool count                       |
-| `webmcp_list_tools`   | Lists all relayed tools with source info                                                                       |
-| `webmcp_call_tool`    | Invokes a relayed tool by name with JSON arguments (for clients that do not support dynamic tool registration) |
-| `webmcp_open_page`    | Opens a URL in the default browser or refreshes a connected source page by matching origin                     |
+| Tool                  | Description                                                                                |
+| --------------------- | ------------------------------------------------------------------------------------------ |
+| `webmcp_list_sources` | Lists connected browser tabs with metadata: tab ID, origin, URL, title, icon, tool count   |
+| `webmcp_list_tools`   | Lists all relayed tools with source info                                                   |
+| `webmcp_open_page`    | Opens a URL in the default browser or refreshes a connected source page by matching origin |
 
 ## Dynamic tool registration
 
@@ -173,7 +172,7 @@ Increase the per-request timeout for tools that chain several slow API calls:
 ></script>
 ```
 
-The embed script injects a hidden iframe that opens a WebSocket to the relay on `localhost`. Tools are discovered via `document.modelContext` (or `navigator.modelContextTesting` as fallback) and forwarded to the relay.
+The embed script injects a hidden iframe that opens a WebSocket to the relay on `localhost`. Page code registers tools on `document.modelContext`. The embed supports current native Chrome discovery through asynchronous `getTools()` and executes the exact returned descriptor through Chrome's feature-detected `executeTool()` extension.
 
 ### Elicitation support
 
@@ -197,10 +196,13 @@ When a second relay instance starts and the port is in use (`EADDRINUSE`), it fa
 
 The relay supports pages using:
 
-1. `@mcp-b/global` (recommended)
-2. `@mcp-b/webmcp-polyfill` with `navigator.modelContextTesting`
+1. `@mcp-b/global` (recommended for the complete MCP-B runtime)
+2. Current native Chrome with `document.modelContext.getTools()` and the optional descriptor-based `executeTool()` extension
+3. `@mcp-b/webmcp-polyfill`
 
-The browser embed uses `document.modelContext.listTools` + `callTool` when present, and falls back to `navigator.modelContextTesting.listTools` + `executeTool`.
+The browser embed always uses document-first discovery and executes the current
+descriptor returned by `getTools()`. It does not depend on the removed
+name-based compatibility APIs.
 
 ## Security
 
@@ -265,13 +267,13 @@ The package exports the following for programmatic use:
 
 ## Troubleshooting
 
-| Problem                  | Fix                                                                                                                                                                                             |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `No sources connected`   | Ensure the page loaded `embed.js` and the relay process is running                                                                                                                              |
-| `No tools listed`        | Ensure tools are registered on the page's WebMCP runtime. If tools register after load, confirm your runtime emits tool-change notifications (`toolschanged` or `registerToolsChangedCallback`) |
-| `Tool not found`         | Tab reloaded or disconnected — call `webmcp_list_tools` again to refresh                                                                                                                        |
-| Connection blocked       | Verify `--widget-origin` matches your host page's origin (e.g., `https://myapp.com`), and relay port matches `data-relay-port`                                                                  |
-| `Host response timeout:` | The host page took longer than the per-request timeout (default 60s) to respond. Increase via `data-request-timeout="<ms>"` on the embed script tag                                             |
+| Problem                  | Fix                                                                                                                                                                                        |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `No sources connected`   | Ensure the page loaded `embed.js` and the relay process is running                                                                                                                         |
+| `No tools listed`        | Ensure tools are registered on the page's WebMCP runtime. If tools register after load, confirm your runtime emits `toolchange`; older MCP-B shims may use `registerToolsChangedCallback`. |
+| `Tool not found`         | Tab reloaded or disconnected — call `webmcp_list_tools` again to refresh                                                                                                                   |
+| Connection blocked       | Verify `--widget-origin` matches your host page's origin (e.g., `https://myapp.com`), and relay port matches `data-relay-port`                                                             |
+| `Host response timeout:` | The host page took longer than the per-request timeout (default 60s) to respond. Increase via `data-request-timeout="<ms>"` on the embed script tag                                        |
 
 ## Related
 

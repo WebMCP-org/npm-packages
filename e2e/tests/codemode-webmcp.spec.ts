@@ -1,7 +1,17 @@
 import { expect, test } from '@playwright/test';
 
 test.describe('Codemode WebMCP E2E', () => {
-  test('uses modelContextTesting to build and execute a codemode tool', async ({ page }) => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      (
+        window as Window & {
+          __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'];
+        }
+      ).__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ = document.modelContext;
+    });
+  });
+
+  test('builds and executes a codemode tool from document.modelContext', async ({ page }) => {
     await page.goto('/codemode-webmcp.html');
 
     await expect(page.locator('#codemode-status')).toHaveAttribute('data-status', 'ready', {

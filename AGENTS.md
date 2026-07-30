@@ -73,12 +73,12 @@ the Diataxis framework.
 - **Formatter**: Oxfmt (via `vp fmt` / `vp check`)
 - **Bundler**: tsdown via `vp pack` (config in each package's `vite.config.ts` `pack` block)
 - **Test runner**: Vitest via `vp test` (config in each package's `vite.config.ts` `test` block)
-- **Zod version**: Optional peer dep. Supports ^3.25 || ^4.0 when present
+- **Zod version**: MCP SDK v2 requires Zod ^4.2 when used. Zod 3 is unsupported
 - **Commit format**: `<type>(<scope>): <subject>` (enforced by hook)
 
 ### Commit Scopes
 
-Package scopes: `codemode`, `extension-tools`, `global`, `mcp-iframe`, `react-webmcp`, `smart-dom-reader`, `transports`, `usewebmcp`, `webmcp-local-relay`, `webmcp-polyfill`, `webmcp-ts-sdk`, `webmcp-types`
+Package scopes: `codemode`, `global`, `mcp-iframe`, `react-webmcp`, `smart-dom-reader`, `transports`, `usewebmcp`, `webmcp-local-relay`, `webmcp-polyfill`, `webmcp-ts-sdk`, `webmcp-types`
 
 Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 
@@ -86,7 +86,7 @@ Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 
 ### Web Standard APIs
 
-- `document.modelContext` is the canonical WebMCP v3 surface.
+- `document.modelContext` is the canonical current-draft WebMCP surface.
 - `navigator.modelContext` is a deprecated compatibility alias.
 - `navigator.modelContextTesting` is a compatibility surface for testing only.
 - New examples and public documentation use `document.modelContext`.
@@ -120,29 +120,29 @@ Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 
 1. **Polyfill** — `initializeWebMCPPolyfill()` is called. If a native model context already exists, the polyfill returns early. Otherwise it installs `document.modelContext`, the deprecated navigator alias, and the optional testing shim.
 2. **Capture native** — A reference to the current document-first context is saved as `native`.
-3. **BrowserMcpServer** — Created with `{ native }`, so core tool operations (`registerTool`, `unregisterTool`, `clearContext`, `provideContext`) mirror down to the underlying context.
-4. **Replace** — Both compatibility surfaces expose the `BrowserMcpServer` instance, which adds `registerPrompt`, `registerResource`, `listTools`, `callTool`, and other MCP-B extensions.
+3. **BrowserMcpServer** — Created with `{ native }`, so standard tool registrations mirror down to the underlying context and native tools are reconciled through `getTools()`.
+4. **Replace** — Both compatibility surfaces expose the `BrowserMcpServer` instance, which adds `registerPrompt`, `registerResource`, `listTools`, and other MCP-B extensions. Browser-shaped execution uses `getTools()` plus feature-detected `executeTool(tool, inputJson)`.
 5. **Cleanup** — `cleanupWebModelContext()` restores the original native/polyfill context.
 
 ### What Lives Where
 
 | Method               | Web Standard | Polyfill |   BrowserMcpServer    |
 | -------------------- | :----------: | :------: | :-------------------: |
-| `provideContext()`   |      Y       |    Y     | Y (mirrors to native) |
 | `registerTool()`     |      Y       |    Y     | Y (mirrors to native) |
-| `unregisterTool()`   |      Y       |    Y     | Y (mirrors to native) |
-| `clearContext()`     |      Y       |    Y     | Y (mirrors to native) |
+| `getTools()`         |      Y       |    Y     | Y (delegates native)  |
+| `ontoolchange`       |      Y       |    Y     |           Y           |
+| `executeTool(tool)`  | Chrome only  |  compat  |           Y           |
+| `unregisterTool()`   |      -       |  compat  |        compat         |
 | `registerPrompt()`   |      -       |    -     |           Y           |
 | `registerResource()` |      -       |    -     |           Y           |
 | `listTools()`        |      -       |    -     |           Y           |
-| `callTool()`         |      -       |    -     |           Y           |
 | `createMessage()`    |      -       |    -     |           Y           |
 | `elicitInput()`      |      -       |    -     |           Y           |
 
 ### Key Type Interfaces (`@mcp-b/webmcp-types`)
 
-- `ModelContextCore` — the strict web standard surface (provideContext, registerTool, unregisterTool, clearContext)
-- `ModelContextExtensions` — MCPB extensions (listTools, callTool, events)
+- `ModelContextCore` — the strict web standard surface (`registerTool`, `getTools`, `ontoolchange`)
+- `ModelContextExtensions` — MCPB extensions (listTools and events)
 - `ModelContext` = `ModelContextCore` (the type for `document.modelContext`)
 - `ModelContextWithExtensions` = `ModelContextCore & ModelContextExtensions`
 

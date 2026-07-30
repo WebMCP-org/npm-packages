@@ -1,9 +1,9 @@
 import {
   type JSONRPCMessage,
-  JSONRPCMessageSchema,
   type Transport,
   type TransportSendOptions,
-} from '@mcp-b/webmcp-ts-sdk';
+} from '@modelcontextprotocol/server';
+import { JSONRPCMessageSchema } from '@modelcontextprotocol/core';
 
 /**
  * Configuration options for ExtensionServerTransport
@@ -34,10 +34,10 @@ export type ExtensionServerTransportOptions = {
 export class ExtensionServerTransport implements Transport {
   private _port: chrome.runtime.Port;
   private _started = false;
-  private _messageHandler: ((message: any, port: chrome.runtime.Port) => void) | undefined;
+  private _messageHandler: ((message: unknown, port: chrome.runtime.Port) => void) | undefined;
   private _disconnectHandler: ((port: chrome.runtime.Port) => void) | undefined;
-  private _keepAliveTimer: number | undefined;
-  private _options: ExtensionServerTransportOptions;
+  private _keepAliveTimer: ReturnType<typeof setInterval> | undefined;
+  private _options: Required<ExtensionServerTransportOptions>;
   private _connectionInfo: {
     connectedAt: number;
     lastMessageAt: number;
@@ -78,14 +78,19 @@ export class ExtensionServerTransport implements Transport {
     this._started = true;
 
     // Set up message handler
-    this._messageHandler = (message: any) => {
+    this._messageHandler = (message: unknown) => {
       try {
         // Update connection info
         this._connectionInfo.lastMessageAt = Date.now();
         this._connectionInfo.messageCount++;
 
         // Handle ping messages for keep-alive
-        if (message.type === 'ping') {
+        if (
+          typeof message === 'object' &&
+          message !== null &&
+          'type' in message &&
+          message.type === 'ping'
+        ) {
           this._port.postMessage({ type: 'pong' });
           return;
         }
@@ -153,7 +158,7 @@ export class ExtensionServerTransport implements Transport {
     if (this._port) {
       try {
         this._port.disconnect();
-      } catch (_error) {
+      } catch {
         // Port might already be disconnected
       }
     }
@@ -207,7 +212,7 @@ export class ExtensionServerTransport implements Transport {
         console.error('[ExtensionServerTransport] Keep-alive failed:', error);
         this._stopKeepAlive();
       }
-    }, this._options.keepAliveInterval!) as unknown as number;
+    }, this._options.keepAliveInterval);
   }
 
   /**

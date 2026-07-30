@@ -57,7 +57,7 @@
     "packageName": "@mcp-b/transports",
     "sidebarLabel": "transports",
     "category": "Core runtime",
-    "summary": "Tab, iframe, extension, and user-script transport classes for moving MCP messages through browser boundaries.",
+    "summary": "Tab, iframe, and extension transport classes for moving MCP messages through browser boundaries.",
     "installCommand": "npm install @mcp-b/transports",
     "overviewPath": "/packages/transports/overview",
     "referencePath": "/packages/transports/reference",
@@ -70,7 +70,7 @@
     "sidebarLabel": "mcp-iframe",
     "category": "Core runtime",
     "summary": "Custom element that exposes tools, prompts, and resources from an iframe to its parent page.",
-    "installCommand": "npm install @mcp-b/mcp-iframe @modelcontextprotocol/sdk",
+    "installCommand": "npm install @mcp-b/mcp-iframe",
     "overviewPath": "/packages/mcp-iframe/overview",
     "referencePath": "/packages/mcp-iframe/reference",
     "quickstartSnippet": "packages/mcp-iframe-quickstart.html",
@@ -104,7 +104,7 @@
     "sidebarLabel": "react-webmcp",
     "category": "React",
     "summary": "Full React integration for MCP-B, including tool hooks, prompts, resources, sampling, elicitation, and client providers.",
-    "installCommand": "npm install @mcp-b/react-webmcp zod",
+    "installCommand": "npm install @mcp-b/react-webmcp",
     "overviewPath": "/packages/react-webmcp/overview",
     "referencePath": "/packages/react-webmcp/reference",
     "quickstartSnippet": "packages/react-webmcp-quickstart.ts",
@@ -112,7 +112,7 @@
     "note": "Provider and client hooks assume @mcp-b/global or another BrowserMcpServer-based runtime is present.",
     "skill": {
       "name": "react-webmcp",
-      "description": "Use when building React apps with full MCP-B features: useWebMCP hook, prompts, resources, sampling, elicitation, and McpClientProvider. Supports Zod v3 object maps for input/output schemas."
+      "description": "Use when building React apps with full MCP-B features: useWebMCP hook, prompts, resources, sampling, elicitation, and McpClientProvider. Supports JSON Schema and Standard Schema input schemas."
     }
   },
   {
@@ -130,18 +130,6 @@
       "name": "webmcp-local-relay",
       "description": "Use when connecting browser-hosted WebMCP tools to desktop MCP clients like Claude Code, Claude Desktop, or Cursor via the local relay server. Covers CLI options, embed script, static management tools, security, and troubleshooting."
     }
-  },
-  {
-    "id": "extension-tools",
-    "packageName": "@mcp-b/extension-tools",
-    "sidebarLabel": "extension-tools",
-    "category": "Tooling",
-    "summary": "Chrome Extension API tool classes for tabs, bookmarks, history, storage, scripting, and related agent workflows.",
-    "installCommand": "npm install @mcp-b/extension-tools @modelcontextprotocol/sdk",
-    "overviewPath": "/packages/extension-tools/overview",
-    "referencePath": "/packages/extension-tools/reference",
-    "quickstartSnippet": "packages/extension-tools-quickstart.ts",
-    "sourcePackagePath": "packages/extension-tools"
   },
   {
     "id": "smart-dom-reader",

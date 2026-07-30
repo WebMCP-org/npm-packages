@@ -20,7 +20,6 @@ icon: 'code'
 npm: @mcp-b/smart-dom-reader
 license: MIT
 dependencies: none
-optional peer: @modelcontextprotocol/sdk ^1.26.0 (for MCP server)
 ```
 
 ## Installation
@@ -265,7 +264,8 @@ The bundle contains guarded fallbacks for non-browser environments and has no ru
 
 ## MCP server
 
-An optional MCP server returns XML-wrapped Markdown. Output format:
+The separate `@mcp-b/smart-dom-reader-server` package uses
+`@modelcontextprotocol/server` v2 and returns XML-wrapped Markdown. Output format:
 
 ```xml
 <page title="..." url="...">
@@ -295,5 +295,4 @@ Golden path sequence:
 
 ## Related
 
-- [@mcp-b/extension-tools](/packages/extension-tools/reference) (uses `smart-dom-reader` for DOM extraction tools)
-- [Chrome DevTools MCP](/packages/chrome-devtools-mcp/reference) (upstream DevTools-based browser automation)
+- [Use Chrome DevTools MCP](/how-to/use-devtools-mcp) (upstream DevTools-based browser automation)

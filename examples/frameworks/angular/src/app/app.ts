@@ -6,10 +6,10 @@ import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
   template: '<p>WebMCP tool "get_status" registered.</p>',
 })
 export class App implements OnInit {
-  ngOnInit() {
+  async ngOnInit() {
     initializeWebMCPPolyfill();
 
-    navigator.modelContext.registerTool({
+    await document.modelContext.registerTool({
       name: 'get_status',
       description: 'Returns app status',
       inputSchema: {

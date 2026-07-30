@@ -53,10 +53,13 @@
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
     "test": "vp test run && pnpm run test:conformance",
-    "test:browser": "vp test run --config vitest.browser.config.ts --browser.headless",
-    "test:browser:ui": "vp test --config vitest.browser.config.ts --browser",
+    "test:browser": "vp test run --browser.headless",
+    "test:browser:ui": "vp test --browser",
     "test:conformance": "vp test run --config vitest.conformance.config.ts",
     "typecheck": "tsc --noEmit && vp test run --typecheck --silent"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "catalog:"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "catalog:",

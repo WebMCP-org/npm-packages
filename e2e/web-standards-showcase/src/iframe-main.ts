@@ -4,7 +4,7 @@
  */
 
 import { detectNativeAPI } from './api/detection';
-import { installLegacyContextCompat } from './lib/utils';
+import { registerShowcaseTool } from './lib/utils';
 import type { ModelContext, Tool } from './types';
 
 // State tracking
@@ -35,7 +35,6 @@ function init(): void {
   }
 
   modelContext = document.modelContext as unknown as ModelContext;
-  installLegacyContextCompat(modelContext);
 
   setupEventListeners();
   setupToolChangeListener();
@@ -97,7 +96,9 @@ function setupToolChangeListener(): void {
   modelContext.addEventListener('toolchange', () => {
     logEvent('info', 'Tools changed event');
     refreshToolDisplay();
-    notifyParent('tools-changed', { tools: getToolNames() });
+    void getToolNames().then((tools) => {
+      notifyParent('tools-changed', { tools });
+    });
   });
 }
 
@@ -122,7 +123,9 @@ function handleParentMessage(event: MessageEvent): void {
         clearContext();
         break;
       case 'get-tools':
-        notifyParent('tools-list', { tools: getToolNames() });
+        void getToolNames().then((tools) => {
+          notifyParent('tools-list', { tools });
+        });
         break;
     }
   }
@@ -158,7 +161,7 @@ function registerBucketATool(): void {
     },
   };
 
-  bucketARegistrations.set('iframe_echo', modelContext.registerTool(tool));
+  bucketARegistrations.set('iframe_echo', registerShowcaseTool(modelContext, tool));
   bucketATools = ['iframe_echo'];
 
   logEvent('success', 'Registered iframe_echo via registerTool (Bucket A)');
@@ -187,7 +190,7 @@ function registerBucketBTool(): void {
     },
   };
 
-  const registration = modelContext.registerTool(tool);
+  const registration = registerShowcaseTool(modelContext, tool);
   bucketBRegistrations.set('iframe_timestamp', registration);
 
   const unregisterBtn = document.getElementById('unregister-iframe-tool-b') as HTMLButtonElement;
@@ -243,16 +246,28 @@ function clearContext(): void {
 /**
  * Get list of tool names
  */
-function getToolNames(): string[] {
-  return modelContext.listTools().map((t) => t.name);
+async function getToolNames(): Promise<string[]> {
+  return (await modelContext.getTools()).map((tool) => tool.name);
 }
 
 /**
  * Refresh the tool display
  */
 function refreshToolDisplay(): void {
-  const tools = modelContext.listTools();
+  void modelContext
+    .getTools()
+    .then((tools) => {
+      renderToolDisplay(tools);
+    })
+    .catch((error: unknown) => {
+      logEvent(
+        'error',
+        `getTools() failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+    });
+}
 
+function renderToolDisplay(tools: Awaited<ReturnType<ModelContext['getTools']>>): void {
   // Update tool list
   const toolList = document.getElementById('iframe-tool-list');
   if (toolList) {

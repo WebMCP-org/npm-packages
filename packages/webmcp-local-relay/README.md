@@ -65,12 +65,14 @@ New to WebMCP? Here's the full setup:
 ```html
 <script src="https://cdn.jsdelivr.net/npm/@mcp-b/global@latest/dist/index.iife.js"></script>
 <script>
-  document.modelContext.registerTool({
-    name: 'get_page_title',
-    description: 'Get the current page title',
-    inputSchema: { type: 'object', properties: {} },
-    execute: async () => ({ content: [{ type: 'text', text: document.title }] }),
-  });
+  void document.modelContext
+    .registerTool({
+      name: 'get_page_title',
+      description: 'Get the current page title',
+      inputSchema: { type: 'object', properties: {} },
+      execute: async () => ({ content: [{ type: 'text', text: document.title }] }),
+    })
+    .catch(console.error);
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@latest/dist/browser/embed.js"></script>
 ```
@@ -117,14 +119,13 @@ npx @mcp-b/webmcp-local-relay
 
 ### Exposed Tools
 
-The relay exposes four static management tools that are always available:
+The relay exposes three static management tools that are always available:
 
-| Tool                  | Description                                                                                                          |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `webmcp_list_sources` | Lists connected browser tabs with metadata (tab ID, origin, URL, title, icon, tool count)                            |
-| `webmcp_list_tools`   | Lists all relayed tools with source info                                                                             |
-| `webmcp_call_tool`    | Invokes a relayed tool by name with JSON arguments — useful for clients that don't support dynamic tool registration |
-| `webmcp_open_page`    | Opens a URL in the user's default browser, or refreshes a connected source page by matching origin                   |
+| Tool                  | Description                                                                                        |
+| --------------------- | -------------------------------------------------------------------------------------------------- |
+| `webmcp_list_sources` | Lists connected browser tabs with metadata (tab ID, origin, URL, title, icon, tool count)          |
+| `webmcp_list_tools`   | Lists all relayed tools with source info                                                           |
+| `webmcp_open_page`    | Opens a URL in the user's default browser, or refreshes a connected source page by matching origin |
 
 **Dynamic tools** are registered directly on the MCP server using the original tool name, sanitized to `[a-zA-Z0-9_]`. When tools from different tabs share a name, a short tab-ID suffix is appended for disambiguation:
 
@@ -186,7 +187,6 @@ npx @mcp-b/webmcp-local-relay --widget-origin https://myapp.com
 │        LocalRelayMcpServer           │
 │   webmcp_list_sources                │
 │   webmcp_list_tools                  │
-│   webmcp_call_tool                   │
 │   + dynamic tools from browser       │
 └──────────────────┬───────────────────┘
                    │ WebSocket (ws://127.0.0.1:9333)
@@ -206,7 +206,7 @@ npx @mcp-b/webmcp-local-relay --widget-origin https://myapp.com
 └──────────────────────────────────────┘
 ```
 
-**How it connects:** The embed script injects a hidden iframe into the host page. The iframe opens a WebSocket to the relay on `localhost`. Tools are discovered via `document.modelContext` (or `navigator.modelContextTesting` as fallback) and forwarded to the relay, which registers them as standard MCP tools over stdio.
+**How it connects:** The embed script injects a hidden iframe into the host page. The iframe opens a WebSocket to the relay on `localhost`. Tools are discovered through the current `document.modelContext` API and forwarded to the relay, which registers them as standard MCP tools over stdio.
 If the relay is temporarily unavailable, the widget reconnects automatically using exponential backoff (1.5x multiplier) from `500ms` up to `3000ms`, stopping after 100 attempts.
 
 **Client mode:** When a second relay instance starts and the port is already in use (`EADDRINUSE`), it automatically falls back to **client mode**. In client mode the relay connects as a WebSocket client to the existing server relay and proxies tool operations through it. If the server relay later stops, the client attempts to promote itself back to server mode. This enables multiple MCP clients to share the same browser connections without manual configuration.
@@ -215,17 +215,20 @@ If the relay is temporarily unavailable, the widget reconnects automatically usi
 
 Supported page runtimes:
 
-1. `@mcp-b/global` (recommended)
-2. `@mcp-b/webmcp-polyfill` with `navigator.modelContextTesting`
+1. `@mcp-b/global` (recommended for the complete MCP-B runtime)
+2. Current native Chrome with `document.modelContext.getTools()` and the optional descriptor-based `executeTool()` extension
+3. `@mcp-b/webmcp-polyfill`
 
 Runtime dispatch behavior in the browser embed/widget layer:
 
-- Uses `document.modelContext.listTools` + `callTool` when present.
-- Falls back to `navigator.modelContextTesting.listTools` + `executeTool`.
+- Uses asynchronous `document.modelContext.getTools()` and the exact returned
+  descriptor with feature-detected `executeTool()`.
+- Refreshes the descriptor before every invocation so Chrome never receives a
+  stale registration object.
 
 ### WebMCP Standard Status
 
-WebMCP is an emerging web platform proposal. This relay works today with polyfills and will support native browser implementations as they mature.
+WebMCP is an emerging web platform proposal. This relay works with the current native Chrome preview and MCP-B runtimes, but native extension details can still change as implementations mature.
 
 - [W3C WebML CG draft](https://webmachinelearning.github.io/webmcp/)
 - [Proposal repository](https://github.com/webmachinelearning/webmcp)

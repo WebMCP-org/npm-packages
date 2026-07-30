@@ -53,6 +53,7 @@ e2e/test-results
 
 # Vitest screenshots
 **/__screenshots__
+**/.vitest-attachments
 docs/plans/WEBMCP_SPEC.md
 .codex
 .reference

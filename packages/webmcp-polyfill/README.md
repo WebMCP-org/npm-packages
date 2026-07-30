@@ -6,8 +6,8 @@ backward-compatible `navigator.modelContext` alias).
 > **Heads up - WebMCP spec migration.** The `modelContext` getter moved from
 > `Navigator` to `Document` in
 > [webmachinelearning/webmcp#184](https://github.com/webmachinelearning/webmcp/pull/184)
-> and Chrome 150 deprecates `navigator.modelContext`. The polyfill installs on
-> both surfaces today: `document.modelContext` is the canonical install
+> and Chrome deprecated `navigator.modelContext`. The polyfill installs on both
+> surfaces today: `document.modelContext` is the canonical install
 > location, and `navigator.modelContext` remains as a deprecated alias that
 > resolves to the same instance and logs a one-time console warning on first
 > access. Prefer `document.modelContext` for new code.
@@ -19,20 +19,24 @@ if (modelContext) {
 }
 ```
 
-`@mcp-b/webmcp-polyfill` installs only the strict core API:
+`@mcp-b/webmcp-polyfill` installs the strict core API:
 
-- `registerTool(tool, options?)` - pass `options.signal` (`AbortSignal`) to unregister when aborted
-- `getTools()` - async Chromium producer-preview discovery API
-- `executeTool(toolFromGetTools, inputArgsJson, options?)` - Chromium producer-preview execution API
-- `unregisterTool(nameOrTool)` (deprecated compatibility API)
+- `registerTool(tool, options?)` - returns `Promise<void>`; pass `options.signal` (`AbortSignal`) to unregister when aborted
+- `getTools()` - async tool discovery
+- `toolchange` events
 
-It does not install MCP bridge extensions like `callTool`, resources, or prompts.
+It also retains two non-standard compatibility methods:
+
+- `executeTool(toolFromGetTools, inputArgsJson, options?)` - optional Chromium preview extension
+- `unregisterTool(nameOrTool)` - deprecated compatibility API
+
+It does not install MCP bridge extensions such as `listTools()`, resources, prompts, sampling, or elicitation.
 
 Important:
 
-- `document.modelContext` is the canonical install location. `navigator.modelContext` is kept as a backward-compatible alias that returns the same instance and logs a one-time deprecation warning on first access. The upstream WebMCP draft moved the getter from Navigator to Document on May 27, 2026 ([webmachinelearning/webmcp#184](https://github.com/webmachinelearning/webmcp/pull/184)) and Chrome 150 deprecates `navigator.modelContext`. The polyfill will remove the Navigator alias in the next major version.
+- `document.modelContext` is the canonical install location. `navigator.modelContext` is kept as a backward-compatible alias that returns the same instance and logs a one-time deprecation warning on first access. The upstream WebMCP draft moved the getter from Navigator to Document on May 27, 2026 ([webmachinelearning/webmcp#184](https://github.com/webmachinelearning/webmcp/pull/184)). The polyfill will remove the Navigator alias in the next major version.
 - `document.modelContext` in this package does not provide `listTools()` or `callTool(...)`; producer discovery/execution uses `getTools()` and `executeTool(...)`.
-- For list/execute test flows, use `navigator.modelContextTesting` (when `installTestingShim` is enabled).
+- `navigator.modelContextTesting` is available only when the legacy testing shim is enabled.
 - `provideContext()` and `clearContext()` were removed from the upstream WebMCP spec on March 5, 2026 and are not exposed by this polyfill.
 - `unregisterTool(name)` was removed from the WebMCP draft on April 23, 2026 in favor of `AbortSignal`-driven unregistration. The polyfill keeps it functional with a one-time deprecation warning; it will be removed in the next major version.
 
@@ -69,7 +73,7 @@ import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
 
 initializeWebMCPPolyfill();
 
-document.modelContext.registerTool({
+await document.modelContext.registerTool({
   name: 'get-page-title',
   description: 'Get the current page title',
   inputSchema: { type: 'object', properties: {} },
@@ -114,7 +118,7 @@ const inputSchema = {
   additionalProperties: false,
 } as const satisfies JsonSchemaForInference;
 
-document.modelContext.registerTool({
+await document.modelContext.registerTool({
   name: 'search',
   description: 'Search indexed docs',
   inputSchema,
@@ -139,11 +143,10 @@ Inference notes:
 
 Installs the strict core polyfill on `document.modelContext` (canonical) and `navigator.modelContext` (deprecated alias to the same instance).
 
-| Option                            | Type                                  | Default        | Notes                                                                                                        |
-| --------------------------------- | ------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------ |
-| `autoInitialize`                  | `boolean`                             | `true`         | Used by auto-init flows (IIFE/import side effect). Set `false` to disable auto-init and initialize manually. |
-| `installTestingShim`              | `boolean \| 'always' \| 'if-missing'` | `'if-missing'` | Controls whether `navigator.modelContextTesting` is installed.                                               |
-| `disableIframeTransportByDefault` | `boolean`                             | n/a            | Deprecated no-op, kept for compatibility.                                                                    |
+| Option               | Type                                  | Default        | Notes                                                                                                        |
+| -------------------- | ------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------ |
+| `autoInitialize`     | `boolean`                             | `true`         | Used by auto-init flows (IIFE/import side effect). Set `false` to disable auto-init and initialize manually. |
+| `installTestingShim` | `boolean \| 'always' \| 'if-missing'` | `'if-missing'` | Controls whether `navigator.modelContextTesting` is installed.                                               |
 
 Behavior:
 
@@ -164,13 +167,13 @@ Restores previous `document.modelContext`, `navigator.modelContext`, and `naviga
 ### `registerTool(tool, options?)`
 
 - Requires a non-empty `name`, non-empty `description`, and `execute` function.
-- Throws on duplicate tool names.
+- Returns `Promise<void>` and rejects invalid or duplicate registrations.
 - If `inputSchema` is omitted, runtime defaults to `{ type: 'object', properties: {} }`.
-- `options.signal` (optional `AbortSignal`) - when the signal aborts, the tool is unregistered. If the signal is already aborted at registration time, the polyfill skips the registration and logs a warning (matching the April 23, 2026 spec step).
+- `options.signal` (optional `AbortSignal`) - when the signal aborts, the tool is unregistered. If it is already aborted, registration rejects with `signal.reason`.
 
 ```ts
 const ac = new AbortController();
-document.modelContext.registerTool(
+await document.modelContext.registerTool(
   {
     name: 'search',
     description: 'Search docs',
@@ -194,8 +197,22 @@ ac.abort();
 
 ## Listing and Executing Tools
 
-In `@mcp-b/webmcp-polyfill`, listing and execution helpers are exposed on
-`navigator.modelContextTesting` (not `document.modelContext`) when the testing shim is enabled.
+Use the current WebMCP producer API on `document.modelContext`:
+
+```ts
+const [tool] = await document.modelContext.getTools();
+const result = tool
+  ? await document.modelContext.executeTool(tool, JSON.stringify({ query: 'webmcp' }))
+  : null;
+```
+
+`getTools({ fromOrigins })` accepts the current discovery filter, but this local polyfill cannot
+securely discover tools in descendant documents. It warns once and returns tools registered in the
+current document. Use native WebMCP when cross-document discovery or `exposedTo` enforcement is
+required.
+
+The optional testing shim also exposes compatibility helpers on
+`navigator.modelContextTesting`:
 
 ```ts
 import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
@@ -212,7 +229,7 @@ void tools;
 void result;
 ```
 
-If you want `callTool(...)` / extension-style runtime methods on `document.modelContext`, use
+If you need prompts, resources, sampling, elicitation, or MCP transports, use
 `@mcp-b/global`.
 
 ## Input Schema Support
@@ -220,13 +237,20 @@ If you want `callTool(...)` / extension-style runtime methods on `document.model
 `inputSchema` accepts:
 
 - Plain JSON Schema objects (`InputSchema`)
-- Standard Schema v1 validator objects (`~standard.validate(...)`)
 - Standard JSON Schema v1 objects (`~standard.jsonSchema.input(...)`)
+- Standard JSON Schema v1 objects that also expose Standard Schema validation (`~standard.validate(...)`)
 
 Notes:
 
 - Standard JSON Schema conversion is attempted with targets `draft-2020-12`, then `draft-07`.
-- When both Standard validator and Standard JSON Schema are present, JSON conversion is preferred for validation parity.
+- Validator-only Standard Schema objects are rejected because WebMCP must advertise JSON Schema metadata.
+- When both Standard Schema interfaces are present, JSON conversion supplies
+  WebMCP metadata. Direct WebMCP execution does not run the Standard Schema
+  validator.
+- Imperative and testing-shim `executeTool(...)` follow Chrome and invoke the
+  tool without schema validation. MCP transport calls are validated by the
+  official MCP server; validate inside the handler only when direct WebMCP
+  execution must enforce refinements.
 
 ## Optional Testing Shim
 
@@ -244,7 +268,7 @@ Older native previews also exposed `navigator.modelContextTesting.ontoolchange`;
 ## Interop with `@mcp-b/global`
 
 - If this polyfill is installed first, `@mcp-b/global` can attach bridge features without replacing the existing core object identity.
-- Use `@mcp-b/global` directly when you need extension APIs such as `callTool`, resources, or prompts.
+- Use `@mcp-b/global` directly when you need extension APIs such as resources, prompts, sampling, or elicitation.
 
 ## Migration Notes
 

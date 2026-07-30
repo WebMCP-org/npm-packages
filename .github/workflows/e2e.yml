@@ -54,9 +54,6 @@ jobs:
       - name: Print Chrome version
         run: '"${{ steps.chrome.outputs.chrome-path }}" --version'
 
-      - name: Install Puppeteer Chrome (for chrome-devtools-mcp e2e)
-        run: pnpm --filter @mcp-b/chrome-devtools-mcp exec puppeteer browsers install chrome
-
       - name: Run runtime contract E2E tests
         env:
           PLAYWRIGHT_CHROMIUM_CHANNEL: chrome
@@ -116,10 +113,10 @@ jobs:
       - name: Install dependencies
         run: vp install
 
-      - name: Run extension E2E tests
+      - name: Run extension transport E2E tests
         env:
           PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
-        run: pnpm --filter @mcp-b/extension-tools test:e2e
+        run: pnpm --filter @mcp-b/transports test:e2e
 
   native-parity:
     name: Native API Parity (chrome-canary)

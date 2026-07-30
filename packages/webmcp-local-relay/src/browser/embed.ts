@@ -11,26 +11,33 @@
  * chain multiple API calls:
  * `<script src=".../embed.js" data-request-timeout="120000"></script>`
  */
+import { normalizeToolResponse } from '@mcp-b/webmcp-polyfill/schema';
 import type {
-  ModelContextTestingPolyfillExtensions,
-  ModelContextTestingToolInfo,
-  ModelContextWithExtensions,
-  ToolListItem,
+  ChromeModelContextExtensions,
+  ModelContextCore,
+  RegisteredTool,
 } from '@mcp-b/webmcp-types';
-import { isJsonObject } from './shared.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
+import { createRequestId, isJsonObject } from './shared.js';
 
 /** Loose JSON object: values aren't recursively typed since we just forward them. */
 type JsonObject = Record<string, unknown>;
 
 interface RelayToolDescriptor {
   name: string;
-  description?: string;
-  inputSchema?: JsonObject;
+  description: string;
+  inputSchema?: unknown;
 }
 
-interface ToolBridge {
-  listTools: () => RelayToolDescriptor[] | Promise<RelayToolDescriptor[]>;
-  invoke: (name: string, args: JsonObject) => unknown;
+interface DescriptorToolContext extends ModelContextCore {
+  executeTool: NonNullable<ChromeModelContextExtensions['executeTool']>;
+}
+
+interface ElicitationModelContext extends ModelContextCore {
+  elicitInput: (
+    params: Record<string, unknown>,
+    options?: unknown
+  ) => Promise<Record<string, unknown>>;
 }
 
 interface WidgetRequestMessage {
@@ -72,13 +79,6 @@ function debugWarn(...args: unknown[]): void {
   if (DEBUG) console.warn('[webmcp-relay-embed]', ...args);
 }
 
-function createTabId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  return `${String(Date.now())}_${String(Math.random()).slice(2, 10)}`;
-}
-
 function readOrCreateTabId(): string {
   try {
     const storedTabId = sessionStorage.getItem(TAB_ID_STORAGE_KEY);
@@ -89,7 +89,7 @@ function readOrCreateTabId(): string {
     debugWarn('sessionStorage read failed, tab ID will not persist:', err);
   }
 
-  const tabId = createTabId();
+  const tabId = createRequestId();
   try {
     sessionStorage.setItem(TAB_ID_STORAGE_KEY, tabId);
   } catch (err) {
@@ -130,23 +130,6 @@ function buildRelayConfig(script: HTMLScriptElement | null): RelayConfig {
   };
 }
 
-function parseTestingSchema(rawSchema: unknown): JsonObject {
-  if (typeof rawSchema !== 'string' || rawSchema.length === 0) {
-    return { type: 'object', properties: {} };
-  }
-  try {
-    const parsed: unknown = JSON.parse(rawSchema);
-    return isJsonObject(parsed) ? parsed : { type: 'object', properties: {} };
-  } catch (err) {
-    debugWarn(
-      'Tool inputSchema is not valid JSON:',
-      typeof rawSchema === 'string' ? rawSchema.slice(0, 200) : rawSchema,
-      err
-    );
-    return { type: 'object', properties: {} };
-  }
-}
-
 function toInvokeArgs(value: unknown): JsonObject {
   if (isJsonObject(value)) return value;
   if (value !== undefined && value !== null) {
@@ -155,101 +138,80 @@ function toInvokeArgs(value: unknown): JsonObject {
   return {};
 }
 
-function mapToolListItem(tool: ToolListItem): RelayToolDescriptor {
+function mapRegisteredTool(tool: RegisteredTool): RelayToolDescriptor {
   return {
     name: tool.name,
     description: tool.description,
-    inputSchema: tool.inputSchema,
+    ...(tool.inputSchema === undefined
+      ? {}
+      : { inputSchema: JSON.parse(tool.inputSchema) as unknown }),
   };
 }
 
-function mapTestingToolInfo(tool: ModelContextTestingToolInfo): RelayToolDescriptor {
-  return {
-    name: tool.name,
-    description: tool.description,
-    inputSchema: parseTestingSchema(tool.inputSchema),
-  };
-}
-
-/**
- * At runtime, navigator.modelContext may be the extended BrowserMcpServer
- * (with listTools/callTool/addEventListener) installed by @mcp-b/global,
- * or the bare ModelContextCore from the native browser / polyfill.
- * We duck-type to detect the extended version.
- */
-function getExtendedModelContext(): ModelContextWithExtensions | undefined {
-  const mc = navigator.modelContext;
-  if (
-    mc &&
-    typeof (mc as Partial<ModelContextWithExtensions>).listTools === 'function' &&
-    typeof (mc as Partial<ModelContextWithExtensions>).callTool === 'function'
-  ) {
-    return mc as ModelContextWithExtensions;
-  }
-  return undefined;
-}
-
-function getToolBridge(): ToolBridge | null {
-  const modelContext = getExtendedModelContext();
-  if (modelContext) {
+function normalizeSerializedToolResult(serialized: string | null): CallToolResult {
+  if (serialized === null) {
     return {
-      listTools() {
-        return modelContext.listTools().map(mapToolListItem);
-      },
-      invoke(name: string, args: JsonObject) {
-        return modelContext.callTool({ name, arguments: args });
-      },
+      isError: true,
+      content: [{ type: 'text', text: 'Tool execution interrupted by navigation' }],
     };
   }
 
-  const testing = navigator.modelContextTesting;
-  if (
-    testing &&
-    typeof testing.listTools === 'function' &&
-    typeof testing.executeTool === 'function'
-  ) {
-    return {
-      listTools() {
-        return testing.listTools().map(mapTestingToolInfo);
-      },
-      async invoke(name: string, args: JsonObject) {
-        const serialized: string | null = await testing.executeTool(name, JSON.stringify(args));
-        if (serialized === null) {
-          return {
-            isError: true,
-            content: [{ type: 'text', text: 'Tool execution interrupted by navigation' }],
-          };
-        }
-        let parsed: unknown;
-        try {
-          parsed = JSON.parse(serialized);
-        } catch {
-          throw new Error(
-            `Testing tool returned invalid JSON: ${String(serialized).slice(0, 200)}`
-          );
-        }
-        if (!isJsonObject(parsed)) {
-          throw new Error('Testing tool response was not an object');
-        }
-        return parsed;
-      },
-    };
+  let rawResult: unknown;
+  try {
+    rawResult = JSON.parse(serialized);
+  } catch {
+    // Chrome returns callback strings directly rather than JSON-quoting them.
+    rawResult = serialized;
   }
 
-  debugWarn('No WebMCP runtime found (navigator.modelContext or navigator.modelContextTesting).');
-  return null;
+  return normalizeToolResponse(rawResult);
 }
 
-function listRelayTools(): Promise<RelayToolDescriptor[]> {
-  const bridge = getToolBridge();
-  if (!bridge) {
-    return Promise.resolve([]);
+function hasDescriptorToolApi(
+  modelContext: ModelContextCore | undefined
+): modelContext is DescriptorToolContext {
+  return Boolean(
+    modelContext && 'executeTool' in modelContext && typeof modelContext.executeTool === 'function'
+  );
+}
+
+function getDocumentDescriptorContext(): DescriptorToolContext | undefined {
+  const modelContext: ModelContextCore | undefined = document.modelContext;
+  return hasDescriptorToolApi(modelContext) ? modelContext : undefined;
+}
+
+function hasElicitation(modelContext: ModelContextCore): modelContext is ElicitationModelContext {
+  return 'elicitInput' in modelContext && typeof modelContext.elicitInput === 'function';
+}
+
+async function listRelayTools(): Promise<RelayToolDescriptor[]> {
+  const descriptorContext = getDocumentDescriptorContext();
+  if (!descriptorContext) {
+    return [];
   }
 
-  return Promise.resolve(bridge.listTools()).then((tools) => (Array.isArray(tools) ? tools : []));
+  return (await descriptorContext.getTools()).map(mapRegisteredTool);
+}
+
+async function invokeRelayTool(name: string, args: JsonObject): Promise<CallToolResult> {
+  const descriptorContext = getDocumentDescriptorContext();
+  if (!descriptorContext) {
+    throw new Error('No executable WebMCP runtime found on this page');
+  }
+
+  // Current Chrome requires a RegisteredTool returned by getTools(), not a
+  // name or a stale copy.
+  const tool = (await descriptorContext.getTools()).find((candidate) => candidate.name === name);
+  if (!tool) {
+    throw new Error(`Tool not found: ${name}`);
+  }
+
+  const serialized = await descriptorContext.executeTool(tool, JSON.stringify(args));
+  return normalizeSerializedToolResult(serialized);
 }
 
 let toolSyncScheduled = false;
+let toolSyncRevision = 0;
 let toolSyncPollTimer: ReturnType<typeof setInterval> | null = null;
 let lastToolsSnapshot = '';
 
@@ -273,9 +235,11 @@ function toolsSnapshot(tools: RelayToolDescriptor[]): string {
 
 function pushToolsIfChanged(): void {
   toolSyncScheduled = false;
+  const revision = toolSyncRevision;
 
   listRelayTools()
     .then((tools) => {
+      if (revision !== toolSyncRevision) return;
       const nextSnapshot = toolsSnapshot(tools);
       if (nextSnapshot === lastToolsSnapshot || !widgetWindow) return;
       lastToolsSnapshot = nextSnapshot;
@@ -287,6 +251,7 @@ function pushToolsIfChanged(): void {
 }
 
 function scheduleToolSync(): void {
+  toolSyncRevision++;
   if (toolSyncScheduled) return;
   toolSyncScheduled = true;
   setTimeout(pushToolsIfChanged, 0);
@@ -297,49 +262,18 @@ function startToolSyncPolling(): void {
   toolSyncPollTimer = setInterval(scheduleToolSync, TOOL_SYNC_POLL_INTERVAL_MS);
 }
 
-// Subscribe on BOTH modelContext and modelContextTesting (non-exclusive).
-// Chrome native fires toolchange on modelContextTesting; the polyfill fires on
-// modelContext. We subscribe to all available surfaces so no event is missed.
 function trySubscribe(): boolean {
-  let subscribed = false;
-
-  const mc = getExtendedModelContext();
-  if (mc) {
-    try {
-      mc.addEventListener('toolchange', scheduleToolSync);
-      subscribed = true;
-    } catch (error) {
-      debugWarn('addEventListener on modelContext threw:', error);
-    }
+  try {
+    document.modelContext.addEventListener('toolchange', scheduleToolSync);
+    return true;
+  } catch (error) {
+    debugWarn('addEventListener on modelContext threw:', error);
+    return false;
   }
-
-  const testing = navigator.modelContextTesting as
-    | (typeof navigator.modelContextTesting & Partial<ModelContextTestingPolyfillExtensions>)
-    | undefined;
-  if (testing) {
-    if (typeof testing.addEventListener === 'function') {
-      try {
-        testing.addEventListener('toolchange', scheduleToolSync);
-        subscribed = true;
-      } catch (error) {
-        debugWarn('addEventListener on modelContextTesting threw:', error);
-      }
-    } else if (typeof testing.registerToolsChangedCallback === 'function') {
-      try {
-        testing.registerToolsChangedCallback(scheduleToolSync);
-        subscribed = true;
-      } catch (error) {
-        debugWarn('Failed to subscribe via registerToolsChangedCallback:', error);
-      }
-    }
-  }
-
-  return subscribed;
 }
 
-// Polling fallback: Chrome 148+ removed unregisterTool(); tools are removed via
-// AbortSignal only, which does NOT fire a toolchange event. Polling every 2s
-// ensures we still detect those silent removals within a bounded delay.
+// Polling fallback: some Chromium previews miss toolchange events when an
+// AbortSignal removes a tool. Polling bounds how long a stale tool can remain.
 function subscribeToToolChanges(): void {
   startToolSyncPolling();
   scheduleToolSync();
@@ -425,7 +359,7 @@ function handleListRequest(request: WidgetRequestMessage, event: MessageEvent): 
 }
 
 /**
- * Monkey-patches `navigator.modelContext.elicitInput` to bridge elicitation
+ * Monkey-patches the MCP-B model context's `elicitInput` to bridge elicitation
  * requests through the relay widget iframe to the local relay server, which
  * forwards them to the MCP client (e.g. Claude Code).
  *
@@ -438,20 +372,13 @@ let elicitBridgeInstalled = false;
 function installElicitBridge(widgetSource: MessageEventSource, widgetOrigin: string): void {
   if (elicitBridgeInstalled) return;
 
-  const mc = getExtendedModelContext() as
-    | (ModelContextWithExtensions & {
-        elicitInput?: (
-          params: Record<string, unknown>,
-          options?: unknown
-        ) => Promise<Record<string, unknown>>;
-      })
-    | undefined;
-  if (!mc || typeof mc.elicitInput !== 'function') {
+  const modelContext = document.modelContext;
+  if (!hasElicitation(modelContext)) {
     debugWarn('Elicitation bridge not installed: elicitInput not available on modelContext');
     return;
   }
 
-  mc.elicitInput = (
+  modelContext.elicitInput = (
     params: Record<string, unknown>,
     _options?: unknown
   ): Promise<Record<string, unknown>> => {
@@ -472,7 +399,7 @@ function installElicitBridge(widgetSource: MessageEventSource, widgetOrigin: str
 
       const handler = (event: MessageEvent): void => {
         if (event.origin !== widgetOrigin) return;
-        const data = event.data as Record<string, unknown>;
+        const data: unknown = event.data;
         if (
           !isJsonObject(data) ||
           data.type !== 'webmcp.elicitation.response' ||
@@ -481,11 +408,7 @@ function installElicitBridge(widgetSource: MessageEventSource, widgetOrigin: str
           return;
         }
         cleanup();
-        resolve(
-          isJsonObject(data.result)
-            ? (data.result as Record<string, unknown>)
-            : { action: 'decline', content: null }
-        );
+        resolve(isJsonObject(data.result) ? data.result : { action: 'decline', content: null });
       };
       window.addEventListener('message', handler);
 
@@ -508,12 +431,11 @@ function createElicitCallId(): string {
 }
 
 function handleInvokeRequest(request: WidgetRequestMessage, event: MessageEvent): void {
-  const bridge = getToolBridge();
-  if (!bridge) {
+  if (!getDocumentDescriptorContext()) {
     respondToSource(event.source, event.origin, {
       type: 'webmcp.tools.invoke.error',
       requestId: request.requestId,
-      error: 'No WebMCP runtime found on this page',
+      error: 'No executable WebMCP runtime found on this page',
     });
     return;
   }
@@ -524,7 +446,7 @@ function handleInvokeRequest(request: WidgetRequestMessage, event: MessageEvent)
     installElicitBridge(event.source, event.origin);
   }
 
-  Promise.resolve(bridge.invoke(String(request.toolName ?? ''), toInvokeArgs(request.args)))
+  invokeRelayTool(String(request.toolName ?? ''), toInvokeArgs(request.args))
     .then((result) => {
       respondToSource(event.source, event.origin, {
         type: 'webmcp.tools.invoke.response',

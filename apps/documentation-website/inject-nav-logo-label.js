@@ -96,7 +96,7 @@
     style.id = 'nav-logo-label-protect-style';
     style.textContent = css;
     (document.head || document.documentElement).appendChild(style);
-  } catch (e) {
+  } catch {
     /* ignore */
   }
 })();

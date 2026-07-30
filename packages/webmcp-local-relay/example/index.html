@@ -13,7 +13,7 @@
     <!-- WebMCP polyfill -->
     <script src="https://cdn.jsdelivr.net/npm/@mcp-b/global@latest/dist/index.iife.js"></script>
 
-    <script>
+    <script type="module">
       const log = document.getElementById('log');
       function addLog(msg) {
         log.textContent += msg + '\n';
@@ -21,7 +21,7 @@
       }
 
       addLog('[example] Registering sample tool...');
-      navigator.modelContext.registerTool({
+      await document.modelContext.registerTool({
         name: 'get_page_title',
         description: 'Returns the current page title',
         inputSchema: { type: 'object', properties: {} },
@@ -31,7 +31,7 @@
         },
       });
 
-      navigator.modelContext.registerTool({
+      await document.modelContext.registerTool({
         name: 'greet_user',
         description: 'Greets a user by name',
         inputSchema: {
@@ -49,7 +49,11 @@
       addLog('[example] Tools registered. Loading embed...');
     </script>
 
-    <!-- Local relay embed (served from same directory) -->
-    <script src="embed.js" data-relay-host="127.0.0.1" data-relay-port="9333"></script>
+    <!-- Built relay embed -->
+    <script
+      src="../dist/browser/embed.js"
+      data-relay-host="127.0.0.1"
+      data-relay-port="9333"
+    ></script>
   </body>
 </html>

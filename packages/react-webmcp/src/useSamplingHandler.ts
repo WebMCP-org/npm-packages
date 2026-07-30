@@ -1,24 +1,19 @@
-import type { SamplingRequestParams, SamplingResult } from '@mcp-b/webmcp-ts-sdk';
-import { useCallback, useState } from 'react';
-import { getModelContext, type ModelContextSurface } from './model-context.js';
+import type {
+  CreateMessageRequest,
+  CreateMessageResult,
+  CreateMessageResultWithTools,
+} from '@modelcontextprotocol/server';
+import { useCallback } from 'react';
+import { getBrowserMcpServer } from './model-context.js';
+import { useMcpRequest, type McpRequestState } from './useMcpRequest.js';
 
-type SamplingModelContext = ModelContextSurface & {
-  createMessage: (params: SamplingRequestParams) => Promise<SamplingResult>;
-};
+type SamplingRequestParams = CreateMessageRequest['params'];
+type SamplingResult = CreateMessageResult | CreateMessageResultWithTools;
 
 /**
  * State for sampling requests, tracking the current request and results.
  */
-export interface SamplingState {
-  /** Whether a sampling request is currently in progress */
-  isLoading: boolean;
-  /** The last sampling result received */
-  result: SamplingResult | null;
-  /** Any error that occurred during the last request */
-  error: Error | null;
-  /** Total number of requests made */
-  requestCount: number;
-}
+export interface SamplingState extends McpRequestState<SamplingResult> {}
 
 /**
  * Configuration options for the useSampling hook.
@@ -87,74 +82,19 @@ export interface UseSamplingReturn {
  * ```
  */
 export function useSampling(config: UseSamplingConfig = {}): UseSamplingReturn {
-  const { onSuccess, onError } = config;
+  const request = useCallback(async (params: SamplingRequestParams): Promise<SamplingResult> => {
+    const modelContext = getBrowserMcpServer();
+    if (!modelContext) {
+      throw new Error('document.modelContext is not available');
+    }
 
-  const [state, setState] = useState<SamplingState>({
-    isLoading: false,
-    result: null,
-    error: null,
-    requestCount: 0,
-  });
-
-  const reset = useCallback(() => {
-    setState({
-      isLoading: false,
-      result: null,
-      error: null,
-      requestCount: 0,
-    });
+    return modelContext.createMessage(params);
   }, []);
-
-  const createMessage = useCallback(
-    async (params: SamplingRequestParams): Promise<SamplingResult> => {
-      const modelContext = getModelContext() as SamplingModelContext | undefined;
-      if (!modelContext) {
-        throw new Error('document.modelContext is not available');
-      }
-
-      setState((prev) => ({
-        ...prev,
-        isLoading: true,
-        error: null,
-      }));
-
-      try {
-        const result = await modelContext.createMessage(params);
-
-        setState((prev) => ({
-          isLoading: false,
-          result,
-          error: null,
-          requestCount: prev.requestCount + 1,
-        }));
-
-        onSuccess?.(result);
-        return result;
-      } catch (err) {
-        const error = err instanceof Error ? err : new Error(String(err));
-
-        setState((prev) => ({
-          ...prev,
-          isLoading: false,
-          error,
-        }));
-
-        onError?.(error);
-        throw error;
-      }
-    },
-    [onSuccess, onError]
-  );
+  const { execute, reset, state } = useMcpRequest(request, config);
 
   return {
     state,
-    createMessage,
+    createMessage: execute,
     reset,
   };
 }
-
-// Also export with the old name for backwards compatibility during migration
-export { useSampling as useSamplingHandler };
-export type { SamplingState as SamplingHandlerState };
-export type { UseSamplingConfig as UseSamplingHandlerConfig };
-export type { UseSamplingReturn as UseSamplingHandlerReturn };

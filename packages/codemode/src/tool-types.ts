@@ -20,21 +20,11 @@ export interface ToolDescriptor {
 
 export type ToolDescriptors = Record<string, ToolDescriptor>;
 
-// --- Schema detection helpers ---
-
-function hasZodMarker(value: object): boolean {
-  return '_zod' in value && (value as UnknownRecord)._zod !== undefined;
-}
-
 function hasStandardMarker(value: object): boolean {
   return '~standard' in value && (value as UnknownRecord)['~standard'] !== undefined;
 }
 
-function isZodSchema(value: unknown): value is ZodType {
-  return value !== null && typeof value === 'object' && hasZodMarker(value);
-}
-
-function isStandardSchema(value: unknown): boolean {
+function isStandardSchema(value: unknown): value is ZodType {
   return value !== null && typeof value === 'object' && hasStandardMarker(value);
 }
 
@@ -125,8 +115,8 @@ function extractParamDescriptions(schema: unknown): string[] {
 
 function safeSchemaToTs(schema: unknown, typeName: string): string {
   try {
-    if (isZodSchema(schema) || isStandardSchema(schema)) {
-      const wrapped = asSchema(schema as ZodType);
+    if (isStandardSchema(schema)) {
+      const wrapped = asSchema(schema);
       const jsonSchema = wrapped.jsonSchema as JSONSchema7;
       if (jsonSchema) {
         const ctx: ConversionContext = {

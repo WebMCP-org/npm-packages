@@ -54,7 +54,7 @@ export const InteractiveQuickstart = () => {
   // Check polyfill status
   useEffect(() => {
     const checkPolyfill = () => {
-      if (window.navigator?.modelContext) {
+      if (document.modelContext) {
         setIsPolyfillLoaded(true);
       }
     };
@@ -69,23 +69,33 @@ export const InteractiveQuickstart = () => {
   // Generate code for different frameworks
   const generateCode = (framework) => {
     const paramName = toolConfig.parameters[0]?.name || 'input';
+    const schemaProps = toolConfig.parameters
+      .map((p) => `        ${p.name}: { type: '${p.type}', description: '${p.description}' }`)
+      .join(',\n');
+    const required = toolConfig.parameters
+      .filter((p) => p.required)
+      .map((p) => `'${p.name}'`)
+      .join(', ');
 
     if (framework === 'react') {
-      const zodSchema = toolConfig.parameters
-        .map((p) => `      ${p.name}: z.${p.type}()${p.required ? '' : '.optional()'}`)
+      const properties = toolConfig.parameters
+        .map((p) => `        ${p.name}: { type: '${p.type}' }`)
         .join(',\n');
 
       return `import '@mcp-b/global';
 import { useWebMCP } from '@mcp-b/react-webmcp';
-import { z } from 'zod';
 
 function MyComponent() {
   useWebMCP({
     name: '${toolConfig.name}',
     description: '${toolConfig.description}',
     inputSchema: {
-${zodSchema}
-    },
+      type: 'object',
+      properties: {
+${properties}
+      },
+      required: [${required}]
+    } as const,
     handler: async ({ ${paramName} }) => {
       return \`Hello, \${${paramName}}!\`;
     }
@@ -96,17 +106,9 @@ ${zodSchema}
     }
 
     if (framework === 'vanilla') {
-      const schemaProps = toolConfig.parameters
-        .map((p) => `        ${p.name}: { type: '${p.type}', description: '${p.description}' }`)
-        .join(',\n');
-      const required = toolConfig.parameters
-        .filter((p) => p.required)
-        .map((p) => `'${p.name}'`)
-        .join(', ');
-
       return `import '@mcp-b/global';
 
-document.modelContext.registerTool({
+await document.modelContext.registerTool({
   name: '${toolConfig.name}',
   description: '${toolConfig.description}',
   inputSchema: {
@@ -125,17 +127,9 @@ ${schemaProps}
     }
 
     if (framework === 'script') {
-      const schemaProps = toolConfig.parameters
-        .map((p) => `        ${p.name}: { type: '${p.type}', description: '${p.description}' }`)
-        .join(',\n');
-      const required = toolConfig.parameters
-        .filter((p) => p.required)
-        .map((p) => `'${p.name}'`)
-        .join(', ');
-
       return `<script src="https://unpkg.com/@mcp-b/global@latest/dist/index.iife.js"></script>
 <script>
-  document.modelContext.registerTool({
+  void document.modelContext.registerTool({
     name: '${toolConfig.name}',
     description: '${toolConfig.description}',
     inputSchema: {
@@ -150,7 +144,7 @@ ${schemaProps}
         content: [{ type: 'text', text: \`Hello, \${${paramName}}!\` }]
       };
     }
-  });
+  }).catch(console.error);
 </script>`;
     }
   };
@@ -647,7 +641,7 @@ ${schemaProps}
           {/* Code footer */}
           <div className="px-4 py-2 border-t border-zinc-700 bg-zinc-800/50">
             <p className="text-xs text-zinc-500">
-              {activeTab === 'react' && 'Requires: @mcp-b/global, @mcp-b/react-webmcp, zod'}
+              {activeTab === 'react' && 'Requires: @mcp-b/global, @mcp-b/react-webmcp'}
               {activeTab === 'vanilla' && 'Requires: @mcp-b/global (npm install)'}
               {activeTab === 'script' && 'No build tools required - just paste into HTML'}
             </p>

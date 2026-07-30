@@ -67,10 +67,19 @@ describe('normalizeInboundTool', () => {
     const normalized = normalizeInboundTool({
       name: 'bad',
       annotations: { readOnlyHint: 'nope' },
-      outputSchema: { type: 'string' },
+      outputSchema: 'not-a-schema',
     });
     expect(normalized.annotations).toBeUndefined();
     expect(normalized.outputSchema).toBeUndefined();
+  });
+
+  it('preserves primitive output schemas supported by MCP v2', () => {
+    const normalized = normalizeInboundTool({
+      name: 'string-result',
+      outputSchema: { type: 'string' },
+    });
+
+    expect(normalized.outputSchema).toEqual({ type: 'string' });
   });
 });
 

@@ -16,7 +16,7 @@ The current registration pattern ties a tool to an `AbortSignal`:
 
 ```ts
 const controller = new AbortController();
-document.modelContext.registerTool(tool, { signal: controller.signal });
+await document.modelContext.registerTool(tool, { signal: controller.signal });
 
 // Remove the registration during route or component cleanup.
 controller.abort();

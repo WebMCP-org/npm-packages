@@ -10,7 +10,7 @@ const inputSchema = {
   additionalProperties: false,
 } as const satisfies JsonSchemaForInference;
 
-document.modelContext.registerTool({
+await document.modelContext.registerTool({
   name: 'search',
   description: 'Search indexed docs',
   inputSchema,

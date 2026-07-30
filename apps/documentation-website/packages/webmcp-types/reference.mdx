@@ -47,7 +47,7 @@ TypeScript may not automatically include global declarations from npm packages. 
   </Tab>
 </Tabs>
 
-After activation, `document.modelContext` is typed as `ModelContext` and `navigator.modelContextTesting` as `ModelContextTesting | undefined`.
+After activation, `document.modelContext` is typed as `ModelContext`. The deprecated navigator compatibility globals remain optional.
 
 ---
 
@@ -59,10 +59,11 @@ After activation, `document.modelContext` is typed as `ModelContext` and `naviga
 
 ## Global augmentation
 
-| Property                        | Type                               | Description                |
-| ------------------------------- | ---------------------------------- | -------------------------- |
-| `document.modelContext`         | `ModelContext`                     | Strict core WebMCP surface |
-| `navigator.modelContextTesting` | `ModelContextTesting \| undefined` | Testing API (optional)     |
+| Property                        | Type                               | Description                                    |
+| ------------------------------- | ---------------------------------- | ---------------------------------------------- |
+| `document.modelContext`         | `ModelContext`                     | Strict core WebMCP surface                     |
+| `navigator.modelContext`        | `ModelContext \| undefined`        | Deprecated compatibility alias                 |
+| `navigator.modelContextTesting` | `ModelContextTesting \| undefined` | Deprecated MCP-B testing compatibility surface |
 
 ---
 
@@ -76,24 +77,40 @@ Alias for `ModelContextCore`. This is the type of `document.modelContext`.
 
 The strict specification surface.
 
-| Method                | Signature                                                                                  |
-| --------------------- | ------------------------------------------------------------------------------------------ |
-| `registerTool`        | Multiple overloads (see below)                                                             |
-| `getTools`            | `() => Promise<ModelContextToolInfo[]>`                                                    |
-| `executeTool`         | `(tool: ModelContextToolInfo, inputArgsJson: string, options?) => Promise<string \| null>` |
-| `addEventListener`    | `(type: 'toolchange', listener, options?) => void`                                         |
-| `removeEventListener` | `(type: 'toolchange', listener, options?) => void`                                         |
-| `dispatchEvent`       | `(event: Event) => boolean`                                                                |
+| Method                | Signature                                                |
+| --------------------- | -------------------------------------------------------- |
+| `registerTool`        | Multiple overloads returning `Promise<void>` (see below) |
+| `getTools`            | `() => Promise<RegisteredTool[]>`                        |
+| `addEventListener`    | `(type: 'toolchange', listener, options?) => void`       |
+| `removeEventListener` | `(type: 'toolchange', listener, options?) => void`       |
+| `dispatchEvent`       | `(event: Event) => boolean`                              |
+
+### `ChromeModelContext`
+
+Combines `ModelContextCore & ChromeModelContextExtensions`. Chrome's current preview adds an optional descriptor-based execution method that is not part of the WebMCP Community Group specification:
+
+```ts
+import type { ChromeModelContext } from '@mcp-b/webmcp-types';
+
+const modelContext = document.modelContext as ChromeModelContext;
+const tool = (await modelContext.getTools()).find((candidate) => candidate.name === 'search');
+const executeTool = modelContext.executeTool;
+
+if (tool && executeTool) {
+  const result = await executeTool.call(modelContext, tool, '{"query":"webmcp"}');
+}
+```
+
+Always feature-detect `executeTool()`.
 
 ### `ModelContextExtensions`
 
 MCP-B extension methods. Not part of the WebMCP specification.
 
-| Method           | Signature                                                                                  |
-| ---------------- | ------------------------------------------------------------------------------------------ |
-| `unregisterTool` | `(nameOrTool: string \| ModelContextToolReference) => void`                                |
-| `listTools`      | `() => ToolListItem[]`                                                                     |
-| `callTool`       | `(params: { name: string; arguments?: Record<string, unknown> }) => Promise<ToolResponse>` |
+| Method           | Signature                                                   |
+| ---------------- | ----------------------------------------------------------- |
+| `unregisterTool` | `(nameOrTool: string \| ModelContextToolReference) => void` |
+| `listTools`      | `() => ToolListItem[]`                                      |
 
 ### `ModelContextWithExtensions`
 
@@ -134,19 +151,19 @@ Tool metadata returned by `listTools()`. Same shape as `ToolDescriptor` without 
 
 ### `ToolAnnotations`
 
-| Property          | Type                           | Description                      |
-| ----------------- | ------------------------------ | -------------------------------- |
-| `title`           | `string?`                      | Display title                    |
-| `readOnlyHint`    | `boolean \| 'true' \| 'false'` | Read-only indicator              |
-| `destructiveHint` | `boolean \| 'true' \| 'false'` | Destructive action indicator     |
-| `idempotentHint`  | `boolean \| 'true' \| 'false'` | Idempotent action indicator      |
-| `openWorldHint`   | `boolean \| 'true' \| 'false'` | External system access indicator |
+| Property          | Type       | Description                      |
+| ----------------- | ---------- | -------------------------------- |
+| `title`           | `string?`  | Display title                    |
+| `readOnlyHint`    | `boolean?` | Read-only indicator              |
+| `destructiveHint` | `boolean?` | Destructive action indicator     |
+| `idempotentHint`  | `boolean?` | Idempotent action indicator      |
+| `openWorldHint`   | `boolean?` | External system access indicator |
 
 ### `CallToolResult` / `ToolResponse`
 
 ```ts
 interface CallToolResult {
-  content: Array<ContentBlock | LooseContentBlock>;
+  content: ContentBlock[];
   structuredContent?: JsonObject;
   isError?: boolean;
 }
@@ -241,7 +258,7 @@ const outputSchema = {
   additionalProperties: false,
 } as const satisfies JsonSchemaForInference;
 
-document.modelContext.registerTool({
+await document.modelContext.registerTool({
   name: 'search',
   description: 'Search docs',
   inputSchema,
@@ -264,60 +281,18 @@ Schema-driven descriptor type. Both `execute` args and `structuredContent` are i
 
 ---
 
-## Typed model context
-
-### `TypedModelContext<TTools>`
-
-Provides name-aware `callTool` and `listTools` typing for known tool registries.
-
-```ts
-import type { CallToolResult, ToolDescriptor, TypedModelContext } from '@mcp-b/webmcp-types';
-
-type SearchTool = ToolDescriptor<
-  { query: string; limit?: number },
-  CallToolResult & { structuredContent: { total: number } },
-  'search'
->;
-
-type PingTool = ToolDescriptor<Record<string, never>, CallToolResult, 'ping'>;
-
-type AppContext = TypedModelContext<readonly [SearchTool, PingTool]>;
-
-declare const ctx: AppContext;
-
-// Deprecated MCP-B compatibility helper: name is narrowed; arguments are inferred
-await ctx.callTool({ name: 'search', arguments: { query: 'webmcp' } });
-
-// Deprecated MCP-B compatibility helper: arguments optional for Record<string, never> tools
-await ctx.callTool({ name: 'ping' });
-```
-
-For WebMCP DOM callers, prefer `getTools()` and `executeTool(tool, inputArgsJson)`. The standard execution method accepts JSON strings and returns JSON strings, so it does not provide the name-aware argument inference that the compatibility `callTool` overloads provide.
-
-### Helper types
-
-| Type                              | Description                                 |
-| --------------------------------- | ------------------------------------------- |
-| `InferToolArgs<T>`                | Extract args type from a tool descriptor    |
-| `InferToolResult<T>`              | Extract result type from a tool descriptor  |
-| `ToolName<TTools>`                | Union of tool names from a descriptor array |
-| `ToolByName<TTools, TName>`       | Extract a descriptor by name                |
-| `ToolArgsByName<TTools, TName>`   | Args type by tool name                      |
-| `ToolResultByName<TTools, TName>` | Result type by tool name                    |
-| `ToolCallParams<TName, TArgs>`    | Typed parameters for `callTool`             |
-
----
-
-## Testing types
+## Deprecated testing compatibility types
 
 ### `ModelContextTesting`
 
-| Method                             | Signature                                  |
-| ---------------------------------- | ------------------------------------------ |
-| `listTools`                        | `() => ModelContextTestingToolInfo[]`      |
-| `executeTool`                      | Overloaded: JSON string or streamed source |
-| `registerToolsChangedCallback`     | `(callback: () => void) => void`           |
-| `getCrossDocumentScriptToolResult` | `() => Promise<string>`                    |
+This removed Chromium preview shape remains typed only for older runtimes and MCP-B/polyfill compatibility shims. New native code uses `document.modelContext.getTools()` and feature-detects Chrome's optional descriptor-based `executeTool()`.
+
+| Method                             | Signature                                                                        |
+| ---------------------------------- | -------------------------------------------------------------------------------- |
+| `listTools`                        | `() => ModelContextTestingToolInfo[]`                                            |
+| `executeTool`                      | `(toolName: string, inputArgsJson: string, options?) => Promise<string \| null>` |
+| `registerToolsChangedCallback`     | `(callback: () => void) => void` (optional and deprecated)                       |
+| `getCrossDocumentScriptToolResult` | `() => Promise<string>` (optional)                                               |
 
 ### `ModelContextTestingToolInfo`
 
@@ -332,19 +307,16 @@ For WebMCP DOM callers, prefer `getTools()` and `executeTool(tool, inputArgsJson
 
 ## Other exports
 
-| Export                 | Description                                            |
-| ---------------------- | ------------------------------------------------------ |
-| `InputSchema`          | JSON Schema interface for tool parameters              |
-| `ContentBlock`         | Discriminated union of content types                   |
-| `LooseContentBlock`    | Permissive content block type                          |
-| `MaybePromise<T>`      | `T \| Promise<T>`                                      |
-| `ModelContextClient`   | Execute callback client with `requestUserInteraction`  |
-| `ToolExecutionContext` | Extended client with `elicitInput`                     |
-| `ModelContextInput`    | Legacy options type (kept for backwards compatibility) |
-| `ModelContextOptions`  | Alias for `ModelContextInput`                          |
-| `ElicitationParams`    | Elicitation request parameters                         |
-| `ElicitationResult`    | Elicitation response                                   |
-| `ToolCallEvent`        | Event dispatched on tool invocation                    |
+| Export                | Description                                            |
+| --------------------- | ------------------------------------------------------ |
+| `InputSchema`         | JSON Schema interface for tool parameters              |
+| `ContentBlock`        | Discriminated union of content types                   |
+| `MaybePromise<T>`     | `T \| Promise<T>`                                      |
+| `ModelContextClient`  | Execute callback client with `requestUserInteraction`  |
+| `ModelContextInput`   | Legacy options type (kept for backwards compatibility) |
+| `ModelContextOptions` | Alias for `ModelContextInput`                          |
+| `ElicitationParams`   | Elicitation request parameters                         |
+| `ElicitationResult`   | Elicitation response                                   |
 
 ---
 

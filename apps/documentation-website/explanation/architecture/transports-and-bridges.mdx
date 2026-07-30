@@ -6,12 +6,12 @@ icon: 'bridge'
 ---
 
 WebMCP tools execute inside a page, while a consumer may run in an iframe,
-browser extension, userscript, or desktop MCP client. A transport carries tool
+browser extension, or desktop MCP client. A transport carries tool
 discovery, calls, results, and lifecycle notifications across that boundary
 without changing where the tool runs.
 
-`@mcp-b/transports` implements low-level tab, iframe, extension, and userscript
-paths. `@mcp-b/mcp-iframe` wraps iframe forwarding.
+`@mcp-b/transports` implements low-level tab, iframe, and extension paths.
+`@mcp-b/mcp-iframe` wraps iframe forwarding.
 `@mcp-b/webmcp-local-relay` connects browser tools to desktop clients through
 localhost and stdio. Upstream `chrome-devtools-mcp` uses the Chrome DevTools
 Protocol for coding-agent workflows.

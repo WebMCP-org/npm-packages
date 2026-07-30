@@ -51,8 +51,9 @@ node -e "
   const fs = require('fs');
   const pkg = JSON.parse(fs.readFileSync('$PKG_DIR/package.json', 'utf8'));
   const catalog = {
-    '@modelcontextprotocol/sdk': '1.26.0',
-    'zod': '3.25.76'
+    '@modelcontextprotocol/core': '2.0.0',
+    '@modelcontextprotocol/server': '2.0.0',
+    'zod': '4.4.3'
   };
   const deps = {};
   for (const [name, ver] of Object.entries(pkg.dependencies || {})) {

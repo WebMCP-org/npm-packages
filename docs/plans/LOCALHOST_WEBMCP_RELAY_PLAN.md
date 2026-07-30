@@ -80,16 +80,6 @@ Proven patterns:
 - inject selector (`__sourceId`) when ambiguous
 - remap stale connection IDs by stable tab identity
 
-### D) Dynamic naming + sanitization patterns exist in chrome-devtools-mcp
-
-- `packages/chrome-devtools-mcp/src/tools/WebMCPToolHub.ts`
-
-Useful for stable display names and collision-safe tool IDs:
-
-- domain extraction/sanitization
-- localhost port handling
-- consistent naming for multi-page tool surfaces
-
 ## 4) MVP Architecture
 
 ## 4.1 Components

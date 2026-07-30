@@ -43,16 +43,18 @@
     <h1>My AI-Powered App</h1>
 
     <script>
-      document.modelContext.registerTool({
-        name: 'get-page-title',
-        description: 'Get the current page title',
-        inputSchema: { type: 'object', properties: {} },
-        async execute() {
-          return {
-            content: [{ type: 'text', text: document.title }],
-          };
-        },
-      });
+      void document.modelContext
+        .registerTool({
+          name: 'get-page-title',
+          description: 'Get the current page title',
+          inputSchema: { type: 'object', properties: {} },
+          async execute() {
+            return {
+              content: [{ type: 'text', text: document.title }],
+            };
+          },
+        })
+        .catch(console.error);
     </script>
   </body>
 </html>
@@ -67,7 +69,7 @@
 ```html
 <script type="module">
   import '@mcp-b/global';
-  document.modelContext.registerTool({
+  await document.modelContext.registerTool({
     /* your tool */
   });
 </script>
@@ -84,7 +86,7 @@ npm install @mcp-b/global
 ```javascript
 import '@mcp-b/global';
 
-document.modelContext.registerTool({
+await document.modelContext.registerTool({
   /* your tool */
 });
 ```
@@ -104,7 +106,6 @@ initializeWebModelContext({
   transport: {
     tabServer: { allowedOrigins: ['https://example.com'] },
   },
-  nativeModelContextBehavior: 'preserve',
 });
 ```
 
@@ -112,7 +113,7 @@ initializeWebModelContext({
 
 - Only operates in browser environments
 - Idempotent - calling multiple times is a no-op after first initialization
-- Preserves native `document.modelContext` by default (configurable)
+- Wraps native `document.modelContext` and restores it during cleanup
 - Auto-called on import unless `window.__webModelContextOptions.autoInitialize` is `false`
 
 #### `cleanupWebModelContext()`
@@ -136,11 +137,13 @@ After initialization, `document.modelContext` exposes these methods:
 
 #### `registerTool(tool, options?)`
 
-Registers a single tool. The tool name must be unique, otherwise throws if a tool with the same name already exists. The recommended unregistration path is `options.signal` (`AbortSignal`):
+Registers a single tool. The tool name must be unique. Duplicate and invalid
+registrations reject the returned promise. The recommended unregistration path
+is `options.signal` (`AbortSignal`):
 
 ```typescript
 const ac = new AbortController();
-document.modelContext.registerTool(
+await document.modelContext.registerTool(
   {
     name: 'add-to-cart',
     description: 'Add a product to the shopping cart',
@@ -202,9 +205,10 @@ const result = resultJson === null ? null : JSON.parse(resultJson);
 // { content: [{ type: 'text', text: '...' }] }
 ```
 
-#### `listTools()` and `callTool(params)` (deprecated)
+#### `listTools()`
 
-These MCP-B compatibility helpers remain available for older integrations. Prefer `getTools()` and `executeTool(tool, inputArgsJson)` for in-page WebMCP consumers.
+This MCP-B helper exposes MCP metadata. In-page WebMCP consumers should use
+`getTools()` and feature-detect `executeTool(tool, inputArgsJson)`.
 
 ### Tool Descriptor
 
@@ -242,17 +246,15 @@ Tools return a `ToolResponse` object:
 interface WebModelContextInitOptions {
   transport?: TransportConfiguration;
   autoInitialize?: boolean;
-  nativeModelContextBehavior?: 'preserve' | 'patch';
   installTestingShim?: boolean | 'always' | 'if-missing';
 }
 ```
 
-| Option                       | Default        | Description                                                                                                                         |
-| ---------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `transport`                  | Auto-detect    | Transport layer configuration (tab server and/or iframe)                                                                            |
-| `autoInitialize`             | `true`         | Whether to auto-initialize on import                                                                                                |
-| `nativeModelContextBehavior` | `'preserve'`   | `'preserve'` keeps native implementation untouched. `'patch'` replaces it with a BrowserMcpServer that mirrors to the native object |
-| `installTestingShim`         | `'if-missing'` | Controls `navigator.modelContextTesting` installation. Only installs when not already present natively                              |
+| Option               | Default        | Description                                                                                            |
+| -------------------- | -------------- | ------------------------------------------------------------------------------------------------------ |
+| `transport`          | Auto-detect    | Transport layer configuration (tab server and/or iframe)                                               |
+| `autoInitialize`     | `true`         | Whether to auto-initialize on import                                                                   |
+| `installTestingShim` | `'if-missing'` | Controls `navigator.modelContextTesting` installation. Only installs when not already present natively |
 
 ### Transport Configuration
 
@@ -333,10 +335,12 @@ const result = await navigator.modelContextTesting?.executeTool(
 ## Feature Detection
 
 ```javascript
-if ('modelContext' in navigator) {
-  document.modelContext.registerTool({
-    /* your tool */
-  });
+if ('modelContext' in document) {
+  void document.modelContext
+    .registerTool({
+      /* your tool */
+    })
+    .catch(console.error);
 }
 ```
 
@@ -347,7 +351,7 @@ if ('modelContext' in navigator) {
 ```typescript
 import '@mcp-b/global';
 
-document.modelContext.registerTool({
+await document.modelContext.registerTool({
   name: 'search-products',
   description: 'Search products by keyword, category, or price range',
   inputSchema: {
@@ -367,7 +371,7 @@ document.modelContext.registerTool({
   },
 });
 
-document.modelContext.registerTool({
+await document.modelContext.registerTool({
   name: 'add-to-cart',
   description: 'Add a product to the shopping cart',
   inputSchema: {
@@ -395,7 +399,7 @@ import '@mcp-b/global';
 
 // Start with base tools
 const userToolController = new AbortController();
-document.modelContext.registerTool(
+await document.modelContext.registerTool(
   {
     name: 'get-user',
     description: 'Get current user info',
@@ -409,11 +413,11 @@ document.modelContext.registerTool(
 
 let adminToolController: AbortController | undefined;
 
-function registerAdminTool() {
+async function registerAdminTool() {
   adminToolController?.abort();
   adminToolController = new AbortController();
 
-  document.modelContext.registerTool(
+  await document.modelContext.registerTool(
     {
       name: 'delete-user',
       description: 'Delete a user account (admin only)',
@@ -438,7 +442,7 @@ function unregisterAdminTool() {
 
 // Add tools dynamically based on user role
 if (currentUser.isAdmin) {
-  registerAdminTool();
+  await registerAdminTool();
 }
 
 // Remove tools when permissions change
@@ -453,7 +457,7 @@ function onLogout() {
 ```typescript
 import '@mcp-b/global';
 
-document.modelContext.registerTool({
+await document.modelContext.registerTool({
   name: 'fill-contact-form',
   description: 'Fill the contact form with provided details',
   inputSchema: {
@@ -473,7 +477,7 @@ document.modelContext.registerTool({
   },
 });
 
-document.modelContext.registerTool({
+await document.modelContext.registerTool({
   name: 'submit-form',
   description: 'Submit the contact form',
   inputSchema: { type: 'object', properties: {} },
@@ -493,9 +497,11 @@ document.modelContext.registerTool({
 | Firefox                 | No             | Yes      |
 | Safari                  | No             | Yes      |
 
-## Zod Version Compatibility
+## Schema Compatibility
 
-This package supports **Zod `^3.25 || ^4.0`** where Zod is used by higher-level helpers. Plain JSON Schema is also supported.
+The browser API accepts plain JSON Schema and does not require Zod. Direct MCP SDK v2
+registrations accept Standard Schema implementations that emit JSON Schema, including Zod 4.2 or
+newer. Zod 3 is unsupported.
 
 ## Type Exports
 
@@ -507,7 +513,6 @@ import type {
   InputSchema,
   ModelContext,
   ModelContextCore,
-  NativeModelContextBehavior,
   ToolAnnotations,
   ToolDescriptor,
   ToolListItem,
@@ -526,7 +531,6 @@ import type {
 
 - [`@mcp-b/transports`](https://docs.mcp-b.ai/packages/transports/reference) - MCP transport implementations
 - [`@mcp-b/react-webmcp`](https://docs.mcp-b.ai/packages/react-webmcp/reference) - React hooks for MCP
-- [`@mcp-b/extension-tools`](https://docs.mcp-b.ai/packages/extension-tools/reference) - Chrome Extension API tools
 - [`chrome-devtools-mcp`](https://github.com/ChromeDevTools/chrome-devtools-mcp) - Upstream Chrome DevTools MCP server
 
 ## Resources

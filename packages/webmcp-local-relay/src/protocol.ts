@@ -1,12 +1,10 @@
+import type { CallToolResult, Tool, ToolAnnotations } from '@modelcontextprotocol/server';
 import {
   CallToolRequestParamsSchema,
-  type CallToolResult,
   CallToolResultSchema,
-  type Tool,
-  type ToolAnnotations,
   ToolAnnotationsSchema,
   ToolSchema,
-} from '@modelcontextprotocol/sdk/types.js';
+} from '@modelcontextprotocol/core';
 import { z } from 'zod/v4';
 
 /**

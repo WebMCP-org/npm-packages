@@ -3,12 +3,7 @@ import {
   toJsonValue,
   type ToolInputSchema,
 } from '@mcp-b/webmcp-polyfill/schema';
-import type {
-  CallToolResult,
-  InputSchema,
-  JsonSchemaForInference,
-  ToolDescriptor,
-} from '@mcp-b/webmcp-types';
+import type { CallToolResult, InputSchema, JsonSchemaForInference } from '@mcp-b/webmcp-types';
 import type { DependencyList } from 'react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type {
@@ -35,14 +30,7 @@ function defaultFormatOutput(output: unknown): string {
   return JSON.stringify(output, null, 2);
 }
 
-const TOOL_OWNER_BY_NAME = new Map<string, symbol>();
-
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
-
-function isDev(): boolean {
-  const env = typeof process !== 'undefined' ? process.env?.NODE_ENV : undefined;
-  return env !== undefined ? env !== 'production' : false;
-}
 
 /**
  * React hook for registering and managing Model Context Protocol (MCP) tools.
@@ -185,11 +173,6 @@ export function useWebMCP<
   const outputSchemaRef = useRef(outputSchema);
   const annotationsRef = useRef(annotations);
   const isMountedRef = useRef(true);
-  const warnedRef = useRef(new Set<string>());
-  const prevConfigRef = useRef({
-    description,
-    deps,
-  });
   // Update refs when callbacks or static descriptors are recreated during render.
   useIsomorphicLayoutEffect(() => {
     toolExecuteRef.current = toolExecute;
@@ -208,43 +191,6 @@ export function useWebMCP<
       isMountedRef.current = false;
     };
   }, []);
-
-  useEffect(() => {
-    if (!isDev()) {
-      prevConfigRef.current = { description, deps };
-      return;
-    }
-
-    const warnOnce = (key: string, message: string) => {
-      if (warnedRef.current.has(key)) {
-        return;
-      }
-      console.warn(`[useWebMCP] ${message}`);
-      warnedRef.current.add(key);
-    };
-
-    const prev = prevConfigRef.current;
-
-    if (description !== prev.description) {
-      warnOnce(
-        'description',
-        `Tool "${name}" description changed; this re-registers the tool. Memoize the description if it does not need to update.`
-      );
-    }
-
-    if (
-      deps?.some(
-        (value) => (typeof value === 'object' && value !== null) || typeof value === 'function'
-      )
-    ) {
-      warnOnce(
-        'deps',
-        `Tool "${name}" deps contains non-primitive values; prefer primitives or memoize objects/functions to reduce re-registration.`
-      );
-    }
-
-    prevConfigRef.current = { description, deps };
-  }, [deps, description, name]);
 
   /**
    * Executes the configured tool implementation with input validation and state management.
@@ -297,17 +243,6 @@ export function useWebMCP<
       throw err;
     }
   }, []);
-  const executeRef = useRef(execute);
-
-  useEffect(() => {
-    executeRef.current = execute;
-  }, [execute]);
-
-  const stableExecute = useCallback(
-    (input: TInput): Promise<TOutput> => executeRef.current(input),
-    []
-  );
-
   /**
    * Resets the execution state to initial values.
    */
@@ -329,15 +264,19 @@ export function useWebMCP<
       return;
     }
 
+    const resolvedInputSchema = normalizeInputSchema(inputSchemaRef.current).inputSchema;
+    const resolvedOutputSchema = outputSchemaRef.current;
+    const resolvedAnnotations = annotationsRef.current;
+
     /**
      * Handles MCP tool execution by running the tool implementation and formatting the response.
      *
      * @param input - The input parameters from the MCP client
      * @returns CallToolResult with text content and optional structuredContent
      */
-    const mcpHandler = async (input: unknown): Promise<CallToolResult> => {
+    const mcpHandler = async (input: TInput): Promise<CallToolResult> => {
       try {
-        const result = await Reflect.apply(executeRef.current, undefined, [input]);
+        const result = await execute(input);
         const formattedOutput = formatOutputRef.current(result);
 
         const response: CallToolResult = {
@@ -349,7 +288,7 @@ export function useWebMCP<
           ],
         };
 
-        if (outputSchemaRef.current) {
+        if (resolvedOutputSchema) {
           const structuredContent = toJsonValue(result);
           if (structuredContent === undefined) {
             throw new Error(
@@ -375,11 +314,7 @@ export function useWebMCP<
       }
     };
 
-    const ownerToken = Symbol(name);
-    const resolvedInputSchema = normalizeInputSchema(inputSchemaRef.current).inputSchema;
-    const resolvedOutputSchema = outputSchemaRef.current;
-    const resolvedAnnotations = annotationsRef.current;
-    const toolDescriptor: ToolDescriptor & { inputSchema: InputSchema } = {
+    const toolDescriptor = {
       name,
       description,
       inputSchema: resolvedInputSchema,
@@ -389,56 +324,31 @@ export function useWebMCP<
     };
 
     const controller = new AbortController();
-    let registered = false;
-    let disposed = false;
 
     try {
       const registerResult = modelContext.registerTool(toolDescriptor, {
         signal: controller.signal,
       });
 
-      void Promise.resolve(registerResult).then(
-        () => {
-          if (!disposed && !controller.signal.aborted) {
-            registered = true;
-            TOOL_OWNER_BY_NAME.set(name, ownerToken);
-          }
-        },
-        (error: unknown) => {
-          if (!controller.signal.aborted) {
-            controller.abort();
-            console.warn(`[useWebMCP] registerTool("${name}") rejected:`, error);
-          }
+      void Promise.resolve(registerResult).catch((error: unknown) => {
+        if (!controller.signal.aborted) {
+          controller.abort();
+          console.warn(`[useWebMCP] registerTool("${name}") rejected:`, error);
         }
-      );
+      });
     } catch (error) {
       controller.abort();
       console.warn(`[useWebMCP] registerTool("${name}") rejected:`, error);
       return;
     }
 
-    return () => {
-      disposed = true;
-
-      if (registered && TOOL_OWNER_BY_NAME.get(name) === ownerToken) {
-        TOOL_OWNER_BY_NAME.delete(name);
-        controller.abort();
-        return;
-      }
-
-      if (!registered) {
-        controller.abort();
-      }
-    };
-    // Spread operator in dependencies: Allows users to provide additional dependencies
-    // via the `deps` parameter. While unconventional, this pattern is intentional to support
-    // dynamic dependency injection. The spread is safe because deps is validated and warned
-    // about non-primitive values earlier in this hook.
+    return () => controller.abort();
+    // `deps` lets callers explicitly opt descriptor values into re-registration.
   }, [name, description, ...(deps ?? [])]);
 
   return {
     state,
-    execute: stableExecute,
+    execute,
     reset,
   };
 }

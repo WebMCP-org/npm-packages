@@ -7,7 +7,7 @@ export default function Home() {
   useEffect(() => {
     initializeWebMCPPolyfill();
 
-    navigator.modelContext.registerTool({
+    void document.modelContext.registerTool({
       name: 'get_status',
       description: 'Returns app status',
       inputSchema: {

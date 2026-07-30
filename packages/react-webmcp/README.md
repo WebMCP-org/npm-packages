@@ -17,7 +17,7 @@
 | Feature                      | Benefit                                                                      |
 | ---------------------------- | ---------------------------------------------------------------------------- |
 | **React-First Design**       | Hooks follow React patterns with automatic cleanup and StrictMode support    |
-| **Type-Safe with Zod**       | Full TypeScript support with input validation and output typing              |
+| **Type-Safe Schemas**        | JSON Schema and Standard Schema input typing, plus JSON Schema output typing |
 | **Two-Way Integration**      | Both expose tools TO AI agents AND consume tools FROM MCP servers            |
 | **Execution State Tracking** | Built-in loading, success, and error states for UI feedback                  |
 | **Works with Any AI**        | Compatible with Claude, ChatGPT, Gemini, Cursor, Copilot, and any MCP client |
@@ -25,15 +25,16 @@
 ## Installation
 
 ```bash
-pnpm add @mcp-b/react-webmcp zod
+pnpm add @mcp-b/react-webmcp
 ```
 
-If you only want strict core WebMCP hooks (without MCP-B extension APIs like prompts/resources/sampling/elicitation), use `usewebmcp` instead.
+If you only want strict core WebMCP hooks, install `usewebmcp` directly. This package re-exports
+that same hook implementation and adds prompts, resources, sampling, elicitation, and MCP clients.
 
 For client functionality, you'll also need:
 
 ```bash
-pnpm add @mcp-b/transports @modelcontextprotocol/sdk
+pnpm add @mcp-b/transports @modelcontextprotocol/client
 ```
 
 **Prerequisites:** Provider hooks require the `document.modelContext` API. Install `@mcp-b/global` or use a browser that implements the WebMCP API.
@@ -51,15 +52,18 @@ responses. Native Chrome WebMCP does not currently define or enforce it.
 
 ```tsx
 import { useWebMCP } from '@mcp-b/react-webmcp';
-import { z } from 'zod';
 
 function PostsPage() {
   const likeTool = useWebMCP({
     name: 'posts_like',
     description: 'Like a post by ID. Increments the like count.',
     inputSchema: {
-      postId: z.string().uuid().describe('The post ID to like'),
-    },
+      type: 'object',
+      properties: {
+        postId: { type: 'string', description: 'The post ID to like' },
+      },
+      required: ['postId'],
+    } as const,
     annotations: {
       title: 'Like Post',
       readOnlyHint: false,
@@ -85,11 +89,17 @@ function PostsPage() {
 
 ```tsx
 import { McpClientProvider, useMcpClient } from '@mcp-b/react-webmcp';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { TabClientTransport } from '@mcp-b/transports';
+import { Client } from '@modelcontextprotocol/client';
 
-const client = new Client({ name: 'MyApp', version: '1.0.0' });
-const transport = new TabClientTransport('mcp', { clientInstanceId: 'my-app' });
+const client = new Client(
+  { name: 'MyApp', version: '1.0.0' },
+  { versionNegotiation: { mode: 'auto' } }
+);
+const transport = new TabClientTransport({
+  channelId: 'mcp',
+  targetOrigin: window.location.origin,
+});
 
 function App() {
   return (
@@ -135,9 +145,9 @@ function ToolConsumer() {
 | `McpClientProvider` | Provider component managing an MCP client connection      |
 | `useMcpClient()`    | Access client, tools, connection status, and capabilities |
 
-## Zod Version Compatibility
+## Schema Compatibility
 
-This package supports **Zod `^3.25 || ^4.0`** as an optional peer dependency.
+Inputs accept JSON Schema or Standard Schema implementations that can emit JSON Schema. Outputs use JSON Schema for typed `structuredContent`.
 
 ## Documentation
 

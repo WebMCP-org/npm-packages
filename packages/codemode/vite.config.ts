@@ -15,7 +15,9 @@ export default defineConfig({
     minify: false,
     target: 'esnext',
     platform: 'browser',
-    external: [/^ai$/, /^zod/, /^@mcp-b\//, /^acorn$/],
+    deps: {
+      neverBundle: [/^ai$/, /^zod/, /^@mcp-b\//, /^acorn$/],
+    },
     tsconfig: './tsconfig.json',
   },
   test: {

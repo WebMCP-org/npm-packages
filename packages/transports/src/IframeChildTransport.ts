@@ -1,4 +1,5 @@
-import { type JSONRPCMessage, JSONRPCMessageSchema, type Transport } from '@mcp-b/webmcp-ts-sdk';
+import { JSONRPCMessageSchema } from '@modelcontextprotocol/core';
+import type { JSONRPCMessage, Transport } from '@modelcontextprotocol/server';
 
 export interface IframeChildTransportOptions {
   /** Whitelist of parent origins allowed to connect (for security) */

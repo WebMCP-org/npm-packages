@@ -1,9 +1,9 @@
 import {
   type JSONRPCMessage,
-  JSONRPCMessageSchema,
   type Transport,
   type TransportSendOptions,
-} from '@mcp-b/webmcp-ts-sdk';
+} from '@modelcontextprotocol/server';
+import { JSONRPCMessageSchema } from '@modelcontextprotocol/core';
 
 /**
  * Configuration options for ExtensionClientTransport
@@ -62,11 +62,11 @@ export class ExtensionClientTransport implements Transport {
   private _port: chrome.runtime.Port | undefined;
   private _extensionId: string | undefined;
   private _portName: string;
-  private _messageHandler: ((message: any) => void) | undefined;
+  private _messageHandler: ((message: unknown) => void) | undefined;
   private _disconnectHandler: (() => void) | undefined;
   private _isReconnecting = false;
   private _reconnectAttempts = 0;
-  private _reconnectTimer: number | undefined;
+  private _reconnectTimer: ReturnType<typeof setTimeout> | undefined;
   private _currentReconnectDelay: number;
   private _isStarted = false;
   private _isClosed = false;
@@ -135,10 +135,15 @@ export class ExtensionClientTransport implements Transport {
         }
 
         // Set up message handler
-        this._messageHandler = (message: any) => {
+        this._messageHandler = (message: unknown) => {
           try {
             // Handle keep-alive messages
-            if (message.type === 'keep-alive') {
+            if (
+              typeof message === 'object' &&
+              message !== null &&
+              'type' in message &&
+              message.type === 'keep-alive'
+            ) {
               // Just acknowledge receipt, no need to propagate
               return;
             }
@@ -231,7 +236,7 @@ export class ExtensionClientTransport implements Transport {
     if (this._port) {
       try {
         this._port.disconnect();
-      } catch (_error) {
+      } catch {
         // Port might already be disconnected
       }
     }
@@ -282,7 +287,7 @@ export class ExtensionClientTransport implements Transport {
 
     this._reconnectTimer = setTimeout(() => {
       this._attemptReconnect();
-    }, this._currentReconnectDelay) as unknown as number;
+    }, this._currentReconnectDelay);
 
     // Apply exponential backoff
     this._currentReconnectDelay = Math.min(
@@ -304,7 +309,7 @@ export class ExtensionClientTransport implements Transport {
       if (chrome?.runtime?.sendMessage) {
         try {
           await chrome.runtime.sendMessage({ type: 'ping' });
-        } catch (_error) {
+        } catch {
           // Service worker might not be ready yet
         }
       }

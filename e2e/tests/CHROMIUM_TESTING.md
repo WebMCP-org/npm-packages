@@ -1,100 +1,98 @@
-# Chromium Native Contract Testing
+# Chromium native contract testing
 
-This guide covers the native Chromium WebMCP validation lanes in this repo.
+This guide separates native Chrome coverage from MCP-B compatibility coverage.
 
-## Definitions
+## Native boundary
 
-- **Canonical native contract**: validates the real browser API surface directly through `document.modelContext`, the deprecated `navigator.modelContext` alias, and `navigator.modelContextTesting`.
-- **Native parity / showcase integration**: keeps broader compatibility and demo coverage, but is not the canonical E2E gate.
+Native tests capture `document.modelContext` before the test app can install a
+runtime or polyfill. They use:
 
-## Quick Run
+- `registerTool(tool, { signal })`
+- `await getTools()`
+- `toolchange` events
+- Chrome's optional `executeTool(registeredTool, inputJson)` extension
 
-### Chrome Canary Canonical Contract
+`executeTool()` receives a descriptor returned by `getTools()`. Tests
+feature-detect the method because it is a Chromium preview extension, not strict
+WebMCP core.
+
+Current Chrome no longer exposes `navigator.modelContext` as the canonical
+surface. `navigator.modelContextTesting` is also outside the current native
+contract.
+
+## Run the native contract
+
+From `e2e/`:
 
 ```bash
-cd e2e
 CHROME_BIN="/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary" \
 PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH="/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary" \
 pnpm test:native-contract:default
 ```
 
-`test:native-contract:default` uses `playwright-chrome-beta-webmcp.config.ts`, requires Chrome 152 or newer, and launches Chrome with:
+The configuration requires Chrome 152 or newer and launches it with:
 
-- `--enable-experimental-web-platform-features`
-- `--enable-features=WebMCPTesting,DevToolsWebMCPSupport`
-
-## Why Native Is Different
-
-For tab, iframe, relay, DevTools, and extension runtimes, the canonical caller is an SDK `Client` over the runtime's real transport.
-
-For native Chromium, the real public boundary is the browser API itself. The canonical contract therefore uses:
-
-- `await document.modelContext.registerTool(...)`
-- `document.modelContext.getTools()`
-- `document.modelContext.executeTool(...)`
-- deprecated `navigator.modelContext` alias reads
-- `navigator.modelContextTesting.listTools()`
-- `navigator.modelContextTesting.executeTool(...)`
-
-That is intentional and is the only exception to the SDK-client rule.
-
-## Canonical Assertions
-
-The native contract lane proves that:
-
-1. tool registration is visible through the browser API
-2. producer discovery works through async `document.modelContext.getTools()`
-3. producer execution works through `document.modelContext.executeTool(toolFromGetTools, inputArgsJson)`
-4. testing execution works through `modelContextTesting.executeTool(...)`
-5. dynamic registration and abort-signal unregistration are reflected in `listTools()`
-6. runtime-thrown tool errors propagate through the native browser API
-
-## Integration Lanes
-
-These lanes still exist locally and are useful for broader compatibility checks:
-
-```bash
-cd e2e
-pnpm test:native-showcase
-pnpm test:integration:runtime-api
+```text
+--enable-experimental-web-platform-features
+--enable-features=WebMCPTesting,DevToolsWebMCPSupport
 ```
 
-They cover suites such as:
+`WebMCPTesting` is the Chromium feature-flag name used by this environment. Its
+name does not make the removed `navigator.modelContextTesting` object part of
+native conformance.
 
+## Native assertions
+
+The contract lanes verify:
+
+1. The captured context is native rather than an MCP-B polyfill.
+2. `getTools()` returns registered descriptors with browser-owned metadata.
+3. AbortSignal cleanup removes an owned registration.
+4. Descriptor-based execution works when Chrome exposes `executeTool()`.
+5. Tool errors propagate through the native browser surface.
+6. The showcase registers tools and handles parent/iframe lifecycles without
+   the testing shim.
+
+Relevant files:
+
+- `tests/runtime-contract-native.spec.ts`
 - `tests/chrome-beta-webmcp.spec.ts`
-- `tests/chromium-native-api.spec.ts`
+- `tests/native-showcase.spec.ts`
+- `playwright-chrome-beta-webmcp.config.ts`
 - `playwright-native-showcase.config.ts`
 
-## API Surface Validated
+## MCP-B compatibility lane
 
-### `document.modelContext`
+`tests/chromium-native-api.spec.ts` has a historical filename. It runs against
+the `@mcp-b/global` test app in ordinary Playwright Chromium and intentionally
+checks:
 
-- Canonical WebMCP core surface as of Chrome M152.
-- Native M152 exposes the same instance through deprecated `navigator.modelContext`.
-- `registerTool(tool, options?)`
-- `getTools() => Promise<Array<{ name; title; description; inputSchema?; origin; window }>>`
-- `executeTool(toolFromGetTools, inputArgsJson) => Promise<string | null>`
-- `ontoolchange`
+- MCP-B `listTools()` and by-name `unregisterTool()`
+- the deprecated `navigator.modelContextTesting` compatibility shim
+- shim execution, event, and error behavior
 
-### `navigator.modelContext`
+It is runtime integration coverage, not native Chromium conformance.
 
-Deprecated alias retained for compatibility.
-
-### `navigator.modelContextTesting`
-
-- `executeTool(toolName, inputArgsJson, options?) => Promise<string | null>`
-- `listTools() => Array<{ name: string; description: string; inputSchema?: string }>`
-- `registerToolsChangedCallback(callback) => void`
-- `getCrossDocumentScriptToolResult() => Promise<string>`
-
-## Debug Tips
+Run it from `e2e/`:
 
 ```bash
-# Headed native showcase run
-cd e2e
-pnpm test:native-showcase:headed
+pnpm test:chromium-native-api
+```
 
-# Playwright UI for native showcase integration lane
-cd e2e
+Testing call history, mock responses, arbitrary by-name unregistration, and a
+global context reset have no current WebMCP replacement. Keep those assertions
+in compatibility suites rather than presenting them as native behavior.
+
+## Native showcase
+
+Run the interactive native lane with:
+
+```bash
+pnpm test:native-showcase
+pnpm test:native-showcase:headed
 pnpm test:native-showcase:ui
 ```
+
+See
+[`web-standards-showcase/CHROMIUM_FLAGS.md`](../web-standards-showcase/CHROMIUM_FLAGS.md)
+for Chrome selection, launch flags, and troubleshooting.

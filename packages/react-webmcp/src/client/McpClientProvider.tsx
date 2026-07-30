@@ -1,13 +1,11 @@
 import {
   type Client,
-  type Tool as McpTool,
   type RequestOptions,
   type Resource,
-  ResourceListChangedNotificationSchema,
   type ServerCapabilities,
-  ToolListChangedNotificationSchema,
+  type Tool as McpTool,
   type Transport,
-} from '@mcp-b/webmcp-ts-sdk';
+} from '@modelcontextprotocol/client';
 import {
   createContext,
   type ReactElement,
@@ -37,33 +35,6 @@ interface McpClientContextValue {
 
 const McpClientContext = createContext<McpClientContextValue | null>(null);
 const EMPTY_REQUEST_OPTS: RequestOptions = {};
-const TOOL_FLOW_TRACE_KEY = 'WEBMCP_TRACE_TOOL_FLOW';
-
-function emitForcedToolFlowTrace(event: string, details: Record<string, unknown>): void {
-  const consoleRef = globalThis.console;
-  if (!consoleRef) {
-    return;
-  }
-
-  const method = consoleRef.debug ?? consoleRef.log;
-  if (typeof method !== 'function') {
-    return;
-  }
-
-  method.call(consoleRef, '[ReactWebMCP:McpClientProvider:ToolFlow]', event, details);
-}
-
-function isToolFlowTraceEnabled(): boolean {
-  if (typeof window === 'undefined') {
-    return false;
-  }
-
-  try {
-    return window.localStorage.getItem(TOOL_FLOW_TRACE_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
 
 /**
  * Props for the McpClientProvider component.
@@ -111,17 +82,18 @@ export interface McpClientProviderProps {
  * @example
  * Connect to an MCP server via tab transport:
  * ```tsx
- * import { Client } from '@modelcontextprotocol/sdk/client/index.js';
  * import { TabClientTransport } from '@mcp-b/transports';
  * import { McpClientProvider } from '@mcp-b/react-webmcp';
+ * import { Client } from '@modelcontextprotocol/client';
  *
  * const client = new Client(
  *   { name: 'my-app', version: '1.0.0' },
- *   { capabilities: {} }
+ *   { versionNegotiation: { mode: 'auto' } }
  * );
  *
- * const transport = new TabClientTransport('mcp', {
- *   clientInstanceId: 'my-app-instance',
+ * const transport = new TabClientTransport({
+ *   channelId: 'mcp',
+ *   targetOrigin: window.location.origin,
  * });
  *
  * function App() {
@@ -175,23 +147,13 @@ export function McpClientProvider({
   const requestOpts = opts ?? EMPTY_REQUEST_OPTS;
 
   const connectionStateRef = useRef<'disconnected' | 'connecting' | 'connected'>('disconnected');
-  const toolFlowSequenceRef = useRef(0);
-  const logToolFlow = useCallback((event: string, details: Record<string, unknown> = {}) => {
-    const sequence = ++toolFlowSequenceRef.current;
-    const message = `[${sequence}] ${event}`;
-
-    if (isToolFlowTraceEnabled()) {
-      emitForcedToolFlowTrace(message, details);
-    }
-  }, []);
+  const connectionGenerationRef = useRef(0);
 
   /**
    * Fetches available resources from the MCP server.
    * Only fetches if the server supports the resources capability.
    */
   const fetchResourcesInternal = useCallback(async () => {
-    if (!client) return;
-
     const serverCapabilities = client.getServerCapabilities();
     if (!serverCapabilities?.resources) {
       setResources([]);
@@ -212,45 +174,26 @@ export function McpClientProvider({
    * Only fetches if the server supports the tools capability.
    */
   const fetchToolsInternal = useCallback(async () => {
-    if (!client) return;
-
     const serverCapabilities = client.getServerCapabilities();
     if (!serverCapabilities?.tools) {
-      logToolFlow('listTools:capability_missing', {});
       setTools([]);
       return;
     }
 
-    const startedAt = Date.now();
-    logToolFlow('listTools:start', {
-      hasToolsCapability: Boolean(serverCapabilities.tools),
-    });
     try {
       const response = await client.listTools();
       setTools(response.tools);
-      logToolFlow('listTools:success', {
-        durationMs: Date.now() - startedAt,
-        toolCount: response.tools.length,
-      });
     } catch (e) {
-      logToolFlow('listTools:error', {
-        durationMs: Date.now() - startedAt,
-        errorMessage: e instanceof Error ? e.message : String(e),
-      });
       console.error('[ReactWebMCP:McpClientProvider]', 'Error fetching tools:', e);
       throw e;
     }
-  }, [client, logToolFlow]);
+  }, [client]);
 
   /**
    * Establishes connection to the MCP server.
    * Safe to call multiple times - will no-op if already connected or connecting.
    */
   const reconnect = useCallback(async () => {
-    if (!client || !transport) {
-      throw new Error('Client or transport not available');
-    }
-
     if (connectionStateRef.current !== 'disconnected') {
       return;
     }
@@ -258,30 +201,35 @@ export function McpClientProvider({
     connectionStateRef.current = 'connecting';
     setIsLoading(true);
     setError(null);
+    const connectionGeneration = connectionGenerationRef.current;
 
     try {
       await client.connect(transport, requestOpts);
+      if (connectionGeneration !== connectionGenerationRef.current) {
+        return;
+      }
       const caps = client.getServerCapabilities();
       setIsConnected(true);
-      setCapabilities(caps || null);
+      setCapabilities(caps ?? null);
       connectionStateRef.current = 'connected';
-      logToolFlow('reconnect:connected', {
-        hasToolsListChanged: Boolean(caps?.tools?.listChanged),
-      });
 
       await Promise.all([fetchResourcesInternal(), fetchToolsInternal()]);
     } catch (e) {
       const err = e instanceof Error ? e : new Error(String(e));
-      connectionStateRef.current = 'disconnected';
-      setError(err);
+      if (connectionGeneration === connectionGenerationRef.current) {
+        connectionStateRef.current = 'disconnected';
+        setError(err);
+      }
       throw err;
     } finally {
-      setIsLoading(false);
+      if (connectionGeneration === connectionGenerationRef.current) {
+        setIsLoading(false);
+      }
     }
-  }, [client, transport, requestOpts, fetchResourcesInternal, fetchToolsInternal, logToolFlow]);
+  }, [client, transport, requestOpts, fetchResourcesInternal, fetchToolsInternal]);
 
   useEffect(() => {
-    if (!isConnected || !client) {
+    if (!isConnected) {
       return;
     }
 
@@ -298,7 +246,6 @@ export function McpClientProvider({
     };
 
     const handleToolsChanged = () => {
-      logToolFlow('notification:tools/list_changed', {});
       fetchToolsInternal().catch((error) => {
         console.error(
           '[ReactWebMCP:McpClientProvider]',
@@ -309,22 +256,12 @@ export function McpClientProvider({
     };
 
     if (serverCapabilities?.resources?.listChanged) {
-      client.setNotificationHandler(ResourceListChangedNotificationSchema, handleResourcesChanged);
+      client.setNotificationHandler('notifications/resources/list_changed', handleResourcesChanged);
     }
 
     if (serverCapabilities?.tools?.listChanged) {
-      client.setNotificationHandler(ToolListChangedNotificationSchema, handleToolsChanged);
+      client.setNotificationHandler('notifications/tools/list_changed', handleToolsChanged);
     }
-
-    // Re-fetch after setting up handlers to catch any changes that occurred
-    // during the gap between initial fetch and handler setup
-    Promise.all([fetchResourcesInternal(), fetchToolsInternal()]).catch((error) => {
-      console.error(
-        '[ReactWebMCP:McpClientProvider]',
-        'Failed to refresh tools/resources after handler registration:',
-        error
-      );
-    });
 
     return () => {
       if (serverCapabilities?.resources?.listChanged) {
@@ -335,19 +272,28 @@ export function McpClientProvider({
         client.removeNotificationHandler('notifications/tools/list_changed');
       }
     };
-  }, [client, isConnected, fetchResourcesInternal, fetchToolsInternal, logToolFlow]);
+  }, [client, isConnected, fetchResourcesInternal, fetchToolsInternal]);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional - reconnect when client/transport props change
   useEffect(() => {
+    const connectionGeneration = connectionGenerationRef.current;
+    connectionStateRef.current = 'disconnected';
+    setIsConnected(false);
+
     // Initial connection - reconnect() has its own guard to prevent concurrent connections
     reconnect().catch((err) => {
-      console.error('[ReactWebMCP:McpClientProvider]', 'Failed to connect MCP client:', err);
+      if (connectionGeneration === connectionGenerationRef.current) {
+        console.error('[ReactWebMCP:McpClientProvider]', 'Failed to connect MCP client:', err);
+      }
     });
 
-    // Cleanup: mark as disconnected so next mount will reconnect
     return () => {
+      if (connectionGenerationRef.current === connectionGeneration) {
+        connectionGenerationRef.current += 1;
+      }
       connectionStateRef.current = 'disconnected';
-      setIsConnected(false);
+      void client.close().catch((error: unknown) => {
+        console.error('[ReactWebMCP:McpClientProvider]', 'Failed to close MCP client:', error);
+      });
     };
   }, [client, transport, reconnect]);
 

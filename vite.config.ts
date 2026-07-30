@@ -12,6 +12,7 @@ export default defineConfig({
       '.cache/',
       'coverage/',
       'chromium/',
+      'e2e/web-standards-showcase/public/relay/embed.js',
       'packages/smart-dom-reader/**/lib/**',
     ],
   },

@@ -7,7 +7,6 @@ export default {
       [
         // Packages (in packages/)
         'codemode',
-        'extension-tools',
         'global',
         'mcp-iframe',
         'react-webmcp',

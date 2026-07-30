@@ -3,7 +3,9 @@ import type {
   CallToolResult,
   InputSchema,
   JsonSchemaForInference,
+  ModelContext,
   ModelContextExtensions,
+  ModelContextWithExtensions,
   ToolDescriptor,
 } from './index.js';
 
@@ -24,9 +26,13 @@ function normalizeFeatureKey(input: string): string {
 }
 
 function hasModelContextExtensions(
-  modelContext: Navigator['modelContext']
-): modelContext is Navigator['modelContext'] & ModelContextExtensions {
-  return 'callTool' in modelContext && 'listTools' in modelContext;
+  modelContext: ModelContext
+): modelContext is ModelContext & ModelContextExtensions {
+  return 'listTools' in modelContext;
+}
+
+function getMcpBModelContext(): ModelContextWithExtensions {
+  return document.modelContext as ModelContextWithExtensions;
 }
 
 function isInteractionResponse(
@@ -45,7 +51,7 @@ test('global registerTool kitchen sink examples compile', () => {
     return;
   }
 
-  navigator.modelContext.registerTool({
+  getMcpBModelContext().registerTool({
     name: 'ping_sync',
     description: 'Simple synchronous tool',
     inputSchema: {
@@ -60,7 +66,7 @@ test('global registerTool kitchen sink examples compile', () => {
     },
   });
 
-  navigator.modelContext.registerTool({
+  getMcpBModelContext().registerTool({
     name: 'no_schema_defaults',
     description: 'Schema omitted to use runtime default',
     execute(args: Record<string, unknown>) {
@@ -72,7 +78,7 @@ test('global registerTool kitchen sink examples compile', () => {
     },
   });
 
-  navigator.modelContext.registerTool({
+  getMcpBModelContext().registerTool({
     name: 'search_async',
     description: 'Async tool with inferred args',
     inputSchema: {
@@ -94,7 +100,7 @@ test('global registerTool kitchen sink examples compile', () => {
     },
   });
 
-  navigator.modelContext.registerTool({
+  getMcpBModelContext().registerTool({
     name: 'search_summary',
     description: 'Async tool with inferred structured output',
     inputSchema: {
@@ -118,8 +124,7 @@ test('global registerTool kitchen sink examples compile', () => {
     } as const satisfies JsonSchemaForInference,
     async execute(args) {
       return {
-        // Loose content block shape is accepted.
-        content: [{ text: `summary for ${args.query}`, data: 'opaque' }],
+        content: [{ type: 'text', text: `summary for ${args.query}` }],
         structuredContent: {
           total: 1,
           tags: [args.query],
@@ -129,7 +134,7 @@ test('global registerTool kitchen sink examples compile', () => {
     },
   });
 
-  navigator.modelContext.registerTool({
+  getMcpBModelContext().registerTool({
     name: 'runtime_schema',
     description: 'Widened schema fallback',
     inputSchema: {
@@ -174,9 +179,9 @@ test('global registerTool kitchen sink examples compile', () => {
     },
   };
 
-  navigator.modelContext.registerTool(explicitTypedTool);
+  getMcpBModelContext().registerTool(explicitTypedTool);
 
-  navigator.modelContext.registerTool({
+  getMcpBModelContext().registerTool({
     name: 'deploy_with_elicitation',
     description: 'Uses execution context elicitation',
     inputSchema: {
@@ -220,7 +225,7 @@ test('global registerTool implementation-first examples compile', () => {
     return;
   }
 
-  navigator.modelContext.registerTool({
+  getMcpBModelContext().registerTool({
     name: 'feature_toggle_summary',
     description: 'Compute normalized feature toggle summary',
     inputSchema: {
@@ -269,32 +274,10 @@ test('global registerTool implementation-first examples compile', () => {
     },
   });
 
-  const modelContext = navigator.modelContext;
+  const modelContext = document.modelContext;
   if (!hasModelContextExtensions(modelContext)) {
     return;
   }
-
-  const callResult = modelContext.callTool({
-    name: 'feature_toggle_summary',
-    arguments: {
-      features: 'Search, Billing, Multi Region',
-      defaultOn: 'billing',
-    },
-  });
-
-  void callResult.then((result) => {
-    const firstBlock = result.content[0];
-    if (
-      firstBlock &&
-      'type' in firstBlock &&
-      firstBlock.type === 'text' &&
-      'text' in firstBlock &&
-      typeof firstBlock.text === 'string'
-    ) {
-      const rendered = firstBlock.text.toUpperCase();
-      void rendered;
-    }
-  });
 
   const listedTools = modelContext.listTools();
   for (const tool of listedTools) {
@@ -312,7 +295,7 @@ test('global registerTool accepts widened-schema tools returning raw values', ()
     return;
   }
 
-  navigator.modelContext.registerTool({
+  getMcpBModelContext().registerTool({
     name: 'raw_string_result',
     description: 'Widened schema tool returning raw string',
     inputSchema: {
@@ -327,7 +310,7 @@ test('global registerTool accepts widened-schema tools returning raw values', ()
     },
   });
 
-  navigator.modelContext.registerTool({
+  getMcpBModelContext().registerTool({
     name: 'raw_array_result',
     description: 'Widened schema tool returning raw array',
     inputSchema: {
@@ -339,7 +322,7 @@ test('global registerTool accepts widened-schema tools returning raw values', ()
     },
   });
 
-  navigator.modelContext.registerTool({
+  getMcpBModelContext().registerTool({
     name: 'raw_no_schema_string',
     description: 'No-schema tool returning raw string',
     execute() {
@@ -357,7 +340,7 @@ test('global registerTool accepts string outputSchema with raw string return', (
     return;
   }
 
-  navigator.modelContext.registerTool({
+  getMcpBModelContext().registerTool({
     name: 'string_output_raw',
     description: 'Tool with string outputSchema returning raw string',
     inputSchema: {
@@ -382,7 +365,7 @@ test('global registerTool accepts string outputSchema with CallToolResult return
     return;
   }
 
-  navigator.modelContext.registerTool({
+  getMcpBModelContext().registerTool({
     name: 'string_output_wrapped',
     description: 'Tool with string outputSchema returning CallToolResult',
     inputSchema: {
@@ -410,7 +393,7 @@ test('global registerTool accepts array outputSchema', () => {
     return;
   }
 
-  navigator.modelContext.registerTool({
+  getMcpBModelContext().registerTool({
     name: 'array_output',
     description: 'Tool with array outputSchema',
     inputSchema: {
@@ -432,7 +415,7 @@ test('global registerTool accepts number outputSchema', () => {
     return;
   }
 
-  navigator.modelContext.registerTool({
+  getMcpBModelContext().registerTool({
     name: 'number_output',
     description: 'Tool with number outputSchema',
     inputSchema: {
@@ -457,7 +440,7 @@ test('global registerTool accepts boolean outputSchema', () => {
     return;
   }
 
-  navigator.modelContext.registerTool({
+  getMcpBModelContext().registerTool({
     name: 'boolean_output',
     description: 'Tool with boolean outputSchema',
     inputSchema: {
@@ -482,7 +465,7 @@ test('global registerTool rejects mismatched return for string outputSchema', ()
   }
 
   // @ts-expect-error - execute returns number but outputSchema expects string
-  navigator.modelContext.registerTool({
+  getMcpBModelContext().registerTool({
     name: 'string_output_mismatch',
     description: 'Mismatched return type for string outputSchema',
     inputSchema: {
@@ -504,7 +487,7 @@ test('global registerTool rejects mismatched return for number outputSchema', ()
   }
 
   // @ts-expect-error - execute returns string but outputSchema expects number
-  navigator.modelContext.registerTool({
+  getMcpBModelContext().registerTool({
     name: 'number_output_mismatch',
     description: 'Mismatched return type for number outputSchema',
     inputSchema: {
@@ -535,7 +518,7 @@ test('global registerTool accepts empty inputSchema {}', () => {
   }
 
   // inputSchema: {} is common for no-arg tools — must compile
-  navigator.modelContext.registerTool({
+  getMcpBModelContext().registerTool({
     name: 'empty_schema_tool',
     description: 'Tool with empty inputSchema object',
     inputSchema: {},
@@ -551,7 +534,7 @@ test('global registerTool accepts widened primitive outputSchema with raw return
   }
 
   // Primitive outputSchema WITHOUT as const satisfies + raw return
-  navigator.modelContext.registerTool({
+  getMcpBModelContext().registerTool({
     name: 'primitive_output_raw',
     description: 'Widened primitive outputSchema with raw string return',
     inputSchema: { type: 'object', properties: {} },
@@ -568,7 +551,7 @@ test('global registerTool accepts full literal schemas with as const satisfies',
   }
 
   // Full inference path — inputSchema + outputSchema with as const satisfies
-  navigator.modelContext.registerTool({
+  getMcpBModelContext().registerTool({
     name: 'full_inference',
     description: 'Fully inferred tool',
     inputSchema: {
@@ -595,7 +578,7 @@ test('global registerTool accepts literal inputSchema with raw return and no out
   }
 
   // Literal inputSchema for arg inference, but raw return (no outputSchema)
-  navigator.modelContext.registerTool({
+  getMcpBModelContext().registerTool({
     name: 'inferred_args_raw_return',
     description: 'Inferred args with raw return',
     inputSchema: {

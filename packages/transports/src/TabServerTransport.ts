@@ -1,4 +1,5 @@
-import { type JSONRPCMessage, JSONRPCMessageSchema, type Transport } from '@mcp-b/webmcp-ts-sdk';
+import { JSONRPCMessageSchema } from '@modelcontextprotocol/core';
+import type { JSONRPCMessage, Transport } from '@modelcontextprotocol/server';
 
 export interface TabServerTransportOptions {
   /** Whitelist of origins allowed to connect (for security) */

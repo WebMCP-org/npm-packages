@@ -1,4 +1,4 @@
-import type { JsonPrimitive, JsonValue } from './common.js';
+import type { JsonValue } from './common.js';
 
 /**
  * Primitive JSON Schema `type` values supported by the MVP inference layer.
@@ -18,7 +18,7 @@ export type JsonSchemaTypeArray = readonly [JsonSchemaType, ...JsonSchemaType[]]
 /**
  * Literal values supported in JSON Schema `enum`/`const`.
  */
-export type JsonSchemaEnumValue = JsonPrimitive | JsonValue;
+export type JsonSchemaEnumValue = JsonValue;
 
 /**
  * Extra JSON Schema keywords tolerated by the inference layer.
@@ -277,23 +277,15 @@ type IsWidenedTypeKeyword<TTypeKeyword> = string extends TTypeKeyword
       : false
     : false;
 
-type IncludesObjectType<TSchema> =
-  TypeOptionsOf<TSchema> extends never
-    ? false
-    : 'object' extends TypeOptionsOf<TSchema>
-      ? true
-      : false;
-
 /**
  * Infers tool argument types from a root `InputSchema`.
  *
- * If the schema is not a literal object schema (for example a widened
- * `InputSchema` loaded at runtime), this intentionally falls back to
- * `Record<string, unknown>`.
+ * WebIDL passes any ECMAScript object, including arrays. Widened runtime
+ * schemas intentionally fall back to `Record<string, unknown>`.
  */
 export type InferArgsFromInputSchema<TSchema> =
   IsWidenedTypeKeyword<TypeKeywordOf<TSchema>> extends true
     ? Record<string, unknown>
-    : IncludesObjectType<TSchema> extends true
-      ? InferObject<TSchema>
-      : Record<string, unknown>;
+    : Extract<InferJsonSchema<TSchema>, Record<string, unknown> | unknown[]> extends never
+      ? Record<string, unknown>
+      : Extract<InferJsonSchema<TSchema>, Record<string, unknown> | unknown[]>;

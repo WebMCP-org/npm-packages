@@ -67,17 +67,22 @@ Create a file called `relay-demo.html`:
     <p id="status">Registering tool...</p>
 
     <script>
-      document.modelContext.registerTool({
-        name: 'get_page_title',
-        description: 'Get the current page title',
-        inputSchema: { type: 'object', properties: {} },
-        execute: async () => ({
-          content: [{ type: 'text', text: document.title }],
-        }),
-      });
-
-      document.getElementById('status').textContent =
-        'Tool "get_page_title" registered. Waiting for relay connection...';
+      void document.modelContext
+        .registerTool({
+          name: 'get_page_title',
+          description: 'Get the current page title',
+          inputSchema: { type: 'object', properties: {} },
+          execute: async () => ({
+            content: [{ type: 'text', text: document.title }],
+          }),
+        })
+        .then(() => {
+          document.getElementById('status').textContent =
+            'Tool "get_page_title" registered. Waiting for relay connection...';
+        })
+        .catch((error) => {
+          document.getElementById('status').textContent = `Registration failed: ${error.message}`;
+        });
     </script>
 
     <script src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@latest/dist/browser/embed.js"></script>

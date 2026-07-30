@@ -19,7 +19,8 @@ must remain clearly distinguished from the standard surface.
 
 New code uses `document.modelContext`. `navigator.modelContext` remains a
 deprecated compatibility alias, while `navigator.modelContextTesting` is a
-testing and inspection surface. Adapter boundaries reduce migration cost.
+removed Chromium preview API retained only by MCP-B compatibility shims.
+Adapter boundaries reduce migration cost.
 
 See [Try the native Chrome preview](/tutorials/first-native-preview) and
 [Test native and polyfill](/how-to/test-native-and-polyfill).
@@ -37,9 +38,9 @@ Use first-party sources for compatibility decisions:
 | [MCP SEP-2106](https://modelcontextprotocol.io/seps/2106-json-schema-2020-12)                | MCP schema changes for JSON Schema 2020-12, output schemas, and `structuredContent`                                                |
 
 This release line follows those sources by making `document.modelContext` the
-primary surface, preferring `getTools()` plus `executeTool()`, using
-`AbortSignal` for cleanup, and keeping legacy MCP-B helpers as compatibility
-APIs.
+primary surface, using `getTools()` for discovery, feature-detecting Chrome's
+optional `executeTool()` extension, using `AbortSignal` for cleanup, and
+keeping legacy MCP-B helpers as compatibility APIs.
 
 `outputSchema` is not part of the current W3C/Chrome WebMCP tool dictionary.
 MCP-B keeps it as helper metadata for TypeScript inference, structured MCP

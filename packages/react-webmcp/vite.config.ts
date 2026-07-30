@@ -13,9 +13,9 @@ export default defineConfig({
     sourcemap: true,
     clean: true,
     treeshake: true,
-    // We don't want to bundle these with the library,
-    // as the consuming project will provide them.
-    external: ['react', 'react/jsx-runtime', 'react-dom', 'zod', /^@modelcontextprotocol\/sdk/],
+    deps: {
+      neverBundle: [/^react(?:\/.*)?$/, /^react-dom(?:\/.*)?$/, /^usewebmcp$/],
+    },
     tsconfig: './tsconfig.json',
   },
   test: {

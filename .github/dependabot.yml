@@ -1,19 +1,6 @@
 version: 2
 updates:
-  # Published packages only (excluding chrome-devtools-mcp)
-  - package-ecosystem: 'npm'
-    directory: '/packages/extension-tools'
-    schedule:
-      interval: 'weekly'
-    commit-message:
-      prefix: 'chore(deps)'
-    labels:
-      - 'dependencies'
-      - 'packages/extension-tools'
-    ignore:
-      - dependency-name: '*'
-        update-types: ['version-update:semver-major']
-
+  # Published packages
   - package-ecosystem: 'npm'
     directory: '/packages/global'
     schedule:

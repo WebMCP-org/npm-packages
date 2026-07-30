@@ -1,43 +1,31 @@
 import { execFile } from 'node:child_process';
 
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import { ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import {
+  type CallToolResult,
+  fromJsonSchema,
+  type JsonSchemaType,
+  McpServer,
+  type RegisteredTool,
+  type ToolAnnotations,
+  type Transport,
+} from '@modelcontextprotocol/server';
+import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 import { z } from 'zod/v4';
 
 import { RelayBridgeServer, type RelayBridgeServerOptions } from './bridgeServer.js';
 import type { AggregatedTool, SourceInfo } from './registry.js';
 import {
   EMPTY_STATIC_TOOL_INPUT_SHAPE,
-  publicInputSchemaFromZodShape,
   type StaticToolInputShape,
-  WEBMCP_CALL_TOOL_INPUT_SHAPE,
   WEBMCP_OPEN_PAGE_INPUT_SHAPE,
 } from './staticToolSchemas.js';
-
-/**
- * Handle returned by MCP tool registration.
- */
-interface RegisteredToolHandle {
-  remove: () => void;
-}
 
 interface StaticToolRegistration<T extends StaticToolInputShape = StaticToolInputShape> {
   name: string;
   description: string;
   inputShape: T;
-  annotations?: unknown;
-  handler: (args: z.output<z.ZodObject<T>>) => Promise<Record<string, unknown>>;
-}
-
-interface PublicToolMetadata {
-  name: string;
-  title?: string;
-  description?: string;
-  inputSchema: Record<string, unknown>;
-  outputSchema?: Record<string, unknown>;
-  annotations?: unknown;
+  annotations?: ToolAnnotations;
+  handler: (args: z.output<z.ZodObject<T>>) => Promise<CallToolResult>;
 }
 
 /**
@@ -76,9 +64,7 @@ export class LocalRelayMcpServer {
   readonly bridge: RelayBridgeServer;
 
   private readonly mcpServer: McpServer;
-  private readonly staticToolData = new Map<string, PublicToolMetadata>();
-  private readonly dynamicToolHandles = new Map<string, RegisteredToolHandle>();
-  private readonly dynamicToolData = new Map<string, AggregatedTool>();
+  private readonly dynamicToolHandles = new Map<string, RegisteredTool>();
   private readonly dynamicToolSignature = new Map<string, string>();
 
   private syncing = false;
@@ -131,7 +117,6 @@ export class LocalRelayMcpServer {
     );
 
     this.registerStaticTools();
-    this.overrideListToolsHandler();
   }
 
   /**
@@ -204,33 +189,6 @@ export class LocalRelayMcpServer {
     return Array.from(this.dynamicToolHandles.keys()).sort();
   }
 
-  /**
-   * Overrides the SDK's ListTools handler to return real JSON Schema
-   * for dynamic tools instead of the empty `z.object({}).passthrough()`
-   * schema that the SDK would otherwise convert to `{ type: 'object' }`.
-   *
-   * The MCP SDK's McpServer internally runs `toJsonSchemaCompat()` on
-   * registered inputSchema values, which strips plain JSON Schema objects
-   * (non-Zod) to empty schemas. This override bypasses that conversion
-   * for dynamic (relayed) tools while preserving static tools as-is.
-   */
-  private overrideListToolsHandler(): void {
-    this.mcpServer.server.setRequestHandler(ListToolsRequestSchema, () => {
-      const tools: Array<Record<string, unknown>> = [
-        ...Array.from(this.staticToolData.values()).map((tool) => ({ ...tool })),
-        ...Array.from(this.dynamicToolData.entries()).map(([name, tool]) => ({
-          name,
-          description: this.dynamicToolDescription(tool),
-          inputSchema: tool.inputSchema,
-          ...(tool.outputSchema ? { outputSchema: tool.outputSchema } : {}),
-          ...(tool.annotations ? { annotations: tool.annotations } : {}),
-        })),
-      ].sort((left, right) => String(left.name).localeCompare(String(right.name)));
-
-      return { tools };
-    });
-  }
-
   private registerStaticTool<T extends StaticToolInputShape>({
     name,
     description,
@@ -242,17 +200,11 @@ export class LocalRelayMcpServer {
       name,
       {
         description,
-        inputSchema: inputShape,
+        inputSchema: z.object(inputShape),
         ...(annotations ? { annotations } : {}),
-      } as Parameters<McpServer['registerTool']>[1],
-      handler as Parameters<McpServer['registerTool']>[2]
+      },
+      handler
     );
-    this.staticToolData.set(name, {
-      name,
-      description,
-      inputSchema: publicInputSchemaFromZodShape(inputShape),
-      ...(annotations ? { annotations } : {}),
-    });
   }
 
   /**
@@ -296,7 +248,7 @@ export class LocalRelayMcpServer {
     this.registerStaticTool({
       name: 'webmcp_list_tools',
       description:
-        'List WebMCP tools available from connected browser sources. Returns tool definitions including name, description, input schema, and source info. Use webmcp_call_tool to invoke a tool by name.',
+        'List WebMCP tools available from connected browser sources. Returns tool definitions including name, description, input schema, and source info.',
       inputShape: EMPTY_STATIC_TOOL_INPUT_SHAPE,
       annotations: {
         readOnlyHint: true,
@@ -313,65 +265,6 @@ export class LocalRelayMcpServer {
             tools,
           },
         };
-      },
-    });
-
-    this.registerStaticTool({
-      name: 'webmcp_call_tool',
-      description:
-        'Call a WebMCP tool registered by a connected browser page. Use webmcp_list_tools first to see available tools and their input schemas.',
-      inputShape: WEBMCP_CALL_TOOL_INPUT_SHAPE,
-      annotations: {
-        readOnlyHint: false,
-      },
-      handler: async ({ name, arguments: args }) => {
-        const tools = this.listAggregatedTools();
-        const toolSummary = this.buildToolSummary(tools);
-
-        const matched = tools.find((t) => t.name === name);
-        if (!matched) {
-          const errorLines = [`Tool "${name}" not found.`];
-          if (toolSummary) {
-            errorLines.push('', 'Available tools:', toolSummary);
-          } else {
-            errorLines.push(
-              '',
-              'No tools are currently available. Ensure a browser page with WebMCP is connected.'
-            );
-          }
-          return {
-            content: [{ type: 'text' as const, text: errorLines.join('\n') }],
-            isError: true,
-          };
-        }
-
-        try {
-          const result = await this.bridge.invokeTool(name, args ?? {});
-
-          const updatedTools =
-            this.bridge.mode === 'client'
-              ? this.buildAggregatedToolsFromRelay()
-              : this.bridge.registry.listTools();
-          const updatedSummary = this.buildToolSummary(updatedTools);
-          if (updatedSummary) {
-            result.content = [
-              ...result.content,
-              { type: 'text' as const, text: `\n---\nAvailable tools:\n${updatedSummary}` },
-            ];
-          }
-
-          return result;
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err);
-          const errorLines = [`Failed to call tool "${name}": ${message}`];
-          if (toolSummary) {
-            errorLines.push('', 'Available tools:', toolSummary);
-          }
-          return {
-            content: [{ type: 'text' as const, text: errorLines.join('\n') }],
-            isError: true,
-          };
-        }
       },
     });
 
@@ -513,22 +406,6 @@ export class LocalRelayMcpServer {
   }
 
   /**
-   * Builds a concise plain-text list of available tools.
-   */
-  private buildToolSummary(tools: AggregatedTool[]): string | null {
-    if (tools.length === 0) {
-      return null;
-    }
-
-    return tools
-      .map((t) => {
-        const desc = t.description ? ` - ${t.description.split('\n')[0]}` : '';
-        return `  ${t.name}${desc}`;
-      })
-      .join('\n');
-  }
-
-  /**
    * Opens a URL in the user's default browser using the platform open command.
    *
    * Uses the re-serialized `URL.href` to prevent injection of shell metacharacters.
@@ -665,7 +542,6 @@ export class LocalRelayMcpServer {
 
       handle.remove();
       this.dynamicToolHandles.delete(name);
-      this.dynamicToolData.delete(name);
       this.dynamicToolSignature.delete(name);
       changed = true;
     }
@@ -686,7 +562,6 @@ export class LocalRelayMcpServer {
 
       const handle = this.registerDynamicTool(tool);
       this.dynamicToolHandles.set(tool.name, handle);
-      this.dynamicToolData.set(tool.name, tool);
       this.dynamicToolSignature.set(tool.name, signature);
       changed = true;
     }
@@ -705,16 +580,24 @@ export class LocalRelayMcpServer {
   /**
    * Registers a single dynamic tool and returns a removal handle.
    */
-  private registerDynamicTool(tool: AggregatedTool): RegisteredToolHandle {
-    const inputSchema = z.object({}).passthrough();
-    const config = {
-      description: this.dynamicToolDescription(tool),
-      inputSchema,
-    };
+  private registerDynamicTool(tool: AggregatedTool): RegisteredTool {
+    // `AggregatedTool` has already passed the SDK's ToolSchema validation.
+    // JsonSchemaType's exact optional properties are structurally narrower
+    // than the protocol Tool type even though both describe JSON Schema.
+    const inputSchema = fromJsonSchema<Record<string, unknown>>(tool.inputSchema as JsonSchemaType);
+    const outputSchema = tool.outputSchema
+      ? fromJsonSchema(tool.outputSchema as JsonSchemaType)
+      : undefined;
 
-    const handle = this.mcpServer.registerTool(
+    return this.mcpServer.registerTool(
       tool.name,
-      tool.annotations ? { ...config, annotations: tool.annotations } : config,
+      {
+        ...(tool.title ? { title: tool.title } : {}),
+        description: this.dynamicToolDescription(tool),
+        inputSchema,
+        ...(outputSchema ? { outputSchema } : {}),
+        ...(tool.annotations ? { annotations: tool.annotations } : {}),
+      },
       async (args: Record<string, unknown>) => {
         try {
           return await this.bridge.invokeTool(tool.name, args);
@@ -736,12 +619,6 @@ export class LocalRelayMcpServer {
         }
       }
     );
-
-    return {
-      remove: () => {
-        handle.remove();
-      },
-    };
   }
 
   /**

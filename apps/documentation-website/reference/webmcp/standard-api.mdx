@@ -14,33 +14,61 @@ Chrome's current implementation notes live in the
 
 New code uses `document.modelContext`.
 
-| Member                                   | Purpose                                                          |
-| ---------------------------------------- | ---------------------------------------------------------------- |
-| `registerTool(tool, { signal })`         | Publish a tool and bind its lifetime to an optional abort signal |
-| `getTools()`                             | Discover registered tool objects                                 |
-| `executeTool(tool, inputJson, options?)` | Execute a tool object returned by `getTools()`                   |
-| `toolchange`                             | Notify consumers that available tools changed                    |
+| Member                           | Purpose                                                          |
+| -------------------------------- | ---------------------------------------------------------------- |
+| `registerTool(tool, { signal })` | Publish a tool and bind its lifetime to an optional abort signal |
+| `getTools(options?)`             | Discover registered tool objects                                 |
+| `toolchange`                     | Notify consumers that available tools changed                    |
 
 ```ts
 const controller = new AbortController();
 
-document.modelContext.registerTool(tool, {
+await document.modelContext.registerTool(tool, {
   signal: controller.signal,
 });
 
 controller.abort();
 ```
 
-`getTools()` and `executeTool()` are the producer-facing discovery and execution
-path in Chrome's current preview. `registerTool()` returns `Promise<void>`, and
-tool cleanup is tied to the optional `AbortSignal` passed at registration time.
+`registerTool()` returns `Promise<void>`, and tool cleanup is tied to the
+optional `AbortSignal` passed at registration time. Invalid descriptors and
+duplicate names reject the returned promise, so await registration or handle
+its rejection.
+
+## Chrome execution extension
+
+Chrome's current preview adds `executeTool(tool, inputJson, options?)`. It is
+not part of the strict WebMCP Community Group specification, so feature-detect
+it:
+
+```ts
+import type { ChromeModelContext } from '@mcp-b/webmcp-types';
+
+const modelContext = document.modelContext as ChromeModelContext;
+const tool = (await modelContext.getTools()).find((candidate) => candidate.name === 'search');
+const executeTool = modelContext.executeTool;
+
+if (tool && executeTool) {
+  const resultJson = await executeTool.call(
+    modelContext,
+    tool,
+    JSON.stringify({ query: 'webmcp' })
+  );
+}
+```
+
+The extension accepts a descriptor returned by `getTools()`, a JSON object or
+array string, and optional abort options. It resolves to a JSON string or
+`null`.
 
 ## Compatibility
 
-- `navigator.modelContext` is a deprecated alias for migration.
-- `navigator.modelContextTesting` is a compatibility surface for testing.
-- `listTools()`, deprecated `callTool()` compatibility helpers, prompts,
-  resources, sampling, elicitation, and transports are MCP-B extensions.
+- `navigator.modelContext` is a deprecated compatibility alias. Current Chrome
+  exposes `document.modelContext` only.
+- `navigator.modelContextTesting` is a removed Chromium preview API retained
+  only by older runtimes and MCP-B/polyfill compatibility shims.
+- `listTools()`, prompts, resources, sampling, elicitation, and transports are
+  MCP-B extensions.
 - `outputSchema` is not part of the current W3C/Chrome WebMCP tool
   dictionary. MCP-B packages expose it as helper metadata for type inference,
   structured MCP responses, and polyfill/runtime adapters.

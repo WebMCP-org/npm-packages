@@ -11,24 +11,22 @@ This package is the type-safety source of truth for WebMCP.
 - Infer tool input args from literal `inputSchema`
 - Infer `structuredContent` from literal `outputSchema`
 - Keep safe fallbacks (`Record<string, unknown>`) when schemas are widened/runtime-defined
-- Provide name-aware typed registries with `TypedModelContext`
 
 ## Why This Package
 
 - Global `Document` augmentation for `document.modelContext`
-- Deprecated global `Navigator` augmentation for backward-compatible `navigator.modelContext`
+- Optional deprecated `Navigator` augmentation for older `navigator.modelContext` runtimes
 - Strongly typed tool descriptors and tool responses
 - Literal JSON Schema inference for tool args and `structuredContent`
-- Name-aware helper types for typed tool registries
 - Runtime-agnostic: works with native implementations, polyfills, or adapters
 
 ## Package Selection
 
-| Package                  | Use When                                                                      |
-| ------------------------ | ----------------------------------------------------------------------------- |
-| `@mcp-b/webmcp-types`    | You only need compile-time types                                              |
-| `@mcp-b/webmcp-polyfill` | You need strict WebMCP core runtime behavior                                  |
-| `@mcp-b/global`          | You want core + MCPB bridge extensions (`callTool`, prompts, resources, etc.) |
+| Package                  | Use When                                                             |
+| ------------------------ | -------------------------------------------------------------------- |
+| `@mcp-b/webmcp-types`    | You only need compile-time types                                     |
+| `@mcp-b/webmcp-polyfill` | You need strict WebMCP core runtime behavior                         |
+| `@mcp-b/global`          | You want core + MCPB bridge extensions such as prompts and resources |
 
 ## Install
 
@@ -81,30 +79,15 @@ const inputSchema = {
   additionalProperties: false,
 } as const satisfies JsonSchemaForInference;
 
-const outputSchema = {
-  type: 'object',
-  properties: {
-    total: { type: 'integer' },
-    items: { type: 'array', items: { type: 'string' } },
-  },
-  required: ['total'],
-  additionalProperties: false,
-} as const satisfies JsonSchemaForInference;
-
-document.modelContext.registerTool({
+await document.modelContext.registerTool({
   name: 'search',
   description: 'Search indexed docs',
   inputSchema,
-  outputSchema,
   async execute(args) {
     // args is inferred as: { query: string; limit?: number }
     return {
-      content: [{ type: 'text', text: `Searching for ${args.query}` }],
-      structuredContent: {
-        // inferred from outputSchema
-        total: 1,
-        items: [args.query],
-      },
+      total: 1,
+      items: [args.query],
     };
   },
 });
@@ -150,11 +133,11 @@ Other schema keywords are accepted as metadata but do not add new inferred struc
 
 If `required` is widened (for example a runtime `string[]`), fields are treated as optional by design.
 
-### 5. Output inference from `outputSchema`
+### 5. MCP-B output inference from `outputSchema`
 
 When `outputSchema` is a literal JSON Schema, `structuredContent` is inferred automatically via `ToolResultFromOutputSchema`. Object, array, string, number, boolean, and null schemas are supported for MCP-B type inference.
 
-Native Chrome WebMCP does not currently define or enforce `outputSchema`; treat it as helper metadata unless a specific MCP-B runtime or adapter consumes it.
+`outputSchema` is not part of the WebMCP `ModelContextTool` dictionary. Use it through `ModelContextWithExtensions` when an MCP-B runtime or adapter consumes the metadata.
 
 This catches enum/type mismatches at compile time.
 
@@ -162,37 +145,26 @@ This catches enum/type mismatches at compile time.
 
 You can always provide explicit generic args/results with `ToolDescriptor<TArgs, TResult, TName>` when schema inference is not enough for your use case.
 
-## Name-Aware Typed Context (Advanced)
-
-`TypedModelContext<TTools>` gives literal-name-aware `callTool(...)` typing for known registries.
-
-```ts
-import type { CallToolResult, ToolDescriptor, TypedModelContext } from '@mcp-b/webmcp-types';
-
-type SearchTool = ToolDescriptor<
-  { query: string; limit?: number },
-  CallToolResult & { structuredContent: { total: number } },
-  'search'
->;
-
-type PingTool = ToolDescriptor<Record<string, never>, CallToolResult, 'ping'>;
-type AppModelContext = TypedModelContext<readonly [SearchTool, PingTool]>;
-
-declare const modelContext: AppModelContext;
-
-await modelContext.callTool({
-  name: 'search',
-  arguments: { query: 'webmcp' },
-});
-
-await modelContext.callTool({ name: 'ping' });
-// arguments are optional for Record<string, never> tools
-```
-
 ## Core and Extension Surfaces
 
 `Document['modelContext']` is typed as strict core WebMCP methods only.
-`Navigator['modelContext']` remains typed as a deprecated backward-compatible alias.
+`Navigator['modelContext']` remains an optional deprecated compatibility alias.
+
+Current Chromium previews may add `executeTool(...)`. It is intentionally absent
+from the strict core and available as an optional `ChromeModelContextExtensions`
+member:
+
+```ts
+import type { ChromeModelContextExtensions } from '@mcp-b/webmcp-types';
+
+const chromeContext = document.modelContext as Document['modelContext'] &
+  ChromeModelContextExtensions;
+const registeredTool = (await document.modelContext.getTools())[0];
+
+if (registeredTool && chromeContext.executeTool) {
+  await chromeContext.executeTool(registeredTool, JSON.stringify({ query: 'docs' }));
+}
+```
 
 Extension methods are available via `ModelContextExtensions` and `ModelContextWithExtensions`:
 
@@ -201,40 +173,38 @@ import type { ModelContextExtensions } from '@mcp-b/webmcp-types';
 
 const modelContext = document.modelContext as Document['modelContext'] & ModelContextExtensions;
 const tools = modelContext.listTools();
-const result = await modelContext.callTool({
-  name: 'search',
-  arguments: { query: 'docs' },
-});
 
 void tools;
-void result;
 ```
 
 ## Commonly Used Exports
 
-| Export                               | Purpose                                                      |
-| ------------------------------------ | ------------------------------------------------------------ |
-| `ModelContext`                       | Strict core `document.modelContext` type                     |
-| `ToolDescriptor`                     | Explicitly typed tool descriptor                             |
-| `ToolDescriptorFromSchema`           | Schema-driven descriptor with inferred args/result           |
-| `JsonSchemaForInference`             | Supported JSON Schema subset for inference                   |
-| `InferArgsFromInputSchema`           | Derive args shape from a schema type                         |
-| `ToolResultFromOutputSchema`         | Derive `structuredContent` type from output schema           |
-| `TypedModelContext`                  | Name-aware typed `callTool`/`listTools` for known registries |
-| `CallToolResult`                     | Tool response type                                           |
-| `ContentBlock` / `LooseContentBlock` | Strict and pragmatic content block typing                    |
-| `ModelContextClient`                 | Tool execution client (`requestUserInteraction`)             |
+| Export                         | Purpose                                            |
+| ------------------------------ | -------------------------------------------------- |
+| `ModelContext`                 | Strict core `document.modelContext` type           |
+| `ModelContextTool`             | Strict one-argument WebMCP tool descriptor         |
+| `RegisteredTool`               | Tool metadata returned by `getTools()`             |
+| `ChromeModelContextExtensions` | Optional experimental Chromium additions           |
+| `ToolDescriptor`               | Explicitly typed tool descriptor                   |
+| `ToolDescriptorFromSchema`     | Schema-driven descriptor with inferred args/result |
+| `JsonSchemaForInference`       | Supported JSON Schema subset for inference         |
+| `InferArgsFromInputSchema`     | Derive args shape from a schema type               |
+| `ToolResultFromOutputSchema`   | Derive `structuredContent` type from output schema |
+| `CallToolResult`               | Tool response type                                 |
+| `ContentBlock`                 | MCP v2 tool result content blocks                  |
+| `ModelContextClient`           | Tool execution client (`requestUserInteraction`)   |
 
 ## Important Notes
 
 - This package does not install any runtime behavior.
 - Runtime validation/execution behavior depends on your WebMCP runtime package.
-- Prefer `document.modelContext` for new code. `navigator.modelContext` is retained as a deprecated backward-compatible alias during the WebMCP migration.
+- Prefer `document.modelContext`. Current Chromium has removed `navigator.modelContext`; the optional type remains for older browsers and compatibility runtimes.
 - `provideContext()` and `clearContext()` were removed from the upstream WebMCP spec on March 5, 2026 and are intentionally not typed.
 - `unregisterTool(name)` is `@deprecated`. The April 23, 2026 WebMCP draft removed it from the spec in favor of an `AbortSignal` passed via `registerTool(tool, { signal })`. The type is retained for compatibility with older native previews and existing MCP-B wrappers; it will be removed in the next major version.
-- `registerTool(tool, options?)` accepts a `ModelContextRegisterToolOptions` dictionary with an optional `signal: AbortSignal`. Aborting the signal unregisters the tool.
-- `ToolAnnotations.untrustedContentHint` was added to the spec on April 23, 2026 to flag tools whose output may include externally-sourced content.
-- `navigator.modelContextTesting` is typed as optional for compatibility with Chromium preview/testing surfaces.
+- `registerTool(tool, options?)` returns `Promise<void>` and accepts a `ModelContextRegisterToolOptions` dictionary with an optional `signal: AbortSignal`. Aborting the signal unregisters the tool. Invalid and duplicate registrations reject the promise.
+- `getTools({ fromOrigins })` discovers same-origin tools plus tools explicitly exposed by matching descendant origins.
+- Strict WebMCP annotations are boolean `readOnlyHint` and `untrustedContentHint` fields. MCP-B annotation extensions remain available on `ToolDescriptor`.
+- `navigator.modelContextTesting` is deprecated and optional for compatibility with older Chromium previews and MCP-B testing shims.
 
 ## License
 

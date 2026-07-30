@@ -9,7 +9,7 @@ keywords:
     'polyfill',
     'e2e',
     'chrome flags',
-    'modelContextTesting',
+    'executeTool',
     'runtime contract',
   ]
 icon: 'flask-vial'
@@ -25,8 +25,8 @@ The monorepo provides several testing lanes organized by runtime:
 | ----------------------------- | ----------------------------------------------- | ---------------------------------------------------------- |
 | Tab / global (polyfill)       | SDK `Client` + `TabClientTransport`             | `pnpm --filter mcp-e2e-tests test:runtime-contract`        |
 | Iframe                        | SDK `Client` + `IframeParentTransport`          | `pnpm --filter mcp-e2e-tests test:runtime-contract`        |
-| Native Chromium (default)     | `document.modelContext` / `modelContextTesting` | `pnpm --filter mcp-e2e-tests test:native-contract:default` |
-| Native Chromium (Chrome 152+) | `document.modelContext` / `modelContextTesting` | `pnpm --filter mcp-e2e-tests test:native-contract:beta`    |
+| Native Chromium (default)     | `getTools()` + feature-detected `executeTool()` | `pnpm --filter mcp-e2e-tests test:native-contract:default` |
+| Native Chromium (Chrome 152+) | `getTools()` + feature-detected `executeTool()` | `pnpm --filter mcp-e2e-tests test:native-contract:beta`    |
 | Local relay                   | SDK `Client` over stdio                         | `pnpm --filter @mcp-b/webmcp-local-relay test:e2e`         |
 
 Every canonical E2E suite proves the same six assertions against the real runtime:
@@ -54,7 +54,9 @@ These tests use the shared fixture in `e2e/runtime-contract/` which registers a 
 
 ## Run the native Chromium tests
 
-Native Chromium tests use the browser's built-in `document.modelContext` and `navigator.modelContextTesting` APIs directly. This is the one exception to the SDK-client pattern: the browser API itself is the public boundary.
+Native Chromium tests use the browser's built-in `document.modelContext` API directly. This is the one exception to the SDK-client pattern: the browser API itself is the public boundary.
+
+`navigator.modelContextTesting` is not part of current Chrome WebMCP. MCP-B can install a name-based compatibility shim for older tests, but native coverage should use `getTools()` and feature-detect Chrome's `executeTool()` extension.
 
 ### Default Chromium
 
@@ -85,16 +87,12 @@ pnpm --filter mcp-e2e-tests test:native-contract:default
 If you need runtime detection (for conditional test paths or feature flags):
 
 ```javascript
-// Check if the API exists
-console.log('modelContext available:', !!document.modelContext);
-console.log('modelContextTesting available:', !!navigator.modelContextTesting);
+const modelContext = document.modelContext;
 
-// Distinguish native from polyfill
-if (navigator.modelContextTesting) {
-  const name = navigator.modelContextTesting.constructor.name;
-  const isNative = !name.includes('WebModelContext');
-  console.log('Is native:', isNative);
-}
+console.log('modelContext available:', !!modelContext);
+console.log('getTools available:', typeof modelContext?.getTools === 'function');
+console.log('Chrome executeTool available:', typeof modelContext?.executeTool === 'function');
+console.log('MCP-B polyfill:', modelContext?.__isWebMCPPolyfill === true);
 ```
 
 ## Configure Playwright for native testing
@@ -134,7 +132,7 @@ chromium \
 Beyond the canonical contract lanes, the monorepo has additional integration suites:
 
 ```bash
-# Runtime API integration (direct page.evaluate, modelContextTesting probes)
+# Runtime API integration (direct page.evaluate and browser API probes)
 pnpm --filter mcp-e2e-tests test:integration:runtime-api
 
 # Framework integration (React hooks, validation matrices)

@@ -5,8 +5,6 @@
 * @WebMCP-org/core-devs
 
 # Package-specific owners
-/packages/chrome-devtools-mcp/ @WebMCP-org/core-devs
-/packages/extension-tools/ @WebMCP-org/core-devs
 /packages/global/ @WebMCP-org/core-devs
 /packages/mcp-iframe/ @WebMCP-org/core-devs
 /packages/react-webmcp/ @WebMCP-org/core-devs

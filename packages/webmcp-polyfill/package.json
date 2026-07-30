@@ -59,19 +59,17 @@
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
     "test": "vp test run",
-    "test:browser": "vp test run --config vitest.browser.config.ts --browser.headless",
-    "test:browser:ui": "vp test --config vitest.browser.config.ts --browser",
+    "test:browser": "vp test run --browser.headless",
+    "test:browser:ui": "vp test --browser",
     "test:conformance": "vp test run --config vitest.conformance.config.ts --browser.headless",
     "typecheck": "pnpm --filter @mcp-b/webmcp-types build && tsc --noEmit && vp test run --typecheck --silent"
   },
   "dependencies": {
-    "@cfworker/json-schema": "catalog:",
     "@mcp-b/webmcp-types": "workspace:*",
     "@standard-schema/spec": "^1.1.0"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "catalog:",
-    "happy-dom": "^20.8.9",
     "playwright": "catalog:",
     "typescript": "catalog:",
     "vite-plus": "catalog:",

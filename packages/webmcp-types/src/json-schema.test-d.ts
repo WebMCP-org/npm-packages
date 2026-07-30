@@ -5,6 +5,7 @@ import type {
   InferJsonSchema,
   JsonSchemaForInference,
   ModelContext,
+  ModelContextWithExtensions,
   ToolDescriptorFromSchema,
 } from './index.js';
 
@@ -92,7 +93,8 @@ const schemaWithObjectTypeUnion = {
 } as const satisfies JsonSchemaForInference;
 
 declare const runtimeSchema: InputSchema;
-declare const registerTool: ModelContext['registerTool'];
+declare const registerStandardTool: ModelContext['registerTool'];
+declare const registerTool: ModelContextWithExtensions['registerTool'];
 const shouldInvokeRegisterTool = Date.now() < 0;
 
 test('InferJsonSchema maps primitive, enum, const, and array schemas', () => {
@@ -206,7 +208,7 @@ test('ToolDescriptorFromSchema infers raw return type from outputSchema', () => 
 
 test('ModelContext.registerTool infers execute args from literal schema', () => {
   if (shouldInvokeRegisterTool) {
-    registerTool({
+    registerStandardTool({
       name: 'search',
       description: 'Search docs',
       inputSchema: closedSchema,
@@ -224,11 +226,11 @@ test('ModelContext.registerTool infers execute args from literal schema', () => 
 
 test('ModelContext.registerTool rejects unknown execute args for closed schemas', () => {
   if (shouldInvokeRegisterTool) {
-    registerTool({
+    registerStandardTool({
       name: 'search_closed_args',
       description: 'Search docs with closed schema args',
       inputSchema: closedSchema,
-      execute(args) {
+      async execute(args) {
         // @ts-expect-error - closed schema does not infer unknown keys
         const extra = args.extra;
         void extra;
@@ -242,7 +244,7 @@ test('ModelContext.registerTool rejects unknown execute args for closed schemas'
 
 test('ModelContext.registerTool infers execute args from object type unions', () => {
   if (shouldInvokeRegisterTool) {
-    registerTool({
+    registerStandardTool({
       name: 'search_union',
       description: 'Search docs with object union schema',
       inputSchema: schemaWithObjectTypeUnion,
@@ -257,7 +259,7 @@ test('ModelContext.registerTool infers execute args from object type unions', ()
   }
 });
 
-test('ModelContext.registerTool accepts sync execute handlers', () => {
+test('ModelContextWithExtensions.registerTool accepts sync execute handlers', () => {
   if (shouldInvokeRegisterTool) {
     registerTool({
       name: 'sync_search',

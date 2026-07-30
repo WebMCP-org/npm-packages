@@ -149,7 +149,6 @@ We follow the [Conventional Commits](https://www.conventionalcommits.org/) speci
 
 Package scopes (all in `packages/` directory):
 
-- `extension-tools` - @mcp-b/extension-tools
 - `global` - @mcp-b/global
 - `mcp-iframe` - @mcp-b/mcp-iframe
 - `react-webmcp` - @mcp-b/react-webmcp
@@ -175,12 +174,11 @@ Repository-wide scopes:
 ```bash
 # Package-specific changes
 git commit -m "feat(transports): add postMessage timeout option to TabServerTransport"
-git commit -m "fix(extension-tools): handle chrome.runtime errors gracefully"
 git commit -m "docs(react-webmcp): update usage examples"
 git commit -m "feat(global): add new tool registration API"
 
 # Repository-wide changes
-git commit -m "chore(deps): upgrade @modelcontextprotocol/sdk to v2.0"
+git commit -m "chore(deps): upgrade MCP TypeScript SDK packages to v2.0"
 git commit -m "ci(root): add npm publishing workflow"
 git commit -m "docs(root): update README with installation instructions"
 
@@ -218,7 +216,6 @@ git commit -m "refactor(*): update to new MCP SDK types"
 ```
 npm-packages/
 ├── packages/                    # All NPM packages
-│   ├── extension-tools/         # Chrome Extension API tools
 │   ├── global/                  # Full MCP-B runtime (core + extensions)
 │   ├── mcp-iframe/              # Iframe MCP element
 │   ├── react-webmcp/            # React hooks for MCP-B runtime
@@ -264,13 +261,6 @@ When contributing to a specific package:
 - Add proper TypeScript types for hooks
 - Support both provider and client use cases
 - Test with React StrictMode
-
-### @mcp-b/extension-tools
-
-- Test in Chrome extension context
-- Document required permissions
-- Handle chrome.runtime errors gracefully
-- Auto-generate tools from Chrome API types
 
 ### @mcp-b/smart-dom-reader
 

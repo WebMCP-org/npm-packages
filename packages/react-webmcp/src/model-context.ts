@@ -1,14 +1,15 @@
+import { SERVER_MARKER_PROPERTY, type BrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
 import type { ModelContext } from '@mcp-b/webmcp-types';
 
-export type ModelContextSurface = ModelContext;
-type ModelContextHost = { modelContext?: ModelContext };
+function isBrowserMcpServer(modelContext: ModelContext): modelContext is BrowserMcpServer {
+  return SERVER_MARKER_PROPERTY in modelContext && modelContext[SERVER_MARKER_PROPERTY] === true;
+}
 
-export function getModelContext(): ModelContextSurface | undefined {
-  if (typeof window === 'undefined') {
+export function getBrowserMcpServer(): BrowserMcpServer | undefined {
+  if (typeof document === 'undefined' || typeof navigator === 'undefined') {
     return undefined;
   }
 
-  const documentContext = (window.document as Document & ModelContextHost).modelContext;
-  const navigatorContext = (window.navigator as Navigator & ModelContextHost).modelContext;
-  return documentContext ?? navigatorContext;
+  const modelContext = document.modelContext ?? navigator.modelContext;
+  return modelContext && isBrowserMcpServer(modelContext) ? modelContext : undefined;
 }

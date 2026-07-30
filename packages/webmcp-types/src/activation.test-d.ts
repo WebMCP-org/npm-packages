@@ -6,7 +6,7 @@ test('type-only import activates global Document.modelContext typing', () => {
   expectTypeOf<Document['modelContext']>().toHaveProperty('registerTool');
 });
 
-test('type-only import activates deprecated global Navigator.modelContext typing', () => {
+test('type-only import activates optional deprecated Navigator.modelContext typing', () => {
   expectTypeOf<Navigator>().toHaveProperty('modelContext');
-  expectTypeOf<Navigator['modelContext']>().toHaveProperty('registerTool');
+  expectTypeOf<NonNullable<Navigator['modelContext']>>().toHaveProperty('registerTool');
 });

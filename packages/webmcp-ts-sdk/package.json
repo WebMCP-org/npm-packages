@@ -1,7 +1,7 @@
 {
   "name": "@mcp-b/webmcp-ts-sdk",
   "version": "4.0.0",
-  "description": "Browser-adapted MCP TypeScript SDK - Dynamic tool registration for W3C Web Model Context API and AI agent integration",
+  "description": "Thin WebMCP-to-MCP v2 browser adapter with native Chrome tool mirroring",
   "keywords": [
     "adapter",
     "ai-agents",
@@ -12,6 +12,7 @@
     "claude",
     "copilot",
     "cursor",
+    "document-modelcontext",
     "dynamic-tools",
     "gemini",
     "llm",
@@ -19,7 +20,6 @@
     "mcp-client",
     "mcp-server",
     "model-context-protocol",
-    "navigator-modelcontext",
     "openai",
     "sdk",
     "tool-registration",
@@ -73,26 +73,14 @@
   "dependencies": {
     "@mcp-b/webmcp-polyfill": "workspace:*",
     "@mcp-b/webmcp-types": "workspace:*",
-    "@modelcontextprotocol/sdk": "catalog:"
+    "@modelcontextprotocol/server": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vite-plus": "catalog:"
   },
-  "peerDependencies": {
-    "zod": "^3.25 || ^4.0",
-    "zod-to-json-schema": "^3.25.0"
-  },
-  "peerDependenciesMeta": {
-    "zod": {
-      "optional": true
-    },
-    "zod-to-json-schema": {
-      "optional": true
-    }
-  },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   }
 }

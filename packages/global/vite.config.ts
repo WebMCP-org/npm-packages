@@ -18,7 +18,9 @@ const esmConfig: Options = {
   minify: false,
   target: 'esnext',
   platform: 'browser',
-  external: ['@mcp-b/transports', '@mcp-b/webmcp-ts-sdk'],
+  deps: {
+    neverBundle: ['@mcp-b/transports', '@mcp-b/webmcp-ts-sdk'],
+  },
   tsconfig: './tsconfig.json',
   outDir: 'dist',
 };
@@ -37,8 +39,9 @@ const iifeConfig: Options = {
   minify: true,
   target: 'esnext',
   platform: 'browser',
-  external: [], // Bundle everything - no externals for standalone script
-  noExternal: [/.*/], // Explicitly bundle all dependencies
+  deps: {
+    alwaysBundle: [/.*/],
+  },
   tsconfig: './tsconfig.json',
   outDir: 'dist',
   globalName: 'WebMCP',

@@ -147,18 +147,24 @@ Click the button a few more times. The execution count increases with each click
 Open the browser console (F12) and verify the tool is registered:
 
 ```javascript
-const tools = navigator.modelContextTesting.listTools();
+const modelContext = document.modelContext;
+const tools = await modelContext.getTools();
 console.log(tools);
 ```
 
-You should see an array containing your `say_hello` tool. Now call it through the testing API:
+You should see an array containing your `say_hello` tool. Now feature-detect the Chrome-compatible execution extension and call it:
 
 ```javascript
-const result = await navigator.modelContextTesting.executeTool(
-  'say_hello',
-  JSON.stringify({ name: 'Console' })
-);
-console.log(JSON.parse(result));
+const tool = tools.find((candidate) => candidate.name === 'say_hello');
+if (!tool) throw new Error('say_hello is not registered');
+
+const executeTool = modelContext.executeTool;
+if (typeof executeTool !== 'function') {
+  throw new Error('This runtime does not expose the optional Chrome executeTool extension');
+}
+
+const result = await executeTool.call(modelContext, tool, JSON.stringify({ name: 'Console' }));
+console.log(result === null ? null : JSON.parse(result));
 ```
 
 The output should be an object containing the tool response:
@@ -239,7 +245,7 @@ export function App() {
 - `useWebMCP` registers a tool on mount and unregisters on unmount
 - Define input schemas outside the component (or memoize them) to avoid re-registration on each render
 - The hook returns `state` (with `executionCount`, `lastResult`, `error`, `isExecuting`) and an `execute` function for local invocation
-- Tools registered via the hook are also callable through `navigator.modelContextTesting` in the console
+- Tools registered via the hook are discoverable with `document.modelContext.getTools()` and callable when the runtime exposes Chrome's optional `executeTool()` extension
 
 ## Next steps
 

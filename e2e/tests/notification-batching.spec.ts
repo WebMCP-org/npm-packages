@@ -99,7 +99,7 @@ test.describe('Notification Batching Tests', () => {
       for (let i = 0; i < 5; i++) {
         const controller = new AbortController();
         controllers.push(controller);
-        navigator.modelContext.registerTool(
+        document.modelContext.registerTool(
           {
             name: `rapidCycleTool_${i}`,
             description: `Rapid cycle test tool ${i}`,
@@ -144,7 +144,7 @@ test.describe('Notification Batching Tests', () => {
 
       const controllers = Array.from({ length: 3 }, (_, index) => {
         const controller = new AbortController();
-        navigator.modelContext.registerTool(
+        document.modelContext.registerTool(
           {
             name: `batchAbort${index + 1}`,
             description: 'test',
@@ -193,7 +193,7 @@ test.describe('Notification Batching Tests', () => {
       for (let i = 0; i < 100; i++) {
         const controller = new AbortController();
         controllers.push(controller);
-        navigator.modelContext.registerTool(
+        document.modelContext.registerTool(
           {
             name: `reactHookTool_${i}`,
             description: `Simulated React hook tool ${i}`,
@@ -248,7 +248,7 @@ test.describe('Notification Batching - Edge Cases', () => {
       }
 
       const controller = new AbortController();
-      navigator.modelContext.registerTool(
+      document.modelContext.registerTool(
         {
           name: 'singleTool',
           description: 'Single tool test',
@@ -282,7 +282,7 @@ test.describe('Notification Batching - Edge Cases', () => {
       for (let i = 0; i < 5; i++) {
         const controller = new AbortController();
         controllers.push(controller);
-        navigator.modelContext.registerTool(
+        document.modelContext.registerTool(
           {
             name: `abortCleanupTool_${i}`,
             description: 'test',

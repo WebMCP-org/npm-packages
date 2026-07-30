@@ -1,24 +1,19 @@
 import { expectTypeOf, test } from 'vitest';
-import type {
-  CallToolResult,
-  ContentBlock,
-  ElicitationParams,
-  ElicitationResult,
-  InputSchema,
-  LooseContentBlock,
-} from './common.js';
+import type { CallToolResult, ContentBlock, InputSchema } from './common.js';
 import type {
   MaybePromise,
   ModelContextClient,
+  ModelContextTool,
   ToolAnnotations,
   ToolDescriptor,
   ToolExecuteResultFromOutputSchema,
-  ToolExecutionContext,
   ToolListItem,
   ToolResultFromOutputSchema,
+  WebMcpToolAnnotations,
 } from './tool.js';
 import type { JsonSchemaForInference } from './json-schema.js';
 import type { ModelContextCore, ModelContextRegisterToolOptions } from './model-context.js';
+import type { Tool as McpTool } from '@modelcontextprotocol/server';
 
 test('ToolDescriptor has required fields', () => {
   expectTypeOf<ToolDescriptor>().toHaveProperty('name');
@@ -33,13 +28,10 @@ test('ToolDescriptor.execute accepts Record and returns MaybePromise<unknown> by
   expectTypeOf<ToolDescriptor['execute']>().returns.toEqualTypeOf<MaybePromise<unknown>>();
 });
 
-test('ToolExecutionContext.elicitInput accepts ElicitationParams and returns ElicitationResult', () => {
-  expectTypeOf<ToolExecutionContext['elicitInput']>()
-    .parameter(0)
-    .toEqualTypeOf<ElicitationParams>();
-  expectTypeOf<ToolExecutionContext['elicitInput']>().returns.toEqualTypeOf<
-    Promise<ElicitationResult>
-  >();
+test('ModelContextTool uses the standard one-argument promise callback', () => {
+  expectTypeOf<ModelContextTool['execute']>().parameter(0).toEqualTypeOf<Record<string, unknown>>();
+  expectTypeOf<Parameters<ModelContextTool['execute']>['length']>().toEqualTypeOf<1>();
+  expectTypeOf<ModelContextTool['execute']>().returns.toEqualTypeOf<Promise<unknown>>();
 });
 
 test('ToolDescriptor supports strongly typed args and result via generics', () => {
@@ -98,15 +90,14 @@ test('ToolDescriptor accepts both sync and async execute implementations', () =>
   expectTypeOf(asyncTool.execute).returns.toEqualTypeOf<MaybePromise<CallToolResult>>();
 });
 
-test('CallToolResult.content accepts strict and loose content blocks', () => {
+test('CallToolResult.content uses MCP v2 content blocks', () => {
   const strictBlock: ContentBlock = { type: 'text', text: 'ok' };
-  const looseBlock: LooseContentBlock = { text: 'legacy', data: 'opaque' };
 
   const result: CallToolResult = {
-    content: [strictBlock, looseBlock],
+    content: [strictBlock],
   };
 
-  expectTypeOf(result.content).toEqualTypeOf<Array<ContentBlock | LooseContentBlock>>();
+  expectTypeOf(result.content).toEqualTypeOf<ContentBlock[]>();
 });
 
 test('ToolDescriptor supports literal tool names via generics', () => {
@@ -117,6 +108,10 @@ test('ToolDescriptor supports literal tool names via generics', () => {
 
 test('ToolDescriptor.inputSchema supports InputSchema', () => {
   expectTypeOf<ToolDescriptor['inputSchema']>().toEqualTypeOf<InputSchema | undefined>();
+});
+
+test('InputSchema accepts the MCP v2 tool schema at the WebMCP boundary', () => {
+  expectTypeOf<McpTool['inputSchema']>().toExtend<InputSchema>();
 });
 
 test('ToolDescriptor.outputSchema supports inferable JSON Schema', () => {
@@ -156,12 +151,19 @@ test('ToolDescriptor.annotations is optional ToolAnnotations', () => {
 
 test('ToolAnnotations has optional behavioral hints', () => {
   expectTypeOf<ToolAnnotations>().toMatchTypeOf<{
-    title?: string;
-    destructiveHint?: boolean | 'true' | 'false';
-    readOnlyHint?: boolean | 'true' | 'false';
-    untrustedContentHint?: boolean | 'true' | 'false';
-    idempotentHint?: boolean | 'true' | 'false';
-    openWorldHint?: boolean | 'true' | 'false';
+    title?: string | undefined;
+    destructiveHint?: boolean | undefined;
+    readOnlyHint?: boolean | undefined;
+    untrustedContentHint?: boolean | undefined;
+    idempotentHint?: boolean | undefined;
+    openWorldHint?: boolean | undefined;
+  }>();
+});
+
+test('WebMcpToolAnnotations only contains standard boolean hints', () => {
+  expectTypeOf<WebMcpToolAnnotations>().toEqualTypeOf<{
+    readOnlyHint?: boolean;
+    untrustedContentHint?: boolean;
   }>();
 });
 

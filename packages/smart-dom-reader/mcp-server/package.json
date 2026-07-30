@@ -21,7 +21,7 @@
     "typecheck": "NODE_OPTIONS='--max-old-space-size=16384' tsc --noEmit"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "catalog:",
+    "@modelcontextprotocol/server": "catalog:",
     "playwright": "^1.54.2",
     "tsx": "^4.21.0",
     "zod": "catalog:"
@@ -29,5 +29,8 @@
   "devDependencies": {
     "@types/node": "^22.19.7",
     "typescript": "^5.8.0"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

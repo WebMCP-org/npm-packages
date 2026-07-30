@@ -269,16 +269,16 @@ This is critical. WebMCP is a **W3C web standard** developed by Google and Micro
 
 ### What we own (document fully)
 
-| Topic                                          | Location                                                                        |
-| ---------------------------------------------- | ------------------------------------------------------------------------------- |
-| `@mcp-b/*` package APIs                        | `packages/*/README.md` and `packages/*/src/`                                    |
-| Package architecture & philosophy              | `CLAUDE.md`, `docs/MCPB_PACKAGE_PHILOSOPHY.md`                                  |
-| Polyfill behavior & initialization             | `packages/webmcp-polyfill/`, `packages/global/`                                 |
-| React hooks                                    | `packages/react-webmcp/`, `packages/usewebmcp/`                                 |
-| Transports, iframe, relay                      | `packages/transports/`, `packages/mcp-iframe/`, `packages/webmcp-local-relay/`  |
-| Tooling (devtools-mcp, smart-dom-reader, etc.) | `packages/chrome-devtools-mcp/`, `packages/smart-dom-reader/`, etc.             |
-| Type contracts                                 | `packages/webmcp-types/src/*.test-d.ts`                                         |
-| Chromium flags & testing                       | `e2e/web-standards-showcase/CHROMIUM_FLAGS.md`, `e2e/tests/CHROMIUM_TESTING.md` |
+| Topic                              | Location                                                                        |
+| ---------------------------------- | ------------------------------------------------------------------------------- |
+| `@mcp-b/*` package APIs            | `packages/*/README.md` and `packages/*/src/`                                    |
+| Package architecture & philosophy  | `CLAUDE.md`, `docs/MCPB_PACKAGE_PHILOSOPHY.md`                                  |
+| Polyfill behavior & initialization | `packages/webmcp-polyfill/`, `packages/global/`                                 |
+| React hooks                        | `packages/react-webmcp/`, `packages/usewebmcp/`                                 |
+| Transports, iframe, relay          | `packages/transports/`, `packages/mcp-iframe/`, `packages/webmcp-local-relay/`  |
+| Tooling (smart-dom-reader, etc.)   | `packages/smart-dom-reader/`, etc.                                              |
+| Type contracts                     | `packages/webmcp-types/src/*.test-d.ts`                                         |
+| Chromium flags & testing           | `e2e/web-standards-showcase/CHROMIUM_FLAGS.md`, `e2e/tests/CHROMIUM_TESTING.md` |
 
 ---
 

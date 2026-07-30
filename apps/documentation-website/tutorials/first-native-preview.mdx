@@ -17,8 +17,9 @@ In this tutorial, we will enable Chrome's native WebMCP preview, open one of the
 
 <Note>
   WebMCP is an experimental browser preview. The flag name and API can change between Chrome
-  releases. For production use, follow the polyfill path in [Build Your First
-  Tool](/tutorials/first-tool).
+  releases. Follow Chrome's [Imperative API
+  guide](https://developer.chrome.com/docs/ai/webmcp/imperative-api) for the current native surface.
+  For production use, follow the polyfill path in [Build Your First Tool](/tutorials/first-tool).
 </Note>
 
 ## Prerequisites
@@ -70,14 +71,16 @@ Run:
 
 ```javascript
 console.log('modelContext:', !!document.modelContext);
-console.log('modelContextTesting:', !!navigator.modelContextTesting);
+console.log('getTools:', typeof document.modelContext?.getTools);
+console.log('executeTool:', typeof document.modelContext?.executeTool);
 ```
 
 You should see:
 
 ```text
 modelContext: true
-modelContextTesting: true
+getTools: function
+executeTool: function
 ```
 
 </Step>
@@ -87,7 +90,7 @@ modelContextTesting: true
 Run:
 
 ```javascript
-const tools = navigator.modelContextTesting.listTools();
+const tools = await document.modelContext.getTools();
 console.log(tools);
 ```
 
@@ -101,7 +104,7 @@ You should see tool metadata from the demo. On the pizza demo, the list includes
 2. Open its panel
 3. Confirm that the same tool list appears there
 
-The extension and `navigator.modelContextTesting` are now showing the same native tool surface.
+The extension and `document.modelContext.getTools()` are now showing the same native tool surface.
 
 </Step>
 
@@ -110,10 +113,16 @@ The extension and `navigator.modelContextTesting` are now showing the same nativ
 Run this in the console:
 
 ```javascript
-const result = await navigator.modelContextTesting.executeTool(
-  'add_topping',
-  JSON.stringify({ topping: '🍄' })
-);
+const modelContext = document.modelContext;
+const addTopping = tools.find((tool) => tool.name === 'add_topping');
+if (!addTopping) throw new Error('add_topping is unavailable');
+
+const executeTool = modelContext.executeTool;
+if (typeof executeTool !== 'function') {
+  throw new Error('This Chrome build does not expose the optional executeTool extension');
+}
+
+const result = await executeTool.call(modelContext, addTopping, JSON.stringify({ topping: '🍄' }));
 console.log(result);
 ```
 
@@ -138,7 +147,7 @@ On this Chrome-team demo, there is no `@mcp-b/global` or `@mcp-b/webmcp-polyfill
 ## What you learned
 
 - Chrome preview builds can expose `document.modelContext` behind the `chrome://flags/#enable-webmcp-testing` flag
-- Chrome also exposes `navigator.modelContextTesting` for inspection and execution during the preview
+- `document.modelContext.getTools()` discovers tools, and Chrome's feature-detected `executeTool()` extension executes a discovered tool
 - The Model Context Tool Inspector is the official Chrome-side inspection tool
 - The Chrome demos are the best place to see current native behavior without local setup drift
 

@@ -98,7 +98,7 @@ topological order (dependencies before dependents).
 
 ```bash
 # Quick check: all published versions match local
-for pkg in webmcp-types webmcp-polyfill webmcp-ts-sdk transports global mcp-iframe extension-tools react-webmcp smart-dom-reader webmcp-local-relay chrome-devtools-mcp; do
+for pkg in webmcp-types webmcp-polyfill webmcp-ts-sdk transports global mcp-iframe react-webmcp smart-dom-reader webmcp-local-relay; do
   LOCAL=$(node -p "require('./packages/$pkg/package.json').version" 2>/dev/null)
   NPM=$(npm view @mcp-b/$pkg version 2>/dev/null)
   echo "@mcp-b/$pkg: local=$LOCAL npm=$NPM"
@@ -223,13 +223,13 @@ Tier 3 (← Tier 2):
   @mcp-b/transports
 
 Tier 4 (← Tier 3):
-  @mcp-b/extension-tools, @mcp-b/mcp-iframe, @mcp-b/global
+  @mcp-b/mcp-iframe, @mcp-b/global
 
 Tier 5 (← Tier 4):
   @mcp-b/react-webmcp, usewebmcp
 
 Independent (no internal deps):
-  @mcp-b/webmcp-local-relay, @mcp-b/chrome-devtools-mcp
+  @mcp-b/webmcp-local-relay
 ```
 
 ## Complete Dependency Graph
@@ -238,11 +238,9 @@ Independent (no internal deps):
 @mcp-b/webmcp-types          (no internal deps)
 @mcp-b/smart-dom-reader      (no internal deps)
 @mcp-b/webmcp-local-relay    (no internal deps)
-@mcp-b/chrome-devtools-mcp   (no internal deps)
 @mcp-b/webmcp-polyfill       → webmcp-types
 @mcp-b/webmcp-ts-sdk         → webmcp-polyfill, webmcp-types
 @mcp-b/transports            → webmcp-ts-sdk
-@mcp-b/extension-tools       → smart-dom-reader, webmcp-ts-sdk
 @mcp-b/mcp-iframe            → transports, webmcp-ts-sdk, webmcp-types
 @mcp-b/global                → transports, webmcp-polyfill, webmcp-ts-sdk, webmcp-types
 @mcp-b/react-webmcp          → global, transports, webmcp-polyfill, webmcp-ts-sdk, webmcp-types
@@ -261,12 +259,11 @@ If you discover a stale dependency after publishing:
 
 ## Package Notes
 
-| Package                      | Notes                                                                         |
-| ---------------------------- | ----------------------------------------------------------------------------- |
-| `@mcp-b/webmcp-types`        | Foundational types. Almost everything depends on this.                        |
-| `@mcp-b/global`              | Dual build (ESM + IIFE). Most internal deps. Most vulnerable to chain issues. |
-| `@mcp-b/chrome-devtools-mcp` | Complex build — always `rm -rf build/` before building.                       |
-| `usewebmcp`                  | Standalone package. NOT an alias for react-webmcp.                            |
+| Package               | Notes                                                                         |
+| --------------------- | ----------------------------------------------------------------------------- |
+| `@mcp-b/webmcp-types` | Foundational types. Almost everything depends on this.                        |
+| `@mcp-b/global`       | Dual build (ESM + IIFE). Most internal deps. Most vulnerable to chain issues. |
+| `usewebmcp`           | Standalone package. NOT an alias for react-webmcp.                            |
 
 ## NPM Authentication
 

@@ -1,261 +1,162 @@
 # @mcp-b/webmcp-ts-sdk
 
-> Browser-adapted MCP TypeScript SDK - Dynamic tool registration for AI agents like Claude, ChatGPT, and Gemini
+A thin WebMCP adapter over the official MCP TypeScript SDK v2.
 
 [![npm version](https://img.shields.io/npm/v/@mcp-b/webmcp-ts-sdk?style=flat-square)](https://www.npmjs.com/package/@mcp-b/webmcp-ts-sdk)
 [![npm downloads](https://img.shields.io/npm/dm/@mcp-b/webmcp-ts-sdk?style=flat-square)](https://www.npmjs.com/package/@mcp-b/webmcp-ts-sdk)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue?style=flat-square)](https://www.typescriptlang.org/)
-**[Reference](https://docs.mcp-b.ai/packages/webmcp-ts-sdk/reference)** | **[First Tool Tutorial](https://docs.mcp-b.ai/tutorials/first-tool)**
 
-**@mcp-b/webmcp-ts-sdk** adapts the official MCP TypeScript SDK for browser environments, enabling dynamic tool registration required by the WebMCP API. This allows AI agents like Claude, ChatGPT, Gemini, Cursor, and Copilot to interact with browser-based applications.
+[`BrowserMcpServer`](https://docs.mcp-b.ai/packages/webmcp-ts-sdk/reference) composes the official v2 `McpServer`. It does not subclass or fork it.
 
-## Why Use @mcp-b/webmcp-ts-sdk?
+## Why this package still exists
 
-| Feature                       | Benefit                                                               |
-| ----------------------------- | --------------------------------------------------------------------- |
-| **Dynamic Tool Registration** | Register tools after transport connection - required for browser apps |
-| **Full SDK Compatibility**    | Re-exports all types, classes, and utilities from official SDK        |
-| **Type-Safe**                 | No prototype hacks - clean TypeScript extension                       |
-| **Auto-Updates**              | Types and protocol follow official SDK automatically                  |
+MCP TypeScript SDK v2 removed the original need for a modified server. The upstream server now owns:
 
-## Overview
+- Dynamic tool, prompt, and resource registrations
+- MCP transport and protocol behavior
+- Standard Schema validation, including Zod 4.2 or newer
+- Raw JSON Schema conversion through `fromJsonSchema`
 
-This package adapts the official [@modelcontextprotocol/sdk](https://www.npmjs.com/package/@modelcontextprotocol/sdk) for browser environments with modifications to support dynamic tool registration required by the [WebMCP API](https://webmachinelearning.github.io/webmcp/) (`document.modelContext`).
+`BrowserMcpServer` only adds the browser boundary:
 
-## Why This Package Exists
+- The WebMCP `registerTool(tool, options?)`, `getTools()`, and `toolchange` surface
+- Mirroring registrations to an existing `document.modelContext`
+- Backfilling tools already registered in native Chrome or a compatibility runtime
+- MCP-B resource, prompt, sampling, and elicitation helpers
 
-The official MCP TypeScript SDK has a restriction that prevents registering server capabilities (like tools) after a transport connection is established. This is enforced by this check in the `Server` class:
+Use the official [`@modelcontextprotocol/server`](https://ts.sdk.modelcontextprotocol.io/v2/api/%40modelcontextprotocol/server/) directly when you only need an MCP server. Use `@mcp-b/global` for the normal browser setup.
 
-```typescript
-public registerCapabilities(capabilities: ServerCapabilities): void {
-    if (this.transport) {
-        throw new Error('Cannot register capabilities after connecting to transport');
-    }
-    ...
-}
-```
+Protocol-version limit: `BrowserMcpServer.connect(customTransport)` uses SDK v2's legacy 2025-era route. Installing v2 does not make tab, iframe, or other custom transports speak MCP 2026-07-28. Instance-level sampling and elicitation helpers are legacy-only and throw on modern-era v2 instances. See [Supporting protocol revision 2026-07-28](https://ts.sdk.modelcontextprotocol.io/v2/migration/support-2026-07-28).
 
-For WebMCP, this restriction is incompatible because:
-
-1. **Tools arrive dynamically** - Web pages call `document.modelContext.registerTool(...)` at any time
-2. **Transport must be ready immediately** - The MCP server/transport needs to be connected when the page loads
-3. **Asynchronous registration** - Tools are registered as the page's JavaScript executes, potentially long after initialization
-
-This package solves the problem by **pre-registering tool capabilities** before the transport connects, allowing dynamic tool registration to work seamlessly.
-
-Compatibility note:
-
-- `BrowserMcpServer.registerTool(tool, options?)` accepts the WebMCP April 23, 2026 draft signature, including `options.signal` (`AbortSignal`) for unregistration. When the signal aborts, both the server-side registration and the mirrored native registration are removed.
-- The same call resolves `undefined`, matching current Chromium and the WebMCP spec.
-- `unregisterTool(name)` was removed from the WebMCP draft on April 23, 2026 in favor of the `AbortSignal` flow. It is kept on `BrowserMcpServer` with a one-time deprecation warning for older MCP-B integrations. It will be removed in the next major version.
-- `provideContext()` and `clearContext()` were removed from the WebMCP draft on March 5, 2026 and are not exposed by `BrowserMcpServer`.
-
-## Modifications from Official SDK
-
-### BrowserMcpServer Class
-
-The `BrowserMcpServer` extends `McpServer` with these changes:
-
-```typescript
-export class BrowserMcpServer extends BaseMcpServer {
-  constructor(serverInfo, options?) {
-    // Pre-register tool capabilities in constructor
-    const enhancedOptions = {
-      ...options,
-      capabilities: mergeCapabilities(options?.capabilities || {}, {
-        tools: { listChanged: true },
-      }),
-    };
-    super(serverInfo, enhancedOptions);
-  }
-
-  async connect(transport: Transport) {
-    // Ensure capabilities are set before connecting
-    // This bypasses the "cannot register after connect" restriction
-    return super.connect(transport);
-  }
-}
-```
-
-**Key Difference**: Capabilities are registered **before** connecting, allowing tools to be added dynamically afterward.
-
-## What's Re-Exported
-
-This package re-exports almost everything from the official SDK:
-
-### Types
-
-- All MCP protocol types (`Tool`, `Resource`, `Prompt`, etc.)
-- Request/response schemas
-- Client and server capabilities
-- Error codes and constants
-
-### Classes
-
-- `Server` - Base server class (unchanged)
-- `McpServer` - Aliased to `BrowserMcpServer` with our modifications
-
-### Utilities
-
-- `Transport` interface
-- `mergeCapabilities` helper
-- Protocol version constants
+Schema-shape limit: WebMCP can register an array-root input schema because arrays are JavaScript objects. MCP requires tool input schemas to have an object root. Those tools remain available through WebMCP but are omitted from the MCP tool list with a warning.
 
 ## Installation
 
 ```bash
-npm install @mcp-b/webmcp-ts-sdk
-# or
-pnpm add @mcp-b/webmcp-ts-sdk
+pnpm add @mcp-b/webmcp-ts-sdk @mcp-b/transports
 ```
 
-## Usage
+## Quick start
 
-Use it exactly like the official SDK:
-
-```typescript
-import { McpServer } from '@mcp-b/webmcp-ts-sdk';
+```ts
 import { TabServerTransport } from '@mcp-b/transports';
+import { BrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
 
-const server = new McpServer({
-  name: 'my-web-app',
+const server = new BrowserMcpServer({
+  name: 'catalog-app',
   version: '1.0.0',
 });
 
-// Connect transport first
-const transport = new TabServerTransport({ allowedOrigins: ['*'] });
-await server.connect(transport);
-
-// Now you can register tools dynamically (this would fail with official SDK)
-server.registerTool(
-  'my-tool',
-  {
-    description: 'A dynamically registered tool',
-    inputSchema: { message: z.string() },
-    // outputSchema is MCP-B metadata for structured, type-safe responses
-    outputSchema: { result: z.string() },
-  },
-  async ({ message }) => {
-    return {
-      content: [{ type: 'text', text: `Echo: ${message}` }],
-      // structuredContent should match the outputSchema for MCP-B adapters
-      structuredContent: { result: `Echo: ${message}` },
-    };
-  }
+await server.connect(
+  new TabServerTransport({
+    allowedOrigins: ['https://shop.example'],
+  })
 );
 
-// Example with complex output schema
-server.registerTool(
-  'analyze-data',
+const controller = new AbortController();
+
+await server.registerTool(
   {
-    description: 'Analyze data and return structured results',
+    name: 'echo',
+    description: 'Echo a message',
     inputSchema: {
-      data: z.array(z.number()),
-      operation: z.enum(['sum', 'average', 'stats']),
+      type: 'object',
+      properties: {
+        message: { type: 'string' },
+      },
+      required: ['message'],
+      additionalProperties: false,
     },
-    outputSchema: {
-      result: z.number(),
-      operation: z.string(),
-      metadata: z.object({
-        count: z.number(),
-        min: z.number().optional(),
-        max: z.number().optional(),
-      }),
+    async execute({ message }) {
+      return {
+        content: [{ type: 'text', text: `Echo: ${String(message)}` }],
+      };
     },
   },
-  async ({ data, operation }) => {
-    const stats = calculateStats(data, operation);
-    return {
-      content: [{ type: 'text', text: `Result: ${stats.result}` }],
-      structuredContent: stats,
-    };
-  }
+  { signal: controller.signal }
+);
+
+controller.abort();
+```
+
+`BrowserMcpServer.registerTool` takes a WebMCP descriptor and options. The upstream v2 `McpServer.registerTool` keeps its MCP signature: `registerTool(name, config, handler)`.
+
+## Schema ownership
+
+The browser-facing API remains JSON Schema-first. `BrowserMcpServer` normalizes it to the
+`StandardSchemaWithJSON` contract accepted by MCP SDK v2. Plain JSON Schema uses the browser-safe
+runtime-selected validator provided by `fromJsonSchema`; Standard Schema inputs keep their own
+validator, refinements, and transforms. The official v2 server owns MCP-call validation in both
+cases.
+
+For direct upstream registrations, v2 accepts Standard Schema implementations that can emit JSON Schema. Use Zod 4.2 or newer; Zod 3 is unsupported. Existing raw JSON Schema can be wrapped without Zod:
+
+```ts
+import { fromJsonSchema, McpServer } from '@modelcontextprotocol/server';
+
+const server = new McpServer({ name: 'catalog-api', version: '1.0.0' });
+
+server.registerTool(
+  'lookup-product',
+  {
+    inputSchema: fromJsonSchema<{ sku: string }>({
+      type: 'object',
+      properties: { sku: { type: 'string' } },
+      required: ['sku'],
+    }),
+  },
+  async ({ sku }) => ({
+    content: [{ type: 'text', text: `Looking up ${sku}` }],
+  })
 );
 ```
 
-## Architecture
+See the official [schema library guide](https://ts.sdk.modelcontextprotocol.io/v2/advanced/schema-libraries) for Standard Schema and validator details.
 
-```
-┌─────────────────────────────────┐
-│  @mcp-b/webmcp-ts-sdk           │
-│                                 │
-│  ┌───────────────────────────┐  │
-│  │ BrowserMcpServer          │  │
-│  │ (Modified behavior)        │  │
-│  └───────────┬───────────────┘  │
-│              │ extends          │
-│              ▼                  │
-│  ┌───────────────────────────┐  │
-│  │ @modelcontextprotocol/sdk │  │
-│  │ (Official SDK)             │  │
-│  │ - Types                    │  │
-│  │ - Protocol                 │  │
-│  │ - Validation               │  │
-│  └───────────────────────────┘  │
-└─────────────────────────────────┘
+## Native Chrome integration
+
+Pass the existing browser context as `native` to mirror registrations:
+
+```ts
+const server = new BrowserMcpServer(
+  { name: 'catalog-app', version: '1.0.0' },
+  { native: document.modelContext }
+);
+
+const added = await server.syncNativeTools();
 ```
 
-## Maintenance Strategy
+The adapter forwards `signal` and `exposedTo` when it registers a native tool. Aborting the signal removes both the MCP registration and its native mirror.
 
-This package is designed for **minimal maintenance**:
+`syncNativeTools()` performs an initial reconciliation and resolves to the number of native tools added to the MCP registry. It then listens for native `toolchange` events so later reconciliations add new tools and remove previously backfilled tools that are no longer exposed.
 
-- **Automatic updates** for types, protocol, validation via official SDK dependency
-- **Small modification surface** - capability registration and browser runtime adaptation
-- **Type-safe** - no prototype hacks or unsafe casts
+Native synchronization uses `getTools()` and the optional `executeTool()` extension described in [Chrome's imperative API](https://developer.chrome.com/docs/ai/webmcp/imperative-api).
 
-### Syncing with Upstream
+Use Chrome's [Model Context Tool Inspector](https://chromewebstore.google.com/detail/model-context-tool-inspec/gbpdfapgefenggkahomfgkhfehlcenpd) to inspect mirrored tools.
 
-When the official SDK updates:
+## Exports
 
-1. Update the catalog version in `pnpm-workspace.yaml`
-2. Run `pnpm install` to get latest SDK
-3. Test that capability registration still works
-4. Update this README if SDK behavior changes
+This package exports only what it owns:
 
-The modification surface is intentionally small and should be checked whenever
-the upstream SDK changes capability registration behavior.
+- `BrowserMcpServer`
+- `BrowserMcpServerOptions`
+- `PromptDescriptor`
+- `ResourceDescriptor`
+- `SERVER_MARKER_PROPERTY`
 
-## Frequently Asked Questions
+Import clients, servers, protocol schemas, transports, and validators directly from the official
+`@modelcontextprotocol/client`, `@modelcontextprotocol/server`, and `@modelcontextprotocol/core`
+packages. `BrowserMcpServer.callTool()` and the name-based `executeTool()` overload no longer exist;
+use an MCP `Client` for MCP calls or Chrome's descriptor-based `executeTool(tool, inputJson)`.
 
-### Why can't I use the official SDK directly?
+## Related packages
 
-The official SDK throws an error if you try to register tools after connecting a transport. Browsers need dynamic registration because tools arrive asynchronously as the page loads.
-
-### Is this a fork of the official SDK?
-
-No. It is an adapter that extends the official SDK. Core protocol handling and most SDK types come from the upstream package.
-
-### Will this break when the official SDK updates?
-
-Unlikely. The modification surface is isolated. When upstream updates, update the dependency and run the conformance tests.
-
-### When should I use this vs `@mcp-b/global`?
-
-Use `@mcp-b/global` for the standard `document.modelContext` API. Use this package directly only if you need low-level control over the MCP server.
-
-## Related Packages
-
-- [`@mcp-b/global`](https://docs.mcp-b.ai/packages/global/reference) - Full MCP-B browser runtime (uses this package internally)
-- [`@mcp-b/transports`](https://docs.mcp-b.ai/packages/transports/reference) - Browser-specific MCP transports
-- [`@mcp-b/react-webmcp`](https://docs.mcp-b.ai/packages/react-webmcp/reference) - React hooks for MCP
-- [`chrome-devtools-mcp`](https://github.com/ChromeDevTools/chrome-devtools-mcp) - Upstream Chrome DevTools MCP server
-- [`@modelcontextprotocol/sdk`](https://www.npmjs.com/package/@modelcontextprotocol/sdk) - Official MCP SDK
-
-## Resources
-
-- [WebMCP Documentation](https://docs.mcp-b.ai)
-- [WebMCP specification](https://webmachinelearning.github.io/webmcp/)
-- [Model Context Protocol Spec](https://modelcontextprotocol.io/)
-- [Official MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk)
-- [MCP GitHub Repository](https://github.com/modelcontextprotocol)
+- [`@mcp-b/global`](https://docs.mcp-b.ai/packages/global/reference) initializes the full browser runtime.
+- [`@mcp-b/transports`](https://docs.mcp-b.ai/packages/transports/reference) provides browser MCP transports.
+- [`@mcp-b/webmcp-types`](https://docs.mcp-b.ai/packages/webmcp-types/reference) defines the strict WebMCP and MCP-B extension types.
+- [MCP TypeScript SDK v2](https://ts.sdk.modelcontextprotocol.io/v2/) documents the upstream server, client, and core packages.
+- [WebMCP specification](https://webmachinelearning.github.io/webmcp/) defines the authoritative browser API.
 
 ## License
 
-MIT - see [LICENSE](../../LICENSE) for details
-
-## Support
-
-- [GitHub Issues](https://github.com/WebMCP-org/npm-packages/issues)
-- [Documentation](https://docs.mcp-b.ai)
-- [Discord Community](https://discord.gg/a9fBR6Bw)
+MIT. See [LICENSE](../../LICENSE).

@@ -15,21 +15,6 @@
  * @packageDocumentation
  */
 
-/**
- * Re-export types that are part of this package's own API surface
- * (used in WebMCPConfig, WebMCPPromptConfig, WebMCPResourceConfig signatures).
- */
-export type {
-  CallToolResult,
-  ModelContextProtocol,
-  PromptDescriptor,
-  PromptMessage,
-  ResourceContents,
-  ResourceDescriptor,
-  ToolAnnotations,
-  ToolDescriptor,
-} from './types.js';
-
 // ============================================
 // Provider Hooks (Register/Expose Tools)
 // ============================================
@@ -40,24 +25,22 @@ export type {
  * - {@link WebMCPConfig} - Configuration for tool registration
  * - {@link WebMCPReturn} - Return value from useWebMCP hook
  * - {@link ToolExecutionState} - Current execution state of a tool
- * - {@link InferOutput} - Utility type for inferring output from Zod schema
+ * - {@link InferOutput} - Utility type for inferring output from JSON Schema
  */
 export type {
   InferOutput,
   InferToolInput,
-  ReactWebMCPInputSchema,
   ToolExecutionState,
-  ToolInputSchema,
   WebMCPConfig,
   WebMCPReturn,
-  ZodSchema,
-  ZodSchemaObject,
-} from './types.js';
+} from 'usewebmcp';
+export type { ToolInputSchema } from '@mcp-b/webmcp-polyfill/schema';
+export type { ReactWebMCPInputSchema } from './types.js';
 /**
  * Main hook for registering MCP tools with full control over execution state,
  * validation, and lifecycle callbacks.
  */
-export { useWebMCP } from './useWebMCP.js';
+export { useWebMCP } from 'usewebmcp';
 /**
  * Simplified hook for exposing read-only context data to AI assistants.
  * Convenience wrapper around `useWebMCP` for context tools.
@@ -100,36 +83,24 @@ export { useWebMCPResource } from './useWebMCPResource.js';
  * Type definitions for elicitation hook.
  */
 export type {
-  // Backwards compatibility aliases
-  ElicitationHandlerState,
   ElicitationState,
   UseElicitationConfig,
-  UseElicitationHandlerConfig,
-  UseElicitationHandlerReturn,
   UseElicitationReturn,
 } from './useElicitationHandler.js';
 /**
  * Hook for requesting user input from the connected MCP client.
  * Use this when the page needs to collect information from users via the AI client.
  */
-export { useElicitation, useElicitationHandler } from './useElicitationHandler.js';
+export { useElicitation } from './useElicitationHandler.js';
 /**
  * Type definitions for sampling hook.
  */
-export type {
-  // Backwards compatibility aliases
-  SamplingHandlerState,
-  SamplingState,
-  UseSamplingConfig,
-  UseSamplingHandlerConfig,
-  UseSamplingHandlerReturn,
-  UseSamplingReturn,
-} from './useSamplingHandler.js';
+export type { SamplingState, UseSamplingConfig, UseSamplingReturn } from './useSamplingHandler.js';
 /**
  * Hook for requesting LLM completions from the connected MCP client.
  * Use this when the page needs AI model responses.
  */
-export { useSampling, useSamplingHandler } from './useSamplingHandler.js';
+export { useSampling } from './useSamplingHandler.js';
 
 // ============================================
 // Client Hooks (Consume Tools)

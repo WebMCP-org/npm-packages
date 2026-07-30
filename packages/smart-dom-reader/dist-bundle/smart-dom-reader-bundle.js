@@ -800,7 +800,7 @@ var SmartDOMReaderBundle = (function (exports) {
                 const extracted = DOMTraversal.extractElement(element, options);
                 if (extracted) elements.push(extracted);
               }
-            } catch (_e) {
+            } catch {
               console.warn(`Invalid custom selector: ${customSelector}`);
             }
         return elements;
@@ -952,7 +952,7 @@ var SmartDOMReaderBundle = (function (exports) {
     return `${icon} ${label} → \`${region.selector}\` [${id}]${statsLine}`;
   }
   function wrapXml(body, meta, type = 'section') {
-    return `<page ${[meta?.title ? `title="${escapeXml(meta?.title)}"` : null, meta?.url ? `url="${escapeXml(meta?.url)}"` : null].filter(Boolean).join(' ')}>\n  <${type}><![CDATA[\n${body}\n]]></${type}>\n</page>`;
+    return `<page ${[meta?.title ? `title="${escapeXml(meta.title)}"` : null, meta?.url ? `url="${escapeXml(meta.url)}"` : null].filter(Boolean).join(' ')}>\n  <${type}><![CDATA[\n${body}\n]]></${type}>\n</page>`;
   }
   function escapeXml(s) {
     return s

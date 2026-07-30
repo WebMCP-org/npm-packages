@@ -1,9 +1,5 @@
 {
   "mcpServers": {
-    "chrome-devtools": {
-      "command": "node",
-      "args": ["./packages/chrome-devtools-mcp/build/src/index.js"]
-    },
     "webmcp-local-relay": {
       "command": "node",
       "args": ["./packages/webmcp-local-relay/dist/cli.mjs"]

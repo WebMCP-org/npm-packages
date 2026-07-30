@@ -1,56 +1,44 @@
-import type {
-  CallToolResult,
-  ElicitationParams,
-  ElicitationResult,
-  InputSchema,
-} from './common.js';
+import type { CallToolResult, InputSchema } from './common.js';
 import type {
   InferArgsFromInputSchema,
   InferJsonSchema,
   JsonSchemaForInference,
 } from './json-schema.js';
+import type { ToolAnnotations as McpToolAnnotations } from '@modelcontextprotocol/server';
 
 // ============================================================================
 // Tool Annotations
 // ============================================================================
 
 /**
- * Annotations providing hints about tool behavior.
+ * Annotations defined by the WebMCP specification.
+ *
+ * Web IDL converts both fields to booleans. MCP-B runtimes may support the
+ * additional MCP annotations exposed by {@link ToolAnnotations}.
  *
  * @see {@link https://webmachinelearning.github.io/webmcp/#dictdef-toolannotations}
- * @see {@link https://spec.modelcontextprotocol.io/specification/server/tools/}
  */
-export interface ToolAnnotations {
-  /**
-   * Optional display title.
-   */
-  title?: string;
-
+export interface WebMcpToolAnnotations {
   /**
    * Indicates the tool is read-only.
    */
-  readOnlyHint?: boolean | 'true' | 'false';
+  readOnlyHint?: boolean;
 
   /**
    * Indicates the tool's output may include content from outside the page's trust boundary.
    */
-  untrustedContentHint?: boolean | 'true' | 'false';
-
-  /**
-   * Indicates the tool may perform destructive actions.
-   */
-  destructiveHint?: boolean | 'true' | 'false';
-
-  /**
-   * Indicates the tool can be called repeatedly without changing outcome.
-   */
-  idempotentHint?: boolean | 'true' | 'false';
-
-  /**
-   * Indicates the tool may reach beyond local context (network, external systems, etc.).
-   */
-  openWorldHint?: boolean | 'true' | 'false';
+  untrustedContentHint?: boolean;
 }
+
+/**
+ * MCP-B annotation extensions accepted by compatibility runtimes.
+ *
+ * `document.modelContext` only guarantees the fields in
+ * {@link WebMcpToolAnnotations}. The remaining fields are MCP-B extensions.
+ *
+ * @see {@link https://modelcontextprotocol.io/specification/latest/server/tools}
+ */
+export type ToolAnnotations = McpToolAnnotations & WebMcpToolAnnotations;
 
 /**
  * Raw tool result values accepted by execute handlers before runtime normalization.
@@ -79,34 +67,78 @@ export interface ModelContextClient {
 }
 
 /**
- * MCPB extension context with additional elicitation helper.
- */
-export interface ToolExecutionContext extends ModelContextClient {
-  /**
-   * Requests user input for the current tool call.
-   *
-   * This function is bound to the active tool call and should only be used
-   * during execution of that call.
-   */
-  elicitInput(params: ElicitationParams): Promise<ElicitationResult>;
-}
-
-/**
  * Value that may be returned synchronously or via Promise.
  */
 export type MaybePromise<T> = T | Promise<T>;
 
 /**
- * Tool descriptor for the Web Model Context API.
+ * Tool descriptor accepted by the strict WebMCP browser API.
  *
- * Tools are functions that AI models can call to perform actions or retrieve
- * information. This interface uses JSON Schema for input/output typing.
+ * The browser invokes `execute(input)` with one argument. MCP-B runtimes expose
+ * the richer {@link ToolDescriptor} callback when their extension surface is
+ * used.
+ */
+export interface ModelContextTool<
+  TArgs extends Record<string, unknown> | unknown[] = Record<string, unknown>,
+  TResult = unknown,
+  TName extends string = string,
+> {
+  /**
+   * Unique tool identifier.
+   */
+  name: TName;
+
+  /**
+   * Optional user-facing label.
+   */
+  title?: string;
+
+  /**
+   * Human-readable summary of what the tool does.
+   */
+  description: string;
+
+  /**
+   * JSON Schema describing accepted input arguments.
+   */
+  inputSchema?: InputSchema;
+
+  /**
+   * Standard WebMCP behavior hints.
+   */
+  annotations?: WebMcpToolAnnotations;
+
+  /**
+   * Browser tool execution callback.
+   */
+  execute: (input: TArgs) => Promise<TResult>;
+}
+
+/**
+ * Strict WebMCP tool descriptor whose input is inferred from JSON Schema.
+ */
+export type ModelContextToolFromSchema<
+  TInputSchema extends { type?: string | readonly string[] | undefined },
+  TResult = unknown,
+  TName extends string = string,
+> = Omit<
+  ModelContextTool<InferArgsFromInputSchema<TInputSchema>, TResult, TName>,
+  'inputSchema'
+> & {
+  inputSchema: TInputSchema;
+};
+
+/**
+ * Extended tool descriptor accepted by MCP-B compatibility runtimes.
+ *
+ * Unlike the strict browser callback, this descriptor can receive a per-call
+ * client and carry MCP output schemas and annotations.
  *
  * @template TArgs - Tool input arguments.
  * @template TResult - Tool execution raw result shape (or full CallToolResult).
  * @template TName - Tool name literal type.
  *
- * @see {@link https://spec.modelcontextprotocol.io/specification/server/tools/}
+ * @see {@link https://modelcontextprotocol.io/specification/latest/server/tools}
  */
 export interface ToolDescriptor<
   TArgs extends Record<string, unknown> = Record<string, unknown>,
@@ -186,12 +218,14 @@ export type ToolExecuteResultFromOutputSchema<
  * @template TResult - Optional result type override constrained by inferred output schema.
  */
 export type ToolDescriptorFromSchema<
-  TInputSchema extends { type?: string | readonly string[] },
+  TInputSchema extends { type?: string | readonly string[] | undefined },
   TOutputSchema extends JsonSchemaForInference | undefined = undefined,
   TName extends string = string,
 > = Omit<
   ToolDescriptor<
-    InferArgsFromInputSchema<TInputSchema>,
+    InferArgsFromInputSchema<TInputSchema> extends Record<string, unknown>
+      ? InferArgsFromInputSchema<TInputSchema>
+      : Record<string, unknown>,
     ToolExecuteResultFromOutputSchema<TOutputSchema>,
     TName
   >,
@@ -199,7 +233,9 @@ export type ToolDescriptorFromSchema<
 > & {
   inputSchema: TInputSchema;
   execute: (
-    args: InferArgsFromInputSchema<TInputSchema>,
+    args: InferArgsFromInputSchema<TInputSchema> extends Record<string, unknown>
+      ? InferArgsFromInputSchema<TInputSchema>
+      : Record<string, unknown>,
     client: ModelContextClient
   ) => MaybePromise<ToolExecuteResultFromOutputSchema<TOutputSchema>>;
 } & (TOutputSchema extends JsonSchemaForInference
@@ -225,6 +261,11 @@ export interface ToolListItem<TName extends string = string> {
    * Unique tool identifier.
    */
   name: TName;
+
+  /**
+   * Optional user-facing label.
+   */
+  title?: string;
 
   /**
    * Human-readable summary of what the tool does.

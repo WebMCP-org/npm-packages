@@ -18,7 +18,7 @@ import type {
  * @internal
  */
 export type InferToolInput<T> = T extends { readonly '~standard': { readonly types?: infer Types } }
-  ? Types extends { readonly input: infer I }
+  ? NonNullable<Types> extends { readonly input: infer I }
     ? I
     : Record<string, unknown>
   : T extends InputSchema

@@ -20,7 +20,7 @@
 | **Secure by Default**        | Origin validation, CORS configuration, and Chrome's secure messaging APIs    |
 | **AI-Agent Ready**           | Built specifically for MCP, the standard protocol for AI tool integration    |
 | **TypeScript First**         | Full type safety with comprehensive type definitions                         |
-| **Zero Dependencies**        | Only requires `zod` for schema validation                                    |
+| **MCP SDK v2**               | Uses the split MCP server and core packages                                  |
 | **Works Everywhere**         | Chrome, Firefox, Edge, and any Chromium-based browser                        |
 
 ## Use Cases
@@ -34,7 +34,7 @@
 ## Installation
 
 ```bash
-npm install @mcp-b/transports
+npm install @mcp-b/transports @modelcontextprotocol/client @modelcontextprotocol/server zod
 ```
 
 ## Transport Types
@@ -49,7 +49,8 @@ Use `ExtensionClientTransport` and `ExtensionServerTransport` for communication 
 
 ### Extension External Transports (Cross-Extension Communication)
 
-Use `ExtensionExternalClientTransport` and `ExtensionExternalServerTransport` for communication between different browser extensions, enabling one extension to access MCP servers hosted by another extension.
+Use `ExtensionClientTransport` and `ExtensionServerTransport` with an extension ID and
+`chrome.runtime.onConnectExternal` for communication between different browser extensions.
 
 ## Tab Transport Examples
 
@@ -59,7 +60,7 @@ Create an MCP server in your web page and expose it via `TabServerTransport`:
 
 ```typescript
 import { TabServerTransport } from '@mcp-b/transports';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 
 // Create MCP server with tools
@@ -74,11 +75,13 @@ const server = new McpServer(
 );
 
 // Register a tool
-server.tool(
+server.registerTool(
   'createTodo',
-  'Creates a new todo item for the current user',
   {
-    todoText: z.string().describe('The content of the todo item.'),
+    description: 'Creates a new todo item for the current user',
+    inputSchema: z.object({
+      todoText: z.string().describe('The content of the todo item.'),
+    }),
   },
   async (args) => {
     // Implementation here
@@ -106,24 +109,23 @@ Connect to the server from within the same page or from an extension content scr
 
 ```typescript
 import { TabClientTransport } from '@mcp-b/transports';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { Client } from '@modelcontextprotocol/client';
 
 // Create transport with target origin
 const transport = new TabClientTransport({
   targetOrigin: window.location.origin,
 });
 
-// Discover available servers
-const availableServers = await transport.discover();
-if (availableServers.length > 0) {
-  console.log(`Found server: ${availableServers[0].implementation.name}`);
-}
-
 // Create and connect client
-const client = new Client({
-  name: 'ExtensionProxyClient',
-  version: '1.0.0',
-});
+const client = new Client(
+  {
+    name: 'ExtensionProxyClient',
+    version: '1.0.0',
+  },
+  {
+    versionNegotiation: { mode: 'auto' },
+  }
+);
 
 await client.connect(transport);
 
@@ -156,28 +158,23 @@ Create an MCP server inside an iframe that can be accessed by the parent page:
 
 ```typescript
 import { IframeChildTransport } from '@mcp-b/transports';
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 
 // Create MCP server
-const server = new Server(
-  {
-    name: 'IframeApp',
-    version: '1.0.0',
-  },
-  {
-    capabilities: {
-      tools: {},
-    },
-  }
-);
+const server = new McpServer({
+  name: 'IframeApp',
+  version: '1.0.0',
+});
 
 // Register tools
-server.tool(
+server.registerTool(
   'getIframeData',
-  'Get data from the iframe application',
   {
-    key: z.string().describe('Data key to retrieve'),
+    description: 'Get data from the iframe application',
+    inputSchema: z.object({
+      key: z.string().describe('Data key to retrieve'),
+    }),
   },
   async (args) => {
     return {
@@ -206,7 +203,7 @@ Connect from the parent page to the iframe's MCP server:
 
 ```typescript
 import { IframeParentTransport } from '@mcp-b/transports';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { Client } from '@modelcontextprotocol/client';
 
 // Get reference to iframe element
 const iframe = document.querySelector('iframe');
@@ -220,10 +217,15 @@ iframe.addEventListener('load', async () => {
   });
 
   // Create MCP client
-  const client = new Client({
-    name: 'ParentPage',
-    version: '1.0.0',
-  });
+  const client = new Client(
+    {
+      name: 'ParentPage',
+      version: '1.0.0',
+    },
+    {
+      versionNegotiation: { mode: 'auto' },
+    }
+  );
 
   // Connect and use
   await client.connect(transport);
@@ -272,7 +274,7 @@ The extension background script acts as a hub, aggregating tools from multiple t
 
 ```typescript
 import { ExtensionServerTransport } from '@mcp-b/transports';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 
 class McpHub {
   private server: McpServer;
@@ -309,17 +311,22 @@ Content scripts act as a bridge between the page's MCP server and the extension:
 
 ```typescript
 import { TabClientTransport } from '@mcp-b/transports';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { Client } from '@modelcontextprotocol/client';
 
 // Connect to the page's MCP server
 const transport = new TabClientTransport({
   targetOrigin: window.location.origin,
 });
 
-const client = new Client({
-  name: 'ExtensionProxyClient',
-  version: '1.0.0',
-});
+const client = new Client(
+  {
+    name: 'ExtensionProxyClient',
+    version: '1.0.0',
+  },
+  {
+    versionNegotiation: { mode: 'auto' },
+  }
+);
 
 // Connect to extension background
 const backgroundPort = chrome.runtime.connect({
@@ -359,7 +366,7 @@ Connect from the extension's sidebar or popup to use tools from all connected pa
 
 ```typescript
 import { ExtensionClientTransport } from '@mcp-b/transports';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { Client } from '@modelcontextprotocol/client';
 
 // Create transport - connects to the extension's background script
 const transport = new ExtensionClientTransport({
@@ -367,10 +374,15 @@ const transport = new ExtensionClientTransport({
 });
 
 // Create MCP client
-const client = new Client({
-  name: 'Extension Sidepanel',
-  version: '1.0.0',
-});
+const client = new Client(
+  {
+    name: 'Extension Sidepanel',
+    version: '1.0.0',
+  },
+  {
+    versionNegotiation: { mode: 'auto' },
+  }
+);
 
 // Connect and use
 await client.connect(transport);
@@ -392,8 +404,8 @@ const result = await client.callTool({
 Create an MCP server in Extension 1 that can be accessed by other extensions:
 
 ```typescript
-import { ExtensionExternalServerTransport } from '@mcp-b/transports';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { ExtensionServerTransport } from '@mcp-b/transports';
+import { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 
 // Create MCP server with tools
@@ -408,17 +420,24 @@ const server = new McpServer(
 );
 
 // Register tools
-server.tool('getBookmarks', 'Retrieves user bookmarks', {}, async () => {
-  const bookmarks = await chrome.bookmarks.getTree();
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify(bookmarks, null, 2),
-      },
-    ],
-  };
-});
+server.registerTool(
+  'getBookmarks',
+  {
+    description: 'Retrieves user bookmarks',
+    inputSchema: z.object({}),
+  },
+  async () => {
+    const bookmarks = await chrome.bookmarks.getTree();
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(bookmarks, null, 2),
+        },
+      ],
+    };
+  }
+);
 
 // Set up external connection listener in background script
 chrome.runtime.onConnectExternal.addListener(async (port) => {
@@ -440,8 +459,8 @@ chrome.runtime.onConnectExternal.addListener(async (port) => {
 Connect from Extension 2 to use Extension 1's MCP server:
 
 ```typescript
-import { ExtensionExternalClientTransport } from '@mcp-b/transports';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { ExtensionClientTransport } from '@mcp-b/transports';
+import { Client } from '@modelcontextprotocol/client';
 
 // Create transport targeting Extension 1
 const transport = new ExtensionClientTransport({
@@ -450,10 +469,15 @@ const transport = new ExtensionClientTransport({
 });
 
 // Create MCP client
-const client = new Client({
-  name: 'ClientExtension',
-  version: '1.0.0',
-});
+const client = new Client(
+  {
+    name: 'ClientExtension',
+    version: '1.0.0',
+  },
+  {
+    versionNegotiation: { mode: 'auto' },
+  }
+);
 
 // Connect and use
 await client.connect(transport);
@@ -493,8 +517,8 @@ const result = await client.callTool({
 
 ### Extension External Transport Flow
 
-1. Extension 1 creates `ExtensionExternalServerTransport` and listens on `chrome.runtime.onConnectExternal`
-2. Extension 2 creates `ExtensionExternalClientTransport` targeting Extension 1's ID
+1. Extension 1 creates `ExtensionServerTransport` instances from `chrome.runtime.onConnectExternal`
+2. Extension 2 creates an `ExtensionClientTransport` with Extension 1's ID
 3. Communication happens through Chrome's secure cross-extension messaging
 4. Server extension can validate connections and control access
 
@@ -524,12 +548,12 @@ MCP is an open protocol that standardizes how AI applications connect to externa
 
 ### Which transport should I use?
 
-| Scenario                     | Recommended Transport                                                   |
-| ---------------------------- | ----------------------------------------------------------------------- |
-| Same-page communication      | `TabServerTransport` / `TabClientTransport`                             |
-| Parent page to iframe        | `IframeParentTransport` / `IframeChildTransport`                        |
-| Browser extension to webpage | `ExtensionClientTransport` / `ExtensionServerTransport`                 |
-| Extension to extension       | `ExtensionExternalClientTransport` / `ExtensionExternalServerTransport` |
+| Scenario                     | Recommended Transport                                   |
+| ---------------------------- | ------------------------------------------------------- |
+| Same-page communication      | `TabServerTransport` / `TabClientTransport`             |
+| Parent page to iframe        | `IframeParentTransport` / `IframeChildTransport`        |
+| Browser extension to webpage | `ExtensionClientTransport` / `ExtensionServerTransport` |
+| Extension to extension       | `ExtensionClientTransport` / `ExtensionServerTransport` |
 
 ### Is this compatible with Claude Desktop, Cursor, or VS Code Copilot?
 
@@ -557,9 +581,8 @@ Yes! `TabServerTransport` and `TabClientTransport` work entirely within a web pa
 
 - [`@mcp-b/global`](https://docs.mcp-b.ai/packages/global/reference) - Full MCP-B browser runtime
 - [`@mcp-b/react-webmcp`](https://docs.mcp-b.ai/packages/react-webmcp/reference) - React hooks for MCP tool registration
-- [`@mcp-b/extension-tools`](https://docs.mcp-b.ai/packages/extension-tools/reference) - 62+ Chrome Extension API tools for MCP
 - [`chrome-devtools-mcp`](https://github.com/ChromeDevTools/chrome-devtools-mcp) - Upstream Chrome DevTools MCP server
-- [`@modelcontextprotocol/sdk`](https://www.npmjs.com/package/@modelcontextprotocol/sdk) - Official MCP SDK
+- [`@modelcontextprotocol/client`](https://www.npmjs.com/package/@modelcontextprotocol/client) and [`@modelcontextprotocol/server`](https://www.npmjs.com/package/@modelcontextprotocol/server) - Official MCP TypeScript SDK v2 packages
 
 ## Resources
 

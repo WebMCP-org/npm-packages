@@ -1,10 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import type {
-  InputSchema,
-  ModelContext,
-  ModelContextTesting,
-  ToolDescriptor,
-} from '@mcp-b/webmcp-types';
+import type { ChromeModelContext, InputSchema, ToolDescriptor } from '@mcp-b/webmcp-types';
 
 interface RuntimeCoreConformanceOptions {
   suiteName: string;
@@ -26,34 +21,23 @@ function uniqueToolName(prefix: string): string {
   return `${prefix}_${String(Date.now())}_${String(Math.random()).slice(2)}`;
 }
 
-function requireModelContext(): ModelContext {
+function requireModelContext(): ChromeModelContext {
   const modelContext = document.modelContext;
   if (!modelContext) {
     throw new Error('Expected document.modelContext to be available');
   }
-  return modelContext as unknown as ModelContext;
+  return modelContext as ChromeModelContext;
 }
 
-function requireTestingContext(): ModelContextTesting {
-  const testing = navigator.modelContextTesting;
-  if (!testing) {
-    throw new Error('Expected navigator.modelContextTesting to be available');
+function requireExecuteTool(modelContext: ChromeModelContext) {
+  if (!modelContext.executeTool) {
+    throw new Error('Expected document.modelContext.executeTool to be available');
   }
-  return testing;
+  return modelContext.executeTool.bind(modelContext);
 }
 
-function listToolNames(): string[] {
-  return requireTestingContext()
-    .listTools()
-    .map((tool) => tool.name);
-}
-
-function resetTestingShim(): void {
-  (
-    navigator.modelContextTesting as
-      | (Navigator['modelContextTesting'] & { reset?: () => void })
-      | undefined
-  )?.reset?.();
+async function listToolNames(): Promise<string[]> {
+  return (await requireModelContext().getTools()).map((tool) => tool.name);
 }
 
 async function registerAbortableTool(tool: ToolDescriptor): Promise<AbortController> {
@@ -77,7 +61,6 @@ export function runRuntimeCoreConformanceSuite(options: RuntimeCoreConformanceOp
       for (const controller of activeControllers.splice(0)) {
         controller.abort();
       }
-      resetTestingShim();
       await flushMicrotasks(2);
     });
 
@@ -122,12 +105,15 @@ export function runRuntimeCoreConformanceSuite(options: RuntimeCoreConformanceOp
       expect(documentTool).toBeDefined();
       expect(navigatorTool).toBeDefined();
 
-      const serialized = await navigatorAlias.executeTool(navigatorTool!, '{}');
+      const serialized = await requireExecuteTool(navigatorAlias as ChromeModelContext)(
+        navigatorTool!,
+        '{}'
+      );
       expect(serialized).toEqual(expect.any(String));
       expect(serialized).toContain('alias-ok');
     });
 
-    it('registerTool resolves undefined and duplicate names throw', async () => {
+    it('registerTool resolves undefined and duplicate names reject', async () => {
       const toolName = uniqueToolName('duplicate_name_case');
       await registerAbortableTool({
         name: toolName,
@@ -138,8 +124,8 @@ export function runRuntimeCoreConformanceSuite(options: RuntimeCoreConformanceOp
         },
       });
 
-      expect(listToolNames()).toContain(toolName);
-      expect(() =>
+      expect(await listToolNames()).toContain(toolName);
+      await expect(
         requireModelContext().registerTool({
           name: toolName,
           description: 'Second registration',
@@ -148,11 +134,12 @@ export function runRuntimeCoreConformanceSuite(options: RuntimeCoreConformanceOp
             return { content: [{ type: 'text', text: 'second' }] };
           },
         })
-      ).toThrow();
+      ).rejects.toThrow();
     });
 
-    it('applies default inputSchema and throws on invalid schema', async () => {
+    it('applies default inputSchema and preserves schema metadata', async () => {
       const toolName = uniqueToolName('default_schema_case');
+      const modelContext = requireModelContext();
       await registerAbortableTool({
         name: toolName,
         description: 'No explicit schema',
@@ -161,42 +148,25 @@ export function runRuntimeCoreConformanceSuite(options: RuntimeCoreConformanceOp
         },
       });
 
-      const serialized = await requireTestingContext().executeTool(toolName, '{}');
+      const tool = (await modelContext.getTools()).find((candidate) => candidate.name === toolName);
+      expect(tool).toBeDefined();
+      const serialized = await requireExecuteTool(modelContext)(tool!, '{}');
       expect(serialized).toEqual(expect.any(String));
       expect(serialized).toContain('ok');
 
-      expect(() =>
-        requireModelContext().registerTool({
-          name: uniqueToolName('invalid_schema_case'),
-          description: 'Invalid schema',
-          inputSchema: { type: 42 } as unknown as InputSchema,
-          async execute() {
-            return { content: [{ type: 'text', text: 'invalid' }] };
-          },
-        })
-      ).toThrow();
-    });
-
-    it('executes registered tools via the testing API', async () => {
-      const toolName = uniqueToolName('testing_execute_case');
+      const metadataToolName = uniqueToolName('schema_metadata_case');
       await registerAbortableTool({
-        name: toolName,
-        description: 'Basic executeTool execution',
-        inputSchema: { type: 'object', properties: { value: { type: 'number' } } },
-        async execute(args) {
-          return {
-            content: [{ type: 'text', text: `value:${String(args.value)}` }],
-          };
+        name: metadataToolName,
+        description: 'Schema vocabulary is metadata at the WebMCP boundary',
+        inputSchema: { type: 42 } as unknown as InputSchema,
+        async execute() {
+          return { content: [{ type: 'text', text: 'metadata' }] };
         },
       });
-
-      const serialized = await requireTestingContext().executeTool(
-        toolName,
-        JSON.stringify({ value: 7 })
+      const metadataTool = (await modelContext.getTools()).find(
+        (candidate) => candidate.name === metadataToolName
       );
-
-      expect(serialized).toEqual(expect.any(String));
-      expect(serialized).toContain('value:7');
+      expect(metadataTool?.inputSchema).toBe('{"type":42}');
     });
 
     it('executes registered tools via the producer getTools/executeTool API', async () => {
@@ -217,7 +187,10 @@ export function runRuntimeCoreConformanceSuite(options: RuntimeCoreConformanceOp
       const tool = tools.find((candidate) => candidate.name === toolName);
       expect(tool).toBeDefined();
 
-      const serialized = await modelContext.executeTool(tool!, JSON.stringify({ value: 9 }));
+      const serialized = await requireExecuteTool(modelContext)(
+        tool!,
+        JSON.stringify({ value: 9 })
+      );
       expect(serialized).toEqual(expect.any(String));
       expect(serialized).toContain('producer:9');
     });
@@ -233,12 +206,12 @@ export function runRuntimeCoreConformanceSuite(options: RuntimeCoreConformanceOp
         },
       });
 
-      expect(listToolNames()).toContain(toolName);
+      expect(await listToolNames()).toContain(toolName);
 
       controller.abort();
       await flushMicrotasks(2);
 
-      expect(listToolNames()).not.toContain(toolName);
+      expect(await listToolNames()).not.toContain(toolName);
     });
 
     it('registerTool with a pre-aborted signal rejects and does not register the tool', async () => {
@@ -261,7 +234,7 @@ export function runRuntimeCoreConformanceSuite(options: RuntimeCoreConformanceOp
       ).rejects.toThrow(/aborted/i);
       await flushMicrotasks(2);
 
-      expect(listToolNames()).not.toContain(toolName);
+      expect(await listToolNames()).not.toContain(toolName);
     });
   });
 }

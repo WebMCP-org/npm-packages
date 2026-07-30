@@ -1,6 +1,6 @@
 import '@mcp-b/global';
 
-document.modelContext.registerTool({
+await document.modelContext.registerTool({
   name: 'get_page_title',
   description: 'Get the current page title',
   inputSchema: { type: 'object', properties: {} },

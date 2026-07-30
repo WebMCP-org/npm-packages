@@ -13,10 +13,9 @@
     "@mcp-b/global": "workspace:*",
     "@mcp-b/react-webmcp": "workspace:*",
     "@mcp-b/transports": "workspace:*",
-    "@modelcontextprotocol/sdk": "catalog:",
+    "@modelcontextprotocol/client": "catalog:",
     "react": "catalog:",
-    "react-dom": "catalog:",
-    "zod": "catalog:"
+    "react-dom": "catalog:"
   },
   "devDependencies": {
     "@types/react": "catalog:",

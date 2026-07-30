@@ -20,12 +20,12 @@ Main hook for registering MCP tools with full control over behavior and state.
 
 ```tsx
 function useWebMCP<
-  TInputSchema extends Record<string, z.ZodTypeAny> = Record<string, never>,
-  TOutputSchema extends Record<string, z.ZodTypeAny> = Record<string, never>,
+  TInputSchema extends ReactWebMCPInputSchema = InputSchema,
+  TOutputSchema extends ReactWebMCPOutputSchema | undefined = undefined,
 >(
   config: WebMCPConfig<TInputSchema, TOutputSchema>,
   deps?: DependencyList
-): WebMCPReturn<TOutputSchema>;
+): WebMCPReturn<TOutputSchema, TInputSchema>;
 ```
 
 `InferOutput<TOutputSchema>` is the output type inferred from `outputSchema`.
@@ -34,17 +34,17 @@ React hook uses it for output typing and structured MCP responses.
 
 #### Configuration Options
 
-| Option         | Type                          | Required | Description                                 |
-| -------------- | ----------------------------- | -------- | ------------------------------------------- |
-| `name`         | `string`                      | Yes      | Unique tool identifier (e.g., 'posts_like') |
-| `description`  | `string`                      | Yes      | Human-readable description for AI           |
-| `inputSchema`  | `Record<string, ZodType>`     | -        | Input validation using Zod schemas          |
-| `outputSchema` | `Record<string, ZodType>`     | -        | MCP-B output helper metadata                |
-| `annotations`  | `ToolAnnotations`             | -        | Metadata hints for the AI                   |
-| `handler`      | `(input) => Promise<TOutput>` | Yes      | Function that executes the tool             |
-| `formatOutput` | `(output) => string`          | -        | Custom output formatter                     |
-| `onSuccess`    | `(result, input) => void`     | -        | Success callback                            |
-| `onError`      | `(error, input) => void`      | -        | Error handler callback                      |
+| Option         | Type                                     | Required | Description                                 |
+| -------------- | ---------------------------------------- | -------- | ------------------------------------------- |
+| `name`         | `string`                                 | Yes      | Unique tool identifier (e.g., 'posts_like') |
+| `description`  | `string`                                 | Yes      | Human-readable description for AI           |
+| `inputSchema`  | JSON Schema or Standard Schema v1        | -        | Input validation and handler typing         |
+| `outputSchema` | JSON Schema                              | -        | MCP-B output helper metadata                |
+| `annotations`  | `ToolAnnotations`                        | -        | Metadata hints for the AI                   |
+| `handler`      | `(input) => TOutput \| Promise<TOutput>` | Yes      | Function that executes the tool             |
+| `formatOutput` | `(output) => string`                     | -        | Deprecated custom output formatter          |
+| `onSuccess`    | `(result, input) => void`                | -        | Success callback                            |
+| `onError`      | `(error, input) => void`                 | -        | Error handler callback                      |
 
 #### Memoization and `deps` (important)
 
@@ -56,7 +56,11 @@ Bad:
 useWebMCP({
   name: 'counter',
   description: `Count: ${count}`,
-  outputSchema: { count: z.number() },
+  outputSchema: {
+    type: 'object',
+    properties: { count: { type: 'number' } },
+    required: ['count'],
+  } as const,
   handler: async () => ({ count }),
 });
 ```
@@ -64,7 +68,11 @@ useWebMCP({
 Good:
 
 ```tsx
-const OUTPUT_SCHEMA = { count: z.number() };
+const OUTPUT_SCHEMA = {
+  type: 'object',
+  properties: { count: { type: 'number' } },
+  required: ['count'],
+} as const;
 const description = useMemo(() => `Count: ${count}`, [count]);
 
 useWebMCP(
@@ -85,14 +93,14 @@ useWebMCP(
 #### Return Value
 
 ```tsx
-interface WebMCPReturn<TOutputSchema> {
+interface WebMCPReturn<TOutputSchema, TInputSchema> {
   state: {
     isExecuting: boolean;
     lastResult: InferOutput<TOutputSchema> | null;
     error: Error | null;
     executionCount: number;
   };
-  execute: (input: unknown) => Promise<InferOutput<TOutputSchema>>;
+  execute: (input: InferToolInput<TInputSchema>) => Promise<InferOutput<TOutputSchema>>;
   reset: () => void;
 }
 ```
@@ -107,7 +115,8 @@ function useWebMCPContext<T>(name: string, description: string, getValue: () => 
 
 ### Tool with Output Schema
 
-Output schemas enable AI agents to return structured, type-safe responses:
+Input schemas accept JSON Schema or Standard Schema v1 objects such as Zod 4
+schemas. Output schemas use JSON Schema for typed structured responses:
 
 ```tsx
 import { useWebMCP } from '@mcp-b/react-webmcp';
@@ -117,32 +126,44 @@ function ProductSearch() {
   const searchTool = useWebMCP({
     name: 'products_search',
     description: 'Search for products in the catalog',
-    inputSchema: {
+    inputSchema: z.object({
       query: z.string().describe('Search query'),
-      maxResults: z.number().min(1).max(50).default(10),
+      maxResults: z.number().min(1).max(50),
       category: z.enum(['electronics', 'clothing', 'books']).optional(),
-    },
+    }),
     outputSchema: {
-      products: z.array(
-        z.object({
-          id: z.string(),
-          name: z.string(),
-          price: z.number(),
-          inStock: z.boolean(),
-        })
-      ),
-      total: z.number().describe('Total matching products'),
-      hasMore: z.boolean(),
-    },
+      type: 'object',
+      properties: {
+        products: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              name: { type: 'string' },
+              price: { type: 'number' },
+              inStock: { type: 'boolean' },
+            },
+            required: ['id', 'name', 'price', 'inStock'],
+          },
+        },
+        total: { type: 'number', description: 'Total matching products' },
+        hasMore: { type: 'boolean' },
+      },
+      required: ['products', 'total', 'hasMore'],
+    } as const,
     handler: async ({ query, maxResults, category }) => {
-      const results = await api.products.search({ query, maxResults, category });
+      const results = await api.products.search({
+        query,
+        maxResults,
+        ...(category && { category }),
+      });
       return {
         products: results.items,
         total: results.totalCount,
         hasMore: results.totalCount > maxResults,
       };
     },
-    formatOutput: (result) => `Found ${result.total} products`,
   });
 
   return (
@@ -196,14 +217,17 @@ interface McpClientProviderProps {
 ```tsx
 // Same-page MCP server (via @mcp-b/global)
 import { TabClientTransport } from '@mcp-b/transports';
-const transport = new TabClientTransport('mcp', { clientInstanceId: 'my-app' });
+const transport = new TabClientTransport({
+  channelId: 'mcp',
+  targetOrigin: window.location.origin,
+});
 
 // Chrome extension MCP server
 import { ExtensionClientTransport } from '@mcp-b/transports';
 const transport = new ExtensionClientTransport({ portName: 'mcp' });
 
 // In-memory connection (for testing)
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { InMemoryTransport } from '@modelcontextprotocol/client';
 const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
 ```
 
@@ -253,12 +277,17 @@ function MyComponent() {
 ```tsx
 import '@mcp-b/global';
 import { McpClientProvider, useWebMCP, useMcpClient } from '@mcp-b/react-webmcp';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { TabClientTransport } from '@mcp-b/transports';
-import { z } from 'zod';
+import { Client } from '@modelcontextprotocol/client';
 
-const client = new Client({ name: 'MyApp', version: '1.0.0' });
-const transport = new TabClientTransport('mcp', { clientInstanceId: 'my-app' });
+const client = new Client(
+  { name: 'MyApp', version: '1.0.0' },
+  { versionNegotiation: { mode: 'auto' } }
+);
+const transport = new TabClientTransport({
+  channelId: 'mcp',
+  targetOrigin: window.location.origin,
+});
 
 function App() {
   return (
@@ -275,8 +304,13 @@ function ToolProvider() {
   useWebMCP({
     name: 'increment_counter',
     description: 'Increment the counter',
-    inputSchema: { amount: z.number().default(1) },
-    handler: async ({ amount }) => {
+    inputSchema: {
+      type: 'object',
+      properties: {
+        amount: { type: 'number', default: 1 },
+      },
+    } as const,
+    handler: async ({ amount = 1 }) => {
       setCount((prev) => prev + amount);
       return { newValue: count + amount };
     },
@@ -402,10 +436,10 @@ Yes. Tool handlers have access to component state via closures. State updates tr
 
 ## Comparison with Alternatives
 
-| Feature                     | @mcp-b/react-webmcp | Raw MCP SDK | Custom Implementation |
-| --------------------------- | ------------------- | ----------- | --------------------- |
-| React Lifecycle Integration | Automatic           | Manual      | Manual                |
-| StrictMode Support          | Yes                 | N/A         | Manual                |
-| Zod Schema Validation       | Built-in            | Manual      | Manual                |
-| Execution State Tracking    | Built-in            | Manual      | Manual                |
-| TypeScript Support          | Full                | Partial     | Varies                |
+| Feature                         | @mcp-b/react-webmcp | Raw MCP SDK | Custom Implementation |
+| ------------------------------- | ------------------- | ----------- | --------------------- |
+| React Lifecycle Integration     | Automatic           | Manual      | Manual                |
+| StrictMode Support              | Yes                 | N/A         | Manual                |
+| JSON/Standard Schema Validation | Built-in            | Manual      | Manual                |
+| Execution State Tracking        | Built-in            | Manual      | Manual                |
+| TypeScript Support              | Full                | Partial     | Varies                |

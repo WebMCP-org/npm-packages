@@ -1,6 +1,6 @@
 ---
 title: 'Use Schemas and Structured Output'
-description: 'Define tool input schemas with JSON Schema, Standard Schema, or Zod, and add output schemas for typed agent responses.'
+description: 'Define tool input schemas with JSON Schema or Standard Schema, and add output schemas for typed agent responses.'
 keywords:
   [
     'inputSchema',
@@ -24,7 +24,7 @@ Every tool can have an `inputSchema` that describes the arguments it accepts. Th
 Write the schema as a plain object. This works with every WebMCP runtime and requires no additional dependencies.
 
 ```ts title="json-schema-tool.ts"
-document.modelContext.registerTool({
+await document.modelContext.registerTool({
   name: 'search',
   description: 'Search indexed docs',
   inputSchema: {
@@ -67,7 +67,7 @@ const inputSchema = {
   additionalProperties: false,
 } as const satisfies JsonSchemaForInference;
 
-document.modelContext.registerTool({
+await document.modelContext.registerTool({
   name: 'search',
   description: 'Search indexed docs',
   inputSchema,
@@ -88,7 +88,10 @@ document.modelContext.registerTool({
 
 ### Standard Schema (Zod, Valibot, ArkType)
 
-The polyfill accepts any [Standard Schema v1](https://github.com/standard-schema/standard-schema) object as `inputSchema`. This includes Zod v4, Valibot, and ArkType validators. The runtime extracts JSON Schema for agent discovery and validates input using the schema's `~standard.validate` function.
+MCP-B runtimes accept [Standard Schema v1](https://github.com/standard-schema/standard-schema)
+objects that can emit JSON Schema for `inputSchema`. This includes Zod v4, Valibot, and ArkType
+when they provide `~standard.jsonSchema.input()`. The emitted JSON Schema is used for browser
+discovery. MCP calls and the MCP-B testing shim use `~standard.validate()` when present.
 
 With Zod v4:
 
@@ -97,17 +100,20 @@ npm install zod
 ```
 
 ```ts title="zod-tool.ts"
+import { normalizeInputSchema } from '@mcp-b/webmcp-polyfill/schema';
 import { z } from 'zod';
 
-document.modelContext.registerTool({
+const searchInput = z.object({
+  query: z.string(),
+  limit: z.int().min(1).max(50).optional(),
+});
+
+await document.modelContext.registerTool({
   name: 'search',
   description: 'Search indexed docs',
-  inputSchema: z.object({
-    query: z.string(),
-    limit: z.int().min(1).max(50).optional(),
-  }),
-  async execute(args) {
-    // args is validated and typed by Zod
+  inputSchema: normalizeInputSchema(searchInput).inputSchema,
+  async execute(input) {
+    const args = searchInput.parse(input);
     return {
       content: [{ type: 'text', text: `Searching for ${args.query}` }],
     };
@@ -115,33 +121,42 @@ document.modelContext.registerTool({
 });
 ```
 
-**Use this when** you want runtime validation (not just compile-time types) and already use a Standard Schema-compatible library.
+**Use this when** you want schema-library typing and MCP-route validation and already use a
+Standard Schema-compatible library.
 
 <Note>
-  When both a Standard Schema validator and Standard JSON Schema are present on the same object,
-  JSON Schema conversion is preferred for validation parity. The runtime attempts conversion with
+  Standard Schema validators that cannot emit JSON Schema are rejected at registration time because
+  WebMCP callers need an advertised `inputSchema`. The runtime attempts conversion with
   `draft-2020-12` first, then falls back to `draft-07`.
 </Note>
 
-### Zod with `@mcp-b/react-webmcp`
+<Warning>
+  Native Chrome receives the emitted JSON Schema metadata; it does not execute your schema library's
+  refinements before invoking the page handler. Parse inside `execute` when native calls must
+  enforce Zod, Valibot, or ArkType-specific rules.
+</Warning>
 
-The React hooks in `@mcp-b/react-webmcp` accept Zod schemas in a shorthand form where you pass the shape directly (without wrapping in `z.object`):
+### Standard Schema with `@mcp-b/react-webmcp`
+
+The React hooks in `@mcp-b/react-webmcp` accept the same Standard Schema objects for input schemas. Pass the schema object itself, not a raw Zod shape map:
 
 ```tsx title="SearchTool.tsx"
 import { useWebMCP } from '@mcp-b/react-webmcp';
 import { z } from 'zod';
 
+const searchInput = z.object({
+  query: z.string().describe('Search terms'),
+  limit: z.int().min(1).max(50).optional(),
+});
+
 function SearchTool() {
   const tool = useWebMCP({
     name: 'search',
     description: 'Search indexed docs',
-    inputSchema: {
-      query: z.string().describe('Search terms'),
-      limit: z.int().min(1).max(50).optional(),
-    },
+    inputSchema: searchInput,
     handler: async (input) => {
-      // input is { query: string; limit?: number }
-      return { results: await search(input.query, input.limit) };
+      const parsed = searchInput.parse(input);
+      return { results: await search(parsed.query, parsed.limit) };
     },
   });
 
@@ -151,11 +166,11 @@ function SearchTool() {
 
 ### Choosing a schema style
 
-| Style                       | Dependencies                | Runtime validation | Type inference | Best for                                     |
-| --------------------------- | --------------------------- | ------------------ | -------------- | -------------------------------------------- |
-| Plain JSON Schema           | None                        | No                 | No             | Quick prototyping, zero-dep projects         |
-| JSON Schema + `as const`    | `@mcp-b/webmcp-types` (dev) | No                 | Yes            | TypeScript projects without a schema library |
-| Standard Schema (Zod, etc.) | Schema library              | Yes                | Yes            | Production apps that need runtime validation |
+| Style                       | Dependencies                | Runtime validation | Type inference | Best for                                         |
+| --------------------------- | --------------------------- | ------------------ | -------------- | ------------------------------------------------ |
+| Plain JSON Schema           | None                        | No                 | No             | Quick prototyping, zero-dep projects             |
+| JSON Schema + `as const`    | `@mcp-b/webmcp-types` (dev) | No                 | Yes            | TypeScript projects without a schema library     |
+| Standard Schema (Zod, etc.) | Schema library              | MCP-B routes       | Yes            | Apps that want library typing and MCP validation |
 
 ## Define output schemas
 
@@ -175,7 +190,7 @@ const outputSchema = {
   required: ['counter', 'timestamp'],
 } as const satisfies JsonSchemaForInference;
 
-document.modelContext.registerTool({
+await document.modelContext.registerTool({
   name: 'counter_get',
   description: 'Get counter value',
   inputSchema: { type: 'object', properties: {} },
@@ -204,7 +219,7 @@ const outputSchema = {
   items: { type: 'string' },
 } as const satisfies JsonSchemaForInference;
 
-document.modelContext.registerTool({
+await document.modelContext.registerTool({
   name: 'tags_list',
   description: 'List tags on the current document',
   inputSchema: { type: 'object', properties: {} },
@@ -247,9 +262,9 @@ export function CounterTool() {
 <Warning>
   If `outputSchema` is defined, the tool implementation must return a JSON-serializable value that
   matches the schema for MCP-B helpers that consume it. Native WebMCP does not enforce this field.
-  The MCP transport bridge currently forwards object-shaped `structuredContent`; use the WebMCP
-  `executeTool()` path for primitive or array structured outputs until downstream MCP clients accept
-  SEP-2106 shapes.
+  The MCP transport bridge currently forwards object-shaped `structuredContent`; use the
+  feature-detected Chrome-compatible `executeTool()` path for primitive or array structured outputs
+  until downstream MCP clients accept SEP-2106 shapes.
 </Warning>
 
 ### Keep text and structure aligned

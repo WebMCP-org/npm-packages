@@ -1,14 +1,15 @@
 import '@mcp-b/global';
 import { IframeSandboxExecutor } from '@mcp-b/codemode';
-import { createCodeToolFromModelContextTesting } from '@mcp-b/codemode/webmcp';
-import type {
-  ModelContextTesting,
-  ModelContextTestingPolyfillExtensions,
-  ToolResponse,
-} from '@mcp-b/webmcp-types';
+import { createCodeToolFromModelContext } from '@mcp-b/codemode/webmcp';
+import type { ChromeModelContextExtensions, ToolResponse } from '@mcp-b/webmcp-types';
 
-type ExtendedModelContextTesting = ModelContextTesting &
-  Partial<ModelContextTestingPolyfillExtensions>;
+type ExecutableModelContext = Pick<Document['modelContext'], 'getTools' | 'registerTool'> & {
+  executeTool: NonNullable<ChromeModelContextExtensions['executeTool']>;
+  __isWebMCPPolyfill?: boolean;
+};
+type NativeContextWindow = Window & {
+  __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: ExecutableModelContext;
+};
 type StructuredContent = Record<string, string | number | boolean | null>;
 type RuntimeMode = 'native' | 'polyfill';
 
@@ -41,41 +42,33 @@ const resultEl = requireElement<HTMLPreElement>('codemode-result');
 const callsEl = requireElement<HTMLPreElement>('codemode-calls');
 
 function detectRuntimeMode(
-  modelContext: Navigator['modelContext'],
-  modelContextTesting: ExtendedModelContextTesting
+  modelContext: ExecutableModelContext,
+  capturedNative: boolean
 ): RuntimeMode {
-  const maybePolyfillModelContext = modelContext as { __isWebMCPPolyfill?: boolean };
-  if (maybePolyfillModelContext.__isWebMCPPolyfill === true) {
-    return 'polyfill';
-  }
-
-  if (typeof modelContextTesting.reset === 'function') {
-    return 'polyfill';
-  }
-
-  return 'native';
+  return capturedNative && modelContext.__isWebMCPPolyfill !== true ? 'native' : 'polyfill';
 }
 
 async function bootstrap() {
-  const modelContext = document.modelContext ?? navigator.modelContext;
-  const modelContextTesting = navigator.modelContextTesting as
-    | ExtendedModelContextTesting
-    | undefined;
+  const nativeModelContext = (window as NativeContextWindow).__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
+  const modelContext =
+    nativeModelContext ?? (document.modelContext as unknown as ExecutableModelContext);
 
-  if (!modelContext) {
+  if (
+    !modelContext ||
+    typeof modelContext.getTools !== 'function' ||
+    typeof modelContext.registerTool !== 'function'
+  ) {
     throw new Error('document.modelContext is unavailable');
   }
 
-  if (!modelContextTesting) {
-    throw new Error('navigator.modelContextTesting is unavailable');
+  if (typeof modelContext.executeTool !== 'function') {
+    throw new Error('document.modelContext.executeTool is unavailable');
   }
 
-  const runtimeMode = detectRuntimeMode(modelContext, modelContextTesting);
+  const runtimeMode = detectRuntimeMode(modelContext, nativeModelContext !== undefined);
   runtimeEl.textContent = runtimeMode;
   runtimeEl.dataset.runtime = runtimeMode;
   statusEl.dataset.runtime = runtimeMode;
-
-  modelContextTesting.reset?.();
 
   const recordedCalls: Array<{
     toolName: string;
@@ -94,6 +87,7 @@ async function bootstrap() {
       required: ['a', 'b'],
     },
     async execute(args: { a: number; b: number }) {
+      recordedCalls.push({ toolName: 'sumNumbers', arguments: args });
       const total = args.a + args.b;
       return createTextResponse(String(total), { total });
     },
@@ -110,36 +104,24 @@ async function bootstrap() {
       required: ['name'],
     },
     async execute(args: { name: string }) {
+      recordedCalls.push({ toolName: 'greetPerson', arguments: args });
       const message = `Hello, ${args.name}!`;
       return createTextResponse(message, { message });
     },
   });
 
-  const listedTools = modelContextTesting.listTools();
-  toolsEl.textContent = JSON.stringify(listedTools, null, 2);
-  toolsEl.dataset.count = String(listedTools.length);
+  const toolNames = new Set(['sumNumbers', 'greetPerson']);
+  const listedTools = (await modelContext.getTools()).filter((tool) => toolNames.has(tool.name));
+  const displayedTools = listedTools.map(({ name, description, inputSchema }) => ({
+    name,
+    description,
+    ...(inputSchema === undefined ? {} : { inputSchema }),
+  }));
+  toolsEl.textContent = JSON.stringify(displayedTools, null, 2);
+  toolsEl.dataset.count = String(displayedTools.length);
 
-  const instrumentedTesting: Pick<ModelContextTesting, 'listTools' | 'executeTool'> = {
-    listTools: () => modelContextTesting.listTools(),
-    executeTool: async (toolName, inputArgsJson, options) => {
-      let parsedArgs: Record<string, unknown> = {};
-      try {
-        parsedArgs = JSON.parse(inputArgsJson) as Record<string, unknown>;
-      } catch {
-        parsedArgs = {};
-      }
-
-      recordedCalls.push({
-        toolName,
-        arguments: parsedArgs,
-      });
-
-      return modelContextTesting.executeTool(toolName, inputArgsJson, options);
-    },
-  };
-
-  const codemode = createCodeToolFromModelContextTesting({
-    modelContextTesting: instrumentedTesting,
+  const codemode = await createCodeToolFromModelContext({
+    modelContext,
     executor: new IframeSandboxExecutor(),
   });
 

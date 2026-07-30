@@ -27,7 +27,7 @@ Use when you want:
 ### 2) `@mcp-b/webmcp-polyfill` (Canonical Core Runtime)
 
 - Strict runtime polyfill for core WebMCP behavior.
-- Includes compatibility for current browser testing realities (`modelContextTesting`) where applicable.
+- Includes the optional MCP-B `modelContextTesting` compatibility shim where applicable.
 - Built on top of `@mcp-b/webmcp-types`.
 
 Use when you want:

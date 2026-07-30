@@ -468,7 +468,7 @@ Inspired by:
 - [`@mcp-b/global`](https://docs.mcp-b.ai/packages/global/reference) - Full MCP-B browser runtime
 - [`@mcp-b/transports`](https://docs.mcp-b.ai/packages/transports/reference) - Browser-specific MCP transports
 - [`chrome-devtools-mcp`](https://github.com/ChromeDevTools/chrome-devtools-mcp) - Upstream Chrome DevTools MCP server
-- [`@modelcontextprotocol/sdk`](https://www.npmjs.com/package/@modelcontextprotocol/sdk) - Official MCP SDK
+- [`@modelcontextprotocol/server`](https://www.npmjs.com/package/@modelcontextprotocol/server) - Official MCP TypeScript SDK v2 server used by `@mcp-b/smart-dom-reader-server`
 
 ## Resources
 

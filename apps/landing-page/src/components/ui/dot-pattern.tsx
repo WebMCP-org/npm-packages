@@ -98,8 +98,8 @@ export function DotPattern({
       const col = i % Math.ceil(dimensions.width / width);
       const row = Math.floor(i / Math.ceil(dimensions.width / width));
       return {
-        x: col * width + cx,
-        y: row * height + cy,
+        x: x + col * width + cx,
+        y: y + row * height + cy,
         delay: Math.random() * 5,
         duration: Math.random() * 3 + 2,
       };

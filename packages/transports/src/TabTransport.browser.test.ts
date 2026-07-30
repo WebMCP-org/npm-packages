@@ -87,11 +87,6 @@ browserDescribe('Tab transports (browser)', () => {
       await safeClose(clientTransport);
     });
 
-    it('defaults targetOrigin to * when not provided', () => {
-      const transport = new TabClientTransport({});
-      expect((transport as any)._targetOrigin).toBe('*');
-    });
-
     it('rejects sends before start', async () => {
       await expect(clientTransport.send({ jsonrpc: '2.0', method: 'test', id: 1 })).rejects.toThrow(
         'Transport not started'
@@ -564,7 +559,7 @@ browserDescribe('Tab transports (browser)', () => {
       });
     });
 
-    it('clears request timeouts after responses arrive', async () => {
+    it('does not synthesize a timeout after a response arrives', async () => {
       const responses: unknown[] = [];
       clientTransport.onmessage = (msg) => responses.push(msg);
 
@@ -573,9 +568,6 @@ browserDescribe('Tab transports (browser)', () => {
 
       await delay(200);
       expect(responses).toHaveLength(1);
-
-      const activeRequests = (clientTransport as any)._activeRequests as Map<unknown, unknown>;
-      expect(activeRequests?.size ?? 0).toBe(0);
     });
 
     it('surfaces synthesized timeout errors when server hangs', async () => {

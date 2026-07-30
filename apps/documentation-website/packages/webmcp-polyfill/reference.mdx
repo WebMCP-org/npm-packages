@@ -54,11 +54,10 @@ initializeWebMCPPolyfill();
 
 #### Options
 
-| Option                            | Type                                  | Default        | Description                                                    |
-| --------------------------------- | ------------------------------------- | -------------- | -------------------------------------------------------------- |
-| `autoInitialize`                  | `boolean`                             | `true`         | Set `false` to disable auto-init from IIFE/import side effect. |
-| `installTestingShim`              | `boolean \| 'always' \| 'if-missing'` | `'if-missing'` | Controls whether `navigator.modelContextTesting` is installed. |
-| `disableIframeTransportByDefault` | `boolean`                             | -              | Deprecated no-op, kept for backward compatibility.             |
+| Option               | Type                                  | Default        | Description                                                            |
+| -------------------- | ------------------------------------- | -------------- | ---------------------------------------------------------------------- |
+| `autoInitialize`     | `boolean`                             | `true`         | Set `false` to disable auto-init from IIFE/import side effect.         |
+| `installTestingShim` | `boolean \| 'always' \| 'if-missing'` | `'if-missing'` | Controls the MCP-B `navigator.modelContextTesting` compatibility shim. |
 
 #### `installTestingShim` values
 
@@ -108,32 +107,36 @@ After initialization, `document.modelContext` exposes these methods:
 Adds a single tool to the registry.
 
 - Requires a non-empty `name`, non-empty `description`, and `execute` function.
-- Throws on duplicate tool names.
+- Returns `Promise<void>` and rejects invalid or duplicate registrations.
 - If `inputSchema` is omitted, defaults to `{ type: "object", properties: {} }`.
 - Pass `options.signal` to remove the tool when the signal aborts.
+- If the signal is already aborted, registration rejects with `signal.reason`.
 
-### `getTools()`
+### `getTools(options?)`
 
 Returns `Promise<ModelContextToolInfo[]>`. Each tool includes a JSON-stringified `inputSchema`, `origin`, and `window`.
 
-### `executeTool(tool, inputArgsJson, options?)`
+`options.fromOrigins` accepts the current WebMCP discovery filter. This local polyfill cannot securely discover tools in descendant documents, so it warns once and returns only tools registered in the current document. Use native WebMCP when cross-document discovery or `exposedTo` enforcement is required.
 
-Executes a tool descriptor returned from `getTools()`. The input arguments are a JSON object string. The return value is `Promise<string | null>`.
+### `executeTool(tool, inputArgsJson, options?)` (Chrome-compatible extension)
+
+Executes a tool descriptor returned from `getTools()`. The input arguments are a JSON object or array string. The return value is `Promise<string | null>`. This method follows Chrome's current optional extension and is not part of the strict WebMCP specification; callers should feature-detect it.
 
 ### `unregisterTool(name)` (deprecated)
 
 Removes a tool by name for older MCP-B integrations. Unknown names are a no-op. Prefer `registerTool(tool, { signal })`.
 
 <Note>
-  The polyfill does not provide MCP-B extension methods such as `listTools()` or `callTool()` on
-  `document.modelContext`. For those helpers, use [`@mcp-b/global`](/packages/global/reference).
+  The polyfill does not provide MCP-B extension methods such as `listTools()`, prompts, or resources
+  on `document.modelContext`. For those capabilities, use
+  [`@mcp-b/global`](/packages/global/reference).
 </Note>
 
 ---
 
 ## Testing shim
 
-When `installTestingShim` is enabled, the polyfill installs `navigator.modelContextTesting` with the standard testing API:
+When `installTestingShim` is enabled, the polyfill installs the MCP-B compatibility API on `navigator.modelContextTesting`:
 
 | Method                                           | Returns                                       |
 | ------------------------------------------------ | --------------------------------------------- |
@@ -152,39 +155,48 @@ const result = await navigator.modelContextTesting?.executeTool(
 );
 ```
 
-For full details on the testing API, see [WebMCP standard API](/reference/webmcp/standard-api).
+For current native discovery and execution, use `document.modelContext.getTools()` and Chrome's feature-detected `document.modelContext.executeTool()` extension.
 
 ---
 
 ## Input schema support
 
-The polyfill accepts three formats for `inputSchema`:
+The polyfill accepts these formats for `inputSchema`:
 
-| Format                       | Description                                      |
-| ---------------------------- | ------------------------------------------------ |
-| Plain JSON Schema            | `InputSchema` object                             |
-| Standard Schema v1 validator | Object with `~standard.validate()` (e.g., Zod 4) |
-| Standard JSON Schema v1      | Object with `~standard.jsonSchema.input()`       |
+| Format                  | Description                                |
+| ----------------------- | ------------------------------------------ |
+| Plain JSON Schema       | `InputSchema` object                       |
+| Standard JSON Schema v1 | Object with `~standard.jsonSchema.input()` |
 
-Standard JSON Schema conversion is attempted with targets `draft-2020-12` first, then `draft-07`. When both Standard validator and Standard JSON Schema are present on the same object, JSON conversion is preferred.
+Standard JSON Schema conversion is attempted with targets `draft-2020-12` first, then `draft-07`.
+When `~standard.validate()` is present on the same object, the polyfill still
+uses only its JSON Schema conversion for advertised metadata. Direct WebMCP and
+testing-shim execution do not invoke that validator. Validator-only Standard
+Schema objects are rejected because callers need advertised JSON Schema
+metadata.
 
 ---
 
-## Validation
+## Registration validation
 
 The polyfill validates tool descriptors on registration:
 
-| Condition                              | Error                                                                    |
-| -------------------------------------- | ------------------------------------------------------------------------ |
-| `tool` is not an object                | `TypeError: registerTool(tool) requires a tool object`                   |
-| `name` is empty or not a string        | `TypeError: Tool "name" must be a non-empty string`                      |
-| `description` is empty or not a string | `TypeError: Tool "description" must be a non-empty string`               |
-| `execute` is not a function            | `TypeError: Tool "execute" must be a function`                           |
-| Duplicate tool name                    | `Error: Tool already registered: <name>`                                 |
-| Invalid JSON Schema structure          | `Error: Invalid JSON Schema at <path>: <details>`                        |
-| Schema not JSON-serializable           | `Error: Invalid JSON Schema at <path>: schema must be JSON-serializable` |
+| Condition                            | Error                                                  |
+| ------------------------------------ | ------------------------------------------------------ |
+| `tool` is not an object              | `TypeError: registerTool(tool) requires a tool object` |
+| `name` or `description` is missing   | `TypeError`                                            |
+| Tool name is empty or has bad syntax | `InvalidStateError`                                    |
+| Description is empty                 | `InvalidStateError`                                    |
+| `execute` is not a function          | `TypeError: Tool "execute" must be a function`         |
+| Duplicate tool name                  | `InvalidStateError: Tool already registered: <name>`   |
+| `inputSchema` is not an object       | `TypeError: inputSchema must be an object`             |
+| Schema is not JSON-serializable      | `TypeError: inputSchema must be JSON-serializable`     |
 
-Input arguments are validated at execution time using JSON Schema validation (via `@cfworker/json-schema`). Standard Schema validators are used when available.
+Both native-shaped and testing-shim execution parse the JSON input and invoke
+the handler without schema validation, matching Chrome's producer behavior.
+The official MCP server owns validation for MCP transport calls.
+
+Registration validation failures are Promise rejections from `registerTool()`.
 
 ---
 
@@ -208,7 +220,7 @@ const inputSchema = {
   additionalProperties: false,
 } as const satisfies JsonSchemaForInference;
 
-document.modelContext.registerTool({
+await document.modelContext.registerTool({
   name: 'search',
   description: 'Search indexed docs',
   inputSchema,
@@ -225,4 +237,4 @@ For full inference documentation, see [@mcp-b/webmcp-types](/packages/webmcp-typ
 
 ## Interop with @mcp-b/global
 
-If the polyfill is installed first, `@mcp-b/global` wraps the existing context with `BrowserMcpServer` to add MCP-B extension APIs without replacing the core object identity. Use `@mcp-b/global` directly when you need `callTool`, resources, prompts, or transport. For guidance on choosing between them, see [Choose a Runtime](/how-to/choose-runtime).
+If the polyfill is installed first, `@mcp-b/global` keeps it as the underlying context for native-shaped mirroring, then replaces the public document surface with a `BrowserMcpServer` that adds MCP-B extension APIs. Cleanup restores the underlying polyfill context. Use `@mcp-b/global` directly when you need resources, prompts, or transport. For guidance on choosing between them, see [Choose a Runtime](/how-to/choose-runtime).

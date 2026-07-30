@@ -22,7 +22,7 @@
       <div class="container mx-auto max-w-7xl">
         <h1 class="text-3xl font-bold text-foreground">Web Model Context API Showcase</h1>
         <p class="mt-2 text-lg text-muted-foreground">
-          Native Chromium implementation with in-page demo compatibility helpers
+          Native Chromium registration, discovery, execution, and iframe lifecycle
         </p>
       </div>
     </header>
@@ -42,7 +42,7 @@
                 <option value="calculator">Calculator</option>
                 <option value="todo">Todo List</option>
                 <option value="timer">Timer</option>
-                <option value="output-schema">Output Schema</option>
+                <option value="structured-result">Structured Result</option>
                 <option value="state-machine">State Machine</option>
               </select>
               <button
@@ -150,7 +150,7 @@
                     id="iframe-parent-clear"
                     class="rounded-md border border-destructive bg-background px-3 py-1.5 text-sm font-medium text-destructive hover:bg-destructive/10"
                   >
-                    Clear Context
+                    Clear Parent Registrations
                   </button>
                 </div>
               </div>
@@ -194,7 +194,7 @@
                     id="iframe-child-clear"
                     class="rounded-md border border-destructive bg-background px-3 py-1.5 text-sm font-medium text-destructive hover:bg-destructive/10"
                   >
-                    Clear Context
+                    Clear Iframe Registrations
                   </button>
                 </div>
               </div>

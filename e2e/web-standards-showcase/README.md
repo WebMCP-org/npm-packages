@@ -1,511 +1,188 @@
-# Web Model Context API - Native Chromium Showcase
+# Native Chromium WebMCP showcase
 
-**A live, interactive demonstration of the native Web Model Context API
-running in Chromium with a small in-page compatibility layer for legacy demos.**
+This app exercises the current native WebMCP surface in Chrome without loading
+an MCP-B runtime or polyfill. It uses `document.modelContext` for registration
+and discovery, and it feature-detects Chrome's optional `executeTool()`
+extension.
 
-![Native API Showcase](https://img.shields.io/badge/Native%20API-Chromium-4285F4?style=for-the-badge&logo=google-chrome)
-![Demo Compat](https://img.shields.io/badge/Demo%20Compat-In--Page-orange?style=for-the-badge)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.8+-blue?style=for-the-badge&logo=typescript)
+The authoritative API definition lives in the
+[WebMCP specification](https://webmachinelearning.github.io/webmcp/). For
+Chrome's preview status and enrollment details, see the
+[Chrome WebMCP early preview](https://developer.chrome.com/blog/webmcp-epp).
+The
+[Model Context Tool Inspector](https://chromewebstore.google.com/detail/model-context-tool-inspec/gbpdfapgefenggkahomfgkhfehlcenpd)
+can inspect tools exposed by a page.
 
-## Overview
+## What the showcase covers
 
-This application is a **split-pane interactive playground** that
-showcases the native Web Model Context API implementation in Chromium.
-It demonstrates the current native API surface, preserves the older
-two-bucket demo flows through a local compatibility shim, and provides
-a live code editor for experimenting with tool registration.
+- Dynamic tool registration through `document.modelContext.registerTool()`
+- Asynchronous discovery through `document.modelContext.getTools()`
+- Cleanup of showcase-owned registrations through `AbortSignal`
+- Descriptor-based execution when Chrome exposes `executeTool()`
+- Native `toolchange` events
+- Same-origin parent and iframe contexts
+- A live editor and generated forms for tool inputs
 
-### Key Features
+The app does not load `@mcp-b/global`, and it rejects contexts carrying the
+MCP-B polyfill marker. It does not depend on the deprecated
+`navigator.modelContext` alias or the removed `navigator.modelContextTesting`
+API.
 
-- **Live Code Editor** - Write and execute tool definitions in real time.
-- **Split-pane UI** - Split-screen editor with live output.
-- **Pre-built Templates** - Counter, Calculator, Todo, Timer, and
-  State Machine examples.
-- **Two-Bucket System** - Demonstrates the showcase compatibility `provideContext()` flow versus native `registerTool()`.
-- **Testing API Explorer** - Full access to `navigator.modelContextTesting` methods.
-- **Event Log** - Real-time tracking of API operations.
-- **Native Runtime Required** - Explicitly requires and validates native implementation.
-- **Legacy Demo Compatibility** - Installs in-page helpers for removed or transitional APIs used by the showcase UI.
+## Requirements
 
----
+- Chrome Canary or Dev 152 or newer
+- Node.js 22.12 or newer
+- pnpm
 
-## Quick Start
+The dedicated Playwright configuration chooses an installed Chrome 152+ binary.
+Override the selection with `CHROME_BIN` or
+`PLAYWRIGHT_NATIVE_SHOWCASE_EXECUTABLE_PATH`.
 
-### Prerequisites
+## Run the showcase
 
-- **Chromium/Chrome** (version 120+ recommended)
-- **Node.js** >= 22.12
-- **pnpm** >= 10.0.0
-
-### Installation
-
-```bash
-# From the e2e/web-standards-showcase directory
-pnpm install
-
-# Start development server
-pnpm dev
-```
-
-Then open `http://localhost:5174` in Chromium with the experimental flag enabled.
-
-### Running with Native API
-
-The native Web Model Context API is an experimental Chromium feature
-that must be explicitly enabled.
-
-#### Option 1: Launch Chromium with Flags (Recommended)
+From the repository root:
 
 ```bash
-# Linux/Mac
-chromium --enable-experimental-web-platform-features http://localhost:5174
-
-# Or using Chrome
-google-chrome --enable-experimental-web-platform-features http://localhost:5174
-
-# Windows
-chrome.exe --enable-experimental-web-platform-features http://localhost:5174
+pnpm --dir e2e/web-standards-showcase dev
 ```
 
-#### Option 2: Enable via chrome://flags
+Open `http://localhost:5174` in Chrome launched with the flags documented in
+[CHROMIUM_FLAGS.md](./CHROMIUM_FLAGS.md).
 
-1. Open Chromium/Chrome
-2. Navigate to `chrome://flags`
-3. Search for **"Experimental Web Platform Features"**
-4. Set to **Enabled**
-5. Click **Relaunch**
-6. Navigate to `http://localhost:5174`
+## Current API patterns
 
----
+### Register and clean up a tool
 
-## User Guide
-
-### Live Code Editor
-
-The editor allows you to write tool definitions in JavaScript and
-register them in real-time.
-
-#### Basic Tool Template
+WebMCP ties registration cleanup to an `AbortSignal`. Keep the controller for
+every registration you own.
 
 ```javascript
-const tool = {
-  name: 'my_tool',
-  description: 'Description of what this tool does',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      param: { type: 'string', description: 'A parameter' },
+const controller = new AbortController();
+
+await document.modelContext.registerTool(
+  {
+    name: 'counter_increment',
+    description: 'Increment a counter',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        amount: { type: 'number' },
+      },
+      required: ['amount'],
     },
-    required: ['param'],
+    async execute({ amount }) {
+      return `Incremented by ${amount}`;
+    },
   },
-  async execute(input) {
-    // Your tool logic here
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Result: ${input.param}`,
-        },
-      ],
-    };
-  },
-};
-
-// Register using registerTool
-navigator.modelContext.registerTool(tool);
-```
-
-#### Using Templates
-
-The editor includes pre-built templates:
-
-- **Counter** - Simple counter with increment operation
-- **Calculator** - Math operations (add, multiply)
-- **Todo** - Full CRUD todo list manager
-- **Timer** - Start/stop/check timer with state
-- **State Machine** - State transitions with history
-
-Load a template from the dropdown, modify it, and click **▶ Register Tool**.
-
----
-
-## API Demonstrations
-
-### Two-Bucket Tool Management
-
-The showcase keeps its historical **two-bucket** demo by tracking
-registration handles on top of the current native API.
-
-Important:
-
-- Current Chrome 152+ exposes `registerTool(...)`, `getTools()`, and the testing-only `navigator.modelContextTesting.listTools()`.
-- `provideContext()` and `clearContext()` were removed from the WebMCP spec. The showcase does not call them.
-- The Bucket A / Bucket B UI is implemented with ordinary `registerTool(...)` calls plus local registration tracking.
-
-#### Bucket A - Replaceable Registration Group
-
-- Tools registered through the showcase's local Bucket A helper
-- **Completely replaced** when Bucket A is registered again
-- Ideal for dynamic tool sets that need full replacement
-- Color-coded **blue** in the UI
-
-**Example:**
-
-```javascript
-const controllers = [new AbortController(), new AbortController(), new AbortController()];
-navigator.modelContext.registerTool(tool1, { signal: controllers[0].signal });
-navigator.modelContext.registerTool(tool2, { signal: controllers[1].signal });
-navigator.modelContext.registerTool(tool3, { signal: controllers[2].signal });
-
-// Later, replace the group
-controllers.forEach((controller) => controller.abort());
-navigator.modelContext.registerTool(tool4);
-```
-
-#### Bucket B - `registerTool()`
-
-- Tools registered via `registerTool(tool)`
-- **Persist until their own registration is removed**
-- Can be individually unregistered in native snapshots that expose `unregisterTool(name)`
-- Suitable for long-lived tools
-- Color-coded **green** in the UI
-
-**Example:**
-
-```javascript
-// Register a persistent tool
-navigator.modelContext.registerTool(myTool);
-
-// Later, when you want to remove it:
-navigator.modelContext.unregisterTool(myTool.name);
-```
-
-### Native Chromium Methods
-
-These methods are **only available in the native Chromium
-implementation** (not in polyfills):
-
-#### `unregisterTool(name: string)`
-
-Remove a specific tool by name from **any bucket**.
-
-```javascript
-navigator.modelContext.unregisterTool('counter_increment');
-```
-
-### Testing API (`navigator.modelContextTesting`)
-
-Advanced testing features for debugging and development.
-
-#### Key Differences from Main API
-
-**Important:** The Testing API has subtle but critical differences:
-
-- **`executeTool()`**
-  - Main API: takes an object input, e.g. `{ key: value }`.
-  - Testing API: takes a JSON string input, e.g. `'{"key":"value"}'`.
-- **`listTools()`**
-  - Main API: returns `inputSchema` as an object.
-  - Testing API: returns `inputSchema` as a JSON string.
-- **Return value behavior**
-  - Main API: returns a result object.
-  - Testing API: returns the string from `content[0].text`.
-
-#### Testing API Methods
-
-```javascript
-// List tools (schemas are JSON strings!)
-const tools = navigator.modelContextTesting.listTools();
-tools.forEach((tool) => {
-  const schema = JSON.parse(tool.inputSchema); // Must parse!
-});
-
-// Execute tool (input must be JSON string!)
-const result = await navigator.modelContextTesting.executeTool(
-  'my_tool',
-  JSON.stringify({ param: 'value' })
+  { signal: controller.signal }
 );
 
-// Get execution history
-const calls = navigator.modelContextTesting.getToolCalls();
-
-// Clear history
-navigator.modelContextTesting.clearToolCalls();
-
-// Set mock response
-navigator.modelContextTesting.setMockToolResponse('my_tool', 'mocked result');
-
-// Remove mock
-navigator.modelContextTesting.clearMockToolResponse('my_tool');
-
-// Reset all testing state
-navigator.modelContextTesting.reset();
-
-// Register callback for tool changes
-navigator.modelContextTesting.registerToolsChangedCallback(() => {
-  console.log('Tools changed!');
-});
-
-// Chrome also exposes an EventTarget-style property
-navigator.modelContextTesting.ontoolchange = () => {
-  console.log('Tools changed!');
-};
+// Remove this registration later.
+controller.abort();
 ```
 
----
+The showcase's Bucket A and Bucket B labels describe local groups of
+controllers. They are not browser API buckets.
 
-## Modern Tooling Best Practices
+### Discover registered descriptors
 
-When authoring tools in the live editor, prefer these patterns:
+`getTools()` is asynchronous and returns registered descriptors. Each descriptor
+includes browser-owned fields such as `window` and `origin`.
 
-- **Use stable, action-first tool names** such as `search_products` or
-  `create_ticket`.
-- **Keep input schemas explicit and narrow** (required fields, clear types,
-  and concise descriptions).
-- **Return deterministic output** so clients can parse and validate results
-  reliably.
-- **Separate read and write tools** to reduce accidental destructive actions.
-- **Follow least-privilege behavior** (only expose capabilities required for
-  the immediate task).
+```javascript
+const tools = await document.modelContext.getTools();
+const counterTool = tools.find((tool) => tool.name === 'counter_increment');
+```
 
----
+### Execute a discovered descriptor
 
-## Testing
+Chrome's current preview may expose `executeTool()` on
+`document.modelContext`. The method is not part of the strict WebMCP core, so
+feature-detect it. Pass a descriptor returned by `getTools()`, not a tool name.
 
-### Run E2E Tests
+```javascript
+const context = document.modelContext;
+const executeTool = context.executeTool;
 
-The showcase includes comprehensive Playwright tests that verify all functionality.
+if (typeof executeTool === 'function') {
+  const tool = (await context.getTools()).find(
+    (candidate) => candidate.name === 'counter_increment'
+  );
+
+  if (tool) {
+    const result = await executeTool.call(context, tool, JSON.stringify({ amount: 2 }));
+    console.log(result);
+  }
+}
+```
+
+## Removed preview APIs
+
+The showcase does not emulate removed native methods.
+
+| Removed preview API                                      | Current approach                                                                       |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `navigator.modelContext`                                 | Use `document.modelContext`.                                                           |
+| `navigator.modelContextTesting.listTools()`              | Await `document.modelContext.getTools()`.                                              |
+| `navigator.modelContextTesting.executeTool(name, input)` | Feature-detect `document.modelContext.executeTool()` and pass a discovered descriptor. |
+| `unregisterTool(name)`                                   | Abort the signal retained for a registration you own.                                  |
+| `clearContext()`                                         | Abort each locally retained controller. WebMCP has no global clear operation.          |
+| `provideContext()`                                       | Register the desired tools and manage their controllers as a local group.              |
+
+Testing call logs, mock responses, and whole-context reset controls have no
+current WebMCP replacement. The separate
+`tests/chromium-native-api.spec.ts` lane intentionally tests MCP-B compatibility
+shims for those older integrations; it is not native conformance coverage.
+
+MCP `outputSchema` and `structuredContent` are also outside the strict WebMCP
+core. The showcase's structured-result template returns an ordinary structured
+value without claiming native output-schema support.
+
+## Run tests
+
+From `e2e/`:
 
 ```bash
-# From the e2e directory
 pnpm test:native-showcase
-
-# With UI mode
-pnpm test:native-showcase:ui
-
-# Debug mode
-pnpm test:native-showcase:debug
-
-# Headed mode (see browser)
 pnpm test:native-showcase:headed
+pnpm test:native-showcase:ui
+pnpm test:native-showcase:debug
 ```
 
-### Test Coverage
+The native suite captures `document.modelContext` before application code runs.
+It then verifies:
 
-The test suite covers:
+- the document-owned native surface
+- `getTools()` discovery
+- AbortSignal registration cleanup
+- descriptor-based execution when `executeTool()` exists
+- live-editor registration
+- iframe lifecycle behavior
 
-- Native API detection and validation
-- Live code editor functionality
-- Template loading and execution
-- Replaceable and persistent registration behavior
-- Native/testing methods (`getTools`, `listTools`, `executeTool`, `unregisterTool`)
-- Testing API methods
-- Tool executor with various inputs
-- Event logging
-- Error handling
+## Build and type-check
 
----
+From the repository root:
 
-## Architecture
+```bash
+pnpm --filter web-standards-showcase typecheck
+pnpm --filter web-standards-showcase build
+```
 
-### Project Structure
+## Source map
 
 ```text
-web-standards-showcase/
+e2e/web-standards-showcase/
+├── index.html
+├── iframe-test.html
 ├── src/
-│   ├── main.ts              # Application entry point
-│   ├── types.ts             # TypeScript type definitions
-│   ├── api/
-│   │   └── detection.ts     # Native API detection logic
-│   ├── ui/
-│   │   ├── eventLog.ts      # Event log UI manager
-│   │   └── toolDisplay.ts   # Tool display UI manager
-│   ├── examples/
-│   │   └── templates.ts     # Pre-built tool templates
-│   └── styles/
-│       └── main.css         # Application styles
-├── index.html               # Main HTML page
-├── vite.config.ts          # Vite configuration
-├── package.json
-├── tsconfig.json
-└── README.md
+│   ├── api/detection.ts
+│   ├── examples/templates.ts
+│   ├── iframe-main.ts
+│   ├── lib/utils.ts
+│   └── main.ts
+├── CHROMIUM_FLAGS.md
+└── package.json
 ```
 
-### Tech Stack
-
-- **Build Tool:** Vite 6
-- **Language:** TypeScript 5.8+
-- **Framework:** Vanilla TypeScript (framework-free)
-- **Styling:** Modern CSS with custom properties
-- **Testing:** Playwright
-- **Module System:** ES Modules
-
-### Design Philosophy
-
-1. **Native Runtime** - Explicitly rejects polyfill implementations while documenting the demo-only compatibility helpers layered on top
-2. **Zero Dependencies** - Pure web standards, no libraries
-3. **Native First** - Showcases native browser capabilities
-4. **Educational** - Clear demonstrations with explanations
-5. **Interactive** - Live code editor for experimentation
-
----
-
-## UI Components
-
-### Status Banner
-
-Shows the native API detection status:
-
-- **Green (Success)** - Native API detected and ready
-- **Yellow (Warning)** - Polyfill detected (app disabled)
-- **Red (Error)** - API not available (app disabled)
-
-### Code Editor Panel
-
-- Syntax highlighting via CSS
-- Template loading
-- Real-time execution
-- Error display
-
-### Tools Output Panel
-
-- Live tool registry display
-- Color-coded buckets (blue=A, green=B)
-- JSON schema display
-- Tool descriptions
-
-### Event Log
-
-- Real-time event tracking
-- Timestamped entries
-- Color-coded event types
-- Auto-scrolling
-
----
-
-## Debugging
-
-### Check API Availability
-
-Open browser console and run:
-
-```javascript
-// Check if API is available
-console.log('modelContext:', navigator.modelContext);
-console.log('modelContextTesting:', navigator.modelContextTesting);
-
-// Check if it's native (not polyfill)
-console.log('Constructor:', navigator.modelContextTesting?.constructor.name);
-// Should NOT contain "WebModelContext"
-
-// List available methods
-console.log('Methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(navigator.modelContext)));
-```
-
-### Common Issues
-
-#### "navigator.modelContext not found"
-
-**Solution:** You haven't enabled the experimental feature flag.
-
-- Launch Chromium with `--enable-experimental-web-platform-features`
-- Or enable in `chrome://flags`
-
-#### "Polyfill detected"
-
-**Solution:** Remove any polyfill imports from the page.
-
-- Check for `@mcp-b/global` imports
-- Ensure no other scripts are adding polyfills
-- Hard refresh the page (Ctrl+Shift+R)
-
-#### "Tools not appearing in output"
-
-**Solution:** Check the event log and browser console for errors.
-
-- Verify tool definition syntax
-- Check for JavaScript errors
-- Ensure `execute()` returns correct format
-
----
-
-## Additional Resources
-
-- **Chromium Source:** [blink/web_tests/external/wpt/model-context/](https://chromium.googlesource.com/chromium/src/+/main/third_party/blink/web_tests/external/wpt/model-context/)
-- **CHROMIUM_FLAGS.md** - Detailed flag documentation
-- **Main Project README** - [../../README.md](../../README.md)
-- **E2E Testing Guide** - [../README.md](../README.md)
-
----
-
-## Contributing
-
-This is a demonstration app within the MCP-B monorepo.
-For contribution guidelines, see the main project
-[CONTRIBUTING.md](../../CONTRIBUTING.md).
-
----
-
-## License
-
-MIT License - See [LICENSE](../../LICENSE) for details.
-
----
-
-## Learning Resources
-
-### Understanding the Two-Bucket System
-
-The two-bucket architecture solves a common problem: how to manage
-both **dynamic** (frequently changing) and **persistent** (long-lived)
-tools in the same context.
-
-**Real-world analogy:**
-
-- **Bucket A:** Like a whiteboard, erase the locally tracked group and write new content.
-- **Bucket B (registerTool):** Like sticky notes—they stay until you
-  peel them off individually.
-
-### When to Use Each Bucket
-
-| Scenario                       | Use Bucket A | Use Bucket B |
-| ------------------------------ | ------------ | ------------ |
-| Tools that change together     | Yes          | No           |
-| Individual tool lifecycle      | No           | Yes          |
-| Page/context-specific tools    | Yes          | No           |
-| Cross-context persistent tools | No           | Yes          |
-| Full replacement needed        | Yes          | No           |
-| Partial updates                | No           | Yes          |
-
-### Example: Chat Application with Tools
-
-```javascript
-// Bucket A: message-specific tools (change with each message)
-const messageToolControllers = messageTools.map(() => new AbortController());
-messageTools.forEach((tool, index) => {
-  navigator.modelContext.registerTool(tool, {
-    signal: messageToolControllers[index].signal,
-  });
-});
-
-// Bucket B: App-wide tools (persistent across messages)
-navigator.modelContext.registerTool({
-  name: 'open_settings',
-  description: 'Open app settings',
-  ...
-});
-
-navigator.modelContext.registerTool({
-  name: 'search_history',
-  description: 'Search chat history',
-  ...
-});
-
-// When user selects a different message:
-// - Bucket A tools are REPLACED with new message tools
-// - Bucket B tools (settings, search) REMAIN available
-```
-
----
-
-**Part of the [MCP-B Project](https://github.com/WebMCP-org/WebMCP).**
+`src/lib/utils.ts` retains AbortControllers for showcase-owned registrations.
+It does not add methods to the native context.

@@ -6,45 +6,28 @@ packages:
   - e2e/react-webmcp-test-app
   - e2e/web-standards-showcase
   - e2e/vanilla-iife-json
-  - e2e/vanilla-iife-zod3
-  - e2e/vanilla-esm-zod3
-  - e2e/react18-zod3
   - examples/frameworks/*
   - apps/*
 
 catalog:
-  '@cfworker/json-schema': ^4.1.1
-  '@cloudflare/vite-plugin': ^1.13.18
-  '@composio/json-schema-to-zod': ^0.1.19
-  '@hookform/resolvers': ^5.2.2
-  '@mcp-b/global': file:/var/folders/5y/ysfq1x7s50lc168yy1gvvf4m0000gn/T/mcpb-global-tarball-1NFVbD/mcp-b-global-3.0.0.tgz
-  '@modelcontextprotocol/sdk': 1.29.0
-  '@radix-ui/react-collapsible': ^1.1.12
-  '@sentry/cloudflare': ^10.22.0
-  '@sentry/react': ^10.22.0
-  '@sentry/vite-plugin': ^4.6.0
+  '@modelcontextprotocol/client': 2.0.0
+  '@modelcontextprotocol/core': 2.0.0
+  '@modelcontextprotocol/server': 2.0.0
   '@types/chrome': ^0.0.326
   '@types/node': 22.17.2
   '@types/react': ^19.2.9
   '@types/react-dom': ^19.1.2
-  '@use-gesture/react': ^10.3.1
   '@vitest/coverage-v8': ^4.1.7
   ai: ^5.0.83
-  babel-plugin-react-compiler: ^1.0.0
-  fast-check: ^4.0.0
   playwright: ^1.60.0
   react: ^19.1.0
   react-dom: ^19.1.0
-  react-markdown: ^10.1.0
-  tsx: ^4.20.0
   typescript: ^5.8.3
   vite: npm:@voidzero-dev/vite-plus-core@latest
   vite-plugin-monkey: ^6.0.1
   vite-plus: ^0.1.22
   vitest: npm:@voidzero-dev/vite-plus-test@latest
-  wrangler: ^4.45.3
-  zod: 3.25.76
-  zod-to-json-schema: ^3.24.5
+  zod: 4.4.3
 
 onlyBuiltDependencies:
   - '@axodotdev/oranda'

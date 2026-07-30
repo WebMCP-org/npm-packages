@@ -519,7 +519,7 @@ export class DOMTraversal {
               elements.push(extracted);
             }
           }
-        } catch (_e) {
+        } catch {
           console.warn(`Invalid custom selector: ${customSelector}`);
         }
       }

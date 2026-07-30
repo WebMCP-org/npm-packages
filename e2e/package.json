@@ -46,7 +46,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
+    "@mcp-b/webmcp-ts-sdk": "workspace:*",
     "@mcp-b/webmcp-types": "workspace:*",
+    "@modelcontextprotocol/client": "catalog:",
     "@playwright/test": "^1.58.0",
     "@types/node": "catalog:",
     "typescript": "catalog:"

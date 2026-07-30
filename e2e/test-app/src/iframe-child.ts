@@ -7,35 +7,26 @@
 
 // Import the polyfill to create the MCP server
 import '@mcp-b/global';
+import type { BrowserMcpServer, PromptDescriptor, ResourceDescriptor } from '@mcp-b/webmcp-ts-sdk';
+import type { InputSchema, ToolDescriptor } from '@mcp-b/webmcp-types';
 
-const modelContext = navigator.modelContext;
+const modelContext = document.modelContext as BrowserMcpServer;
 
 type RegisterableContext = {
-  tools?: unknown[];
-  resources?: unknown[];
-  prompts?: unknown[];
+  tools: Array<ToolDescriptor & { inputSchema: InputSchema }>;
+  resources: ResourceDescriptor[];
+  prompts: PromptDescriptor[];
 };
 
-function provideExtendedContext(options: RegisterableContext): void {
-  const register = (
-    item: unknown,
-    methodName: 'registerTool' | 'registerResource' | 'registerPrompt'
-  ) => {
-    const registerMethod = (modelContext as unknown as Record<string, unknown>)[methodName];
-    if (typeof registerMethod !== 'function') {
-      throw new Error(`${methodName} is not available`);
-    }
-    registerMethod.call(modelContext, item);
-  };
-
-  for (const tool of options.tools ?? []) {
-    register(tool, 'registerTool');
+async function registerContext(options: RegisterableContext): Promise<void> {
+  for (const tool of options.tools) {
+    await modelContext.registerTool(tool);
   }
-  for (const resource of options.resources ?? []) {
-    register(resource, 'registerResource');
+  for (const resource of options.resources) {
+    modelContext.registerResource(resource);
   }
-  for (const prompt of options.prompts ?? []) {
-    register(prompt, 'registerPrompt');
+  for (const prompt of options.prompts) {
+    modelContext.registerPrompt(prompt);
   }
 }
 
@@ -56,7 +47,7 @@ function updateStatus(text: string) {
 // ==================== Register Tools, Resources, and Prompts ====================
 log('Registering tools, resources, and prompts...');
 
-provideExtendedContext({
+void registerContext({
   tools: [
     {
       name: 'add',
@@ -170,8 +161,8 @@ provideExtendedContext({
         },
         required: ['text'],
       },
-      async get(args: Record<string, unknown>) {
-        const text = args.text as string;
+      async get(args: Record<string, string>) {
+        const text = args.text ?? '';
         log(`Getting summarize prompt for: "${text.substring(0, 30)}..."`);
         return {
           messages: [
@@ -197,9 +188,9 @@ provideExtendedContext({
         },
         required: ['text', 'language'],
       },
-      async get(args: Record<string, unknown>) {
-        const text = args.text as string;
-        const language = args.language as string;
+      async get(args: Record<string, string>) {
+        const text = args.text ?? '';
+        const language = args.language ?? '';
         log(`Getting translate prompt: "${text.substring(0, 20)}..." -> ${language}`);
         return {
           messages: [
@@ -215,14 +206,16 @@ provideExtendedContext({
       },
     },
   ],
-});
-
-log('Registered: 3 tools, 2 resources, 2 prompts');
-
-// ==================== Ready ====================
-
-updateStatus('MCP Server Ready - 3 tools, 2 resources, 2 prompts');
-log('Iframe child ready!');
+})
+  .then(() => {
+    log('Registered: 3 tools, 2 resources, 2 prompts');
+    updateStatus('MCP Server Ready - 3 tools, 2 resources, 2 prompts');
+    log('Iframe child ready!');
+  })
+  .catch((error) => {
+    updateStatus(`Registration failed: ${error instanceof Error ? error.message : String(error)}`);
+    console.error('[iframe-child] Registration failed', error);
+  });
 
 // Expose for testing
 declare global {

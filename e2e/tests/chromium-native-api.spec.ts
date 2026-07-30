@@ -1,7 +1,8 @@
 import { expect, test } from '@playwright/test';
 
-type LegacyModelContext = NonNullable<typeof navigator.modelContext> & {
+type CompatibilityModelContext = NonNullable<Document['modelContext']> & {
   unregisterTool(name: string): void;
+  listTools(): Array<{ name: string; description: string; inputSchema?: unknown }>;
 };
 
 function isDirectOrWrappedText(value: unknown, expectedText: string): boolean {
@@ -22,21 +23,17 @@ function isDirectOrWrappedText(value: unknown, expectedText: string): boolean {
 }
 
 /**
- * E2E Tests for Chromium Native API Compatibility
+ * E2E tests for the MCP-B browser compatibility surface.
  *
- * These tests verify that the polyfill correctly implements the Chromium native
- * navigator.modelContext and navigator.modelContextTesting APIs.
+ * This default-Playwright lane loads @mcp-b/global and intentionally verifies
+ * MCP-B extensions plus the deprecated navigator.modelContextTesting shim. It
+ * is not native Chromium conformance coverage; native coverage lives in the
+ * dedicated Chrome and native-showcase configurations.
  *
- * Tests work with both:
- * - Native Chromium implementation (when --enable-experimental-web-platform-features is set)
- * - Polyfill implementation (when native is not available)
- *
- * To test with Chromium native:
- * 1. Launch Chrome 152+ with:
- *    --enable-experimental-web-platform-features --enable-features=WebMCPTesting
- * 2. Or enable "WebMCP for testing" at chrome://flags/#enable-webmcp-testing
+ * There is no current WebMCP replacement for arbitrary by-name
+ * unregistration, whole-context clearing, testing call logs, or mock responses.
  */
-test.describe('Chromium Native API - ModelContext', () => {
+test.describe('MCP-B compatibility - ModelContext extensions', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('h1')).toContainText('Web Model Context API E2E Test');
@@ -45,7 +42,7 @@ test.describe('Chromium Native API - ModelContext', () => {
   test('should have unregisterTool method available', async ({ page }) => {
     const hasMethod = await page.evaluate(() => {
       return (
-        typeof (navigator.modelContext as LegacyModelContext | undefined)?.unregisterTool ===
+        typeof (document.modelContext as unknown as CompatibilityModelContext).unregisterTool ===
         'function'
       );
     });
@@ -55,31 +52,31 @@ test.describe('Chromium Native API - ModelContext', () => {
   test('should not expose removed clearContext method', async ({ page }) => {
     const hasMethod = await page.evaluate(() => {
       return (
-        typeof (navigator.modelContext as unknown as { clearContext?: unknown })?.clearContext ===
+        typeof (document.modelContext as unknown as { clearContext?: unknown })?.clearContext ===
         'function'
       );
     });
     expect(hasMethod).toBe(false);
   });
 
-  test('should unregisterTool by name - dynamic tool', async ({ page }) => {
+  test('should remove a dynamic tool through tracked AbortSignal cleanup', async ({ page }) => {
     // Register a dynamic tool first
     await page.click('#register-dynamic');
     await page.waitForTimeout(500);
 
     // Verify tool exists
     let toolCount = await page.evaluate(() => {
-      return navigator.modelContext.listTools().length;
+      return (document.modelContext as unknown as CompatibilityModelContext).listTools().length;
     });
     expect(toolCount).toBe(5); // 4 base + 1 dynamic
 
-    // Unregister using the new API
+    // Remove the locally tracked registration.
     await page.click('#chromium-unregister-tool');
     await page.waitForTimeout(500);
 
     // Verify tool removed
     toolCount = await page.evaluate(() => {
-      return navigator.modelContext.listTools().length;
+      return (document.modelContext as unknown as CompatibilityModelContext).listTools().length;
     });
     expect(toolCount).toBe(4); // back to 4 base tools
 
@@ -92,47 +89,49 @@ test.describe('Chromium Native API - ModelContext', () => {
   test('should unregisterTool by name - base tool', async ({ page }) => {
     // Get initial tool count
     let toolCount = await page.evaluate(() => {
-      return navigator.modelContext.listTools().length;
+      return (document.modelContext as unknown as CompatibilityModelContext).listTools().length;
     });
     expect(toolCount).toBe(4); // 4 base tools
 
     // Unregister a base tool directly
     await page.evaluate(() => {
-      (navigator.modelContext as LegacyModelContext).unregisterTool('incrementCounter');
+      (document.modelContext as unknown as CompatibilityModelContext).unregisterTool(
+        'incrementCounter'
+      );
     });
     await page.waitForTimeout(300);
 
     // Verify tool removed
     toolCount = await page.evaluate(() => {
-      return navigator.modelContext.listTools().length;
+      return (document.modelContext as unknown as CompatibilityModelContext).listTools().length;
     });
     expect(toolCount).toBe(3); // 3 remaining base tools
 
     // Verify specific tool is gone
     const hasIncrementTool = await page.evaluate(() => {
-      const tools = navigator.modelContext.listTools();
+      const tools = (document.modelContext as unknown as CompatibilityModelContext).listTools();
       return tools.some((tool: { name: string }) => tool.name === 'incrementCounter');
     });
     expect(hasIncrementTool).toBe(false);
   });
 
-  test('should clearContext remove all tools', async ({ page }) => {
+  test('should clear all app-owned registrations', async ({ page }) => {
     // Register dynamic tool to have tools from both buckets
     await page.click('#register-dynamic');
     await page.waitForTimeout(500);
 
     let toolCount = await page.evaluate(() => {
-      return navigator.modelContext.listTools().length;
+      return (document.modelContext as unknown as CompatibilityModelContext).listTools().length;
     });
     expect(toolCount).toBeGreaterThan(0);
 
-    // Clear all tools
+    // Trigger the app's local cleanup action.
     await page.click('#chromium-clear-context');
     await page.waitForTimeout(500);
 
     // Verify all tools cleared
     toolCount = await page.evaluate(() => {
-      return navigator.modelContext.listTools().length;
+      return (document.modelContext as unknown as CompatibilityModelContext).listTools().length;
     });
     expect(toolCount).toBe(0);
 
@@ -140,10 +139,10 @@ test.describe('Chromium Native API - ModelContext', () => {
     expect(logEntries.some((entry) => entry.includes('All tools cleared'))).toBe(true);
   });
 
-  test('should clearContext clear both buckets', async ({ page }) => {
+  test('should clear both locally tracked registration groups', async ({ page }) => {
     // Start with base tools
     let toolCount = await page.evaluate(() => {
-      return navigator.modelContext.listTools().length;
+      return (document.modelContext as unknown as CompatibilityModelContext).listTools().length;
     });
     expect(toolCount).toBe(4); // 4 base tools (Bucket A)
 
@@ -152,7 +151,7 @@ test.describe('Chromium Native API - ModelContext', () => {
     await page.waitForTimeout(500);
 
     toolCount = await page.evaluate(() => {
-      return navigator.modelContext.listTools().length;
+      return (document.modelContext as unknown as CompatibilityModelContext).listTools().length;
     });
     expect(toolCount).toBe(5); // 4 base + 1 dynamic
 
@@ -161,7 +160,7 @@ test.describe('Chromium Native API - ModelContext', () => {
 
     // Verify both buckets cleared
     toolCount = await page.evaluate(() => {
-      return navigator.modelContext.listTools().length;
+      return (document.modelContext as unknown as CompatibilityModelContext).listTools().length;
     });
     expect(toolCount).toBe(0);
   });
@@ -169,7 +168,9 @@ test.describe('Chromium Native API - ModelContext', () => {
   test('should handle unregisterTool on non-existent tool gracefully', async ({ page }) => {
     const result = await page.evaluate(() => {
       try {
-        (navigator.modelContext as LegacyModelContext).unregisterTool('non-existent-tool');
+        (document.modelContext as unknown as CompatibilityModelContext).unregisterTool(
+          'non-existent-tool'
+        );
         return { success: true, error: null };
       } catch (error) {
         return { success: false, error: String(error) };
@@ -181,7 +182,7 @@ test.describe('Chromium Native API - ModelContext', () => {
   });
 });
 
-test.describe('Chromium Native API - ModelContextTesting', () => {
+test.describe('MCP-B compatibility - deprecated ModelContextTesting shim', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('h1')).toContainText('Web Model Context API E2E Test');
@@ -224,7 +225,7 @@ test.describe('Chromium Native API - ModelContextTesting', () => {
       if (!testingAPI) return null;
 
       // Register a simple echo tool
-      navigator.modelContext.registerTool({
+      document.modelContext.registerTool({
         name: 'echoTest',
         description: 'Echo test',
         inputSchema: {
@@ -407,7 +408,7 @@ test.describe('Chromium Native API - ModelContextTesting', () => {
       testingAPI.addEventListener('toolchange', callback2);
 
       const controller = new AbortController();
-      navigator.modelContext.registerTool(
+      document.modelContext.registerTool(
         {
           name: `tempTool_${Date.now()}`,
           description: 'temp',
@@ -447,7 +448,7 @@ test.describe('Chromium Native API - ModelContextTesting', () => {
       });
 
       const controller = new AbortController();
-      navigator.modelContext.registerTool(
+      document.modelContext.registerTool(
         {
           name: `tempTool2_${Date.now()}`,
           description: 'temp',
@@ -468,7 +469,7 @@ test.describe('Chromium Native API - ModelContextTesting', () => {
   });
 });
 
-test.describe('Chromium Native API - Integration Tests', () => {
+test.describe('MCP-B compatibility - integration', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('h1')).toContainText('Web Model Context API E2E Test');
@@ -519,7 +520,7 @@ test.describe('Chromium Native API - Integration Tests', () => {
       const second = new AbortController();
       const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-      navigator.modelContext.registerTool(
+      document.modelContext.registerTool(
         {
           name: `test1_${Date.now()}`,
           description: 'test',
@@ -532,7 +533,7 @@ test.describe('Chromium Native API - Integration Tests', () => {
       );
       await tick();
 
-      navigator.modelContext.registerTool(
+      document.modelContext.registerTool(
         {
           name: `test2_${Date.now()}`,
           description: 'test',
@@ -557,9 +558,9 @@ test.describe('Chromium Native API - Integration Tests', () => {
     expect(operations[0]).toContain('Changed:');
   });
 
-  test('should verify API matches Chromium specification', async ({ page }) => {
+  test('should verify the MCP-B compatibility contract', async ({ page }) => {
     const apiCheck = await page.evaluate(() => {
-      const modelContext = navigator.modelContext;
+      const modelContext = document.modelContext as unknown as CompatibilityModelContext;
       const modelContextTesting = navigator.modelContextTesting;
 
       if (!modelContext || !modelContextTesting) {
@@ -588,7 +589,7 @@ test.describe('Chromium Native API - Integration Tests', () => {
         }
       }
 
-      // Check ModelContextTesting methods (Chromium native)
+      // Check the deprecated testing compatibility shim.
       const testingMethods = ['executeTool', 'listTools', 'addEventListener'];
 
       for (const method of testingMethods) {

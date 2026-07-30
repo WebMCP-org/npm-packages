@@ -2,10 +2,10 @@
 import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
 import { onMounted } from 'vue';
 
-onMounted(() => {
+onMounted(async () => {
   initializeWebMCPPolyfill();
 
-  navigator.modelContext.registerTool({
+  await document.modelContext.registerTool({
     name: 'current_route',
     description: 'Returns the current route path',
     inputSchema: {

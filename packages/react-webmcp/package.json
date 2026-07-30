@@ -1,7 +1,7 @@
 {
   "name": "@mcp-b/react-webmcp",
   "version": "4.0.0",
-  "description": "React hooks for Model Context Protocol (MCP) - expose React components as AI tools for Claude, ChatGPT, Cursor, and Copilot with Zod validation",
+  "description": "React hooks for Model Context Protocol (MCP) - expose React components as AI tools for Claude, ChatGPT, Cursor, and Copilot",
   "keywords": [
     "ai",
     "ai-agents",
@@ -75,14 +75,15 @@
     "version:patch": "pnpm version patch --no-git-tag-version"
   },
   "dependencies": {
-    "@mcp-b/global": "workspace:*",
-    "@mcp-b/transports": "workspace:*",
     "@mcp-b/webmcp-polyfill": "workspace:*",
     "@mcp-b/webmcp-ts-sdk": "workspace:*",
     "@mcp-b/webmcp-types": "workspace:*",
-    "@modelcontextprotocol/sdk": "catalog:"
+    "@modelcontextprotocol/client": "catalog:",
+    "@modelcontextprotocol/server": "catalog:",
+    "usewebmcp": "workspace:*"
   },
   "devDependencies": {
+    "@mcp-b/global": "workspace:*",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@vitest/coverage-v8": "catalog:",
@@ -95,12 +96,9 @@
     "vitest-browser-react": "^2.0.4"
   },
   "peerDependencies": {
-    "react": "^17.0.0 || ^18.0.0 || ^19.0.0",
-    "zod": "^3.25 || ^4.0"
+    "react": "^17.0.0 || ^18.0.0 || ^19.0.0"
   },
-  "peerDependenciesMeta": {
-    "zod": {
-      "optional": true
-    }
+  "engines": {
+    "node": ">=20"
   }
 }

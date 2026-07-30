@@ -17,7 +17,6 @@ export type {
   JsonObject,
   JsonPrimitive,
   JsonValue,
-  LooseContentBlock,
   RegistrationHandle,
   ResourceContents,
   ResourceLink,
@@ -42,40 +41,35 @@ export type {
   JsonSchemaTypeArray,
 } from './json-schema.js';
 export type {
-  AnyToolDescriptor,
-  InferToolArgs,
-  InferToolResult,
+  ChromeModelContext,
+  ChromeModelContextExecuteToolOptions,
+  ChromeModelContextExtensions,
   ModelContext,
   ModelContextCore,
   ModelContextExtensions,
+  ModelContextGetToolOptions,
   ModelContextRegisterToolOptions,
   ModelContextTesting,
   ModelContextTestingExecuteToolOptions,
-  ModelContextTestingPolyfillExtensions,
   ModelContextTestingToolInfo,
   ModelContextToolInfo,
   ModelContextToolReference,
-  ModelContextToolRegistrationHandle,
   ModelContextWithExtensions,
-  ToolArgsByName,
-  ToolByName,
-  ToolCallEvent,
-  ToolCallParams,
-  ToolName,
-  ToolResultByName,
-  TypedModelContext,
+  RegisteredTool,
 } from './model-context.js';
 export type {
   MaybePromise,
   ModelContextClient,
+  ModelContextTool,
+  ModelContextToolFromSchema,
   ToolAnnotations,
   ToolDescriptor,
   ToolDescriptorFromSchema,
   ToolExecuteResult,
-  ToolExecutionContext,
   ToolListItem,
   ToolRawResult,
   ToolResultFromOutputSchema,
+  WebMcpToolAnnotations,
 } from './tool.js';
 
 // ============================================================================
@@ -87,29 +81,30 @@ declare global {
     /**
      * Web Model Context API strict core surface.
      *
-     * Per WebMCP spec PR webmachinelearning/webmcp#184, each Document owns its
-     * associated ModelContext. This is the canonical install location as of
-     * Chrome 150. Prefer `document.modelContext` for new code.
+     * Each Document owns its associated ModelContext. This is the canonical
+     * WebMCP install location.
+     *
+     * @see {@link https://webmachinelearning.github.io/webmcp/#dom-document-modelcontext}
      */
     readonly modelContext: ModelContext;
   }
 
   interface Navigator {
     /**
-     * Web Model Context API strict core surface.
+     * Removed WebMCP preview alias retained for compatibility with older
+     * Chromium builds and MCP-B polyfills.
      *
-     * @deprecated The modelContext getter moved from Navigator to Document in
-     * Chrome 150 (see webmachinelearning/webmcp#173 / PR #184). Use
-     * `document.modelContext` instead. `navigator.modelContext` is kept as a
-     * backward-compatible alias and will be removed in a future Chrome release.
+     * @deprecated Use `document.modelContext`. Current Chromium no longer
+     * exposes this alias.
      */
-    readonly modelContext: ModelContext;
+    readonly modelContext?: ModelContext;
 
     /**
-     * Web Model Context testing API surface (Chromium early preview).
-     * @deprecated Chromium still exposes this API for testing flows. Producer
-     * discovery/execution should prefer document.modelContext.getTools() and
-     * document.modelContext.executeTool(...).
+     * Removed Chromium testing API retained for older browsers and MCP-B
+     * compatibility shims.
+     *
+     * @deprecated Use `document.modelContext.getTools()` and feature-detect the
+     * optional Chrome `executeTool()` extension.
      */
     modelContextTesting?: ModelContextTesting;
   }

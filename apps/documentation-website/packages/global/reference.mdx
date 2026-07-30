@@ -123,16 +123,16 @@ initializeWebModelContext({
 
 **Initialization sequence:**
 
-1. Calls `initializeWebMCPPolyfill()` to install `document.modelContext` and `navigator.modelContextTesting` (skipped if native API exists).
-2. Saves a reference to the current `document.modelContext` as `native`.
-3. Creates a `BrowserMcpServer` with `{ native }` so core operations mirror to the underlying context.
-4. Syncs existing tools from the native/polyfill context into the server.
-5. Replaces `document.modelContext` with the `BrowserMcpServer` instance.
-6. Creates and connects the transport.
+1. Calls `initializeWebMCPPolyfill()`. When no native context exists, the polyfill installs `document.modelContext`, the deprecated navigator alias, and—when enabled—the MCP-B compatibility testing shim.
+2. Saves a reference to the current document-first context as `native`.
+3. Resolves the tab or iframe transport before mutating either browser surface.
+4. Creates a `BrowserMcpServer` with `{ native }` so registrations mirror to the underlying context.
+5. Replaces `document.modelContext` and the deprecated navigator alias with the server instance.
+6. Starts native-tool reconciliation and connects the transport asynchronously.
 
 ### `cleanupWebModelContext()`
 
-Tears down the adapter, closes transport, and restores `document.modelContext` to its pre-initialization state.
+Tears down the adapter, closes transport, and restores the native or polyfilled context that the adapter wrapped.
 
 ```ts
 import { cleanupWebModelContext } from '@mcp-b/global';
@@ -148,12 +148,11 @@ After cleanup, `initializeWebModelContext()` can be called again to re-initializ
 
 ### `WebModelContextInitOptions`
 
-| Option                       | Type                                  | Default        | Description                                                                               |
-| ---------------------------- | ------------------------------------- | -------------- | ----------------------------------------------------------------------------------------- |
-| `transport`                  | `TransportConfiguration`              | Auto-detect    | Transport layer configuration                                                             |
-| `autoInitialize`             | `boolean`                             | `true`         | Whether to auto-initialize on import                                                      |
-| `nativeModelContextBehavior` | `'preserve' \| 'patch'`               | `'preserve'`   | How to handle an existing native `modelContext`. Both modes wrap with `BrowserMcpServer`. |
-| `installTestingShim`         | `boolean \| 'always' \| 'if-missing'` | `'if-missing'` | Controls `navigator.modelContextTesting` installation                                     |
+| Option               | Type                                  | Default        | Description                                                           |
+| -------------------- | ------------------------------------- | -------------- | --------------------------------------------------------------------- |
+| `transport`          | `TransportConfiguration`              | Auto-detect    | Transport layer configuration                                         |
+| `autoInitialize`     | `boolean`                             | `true`         | Whether to auto-initialize on import                                  |
+| `installTestingShim` | `boolean \| 'always' \| 'if-missing'` | `'if-missing'` | Controls the MCP-B `navigator.modelContextTesting` compatibility shim |
 
 ### `TransportConfiguration`
 
@@ -189,25 +188,30 @@ initializeWebModelContext({
 
 After initialization, `document.modelContext` is a `BrowserMcpServer` instance. It exposes:
 
-**Strict WebMCP methods** (mirrored to native/polyfill):
+**Strict WebMCP members** (mirrored to native/polyfill):
 
-| Method                             | Description                        |
-| ---------------------------------- | ---------------------------------- |
-| `registerTool(tool, options?)`     | Add a single tool                  |
-| `getTools()`                       | List producer tool descriptors     |
-| `executeTool(tool, inputArgsJson)` | Execute a producer tool descriptor |
+| Member                         | Description                                 |
+| ------------------------------ | ------------------------------------------- |
+| `registerTool(tool, options?)` | Add a tool and return `Promise<void>`       |
+| `getTools(options?)`           | Resolve registered producer descriptors     |
+| `toolchange`                   | Notify consumers that the tool list changed |
+
+**Chrome-compatible execution extension** (not part of strict WebMCP):
+
+| Method                                       | Description                                   |
+| -------------------------------------------- | --------------------------------------------- |
+| `executeTool(tool, inputArgsJson, options?)` | Execute a descriptor returned by `getTools()` |
 
 **Extension methods** (MCP-B only):
 
-| Method                         | Description                               |
-| ------------------------------ | ----------------------------------------- |
-| `listTools()`                  | List registered tools                     |
-| `callTool(params)`             | Deprecated compatibility execution helper |
-| `unregisterTool(name)`         | Deprecated compatibility removal helper   |
-| `registerResource(descriptor)` | Register an MCP resource                  |
-| `registerPrompt(descriptor)`   | Register an MCP prompt                    |
-| `createMessage(params)`        | Request LLM sampling                      |
-| `elicitInput(params)`          | Request user input                        |
+| Method                         | Description                             |
+| ------------------------------ | --------------------------------------- |
+| `listTools()`                  | List registered tools                   |
+| `unregisterTool(name)`         | Deprecated compatibility removal helper |
+| `registerResource(descriptor)` | Register an MCP resource                |
+| `registerPrompt(descriptor)`   | Register an MCP prompt                  |
+| `createMessage(params)`        | Request LLM sampling                    |
+| `elicitInput(params)`          | Request user input                      |
 
 For the MCP-B-only methods on `document.modelContext`, see [`@mcp-b/webmcp-ts-sdk` reference](/packages/webmcp-ts-sdk/reference). For the standard-owned browser surface, see [WebMCP standard API](/reference/webmcp/standard-api).
 
@@ -215,27 +219,14 @@ For the MCP-B-only methods on `document.modelContext`, see [`@mcp-b/webmcp-ts-sd
 
 ## Tool routing
 
-`@mcp-b/global` mirrors the strict tool lifecycle down to the underlying native or polyfill context so browser-facing tooling can still see registered tools. During initialization it can also backfill existing tools from `navigator.modelContextTesting` when that shim is available.
+`@mcp-b/global` mirrors registrations down to the underlying native or polyfill context so browser-facing tooling can still see them. Initial reconciliation uses the underlying context's asynchronous `getTools()` method and only runs when Chrome's optional descriptor-based `executeTool()` extension is available. Later `toolchange` events trigger another reconciliation. The MCP-B testing shim is not a native-tool discovery source.
 
 ---
 
 ## Type exports
 
 ```ts
-import type {
-  CallToolResult,
-  InputSchema,
-  ModelContext,
-  ModelContextCore,
-  ModelContextOptions,
-  NativeModelContextBehavior,
-  ToolAnnotations,
-  ToolDescriptor,
-  ToolListItem,
-  ToolResponse,
-  TransportConfiguration,
-  WebModelContextInitOptions,
-} from '@mcp-b/global';
+import type { TransportConfiguration, WebModelContextInitOptions } from '@mcp-b/global';
 ```
 
 ---

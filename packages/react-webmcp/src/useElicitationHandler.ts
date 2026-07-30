@@ -1,24 +1,14 @@
-import type { ElicitationParams, ElicitationResult } from '@mcp-b/webmcp-types';
-import { useCallback, useState } from 'react';
-import { getModelContext, type ModelContextSurface } from './model-context.js';
-
-type ElicitationModelContext = ModelContextSurface & {
-  elicitInput: (params: ElicitationParams) => Promise<ElicitationResult>;
-};
+import type { ElicitRequest, ElicitResult } from '@modelcontextprotocol/server';
+import { useCallback } from 'react';
+import { getBrowserMcpServer } from './model-context.js';
+import { useMcpRequest, type McpRequestState } from './useMcpRequest.js';
+type ElicitationParams = ElicitRequest['params'];
+type ElicitationResult = ElicitResult;
 
 /**
  * State for elicitation requests, tracking the current request and results.
  */
-export interface ElicitationState {
-  /** Whether an elicitation request is currently in progress */
-  isLoading: boolean;
-  /** The last elicitation result received */
-  result: ElicitationResult | null;
-  /** Any error that occurred during the last request */
-  error: Error | null;
-  /** Total number of requests made */
-  requestCount: number;
-}
+export interface ElicitationState extends McpRequestState<ElicitationResult> {}
 
 /**
  * Configuration options for the useElicitation hook.
@@ -114,74 +104,19 @@ export interface UseElicitationReturn {
  * ```
  */
 export function useElicitation(config: UseElicitationConfig = {}): UseElicitationReturn {
-  const { onSuccess, onError } = config;
+  const request = useCallback(async (params: ElicitationParams): Promise<ElicitationResult> => {
+    const modelContext = getBrowserMcpServer();
+    if (!modelContext) {
+      throw new Error('document.modelContext is not available');
+    }
 
-  const [state, setState] = useState<ElicitationState>({
-    isLoading: false,
-    result: null,
-    error: null,
-    requestCount: 0,
-  });
-
-  const reset = useCallback(() => {
-    setState({
-      isLoading: false,
-      result: null,
-      error: null,
-      requestCount: 0,
-    });
+    return modelContext.elicitInput(params);
   }, []);
-
-  const elicitInput = useCallback(
-    async (params: ElicitationParams): Promise<ElicitationResult> => {
-      const mc = getModelContext() as ElicitationModelContext | undefined;
-      if (!mc) {
-        throw new Error('document.modelContext is not available');
-      }
-
-      setState((prev) => ({
-        ...prev,
-        isLoading: true,
-        error: null,
-      }));
-
-      try {
-        const result: ElicitationResult = await mc.elicitInput(params);
-
-        setState((prev) => ({
-          isLoading: false,
-          result,
-          error: null,
-          requestCount: prev.requestCount + 1,
-        }));
-
-        onSuccess?.(result);
-        return result;
-      } catch (err) {
-        const error = err instanceof Error ? err : new Error(String(err));
-
-        setState((prev) => ({
-          ...prev,
-          isLoading: false,
-          error,
-        }));
-
-        onError?.(error);
-        throw error;
-      }
-    },
-    [onSuccess, onError]
-  );
+  const { execute, reset, state } = useMcpRequest(request, config);
 
   return {
     state,
-    elicitInput,
+    elicitInput: execute,
     reset,
   };
 }
-
-// Also export with the old name for backwards compatibility during migration
-export { useElicitation as useElicitationHandler };
-export type { ElicitationState as ElicitationHandlerState };
-export type { UseElicitationConfig as UseElicitationHandlerConfig };
-export type { UseElicitationReturn as UseElicitationHandlerReturn };

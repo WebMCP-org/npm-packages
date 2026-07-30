@@ -33,7 +33,8 @@ Register WebMCP tools in any frontend framework by following its native lifecycl
 
   </Tab>
   <Tab title="@mcp-b/webmcp-polyfill (strict core)">
-    Strict-core only: installs `document.modelContext` with `registerTool`, `getTools`, and `executeTool`. No MCP extensions, no transports.
+    Installs the strict `registerTool` and `getTools` surface on `document.modelContext`, plus a
+    feature-detectable Chrome-compatible `executeTool` extension. No MCP extensions or transports.
 
     ```bash
     npm install @mcp-b/webmcp-polyfill
@@ -160,22 +161,25 @@ Each framework has its own lifecycle hooks for mount and unmount. Register tools
 
     | Package | Use when |
     |---------|----------|
-    | [**@mcp-b/react-webmcp**](/packages/react-webmcp/reference) | You want the full MCP-B surface: Zod schemas, prompts, resources, sampling, elicitation |
+    | [**@mcp-b/react-webmcp**](/packages/react-webmcp/reference) | You want the full MCP-B surface: tools, prompts, resources, sampling, elicitation |
     | [**usewebmcp**](/packages/usewebmcp/reference) | You want strict-core `document.modelContext` tools only |
 
     Both handle registration on mount and cleanup on unmount automatically.
 
     ```tsx "src/components/LikeTool.tsx"
     import { useWebMCP } from '@mcp-b/react-webmcp';
-    import { z } from 'zod';
 
     export function LikeTool() {
       const likeTool = useWebMCP({
         name: 'posts_like',
         description: 'Like a post by ID. Increments the like count.',
         inputSchema: {
-          postId: z.string().uuid().describe('The post ID to like'),
-        },
+          type: 'object',
+          properties: {
+            postId: { type: 'string', description: 'The post ID to like' },
+          },
+          required: ['postId'],
+        } as const,
         annotations: {
           title: 'Like Post',
           readOnlyHint: false,
@@ -207,9 +211,9 @@ Each framework has its own lifecycle hooks for mount and unmount. Register tools
     const count = ref(0);
     let controller: AbortController | undefined;
 
-    onMounted(() => {
+    onMounted(async () => {
       controller = new AbortController();
-      document.modelContext.registerTool(
+      await document.modelContext.registerTool(
         {
           name: 'increment',
           description: 'Increment the counter by a given amount',
@@ -253,7 +257,7 @@ Each framework has its own lifecycle hooks for mount and unmount. Register tools
 
       onMount(() => {
         controller = new AbortController();
-        document.modelContext.registerTool(
+        void document.modelContext.registerTool(
           {
             name: 'increment',
             description: 'Increment the counter by a given amount',
@@ -271,7 +275,7 @@ Each framework has its own lifecycle hooks for mount and unmount. Register tools
             },
           },
           { signal: controller.signal }
-        );
+        ).catch(console.error);
       });
 
       onDestroy(() => {
@@ -299,10 +303,10 @@ Each framework has its own lifecycle hooks for mount and unmount. Register tools
       private toolController?: AbortController;
 
       ngOnInit() {
-        if (!('modelContext' in navigator)) return;
+        if (!('modelContext' in document)) return;
 
         this.toolController = new AbortController();
-        document.modelContext.registerTool(
+        void document.modelContext.registerTool(
           {
             name: 'increment',
             description: 'Increment the counter by a given amount',
@@ -320,7 +324,7 @@ Each framework has its own lifecycle hooks for mount and unmount. Register tools
             },
           },
           { signal: this.toolController.signal }
-        );
+        ).catch(console.error);
       }
 
       ngOnDestroy() {
@@ -337,16 +341,19 @@ Each framework has its own lifecycle hooks for mount and unmount. Register tools
     'use client';
 
     import { useWebMCP } from '@mcp-b/react-webmcp';
-    import { z } from 'zod';
 
     export function DashboardTools() {
       useWebMCP({
         name: 'get_metrics',
         description: 'Get dashboard metrics for a date range',
         inputSchema: {
-          startDate: z.string().describe('ISO date string'),
-          endDate: z.string().describe('ISO date string'),
-        },
+          type: 'object',
+          properties: {
+            startDate: { type: 'string', description: 'ISO date string' },
+            endDate: { type: 'string', description: 'ISO date string' },
+          },
+          required: ['startDate', 'endDate'],
+        } as const,
         handler: async ({ startDate, endDate }) => {
           const res = await fetch(`/api/metrics?start=${startDate}&end=${endDate}`);
           return await res.json();
@@ -366,7 +373,7 @@ Each framework has its own lifecycle hooks for mount and unmount. Register tools
       import '@mcp-b/global';
 
       const controller = new AbortController();
-      document.modelContext.registerTool(
+      await document.modelContext.registerTool(
         {
           name: 'get_page_title',
           description: 'Get the current page title',
@@ -399,7 +406,7 @@ Each framework has its own lifecycle hooks for mount and unmount. Register tools
 
     const controller = new AbortController();
 
-    document.modelContext.registerTool(
+    await document.modelContext.registerTool(
       {
         name: 'get-page-title',
         description: 'Get the current page title',
@@ -437,9 +444,9 @@ React already has dedicated hook packages (`@mcp-b/react-webmcp` and `usewebmcp`
     ) {
       let controller: AbortController | undefined;
 
-      onMounted(() => {
+      onMounted(async () => {
         controller = new AbortController();
-        document.modelContext.registerTool(tool, { signal: controller.signal });
+        await document.modelContext.registerTool(tool, { signal: controller.signal });
       });
 
       onUnmounted(() => {
@@ -471,7 +478,9 @@ React already has dedicated hook packages (`@mcp-b/react-webmcp` and `usewebmcp`
       tool: Parameters<typeof document.modelContext.registerTool>[0]
     ) {
       const controller = new AbortController();
-      document.modelContext.registerTool(tool, { signal: controller.signal });
+      void document.modelContext
+        .registerTool(tool, { signal: controller.signal })
+        .catch(console.error);
 
       return {
         destroy() {
@@ -508,14 +517,16 @@ React already has dedicated hook packages (`@mcp-b/react-webmcp` and `usewebmcp`
     export class WebMCPService implements OnDestroy {
       private controllers = new Map<string, AbortController>();
 
-      registerTool(tool: Parameters<typeof document.modelContext.registerTool>[0]) {
-        if (!('modelContext' in navigator)) return;
+      async registerTool(
+        tool: Parameters<typeof document.modelContext.registerTool>[0]
+      ): Promise<void> {
+        if (!('modelContext' in document)) return;
 
         this.controllers.get(tool.name)?.abort();
 
         const controller = new AbortController();
         this.controllers.set(tool.name, controller);
-        document.modelContext.registerTool(tool, { signal: controller.signal });
+        await document.modelContext.registerTool(tool, { signal: controller.signal });
       }
 
       removeTool(name: string) {
@@ -544,14 +555,16 @@ React already has dedicated hook packages (`@mcp-b/react-webmcp` and `usewebmcp`
       constructor(private webmcp: WebMCPService) {}
 
       ngOnInit() {
-        this.webmcp.registerTool({
-          name: 'get_greeting',
-          description: 'Get a greeting message',
-          inputSchema: { type: 'object', properties: {} },
-          execute: async () => ({
-            content: [{ type: 'text', text: 'Hello from Angular!' }],
-          }),
-        });
+        void this.webmcp
+          .registerTool({
+            name: 'get_greeting',
+            description: 'Get a greeting message',
+            inputSchema: { type: 'object', properties: {} },
+            execute: async () => ({
+              content: [{ type: 'text', text: 'Hello from Angular!' }],
+            }),
+          })
+          .catch(console.error);
       }
 
       ngOnDestroy() {
@@ -589,20 +602,22 @@ React already has dedicated hook packages (`@mcp-b/react-webmcp` and `usewebmcp`
     onMounted(() => {
       if (!import.meta.client) return;
 
-      import('@mcp-b/global').then(() => {
-        controller = new AbortController();
-        document.modelContext.registerTool(
-          {
-            name: 'my_tool',
-            description: 'A tool that only runs on the client',
-            inputSchema: { type: 'object', properties: {} },
-            async execute() {
-              return { content: [{ type: 'text', text: 'Done' }] };
+      void import('@mcp-b/global')
+        .then(async () => {
+          controller = new AbortController();
+          await document.modelContext.registerTool(
+            {
+              name: 'my_tool',
+              description: 'A tool that only runs on the client',
+              inputSchema: { type: 'object', properties: {} },
+              async execute() {
+                return { content: [{ type: 'text', text: 'Done' }] };
+              },
             },
-          },
-          { signal: controller.signal }
-        );
-      });
+            { signal: controller.signal }
+          );
+        })
+        .catch(console.error);
     });
 
     onUnmounted(() => {
@@ -627,7 +642,7 @@ React already has dedicated hook packages (`@mcp-b/react-webmcp` and `usewebmcp`
         if (!browser) return;
 
         controller = new AbortController();
-        document.modelContext.registerTool(
+        void document.modelContext.registerTool(
           {
             name: 'my_tool',
             description: 'A tool that only runs on the client',
@@ -637,7 +652,7 @@ React already has dedicated hook packages (`@mcp-b/react-webmcp` and `usewebmcp`
             },
           },
           { signal: controller.signal }
-        );
+        ).catch(console.error);
       });
 
       onDestroy(() => {
@@ -667,10 +682,10 @@ React already has dedicated hook packages (`@mcp-b/react-webmcp` and `usewebmcp`
       }
 
       ngOnInit() {
-        if (!this.isBrowser || !('modelContext' in navigator)) return;
+        if (!this.isBrowser || !('modelContext' in document)) return;
 
         this.controller = new AbortController();
-        document.modelContext.registerTool(
+        void document.modelContext.registerTool(
           {
             name: 'my_tool',
             description: 'A tool that only runs on the client',
@@ -680,7 +695,7 @@ React already has dedicated hook packages (`@mcp-b/react-webmcp` and `usewebmcp`
             }),
           },
           { signal: this.controller.signal }
-        );
+        ).catch(console.error);
       }
 
       ngOnDestroy() {
@@ -709,7 +724,7 @@ React already has dedicated hook packages (`@mcp-b/react-webmcp` and `usewebmcp`
 Open the browser console and run:
 
 ```javascript
-navigator.modelContextTesting?.listTools();
+await document.modelContext.getTools();
 ```
 
-This returns an array of all registered tools with their names, descriptions, and input schemas. For a richer inspection experience, see [Debug and Troubleshoot](/how-to/debug-and-troubleshoot).
+This resolves to the registered tool descriptors, including their names, descriptions, and serialized input schemas. For a richer inspection experience, see [Debug and Troubleshoot](/how-to/debug-and-troubleshoot).

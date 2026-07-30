@@ -1,5 +1,5 @@
 import '@mcp-b/global';
-import { installBrowserRuntimeContract } from '../../runtime-contract/browser-contract.js';
+import { installModelContextRuntimeContract } from '../../runtime-contract/model-context-contract.js';
 
 function requireElement<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
@@ -18,13 +18,9 @@ function setStatus(status: 'booting' | 'ready' | 'error', text: string) {
   runtimeStatusEl.className = status === 'ready' ? 'status ready' : 'status';
 }
 
-function renderTools() {
+async function renderTools() {
   const modelContext = document.modelContext ?? navigator.modelContext;
-  const names =
-    modelContext
-      ?.listTools()
-      .map((tool) => tool.name)
-      .sort() ?? [];
+  const names = modelContext ? (await modelContext.getTools()).map((tool) => tool.name).sort() : [];
   toolListEl.textContent = JSON.stringify(names, null, 2);
   toolListEl.dataset.count = String(names.length);
 }
@@ -35,8 +31,8 @@ async function bootstrap() {
     throw new Error('document.modelContext is unavailable');
   }
 
-  await installBrowserRuntimeContract(modelContext, { runtimeLabel: 'iframe' });
-  renderTools();
+  await installModelContextRuntimeContract(modelContext, { runtimeLabel: 'iframe' });
+  await renderTools();
   setStatus('ready', 'Iframe runtime ready');
 }
 

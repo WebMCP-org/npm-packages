@@ -225,7 +225,7 @@ test.describe('Production Build - Polyfill Detection Tests', () => {
     page,
   }) => {
     const apiCheck = await page.evaluate((marker): ApiCheck => {
-      const ctx = navigator.modelContext;
+      const ctx = document.modelContext;
       const testing = navigator.modelContextTesting;
 
       if (!ctx || !testing) {

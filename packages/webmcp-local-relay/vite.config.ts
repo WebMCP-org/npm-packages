@@ -12,7 +12,6 @@ const nodeConfig: Options = {
   minify: false,
   target: 'node22',
   platform: 'node',
-  external: [],
   tsconfig: './tsconfig.json',
 };
 
@@ -23,7 +22,9 @@ const browserBase: Partial<Options> = {
   target: 'es2020',
   outDir: 'dist/browser',
   splitting: false,
-  noExternal: [/.*/],
+  deps: {
+    alwaysBundle: [/.*/],
+  },
   treeshake: true,
   minify: true,
   dts: false,

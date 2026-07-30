@@ -5,15 +5,14 @@
 
 import { detectNativeAPI, getAPIInfo } from './api/detection';
 import { templates } from './examples/templates';
-import { installLegacyContextCompat } from './lib/utils';
+import { registerShowcaseTool } from './lib/utils';
 import { mountReactToolExecutor } from './mountReactToolExecutor';
-import type { ModelContext, ModelContextTesting, Tool, ToolInfo } from './types';
+import type { ModelContext, Tool, ToolInfo } from './types';
 import { EventLog } from './ui/eventLog';
 
 // Global instances
 let eventLog: EventLog;
 let modelContext: ModelContext;
-let modelContextTesting: ModelContextTesting;
 
 // Bucket tracking
 let bucketATools: string[] = [];
@@ -24,6 +23,7 @@ const bucketBRegistrations = new Map<string, { unregister: () => void }>();
 let iframeReady = false;
 let iframeTools: string[] = [];
 let iframeBucketBTools: string[] = [];
+let parentToolNames: string[] = [];
 const iframeBucketARegistrations = new Map<string, { unregister: () => void }>();
 const iframeBucketBRegistrations = new Map<string, { unregister: () => void }>();
 
@@ -38,7 +38,7 @@ function unregisterBucketA(): void {
 function registerBucketATools(tools: Tool[]): void {
   unregisterBucketA();
   for (const tool of tools) {
-    bucketARegistrations.set(tool.name, modelContext.registerTool(tool));
+    bucketARegistrations.set(tool.name, registerShowcaseTool(modelContext, tool));
   }
   bucketATools = tools.map((tool) => tool.name);
 }
@@ -111,8 +111,7 @@ function init(): void {
     | (ModelContext & {
         provideContext?: unknown;
         clearContext?: unknown;
-        getTools?: unknown;
-        executeTool?: unknown;
+        unregisterTool?: unknown;
       })
     | undefined;
   (
@@ -126,8 +125,6 @@ function init(): void {
     hasProvideContext: typeof rawModelContext?.provideContext === 'function',
   };
   modelContext = rawModelContext as ModelContext;
-  installLegacyContextCompat(modelContext);
-  modelContextTesting = navigator.modelContextTesting as unknown as ModelContextTesting;
 
   // Initialize UI managers
   eventLog = new EventLog('event-log');
@@ -138,6 +135,7 @@ function init(): void {
   setupToolChangeListener();
   setupIframeEventListeners();
   setupIframeMessageListener();
+  refreshToolDisplay();
 
   eventLog.success('Application initialized', 'Native API ready');
 }
@@ -225,19 +223,11 @@ function setupEventListeners(): void {
   document.getElementById('register-timer-tool')?.addEventListener('click', registerTimerTool);
   document.getElementById('unregister-timer')?.addEventListener('click', unregisterTimerTool);
 
-  // Native methods
+  // Native discovery and Chromium execution extension
   document.getElementById('list-tools')?.addEventListener('click', listToolsDemo);
   document.getElementById('execute-tool')?.addEventListener('click', executeToolDemo);
   document.getElementById('unregister-tool')?.addEventListener('click', unregisterToolDemo);
   document.getElementById('clear-context')?.addEventListener('click', clearContextDemo);
-
-  // Testing API
-  document.getElementById('testing-list-tools')?.addEventListener('click', testingListTools);
-  document.getElementById('testing-execute')?.addEventListener('click', testingExecute);
-  document.getElementById('get-tool-calls')?.addEventListener('click', getToolCalls);
-  document.getElementById('clear-tool-calls')?.addEventListener('click', clearToolCalls);
-  document.getElementById('set-mock')?.addEventListener('click', setMockResponse);
-  document.getElementById('reset-testing')?.addEventListener('click', resetTesting);
 
   // Tool executor
   document.getElementById('exec-button')?.addEventListener('click', executeSelectedTool);
@@ -272,7 +262,7 @@ function executeEditorCode(code: string): void {
   try {
     // Execute the code
     // Note: In a real app, you'd want to sanitize this more carefully
-    // biome-ignore lint/security/noGlobalEval: This is a demo/testing tool
+    // oxlint-disable-next-line no-eval -- the live editor intentionally runs entered tool definitions
     eval(code);
 
     eventLog.success('Code executed', 'Tool registered successfully');
@@ -309,11 +299,18 @@ function hideError(): void {
  * Refresh tool display
  */
 function refreshToolDisplay(): void {
-  const tools = modelContextTesting.listTools();
-  updateToolCount(tools.length);
-  updateToolExecutorSelect(tools);
-  updateReactToolExecutor(tools);
-  updateBucketIndicators();
+  void modelContext
+    .getTools()
+    .then((tools) => {
+      updateToolCount(tools.length);
+      updateToolExecutorSelect(tools);
+      updateReactToolExecutor(tools);
+      updateBucketIndicators();
+      updateParentToolsDisplay(tools.map((tool) => tool.name));
+    })
+    .catch((error: unknown) => {
+      eventLog.error('getTools() failed', error instanceof Error ? error.message : String(error));
+    });
 }
 
 /**
@@ -335,10 +332,24 @@ function updateReactToolExecutor(tools: ToolInfo[]): void {
 
   mountReactToolExecutor(container, tools, async (toolName: string, argsJson: string) => {
     eventLog.info(`Executing "${toolName}"`, argsJson);
-    const result = await modelContextTesting.executeTool(toolName, argsJson);
+    const result = await executeRegisteredTool(toolName, argsJson);
     eventLog.success(`Executed "${toolName}"`, 'Tool executed successfully');
-    return result ?? '';
+    return result;
   });
+}
+
+async function executeRegisteredTool(toolName: string, argsJson: string): Promise<string> {
+  const executeTool = modelContext.executeTool;
+  if (typeof executeTool !== 'function') {
+    throw new Error("This Chromium build doesn't expose the optional executeTool() extension");
+  }
+
+  const tool = (await modelContext.getTools()).find((candidate) => candidate.name === toolName);
+  if (!tool) {
+    throw new Error(`Tool "${toolName}" was not found`);
+  }
+
+  return (await executeTool.call(modelContext, tool, argsJson)) ?? '';
 }
 
 /**
@@ -401,16 +412,8 @@ function provideCounterTools(): void {
     },
     {
       name: 'counter_get',
-      description: 'Get counter value with structured output',
+      description: 'Get counter value as a structured result',
       inputSchema: { type: 'object', properties: {} },
-      outputSchema: {
-        type: 'object',
-        properties: {
-          counter: { type: 'number', description: 'Current counter value' },
-          timestamp: { type: 'string', description: 'ISO timestamp' },
-        },
-        required: ['counter', 'timestamp'],
-      },
       async execute() {
         return { counter, timestamp: new Date().toISOString() };
       },
@@ -484,7 +487,7 @@ function registerTimerTool(): void {
     },
   };
 
-  const registration = modelContext.registerTool(timerTool);
+  const registration = registerShowcaseTool(modelContext, timerTool);
   bucketBRegistrations.set('timer', registration);
 
   eventLog.success('Bucket B updated', 'Timer tool registered via registerTool()');
@@ -505,24 +508,28 @@ function unregisterTimerTool(): void {
 
 // ==================== Native Method Demos ====================
 
-function listToolsDemo(): void {
-  const tools = modelContextTesting.listTools();
-  const result = document.getElementById('native-result');
+async function listToolsDemo(): Promise<void> {
+  try {
+    const tools = await modelContext.getTools();
+    const result = document.getElementById('native-result');
 
-  if (result) {
-    result.textContent = JSON.stringify(
-      tools.map((t) => ({ name: t.name, description: t.description })),
-      null,
-      2
-    );
-    result.classList.remove('hidden');
+    if (result) {
+      result.textContent = JSON.stringify(
+        tools.map((tool) => ({ name: tool.name, description: tool.description })),
+        null,
+        2
+      );
+      result.classList.remove('hidden');
+    }
+
+    eventLog.info('getTools() called', `Found ${tools.length} tools`);
+  } catch (error) {
+    eventLog.error('getTools() failed', error instanceof Error ? error.message : String(error));
   }
-
-  eventLog.info('listTools() called', `Found ${tools.length} tools`);
 }
 
 async function executeToolDemo(): Promise<void> {
-  const tools = modelContextTesting.listTools();
+  const tools = await modelContext.getTools();
   const result = document.getElementById('native-result');
 
   if (tools.length === 0) {
@@ -532,7 +539,7 @@ async function executeToolDemo(): Promise<void> {
 
   try {
     const firstTool = tools[0];
-    const toolResult = await modelContextTesting.executeTool(firstTool.name, JSON.stringify({}));
+    const toolResult = await executeRegisteredTool(firstTool.name, JSON.stringify({}));
 
     if (result) {
       result.textContent = JSON.stringify(toolResult, null, 2);
@@ -558,11 +565,11 @@ function unregisterToolDemo(): void {
   }
 
   const toolName = bucketATools[0];
-  modelContext.unregisterTool(toolName);
+  bucketARegistrations.get(toolName)?.unregister();
   bucketARegistrations.delete(toolName);
   bucketATools = bucketATools.filter((name) => name !== toolName);
 
-  eventLog.success('unregisterTool() called', `Removed "${toolName}" (native method)`);
+  eventLog.success('Registration aborted', `Removed locally owned tool "${toolName}"`);
   refreshToolDisplay();
 }
 
@@ -575,119 +582,6 @@ function clearContextDemo(): void {
 
   eventLog.success('Tools cleared', 'All showcase registrations were unregistered');
   refreshToolDisplay();
-}
-
-// ==================== Testing API Demos ====================
-
-function testingListTools(): void {
-  const tools = modelContextTesting.listTools();
-  const result = document.getElementById('testing-result');
-
-  if (result) {
-    result.textContent = JSON.stringify(
-      tools.map((t) => ({
-        name: t.name,
-        description: t.description,
-        inputSchema: t.inputSchema, // This is a JSON string!
-      })),
-      null,
-      2
-    );
-    result.classList.remove('hidden');
-  }
-
-  eventLog.info('Testing.listTools() called', `Found ${tools.length} tools`);
-}
-
-async function testingExecute(): Promise<void> {
-  const tools = modelContextTesting.listTools();
-  const result = document.getElementById('testing-result');
-
-  if (tools.length === 0) {
-    eventLog.warning('No tools available', 'Register some tools first');
-    return;
-  }
-
-  try {
-    const firstTool = tools[0];
-    // Note: executeTool takes JSON STRING, not object
-    const toolResult = await modelContextTesting.executeTool(firstTool.name, '{}');
-
-    if (result) {
-      result.textContent = `Result (string):\n${toolResult}`;
-      result.classList.remove('hidden');
-    }
-
-    eventLog.success(`Testing.executeTool("${firstTool.name}")`, 'Tool executed successfully');
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    eventLog.error('Testing.executeTool() failed', message);
-
-    if (result) {
-      result.textContent = `Error: ${message}`;
-      result.classList.remove('hidden');
-    }
-  }
-}
-
-function getToolCalls(): void {
-  const calls = modelContextTesting.getToolCalls();
-  const result = document.getElementById('testing-result');
-
-  if (result) {
-    result.textContent = JSON.stringify(calls, null, 2);
-    result.classList.remove('hidden');
-  }
-
-  eventLog.info('getToolCalls() called', `Found ${calls.length} calls`);
-}
-
-function clearToolCalls(): void {
-  modelContextTesting.clearToolCalls();
-  const result = document.getElementById('testing-result');
-
-  if (result) {
-    result.textContent = 'Tool call history cleared';
-    result.classList.remove('hidden');
-  }
-
-  eventLog.success('clearToolCalls() called', 'History cleared');
-}
-
-function setMockResponse(): void {
-  const tools = modelContextTesting.listTools();
-
-  if (tools.length === 0) {
-    eventLog.warning('No tools available', 'Register some tools first');
-    return;
-  }
-
-  const toolName = tools[0].name;
-  const mockResponse = 'This is a mocked response!';
-
-  modelContextTesting.setMockToolResponse(toolName, {
-    content: [{ type: 'text', text: mockResponse }],
-  });
-
-  const result = document.getElementById('testing-result');
-  if (result) {
-    result.textContent = `Mock set for "${toolName}"\nResponse: ${mockResponse}`;
-    result.classList.remove('hidden');
-  }
-
-  eventLog.success('setMockToolResponse() called', `Mocked "${toolName}"`);
-}
-
-function resetTesting(): void {
-  modelContextTesting.reset();
-
-  const result = document.getElementById('testing-result');
-  if (result) {
-    result.textContent = 'Testing API reset';
-    result.classList.remove('hidden');
-  }
-
-  eventLog.success('reset() called', 'Testing state cleared');
 }
 
 // ==================== Tool Executor ====================
@@ -704,7 +598,7 @@ async function executeSelectedTool(): Promise<void> {
 
   try {
     const args = input.value.trim() ? JSON.parse(input.value) : {};
-    const toolResult = await modelContextTesting.executeTool(select.value, JSON.stringify(args));
+    const toolResult = await executeRegisteredTool(select.value, JSON.stringify(args));
     console.log('Tool result:', toolResult);
     if (result) {
       result.textContent = JSON.stringify(toolResult, null, 2);
@@ -931,15 +825,15 @@ function updateIframeToolsDisplay(): void {
 /**
  * Update parent tools display (for iframe section)
  */
-function updateParentToolsDisplay(): void {
+function updateParentToolsDisplay(toolNames: string[]): void {
+  parentToolNames = toolNames;
   const parentToolsDiv = document.getElementById('iframe-parent-tools');
-  const parentTools = modelContext.listTools().map((t) => t.name);
 
   if (parentToolsDiv) {
-    if (parentTools.length === 0) {
+    if (parentToolNames.length === 0) {
       parentToolsDiv.innerHTML = '<span class="text-muted-foreground">No tools</span>';
     } else {
-      parentToolsDiv.innerHTML = parentTools
+      parentToolsDiv.innerHTML = parentToolNames
         .map(
           (t) =>
             `<div class="flex items-center gap-2 py-0.5">
@@ -958,7 +852,7 @@ function updateParentToolsDisplay(): void {
  * Update context comparison display
  */
 function updateContextComparison(): void {
-  const parentTools = new Set(modelContext.listTools().map((t) => t.name));
+  const parentTools = new Set(parentToolNames);
   const childTools = new Set(iframeTools);
 
   // Parent only tools
@@ -1028,11 +922,11 @@ function iframeParentRegisterBucketA(): void {
     },
   };
 
-  iframeBucketARegistrations.set('parent_greet', modelContext.registerTool(tool));
+  iframeBucketARegistrations.set('parent_greet', registerShowcaseTool(modelContext, tool));
 
   iframeEventLog.log('success', 'Parent: Registered parent_greet via registerTool (Bucket A)');
   eventLog.info('Iframe Demo', 'Registered parent_greet in parent context (Bucket A)');
-  updateParentToolsDisplay();
+  refreshToolDisplay();
 }
 
 /**
@@ -1056,7 +950,7 @@ function iframeParentRegisterBucketB(): void {
     },
   };
 
-  const registration = modelContext.registerTool(tool);
+  const registration = registerShowcaseTool(modelContext, tool);
   iframeBucketBRegistrations.set('parent_time', registration);
 
   const btn = document.getElementById('iframe-parent-unregister-b') as HTMLButtonElement;
@@ -1066,7 +960,7 @@ function iframeParentRegisterBucketB(): void {
 
   iframeEventLog.log('success', 'Parent: Registered parent_time via registerTool (Bucket B)');
   eventLog.info('Iframe Demo', 'Registered parent_time in parent context (Bucket B)');
-  updateParentToolsDisplay();
+  refreshToolDisplay();
 }
 
 /**
@@ -1085,7 +979,7 @@ function iframeParentUnregisterBucketB(): void {
 
     iframeEventLog.log('info', 'Parent: Unregistered parent_time (Bucket B)');
     eventLog.info('Iframe Demo', 'Unregistered parent_time from parent context');
-    updateParentToolsDisplay();
+    refreshToolDisplay();
   }
 }
 
@@ -1102,7 +996,7 @@ function iframeParentClearContext(): void {
 
   iframeEventLog.log('info', 'Parent: Iframe demo registrations cleared');
   eventLog.info('Iframe Demo', 'Parent iframe demo registrations cleared');
-  updateParentToolsDisplay();
+  refreshToolDisplay();
 }
 
 // Initialize on load

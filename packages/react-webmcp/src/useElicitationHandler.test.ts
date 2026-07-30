@@ -1,129 +1,96 @@
-import { initializeWebModelContext } from '@mcp-b/global';
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
-import { useElicitation, useElicitationHandler } from './useElicitationHandler.js';
+import { installConnectedModelContext } from './connected-model-context.test-helper.js';
+import { useElicitation } from './useElicitationHandler.js';
 
-const TEST_CHANNEL_ID = `useElicitation-test-${Date.now()}`;
+const FORM_CAPABILITY = { elicitation: { form: {} } } as const;
 
-describe('useElicitation', () => {
-  beforeAll(() => {
-    if (!navigator.modelContext) {
-      initializeWebModelContext({
-        transport: {
-          tabServer: {
-            channelId: TEST_CHANNEL_ID,
-            allowedOrigins: [window.location.origin],
-          },
+describe('useElicitation with a real MCP v2 client', () => {
+  it('requests user input and tracks the accepted result', async () => {
+    const connection = await installConnectedModelContext(FORM_CAPABILITY, (client) => {
+      client.setRequestHandler('elicitation/create', async () => ({
+        action: 'accept',
+        content: { displayName: 'Ada' },
+      }));
+    });
+    let successCount = 0;
+    const hook = await renderHook(() =>
+      useElicitation({
+        onSuccess: () => {
+          successCount += 1;
         },
+      })
+    );
+
+    try {
+      let response: unknown;
+      await hook.act(async () => {
+        response = await hook.result.current.elicitInput({
+          message: 'Choose a display name',
+          requestedSchema: {
+            type: 'object',
+            properties: {
+              displayName: { type: 'string' },
+            },
+            required: ['displayName'],
+          },
+        });
       });
+
+      expect(response).toEqual({
+        action: 'accept',
+        content: { displayName: 'Ada' },
+      });
+      expect(hook.result.current.state).toMatchObject({
+        isLoading: false,
+        error: null,
+        requestCount: 1,
+        result: response,
+      });
+      expect(successCount).toBe(1);
+    } finally {
+      await hook.unmount();
+      await connection.close();
     }
   });
 
-  beforeEach(() => {
-    (
-      navigator.modelContextTesting as
-        | (Navigator['modelContextTesting'] & { reset?: () => void })
-        | undefined
-    )?.reset?.();
-  });
-
-  describe('initial state', () => {
-    it('should have correct initial state', async () => {
-      const { result } = await renderHook(() => useElicitation());
-
-      expect(result.current.state).toEqual({
-        isLoading: false,
-        result: null,
-        error: null,
-        requestCount: 0,
+  it('surfaces protocol request failures through state and callbacks', async () => {
+    const connection = await installConnectedModelContext(FORM_CAPABILITY, (client) => {
+      client.setRequestHandler('elicitation/create', async () => {
+        throw new Error('User input is unavailable');
       });
     });
+    const failures: Error[] = [];
+    const hook = await renderHook(() =>
+      useElicitation({
+        onError: (error) => {
+          failures.push(error);
+        },
+      })
+    );
 
-    it('should provide elicitInput and reset functions', async () => {
-      const { result } = await renderHook(() => useElicitation());
-
-      expect(typeof result.current.elicitInput).toBe('function');
-      expect(typeof result.current.reset).toBe('function');
-    });
-  });
-
-  describe('elicitInput behavior', () => {
-    it('should set error state when elicitInput fails', async () => {
-      const { result, act } = await renderHook(() => useElicitation());
-
-      await act(async () => {
-        try {
-          await result.current.elicitInput({
-            message: 'Configure',
-            requestedSchema: { type: 'object' as const, properties: {} },
-          });
-        } catch {
-          // Expected - elicitInput will fail without a connected client
-        }
+    try {
+      await hook.act(async () => {
+        await expect(
+          hook.result.current.elicitInput({
+            message: 'Choose a display name',
+            requestedSchema: {
+              type: 'object',
+              properties: {
+                displayName: { type: 'string' },
+              },
+            },
+          })
+        ).rejects.toThrow('User input is unavailable');
       });
 
-      // The error state should be set
-      expect(result.current.state.error).not.toBeNull();
-      expect(result.current.state.isLoading).toBe(false);
-    });
-
-    it('should call onError callback when elicitInput fails', async () => {
-      const onError = vi.fn();
-
-      const { result, act } = await renderHook(() => useElicitation({ onError }));
-
-      await act(async () => {
-        try {
-          await result.current.elicitInput({
-            message: 'Configure',
-            requestedSchema: { type: 'object' as const, properties: {} },
-          });
-        } catch {
-          // Expected
-        }
-      });
-
-      expect(onError).toHaveBeenCalled();
-      expect(onError.mock.calls[0][0]).toBeInstanceOf(Error);
-    });
-  });
-
-  describe('reset', () => {
-    it('should reset state to initial values', async () => {
-      const { result, act } = await renderHook(() => useElicitation());
-
-      // First, trigger an error to change state
-      await act(async () => {
-        try {
-          await result.current.elicitInput({
-            message: 'Configure',
-            requestedSchema: { type: 'object' as const, properties: {} },
-          });
-        } catch {
-          // Expected
-        }
-      });
-
-      // Verify state changed
-      expect(result.current.state.error).not.toBeNull();
-
-      // Reset
-      await act(async () => {
-        result.current.reset();
-      });
-
-      expect(result.current.state).toEqual({
-        isLoading: false,
-        result: null,
-        error: null,
-        requestCount: 0,
-      });
-    });
-  });
-
-  describe('backwards compatibility', () => {
-    it('should export useElicitationHandler as an alias', () => {
-      expect(useElicitationHandler).toBe(useElicitation);
-    });
+      expect(hook.result.current.state.isLoading).toBe(false);
+      expect(hook.result.current.state.error).toBeInstanceOf(Error);
+      expect(failures).toHaveLength(1);
+      expect(failures[0]?.message).toContain('User input is unavailable');
+    } finally {
+      await hook.unmount();
+      await connection.close();
+    }
   });
 });

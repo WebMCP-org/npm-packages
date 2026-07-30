@@ -9,12 +9,12 @@ icon: 'react'
 
 ## Version
 
-The 4.0 release line aligns with the document-first WebMCP API. Provider hooks register tools against `document.modelContext` while retaining a `navigator.modelContext` fallback for older preview runtimes.
+The 4.0 release line aligns with the document-first WebMCP API. Provider hooks register tools against `document.modelContext`. An internal fallback to the deprecated `navigator.modelContext` alias remains only for older preview runtimes; application code should not use it.
 
 ## When to use this package
 
 - You want the full MCP-B feature set from React (tools, prompts, resources, sampling, elicitation).
-- You want Zod v3 object-map support and Standard Schema v1 (e.g., Zod v4 `~standard`) in hook configuration.
+- You want JSON Schema or Standard Schema input schemas in hook configuration.
 - You need client/provider hooks (`McpClientProvider`, `useMcpClient`) in addition to browser-exposed tools.
 
 ## When not to use this package
@@ -27,7 +27,6 @@ The 4.0 release line aligns with the document-first WebMCP API. Provider hooks r
 This package sits above the full runtime stack. It expects `document.modelContext` to come from a browser-native implementation or from the MCP-B runtime that wraps the strict core with `BrowserMcpServer`.
 
 React peer dependency: `^17.0.0 || ^18.0.0 || ^19.0.0`.
-Zod peer dependency (optional): `^3.25 || ^4.0`.
 
 ## First step
 
@@ -37,7 +36,7 @@ Initialize the runtime with [`@mcp-b/global`](/packages/global/overview), then a
 
 <CardGroup cols={2}>
   <Card title="Reference" icon="book-open" href="/packages/react-webmcp/reference">
-    Hook APIs, provider APIs, Zod support, and return types.
+    Hook APIs, provider APIs, schema support, and return types.
   </Card>
   <Card title="Your first React tool" icon="graduation-cap" href="/tutorials/first-react-tool">
     Guided tutorial for registering a React tool.

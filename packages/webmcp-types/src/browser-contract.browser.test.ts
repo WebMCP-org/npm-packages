@@ -1,87 +1,71 @@
 import { afterEach, describe, expect, expectTypeOf, it } from 'vitest';
 import type {
-  CallToolResult,
+  ChromeModelContext,
   ModelContext,
+  ModelContextGetToolOptions,
   ModelContextTesting,
-  ModelContextToolInfo,
-  ToolDescriptor,
+  ModelContextTool,
+  RegisteredTool,
 } from './index.js';
 
 const DEFAULT_INPUT_SCHEMA = { type: 'object', properties: {} } as const;
 
-function createModelContextStub(): ModelContext {
-  const tools = new Map<string, ToolDescriptor>();
+class ModelContextStub extends EventTarget {
+  readonly tools = new Map<string, ModelContextTool>();
+  ontoolchange: ((this: ModelContext, event: Event) => unknown) | null = null;
 
-  return {
-    provideContext(options) {
-      tools.clear();
-      for (const tool of options?.tools ?? []) {
-        tools.set(tool.name, tool as ToolDescriptor);
-      }
-    },
-    registerTool(tool) {
-      tools.set((tool as ToolDescriptor).name, tool as ToolDescriptor);
-    },
-    unregisterTool(name) {
-      tools.delete(name);
-    },
-    clearContext() {
-      tools.clear();
-    },
-    async getTools() {
-      return [...tools.values()].map((tool) => ({
-        name: tool.name,
-        title: tool.title ?? '',
-        description: tool.description,
-        inputSchema: JSON.stringify(tool.inputSchema ?? DEFAULT_INPUT_SCHEMA),
-        origin: window.location.origin,
-        window,
-      }));
-    },
-    async executeTool(tool: ModelContextToolInfo, inputArgsJson: string) {
-      const registeredTool = tools.get(tool.name);
-      if (!registeredTool) {
-        throw new Error(`Tool not found: ${tool.name}`);
-      }
-      const result = await registeredTool.execute(JSON.parse(inputArgsJson), {
-        requestUserInteraction: async (callback: () => Promise<unknown>) => callback(),
-      });
-      return JSON.stringify(result);
-    },
-    listTools() {
-      return [...tools.values()].map((tool) => ({
-        name: tool.name,
-        description: tool.description,
-        inputSchema: tool.inputSchema ?? DEFAULT_INPUT_SCHEMA,
-        ...(tool.outputSchema ? { outputSchema: tool.outputSchema } : {}),
-        ...(tool.annotations ? { annotations: tool.annotations } : {}),
-      }));
-    },
-    async callTool(params) {
-      const tool = tools.get(params.name);
-      if (!tool) {
-        throw new Error(`Tool not found: ${params.name}`);
-      }
+  async registerTool(tool: ModelContextTool, options?: { signal?: AbortSignal }): Promise<void> {
+    if (options?.signal?.aborted) {
+      throw options.signal.reason;
+    }
 
-      return tool.execute((params.arguments ?? {}) as Record<string, unknown>, {
-        requestUserInteraction: async (callback: () => Promise<unknown>) => callback(),
-      });
-    },
-    addEventListener() {},
-    removeEventListener() {},
-    dispatchEvent() {
-      return true;
-    },
-  } as unknown as ModelContext;
+    this.tools.set(tool.name, tool);
+    options?.signal?.addEventListener('abort', () => this.tools.delete(tool.name), {
+      once: true,
+    });
+
+    const event = new Event('toolchange');
+    this.ontoolchange?.call(this as unknown as ModelContext, event);
+    this.dispatchEvent(event);
+  }
+
+  async getTools(_options?: ModelContextGetToolOptions): Promise<RegisteredTool[]> {
+    return [...this.tools.values()].map((tool) => ({
+      name: tool.name,
+      ...(tool.title === undefined ? {} : { title: tool.title }),
+      description: tool.description,
+      ...(tool.inputSchema === undefined ? {} : { inputSchema: JSON.stringify(tool.inputSchema) }),
+      origin: window.location.origin,
+      window,
+      ...(tool.annotations === undefined ? {} : { annotations: tool.annotations }),
+    }));
+  }
+
+  async executeTool(tool: RegisteredTool, inputArguments: string): Promise<string> {
+    const registeredTool = this.tools.get(tool.name);
+    if (!registeredTool) {
+      throw new Error(`Tool not found: ${tool.name}`);
+    }
+
+    const result = await registeredTool.execute(JSON.parse(inputArguments));
+    return JSON.stringify(result);
+  }
 }
 
-function createModelContextTestingStub(): ModelContextTesting {
-  return {
-    listTools: () => [],
-    executeTool: async () => '{}',
-    registerToolsChangedCallback: () => {},
-    getCrossDocumentScriptToolResult: async () => '[]',
-  };
+class ModelContextTestingStub extends EventTarget implements ModelContextTesting {
+  ontoolchange: ((this: ModelContextTesting, event: Event) => unknown) | null = null;
+
+  listTools(): [] {
+    return [];
+  }
+
+  async executeTool(): Promise<string> {
+    return '{}';
+  }
+}
+
+function createModelContextStub(): ChromeModelContext {
+  return new ModelContextStub() as unknown as ChromeModelContext;
 }
 
 describe('@mcp-b/webmcp-types browser contract', () => {
@@ -91,15 +75,15 @@ describe('@mcp-b/webmcp-types browser contract', () => {
     delete (navigator as unknown as Record<string, unknown>).modelContextTesting;
   });
 
-  it('keeps document-first global augmentation types for browser consumers', () => {
+  it('keeps document strict and navigator compatibility globals optional', () => {
     expectTypeOf<Document['modelContext']>().toEqualTypeOf<ModelContext>();
-    expectTypeOf<Navigator['modelContext']>().toEqualTypeOf<ModelContext>();
+    expectTypeOf<Navigator['modelContext']>().toEqualTypeOf<ModelContext | undefined>();
     expectTypeOf<Navigator['modelContextTesting']>().toEqualTypeOf<
       ModelContextTesting | undefined
     >();
   });
 
-  it('supports typed tool registration and call flow via document.modelContext', async () => {
+  it('registers and discovers tools through the strict document surface', async () => {
     const context = createModelContextStub();
     Object.defineProperty(document, 'modelContext', {
       configurable: true,
@@ -108,28 +92,60 @@ describe('@mcp-b/webmcp-types browser contract', () => {
       value: context,
     });
 
-    const tool: ToolDescriptor<{ count: number }, CallToolResult, 'counter'> = {
+    const tool: ModelContextTool<{ count: number }, { count: number }, 'counter'> = {
       name: 'counter',
-      description: 'Returns count text',
+      description: 'Returns the supplied count',
       inputSchema: DEFAULT_INPUT_SCHEMA,
-      async execute(args) {
-        return { content: [{ type: 'text', text: String(args.count) }] };
+      async execute(input) {
+        return { count: input.count };
       },
     };
 
-    document.modelContext.registerTool(tool);
+    await document.modelContext.registerTool(tool);
+    const registeredTools = await document.modelContext.getTools();
 
-    const result = await document.modelContext.callTool({
+    expect(registeredTools).toHaveLength(1);
+    expect(registeredTools[0]).toMatchObject({
       name: 'counter',
-      arguments: { count: 3 },
+      description: 'Returns the supplied count',
     });
-
-    expect(result.content[0]?.type).toBe('text');
-    expect(result.content[0]?.text).toBe('3');
-    expectTypeOf(result).toMatchTypeOf<CallToolResult>();
+    expectTypeOf(registeredTools).toEqualTypeOf<RegisteredTool[]>();
   });
 
-  it('keeps deprecated navigator.modelContext usable for backward-compatible consumers', async () => {
+  it('feature-detects Chromium executeTool outside the strict core', async () => {
+    const context = createModelContextStub();
+    Object.defineProperty(document, 'modelContext', {
+      configurable: true,
+      enumerable: true,
+      writable: false,
+      value: context,
+    });
+
+    await document.modelContext.registerTool({
+      name: 'chrome_counter',
+      description: 'Returns the supplied count through the Chrome extension',
+      inputSchema: DEFAULT_INPUT_SCHEMA,
+      async execute(input: Record<string, unknown>) {
+        return { count: input.count };
+      },
+    });
+
+    const executeTool = context.executeTool;
+    if (!executeTool) {
+      throw new Error('Expected the test stub to expose the Chromium executeTool extension');
+    }
+
+    const [registeredTool] = await document.modelContext.getTools();
+    if (!registeredTool) {
+      throw new Error('Expected the registered tool to be discoverable');
+    }
+
+    await expect(
+      executeTool.call(context, registeredTool, JSON.stringify({ count: 3 }))
+    ).resolves.toBe(JSON.stringify({ count: 3 }));
+  });
+
+  it('keeps navigator.modelContext as optional deprecated compatibility', async () => {
     const context = createModelContextStub();
     Object.defineProperty(navigator, 'modelContext', {
       configurable: true,
@@ -137,29 +153,26 @@ describe('@mcp-b/webmcp-types browser contract', () => {
       get: () => context,
     });
 
-    const tool: ToolDescriptor<{ count: number }, CallToolResult, 'legacy_counter'> = {
+    const compatibilityContext = navigator.modelContext;
+    if (!compatibilityContext) {
+      throw new Error('Expected the test compatibility alias to be installed');
+    }
+
+    await compatibilityContext.registerTool({
       name: 'legacy_counter',
-      description: 'Returns count text through the legacy surface',
-      inputSchema: DEFAULT_INPUT_SCHEMA,
-      async execute(args) {
-        return { content: [{ type: 'text', text: String(args.count) }] };
+      description: 'Returns a count through the deprecated alias',
+      async execute() {
+        return { count: 4 };
       },
-    };
-
-    navigator.modelContext.registerTool(tool);
-
-    const result = await navigator.modelContext.callTool({
-      name: 'legacy_counter',
-      arguments: { count: 4 },
     });
 
-    expect(result.content[0]?.type).toBe('text');
-    expect(result.content[0]?.text).toBe('4');
-    expectTypeOf(result).toMatchTypeOf<CallToolResult>();
+    await expect(compatibilityContext.getTools()).resolves.toEqual([
+      expect.objectContaining({ name: 'legacy_counter' }),
+    ]);
   });
 
-  it('supports modelContextTesting typing in browser runtime', () => {
-    const testing = createModelContextTestingStub();
+  it('keeps modelContextTesting as optional deprecated compatibility', () => {
+    const testing = new ModelContextTestingStub();
     Object.defineProperty(navigator, 'modelContextTesting', {
       configurable: true,
       enumerable: true,

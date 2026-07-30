@@ -1,6 +1,12 @@
-// @vitest-environment happy-dom
-import type { InputSchema, ToolDescriptor } from '@mcp-b/webmcp-types';
+import type {
+  ChromeModelContextExtensions,
+  InputSchema,
+  ModelContext,
+  ModelContextRegisterToolOptions,
+  ToolDescriptor,
+} from '@mcp-b/webmcp-types';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import * as polyfillRoot from './index.js';
 import {
   cleanupWebMCPPolyfill,
   initializeWebMCPPolyfill,
@@ -8,7 +14,9 @@ import {
 } from './index.js';
 import { toJsonValue } from './schema.js';
 
-type CompatModelContext = Navigator['modelContext'] & {
+type CompatModelContext = {
+  executeTool: NonNullable<ChromeModelContextExtensions['executeTool']>;
+  registerTool(tool: ToolDescriptor, options?: ModelContextRegisterToolOptions): Promise<void>;
   unregisterTool(nameOrTool: string | { name: string }): void;
 };
 
@@ -17,13 +25,24 @@ function asPolyfillInputSchema(schema: unknown): InputSchema {
 }
 
 function getCompatModelContext(): CompatModelContext {
-  return navigator.modelContext as CompatModelContext;
+  return document.modelContext as unknown as CompatModelContext;
 }
 
-function expectInvalidStateError(register: () => void, message?: string | RegExp): void {
+function getDeprecatedNavigatorModelContext(): NonNullable<Navigator['modelContext']> {
+  const context = navigator.modelContext;
+  if (!context) {
+    throw new Error('Expected the deprecated navigator.modelContext alias');
+  }
+  return context;
+}
+
+async function expectInvalidStateError(
+  register: () => Promise<void>,
+  message?: string | RegExp
+): Promise<void> {
   try {
-    register();
-    expect.fail('Expected registerTool to throw InvalidStateError');
+    await register();
+    expect.fail('Expected registerTool to reject with InvalidStateError');
   } catch (error) {
     expect(error).toMatchObject({ name: 'InvalidStateError' });
     if (message !== undefined) {
@@ -43,20 +62,10 @@ describe('@mcp-b/webmcp-polyfill', () => {
     expect(typeof cleanupWebMCPPolyfill).toBe('function');
   });
 
-  it('installs strict core methods on navigator.modelContext', () => {
-    initializeWebMCPPolyfill();
-
-    expect(
-      typeof (navigator.modelContext as unknown as { provideContext?: unknown }).provideContext
-    ).toBe('undefined');
-    expect(
-      typeof (navigator.modelContext as unknown as { clearContext?: unknown }).clearContext
-    ).toBe('undefined');
-    expect(typeof navigator.modelContext.registerTool).toBe('function');
-    expect(typeof navigator.modelContext.getTools).toBe('function');
-    expect(typeof getCompatModelContext().unregisterTool).toBe('function');
-    expect(typeof navigator.modelContext.ontoolchange).toBe('object');
-    expect((navigator.modelContext as unknown as { callTool?: unknown }).callTool).toBeUndefined();
+  it('keeps schema utilities on the schema entry point', () => {
+    expect('normalizeInputSchema' in polyfillRoot).toBe(false);
+    expect('toJsonValue' in polyfillRoot).toBe(false);
+    expect(typeof toJsonValue).toBe('function');
   });
 
   it('installs strict core methods on document.modelContext', () => {
@@ -70,7 +79,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
     ).toBe('undefined');
     expect(typeof document.modelContext.registerTool).toBe('function');
     expect(typeof document.modelContext.getTools).toBe('function');
-    expect(typeof (document.modelContext as CompatModelContext).unregisterTool).toBe('function');
+    expect(typeof getCompatModelContext().unregisterTool).toBe('function');
     expect(typeof document.modelContext.ontoolchange).toBe('object');
     expect((document.modelContext as unknown as { callTool?: unknown }).callTool).toBeUndefined();
   });
@@ -101,29 +110,29 @@ describe('@mcp-b/webmcp-polyfill', () => {
     expect(document.modelContext).toBe(originalDocumentModelContext);
   });
 
-  it('document.modelContext and navigator.modelContext share the same instance', () => {
+  it('document.modelContext and navigator.modelContext share the same instance', async () => {
     initializeWebMCPPolyfill();
 
     // Per WebMCP PR #184, document.modelContext is canonical and
     // navigator.modelContext is a deprecated alias to the same registry.
     // Tools registered on either surface must be observable on the other.
-    expect(document.modelContext).toBe(navigator.modelContext);
+    expect(document.modelContext).toBe(getDeprecatedNavigatorModelContext());
 
-    document.modelContext.registerTool({
+    await getDeprecatedNavigatorModelContext().registerTool({
       name: 'shared_registry_tool',
-      description: 'Tool registered via document.modelContext',
+      description: 'Tool registered via navigator.modelContext',
       inputSchema: { type: 'object', properties: {} },
       execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
     });
 
-    expect(() =>
-      navigator.modelContext.registerTool({
+    await expect(
+      document.modelContext.registerTool({
         name: 'shared_registry_tool',
-        description: 'Conflicting registration via navigator.modelContext',
+        description: 'Conflicting registration via document.modelContext',
         inputSchema: { type: 'object', properties: {} },
         execute: async () => ({ content: [{ type: 'text', text: 'second' }] }),
       })
-    ).toThrow('Tool already registered: shared_registry_tool');
+    ).rejects.toThrow('Tool already registered: shared_registry_tool');
   });
 
   it('logs a one-time deprecation warning when navigator.modelContext is accessed', () => {
@@ -133,10 +142,10 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
     try {
       // First read triggers the warning.
-      void navigator.modelContext;
+      void getDeprecatedNavigatorModelContext();
       // Subsequent reads must not re-warn.
-      void navigator.modelContext;
-      void navigator.modelContext;
+      void getDeprecatedNavigatorModelContext();
+      void getDeprecatedNavigatorModelContext();
 
       expect(warnSpy).toHaveBeenCalledWith(
         '[WebMCPPolyfill] navigator.modelContext is deprecated. The May 27, 2026 WebMCP draft moved the modelContext getter from Navigator to Document — use document.modelContext instead. See https://github.com/webmachinelearning/webmcp/pull/184.'
@@ -173,66 +182,55 @@ describe('@mcp-b/webmcp-polyfill', () => {
     });
 
     await expect(firstResult).resolves.toBeUndefined();
-    expect(() =>
+    await expect(
       document.modelContext.registerTool({
         name: 'echo',
         description: 'Echo back input again',
         inputSchema: { type: 'object', properties: {} },
         execute: async () => ({ content: [{ type: 'text', text: 'second' }] }),
       })
-    ).toThrow('Tool already registered: echo');
+    ).rejects.toThrow('Tool already registered: echo');
   });
 
-  it('throws on invalid inputSchema during registration', () => {
+  it('serializes inputSchema without semantically validating JSON Schema keywords', async () => {
     initializeWebMCPPolyfill();
 
-    expect(() =>
-      navigator.modelContext.registerTool({
-        name: 'invalid_schema_tool',
-        description: 'Invalid schema',
+    await expect(
+      document.modelContext.registerTool({
+        name: 'schema_metadata_tool',
+        description: 'Schema metadata',
         inputSchema: {
           type: 123 as unknown as string,
         },
-        execute: async () => ({ content: [{ type: 'text', text: 'never' }] }),
+        execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
       })
-    ).toThrow('Invalid JSON Schema at $: "type" must be a string or string[]');
+    ).resolves.toBeUndefined();
+
+    await expect(document.modelContext.getTools()).resolves.toMatchObject([
+      {
+        name: 'schema_metadata_tool',
+        inputSchema: '{"type":123}',
+      },
+    ]);
   });
 
-  it('supports requestUserInteraction and enforces client lifecycle', async () => {
+  it('invokes the standard execute callback with only the input argument', async () => {
     initializeWebMCPPolyfill();
+    let argumentCount = 0;
 
-    let capturedClient: {
-      requestUserInteraction: (cb: () => Promise<unknown>) => Promise<unknown>;
-    } | null = null;
-
-    navigator.modelContext.registerTool({
-      name: 'interaction_tool',
-      description: 'Uses requestUserInteraction',
-      inputSchema: { type: 'object', properties: {} },
-      execute: async (_args, client) => {
-        capturedClient = client;
-        const result = await client.requestUserInteraction(async () => ({ approved: true }));
-        return {
-          content: [{ type: 'text', text: JSON.stringify(result) }],
-        };
+    await document.modelContext.registerTool({
+      name: 'standard_callback_shape',
+      description: 'Checks the WebMCP callback shape',
+      async execute() {
+        argumentCount = arguments.length;
+        return 'ok';
       },
     });
 
-    const serialized = await navigator.modelContextTesting?.executeTool('interaction_tool', '{}');
-    expect(serialized).toContain('approved');
-    expect(capturedClient).not.toBeNull();
-
-    if (!capturedClient) {
-      throw new Error('Expected capturedClient to be set');
-    }
-
-    const closedClient = capturedClient as {
-      requestUserInteraction: (cb: () => Promise<unknown>) => Promise<unknown>;
-    };
-
-    await expect(closedClient.requestUserInteraction(async () => ({ late: true }))).rejects.toThrow(
-      'ModelContextClient for tool "interaction_tool" is no longer active'
-    );
+    const [tool] = await document.modelContext.getTools();
+    if (!tool) throw new Error('Expected the registered tool');
+    await getCompatModelContext().executeTool(tool, '{}');
+    expect(argumentCount).toBe(1);
   });
 
   it('unregisterTool on unknown names is a no-op', () => {
@@ -250,7 +248,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
       execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
     };
 
-    navigator.modelContext.registerTool(tool);
+    await getCompatModelContext().registerTool(tool);
     getCompatModelContext().unregisterTool(tool);
 
     await expect(
@@ -266,7 +264,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
     );
   });
 
-  it('warns that unregisterTool is deprecated while preserving behavior', () => {
+  it('warns that unregisterTool is deprecated while preserving behavior', async () => {
     initializeWebMCPPolyfill();
 
     const tool = {
@@ -275,17 +273,12 @@ describe('@mcp-b/webmcp-polyfill', () => {
       inputSchema: { type: 'object', properties: {} },
       execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
     };
-    navigator.modelContext.registerTool(tool);
+    await document.modelContext.registerTool(tool);
 
-    // Re-registration throws iff the tool is in the registry.
-    expect(() => navigator.modelContext.registerTool(tool)).toThrow(
+    // Re-registration rejects iff the tool is in the registry.
+    await expect(document.modelContext.registerTool(tool)).rejects.toThrow(
       'Tool already registered: deprecation_tool'
     );
-
-    // Drain the one-shot navigator.modelContext deprecation warning before the spy
-    // is installed — the surface under test here is the unregisterTool deprecation,
-    // not the navigator-vs-document migration warning.
-    void navigator.modelContext;
 
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
@@ -294,17 +287,17 @@ describe('@mcp-b/webmcp-polyfill', () => {
       getCompatModelContext().unregisterTool('deprecation_tool');
 
       expect(warnSpy).toHaveBeenCalledWith(
-        '[WebMCPPolyfill] navigator.modelContext.unregisterTool() is deprecated. The April 23, 2026 WebMCP draft removed it in favor of registerTool(tool, { signal }) — pass an AbortSignal and abort it to unregister.'
+        '[WebMCPPolyfill] document.modelContext.unregisterTool() is deprecated. The April 23, 2026 WebMCP draft removed it in favor of registerTool(tool, { signal }) — pass an AbortSignal and abort it to unregister.'
       );
       expect(warnSpy).toHaveBeenCalledTimes(1);
     } finally {
       warnSpy.mockRestore();
     }
 
-    expect(() => navigator.modelContext.registerTool(tool)).not.toThrow();
+    await expect(document.modelContext.registerTool(tool)).resolves.toBeUndefined();
   });
 
-  it('registerTool with options.signal unregisters when the signal aborts', () => {
+  it('registerTool with options.signal unregisters when the signal aborts', async () => {
     initializeWebMCPPolyfill();
 
     const tool = {
@@ -315,22 +308,23 @@ describe('@mcp-b/webmcp-polyfill', () => {
     };
 
     const ac = new AbortController();
-    navigator.modelContext.registerTool(tool, { signal: ac.signal });
+    await document.modelContext.registerTool(tool, { signal: ac.signal });
 
-    expect(() => navigator.modelContext.registerTool(tool)).toThrow(
+    await expect(document.modelContext.registerTool(tool)).rejects.toThrow(
       'Tool already registered: signal_tool'
     );
 
     ac.abort();
 
-    expect(() => navigator.modelContext.registerTool(tool)).not.toThrow();
+    await expect(document.modelContext.registerTool(tool)).resolves.toBeUndefined();
   });
 
   it('registerTool with a pre-aborted signal rejects and does not register the tool', async () => {
     initializeWebMCPPolyfill();
 
     const ac = new AbortController();
-    ac.abort();
+    const reason = { code: 'registration-cancelled' };
+    ac.abort(reason);
 
     const tool = {
       name: 'preaborted_tool',
@@ -339,11 +333,54 @@ describe('@mcp-b/webmcp-polyfill', () => {
       execute: async () => ({ content: [{ type: 'text', text: 'never' }] }),
     };
 
-    await expect(navigator.modelContext.registerTool(tool, { signal: ac.signal })).rejects.toThrow(
-      /aborted/i
+    await expect(document.modelContext.registerTool(tool, { signal: ac.signal })).rejects.toBe(
+      reason
     );
 
-    expect(() => navigator.modelContext.registerTool(tool)).not.toThrow();
+    await expect(document.modelContext.registerTool(tool)).resolves.toBeUndefined();
+  });
+
+  it('does not let an old registration signal remove a same-name replacement', async () => {
+    initializeWebMCPPolyfill();
+    const originalController = new AbortController();
+    const original = {
+      name: 'signal_replacement_tool',
+      description: 'Original registration',
+      execute: async () => ({ version: 'original' }),
+    };
+    await document.modelContext.registerTool(original, { signal: originalController.signal });
+    getCompatModelContext().unregisterTool(original);
+
+    await document.modelContext.registerTool({
+      ...original,
+      description: 'Replacement registration',
+      execute: async () => ({ version: 'replacement' }),
+    });
+    originalController.abort();
+
+    const [registered] = await document.modelContext.getTools();
+    expect(registered?.name).toBe('signal_replacement_tool');
+    await expect(getCompatModelContext().executeTool(registered!, '{}')).resolves.toBe(
+      '{"version":"replacement"}'
+    );
+  });
+
+  it('rejects untrustworthy cross-origin options with SecurityError', async () => {
+    initializeWebMCPPolyfill();
+
+    await expect(
+      document.modelContext.registerTool(
+        {
+          name: 'untrustworthy_exposure',
+          description: 'Must not register',
+          execute: async () => null,
+        },
+        { exposedTo: ['http://example.com'] }
+      )
+    ).rejects.toMatchObject({ name: 'SecurityError' });
+    await expect(
+      document.modelContext.getTools({ fromOrigins: ['not an origin'] })
+    ).rejects.toMatchObject({ name: 'SecurityError' });
   });
 
   it('fires toolchange event for registry mutations', async () => {
@@ -354,7 +391,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
       count += 1;
     });
 
-    navigator.modelContext.registerTool({
+    await document.modelContext.registerTool({
       name: 't1',
       description: 'tool 1',
       inputSchema: { type: 'object', properties: {} },
@@ -363,16 +400,15 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
     getCompatModelContext().unregisterTool('t1');
 
-    await Promise.resolve();
-    await Promise.resolve();
-
-    expect(count).toBe(1);
+    await vi.waitFor(() => {
+      expect(count).toBe(2);
+    });
   });
 
   it('exposes native-shaped getTools on document.modelContext', async () => {
     initializeWebMCPPolyfill();
 
-    document.modelContext.registerTool({
+    await document.modelContext.registerTool({
       name: 'native_get_tools_shape',
       title: 'Native Tool',
       description: 'Native getTools shape',
@@ -397,10 +433,78 @@ describe('@mcp-b/webmcp-polyfill', () => {
     ]);
   });
 
+  it('returns strict, sorted WebMCP tool metadata', async () => {
+    initializeWebMCPPolyfill();
+
+    const exactSchema = {
+      properties: { value: { type: 'string' } },
+      required: ['value'],
+      additionalProperties: false,
+    };
+
+    await document.modelContext.registerTool({
+      name: 'a_tool',
+      description: 'No schema',
+      execute: async () => ({ content: [] }),
+    });
+    await getCompatModelContext().registerTool({
+      name: 'Z_tool',
+      description: 'Exact schema and sanitized annotations',
+      inputSchema: exactSchema,
+      annotations: {
+        readOnlyHint: true,
+        untrustedContentHint: false,
+        destructiveHint: true,
+        title: 'MCP-only annotation',
+      },
+      execute: async () => ({ content: [] }),
+    });
+    await document.modelContext.registerTool({
+      name: '_tool',
+      description: 'Sort sentinel',
+      execute: async () => ({ content: [] }),
+    });
+
+    const tools = await document.modelContext.getTools();
+
+    expect(tools.map(({ name }) => name)).toEqual(['Z_tool', '_tool', 'a_tool']);
+    expect(tools[0]).toMatchObject({
+      title: '',
+      inputSchema: JSON.stringify(exactSchema),
+      annotations: {
+        readOnlyHint: true,
+        untrustedContentHint: false,
+      },
+    });
+    expect(tools[0]?.annotations).toEqual({
+      readOnlyHint: true,
+      untrustedContentHint: false,
+    });
+    expect(tools[2]).not.toHaveProperty('inputSchema');
+  });
+
+  it('warns once when cross-origin discovery is requested', async () => {
+    initializeWebMCPPolyfill();
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      await document.modelContext.getTools({ fromOrigins: ['https://example.com'] });
+      await document.modelContext.getTools({ fromOrigins: ['https://example.org'] });
+      await document.modelContext.getTools({ fromOrigins: [] });
+
+      expect(warnSpy).toHaveBeenCalledOnce();
+      expect(warnSpy).toHaveBeenCalledWith(
+        '[WebMCPPolyfill] Cross-document getTools({ fromOrigins }) discovery requires native WebMCP and is not available in the local polyfill.'
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
   it('executes registered tool objects from document.modelContext.getTools', async () => {
     initializeWebMCPPolyfill();
 
-    document.modelContext.registerTool({
+    await document.modelContext.registerTool({
       name: 'native_execute_tool_shape',
       title: 'Native Execute Tool',
       description: 'Native executeTool shape',
@@ -413,9 +517,40 @@ describe('@mcp-b/webmcp-polyfill', () => {
     });
 
     const [tool] = await document.modelContext.getTools();
-    const result = await document.modelContext.executeTool(tool!, JSON.stringify({ value: 'ok' }));
+    const result = await getCompatModelContext().executeTool(
+      tool!,
+      JSON.stringify({ value: 'ok' })
+    );
 
     expect(result).toBe('{"echoed":"ok"}');
+  });
+
+  it('rejects opaque origins and disabled origin isolation during native-shaped execution', async () => {
+    initializeWebMCPPolyfill();
+    await document.modelContext.registerTool({
+      name: 'secured_execute_tool',
+      description: 'Checks execution security gates',
+      execute: async () => 'ok',
+    });
+    const [tool] = await document.modelContext.getTools();
+
+    await expect(
+      getCompatModelContext().executeTool({ ...tool!, origin: 'data:text/html,test' }, '{}')
+    ).rejects.toMatchObject({ name: 'NotSupportedError' });
+
+    const previous = Object.getOwnPropertyDescriptor(globalThis, 'originAgentCluster');
+    Object.defineProperty(globalThis, 'originAgentCluster', {
+      configurable: true,
+      value: false,
+    });
+    try {
+      await expect(getCompatModelContext().executeTool(tool!, '{}')).rejects.toMatchObject({
+        name: 'SecurityError',
+      });
+    } finally {
+      if (previous) Object.defineProperty(globalThis, 'originAgentCluster', previous);
+      else delete (globalThis as { originAgentCluster?: boolean }).originAgentCluster;
+    }
   });
 
   it('fires producer toolchange events and ontoolchange for document registry mutations', async () => {
@@ -426,12 +561,17 @@ describe('@mcp-b/webmcp-polyfill', () => {
     document.modelContext.addEventListener('toolchange', () => {
       listenerCount += 1;
     });
-    document.modelContext.ontoolchange = () => {
+    let handlerTarget: EventTarget | null = null;
+    let handlerThis: ModelContext | null = null;
+    document.modelContext.ontoolchange = function (event) {
       handlerCount += 1;
+      handlerTarget = event.target;
+      // oxlint-disable-next-line typescript/no-this-alias -- verifies EventHandler `this` binding.
+      handlerThis = this;
     };
 
     const controller = new AbortController();
-    document.modelContext.registerTool(
+    await document.modelContext.registerTool(
       {
         name: 'producer_event_tool',
         description: 'Producer event tool',
@@ -442,11 +582,28 @@ describe('@mcp-b/webmcp-polyfill', () => {
     );
 
     controller.abort();
-    await Promise.resolve();
-    await Promise.resolve();
+    await vi.waitFor(() => {
+      expect(listenerCount).toBe(2);
+      expect(handlerCount).toBe(2);
+    });
+    expect(handlerTarget).toBe(document.modelContext);
+    expect(handlerThis).toBe(document.modelContext);
+  });
 
-    expect(listenerCount).toBe(1);
-    expect(handlerCount).toBe(1);
+  it('keeps the ontoolchange listener position when its callback is replaced', async () => {
+    initializeWebMCPPolyfill();
+    const order: string[] = [];
+    document.modelContext.ontoolchange = () => order.push('first');
+    document.modelContext.addEventListener('toolchange', () => order.push('listener'));
+    document.modelContext.ontoolchange = () => order.push('replacement');
+
+    await document.modelContext.registerTool({
+      name: 'handler_order_tool',
+      description: 'Checks event handler ordering',
+      execute: async () => null,
+    });
+
+    expect(order).toEqual(['replacement', 'listener']);
   });
 
   // =========================================================================
@@ -488,12 +645,12 @@ describe('@mcp-b/webmcp-polyfill', () => {
       initializeWebMCPPolyfill();
 
       expect(document.modelContext).toBe(fakeContext);
-      expect(navigator.modelContext).toBe(fakeContext);
+      expect(getDeprecatedNavigatorModelContext()).toBe(fakeContext);
       expect(navigator.modelContextTesting).toBeUndefined();
 
       cleanupWebMCPPolyfill();
       expect('modelContext' in document).toBe(false);
-      expect(navigator.modelContext).toBe(fakeContext);
+      expect(getDeprecatedNavigatorModelContext()).toBe(fakeContext);
 
       delete (navigator as unknown as Record<string, unknown>).modelContext;
     });
@@ -515,12 +672,12 @@ describe('@mcp-b/webmcp-polyfill', () => {
       initializeWebMCPPolyfill();
 
       expect(document.modelContext).toBe(documentContext);
-      expect(navigator.modelContext).toBe(navigatorContext);
+      expect(getDeprecatedNavigatorModelContext()).toBe(navigatorContext);
       expect(navigator.modelContextTesting).toBeUndefined();
 
       cleanupWebMCPPolyfill();
       expect(document.modelContext).toBe(documentContext);
-      expect(navigator.modelContext).toBe(navigatorContext);
+      expect(getDeprecatedNavigatorModelContext()).toBe(navigatorContext);
 
       delete (document as unknown as Record<string, unknown>).modelContext;
       delete (navigator as unknown as Record<string, unknown>).modelContext;
@@ -528,7 +685,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
     it('does not install modelContextTesting when installTestingShim=false', () => {
       initializeWebMCPPolyfill({ installTestingShim: false });
-      expect(navigator.modelContext).toBeDefined();
+      expect(document.modelContext).toBeDefined();
       expect(navigator.modelContextTesting).toBeUndefined();
     });
 
@@ -545,7 +702,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
       initializeWebMCPPolyfill();
 
-      expect(navigator.modelContext).toBeDefined();
+      expect(document.modelContext).toBeDefined();
       expect(navigator.modelContextTesting).toBe(existingTesting);
 
       cleanupWebMCPPolyfill();
@@ -565,7 +722,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
       initializeWebMCPPolyfill({ installTestingShim: 'always' });
 
-      expect(navigator.modelContext).toBeDefined();
+      expect(document.modelContext).toBeDefined();
       expect(navigator.modelContextTesting).not.toBe(existingTesting);
       expect(typeof navigator.modelContextTesting?.executeTool).toBe('function');
 
@@ -575,10 +732,10 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
     it('is idempotent when already installed', () => {
       initializeWebMCPPolyfill();
-      const first = navigator.modelContext;
+      const first = document.modelContext;
 
       initializeWebMCPPolyfill();
-      const second = navigator.modelContext;
+      const second = document.modelContext;
 
       expect(first).toBe(second);
       expect(typeof second.registerTool).toBe('function');
@@ -613,10 +770,12 @@ describe('@mcp-b/webmcp-polyfill', () => {
       });
 
       initializeWebMCPPolyfill();
-      expect((navigator.modelContext as unknown as { original?: boolean }).original).toBe(true);
+      expect((document.modelContext as unknown as { original?: boolean }).original).toBe(true);
 
       cleanupWebMCPPolyfill();
-      expect((navigator.modelContext as unknown as { original?: boolean }).original).toBe(true);
+      expect(
+        (getDeprecatedNavigatorModelContext() as unknown as { original?: boolean }).original
+      ).toBe(true);
       expect(
         (navigator.modelContextTesting as unknown as { originalTesting?: boolean }).originalTesting
       ).toBe(true);
@@ -629,7 +788,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
     it('removes installed document and navigator surfaces after a full polyfill install', () => {
       initializeWebMCPPolyfill();
       expect(document.modelContext).toBeDefined();
-      expect(navigator.modelContext).toBeDefined();
+      expect(getDeprecatedNavigatorModelContext()).toBeDefined();
 
       cleanupWebMCPPolyfill();
 
@@ -673,20 +832,20 @@ describe('@mcp-b/webmcp-polyfill', () => {
   // =========================================================================
 
   describe('normalizeToolDescriptor validation', () => {
-    it('throws when tool is not an object', () => {
+    it('throws when tool is not an object', async () => {
       initializeWebMCPPolyfill();
-      expect(() =>
-        navigator.modelContext.registerTool(
-          null as unknown as Parameters<typeof navigator.modelContext.registerTool>[0]
+      await expect(
+        document.modelContext.registerTool(
+          null as unknown as Parameters<typeof document.modelContext.registerTool>[0]
         )
-      ).toThrow('registerTool(tool) requires a tool object');
+      ).rejects.toThrow('registerTool(tool) requires a tool object');
     });
 
-    it('throws InvalidStateError when tool name is empty', () => {
+    it('throws InvalidStateError when tool name is empty', async () => {
       initializeWebMCPPolyfill();
-      expectInvalidStateError(
+      await expectInvalidStateError(
         () =>
-          navigator.modelContext.registerTool({
+          document.modelContext.registerTool({
             name: '',
             description: 'test',
             execute: async () => ({ content: [] }),
@@ -695,24 +854,37 @@ describe('@mcp-b/webmcp-polyfill', () => {
       );
     });
 
-    it('throws InvalidStateError when tool name is not a string', () => {
+    it('applies WebIDL string coercion to tool metadata', async () => {
       initializeWebMCPPolyfill();
-      expectInvalidStateError(
-        () =>
-          navigator.modelContext.registerTool({
-            name: 42 as unknown as string,
-            description: 'test',
-            execute: async () => ({ content: [] }),
-          }),
-        'Tool "name" must be a non-empty string'
-      );
+      await document.modelContext.registerTool({
+        name: 42 as unknown as string,
+        title: 7 as unknown as string,
+        description: 123 as unknown as string,
+        annotations: {
+          readOnlyHint: 1 as unknown as boolean,
+          untrustedContentHint: 0 as unknown as boolean,
+        },
+        execute: async () => ({ content: [] }),
+      });
+
+      await expect(document.modelContext.getTools()).resolves.toMatchObject([
+        {
+          name: '42',
+          title: '7',
+          description: '123',
+          annotations: {
+            readOnlyHint: true,
+            untrustedContentHint: false,
+          },
+        },
+      ]);
     });
 
-    it('throws InvalidStateError when tool description is empty', () => {
+    it('throws InvalidStateError when tool description is empty', async () => {
       initializeWebMCPPolyfill();
-      expectInvalidStateError(
+      await expectInvalidStateError(
         () =>
-          navigator.modelContext.registerTool({
+          document.modelContext.registerTool({
             name: 'test',
             description: '',
             execute: async () => ({ content: [] }),
@@ -721,27 +893,25 @@ describe('@mcp-b/webmcp-polyfill', () => {
       );
     });
 
-    it('throws InvalidStateError when tool description is not a string', () => {
+    it('rejects symbols during WebIDL string coercion', async () => {
       initializeWebMCPPolyfill();
-      expectInvalidStateError(
-        () =>
-          navigator.modelContext.registerTool({
-            name: 'test',
-            description: 123 as unknown as string,
-            execute: async () => ({ content: [] }),
-          }),
-        'Tool "description" must be a non-empty string'
-      );
+      await expect(
+        document.modelContext.registerTool({
+          name: Symbol('tool') as unknown as string,
+          description: 'test',
+          execute: async () => ({ content: [] }),
+        })
+      ).rejects.toThrow(TypeError);
     });
 
     const invalidToolNameMessage =
       /Tool "name" must be 1–128 characters and contain only ASCII alphanumeric, underscore, hyphen, or period/;
 
-    it('throws InvalidStateError for tool name with zero-width space', () => {
+    it('throws InvalidStateError for tool name with zero-width space', async () => {
       initializeWebMCPPolyfill();
-      expectInvalidStateError(
+      await expectInvalidStateError(
         () =>
-          navigator.modelContext.registerTool({
+          document.modelContext.registerTool({
             name: 'tool\u200Bname',
             description: 'test',
             execute: async () => ({ content: [] }),
@@ -750,11 +920,11 @@ describe('@mcp-b/webmcp-polyfill', () => {
       );
     });
 
-    it('throws InvalidStateError for tool name with cyrillic homoglyph', () => {
+    it('throws InvalidStateError for tool name with cyrillic homoglyph', async () => {
       initializeWebMCPPolyfill();
-      expectInvalidStateError(
+      await expectInvalidStateError(
         () =>
-          navigator.modelContext.registerTool({
+          document.modelContext.registerTool({
             name: 't\u043Eo\u043Bl',
             description: 'test',
             execute: async () => ({ content: [] }),
@@ -763,11 +933,11 @@ describe('@mcp-b/webmcp-polyfill', () => {
       );
     });
 
-    it('throws InvalidStateError for tool name with ASCII space', () => {
+    it('throws InvalidStateError for tool name with ASCII space', async () => {
       initializeWebMCPPolyfill();
-      expectInvalidStateError(
+      await expectInvalidStateError(
         () =>
-          navigator.modelContext.registerTool({
+          document.modelContext.registerTool({
             name: 'tool name',
             description: 'test',
             execute: async () => ({ content: [] }),
@@ -776,11 +946,11 @@ describe('@mcp-b/webmcp-polyfill', () => {
       );
     });
 
-    it('throws InvalidStateError for tool name with colon', () => {
+    it('throws InvalidStateError for tool name with colon', async () => {
       initializeWebMCPPolyfill();
-      expectInvalidStateError(
+      await expectInvalidStateError(
         () =>
-          navigator.modelContext.registerTool({
+          document.modelContext.registerTool({
             name: 'tool:name',
             description: 'test',
             execute: async () => ({ content: [] }),
@@ -789,11 +959,11 @@ describe('@mcp-b/webmcp-polyfill', () => {
       );
     });
 
-    it('throws InvalidStateError for tool name longer than 128 characters', () => {
+    it('throws InvalidStateError for tool name longer than 128 characters', async () => {
       initializeWebMCPPolyfill();
-      expectInvalidStateError(
+      await expectInvalidStateError(
         () =>
-          navigator.modelContext.registerTool({
+          document.modelContext.registerTool({
             name: 'a'.repeat(129),
             description: 'test',
             execute: async () => ({ content: [] }),
@@ -802,54 +972,54 @@ describe('@mcp-b/webmcp-polyfill', () => {
       );
     });
 
-    it('accepts tool name with underscore, period, and hyphen', () => {
+    it('accepts tool name with underscore, period, and hyphen', async () => {
       initializeWebMCPPolyfill();
-      expect(() =>
-        navigator.modelContext.registerTool({
+      await expect(
+        document.modelContext.registerTool({
           name: 'a._-b',
           description: 'test',
           execute: async () => ({ content: [] }),
         })
-      ).not.toThrow();
+      ).resolves.toBeUndefined();
     });
 
-    it('accepts tool name with exactly 128 characters', () => {
+    it('accepts tool name with exactly 128 characters', async () => {
       initializeWebMCPPolyfill();
-      expect(() =>
-        navigator.modelContext.registerTool({
+      await expect(
+        document.modelContext.registerTool({
           name: 'a'.repeat(128),
           description: 'test',
           execute: async () => ({ content: [] }),
         })
-      ).not.toThrow();
+      ).resolves.toBeUndefined();
     });
 
-    it('throws when tool execute is not a function', () => {
+    it('throws when tool execute is not a function', async () => {
       initializeWebMCPPolyfill();
-      expect(() =>
-        navigator.modelContext.registerTool({
+      await expect(
+        document.modelContext.registerTool({
           name: 'test',
           description: 'test desc',
           execute: 'not-a-function' as unknown as () => Promise<{ content: never[] }>,
         })
-      ).toThrow('Tool "execute" must be a function');
+      ).rejects.toThrow('Tool "execute" must be a function');
     });
 
-    it('throws when inputSchema is not an object', () => {
+    it('throws when inputSchema is not an object', async () => {
       initializeWebMCPPolyfill();
-      expect(() =>
-        navigator.modelContext.registerTool({
+      await expect(
+        document.modelContext.registerTool({
           name: 'test',
           description: 'test desc',
           inputSchema: 'not-object' as unknown as { type: string },
           execute: async () => ({ content: [] }),
         })
-      ).toThrow('inputSchema must be a JSON Schema object');
+      ).rejects.toThrow('inputSchema must be an object');
     });
 
     it('defaults inputSchema to empty object schema when not provided', async () => {
       initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
+      document.modelContext.registerTool({
         name: 'no_schema',
         description: 'No schema tool',
         execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
@@ -864,7 +1034,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
     it('defaults inputSchema.type to object when schema omits root type', async () => {
       initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
+      document.modelContext.registerTool({
         name: 'implicit_object_schema',
         description: 'Implicit object schema tool',
         inputSchema: {
@@ -883,32 +1053,9 @@ describe('@mcp-b/webmcp-polyfill', () => {
         properties: { query: { type: 'string' } },
         required: ['query'],
       });
-
-      await expect(
-        navigator.modelContextTesting?.executeTool('implicit_object_schema', '{}')
-      ).rejects.toThrow('Instance does not have required property "query"');
     });
 
-    it('accepts annotation boolean strings during tool registration', async () => {
-      initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
-        name: 'annotation_coercion',
-        description: 'Annotation coercion tool',
-        annotations: {
-          readOnlyHint: 'true',
-          destructiveHint: 'false',
-          openWorldHint: 'true',
-          idempotentHint: 'false',
-        },
-        execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
-      });
-
-      await expect(
-        navigator.modelContextTesting?.executeTool('annotation_coercion', '{}')
-      ).resolves.toContain('ok');
-    });
-
-    it('accepts Standard Schema validators for input validation', async () => {
+    it('throws when Standard Schema validators cannot advertise JSON Schema metadata', async () => {
       initializeWebMCPPolyfill();
 
       const standardSchema = {
@@ -930,20 +1077,14 @@ describe('@mcp-b/webmcp-polyfill', () => {
         },
       };
 
-      navigator.modelContext.registerTool({
-        name: 'standard_validator_tool',
-        description: 'Standard validator tool',
-        inputSchema: asPolyfillInputSchema(standardSchema),
-        execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
-      });
-
       await expect(
-        navigator.modelContextTesting?.executeTool('standard_validator_tool', '{}')
-      ).rejects.toThrow('Input validation error: message is required');
-
-      await expect(
-        navigator.modelContextTesting?.executeTool('standard_validator_tool', '{"message":"hello"}')
-      ).resolves.toContain('ok');
+        document.modelContext.registerTool({
+          name: 'standard_validator_tool',
+          description: 'Standard validator tool',
+          inputSchema: asPolyfillInputSchema(standardSchema),
+          execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+        })
+      ).rejects.toThrow('Standard Schema inputSchema must provide ~standard.jsonSchema.input()');
     });
 
     it('converts Standard JSON Schema inputs for testing shim metadata', () => {
@@ -964,7 +1105,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
         },
       };
 
-      navigator.modelContext.registerTool({
+      document.modelContext.registerTool({
         name: 'standard_json_tool',
         description: 'Standard json schema tool',
         inputSchema: asPolyfillInputSchema(standardJsonSchema),
@@ -981,7 +1122,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
       });
     });
 
-    it('prefers converted JSON Schema validation when validate() and jsonSchema.input() both exist', async () => {
+    it('advertises converted Standard JSON Schema without running its validator', async () => {
       initializeWebMCPPolyfill();
       let validateCallCount = 0;
 
@@ -989,9 +1130,16 @@ describe('@mcp-b/webmcp-polyfill', () => {
         '~standard': {
           version: 1 as const,
           vendor: 'test',
-          validate(_value: unknown) {
+          validate(value: unknown) {
             validateCallCount += 1;
-            return { issues: [{ message: 'query is required', path: ['query'] }] };
+            if (!value || typeof value !== 'object' || Array.isArray(value)) {
+              return { issues: [{ message: 'arguments must be an object' }] };
+            }
+            const record = value as Record<string, unknown>;
+            if (record.count !== 3) {
+              return { issues: [{ message: 'count must be 3', path: ['count'] }] };
+            }
+            return { value: { count: 4 } };
           },
           jsonSchema: {
             input: () => ({
@@ -1004,119 +1152,32 @@ describe('@mcp-b/webmcp-polyfill', () => {
         },
       };
 
-      navigator.modelContext.registerTool({
+      document.modelContext.registerTool({
         name: 'standard_both_tool',
         description: 'Standard schema + json schema tool',
         inputSchema: asPolyfillInputSchema(schemaWithBoth),
         execute: async (args) => ({ content: [{ type: 'text', text: String(args.count ?? '') }] }),
       });
 
+      const tools = navigator.modelContextTesting?.listTools();
+      expect(JSON.parse(tools?.[0]?.inputSchema ?? '{}')).toEqual({
+        type: 'object',
+        properties: { count: { type: 'number' } },
+        required: ['count'],
+      });
+
       await expect(
         navigator.modelContextTesting?.executeTool('standard_both_tool', '{}')
-      ).rejects.toThrow('Instance does not have required property "count"');
+      ).resolves.toContain('""');
 
       await expect(
         navigator.modelContextTesting?.executeTool('standard_both_tool', '{"count":3}')
-      ).resolves.toContain('3');
+      ).resolves.toContain('"3"');
 
       expect(validateCallCount).toBe(0);
     });
 
-    it('matches missing-required errors for plain JSON Schema and Standard JSON Schema inputs', async () => {
-      initializeWebMCPPolyfill();
-
-      navigator.modelContext.registerTool({
-        name: 'plain_json_required_tool',
-        description: 'Plain JSON schema required field',
-        inputSchema: {
-          type: 'object',
-          properties: { count: { type: 'number' } },
-          required: ['count'],
-        },
-        execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
-      });
-
-      const standardJsonSchema = {
-        '~standard': {
-          version: 1 as const,
-          vendor: 'test',
-          jsonSchema: {
-            input: () => ({
-              type: 'object',
-              properties: { count: { type: 'number' } },
-              required: ['count'],
-            }),
-            output: () => ({ type: 'object', properties: {} }),
-          },
-        },
-      };
-
-      navigator.modelContext.registerTool({
-        name: 'standard_json_required_tool',
-        description: 'Standard JSON schema required field',
-        inputSchema: asPolyfillInputSchema(standardJsonSchema),
-        execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
-      });
-
-      await expect(
-        navigator.modelContextTesting?.executeTool('plain_json_required_tool', '{}')
-      ).rejects.toThrow('Instance does not have required property "count"');
-
-      await expect(
-        navigator.modelContextTesting?.executeTool('standard_json_required_tool', '{}')
-      ).rejects.toThrow('Instance does not have required property "count"');
-    });
-
-    it('matches type-mismatch errors for plain JSON Schema and Standard JSON Schema inputs', async () => {
-      initializeWebMCPPolyfill();
-
-      navigator.modelContext.registerTool({
-        name: 'plain_json_type_tool',
-        description: 'Plain JSON schema type mismatch',
-        inputSchema: {
-          type: 'object',
-          properties: { count: { type: 'number' } },
-        },
-        execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
-      });
-
-      const standardJsonSchema = {
-        '~standard': {
-          version: 1 as const,
-          vendor: 'test',
-          jsonSchema: {
-            input: () => ({
-              type: 'object',
-              properties: { count: { type: 'number' } },
-            }),
-            output: () => ({ type: 'object', properties: {} }),
-          },
-        },
-      };
-
-      navigator.modelContext.registerTool({
-        name: 'standard_json_type_tool',
-        description: 'Standard JSON schema type mismatch',
-        inputSchema: asPolyfillInputSchema(standardJsonSchema),
-        execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
-      });
-
-      await expect(
-        navigator.modelContextTesting?.executeTool(
-          'plain_json_type_tool',
-          '{"count":"not-a-number"}'
-        )
-      ).rejects.toThrow('Instance type "string" is invalid. Expected "number"');
-
-      await expect(
-        navigator.modelContextTesting?.executeTool(
-          'standard_json_type_tool',
-          '{"count":"not-a-number"}'
-        )
-      ).rejects.toThrow('Instance type "string" is invalid. Expected "number"');
-    });
-
-    it('throws a stable error when Standard JSON Schema conversion fails for all targets', () => {
+    it('throws a stable error when Standard JSON Schema conversion fails for all targets', async () => {
       initializeWebMCPPolyfill();
       const attemptedTargets: string[] = [];
 
@@ -1134,14 +1195,16 @@ describe('@mcp-b/webmcp-polyfill', () => {
         },
       };
 
-      expect(() =>
-        navigator.modelContext.registerTool({
+      await expect(
+        document.modelContext.registerTool({
           name: 'unsupported_standard_json_tool',
           description: 'Unsupported standard json schema tool',
           inputSchema: asPolyfillInputSchema(unsupportedStandardJsonSchema),
           execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
         })
-      ).toThrow('Failed to convert Standard JSON Schema inputSchema to a JSON Schema object');
+      ).rejects.toThrow(
+        'Failed to convert Standard JSON Schema inputSchema to a JSON Schema object'
+      );
 
       expect(attemptedTargets).toEqual(['draft-2020-12', 'draft-07']);
     });
@@ -1190,322 +1253,82 @@ describe('@mcp-b/webmcp-polyfill', () => {
   });
 
   // =========================================================================
-  // validateJsonSchemaNode edge cases
+  // inputSchema serialization semantics
   // =========================================================================
 
-  describe('validateJsonSchemaNode edge cases', () => {
-    it('accepts type as a string array', () => {
-      initializeWebMCPPolyfill();
-      expect(() =>
-        navigator.modelContext.registerTool({
-          name: 'multi_type',
-          description: 'Multi type tool',
-          inputSchema: { type: ['string', 'number'] as unknown as string },
-          execute: async () => ({ content: [] }),
-        })
-      ).not.toThrow();
-    });
-
-    it('rejects type as array with empty strings', () => {
-      initializeWebMCPPolyfill();
-      expect(() =>
-        navigator.modelContext.registerTool({
-          name: 'bad_array_type',
-          description: 'Bad array type',
-          inputSchema: { type: ['string', ''] as unknown as string },
-          execute: async () => ({ content: [] }),
-        })
-      ).toThrow('"type" must be a string or string[]');
-    });
-
-    it('rejects type as array with non-string elements', () => {
-      initializeWebMCPPolyfill();
-      expect(() =>
-        navigator.modelContext.registerTool({
-          name: 'bad_type_elements',
-          description: 'Bad type elements',
-          inputSchema: { type: [123] as unknown as string },
-          execute: async () => ({ content: [] }),
-        })
-      ).toThrow('"type" must be a string or string[]');
-    });
-
-    it('rejects non-array non-string required field', () => {
-      initializeWebMCPPolyfill();
-      expect(() =>
-        navigator.modelContext.registerTool({
-          name: 'bad_required',
-          description: 'Bad required',
-          inputSchema: { type: 'object', required: 'name' as unknown as string[] },
-          execute: async () => ({ content: [] }),
-        })
-      ).toThrow('"required" must be an array of strings');
-    });
-
-    it('rejects required array with non-string elements', () => {
-      initializeWebMCPPolyfill();
-      expect(() =>
-        navigator.modelContext.registerTool({
-          name: 'bad_required_elements',
-          description: 'Bad required elements',
-          inputSchema: { type: 'object', required: [123] as unknown as string[] },
-          execute: async () => ({ content: [] }),
-        })
-      ).toThrow('"required" must be an array of strings');
-    });
-
-    it('rejects properties that is not an object', () => {
-      initializeWebMCPPolyfill();
-      expect(() =>
-        navigator.modelContext.registerTool({
-          name: 'bad_properties',
-          description: 'Bad properties',
-          inputSchema: { type: 'object', properties: 'not-object' as never },
-          execute: async () => ({ content: [] }),
-        })
-      ).toThrow('"properties" must be an object');
-    });
-
-    it('rejects property value that is not an object', () => {
-      initializeWebMCPPolyfill();
-      expect(() =>
-        navigator.modelContext.registerTool({
-          name: 'bad_property_value',
-          description: 'Bad property value',
-          inputSchema: {
-            type: 'object',
-            properties: { name: 'not-an-object' as unknown as { type: string } },
-          },
-          execute: async () => ({ content: [] }),
-        })
-      ).toThrow('expected object schema');
-    });
-
-    it('validates nested property schemas recursively', () => {
-      initializeWebMCPPolyfill();
-      expect(() =>
-        navigator.modelContext.registerTool({
-          name: 'nested_bad',
-          description: 'Nested bad schema',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              nested: { type: 'object', properties: { sub: 'bad' as unknown as { type: string } } },
-            },
-          },
-          execute: async () => ({ content: [] }),
-        })
-      ).toThrow('expected object schema');
-    });
-
-    it('validates items as an object schema', () => {
-      initializeWebMCPPolyfill();
-      expect(() =>
-        navigator.modelContext.registerTool({
-          name: 'items_object',
-          description: 'Items as object',
-          inputSchema: {
-            type: 'array',
-            items: { type: 'string' },
-          } as unknown as { type: string },
-          execute: async () => ({ content: [] }),
-        })
-      ).not.toThrow();
-    });
-
-    it('validates items as an array of object schemas', () => {
-      initializeWebMCPPolyfill();
-      expect(() =>
-        navigator.modelContext.registerTool({
-          name: 'items_array',
-          description: 'Items as array',
-          inputSchema: {
-            type: 'array',
-            items: [{ type: 'string' }, { type: 'number' }],
-          } as unknown as { type: string },
-          execute: async () => ({ content: [] }),
-        })
-      ).not.toThrow();
-    });
-
-    it('rejects items array with non-object entries', () => {
-      initializeWebMCPPolyfill();
-      expect(() =>
-        navigator.modelContext.registerTool({
-          name: 'bad_items_array',
-          description: 'Bad items array',
-          inputSchema: {
-            type: 'array',
-            items: [{ type: 'string' }, 'not-object'],
-          } as unknown as { type: string },
-          execute: async () => ({ content: [] }),
-        })
-      ).toThrow('expected object schema');
-    });
-
-    it('rejects items that is neither an object nor an array', () => {
-      initializeWebMCPPolyfill();
-      expect(() =>
-        navigator.modelContext.registerTool({
-          name: 'bad_items',
-          description: 'Bad items',
-          inputSchema: {
-            type: 'array',
-            items: 'not-valid',
-          } as unknown as { type: string },
-          execute: async () => ({ content: [] }),
-        })
-      ).toThrow('"items" must be an object or object[]');
-    });
-
-    it('validates allOf keyword', () => {
-      initializeWebMCPPolyfill();
-      expect(() =>
-        navigator.modelContext.registerTool({
-          name: 'allof_tool',
-          description: 'AllOf tool',
-          inputSchema: {
-            type: 'object',
-            allOf: [{ type: 'object' }],
-          } as unknown as { type: string },
-          execute: async () => ({ content: [] }),
-        })
-      ).not.toThrow();
-    });
-
-    it('rejects allOf that is not an array', () => {
-      initializeWebMCPPolyfill();
-      expect(() =>
-        navigator.modelContext.registerTool({
-          name: 'bad_allof',
-          description: 'Bad allOf',
-          inputSchema: {
-            type: 'object',
-            allOf: 'not-array',
-          } as unknown as { type: string },
-          execute: async () => ({ content: [] }),
-        })
-      ).toThrow('"allOf" must be an array');
-    });
-
-    it('rejects allOf array with non-object entries', () => {
-      initializeWebMCPPolyfill();
-      expect(() =>
-        navigator.modelContext.registerTool({
-          name: 'bad_allof_entry',
-          description: 'Bad allOf entry',
-          inputSchema: {
-            type: 'object',
-            allOf: ['not-object'],
-          } as unknown as { type: string },
-          execute: async () => ({ content: [] }),
-        })
-      ).toThrow('expected object schema');
-    });
-
-    it('validates anyOf keyword', () => {
-      initializeWebMCPPolyfill();
-      expect(() =>
-        navigator.modelContext.registerTool({
-          name: 'anyof_tool',
-          description: 'AnyOf tool',
-          inputSchema: {
-            type: 'object',
-            anyOf: [{ type: 'string' }, { type: 'number' }],
-          } as unknown as { type: string },
-          execute: async () => ({ content: [] }),
-        })
-      ).not.toThrow();
-    });
-
-    it('rejects anyOf that is not an array', () => {
-      initializeWebMCPPolyfill();
-      expect(() =>
-        navigator.modelContext.registerTool({
-          name: 'bad_anyof',
-          description: 'Bad anyOf',
-          inputSchema: {
-            type: 'object',
-            anyOf: 'not-array',
-          } as unknown as { type: string },
-          execute: async () => ({ content: [] }),
-        })
-      ).toThrow('"anyOf" must be an array');
-    });
-
-    it('validates oneOf keyword', () => {
-      initializeWebMCPPolyfill();
-      expect(() =>
-        navigator.modelContext.registerTool({
-          name: 'oneof_tool',
-          description: 'OneOf tool',
-          inputSchema: {
-            type: 'object',
-            oneOf: [{ type: 'string' }],
-          } as unknown as { type: string },
-          execute: async () => ({ content: [] }),
-        })
-      ).not.toThrow();
-    });
-
-    it('rejects oneOf that is not an array', () => {
-      initializeWebMCPPolyfill();
-      expect(() =>
-        navigator.modelContext.registerTool({
-          name: 'bad_oneof',
-          description: 'Bad oneOf',
-          inputSchema: {
-            type: 'object',
-            oneOf: 'not-array',
-          } as unknown as { type: string },
-          execute: async () => ({ content: [] }),
-        })
-      ).toThrow('"oneOf" must be an array');
-    });
-
-    it('validates not keyword', () => {
-      initializeWebMCPPolyfill();
-      expect(() =>
-        navigator.modelContext.registerTool({
-          name: 'not_tool',
-          description: 'Not tool',
-          inputSchema: {
-            type: 'object',
-            not: { type: 'string' },
-          } as unknown as { type: string },
-          execute: async () => ({ content: [] }),
-        })
-      ).not.toThrow();
-    });
-
-    it('rejects not that is not an object', () => {
-      initializeWebMCPPolyfill();
-      expect(() =>
-        navigator.modelContext.registerTool({
-          name: 'bad_not',
-          description: 'Bad not',
-          inputSchema: {
-            type: 'object',
-            not: 'not-object',
-          } as unknown as { type: string },
-          execute: async () => ({ content: [] }),
-        })
-      ).toThrow('"not" must be an object schema');
-    });
-
-    it('rejects non-JSON-serializable schema', () => {
+  describe('inputSchema serialization semantics', () => {
+    it('rethrows the TypeError produced by JSON.stringify for circular schemas', async () => {
       initializeWebMCPPolyfill();
       const circular: Record<string, unknown> = { type: 'object' };
       circular.self = circular;
 
-      expect(() =>
-        navigator.modelContext.registerTool({
+      let error: unknown;
+      try {
+        await document.modelContext.registerTool({
           name: 'circular_schema',
           description: 'Circular schema',
-          inputSchema: circular as unknown as { type: string },
+          inputSchema: circular as never,
+          execute: async () => ({ content: [] }),
+        });
+      } catch (caught) {
+        error = caught;
+      }
+
+      expect(error).toBeInstanceOf(TypeError);
+      expect((error as Error).message).toContain('circular');
+    });
+
+    it('rejects when inputSchema.toJSON returns undefined', async () => {
+      initializeWebMCPPolyfill();
+
+      await expect(
+        document.modelContext.registerTool({
+          name: 'undefined_schema',
+          description: 'Undefined serialized schema',
+          inputSchema: {
+            toJSON: () => undefined,
+          } as never,
           execute: async () => ({ content: [] }),
         })
-      ).toThrow('schema must be JSON-serializable');
+      ).rejects.toThrow('inputSchema must be JSON-serializable');
+    });
+
+    it('rethrows errors raised by inputSchema.toJSON', async () => {
+      initializeWebMCPPolyfill();
+      const serializationError = new Error('schema serialization failed');
+
+      await expect(
+        document.modelContext.registerTool({
+          name: 'throwing_schema',
+          description: 'Throwing serialized schema',
+          inputSchema: {
+            toJSON() {
+              throw serializationError;
+            },
+          } as never,
+          execute: async () => ({ content: [] }),
+        })
+      ).rejects.toBe(serializationError);
+    });
+
+    it('exposes the exact JSON string produced through inputSchema.toJSON', async () => {
+      initializeWebMCPPolyfill();
+
+      await document.modelContext.registerTool({
+        name: 'custom_serialized_schema',
+        description: 'Custom serialized schema',
+        inputSchema: {
+          toJSON: () => 'serialized-schema',
+        } as never,
+        execute: async () => ({ content: [] }),
+      });
+
+      await expect(document.modelContext.getTools()).resolves.toMatchObject([
+        {
+          name: 'custom_serialized_schema',
+          inputSchema: '"serialized-schema"',
+        },
+      ]);
     });
   });
 
@@ -1522,7 +1345,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
     it('listTools returns registered tools with serialized inputSchema', () => {
       initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
+      document.modelContext.registerTool({
         name: 'test_tool',
         description: 'Test tool',
         inputSchema: { type: 'object', properties: { x: { type: 'number' } } },
@@ -1540,7 +1363,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
     it('listTools normalizes empty inputSchema {} to default object schema', () => {
       initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
+      document.modelContext.registerTool({
         name: 'no_args_tool',
         description: 'Tool with no arguments',
         inputSchema: {},
@@ -1554,25 +1377,6 @@ describe('@mcp-b/webmcp-polyfill', () => {
       expect(parsed).toEqual({ type: 'object', properties: {} });
     });
 
-    it('listTools omits inputSchema when serialization fails', () => {
-      initializeWebMCPPolyfill();
-
-      // Register a tool normally
-      navigator.modelContext.registerTool({
-        name: 'circular_tool',
-        description: 'Circular tool',
-        execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
-      });
-
-      // Monkey-patch the tool's inputSchema to be circular (to test the catch in listTools)
-      // We need to access the internal tools map - so register via provideContext with a tool
-      // that has valid schema, then we'll verify the normal path works
-      const tools = navigator.modelContextTesting?.listTools();
-      expect(tools).toHaveLength(1);
-      // The inputSchema was the default, so it should be serializable
-      expect(tools?.[0]?.inputSchema).toBeDefined();
-    });
-
     it('executeTool throws on unknown tool', async () => {
       initializeWebMCPPolyfill();
       await expect(navigator.modelContextTesting?.executeTool('nonexistent', '{}')).rejects.toThrow(
@@ -1582,7 +1386,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
     it('executeTool throws on invalid JSON input', async () => {
       initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
+      document.modelContext.registerTool({
         name: 'tool1',
         description: 'Tool 1',
         execute: async () => ({ content: [] }),
@@ -1593,22 +1397,27 @@ describe('@mcp-b/webmcp-polyfill', () => {
       );
     });
 
-    it('executeTool throws when input is a JSON array', async () => {
+    it('executeTool accepts a JSON array and passes it to the handler', async () => {
       initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
+      let receivedInput: unknown;
+      document.modelContext.registerTool({
         name: 'tool1',
         description: 'Tool 1',
-        execute: async () => ({ content: [] }),
+        execute: async (input) => {
+          receivedInput = input;
+          return { content: [] };
+        },
       });
 
-      await expect(navigator.modelContextTesting?.executeTool('tool1', '[1,2,3]')).rejects.toThrow(
-        'Failed to parse input arguments'
+      await expect(navigator.modelContextTesting?.executeTool('tool1', '[1,2,3]')).resolves.toBe(
+        '{"content":[]}'
       );
+      expect(receivedInput).toEqual([1, 2, 3]);
     });
 
     it('executeTool throws when input is a JSON primitive', async () => {
       initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
+      document.modelContext.registerTool({
         name: 'tool1',
         description: 'Tool 1',
         execute: async () => ({ content: [] }),
@@ -1621,7 +1430,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
     it('executeTool throws when input is JSON null', async () => {
       initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
+      document.modelContext.registerTool({
         name: 'tool1',
         description: 'Tool 1',
         execute: async () => ({ content: [] }),
@@ -1632,27 +1441,29 @@ describe('@mcp-b/webmcp-polyfill', () => {
       );
     });
 
-    it('executeTool throws when signal is already aborted', async () => {
+    it('executeTool preserves a pre-existing AbortSignal reason', async () => {
       initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
+      document.modelContext.registerTool({
         name: 'tool1',
         description: 'Tool 1',
         execute: async () => ({ content: [] }),
       });
 
       const controller = new AbortController();
-      controller.abort();
+      const reason = { code: 'already-cancelled' };
+      controller.abort(reason);
 
       await expect(
         navigator.modelContextTesting?.executeTool('tool1', '{}', { signal: controller.signal })
-      ).rejects.toThrow('Tool was cancelled');
+      ).rejects.toBe(reason);
     });
 
-    it('executeTool throws when signal is aborted during execution', async () => {
+    it('executeTool preserves an AbortSignal reason during execution', async () => {
       initializeWebMCPPolyfill();
       const controller = new AbortController();
+      const reason = { code: 'cancelled-during-execution' };
 
-      navigator.modelContext.registerTool({
+      document.modelContext.registerTool({
         name: 'slow_tool',
         description: 'Slow tool',
         execute: async () => {
@@ -1663,53 +1474,16 @@ describe('@mcp-b/webmcp-polyfill', () => {
       });
 
       // Abort after a short delay
-      setTimeout(() => controller.abort(), 10);
+      setTimeout(() => controller.abort(reason), 10);
 
-      // The abort rejection from withAbortSignal is caught by the outer
-      // try/catch in executeToolForTesting and re-thrown with the generic message
       await expect(
         navigator.modelContextTesting?.executeTool('slow_tool', '{}', { signal: controller.signal })
-      ).rejects.toThrow('Tool was executed but the invocation failed');
-    });
-
-    it('executeTool validates required fields', async () => {
-      initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
-        name: 'required_tool',
-        description: 'Required fields tool',
-        inputSchema: {
-          type: 'object',
-          properties: { name: { type: 'string' } },
-          required: ['name'],
-        },
-        execute: async (args) => ({ content: [{ type: 'text', text: String(args.name) }] }),
-      });
-
-      await expect(
-        navigator.modelContextTesting?.executeTool('required_tool', '{}')
-      ).rejects.toThrow('Instance does not have required property "name"');
-    });
-
-    it('executeTool validates field types', async () => {
-      initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
-        name: 'typed_tool',
-        description: 'Typed fields tool',
-        inputSchema: {
-          type: 'object',
-          properties: { count: { type: 'number' } },
-        },
-        execute: async () => ({ content: [] }),
-      });
-
-      await expect(
-        navigator.modelContextTesting?.executeTool('typed_tool', '{"count":"not-a-number"}')
-      ).rejects.toThrow('Instance type "string" is invalid. Expected "number"');
+      ).rejects.toBe(reason);
     });
 
     it('executeTool throws when tool execution throws', async () => {
       initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
+      document.modelContext.registerTool({
         name: 'throwing_tool',
         description: 'Throwing tool',
         execute: async () => {
@@ -1722,125 +1496,9 @@ describe('@mcp-b/webmcp-polyfill', () => {
       ).rejects.toThrow('Tool was executed but the invocation failed');
     });
 
-    it('includes thrown Standard Schema validator error details', async () => {
-      initializeWebMCPPolyfill();
-      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-      try {
-        navigator.modelContext.registerTool({
-          name: 'throwing_standard_validator_tool',
-          description: 'Throws from Standard Schema validate()',
-          inputSchema: asPolyfillInputSchema({
-            '~standard': {
-              version: 1 as const,
-              vendor: 'test',
-              validate() {
-                throw new Error('validator exploded');
-              },
-            },
-          }),
-          execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
-        });
-
-        await expect(
-          navigator.modelContextTesting?.executeTool('throwing_standard_validator_tool', '{}')
-        ).rejects.toThrow('schema validation failed: validator exploded');
-
-        expect(errorSpy).toHaveBeenCalledWith(
-          '[WebMCPPolyfill] Standard Schema validation threw unexpectedly:',
-          expect.any(Error)
-        );
-      } finally {
-        errorSpy.mockRestore();
-      }
-    });
-
-    it('formats Standard Schema issue paths with object key segments', async () => {
-      initializeWebMCPPolyfill();
-
-      navigator.modelContext.registerTool({
-        name: 'standard_validator_path_tool',
-        description: 'Returns issue path in object-segment format',
-        inputSchema: asPolyfillInputSchema({
-          '~standard': {
-            version: 1 as const,
-            vendor: 'test',
-            validate() {
-              return {
-                issues: [{ message: 'invalid value', path: [{ key: 'profile' }, 'email'] }],
-              };
-            },
-          },
-        }),
-        execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
-      });
-
-      await expect(
-        navigator.modelContextTesting?.executeTool('standard_validator_path_tool', '{}')
-      ).rejects.toThrow('invalid value at profile.email');
-    });
-
-    it('falls back to generic input validation error when first issue is missing', async () => {
-      initializeWebMCPPolyfill();
-
-      navigator.modelContext.registerTool({
-        name: 'standard_validator_missing_issue_tool',
-        description: 'Returns malformed issues payload',
-        inputSchema: asPolyfillInputSchema({
-          '~standard': {
-            version: 1 as const,
-            vendor: 'test',
-            validate() {
-              return {
-                issues: [undefined],
-              };
-            },
-          },
-        }),
-        execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
-      });
-
-      await expect(
-        navigator.modelContextTesting?.executeTool('standard_validator_missing_issue_tool', '{}')
-      ).rejects.toThrow('Input validation error');
-    });
-
-    it('omits issue path suffix when path segments resolve to empty strings', async () => {
-      initializeWebMCPPolyfill();
-
-      navigator.modelContext.registerTool({
-        name: 'standard_validator_empty_path_tool',
-        description: 'Returns empty issue path segments',
-        inputSchema: asPolyfillInputSchema({
-          '~standard': {
-            version: 1 as const,
-            vendor: 'test',
-            validate() {
-              return {
-                issues: [{ message: 'empty path issue', path: [''] }],
-              };
-            },
-          },
-        }),
-        execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
-      });
-
-      try {
-        await navigator.modelContextTesting?.executeTool(
-          'standard_validator_empty_path_tool',
-          '{}'
-        );
-        throw new Error('Expected standard_validator_empty_path_tool to fail validation');
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        expect(message).toContain('empty path issue');
-        expect(message).not.toContain(' at ');
-      }
-    });
-
     it('executeTool handles tool returning isError=true with text content', async () => {
       initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
+      document.modelContext.registerTool({
         name: 'error_tool',
         description: 'Error tool',
         execute: async () => ({
@@ -1859,7 +1517,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
     it('executeTool handles tool returning isError=true without text content', async () => {
       initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
+      document.modelContext.registerTool({
         name: 'error_no_text_tool',
         description: 'Error no text tool',
         execute: async () => ({
@@ -1875,7 +1533,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
     it('executeTool handles tool returning isError=true with empty content', async () => {
       initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
+      document.modelContext.registerTool({
         name: 'error_empty_tool',
         description: 'Error empty content tool',
         execute: async () => ({
@@ -1891,7 +1549,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
     it('executeTool returns null when result has metadata.willNavigate=true', async () => {
       initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
+      document.modelContext.registerTool({
         name: 'navigate_tool',
         description: 'Navigate tool',
         execute: async () => ({
@@ -1906,7 +1564,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
     it('executeTool returns serialized result for normal tool response', async () => {
       initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
+      document.modelContext.registerTool({
         name: 'normal_tool',
         description: 'Normal tool',
         execute: async () => ({
@@ -1922,7 +1580,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
     it('executeTool wraps raw object returns into content and structuredContent', async () => {
       initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
+      document.modelContext.registerTool({
         name: 'raw_object_tool',
         description: 'Raw object tool',
         execute: async () => ({ ok: true, nested: { count: 2 } }),
@@ -1935,9 +1593,9 @@ describe('@mcp-b/webmcp-polyfill', () => {
       expect(parsed.structuredContent).toEqual({ ok: true, nested: { count: 2 } });
     });
 
-    it('executeTool validates structuredContent against outputSchema', async () => {
+    it('does not enforce outputSchema during imperative execution', async () => {
       initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
+      getCompatModelContext().registerTool({
         name: 'invalid_output_schema_tool',
         description: 'Invalid output schema tool',
         outputSchema: {
@@ -1948,31 +1606,17 @@ describe('@mcp-b/webmcp-polyfill', () => {
         execute: async () => ({ count: 'wrong' }),
       });
 
-      await expect(
-        navigator.modelContextTesting?.executeTool('invalid_output_schema_tool', '{}')
-      ).rejects.toThrow('Output validation error');
-    });
-
-    it('executeTool validates primitive structuredContent against outputSchema', async () => {
-      initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
-        name: 'primitive_output_schema_tool',
-        description: 'Primitive output schema tool',
-        outputSchema: { type: 'string' },
-        execute: async () => 'ready',
-      });
-
       const result = await navigator.modelContextTesting?.executeTool(
-        'primitive_output_schema_tool',
+        'invalid_output_schema_tool',
         '{}'
       );
       const parsed = JSON.parse(result ?? '{}');
-      expect(parsed.structuredContent).toBe('ready');
+      expect(parsed.structuredContent).toEqual({ count: 'wrong' });
     });
 
     it('executeTool does not set structuredContent for non-json-safe objects', async () => {
       initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
+      document.modelContext.registerTool({
         name: 'non_json_structured_content_tool',
         description: 'Non JSON structured content tool',
         execute: async () => ({ value: Number.NaN }),
@@ -1993,14 +1637,14 @@ describe('@mcp-b/webmcp-polyfill', () => {
       navigator.modelContextTesting!.ontoolchange = () => {
         called = true;
       };
-      navigator.modelContext.registerTool({
+      document.modelContext.registerTool({
         name: 'ontoolchange_test',
         description: 'test',
         execute: async () => 'ok',
       });
-      await Promise.resolve();
-      await Promise.resolve();
-      expect(called).toBe(true);
+      await vi.waitFor(() => {
+        expect(called).toBe(true);
+      });
     });
 
     it('getCrossDocumentScriptToolResult returns empty array string', async () => {
@@ -2015,343 +1659,20 @@ describe('@mcp-b/webmcp-polyfill', () => {
   });
 
   // =========================================================================
-  // requestUserInteraction edge cases
-  // =========================================================================
-
-  describe('requestUserInteraction edge cases', () => {
-    it('throws when callback is not a function', async () => {
-      initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
-        name: 'bad_interaction_tool',
-        description: 'Bad interaction',
-        execute: async (_args, client) => {
-          await client.requestUserInteraction(
-            'not-a-function' as unknown as () => Promise<unknown>
-          );
-          return { content: [] };
-        },
-      });
-
-      await expect(
-        navigator.modelContextTesting?.executeTool('bad_interaction_tool', '{}')
-      ).rejects.toThrow('Tool was executed but the invocation failed');
-    });
-  });
-
-  // =========================================================================
-  // isMatchingPrimitiveType coverage
-  // =========================================================================
-
-  describe('argument type validation', () => {
-    it('validates string type', async () => {
-      initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
-        name: 'str_tool',
-        description: 'String tool',
-        inputSchema: { type: 'object', properties: { val: { type: 'string' } } },
-        execute: async () => ({ content: [] }),
-      });
-
-      // Valid string
-      await expect(
-        navigator.modelContextTesting?.executeTool('str_tool', '{"val":"hello"}')
-      ).resolves.toBeDefined();
-
-      // Invalid: number where string expected - need to re-register
-    });
-
-    it('rejects non-string for string type', async () => {
-      initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
-        name: 'str_tool2',
-        description: 'String tool 2',
-        inputSchema: { type: 'object', properties: { val: { type: 'string' } } },
-        execute: async () => ({ content: [] }),
-      });
-
-      await expect(
-        navigator.modelContextTesting?.executeTool('str_tool2', '{"val":42}')
-      ).rejects.toThrow('Instance type "number" is invalid. Expected "string"');
-    });
-
-    it('validates integer type', async () => {
-      initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
-        name: 'int_tool',
-        description: 'Integer tool',
-        inputSchema: { type: 'object', properties: { val: { type: 'integer' } } },
-        execute: async () => ({ content: [] }),
-      });
-
-      // Valid integer
-      await expect(
-        navigator.modelContextTesting?.executeTool('int_tool', '{"val":42}')
-      ).resolves.toBeDefined();
-    });
-
-    it('rejects float for integer type', async () => {
-      initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
-        name: 'int_tool2',
-        description: 'Integer tool 2',
-        inputSchema: { type: 'object', properties: { val: { type: 'integer' } } },
-        execute: async () => ({ content: [] }),
-      });
-
-      await expect(
-        navigator.modelContextTesting?.executeTool('int_tool2', '{"val":3.14}')
-      ).rejects.toThrow('Instance type "number" is invalid. Expected "integer"');
-    });
-
-    it('validates boolean type', async () => {
-      initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
-        name: 'bool_tool',
-        description: 'Boolean tool',
-        inputSchema: { type: 'object', properties: { val: { type: 'boolean' } } },
-        execute: async () => ({ content: [] }),
-      });
-
-      await expect(
-        navigator.modelContextTesting?.executeTool('bool_tool', '{"val":true}')
-      ).resolves.toBeDefined();
-    });
-
-    it('rejects non-boolean for boolean type', async () => {
-      initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
-        name: 'bool_tool2',
-        description: 'Boolean tool 2',
-        inputSchema: { type: 'object', properties: { val: { type: 'boolean' } } },
-        execute: async () => ({ content: [] }),
-      });
-
-      await expect(
-        navigator.modelContextTesting?.executeTool('bool_tool2', '{"val":"true"}')
-      ).rejects.toThrow('Instance type "string" is invalid. Expected "boolean"');
-    });
-
-    it('validates object type', async () => {
-      initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
-        name: 'obj_tool',
-        description: 'Object tool',
-        inputSchema: { type: 'object', properties: { val: { type: 'object' } } },
-        execute: async () => ({ content: [] }),
-      });
-
-      await expect(
-        navigator.modelContextTesting?.executeTool('obj_tool', '{"val":{"a":1}}')
-      ).resolves.toBeDefined();
-    });
-
-    it('rejects non-object for object type', async () => {
-      initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
-        name: 'obj_tool2',
-        description: 'Object tool 2',
-        inputSchema: { type: 'object', properties: { val: { type: 'object' } } },
-        execute: async () => ({ content: [] }),
-      });
-
-      await expect(
-        navigator.modelContextTesting?.executeTool('obj_tool2', '{"val":"not-object"}')
-      ).rejects.toThrow('Instance type "string" is invalid. Expected "object"');
-    });
-
-    it('validates array type', async () => {
-      initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
-        name: 'arr_tool',
-        description: 'Array tool',
-        inputSchema: { type: 'object', properties: { val: { type: 'array' } } },
-        execute: async () => ({ content: [] }),
-      });
-
-      await expect(
-        navigator.modelContextTesting?.executeTool('arr_tool', '{"val":[1,2,3]}')
-      ).resolves.toBeDefined();
-    });
-
-    it('rejects non-array for array type', async () => {
-      initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
-        name: 'arr_tool2',
-        description: 'Array tool 2',
-        inputSchema: { type: 'object', properties: { val: { type: 'array' } } },
-        execute: async () => ({ content: [] }),
-      });
-
-      await expect(
-        navigator.modelContextTesting?.executeTool('arr_tool2', '{"val":"not-array"}')
-      ).rejects.toThrow('Instance type "string" is invalid. Expected "array"');
-    });
-
-    it('validates null type', async () => {
-      initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
-        name: 'null_tool',
-        description: 'Null tool',
-        inputSchema: { type: 'object', properties: { val: { type: 'null' } } },
-        execute: async () => ({ content: [] }),
-      });
-
-      await expect(
-        navigator.modelContextTesting?.executeTool('null_tool', '{"val":null}')
-      ).resolves.toBeDefined();
-    });
-
-    it('rejects non-null for null type', async () => {
-      initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
-        name: 'null_tool2',
-        description: 'Null tool 2',
-        inputSchema: { type: 'object', properties: { val: { type: 'null' } } },
-        execute: async () => ({ content: [] }),
-      });
-
-      await expect(
-        navigator.modelContextTesting?.executeTool('null_tool2', '{"val":"not-null"}')
-      ).rejects.toThrow('Instance type "string" is invalid. Expected "null"');
-    });
-
-    it('rejects values for unknown type', async () => {
-      initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
-        name: 'custom_tool',
-        description: 'Custom type tool',
-        inputSchema: { type: 'object', properties: { val: { type: 'custom_type' } } },
-        execute: async () => ({ content: [] }),
-      });
-
-      await expect(
-        navigator.modelContextTesting?.executeTool('custom_tool', '{"val":"anything"}')
-      ).rejects.toThrow('Instance type "string" is invalid. Expected "custom_type"');
-    });
-
-    it('rejects NaN and Infinity for number type', async () => {
-      initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
-        name: 'num_tool',
-        description: 'Number tool',
-        inputSchema: { type: 'object', properties: { val: { type: 'number' } } },
-        execute: async () => ({ content: [] }),
-      });
-
-      // Valid number
-      await expect(
-        navigator.modelContextTesting?.executeTool('num_tool', '{"val":3.14}')
-      ).resolves.toBeDefined();
-    });
-
-    it('allows extra properties not in schema', async () => {
-      initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
-        name: 'extra_props_tool',
-        description: 'Extra props tool',
-        inputSchema: { type: 'object', properties: { known: { type: 'string' } } },
-        execute: async () => ({ content: [] }),
-      });
-
-      // Extra property "unknown" not in schema - should pass
-      await expect(
-        navigator.modelContextTesting?.executeTool(
-          'extra_props_tool',
-          '{"known":"hello","unknown":42}'
-        )
-      ).resolves.toBeDefined();
-    });
-
-    it('skips validation for properties without a type', async () => {
-      initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
-        name: 'no_type_prop_tool',
-        description: 'No type property tool',
-        inputSchema: {
-          type: 'object',
-          properties: { val: { description: 'anything goes' } as never },
-        },
-        execute: async () => ({ content: [] }),
-      });
-
-      await expect(
-        navigator.modelContextTesting?.executeTool('no_type_prop_tool', '{"val":42}')
-      ).resolves.toBeDefined();
-    });
-  });
-
-  // =========================================================================
   // notifyToolsChanged edge cases
   // =========================================================================
 
   describe('notifyToolsChanged edge cases', () => {
-    it('does not throw when ontoolchange handler errors are swallowed', async () => {
-      initializeWebMCPPolyfill();
-
-      navigator.modelContextTesting!.ontoolchange = () => {
-        throw new Error('Handler error');
-      };
-
-      // Should not throw even though callback throws
-      navigator.modelContext.registerTool({
-        name: 'trigger_tool',
-        description: 'Trigger tool',
-        execute: async () => ({ content: [] }),
-      });
-
-      // Wait for microtask
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-
     it('does not call callback when no callback is registered', async () => {
       initializeWebMCPPolyfill();
       // Register and unregister without a callback - should not throw
-      navigator.modelContext.registerTool({
+      document.modelContext.registerTool({
         name: 'no_cb_tool',
         description: 'No callback tool',
         execute: async () => ({ content: [] }),
       });
 
       await Promise.resolve();
-    });
-  });
-
-  // =========================================================================
-  // JSON Schema validation edge cases
-  // =========================================================================
-
-  describe('JSON Schema validation edge cases', () => {
-    it('validates with no properties defined in schema', async () => {
-      initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
-        name: 'no_props_tool',
-        description: 'No properties',
-        inputSchema: { type: 'object' },
-        execute: async () => ({ content: [] }),
-      });
-
-      // Should pass even with args since no properties are validated
-      await expect(
-        navigator.modelContextTesting?.executeTool('no_props_tool', '{"anything":"goes"}')
-      ).resolves.toBeDefined();
-    });
-
-    it('filters non-string required entries at schema validation', () => {
-      initializeWebMCPPolyfill();
-      // A required array with non-string elements is rejected at schema validation time
-      expect(() =>
-        navigator.modelContext.registerTool({
-          name: 'mixed_req_tool',
-          description: 'Mixed required',
-          inputSchema: {
-            type: 'object',
-            properties: { name: { type: 'string' } },
-            required: ['name', 123 as unknown as string],
-          },
-          execute: async (args) => ({ content: [{ type: 'text', text: String(args.name) }] }),
-        })
-      ).toThrow('"required" must be an array of strings');
     });
   });
 
@@ -2364,7 +1685,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
       initializeWebMCPPolyfill();
       const controller = new AbortController();
 
-      navigator.modelContext.registerTool({
+      document.modelContext.registerTool({
         name: 'fast_tool',
         description: 'Fast tool',
         execute: async () => ({ content: [{ type: 'text' as const, text: 'fast' }] }),
@@ -2382,7 +1703,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
       let resolvePromise: ((value: unknown) => void) | null = null;
 
-      navigator.modelContext.registerTool({
+      document.modelContext.registerTool({
         name: 'pending_tool',
         description: 'Pending tool',
         execute: () =>
@@ -2398,11 +1719,10 @@ describe('@mcp-b/webmcp-polyfill', () => {
       // Give it a tick to start
       await Promise.resolve();
 
-      // Abort while pending - the abort rejection is caught by outer catch
-      // which re-throws with the generic message
-      controller.abort();
+      const reason = { code: 'pending-cancelled' };
+      controller.abort(reason);
 
-      await expect(resultPromise).rejects.toThrow('Tool was executed but the invocation failed');
+      await expect(resultPromise).rejects.toBe(reason);
 
       // Clean up - resolve the pending promise to avoid hanging
       (resolvePromise as ((v: unknown) => void) | null)?.({ content: [] });
@@ -2416,7 +1736,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
   describe('toSerializedTestingResult edge cases', () => {
     it('handles isError=true with text that does not start with Error:', async () => {
       initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
+      document.modelContext.registerTool({
         name: 'plain_error_tool',
         description: 'Plain error tool',
         execute: async () => ({
@@ -2434,7 +1754,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
     it('treats malformed isError payloads as raw return values', async () => {
       initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
+      document.modelContext.registerTool({
         name: 'no_content_error_tool',
         description: 'No content error tool',
         execute: async () => ({
@@ -2455,7 +1775,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
     it('handles metadata.willNavigate=false (does not return null)', async () => {
       initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
+      document.modelContext.registerTool({
         name: 'no_navigate_tool',
         description: 'No navigate tool',
         execute: async () => ({
@@ -2479,7 +1799,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
       initializeWebMCPPolyfill();
       const controller = new AbortController();
 
-      navigator.modelContext.registerTool({
+      document.modelContext.registerTool({
         name: 'error_with_signal_tool',
         description: 'Error with signal',
         execute: async () => {
@@ -2505,21 +1825,8 @@ describe('@mcp-b/webmcp-polyfill', () => {
     it('sets __isWebMCPPolyfill marker on modelContext', () => {
       initializeWebMCPPolyfill();
       expect(
-        (navigator.modelContext as unknown as { __isWebMCPPolyfill?: boolean }).__isWebMCPPolyfill
+        (document.modelContext as unknown as { __isWebMCPPolyfill?: boolean }).__isWebMCPPolyfill
       ).toBe(true);
-    });
-  });
-
-  // =========================================================================
-  // disableIframeTransportByDefault (deprecated no-op)
-  // =========================================================================
-
-  describe('deprecated options', () => {
-    it('accepts disableIframeTransportByDefault without error', () => {
-      expect(() =>
-        initializeWebMCPPolyfill({ disableIframeTransportByDefault: true })
-      ).not.toThrow();
-      expect(navigator.modelContext).toBeDefined();
     });
   });
 
@@ -2530,7 +1837,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
   describe('synchronous execute', () => {
     it('handles synchronous tool execute function', async () => {
       initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
+      getCompatModelContext().registerTool({
         name: 'sync_tool',
         description: 'Sync tool',
         execute: () => ({ content: [{ type: 'text' as const, text: 'sync result' }] }),
@@ -2548,7 +1855,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
   describe('getFirstTextBlock edge cases', () => {
     it('skips non-text content blocks for error message extraction', async () => {
       initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
+      document.modelContext.registerTool({
         name: 'mixed_content_error_tool',
         description: 'Mixed content error tool',
         execute: async () => ({
@@ -2569,7 +1876,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
     it('handles isError with empty string text', async () => {
       initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
+      document.modelContext.registerTool({
         name: 'empty_text_error_tool',
         description: 'Empty text error tool',
         execute: async () => ({
@@ -2596,7 +1903,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
       const circular: Record<string, unknown> = { type: 'text', text: 'ok' };
       circular.self = circular;
 
-      navigator.modelContext.registerTool({
+      getCompatModelContext().registerTool({
         name: 'circular_result_tool',
         description: 'Circular result tool',
         execute: () => ({
@@ -2610,26 +1917,6 @@ describe('@mcp-b/webmcp-polyfill', () => {
       await expect(
         navigator.modelContextTesting?.executeTool('circular_result_tool', '{}')
       ).rejects.toThrow('Tool was executed but the invocation failed');
-    });
-  });
-
-  // =========================================================================
-  // Reject arrays for object type in isPlainObject (via object type validation)
-  // =========================================================================
-
-  describe('isPlainObject rejects arrays for object type', () => {
-    it('rejects array value for object type property', async () => {
-      initializeWebMCPPolyfill();
-      navigator.modelContext.registerTool({
-        name: 'obj_arr_tool',
-        description: 'Object vs array tool',
-        inputSchema: { type: 'object', properties: { val: { type: 'object' } } },
-        execute: async () => ({ content: [] }),
-      });
-
-      await expect(
-        navigator.modelContextTesting?.executeTool('obj_arr_tool', '{"val":[1,2]}')
-      ).rejects.toThrow('Instance type "array" is invalid. Expected "object"');
     });
   });
 

@@ -1,4 +1,5 @@
-import { type JSONRPCMessage, JSONRPCMessageSchema, type Transport } from '@mcp-b/webmcp-ts-sdk';
+import { JSONRPCMessageSchema } from '@modelcontextprotocol/core';
+import type { JSONRPCMessage, Transport } from '@modelcontextprotocol/server';
 
 export interface IframeParentTransportOptions {
   /** Reference to the iframe element */
@@ -25,7 +26,10 @@ export interface IframeParentTransportOptions {
  *   targetOrigin: 'https://iframe-app.com',
  * });
  *
- * const client = new Client({ name: 'Parent', version: '1.0.0' });
+ * const client = new Client(
+ *   { name: 'Parent', version: '1.0.0' },
+ *   { versionNegotiation: { mode: 'auto' } }
+ * );
  * await client.connect(transport);
  * ```
  */

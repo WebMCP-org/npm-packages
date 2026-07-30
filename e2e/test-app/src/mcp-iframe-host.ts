@@ -5,13 +5,23 @@
  * and expose its tools, resources, and prompts to the parent.
  */
 
-// Import the polyfill (creates navigator.modelContext on parent)
+// Import the browser runtime (creates document.modelContext on parent)
 import '@mcp-b/global';
 
 // Import the MCPIframeElement (auto-registers as <mcp-iframe>)
 import '@mcp-b/mcp-iframe';
 
 import type { MCPIframeElement } from '@mcp-b/mcp-iframe';
+import { normalizeToolResponse } from '@mcp-b/webmcp-polyfill/schema';
+import type {
+  CallToolResult,
+  ChromeModelContextExtensions,
+  ModelContextCore,
+} from '@mcp-b/webmcp-types';
+
+type DescriptorExecutionContext = ModelContextCore & {
+  executeTool: NonNullable<ChromeModelContextExtensions['executeTool']>;
+};
 
 // DOM elements
 const connectionStatus = document.getElementById('connection-status')!;
@@ -22,7 +32,33 @@ const toolResultEl = document.getElementById('tool-result')!;
 const resourceResultEl = document.getElementById('resource-result')!;
 const promptResultEl = document.getElementById('prompt-result')!;
 const logEl = document.getElementById('log')!;
-const modelContext = navigator.modelContext;
+const modelContext = document.modelContext;
+
+function hasDescriptorExecution(context: ModelContextCore): context is DescriptorExecutionContext {
+  return 'executeTool' in context && typeof context.executeTool === 'function';
+}
+
+async function executeRegisteredTool(
+  context: ModelContextCore,
+  name: string,
+  args: Record<string, unknown>
+): Promise<CallToolResult> {
+  if (!hasDescriptorExecution(context)) {
+    throw new Error('Chrome descriptor execution is unavailable');
+  }
+
+  const tool = (await context.getTools()).find((candidate) => candidate.name === name);
+  if (!tool) {
+    throw new Error(`Tool not found: ${name}`);
+  }
+
+  const serialized = await context.executeTool(tool, JSON.stringify(args));
+  if (serialized === null) {
+    throw new Error('Tool execution was interrupted');
+  }
+
+  return normalizeToolResponse(JSON.parse(serialized));
+}
 
 // Get the mcp-iframe element
 const mcpIframe = document.getElementById('child-iframe') as MCPIframeElement;
@@ -89,8 +125,8 @@ async function callTool(name: string, args: Record<string, unknown>) {
   toolResultEl.textContent = 'Calling...';
 
   try {
-    // Use the parent's modelContext to call the exposed tool
-    const result = await modelContext.executeTool(prefixedName, args);
+    // Resolve the current descriptor before every execution, as Chrome requires.
+    const result = await executeRegisteredTool(modelContext, prefixedName, args);
     const rawText =
       result.content[0]?.type === 'text' ? result.content[0].text : JSON.stringify(result);
     const text = typeof rawText === 'string' ? rawText : JSON.stringify(rawText);

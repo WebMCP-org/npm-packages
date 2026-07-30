@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import type { BrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
 
 test.describe('Web Model Context API E2E Tests', () => {
   test.beforeEach(async ({ page }) => {
@@ -22,9 +23,9 @@ test.describe('Web Model Context API E2E Tests', () => {
     await expect(page.locator('#unregister-dynamic')).toBeDisabled();
   });
 
-  test('should have navigator.modelContext API available', async ({ page }) => {
+  test('should have document.modelContext API available', async ({ page }) => {
     // Check that the API is available
-    const hasAPI = await page.evaluate(() => 'modelContext' in navigator);
+    const hasAPI = await page.evaluate(() => 'modelContext' in document);
     expect(hasAPI).toBe(true);
 
     // Verify status shows API is ready
@@ -51,7 +52,7 @@ test.describe('Web Model Context API E2E Tests', () => {
     await page.waitForTimeout(500);
 
     const toolNames = await page.evaluate(() =>
-      navigator.modelContext.listTools().map((tool: { name: string }) => tool.name)
+      (document.modelContext as BrowserMcpServer).listTools().map((tool) => tool.name)
     );
     expect(toolNames).toHaveLength(4);
     expect(toolNames).toContain('incrementCounter');
@@ -113,7 +114,7 @@ test.describe('Web Model Context API E2E Tests', () => {
 
     // Verify 5 tools total (4 base + 1 dynamic)
     let toolNames = await page.evaluate(() =>
-      navigator.modelContext.listTools().map((tool: { name: string }) => tool.name)
+      (document.modelContext as BrowserMcpServer).listTools().map((tool) => tool.name)
     );
     expect(toolNames).toHaveLength(5);
     expect(toolNames).toContain('dynamicTool');
@@ -123,7 +124,7 @@ test.describe('Web Model Context API E2E Tests', () => {
     await page.waitForTimeout(500);
 
     toolNames = await page.evaluate(() =>
-      navigator.modelContext.listTools().map((tool: { name: string }) => tool.name)
+      (document.modelContext as BrowserMcpServer).listTools().map((tool) => tool.name)
     );
     expect(toolNames).toHaveLength(3);
     expect(toolNames).toContain('doubleCounter');
@@ -132,7 +133,9 @@ test.describe('Web Model Context API E2E Tests', () => {
   });
 
   test('should expose tools via public modelContext API', async ({ page }) => {
-    const toolCount = await page.evaluate(() => navigator.modelContext.listTools().length);
+    const toolCount = await page.evaluate(
+      () => (document.modelContext as BrowserMcpServer).listTools().length
+    );
 
     // Should have 4 base tools initially
     expect(toolCount).toBe(4);
@@ -377,7 +380,7 @@ test.describe('Model Context Testing API Tests', () => {
 
       const toolName = `testingCallbackTool_${Date.now()}`;
       const controller = new AbortController();
-      navigator.modelContext.registerTool(
+      document.modelContext.registerTool(
         {
           name: toolName,
           description: 'Callback test tool',
@@ -430,16 +433,16 @@ test.describe('Sampling & Elicitation API Tests', () => {
     expect(logEntries.some((entry) => entry.includes('elicitInput available: true'))).toBe(true);
   });
 
-  test('should have createMessage method on navigator.modelContext', async ({ page }) => {
+  test('should have createMessage method on document.modelContext', async ({ page }) => {
     const hasMethod = await page.evaluate(() => {
-      return typeof navigator.modelContext.createMessage === 'function';
+      return typeof (document.modelContext as BrowserMcpServer).createMessage === 'function';
     });
     expect(hasMethod).toBe(true);
   });
 
-  test('should have elicitInput method on navigator.modelContext', async ({ page }) => {
+  test('should have elicitInput method on document.modelContext', async ({ page }) => {
     const hasMethod = await page.evaluate(() => {
-      return typeof navigator.modelContext.elicitInput === 'function';
+      return typeof (document.modelContext as BrowserMcpServer).elicitInput === 'function';
     });
     expect(hasMethod).toBe(true);
   });
@@ -450,7 +453,7 @@ test.describe('Sampling & Elicitation API Tests', () => {
     const outcome = await page.evaluate(async () => {
       try {
         await Promise.race([
-          navigator.modelContext.createMessage({
+          (document.modelContext as BrowserMcpServer).createMessage({
             messages: [{ role: 'user', content: { type: 'text', text: 'test' } }],
             maxTokens: 50,
           }),
@@ -473,7 +476,7 @@ test.describe('Sampling & Elicitation API Tests', () => {
     const outcome = await page.evaluate(async () => {
       try {
         await Promise.race([
-          navigator.modelContext.elicitInput({
+          (document.modelContext as BrowserMcpServer).elicitInput({
             message: 'Name?',
             requestedSchema: {
               type: 'object',

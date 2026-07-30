@@ -79,25 +79,26 @@ If you are new to WebMCP, register tools first with `@mcp-b/global`, then load t
 ```html
 <script src="https://cdn.jsdelivr.net/npm/@mcp-b/global@latest/dist/index.iife.js"></script>
 <script>
-  document.modelContext.registerTool({
-    name: 'get_page_title',
-    description: 'Get the current page title',
-    inputSchema: { type: 'object', properties: {} },
-    execute: async () => ({ content: [{ type: 'text', text: document.title }] }),
-  });
+  void document.modelContext
+    .registerTool({
+      name: 'get_page_title',
+      description: 'Get the current page title',
+      inputSchema: { type: 'object', properties: {} },
+      execute: async () => ({ content: [{ type: 'text', text: document.title }] }),
+    })
+    .catch(console.error);
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@latest/dist/browser/embed.js"></script>
 ```
 
 ## Verify the connection
 
-Once the relay is running and your page has loaded `embed.js`, your AI agent has access to four management tools:
+Once the relay is running and your page has loaded `embed.js`, your AI agent has access to three management tools:
 
 | Tool                  | What it does                                                                               |
 | --------------------- | ------------------------------------------------------------------------------------------ |
 | `webmcp_list_sources` | Lists connected browser tabs with metadata (tab ID, origin, URL, title, tool count)        |
 | `webmcp_list_tools`   | Lists all relayed tools with source info                                                   |
-| `webmcp_call_tool`    | Invokes a relayed tool by name (for clients that do not support dynamic tool registration) |
 | `webmcp_open_page`    | Opens a URL in the default browser or refreshes a connected source page by matching origin |
 
 Tools also register as first-class MCP tools using their original name. When multiple tabs register a tool with the same name, the relay appends a short tab-ID suffix for disambiguation (e.g. `search_ed93`, `search_a1b2`).

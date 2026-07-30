@@ -5,15 +5,9 @@ import {
   type TabServerTransportOptions,
 } from '@mcp-b/transports';
 import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
-import { BrowserMcpServer, SERVER_MARKER_PROPERTY, type Transport } from '@mcp-b/webmcp-ts-sdk';
-import type {
-  InputSchema,
-  ModelContextCore,
-  ModelContextTesting,
-  ModelContextTestingPolyfillExtensions,
-  ToolListItem,
-  ToolResponse,
-} from '@mcp-b/webmcp-types';
+import { BrowserMcpServer, SERVER_MARKER_PROPERTY } from '@mcp-b/webmcp-ts-sdk';
+import type { ModelContextCore } from '@mcp-b/webmcp-types';
+import type { Transport } from '@modelcontextprotocol/server';
 import type { WebModelContextInitOptions } from './types.js';
 
 interface RuntimeState {
@@ -30,32 +24,17 @@ function isBrowserEnvironment(): boolean {
   return typeof window !== 'undefined' && typeof window.navigator !== 'undefined';
 }
 
-function readCurrentModelContext(): unknown {
-  const navigatorDescriptor = Object.getOwnPropertyDescriptor(navigator, 'modelContext');
-  if (navigatorDescriptor) {
-    return navigator.modelContext;
-  }
-
+function readCurrentModelContext(): ModelContextCore | undefined {
   return document.modelContext ?? navigator.modelContext;
 }
 
 function replaceDocumentModelContext(value: unknown): void {
-  try {
-    Object.defineProperty(document, 'modelContext', {
-      configurable: true,
-      enumerable: true,
-      writable: false,
-      value,
-    });
-  } catch {
-    Object.defineProperty(Object.getPrototypeOf(document), 'modelContext', {
-      configurable: true,
-      enumerable: true,
-      get() {
-        return value;
-      },
-    });
-  }
+  Object.defineProperty(document, 'modelContext', {
+    configurable: true,
+    enumerable: true,
+    writable: false,
+    value,
+  });
 
   if (document.modelContext !== value) {
     console.error(
@@ -67,24 +46,12 @@ function replaceDocumentModelContext(value: unknown): void {
 }
 
 function replaceNavigatorModelContext(value: unknown): void {
-  try {
-    Object.defineProperty(navigator, 'modelContext', {
-      configurable: true,
-      enumerable: true,
-      writable: false,
-      value,
-    });
-  } catch {
-    // Native browser property is non-configurable on the instance.
-    // Shadow it with a getter on the prototype instead.
-    Object.defineProperty(Object.getPrototypeOf(navigator), 'modelContext', {
-      configurable: true,
-      enumerable: true,
-      get() {
-        return value;
-      },
-    });
-  }
+  Object.defineProperty(navigator, 'modelContext', {
+    configurable: true,
+    enumerable: true,
+    writable: false,
+    value,
+  });
 
   // Verify the replacement actually worked — the prototype getter cannot
   // shadow a non-configurable own property on the navigator instance.
@@ -100,24 +67,40 @@ function replaceNavigatorModelContext(value: unknown): void {
 /**
  * Replace both modelContext surfaces with the given value.
  *
- * The Chrome 152 baseline uses document.modelContext as canonical and keeps
- * navigator.modelContext as a deprecated alias. @mcp-b/global still supports
- * old navigator-first users, so the bridge exposes the BrowserMcpServer wrapper
+ * document.modelContext is canonical. @mcp-b/global still supports old
+ * navigator-first users, so the bridge exposes the BrowserMcpServer wrapper
  * through both properties.
  */
-function replaceModelContext(value: unknown): void {
-  replaceDocumentModelContext(value);
-  replaceNavigatorModelContext(value);
+function restoreProperty(
+  target: Document | Navigator,
+  key: 'modelContext',
+  descriptor: PropertyDescriptor | undefined
+): void {
+  if (descriptor) Object.defineProperty(target, key, descriptor);
+  else Reflect.deleteProperty(target, key);
+}
+
+function replaceModelContext(
+  value: unknown,
+  previousDocumentDescriptor: PropertyDescriptor | undefined,
+  previousNavigatorDescriptor: PropertyDescriptor | undefined
+): void {
+  try {
+    replaceDocumentModelContext(value);
+    replaceNavigatorModelContext(value);
+  } catch (error) {
+    restoreProperty(document, 'modelContext', previousDocumentDescriptor);
+    restoreProperty(navigator, 'modelContext', previousNavigatorDescriptor);
+    throw error;
+  }
 }
 
 function createTransport(config: WebModelContextInitOptions['transport']): Transport {
   const inIframe = window.parent !== window;
 
   if (inIframe && config?.iframeServer !== false) {
-    const iframeOptions =
-      typeof config?.iframeServer === 'object'
-        ? config.iframeServer
-        : ({} as Partial<IframeChildTransportOptions>);
+    const iframeOptions: Partial<IframeChildTransportOptions> =
+      typeof config?.iframeServer === 'object' ? config.iframeServer : {};
 
     const { allowedOrigins, ...rest } = iframeOptions;
 
@@ -131,10 +114,8 @@ function createTransport(config: WebModelContextInitOptions['transport']): Trans
     throw new Error('tabServer transport is disabled and iframe transport was not selected');
   }
 
-  const tabOptions =
-    typeof config?.tabServer === 'object'
-      ? config.tabServer
-      : ({} as Partial<TabServerTransportOptions>);
+  const tabOptions: Partial<TabServerTransportOptions> =
+    typeof config?.tabServer === 'object' ? config.tabServer : {};
 
   const { allowedOrigins, ...rest } = tabOptions;
 
@@ -144,97 +125,8 @@ function createTransport(config: WebModelContextInitOptions['transport']): Trans
   });
 }
 
-function parseTestingInputSchema(inputSchema: string | undefined): InputSchema | undefined {
-  if (!inputSchema) {
-    return undefined;
-  }
-
-  try {
-    const parsed = JSON.parse(inputSchema) as unknown;
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      return undefined;
-    }
-    return parsed as InputSchema;
-  } catch (error) {
-    console.warn('[WebMCP] Failed to parse testing inputSchema JSON:', error);
-    return undefined;
-  }
-}
-
-function getTestingShimTools():
-  | {
-      testingShim: ModelContextTesting;
-      tools: ToolListItem[];
-    }
-  | undefined {
-  const testingShim = navigator.modelContextTesting as
-    | (ModelContextTesting & Partial<ModelContextTestingPolyfillExtensions>)
-    | undefined;
-  if (!testingShim) {
-    return undefined;
-  }
-
-  if (typeof testingShim.getRegisteredTools === 'function') {
-    return {
-      testingShim,
-      tools: testingShim.getRegisteredTools() as ToolListItem[],
-    };
-  }
-
-  if (typeof testingShim.listTools !== 'function') {
-    return undefined;
-  }
-
-  const tools = testingShim.listTools().map(
-    (tool): ToolListItem => ({
-      name: tool.name,
-      description: tool.description ?? '',
-      inputSchema: parseTestingInputSchema(tool.inputSchema) ?? {
-        type: 'object',
-        properties: {},
-      },
-    })
-  );
-
-  return {
-    testingShim,
-    tools,
-  };
-}
-
-function syncToolsFromTestingShim(server: BrowserMcpServer): number {
-  const shimState = getTestingShimTools();
-  if (!shimState) {
-    return 0;
-  }
-
-  const { testingShim, tools } = shimState;
-  return server.backfillTools(tools, async (name: string, args: Record<string, unknown>) => {
-    const serialized = await testingShim.executeTool(name, JSON.stringify(args ?? {}));
-    if (serialized === null) {
-      return {
-        content: [{ type: 'text', text: 'Tool execution interrupted by navigation' }],
-        isError: true,
-      } satisfies ToolResponse;
-    }
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(serialized);
-    } catch (parseError) {
-      throw new Error(
-        `Failed to parse serialized tool response for ${name}: ${parseError instanceof Error ? parseError.message : String(parseError)}`
-      );
-    }
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      throw new Error(`Invalid serialized tool response for ${name}`);
-    }
-    return parsed as ToolResponse;
-  });
-}
-
 export function initializeWebModelContext(options?: WebModelContextInitOptions): void {
-  if (!isBrowserEnvironment()) {
+  if (!isBrowserEnvironment() || globalThis.isSecureContext === false) {
     return;
   }
 
@@ -244,8 +136,12 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
 
   // Cross-bundle guard: if modelContext is already a BrowserMcpServer
   // (set by another bundle in this window), skip initialization.
-  const existingContext = readCurrentModelContext() as Record<string, unknown> | undefined;
-  if (existingContext?.[SERVER_MARKER_PROPERTY]) {
+  const existingContext = readCurrentModelContext();
+  if (
+    existingContext &&
+    SERVER_MARKER_PROPERTY in existingContext &&
+    existingContext[SERVER_MARKER_PROPERTY] === true
+  ) {
     return;
   }
 
@@ -255,20 +151,19 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
   });
 
   // 2. Save reference to the polyfill's (or native) context
-  const native = readCurrentModelContext() as ModelContextCore | undefined;
+  const native = readCurrentModelContext();
   if (!native) {
     throw new Error('modelContext is not available');
   }
 
-  // 3. Create server with native mirroring
+  // 3. Resolve transport before mutating either browser surface.
+  const transport = createTransport(options?.transport);
+
+  // 4. Create server with native mirroring
   const hostname = window.location.hostname || 'localhost';
   const server = new BrowserMcpServer({ name: `${hostname}-webmcp`, version: '1.0.0' }, { native });
-  server.syncNativeTools();
-  syncToolsFromTestingShim(server);
 
-  // 4. Replace navigator.modelContext with the server.
-  // Try own-property on the navigator instance first (works for polyfill and most cases).
-  // Fall back to a prototype getter if the native property is non-configurable.
+  // 5. Replace both the canonical document surface and compatibility alias.
   const previousDocumentModelContextDescriptor = Object.getOwnPropertyDescriptor(
     document,
     'modelContext'
@@ -277,20 +172,33 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
     navigator,
     'modelContext'
   );
-  replaceModelContext(server);
+  try {
+    replaceModelContext(
+      server,
+      previousDocumentModelContextDescriptor,
+      previousNavigatorModelContextDescriptor
+    );
+    runtime = {
+      native,
+      server,
+      transport,
+      previousDocumentModelContextDescriptor,
+      previousNavigatorModelContextDescriptor,
+    };
+  } catch (error) {
+    void server.close();
+    void transport.close();
+    throw error;
+  }
 
-  // 5. Create transport and connect
-  const transport = createTransport(options?.transport);
-  runtime = {
-    native,
-    server,
-    transport,
-    previousDocumentModelContextDescriptor,
-    previousNavigatorModelContextDescriptor,
-  };
-
+  void server.syncNativeTools().catch((error: unknown) => {
+    console.warn('[WebModelContext] Native WebMCP tool synchronization failed:', error);
+  });
   void server.connect(transport).catch((error: unknown) => {
     console.error('[WebModelContext] Failed to connect MCP transport:', error);
+    if (runtime?.server === server) {
+      cleanupWebModelContext();
+    }
   });
 }
 
@@ -313,15 +221,6 @@ export function cleanupWebModelContext(): void {
   // Restore the descriptors that existed before we wrapped with BrowserMcpServer.
   // We intentionally do NOT call cleanupWebMCPPolyfill() here — the polyfill
   // manages its own lifecycle (auto-init, testing shim) independently.
-  if (previousDocumentModelContextDescriptor) {
-    Object.defineProperty(document, 'modelContext', previousDocumentModelContextDescriptor);
-  } else {
-    delete (document as unknown as Record<string, unknown>).modelContext;
-  }
-
-  if (previousNavigatorModelContextDescriptor) {
-    Object.defineProperty(navigator, 'modelContext', previousNavigatorModelContextDescriptor);
-  } else {
-    delete (navigator as unknown as Record<string, unknown>).modelContext;
-  }
+  restoreProperty(document, 'modelContext', previousDocumentModelContextDescriptor);
+  restoreProperty(navigator, 'modelContext', previousNavigatorModelContextDescriptor);
 }

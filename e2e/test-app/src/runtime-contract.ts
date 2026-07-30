@@ -1,7 +1,7 @@
 import '@mcp-b/global';
 import { TabClientTransport } from '@mcp-b/transports';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { installBrowserRuntimeContract } from '../../runtime-contract/browser-contract.js';
+import { Client } from '@modelcontextprotocol/client';
+import { installModelContextRuntimeContract } from '../../runtime-contract/model-context-contract.js';
 
 type RuntimeHook = NonNullable<Window['__WEBMCP_E2E__']>;
 
@@ -41,9 +41,9 @@ function getRuntimeHook(): RuntimeHook {
   return hook;
 }
 
-function renderInvocations() {
+async function renderInvocations() {
   const hook = getRuntimeHook();
-  const invocations = hook.readInvocations();
+  const invocations = await hook.readInvocations();
   invocationListEl.textContent = JSON.stringify(invocations, null, 2);
   invocationListEl.dataset.count = String(invocations.length);
 }
@@ -61,11 +61,14 @@ async function bootstrap() {
     throw new Error('document.modelContext is unavailable');
   }
 
-  await installBrowserRuntimeContract(modelContext, { runtimeLabel: 'tab' });
+  await installModelContextRuntimeContract(modelContext, { runtimeLabel: 'tab' });
   setStatus(runtimeStatusEl, 'ready', 'Runtime ready');
-  renderInvocations();
+  await renderInvocations();
 
-  const client = new Client({ name: 'runtime-contract-tab-client', version: '1.0.0' });
+  const client = new Client(
+    { name: 'runtime-contract-tab-client', version: '1.0.0' },
+    { versionNegotiation: { mode: 'auto' } }
+  );
   const transport = new TabClientTransport({
     targetOrigin: window.location.origin,
   });
@@ -88,12 +91,12 @@ async function bootstrap() {
 
   refreshToolsBtn.addEventListener('click', async () => {
     await renderTools(client);
-    renderInvocations();
+    await renderInvocations();
   });
 
-  resetInvocationsBtn.addEventListener('click', () => {
-    getRuntimeHook().resetInvocations();
-    renderInvocations();
+  resetInvocationsBtn.addEventListener('click', async () => {
+    await getRuntimeHook().resetInvocations();
+    await renderInvocations();
   });
 }
 

@@ -84,9 +84,9 @@ const resultJson = await document.modelContext.executeTool(tool, '{}');
 const result = resultJson === null ? null : JSON.parse(resultJson);
 ```
 
-`listTools()` and `callTool()` are MCP-B compatibility helpers. MCP clients that
-connect through the MCP SDK still use the SDK's `client.listTools()` and
-`client.callTool(...)` APIs.
+`listTools()` is an MCP-B metadata helper. MCP clients that connect through the
+MCP SDK still use the SDK's `client.listTools()` and `client.callTool(...)`
+protocol APIs.
 
 ## Configure initialization
 
@@ -103,13 +103,12 @@ initializeWebModelContext({
 
 Useful options:
 
-| Option                       | Default        | Purpose                                                              |
-| ---------------------------- | -------------- | -------------------------------------------------------------------- |
-| `autoInitialize`             | `true`         | Disable when you want to call `initializeWebModelContext()` yourself |
-| `transport.tabServer`        | auto           | Configure or disable the tab transport                               |
-| `transport.iframeServer`     | auto           | Configure or disable iframe transport                                |
-| `nativeModelContextBehavior` | `'preserve'`   | Wrap an existing native/polyfill context                             |
-| `installTestingShim`         | `'if-missing'` | Install `navigator.modelContextTesting` for tests and tooling        |
+| Option                   | Default        | Purpose                                                              |
+| ------------------------ | -------------- | -------------------------------------------------------------------- |
+| `autoInitialize`         | `true`         | Disable when you want to call `initializeWebModelContext()` yourself |
+| `transport.tabServer`    | auto           | Configure or disable the tab transport                               |
+| `transport.iframeServer` | auto           | Configure or disable iframe transport                                |
+| `installTestingShim`     | `'if-missing'` | Install `navigator.modelContextTesting` for tests and tooling        |
 
 ## Runtime layering
 
@@ -165,5 +164,6 @@ const tools = await document.modelContext.getTools();
 console.log(tools.map((tool) => tool.name));
 ```
 
-Use `navigator.modelContextTesting` only for native preview/testing flows and
-tool inspectors. It is not the author-facing runtime surface.
+Use `navigator.modelContextTesting` only for MCP-B compatibility tests and
+older tooling. Current native Chrome tests use `getTools()` and feature-detect
+the descriptor-based `executeTool()` extension.

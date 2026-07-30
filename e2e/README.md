@@ -15,7 +15,7 @@ This package also keeps non-canonical integration lanes for direct runtime APIs,
 Other canonical runtime E2E lanes live in package-specific commands:
 
 - `pnpm --filter @mcp-b/webmcp-local-relay test:e2e`
-- `pnpm --filter @mcp-b/extension-tools test:e2e`
+- `pnpm --filter @mcp-b/transports test:e2e`
 
 ## Canonical E2E Definition
 
@@ -26,16 +26,18 @@ A test is canonical E2E only if it proves:
 3. tools are called through that same boundary
 4. no mocked transports or fake servers are used
 
-Native Chromium is the one exception to the SDK-client rule: its real public boundary is `document.modelContext` / `navigator.modelContextTesting`. `navigator.modelContext` is only checked as the deprecated compatibility alias.
+Native Chromium is the one exception to the SDK-client rule: its real public
+boundary is `document.modelContext`. Native discovery uses `getTools()`.
+Execution uses Chrome's optional descriptor-based `executeTool()` extension
+when the browser exposes it.
 
 ## Structure
 
 ```text
 e2e/
 ├── runtime-contract/
-│   ├── browser-contract.js
-│   ├── server-contract.js
-│   └── core.js
+│   ├── core.ts
+│   └── model-context-contract.ts
 ├── test-app/
 │   ├── runtime-contract.html
 │   ├── runtime-contract-iframe-client.html
@@ -51,7 +53,7 @@ e2e/
 │   ├── tab-transport.spec.ts
 │   ├── mcp-iframe-element.spec.ts
 │   ├── codemode-webmcp.spec.ts
-│   ├── chromium-native-api.spec.ts
+│   ├── chromium-native-api.spec.ts # Historical name; MCP-B compatibility shim coverage
 │   └── chrome-beta-webmcp.spec.ts
 ├── playwright.config.ts
 └── package.json
@@ -118,7 +120,7 @@ pnpm test:integration:frameworks
 # Older targeted commands retained for focused runs
 pnpm test:tab-transport
 pnpm test:mcp-iframe
-pnpm test:chromium-native-api
+pnpm test:chromium-native-api # MCP-B compatibility, not native conformance
 pnpm test:native-showcase
 pnpm test:chrome-beta:webmcp
 ```
@@ -141,7 +143,8 @@ These suites remain valuable, but they are not the default E2E definition:
 - `tests/tab-transport.spec.ts`
 - `tests/mcp-iframe-element.spec.ts`
 - `tests/codemode-webmcp.spec.ts`
-- `tests/chromium-native-api.spec.ts`
+- `tests/chromium-native-api.spec.ts` (MCP-B extensions and the deprecated
+  `modelContextTesting` compatibility shim, despite the historical filename)
 - `tests/notification-batching.spec.ts`
 - `tests/chrome-beta-webmcp.spec.ts`
 - `playwright-native-showcase.config.ts`
@@ -149,7 +152,8 @@ These suites remain valuable, but they are not the default E2E definition:
 Focused codemode coverage:
 
 - `pnpm test:codemode:webmcp` verifies the codemode page flow in Chromium and records whether the page ran against the native or polyfill runtime path.
-- `pnpm test:codemode:webmcp:beta` verifies that same page flow against Chrome 152+ with the native `document.modelContext` and `navigator.modelContextTesting` APIs enabled.
+- `pnpm test:codemode:webmcp:beta` verifies that same page flow against Chrome
+  152+ through the captured native `document.modelContext` surface.
 
 ## Manual Runtime Pages
 

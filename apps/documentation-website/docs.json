@@ -147,17 +147,6 @@
                 ]
               },
               {
-                "group": "Chrome DevTools MCP (upstream)",
-                "pages": [
-                  "packages/chrome-devtools-mcp/overview",
-                  "packages/chrome-devtools-mcp/reference"
-                ]
-              },
-              {
-                "group": "@mcp-b/extension-tools",
-                "pages": ["packages/extension-tools/overview", "packages/extension-tools/reference"]
-              },
-              {
                 "group": "@mcp-b/smart-dom-reader",
                 "pages": [
                   "packages/smart-dom-reader/overview",

@@ -1,6 +1,5 @@
 import { useMemo, useRef } from 'react';
-import type { WebMCPReturn } from './types.js';
-import { useWebMCP } from './useWebMCP.js';
+import { useWebMCP, type WebMCPReturn } from 'usewebmcp';
 
 /**
  * Convenience hook for exposing read-only context data to AI assistants.
@@ -85,21 +84,14 @@ export function useWebMCPContext<T>(
     [name]
   );
 
-  // Use default generics (no input/output schema) since context tools
-  // don't define structured schemas. The handler returns T but it's
-  // treated as `unknown` in the return type since no outputSchema is defined.
   return useWebMCP({
     name,
     description,
     annotations,
-    // Cast to unknown since context tools return arbitrary types
-    // that don't need to conform to a specific schema
-    handler: async (_input: Record<string, unknown>) => {
-      return getValueRef.current() as Record<string, unknown>;
-    },
+    execute: async () => getValueRef.current(),
     formatOutput: (output) => {
       if (typeof output === 'string') {
-        return output as string;
+        return output;
       }
       return JSON.stringify(output, null, 2);
     },

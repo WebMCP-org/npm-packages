@@ -1,15 +1,66 @@
 import { TabClientTransport, TabServerTransport } from '@mcp-b/transports';
 import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
-import { BrowserMcpServer, Client } from '@mcp-b/webmcp-ts-sdk';
+import { normalizeInputSchema } from '@mcp-b/webmcp-polyfill/schema';
+import { BrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
+import type { ModelContextCore } from '@mcp-b/webmcp-types';
+import { Client } from '@modelcontextprotocol/client';
+import { inputRequired, McpServer } from '@modelcontextprotocol/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanupWebModelContext, initializeWebModelContext } from './global.js';
 
+const documentModelContextDescriptorStack: Array<PropertyDescriptor | undefined> = [];
+
+function setDocumentModelContext(value: unknown): void {
+  documentModelContextDescriptorStack.push(
+    Object.getOwnPropertyDescriptor(document, 'modelContext')
+  );
+  Object.defineProperty(document, 'modelContext', {
+    configurable: true,
+    enumerable: true,
+    writable: false,
+    value,
+  });
+}
+
+function restoreDocumentModelContext(): void {
+  const descriptor = documentModelContextDescriptorStack.pop();
+  if (descriptor) {
+    Object.defineProperty(document, 'modelContext', descriptor);
+    return;
+  }
+  delete (document as unknown as Record<string, unknown>).modelContext;
+}
+
 afterEach(() => {
   cleanupWebModelContext();
+  while (documentModelContextDescriptorStack.length > 0) {
+    restoreDocumentModelContext();
+  }
 });
 
 function getModelContext(): BrowserMcpServer {
-  return navigator.modelContext as unknown as BrowserMcpServer;
+  return document.modelContext as unknown as BrowserMcpServer;
+}
+
+async function executeRegisteredTool(
+  modelContext: BrowserMcpServer,
+  name: string,
+  args: unknown = {}
+): Promise<string | null> {
+  const tool = (await modelContext.getTools()).find((candidate) => candidate.name === name);
+  if (!tool) {
+    throw new Error(`Tool not found: ${name}`);
+  }
+  return modelContext.executeTool(tool, JSON.stringify(args));
+}
+
+function parseSerializedResult(serialized: string | null): unknown {
+  if (serialized === null) return null;
+  try {
+    return JSON.parse(serialized);
+  } catch {
+    return serialized;
+  }
 }
 
 function createNativeModelContextStub(): Navigator['modelContext'] {
@@ -25,65 +76,60 @@ function createNativeModelContextStub(): Navigator['modelContext'] {
   return nativeContext as unknown as Navigator['modelContext'];
 }
 
-function setTestingShim(value: unknown): void {
-  testingShimDescriptorStack.push(
-    Object.getOwnPropertyDescriptor(navigator, 'modelContextTesting')
-  );
-  Object.defineProperty(navigator, 'modelContextTesting', {
-    configurable: true,
-    enumerable: true,
-    writable: true,
-    value,
-  });
-}
-
-const testingShimDescriptorStack: Array<PropertyDescriptor | undefined> = [];
-
-function clearTestingShim(): void {
-  const previousDescriptor = testingShimDescriptorStack.pop();
-  if (previousDescriptor) {
-    Object.defineProperty(navigator, 'modelContextTesting', previousDescriptor);
-    return;
-  }
-
-  delete (navigator as unknown as Record<string, unknown>).modelContextTesting;
-}
-
 describe('global adapter', () => {
-  it('wraps native navigator.modelContext with BrowserMcpServer by default', () => {
+  it('wraps native document.modelContext with BrowserMcpServer by default', () => {
     const nativeContext = createNativeModelContextStub();
-    Object.defineProperty(navigator, 'modelContext', {
-      configurable: true,
-      enumerable: true,
-      writable: true,
-      value: nativeContext,
-    });
+    setDocumentModelContext(nativeContext);
 
     initializeWebModelContext();
     // Server wraps native, adding registerPrompt/registerResource/etc.
-    expect(navigator.modelContext).not.toBe(nativeContext);
+    expect(document.modelContext).not.toBe(nativeContext);
 
     cleanupWebModelContext();
-    expect(navigator.modelContext).toBe(nativeContext);
-    delete (navigator as unknown as Record<string, unknown>).modelContext;
+    expect(document.modelContext).toBe(nativeContext);
   });
 
-  it('can patch native navigator.modelContext when requested', () => {
+  it('leaves the native surface untouched when transport selection fails', () => {
     const nativeContext = createNativeModelContextStub();
-    Object.defineProperty(navigator, 'modelContext', {
-      configurable: true,
-      enumerable: true,
-      writable: true,
-      value: nativeContext,
-    });
+    setDocumentModelContext(nativeContext);
 
-    initializeWebModelContext({ nativeModelContextBehavior: 'patch' });
-    // Server replaces the native context
-    expect(navigator.modelContext).not.toBe(nativeContext);
+    expect(() =>
+      initializeWebModelContext({
+        transport: { iframeServer: false, tabServer: false },
+      })
+    ).toThrow('tabServer transport is disabled');
+    expect(document.modelContext).toBe(nativeContext);
+  });
 
-    cleanupWebModelContext();
-    expect(navigator.modelContext).toBe(nativeContext);
-    delete (navigator as unknown as Record<string, unknown>).modelContext;
+  it('restores the native surface and permits retry when transport connection fails', async () => {
+    const nativeContext = createNativeModelContextStub();
+    const connectionError = new Error('transport connection failed');
+    const connectSpy = vi
+      .spyOn(BrowserMcpServer.prototype, 'connect')
+      .mockRejectedValueOnce(connectionError)
+      .mockResolvedValueOnce(undefined);
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    setDocumentModelContext(nativeContext);
+
+    try {
+      initializeWebModelContext();
+
+      await vi.waitFor(() => {
+        expect(document.modelContext).toBe(nativeContext);
+      });
+      expect(consoleSpy).toHaveBeenCalledWith(
+        '[WebModelContext] Failed to connect MCP transport:',
+        connectionError
+      );
+
+      initializeWebModelContext();
+
+      expect(connectSpy).toHaveBeenCalledTimes(2);
+      expect(document.modelContext).not.toBe(nativeContext);
+    } finally {
+      connectSpy.mockRestore();
+      consoleSpy.mockRestore();
+    }
   });
 
   it('init replaces navigator.modelContext with BrowserMcpServer', () => {
@@ -102,11 +148,12 @@ describe('global adapter', () => {
     );
     expect(typeof modelContext.listTools).toBe('function');
     expect(typeof modelContext.getTools).toBe('function');
-    expect(typeof modelContext.callTool).toBe('function');
+    expect(typeof modelContext.executeTool).toBe('function');
     expect(typeof modelContext.ontoolchange).toBe('object');
+    expect(modelContext).toBeInstanceOf(EventTarget);
   });
 
-  it('registerTool resolves undefined and mirrors to native/testing API', async () => {
+  it('registerTool resolves undefined and mirrors to the browser API', async () => {
     initializeWebModelContext();
 
     const modelContext = getModelContext();
@@ -122,37 +169,36 @@ describe('global adapter', () => {
 
     await expect(result).resolves.toBeUndefined();
 
-    // Testing shim reads from the native polyfill, which is mirrored
-    const tools = navigator.modelContextTesting?.listTools() ?? [];
+    const tools = await modelContext.getTools();
     expect(tools.some((tool) => tool.name === 'web_tool')).toBe(true);
 
-    const serialized = await navigator.modelContextTesting?.executeTool('web_tool', '{}');
+    const serialized = await executeRegisteredTool(modelContext, 'web_tool');
     expect(serialized).toContain('web-ok');
 
     modelContext.unregisterTool('web_tool');
-    expect(
-      navigator.modelContextTesting?.listTools().some((tool) => tool.name === 'web_tool')
-    ).toBe(false);
+    expect((await modelContext.getTools()).some((tool) => tool.name === 'web_tool')).toBe(false);
   });
 
   it('getTools returns the native producer tool-list shape', async () => {
     initializeWebModelContext();
 
     const modelContext = getModelContext();
-    modelContext.registerTool({
+    await modelContext.registerTool({
       name: 'native_shape_tool',
+      title: 'Native shape tool',
       description: 'Native shape tool',
       inputSchema: {
         type: 'object',
         properties: { value: { type: 'number' } },
         required: ['value'],
       },
-      async execute() {
-        return { content: [{ type: 'text', text: 'ok' }] };
+      async execute({ value }) {
+        return { value };
       },
     });
 
-    await expect(modelContext.getTools()).resolves.toEqual([
+    const tools = await modelContext.getTools();
+    expect(tools).toEqual([
       expect.objectContaining({
         name: 'native_shape_tool',
         title: 'Native shape tool',
@@ -163,6 +209,163 @@ describe('global adapter', () => {
         window: expect.any(Object),
       }),
     ]);
+    await expect(modelContext.executeTool(tools[0]!, '{"value":7}')).resolves.toBe('{"value":7}');
+  });
+
+  it('sorts local getTools fallback and supplies the WebMCP title default', async () => {
+    const server = new BrowserMcpServer({ name: 'local-get-tools-test', version: '1.0.0' });
+    for (const name of ['z_tool', 'a_tool']) {
+      await server.registerTool({
+        name,
+        description: name,
+        async execute() {},
+      });
+    }
+
+    expect((await server.getTools()).map(({ name, title }) => ({ name, title }))).toEqual([
+      { name: 'a_tool', title: '' },
+      { name: 'z_tool', title: '' },
+    ]);
+    await server.close();
+  });
+
+  it('passes explicit v2 request options through unchanged', async () => {
+    const server = new BrowserMcpServer({ name: 'request-options-test', version: '1.0.0' });
+    const createMessage = vi.spyOn(server.server, 'createMessage').mockResolvedValue({} as never);
+    const params = {
+      messages: [{ role: 'user' as const, content: { type: 'text' as const, text: 'Hi' } }],
+      maxTokens: 100,
+    };
+    const options = { timeout: 30_000, maxTotalTimeout: 60_000 };
+
+    await server.createMessage(params, options);
+
+    expect(createMessage).toHaveBeenCalledWith(params, options);
+    await server.close();
+  });
+
+  it('passes Standard Schema validation and input-required results through MCP v2', async () => {
+    let mcpInputSchema: ReturnType<typeof normalizeInputSchema>['standardValidator'] | undefined;
+    let mcpHandler:
+      | ((
+          args: Record<string, unknown>,
+          context: { mcpReq: { signal: AbortSignal } }
+        ) => Promise<unknown>)
+      | undefined;
+    const registerSpy = vi.spyOn(McpServer.prototype, 'registerTool');
+    registerSpy.mockImplementation(((_name: unknown, config: unknown, handler: unknown) => {
+      mcpInputSchema = (
+        config as {
+          inputSchema?: ReturnType<typeof normalizeInputSchema>['standardValidator'];
+        }
+      ).inputSchema;
+      mcpHandler = handler as typeof mcpHandler;
+      return { remove: vi.fn() };
+    }) as never);
+
+    const expected = inputRequired({ requestState: 'opaque-state' });
+    const standardSchema = {
+      '~standard': {
+        version: 1 as const,
+        vendor: 'test',
+        validate(value: unknown) {
+          const count = (value as { count?: unknown }).count;
+          return count === 3
+            ? { value: { count: 4 } }
+            : { issues: [{ message: 'count must be 3' }] };
+        },
+        jsonSchema: {
+          input: () => ({
+            type: 'object',
+            properties: { count: { type: 'number' } },
+            required: ['count'],
+          }),
+          output: () => ({ type: 'object', properties: {} }),
+        },
+      },
+    };
+    const server = new BrowserMcpServer({ name: 'v2-boundary-test', version: '1.0.0' });
+
+    try {
+      await server.registerTool({
+        name: 'v2_boundary_tool',
+        description: 'Exercises the v2 registration boundary',
+        inputSchema: normalizeInputSchema(standardSchema).inputSchema,
+        async execute({ count }) {
+          expect(count).toBe(4);
+          return expected;
+        },
+      });
+
+      const validation = await mcpInputSchema?.['~standard'].validate({ count: 3 });
+      expect(validation).toEqual({ value: { count: 4 } });
+      if (!validation || validation.issues) throw new Error('Expected valid transformed input');
+
+      await expect(
+        mcpHandler?.(validation.value, {
+          mcpReq: { signal: new AbortController().signal },
+        })
+      ).resolves.toBe(expected);
+    } finally {
+      registerSpy.mockRestore();
+      await server.close();
+    }
+  });
+
+  it('mirrors Standard Schema inputs to native as plain JSON Schema', async () => {
+    const nativeRegisterTool = vi.fn();
+    const nativeContext = Object.assign(new EventTarget(), {
+      registerTool: nativeRegisterTool,
+      async getTools() {
+        return [];
+      },
+    });
+    const server = new BrowserMcpServer(
+      { name: 'standard-schema-native-mirror-test', version: '1.0.0' },
+      { native: nativeContext }
+    );
+    const inputSchema = {
+      '~standard': {
+        version: 1 as const,
+        vendor: 'test',
+        validate(value: unknown) {
+          return { value };
+        },
+        jsonSchema: {
+          input: () => ({
+            type: 'object',
+            properties: { query: { type: 'string' } },
+            required: ['query'],
+          }),
+          output: () => ({ type: 'object', properties: {} }),
+        },
+      },
+    };
+
+    try {
+      await server.registerTool({
+        name: 'standard_schema_native_mirror',
+        description: 'Mirrors converted schema metadata',
+        inputSchema,
+        async execute() {
+          return 'ok';
+        },
+      });
+
+      expect(nativeRegisterTool).toHaveBeenCalledWith(
+        expect.objectContaining({
+          inputSchema: {
+            type: 'object',
+            properties: { query: { type: 'string' } },
+            required: ['query'],
+          },
+        }),
+        expect.any(Object)
+      );
+      expect(nativeRegisterTool.mock.calls[0]?.[0]).not.toHaveProperty('inputSchema.~standard');
+    } finally {
+      await server.close();
+    }
   });
 
   it('fires producer toolchange events and ontoolchange on wrapper mutations', async () => {
@@ -171,14 +374,19 @@ describe('global adapter', () => {
     const modelContext = getModelContext();
     let listenerCount = 0;
     let handlerCount = 0;
+    let handlerTarget: EventTarget | null = null;
+    let handlerThis: ModelContextCore | null = null;
     modelContext.addEventListener('toolchange', () => {
       listenerCount += 1;
     });
-    modelContext.ontoolchange = () => {
+    modelContext.ontoolchange = function (event) {
       handlerCount += 1;
+      handlerTarget = event.target;
+      // oxlint-disable-next-line typescript/no-this-alias -- verifies EventHandler `this` binding.
+      handlerThis = this;
     };
 
-    modelContext.registerTool({
+    await modelContext.registerTool({
       name: 'wrapper_event_tool',
       description: 'Wrapper event tool',
       inputSchema: { type: 'object', properties: {} },
@@ -188,21 +396,21 @@ describe('global adapter', () => {
     });
 
     modelContext.unregisterTool('wrapper_event_tool');
-    await Promise.resolve();
-    await Promise.resolve();
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    expect(listenerCount).toBeGreaterThanOrEqual(1);
-    expect(handlerCount).toBeGreaterThanOrEqual(1);
+    await vi.waitFor(() => {
+      expect(listenerCount).toBe(2);
+      expect(handlerCount).toBe(2);
+    });
+    expect(handlerTarget).toBe(modelContext);
+    expect(handlerThis).toBe(modelContext);
   });
 
-  it('registerTool({ signal }) abort removes the tool from both wrapper and mirrored native', async () => {
+  it('registerTool({ signal }) abort removes the tool from browser discovery', async () => {
     initializeWebModelContext();
 
     const modelContext = getModelContext();
     const ac = new AbortController();
 
-    modelContext.registerTool(
+    await modelContext.registerTool(
       {
         name: 'signal_tool',
         description: 'AbortSignal-driven tool',
@@ -215,16 +423,165 @@ describe('global adapter', () => {
     );
 
     expect(modelContext.listTools().some((tool) => tool.name === 'signal_tool')).toBe(true);
-    expect(
-      navigator.modelContextTesting?.listTools().some((tool) => tool.name === 'signal_tool')
-    ).toBe(true);
+    expect((await modelContext.getTools()).some((tool) => tool.name === 'signal_tool')).toBe(true);
 
     ac.abort();
 
     expect(modelContext.listTools().some((tool) => tool.name === 'signal_tool')).toBe(false);
-    expect(
-      navigator.modelContextTesting?.listTools().some((tool) => tool.name === 'signal_tool')
-    ).toBe(false);
+    expect((await modelContext.getTools()).some((tool) => tool.name === 'signal_tool')).toBe(false);
+  });
+
+  it('does not let an old registration signal remove a same-name replacement', async () => {
+    const server = new BrowserMcpServer({ name: 'signal-replacement-test', version: '1.0.0' });
+    const originalController = new AbortController();
+    await server.registerTool(
+      {
+        name: 'signal_replacement_tool',
+        description: 'Original registration',
+        async execute() {
+          return { version: 'original' };
+        },
+      },
+      { signal: originalController.signal }
+    );
+    server.unregisterTool('signal_replacement_tool');
+    await server.registerTool({
+      name: 'signal_replacement_tool',
+      description: 'Replacement registration',
+      async execute() {
+        return { version: 'replacement' };
+      },
+    });
+
+    originalController.abort();
+
+    await expect(executeRegisteredTool(server, 'signal_replacement_tool')).resolves.toBe(
+      '{"version":"replacement"}'
+    );
+    await server.close();
+  });
+
+  it('detaches registration cleanup before restoring a native context', async () => {
+    const nativeTools = new Map<string, unknown>();
+    const nativeContext = Object.assign(new EventTarget(), {
+      registerTool(tool: { name: string }, options?: { signal?: AbortSignal }) {
+        nativeTools.set(tool.name, tool);
+        options?.signal?.addEventListener(
+          'abort',
+          () => {
+            nativeTools.delete(tool.name);
+          },
+          { once: true }
+        );
+      },
+      unregisterTool(name: string) {
+        nativeTools.delete(name);
+      },
+      async getTools() {
+        return [];
+      },
+    });
+    const server = new BrowserMcpServer(
+      { name: 'close-cleanup-test', version: '1.0.0' },
+      { native: nativeContext }
+    );
+    const controller = new AbortController();
+
+    await server.registerTool(
+      {
+        name: 'restored_native_tool',
+        description: 'Original wrapper registration',
+        async execute() {},
+      },
+      { signal: controller.signal }
+    );
+    await server.close();
+
+    const replacement = { name: 'restored_native_tool' };
+    nativeTools.set(replacement.name, replacement);
+    controller.abort();
+
+    expect(nativeTools.get(replacement.name)).toBe(replacement);
+  });
+
+  it('preserves AbortSignal reasons for registration and Chrome execution', async () => {
+    const server = new BrowserMcpServer({ name: 'abort-reason-test', version: '1.0.0' });
+    const registrationReason = { source: 'registration' };
+    const registrationController = new AbortController();
+    registrationController.abort(registrationReason);
+
+    await expect(
+      server.registerTool(
+        {
+          name: 'preaborted_tool',
+          description: 'Never registers',
+          async execute() {},
+        },
+        { signal: registrationController.signal }
+      )
+    ).rejects.toBe(registrationReason);
+
+    const pendingReason = { source: 'pending-registration' };
+    const pendingController = new AbortController();
+    const pendingRegistration = server.registerTool(
+      {
+        name: 'pending_abort_tool',
+        description: 'Aborted before registration settles',
+        async execute() {},
+      },
+      { signal: pendingController.signal }
+    );
+    pendingController.abort(pendingReason);
+    await expect(pendingRegistration).rejects.toBe(pendingReason);
+
+    await server.registerTool({
+      name: 'cancelled_execution_tool',
+      description: 'Waits for cancellation',
+      async execute() {
+        return new Promise(() => {});
+      },
+    });
+    const [tool] = await server.getTools();
+    const executionReason = { source: 'execution' };
+    const executionController = new AbortController();
+    const execution = server.executeTool(tool!, '{}', { signal: executionController.signal });
+    executionController.abort(executionReason);
+    await expect(execution).rejects.toBe(executionReason);
+    await server.close();
+  });
+
+  it('rejects invalid direct registrations and untrustworthy origin options', async () => {
+    const server = new BrowserMcpServer({ name: 'registration-validation-test', version: '1.0.0' });
+
+    await expect(
+      server.registerTool({
+        name: 'empty_description_tool',
+        description: '',
+        async execute() {},
+      })
+    ).rejects.toMatchObject({ name: 'InvalidStateError' });
+    await expect(
+      server.registerTool({
+        name: 'missing_execute_tool',
+        description: 'Missing execute callback',
+      } as never)
+    ).rejects.toBeInstanceOf(TypeError);
+    await expect(
+      server.registerTool(
+        {
+          name: 'untrustworthy_exposure_tool',
+          description: 'Must not register',
+          async execute() {},
+        },
+        { exposedTo: ['http://example.com'] }
+      )
+    ).rejects.toMatchObject({ name: 'SecurityError' });
+    await expect(server.getTools({ fromOrigins: ['not an origin'] })).rejects.toMatchObject({
+      name: 'SecurityError',
+    });
+
+    expect(server.listTools()).toEqual([]);
+    await server.close();
   });
 
   it('supports calling destructured registerTool', async () => {
@@ -233,7 +590,7 @@ describe('global adapter', () => {
     const modelContext = getModelContext();
     const registerTool = modelContext.registerTool;
 
-    registerTool({
+    await registerTool({
       name: 'destructured_register_tool',
       description: 'Registered via destructured method',
       inputSchema: { type: 'object', properties: {} },
@@ -242,48 +599,55 @@ describe('global adapter', () => {
       },
     });
 
-    const result = await modelContext.callTool({
-      name: 'destructured_register_tool',
-      arguments: {},
-    });
-    expect(result.content[0]?.type).toBe('text');
-    expect((result.content[0] as { text?: string }).text).toContain('destructured-ok');
+    const result = await executeRegisteredTool(modelContext, 'destructured_register_tool');
+    expect(result).toContain('destructured-ok');
   });
 
   it('backfills tools registered before initializeWebModelContext', async () => {
     initializeWebMCPPolyfill();
 
     const nativeContext = document.modelContext as unknown as {
-      registerTool: (tool: {
-        name: string;
-        description: string;
-        inputSchema: { type: 'object'; properties: Record<string, never> };
-        execute: () => Promise<{
-          content: Array<{ type: 'text'; text: string }>;
-        }>;
-      }) => void;
+      registerTool: (
+        tool: {
+          name: string;
+          description: string;
+          inputSchema: { type: 'object'; properties: Record<string, never> };
+          execute: () => Promise<{
+            content: Array<{ type: 'text'; text: string }>;
+          }>;
+        },
+        options?: { signal?: AbortSignal }
+      ) => Promise<void>;
     };
+    const controller = new AbortController();
 
-    nativeContext.registerTool({
-      name: 'pre_registered_tool',
-      description: 'registered before wrapper init',
-      inputSchema: { type: 'object', properties: {} },
-      async execute() {
-        return { content: [{ type: 'text', text: 'pre-registered-ok' }] };
+    await nativeContext.registerTool(
+      {
+        name: 'pre_registered_tool',
+        description: 'registered before wrapper init',
+        inputSchema: { type: 'object', properties: {} },
+        async execute() {
+          return { content: [{ type: 'text', text: 'pre-registered-ok' }] };
+        },
       },
-    });
+      { signal: controller.signal }
+    );
 
     initializeWebModelContext();
     const modelContext = getModelContext();
-    const names = modelContext.listTools().map((tool) => tool.name);
-    expect(names).toContain('pre_registered_tool');
-
-    const result = await modelContext.callTool({
-      name: 'pre_registered_tool',
-      arguments: {},
+    await vi.waitFor(() => {
+      expect(modelContext.listTools().map((tool) => tool.name)).toContain('pre_registered_tool');
     });
-    expect(result.content[0]?.type).toBe('text');
-    expect((result.content[0] as { text?: string }).text).toContain('pre-registered-ok');
+
+    const result = await executeRegisteredTool(modelContext, 'pre_registered_tool');
+    expect(result).toContain('pre-registered-ok');
+
+    controller.abort();
+    await vi.waitFor(() => {
+      expect(modelContext.listTools().map((tool) => tool.name)).not.toContain(
+        'pre_registered_tool'
+      );
+    });
   });
 
   it('backfills tools from a native document modelContext using getTools and executeTool', async () => {
@@ -298,26 +662,25 @@ describe('global adapter', () => {
       origin: window.location.origin,
       window,
     };
-    const executeTool = vi.fn(async () =>
-      JSON.stringify({
-        content: [{ type: 'text', text: 'standard-native-ok' }],
-        structuredContent: { ok: true },
-      })
+    const executeTool = vi.fn(async (_tool: unknown, input: string) =>
+      JSON.parse(input).message === 'plain'
+        ? 'standard-native-text'
+        : JSON.stringify({
+            content: [{ type: 'text', text: 'standard-native-ok' }],
+            structuredContent: { ok: true },
+          })
     );
+    const getTools = vi.fn(async () => [nativeTool]);
     const nativeContext = {
       registerTool: () => {},
-      getTools: async () => [nativeTool],
+      getTools,
       executeTool,
       addEventListener: () => {},
       removeEventListener: () => {},
       dispatchEvent: () => true,
     };
 
-    Object.defineProperty(document, 'modelContext', {
-      configurable: true,
-      enumerable: true,
-      value: nativeContext,
-    });
+    setDocumentModelContext(nativeContext);
 
     initializeWebModelContext();
     await vi.waitFor(() => {
@@ -326,169 +689,203 @@ describe('global adapter', () => {
         .map((tool) => tool.name);
       expect(names).toContain('standard_native_tool');
     });
+    await getModelContext().getTools({ fromOrigins: ['https://child.example'] });
+    expect(getTools).toHaveBeenLastCalledWith({ fromOrigins: ['https://child.example'] });
 
-    const result = await getModelContext().callTool({
-      name: 'standard_native_tool',
-      arguments: { message: 'hello' },
-    });
+    const result = parseSerializedResult(
+      await executeRegisteredTool(getModelContext(), 'standard_native_tool', {
+        message: 'hello',
+      })
+    ) as { content: unknown[]; structuredContent?: unknown };
 
     expect(result.content[0]).toMatchObject({ type: 'text', text: 'standard-native-ok' });
     expect(result.structuredContent).toEqual({ ok: true });
-    expect(executeTool).toHaveBeenCalledWith(nativeTool, JSON.stringify({ message: 'hello' }));
-  });
-
-  it('backfills tools from testing shim listTools() and tolerates invalid inputSchema JSON', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const executeTool = vi.fn(async () =>
-      JSON.stringify({
-        content: [{ type: 'text', text: 'shim-ok' }],
-      })
+    expect(executeTool).toHaveBeenCalledWith(
+      nativeTool,
+      JSON.stringify({ message: 'hello' }),
+      undefined
     );
 
-    setTestingShim({
-      listTools: () => [
-        {
-          name: 'shim_list_tool',
-          description: 'Tool sourced from listTools',
-          inputSchema: 'not-json',
-        },
-      ],
-      executeTool,
+    const plainResult = await executeRegisteredTool(getModelContext(), 'standard_native_tool', {
+      message: 'plain',
     });
+    expect(plainResult).toBe('standard-native-text');
+  });
+
+  it('refreshes native tool identity and metadata through MCP reconciliation', async () => {
+    const channelId = `native-refresh-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const firstNativeTool = {
+      name: 'refreshable_native_tool',
+      description: 'Original metadata',
+      inputSchema: JSON.stringify({ type: 'object', properties: {} }),
+      origin: window.location.origin,
+      window,
+    };
+    let visibleNativeTool = firstNativeTool;
+    const executedTools: Array<typeof firstNativeTool> = [];
+    const nativeContext = Object.assign(new EventTarget(), {
+      registerTool: () => {},
+      getTools: async () => [visibleNativeTool],
+      executeTool: async (tool: typeof firstNativeTool) => {
+        executedTools.push(tool);
+        return JSON.stringify({
+          content: [{ type: 'text', text: tool === visibleNativeTool ? 'current' : 'stale' }],
+        });
+      },
+    });
+    const server = new BrowserMcpServer(
+      { name: 'native-refresh-server', version: '1.0.0' },
+      { native: nativeContext }
+    );
+    const client = new Client(
+      { name: 'native-refresh-client', version: '1.0.0' },
+      { versionNegotiation: { mode: 'auto' } }
+    );
+
+    expect(await server.syncNativeTools()).toBe(1);
+    await server.connect(new TabServerTransport({ allowedOrigins: ['*'], channelId }));
 
     try {
-      initializeWebModelContext();
-      const modelContext = getModelContext();
-
-      expect(modelContext.listTools().map((tool) => tool.name)).toContain('shim_list_tool');
-
-      const result = await modelContext.callTool({
-        name: 'shim_list_tool',
-        arguments: { sample: true },
-      });
-      expect(result.isError).toBeFalsy();
-      expect((result.content[0] as { text?: string }).text).toContain('shim-ok');
-      expect(executeTool).toHaveBeenCalledWith('shim_list_tool', JSON.stringify({ sample: true }));
-      expect(warnSpy).toHaveBeenCalledWith(
-        '[WebMCP] Failed to parse testing inputSchema JSON:',
-        expect.any(Error)
+      await client.connect(
+        new TabClientTransport({ targetOrigin: '*', channelId, requestTimeout: 5000 })
       );
-    } finally {
-      warnSpy.mockRestore();
-      cleanupWebModelContext();
-      clearTestingShim();
-    }
-  });
-
-  it('returns navigation interruption error when testing shim executeTool resolves null', async () => {
-    setTestingShim({
-      getRegisteredTools: () => [
-        {
-          name: 'shim_nav_tool',
-          description: 'Navigation test',
-          inputSchema: { type: 'object', properties: {} },
-        },
-      ],
-      executeTool: async () => null,
-    });
-
-    try {
-      initializeWebModelContext();
-      const modelContext = getModelContext();
-
-      const result = await modelContext.callTool({
-        name: 'shim_nav_tool',
-        arguments: {},
+      await expect(
+        client.callTool({ name: firstNativeTool.name, arguments: {} })
+      ).resolves.toMatchObject({
+        content: [{ type: 'text', text: 'current' }],
       });
 
-      expect(result.isError).toBe(true);
-      expect((result.content[0] as { text?: string }).text).toContain('interrupted by navigation');
+      const replacement = { ...firstNativeTool };
+      visibleNativeTool = replacement;
+      expect(await server.syncNativeTools()).toBe(0);
+      await client.callTool({ name: firstNativeTool.name, arguments: {} });
+      expect(executedTools.at(-1)).toBe(replacement);
+
+      const updated = { ...replacement, description: 'Updated metadata' };
+      visibleNativeTool = updated;
+      expect(await server.syncNativeTools()).toBe(0);
+      const listed = await client.listTools();
+      expect(listed.tools.find(({ name }) => name === updated.name)?.description).toBe(
+        'Updated metadata'
+      );
+      await client.callTool({ name: updated.name, arguments: {} });
+      expect(executedTools.at(-1)).toBe(updated);
     } finally {
-      cleanupWebModelContext();
-      clearTestingShim();
+      await client.close();
+      await server.close();
     }
   });
 
-  it('throws when testing shim returns invalid serialized JSON', async () => {
-    setTestingShim({
-      getRegisteredTools: () => [
-        {
-          name: 'shim_invalid_json_tool',
-          description: 'Bad JSON serialization',
-          inputSchema: { type: 'object', properties: {} },
-        },
-      ],
-      executeTool: async () => 'not-json',
+  it('forwards MCP cancellation to a backfilled native Chrome tool', async () => {
+    const channelId = `native-cancel-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const nativeTool = {
+      name: 'cancellable_native_tool',
+      description: 'Waits for cancellation',
+      origin: window.location.origin,
+      window,
+    };
+    let nativeSignal: AbortSignal | undefined;
+    const nativeContext = Object.assign(new EventTarget(), {
+      registerTool: () => {},
+      getTools: async () => [nativeTool],
+      executeTool: vi.fn(
+        (
+          _tool: typeof nativeTool,
+          _input: string,
+          options?: { signal?: AbortSignal }
+        ): Promise<string> => {
+          nativeSignal = options?.signal;
+          return new Promise((_, reject) => {
+            nativeSignal?.addEventListener('abort', () => reject(nativeSignal?.reason), {
+              once: true,
+            });
+          });
+        }
+      ),
     });
+    const server = new BrowserMcpServer(
+      { name: 'native-cancellation-server', version: '1.0.0' },
+      { native: nativeContext }
+    );
+    await server.syncNativeTools();
+    await server.connect(new TabServerTransport({ allowedOrigins: ['*'], channelId }));
+    const client = new Client(
+      { name: 'native-cancellation-client', version: '1.0.0' },
+      { versionNegotiation: { mode: 'auto' } }
+    );
+    const controller = new AbortController();
 
     try {
-      initializeWebModelContext();
-      const modelContext = getModelContext();
+      await client.connect(
+        new TabClientTransport({ targetOrigin: '*', channelId, requestTimeout: 5000 })
+      );
+      const call = client.callTool(
+        { name: nativeTool.name, arguments: {} },
+        { signal: controller.signal }
+      );
+      await vi.waitFor(() => expect(nativeSignal).toBeInstanceOf(AbortSignal));
 
-      await expect(
-        modelContext.callTool({
-          name: 'shim_invalid_json_tool',
-          arguments: {},
-        })
-      ).rejects.toThrow('Failed to parse serialized tool response for shim_invalid_json_tool');
+      controller.abort();
+
+      await expect(call).rejects.toMatchObject({
+        name: 'SdkError',
+        message: expect.stringContaining('AbortError'),
+      });
+      await vi.waitFor(() => expect(nativeSignal?.aborted).toBe(true));
     } finally {
-      cleanupWebModelContext();
-      clearTestingShim();
+      await client.close();
+      await server.close();
     }
   });
 
-  it('throws when testing shim returns serialized non-object payload', async () => {
-    setTestingShim({
-      getRegisteredTools: () => [
-        {
-          name: 'shim_invalid_shape_tool',
-          description: 'Bad response shape',
-          inputSchema: { type: 'object', properties: {} },
-        },
-      ],
-      executeTool: async () => JSON.stringify('not-an-object'),
-    });
-
-    try {
-      initializeWebModelContext();
-      const modelContext = getModelContext();
-
-      await expect(
-        modelContext.callTool({
-          name: 'shim_invalid_shape_tool',
-          arguments: {},
-        })
-      ).rejects.toThrow('Invalid serialized tool response for shim_invalid_shape_tool');
-    } finally {
-      cleanupWebModelContext();
-      clearTestingShim();
-    }
-  });
-
-  it('ignores testing shims without listTools/getRegisteredTools methods', () => {
-    setTestingShim({
+  it('reconciles native tools after toolchange events', async () => {
+    const nativeTools: Array<{
+      name: string;
+      description: string;
+      origin: string;
+      window: Window;
+    }> = [];
+    const nativeContext = Object.assign(new EventTarget(), {
+      registerTool: () => {},
+      getTools: async () => nativeTools,
       executeTool: async () =>
-        JSON.stringify({
-          content: [{ type: 'text', text: 'unused' }],
-        }),
+        JSON.stringify({ content: [{ type: 'text', text: 'native-event-ok' }] }),
+    });
+    setDocumentModelContext(nativeContext);
+    initializeWebModelContext();
+
+    nativeTools.push({
+      name: 'native_event_tool',
+      description: 'Added after initialization',
+      origin: window.location.origin,
+      window,
+    });
+    nativeContext.dispatchEvent(new Event('toolchange'));
+    await vi.waitFor(() => {
+      expect(
+        getModelContext()
+          .listTools()
+          .map((tool) => tool.name)
+      ).toContain('native_event_tool');
     });
 
-    try {
-      initializeWebModelContext();
-      const modelContext = getModelContext();
-      expect(modelContext.listTools()).toEqual([]);
-    } finally {
-      cleanupWebModelContext();
-      clearTestingShim();
-    }
+    nativeTools.length = 0;
+    nativeContext.dispatchEvent(new Event('toolchange'));
+    await vi.waitFor(() => {
+      expect(
+        getModelContext()
+          .listTools()
+          .map((tool) => tool.name)
+      ).not.toContain('native_event_tool');
+    });
   });
 
-  it('unregisterTool removes mirrored tools', () => {
+  it('unregisterTool removes mirrored tools', async () => {
     initializeWebModelContext();
 
     const modelContext = getModelContext();
 
-    modelContext.registerTool({
+    await modelContext.registerTool({
       name: 'remove_me',
       description: 'remove me',
       inputSchema: { type: 'object', properties: {} },
@@ -499,11 +896,11 @@ describe('global adapter', () => {
 
     modelContext.unregisterTool('remove_me');
 
-    let tools = navigator.modelContextTesting?.listTools() ?? [];
+    const tools = await modelContext.getTools();
     expect(tools.some((tool) => tool.name === 'remove_me')).toBe(false);
   });
 
-  it('unregisterTool accepts the originally registered tool object for compatibility', () => {
+  it('unregisterTool accepts the originally registered tool object for compatibility', async () => {
     initializeWebModelContext();
 
     const modelContext = getModelContext();
@@ -516,28 +913,23 @@ describe('global adapter', () => {
       },
     } satisfies Parameters<typeof modelContext.registerTool>[0];
 
-    modelContext.registerTool(tool);
+    await modelContext.registerTool(tool);
     modelContext.unregisterTool(tool);
 
-    const tools = navigator.modelContextTesting?.listTools() ?? [];
+    const tools = await modelContext.getTools();
     expect(tools.some((registeredTool) => registeredTool.name === 'compat_unregister_tool')).toBe(
       false
     );
   });
 
-  it('forwards string tool names to native unregisterTool even for compatibility inputs', () => {
+  it('forwards string tool names to native unregisterTool even for compatibility inputs', async () => {
     const nativeUnregisterTool = vi.fn();
     const nativeContext = {
       ...createNativeModelContextStub(),
       unregisterTool: nativeUnregisterTool,
     } as Navigator['modelContext'];
 
-    Object.defineProperty(navigator, 'modelContext', {
-      configurable: true,
-      enumerable: true,
-      writable: true,
-      value: nativeContext,
-    });
+    setDocumentModelContext(nativeContext);
 
     try {
       initializeWebModelContext();
@@ -552,7 +944,7 @@ describe('global adapter', () => {
         },
       } satisfies Parameters<typeof modelContext.registerTool>[0];
 
-      modelContext.registerTool(tool);
+      await modelContext.registerTool(tool);
       nativeUnregisterTool.mockClear();
 
       modelContext.unregisterTool(tool);
@@ -560,11 +952,10 @@ describe('global adapter', () => {
       expect(nativeUnregisterTool).toHaveBeenCalledWith('native_name_forwarding_tool');
     } finally {
       cleanupWebModelContext();
-      delete (navigator as unknown as Record<string, unknown>).modelContext;
     }
   });
 
-  it('uses AbortSignal cleanup when native mirrors omit unregisterTool', () => {
+  it('uses AbortSignal cleanup when native mirrors omit unregisterTool', async () => {
     const nativeToolNames = new Set<string>();
     const nativeRegisterTool = vi.fn(
       (
@@ -597,7 +988,7 @@ describe('global adapter', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     try {
-      server.registerTool({
+      await server.registerTool({
         name: 'signal_only_native_tool',
         description: 'Native signal-only cleanup tool',
         inputSchema: { type: 'object', properties: {} },
@@ -620,16 +1011,42 @@ describe('global adapter', () => {
     }
   });
 
-  it('falls back to transport registration when native registerTool is blocked by permissions policy', async () => {
+  it('preserves raw WebMCP results at the native mirror boundary', async () => {
+    let mirroredTool: { execute(args: Record<string, unknown>): Promise<unknown> } | undefined;
+    const server = new BrowserMcpServer(
+      { name: 'native-raw-result-test', version: '1.0.0' },
+      {
+        native: {
+          ...createNativeModelContextStub(),
+          registerTool(tool: typeof mirroredTool) {
+            mirroredTool = tool;
+          },
+        } as unknown as Navigator['modelContext'],
+      }
+    );
+
+    await server.registerTool({
+      name: 'raw_native_tool',
+      description: 'Returns an unwrapped WebMCP value',
+      async execute() {
+        return { ok: true };
+      },
+    });
+
+    await expect(mirroredTool?.execute({})).resolves.toEqual({ ok: true });
+    await server.close();
+  });
+
+  it('rejects and rolls back when native registration is blocked by permissions policy', async () => {
     const nativeRegisterTool = vi.fn(() => {
       throw new DOMException(
         "Failed to execute 'registerTool' on 'ModelContext': Access to the feature \"tools\" is disallowed by permissions policy.",
-        'SecurityError'
+        'NotAllowedError'
       );
     });
     const nativeContext = {
       registerTool: nativeRegisterTool,
-      listTools: () => [],
+      getTools: async () => [],
       addEventListener: () => {},
       removeEventListener: () => {},
       dispatchEvent: () => true,
@@ -640,10 +1057,9 @@ describe('global adapter', () => {
         native: nativeContext,
       }
     );
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     try {
-      expect(() =>
+      await expect(
         server.registerTool({
           name: 'iframe_blocked_native_tool',
           description: 'Native registration is blocked inside the iframe',
@@ -652,25 +1068,19 @@ describe('global adapter', () => {
             return { content: [{ type: 'text', text: 'ok' }] };
           },
         })
-      ).not.toThrow();
+      ).rejects.toMatchObject({ name: 'NotAllowedError' });
 
       expect(nativeRegisterTool).toHaveBeenCalled();
       expect(server.listTools().some((tool) => tool.name === 'iframe_blocked_native_tool')).toBe(
-        true
+        false
       );
-      await expect(server.getTools()).resolves.toEqual(
-        expect.arrayContaining([expect.objectContaining({ name: 'iframe_blocked_native_tool' })])
-      );
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Native WebMCP tool mirror is blocked by permissions policy')
-      );
+      await expect(server.getTools()).resolves.toEqual([]);
     } finally {
-      warnSpy.mockRestore();
       void server.close();
     }
   });
 
-  it('keeps transport registration alive when async native registerTool rejects', async () => {
+  it('rolls back transport registration when async native registerTool rejects', async () => {
     let nativeCleanupSignal: AbortSignal | undefined;
     let nativeCleanupAbortCount = 0;
     const nativeRegisterTool = vi.fn(
@@ -702,16 +1112,16 @@ describe('global adapter', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     try {
-      server.registerTool({
-        name: 'async_rejected_native_tool',
-        description: 'Native registration rejects asynchronously',
-        inputSchema: { type: 'object', properties: {} },
-        async execute() {
-          return { content: [{ type: 'text', text: 'transport-ok' }] };
-        },
-      });
-
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      await expect(
+        server.registerTool({
+          name: 'async_rejected_native_tool',
+          description: 'Native registration rejects asynchronously',
+          inputSchema: { type: 'object', properties: {} },
+          async execute() {
+            return { content: [{ type: 'text', text: 'transport-ok' }] };
+          },
+        })
+      ).rejects.toThrow('native async registration rejected');
 
       expect(nativeRegisterTool).toHaveBeenCalledWith(
         expect.objectContaining({ name: 'async_rejected_native_tool' }),
@@ -720,18 +1130,9 @@ describe('global adapter', () => {
       expect(nativeCleanupSignal?.aborted).toBe(true);
       expect(nativeCleanupAbortCount).toBe(1);
       expect(server.listTools().some((tool) => tool.name === 'async_rejected_native_tool')).toBe(
-        true
+        false
       );
-      await expect(server.executeTool('async_rejected_native_tool', {})).resolves.toMatchObject({
-        content: [{ type: 'text', text: 'transport-ok' }],
-      });
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Native WebMCP tool mirror registration rejected'),
-        expect.any(Error)
-      );
-
-      expect(() => server.unregisterTool('async_rejected_native_tool')).not.toThrow();
-      expect(nativeCleanupAbortCount).toBe(1);
+      expect(warnSpy).not.toHaveBeenCalled();
     } finally {
       warnSpy.mockRestore();
       void server.close();
@@ -768,7 +1169,7 @@ describe('global adapter', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     try {
-      server.registerTool({
+      const registration = server.registerTool({
         name: 'native_abort_rejected_tool',
         description: 'Native registration rejects on cleanup abort',
         inputSchema: { type: 'object', properties: {} },
@@ -778,7 +1179,7 @@ describe('global adapter', () => {
       });
 
       expect(() => server.unregisterTool('native_abort_rejected_tool')).not.toThrow();
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      await expect(registration).rejects.toMatchObject({ name: 'AbortError' });
 
       expect(warnSpy).not.toHaveBeenCalledWith(
         expect.stringContaining('Native WebMCP tool mirror registration rejected'),
@@ -790,7 +1191,7 @@ describe('global adapter', () => {
     }
   });
 
-  it('aborts signal-only native mirrors when the caller signal aborts', () => {
+  it('aborts signal-only native mirrors when the caller signal aborts', async () => {
     const nativeToolNames = new Set<string>();
     const nativeRegisterTool = vi.fn(
       (
@@ -824,7 +1225,7 @@ describe('global adapter', () => {
     const controller = new AbortController();
 
     try {
-      server.registerTool(
+      const registration = server.registerTool(
         {
           name: 'caller_signal_only_native_tool',
           description: 'Native caller signal cleanup tool',
@@ -842,6 +1243,7 @@ describe('global adapter', () => {
       expect(nativeToolNames.has('caller_signal_only_native_tool')).toBe(true);
 
       controller.abort();
+      await expect(registration).rejects.toBe(controller.signal.reason);
 
       expect(
         server.listTools().some((tool) => tool.name === 'caller_signal_only_native_tool')
@@ -853,35 +1255,28 @@ describe('global adapter', () => {
     }
   });
 
-  it('sets __isBrowserMcpServer marker on navigator.modelContext', () => {
+  it('sets __isBrowserMcpServer marker on document.modelContext', () => {
     initializeWebModelContext();
-    const ctx = navigator.modelContext as unknown as Record<string, unknown>;
+    const ctx = document.modelContext as unknown as Record<string, unknown>;
     expect(ctx.__isBrowserMcpServer).toBe(true);
   });
 
-  it('skips initialization when navigator.modelContext already has __isBrowserMcpServer marker', () => {
+  it('skips initialization when document.modelContext already has __isBrowserMcpServer marker', () => {
     // Simulate another bundle having already set up a BrowserMcpServer
     const fakeServer = {
       __isBrowserMcpServer: true,
       registerTool: () => {},
       unregisterTool: () => {},
     };
-    Object.defineProperty(navigator, 'modelContext', {
-      configurable: true,
-      enumerable: true,
-      writable: true,
-      value: fakeServer,
-    });
+    setDocumentModelContext(fakeServer);
 
     try {
       initializeWebModelContext();
 
       // Init should have been skipped — modelContext should still be the fake server
-      expect(navigator.modelContext).toBe(fakeServer);
+      expect(document.modelContext).toBe(fakeServer);
     } finally {
       cleanupWebModelContext();
-      delete (navigator as unknown as Record<string, unknown>).modelContext;
-      delete (navigator as unknown as Record<string, unknown>).modelContextTesting;
     }
   });
 
@@ -895,11 +1290,11 @@ describe('global adapter', () => {
     expect(typeof getModelContext().listTools).toBe('function');
   });
 
-  it('listTools normalizes empty inputSchema {} to default object schema', () => {
+  it('listTools normalizes empty inputSchema {} to default object schema', async () => {
     initializeWebModelContext();
     const modelContext = getModelContext();
 
-    modelContext.registerTool({
+    await modelContext.registerTool({
       name: 'no_args_tool',
       description: 'Tool with no arguments',
       inputSchema: {},
@@ -914,11 +1309,11 @@ describe('global adapter', () => {
     expect(tool?.inputSchema).toEqual({ type: 'object', properties: {} });
   });
 
-  it('listTools does not prepend type:"object" to non-object outputSchema', () => {
+  it('listTools does not prepend type:"object" to non-object outputSchema', async () => {
     initializeWebModelContext();
     const modelContext = getModelContext();
 
-    modelContext.registerTool({
+    await modelContext.registerTool({
       name: 'string_output_tool',
       description: 'Tool with string output schema',
       inputSchema: { type: 'object', properties: {} },
@@ -939,7 +1334,7 @@ describe('global adapter', () => {
     initializeWebModelContext();
     const modelContext = getModelContext();
 
-    modelContext.registerTool({
+    await modelContext.registerTool({
       name: 'output_no_type_tool',
       description: 'Tool with output schema missing root type',
       inputSchema: {},
@@ -966,7 +1361,9 @@ describe('global adapter', () => {
       required: ['value'],
     });
 
-    const result = await modelContext.callTool({ name: 'output_no_type_tool', arguments: {} });
+    const result = parseSerializedResult(
+      await executeRegisteredTool(modelContext, 'output_no_type_tool')
+    ) as { isError?: boolean; structuredContent?: Record<string, unknown> };
     expect(result.isError).toBeFalsy();
     expect(result.structuredContent).toMatchObject({ value: 'ok' });
   });
@@ -975,7 +1372,7 @@ describe('global adapter', () => {
     initializeWebModelContext();
     const modelContext = getModelContext();
 
-    modelContext.registerTool({
+    await modelContext.registerTool({
       name: 'input_no_type_tool',
       description: 'Tool with input schema missing root type',
       inputSchema: {
@@ -1000,10 +1397,12 @@ describe('global adapter', () => {
       required: ['message'],
     });
 
-    const result = await modelContext.callTool({
-      name: 'input_no_type_tool',
-      arguments: { message: 'hi' },
-    });
+    const result = parseSerializedResult(
+      await executeRegisteredTool(modelContext, 'input_no_type_tool', { message: 'hi' })
+    ) as {
+      content: Array<{ type: string; text?: string }>;
+      isError?: boolean;
+    };
     expect(result.isError).toBeFalsy();
     expect(result.content[0]).toMatchObject({ type: 'text', text: 'echo:hi' });
   });
@@ -1058,7 +1457,7 @@ describe('cross-bundle duplicate prevention (e2e)', () => {
     // Simulate the real cross-bundle scenario:
     //   Bundle A: creates BrowserMcpServer + TabServerTransport, sets marker on modelContext
     //   Bundle B: calls initializeWebModelContext() with its own runtime=null,
-    //             sees marker on navigator.modelContext → skips
+    //             sees marker on document.modelContext → skips
     //
     // We simulate this by manually setting up a BrowserMcpServer with a transport
     // (acting as Bundle A), then calling initializeWebModelContext() (acting as Bundle B).
@@ -1083,16 +1482,11 @@ describe('cross-bundle duplicate prevention (e2e)', () => {
 
     await server.connect(serverTransport);
 
-    // Place server on navigator.modelContext (as initializeWebModelContext would)
-    Object.defineProperty(navigator, 'modelContext', {
-      configurable: true,
-      enumerable: true,
-      writable: true,
-      value: server,
-    });
+    // Place server on document.modelContext (as initializeWebModelContext would)
+    setDocumentModelContext(server);
 
     // Verify marker is present (BrowserMcpServer sets it automatically)
-    const ctx = navigator.modelContext as unknown as Record<string, unknown>;
+    const ctx = document.modelContext as unknown as Record<string, unknown>;
     expect(ctx.__isBrowserMcpServer).toBe(true);
 
     // --- Bundle B: calls initializeWebModelContext() ---
@@ -1103,7 +1497,7 @@ describe('cross-bundle duplicate prevention (e2e)', () => {
     });
 
     // modelContext should still be Bundle A's server — not replaced
-    expect(navigator.modelContext).toBe(server);
+    expect(document.modelContext).toBe(server);
 
     // --- Verify: full MCP roundtrip invokes tool exactly once ---
     const clientTransport = new TabClientTransport({
@@ -1111,7 +1505,10 @@ describe('cross-bundle duplicate prevention (e2e)', () => {
       channelId,
       requestTimeout: 5000,
     });
-    const mcpClient = new Client({ name: 'test-client', version: '1.0.0' });
+    const mcpClient = new Client(
+      { name: 'test-client', version: '1.0.0' },
+      { versionNegotiation: { mode: 'auto' } }
+    );
     await mcpClient.connect(clientTransport);
 
     const result = await mcpClient.callTool({ name: 'e2e_guard_tool', arguments: {} });
@@ -1122,11 +1519,9 @@ describe('cross-bundle duplicate prevention (e2e)', () => {
     // Cleanup (manual since we didn't use initializeWebModelContext)
     await mcpClient.close();
     await server.close();
-    delete (navigator as unknown as Record<string, unknown>).modelContext;
-    delete (navigator as unknown as Record<string, unknown>).modelContextTesting;
   });
 
-  it('keeps primitive outputSchema on WebMCP listTools but omits it from MCP transport', async () => {
+  it('keeps primitive outputSchema on WebMCP and projects it for legacy MCP transport', async () => {
     const channelId = uniqueChannel();
     const serverTransport = new TabServerTransport({ allowedOrigins: ['*'], channelId });
     const server = new BrowserMcpServer({ name: 'primitive-output-server', version: '1.0.0' });
@@ -1152,22 +1547,65 @@ describe('cross-bundle duplicate prevention (e2e)', () => {
       channelId,
       requestTimeout: 5000,
     });
-    const mcpClient = new Client({ name: 'primitive-output-client', version: '1.0.0' });
+    const mcpClient = new Client(
+      { name: 'primitive-output-client', version: '1.0.0' },
+      { versionNegotiation: { mode: 'auto' } }
+    );
 
     try {
       await mcpClient.connect(clientTransport);
       const listed = await mcpClient.listTools();
       const listedTool = listed.tools.find((tool) => tool.name === 'primitive_output_tool');
-      expect(listedTool?.outputSchema).toBeUndefined();
+      expect(listedTool?.outputSchema).toEqual({
+        type: 'object',
+        properties: { result: { type: 'string' } },
+        required: ['result'],
+      });
 
       const result = await mcpClient.callTool({
         name: 'primitive_output_tool',
         arguments: {},
       });
       expect(result.content).toEqual([{ type: 'text', text: 'ready' }]);
-      expect(result.structuredContent).toBeUndefined();
+      expect(result.structuredContent).toEqual({ result: 'ready' });
     } finally {
       await mcpClient.close();
+      await server.close();
+    }
+  });
+
+  it('keeps non-object input schemas on WebMCP without breaking the MCP tool list', async () => {
+    const channelId = uniqueChannel();
+    const server = new BrowserMcpServer({ name: 'array-input-server', version: '1.0.0' });
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await (server as unknown as ModelContextCore).registerTool({
+      name: 'array_input_tool',
+      description: 'Accepts a WebMCP array input',
+      inputSchema: { type: 'array', items: { type: 'number' } },
+      async execute(values) {
+        return values;
+      },
+    });
+
+    expect(server.listTools().map((tool) => tool.name)).toContain('array_input_tool');
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('MCP input schemas require'));
+
+    await server.connect(new TabServerTransport({ allowedOrigins: ['*'], channelId }));
+    const client = new Client(
+      { name: 'array-input-client', version: '1.0.0' },
+      { versionNegotiation: { mode: 'auto' } }
+    );
+
+    try {
+      await client.connect(
+        new TabClientTransport({ targetOrigin: '*', channelId, requestTimeout: 5000 })
+      );
+      const listed = await client.listTools();
+      expect(listed.tools.map((tool) => tool.name)).not.toContain('array_input_tool');
+    } finally {
+      warnSpy.mockRestore();
+      await client.close();
       await server.close();
     }
   });
@@ -1201,7 +1639,10 @@ describe('cross-bundle duplicate prevention (e2e)', () => {
       channelId,
       requestTimeout: 5000,
     });
-    const mcpClient = new Client({ name: 'object-output-client', version: '1.0.0' });
+    const mcpClient = new Client(
+      { name: 'object-output-client', version: '1.0.0' },
+      { versionNegotiation: { mode: 'auto' } }
+    );
 
     try {
       await mcpClient.connect(clientTransport);
