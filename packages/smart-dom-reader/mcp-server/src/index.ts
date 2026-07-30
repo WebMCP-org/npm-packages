@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 
 import { constants as fsConstants } from 'node:fs';
-import { access, readFile, stat } from 'node:fs/promises';
+import { access, open } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -777,22 +777,37 @@ class SmartDomReaderServer {
   }
 
   private async readLibraryFile(resolvedPath: string): Promise<string> {
-    if (!(await pathExists(resolvedPath))) {
-      throw new ProtocolError(
-        ProtocolErrorCode.InvalidParams,
-        `Embedded library file not found at ${resolvedPath}. Ensure the bundled file exists.`
-      );
+    let file;
+    try {
+      file = await open(resolvedPath, 'r');
+    } catch (error) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        error.code === 'ENOENT'
+      ) {
+        throw new ProtocolError(
+          ProtocolErrorCode.InvalidParams,
+          `Embedded library file not found at ${resolvedPath}. Ensure the bundled file exists.`
+        );
+      }
+      throw error;
     }
 
-    // If cached, validate mtime to support hot updates without restart
-    const { mtimeMs } = await stat(resolvedPath);
-    if (this.cachedLibrary?.path === resolvedPath && this.cachedLibrary.mtimeMs === mtimeMs) {
-      return this.cachedLibrary.code;
-    }
+    try {
+      // If cached, validate mtime to support hot updates without restart
+      const { mtimeMs } = await file.stat();
+      if (this.cachedLibrary?.path === resolvedPath && this.cachedLibrary.mtimeMs === mtimeMs) {
+        return this.cachedLibrary.code;
+      }
 
-    const code = await readFile(resolvedPath, 'utf8');
-    this.cachedLibrary = { path: resolvedPath, code, mtimeMs };
-    return code;
+      const code = await file.readFile('utf8');
+      this.cachedLibrary = { path: resolvedPath, code, mtimeMs };
+      return code;
+    } finally {
+      await file.close();
+    }
   }
 
   private handleToolError(error: unknown, fallbackMessage: string): never {

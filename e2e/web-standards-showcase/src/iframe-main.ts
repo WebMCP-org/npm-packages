@@ -106,6 +106,8 @@ function setupToolChangeListener(): void {
  * Handle messages from parent window
  */
 function handleParentMessage(event: MessageEvent): void {
+  if (event.origin !== window.location.origin || event.source !== window.parent) return;
+
   const data = event.data;
 
   if (data?.type === 'iframe-command') {

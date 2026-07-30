@@ -31,6 +31,8 @@ function captureServerPayloads(channelId: string): {
   const payloads: unknown[] = [];
 
   const handler = (event: MessageEvent) => {
+    if (event.origin !== window.location.origin || event.source !== window) return;
+
     if (
       event.data?.channel === channelId &&
       event.data?.type === 'mcp' &&

@@ -62,7 +62,7 @@
     "@mcp-b/webmcp-polyfill": "workspace:*",
     "@modelcontextprotocol/core": "catalog:",
     "@modelcontextprotocol/server": "catalog:",
-    "ws": "^8.21.0",
+    "ws": "^8.21.1",
     "zod": "catalog:"
   },
   "devDependencies": {
