@@ -6,7 +6,7 @@ description: Author and review the WebMCP documentation site using its Diataxis 
 # WebMCP Documentation: Authoring Guide
 
 Reference for writing and editing the WebMCP docs. The repo-wide agent
-instructions live in the root [CLAUDE.md](../../../CLAUDE.md); this file covers the
+instructions live in the root [AGENTS.md](../../../AGENTS.md); this file covers the
 docs-specific rules (Diataxis, writing style, Mintlify components, source-of-truth
 boundaries).
 
@@ -272,7 +272,7 @@ This is critical. WebMCP is a **W3C web standard** developed by Google and Micro
 | Topic                              | Location                                                                        |
 | ---------------------------------- | ------------------------------------------------------------------------------- |
 | `@mcp-b/*` package APIs            | `packages/*/README.md` and `packages/*/src/`                                    |
-| Package architecture & philosophy  | `CLAUDE.md`, `docs/MCPB_PACKAGE_PHILOSOPHY.md`                                  |
+| Package architecture & philosophy  | `AGENTS.md`, `docs/MCPB_PACKAGE_PHILOSOPHY.md`                                  |
 | Polyfill behavior & initialization | `packages/webmcp-polyfill/`, `packages/global/`                                 |
 | React hooks                        | `packages/react-webmcp/`, `packages/usewebmcp/`                                 |
 | Transports, iframe, relay          | `packages/transports/`, `packages/mcp-iframe/`, `packages/webmcp-local-relay/`  |

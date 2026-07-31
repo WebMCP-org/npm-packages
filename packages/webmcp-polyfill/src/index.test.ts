@@ -84,6 +84,28 @@ describe('@mcp-b/webmcp-polyfill', () => {
     expect((document.modelContext as unknown as { callTool?: unknown }).callTool).toBeUndefined();
   });
 
+  it('installs the exposed ModelContext constructor and brands the context instance', () => {
+    initializeWebMCPPolyfill();
+
+    const constructor = Reflect.get(globalThis, 'ModelContext') as
+      | (Function & { prototype: object })
+      | undefined;
+    expect(constructor).toBeTypeOf('function');
+    if (typeof constructor !== 'function') throw new Error('Expected ModelContext constructor');
+
+    expect(document.modelContext).toBeInstanceOf(constructor);
+    expect(Object.getPrototypeOf(document.modelContext)).toBe(constructor.prototype);
+    expect(document.modelContext.constructor).toBe(constructor);
+    expect(Object.prototype.toString.call(document.modelContext)).toBe('[object ModelContext]');
+    expect(() => Reflect.construct(constructor, [])).toThrow(TypeError);
+    expect(Object.getOwnPropertyDescriptor(globalThis, 'ModelContext')).toMatchObject({
+      configurable: true,
+      enumerable: false,
+      writable: true,
+      value: constructor,
+    });
+  });
+
   it('installs readonly document descriptor and deprecated navigator accessor', () => {
     initializeWebMCPPolyfill();
 
@@ -338,6 +360,72 @@ describe('@mcp-b/webmcp-polyfill', () => {
     );
 
     await expect(document.modelContext.registerTool(tool)).resolves.toBeUndefined();
+  });
+
+  it('does not register when the signal aborts during option conversion', async () => {
+    initializeWebMCPPolyfill();
+
+    const controller = new AbortController();
+    const reason = { code: 'cancelled-during-options' };
+    const exposedTo = [''];
+    Object.defineProperty(exposedTo, 0, {
+      get() {
+        controller.abort(reason);
+        return window.location.origin;
+      },
+    });
+
+    await expect(
+      document.modelContext.registerTool(
+        {
+          name: 'aborted_during_options',
+          description: 'Must not leak into the registry',
+          execute: async () => ({ content: [{ type: 'text', text: 'never' }] }),
+        },
+        { exposedTo, signal: controller.signal }
+      )
+    ).rejects.toBe(reason);
+
+    await expect(document.modelContext.getTools()).resolves.toEqual([]);
+  });
+
+  it('rejects registration and discovery from a detached document', async () => {
+    const iframe = document.createElement('iframe');
+    const readyMessage = `webmcp-polyfill-ready-${crypto.randomUUID()}`;
+    const moduleUrl = new URL('./index.ts', import.meta.url).href;
+    const loaded = new Promise<void>((resolve, reject) => {
+      const timeout = window.setTimeout(
+        () => reject(new Error('Timed out installing the polyfill in the iframe')),
+        2_000
+      );
+      const receiveReady = (event: MessageEvent) => {
+        if (event.source !== iframe.contentWindow || event.data !== readyMessage) return;
+        window.clearTimeout(timeout);
+        window.removeEventListener('message', receiveReady);
+        resolve();
+      };
+      window.addEventListener('message', receiveReady);
+    });
+
+    iframe.srcdoc = `<script type="module">
+      await import(${JSON.stringify(moduleUrl)});
+      parent.postMessage(${JSON.stringify(readyMessage)}, '*');
+    </script>`;
+    document.body.append(iframe);
+    await loaded;
+
+    const detachedContext = iframe.contentDocument?.modelContext;
+    if (!detachedContext) throw new Error('Expected the iframe ModelContext');
+    iframe.remove();
+
+    await expect(
+      detachedContext.registerTool({
+        name: 'detached_document_tool',
+        description: 'Must not register after its document is detached',
+        execute: async () => ({ content: [{ type: 'text', text: 'never' }] }),
+      })
+    ).rejects.toMatchObject({ name: 'InvalidStateError' });
+    await expect(detachedContext.getTools()).rejects.toMatchObject({ name: 'InvalidStateError' });
   });
 
   it('does not let an old registration signal remove a same-name replacement', async () => {
@@ -606,6 +694,23 @@ describe('@mcp-b/webmcp-polyfill', () => {
     expect(order).toEqual(['replacement', 'listener']);
   });
 
+  it('re-adds ontoolchange after listeners when it was cleared', async () => {
+    initializeWebMCPPolyfill();
+    const order: string[] = [];
+    document.modelContext.ontoolchange = () => order.push('first');
+    document.modelContext.addEventListener('toolchange', () => order.push('listener'));
+    document.modelContext.ontoolchange = null;
+    document.modelContext.ontoolchange = () => order.push('replacement');
+
+    await document.modelContext.registerTool({
+      name: 'readded_handler_order_tool',
+      description: 'Checks re-added event handler ordering',
+      execute: async () => null,
+    });
+
+    expect(order).toEqual(['listener', 'replacement']);
+  });
+
   // =========================================================================
   // Initialization & cleanup edge cases
   // =========================================================================
@@ -824,6 +929,35 @@ describe('@mcp-b/webmcp-polyfill', () => {
       expect(navigator.modelContextTesting).toBe(existingTesting);
 
       delete (navigator as unknown as Record<string, unknown>).modelContextTesting;
+    });
+
+    it('restores a pre-existing global ModelContext descriptor', () => {
+      const originalDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'ModelContext');
+      const existingConstructor = function ExistingModelContext() {};
+      Object.defineProperty(globalThis, 'ModelContext', {
+        configurable: true,
+        enumerable: true,
+        get: () => existingConstructor,
+      });
+      const existingDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'ModelContext');
+
+      try {
+        initializeWebMCPPolyfill();
+        expect(Reflect.get(globalThis, 'ModelContext')).not.toBe(existingConstructor);
+
+        cleanupWebMCPPolyfill();
+
+        expect(Object.getOwnPropertyDescriptor(globalThis, 'ModelContext')).toEqual(
+          existingDescriptor
+        );
+        expect(Reflect.get(globalThis, 'ModelContext')).toBe(existingConstructor);
+      } finally {
+        if (originalDescriptor) {
+          Object.defineProperty(globalThis, 'ModelContext', originalDescriptor);
+        } else {
+          Reflect.deleteProperty(globalThis, 'ModelContext');
+        }
+      }
     });
   });
 
@@ -1645,6 +1779,24 @@ describe('@mcp-b/webmcp-polyfill', () => {
       await vi.waitFor(() => {
         expect(called).toBe(true);
       });
+    });
+
+    it('re-adds testing ontoolchange after listeners when it was cleared', async () => {
+      initializeWebMCPPolyfill();
+      const testing = navigator.modelContextTesting!;
+      const order: string[] = [];
+      testing.ontoolchange = () => order.push('first');
+      testing.addEventListener('toolchange', () => order.push('listener'));
+      testing.ontoolchange = null;
+      testing.ontoolchange = () => order.push('replacement');
+
+      await document.modelContext.registerTool({
+        name: 'testing_readded_handler_order_tool',
+        description: 'Checks re-added testing event handler ordering',
+        execute: async () => null,
+      });
+
+      expect(order).toEqual(['listener', 'replacement']);
     });
 
     it('getCrossDocumentScriptToolResult returns empty array string', async () => {

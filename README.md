@@ -136,9 +136,10 @@ Or as a script tag (zero build step):
 </script>
 ```
 
-Or with React: `pnpm add @mcp-b/react-webmcp`
+Or with React: `pnpm add @mcp-b/global @mcp-b/react-webmcp`
 
 ```tsx
+import '@mcp-b/global';
 import { useWebMCP } from '@mcp-b/react-webmcp';
 
 function TodoApp({ todos, addTodo }) {
@@ -322,12 +323,14 @@ pnpm add @mcp-b/smart-dom-reader
 ```
 webmcp-types          (canonical type definitions)
 ├── webmcp-polyfill   (canonical runtime polyfill)
-├── webmcp-ts-sdk     (TypeScript SDK adapter)
-├── transports        (browser transports)
-│   ├── mcp-iframe    (iframe custom element)
-│   └── global        (full MCP-B runtime)
-│       └── react-webmcp (React hooks for MCP-B)
-└── usewebmcp         (React hooks for strict core)
+│   ├── webmcp-ts-sdk (TypeScript SDK adapter)
+│   │   ├── global    (full runtime; also uses transports)
+│   │   ├── mcp-iframe (iframe element; also uses transports)
+│   │   └── react-webmcp (also uses usewebmcp; pair with global at app level)
+│   └── usewebmcp     (React hooks for strict core)
+└── codemode          (browser-native code execution)
+
+transports            (browser transports used by global and mcp-iframe)
 ```
 
 Standalone packages: `smart-dom-reader`, `webmcp-local-relay`.

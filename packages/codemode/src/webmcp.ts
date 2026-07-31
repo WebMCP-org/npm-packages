@@ -39,12 +39,20 @@ function isJsonSchemaLike(value: unknown): value is JSONSchema7 {
   );
 }
 
+function registeredToolsByName(tools: RegisteredTool[]): Map<string, RegisteredTool> {
+  const selected = new Map<string, RegisteredTool>();
+  for (const tool of tools) {
+    if (!selected.has(tool.name)) selected.set(tool.name, tool);
+  }
+  return selected;
+}
+
 /**
  * Convert WebMCP registered tools into codemode-compatible JSON Schema tool descriptors.
  */
 export function registeredToolsToCodemode(tools: RegisteredTool[]): JsonSchemaToolDescriptors {
-  const descriptors: JsonSchemaToolDescriptors = {};
-  for (const tool of tools) {
+  const descriptors = Object.create(null) as JsonSchemaToolDescriptors;
+  for (const tool of registeredToolsByName(tools).values()) {
     const inputSchema = parseRegisteredToolSchema(tool.inputSchema);
 
     const descriptor: JsonSchemaToolDescriptor = { inputSchema };
@@ -71,30 +79,44 @@ function parseRegisteredToolSchema(serializedSchema?: string): JSONSchema7 {
 function parseToolResult(serialized: string | null): unknown {
   if (serialized == null) return null;
 
+  let parsed: unknown;
   try {
-    const parsed: unknown = JSON.parse(serialized);
-
-    if (isRecord(parsed)) {
-      if (parsed.structuredContent != null) {
-        return parsed.structuredContent;
-      }
-
-      if (Array.isArray(parsed.content)) {
-        const textBlock = parsed.content.find((block) => isRecord(block) && block.type === 'text');
-        if (isRecord(textBlock) && typeof textBlock.text === 'string') {
-          try {
-            return JSON.parse(textBlock.text);
-          } catch {
-            return textBlock.text;
-          }
-        }
-      }
-    }
-
-    return parsed;
+    parsed = JSON.parse(serialized);
   } catch {
     return serialized;
   }
+
+  if (!isRecord(parsed)) return parsed;
+
+  const textBlock = Array.isArray(parsed.content)
+    ? parsed.content.find(
+        (block) =>
+          isRecord(block) &&
+          block.type === 'text' &&
+          typeof block.text === 'string' &&
+          block.text.trim() !== ''
+      )
+    : undefined;
+  const text =
+    isRecord(textBlock) && typeof textBlock.text === 'string' ? textBlock.text : undefined;
+
+  if (parsed.isError === true) {
+    throw new Error(text?.trim() || 'WebMCP tool execution failed');
+  }
+
+  if ('structuredContent' in parsed) {
+    return parsed.structuredContent;
+  }
+
+  if (text !== undefined) {
+    try {
+      return JSON.parse(text);
+    } catch {
+      return text;
+    }
+  }
+
+  return parsed;
 }
 
 function buildCompactTypeBlock(tools: JsonSchemaToolDescriptors, omittedToolCount = 0): string {
@@ -188,14 +210,24 @@ export async function modelContextToCodemodeTools(
     throw new Error('document.modelContext.executeTool is unavailable');
   }
 
-  const descriptors = registeredToolsToCodemode(await modelContext.getTools());
-  const executableTools: JsonSchemaExecutableToolDescriptors = {};
+  const initialTools = await modelContext.getTools();
+  const registeredTools = registeredToolsByName(initialTools);
+  const descriptors = registeredToolsToCodemode(initialTools);
+  const executableTools = Object.create(null) as JsonSchemaExecutableToolDescriptors;
 
   for (const [name, descriptor] of Object.entries(descriptors)) {
+    const source = registeredTools.get(name);
+    if (!source) continue;
+
     const executableDescriptor: JsonSchemaExecutableToolDescriptor = {
       ...descriptor,
       execute: async (args: unknown) => {
-        const tool = (await modelContext.getTools()).find((candidate) => candidate.name === name);
+        const tool = (await modelContext.getTools()).find(
+          (candidate) =>
+            candidate.name === name &&
+            candidate.origin === source.origin &&
+            candidate.window === source.window
+        );
         if (!tool) {
           throw new Error(`WebMCP tool is unavailable: ${name}`);
         }

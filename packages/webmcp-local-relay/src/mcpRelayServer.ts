@@ -533,7 +533,6 @@ export class LocalRelayMcpServer {
    */
   private applyDynamicTools(tools: AggregatedTool[]): void {
     const nextNames = new Set(tools.map((tool) => tool.name));
-    let changed = false;
 
     for (const [name, handle] of this.dynamicToolHandles.entries()) {
       if (nextNames.has(name)) {
@@ -543,7 +542,6 @@ export class LocalRelayMcpServer {
       handle.remove();
       this.dynamicToolHandles.delete(name);
       this.dynamicToolSignature.delete(name);
-      changed = true;
     }
 
     for (const tool of tools) {
@@ -560,18 +558,15 @@ export class LocalRelayMcpServer {
         this.dynamicToolHandles.delete(tool.name);
       }
 
-      const handle = this.registerDynamicTool(tool);
-      this.dynamicToolHandles.set(tool.name, handle);
-      this.dynamicToolSignature.set(tool.name, signature);
-      changed = true;
-    }
-
-    if (changed && this.connected) {
       try {
-        this.mcpServer.sendToolListChanged();
+        const handle = this.registerDynamicTool(tool);
+        this.dynamicToolHandles.set(tool.name, handle);
+        this.dynamicToolSignature.set(tool.name, signature);
       } catch (err) {
+        this.dynamicToolSignature.delete(tool.name);
+        const details = err instanceof Error ? (err.stack ?? err.message) : String(err);
         process.stderr.write(
-          `[webmcp-local-relay] warn: failed to send tool list changed notification: ${err instanceof Error ? err.message : String(err)}\n`
+          `[webmcp-local-relay] warn: skipped dynamic tool "${tool.name}" because its schema could not be compiled: ${details}\n`
         );
       }
     }
@@ -592,11 +587,13 @@ export class LocalRelayMcpServer {
     return this.mcpServer.registerTool(
       tool.name,
       {
-        ...(tool.title ? { title: tool.title } : {}),
+        ...(tool.title !== undefined ? { title: tool.title } : {}),
         description: this.dynamicToolDescription(tool),
         inputSchema,
         ...(outputSchema ? { outputSchema } : {}),
         ...(tool.annotations ? { annotations: tool.annotations } : {}),
+        ...(tool.icons ? { icons: tool.icons } : {}),
+        ...(tool._meta ? { _meta: tool._meta } : {}),
       },
       async (args: Record<string, unknown>) => {
         try {

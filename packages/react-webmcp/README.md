@@ -14,22 +14,24 @@
 
 ## Why Use @mcp-b/react-webmcp?
 
-| Feature                      | Benefit                                                                      |
-| ---------------------------- | ---------------------------------------------------------------------------- |
-| **React-First Design**       | Hooks follow React patterns with automatic cleanup and StrictMode support    |
-| **Type-Safe Schemas**        | JSON Schema and Standard Schema input typing, plus JSON Schema output typing |
-| **Two-Way Integration**      | Both expose tools TO AI agents AND consume tools FROM MCP servers            |
-| **Execution State Tracking** | Built-in loading, success, and error states for UI feedback                  |
-| **Works with Any AI**        | Compatible with Claude, ChatGPT, Gemini, Cursor, Copilot, and any MCP client |
+| Feature                      | Benefit                                                                           |
+| ---------------------------- | --------------------------------------------------------------------------------- |
+| **React-First Design**       | Hooks follow React patterns with automatic cleanup and StrictMode support         |
+| **Type-Safe Schemas**        | JSON Schema and Standard JSON Schema input typing, plus JSON Schema output typing |
+| **Two-Way Integration**      | Both expose tools TO AI agents AND consume tools FROM MCP servers                 |
+| **Execution State Tracking** | Built-in loading, success, and error states for UI feedback                       |
+| **Works with Any AI**        | Compatible with Claude, ChatGPT, Gemini, Cursor, Copilot, and any MCP client      |
 
 ## Installation
 
 ```bash
-pnpm add @mcp-b/react-webmcp
+pnpm add @mcp-b/global @mcp-b/react-webmcp
 ```
 
-If you only want strict core WebMCP hooks, install `usewebmcp` directly. This package re-exports
-that same hook implementation and adds prompts, resources, sampling, elicitation, and MCP clients.
+You can omit `@mcp-b/global` when you only consume an MCP server as a client, or when a native
+WebMCP implementation supplies `document.modelContext` and you only use the core `useWebMCP` tool
+hook. Prompt, resource, sampling, and elicitation hooks require the MCP-B extensions installed by
+`@mcp-b/global`. If you only want strict core WebMCP hooks, install `usewebmcp` directly.
 
 For client functionality, you'll also need:
 
@@ -37,7 +39,8 @@ For client functionality, you'll also need:
 pnpm add @mcp-b/transports @modelcontextprotocol/client
 ```
 
-**Prerequisites:** Provider hooks require the `document.modelContext` API. Install `@mcp-b/global` or use a browser that implements the WebMCP API.
+**Prerequisites:** Provider hooks require `document.modelContext`. Install `@mcp-b/global`, or use
+a native WebMCP implementation for the core `useWebMCP` tool hook.
 
 Provider hooks register tools with `document.modelContext.registerTool(tool, {
 signal })` and abort the controller on unmount. The hooks retain a
@@ -51,6 +54,7 @@ responses. Native Chrome WebMCP does not currently define or enforce it.
 ## Quick Start - Provider (Registering Tools)
 
 ```tsx
+import '@mcp-b/global';
 import { useWebMCP } from '@mcp-b/react-webmcp';
 
 function PostsPage() {
@@ -129,6 +133,10 @@ function ToolConsumer() {
 }
 ```
 
+`useMcpClient().reconnect()` retries tool and resource discovery while the client remains connected.
+If a one-shot transport closes, construct a new transport and pass it to
+`reconnect(newTransport)`; closed transport instances are not generally reusable.
+
 ## API Overview
 
 ### Provider Hooks
@@ -147,7 +155,7 @@ function ToolConsumer() {
 
 ## Schema Compatibility
 
-Inputs accept JSON Schema or Standard Schema implementations that can emit JSON Schema. Outputs use JSON Schema for typed `structuredContent`.
+Inputs accept JSON Schema or Standard JSON Schema v1 implementations such as Zod 4.2+. Outputs use JSON Schema for typed `structuredContent`.
 
 ## Documentation
 

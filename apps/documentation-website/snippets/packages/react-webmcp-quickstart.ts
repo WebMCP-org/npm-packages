@@ -1,3 +1,4 @@
+import '@mcp-b/global';
 import { useWebMCP } from '@mcp-b/react-webmcp';
 
 export function PostsPage() {

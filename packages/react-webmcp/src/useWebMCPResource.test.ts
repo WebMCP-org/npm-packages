@@ -1,4 +1,5 @@
 import { initializeWebModelContext } from '@mcp-b/global';
+import { Suspense, createElement } from 'react';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
 import { getBrowserMcpServer } from './model-context.js';
@@ -101,6 +102,40 @@ describe('useWebMCPResource in a browser runtime', () => {
     expect(response.contents[0]).toMatchObject({
       uri: 'data://latest',
       text: 'second',
+    });
+
+    await hook.unmount();
+  });
+
+  it('keeps the committed reader while a newer render is suspended', async () => {
+    const pending = new Promise<never>(() => {});
+
+    const hook = await renderHook(
+      ({ version, suspend }: { version: string; suspend?: boolean }) => {
+        useWebMCPResource({
+          uri: 'data://committed',
+          name: 'Committed resource',
+          read: async (uri) => ({
+            contents: [{ uri: uri.href, text: version }],
+          }),
+        });
+
+        if (suspend) {
+          throw pending;
+        }
+      },
+      {
+        initialProps: { version: 'committed' },
+        wrapper: ({ children }) => createElement(Suspense, { fallback: null }, children),
+      }
+    );
+
+    await hook.rerender({ version: 'uncommitted', suspend: true });
+
+    const response = await modelContext().readResource('data://committed');
+    expect(response.contents[0]).toMatchObject({
+      uri: 'data://committed',
+      text: 'committed',
     });
 
     await hook.unmount();

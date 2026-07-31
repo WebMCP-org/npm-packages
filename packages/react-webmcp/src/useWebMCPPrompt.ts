@@ -3,6 +3,7 @@ import type { PromptDescriptor } from '@mcp-b/webmcp-ts-sdk';
 import { useCallback, useRef } from 'react';
 import type { WebMCPPromptConfig, WebMCPPromptReturn } from './types.js';
 import { getBrowserMcpServer } from './model-context.js';
+import { useIsomorphicLayoutEffect } from './useIsomorphicLayoutEffect.js';
 import { useMcpRegistration } from './useMcpRegistration.js';
 
 /**
@@ -72,7 +73,9 @@ export function useWebMCPPrompt(config: WebMCPPromptConfig): WebMCPPromptReturn 
   const { name, description, argsSchema, get } = config;
 
   const getRef = useRef(get);
-  getRef.current = get;
+  useIsomorphicLayoutEffect(() => {
+    getRef.current = get;
+  }, [get]);
 
   const register = useCallback(() => {
     const modelContext = getBrowserMcpServer();

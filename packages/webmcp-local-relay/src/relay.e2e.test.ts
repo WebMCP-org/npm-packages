@@ -104,6 +104,9 @@ function buildBridgeFixtureScript(): string {
 
     const makeDescriptor = (tool) => ({
       name: tool.name,
+      ...(tool.name === 'sum'
+        ? { title: 'Add numbers', annotations: { readOnlyHint: true } }
+        : {}),
       description: tool.description ?? '',
       inputSchema: JSON.stringify(tool.inputSchema ?? { type: 'object', properties: {} }),
       window,
@@ -149,6 +152,12 @@ function buildBridgeFixtureScript(): string {
         throw new Error('executeTool received a stale RegisteredTool descriptor');
       }
       counts.lastExecuteGeneration = descriptor.__generation;
+      if (descriptor.name === 'always_fail') {
+        return JSON.stringify({
+          resultType: 'input_required',
+          requestState: 'fixture-input-required',
+        });
+      }
       const result = await descriptor.__execute(JSON.parse(inputJson));
       if (descriptor.name === 'sum') {
         return result.content[0].text;
@@ -653,6 +662,8 @@ describe('relay e2e (real browser assets)', () => {
           b: { type: 'number' },
         },
       });
+      expect(sumTool?.title).toBe('Add numbers');
+      expect(sumTool?.annotations).toMatchObject({ readOnlyHint: true });
       expect(tools.tools.some((tool) => tool.name === 'decoy_extension')).toBe(false);
 
       let snapshot = await readBridgeFixtureSnapshot(harness.page);
@@ -693,6 +704,16 @@ describe('relay e2e (real browser assets)', () => {
       snapshot = await readBridgeFixtureSnapshot(harness.page);
       expect(snapshot.executeTool).toBe(1);
       expect(snapshot.lastExecuteGeneration).toBe(1);
+
+      const inputRequiredResult = await harness.client.callTool({
+        name: sanitizeName('always_fail'),
+        arguments: {},
+      });
+      expect(inputRequiredResult.isError).toBe(true);
+      expect(firstContentText(inputRequiredResult)).toContain(
+        'cannot forward MCP input_required results'
+      );
+      expect(inputRequiredResult).not.toHaveProperty('structuredContent.resultType');
     } catch (error) {
       throw formatE2EError('native document bridge', error, harness);
     } finally {

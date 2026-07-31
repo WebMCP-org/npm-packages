@@ -191,15 +191,26 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
     throw error;
   }
 
-  void server.syncNativeTools().catch((error: unknown) => {
-    console.warn('[WebModelContext] Native WebMCP tool synchronization failed:', error);
-  });
-  void server.connect(transport).catch((error: unknown) => {
-    console.error('[WebModelContext] Failed to connect MCP transport:', error);
-    if (runtime?.server === server) {
-      cleanupWebModelContext();
+  void (async () => {
+    try {
+      await server.syncNativeTools();
+    } catch (error) {
+      console.warn('[WebModelContext] Native WebMCP tool synchronization failed:', error);
     }
-  });
+
+    if (runtime?.server !== server) {
+      return;
+    }
+
+    try {
+      await server.connect(transport);
+    } catch (error) {
+      console.error('[WebModelContext] Failed to connect MCP transport:', error);
+      if (runtime?.server === server) {
+        cleanupWebModelContext();
+      }
+    }
+  })();
 }
 
 export function cleanupWebModelContext(): void {

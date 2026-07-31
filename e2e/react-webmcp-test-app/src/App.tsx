@@ -338,7 +338,7 @@ function App() {
     description: 'Get user profile data by user ID',
     mimeType: 'application/json',
     read: async (uri, params) => {
-      const userId = params?.userId ?? 'unknown';
+      const userId = typeof params?.userId === 'string' ? params.userId : 'unknown';
       // Simulated user data
       const users: Record<string, { name: string; email: string; role: string }> = {
         '1': { name: 'Alice Johnson', email: 'alice@example.com', role: 'admin' },

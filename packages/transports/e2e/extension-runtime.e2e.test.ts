@@ -56,10 +56,13 @@ async function listTools(page: Page): Promise<string[]> {
 async function callTool(page: Page, name: string, args: Record<string, unknown>): Promise<string> {
   return page.evaluate(
     async ({ toolName, toolArgs }) => {
-      const result = await window.mcpClient?.callTool({
-        name: toolName,
-        arguments: toolArgs,
-      });
+      const result = await window.mcpClient?.callTool(
+        {
+          name: toolName,
+          arguments: toolArgs,
+        },
+        { timeout: 5000 }
+      );
       const content = Array.isArray(result?.content) ? result.content : [];
       return typeof content[0]?.text === 'string' ? content[0].text : JSON.stringify(result);
     },
@@ -167,6 +170,33 @@ describe('extension runtime contract', () => {
 
       const echoText = await callTool(secondPage, 'echo', { message: 'reconnected' });
       assert.strictEqual(echoText, 'echo:reconnected');
+
+      await secondPage.close();
+    } finally {
+      await context.close();
+    }
+  });
+
+  it('keeps simultaneous extension clients in separate MCP sessions', async () => {
+    const { context, extensionId } = await launchExtensionContext();
+
+    try {
+      const firstPage = await openClientPage(context, extensionId);
+      const secondPage = await openClientPage(context, extensionId);
+
+      assert.deepStrictEqual(await listTools(firstPage), ['always_fail', 'echo', 'sum']);
+      assert.deepStrictEqual(await listTools(secondPage), ['always_fail', 'echo', 'sum']);
+
+      const [firstEcho, secondEcho] = await Promise.all([
+        callTool(firstPage, 'echo', { message: 'first' }),
+        callTool(secondPage, 'echo', { message: 'second' }),
+      ]);
+      assert.strictEqual(firstEcho, 'echo:first');
+      assert.strictEqual(secondEcho, 'echo:second');
+
+      await firstPage.close();
+      const survivingEcho = await callTool(secondPage, 'echo', { message: 'still-connected' });
+      assert.strictEqual(survivingEcho, 'echo:still-connected');
 
       await secondPage.close();
     } finally {

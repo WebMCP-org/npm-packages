@@ -8,6 +8,12 @@ import {
   type RelayTool,
 } from './protocol.js';
 
+function normalizeSupportedInboundTools(tools: z.infer<typeof InboundToolSchema>[]): RelayTool[] {
+  return tools
+    .map(normalizeInboundTool)
+    .filter((tool) => tool.execution?.taskSupport !== 'required');
+}
+
 /**
  * Schema for source identity bootstrap message.
  */
@@ -27,9 +33,7 @@ export const BrowserHelloMessageSchema = z.object({
  */
 export const BrowserToolsListMessageSchema = z.object({
   type: z.literal('tools/list'),
-  tools: z
-    .array(InboundToolSchema)
-    .transform((tools): RelayTool[] => tools.map(normalizeInboundTool)),
+  tools: z.array(InboundToolSchema).transform(normalizeSupportedInboundTools),
 });
 
 /**
@@ -41,9 +45,7 @@ export const BrowserToolsListMessageSchema = z.object({
  */
 export const BrowserToolsChangedMessageSchema = z.object({
   type: z.literal('tools/changed'),
-  tools: z
-    .array(InboundToolSchema)
-    .transform((tools): RelayTool[] => tools.map(normalizeInboundTool)),
+  tools: z.array(InboundToolSchema).transform(normalizeSupportedInboundTools),
 });
 
 /**

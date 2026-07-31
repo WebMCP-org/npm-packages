@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue?style=flat-square)](https://www.typescriptlang.org/)
 
-**@mcp-b/mcp-iframe** provides `<mcp-iframe>`, a Web Component that wraps an iframe and automatically bridges its MCP tools, resources, and prompts to the parent page's `document.modelContext`. Items are namespaced with the element's `id` to avoid collisions.
+**@mcp-b/mcp-iframe** provides `<mcp-iframe>`, a Web Component that wraps an iframe and automatically bridges its MCP tools, resources, and prompts to the parent page's `document.modelContext`. Tool and prompt names include the element's `id`. Resource URIs use an `mcp-iframe:` wrapper that records the element prefix and child URI.
 
 ## Installation
 

@@ -81,6 +81,21 @@ describe('normalizeInboundTool', () => {
 
     expect(normalized.outputSchema).toEqual({ type: 'string' });
   });
+
+  it('preserves valid MCP v2 tool metadata', () => {
+    const normalized = normalizeInboundTool({
+      name: 'metadata',
+      icons: [{ src: 'https://example.com/icon.svg', mimeType: 'image/svg+xml' }],
+      execution: { taskSupport: 'forbidden' },
+      _meta: { 'example/key': 'value' },
+    });
+
+    expect(normalized.icons).toEqual([
+      { src: 'https://example.com/icon.svg', mimeType: 'image/svg+xml' },
+    ]);
+    expect(normalized.execution).toEqual({ taskSupport: 'forbidden' });
+    expect(normalized._meta).toEqual({ 'example/key': 'value' });
+  });
 });
 
 describe('BrowserHelloMessageSchema', () => {
@@ -294,6 +309,24 @@ describe('BrowserToolsListMessageSchema', () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it('omits task-required tools and keeps ordinary-call tools', () => {
+    const result = BrowserToolsListMessageSchema.parse({
+      type: 'tools/list',
+      tools: [
+        { name: 'task_required', execution: { taskSupport: 'required' } },
+        { name: 'task_optional', execution: { taskSupport: 'optional' } },
+        { name: 'task_forbidden', execution: { taskSupport: 'forbidden' } },
+        { name: 'ordinary' },
+      ],
+    });
+
+    expect(result.tools.map((tool) => tool.name)).toEqual([
+      'task_optional',
+      'task_forbidden',
+      'ordinary',
+    ]);
+  });
 });
 
 describe('BrowserToolsChangedMessageSchema', () => {
@@ -303,6 +336,18 @@ describe('BrowserToolsChangedMessageSchema', () => {
       tools: [{ name: 'updated_tool' }],
     });
     expect(result.success).toBe(true);
+  });
+
+  it('omits task-required tools from replacement lists', () => {
+    const result = BrowserToolsChangedMessageSchema.parse({
+      type: 'tools/changed',
+      tools: [
+        { name: 'task_required', execution: { taskSupport: 'required' } },
+        { name: 'ordinary' },
+      ],
+    });
+
+    expect(result.tools.map((tool) => tool.name)).toEqual(['ordinary']);
   });
 });
 

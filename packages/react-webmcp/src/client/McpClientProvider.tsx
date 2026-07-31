@@ -3,6 +3,7 @@ import {
   type RequestOptions,
   type Resource,
   type ServerCapabilities,
+  type SubscriptionFilter,
   type Tool as McpTool,
   type Transport,
 } from '@modelcontextprotocol/client';
@@ -13,9 +14,11 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
+import { useIsomorphicLayoutEffect } from '../useIsomorphicLayoutEffect.js';
 
 /**
  * Context value provided by McpClientProvider.
@@ -30,11 +33,44 @@ interface McpClientContextValue {
   isLoading: boolean;
   error: Error | null;
   capabilities: ServerCapabilities | null;
-  reconnect: () => Promise<void>;
+  reconnect: (freshTransport?: Transport) => Promise<void>;
 }
+
+type ConnectionState = 'disconnected' | 'connecting' | 'initializing' | 'connected';
 
 const McpClientContext = createContext<McpClientContextValue | null>(null);
 const EMPTY_REQUEST_OPTS: RequestOptions = {};
+
+function startListChangedSubscription(
+  client: Client,
+  filter: SubscriptionFilter,
+  refreshLists: () => Promise<void>
+): () => void {
+  const controller = new AbortController();
+
+  void client
+    .listen(filter, { signal: controller.signal })
+    .then(async (subscription) => {
+      if (controller.signal.aborted) {
+        await subscription.close();
+        return;
+      }
+
+      // Modern servers deliver list_changed only after listen is acknowledged.
+      await refreshLists();
+    })
+    .catch((error) => {
+      if (!controller.signal.aborted) {
+        console.error(
+          '[ReactWebMCP:McpClientProvider]',
+          'Failed to listen for list_changed notifications:',
+          error
+        );
+      }
+    });
+
+  return () => controller.abort();
+}
 
 /**
  * Props for the McpClientProvider component.
@@ -132,6 +168,7 @@ export interface McpClientProviderProps {
  * }
  * ```
  */
+// oxlint-disable-next-line react-doctor/no-giant-component -- This is one MCP connection state machine; splitting its coupled generation guards would obscure lifecycle ordering.
 export function McpClientProvider({
   children,
   client,
@@ -140,20 +177,31 @@ export function McpClientProvider({
 }: McpClientProviderProps): ReactElement {
   const [resources, setResources] = useState<Resource[]>([]);
   const [tools, setTools] = useState<McpTool[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
-  const [isConnected, setIsConnected] = useState<boolean>(false);
+  const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
   const [capabilities, setCapabilities] = useState<ServerCapabilities | null>(null);
+  const isConnected = connectionState === 'initializing' || connectionState === 'connected';
+  const isLoading = connectionState === 'connecting' || connectionState === 'initializing';
   const requestOpts = opts ?? EMPTY_REQUEST_OPTS;
 
-  const connectionStateRef = useRef<'disconnected' | 'connecting' | 'connected'>('disconnected');
+  const connectionStateRef = useRef<ConnectionState>('disconnected');
   const connectionGenerationRef = useRef(0);
+  const closePromiseRef = useRef<Promise<void> | null>(null);
+  const providerCloseRef = useRef<object | null>(null);
+  const resourcesRequestRef = useRef(0);
+  const toolsRequestRef = useRef(0);
+  const inventoryRequestRef = useRef(0);
+  const requestOptsRef = useRef(requestOpts);
+  useIsomorphicLayoutEffect(() => {
+    requestOptsRef.current = requestOpts;
+  }, [requestOpts]);
 
   /**
    * Fetches available resources from the MCP server.
    * Only fetches if the server supports the resources capability.
    */
   const fetchResourcesInternal = useCallback(async () => {
+    const request = ++resourcesRequestRef.current;
     const serverCapabilities = client.getServerCapabilities();
     if (!serverCapabilities?.resources) {
       setResources([]);
@@ -161,9 +209,14 @@ export function McpClientProvider({
     }
 
     try {
-      const response = await client.listResources();
-      setResources(response.resources);
+      const response = await client.listResources(undefined, { cacheMode: 'refresh' });
+      if (request === resourcesRequestRef.current) {
+        setResources(response.resources);
+      }
     } catch (e) {
+      if (request !== resourcesRequestRef.current) {
+        return;
+      }
       console.error('[ReactWebMCP:McpClientProvider]', 'Error fetching resources:', e);
       throw e;
     }
@@ -174,6 +227,7 @@ export function McpClientProvider({
    * Only fetches if the server supports the tools capability.
    */
   const fetchToolsInternal = useCallback(async () => {
+    const request = ++toolsRequestRef.current;
     const serverCapabilities = client.getServerCapabilities();
     if (!serverCapabilities?.tools) {
       setTools([]);
@@ -181,52 +235,127 @@ export function McpClientProvider({
     }
 
     try {
-      const response = await client.listTools();
-      setTools(response.tools);
+      const response = await client.listTools(undefined, { cacheMode: 'refresh' });
+      if (request === toolsRequestRef.current) {
+        setTools(response.tools);
+      }
     } catch (e) {
+      if (request !== toolsRequestRef.current) {
+        return;
+      }
       console.error('[ReactWebMCP:McpClientProvider]', 'Error fetching tools:', e);
       throw e;
     }
   }, [client]);
 
   /**
-   * Establishes connection to the MCP server.
-   * Safe to call multiple times - will no-op if already connected or connecting.
+   * Refreshes every provider-owned inventory list and clears a prior inventory
+   * error only after the complete refresh succeeds.
    */
-  const reconnect = useCallback(async () => {
-    if (connectionStateRef.current !== 'disconnected') {
-      return;
-    }
+  const refreshInventory = useCallback(
+    async (connectionGeneration: number): Promise<void> => {
+      const inventoryRequest = ++inventoryRequestRef.current;
 
-    connectionStateRef.current = 'connecting';
-    setIsLoading(true);
-    setError(null);
-    const connectionGeneration = connectionGenerationRef.current;
+      try {
+        await Promise.all([fetchResourcesInternal(), fetchToolsInternal()]);
+      } catch (cause) {
+        const error = cause instanceof Error ? cause : new Error(String(cause));
+        if (
+          connectionGeneration === connectionGenerationRef.current &&
+          inventoryRequest === inventoryRequestRef.current
+        ) {
+          setError(error);
+        }
+        throw error;
+      }
 
-    try {
-      await client.connect(transport, requestOpts);
+      if (
+        connectionGeneration === connectionGenerationRef.current &&
+        inventoryRequest === inventoryRequestRef.current
+      ) {
+        setError(null);
+      }
+    },
+    [fetchResourcesInternal, fetchToolsInternal]
+  );
+
+  /**
+   * Connects a disconnected client, or retries inventory discovery when the
+   * MCP handshake is already alive. Calls made while work is in progress no-op.
+   *
+   * Pass a fresh transport after a one-shot transport has closed.
+   */
+  const reconnect = useCallback(
+    async (freshTransport?: Transport): Promise<void> => {
+      if (connectionStateRef.current === 'connected' && freshTransport === undefined) {
+        const connectionGeneration = connectionGenerationRef.current;
+        connectionStateRef.current = 'initializing';
+        setConnectionState('initializing');
+
+        try {
+          await refreshInventory(connectionGeneration);
+        } catch {
+          // Inventory failure does not undo the completed MCP handshake.
+        }
+
+        if (connectionGeneration === connectionGenerationRef.current) {
+          connectionStateRef.current = 'connected';
+          setConnectionState('connected');
+        }
+        return;
+      }
+
+      if (connectionStateRef.current !== 'disconnected') {
+        return;
+      }
+
+      connectionStateRef.current = 'connecting';
+      setConnectionState('connecting');
+      setError(null);
+      const connectionGeneration = connectionGenerationRef.current;
+
+      try {
+        await closePromiseRef.current;
+        if (connectionGeneration !== connectionGenerationRef.current) {
+          return;
+        }
+        await client.connect(freshTransport ?? transport, requestOptsRef.current);
+        if (connectionGeneration !== connectionGenerationRef.current) {
+          return;
+        }
+      } catch (e) {
+        const err = e instanceof Error ? e : new Error(String(e));
+        if (connectionGeneration === connectionGenerationRef.current) {
+          connectionStateRef.current = 'disconnected';
+          setConnectionState('disconnected');
+          setError(err);
+        }
+        throw err;
+      }
+
+      const caps = client.getServerCapabilities();
+      setCapabilities(caps ?? null);
+      connectionStateRef.current = 'initializing';
+      setConnectionState('initializing');
+
+      try {
+        await refreshInventory(connectionGeneration);
+      } catch {
+        if (connectionGeneration === connectionGenerationRef.current) {
+          // Inventory failure does not undo the completed MCP handshake.
+          connectionStateRef.current = 'connected';
+          setConnectionState('connected');
+        }
+        return;
+      }
       if (connectionGeneration !== connectionGenerationRef.current) {
         return;
       }
-      const caps = client.getServerCapabilities();
-      setIsConnected(true);
-      setCapabilities(caps ?? null);
       connectionStateRef.current = 'connected';
-
-      await Promise.all([fetchResourcesInternal(), fetchToolsInternal()]);
-    } catch (e) {
-      const err = e instanceof Error ? e : new Error(String(e));
-      if (connectionGeneration === connectionGenerationRef.current) {
-        connectionStateRef.current = 'disconnected';
-        setError(err);
-      }
-      throw err;
-    } finally {
-      if (connectionGeneration === connectionGenerationRef.current) {
-        setIsLoading(false);
-      }
-    }
-  }, [client, transport, requestOpts, fetchResourcesInternal, fetchToolsInternal]);
+      setConnectionState('connected');
+    },
+    [client, transport, refreshInventory]
+  );
 
   useEffect(() => {
     if (!isConnected) {
@@ -235,49 +364,82 @@ export function McpClientProvider({
 
     const serverCapabilities = client.getServerCapabilities();
 
-    const handleResourcesChanged = () => {
-      fetchResourcesInternal().catch((error) => {
+    const resourcesListChanged = serverCapabilities?.resources?.listChanged === true;
+    const toolsListChanged = serverCapabilities?.tools?.listChanged === true;
+    const refreshLists = async () => {
+      try {
+        await refreshInventory(connectionGenerationRef.current);
+      } catch (error) {
         console.error(
           '[ReactWebMCP:McpClientProvider]',
-          'Failed to refresh resources after list_changed:',
+          'Failed to refresh tools/resources after list_changed:',
           error
         );
-      });
+      }
     };
 
-    const handleToolsChanged = () => {
-      fetchToolsInternal().catch((error) => {
-        console.error(
-          '[ReactWebMCP:McpClientProvider]',
-          'Failed to refresh tools after list_changed:',
-          error
-        );
-      });
-    };
-
-    if (serverCapabilities?.resources?.listChanged) {
-      client.setNotificationHandler('notifications/resources/list_changed', handleResourcesChanged);
+    if (resourcesListChanged) {
+      client.setNotificationHandler('notifications/resources/list_changed', refreshLists);
     }
 
-    if (serverCapabilities?.tools?.listChanged) {
-      client.setNotificationHandler('notifications/tools/list_changed', handleToolsChanged);
+    if (toolsListChanged) {
+      client.setNotificationHandler('notifications/tools/list_changed', refreshLists);
+    }
+
+    const hasListChanged = resourcesListChanged || toolsListChanged;
+    const stopListening =
+      client.getProtocolEra() === 'modern' && hasListChanged
+        ? startListChangedSubscription(
+            client,
+            {
+              ...(toolsListChanged && { toolsListChanged: true }),
+              ...(resourcesListChanged && { resourcesListChanged: true }),
+            },
+            refreshLists
+          )
+        : undefined;
+    if (!stopListening && hasListChanged) {
+      // Legacy servers deliver list_changed unsolicited once handlers are installed.
+      void refreshLists();
     }
 
     return () => {
-      if (serverCapabilities?.resources?.listChanged) {
+      if (resourcesListChanged) {
         client.removeNotificationHandler('notifications/resources/list_changed');
       }
 
-      if (serverCapabilities?.tools?.listChanged) {
+      if (toolsListChanged) {
         client.removeNotificationHandler('notifications/tools/list_changed');
       }
+
+      stopListening?.();
     };
-  }, [client, isConnected, fetchResourcesInternal, fetchToolsInternal]);
+  }, [client, isConnected, refreshInventory]);
 
   useEffect(() => {
+    let active = true;
     const connectionGeneration = connectionGenerationRef.current;
+    const previousOnclose = client.onclose;
+    const handleClientClose = () => {
+      try {
+        previousOnclose?.();
+      } finally {
+        if (active && providerCloseRef.current === null) {
+          connectionGenerationRef.current += 1;
+          resourcesRequestRef.current += 1;
+          toolsRequestRef.current += 1;
+          inventoryRequestRef.current += 1;
+          connectionStateRef.current = 'disconnected';
+          setConnectionState('disconnected');
+          setCapabilities(null);
+          setResources([]);
+          setTools([]);
+        }
+      }
+    };
+    client.onclose = handleClientClose;
     connectionStateRef.current = 'disconnected';
-    setIsConnected(false);
+    setConnectionState('disconnected');
 
     // Initial connection - reconnect() has its own guard to prevent concurrent connections
     reconnect().catch((err) => {
@@ -287,32 +449,49 @@ export function McpClientProvider({
     });
 
     return () => {
-      if (connectionGenerationRef.current === connectionGeneration) {
-        connectionGenerationRef.current += 1;
+      active = false;
+      if (client.onclose === handleClientClose) {
+        if (previousOnclose) {
+          client.onclose = previousOnclose;
+        } else {
+          Reflect.deleteProperty(client, 'onclose');
+        }
       }
+      connectionGenerationRef.current += 1;
+      resourcesRequestRef.current += 1;
+      toolsRequestRef.current += 1;
+      inventoryRequestRef.current += 1;
       connectionStateRef.current = 'disconnected';
-      void client.close().catch((error: unknown) => {
-        console.error('[ReactWebMCP:McpClientProvider]', 'Failed to close MCP client:', error);
-      });
+      const closeToken = {};
+      providerCloseRef.current = closeToken;
+      closePromiseRef.current = client
+        .close()
+        .catch((error: unknown) => {
+          console.error('[ReactWebMCP:McpClientProvider]', 'Failed to close MCP client:', error);
+        })
+        .finally(() => {
+          if (providerCloseRef.current === closeToken) {
+            providerCloseRef.current = null;
+          }
+        });
     };
   }, [client, transport, reconnect]);
 
-  return (
-    <McpClientContext.Provider
-      value={{
-        client,
-        tools,
-        resources,
-        isConnected,
-        isLoading,
-        error,
-        capabilities,
-        reconnect,
-      }}
-    >
-      {children}
-    </McpClientContext.Provider>
+  const contextValue = useMemo(
+    () => ({
+      client,
+      tools,
+      resources,
+      isConnected,
+      isLoading,
+      error,
+      capabilities,
+      reconnect,
+    }),
+    [client, tools, resources, isConnected, isLoading, error, capabilities, reconnect]
   );
+
+  return <McpClientContext.Provider value={contextValue}>{children}</McpClientContext.Provider>;
 }
 
 /**
@@ -333,7 +512,7 @@ export function McpClientProvider({
  *     return (
  *       <div>
  *         Error: {error.message}
- *         <button onClick={reconnect}>Retry</button>
+ *         <button onClick={() => void reconnect()}>Retry</button>
  *       </div>
  *     );
  *   }

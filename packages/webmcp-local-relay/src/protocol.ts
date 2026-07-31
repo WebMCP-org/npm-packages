@@ -64,25 +64,25 @@ export type RelayInvokeArgs = Exclude<z.infer<typeof RelayInvokeArgsSchema>, und
  */
 export function normalizeInboundTool(inbound: z.infer<typeof InboundToolSchema>): RelayTool {
   const inputSchemaParsed = ToolSchema.shape.inputSchema.safeParse(inbound.inputSchema);
-  const outputSchemaParsed = ToolSchema.shape.outputSchema.safeParse(inbound.outputSchema);
-  const annotationsParsed = ToolAnnotationsSchema.safeParse(inbound.annotations);
 
   const normalizedCandidate: Record<string, unknown> = {
     name: inbound.name,
     inputSchema: inputSchemaParsed.success ? inputSchemaParsed.data : DEFAULT_TOOL_INPUT_SCHEMA,
   };
 
-  if (typeof inbound.description === 'string') {
-    normalizedCandidate.description = inbound.description;
-  }
-  if (typeof inbound.title === 'string') {
-    normalizedCandidate.title = inbound.title;
-  }
-  if (outputSchemaParsed.success && outputSchemaParsed.data !== undefined) {
-    normalizedCandidate.outputSchema = outputSchemaParsed.data;
-  }
-  if (annotationsParsed.success && annotationsParsed.data !== undefined) {
-    normalizedCandidate.annotations = annotationsParsed.data;
+  for (const key of [
+    'title',
+    'description',
+    'outputSchema',
+    'annotations',
+    'icons',
+    'execution',
+    '_meta',
+  ] as const) {
+    const parsed = ToolSchema.shape[key].safeParse(inbound[key]);
+    if (parsed.success && parsed.data !== undefined) {
+      normalizedCandidate[key] = parsed.data;
+    }
   }
 
   const normalizedParsed = NormalizedToolSchema.safeParse(normalizedCandidate);

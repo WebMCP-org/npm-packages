@@ -68,7 +68,7 @@
     "prepublishOnly": "node ../../scripts/validate-publish.js && pnpm run build",
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
-    "test": "pnpm run test:browser",
+    "test": "vp test run src/ExtensionClientTransport.test.ts src/ExtensionServerTransport.test.ts && pnpm run test:browser",
     "test:browser": "VITEST_BROWSER=true vp test run --browser.headless src/TabTransport.browser.test.ts",
     "test:browser:ui": "VITEST_BROWSER=true vp test --browser src/TabTransport.browser.test.ts",
     "test:e2e": "pnpm --filter @mcp-b/transports build && pnpm --filter @mcp-b/webmcp-polyfill build && pnpm --filter @mcp-b/webmcp-ts-sdk build && vp pack --filter e2e-extension && node e2e/build-extension.mjs && node --experimental-strip-types --test e2e/extension-runtime.e2e.test.ts",

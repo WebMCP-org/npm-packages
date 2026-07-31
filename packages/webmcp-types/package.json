@@ -67,5 +67,8 @@
     "typescript": "catalog:",
     "vite-plus": "catalog:",
     "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

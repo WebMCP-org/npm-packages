@@ -45,7 +45,10 @@ export class TabServerTransport implements Transport {
     }
 
     this._messageHandler = (event: MessageEvent) => {
-      if (!this._allowedOrigins.includes(event.origin) && !this._allowedOrigins.includes('*')) {
+      if (
+        event.source !== window ||
+        (!this._allowedOrigins.includes(event.origin) && !this._allowedOrigins.includes('*'))
+      ) {
         return;
       }
 

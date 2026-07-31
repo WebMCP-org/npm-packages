@@ -1,4 +1,5 @@
 import { initializeWebModelContext } from '@mcp-b/global';
+import { Suspense, createElement } from 'react';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
 import { getBrowserMcpServer } from './model-context.js';
@@ -125,6 +126,44 @@ describe('useWebMCPPrompt in a browser runtime', () => {
     expect(response.messages[0]?.content).toMatchObject({
       type: 'text',
       text: 'second',
+    });
+
+    await hook.unmount();
+  });
+
+  it('keeps the committed callback while a newer render is suspended', async () => {
+    const pending = new Promise<never>(() => {});
+
+    const hook = await renderHook(
+      ({ version, suspend }: { version: string; suspend?: boolean }) => {
+        useWebMCPPrompt({
+          name: 'committed_prompt',
+          get: async () => ({
+            messages: [
+              {
+                role: 'user',
+                content: { type: 'text', text: version },
+              },
+            ],
+          }),
+        });
+
+        if (suspend) {
+          throw pending;
+        }
+      },
+      {
+        initialProps: { version: 'committed' },
+        wrapper: ({ children }) => createElement(Suspense, { fallback: null }, children),
+      }
+    );
+
+    await hook.rerender({ version: 'uncommitted', suspend: true });
+
+    const response = await modelContext().getPrompt('committed_prompt');
+    expect(response.messages[0]?.content).toMatchObject({
+      type: 'text',
+      text: 'committed',
     });
 
     await hook.unmount();

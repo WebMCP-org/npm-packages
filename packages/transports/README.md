@@ -277,15 +277,17 @@ import { ExtensionServerTransport } from '@mcp-b/transports';
 import { McpServer } from '@modelcontextprotocol/server';
 
 class McpHub {
-  private server: McpServer;
-
   constructor() {
-    this.server = new McpServer({
+    this.setupConnections();
+  }
+
+  private createServer() {
+    const server = new McpServer({
       name: 'Extension-Hub',
       version: '1.0.0',
     });
-
-    this.setupConnections();
+    // Register tools backed by the hub's shared application state here.
+    return server;
   }
 
   private setupConnections() {
@@ -299,11 +301,15 @@ class McpHub {
   }
 
   private async handleUiConnection(port: chrome.runtime.Port) {
+    const server = this.createServer();
     const transport = new ExtensionServerTransport(port);
-    await this.server.connect(transport);
+    await server.connect(transport);
   }
 }
 ```
+
+Each `McpServer` owns one protocol session, so every accepted port gets a fresh server. Keep the
+hub's shared application state outside the per-connection server.
 
 ### Content Script Bridge
 
@@ -408,36 +414,37 @@ import { ExtensionServerTransport } from '@mcp-b/transports';
 import { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 
-// Create MCP server with tools
-const server = new McpServer(
-  {
-    name: 'MyExtensionAPI',
-    version: '1.0.0',
-  },
-  {
-    instructions: 'Extension API for cross-extension communication',
-  }
-);
+function createServer() {
+  const server = new McpServer(
+    {
+      name: 'MyExtensionAPI',
+      version: '1.0.0',
+    },
+    {
+      instructions: 'Extension API for cross-extension communication',
+    }
+  );
 
-// Register tools
-server.registerTool(
-  'getBookmarks',
-  {
-    description: 'Retrieves user bookmarks',
-    inputSchema: z.object({}),
-  },
-  async () => {
-    const bookmarks = await chrome.bookmarks.getTree();
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(bookmarks, null, 2),
-        },
-      ],
-    };
-  }
-);
+  server.registerTool(
+    'getBookmarks',
+    {
+      description: 'Retrieves user bookmarks',
+      inputSchema: z.object({}),
+    },
+    async () => {
+      const bookmarks = await chrome.bookmarks.getTree();
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(bookmarks, null, 2),
+          },
+        ],
+      };
+    }
+  );
+  return server;
+}
 
 // Set up external connection listener in background script
 chrome.runtime.onConnectExternal.addListener(async (port) => {
@@ -448,6 +455,7 @@ chrome.runtime.onConnectExternal.addListener(async (port) => {
       return;
     }
 
+    const server = createServer();
     const transport = new ExtensionServerTransport(port);
     await server.connect(transport);
   }

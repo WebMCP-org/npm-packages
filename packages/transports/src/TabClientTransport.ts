@@ -226,7 +226,10 @@ export class TabClientTransport implements Transport {
 
     this._messageHandler = (event: MessageEvent) => {
       // Security: Validate message origin
-      if (this._targetOrigin !== '*' && event.origin !== this._targetOrigin) {
+      if (
+        event.source !== window ||
+        (this._targetOrigin !== '*' && event.origin !== this._targetOrigin)
+      ) {
         return;
       }
 

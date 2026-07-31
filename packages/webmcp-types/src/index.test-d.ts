@@ -102,6 +102,19 @@ test('document.modelContext is typed as ModelContext', () => {
   expectTypeOf<Document['modelContext']>().toEqualTypeOf<ModelContext>();
 });
 
+test('global ModelContext exposes the Web IDL constructor value', () => {
+  expectTypeOf<typeof globalThis.ModelContext>().toEqualTypeOf<{
+    prototype: ModelContext;
+    new (): ModelContext;
+  }>();
+  expectTypeOf<InstanceType<typeof globalThis.ModelContext>>().toEqualTypeOf<ModelContext>();
+  const hasModelContextBrand = (
+    context: ModelContext,
+    constructor: typeof globalThis.ModelContext
+  ) => context instanceof constructor;
+  expectTypeOf(hasModelContextBrand).returns.toBeBoolean();
+});
+
 test('navigator.modelContext is typed as an optional deprecated alias', () => {
   expectTypeOf<Navigator['modelContext']>().toEqualTypeOf<ModelContext | undefined>();
 });

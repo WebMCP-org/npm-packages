@@ -74,7 +74,7 @@ pnpm --filter mcp-e2e-tests test:react-webmcp:debug
 
 ## Test Coverage
 
-The Playwright test suite includes 18 comprehensive tests:
+The Playwright test suite includes 34 comprehensive tests:
 
 1. **Initialization Tests**
    - App loads and initializes MCP

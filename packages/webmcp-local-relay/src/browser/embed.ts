@@ -25,8 +25,10 @@ type JsonObject = Record<string, unknown>;
 
 interface RelayToolDescriptor {
   name: string;
+  title?: string;
   description: string;
   inputSchema?: unknown;
+  annotations?: RegisteredTool['annotations'];
 }
 
 interface DescriptorToolContext extends ModelContextCore {
@@ -62,6 +64,8 @@ interface RelayConfig {
 const RELAY_IFRAME_SELECTOR = '[data-webmcp-relay]';
 const TAB_ID_STORAGE_KEY = '__webmcp_relay_tab_id';
 const TOOL_SYNC_POLL_INTERVAL_MS = 2000;
+const INPUT_REQUIRED_UNSUPPORTED_MESSAGE =
+  'The WebMCP local relay cannot forward MCP input_required results. Multi-round tool flows require direct McpServer registration.';
 const FALLBACK_WIDGET_URL =
   'https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay/dist/browser/widget.html';
 
@@ -141,10 +145,12 @@ function toInvokeArgs(value: unknown): JsonObject {
 function mapRegisteredTool(tool: RegisteredTool): RelayToolDescriptor {
   return {
     name: tool.name,
+    ...(tool.title === undefined ? {} : { title: tool.title }),
     description: tool.description,
     ...(tool.inputSchema === undefined
       ? {}
       : { inputSchema: JSON.parse(tool.inputSchema) as unknown }),
+    ...(tool.annotations === undefined ? {} : { annotations: tool.annotations }),
   };
 }
 
@@ -162,6 +168,13 @@ function normalizeSerializedToolResult(serialized: string | null): CallToolResul
   } catch {
     // Chrome returns callback strings directly rather than JSON-quoting them.
     rawResult = serialized;
+  }
+
+  if (isJsonObject(rawResult) && rawResult.resultType === 'input_required') {
+    return {
+      isError: true,
+      content: [{ type: 'text', text: INPUT_REQUIRED_UNSUPPORTED_MESSAGE }],
+    };
   }
 
   return normalizeToolResponse(rawResult);

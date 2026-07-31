@@ -32,8 +32,9 @@ export type ExtensionServerTransportOptions = {
  * - Graceful connection state management
  */
 export class ExtensionServerTransport implements Transport {
-  private _port: chrome.runtime.Port;
+  private _port: chrome.runtime.Port | undefined;
   private _started = false;
+  private _closed = false;
   private _messageHandler: ((message: unknown, port: chrome.runtime.Port) => void) | undefined;
   private _disconnectHandler: ((port: chrome.runtime.Port) => void) | undefined;
   private _keepAliveTimer: ReturnType<typeof setInterval> | undefined;
@@ -65,6 +66,9 @@ export class ExtensionServerTransport implements Transport {
    * Starts the transport and begins handling messages
    */
   async start(): Promise<void> {
+    if (this._closed) {
+      throw new Error('ExtensionServerTransport cannot be restarted after it closes');
+    }
     if (this._started) {
       throw new Error(
         'ExtensionServerTransport already started! If using Server class, note that connect() calls start() automatically.'
@@ -78,6 +82,7 @@ export class ExtensionServerTransport implements Transport {
     this._started = true;
 
     // Set up message handler
+    const port = this._port;
     this._messageHandler = (message: unknown) => {
       try {
         // Update connection info
@@ -91,7 +96,7 @@ export class ExtensionServerTransport implements Transport {
           'type' in message &&
           message.type === 'ping'
         ) {
-          this._port.postMessage({ type: 'pong' });
+          port.postMessage({ type: 'pong' });
           return;
         }
 
@@ -104,15 +109,15 @@ export class ExtensionServerTransport implements Transport {
 
     // Set up disconnect handler
     this._disconnectHandler = () => {
+      if (this._closed) return;
       console.debug(
         `[ExtensionServerTransport] Client disconnected after ${Date.now() - this._connectionInfo.connectedAt}ms, processed ${this._connectionInfo.messageCount} messages`
       );
-      this._cleanup();
-      this.onclose?.();
+      this._finishClose(false);
     };
 
-    this._port.onMessage.addListener(this._messageHandler);
-    this._port.onDisconnect.addListener(this._disconnectHandler);
+    port.onMessage.addListener(this._messageHandler);
+    port.onDisconnect.addListener(this._disconnectHandler);
 
     // Start keep-alive mechanism if enabled
     if (this._options.keepAlive) {
@@ -120,7 +125,7 @@ export class ExtensionServerTransport implements Transport {
     }
 
     console.debug(
-      `[ExtensionServerTransport] Started with client: ${this._port.sender?.id || 'unknown'}`
+      `[ExtensionServerTransport] Started with client: ${port.sender?.id || 'unknown'}`
     );
   }
 
@@ -128,24 +133,23 @@ export class ExtensionServerTransport implements Transport {
    * Sends a message to the client
    */
   async send(message: JSONRPCMessage, _options?: TransportSendOptions): Promise<void> {
+    if (this._closed) {
+      throw new Error('Transport is closed');
+    }
     if (!this._started) {
       throw new Error('Transport not started');
     }
 
-    if (!this._port) {
+    const port = this._port;
+    if (!port) {
       throw new Error('Not connected to client');
     }
 
     try {
-      this._port.postMessage(message);
+      port.postMessage(message);
     } catch (error) {
-      // Check if the error is due to disconnection
-      if (chrome.runtime.lastError || !this._port) {
-        this._cleanup();
-        this.onclose?.();
-        throw new Error('Client disconnected');
-      }
-      throw new Error(`Failed to send message: ${error}`);
+      this._finishClose(true);
+      throw new Error(`Client disconnected: ${error}`);
     }
   }
 
@@ -153,17 +157,26 @@ export class ExtensionServerTransport implements Transport {
    * Closes the transport
    */
   async close(): Promise<void> {
-    this._started = false;
+    this._finishClose(true);
+  }
 
-    if (this._port) {
+  private _finishClose(disconnectPort: boolean): void {
+    if (this._closed) return;
+
+    const port = this._port;
+    this._closed = true;
+    this._started = false;
+    this._cleanup();
+    this._port = undefined;
+
+    if (disconnectPort && port) {
       try {
-        this._port.disconnect();
+        port.disconnect();
       } catch {
         // Port might already be disconnected
       }
     }
 
-    this._cleanup();
     this.onclose?.();
   }
 
@@ -185,6 +198,8 @@ export class ExtensionServerTransport implements Transport {
         this._port.onDisconnect.removeListener(this._disconnectHandler);
       }
     }
+    this._messageHandler = undefined;
+    this._disconnectHandler = undefined;
   }
 
   /**
@@ -200,17 +215,18 @@ export class ExtensionServerTransport implements Transport {
     );
 
     this._keepAliveTimer = setInterval(() => {
-      if (!this._port) {
+      const port = this._port;
+      if (!this._started || !port) {
         this._stopKeepAlive();
         return;
       }
 
       try {
         // Send a keep-alive ping
-        this._port.postMessage({ type: 'keep-alive', timestamp: Date.now() });
+        port.postMessage({ type: 'keep-alive', timestamp: Date.now() });
       } catch (error) {
         console.error('[ExtensionServerTransport] Keep-alive failed:', error);
-        this._stopKeepAlive();
+        this._finishClose(true);
       }
     }, this._options.keepAliveInterval);
   }
@@ -232,7 +248,7 @@ export class ExtensionServerTransport implements Transport {
     return {
       ...this._connectionInfo,
       uptime: Date.now() - this._connectionInfo.connectedAt,
-      isConnected: !!this._port && this._started,
+      isConnected: this._port !== undefined && this._started && !this._closed,
     };
   }
 }

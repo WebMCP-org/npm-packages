@@ -13,6 +13,7 @@ import '@mcp-b/mcp-iframe';
 
 import type { MCPIframeElement } from '@mcp-b/mcp-iframe';
 import { normalizeToolResponse } from '@mcp-b/webmcp-polyfill/schema';
+import type { BrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
 import type {
   CallToolResult,
   ChromeModelContextExtensions,
@@ -32,7 +33,7 @@ const toolResultEl = document.getElementById('tool-result')!;
 const resourceResultEl = document.getElementById('resource-result')!;
 const promptResultEl = document.getElementById('prompt-result')!;
 const logEl = document.getElementById('log')!;
-const modelContext = document.modelContext;
+const modelContext = document.modelContext as BrowserMcpServer;
 
 function hasDescriptorExecution(context: ModelContextCore): context is DescriptorExecutionContext {
   return 'executeTool' in context && typeof context.executeTool === 'function';
@@ -145,28 +146,19 @@ async function callTool(name: string, args: Record<string, unknown>) {
 
 // Test resource reads
 async function readResource(uri: string) {
-  const prefixedUri = `child-iframe_${uri}`;
-  log(`Reading resource: ${prefixedUri}`);
+  const parentUri = uri.startsWith('mcp-iframe:')
+    ? uri
+    : mcpIframe.exposedResources.find(
+        (candidate) => new URL(candidate).searchParams.get('uri') === uri
+      );
+  log(`Reading resource: ${parentUri ?? uri}`);
   resourceResultEl.textContent = 'Reading...';
 
   try {
-    // Access the internal bridge to read resources
-    const w = window as unknown as {
-      __mcpBridge?: {
-        modelContext: {
-          readResource: (
-            uri: string
-          ) => Promise<{ contents: Array<{ uri: string; text?: string }> }>;
-        };
-      };
-    };
-
-    if (!w.__mcpBridge) {
-      throw new Error('MCP bridge not available');
-    }
-
-    const result = await w.__mcpBridge.modelContext.readResource(prefixedUri);
-    const text = result.contents[0]?.text ?? JSON.stringify(result);
+    if (!parentUri) throw new Error(`Resource not found: ${uri}`);
+    const result = await modelContext.readResource(parentUri);
+    const content = result.contents[0];
+    const text = content && 'text' in content ? content.text : JSON.stringify(result);
     log(`Resource content: ${text}`, 'success');
     resourceResultEl.textContent = `Content: ${text}`;
     resourceResultEl.setAttribute('data-result', text);
@@ -178,6 +170,30 @@ async function readResource(uri: string) {
     resourceResultEl.setAttribute('data-error', errorMsg);
     throw error;
   }
+}
+
+async function addChildDynamicItem(item: 'tool' | 'resource' | 'prompt'): Promise<void> {
+  const iframeChild = mcpIframe.iframe?.contentWindow?.iframeChild;
+  if (!iframeChild) {
+    throw new Error('Iframe child API is unavailable');
+  }
+  await iframeChild.addDynamicItem(item);
+}
+
+function removeChildDynamicItems(): void {
+  const iframeChild = mcpIframe.iframe?.contentWindow?.iframeChild;
+  if (!iframeChild) {
+    throw new Error('Iframe child API is unavailable');
+  }
+  iframeChild.removeDynamicItems();
+}
+
+async function stopChildRuntime(): Promise<void> {
+  const iframeChild = mcpIframe.iframe?.contentWindow?.iframeChild;
+  if (!iframeChild) {
+    throw new Error('Iframe child API is unavailable');
+  }
+  await iframeChild.stopRuntime();
 }
 
 // Test prompt gets
@@ -271,6 +287,10 @@ declare global {
       callTool: (name: string, args: Record<string, unknown>) => Promise<unknown>;
       readResource: (uri: string) => Promise<unknown>;
       getPrompt: (name: string, args: Record<string, unknown>) => Promise<unknown>;
+      getParentTool: (name: string) => Promise<unknown>;
+      addChildDynamicItem: (item: 'tool' | 'resource' | 'prompt') => Promise<void>;
+      removeChildDynamicItems: () => void;
+      stopChildRuntime: () => Promise<void>;
     };
   }
 }
@@ -284,4 +304,9 @@ window.mcpIframeHost = {
   callTool,
   readResource,
   getPrompt,
+  getParentTool: async (name) =>
+    (await modelContext.getTools()).find((tool) => tool.name === `child-iframe_${name}`),
+  addChildDynamicItem,
+  removeChildDynamicItems,
+  stopChildRuntime,
 };

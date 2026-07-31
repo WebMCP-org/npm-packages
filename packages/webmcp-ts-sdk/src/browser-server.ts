@@ -40,7 +40,9 @@ import {
   isInputRequiredResult,
   McpServer,
   mergeCapabilities,
-  type CallToolResult as McpCallToolResult,
+  ProtocolError,
+  ProtocolErrorCode,
+  ResourceTemplate,
   type CreateMessageRequest,
   type CreateMessageRequestParamsBase,
   type CreateMessageRequestParamsWithTools,
@@ -53,15 +55,18 @@ import {
   type ReadResourceResult,
   type RegisteredPrompt as McpRegisteredPrompt,
   type RegisteredResource as McpRegisteredResource,
+  type RegisteredResourceTemplate as McpRegisteredResourceTemplate,
   type RegisteredTool as McpRegisteredTool,
   type RequestOptions,
   type ServerOptions,
   type StandardSchemaWithJSON,
   type ToolAnnotations as McpToolAnnotations,
   type Transport,
+  type Variables,
 } from '@modelcontextprotocol/server';
 
 const DEFAULT_INPUT_SCHEMA = normalizeInputSchema(undefined).inputSchema;
+const DEFAULT_CLIENT_REQUEST_TIMEOUT = 10_000;
 export const SERVER_MARKER_PROPERTY = '__isBrowserMcpServer' as const;
 
 interface RegisteredWebMcpTool {
@@ -79,11 +84,13 @@ interface RegisteredWebMcpTool {
 
 interface RegisteredWebMcpResource {
   descriptor: ResourceDescriptor;
-  mcpHandle: McpRegisteredResource;
+  mcpHandle: McpRegisteredResource | McpRegisteredResourceTemplate;
+  template?: ResourceTemplate;
 }
 
 interface RegisteredWebMcpPrompt {
   descriptor: PromptDescriptor;
+  argsSchema?: StandardSchemaWithJSON<Record<string, string>>;
   mcpHandle: McpRegisteredPrompt;
 }
 
@@ -134,7 +141,7 @@ function toToolListItemFromNativeToolInfo(tool: RegisteredTool): ToolListItem | 
   };
 }
 
-function parseNativeToolResult(serialized: string | null): McpCallToolResult {
+function parseNativeToolResult(serialized: string | null): unknown {
   if (serialized === null) {
     return {
       content: [{ type: 'text', text: 'Tool execution interrupted by navigation' }],
@@ -142,11 +149,19 @@ function parseNativeToolResult(serialized: string | null): McpCallToolResult {
     };
   }
 
+  let result: unknown;
   try {
-    return normalizeToolResponse(JSON.parse(serialized));
+    result = JSON.parse(serialized);
   } catch {
     return normalizeToolResponse(serialized);
   }
+  return isInputRequiredResult(result) ? result : normalizeToolResponse(result);
+}
+
+function withDefaultTimeout(options?: RequestOptions): RequestOptions {
+  return options?.signal
+    ? options
+    : { ...options, timeout: options?.timeout ?? DEFAULT_CLIENT_REQUEST_TIMEOUT };
 }
 
 function toMcpInputSchema(
@@ -395,7 +410,7 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
     normalized: NormalizedInputSchema,
     executeOverride?: (args: Record<string, unknown>, signal?: AbortSignal) => Promise<unknown>
   ): RegisteredWebMcpTool {
-    const execute =
+    const executeTool =
       executeOverride ??
       (async (args: Record<string, unknown>, signal?: AbortSignal): Promise<unknown> => {
         let active = true;
@@ -415,14 +430,27 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
 
         try {
           signal?.throwIfAborted();
-          return await withAbortSignal(
+          const result = await withAbortSignal(
             Promise.resolve().then(() => tool.execute(args, client)),
             signal
           );
+          return result;
         } finally {
           active = false;
         }
       });
+    const execute = async (
+      args: Record<string, unknown>,
+      signal?: AbortSignal
+    ): Promise<unknown> => {
+      const result = await executeTool(args, signal);
+      if (isInputRequiredResult(result)) {
+        throw new Error(
+          `WebMCP tool "${tool.name}" returned input_required. Multi-round tool flows require direct McpServer registration.`
+        );
+      }
+      return result;
+    };
     const outputSchema = tool.outputSchema
       ? fromJsonSchema(tool.outputSchema as Parameters<typeof fromJsonSchema>[0])
       : undefined;
@@ -440,7 +468,7 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
           },
           async (args, context) => {
             const result = await execute(args, context.mcpReq.signal);
-            return isInputRequiredResult(result) ? result : normalizeToolResponse(result);
+            return normalizeToolResponse(result);
           }
         )
       : undefined;
@@ -602,6 +630,7 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
 
   private async backfillNativeStandardTools(native: NativeStandardToolsApi): Promise<number> {
     const tools = await native.getTools();
+    if (this.closed) return 0;
     const previouslyTracked = new Set(this.nativeBackfilledTools.keys());
     const nextTools = new Map<string, NativeBackfilledTool>();
     for (const tool of tools) {
@@ -651,9 +680,16 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
         ...(next.item.annotations ? { annotations: next.item.annotations } : {}),
         execute: (args) => execute(args),
       };
-      const normalized = this.validateToolDescriptor(tool);
-      this.tools.set(tool.name, this.registerToolInMcp(tool, normalized, execute));
-      this.nativeBackfilledTools.set(name, next);
+      try {
+        const normalized = this.validateToolDescriptor(tool);
+        this.tools.set(tool.name, this.registerToolInMcp(tool, normalized, execute));
+        this.nativeBackfilledTools.set(name, next);
+      } catch (error) {
+        console.warn(
+          `[BrowserMcpServer] Native tool "${name}" was not exposed over MCP because its schema could not be compiled:`,
+          error
+        );
+      }
     }
 
     return [...this.nativeBackfilledTools.keys()].filter((name) => !previouslyTracked.has(name))
@@ -662,16 +698,21 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
 
   registerResource(descriptor: ResourceDescriptor): { unregister(): void } {
     if (this.closed) throw createInvalidStateError('BrowserMcpServer is closed');
-    const mcpHandle = this.mcpServer.registerResource(
-      descriptor.name,
-      descriptor.uri,
-      {
-        ...(descriptor.description !== undefined ? { description: descriptor.description } : {}),
-        ...(descriptor.mimeType !== undefined ? { mimeType: descriptor.mimeType } : {}),
-      },
-      async (uri) => descriptor.read(uri)
-    );
-    const registered = { descriptor, mcpHandle };
+    const config = {
+      ...(descriptor.description !== undefined ? { description: descriptor.description } : {}),
+      ...(descriptor.mimeType !== undefined ? { mimeType: descriptor.mimeType } : {}),
+    };
+    const template = descriptor.uri.includes('{')
+      ? new ResourceTemplate(descriptor.uri, { list: undefined })
+      : undefined;
+    const mcpHandle = template
+      ? this.mcpServer.registerResource(descriptor.name, template, config, async (uri, variables) =>
+          descriptor.read(uri, variables)
+        )
+      : this.mcpServer.registerResource(descriptor.name, descriptor.uri, config, async (uri) =>
+          descriptor.read(uri)
+        );
+    const registered = { descriptor, mcpHandle, ...(template ? { template } : {}) };
     this.resources.set(descriptor.uri, registered);
     let removed = false;
     return {
@@ -701,27 +742,32 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
 
   async readResource(uri: string): Promise<ReadResourceResult> {
     const resource = this.resources.get(uri);
-    if (!resource) throw new Error(`Resource not found: ${uri}`);
-    return resource.descriptor.read(new URL(uri));
+    if (resource) return resource.descriptor.read(new URL(uri));
+
+    for (const candidate of this.resources.values()) {
+      const variables = candidate.template?.uriTemplate.match(uri);
+      if (variables) return candidate.descriptor.read(new URL(uri), variables);
+    }
+
+    throw new Error(`Resource not found: ${uri}`);
   }
 
   registerPrompt(descriptor: PromptDescriptor): { unregister(): void } {
     if (this.closed) throw createInvalidStateError('BrowserMcpServer is closed');
+    const argsSchema = descriptor.argsSchema
+      ? fromJsonSchema<Record<string, string>>(
+          descriptor.argsSchema as Parameters<typeof fromJsonSchema>[0]
+        )
+      : undefined;
     const mcpHandle = this.mcpServer.registerPrompt(
       descriptor.name,
       {
         ...(descriptor.description !== undefined ? { description: descriptor.description } : {}),
-        ...(descriptor.argsSchema
-          ? {
-              argsSchema: fromJsonSchema<Record<string, string>>(
-                descriptor.argsSchema as Parameters<typeof fromJsonSchema>[0]
-              ),
-            }
-          : {}),
+        ...(argsSchema ? { argsSchema } : {}),
       },
       async (args) => descriptor.get(args ?? {})
     );
-    const registered = { descriptor, mcpHandle };
+    const registered = { descriptor, ...(argsSchema ? { argsSchema } : {}), mcpHandle };
     this.prompts.set(descriptor.name, registered);
     let removed = false;
     return {
@@ -760,7 +806,18 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
   async getPrompt(name: string, args: Record<string, string> = {}): Promise<GetPromptResult> {
     const prompt = this.prompts.get(name);
     if (!prompt) throw new Error(`Prompt not found: ${name}`);
-    return prompt.descriptor.get(args);
+    if (!prompt.argsSchema) return prompt.descriptor.get(args);
+
+    const validation = await prompt.argsSchema['~standard'].validate(args);
+    if (validation.issues) {
+      throw new ProtocolError(
+        ProtocolErrorCode.InvalidParams,
+        `Invalid arguments for prompt ${name}: ${validation.issues
+          .map(({ message }) => message)
+          .join('; ')}`
+      );
+    }
+    return prompt.descriptor.get(validation.value);
   }
 
   listTools(): ToolListItem[] {
@@ -891,14 +948,14 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
     params: CreateMessageRequest['params'],
     options?: RequestOptions
   ): Promise<CreateMessageResult | CreateMessageResultWithTools> {
-    return this.server.createMessage(params, options);
+    return this.server.createMessage(params, withDefaultTimeout(options));
   }
 
   async elicitInput(
     params: ElicitRequest['params'],
     options?: RequestOptions
   ): Promise<ElicitResult> {
-    return this.server.elicitInput(params, options);
+    return this.server.elicitInput(params, withDefaultTimeout(options));
   }
 }
 
@@ -907,7 +964,7 @@ export interface ResourceDescriptor {
   name: string;
   description?: string;
   mimeType?: string;
-  read: (uri: URL, params?: Record<string, string>) => Promise<ReadResourceResult>;
+  read: (uri: URL, params?: Variables) => Promise<ReadResourceResult>;
 }
 
 export interface PromptDescriptor {

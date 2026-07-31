@@ -42,18 +42,18 @@ import { useWebMCP } from 'usewebmcp';
 
 ## Config fields
 
-| Field                      | Type                              | Required | Description                                                      |
-| -------------------------- | --------------------------------- | -------- | ---------------------------------------------------------------- |
-| `name`                     | `string`                          | Yes      | Unique tool identifier (lowercase with underscores)              |
-| `description`              | `string`                          | Yes      | Human-readable description for AI assistants                     |
-| `inputSchema`              | JSON Schema or Standard Schema v1 | No       | Defines input parameters. Use `as const` for inference.          |
-| `outputSchema`             | JSON Schema                       | No       | MCP-B helper metadata for output typing and `structuredContent`. |
-| `annotations`              | `ToolAnnotations`                 | No       | Metadata hints such as `readOnlyHint` and `idempotentHint`       |
-| `execute(input)`           | `(input) => T \| Promise<T>`      | Yes\*    | Preferred tool implementation function                           |
-| `handler(input)`           | `(input) => T \| Promise<T>`      | Yes\*    | Backward-compatible alias for `execute`                          |
-| `formatOutput(output)`     | `(output) => string`              | No       | Deprecated. Prefer `outputSchema`.                               |
-| `onSuccess(result, input)` | `(result, input) => void`         | No       | Callback after successful execution                              |
-| `onError(error, input)`    | `(error, input) => void`          | No       | Callback after failed execution                                  |
+| Field                      | Type                                   | Required | Description                                                      |
+| -------------------------- | -------------------------------------- | -------- | ---------------------------------------------------------------- |
+| `name`                     | `string`                               | Yes      | Unique tool identifier (lowercase with underscores)              |
+| `description`              | `string`                               | Yes      | Human-readable description for AI assistants                     |
+| `inputSchema`              | JSON Schema or Standard JSON Schema v1 | No       | Defines input parameters. Use `as const` for inference.          |
+| `outputSchema`             | JSON Schema                            | No       | MCP-B helper metadata for output typing and `structuredContent`. |
+| `annotations`              | `ToolAnnotations`                      | No       | Metadata hints such as `readOnlyHint` and `idempotentHint`       |
+| `execute(input)`           | `(input) => T \| Promise<T>`           | Yes\*    | Preferred tool implementation function                           |
+| `handler(input)`           | `(input) => T \| Promise<T>`           | Yes\*    | Backward-compatible alias for `execute`                          |
+| `formatOutput(output)`     | `(output) => string`                   | No       | Deprecated. Prefer `outputSchema`.                               |
+| `onSuccess(result, input)` | `(result, input) => void`              | No       | Callback after successful execution                              |
+| `onError(error, input)`    | `(error, input) => void`               | No       | Callback after failed execution                                  |
 
 _One of `execute` or `handler` is required. If both are present, `execute` wins._
 
@@ -71,7 +71,7 @@ _One of `execute` or `handler` is required. If both are present, `execute` wins.
 Input inference works with two schema formats:
 
 - JSON Schema literals with `as const`
-- Standard Schema v1 implementations such as Zod v4, Valibot, and ArkType
+- Standard JSON Schema v1 implementations such as Zod 4.2+
 
 Output inference comes from `outputSchema` when you pass a JSON Schema literal:
 
@@ -103,12 +103,10 @@ The hook unregisters and re-registers when any of these values change:
 
 - `name`
 - `description`
-- `inputSchema` reference
-- `outputSchema` reference
-- `annotations` reference
 - values in `deps`
 
-These callbacks are stored in refs and do not trigger re-registration:
+The hook stores these callbacks in refs. Their latest committed values apply without
+re-registration:
 
 - `execute`
 - `handler`
@@ -116,10 +114,10 @@ These callbacks are stored in refs and do not trigger re-registration:
 - `onError`
 - `formatOutput`
 
-<Warning>
-  Define `inputSchema`, `outputSchema`, and `annotations` outside the component or memoize them.
-  Fresh object references on every render force unnecessary re-registration.
-</Warning>
+The hook also stores `inputSchema`, `outputSchema`, and `annotations` in refs, so new object
+references do not re-register the tool. A registered descriptor retains its current schema and
+annotations until another trigger re-registers it. Include a schema or annotation change indicator
+in `deps` when the registered descriptor must change.
 
 ## Output schema contract
 

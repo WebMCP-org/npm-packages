@@ -112,7 +112,7 @@
     "note": "Provider and client hooks assume @mcp-b/global or another BrowserMcpServer-based runtime is present.",
     "skill": {
       "name": "react-webmcp",
-      "description": "Use when building React apps with full MCP-B features: useWebMCP hook, prompts, resources, sampling, elicitation, and McpClientProvider. Supports JSON Schema and Standard Schema input schemas."
+      "description": "Use when building React apps with full MCP-B features: useWebMCP hook, prompts, resources, sampling, elicitation, and McpClientProvider. Supports JSON Schema and Standard JSON Schema input schemas."
     }
   },
   {

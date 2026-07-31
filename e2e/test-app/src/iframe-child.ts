@@ -8,7 +8,7 @@
 // Import the polyfill to create the MCP server
 import '@mcp-b/global';
 import type { BrowserMcpServer, PromptDescriptor, ResourceDescriptor } from '@mcp-b/webmcp-ts-sdk';
-import type { InputSchema, ToolDescriptor } from '@mcp-b/webmcp-types';
+import type { InputSchema, RegistrationHandle, ToolDescriptor } from '@mcp-b/webmcp-types';
 
 const modelContext = document.modelContext as BrowserMcpServer;
 
@@ -51,7 +51,9 @@ void registerContext({
   tools: [
     {
       name: 'add',
+      title: 'Add numbers',
       description: 'Add two numbers',
+      annotations: { readOnlyHint: true },
       inputSchema: {
         type: 'object',
         properties: {
@@ -149,6 +151,25 @@ void registerContext({
         };
       },
     },
+    {
+      uri: 'iframe://users/{userId}',
+      name: 'Iframe User',
+      description: 'A user selected through a URI template',
+      mimeType: 'application/json',
+      async read(uri, params) {
+        const userId = String(params?.userId ?? '');
+        log(`Reading ${uri.href} for user ${userId}`);
+        return {
+          contents: [
+            {
+              uri: uri.href,
+              text: JSON.stringify({ userId, source: 'iframe-child' }),
+              mimeType: 'application/json',
+            },
+          ],
+        };
+      },
+    },
   ],
   prompts: [
     {
@@ -208,14 +229,78 @@ void registerContext({
   ],
 })
   .then(() => {
-    log('Registered: 3 tools, 2 resources, 2 prompts');
-    updateStatus('MCP Server Ready - 3 tools, 2 resources, 2 prompts');
+    log('Registered: 3 tools, 2 resources, 1 resource template, 2 prompts');
+    updateStatus('MCP Server Ready - 3 tools, 2 resources, 1 resource template, 2 prompts');
     log('Iframe child ready!');
   })
   .catch((error) => {
     updateStatus(`Registration failed: ${error instanceof Error ? error.message : String(error)}`);
     console.error('[iframe-child] Registration failed', error);
   });
+
+type DynamicItem = 'tool' | 'resource' | 'prompt';
+
+let dynamicToolController: AbortController | undefined;
+let dynamicResourceRegistration: RegistrationHandle | undefined;
+let dynamicPromptRegistration: RegistrationHandle | undefined;
+
+async function addDynamicItem(item: DynamicItem): Promise<void> {
+  switch (item) {
+    case 'tool': {
+      if (dynamicToolController) return;
+      const controller = new AbortController();
+      await modelContext.registerTool(
+        {
+          name: 'dynamic',
+          description: 'A dynamically registered tool',
+          inputSchema: { type: 'object', properties: {} },
+          async execute() {
+            return { content: [{ type: 'text', text: 'dynamic tool' }] };
+          },
+        },
+        { signal: controller.signal }
+      );
+      dynamicToolController = controller;
+      break;
+    }
+    case 'resource':
+      dynamicResourceRegistration ??= modelContext.registerResource({
+        uri: 'iframe://dynamic',
+        name: 'Dynamic resource',
+        async read() {
+          return {
+            contents: [{ uri: 'iframe://dynamic', text: 'dynamic resource' }],
+          };
+        },
+      });
+      break;
+    case 'prompt':
+      dynamicPromptRegistration ??= modelContext.registerPrompt({
+        name: 'dynamic',
+        description: 'A dynamically registered prompt',
+        async get() {
+          return {
+            messages: [
+              {
+                role: 'user',
+                content: { type: 'text', text: 'dynamic prompt' },
+              },
+            ],
+          };
+        },
+      });
+      break;
+  }
+}
+
+function removeDynamicItems(): void {
+  dynamicToolController?.abort();
+  dynamicToolController = undefined;
+  dynamicResourceRegistration?.unregister();
+  dynamicResourceRegistration = undefined;
+  dynamicPromptRegistration?.unregister();
+  dynamicPromptRegistration = undefined;
+}
 
 // Expose for testing
 declare global {
@@ -224,6 +309,9 @@ declare global {
       getToolCount: () => number;
       getResourceCount: () => number;
       getPromptCount: () => number;
+      addDynamicItem: (item: DynamicItem) => Promise<void>;
+      removeDynamicItems: () => void;
+      stopRuntime: () => Promise<void>;
     };
   }
 }
@@ -232,4 +320,7 @@ window.iframeChild = {
   getToolCount: () => modelContext.listTools().length,
   getResourceCount: () => modelContext.listResources().length,
   getPromptCount: () => modelContext.listPrompts().length,
+  addDynamicItem,
+  removeDynamicItems,
+  stopRuntime: () => modelContext.close(),
 };

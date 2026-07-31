@@ -151,7 +151,8 @@ Installs the strict core polyfill on `document.modelContext` (canonical) and `na
 Behavior:
 
 - No-op in non-browser environments.
-- Non-destructive by default: if either `document.modelContext` or `navigator.modelContext` already exists (e.g. native Chromium support), initialization is skipped.
+- Non-destructive by default: an existing `document.modelContext` is left unchanged. A
+  navigator-only preview runtime is adopted as the canonical document surface.
 - Safe to call repeatedly.
 
 ### `initializeWebModelContextPolyfill(options?)`
@@ -200,10 +201,16 @@ ac.abort();
 Use the current WebMCP producer API on `document.modelContext`:
 
 ```ts
-const [tool] = await document.modelContext.getTools();
-const result = tool
-  ? await document.modelContext.executeTool(tool, JSON.stringify({ query: 'webmcp' }))
-  : null;
+import type { ChromeModelContext } from '@mcp-b/webmcp-types';
+
+const modelContext = document.modelContext as ChromeModelContext;
+const [tool] = await modelContext.getTools();
+const executeTool = modelContext.executeTool;
+
+const result =
+  tool && executeTool
+    ? await executeTool.call(modelContext, tool, JSON.stringify({ query: 'webmcp' }))
+    : null;
 ```
 
 `getTools({ fromOrigins })` accepts the current discovery filter, but this local polyfill cannot

@@ -36,6 +36,16 @@ const REGISTERED_INPUT_SCHEMA_SYMBOL = Symbol('registeredInputSchema');
 const REGISTRATION_SIGNAL_SYMBOL = Symbol('registrationSignal');
 const REGISTRATION_ABORT_SYMBOL = Symbol('registrationAbort');
 
+function isFullyActiveDocument(ownerDocument: Document | null): boolean {
+  try {
+    const ownerWindow = ownerDocument?.defaultView;
+    return Boolean(ownerWindow && ownerWindow.document === ownerDocument);
+  } catch {
+    // A navigated cross-origin WindowProxy is not the document's active window.
+    return false;
+  }
+}
+
 interface PolyfillToolDescriptor extends ToolDescriptor<Record<string, unknown>, unknown, string> {
   inputSchema: InputSchema;
   [REGISTERED_INPUT_SCHEMA_SYMBOL]?: string;
@@ -48,9 +58,11 @@ interface InstallState {
   previousNavigatorModelContextDescriptor: PropertyDescriptor | undefined;
   previousNavigatorModelContextTestingDescriptor: PropertyDescriptor | undefined;
   previousDocumentModelContextDescriptor: PropertyDescriptor | undefined;
+  previousModelContextConstructorDescriptor: PropertyDescriptor | undefined;
   installedNavigatorModelContext: boolean;
   installedNavigatorModelContextTesting: boolean;
   installedDocumentModelContext: boolean;
+  installedModelContextConstructor: boolean;
 }
 
 const installState: InstallState = {
@@ -58,9 +70,11 @@ const installState: InstallState = {
   previousNavigatorModelContextDescriptor: undefined,
   previousNavigatorModelContextTestingDescriptor: undefined,
   previousDocumentModelContextDescriptor: undefined,
+  previousModelContextConstructorDescriptor: undefined,
   installedNavigatorModelContext: false,
   installedNavigatorModelContextTesting: false,
   installedDocumentModelContext: false,
+  installedModelContextConstructor: false,
 };
 
 export interface WebMCPPolyfillInitOptions {
@@ -86,29 +100,50 @@ class StrictWebMCPContext extends EventTarget {
   private tools = new Map<string, PolyfillToolDescriptor>();
   private testingShim: PolyfillTestingShim | null = null;
   private _ontoolchange: ((this: ModelContext, ev: Event) => unknown) | null = null;
-  private ontoolchangeListenerInstalled = false;
+  private readonly ontoolchangeListener: EventListener = (event) => {
+    this._ontoolchange?.call(this as unknown as ModelContext, event);
+  };
   private unregisterToolDeprecationWarned = false;
   private crossOriginDiscoveryWarned = false;
   private crossOriginExposureWarned = false;
+  private readonly DOMExceptionConstructor: typeof DOMException;
+
+  constructor(private readonly ownerDocument: Document | null) {
+    super();
+    this.DOMExceptionConstructor = ownerDocument?.defaultView?.DOMException ?? DOMException;
+  }
+
+  private validateFullyActiveDocument(): void {
+    if (isFullyActiveDocument(this.ownerDocument)) return;
+    throw new this.DOMExceptionConstructor(
+      'The associated document is not fully active',
+      'InvalidStateError'
+    );
+  }
 
   get ontoolchange(): ((this: ModelContext, ev: Event) => unknown) | null {
     return this._ontoolchange;
   }
 
   set ontoolchange(handler: ((this: ModelContext, ev: Event) => unknown) | null) {
-    this._ontoolchange = handler;
-    if (handler && !this.ontoolchangeListenerInstalled) {
-      this.ontoolchangeListenerInstalled = true;
-      super.addEventListener('toolchange', (event) => {
-        this._ontoolchange?.call(this as unknown as ModelContext, event);
-      });
+    const listener = typeof handler === 'function' ? handler : null;
+    if (listener === null) {
+      this._ontoolchange = null;
+      super.removeEventListener('toolchange', this.ontoolchangeListener);
+      return;
     }
+
+    if (this._ontoolchange === null) {
+      super.addEventListener('toolchange', this.ontoolchangeListener);
+    }
+    this._ontoolchange = listener;
   }
 
   async registerTool(
     tool: ToolDescriptor,
     options?: ModelContextRegisterToolOptions
   ): Promise<void> {
+    this.validateFullyActiveDocument();
     validateOriginAgentCluster();
     const signal = options?.signal;
     const normalized = normalizeToolDescriptor(tool, this.tools);
@@ -120,6 +155,7 @@ class StrictWebMCPContext extends EventTarget {
         '[WebMCPPolyfill] Cross-document exposedTo enforcement requires native WebMCP and is not available in the local polyfill.'
       );
     }
+    signal?.throwIfAborted();
     this.tools.set(normalized.name, normalized);
 
     if (signal) {
@@ -152,6 +188,7 @@ class StrictWebMCPContext extends EventTarget {
   }
 
   async getTools(options?: ModelContextGetToolOptions): Promise<ModelContextToolInfo[]> {
+    this.validateFullyActiveDocument();
     validateOriginAgentCluster();
     validatePotentiallyTrustworthyOrigins(options?.fromOrigins);
     if (options?.fromOrigins?.length && !this.crossOriginDiscoveryWarned) {
@@ -294,6 +331,25 @@ class StrictWebMCPContext extends EventTarget {
   }
 }
 
+const modelContextConstructor = {
+  ModelContext(): never {
+    throw new TypeError('Illegal constructor');
+  },
+}.ModelContext;
+
+Object.defineProperty(modelContextConstructor, 'prototype', {
+  value: StrictWebMCPContext.prototype,
+});
+Object.defineProperty(StrictWebMCPContext.prototype, 'constructor', {
+  configurable: true,
+  writable: true,
+  value: modelContextConstructor,
+});
+Object.defineProperty(StrictWebMCPContext.prototype, Symbol.toStringTag, {
+  configurable: true,
+  value: 'ModelContext',
+});
+
 /**
  * EventTarget-based testing shim matching the native Chromium ModelContextTesting surface.
  *
@@ -304,7 +360,9 @@ class StrictWebMCPContext extends EventTarget {
 class PolyfillTestingShim extends EventTarget implements ModelContextTesting {
   private context: StrictWebMCPContext;
   private _ontoolchange: ((this: ModelContextTesting, ev: Event) => unknown) | null = null;
-  private ontoolchangeListenerInstalled = false;
+  private readonly ontoolchangeListener: EventListener = (event) => {
+    this._ontoolchange?.call(this, event);
+  };
 
   constructor(context: StrictWebMCPContext) {
     super();
@@ -332,13 +390,17 @@ class PolyfillTestingShim extends EventTarget implements ModelContextTesting {
   }
 
   set ontoolchange(handler: ((this: ModelContextTesting, ev: Event) => unknown) | null) {
-    this._ontoolchange = handler;
-    if (handler && !this.ontoolchangeListenerInstalled) {
-      this.ontoolchangeListenerInstalled = true;
-      super.addEventListener('toolchange', (event) => {
-        this._ontoolchange?.call(this, event);
-      });
+    const listener = typeof handler === 'function' ? handler : null;
+    if (listener === null) {
+      this._ontoolchange = null;
+      super.removeEventListener('toolchange', this.ontoolchangeListener);
+      return;
     }
+
+    if (this._ontoolchange === null) {
+      super.addEventListener('toolchange', this.ontoolchangeListener);
+    }
+    this._ontoolchange = listener;
   }
 
   /**
@@ -450,6 +512,19 @@ function getDocument(): Document | null {
   return null;
 }
 
+function getWindow(): Window | null {
+  return typeof window === 'undefined' ? null : window;
+}
+
+function defineGlobalModelContextConstructor(target: Window): void {
+  Object.defineProperty(target, 'ModelContext', {
+    configurable: true,
+    enumerable: false,
+    writable: true,
+    value: modelContextConstructor,
+  });
+}
+
 function defineDocumentModelContextProperty(target: Document, value: ModelContext): void {
   Object.defineProperty(target, 'modelContext', {
     configurable: true,
@@ -511,7 +586,21 @@ export function initializeWebMCPPolyfill(options?: WebMCPPolyfillInitOptions): v
     return;
   }
 
-  const context = new StrictWebMCPContext();
+  const globalWindow = getWindow();
+  if (globalWindow) {
+    const previousDescriptor = Object.getOwnPropertyDescriptor(globalWindow, 'ModelContext');
+    if (previousDescriptor && !previousDescriptor.configurable) {
+      if (Reflect.get(globalWindow, 'ModelContext') !== modelContextConstructor) {
+        throw new TypeError('Cannot install ModelContext over a non-configurable global');
+      }
+    } else {
+      installState.previousModelContextConstructorDescriptor = previousDescriptor;
+      defineGlobalModelContextConstructor(globalWindow);
+      installState.installedModelContextConstructor = true;
+    }
+  }
+
+  const context = new StrictWebMCPContext(doc);
   const modelContext = context as unknown as ModelContext;
 
   if (doc) {
@@ -565,7 +654,7 @@ export function cleanupWebMCPPolyfill(): void {
   }
 
   const restore = (
-    target: Navigator | Document,
+    target: object,
     key: string,
     previousDescriptor: PropertyDescriptor | undefined
   ) => {
@@ -579,6 +668,7 @@ export function cleanupWebMCPPolyfill(): void {
 
   const nav = getNavigator();
   const doc = getDocument();
+  const globalWindow = getWindow();
 
   if (doc && installState.installedDocumentModelContext) {
     restore(doc, 'modelContext', installState.previousDocumentModelContextDescriptor);
@@ -593,14 +683,19 @@ export function cleanupWebMCPPolyfill(): void {
       installState.previousNavigatorModelContextTestingDescriptor
     );
   }
+  if (globalWindow && installState.installedModelContextConstructor) {
+    restore(globalWindow, 'ModelContext', installState.previousModelContextConstructorDescriptor);
+  }
 
   installState.installed = false;
   installState.previousDocumentModelContextDescriptor = undefined;
   installState.previousNavigatorModelContextDescriptor = undefined;
   installState.previousNavigatorModelContextTestingDescriptor = undefined;
+  installState.previousModelContextConstructorDescriptor = undefined;
   installState.installedDocumentModelContext = false;
   installState.installedNavigatorModelContext = false;
   installState.installedNavigatorModelContextTesting = false;
+  installState.installedModelContextConstructor = false;
   navigatorModelContextDeprecationWarned = false;
 }
 

@@ -173,7 +173,7 @@ export function useWebMCP<
   const outputSchemaRef = useRef(outputSchema);
   const annotationsRef = useRef(annotations);
   const isMountedRef = useRef(true);
-  // Update refs when callbacks or static descriptors are recreated during render.
+  // Publish recreated callbacks and descriptors only after React commits the render.
   useIsomorphicLayoutEffect(() => {
     toolExecuteRef.current = toolExecute;
     onSuccessRef.current = onSuccess;
@@ -344,6 +344,7 @@ export function useWebMCP<
 
     return () => controller.abort();
     // `deps` lets callers explicitly opt descriptor values into re-registration.
+    // oxlint-disable-next-line react-doctor/exhaustive-deps -- Public API deliberately forwards caller deps.
   }, [name, description, ...(deps ?? [])]);
 
   return {

@@ -27,7 +27,6 @@
     "webmcp-local-relay": "./dist/cli.mjs"
   },
   "files": [
-    ".claude-plugin",
     ".mcp.json",
     "dist"
   ],
@@ -59,13 +58,13 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.browser.json"
   },
   "dependencies": {
-    "@mcp-b/webmcp-polyfill": "workspace:*",
     "@modelcontextprotocol/core": "catalog:",
     "@modelcontextprotocol/server": "catalog:",
     "ws": "^8.21.1",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@mcp-b/webmcp-polyfill": "workspace:*",
     "@mcp-b/webmcp-types": "workspace:*",
     "@modelcontextprotocol/client": "catalog:",
     "@types/node": "catalog:",

@@ -295,16 +295,6 @@ pnpm --filter @mcp-b/webmcp-local-relay build:mcpb
 
 Produces `webmcp-local-relay-<version>.mcpb` for distribution via Claude Desktop.
 
-### Plugin and Skill Files
-
-| File                                         | Purpose                            |
-| -------------------------------------------- | ---------------------------------- |
-| `.claude-plugin/plugin.json`                 | Claude Code plugin definition      |
-| `.claude-plugin/marketplace.json`            | Plugin marketplace metadata        |
-| `.mcp.json`                                  | MCP server configuration           |
-| `.agents/skills/webmcp-local-relay/SKILL.md` | Claude Code skill workspace source |
-| `manifest.json`                              | MCPB bundle manifest               |
-
 ### References
 
 - [MCP Bundle (MCPB) project](https://github.com/modelcontextprotocol/mcpb)

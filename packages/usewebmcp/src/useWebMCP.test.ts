@@ -2,6 +2,7 @@ import { initializeWebModelContext } from '@mcp-b/global';
 import type { CallToolResult, ChromeModelContext, ModelContextCore } from '@mcp-b/webmcp-types';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
+import { z } from 'zod';
 import { useWebMCP } from './useWebMCP.js';
 
 const TEST_CHANNEL_ID = `usewebmcp-browser-${Date.now()}`;
@@ -218,39 +219,29 @@ describe('useWebMCP in a browser runtime', () => {
     expect((await findTool('browser_dependency'))?.description).toBe('Revision two');
   });
 
-  it('converts Standard JSON Schema metadata through the real registration path', async () => {
-    const attemptedTargets: string[] = [];
-    const standardJsonSchema = {
-      '~standard': {
-        version: 1 as const,
-        vendor: 'browser-test',
-        jsonSchema: {
-          input: ({ target }: { target: string }) => {
-            attemptedTargets.push(target);
-            return {
-              type: 'object',
-              properties: { query: { type: 'string' } },
-              required: ['query'],
-            };
-          },
-          output: () => ({ type: 'object', properties: {} }),
-        },
-      },
-    };
+  it('converts a real Zod Standard JSON Schema through the registration path', async () => {
+    const inputSchema = z.object({
+      query: z.string(),
+      limit: z.number().int().min(1).max(50).optional(),
+    });
 
     await renderHook(() =>
       useWebMCP({
         name: 'browser_standard_schema',
         description: 'Uses Standard JSON Schema',
-        inputSchema: standardJsonSchema,
-        execute: async (input) => String(input.query),
+        inputSchema,
+        execute: async ({ query }) => query,
       })
     );
 
     const tool = await findTool('browser_standard_schema');
-    expect(attemptedTargets).toContain('draft-2020-12');
-    expect(JSON.parse(tool?.inputSchema ?? '{}')).toMatchObject({
+    expect(JSON.parse(tool?.inputSchema ?? '{}')).toEqual({
+      $schema: 'https://json-schema.org/draft/2020-12/schema',
       type: 'object',
+      properties: {
+        query: { type: 'string' },
+        limit: { type: 'integer', minimum: 1, maximum: 50 },
+      },
       required: ['query'],
     });
   });

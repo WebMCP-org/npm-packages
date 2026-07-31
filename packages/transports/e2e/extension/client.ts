@@ -3,7 +3,10 @@
 import { ExtensionClientTransport } from '@mcp-b/transports';
 import { Client } from '@modelcontextprotocol/client';
 
-import type { RuntimeInvocationRecord } from '../../../../e2e/runtime-contract/core.js';
+import type {
+  RuntimeContractController,
+  RuntimeInvocationRecord,
+} from '../../../../e2e/runtime-contract/core.js';
 
 interface ControlRequest {
   type: 'runtime-contract/control';
@@ -87,7 +90,6 @@ async function bootstrap() {
   );
   const transport = new ExtensionClientTransport({
     portName: 'mcp',
-    autoReconnect: false,
   });
 
   window.mcpClient = client;
@@ -122,6 +124,7 @@ void bootstrap().catch((error) => {
 declare global {
   interface Window {
     __WEBMCP_E2E_READY__?: boolean;
+    __WEBMCP_E2E__?: RuntimeContractController;
     mcpClient?: Client;
   }
 }

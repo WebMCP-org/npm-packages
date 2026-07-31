@@ -137,6 +137,9 @@ reject the returned promise. If native Chrome blocks mirroring through
 Permissions Policy, registration rejects and the local MCP registration rolls
 back.
 
+WebMCP descriptor callbacks are single-round. Returning an MCP `input_required` result produces a
+tool error. Register multi-round task flows directly on the upstream `McpServer`.
+
 ### `getTools(options?)`
 
 ```ts "get-tools-signature.ts"

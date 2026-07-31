@@ -863,12 +863,12 @@ importers:
       vitest-browser-react:
         specifier: ^2.0.4
         version: 2.0.4(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(@voidzero-dev/vite-plus-test@0.1.24)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
 
   packages/webmcp-local-relay:
     dependencies:
-      '@mcp-b/webmcp-polyfill':
-        specifier: workspace:*
-        version: link:../webmcp-polyfill
       '@modelcontextprotocol/core':
         specifier: 'catalog:'
         version: 2.0.0
@@ -882,6 +882,9 @@ importers:
         specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
+      '@mcp-b/webmcp-polyfill':
+        specifier: workspace:*
+        version: link:../webmcp-polyfill
       '@mcp-b/webmcp-types':
         specifier: workspace:*
         version: link:../webmcp-types
@@ -17941,7 +17944,7 @@ snapshots:
       sirv: 3.0.2
       tinyrainbow: 3.1.0
       vitest: 4.1.0(@opentelemetry/api@1.9.1)(@types/node@25.6.0)(@vitest/browser-playwright@4.1.0)(happy-dom@20.8.9)(msw@2.12.10(@types/node@25.6.0)(typescript@5.9.3))(vite@7.3.0(@types/node@25.6.0)(jiti@2.7.0)(lightningcss@1.32.0)(sass@1.97.1)(tsx@4.21.0)(yaml@2.8.3))
-      ws: 8.21.0
+      ws: 8.21.1
     transitivePeerDependencies:
       - bufferutil
       - msw
@@ -20727,7 +20730,7 @@ snapshots:
       '@types/ws': 8.18.1
       entities: 7.0.1
       whatwg-mimetype: 3.0.0
-      ws: 8.21.0
+      ws: 8.21.1
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate

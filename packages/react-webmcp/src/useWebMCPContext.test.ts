@@ -1,5 +1,6 @@
 import { initializeWebModelContext } from '@mcp-b/global';
 import type { CallToolResult, ChromeModelContext, ModelContextCore } from '@mcp-b/webmcp-types';
+import { Suspense, createElement } from 'react';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
 import { useWebMCPContext } from './useWebMCPContext.js';
@@ -98,6 +99,33 @@ describe('useWebMCPContext in a browser runtime', () => {
       lastResult: null,
       error: null,
       executionCount: 0,
+    });
+
+    await hook.unmount();
+  });
+
+  it('keeps the committed getter while a newer render is suspended', async () => {
+    const pending = new Promise<never>(() => {});
+
+    const hook = await renderHook(
+      ({ value, suspend }: { value: string; suspend?: boolean }) => {
+        useWebMCPContext('context_committed', 'Get committed value', () => value);
+
+        if (suspend) {
+          throw pending;
+        }
+      },
+      {
+        initialProps: { value: 'committed' },
+        wrapper: ({ children }) => createElement(Suspense, { fallback: null }, children),
+      }
+    );
+
+    await hook.rerender({ value: 'uncommitted', suspend: true });
+
+    expect((await executeRegisteredTool('context_committed')).content[0]).toMatchObject({
+      type: 'text',
+      text: 'committed',
     });
 
     await hook.unmount();

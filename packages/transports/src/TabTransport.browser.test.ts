@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { IframeChildTransport } from './IframeChildTransport.js';
+import { IframeParentTransport } from './IframeParentTransport.js';
 import { TabClientTransport } from './TabClientTransport.js';
 import { TabServerTransport } from './TabServerTransport.js';
 
@@ -72,6 +74,102 @@ async function startPair(options?: { channelId?: string; requestTimeout?: number
 }
 
 browserDescribe('Tab transports (browser)', () => {
+  describe('IframeParentTransport', () => {
+    it('accepts the default wildcard origin only from its iframe window', async () => {
+      const iframe = document.createElement('iframe');
+      document.body.append(iframe);
+      const channelId = uniqueChannel('iframe-parent');
+      const transport = new IframeParentTransport({ iframe, channelId });
+
+      try {
+        await transport.start();
+
+        window.dispatchEvent(
+          new MessageEvent('message', {
+            origin: 'https://child.example',
+            source: window,
+            data: {
+              channel: channelId,
+              type: 'mcp',
+              direction: 'server-to-client',
+              payload: 'mcp-server-ready',
+            },
+          })
+        );
+        await delay();
+
+        let ready = false;
+        void transport.serverReadyPromise.then(() => {
+          ready = true;
+        });
+        await delay();
+        expect(ready).toBe(false);
+
+        window.dispatchEvent(
+          new MessageEvent('message', {
+            origin: 'https://child.example',
+            source: iframe.contentWindow,
+            data: {
+              channel: channelId,
+              type: 'mcp',
+              direction: 'server-to-client',
+              payload: 'mcp-server-ready',
+            },
+          })
+        );
+
+        await expect(transport.serverReadyPromise).resolves.toBeUndefined();
+      } finally {
+        await safeClose(transport);
+        iframe.remove();
+      }
+    });
+  });
+
+  describe('IframeChildTransport', () => {
+    it('accepts wildcard-origin messages only from its parent window', async () => {
+      const iframe = document.createElement('iframe');
+      document.body.append(iframe);
+      const channelId = uniqueChannel('iframe-child');
+      const transport = new IframeChildTransport({ allowedOrigins: ['*'], channelId });
+      const onMessage = vi.fn();
+      transport.onmessage = onMessage;
+
+      try {
+        await transport.start();
+        const data = {
+          channel: channelId,
+          type: 'mcp',
+          direction: 'client-to-server',
+          payload: { jsonrpc: '2.0', method: 'tools/list', id: 1 },
+        };
+
+        window.dispatchEvent(
+          new MessageEvent('message', {
+            origin: window.location.origin,
+            source: iframe.contentWindow,
+            data,
+          })
+        );
+        await delay();
+        expect(onMessage).not.toHaveBeenCalled();
+
+        window.dispatchEvent(
+          new MessageEvent('message', {
+            origin: window.location.origin,
+            source: window.parent,
+            data,
+          })
+        );
+        await delay();
+        expect(onMessage).toHaveBeenCalledTimes(1);
+      } finally {
+        await safeClose(transport);
+        iframe.remove();
+      }
+    });
+  });
+
   describe('TabClientTransport', () => {
     let clientTransport: TabClientTransport;
     let channelId: string;
@@ -130,26 +228,43 @@ browserDescribe('Tab transports (browser)', () => {
         targetOrigin: '*',
         channelId,
       });
+      const iframe = document.createElement('iframe');
+      document.body.append(iframe);
       const onMessage = vi.fn();
       wildcardTransport.onmessage = onMessage;
 
-      await wildcardTransport.start();
+      try {
+        await wildcardTransport.start();
+        const data = {
+          channel: channelId,
+          type: 'mcp',
+          direction: 'server-to-client',
+          payload: { jsonrpc: '2.0', result: { ok: true }, id: 99 },
+        };
 
-      window.dispatchEvent(
-        new MessageEvent('message', {
-          origin: 'https://malicious.example',
-          data: {
-            channel: channelId,
-            type: 'mcp',
-            direction: 'server-to-client',
-            payload: { jsonrpc: '2.0', result: { ok: true }, id: 99 },
-          },
-        })
-      );
+        window.dispatchEvent(
+          new MessageEvent('message', {
+            origin: 'https://malicious.example',
+            source: iframe.contentWindow,
+            data,
+          })
+        );
+        await delay();
+        expect(onMessage).not.toHaveBeenCalled();
 
-      await delay();
-      expect(onMessage).toHaveBeenCalled();
-      await safeClose(wildcardTransport);
+        window.dispatchEvent(
+          new MessageEvent('message', {
+            origin: 'https://malicious.example',
+            source: window,
+            data,
+          })
+        );
+        await delay();
+        expect(onMessage).toHaveBeenCalledTimes(1);
+      } finally {
+        await safeClose(wildcardTransport);
+        iframe.remove();
+      }
     });
 
     it('ignores messages with wrong direction', async () => {
@@ -270,6 +385,45 @@ browserDescribe('Tab transports (browser)', () => {
       expect(onMessage).not.toHaveBeenCalled();
     });
 
+    it('accepts allowed-origin messages only from the same window', async () => {
+      const iframe = document.createElement('iframe');
+      document.body.append(iframe);
+      const onMessage = vi.fn();
+      serverTransport.onmessage = onMessage;
+
+      try {
+        await serverTransport.start();
+        const data = {
+          channel: channelId,
+          type: 'mcp',
+          direction: 'client-to-server',
+          payload: { jsonrpc: '2.0', method: 'tools/list', id: 1 },
+        };
+
+        window.dispatchEvent(
+          new MessageEvent('message', {
+            origin: window.location.origin,
+            source: iframe.contentWindow,
+            data,
+          })
+        );
+        await delay();
+        expect(onMessage).not.toHaveBeenCalled();
+
+        window.dispatchEvent(
+          new MessageEvent('message', {
+            origin: window.location.origin,
+            source: window,
+            data,
+          })
+        );
+        await delay();
+        expect(onMessage).toHaveBeenCalledTimes(1);
+      } finally {
+        iframe.remove();
+      }
+    });
+
     it('emits onerror for invalid client payloads', async () => {
       const onError = vi.fn();
       serverTransport.onerror = onError;
@@ -327,6 +481,7 @@ browserDescribe('Tab transports (browser)', () => {
         window.dispatchEvent(
           new MessageEvent('message', {
             origin: crossOrigin,
+            source: window,
             data: {
               channel: crossOriginChannel,
               type: 'mcp',
@@ -426,6 +581,7 @@ browserDescribe('Tab transports (browser)', () => {
         window.dispatchEvent(
           new MessageEvent('message', {
             origin: crossOrigin,
+            source: window,
             data: {
               channel: unloadChannel,
               type: 'mcp',

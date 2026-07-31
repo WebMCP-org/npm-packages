@@ -3,6 +3,7 @@ import type { McpClientProviderProps } from '@mcp-b/react-webmcp';
 import { McpClientProvider } from '@mcp-b/react-webmcp';
 import { TabClientTransport } from '@mcp-b/transports';
 import { Client } from '@modelcontextprotocol/client';
+import { StrictMode } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { testMiddleware } from './testMiddleware';
@@ -46,7 +47,9 @@ if (!rootElement) {
 }
 
 ReactDOM.createRoot(rootElement).render(
-  <McpClientProvider client={providerClient} transport={providerTransport}>
-    <App />
-  </McpClientProvider>
+  <StrictMode>
+    <McpClientProvider client={providerClient} transport={providerTransport}>
+      <App />
+    </McpClientProvider>
+  </StrictMode>
 );

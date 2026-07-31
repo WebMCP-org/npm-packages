@@ -1,6 +1,6 @@
 ---
 title: 'Use Schemas and Structured Output'
-description: 'Define tool input schemas with JSON Schema or Standard Schema, and add output schemas for typed agent responses.'
+description: 'Define tool input schemas with JSON Schema or Standard JSON Schema, and add output schemas for typed agent responses.'
 keywords:
   [
     'inputSchema',
@@ -17,7 +17,9 @@ icon: 'brackets-curly'
 
 ## Define input schemas
 
-Every tool can have an `inputSchema` that describes the arguments it accepts. The runtime uses this schema to validate input from AI agents before calling your `execute` function.
+Every tool can have an `inputSchema` that describes the arguments it accepts. MCP transport calls
+validate the schema before calling `execute`. Direct WebMCP and testing-shim calls do not guarantee
+validation, so handlers should validate untrusted input when required.
 
 ### Literal JSON Schema
 
@@ -86,17 +88,19 @@ await document.modelContext.registerTool({
   Inference works only with literal schemas. If the schema type is widened (for example, loaded from an API at runtime), `args` falls back to `Record<string, unknown>`.
 </Note>
 
-### Standard Schema (Zod, Valibot, ArkType)
+### Standard JSON Schema (Zod, Valibot, ArkType)
 
-MCP-B runtimes accept [Standard Schema v1](https://github.com/standard-schema/standard-schema)
-objects that can emit JSON Schema for `inputSchema`. This includes Zod v4, Valibot, and ArkType
-when they provide `~standard.jsonSchema.input()`. The emitted JSON Schema is used for browser
-discovery. MCP calls and the MCP-B testing shim use `~standard.validate()` when present.
+MCP-B runtimes accept [Standard JSON Schema v1](https://standardschema.dev/json-schema) objects
+that expose `~standard.jsonSchema.input()`. Native implementations include Zod 4.2+ and ArkType
+2.1.28+; Valibot schemas need the `toStandardJsonSchema()` adapter from
+`@valibot/to-json-schema`. The emitted JSON Schema is used for browser discovery. MCP transport
+calls use `~standard.validate()` when present. Direct WebMCP and testing-shim calls pass input to
+the handler, so validate inside `execute` when those routes matter.
 
-With Zod v4:
+With Zod 4.2 or newer:
 
 ```bash
-npm install zod
+npm install zod@^4.2
 ```
 
 ```ts title="zod-tool.ts"
@@ -122,11 +126,11 @@ await document.modelContext.registerTool({
 ```
 
 **Use this when** you want schema-library typing and MCP-route validation and already use a
-Standard Schema-compatible library.
+Standard JSON Schema-compatible library.
 
 <Note>
-  Standard Schema validators that cannot emit JSON Schema are rejected at registration time because
-  WebMCP callers need an advertised `inputSchema`. The runtime attempts conversion with
+  Validation-only Standard Schema objects are rejected at registration time because WebMCP callers
+  need an advertised `inputSchema`. The runtime attempts Standard JSON Schema conversion with
   `draft-2020-12` first, then falls back to `draft-07`.
 </Note>
 
@@ -136,11 +140,13 @@ Standard Schema-compatible library.
   enforce Zod, Valibot, or ArkType-specific rules.
 </Warning>
 
-### Standard Schema with `@mcp-b/react-webmcp`
+### Standard JSON Schema with `@mcp-b/react-webmcp`
 
-The React hooks in `@mcp-b/react-webmcp` accept the same Standard Schema objects for input schemas. Pass the schema object itself, not a raw Zod shape map:
+The React hooks in `@mcp-b/react-webmcp` accept the same Standard JSON Schema objects for input
+schemas. Pass the schema object itself, not a raw Zod shape map:
 
 ```tsx title="SearchTool.tsx"
+import '@mcp-b/global';
 import { useWebMCP } from '@mcp-b/react-webmcp';
 import { z } from 'zod';
 
@@ -166,11 +172,11 @@ function SearchTool() {
 
 ### Choosing a schema style
 
-| Style                       | Dependencies                | Runtime validation | Type inference | Best for                                         |
-| --------------------------- | --------------------------- | ------------------ | -------------- | ------------------------------------------------ |
-| Plain JSON Schema           | None                        | No                 | No             | Quick prototyping, zero-dep projects             |
-| JSON Schema + `as const`    | `@mcp-b/webmcp-types` (dev) | No                 | Yes            | TypeScript projects without a schema library     |
-| Standard Schema (Zod, etc.) | Schema library              | MCP-B routes       | Yes            | Apps that want library typing and MCP validation |
+| Style                    | Dependencies                | Runtime validation | Type inference | Best for                                         |
+| ------------------------ | --------------------------- | ------------------ | -------------- | ------------------------------------------------ |
+| Plain JSON Schema        | None                        | No                 | No             | Quick prototyping, zero-dep projects             |
+| JSON Schema + `as const` | `@mcp-b/webmcp-types` (dev) | No                 | Yes            | TypeScript projects without a schema library     |
+| Standard JSON Schema     | Schema library              | MCP-B routes       | Yes            | Apps that want library typing and MCP validation |
 
 ## Define output schemas
 

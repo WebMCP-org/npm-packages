@@ -25,7 +25,7 @@ Follow these steps in order. Do not skip steps.
 ### Step 1: Validate
 
 ```bash
-pnpm build && pnpm typecheck && pnpm check && pnpm test:unit
+pnpm build && pnpm typecheck && vp check && pnpm test:unit
 ```
 
 Stop if anything fails. Fix it first.
@@ -45,9 +45,9 @@ This is interactive. It will ask:
 This creates a `.changeset/<random-name>.md` file. You can create multiple changesets
 for different changes before releasing.
 
-**Fixed versioning note:** You only select packages that actually changed. Changesets
-automatically bumps ALL packages in the fixed group to the same new version. This is
-configured in `.changeset/config.json`.
+**Fixed versioning note:** Select only packages that actually changed. Changesets
+automatically bumps all packages in the configured fixed group to the same new version.
+`@mcp-b/codemode` and `@mcp-b/smart-dom-reader-server` are versioned independently.
 
 ### Step 3: Apply Version Bumps
 
@@ -57,7 +57,7 @@ pnpm changeset version
 
 This does three things:
 
-1. Bumps `version` in all `package.json` files (fixed — all get the same version)
+1. Bumps each selected package and every package in its fixed group
 2. Generates `CHANGELOG.md` entries from the changeset summaries
 3. Deletes the consumed `.changeset/*.md` files
 
@@ -104,9 +104,12 @@ for pkg in webmcp-types webmcp-polyfill webmcp-ts-sdk transports global mcp-ifra
   echo "@mcp-b/$pkg: local=$LOCAL npm=$NPM"
 done
 echo "usewebmcp: local=$(node -p "require('./packages/usewebmcp/package.json').version") npm=$(npm view usewebmcp version 2>/dev/null)"
+echo "@mcp-b/codemode: local=$(node -p "require('./packages/codemode/package.json').version") npm=$(npm view @mcp-b/codemode version 2>/dev/null)"
+echo "@mcp-b/smart-dom-reader-server: local=$(node -p "require('./packages/smart-dom-reader/mcp-server/package.json').version") npm=$(npm view @mcp-b/smart-dom-reader-server version 2>/dev/null)"
 ```
 
-With fixed versioning, ALL versions should be the SAME number.
+All packages in the fixed group should have the same version. The two independently
+versioned packages may differ.
 
 ### Step 8: Commit and Push
 
@@ -190,10 +193,11 @@ pnpm publish -r --access public --tag canary --no-git-checks
 # Revert: git checkout .
 ```
 
-## Fixed Versioning Strategy
+## Versioning Strategy
 
-**All packages share the same version number.** This is enforced by the `"fixed"` setting
-in `.changeset/config.json`. When any package changes, ALL packages bump together.
+The core browser stack shares one version number through the `"fixed"` group in
+`.changeset/config.json`. When one member changes, all members bump together.
+`@mcp-b/codemode` and `@mcp-b/smart-dom-reader-server` remain independently versioned.
 
 Benefits:
 
@@ -211,25 +215,17 @@ topological order automatically and skips versions that already exist on npm.
 
 ```
 Tier 0 (no internal deps):
-  @mcp-b/webmcp-types, @mcp-b/smart-dom-reader
+  @mcp-b/webmcp-types, @mcp-b/smart-dom-reader, @mcp-b/transports,
+  @mcp-b/webmcp-local-relay, @mcp-b/smart-dom-reader-server
 
 Tier 1 (← Tier 0):
-  @mcp-b/webmcp-polyfill
+  @mcp-b/webmcp-polyfill, @mcp-b/codemode
 
 Tier 2 (← Tier 1):
-  @mcp-b/webmcp-ts-sdk
+  @mcp-b/webmcp-ts-sdk, usewebmcp
 
 Tier 3 (← Tier 2):
-  @mcp-b/transports
-
-Tier 4 (← Tier 3):
-  @mcp-b/mcp-iframe, @mcp-b/global
-
-Tier 5 (← Tier 4):
-  @mcp-b/react-webmcp, usewebmcp
-
-Independent (no internal deps):
-  @mcp-b/webmcp-local-relay
+  @mcp-b/mcp-iframe, @mcp-b/global, @mcp-b/react-webmcp
 ```
 
 ## Complete Dependency Graph
@@ -237,14 +233,16 @@ Independent (no internal deps):
 ```
 @mcp-b/webmcp-types          (no internal deps)
 @mcp-b/smart-dom-reader      (no internal deps)
+@mcp-b/smart-dom-reader-server (no internal deps; independently versioned)
 @mcp-b/webmcp-local-relay    (no internal deps)
+@mcp-b/transports            (no internal deps)
+@mcp-b/codemode              → webmcp-types (independently versioned)
 @mcp-b/webmcp-polyfill       → webmcp-types
 @mcp-b/webmcp-ts-sdk         → webmcp-polyfill, webmcp-types
-@mcp-b/transports            → webmcp-ts-sdk
 @mcp-b/mcp-iframe            → transports, webmcp-ts-sdk, webmcp-types
 @mcp-b/global                → transports, webmcp-polyfill, webmcp-ts-sdk, webmcp-types
-@mcp-b/react-webmcp          → global, transports, webmcp-polyfill, webmcp-ts-sdk, webmcp-types
 usewebmcp                    → webmcp-polyfill, webmcp-types
+@mcp-b/react-webmcp          → usewebmcp, webmcp-polyfill, webmcp-ts-sdk, webmcp-types
 ```
 
 ## Fixing a Stale Dependency Chain
@@ -297,11 +295,10 @@ Set via `gh secret set NPM_TOKEN`.
 
 ## Files Reference
 
-| File                                   | Purpose                                              |
-| -------------------------------------- | ---------------------------------------------------- |
-| `.changeset/config.json`               | Changesets config (includes fixed versioning groups) |
-| `.npmrc`                               | pnpm registry & auth config                          |
-| `.env`                                 | Local NPM_TOKEN (gitignored)                         |
-| `scripts/validate-publish.js`          | Prevents accidental npm (non-pnpm) publish           |
-| `.github/workflows/changesets.yml`     | CI release workflow                                  |
-| `.github/workflows/release-canary.yml` | CI canary release workflow                           |
+| File                               | Purpose                                              |
+| ---------------------------------- | ---------------------------------------------------- |
+| `.changeset/config.json`           | Changesets config (includes fixed versioning groups) |
+| `.npmrc`                           | pnpm registry & auth config                          |
+| `.env`                             | Local NPM_TOKEN (gitignored)                         |
+| `scripts/validate-publish.js`      | Prevents accidental npm (non-pnpm) publish           |
+| `.github/workflows/changesets.yml` | CI release workflow                                  |

@@ -520,6 +520,33 @@ describe('LocalRelayMcpServer', () => {
     await cleanup();
   });
 
+  it('preserves dynamic tool icons and metadata', async () => {
+    const { bridge, client, cleanup } = await createConnectedRelay();
+
+    const ws = await connectBrowser(bridge, {
+      tabId: 'tab-metadata',
+      url: 'https://example.com',
+      tools: [
+        {
+          name: 'metadata_tool',
+          icons: [{ src: 'https://example.com/icon.svg', mimeType: 'image/svg+xml' }],
+          _meta: { 'example/key': 'value' },
+        },
+      ],
+    });
+
+    const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
+    const tool = await waitForClientTool(client, toolName);
+
+    expect(tool.icons).toEqual([
+      { src: 'https://example.com/icon.svg', mimeType: 'image/svg+xml' },
+    ]);
+    expect(tool._meta).toEqual({ 'example/key': 'value' });
+
+    ws.close();
+    await cleanup();
+  });
+
   it('preserves inputSchema through the relay to MCP clients', async () => {
     const { bridge, client, cleanup } = await createConnectedRelay();
 
@@ -553,6 +580,53 @@ describe('LocalRelayMcpServer', () => {
       },
       required: ['query'],
     });
+
+    ws.close();
+    await cleanup();
+  });
+
+  it('skips an unresolvable dynamic schema without blocking later tools', async () => {
+    const { bridge, client, relay, cleanup } = await createConnectedRelay();
+
+    const ws = await connectBrowser(bridge, {
+      tabId: 'tab-schema-isolation',
+      url: 'https://example.com',
+      tools: [
+        {
+          name: 'a_bad_schema',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              value: { $ref: 'https://schemas.invalid/missing.json' },
+            },
+          },
+        },
+        {
+          name: 'z_valid_schema',
+          inputSchema: {
+            type: 'object',
+            properties: { value: { type: 'string' } },
+          },
+        },
+      ],
+    });
+
+    const aggregatedTools = await waitFor(() => {
+      const tools = bridge.registry.listTools();
+      return tools.length === 2 ? tools : undefined;
+    });
+    const badName = aggregatedTools.find(
+      ({ originalName }) => originalName === 'a_bad_schema'
+    )?.name;
+    const validName = aggregatedTools.find(
+      ({ originalName }) => originalName === 'z_valid_schema'
+    )?.name;
+    expect(badName).toBeDefined();
+    expect(validName).toBeDefined();
+
+    const list = await waitForClientToolList(client, validName!);
+    expect(list.tools.some(({ name }) => name === badName)).toBe(false);
+    expect(relay.listDynamicToolNames()).toEqual([validName]);
 
     ws.close();
     await cleanup();
@@ -1222,6 +1296,29 @@ describe('LocalRelayMcpServer', () => {
   });
 
   describe('notification debouncing', () => {
+    it('sends one list-changed notification for one dynamic tool registration', async () => {
+      const { bridge, client, cleanup } = await createConnectedRelay();
+      let notifications = 0;
+      client.setNotificationHandler('notifications/tools/list_changed', () => {
+        notifications += 1;
+      });
+
+      const ws = await connectBrowser(bridge, {
+        tabId: 'tab-notifications',
+        url: 'https://example.com',
+        tools: [{ name: 'notification_tool', description: 'Notification test' }],
+      });
+
+      const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
+      await waitForClientTool(client, toolName);
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(notifications).toBe(1);
+
+      ws.close();
+      await cleanup();
+    });
+
     it('does not re-register tools when a browser reconnects with the same tools', async () => {
       const { bridge, client, cleanup } = await createConnectedRelay();
 

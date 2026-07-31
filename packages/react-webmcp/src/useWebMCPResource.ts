@@ -2,6 +2,7 @@ import type { ResourceDescriptor } from '@mcp-b/webmcp-ts-sdk';
 import { useCallback, useRef } from 'react';
 import { getBrowserMcpServer } from './model-context.js';
 import type { WebMCPResourceConfig, WebMCPResourceReturn } from './types.js';
+import { useIsomorphicLayoutEffect } from './useIsomorphicLayoutEffect.js';
 import { useMcpRegistration } from './useMcpRegistration.js';
 
 /**
@@ -48,7 +49,7 @@ import { useMcpRegistration } from './useMcpRegistration.js';
  *     description: 'User profile data by ID',
  *     mimeType: 'application/json',
  *     read: async (uri, params) => {
- *       const userId = params?.userId ?? '';
+ *       const userId = typeof params?.userId === 'string' ? params.userId : '';
  *       const profile = await fetchUserProfile(userId);
  *       return {
  *         contents: [{
@@ -67,7 +68,9 @@ export function useWebMCPResource(config: WebMCPResourceConfig): WebMCPResourceR
   const { uri, name, description, mimeType, read } = config;
 
   const readRef = useRef(read);
-  readRef.current = read;
+  useIsomorphicLayoutEffect(() => {
+    readRef.current = read;
+  }, [read]);
 
   const register = useCallback(() => {
     const modelContext = getBrowserMcpServer();

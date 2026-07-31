@@ -77,6 +77,16 @@ export type {
 // ============================================================================
 
 declare global {
+  /**
+   * Web IDL interface object for `ModelContext`.
+   *
+   * The browser exposes this value for branding and `instanceof` checks.
+   */
+  var ModelContext: {
+    prototype: ModelContext;
+    new (): ModelContext;
+  };
+
   interface Document {
     /**
      * Web Model Context API strict core surface.

@@ -170,14 +170,28 @@ Wraps a `chrome.runtime.Port` to handle a single client connection. Runs in the 
 
 ```typescript
 import { ExtensionServerTransport } from '@mcp-b/transports';
+import { McpServer } from '@modelcontextprotocol/server';
+
+function createServer() {
+  const server = new McpServer({
+    name: 'extension-background',
+    version: '1.0.0',
+  });
+  // Register this session's tools, resources, and prompts here.
+  return server;
+}
 
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name === 'mcp') {
+    const server = createServer();
     const transport = new ExtensionServerTransport(port);
-    await server.connect(transport);
+    void server.connect(transport);
   }
 });
 ```
+
+An MCP server owns one protocol session. Create a fresh server for every port; keep shared
+application state outside `createServer()` when clients need to see the same data.
 
 #### Constructor
 
@@ -200,7 +214,9 @@ new ExtensionServerTransport(port: chrome.runtime.Port, options?: ExtensionServe
 
 ### ExtensionClientTransport
 
-Connects to the extension's background service worker via `chrome.runtime.connect`. Supports automatic reconnection with exponential backoff.
+Connects to the extension's background service worker via `chrome.runtime.connect`. A port
+disconnect closes the MCP connection. Create a new transport and call `client.connect()` again so
+the new server session completes MCP initialization.
 
 ```typescript
 import { ExtensionClientTransport } from '@mcp-b/transports';
@@ -213,15 +229,10 @@ await client.connect(transport);
 
 #### ExtensionClientTransportOptions
 
-| Option                       | Type      | Required | Default | Description                                                                                                                                                        |
-| ---------------------------- | --------- | -------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `extensionId`                | `string`  | No       | --      | Extension ID to connect to. Omit for same-extension connections. When provided, uses `chrome.runtime.connect(extensionId, ...)` for cross-extension communication. |
-| `portName`                   | `string`  | No       | `"mcp"` | Port name for the connection.                                                                                                                                      |
-| `autoReconnect`              | `boolean` | No       | `true`  | Reconnect automatically on disconnect.                                                                                                                             |
-| `maxReconnectAttempts`       | `number`  | No       | `10`    | Maximum reconnection attempts before giving up.                                                                                                                    |
-| `reconnectDelay`             | `number`  | No       | `1000`  | Initial reconnection delay in milliseconds.                                                                                                                        |
-| `maxReconnectDelay`          | `number`  | No       | `30000` | Maximum reconnection delay in milliseconds.                                                                                                                        |
-| `reconnectBackoffMultiplier` | `number`  | No       | `1.5`   | Multiplier applied to the delay after each failed attempt.                                                                                                         |
+| Option        | Type     | Required | Default | Description                                                                                                                                                        |
+| ------------- | -------- | -------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `extensionId` | `string` | No       | --      | Extension ID to connect to. Omit for same-extension connections. When provided, uses `chrome.runtime.connect(extensionId, ...)` for cross-extension communication. |
+| `portName`    | `string` | No       | `"mcp"` | Port name for the connection.                                                                                                                                      |
 
 ---
 

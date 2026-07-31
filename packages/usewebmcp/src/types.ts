@@ -8,9 +8,9 @@ import type {
 } from '@mcp-b/webmcp-types';
 
 /**
- * Infers tool input type from either a Standard Schema or JSON Schema.
+ * Infers tool input type from either a Standard JSON Schema or JSON Schema.
  *
- * - **Standard Schema** (Zod v4, Valibot, ArkType): extracts `~standard.types.input`
+ * - **Standard JSON Schema** (for example Zod 4.2+): extracts `~standard.types.input`
  * - **JSON Schema** (`as const`): uses `InferArgsFromInputSchema` for structural inference
  * - **Fallback**: `Record<string, unknown>`
  *
@@ -165,8 +165,8 @@ interface WebMCPConfigBase<
 
   /**
    * Schema defining the input parameters for the tool.
-   * Accepts JSON Schema (with `as const`) or any Standard Schema v1
-   * library (Zod v4, Valibot, ArkType, etc.).
+   * Accepts JSON Schema (with `as const`) or a Standard JSON Schema v1
+   * implementation (for example Zod 4.2+).
    *
    * @example JSON Schema
    * ```typescript
@@ -179,7 +179,7 @@ interface WebMCPConfigBase<
    * } as const
    * ```
    *
-   * @example Standard Schema (Zod v4)
+   * @example Standard JSON Schema (Zod 4.2+)
    * ```typescript
    * inputSchema: z.object({ postId: z.string() })
    * ```

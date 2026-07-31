@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 import { useWebMCP, type WebMCPReturn } from 'usewebmcp';
 
 /**
@@ -71,8 +71,6 @@ export function useWebMCPContext<T>(
   description: string,
   getValue: () => T
 ): WebMCPReturn {
-  const getValueRef = useRef(getValue);
-  getValueRef.current = getValue;
   const annotations = useMemo(
     () => ({
       title: `Context: ${name}`,
@@ -88,7 +86,7 @@ export function useWebMCPContext<T>(
     name,
     description,
     annotations,
-    execute: async () => getValueRef.current(),
+    execute: async () => getValue(),
     formatOutput: (output) => {
       if (typeof output === 'string') {
         return output;

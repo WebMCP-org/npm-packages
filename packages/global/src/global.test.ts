@@ -3,9 +3,10 @@ import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
 import { normalizeInputSchema } from '@mcp-b/webmcp-polyfill/schema';
 import { BrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
 import type { ModelContextCore } from '@mcp-b/webmcp-types';
-import { Client } from '@modelcontextprotocol/client';
-import { inputRequired, McpServer } from '@modelcontextprotocol/server';
+import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
+import { inputRequired } from '@modelcontextprotocol/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { BrowserMcpServer as SourceBrowserMcpServer } from '../../webmcp-ts-sdk/src/browser-server.js';
 import { cleanupWebModelContext, initializeWebModelContext } from './global.js';
 
 const documentModelContextDescriptorStack: Array<PropertyDescriptor | undefined> = [];
@@ -124,8 +125,69 @@ describe('global adapter', () => {
 
       initializeWebModelContext();
 
-      expect(connectSpy).toHaveBeenCalledTimes(2);
-      expect(document.modelContext).not.toBe(nativeContext);
+      await vi.waitFor(() => {
+        expect(connectSpy).toHaveBeenCalledTimes(2);
+        expect(document.modelContext).not.toBe(nativeContext);
+      });
+    } finally {
+      connectSpy.mockRestore();
+      consoleSpy.mockRestore();
+    }
+  });
+
+  it('waits for initial native tool synchronization before connecting the transport', async () => {
+    let resolveTools!: (tools: []) => void;
+    const pendingTools = new Promise<[]>((resolve) => {
+      resolveTools = resolve;
+    });
+    const nativeContext = Object.assign(new EventTarget(), {
+      registerTool: () => {},
+      getTools: vi.fn(() => pendingTools),
+      executeTool: vi.fn(async () => null),
+    });
+    const connectSpy = vi.spyOn(BrowserMcpServer.prototype, 'connect').mockResolvedValue(undefined);
+    setDocumentModelContext(nativeContext);
+
+    try {
+      initializeWebModelContext();
+
+      await vi.waitFor(() => {
+        expect(nativeContext.getTools).toHaveBeenCalledOnce();
+      });
+      expect(connectSpy).not.toHaveBeenCalled();
+
+      resolveTools([]);
+
+      await vi.waitFor(() => {
+        expect(connectSpy).toHaveBeenCalledOnce();
+      });
+    } finally {
+      resolveTools([]);
+      connectSpy.mockRestore();
+    }
+  });
+
+  it('connects after an initial native tool synchronization failure', async () => {
+    const synchronizationError = new Error('native discovery failed');
+    const nativeContext = Object.assign(new EventTarget(), {
+      registerTool: () => {},
+      getTools: vi.fn().mockRejectedValue(synchronizationError),
+      executeTool: vi.fn(async () => null),
+    });
+    const connectSpy = vi.spyOn(BrowserMcpServer.prototype, 'connect').mockResolvedValue(undefined);
+    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    setDocumentModelContext(nativeContext);
+
+    try {
+      initializeWebModelContext();
+
+      await vi.waitFor(() => {
+        expect(connectSpy).toHaveBeenCalledOnce();
+      });
+      expect(consoleSpy).toHaveBeenCalledWith(
+        '[WebModelContext] Native WebMCP tool synchronization failed:',
+        synchronizationError
+      );
     } finally {
       connectSpy.mockRestore();
       consoleSpy.mockRestore();
@@ -229,6 +291,49 @@ describe('global adapter', () => {
     await server.close();
   });
 
+  it('validates prompt arguments on direct BrowserMcpServer reads', async () => {
+    const server = new SourceBrowserMcpServer({
+      name: 'prompt-validation-test',
+      version: '1.0.0',
+    });
+    const get = vi.fn(async (args: Record<string, string>) => ({
+      messages: [
+        {
+          role: 'user' as const,
+          content: { type: 'text' as const, text: `Summarize ${args.url}` },
+        },
+      ],
+    }));
+    server.registerPrompt({
+      name: 'summarize',
+      argsSchema: {
+        type: 'object',
+        properties: { url: { type: 'string' } },
+        required: ['url'],
+      },
+      get,
+    });
+
+    try {
+      await expect(server.getPrompt('summarize', {})).rejects.toThrow(
+        'Invalid arguments for prompt summarize'
+      );
+      expect(get).not.toHaveBeenCalled();
+
+      await expect(server.getPrompt('summarize', { url: 'https://example.com' })).resolves.toEqual({
+        messages: [
+          {
+            role: 'user',
+            content: { type: 'text', text: 'Summarize https://example.com' },
+          },
+        ],
+      });
+      expect(get).toHaveBeenCalledOnce();
+    } finally {
+      await server.close();
+    }
+  });
+
   it('passes explicit v2 request options through unchanged', async () => {
     const server = new BrowserMcpServer({ name: 'request-options-test', version: '1.0.0' });
     const createMessage = vi.spyOn(server.server, 'createMessage').mockResolvedValue({} as never);
@@ -244,26 +349,83 @@ describe('global adapter', () => {
     await server.close();
   });
 
-  it('passes Standard Schema validation and input-required results through MCP v2', async () => {
-    let mcpInputSchema: ReturnType<typeof normalizeInputSchema>['standardValidator'] | undefined;
-    let mcpHandler:
-      | ((
-          args: Record<string, unknown>,
-          context: { mcpReq: { signal: AbortSignal } }
-        ) => Promise<unknown>)
-      | undefined;
-    const registerSpy = vi.spyOn(McpServer.prototype, 'registerTool');
-    registerSpy.mockImplementation(((_name: unknown, config: unknown, handler: unknown) => {
-      mcpInputSchema = (
-        config as {
-          inputSchema?: ReturnType<typeof normalizeInputSchema>['standardValidator'];
-        }
-      ).inputSchema;
-      mcpHandler = handler as typeof mcpHandler;
-      return { remove: vi.fn() };
-    }) as never);
+  it('keeps the 10-second sampling and elicitation default timeout', async () => {
+    const server = new BrowserMcpServer({ name: 'default-timeout-test', version: '1.0.0' });
+    const createMessage = vi.spyOn(server.server, 'createMessage').mockResolvedValue({} as never);
+    const elicitInput = vi.spyOn(server.server, 'elicitInput').mockResolvedValue({} as never);
+    const samplingParams = {
+      messages: [{ role: 'user' as const, content: { type: 'text' as const, text: 'Hi' } }],
+      maxTokens: 100,
+    };
+    const elicitationParams = {
+      message: 'Choose a display name',
+      requestedSchema: {
+        type: 'object' as const,
+        properties: { displayName: { type: 'string' as const } },
+      },
+    };
 
-    const expected = inputRequired({ requestState: 'opaque-state' });
+    await server.createMessage(samplingParams);
+    await server.elicitInput(elicitationParams);
+
+    expect(createMessage).toHaveBeenCalledWith(samplingParams, { timeout: 10_000 });
+    expect(elicitInput).toHaveBeenCalledWith(elicitationParams, { timeout: 10_000 });
+    await server.close();
+  });
+
+  it('exposes URI templates through the MCP resource template contract', async () => {
+    const server = new BrowserMcpServer({ name: 'resource-template-test', version: '1.0.0' });
+    const client = new Client(
+      { name: 'resource-template-client', version: '1.0.0' },
+      { versionNegotiation: { mode: 'auto' } }
+    );
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    let templateParams: Record<string, string | string[]> | undefined;
+
+    server.registerResource({
+      uri: 'config://settings',
+      name: 'Settings',
+      async read(uri) {
+        return { contents: [{ uri: uri.href, text: 'static' }] };
+      },
+    });
+    server.registerResource({
+      uri: 'user://{userId}/profile',
+      name: 'User profile',
+      async read(uri, params) {
+        templateParams = params;
+        return { contents: [{ uri: uri.href, text: String(params?.userId) }] };
+      },
+    });
+    await server.connect(serverTransport);
+
+    try {
+      await client.connect(clientTransport);
+
+      await expect(client.listResources()).resolves.toMatchObject({
+        resources: [{ uri: 'config://settings', name: 'Settings' }],
+      });
+      await expect(client.listResourceTemplates()).resolves.toMatchObject({
+        resourceTemplates: [{ uriTemplate: 'user://{userId}/profile', name: 'User profile' }],
+      });
+      await expect(client.readResource({ uri: 'user://42/profile' })).resolves.toMatchObject({
+        contents: [{ uri: 'user://42/profile', text: '42' }],
+      });
+      expect(templateParams).toEqual({ userId: '42' });
+      await expect(client.readResource({ uri: 'config://settings' })).resolves.toMatchObject({
+        contents: [{ uri: 'config://settings', text: 'static' }],
+      });
+      await expect(server.readResource('user://84/profile')).resolves.toMatchObject({
+        contents: [{ uri: 'user://84/profile', text: '84' }],
+      });
+      expect(templateParams).toEqual({ userId: '84' });
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
+  it('rejects input-required results at the WebMCP descriptor boundary', async () => {
     const standardSchema = {
       '~standard': {
         version: 1 as const,
@@ -284,30 +446,50 @@ describe('global adapter', () => {
         },
       },
     };
-    const server = new BrowserMcpServer({ name: 'v2-boundary-test', version: '1.0.0' });
+    const server = new BrowserMcpServer({ name: 'input-required-test', version: '1.0.0' });
+    const client = new Client(
+      { name: 'input-required-client', version: '1.0.0' },
+      { versionNegotiation: { mode: 'auto' } }
+    );
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    let validatedCount: unknown;
 
     try {
       await server.registerTool({
-        name: 'v2_boundary_tool',
-        description: 'Exercises the v2 registration boundary',
+        name: 'webmcp_input_required',
+        description: 'Attempts an unsupported multi-round WebMCP flow',
         inputSchema: normalizeInputSchema(standardSchema).inputSchema,
         async execute({ count }) {
-          expect(count).toBe(4);
-          return expected;
+          validatedCount = count;
+          return inputRequired({ requestState: 'opaque-state' });
         },
       });
+      await server.connect(serverTransport);
+      await client.connect(clientTransport);
 
-      const validation = await mcpInputSchema?.['~standard'].validate({ count: 3 });
-      expect(validation).toEqual({ value: { count: 4 } });
-      if (!validation || validation.issues) throw new Error('Expected valid transformed input');
+      const result = await client.callTool({
+        name: 'webmcp_input_required',
+        arguments: { count: 3 },
+      });
+      expect(validatedCount).toBe(4);
+      expect(result).toMatchObject({
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: expect.stringContaining(
+              'Multi-round tool flows require direct McpServer registration'
+            ),
+          },
+        ],
+      });
 
-      await expect(
-        mcpHandler?.(validation.value, {
-          mcpReq: { signal: new AbortController().signal },
-        })
-      ).resolves.toBe(expected);
+      const [registeredTool] = await server.getTools();
+      await expect(server.executeTool(registeredTool!, '{"count":3}')).rejects.toThrow(
+        'Multi-round tool flows require direct McpServer registration'
+      );
     } finally {
-      registerSpy.mockRestore();
+      await client.close();
       await server.close();
     }
   });
@@ -712,6 +894,101 @@ describe('global adapter', () => {
     expect(plainResult).toBe('standard-native-text');
   });
 
+  it('does not repopulate tools when close races with native getTools', async () => {
+    type NativeTool = {
+      name: string;
+      description: string;
+      inputSchema: string;
+      origin: string;
+      window: Window;
+    };
+
+    let resolveGetTools!: (tools: NativeTool[]) => void;
+    let markGetToolsStarted!: () => void;
+    const getToolsStarted = new Promise<void>((resolve) => {
+      markGetToolsStarted = resolve;
+    });
+    const nativeContext = Object.assign(new EventTarget(), {
+      registerTool: () => {},
+      getTools: () => {
+        markGetToolsStarted();
+        return new Promise<NativeTool[]>((resolve) => {
+          resolveGetTools = resolve;
+        });
+      },
+      executeTool: async () =>
+        JSON.stringify({ content: [{ type: 'text', text: 'should-not-run' }] }),
+    });
+    const server = new SourceBrowserMcpServer(
+      { name: 'native-close-race-server', version: '1.0.0' },
+      { native: nativeContext }
+    );
+
+    const sync = server.syncNativeTools();
+    await getToolsStarted;
+    const closing = server.close();
+    resolveGetTools([
+      {
+        name: 'late_native_tool',
+        description: 'Resolved after close started',
+        inputSchema: JSON.stringify({ type: 'object', properties: {} }),
+        origin: window.location.origin,
+        window,
+      },
+    ]);
+
+    await expect(sync).resolves.toBe(0);
+    await closing;
+    expect(server.listTools()).toEqual([]);
+  });
+
+  it('skips a native tool with an unsupported schema dialect without blocking later tools', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const nativeContext = Object.assign(new EventTarget(), {
+      registerTool: () => {},
+      getTools: async () => [
+        {
+          name: 'a_bad_native_schema',
+          description: 'Cannot be compiled by the MCP validator',
+          inputSchema: JSON.stringify({
+            $schema: 'https://json-schema.org/draft/2099-99/schema',
+            type: 'object',
+            properties: { value: { type: 'string' } },
+          }),
+          origin: window.location.origin,
+          window,
+        },
+        {
+          name: 'z_valid_native_schema',
+          description: 'Should still be registered',
+          inputSchema: JSON.stringify({
+            type: 'object',
+            properties: { value: { type: 'string' } },
+          }),
+          origin: window.location.origin,
+          window,
+        },
+      ],
+      executeTool: async () => JSON.stringify({ content: [{ type: 'text', text: 'ok' }] }),
+    });
+    const server = new SourceBrowserMcpServer(
+      { name: 'native-schema-isolation-server', version: '1.0.0' },
+      { native: nativeContext }
+    );
+
+    try {
+      await expect(server.syncNativeTools()).resolves.toBe(1);
+      expect(server.listTools().map(({ name }) => name)).toEqual(['z_valid_native_schema']);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('a_bad_native_schema'),
+        expect.anything()
+      );
+    } finally {
+      warn.mockRestore();
+      await server.close();
+    }
+  });
+
   it('refreshes native tool identity and metadata through MCP reconciliation', async () => {
     const channelId = `native-refresh-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const firstNativeTool = {
@@ -726,8 +1003,11 @@ describe('global adapter', () => {
     const nativeContext = Object.assign(new EventTarget(), {
       registerTool: () => {},
       getTools: async () => [visibleNativeTool],
-      executeTool: async (tool: typeof firstNativeTool) => {
+      executeTool: async (tool: typeof firstNativeTool, input: string) => {
         executedTools.push(tool);
+        if (JSON.parse(input).inputRequired === true) {
+          return JSON.stringify(inputRequired({ requestState: 'opaque-native-state' }));
+        }
         return JSON.stringify({
           content: [{ type: 'text', text: tool === visibleNativeTool ? 'current' : 'stale' }],
         });
@@ -753,6 +1033,22 @@ describe('global adapter', () => {
         client.callTool({ name: firstNativeTool.name, arguments: {} })
       ).resolves.toMatchObject({
         content: [{ type: 'text', text: 'current' }],
+      });
+      await expect(
+        client.callTool({
+          name: firstNativeTool.name,
+          arguments: { inputRequired: true },
+        })
+      ).resolves.toMatchObject({
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: expect.stringContaining(
+              'Multi-round tool flows require direct McpServer registration'
+            ),
+          },
+        ],
       });
 
       const replacement = { ...firstNativeTool };

@@ -10,7 +10,7 @@
 '@mcp-b/webmcp-ts-sdk': major
 '@mcp-b/webmcp-types': major
 'usewebmcp': major
-'@mcp-b/smart-dom-reader-server': patch
+'@mcp-b/smart-dom-reader-server': minor
 ---
 
 Move the browser stack to the MCP TypeScript SDK v2 packages and the current
@@ -22,3 +22,9 @@ Remove deprecated name-based tool execution, legacy native and userscript
 transports, Zod 3-specific schema handling, and duplicated React/runtime
 contracts. Remove the retired extension-tools package and local Chrome DevTools
 MCP fork; consumers should use the upstream Chrome DevTools MCP package.
+Extension port disconnects now close the MCP connection instead of reconnecting
+the transport beneath a stale protocol session; reconnect with a new transport
+so the client and restarted service worker repeat MCP initialization.
+
+The v2-backed packages now require Node.js 20 or newer, matching the upstream
+MCP SDK engine requirement.

@@ -113,12 +113,14 @@ initializeWebModelContext({
 
 - Only operates in browser environments
 - Idempotent - calling multiple times is a no-op after first initialization
-- Wraps native `document.modelContext` and restores it during cleanup
+- Wraps the native context when present; otherwise installs and wraps the polyfill
+- Cleanup restores the captured native or polyfilled context
 - Auto-called on import unless `window.__webModelContextOptions.autoInitialize` is `false`
 
 #### `cleanupWebModelContext()`
 
-Tears down the adapter and restores `document.modelContext` to its original state. Allows re-initialization.
+Tears down the adapter and restores `document.modelContext` to the captured native or polyfilled
+context. Allows re-initialization.
 
 ```typescript
 import { cleanupWebModelContext, initializeWebModelContext } from '@mcp-b/global';

@@ -8,7 +8,8 @@ import {
 
 function registeredTool(
   name: string,
-  inputSchema?: Record<string, unknown> | string
+  inputSchema?: Record<string, unknown> | string,
+  overrides: Partial<RegisteredTool> = {}
 ): RegisteredTool {
   return {
     name,
@@ -20,6 +21,7 @@ function registeredTool(
         }),
     origin: window.location.origin,
     window,
+    ...overrides,
   };
 }
 
@@ -71,6 +73,36 @@ describe('modelContextToCodemodeTools', () => {
     expect(executeTool).toHaveBeenCalledWith(current, JSON.stringify({ a: 2, b: 3 }));
   });
 
+  it('advertises and executes the same source when tool names collide', async () => {
+    const descendantWindow = Object.create(window) as Window;
+    const initial = registeredTool(
+      'shared',
+      { type: 'object', required: ['parentInput'] },
+      { description: 'Parent tool' }
+    );
+    const duplicate = registeredTool(
+      'shared',
+      { type: 'object', required: ['descendantInput'] },
+      { description: 'Descendant tool', window: descendantWindow }
+    );
+    const current = { ...initial };
+    const currentDuplicate = { ...duplicate };
+    const getTools = vi
+      .fn()
+      .mockResolvedValueOnce([initial, duplicate])
+      .mockResolvedValue([currentDuplicate, current]);
+    const executeTool = vi.fn(async () => null);
+
+    const tools = await modelContextToCodemodeTools({ getTools, executeTool });
+
+    expect(tools.shared).toMatchObject({
+      description: 'Parent tool',
+      inputSchema: { required: ['parentInput'] },
+    });
+    await tools.shared?.execute?.({});
+    expect(executeTool).toHaveBeenCalledWith(current, '{}');
+  });
+
   it('preserves direct string results from Chrome', async () => {
     const tool = registeredTool('echo', { type: 'object' });
     const tools = await modelContextToCodemodeTools({
@@ -80,9 +112,74 @@ describe('modelContextToCodemodeTools', () => {
 
     await expect(tools.echo?.execute?.({ message: 'hello' })).resolves.toBe('plain text result');
   });
+
+  it('preserves explicit null structured content', async () => {
+    const tool = registeredTool('nullable', { type: 'object' });
+    const tools = await modelContextToCodemodeTools({
+      getTools: async () => [tool],
+      executeTool: async () =>
+        JSON.stringify({
+          structuredContent: null,
+          content: [{ type: 'text', text: 'fallback' }],
+        }),
+    });
+
+    await expect(tools.nullable?.execute?.({})).resolves.toBeNull();
+  });
+
+  it('rejects MCP errors with text or a safe fallback', async () => {
+    const tool = registeredTool('failing', { type: 'object' });
+    const executeTool = vi
+      .fn()
+      .mockResolvedValueOnce(
+        JSON.stringify({
+          isError: true,
+          content: [
+            { type: 'text', text: '  ' },
+            { type: 'text', text: 'denied' },
+          ],
+        })
+      )
+      .mockResolvedValueOnce(JSON.stringify({ isError: true, content: [] }));
+    const tools = await modelContextToCodemodeTools({
+      getTools: async () => [tool],
+      executeTool,
+    });
+
+    await expect(tools.failing?.execute?.({})).rejects.toThrow('denied');
+    await expect(tools.failing?.execute?.({})).rejects.toThrow('WebMCP tool execution failed');
+  });
 });
 
 describe('createCodeToolFromModelContext', () => {
+  it('preserves valid tool names that overlap Object prototype properties', async () => {
+    const tool = registeredTool('__proto__', { type: 'object' });
+    const codemode = await createCodeToolFromModelContext({
+      modelContext: {
+        getTools: async () => [tool],
+        executeTool: async () => JSON.stringify('ok'),
+      },
+      executor: {
+        execute: async (_code, fns) => {
+          expect(Object.getPrototypeOf(fns)).toBeNull();
+          expect(Object.hasOwn(fns, '__proto__')).toBe(true);
+          expect(fns.__proto__).toBeTypeOf('function');
+          return {
+            result: await fns.__proto__?.({}),
+            logs: [],
+          };
+        },
+      },
+    });
+
+    await expect(
+      codemode.execute?.(
+        { code: 'async () => codemode.__proto__({})' },
+        { toolCallId: 'test-call', messages: [] }
+      )
+    ).resolves.toMatchObject({ result: 'ok' });
+  });
+
   it('creates a codemode tool from the current document API', async () => {
     const tool = registeredTool('sum', {
       type: 'object',

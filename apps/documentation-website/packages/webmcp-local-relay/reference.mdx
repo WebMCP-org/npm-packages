@@ -132,6 +132,14 @@ When multiple tabs register a tool with the same name, a short tab-ID suffix dis
 
 Tools appear and disappear as tabs open, reload, and close.
 
+## Multi-round tool limitations
+
+The relay exposes browser tools as ordinary MCP tool calls. If a browser tool returns an MCP
+`input_required` result, the relay returns a tool error because it cannot proxy subsequent input
+rounds. Register multi-round tool flows directly on the upstream `McpServer`.
+
+The relay omits tools that declare `execution.taskSupport: 'required'`. It exposes tools that declare `'optional'` or `'forbidden'` as ordinary calls.
+
 ## Browser embed
 
 Add a script tag to expose a page's WebMCP tools to the relay:

@@ -32,10 +32,10 @@ pnpm add usewebmcp react
 npm install usewebmcp react
 ```
 
-Optional (only if you want Standard Schema authoring like Zod v4 input schemas):
+Optional (only if you want Standard JSON Schema authoring like Zod 4.2+ input schemas):
 
 ```bash
-pnpm add zod
+pnpm add zod@^4.2
 ```
 
 ## Runtime Prerequisite
@@ -128,7 +128,7 @@ Both paths run the same underlying tool logic and update the hook state.
 `inputSchema` supports:
 
 - JSON Schema literals (`as const`) via `InferArgsFromInputSchema`
-- Standard Schema v1 input typing (for example Zod v4 / Valibot / ArkType) via `~standard.types.input`
+- Standard JSON Schema v1 input typing (for example Zod 4.2+) via `~standard.types.input`
 
 ```tsx
 const INPUT_SCHEMA = {
@@ -222,24 +222,25 @@ The tool re-registers when any of these change:
 
 - `name`
 - `description`
-- `inputSchema` reference
-- `outputSchema` reference
-- `annotations` reference
 - values in `deps`
 
-The hook avoids re-registration when only callback references change:
+The hook stores callbacks and descriptors in refs, so new references do not re-register the tool:
 
 - `execute`
 - `handler`
 - `onSuccess`
 - `onError`
 - `formatOutput`
+- `inputSchema`
+- `outputSchema`
+- `annotations`
 
-Latest callback versions are still used at execution time.
+Latest committed callback versions are used at execution time. A registered descriptor keeps its
+current schema and annotations until another trigger re-registers it; include a schema or annotation
+revision in `deps` when that metadata must change.
 
 Recommendation:
 
-- Define schemas/annotations outside render or memoize them.
 - Keep `deps` primitive when possible.
 
 ## API

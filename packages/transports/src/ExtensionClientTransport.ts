@@ -19,44 +19,12 @@ export interface ExtensionClientTransportOptions {
    * Default: 'mcp'
    */
   portName?: string;
-
-  /**
-   * Enable automatic reconnection on disconnect
-   * Default: true
-   */
-  autoReconnect?: boolean;
-
-  /**
-   * Maximum number of reconnection attempts
-   * Default: 10
-   */
-  maxReconnectAttempts?: number;
-
-  /**
-   * Initial reconnection delay in milliseconds
-   * Default: 1000
-   */
-  reconnectDelay?: number;
-
-  /**
-   * Maximum reconnection delay in milliseconds
-   * Default: 30000
-   */
-  maxReconnectDelay?: number;
-
-  /**
-   * Reconnection backoff multiplier
-   * Default: 1.5
-   */
-  reconnectBackoffMultiplier?: number;
 }
 
 /**
  * Client transport for Chrome extensions using Port-based messaging.
  * This transport can be used in content scripts, popup scripts, or sidepanel scripts
  * to connect to a server running in the background service worker.
- *
- * Features automatic reconnection to handle background service worker lifecycle.
  */
 export class ExtensionClientTransport implements Transport {
   private _port: chrome.runtime.Port | undefined;
@@ -64,19 +32,8 @@ export class ExtensionClientTransport implements Transport {
   private _portName: string;
   private _messageHandler: ((message: unknown) => void) | undefined;
   private _disconnectHandler: (() => void) | undefined;
-  private _isReconnecting = false;
-  private _reconnectAttempts = 0;
-  private _reconnectTimer: ReturnType<typeof setTimeout> | undefined;
-  private _currentReconnectDelay: number;
   private _isStarted = false;
   private _isClosed = false;
-
-  // Configuration
-  private _autoReconnect: boolean;
-  private _maxReconnectAttempts: number;
-  private _reconnectDelay: number;
-  private _maxReconnectDelay: number;
-  private _reconnectBackoffMultiplier: number;
 
   onclose?: () => void;
   onerror?: (error: Error) => void;
@@ -85,18 +42,15 @@ export class ExtensionClientTransport implements Transport {
   constructor(options: ExtensionClientTransportOptions = {}) {
     this._extensionId = options.extensionId;
     this._portName = options.portName || 'mcp';
-    this._autoReconnect = options.autoReconnect ?? true;
-    this._maxReconnectAttempts = options.maxReconnectAttempts ?? 10;
-    this._reconnectDelay = options.reconnectDelay ?? 1000;
-    this._maxReconnectDelay = options.maxReconnectDelay ?? 30000;
-    this._reconnectBackoffMultiplier = options.reconnectBackoffMultiplier ?? 1.5;
-    this._currentReconnectDelay = this._reconnectDelay;
   }
 
   /**
    * Starts the transport by connecting to the extension port
    */
   async start(): Promise<void> {
+    if (this._isClosed) {
+      throw new Error('ExtensionClientTransport cannot be restarted after it closes');
+    }
     if (this._isStarted && this._port) {
       console.warn(
         'ExtensionClientTransport already started! If using Client class, note that connect() calls start() automatically.'
@@ -105,7 +59,6 @@ export class ExtensionClientTransport implements Transport {
     }
 
     this._isStarted = true;
-    this._isClosed = false;
 
     await this._connect();
   }
@@ -157,14 +110,11 @@ export class ExtensionClientTransport implements Transport {
 
         // Set up disconnect handler
         this._disconnectHandler = () => {
+          if (this._isClosed) return;
+          this._isStarted = false;
+          this._isClosed = true;
           this._cleanup();
-
-          // Only attempt reconnection if we're started and not manually closed
-          if (this._isStarted && !this._isClosed && this._autoReconnect) {
-            this._scheduleReconnect();
-          } else {
-            this.onclose?.();
-          }
+          this.onclose?.();
         };
 
         this._port.onMessage.addListener(this._messageHandler);
@@ -174,21 +124,9 @@ export class ExtensionClientTransport implements Transport {
         const error = chrome.runtime.lastError;
         if (error) {
           this._cleanup();
-
-          // If we're reconnecting and hit an error, schedule another attempt
-          if (this._isReconnecting && this._isStarted && !this._isClosed && this._autoReconnect) {
-            reject(new Error(`Connection failed: ${error.message}`));
-            return;
-          }
-
           reject(new Error(`Connection failed: ${error.message}`));
           return;
         }
-
-        // Connection successful
-        this._reconnectAttempts = 0;
-        this._currentReconnectDelay = this._reconnectDelay;
-        this._isReconnecting = false;
 
         resolve();
       } catch (error) {
@@ -201,12 +139,12 @@ export class ExtensionClientTransport implements Transport {
    * Sends a message to the server
    */
   async send(message: JSONRPCMessage, _options?: TransportSendOptions): Promise<void> {
-    if (!this._isStarted) {
-      throw new Error('Transport not started');
-    }
-
     if (this._isClosed) {
       throw new Error('Transport is closed');
+    }
+
+    if (!this._isStarted) {
+      throw new Error('Transport not started');
     }
 
     if (!this._port) {
@@ -224,14 +162,10 @@ export class ExtensionClientTransport implements Transport {
    * Closes the transport
    */
   async close(): Promise<void> {
+    if (this._isClosed) return;
+
     this._isClosed = true;
     this._isStarted = false;
-
-    // Cancel any pending reconnection
-    if (this._reconnectTimer !== undefined) {
-      clearTimeout(this._reconnectTimer);
-      this._reconnectTimer = undefined;
-    }
 
     if (this._port) {
       try {
@@ -258,72 +192,5 @@ export class ExtensionClientTransport implements Transport {
       }
     }
     this._port = undefined;
-  }
-
-  /**
-   * Schedules a reconnection attempt
-   */
-  private _scheduleReconnect(): void {
-    if (this._isReconnecting || this._isClosed || !this._isStarted) {
-      return;
-    }
-
-    this._isReconnecting = true;
-
-    // Check if we've exceeded max attempts
-    if (this._reconnectAttempts >= this._maxReconnectAttempts) {
-      console.warn('[ExtensionClientTransport] Maximum reconnection attempts reached');
-      this._isReconnecting = false;
-      this.onerror?.(new Error('Maximum reconnection attempts reached'));
-      this.onclose?.();
-      return;
-    }
-
-    this._reconnectAttempts++;
-
-    console.debug(
-      `[ExtensionClientTransport] Scheduling reconnection attempt ${this._reconnectAttempts}/${this._maxReconnectAttempts} in ${this._currentReconnectDelay}ms`
-    );
-
-    this._reconnectTimer = setTimeout(() => {
-      this._attemptReconnect();
-    }, this._currentReconnectDelay);
-
-    // Apply exponential backoff
-    this._currentReconnectDelay = Math.min(
-      this._currentReconnectDelay * this._reconnectBackoffMultiplier,
-      this._maxReconnectDelay
-    );
-  }
-
-  /**
-   * Attempts to reconnect to the extension
-   */
-  private async _attemptReconnect(): Promise<void> {
-    if (this._isClosed || !this._isStarted) {
-      return;
-    }
-
-    try {
-      // First, try to wake up the service worker by sending a message
-      if (chrome?.runtime?.sendMessage) {
-        try {
-          await chrome.runtime.sendMessage({ type: 'ping' });
-        } catch {
-          // Service worker might not be ready yet
-        }
-      }
-
-      // Attempt to connect
-      await this._connect();
-
-      console.debug('[ExtensionClientTransport] Reconnection successful');
-      this._isReconnecting = false;
-    } catch (error) {
-      console.warn('[ExtensionClientTransport] Reconnection failed, retrying', error);
-
-      // Schedule another attempt
-      this._scheduleReconnect();
-    }
   }
 }

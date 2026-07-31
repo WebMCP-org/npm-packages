@@ -7,7 +7,18 @@ declare global {
     mcpClient?: Client;
     mcpIframeHost: {
       callTool: (name: string, args: Record<string, unknown>) => Promise<unknown>;
-      getMcpIframe: () => Element | null;
+      getMcpIframe: () => Element & {
+        client: unknown;
+        ready: boolean;
+        exposedTools: string[];
+        exposedResources: string[];
+        exposedPrompts: string[];
+      };
+      readResource: (uri: string) => Promise<unknown>;
+      getParentTool: (name: string) => Promise<unknown>;
+      addChildDynamicItem: (item: 'tool' | 'resource' | 'prompt') => Promise<void>;
+      removeChildDynamicItems: () => void;
+      stopChildRuntime: () => Promise<void>;
     };
     testApp: {
       testRapidToolRegistration: (

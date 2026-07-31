@@ -58,9 +58,21 @@ export function renderCodeToolDescription(
 }
 
 export function createCodeTool(options: CreateCodeToolOptions): Tool<CodeInput, CodeOutput> {
-  const tools: ToolDescriptors | JsonSchemaExecutableToolDescriptors | ToolSet = {};
+  const tools = Object.create(null) as
+    | ToolDescriptors
+    | JsonSchemaExecutableToolDescriptors
+    | ToolSet;
+  const namesByIdentifier = new Map<string, string>();
   for (const [name, t] of Object.entries(options.tools)) {
     if (!hasNeedsApproval(t as UnknownRecord)) {
+      const identifier = sanitizeToolName(name);
+      const existingName = namesByIdentifier.get(identifier);
+      if (existingName !== undefined) {
+        throw new Error(
+          `Tool names "${existingName}" and "${name}" both map to the JavaScript identifier "${identifier}"`
+        );
+      }
+      namesByIdentifier.set(identifier, name);
       (tools as UnknownRecord)[name] = t;
     }
   }
@@ -75,7 +87,7 @@ export function createCodeTool(options: CreateCodeToolOptions): Tool<CodeInput, 
     description,
     inputSchema: codeSchema,
     execute: async ({ code }) => {
-      const fns: ToolFunctions = {};
+      const fns = Object.create(null) as ToolFunctions;
 
       for (const [name, t] of Object.entries(tools)) {
         const execute =

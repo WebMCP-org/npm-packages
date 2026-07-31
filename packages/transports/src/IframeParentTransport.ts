@@ -70,7 +70,10 @@ export class IframeParentTransport implements Transport {
     }
 
     this._messageHandler = (event: MessageEvent) => {
-      if (event.origin !== this._targetOrigin) {
+      if (
+        event.source !== this._iframe.contentWindow ||
+        (this._targetOrigin !== '*' && event.origin !== this._targetOrigin)
+      ) {
         return;
       }
 
