@@ -57,7 +57,7 @@ jobs:
       - name: Run runtime contract E2E tests
         env:
           PLAYWRIGHT_CHROMIUM_CHANNEL: chrome
-        run: pnpm --filter mcp-e2e-tests run test:runtime-contract:transport
+        run: pnpm --filter mcp-e2e-tests run test:runtime-contract:transport && pnpm --filter mcp-e2e-tests run test:mcp-iframe
 
       - name: Run local relay E2E tests
         env:

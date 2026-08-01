@@ -7,5 +7,5 @@
     "tsBuildInfoFile": "./dist/.tsbuildinfo"
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.*", "**/*.spec.*", "**/*.conformance-d.ts"]
+  "exclude": ["node_modules", "dist", "**/*.test.*", "**/*.spec.*"]
 }

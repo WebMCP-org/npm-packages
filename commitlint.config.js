@@ -6,7 +6,6 @@ export default {
       'always',
       [
         // Packages (in packages/)
-        'codemode',
         'global',
         'mcp-iframe',
         'react-webmcp',

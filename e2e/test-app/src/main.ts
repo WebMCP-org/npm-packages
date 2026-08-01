@@ -104,17 +104,12 @@ const registerDynamicResourceBtn = requireElement<HTMLButtonElement>('register-d
 const unregisterDynamicResourceBtn = requireElement<HTMLButtonElement>(
   'unregister-dynamic-resource'
 );
-const listResourcesBtn = requireElement<HTMLButtonElement>('list-resources');
-const readStaticResourceBtn = requireElement<HTMLButtonElement>('read-static-resource');
 
 // Prompt DOM elements
 const promptsStatusEl = requireElement<HTMLDivElement>('prompts-status');
 const registerBasePromptsBtn = requireElement<HTMLButtonElement>('register-base-prompts');
 const registerDynamicPromptBtn = requireElement<HTMLButtonElement>('register-dynamic-prompt');
 const unregisterDynamicPromptBtn = requireElement<HTMLButtonElement>('unregister-dynamic-prompt');
-const listPromptsBtn = requireElement<HTMLButtonElement>('list-prompts');
-const getPromptWithoutArgsBtn = requireElement<HTMLButtonElement>('get-prompt-without-args');
-const getPromptWithArgsBtn = requireElement<HTMLButtonElement>('get-prompt-with-args');
 
 // Logging utility
 function log(message: string, type: 'info' | 'success' | 'error' = 'info') {
@@ -540,46 +535,6 @@ function unregisterDynamicResource() {
   }
 }
 
-// List all resources
-function listResources() {
-  try {
-    log('Listing all registered resources...', 'info');
-    const resources = modelContext.listResources();
-    log(`Total resources: ${resources.length}`, 'success');
-
-    if (resourcesStatusEl) {
-      resourcesStatusEl.setAttribute('data-resource-count', resources.length.toString());
-    }
-
-    resources.forEach((resource) => {
-      log(`  - ${resource.uri}: ${resource.name}`, 'info');
-    });
-  } catch (error) {
-    log(`Failed to list resources: ${error}`, 'error');
-    console.error(error);
-  }
-}
-
-// Read static resource
-async function readStaticResource() {
-  try {
-    log('Reading static resource config://app-settings...', 'info');
-
-    const result = await modelContext.readResource('config://app-settings');
-    log('Resource read successfully:', 'success');
-    const content = result.contents[0];
-    if (content && 'text' in content) {
-      log(`  Content: ${content.text}`, 'info');
-    }
-    if (resourcesStatusEl) {
-      resourcesStatusEl.setAttribute('data-read-static', 'success');
-    }
-  } catch (error) {
-    log(`Failed to read resource: ${error}`, 'error');
-    console.error(error);
-  }
-}
-
 // ==================== PROMPTS ====================
 
 // Register base prompts (Bucket A)
@@ -722,69 +677,6 @@ function unregisterDynamicPrompt() {
   }
 }
 
-// List all prompts
-function listPrompts() {
-  try {
-    log('Listing all registered prompts...', 'info');
-    const prompts = modelContext.listPrompts();
-    log(`Total prompts: ${prompts.length}`, 'success');
-
-    if (promptsStatusEl) {
-      promptsStatusEl.setAttribute('data-prompt-count', prompts.length.toString());
-    }
-
-    prompts.forEach((prompt) => {
-      log(`  - ${prompt.name}: ${prompt.description}`, 'info');
-    });
-  } catch (error) {
-    log(`Failed to list prompts: ${error}`, 'error');
-    console.error(error);
-  }
-}
-
-// Get prompt without arguments
-async function getPromptWithoutArgs() {
-  try {
-    log('Getting prompt without args (greeting)...', 'info');
-
-    const result = await modelContext.getPrompt('greeting');
-    log('Prompt retrieved successfully:', 'success');
-    const content = result.messages[0]?.content;
-    if (content?.type === 'text') {
-      log(`  Message: ${content.text}`, 'info');
-    }
-    if (promptsStatusEl) {
-      promptsStatusEl.setAttribute('data-get-prompt-no-args', 'success');
-    }
-  } catch (error) {
-    log(`Failed to get prompt: ${error}`, 'error');
-    console.error(error);
-  }
-}
-
-// Get prompt with arguments
-async function getPromptWithArgs() {
-  try {
-    log('Getting prompt with args (code-review)...', 'info');
-
-    const result = await modelContext.getPrompt('code-review', {
-      code: 'console.log("Hello World");',
-      language: 'javascript',
-    });
-    log('Prompt with args retrieved successfully:', 'success');
-    const content = result.messages[0]?.content;
-    if (content?.type === 'text') {
-      log(`  Message: ${content.text.substring(0, 100)}...`, 'info');
-    }
-    if (promptsStatusEl) {
-      promptsStatusEl.setAttribute('data-get-prompt-with-args', 'success');
-    }
-  } catch (error) {
-    log(`Failed to get prompt with args: ${error}`, 'error');
-    console.error(error);
-  }
-}
-
 // Check if modelContextTesting API is available
 function checkTestingAPI() {
   if (testingApiStatusEl) {
@@ -849,33 +741,11 @@ checkTestingApiBtn.addEventListener('click', checkTestingAPI);
 registerBaseResourcesBtn.addEventListener('click', registerBaseResources);
 registerDynamicResourceBtn.addEventListener('click', registerDynamicResource);
 unregisterDynamicResourceBtn.addEventListener('click', unregisterDynamicResource);
-listResourcesBtn.addEventListener('click', listResources);
-readStaticResourceBtn.addEventListener('click', readStaticResource);
 
 // Prompt event listeners
 registerBasePromptsBtn.addEventListener('click', registerBasePrompts);
 registerDynamicPromptBtn.addEventListener('click', registerDynamicPrompt);
 unregisterDynamicPromptBtn.addEventListener('click', unregisterDynamicPrompt);
-listPromptsBtn.addEventListener('click', listPrompts);
-getPromptWithoutArgsBtn.addEventListener('click', getPromptWithoutArgs);
-getPromptWithArgsBtn.addEventListener('click', getPromptWithArgs);
-
-// Sampling & Elicitation event listeners
-const samplingButtons = {
-  checkSamplingApi: document.getElementById('check-sampling-api'),
-  testSamplingCall: document.getElementById('test-sampling-call'),
-  testElicitationCall: document.getElementById('test-elicitation-call'),
-};
-
-if (samplingButtons.checkSamplingApi) {
-  samplingButtons.checkSamplingApi.addEventListener('click', checkSamplingApi);
-}
-if (samplingButtons.testSamplingCall) {
-  samplingButtons.testSamplingCall.addEventListener('click', testSamplingCall);
-}
-if (samplingButtons.testElicitationCall) {
-  samplingButtons.testElicitationCall.addEventListener('click', testElicitationCall);
-}
 
 // Historical MCP-B compatibility event listeners
 const chromiumButtons = {
@@ -922,110 +792,6 @@ if (checkAPIAvailability()) {
   void registerBaseTools().then(() => {
     log('✅ Test app ready! Use buttons to test two-bucket system.', 'success');
   });
-}
-
-// ==================== SAMPLING & ELICITATION ====================
-
-const samplingStatusEl = document.getElementById('sampling-status');
-
-// Check if sampling/elicitation API is available
-function checkSamplingApi() {
-  try {
-    log('Checking sampling/elicitation API availability...', 'info');
-
-    const hasCreateMessage = 'createMessage' in modelContext;
-    const hasElicitInput = 'elicitInput' in modelContext;
-
-    if (samplingStatusEl) {
-      if (hasCreateMessage && hasElicitInput) {
-        samplingStatusEl.textContent =
-          'Sampling/Elicitation: Available ✅ (createMessage, elicitInput)';
-        samplingStatusEl.style.background = '#d4edda';
-        samplingStatusEl.setAttribute('data-sampling-api', 'available');
-      } else {
-        samplingStatusEl.textContent = `Sampling/Elicitation: Partial ⚠️ (createMessage: ${hasCreateMessage}, elicitInput: ${hasElicitInput})`;
-        samplingStatusEl.style.background = '#fff3cd';
-        samplingStatusEl.setAttribute('data-sampling-api', 'partial');
-      }
-    }
-
-    log(`createMessage available: ${hasCreateMessage}`, hasCreateMessage ? 'success' : 'error');
-    log(`elicitInput available: ${hasElicitInput}`, hasElicitInput ? 'success' : 'error');
-  } catch (error) {
-    log(`Failed to check sampling API: ${error}`, 'error');
-  }
-}
-
-// Test createMessage call (should fail without connected client)
-async function testSamplingCall() {
-  try {
-    log('Testing createMessage() - this should fail without a connected client...', 'info');
-
-    const result = await modelContext.createMessage({
-      messages: [{ role: 'user', content: { type: 'text', text: 'Hello, this is a test!' } }],
-      maxTokens: 100,
-    });
-
-    // If we got here, a client responded (unexpected in this test environment)
-    log(`createMessage() succeeded unexpectedly: ${JSON.stringify(result)}`, 'success');
-    if (samplingStatusEl) {
-      samplingStatusEl.setAttribute('data-sampling-call', 'success');
-    }
-  } catch (error) {
-    // Expected behavior - no connected client with sampling capability
-    log(`createMessage() threw error (expected): ${error}`, 'info');
-    if (samplingStatusEl) {
-      samplingStatusEl.setAttribute('data-sampling-call', 'error-no-client');
-    }
-
-    // Check if it's the expected error message
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    if (
-      errorMessage.includes('Sampling is not supported') ||
-      errorMessage.includes('no connected client')
-    ) {
-      log('✅ Correct error thrown for missing client capability', 'success');
-    }
-  }
-}
-
-// Test elicitInput call (should fail without connected client)
-async function testElicitationCall() {
-  try {
-    log('Testing elicitInput() - this should fail without a connected client...', 'info');
-
-    const result = await modelContext.elicitInput({
-      message: 'Please provide your name',
-      requestedSchema: {
-        type: 'object',
-        properties: {
-          name: { type: 'string', title: 'Name', description: 'Your name' },
-        },
-        required: ['name'],
-      },
-    });
-
-    // If we got here, a client responded (unexpected in this test environment)
-    log(`elicitInput() succeeded unexpectedly: ${JSON.stringify(result)}`, 'success');
-    if (samplingStatusEl) {
-      samplingStatusEl.setAttribute('data-elicitation-call', 'success');
-    }
-  } catch (error) {
-    // Expected behavior - no connected client with elicitation capability
-    log(`elicitInput() threw error (expected): ${error}`, 'info');
-    if (samplingStatusEl) {
-      samplingStatusEl.setAttribute('data-elicitation-call', 'error-no-client');
-    }
-
-    // Check if it's the expected error message
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    if (
-      errorMessage.includes('Elicitation is not supported') ||
-      errorMessage.includes('no connected client')
-    ) {
-      log('✅ Correct error thrown for missing client capability', 'success');
-    }
-  }
 }
 
 // Historical MCP-B compatibility test functions
@@ -1563,19 +1329,10 @@ declare global {
       registerBaseResources: () => void;
       registerDynamicResource: () => void;
       unregisterDynamicResource: () => void;
-      listResources: () => void;
-      readStaticResource: () => Promise<void>;
       // Prompt tests
       registerBasePrompts: () => void;
       registerDynamicPrompt: () => void;
       unregisterDynamicPrompt: () => void;
-      listPrompts: () => void;
-      getPromptWithoutArgs: () => Promise<void>;
-      getPromptWithArgs: () => Promise<void>;
-      // Sampling & Elicitation tests
-      checkSamplingApi: () => void;
-      testSamplingCall: () => Promise<void>;
-      testElicitationCall: () => Promise<void>;
       // Notification batching tests
       startNotificationTracking: () => void;
       stopNotificationTracking: () => { tools: number; resources: number; prompts: number };
@@ -1620,19 +1377,10 @@ window.testApp = {
   registerBaseResources,
   registerDynamicResource,
   unregisterDynamicResource,
-  listResources,
-  readStaticResource,
   // Prompt tests
   registerBasePrompts,
   registerDynamicPrompt,
   unregisterDynamicPrompt,
-  listPrompts,
-  getPromptWithoutArgs,
-  getPromptWithArgs,
-  // Sampling & Elicitation tests
-  checkSamplingApi,
-  testSamplingCall,
-  testElicitationCall,
   // Notification batching tests
   startNotificationTracking,
   stopNotificationTracking,

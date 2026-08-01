@@ -26,7 +26,7 @@ const esmConfig: Options = {
 // Uses index.ts which auto-initializes on load
 const iifeConfig: Options = {
   entry: {
-    index: 'src/index.ts',
+    index: 'src/iife.ts',
   },
   format: ['iife'],
   dts: false,
@@ -58,8 +58,8 @@ export default defineConfig({
       }),
       instances: [{ browser: 'chromium' }],
     },
-    include: ['src/**/*.test.ts'],
-    exclude: ['conformance/**/*', 'dist', 'node_modules'],
+    include: ['src/**/*.test.ts', 'conformance/**/*.test.ts'],
+    exclude: ['dist', 'node_modules'],
     globals: true,
     maxConcurrency: isCI ? 1 : 2,
     fileParallelism: false,

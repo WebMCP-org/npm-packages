@@ -1,3 +1,4 @@
+import { playwright } from 'vite-plus/test/browser-playwright';
 import { defineConfig } from 'vite-plus';
 
 export default defineConfig({
@@ -5,7 +6,6 @@ export default defineConfig({
     entry: ['src/index.ts'],
     dts: true,
     format: ['esm'],
-    splitting: false,
     sourcemap: true,
     clean: true,
     treeshake: true,
@@ -16,5 +16,13 @@ export default defineConfig({
       neverBundle: [/^@mcp-b\//],
     },
     tsconfig: './tsconfig.json',
+  },
+  test: {
+    browser: {
+      enabled: true,
+      provider: playwright(),
+      instances: [{ browser: 'chromium' }],
+      headless: true,
+    },
   },
 });

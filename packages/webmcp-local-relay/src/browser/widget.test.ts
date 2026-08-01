@@ -1,14 +1,10 @@
-import { ws } from 'msw';
-import { setupServer } from 'msw/node';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseConfig, parseHostMessage, startWidgetRuntime } from './widgetRuntime.js';
 
-const relayServer = setupServer();
 const APP_ORIGIN = 'https://app.example.com';
 let nextRelayPort = 9333;
 
 interface RelayClient {
-  addEventListener(type: 'message', listener: (event: { data: unknown }) => void): void;
   close(code?: number, reason?: string): void;
   send(data: string): void;
 }
@@ -21,6 +17,7 @@ interface RelayConnection {
 interface HostEvent {
   data: unknown;
   origin: string;
+  source: unknown;
 }
 
 interface HostWindow {
@@ -35,14 +32,79 @@ interface WidgetTestEnv {
   hostWindow: HostWindow;
 }
 
+interface RelayOptions {
+  referrer?: string;
+  search?: string;
+  serverPort?: string;
+  sendHelloAccepted?: boolean;
+  sendHelloRejected?: { message: string; reason: string } | false;
+}
+
+const activeRelaySockets = new Set<MockWebSocket>();
+let connectRelaySocket: ((socket: MockWebSocket) => void) | undefined;
+
+class MockWebSocket extends EventTarget {
+  static readonly CONNECTING = 0;
+  static readonly OPEN = 1;
+  static readonly CLOSED = 3;
+
+  readonly url: string;
+  readyState = MockWebSocket.CONNECTING;
+
+  private onSend?: (data: string) => void;
+
+  constructor(url: string | URL) {
+    super();
+    this.url = String(url);
+    activeRelaySockets.add(this);
+    const connect = connectRelaySocket;
+    queueMicrotask(() => connect?.(this));
+  }
+
+  close(): void {
+    if (this.readyState === MockWebSocket.CLOSED) return;
+    this.readyState = MockWebSocket.CLOSED;
+    activeRelaySockets.delete(this);
+    this.dispatchEvent(new Event('close'));
+  }
+
+  send(data: string): void {
+    if (this.readyState !== MockWebSocket.OPEN) throw new Error('WebSocket is not open');
+    this.onSend?.(String(data));
+  }
+
+  open(onSend: (data: string) => void): void {
+    if (this.readyState !== MockWebSocket.CONNECTING) return;
+    this.readyState = MockWebSocket.OPEN;
+    this.onSend = onSend;
+  }
+
+  receive(data: string): void {
+    if (this.readyState === MockWebSocket.OPEN) {
+      this.dispatchEvent(new MessageEvent('message', { data }));
+    }
+  }
+
+  fail(): void {
+    this.dispatchEvent(new Event('error'));
+    this.close();
+  }
+
+  dispose(): void {
+    this.readyState = MockWebSocket.CLOSED;
+    activeRelaySockets.delete(this);
+  }
+}
+
 const originalDescriptors = {
   document: Object.getOwnPropertyDescriptor(globalThis, 'document'),
   sessionStorage: Object.getOwnPropertyDescriptor(globalThis, 'sessionStorage'),
+  WebSocket: Object.getOwnPropertyDescriptor(globalThis, 'WebSocket'),
   window: Object.getOwnPropertyDescriptor(globalThis, 'window'),
 };
 
 function restoreGlobal(
-  key: 'document' | 'sessionStorage' | 'window',
+  key: 'document' | 'sessionStorage' | 'WebSocket' | 'window',
   descriptor: PropertyDescriptor | undefined
 ): void {
   if (descriptor) {
@@ -103,7 +165,7 @@ function createHostWindow(): HostWindow {
     },
     dispatchMessage(origin: string, data: unknown): void {
       for (const listener of listeners) {
-        listener({ origin, data });
+        listener({ origin, data, source: (globalThis.window as Window).parent });
       }
     },
     parentPostMessage,
@@ -170,13 +232,7 @@ async function completeHandshake(
   return connection;
 }
 
-function installEnvironment(options?: {
-  referrer?: string;
-  search?: string;
-  sendHelloAccepted?: boolean;
-  sendHelloRejected?: { message: string; reason: string } | false;
-  sendServerHello?: boolean;
-}): WidgetTestEnv {
+function installEnvironment(options?: RelayOptions): WidgetTestEnv {
   const connections: RelayConnection[] = [];
   const defaultRelayPort = String(nextRelayPort++);
   const search =
@@ -190,55 +246,67 @@ function installEnvironment(options?: {
   const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
   const hostOrigin = params.get('hostOrigin') || APP_ORIGIN;
   const relayPort = params.get('relayPort') || defaultRelayPort;
+  const serverPort = options?.serverPort ?? relayPort;
   const hostWindow = createHostWindow();
-  const relayLink = ws.link(`ws://127.0.0.1:${relayPort}`);
 
-  relayServer.use(
-    relayLink.addEventListener('connection', ({ client }) => {
-      const connection: RelayConnection = { client: client as RelayClient, messages: [] };
-      client.addEventListener('message', (event) => {
-        const payload = parseWireData(event.data);
-        connection.messages.push(payload);
-        if (!payload || typeof payload !== 'object') {
-          return;
-        }
+  connectRelaySocket = (socket) => {
+    if (new URL(socket.url).port !== serverPort) {
+      socket.close();
+      return;
+    }
 
-        const message = payload as { type?: unknown };
-        if (message.type !== 'hello') {
-          return;
-        }
+    const connection: RelayConnection = {
+      client: {
+        close: () => socket.close(),
+        send: (data) => socket.receive(data),
+      },
+      messages: [],
+    };
+    socket.open((data) => {
+      const payload = parseWireData(data);
+      connection.messages.push(payload);
+      if (!payload || typeof payload !== 'object') {
+        return;
+      }
 
-        if (options?.sendHelloRejected) {
-          client.send(
-            JSON.stringify({
-              type: 'hello/rejected',
-              message: options.sendHelloRejected.message,
-              reason: options.sendHelloRejected.reason,
-            })
-          );
-          return;
-        }
+      const message = payload as { type?: unknown };
+      if (message.type !== 'hello') {
+        return;
+      }
 
-        if (options?.sendHelloAccepted !== false) {
-          client.send(JSON.stringify({ type: 'hello/accepted' }));
-        }
-      });
-      if (options?.sendServerHello !== false) {
-        client.send(
+      if (options?.sendHelloRejected) {
+        socket.receive(
           JSON.stringify({
-            type: 'server-hello',
-            service: 'webmcp-local-relay',
-            version: 1,
-            host: '127.0.0.1',
-            instanceId: `relay-${relayPort}`,
-            port: Number.parseInt(relayPort, 10),
-            relayId: `relay-${relayPort}`,
+            type: 'hello/rejected',
+            message: options.sendHelloRejected.message,
+            reason: options.sendHelloRejected.reason,
           })
         );
+        return;
       }
-      connections.push(connection);
-    })
-  );
+
+      if (options?.sendHelloAccepted !== false) {
+        socket.receive(JSON.stringify({ type: 'hello/accepted' }));
+      }
+    });
+    connections.push(connection);
+    socket.receive(
+      JSON.stringify({
+        type: 'server-hello',
+        service: 'webmcp-local-relay',
+        version: 1,
+        host: '127.0.0.1',
+        instanceId: `relay-${serverPort}`,
+        port: Number(serverPort),
+        relayId: `relay-${serverPort}`,
+      })
+    );
+  };
+  Object.defineProperty(globalThis, 'WebSocket', {
+    configurable: true,
+    value: MockWebSocket,
+    writable: true,
+  });
 
   Object.defineProperty(globalThis, 'document', {
     configurable: true,
@@ -283,13 +351,7 @@ function installEnvironment(options?: {
   return { connections, hostOrigin, hostWindow };
 }
 
-function startRuntime(options?: {
-  referrer?: string;
-  search?: string;
-  sendHelloAccepted?: boolean;
-  sendHelloRejected?: { message: string; reason: string } | false;
-  sendServerHello?: boolean;
-}): WidgetTestEnv {
+function startRuntime(options?: RelayOptions): WidgetTestEnv {
   const env = installEnvironment(options);
   startWidgetRuntime();
   return env;
@@ -459,23 +521,17 @@ describe('parseHostMessage', () => {
 });
 
 describe('widget runtime', () => {
-  beforeAll(() => {
-    relayServer.listen();
-  });
-
-  afterAll(() => {
-    relayServer.close();
-  });
-
   beforeEach(() => {
     vi.useRealTimers();
   });
 
   afterEach(() => {
-    relayServer.resetHandlers();
+    for (const socket of activeRelaySockets) socket.dispose();
+    connectRelaySocket = undefined;
     vi.restoreAllMocks();
     restoreGlobal('document', originalDescriptors.document);
     restoreGlobal('sessionStorage', originalDescriptors.sessionStorage);
+    restoreGlobal('WebSocket', originalDescriptors.WebSocket);
     restoreGlobal('window', originalDescriptors.window);
   });
 
@@ -534,38 +590,6 @@ describe('widget runtime', () => {
   );
 
   it('discovers the next relay port when the hinted port is not a relay', async () => {
-    const discoveredConnections: RelayConnection[] = [];
-    const relayLink = ws.link('ws://127.0.0.1:9334');
-
-    relayServer.use(
-      relayLink.addEventListener('connection', ({ client }) => {
-        const connection: RelayConnection = { client: client as RelayClient, messages: [] };
-        client.addEventListener('message', (event) => {
-          const payload = parseWireData(event.data);
-          connection.messages.push(payload);
-          if (
-            payload &&
-            typeof payload === 'object' &&
-            (payload as { type?: unknown }).type === 'hello'
-          ) {
-            client.send(JSON.stringify({ type: 'hello/accepted' }));
-          }
-        });
-        client.send(
-          JSON.stringify({
-            type: 'server-hello',
-            service: 'webmcp-local-relay',
-            version: 1,
-            host: '127.0.0.1',
-            instanceId: 'relay-9334',
-            port: 9334,
-            relayId: 'relay-9334',
-          })
-        );
-        discoveredConnections.push(connection);
-      })
-    );
-
     const env = startRuntime({
       search: buildSearch({
         hostOrigin: APP_ORIGIN,
@@ -573,11 +597,8 @@ describe('widget runtime', () => {
         relayPort: '9333',
         tabId: 'tab-1',
       }),
-      sendServerHello: false,
+      serverPort: '9334',
     });
-
-    const nonRelayConnection = await waitForConnection(env);
-    nonRelayConnection.client.close();
 
     const request = await waitForPostedMessage(env, 'webmcp.tools.list.request');
     env.hostWindow.dispatchMessage(APP_ORIGIN, {
@@ -587,11 +608,11 @@ describe('widget runtime', () => {
     });
 
     await vi.waitFor(() => {
-      expect(discoveredConnections).toHaveLength(1);
-      expect(discoveredConnections[0]?.messages).toHaveLength(2);
+      expect(env.connections).toHaveLength(1);
+      expect(env.connections[0]?.messages).toHaveLength(2);
     });
 
-    expect(discoveredConnections[0]?.messages[0]).toMatchObject({
+    expect(env.connections[0]?.messages[0]).toMatchObject({
       origin: APP_ORIGIN,
       type: 'hello',
     });
@@ -876,7 +897,8 @@ describe('widget runtime', () => {
     });
   });
 
-  it('falls back to legacy relay behavior when hello is never acknowledged', async () => {
+  it('does not publish tools until the relay acknowledges hello', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const env = startRuntime({
       sendHelloAccepted: false,
     });
@@ -891,18 +913,17 @@ describe('widget runtime', () => {
     const connection = await waitForConnection(env);
     await vi.waitFor(
       () => {
-        expect(connection.messages).toHaveLength(2);
+        expect(warn).toHaveBeenCalledWith(
+          '[webmcp-relay-widget] Relay did not acknowledge browser hello'
+        );
       },
-      { timeout: 1000 }
+      { timeout: 1500 }
     );
 
+    expect(connection.messages).toHaveLength(1);
     expect(connection.messages[0]).toMatchObject({
       origin: APP_ORIGIN,
       type: 'hello',
-    });
-    expect(connection.messages[1]).toEqual({
-      tools: [{ description: 'Adds numbers', name: 'sum' }],
-      type: 'tools/list',
     });
   });
 
@@ -921,62 +942,6 @@ describe('dormant reconnection', () => {
 
   let savedWebSocket: typeof WebSocket;
   let wsUrls: string[];
-
-  function createFailingWebSocket(): typeof WebSocket {
-    return class MockWebSocket {
-      static readonly CONNECTING = 0;
-      static readonly OPEN = 1;
-      static readonly CLOSING = 2;
-      static readonly CLOSED = 3;
-      readonly CONNECTING = 0;
-      readonly OPEN = 1;
-      readonly CLOSING = 2;
-      readonly CLOSED = 3;
-      url: string;
-      readyState = 0;
-      protocol = '';
-      private listeners = new Map<string, Array<{ fn: Listener; once?: boolean }>>();
-
-      constructor(url: string, _protocols?: string | string[]) {
-        this.url = url;
-        wsUrls.push(url);
-        queueMicrotask(() => {
-          this.readyState = 3;
-          this._emit('error', new Event('error'));
-          this._emit('close', new CloseEvent('close'));
-        });
-      }
-
-      addEventListener(t: string, fn: Listener, opts?: { once?: boolean }): void {
-        if (!this.listeners.has(t)) this.listeners.set(t, []);
-        this.listeners.get(t)!.push({ fn, once: opts?.once });
-      }
-
-      removeEventListener(t: string, fn: Listener): void {
-        const arr = this.listeners.get(t);
-        if (!arr) return;
-        const i = arr.findIndex((e) => e.fn === fn);
-        if (i >= 0) arr.splice(i, 1);
-      }
-
-      close(): void {
-        this.readyState = 3;
-      }
-
-      send(_d: string): void {}
-
-      private _emit(t: string, ev: Event): void {
-        for (const e of this.listeners.get(t) ?? []) {
-          e.fn(ev);
-          if (e.once) {
-            const arr = this.listeners.get(t)!;
-            const i = arr.indexOf(e);
-            if (i >= 0) arr.splice(i, 1);
-          }
-        }
-      }
-    } as unknown as typeof WebSocket;
-  }
 
   interface DormantEnv {
     docListeners: Map<string, Set<Listener>>;
@@ -1068,10 +1033,16 @@ describe('dormant reconnection', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     savedWebSocket = globalThis.WebSocket;
-    globalThis.WebSocket = createFailingWebSocket();
+    connectRelaySocket = (socket) => {
+      wsUrls.push(socket.url);
+      socket.fail();
+    };
+    globalThis.WebSocket = MockWebSocket as unknown as typeof WebSocket;
   });
 
   afterEach(() => {
+    for (const socket of activeRelaySockets) socket.dispose();
+    connectRelaySocket = undefined;
     globalThis.WebSocket = savedWebSocket;
     vi.useRealTimers();
     vi.restoreAllMocks();
@@ -1127,9 +1098,10 @@ describe('dormant reconnection', () => {
 
     wsUrls.length = 0;
     for (const fn of env.winListeners.get('message') ?? []) {
-      (fn as (event: { origin: string; data: unknown }) => void)({
+      (fn as (event: { origin: string; data: unknown; source: unknown }) => void)({
         origin: APP_ORIGIN,
         data: { type: 'webmcp.connect' },
+        source: (globalThis.window as Window).parent,
       });
     }
     await vi.advanceTimersByTimeAsync(500);

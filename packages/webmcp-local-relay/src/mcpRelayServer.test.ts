@@ -1,9 +1,17 @@
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import WebSocket from 'ws';
 
 import { RelayBridgeServer } from './bridgeServer.js';
 import { LocalRelayMcpServer } from './mcpRelayServer.js';
+
+const execFileMock = vi.hoisted(() =>
+  vi.fn((_command: string, _args: string[], callback: (error: Error | null) => void) => {
+    callback(null);
+  })
+);
+
+vi.mock('node:child_process', () => ({ execFile: execFileMock }));
 
 /**
  * Polls until `fn` returns a defined value.
@@ -183,6 +191,7 @@ describe('LocalRelayMcpServer', () => {
         tabId: 'tab-abc',
         url: 'https://acme.example.com/dashboard',
         origin: 'https://acme.example.com',
+        title: 'Dashboard v1',
       })
     );
     ws.send(
@@ -265,6 +274,22 @@ describe('LocalRelayMcpServer', () => {
       const list = await client.listTools();
       const tool = list.tools.find((entry) => entry.name === dynamicToolName);
       return tool?.description?.includes('Search docs v2') ? true : undefined;
+    });
+
+    ws.send(
+      JSON.stringify({
+        type: 'hello',
+        tabId: 'tab-abc',
+        url: 'https://acme.example.com/dashboard',
+        origin: 'https://acme.example.com',
+        title: 'Dashboard v2',
+      })
+    );
+
+    await waitFor(async () => {
+      const list = await client.listTools();
+      const tool = list.tools.find((entry) => entry.name === dynamicToolName);
+      return tool?.description?.includes('Dashboard v2') ? true : undefined;
     });
 
     await client.close();
@@ -733,6 +758,30 @@ describe('LocalRelayMcpServer', () => {
   });
 
   describe('webmcp_open_page', () => {
+    it('passes Windows URLs as one literal launcher argument', async () => {
+      const platform = vi.spyOn(process, 'platform', 'get').mockReturnValue('win32');
+      const { client, cleanup } = await createConnectedRelay();
+      const url = 'https://example.com/?payload=$(calc)&next=`whoami`';
+
+      try {
+        execFileMock.mockClear();
+        const result = await client.callTool({
+          name: 'webmcp_open_page',
+          arguments: { url },
+        });
+
+        expect(result.isError).toBeFalsy();
+        expect(execFileMock).toHaveBeenCalledWith(
+          'explorer.exe',
+          [new URL(url).href],
+          expect.any(Function)
+        );
+      } finally {
+        platform.mockRestore();
+        await cleanup();
+      }
+    });
+
     it('returns error for an invalid URL', async () => {
       const { client, cleanup } = await createConnectedRelay();
 
@@ -1224,8 +1273,8 @@ describe('LocalRelayMcpServer', () => {
       await cleanup();
     });
 
-    it('normalizes invalid inputSchema to default', async () => {
-      const { bridge, client, cleanup } = await createConnectedRelay();
+    it('rejects an invalid inputSchema', async () => {
+      const { bridge, cleanup } = await createConnectedRelay();
 
       const ws = await connectBrowser(bridge, {
         tabId: 'tab-invalid',
@@ -1233,13 +1282,8 @@ describe('LocalRelayMcpServer', () => {
         tools: [{ name: 'bad_schema_tool', inputSchema: 'not-an-object' }],
       });
 
-      const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
-
-      const tool = await waitForClientTool(client, toolName);
-      expect(tool?.inputSchema).toEqual({
-        type: 'object',
-        properties: {},
-      });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(bridge.registry.listTools()).toEqual([]);
 
       ws.close();
       await cleanup();

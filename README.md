@@ -45,7 +45,7 @@ MCP-b **polyfills** that API for all browsers today, and **bridges** it to the f
 
 If you're running Chrome with [`--enable-experimental-web-platform-features`](./e2e/web-standards-showcase/CHROMIUM_FLAGS.md), `document.modelContext` is already there. Just use it:
 
-Add `@mcp-b/webmcp-types` (`pnpm add -D @mcp-b/webmcp-types`) for full input/output schema inference:
+Add `@mcp-b/webmcp-types` (`pnpm add -D @mcp-b/webmcp-types`) for input schema inference:
 
 ```ts
 await document.modelContext.registerTool({
@@ -56,12 +56,6 @@ await document.modelContext.registerTool({
     properties: { title: { type: 'string' }, done: { type: 'boolean' } },
     required: ['title'],
   } as const, // ← args inferred: { title: string; done?: boolean }
-  outputSchema: {
-    // ← optional — infers return type
-    type: 'object',
-    properties: { id: { type: 'number' }, title: { type: 'string' } },
-    required: ['id', 'title'],
-  } as const,
   execute: async (args) => ({ id: Date.now(), title: args.title }),
 });
 ```
@@ -153,7 +147,7 @@ function TodoApp({ todos, addTodo }) {
       },
       required: ['title'],
     } as const,
-    handler: async ({ title }) => {
+    execute: async ({ title }) => {
       addTodo(title);
       return { success: true };
     },
@@ -270,7 +264,7 @@ pnpm add @mcp-b/smart-dom-reader
 | Package                                                    | Version                                                                                                                   | Description                                                              |
 | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
 | [@mcp-b/transports](./packages/transports)                 | [![npm](https://img.shields.io/npm/v/@mcp-b/transports)](https://www.npmjs.com/package/@mcp-b/transports)                 | `postMessage`, iframe, and Chrome extension transports                   |
-| [@mcp-b/mcp-iframe](./packages/mcp-iframe)                 | [![npm](https://img.shields.io/npm/v/@mcp-b/mcp-iframe)](https://www.npmjs.com/package/@mcp-b/mcp-iframe)                 | `<mcp-iframe>` web component — surfaces iframe tools to the parent page  |
+| [@mcp-b/mcp-iframe](./packages/mcp-iframe)                 | [![npm](https://img.shields.io/npm/v/@mcp-b/mcp-iframe)](https://www.npmjs.com/package/@mcp-b/mcp-iframe)                 | Web component for exposing iframe tools, resources, and prompts          |
 | [@mcp-b/webmcp-local-relay](./packages/webmcp-local-relay) | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-local-relay)](https://www.npmjs.com/package/@mcp-b/webmcp-local-relay) | Localhost relay — forwards website tools to Claude Desktop, Cursor, etc. |
 
 ### React
@@ -289,10 +283,11 @@ pnpm add @mcp-b/smart-dom-reader
 <details>
 <summary>Deprecated packages</summary>
 
-| Package                        | Status     | Migration                                                  |
-| ------------------------------ | ---------- | ---------------------------------------------------------- |
-| ~~@mcp-b/mcp-react-hooks~~     | Deprecated | Use [@mcp-b/react-webmcp](./packages/react-webmcp) instead |
-| ~~@mcp-b/mcp-react-hook-form~~ | Removed    | Use custom `useWebMCP` wrappers                            |
+| Package                        | Status     | Migration                                                                                                                                                   |
+| ------------------------------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ~~@mcp-b/mcp-react-hooks~~     | Deprecated | Use [@mcp-b/react-webmcp](./packages/react-webmcp) instead                                                                                                  |
+| ~~@mcp-b/mcp-react-hook-form~~ | Removed    | Use custom `useWebMCP` wrappers                                                                                                                             |
+| ~~@mcp-b/codemode~~            | Removed    | Use [Cloudflare Code Mode](https://github.com/cloudflare/agents/tree/main/packages/codemode); browser APIs are exported from `@cloudflare/codemode/browser` |
 
 </details>
 
@@ -322,13 +317,12 @@ pnpm add @mcp-b/smart-dom-reader
 
 ```
 webmcp-types          (canonical type definitions)
-├── webmcp-polyfill   (canonical runtime polyfill)
-│   ├── webmcp-ts-sdk (TypeScript SDK adapter)
-│   │   ├── global    (full runtime; also uses transports)
-│   │   ├── mcp-iframe (iframe element; also uses transports)
-│   │   └── react-webmcp (also uses usewebmcp; pair with global at app level)
-│   └── usewebmcp     (React hooks for strict core)
-└── codemode          (browser-native code execution)
+└── webmcp-polyfill   (canonical runtime polyfill)
+    ├── webmcp-ts-sdk (TypeScript SDK adapter)
+    │   ├── global    (full runtime; also uses transports)
+    │   ├── mcp-iframe (iframe element; also uses transports)
+    │   └── react-webmcp (also uses usewebmcp; pair with global at app level)
+    └── usewebmcp     (React hooks for strict core)
 
 transports            (browser transports used by global and mcp-iframe)
 ```
@@ -368,7 +362,6 @@ pnpm build
 | [Testing Philosophy](./docs/TESTING_PHILOSOPHY.md)               | Test layers, mocking policy, coverage expectations  |
 | [E2E Testing](./docs/TESTING.md)                                 | Playwright setup, test apps, debugging              |
 | [@mcp-b/global guide](./docs/global-guide.md)                    | Advanced usage for the full runtime                 |
-| [@mcp-b/react-webmcp guide](./docs/react-webmcp-guide.md)        | Advanced React patterns                             |
 | [AI Contribution Manifesto](./docs/AI_CONTRIBUTION_MANIFESTO.md) | Safety rules and code quality bar                   |
 | [Relevant Links](./docs/RELEVANT_LINKS.md)                       | Curated external best practices for contributors    |
 

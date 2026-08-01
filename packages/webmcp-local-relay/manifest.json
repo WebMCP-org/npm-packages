@@ -1,8 +1,9 @@
 {
-  "manifest_version": "0.3",
+  "$schema": "https://raw.githubusercontent.com/modelcontextprotocol/mcpb/main/schemas/mcpb-manifest-v0.4.schema.json",
+  "manifest_version": "0.4",
   "name": "webmcp-local-relay",
   "display_name": "WebMCP Local Relay",
-  "version": "2.0.5",
+  "version": "4.0.0",
   "description": "Relay browser-registered WebMCP tools to any MCP client via localhost WebSocket bridge",
   "long_description": "WebMCP Local Relay connects your browser tabs to AI agents like Claude. Websites that register WebMCP tools through document.modelContext are automatically discovered and relayed through a local WebSocket bridge, making them available as standard MCP tools. Tools are dynamically added and removed as you navigate between pages.",
   "author": {
@@ -20,7 +21,15 @@
     "entry_point": "server/cli.mjs",
     "mcp_config": {
       "command": "node",
-      "args": ["${__dirname}/server/cli.mjs"],
+      "args": [
+        "${__dirname}/server/cli.mjs",
+        "--port",
+        "${user_config.port}",
+        "--widget-origin",
+        "${user_config.allowed_origins}",
+        "--invoke-timeout",
+        "${user_config.invoke_timeout}"
+      ],
       "env": {}
     }
   },
@@ -57,10 +66,18 @@
       "description": "Comma-separated list of allowed browser origins, or * to allow all",
       "default": "*",
       "required": false
+    },
+    "invoke_timeout": {
+      "type": "number",
+      "title": "Tool Invocation Timeout",
+      "description": "Maximum browser tool execution time in milliseconds",
+      "default": 65000,
+      "min": 1,
+      "required": false
     }
   },
   "compatibility": {
-    "claude_desktop": ">=0.10.0",
+    "claude_desktop": ">=1.0.0",
     "platforms": ["darwin", "win32", "linux"],
     "runtimes": {
       "node": ">=22.0.0"

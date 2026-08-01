@@ -1,9 +1,8 @@
 import { normalizeInputSchema } from '@mcp-b/webmcp-polyfill/schema';
-import type { PromptDescriptor } from '@mcp-b/webmcp-ts-sdk';
-import { useCallback, useRef } from 'react';
+import { useCallback } from 'react';
 import type { WebMCPPromptConfig, WebMCPPromptReturn } from './types.js';
 import { getBrowserMcpServer } from './model-context.js';
-import { useIsomorphicLayoutEffect } from './useIsomorphicLayoutEffect.js';
+import { useCommittedRef } from './useCommittedRef.js';
 import { useMcpRegistration } from './useMcpRegistration.js';
 
 /**
@@ -72,10 +71,7 @@ import { useMcpRegistration } from './useMcpRegistration.js';
 export function useWebMCPPrompt(config: WebMCPPromptConfig): WebMCPPromptReturn {
   const { name, description, argsSchema, get } = config;
 
-  const getRef = useRef(get);
-  useIsomorphicLayoutEffect(() => {
-    getRef.current = get;
-  }, [get]);
+  const getRef = useCommittedRef(get);
 
   const register = useCallback(() => {
     const modelContext = getBrowserMcpServer();
@@ -86,8 +82,6 @@ export function useWebMCPPrompt(config: WebMCPPromptConfig): WebMCPPromptReturn 
       return;
     }
 
-    const promptHandler: PromptDescriptor['get'] = async (args) => getRef.current(args);
-
     const resolvedArgsSchema = argsSchema
       ? normalizeInputSchema(argsSchema).inputSchema
       : undefined;
@@ -96,9 +90,9 @@ export function useWebMCPPrompt(config: WebMCPPromptConfig): WebMCPPromptReturn 
       name,
       ...(description !== undefined && { description }),
       ...(resolvedArgsSchema && { argsSchema: resolvedArgsSchema }),
-      get: promptHandler,
+      get: async (args) => getRef.current(args),
     });
-  }, [name, description, argsSchema]);
+  }, [name, description, argsSchema, getRef]);
 
   return { isRegistered: useMcpRegistration(register) };
 }

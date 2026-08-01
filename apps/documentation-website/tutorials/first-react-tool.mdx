@@ -108,7 +108,7 @@ export function App() {
 }
 ```
 
-The `useWebMCP` hook registers the tool when the component mounts and unregisters it when the component unmounts. The input schema is defined outside the component to prevent unnecessary re-registration on every render.
+The `useWebMCP` hook registers the tool when the component mounts and unregisters it when the component unmounts. The named schema also keeps the component easy to scan; inline schema objects do not cause re-registration by reference.
 
 </Step>
 
@@ -243,7 +243,7 @@ export function App() {
 
 - `initializeWebMCPPolyfill()` should be called once at app startup, before components mount
 - `useWebMCP` registers a tool on mount and unregisters on unmount
-- Define input schemas outside the component (or memoize them) to avoid re-registration on each render
+- Schema object identity does not trigger re-registration; use `deps` when registered metadata changes
 - The hook returns `state` (with `executionCount`, `lastResult`, `error`, `isExecuting`) and an `execute` function for local invocation
 - Tools registered via the hook are discoverable with `document.modelContext.getTools()` and callable when the runtime exposes Chrome's optional `executeTool()` extension
 

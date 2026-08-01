@@ -4,12 +4,7 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import {
-  buildPortCandidates,
-  persistPort,
-  RELAY_PORT_CACHE_MAX_AGE_MS,
-  readPersistedPort,
-} from './portStrategy.js';
+import { buildPortCandidates, persistPort } from './portStrategy.js';
 
 describe('portStrategy', () => {
   const tempDirs: string[] = [];
@@ -56,25 +51,29 @@ describe('portStrategy', () => {
 
   it('ignores stale persisted ports', async () => {
     const persistPath = await tempFile('relay-port.json');
-    const now = Date.now();
-    await persistPort(9337, persistPath, '127.0.0.1', now - RELAY_PORT_CACHE_MAX_AGE_MS - 1000);
+    await persistPort(9337, persistPath, '127.0.0.1', Date.now() - 25 * 60 * 60 * 1000);
 
-    const persisted = await readPersistedPort(persistPath, {
-      expectedHost: '127.0.0.1',
-      now,
+    const [first] = await buildPortCandidates({
+      defaultPort: 9333,
+      host: '127.0.0.1',
+      persistPath,
+      rangeEnd: 9338,
     });
 
-    expect(persisted).toBeNull();
+    expect(first).toEqual({ fromCache: false, port: 9333, wasFixed: false });
   });
 
   it('ignores persisted ports for a different host', async () => {
     const persistPath = await tempFile('relay-port.json');
     await persistPort(9337, persistPath, '127.0.0.1');
 
-    const persisted = await readPersistedPort(persistPath, {
-      expectedHost: '[::1]',
+    const [first] = await buildPortCandidates({
+      defaultPort: 9333,
+      host: '[::1]',
+      persistPath,
+      rangeEnd: 9338,
     });
 
-    expect(persisted).toBeNull();
+    expect(first).toEqual({ fromCache: false, port: 9333, wasFixed: false });
   });
 });

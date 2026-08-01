@@ -83,11 +83,9 @@ interface CachedRelayEndpoint {
 type RelayRuntimePhase = 'idle' | 'discovering' | 'dormant';
 
 const RECONNECT_INITIAL_DELAY_MS = 500;
-const RECONNECT_MAX_DELAY_MS = 3000;
 const DEFAULT_REQUEST_TIMEOUT_MS = 60000;
 const RELAY_SERVER_HELLO_TIMEOUT_MS = 1200;
-const RELAY_HELLO_ACK_TIMEOUT_MS = 250;
-const MAX_ENDPOINT_FAILURES_BEFORE_REDISCOVERY = 5;
+const RELAY_HELLO_TIMEOUT_MS = 1000;
 
 /** Delay between rediscovery attempts (ms). */
 const REDISCOVERY_DELAYS_MS = [10000, 20000, 30000];
@@ -117,14 +115,14 @@ export function parseConfig(search = window.location.search): WidgetConfig | nul
   const relayHostHint = getParam('relayHost') || '127.0.0.1';
   const relayPortHintRaw = getParam('relayPort');
   const relayPortHint =
-    relayPortHintRaw && relayPortHintRaw.length > 0 ? Number.parseInt(relayPortHintRaw, 10) : 9333;
+    relayPortHintRaw && relayPortHintRaw.length > 0 ? Number(relayPortHintRaw) : 9333;
   const autoConnect = getParam('autoConnect') !== 'false';
   const relayId = getParam('relayId') || undefined;
   const relayWorkspace = getParam('relayWorkspace') || undefined;
   const requestTimeoutRaw = getParam('requestTimeout');
   const requestTimeoutMs =
     requestTimeoutRaw && requestTimeoutRaw.length > 0
-      ? Number.parseInt(requestTimeoutRaw, 10)
+      ? Number(requestTimeoutRaw)
       : DEFAULT_REQUEST_TIMEOUT_MS;
 
   if (!isLoopbackHost(relayHostHint)) {
@@ -428,10 +426,8 @@ export function runWidget(cfg: WidgetConfig): void {
   const pendingRequests = new Map<string, PendingRequest>();
   let activeEndpoint: RelayEndpoint | null = null;
   let activeSocket: WebSocket | null = null;
-  let consecutiveEndpointFailures = 0;
   let helloAccepted = false;
   let helloAckTimer: ReturnType<typeof setTimeout> | null = null;
-  let reconnectDelayMs = RECONNECT_INITIAL_DELAY_MS;
   let scheduledReconnect: ReturnType<typeof setTimeout> | null = null;
   let phase: RelayRuntimePhase = 'idle';
   let discoveryCycleCount = 0;
@@ -491,7 +487,6 @@ export function runWidget(cfg: WidgetConfig): void {
 
     activeEndpoint = endpoint;
     activeSocket = socket;
-    reconnectDelayMs = RECONNECT_INITIAL_DELAY_MS;
     discoveryCycleCount = 0;
     helloAccepted = false;
     phase = 'idle';
@@ -634,14 +629,6 @@ export function runWidget(cfg: WidgetConfig): void {
         activeSocket = null;
         clearHelloAckTimer();
         rejectPendingRequests('WebSocket connection lost');
-        consecutiveEndpointFailures += 1;
-
-        if (consecutiveEndpointFailures >= MAX_ENDPOINT_FAILURES_BEFORE_REDISCOVERY) {
-          consecutiveEndpointFailures = 0;
-          scheduleRediscovery();
-          return;
-        }
-
         scheduleRetrySameEndpoint();
       },
       { once: true }
@@ -674,12 +661,9 @@ export function runWidget(cfg: WidgetConfig): void {
           if (activeSocket !== socket || socket.readyState !== WebSocket.OPEN || helloAccepted) {
             return;
           }
-
-          // Legacy relays accept browser hello but never acknowledge it.
-          helloAccepted = true;
-          writeCachedEndpoint(cfg, endpoint);
-          sendInitialTools();
-        }, RELAY_HELLO_ACK_TIMEOUT_MS);
+          console.warn('[webmcp-relay-widget] Relay did not acknowledge browser hello');
+          socket.close(4000, 'Browser hello was not acknowledged');
+        }, RELAY_HELLO_TIMEOUT_MS);
       })
       .catch((error) => {
         console.warn('[webmcp-relay-widget] Hello handshake failed:', error);
@@ -724,7 +708,6 @@ export function runWidget(cfg: WidgetConfig): void {
       for (const candidate of buildDiscoveryCandidates(cfg)) {
         const connected = await connectToEndpoint(candidate);
         if (connected) {
-          consecutiveEndpointFailures = 0;
           return true;
         }
       }
@@ -746,27 +729,14 @@ export function runWidget(cfg: WidgetConfig): void {
       host: activeEndpoint.host,
       port: activeEndpoint.port,
     };
-    const delay = Math.min(
-      RECONNECT_MAX_DELAY_MS,
-      Math.round(reconnectDelayMs * (0.85 + Math.random() * 0.3))
-    );
-    reconnectDelayMs = Math.min(Math.round(reconnectDelayMs * 1.5), RECONNECT_MAX_DELAY_MS);
+    const delay = Math.round(RECONNECT_INITIAL_DELAY_MS * (0.85 + Math.random() * 0.3));
 
     scheduledReconnect = setTimeout(() => {
       scheduledReconnect = null;
       void connectToEndpoint(retryEndpoint).then((connected) => {
-        if (connected) {
-          consecutiveEndpointFailures = 0;
-          return;
-        }
-
-        if (consecutiveEndpointFailures >= MAX_ENDPOINT_FAILURES_BEFORE_REDISCOVERY) {
-          consecutiveEndpointFailures = 0;
+        if (!connected) {
           scheduleRediscovery();
-          return;
         }
-
-        scheduleRetrySameEndpoint();
       });
     }, delay);
   };
@@ -892,7 +862,6 @@ export function runWidget(cfg: WidgetConfig): void {
    */
   const wakeFromDormant = (): void => {
     cleanupDormantListeners();
-    reconnectDelayMs = RECONNECT_INITIAL_DELAY_MS;
     discoveryCycleCount = 0;
 
     void discoverRelay().then((connected) => {
@@ -903,7 +872,7 @@ export function runWidget(cfg: WidgetConfig): void {
   };
 
   window.addEventListener('message', (event: MessageEvent) => {
-    if (event.origin !== cfg.hostOrigin) {
+    if (event.source !== window.parent || event.origin !== cfg.hostOrigin) {
       return;
     }
 

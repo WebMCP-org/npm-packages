@@ -42,20 +42,14 @@ import { useWebMCP } from 'usewebmcp';
 
 ## Config fields
 
-| Field                      | Type                                   | Required | Description                                                      |
-| -------------------------- | -------------------------------------- | -------- | ---------------------------------------------------------------- |
-| `name`                     | `string`                               | Yes      | Unique tool identifier (lowercase with underscores)              |
-| `description`              | `string`                               | Yes      | Human-readable description for AI assistants                     |
-| `inputSchema`              | JSON Schema or Standard JSON Schema v1 | No       | Defines input parameters. Use `as const` for inference.          |
-| `outputSchema`             | JSON Schema                            | No       | MCP-B helper metadata for output typing and `structuredContent`. |
-| `annotations`              | `ToolAnnotations`                      | No       | Metadata hints such as `readOnlyHint` and `idempotentHint`       |
-| `execute(input)`           | `(input) => T \| Promise<T>`           | Yes\*    | Preferred tool implementation function                           |
-| `handler(input)`           | `(input) => T \| Promise<T>`           | Yes\*    | Backward-compatible alias for `execute`                          |
-| `formatOutput(output)`     | `(output) => string`                   | No       | Deprecated. Prefer `outputSchema`.                               |
-| `onSuccess(result, input)` | `(result, input) => void`              | No       | Callback after successful execution                              |
-| `onError(error, input)`    | `(error, input) => void`               | No       | Callback after failed execution                                  |
-
-_One of `execute` or `handler` is required. If both are present, `execute` wins._
+| Field            | Type                                   | Required | Description                                                      |
+| ---------------- | -------------------------------------- | -------- | ---------------------------------------------------------------- |
+| `name`           | `string`                               | Yes      | Unique tool identifier                                           |
+| `description`    | `string`                               | Yes      | Human-readable description for AI assistants                     |
+| `inputSchema`    | JSON Schema or Standard JSON Schema v1 | No       | Defines input parameters. Use `as const` for inference.          |
+| `outputSchema`   | JSON Schema                            | No       | MCP-B helper metadata for output typing and `structuredContent`. |
+| `annotations`    | `ToolAnnotations`                      | No       | Metadata hints such as `readOnlyHint` and `idempotentHint`       |
+| `execute(input)` | `(input) => T \| Promise<T>`           | Yes      | Tool implementation                                              |
 
 ## `ToolExecutionState`
 
@@ -75,7 +69,7 @@ Input inference works with two schema formats:
 
 Output inference comes from `outputSchema` when you pass a JSON Schema literal:
 
-- the `execute` or `handler` return type is inferred from the schema
+- the `execute` return type is inferred from the schema
 - `state.lastResult` is typed accordingly
 - the MCP response includes `structuredContent`
 
@@ -105,23 +99,18 @@ The hook unregisters and re-registers when any of these values change:
 - `description`
 - values in `deps`
 
-The hook stores these callbacks in refs. Their latest committed values apply without
-re-registration:
+The latest committed `execute` implementation applies without re-registration. The hook also stores
+`inputSchema`, `outputSchema`, and `annotations` in a committed ref, so new object references do not
+re-register the tool. A registered descriptor retains its current metadata until another trigger
+re-registers it. Include a primitive schema or annotation revision in `deps` when that metadata must
+change.
 
-- `execute`
-- `handler`
-- `onSuccess`
-- `onError`
-- `formatOutput`
+## Tool responses
 
-The hook also stores `inputSchema`, `outputSchema`, and `annotations` in refs, so new object
-references do not re-register the tool. A registered descriptor retains its current schema and
-annotations until another trigger re-registers it. Include a schema or annotation change indicator
-in `deps` when the registered descriptor must change.
-
-## Output schema contract
-
-When `outputSchema` is defined, the implementation must return a JSON-serializable value that matches that schema for MCP-B helpers that consume it. Object, array, string, number, boolean, and null schemas are supported for type inference and hook result shaping.
+Existing MCP responses pass through unchanged. Raw strings become text content, while other JSON
+values become text content plus `structuredContent`. When `outputSchema` is defined, the
+implementation must return a JSON-serializable value that matches it. Object, array, string, number,
+boolean, and null schemas are supported for inference.
 
 Native Chrome WebMCP does not currently define or enforce `outputSchema`; the browser standard tool dictionary defines `inputSchema`.
 

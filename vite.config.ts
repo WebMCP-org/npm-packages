@@ -17,6 +17,7 @@ export default defineConfig({
     ],
   },
   fmt: {
+    ignorePatterns: ['**/dist/**'],
     singleQuote: true,
     semi: true, // semicolons: "always"
     trailingComma: 'es5',
@@ -28,6 +29,5 @@ export default defineConfig({
   },
   staged: {
     '*.{js,jsx,ts,tsx,mjs,cjs,json,md,yml,yaml}': 'vp check --fix',
-    'package.json': 'pnpm dlx sort-package-json',
   },
 });

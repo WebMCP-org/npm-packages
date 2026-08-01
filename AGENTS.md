@@ -78,7 +78,7 @@ the Diataxis framework.
 
 ### Commit Scopes
 
-Package scopes: `codemode`, `global`, `mcp-iframe`, `react-webmcp`, `smart-dom-reader`, `transports`, `usewebmcp`, `webmcp-local-relay`, `webmcp-polyfill`, `webmcp-ts-sdk`, `webmcp-types`
+Package scopes: `global`, `mcp-iframe`, `react-webmcp`, `smart-dom-reader`, `transports`, `usewebmcp`, `webmcp-local-relay`, `webmcp-polyfill`, `webmcp-ts-sdk`, `webmcp-types`
 
 Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 
@@ -132,60 +132,24 @@ Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 | `getTools()`         |      Y       |    Y     | Y (delegates native)  |
 | `ontoolchange`       |      Y       |    Y     |           Y           |
 | `executeTool(tool)`  | Chrome only  |  compat  |           Y           |
-| `unregisterTool()`   |      -       |  compat  |        compat         |
 | `registerPrompt()`   |      -       |    -     |           Y           |
 | `registerResource()` |      -       |    -     |           Y           |
 | `listTools()`        |      -       |    -     |           Y           |
-| `createMessage()`    |      -       |    -     |           Y           |
-| `elicitInput()`      |      -       |    -     |           Y           |
 
 ### Key Type Interfaces (`@mcp-b/webmcp-types`)
 
-- `ModelContextCore` — the strict web standard surface (`registerTool`, `getTools`, `ontoolchange`)
+- `ModelContext` — the strict web standard surface (`registerTool`, `getTools`, `ontoolchange`)
 - `ModelContextExtensions` — MCPB extensions (listTools and events)
-- `ModelContext` = `ModelContextCore` (the type for `document.modelContext`)
-- `ModelContextWithExtensions` = `ModelContextCore & ModelContextExtensions`
+- `ModelContextWithExtensions` = `ModelContext & ModelContextExtensions`
 
 ## Reference Repos (`.reference/`)
 
 The `.reference/` directory (gitignored) holds shallow clones of upstream repos we track for sync. These are NOT dependencies — they are for human/AI reference when syncing with upstream changes.
 
-| Directory            | Upstream                                                                                      | Tracked By            |
-| -------------------- | --------------------------------------------------------------------------------------------- | --------------------- |
-| `cloudflare-agents/` | [cloudflare/agents](https://github.com/cloudflare/agents)                                     | `@mcp-b/codemode`     |
-| `standard-schema/`   | [standard-schema/standard-schema](https://github.com/standard-schema/standard-schema)         | `@mcp-b/webmcp-types` |
-| `typescript-sdk/`    | [anthropics/anthropic-sdk-typescript](https://github.com/anthropics/anthropic-sdk-typescript) | General reference     |
-
-To clone or refresh:
-
-```bash
-cd .reference
-git clone --depth 1 https://github.com/cloudflare/agents.git cloudflare-agents
-```
-
-### Codemode Upstream Sync
-
-`@mcp-b/codemode` is a browser-native port of `@cloudflare/codemode`. The file structure mirrors upstream for easy diffing:
-
-| Our file               | Upstream equivalent    | Notes                                                |
-| ---------------------- | ---------------------- | ---------------------------------------------------- |
-| `utils.ts`             | `utils.ts`             | Direct port                                          |
-| `json-schema-types.ts` | `json-schema-types.ts` | Direct port                                          |
-| `normalize.ts`         | `normalize.ts`         | Direct port                                          |
-| `tool-types.ts`        | `tool-types.ts`        | Direct port (AI SDK schema introspection)            |
-| `tool.ts`              | `tool.ts`              | Direct port (createCodeTool)                         |
-| `ai.ts`                | `ai.ts`                | Re-exports (matches upstream)                        |
-| `types.ts`             | `executor.ts`          | Executor/ExecuteResult interfaces only               |
-| `iframe-executor.ts`   | —                      | Browser-native (replaces CF's DynamicWorkerExecutor) |
-| `worker-executor.ts`   | —                      | Browser-native fallback                              |
-| `messages.ts`          | —                      | Typed postMessage protocol                           |
-| `webmcp.ts`            | —                      | WebMCP bridge                                        |
-
-When upstream adds features, diff with:
-
-```bash
-diff -r .reference/cloudflare-agents/packages/codemode/src packages/codemode/src
-```
+| Directory          | Upstream                                                                                      | Tracked By            |
+| ------------------ | --------------------------------------------------------------------------------------------- | --------------------- |
+| `standard-schema/` | [standard-schema/standard-schema](https://github.com/standard-schema/standard-schema)         | `@mcp-b/webmcp-types` |
+| `typescript-sdk/`  | [anthropics/anthropic-sdk-typescript](https://github.com/anthropics/anthropic-sdk-typescript) | General reference     |
 
 ## Before Committing
 

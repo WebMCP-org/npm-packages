@@ -15,8 +15,9 @@ import {
   type RelayInvokeArgs,
   type RelayTool,
 } from './protocol.js';
-import { type AggregatedTool, HelloRequiredError, RelayRegistry } from './registry.js';
+import { RelayRegistry } from './registry.js';
 import {
+  type BrowserToRelayMessage,
   BrowserToRelayMessageSchema,
   type RelayClientToServerMessage,
   RelayClientToServerMessageSchema,
@@ -45,7 +46,6 @@ const SUPPORTED_SUBPROTOCOLS = new Set([
  * In-flight relay invocation waiting for a browser `result` message.
  */
 interface PendingInvocation {
-  callId: string;
   connectionId: string;
   timeoutId: ReturnType<typeof setTimeout>;
   resolve: (result: RelayCallToolResult) => void;
@@ -94,7 +94,7 @@ export interface RelayBridgeServerOptions {
    */
   persistPath?: string;
   /**
-   * Allowed host page origins reported by browser `hello` messages.
+   * Allowed host page origins verified from browser WebSocket requests.
    * Use `["*"]` to allow all origins.
    *
    * Permissive by default for zero-config developer experience: any browser
@@ -112,7 +112,7 @@ export interface RelayBridgeServerOptions {
   maxPayloadBytes?: number;
   /**
    * Timeout used for browser tool invocations.
-   * @defaultValue `25000`
+   * @defaultValue `65000`
    */
   invokeTimeoutMs?: number;
   /**
@@ -161,7 +161,9 @@ export class RelayBridgeServer extends EventEmitter {
 
   private wss: WebSocketServer | null = null;
   private readonly socketByConnectionId = new Map<string, WebSocket>();
+  private readonly requestOriginByConnectionId = new Map<string, string>();
   private readonly pendingInvocations = new Map<string, PendingInvocation>();
+  private readonly browserClientConnectionIds = new Set<string>();
   private readonly relayClientConnectionIds = new Set<string>();
   private readonly heartbeatIntervalByConnectionId = new Map<
     string,
@@ -206,20 +208,29 @@ export class RelayBridgeServer extends EventEmitter {
     // 10MB default: large enough for typical JSON API responses while
     // still protecting the relay process from unbounded memory growth.
     this.maxPayloadBytes = options.maxPayloadBytes ?? 10_000_000;
-    this.invokeTimeoutMs = options.invokeTimeoutMs ?? 25_000;
+    this.invokeTimeoutMs = options.invokeTimeoutMs ?? 65_000;
     this.label = options.label;
     this.workspace = options.workspace;
     this.relayId = options.relayId;
     this.instanceId = randomUUID();
 
-    if (this.preferredPort !== 0 && (this.preferredPort < 1 || this.preferredPort > 65535)) {
+    if (
+      !Number.isInteger(this.preferredPort) ||
+      this.preferredPort < 0 ||
+      this.preferredPort > 65535
+    ) {
       throw new Error(
         `Invalid port ${this.preferredPort}. Port must be 0 (auto-assign) or between 1 and 65535.`
       );
     }
-    if (this.portRangeEnd < this.preferredPort && this.preferredPort !== 0) {
+    if (
+      !Number.isInteger(this.portRangeEnd) ||
+      this.portRangeEnd < 1 ||
+      this.portRangeEnd > 65535 ||
+      (this.portRangeEnd < this.preferredPort && this.preferredPort !== 0)
+    ) {
       throw new Error(
-        `Invalid port range ${this.preferredPort}-${this.portRangeEnd}. rangeEnd must be greater than or equal to the preferred port.`
+        `Invalid port range ${this.preferredPort}-${this.portRangeEnd}. rangeEnd must be an integer between the preferred port and 65535.`
       );
     }
     if (!Number.isInteger(this.maxPayloadBytes) || this.maxPayloadBytes <= 0) {
@@ -227,8 +238,10 @@ export class RelayBridgeServer extends EventEmitter {
         `Invalid maxPayloadBytes ${this.maxPayloadBytes}. Must be a positive integer.`
       );
     }
-    if (this.invokeTimeoutMs <= 0) {
-      throw new Error(`Invalid invokeTimeoutMs ${this.invokeTimeoutMs}. Must be greater than 0.`);
+    if (!Number.isInteger(this.invokeTimeoutMs) || this.invokeTimeoutMs <= 0) {
+      throw new Error(
+        `Invalid invokeTimeoutMs ${this.invokeTimeoutMs}. Must be a positive integer.`
+      );
     }
   }
 
@@ -303,7 +316,7 @@ export class RelayBridgeServer extends EventEmitter {
     for (const candidate of candidates) {
       try {
         await this.startAsServer(candidate.port);
-        await persistPort(this.port, this.persistPath, this.host);
+        await this.persistSelectedPort();
         return;
       } catch (err) {
         if (!this.isAddressInUseError(err)) {
@@ -312,7 +325,7 @@ export class RelayBridgeServer extends EventEmitter {
 
         const attached = await this.tryAttachToExistingRelay(candidate.port);
         if (attached) {
-          await persistPort(this.port, this.persistPath, this.host);
+          await this.persistSelectedPort();
           return;
         }
 
@@ -340,6 +353,16 @@ export class RelayBridgeServer extends EventEmitter {
         ? (error as NodeJS.ErrnoException).code === 'EADDRINUSE'
         : error.message.includes('EADDRINUSE'))
     );
+  }
+
+  private async persistSelectedPort(): Promise<void> {
+    try {
+      await persistPort(this.port, this.persistPath, this.host);
+    } catch (error) {
+      process.stderr.write(
+        `[webmcp-local-relay] warn: could not cache relay port: ${error instanceof Error ? error.message : String(error)}\n`
+      );
+    }
   }
 
   private async tryAttachToExistingRelay(port: number): Promise<boolean> {
@@ -407,6 +430,8 @@ export class RelayBridgeServer extends EventEmitter {
     this.lastPongByConnectionId.clear();
 
     this.socketByConnectionId.clear();
+    this.requestOriginByConnectionId.clear();
+    this.browserClientConnectionIds.clear();
     this.relayClientConnectionIds.clear();
 
     for (const pending of this.pendingInvocations.values()) {
@@ -502,18 +527,17 @@ export class RelayBridgeServer extends EventEmitter {
       server.once('error', onError);
     });
 
-    wss.on('connection', (socket: WebSocket) => {
+    wss.on('connection', (socket: WebSocket, request) => {
+      const requestOrigin = request.headers.origin;
+      if (requestOrigin && socket.protocol === RELAY_INTERNAL_PROTOCOL) {
+        socket.close(1008, 'Browser connections cannot use the relay protocol');
+        return;
+      }
+
       const connectionId = randomUUID();
       this.socketByConnectionId.set(connectionId, socket);
-
-      try {
-        socket.send(JSON.stringify(this.buildServerHello()));
-      } catch (err) {
-        process.stderr.write(
-          `[webmcp-local-relay] warn: failed to send server hello to connection ${connectionId}: ${err instanceof Error ? err.message : String(err)}\n`
-        );
-        socket.close(1011, 'Failed to send server hello');
-        return;
+      if (requestOrigin) {
+        this.requestOriginByConnectionId.set(connectionId, requestOrigin);
       }
 
       socket.on('message', (raw: WebSocket.RawData) => {
@@ -534,6 +558,16 @@ export class RelayBridgeServer extends EventEmitter {
             : undefined;
         this.onSocketClose(connectionId, code);
       });
+
+      try {
+        socket.send(JSON.stringify(this.buildServerHello()));
+      } catch (err) {
+        process.stderr.write(
+          `[webmcp-local-relay] warn: failed to send server hello to connection ${connectionId}: ${err instanceof Error ? err.message : String(err)}\n`
+        );
+        socket.close(1011, 'Failed to send server hello');
+        return;
+      }
 
       this.startHeartbeat(connectionId);
     });
@@ -607,7 +641,6 @@ export class RelayBridgeServer extends EventEmitter {
       }, this.invokeTimeoutMs);
 
       this.pendingInvocations.set(callId, {
-        callId,
         connectionId: resolved.connectionId,
         timeoutId,
         resolve,
@@ -635,12 +668,7 @@ export class RelayBridgeServer extends EventEmitter {
     });
   }
 
-  /**
-   * Handles a raw WebSocket message from a connected source.
-   *
-   * Routes relay-protocol messages (`relay/*`) to the relay client handler
-   * and browser-protocol messages to the existing browser handler.
-   */
+  /** Handles a raw message according to the negotiated WebSocket protocol. */
   private onSocketMessage(connectionId: string, raw: WebSocket.RawData): void {
     const text = this.rawDataToUtf8(raw);
 
@@ -659,8 +687,12 @@ export class RelayBridgeServer extends EventEmitter {
       typeof parsedJson === 'object' && parsedJson !== null
         ? (parsedJson as Record<string, unknown>).type
         : undefined;
+    const socket = this.socketByConnectionId.get(connectionId);
+    if (!socket) {
+      return;
+    }
 
-    if (typeof typeField === 'string' && typeField.startsWith('relay/')) {
+    if (socket.protocol === RELAY_INTERNAL_PROTOCOL) {
       const relayMsg = RelayClientToServerMessageSchema.safeParse(parsedJson);
       if (relayMsg.success) {
         this.onRelayClientMessage(connectionId, relayMsg.data);
@@ -672,7 +704,13 @@ export class RelayBridgeServer extends EventEmitter {
       return;
     }
 
-    this.registry.touchConnection(connectionId);
+    if (typeof typeField === 'string' && typeField.startsWith('relay/')) {
+      process.stderr.write(
+        `[webmcp-local-relay] warn: connection ${connectionId} used the relay protocol without negotiating it\n`
+      );
+      socket.close(1008, 'Relay protocol was not negotiated');
+      return;
+    }
 
     const parsedMessage = BrowserToRelayMessageSchema.safeParse(parsedJson);
     if (!parsedMessage.success) {
@@ -682,15 +720,26 @@ export class RelayBridgeServer extends EventEmitter {
       return;
     }
 
-    const message = parsedMessage.data;
+    this.registry.touchConnection(connectionId);
+    this.onBrowserClientMessage(connectionId, parsedMessage.data);
+  }
+
+  private onBrowserClientMessage(connectionId: string, message: BrowserToRelayMessage): void {
+    if (message.type !== 'hello' && !this.browserClientConnectionIds.has(connectionId)) {
+      process.stderr.write(
+        `[webmcp-local-relay] warn: connection ${connectionId} sent ${message.type} before hello, ignoring\n`
+      );
+      return;
+    }
 
     switch (message.type) {
       case 'hello':
         try {
           const socket = this.socketByConnectionId.get(connectionId);
-          if (!this.isHostOriginAllowed(message.origin)) {
+          const origin = this.requestOriginByConnectionId.get(connectionId) ?? message.origin;
+          if (!this.isHostOriginAllowed(origin)) {
             process.stderr.write(
-              `[webmcp-local-relay] warn: rejecting source ${connectionId} with disallowed host origin: ${message.origin ?? 'missing'}\n`
+              `[webmcp-local-relay] warn: rejecting source ${connectionId} with disallowed host origin: ${origin ?? 'missing'}\n`
             );
             if (socket) {
               this.sendHelloRejected(
@@ -706,7 +755,8 @@ export class RelayBridgeServer extends EventEmitter {
             }
             break;
           }
-          this.registry.upsertSource(connectionId, message);
+          this.registry.upsertSource(connectionId, { ...message, origin });
+          this.browserClientConnectionIds.add(connectionId);
           if (socket) {
             this.sendHelloAccepted(socket, { type: 'hello/accepted' });
           }
@@ -724,17 +774,10 @@ export class RelayBridgeServer extends EventEmitter {
           this.registry.registerTools(connectionId, message.tools);
           this.emit('stateChanged');
         } catch (err) {
-          if (err instanceof HelloRequiredError) {
-            process.stderr.write(
-              `[webmcp-local-relay] warn: connection ${connectionId} sent tools before hello, ignoring\n`
-            );
-          } else {
-            process.stderr.write(
-              `[webmcp-local-relay] error: failed to register tools for connection ${connectionId}: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`
-            );
-            const socket = this.socketByConnectionId.get(connectionId);
-            socket?.close(1011, 'Failed to register tools');
-          }
+          process.stderr.write(
+            `[webmcp-local-relay] error: failed to register tools for connection ${connectionId}: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`
+          );
+          this.socketByConnectionId.get(connectionId)?.close(1008, 'Invalid tool list');
         }
         break;
 
@@ -743,6 +786,12 @@ export class RelayBridgeServer extends EventEmitter {
         if (!pending) {
           process.stderr.write(
             `[webmcp-local-relay] warn: received result for unknown callId ${message.callId}\n`
+          );
+          break;
+        }
+        if (pending.connectionId !== connectionId) {
+          process.stderr.write(
+            `[webmcp-local-relay] warn: connection ${connectionId} returned result for another source's callId ${message.callId}\n`
           );
           break;
         }
@@ -758,6 +807,16 @@ export class RelayBridgeServer extends EventEmitter {
         break;
 
       case 'elicitation-request':
+        if (
+          !Array.from(this.pendingInvocations.values()).some(
+            (pending) => pending.connectionId === connectionId
+          )
+        ) {
+          process.stderr.write(
+            `[webmcp-local-relay] warn: connection ${connectionId} sent elicitation outside an active invocation, ignoring\n`
+          );
+          break;
+        }
         this.emit('elicitationRequest', {
           callId: message.callId,
           connectionId,
@@ -800,6 +859,13 @@ export class RelayBridgeServer extends EventEmitter {
    * Handles relay-protocol messages from relay client connections.
    */
   private onRelayClientMessage(connectionId: string, message: RelayClientToServerMessage): void {
+    if (message.type !== 'relay/hello' && !this.relayClientConnectionIds.has(connectionId)) {
+      process.stderr.write(
+        `[webmcp-local-relay] warn: connection ${connectionId} sent ${message.type} before relay/hello, ignoring\n`
+      );
+      return;
+    }
+
     switch (message.type) {
       case 'relay/hello':
         this.relayClientConnectionIds.add(connectionId);
@@ -822,60 +888,39 @@ export class RelayBridgeServer extends EventEmitter {
 
       case 'relay/invoke': {
         const { callId, toolName, args } = message;
-        void (async () => {
-          try {
-            const result = await this.invokeToolLocally(toolName, args ?? {}, {});
-            const response: RelayServerToClientMessage = {
-              type: 'relay/result',
-              callId,
-              result,
-            };
-            const socket = this.socketByConnectionId.get(connectionId);
-            if (socket?.readyState === WebSocket.OPEN) {
-              try {
-                socket.send(JSON.stringify(response));
-              } catch (sendErr) {
-                process.stderr.write(
-                  `[webmcp-local-relay] warn: failed to send relay result to ${connectionId}: ${sendErr instanceof Error ? sendErr.message : String(sendErr)}\n`
-                );
-              }
-            } else {
-              process.stderr.write(
-                `[webmcp-local-relay] warn: relay client ${connectionId} disconnected before result for callId ${callId} could be delivered\n`
-              );
-            }
-          } catch (err) {
-            const response: RelayServerToClientMessage = {
-              type: 'relay/result',
-              callId,
-              result: {
-                content: [
-                  {
-                    type: 'text',
-                    text: `Relay invocation failed: ${err instanceof Error ? err.message : String(err)}`,
-                  },
-                ],
-                isError: true,
-              },
-            };
-            const socket = this.socketByConnectionId.get(connectionId);
-            if (socket?.readyState === WebSocket.OPEN) {
-              try {
-                socket.send(JSON.stringify(response));
-              } catch (sendErr) {
-                process.stderr.write(
-                  `[webmcp-local-relay] warn: failed to send relay error result to ${connectionId}: ${sendErr instanceof Error ? sendErr.message : String(sendErr)}\n`
-                );
-              }
-            } else {
-              process.stderr.write(
-                `[webmcp-local-relay] warn: relay client ${connectionId} disconnected before error result for callId ${callId} could be delivered\n`
-              );
-            }
-          }
-        })();
+        void this.invokeToolLocally(toolName, args ?? {}, {}).then(
+          (result) => this.sendRelayResult(connectionId, callId, result),
+          (error: unknown) =>
+            this.sendRelayResult(connectionId, callId, {
+              content: [
+                {
+                  type: 'text',
+                  text: `Relay invocation failed: ${error instanceof Error ? error.message : String(error)}`,
+                },
+              ],
+              isError: true,
+            })
+        );
         break;
       }
+    }
+  }
+
+  private sendRelayResult(connectionId: string, callId: string, result: RelayCallToolResult): void {
+    const socket = this.socketByConnectionId.get(connectionId);
+    if (socket?.readyState !== WebSocket.OPEN) {
+      process.stderr.write(
+        `[webmcp-local-relay] warn: relay client ${connectionId} disconnected before result for callId ${callId} could be delivered\n`
+      );
+      return;
+    }
+
+    try {
+      socket.send(JSON.stringify({ type: 'relay/result', callId, result }));
+    } catch (error) {
+      process.stderr.write(
+        `[webmcp-local-relay] warn: failed to send relay result to ${connectionId}: ${error instanceof Error ? error.message : String(error)}\n`
+      );
     }
   }
 
@@ -916,6 +961,8 @@ export class RelayBridgeServer extends EventEmitter {
     if (!this.socketByConnectionId.has(connectionId)) return;
 
     this.stopHeartbeat(connectionId);
+    this.requestOriginByConnectionId.delete(connectionId);
+    this.browserClientConnectionIds.delete(connectionId);
     this.relayClientConnectionIds.delete(connectionId);
     this.registry.removeConnection(connectionId);
     this.socketByConnectionId.delete(connectionId);
@@ -1020,7 +1067,7 @@ export class RelayBridgeServer extends EventEmitter {
 
     return new Promise((resolve, reject) => {
       const wsUrl = `ws://${this.host}:${port}`;
-      const ws = new WebSocket(wsUrl, [RELAY_INTERNAL_PROTOCOL, RELAY_BROWSER_PROTOCOL]);
+      const ws = new WebSocket(wsUrl, RELAY_INTERNAL_PROTOCOL);
       const bufferedMessages: RelayServerToClientMessage[] = [];
 
       const cleanup = () => {
@@ -1032,10 +1079,11 @@ export class RelayBridgeServer extends EventEmitter {
       };
 
       const rejectWith = (error: Error) => {
+        cleanup();
         ws.once('error', () => {
           // Ignore late socket errors from ports that failed relay verification.
         });
-        cleanup();
+        ws.terminate();
         reject(error);
       };
 
@@ -1227,14 +1275,7 @@ export class RelayBridgeServer extends EventEmitter {
         return;
       }
 
-      void this.reconnectWithModePromotion().catch((err) => {
-        process.stderr.write(
-          `[webmcp-local-relay] error: unexpected failure during reconnection: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`
-        );
-        if (!this.stopping) {
-          this.scheduleReconnect();
-        }
-      });
+      void this.reconnectWithModePromotion();
     }, delay);
   }
 
@@ -1283,7 +1324,6 @@ export class RelayBridgeServer extends EventEmitter {
       }, this.invokeTimeoutMs);
 
       this.clientPendingInvocations.set(callId, {
-        callId,
         connectionId: 'relay-server',
         timeoutId,
         resolve,
@@ -1325,17 +1365,10 @@ export class RelayBridgeServer extends EventEmitter {
 
     return {
       type,
-      tools: this.toWireTools(tools),
+      tools: tools.map(({ originalName: _originalName, sources: _sources, ...tool }) => tool),
       sources,
       toolSourceMap,
     };
-  }
-
-  /**
-   * Maps aggregated tools to the wire format used by the relay protocol.
-   */
-  private toWireTools(tools: AggregatedTool[]): RelayTool[] {
-    return tools.map(({ originalName: _originalName, sources: _sources, ...tool }) => tool);
   }
 
   private isHostOriginAllowed(origin: string | undefined): boolean {
@@ -1413,22 +1446,8 @@ export class RelayBridgeServer extends EventEmitter {
    * Converts WebSocket raw data variants to a UTF-8 string payload.
    */
   private rawDataToUtf8(raw: WebSocket.RawData): string {
-    if (typeof raw === 'string') {
-      return raw;
-    }
-
-    if (Buffer.isBuffer(raw)) {
-      return raw.toString('utf8');
-    }
-
-    if (raw instanceof ArrayBuffer) {
-      return Buffer.from(raw).toString('utf8');
-    }
-
-    if (Array.isArray(raw)) {
-      return Buffer.concat(raw).toString('utf8');
-    }
-
-    return String(raw);
+    if (Array.isArray(raw)) return Buffer.concat(raw).toString('utf8');
+    if (Buffer.isBuffer(raw)) return raw.toString('utf8');
+    return Buffer.from(raw).toString('utf8');
   }
 }

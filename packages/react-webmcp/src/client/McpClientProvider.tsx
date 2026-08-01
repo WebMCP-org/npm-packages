@@ -1,6 +1,6 @@
 import {
   type Client,
-  type RequestOptions,
+  type ConnectOptions,
   type Resource,
   type ServerCapabilities,
   type SubscriptionFilter,
@@ -18,7 +18,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { useIsomorphicLayoutEffect } from '../useIsomorphicLayoutEffect.js';
+import { useCommittedRef } from '../useCommittedRef.js';
 
 /**
  * Context value provided by McpClientProvider.
@@ -39,7 +39,6 @@ interface McpClientContextValue {
 type ConnectionState = 'disconnected' | 'connecting' | 'initializing' | 'connected';
 
 const McpClientContext = createContext<McpClientContextValue | null>(null);
-const EMPTY_REQUEST_OPTS: RequestOptions = {};
 
 function startListChangedSubscription(
   client: Client,
@@ -94,9 +93,9 @@ export interface McpClientProviderProps {
   transport: Transport;
 
   /**
-   * Optional request options for the connection.
+   * Optional connection options.
    */
-  opts?: RequestOptions;
+  opts?: ConnectOptions;
 }
 
 /**
@@ -168,7 +167,6 @@ export interface McpClientProviderProps {
  * }
  * ```
  */
-// oxlint-disable-next-line react-doctor/no-giant-component -- This is one MCP connection state machine; splitting its coupled generation guards would obscure lifecycle ordering.
 export function McpClientProvider({
   children,
   client,
@@ -182,71 +180,12 @@ export function McpClientProvider({
   const [capabilities, setCapabilities] = useState<ServerCapabilities | null>(null);
   const isConnected = connectionState === 'initializing' || connectionState === 'connected';
   const isLoading = connectionState === 'connecting' || connectionState === 'initializing';
-  const requestOpts = opts ?? EMPTY_REQUEST_OPTS;
-
   const connectionStateRef = useRef<ConnectionState>('disconnected');
   const connectionGenerationRef = useRef(0);
   const closePromiseRef = useRef<Promise<void> | null>(null);
   const providerCloseRef = useRef<object | null>(null);
-  const resourcesRequestRef = useRef(0);
-  const toolsRequestRef = useRef(0);
   const inventoryRequestRef = useRef(0);
-  const requestOptsRef = useRef(requestOpts);
-  useIsomorphicLayoutEffect(() => {
-    requestOptsRef.current = requestOpts;
-  }, [requestOpts]);
-
-  /**
-   * Fetches available resources from the MCP server.
-   * Only fetches if the server supports the resources capability.
-   */
-  const fetchResourcesInternal = useCallback(async () => {
-    const request = ++resourcesRequestRef.current;
-    const serverCapabilities = client.getServerCapabilities();
-    if (!serverCapabilities?.resources) {
-      setResources([]);
-      return;
-    }
-
-    try {
-      const response = await client.listResources(undefined, { cacheMode: 'refresh' });
-      if (request === resourcesRequestRef.current) {
-        setResources(response.resources);
-      }
-    } catch (e) {
-      if (request !== resourcesRequestRef.current) {
-        return;
-      }
-      console.error('[ReactWebMCP:McpClientProvider]', 'Error fetching resources:', e);
-      throw e;
-    }
-  }, [client]);
-
-  /**
-   * Fetches available tools from the MCP server.
-   * Only fetches if the server supports the tools capability.
-   */
-  const fetchToolsInternal = useCallback(async () => {
-    const request = ++toolsRequestRef.current;
-    const serverCapabilities = client.getServerCapabilities();
-    if (!serverCapabilities?.tools) {
-      setTools([]);
-      return;
-    }
-
-    try {
-      const response = await client.listTools(undefined, { cacheMode: 'refresh' });
-      if (request === toolsRequestRef.current) {
-        setTools(response.tools);
-      }
-    } catch (e) {
-      if (request !== toolsRequestRef.current) {
-        return;
-      }
-      console.error('[ReactWebMCP:McpClientProvider]', 'Error fetching tools:', e);
-      throw e;
-    }
-  }, [client]);
+  const requestOptsRef = useCommittedRef(opts);
 
   /**
    * Refreshes every provider-owned inventory list and clears a prior inventory
@@ -255,28 +194,41 @@ export function McpClientProvider({
   const refreshInventory = useCallback(
     async (connectionGeneration: number): Promise<void> => {
       const inventoryRequest = ++inventoryRequestRef.current;
+      const serverCapabilities = client.getServerCapabilities();
 
       try {
-        await Promise.all([fetchResourcesInternal(), fetchToolsInternal()]);
+        const [resourceResponse, toolResponse] = await Promise.all([
+          serverCapabilities?.resources
+            ? client.listResources(undefined, { cacheMode: 'refresh' })
+            : undefined,
+          serverCapabilities?.tools
+            ? client.listTools(undefined, { cacheMode: 'refresh' })
+            : undefined,
+        ]);
+
+        if (
+          connectionGeneration !== connectionGenerationRef.current ||
+          inventoryRequest !== inventoryRequestRef.current
+        ) {
+          return;
+        }
+
+        setResources(resourceResponse?.resources ?? []);
+        setTools(toolResponse?.tools ?? []);
+        setError(null);
       } catch (cause) {
         const error = cause instanceof Error ? cause : new Error(String(cause));
         if (
-          connectionGeneration === connectionGenerationRef.current &&
-          inventoryRequest === inventoryRequestRef.current
+          connectionGeneration !== connectionGenerationRef.current ||
+          inventoryRequest !== inventoryRequestRef.current
         ) {
-          setError(error);
+          return;
         }
+        setError(error);
         throw error;
       }
-
-      if (
-        connectionGeneration === connectionGenerationRef.current &&
-        inventoryRequest === inventoryRequestRef.current
-      ) {
-        setError(null);
-      }
     },
-    [fetchResourcesInternal, fetchToolsInternal]
+    [client]
   );
 
   /**
@@ -354,7 +306,7 @@ export function McpClientProvider({
       connectionStateRef.current = 'connected';
       setConnectionState('connected');
     },
-    [client, transport, refreshInventory]
+    [client, transport, refreshInventory, requestOptsRef]
   );
 
   useEffect(() => {
@@ -426,8 +378,6 @@ export function McpClientProvider({
       } finally {
         if (active && providerCloseRef.current === null) {
           connectionGenerationRef.current += 1;
-          resourcesRequestRef.current += 1;
-          toolsRequestRef.current += 1;
           inventoryRequestRef.current += 1;
           connectionStateRef.current = 'disconnected';
           setConnectionState('disconnected');
@@ -458,8 +408,6 @@ export function McpClientProvider({
         }
       }
       connectionGenerationRef.current += 1;
-      resourcesRequestRef.current += 1;
-      toolsRequestRef.current += 1;
       inventoryRequestRef.current += 1;
       connectionStateRef.current = 'disconnected';
       const closeToken = {};

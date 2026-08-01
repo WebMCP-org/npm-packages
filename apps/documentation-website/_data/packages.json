@@ -103,7 +103,7 @@
     "packageName": "@mcp-b/react-webmcp",
     "sidebarLabel": "react-webmcp",
     "category": "React",
-    "summary": "Full React integration for MCP-B, including tool hooks, prompts, resources, sampling, elicitation, and client providers.",
+    "summary": "Full React integration for MCP-B, including tool hooks, prompts, resources, and client providers.",
     "installCommand": "npm install @mcp-b/react-webmcp",
     "overviewPath": "/packages/react-webmcp/overview",
     "referencePath": "/packages/react-webmcp/reference",
@@ -112,7 +112,7 @@
     "note": "Provider and client hooks assume @mcp-b/global or another BrowserMcpServer-based runtime is present.",
     "skill": {
       "name": "react-webmcp",
-      "description": "Use when building React apps with full MCP-B features: useWebMCP hook, prompts, resources, sampling, elicitation, and McpClientProvider. Supports JSON Schema and Standard JSON Schema input schemas."
+      "description": "Use when building React apps with useWebMCP, prompt and resource hooks, or McpClientProvider. Supports JSON Schema and Standard JSON Schema input schemas."
     }
   },
   {

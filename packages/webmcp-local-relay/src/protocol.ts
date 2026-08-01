@@ -15,14 +15,6 @@ export const NormalizedToolSchema = ToolSchema.extend({
 });
 
 /**
- * Permissive inbound tool shape from browser/widget payloads.
- *
- * Only enforces a non-empty name at ingest. All other fields are normalized
- * against SDK schemas by {@link normalizeInboundTool}.
- */
-export const InboundToolSchema = z.object({ name: z.string().min(1) }).passthrough();
-
-/**
  * SDK-derived argument schema for tool invocation payloads.
  */
 export const RelayInvokeArgsSchema = CallToolRequestParamsSchema.shape.arguments;
@@ -35,6 +27,11 @@ export const DEFAULT_TOOL_INPUT_SCHEMA: Tool['inputSchema'] = {
   type: 'object',
   properties: {},
 };
+
+/** SDK tool schema with a browser-compatible default input schema. */
+export const InboundToolSchema = NormalizedToolSchema.extend({
+  inputSchema: NormalizedToolSchema.shape.inputSchema.optional(),
+});
 
 /**
  * Canonical normalized relay tool shape.
@@ -57,43 +54,13 @@ export type RelayCallToolResult = CallToolResult;
 export type RelayInvokeArgs = Exclude<z.infer<typeof RelayInvokeArgsSchema>, undefined>;
 
 /**
- * Normalizes permissive inbound tool payloads into SDK-compliant Tool objects.
- *
- * Invalid optional metadata (description, output schema, annotations, etc.)
- * is dropped. Invalid/missing inputSchema falls back to an empty object schema.
+ * Applies the browser default input schema and validates the complete SDK tool.
  */
 export function normalizeInboundTool(inbound: z.infer<typeof InboundToolSchema>): RelayTool {
-  const inputSchemaParsed = ToolSchema.shape.inputSchema.safeParse(inbound.inputSchema);
-
-  const normalizedCandidate: Record<string, unknown> = {
-    name: inbound.name,
-    inputSchema: inputSchemaParsed.success ? inputSchemaParsed.data : DEFAULT_TOOL_INPUT_SCHEMA,
-  };
-
-  for (const key of [
-    'title',
-    'description',
-    'outputSchema',
-    'annotations',
-    'icons',
-    'execution',
-    '_meta',
-  ] as const) {
-    const parsed = ToolSchema.shape[key].safeParse(inbound[key]);
-    if (parsed.success && parsed.data !== undefined) {
-      normalizedCandidate[key] = parsed.data;
-    }
-  }
-
-  const normalizedParsed = NormalizedToolSchema.safeParse(normalizedCandidate);
-  if (normalizedParsed.success) {
-    return normalizedParsed.data;
-  }
-
-  return {
-    name: inbound.name,
-    inputSchema: DEFAULT_TOOL_INPUT_SCHEMA,
-  };
+  return NormalizedToolSchema.parse({
+    ...inbound,
+    inputSchema: inbound.inputSchema ?? DEFAULT_TOOL_INPUT_SCHEMA,
+  });
 }
 
 export { CallToolRequestParamsSchema, CallToolResultSchema, ToolAnnotationsSchema, ToolSchema };

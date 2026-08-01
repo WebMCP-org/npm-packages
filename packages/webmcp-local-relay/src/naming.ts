@@ -1,7 +1,7 @@
 /**
  * Maximum tool name length supported across MCP clients.
  */
-const MAX_MCP_TOOL_NAME_LENGTH = 128;
+export const MAX_MCP_TOOL_NAME_LENGTH = 128;
 
 /**
  * Number of tab-id characters appended when disambiguation is required.
@@ -60,12 +60,6 @@ export function buildPublicToolName(options: {
 
   const shortTab = sanitizeName(options.tabId).slice(0, TAB_ID_DISAMBIGUATION_LENGTH);
   const suffix = `_${shortTab}`;
-  const base = `${safeName}${suffix}`;
-
-  if (base.length <= MAX_MCP_TOOL_NAME_LENGTH) {
-    return base;
-  }
-
   const available = MAX_MCP_TOOL_NAME_LENGTH - suffix.length;
-  return `${safeName.slice(0, Math.max(1, available))}${suffix}`;
+  return `${safeName.slice(0, available)}${suffix}`;
 }

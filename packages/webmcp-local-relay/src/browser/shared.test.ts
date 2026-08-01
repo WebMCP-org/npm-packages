@@ -71,30 +71,6 @@ describe('createRequestId', () => {
     const ids = new Set(Array.from({ length: 20 }, () => createRequestId()));
     expect(ids.size).toBe(20);
   });
-
-  it('falls back when crypto.randomUUID is unavailable', () => {
-    const cryptoDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
-    const dateNow = vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
-    const mathRandom = vi.spyOn(Math, 'random').mockReturnValue(0.123456789);
-
-    Object.defineProperty(globalThis, 'crypto', {
-      configurable: true,
-      value: undefined,
-      writable: true,
-    });
-
-    try {
-      expect(createRequestId()).toBe('1700000000000_12345678');
-    } finally {
-      dateNow.mockRestore();
-      mathRandom.mockRestore();
-      if (cryptoDescriptor) {
-        Object.defineProperty(globalThis, 'crypto', cryptoDescriptor);
-      } else {
-        delete (globalThis as Record<string, unknown>).crypto;
-      }
-    }
-  });
 });
 
 describe('sanitizeLogText', () => {

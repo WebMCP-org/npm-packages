@@ -1,12 +1,10 @@
 import { execFile } from 'node:child_process';
 
 import {
-  type CallToolResult,
   fromJsonSchema,
   type JsonSchemaType,
   McpServer,
   type RegisteredTool,
-  type ToolAnnotations,
   type Transport,
 } from '@modelcontextprotocol/server';
 import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
@@ -14,19 +12,6 @@ import { z } from 'zod/v4';
 
 import { RelayBridgeServer, type RelayBridgeServerOptions } from './bridgeServer.js';
 import type { AggregatedTool, SourceInfo } from './registry.js';
-import {
-  EMPTY_STATIC_TOOL_INPUT_SHAPE,
-  type StaticToolInputShape,
-  WEBMCP_OPEN_PAGE_INPUT_SHAPE,
-} from './staticToolSchemas.js';
-
-interface StaticToolRegistration<T extends StaticToolInputShape = StaticToolInputShape> {
-  name: string;
-  description: string;
-  inputShape: T;
-  annotations?: ToolAnnotations;
-  handler: (args: z.output<z.ZodObject<T>>) => Promise<CallToolResult>;
-}
 
 /**
  * Base options shared by all {@link LocalRelayMcpServer} configurations.
@@ -64,11 +49,8 @@ export class LocalRelayMcpServer {
   readonly bridge: RelayBridgeServer;
 
   private readonly mcpServer: McpServer;
-  private readonly dynamicToolHandles = new Map<string, RegisteredTool>();
-  private readonly dynamicToolSignature = new Map<string, string>();
+  private readonly dynamicTools = new Map<string, { handle: RegisteredTool; signature: string }>();
 
-  private syncing = false;
-  private syncRequested = false;
   private syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private connected = false;
 
@@ -124,7 +106,7 @@ export class LocalRelayMcpServer {
    */
   async start(): Promise<void> {
     await this.bridge.start();
-    await this.syncDynamicTools();
+    this.syncDynamicTools();
   }
 
   /**
@@ -186,95 +168,78 @@ export class LocalRelayMcpServer {
    * Returns dynamic tool names currently registered in MCP.
    */
   listDynamicToolNames(): string[] {
-    return Array.from(this.dynamicToolHandles.keys()).sort();
-  }
-
-  private registerStaticTool<T extends StaticToolInputShape>({
-    name,
-    description,
-    inputShape,
-    annotations,
-    handler,
-  }: StaticToolRegistration<T>): void {
-    this.mcpServer.registerTool(
-      name,
-      {
-        description,
-        inputSchema: z.object(inputShape),
-        ...(annotations ? { annotations } : {}),
-      },
-      handler
-    );
+    return Array.from(this.dynamicTools.keys()).sort();
   }
 
   /**
    * Registers built-in management tools exposed by the relay.
    */
   private registerStaticTools(): void {
-    this.registerStaticTool({
-      name: 'webmcp_list_sources',
-      description: 'List connected browser tool sources and their metadata.',
-      inputShape: EMPTY_STATIC_TOOL_INPUT_SHAPE,
-      annotations: {
-        readOnlyHint: true,
-        idempotentHint: true,
+    this.mcpServer.registerTool(
+      'webmcp_list_sources',
+      {
+        description: 'List connected browser tool sources and their metadata.',
+        inputSchema: z.object({}),
+        annotations: {
+          readOnlyHint: true,
+          idempotentHint: true,
+        },
       },
-      handler: async () => {
-        if (this.bridge.mode === 'client') {
-          const sources = this.bridge.listSourcesFromRelay();
-          const info = {
-            mode: 'client' as const,
-            count: sources.length,
-            sources,
-          };
-          return {
-            content: [{ type: 'text', text: JSON.stringify(info, null, 2) }],
-            structuredContent: info,
-          };
-        }
-        const sources = this.bridge.registry.listSources();
-        return {
-          content: [
-            { type: 'text', text: JSON.stringify({ count: sources.length, sources }, null, 2) },
-          ],
-          structuredContent: {
-            count: sources.length,
-            sources,
-          },
+      async () => {
+        const clientMode = this.bridge.mode === 'client';
+        const sources = clientMode
+          ? this.bridge.listSourcesFromRelay()
+          : this.bridge.registry.listSources();
+        const info = {
+          ...(clientMode ? { mode: 'client' as const } : {}),
+          count: sources.length,
+          sources,
         };
-      },
-    });
+        return {
+          content: [{ type: 'text', text: JSON.stringify(info, null, 2) }],
+          structuredContent: info,
+        };
+      }
+    );
 
-    this.registerStaticTool({
-      name: 'webmcp_list_tools',
-      description:
-        'List WebMCP tools available from connected browser sources. Returns tool definitions including name, description, input schema, and source info.',
-      inputShape: EMPTY_STATIC_TOOL_INPUT_SHAPE,
-      annotations: {
-        readOnlyHint: true,
-        idempotentHint: true,
+    this.mcpServer.registerTool(
+      'webmcp_list_tools',
+      {
+        description:
+          'List WebMCP tools available from connected browser sources. Returns tool definitions including name, description, input schema, and source info.',
+        inputSchema: z.object({}),
+        annotations: {
+          readOnlyHint: true,
+          idempotentHint: true,
+        },
       },
-      handler: async () => {
+      async () => {
         const tools = this.listAggregatedTools();
+        const info = { count: tools.length, tools };
         return {
-          content: [
-            { type: 'text', text: JSON.stringify({ count: tools.length, tools }, null, 2) },
-          ],
-          structuredContent: {
-            count: tools.length,
-            tools,
-          },
+          content: [{ type: 'text', text: JSON.stringify(info, null, 2) }],
+          structuredContent: info,
         };
-      },
-    });
+      }
+    );
 
-    this.registerStaticTool({
-      name: 'webmcp_open_page',
-      description:
-        "Open a URL in the user's default browser, or refresh a connected source page. Use to launch WebMCP-enabled pages or reload stale connections.",
-      inputShape: WEBMCP_OPEN_PAGE_INPUT_SHAPE,
-      annotations: { readOnlyHint: false },
-      handler: async ({ url, refresh }) => {
+    this.mcpServer.registerTool(
+      'webmcp_open_page',
+      {
+        description:
+          "Open a URL in the user's default browser, or refresh a connected source page. Use to launch WebMCP-enabled pages or reload stale connections.",
+        inputSchema: z.object({
+          url: z.string().describe('URL to open or match for refresh.'),
+          refresh: z
+            .boolean()
+            .optional()
+            .describe(
+              'If true, refresh the connected source matching this URL instead of opening a new tab.'
+            ),
+        }),
+        annotations: { readOnlyHint: false },
+      },
+      async ({ url, refresh }) => {
         let parsed: URL;
         try {
           parsed = new URL(url);
@@ -297,6 +262,13 @@ export class LocalRelayMcpServer {
           };
         }
 
+        const existing =
+          this.bridge.mode === 'server'
+            ? this.bridge.registry
+                .listSources()
+                .find((source) => source.url && URL.parse(source.url)?.origin === parsed.origin)
+            : undefined;
+
         if (refresh) {
           if (this.bridge.mode === 'client') {
             return {
@@ -310,20 +282,7 @@ export class LocalRelayMcpServer {
             };
           }
 
-          const sources = this.bridge.registry.listSources();
-          const matched = sources.find((s) => {
-            if (!s.url) return false;
-            try {
-              return new URL(s.url).origin === parsed.origin;
-            } catch {
-              process.stderr.write(
-                `[webmcp-local-relay] warn: source ${s.sourceId} has unparseable URL: ${s.url}\n`
-              );
-              return false;
-            }
-          });
-
-          if (!matched) {
+          if (!existing) {
             return {
               content: [
                 {
@@ -336,12 +295,12 @@ export class LocalRelayMcpServer {
           }
 
           try {
-            this.bridge.reloadSource(matched.sourceId);
+            this.bridge.reloadSource(existing.sourceId);
             return {
               content: [
                 {
                   type: 'text' as const,
-                  text: `Reload sent to source ${matched.sourceId} (${matched.url ?? matched.origin}).`,
+                  text: `Reload sent to source ${existing.sourceId} (${existing.url ?? existing.origin}).`,
                 },
               ],
             };
@@ -372,45 +331,29 @@ export class LocalRelayMcpServer {
           };
         }
 
-        if (this.bridge.mode === 'server') {
-          const sources = this.bridge.registry.listSources();
-          const existing = sources.find((s) => {
-            if (!s.url) return false;
-            try {
-              return new URL(s.url).origin === parsed.origin;
-            } catch {
-              process.stderr.write(
-                `[webmcp-local-relay] warn: source ${s.sourceId} has unparseable URL: ${s.url}\n`
-              );
-              return false;
-            }
-          });
-
-          if (existing) {
-            return {
-              content: [
-                {
-                  type: 'text' as const,
-                  text: `Opened ${url} in the default browser. Note: a source from ${existing.url ?? existing.origin} is already connected.`,
-                },
-              ],
-            };
-          }
+        if (existing) {
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: `Opened ${url} in the default browser. Note: a source from ${existing.url ?? existing.origin} is already connected.`,
+              },
+            ],
+          };
         }
 
         return {
           content: [{ type: 'text' as const, text: `Opened ${url} in the default browser.` }],
         };
-      },
-    });
+      }
+    );
   }
 
   /**
    * Opens a URL in the user's default browser using the platform open command.
    *
-   * Uses the re-serialized `URL.href` to prevent injection of shell metacharacters.
-   * On Windows, PowerShell `Start-Process` is used instead of `cmd /c start`
-   * because cmd.exe interprets `&`, `|`, and other metacharacters in URLs.
+   * Passes the re-serialized `URL.href` directly to the platform launcher.
+   * No shell or command-language string is involved.
    */
   private openInBrowser(url: string): Promise<void> {
     const safeUrl = new URL(url).href;
@@ -422,8 +365,8 @@ export class LocalRelayMcpServer {
         command = 'open';
         args = [safeUrl];
       } else if (platform === 'win32') {
-        command = 'powershell.exe';
-        args = ['-NoProfile', '-Command', `Start-Process "${safeUrl}"`];
+        command = 'explorer.exe';
+        args = [safeUrl];
       } else {
         command = 'xdg-open';
         args = [safeUrl];
@@ -450,39 +393,16 @@ export class LocalRelayMcpServer {
 
     this.syncDebounceTimer = setTimeout(() => {
       this.syncDebounceTimer = null;
-      void this.syncDynamicTools().catch((err) => {
+      try {
+        this.syncDynamicTools();
+      } catch (err) {
         this.logSyncError(err);
-      });
+      }
     }, 16);
   }
 
-  /**
-   * Coalesces concurrent sync requests into a single serialized sync loop.
-   */
-  private async syncDynamicTools(): Promise<void> {
-    if (this.syncing) {
-      this.syncRequested = true;
-      return;
-    }
-
-    this.syncing = true;
-
-    try {
-      do {
-        this.syncRequested = false;
-        const tools = this.listAggregatedTools();
-        this.applyDynamicTools(tools);
-      } while (this.syncRequested);
-    } finally {
-      const retryRequested = this.syncRequested;
-      this.syncRequested = false;
-      this.syncing = false;
-      if (retryRequested) {
-        void this.syncDynamicTools().catch((err) => {
-          this.logSyncError(err);
-        });
-      }
-    }
+  private syncDynamicTools(): void {
+    this.applyDynamicTools(this.listAggregatedTools());
   }
 
   /**
@@ -534,36 +454,32 @@ export class LocalRelayMcpServer {
   private applyDynamicTools(tools: AggregatedTool[]): void {
     const nextNames = new Set(tools.map((tool) => tool.name));
 
-    for (const [name, handle] of this.dynamicToolHandles.entries()) {
+    for (const [name, registration] of this.dynamicTools) {
       if (nextNames.has(name)) {
         continue;
       }
 
-      handle.remove();
-      this.dynamicToolHandles.delete(name);
-      this.dynamicToolSignature.delete(name);
+      registration.handle.remove();
+      this.dynamicTools.delete(name);
     }
 
     for (const tool of tools) {
       const signature = this.toolSignature(tool);
-      const currentSignature = this.dynamicToolSignature.get(tool.name);
+      const current = this.dynamicTools.get(tool.name);
 
-      if (currentSignature === signature && this.dynamicToolHandles.has(tool.name)) {
+      if (current?.signature === signature) {
         continue;
       }
 
-      const existing = this.dynamicToolHandles.get(tool.name);
-      if (existing) {
-        existing.remove();
-        this.dynamicToolHandles.delete(tool.name);
+      if (current) {
+        current.handle.remove();
+        this.dynamicTools.delete(tool.name);
       }
 
       try {
         const handle = this.registerDynamicTool(tool);
-        this.dynamicToolHandles.set(tool.name, handle);
-        this.dynamicToolSignature.set(tool.name, signature);
+        this.dynamicTools.set(tool.name, { handle, signature });
       } catch (err) {
-        this.dynamicToolSignature.delete(tool.name);
         const details = err instanceof Error ? (err.stack ?? err.message) : String(err);
         process.stderr.write(
           `[webmcp-local-relay] warn: skipped dynamic tool "${tool.name}" because its schema could not be compiled: ${details}\n`
@@ -640,19 +556,17 @@ export class LocalRelayMcpServer {
    */
   private toolSignature(tool: AggregatedTool): string {
     return JSON.stringify({
-      name: tool.name,
       originalName: tool.originalName,
       title: tool.title,
       description: tool.description,
       inputSchema: tool.inputSchema,
       outputSchema: tool.outputSchema,
       annotations: tool.annotations,
-      execution: tool.execution,
       _meta: tool._meta,
       icons: tool.icons,
-      sources: tool.sources.map((source) => ({
-        tabId: source.tabId,
-      })),
+      source: tool.sources[0]
+        ? { tabId: tool.sources[0].tabId, title: tool.sources[0].title }
+        : undefined,
     });
   }
 

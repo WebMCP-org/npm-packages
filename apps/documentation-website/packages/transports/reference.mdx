@@ -66,8 +66,6 @@ await server.connect(transport);
 #### Behavior
 
 - Validates `event.origin` against `allowedOrigins` for every incoming message.
-- Tracks pending requests and sends interrupted responses during `beforeunload` if the page navigates while a tool call is in progress.
-- Cleans up stale requests after 5 minutes.
 - Posts `mcp-server-stopped` on close.
 
 ### TabClientTransport
@@ -85,11 +83,10 @@ await client.connect(transport);
 
 #### TabClientTransportOptions
 
-| Option           | Type     | Required | Default         | Description                                                                                                                       |
-| ---------------- | -------- | -------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `targetOrigin`   | `string` | No       | `"*"`           | Expected origin of the server window. Messages from other origins are ignored.                                                    |
-| `channelId`      | `string` | No       | `"mcp-default"` | Channel identifier for message routing.                                                                                           |
-| `requestTimeout` | `number` | No       | `10000`         | Timeout in milliseconds for requests. If the server does not respond in time, a JSON-RPC error with code `-32000` is synthesized. |
+| Option         | Type     | Required | Default         | Description                                                                                      |
+| -------------- | -------- | -------- | --------------- | ------------------------------------------------------------------------------------------------ |
+| `targetOrigin` | `string` | Yes      | --              | Expected origin of the server window. Pass `"*"` only to disable origin validation deliberately. |
+| `channelId`    | `string` | No       | `"mcp-default"` | Channel identifier for message routing.                                                          |
 
 #### Properties
 
@@ -105,7 +102,7 @@ await client.connect(transport);
 
 ## Iframe transports
 
-Cross-origin communication between a parent page and an iframe. Uses `window.postMessage` with retry-based ready handshakes to handle iframe loading timing.
+Cross-origin communication between a parent page and an iframe. Uses `window.postMessage` with a ready handshake to handle iframe loading timing.
 
 ### IframeParentTransport
 
@@ -124,12 +121,12 @@ await client.connect(transport);
 
 #### IframeParentTransportOptions
 
-| Option              | Type                | Required | Default        | Description                                                                           |
-| ------------------- | ------------------- | -------- | -------------- | ------------------------------------------------------------------------------------- |
-| `iframe`            | `HTMLIFrameElement` | Yes      | --             | Reference to the iframe element.                                                      |
-| `targetOrigin`      | `string`            | No       | `"*"`          | Expected origin of the iframe for `postMessage` security.                             |
-| `channelId`         | `string`            | No       | `"mcp-iframe"` | Channel identifier for message routing.                                               |
-| `checkReadyRetryMs` | `number`            | No       | `250`          | Interval in milliseconds to retry the ready handshake if the iframe is not yet ready. |
+| Option              | Type                | Required | Default        | Description                                                                               |
+| ------------------- | ------------------- | -------- | -------------- | ----------------------------------------------------------------------------------------- |
+| `iframe`            | `HTMLIFrameElement` | Yes      | --             | Reference to the iframe element.                                                          |
+| `targetOrigin`      | `string`            | Yes      | --             | Expected origin of the iframe. Pass `"*"` only to disable origin validation deliberately. |
+| `channelId`         | `string`            | No       | `"mcp-iframe"` | Channel identifier for message routing.                                                   |
+| `checkReadyRetryMs` | `number`            | No       | `250`          | Retry interval while `iframe.contentWindow` is unavailable.                               |
 
 #### Properties
 
@@ -152,11 +149,10 @@ await server.connect(transport);
 
 #### IframeChildTransportOptions
 
-| Option               | Type       | Required | Default        | Description                                                                    |
-| -------------------- | ---------- | -------- | -------------- | ------------------------------------------------------------------------------ |
-| `allowedOrigins`     | `string[]` | Yes      | --             | Parent origins permitted to connect. Use `["*"]` to allow any origin.          |
-| `channelId`          | `string`   | No       | `"mcp-iframe"` | Channel identifier for message routing.                                        |
-| `serverReadyRetryMs` | `number`   | No       | `250`          | Interval in milliseconds to retry broadcasting the ready signal to the parent. |
+| Option           | Type       | Required | Default        | Description                                                           |
+| ---------------- | ---------- | -------- | -------------- | --------------------------------------------------------------------- |
+| `allowedOrigins` | `string[]` | Yes      | --             | Parent origins permitted to connect. Use `["*"]` to allow any origin. |
+| `channelId`      | `string`   | No       | `"mcp-iframe"` | Channel identifier for message routing.                               |
 
 ---
 
@@ -204,7 +200,7 @@ new ExtensionServerTransport(port: chrome.runtime.Port, options?: ExtensionServe
 | Option              | Type      | Required | Default | Description                                                        |
 | ------------------- | --------- | -------- | ------- | ------------------------------------------------------------------ |
 | `keepAlive`         | `boolean` | No       | `true`  | Send periodic keep-alive pings to prevent service worker shutdown. |
-| `keepAliveInterval` | `number`  | No       | `1000`  | Keep-alive interval in milliseconds.                               |
+| `keepAliveInterval` | `number`  | No       | `25000` | Keep-alive interval in milliseconds.                               |
 
 #### Methods
 

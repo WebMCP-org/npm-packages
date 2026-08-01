@@ -46,6 +46,7 @@
     "dist"
   ],
   "type": "module",
+  "sideEffects": false,
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -68,25 +69,25 @@
     "prepublishOnly": "node ../../scripts/validate-publish.js && pnpm run build",
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
-    "test": "vp test run src/ExtensionClientTransport.test.ts src/ExtensionServerTransport.test.ts && pnpm run test:browser",
-    "test:browser": "VITEST_BROWSER=true vp test run --browser.headless src/TabTransport.browser.test.ts",
-    "test:browser:ui": "VITEST_BROWSER=true vp test --browser src/TabTransport.browser.test.ts",
+    "test": "vp test run && pnpm run test:browser",
+    "test:browser": "VITEST_BROWSER=true vp test run",
+    "test:browser:ui": "VITEST_BROWSER=true vp test --browser",
     "test:e2e": "pnpm --filter @mcp-b/transports build && pnpm --filter @mcp-b/webmcp-polyfill build && pnpm --filter @mcp-b/webmcp-ts-sdk build && vp pack --filter e2e-extension && node e2e/build-extension.mjs && node --experimental-strip-types --test e2e/extension-runtime.e2e.test.ts",
     "test:watch": "vp test",
-    "typecheck": "tsc --noEmit && tsc -p e2e/tsconfig.extension.json --noEmit",
+    "typecheck": "tsc -p tsconfig.check.json && tsc -p e2e/tsconfig.extension.json --noEmit",
     "version:major": "pnpm version major --no-git-tag-version",
     "version:minor": "pnpm version minor --no-git-tag-version",
     "version:patch": "pnpm version patch --no-git-tag-version"
   },
   "dependencies": {
     "@modelcontextprotocol/core": "catalog:",
-    "@modelcontextprotocol/server": "catalog:"
+    "@modelcontextprotocol/server": "catalog:",
+    "@types/chrome": "catalog:",
+    "@types/node": "catalog:"
   },
   "devDependencies": {
     "@mcp-b/webmcp-ts-sdk": "workspace:*",
     "@modelcontextprotocol/client": "catalog:",
-    "@types/chrome": "catalog:",
-    "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "playwright": "catalog:",
     "typescript": "catalog:",

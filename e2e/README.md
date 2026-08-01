@@ -52,7 +52,6 @@ e2e/
 │   ├── runtime-contract-native.spec.ts
 │   ├── tab-transport.spec.ts
 │   ├── mcp-iframe-element.spec.ts
-│   ├── codemode-webmcp.spec.ts
 │   ├── chromium-native-api.spec.ts # Historical name; MCP-B compatibility shim coverage
 │   └── chrome-beta-webmcp.spec.ts
 ├── playwright.config.ts
@@ -111,8 +110,6 @@ pnpm test:native-contract:beta
 
 # Runtime API integration (not canonical E2E)
 pnpm test:integration:runtime-api
-pnpm test:codemode:webmcp
-pnpm test:codemode:webmcp:beta
 
 # Framework integration (not canonical E2E)
 pnpm test:integration:frameworks
@@ -142,18 +139,11 @@ These suites remain valuable, but they are not the default E2E definition:
 
 - `tests/tab-transport.spec.ts`
 - `tests/mcp-iframe-element.spec.ts`
-- `tests/codemode-webmcp.spec.ts`
 - `tests/chromium-native-api.spec.ts` (MCP-B extensions and the deprecated
   `modelContextTesting` compatibility shim, despite the historical filename)
 - `tests/notification-batching.spec.ts`
 - `tests/chrome-beta-webmcp.spec.ts`
 - `playwright-native-showcase.config.ts`
-
-Focused codemode coverage:
-
-- `pnpm test:codemode:webmcp` verifies the codemode page flow in Chromium and records whether the page ran against the native or polyfill runtime path.
-- `pnpm test:codemode:webmcp:beta` verifies that same page flow against Chrome
-  152+ through the captured native `document.modelContext` surface.
 
 ## Manual Runtime Pages
 

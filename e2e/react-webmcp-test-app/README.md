@@ -18,7 +18,7 @@ This test app demonstrates and validates all features of the `@mcp-b/react-webmc
 
 - `counter_increment` - Increment counter (mutation, non-idempotent)
 - `counter_decrement` - Decrement counter (mutation, non-idempotent)
-- `counter_reset` - Reset to zero (destructive operation with elicitation)
+- `counter_reset` - Reset to zero (destructive operation)
 - `counter_get` - Get current value (read-only, idempotent query)
 
 ### Posts Tools (Complex Operations)

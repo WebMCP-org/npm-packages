@@ -130,14 +130,11 @@ function App() {
     description: 'Increment the counter by a specified amount',
     inputSchema: COUNTER_AMOUNT_INPUT_SCHEMA,
     annotations: INCREMENT_ANNOTATIONS,
-    handler: async (input) => {
+    execute: async (input) => {
       await new Promise((resolve) => setTimeout(resolve, 500)); // Simulate async
       globalCounter += input.amount;
       addLog(`Incremented counter by ${input.amount}. New value: ${globalCounter}`, 'success');
       return { counter: globalCounter, incremented: input.amount };
-    },
-    onError: (error) => {
-      addLog(`Error incrementing: ${error.message}`, 'error');
     },
   });
 
@@ -147,7 +144,7 @@ function App() {
     description: 'Decrement the counter by a specified amount',
     inputSchema: COUNTER_AMOUNT_INPUT_SCHEMA,
     annotations: DECREMENT_ANNOTATIONS,
-    handler: async (input) => {
+    execute: async (input) => {
       await new Promise((resolve) => setTimeout(resolve, 500));
       globalCounter -= input.amount;
       addLog(`Decremented counter by ${input.amount}. New value: ${globalCounter}`, 'success');
@@ -160,7 +157,7 @@ function App() {
     name: 'counter_reset',
     description: 'Reset the counter to zero. This action cannot be undone.',
     annotations: RESET_ANNOTATIONS,
-    handler: async () => {
+    execute: async () => {
       const oldValue = globalCounter;
       globalCounter = 0;
       addLog(`Reset counter from ${oldValue} to 0`, 'success');
@@ -174,7 +171,7 @@ function App() {
     description: 'Get the current counter value',
     outputSchema: GET_COUNTER_OUTPUT_SCHEMA,
     annotations: GET_COUNTER_ANNOTATIONS,
-    handler: async () => {
+    execute: async () => {
       const timestamp = new Date().toISOString();
       addLog(`Retrieved counter value: ${globalCounter}`, 'info');
       return { counter: globalCounter, timestamp };
@@ -187,7 +184,7 @@ function App() {
     description: 'Like a post by ID. Increments the like count.',
     inputSchema: LIKE_POST_INPUT_SCHEMA,
     annotations: LIKE_POST_ANNOTATIONS,
-    handler: async (input) => {
+    execute: async (input) => {
       await new Promise((resolve) => setTimeout(resolve, 300));
       setPosts((prev) =>
         prev.map((post) => (post.id === input.postId ? { ...post, likes: post.likes + 1 } : post))
@@ -207,7 +204,7 @@ function App() {
     description: 'Search posts by keyword',
     inputSchema: SEARCH_POSTS_INPUT_SCHEMA,
     annotations: SEARCH_POSTS_ANNOTATIONS,
-    handler: async (input) => {
+    execute: async (input) => {
       await new Promise((resolve) => setTimeout(resolve, 400));
       const results = posts
         .filter((post) => post.title.toLowerCase().includes(input.query.toLowerCase()))
@@ -219,14 +216,6 @@ function App() {
         results: results.map((p) => ({ id: p.id, title: p.title, likes: p.likes })),
         count: results.length,
       };
-    },
-    formatOutput: (output) => {
-      const typedOutput = output as {
-        count: number;
-        results: Array<{ title: string; likes: number }>;
-      };
-      const results = typedOutput.results;
-      return `Found ${typedOutput.count} posts:\n${results.map((r) => `• ${r.title} (${r.likes} likes)`).join('\n')}`;
     },
   });
 

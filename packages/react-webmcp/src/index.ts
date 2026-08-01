@@ -1,32 +1,10 @@
 'use client';
 
 /**
- * @mcp-b/react-webmcp
- *
- * React hooks for registering and managing Model Context Protocol (MCP) tools
- * with type-safe schemas, async state management, and built-in error handling.
- *
- * This package provides three main use cases:
- *
- * 1. **Provider hooks**: Register and expose tools to AI assistants via `window.document.modelContext`
- * 2. **Client hooks**: Connect to and consume tools from MCP servers
- * 3. **Request hooks**: Make sampling and elicitation requests to connected MCP clients
- *
+ * React hooks for exposing WebMCP tools, prompts, and resources, plus an MCP client provider.
  * @packageDocumentation
  */
 
-// ============================================
-// Provider Hooks (Register/Expose Tools)
-// ============================================
-
-/**
- * Type definitions for tool registration and configuration.
- *
- * - {@link WebMCPConfig} - Configuration for tool registration
- * - {@link WebMCPReturn} - Return value from useWebMCP hook
- * - {@link ToolExecutionState} - Current execution state of a tool
- * - {@link InferOutput} - Utility type for inferring output from JSON Schema
- */
 export type {
   InferOutput,
   InferToolInput,
@@ -34,84 +12,17 @@ export type {
   WebMCPConfig,
   WebMCPReturn,
 } from 'usewebmcp';
-export type { ToolInputSchema } from '@mcp-b/webmcp-polyfill/schema';
-export type { ReactWebMCPInputSchema } from './types.js';
-/**
- * Main hook for registering MCP tools with full control over execution state,
- * validation, and lifecycle callbacks.
- */
 export { useWebMCP } from 'usewebmcp';
-/**
- * Simplified hook for exposing read-only context data to AI assistants.
- * Convenience wrapper around `useWebMCP` for context tools.
- */
-export { useWebMCPContext } from './useWebMCPContext.js';
 
-// ============================================
-// Provider Hooks (Register/Expose Prompts)
-// ============================================
-
-/**
- * Type definitions for prompt registration and configuration.
- */
-export type { WebMCPPromptConfig, WebMCPPromptReturn } from './types.js';
-/**
- * Hook for registering MCP prompts with the Model Context API.
- * Prompts provide reusable message templates for AI interactions.
- */
-export { useWebMCPPrompt } from './useWebMCPPrompt.js';
-
-// ============================================
-// Provider Hooks (Register/Expose Resources)
-// ============================================
-
-/**
- * Type definitions for resource registration and configuration.
- */
-export type { WebMCPResourceConfig, WebMCPResourceReturn } from './types.js';
-/**
- * Hook for registering MCP resources with the Model Context API.
- * Resources expose data that AI models can read.
- */
-export { useWebMCPResource } from './useWebMCPResource.js';
-
-// ============================================
-// Request Hooks (Sampling & Elicitation)
-// ============================================
-
-/**
- * Type definitions for elicitation hook.
- */
-export type {
-  ElicitationState,
-  UseElicitationConfig,
-  UseElicitationReturn,
-} from './useElicitationHandler.js';
-/**
- * Hook for requesting user input from the connected MCP client.
- * Use this when the page needs to collect information from users via the AI client.
- */
-export { useElicitation } from './useElicitationHandler.js';
-/**
- * Type definitions for sampling hook.
- */
-export type { SamplingState, UseSamplingConfig, UseSamplingReturn } from './useSamplingHandler.js';
-/**
- * Hook for requesting LLM completions from the connected MCP client.
- * Use this when the page needs AI model responses.
- */
-export { useSampling } from './useSamplingHandler.js';
-
-// ============================================
-// Client Hooks (Consume Tools)
-// ============================================
-
-/**
- * Type definition for McpClientProvider props.
- */
+export type { ToolInputSchema } from '@mcp-b/webmcp-polyfill/schema';
 export type { McpClientProviderProps } from './client/McpClientProvider.js';
-/**
- * Provider component for connecting to MCP servers and consuming their tools.
- * Manages connection state, fetches tools/resources, and handles server notifications.
- */
 export { McpClientProvider, useMcpClient } from './client/McpClientProvider.js';
+export type {
+  WebMCPPromptConfig,
+  WebMCPPromptReturn,
+  WebMCPResourceConfig,
+  WebMCPResourceReturn,
+} from './types.js';
+export { useWebMCPContext } from './useWebMCPContext.js';
+export { useWebMCPPrompt } from './useWebMCPPrompt.js';
+export { useWebMCPResource } from './useWebMCPResource.js';

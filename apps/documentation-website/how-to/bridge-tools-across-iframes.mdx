@@ -1,5 +1,5 @@
 ---
-title: 'Bridge Tools Across Iframes'
+title: 'Bridge tools across iframes'
 description: 'Surface child-frame WebMCP tools in a parent page using the mcp-iframe custom element with automatic namespacing and routing.'
 keywords:
   [
@@ -18,8 +18,8 @@ This guide shows you how to expose tools, resources, and prompts registered insi
 
 ## Prerequisites
 
-- The **parent page** must have `@mcp-b/global` (or any `document.modelContext` implementation) installed.
-- The **iframe page** must also have `@mcp-b/global` installed and must register tools on `document.modelContext`.
+- The parent page must expose `document.modelContext`. Bridging resources or prompts requires the MCP-B extensions from `@mcp-b/global`.
+- The iframe page must expose its MCP server and register items on `document.modelContext`.
 
 ## Install the package
 
@@ -47,6 +47,18 @@ Replace a standard `<iframe>` with `<mcp-iframe>`. Set the `id` attribute to con
 
 A tool named `calculate` in the iframe appears on the parent as `my-app_calculate`. This namespacing prevents collisions when multiple iframes register tools with the same name.
 
+Importing `@mcp-b/mcp-iframe` auto-registers the default `<mcp-iframe>` tag.
+
+## Register a custom tag
+
+To use another tag name without registering `<mcp-iframe>`, import the side-effect-free entry point:
+
+```typescript
+import { registerMCPIframeElement } from '@mcp-b/mcp-iframe/element';
+
+registerMCPIframeElement('partner-tools-frame');
+```
+
 ## Understand namespacing
 
 The prefix is built from the element's `id` (or `name` attribute, or `"iframe"` as fallback) plus a separator character.
@@ -57,7 +69,7 @@ The prefix is built from the element's `id` (or `name` attribute, or `"iframe"` 
 | `search`        | `widget`     | `widget_search`    |
 | `greet`         | (none)       | `iframe_greet`     |
 
-Tool and prompt names must match the MCP pattern `^[a-zA-Z0-9_-]{1,128}$`. If the `id` contains invalid characters, they are sanitized to underscores automatically.
+The element preserves letters, numbers, underscores, dots, and hyphens in the prefix. It replaces other characters in the `id`, `name`, or separator with underscores.
 
 To change the separator character, set the `prefix-separator` attribute:
 
@@ -68,33 +80,35 @@ To change the separator character, set the `prefix-separator` attribute:
 
 ## Configure the element
 
-| Attribute          | Description                              | Default             |
-| ------------------ | ---------------------------------------- | ------------------- |
-| `src`              | URL of the iframe page                   | (required)          |
-| `id`               | Used as the tool name prefix             | `"iframe"`          |
-| `target-origin`    | Override the `postMessage` target origin | Inferred from `src` |
-| `channel`          | Channel ID for the transport             | `mcp-iframe`        |
-| `call-timeout`     | Timeout in ms for tool calls             | `30000`             |
-| `prefix-separator` | Separator between prefix and tool name   | `_`                 |
+| Attribute          | Description                                                   | Default             |
+| ------------------ | ------------------------------------------------------------- | ------------------- |
+| `src`              | URL of the iframe page (omit when using `srcdoc`)             | —                   |
+| `id`               | Used as the tool and prompt name prefix                       | `"iframe"`          |
+| `target-origin`    | Override the `postMessage` target origin                      | Inferred from `src` |
+| `channel`          | Channel ID for the transport                                  | `mcp-iframe`        |
+| `call-timeout`     | Timeout in ms for tool calls, resource reads, and prompt gets | `30000`             |
+| `prefix-separator` | Separator between the prefix and item name                    | `_`                 |
 
 Standard iframe attributes (`sandbox`, `allow`, `width`, `height`) are mirrored to the internal iframe.
 
+`call-timeout` accepts a positive integer. Invalid values fall back to `30000`.
+
 ## Listen for events
 
-| Event                      | Detail                          | When                                 |
-| -------------------------- | ------------------------------- | ------------------------------------ |
-| `mcp-iframe-ready`         | `{ tools, resources, prompts }` | Connected to the iframe's MCP server |
-| `mcp-iframe-error`         | `{ error }`                     | Connection failed                    |
-| `mcp-iframe-tools-changed` | `{ tools, resources, prompts }` | After calling `refresh()`            |
+| Event                      | Detail                          | When                                           |
+| -------------------------- | ------------------------------- | ---------------------------------------------- |
+| `mcp-iframe-ready`         | `{ tools, resources, prompts }` | Connected to the iframe's MCP server           |
+| `mcp-iframe-error`         | `{ error }`                     | Connection or item refresh failed              |
+| `mcp-iframe-items-changed` | `{ tools, resources, prompts }` | After an advertised list change or `refresh()` |
 
-## Refresh tools after dynamic changes
+## Refresh items manually
 
-If the iframe registers new tools after the initial connection, call `refresh()` to re-sync:
+The element automatically mirrors list changes advertised by the child MCP server. If the child changes its items without sending a supported `list_changed` notification, call `refresh()`:
 
 ```javascript
 const el = document.querySelector('mcp-iframe');
 await el.refresh();
-// Fires "mcp-iframe-tools-changed" with updated tool list
+// Fires "mcp-iframe-items-changed" with the updated item lists
 ```
 
 ## Bridge multiple iframes
@@ -140,6 +154,14 @@ For iframes served from a different domain, set `target-origin` explicitly:
 ```
 
 The iframe page must also allow the parent's origin in its transport configuration. If you control the iframe app, ensure `@mcp-b/global` is loaded with appropriate origin settings.
+
+If `sandbox` omits `allow-same-origin`, or the iframe source otherwise has an opaque origin, set `target-origin="*"`:
+
+```html
+<mcp-iframe src="./child-app.html" sandbox="allow-scripts" target-origin="*"></mcp-iframe>
+```
+
+Use `"*"` only for opaque origins because it disables target-origin validation for messages sent to the iframe.
 
 ## Related pages
 

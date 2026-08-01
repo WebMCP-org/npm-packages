@@ -43,7 +43,6 @@ describe('ExtensionClientTransport', () => {
     vi.stubGlobal('chrome', {
       runtime: {
         connect,
-        lastError: undefined,
       },
     });
 
@@ -69,7 +68,6 @@ describe('ExtensionClientTransport', () => {
     vi.stubGlobal('chrome', {
       runtime: {
         connect: vi.fn().mockReturnValue(connectedPort.port),
-        lastError: undefined,
       },
     });
     const transport = new ExtensionClientTransport();
@@ -77,6 +75,7 @@ describe('ExtensionClientTransport', () => {
     transport.onclose = onclose;
 
     await transport.start();
+    await expect(transport.start()).rejects.toThrow('Transport already started');
     await transport.close();
 
     expect(connectedPort.disconnect).toHaveBeenCalledOnce();

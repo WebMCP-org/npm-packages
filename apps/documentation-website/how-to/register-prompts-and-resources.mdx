@@ -1,12 +1,10 @@
 ---
 title: 'Register Prompts and Resources'
-description: 'Use MCP-B extension APIs to register prompts, resources, and use sampling and elicitation.'
+description: 'Use MCP-B extension APIs to register prompts and resources from JavaScript or React.'
 keywords:
   [
     'registerPrompt',
     'registerResource',
-    'sampling',
-    'elicitation',
     'mcp-b extensions',
     '@mcp-b/react-webmcp',
     'BrowserMcpServer',
@@ -14,7 +12,7 @@ keywords:
 icon: 'layer-plus'
 ---
 
-Prompts, resources, sampling, and elicitation are MCP-B extension features, not part of the strict WebMCP core. They require [`@mcp-b/global`](/packages/global/reference) (which installs `BrowserMcpServer` as `document.modelContext`). For background on this distinction, see [Strict Core vs MCP-B Extensions](/explanation/strict-core-vs-mcp-b-extensions).
+Prompts and resources are MCP-B extension features, not part of the strict WebMCP core. They require [`@mcp-b/global`](/packages/global/reference) (which installs `BrowserMcpServer` as `document.modelContext`). For background on this distinction, see [Strict Core vs MCP-B Extensions](/explanation/strict-core-vs-mcp-b-extensions).
 
 ## Register a prompt
 
@@ -145,74 +143,3 @@ function AppSettingsResource() {
   return <div>Settings resource {isRegistered ? 'ready' : 'loading'}</div>;
 }
 ```
-
-## Use sampling and elicitation
-
-Sampling lets your page request LLM completions from the connected client. Elicitation lets your page request structured input from the user through the client.
-
-Both methods delegate to the MCP SDK and require an active transport connection. See the [`@mcp-b/webmcp-ts-sdk` reference](/packages/webmcp-ts-sdk/reference) for parameter and return type details.
-
-### React
-
-`@mcp-b/react-webmcp` provides `useSampling` and `useElicitation` hooks that manage loading state, errors, and request counts.
-
-<CodeGroup>
-```tsx "Sampling"
-import { useSampling } from '@mcp-b/react-webmcp';
-
-function AIAssistant() {
-const { state, createMessage } = useSampling();
-
-const handleAsk = async () => {
-const result = await createMessage({
-messages: [
-{ role: 'user', content: { type: 'text', text: 'Summarize this page.' } }
-],
-maxTokens: 200,
-});
-console.log(result.content);
-};
-
-return (
-
-<button onClick={handleAsk} disabled={state.isLoading}>
-Ask AI
-</button>
-);
-}
-
-````
-
-```tsx "Elicitation"
-import { useElicitation } from '@mcp-b/react-webmcp';
-
-function ConfigForm() {
-  const { state, elicitInput } = useElicitation();
-
-  const handleConfigure = async () => {
-    const result = await elicitInput({
-      message: 'Please provide your configuration',
-      requestedSchema: {
-        type: 'object',
-        properties: {
-          apiKey: { type: 'string', title: 'API Key' },
-          model: { type: 'string', enum: ['gpt-4', 'gpt-3.5'], title: 'Model' }
-        },
-        required: ['apiKey']
-      }
-    });
-
-    if (result.action === 'accept') {
-      console.log('Config:', result.content);
-    }
-  };
-
-  return (
-    <button onClick={handleConfigure} disabled={state.isLoading}>
-      Configure
-    </button>
-  );
-}
-````
-
-</CodeGroup>

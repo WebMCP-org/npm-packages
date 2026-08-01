@@ -1,23 +1,25 @@
 import type { RuntimeContractController } from '../runtime-contract/core.js';
-import type { Client } from '@modelcontextprotocol/client';
+import type { MCPIframeElement } from '@mcp-b/mcp-iframe/element';
+import type {
+  CallToolResult,
+  Client,
+  GetPromptResult,
+  ReadResourceResult,
+  Variables,
+} from '@modelcontextprotocol/client';
 
 declare global {
   interface Window {
     __WEBMCP_E2E__?: RuntimeContractController;
     mcpClient?: Client;
     mcpIframeHost: {
-      callTool: (name: string, args: Record<string, unknown>) => Promise<unknown>;
-      getMcpIframe: () => Element & {
-        client: unknown;
-        ready: boolean;
-        exposedTools: string[];
-        exposedResources: string[];
-        exposedPrompts: string[];
-      };
-      readResource: (uri: string) => Promise<unknown>;
+      callTool: (name: string, args: Record<string, unknown>) => Promise<CallToolResult>;
+      getMcpIframe: () => MCPIframeElement;
+      readResource: (uri: string) => Promise<ReadResourceResult>;
+      readResourceTemplate: (template: string, variables: Variables) => Promise<ReadResourceResult>;
+      getPrompt: (name: string, args: Record<string, string>) => Promise<GetPromptResult>;
       getParentTool: (name: string) => Promise<unknown>;
-      addChildDynamicItem: (item: 'tool' | 'resource' | 'prompt') => Promise<void>;
-      removeChildDynamicItems: () => void;
+      setDynamicItems: (enabled: boolean) => Promise<void>;
       stopChildRuntime: () => Promise<void>;
     };
     testApp: {

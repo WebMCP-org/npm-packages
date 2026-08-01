@@ -27,13 +27,10 @@ export function isLoopbackHost(host: string): boolean {
 }
 
 /**
- * Creates a random request/tab ID using crypto.randomUUID with fallback.
+ * Creates a random request/tab ID.
  */
 export function createRequestId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  return `${String(Date.now())}_${String(Math.random()).slice(2, 10)}`;
+  return crypto.randomUUID();
 }
 
 /**

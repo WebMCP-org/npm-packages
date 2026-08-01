@@ -6,7 +6,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/@mcp-b/react-webmcp?style=flat-square)](https://www.npmjs.com/package/@mcp-b/react-webmcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue?style=flat-square)](https://www.typescriptlang.org/)
-[![React](https://img.shields.io/badge/React-18+-61DAFB?style=flat-square&logo=react)](https://reactjs.org/)
+[![React](https://img.shields.io/badge/React-17--19-61DAFB?style=flat-square&logo=react)](https://react.dev/)
 
 **[Reference](https://docs.mcp-b.ai/packages/react-webmcp/reference)** | **[React Tutorial](https://docs.mcp-b.ai/tutorials/first-react-tool)** | **[Framework Guides](https://docs.mcp-b.ai/how-to/frameworks)**
 
@@ -30,7 +30,7 @@ pnpm add @mcp-b/global @mcp-b/react-webmcp
 
 You can omit `@mcp-b/global` when you only consume an MCP server as a client, or when a native
 WebMCP implementation supplies `document.modelContext` and you only use the core `useWebMCP` tool
-hook. Prompt, resource, sampling, and elicitation hooks require the MCP-B extensions installed by
+hook. Prompt and resource hooks require the MCP-B extensions installed by
 `@mcp-b/global`. If you only want strict core WebMCP hooks, install `usewebmcp` directly.
 
 For client functionality, you'll also need:
@@ -68,16 +68,23 @@ function PostsPage() {
       },
       required: ['postId'],
     } as const,
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        postId: { type: 'string' },
+      },
+      required: ['success', 'postId'],
+    } as const,
     annotations: {
       title: 'Like Post',
       readOnlyHint: false,
       idempotentHint: true,
     },
-    handler: async (input) => {
+    execute: async (input) => {
       await api.posts.like(input.postId);
       return { success: true, postId: input.postId };
     },
-    formatOutput: (result) => `Post ${result.postId} liked successfully!`,
   });
 
   return (
@@ -145,6 +152,8 @@ If a one-shot transport closes, construct a new transport and pass it to
 | ----------------------------------------------- | --------------------------------------------------------- |
 | `useWebMCP(config, deps?)`                      | Register a tool with full control over behavior and state |
 | `useWebMCPContext(name, description, getValue)` | Simplified hook for read-only context exposure            |
+| `useWebMCPPrompt(config)`                       | Register a reusable MCP prompt                            |
+| `useWebMCPResource(config)`                     | Register an MCP resource                                  |
 
 ### Client Hooks
 
@@ -156,10 +165,6 @@ If a one-shot transport closes, construct a new transport and pass it to
 ## Schema Compatibility
 
 Inputs accept JSON Schema or Standard JSON Schema v1 implementations such as Zod 4.2+. Outputs use JSON Schema for typed `structuredContent`.
-
-## Documentation
-
-For full API reference, output schemas, memoization patterns, migration guide, best practices, and complete examples, see the [React WebMCP Guide](../../docs/react-webmcp-guide.md).
 
 ## Related Packages
 

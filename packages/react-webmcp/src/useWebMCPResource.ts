@@ -1,8 +1,7 @@
-import type { ResourceDescriptor } from '@mcp-b/webmcp-ts-sdk';
-import { useCallback, useRef } from 'react';
+import { useCallback } from 'react';
 import { getBrowserMcpServer } from './model-context.js';
 import type { WebMCPResourceConfig, WebMCPResourceReturn } from './types.js';
-import { useIsomorphicLayoutEffect } from './useIsomorphicLayoutEffect.js';
+import { useCommittedRef } from './useCommittedRef.js';
 import { useMcpRegistration } from './useMcpRegistration.js';
 
 /**
@@ -67,10 +66,7 @@ import { useMcpRegistration } from './useMcpRegistration.js';
 export function useWebMCPResource(config: WebMCPResourceConfig): WebMCPResourceReturn {
   const { uri, name, description, mimeType, read } = config;
 
-  const readRef = useRef(read);
-  useIsomorphicLayoutEffect(() => {
-    readRef.current = read;
-  }, [read]);
+  const readRef = useCommittedRef(read);
 
   const register = useCallback(() => {
     const modelContext = getBrowserMcpServer();
@@ -81,18 +77,14 @@ export function useWebMCPResource(config: WebMCPResourceConfig): WebMCPResourceR
       return;
     }
 
-    const resourceHandler: ResourceDescriptor['read'] = async (resolvedUri, params) => {
-      return readRef.current(resolvedUri, params);
-    };
-
     return modelContext.registerResource({
       uri,
       name,
       ...(description !== undefined && { description }),
       ...(mimeType !== undefined && { mimeType }),
-      read: resourceHandler,
+      read: (resolvedUri, params) => readRef.current(resolvedUri, params),
     });
-  }, [uri, name, description, mimeType]);
+  }, [uri, name, description, mimeType, readRef]);
 
   return { isRegistered: useMcpRegistration(register) };
 }

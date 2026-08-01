@@ -148,11 +148,11 @@ After cleanup, `initializeWebModelContext()` can be called again to re-initializ
 
 ### `WebModelContextInitOptions`
 
-| Option               | Type                                  | Default        | Description                                                           |
-| -------------------- | ------------------------------------- | -------------- | --------------------------------------------------------------------- |
-| `transport`          | `TransportConfiguration`              | Auto-detect    | Transport layer configuration                                         |
-| `autoInitialize`     | `boolean`                             | `true`         | Whether to auto-initialize on import                                  |
-| `installTestingShim` | `boolean \| 'always' \| 'if-missing'` | `'if-missing'` | Controls the MCP-B `navigator.modelContextTesting` compatibility shim |
+| Option               | Type                     | Default     | Description                                                                           |
+| -------------------- | ------------------------ | ----------- | ------------------------------------------------------------------------------------- |
+| `transport`          | `TransportConfiguration` | Auto-detect | Transport layer configuration                                                         |
+| `autoInitialize`     | `boolean`                | `true`      | Whether to auto-initialize on import                                                  |
+| `installTestingShim` | `boolean`                | `true`      | Installs the MCP-B `navigator.modelContextTesting` shim when no implementation exists |
 
 ### `TransportConfiguration`
 
@@ -204,14 +204,12 @@ After initialization, `document.modelContext` is a `BrowserMcpServer` instance. 
 
 **Extension methods** (MCP-B only):
 
-| Method                         | Description                             |
-| ------------------------------ | --------------------------------------- |
-| `listTools()`                  | List registered tools                   |
-| `unregisterTool(name)`         | Deprecated compatibility removal helper |
-| `registerResource(descriptor)` | Register an MCP resource                |
-| `registerPrompt(descriptor)`   | Register an MCP prompt                  |
-| `createMessage(params)`        | Request LLM sampling                    |
-| `elicitInput(params)`          | Request user input                      |
+| Member                         | Description                                      |
+| ------------------------------ | ------------------------------------------------ |
+| `listTools()`                  | List locally registered tools                    |
+| `registerResource(descriptor)` | Register an MCP resource                         |
+| `registerPrompt(descriptor)`   | Register an MCP prompt                           |
+| `mcpServer`                    | Access the official high-level MCP server object |
 
 For the MCP-B-only methods on `document.modelContext`, see [`@mcp-b/webmcp-ts-sdk` reference](/packages/webmcp-ts-sdk/reference). For the standard-owned browser surface, see [WebMCP standard API](/reference/webmcp/standard-api).
 

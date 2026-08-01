@@ -49,6 +49,7 @@ Once connected, your AI client can see and call tools from any open browser tab 
 3. Call any tool directly by name (e.g., `create_issue`, `search_docs`)
 
 Tools appear and disappear automatically as you open, reload, and close tabs.
+Tools that require MCP task execution are omitted, and multi-round `input_required` results return an error.
 
 ## For Website Owners
 
@@ -96,9 +97,13 @@ several slow API calls and might exceed one minute:
 ></script>
 ```
 
+The relay allows `65000` ms by default. If the page timeout is higher, start the
+relay with a slightly larger limit, for example `--invoke-timeout 125000` for
+the `120000` ms page setting above.
+
 Tool registration references:
 
-- [`@mcp-b/global` quick start and `registerTool`](../global/README.md)
+- [`@mcp-b/global` quick start and `registerTool`](https://docs.mcp-b.ai/packages/global/reference)
 - [WebMCP proposal examples for `registerTool`](https://github.com/webmachinelearning/webmcp/blob/main/docs/proposal.md)
 
 ---
@@ -109,7 +114,7 @@ Tool registration references:
 
 The JSON config above works for most clients. Here are additional options:
 
-**Claude Desktop (MCPB bundle)** — download the `.mcpb` file from [GitHub Releases](https://github.com/WebMCP-org/npm-packages/releases) and double-click to install. No terminal needed.
+**Claude Desktop (MCPB bundle)** — download the `.mcpb` file from [GitHub Releases](https://github.com/WebMCP-org/npm-packages/releases) and double-click to install. The installer prompts for the port, allowed origins, and tool timeout and passes those settings to the relay. No terminal is needed.
 
 **Direct CLI** — run the relay standalone:
 
@@ -121,27 +126,32 @@ npx @mcp-b/webmcp-local-relay
 
 The relay exposes three static management tools that are always available:
 
-| Tool                  | Description                                                                                        |
-| --------------------- | -------------------------------------------------------------------------------------------------- |
-| `webmcp_list_sources` | Lists connected browser tabs with metadata (tab ID, origin, URL, title, icon, tool count)          |
-| `webmcp_list_tools`   | Lists all relayed tools with source info                                                           |
-| `webmcp_open_page`    | Opens a URL in the user's default browser, or refreshes a connected source page by matching origin |
+| Tool                  | Description                                                                         |
+| --------------------- | ----------------------------------------------------------------------------------- |
+| `webmcp_list_sources` | Lists connected browser tabs that publish tools, with tab metadata                  |
+| `webmcp_list_tools`   | Lists all relayed tools with source info                                            |
+| `webmcp_open_page`    | Opens a URL, or in server mode refreshes a connected source page by matching origin |
 
 **Dynamic tools** are registered directly on the MCP server using the original tool name, sanitized to `[a-zA-Z0-9_]`. When tools from different tabs share a name, a short tab-ID suffix is appended for disambiguation:
 
 - Single provider: `get_issue`
 - Multiple providers with the same name: `search_ed93`, `search_a1b2`
 
+Names are limited to 128 characters. Sanitization, truncation, or tab-prefix collisions receive deterministic `_2`, `_3`, and later suffixes.
+
 ### CLI Options
 
 ```text
 webmcp-local-relay [options]
 
-  --host, -H               Bind host (default: 127.0.0.1)
-  --port, -p               WebSocket port (default: 9333)
+  --host, -H               Bind host for local websocket relay (default: 127.0.0.1)
+  --port, -p               Preferred root port for the local relay cluster (default: 9333)
   --widget-origin          Allowed host page origin(s), comma-separated (default: *)
-  --allowed-origin         Alias for --widget-origin
-  --ws-origin              Alias for --widget-origin
+  --label                  Human-readable relay label reported during discovery
+  --workspace              Optional workspace name reported during discovery
+  --relay-id               Stable relay identifier reported during discovery
+  --invoke-timeout         Browser tool invocation timeout in milliseconds (default: 65000)
+  --max-payload            Maximum WebSocket payload size in bytes (default: 10000000)
   --help, -h               Show help
 ```
 
@@ -162,7 +172,7 @@ npx @mcp-b/webmcp-local-relay --widget-origin https://myapp.com
 
 - Binds to `127.0.0.1` by default (loopback only, not accessible from your network).
 - The default `allowedOrigins` is `*`, which permits any browser page to connect and register tools. This is convenient for development but means any website open in your browser can expose tools to the relay.
-- `--widget-origin` validates the **host page origin** reported in the browser `hello` message. This is the origin of the page that loaded `embed.js` (e.g., `https://myapp.com`), regardless of whether the widget iframe is served from CDN or self-hosted.
+- `--widget-origin` validates the browser's WebSocket `Origin` header. The injected blob iframe inherits the host page origin, so browser connections cannot override it in `hello`.
 - **Recommended:** Use `--widget-origin` to restrict which websites can register tools:
 
   ```bash
@@ -173,7 +183,7 @@ npx @mcp-b/webmcp-local-relay --widget-origin https://myapp.com
   webmcp-local-relay --widget-origin https://app1.com,https://app2.com
   ```
 
-- Only the host page origin is checked — any local process can connect regardless of origin restrictions.
+- `--widget-origin` is not local-process authentication. An Origin-less browser-protocol client falls back to its claimed `hello.origin`, while the internal relay-to-relay protocol is outside this browser-origin check. Keep the relay bound to loopback unless you add a separate trusted boundary.
 
 ### Architecture
 
@@ -189,34 +199,35 @@ npx @mcp-b/webmcp-local-relay --widget-origin https://myapp.com
 │   webmcp_list_tools                  │
 │   + dynamic tools from browser       │
 └──────────────────┬───────────────────┘
-                   │ WebSocket (ws://127.0.0.1:9333)
+                   │ in process
 ┌──────────────────▼───────────────────┐
 │        RelayBridgeServer             │
 │   Manages connections, routes calls  │
 └──────────────────┬───────────────────┘
-                   │ postMessage
+                   │ WebSocket (ws://127.0.0.1:9333)
 ┌──────────────────▼───────────────────┐
 │        Widget iframe                 │
 │   embed.js injects widget.html       │
 └──────────────────┬───────────────────┘
-                   │ document.modelContext
+                   │ postMessage
 ┌──────────────────▼───────────────────┐
 │        Host page                     │
 │   WebMCP runtime + registered tools  │
 └──────────────────────────────────────┘
 ```
 
-**How it connects:** The embed script injects a hidden iframe into the host page. The iframe opens a WebSocket to the relay on `localhost`. Tools are discovered through the current `document.modelContext` API and forwarded to the relay, which registers them as standard MCP tools over stdio.
-If the relay is temporarily unavailable, the widget reconnects automatically using exponential backoff (1.5x multiplier) from `500ms` up to `3000ms`, stopping after 100 attempts.
+**How it connects:** The embed script fetches the sibling `widget.html`, injects configuration, and loads it as a hidden blob iframe that inherits the host page origin. The iframe opens a WebSocket to the relay on `localhost`. Self-hosted copies must serve both `embed.js` and `widget.html`; cross-origin hosts must allow the widget fetch with CORS. The relay fails closed if that fetch fails.
 
-**Client mode:** When a second relay instance starts and the port is already in use (`EADDRINUSE`), it automatically falls back to **client mode**. In client mode the relay connects as a WebSocket client to the existing server relay and proxies tool operations through it. If the server relay later stops, the client attempts to promote itself back to server mode. This enables multiple MCP clients to share the same browser connections without manual configuration.
+After a disconnect, the widget retries the last endpoint once after about `500ms`, then rescans the relay range after `10s`, `20s`, and `30s`. If no relay responds, it enters a dormant state and probes the configured or cached endpoint every two minutes; returning to the tab or sending `webmcp.connect` triggers immediate rediscovery.
+
+**Client mode:** When a candidate port is already owned by a compatible WebMCP relay, a second instance joins it in client mode and proxies tool operations through it. A non-relay service is skipped while scanning the default range; an explicitly selected occupied port fails. If the server relay later stops, the client attempts to promote itself back to server mode. This enables multiple MCP clients to share the same browser connections without manual configuration.
 
 ### Runtime Compatibility
 
 Supported page runtimes:
 
 1. `@mcp-b/global` (recommended for the complete MCP-B runtime)
-2. Current native Chrome with `document.modelContext.getTools()` and the optional descriptor-based `executeTool()` extension
+2. Current native Chrome with `document.modelContext.getTools()` and its descriptor-based `executeTool()` extension, which this relay requires to invoke tools
 3. `@mcp-b/webmcp-polyfill`
 
 Runtime dispatch behavior in the browser embed/widget layer:
@@ -242,13 +253,13 @@ For Chromium/Chrome Canary native preview testing:
 
 ### Troubleshooting
 
-| Problem                  | Fix                                                                                                                                                                                             |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `No sources connected`   | Ensure the page loaded `embed.js` and the relay process is running                                                                                                                              |
-| `No tools listed`        | Ensure tools are registered on the page's WebMCP runtime. If tools register after load, confirm your runtime emits tool-change notifications (`toolschanged` or `registerToolsChangedCallback`) |
-| `Tool not found`         | Tab reloaded or disconnected — call `webmcp_list_tools` again to refresh                                                                                                                        |
-| Connection blocked       | Verify `--widget-origin` matches your host page's origin (e.g., `https://myapp.com`), and relay port matches `data-relay-port`                                                                  |
-| `Host response timeout:` | The host page took longer than the per-request timeout (default 60s) to respond. Increase via `data-request-timeout="<ms>"` on the embed script tag                                             |
+| Problem                  | Fix                                                                                                                                       |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `No sources connected`   | Ensure the page loaded `embed.js` and the relay process is running                                                                        |
+| `No tools listed`        | Ensure tools are registered on the page's WebMCP runtime. If tools register after load, confirm your runtime emits the `toolchange` event |
+| `Tool not found`         | Tab reloaded or disconnected — call `webmcp_list_tools` again to refresh                                                                  |
+| Connection blocked       | Verify `--widget-origin` matches your host page's origin (e.g., `https://myapp.com`), and relay port matches `data-relay-port`            |
+| `Host response timeout:` | The host page exceeded its timeout (default 60s). Raise `data-request-timeout` and keep CLI `--invoke-timeout` slightly higher            |
 
 ---
 

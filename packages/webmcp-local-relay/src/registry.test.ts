@@ -59,6 +59,31 @@ describe('RelayRegistry', () => {
     expect(names).toEqual(['search_aaaa', 'search_bbbb']);
   });
 
+  it('keeps distinct tool names that sanitize to the same identifier', () => {
+    const registry = new RelayRegistry();
+
+    registry.upsertSource('conn-1', hello('tab-1', 'https://example.com'));
+    registry.registerTools('conn-1', [tool({ name: 'get-user' }), tool({ name: 'get.user' })]);
+
+    const tools = registry.listTools();
+    expect(tools.map((entry) => entry.name)).toEqual(['get_user', 'get_user_2']);
+    expect(tools.map((entry) => entry.originalName)).toEqual(['get-user', 'get.user']);
+  });
+
+  it('keeps tabs whose short disambiguation suffixes collide', () => {
+    const registry = new RelayRegistry();
+
+    registry.upsertSource('conn-1', hello('same-first', 'https://example.com/a'));
+    registry.upsertSource('conn-2', hello('same-second', 'https://example.com/b'));
+    registry.registerTools('conn-1', [tool({ name: 'search' })]);
+    registry.registerTools('conn-2', [tool({ name: 'search' })]);
+
+    expect(registry.listTools().map((entry) => entry.name)).toEqual([
+      'search_same',
+      'search_same_2',
+    ]);
+  });
+
   it('reverts to short name when collision resolves after disconnect', () => {
     const registry = new RelayRegistry();
 

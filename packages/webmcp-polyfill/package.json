@@ -24,10 +24,12 @@
     "dist"
   ],
   "type": "module",
-  "sideEffects": true,
+  "sideEffects": [
+    "./dist/index.iife.js"
+  ],
   "main": "./dist/index.js",
   "module": "./dist/index.js",
-  "browser": "./dist/index.iife.js",
+  "browser": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
@@ -50,7 +52,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "scripts": {
-    "build": "pnpm --filter @mcp-b/webmcp-types build && vp pack",
+    "build": "vp pack",
     "check": "vp check --fix",
     "clean": "rm -rf dist",
     "format": "vp fmt --write",
@@ -61,7 +63,7 @@
     "test": "vp test run",
     "test:browser": "vp test run --browser.headless",
     "test:browser:ui": "vp test --browser",
-    "test:conformance": "vp test run --config vitest.conformance.config.ts --browser.headless",
+    "test:conformance": "vp test run conformance/polyfill-runtime.e2e.test.ts --browser.headless",
     "typecheck": "tsc --noEmit && vp test run --typecheck --silent"
   },
   "dependencies": {
@@ -69,7 +71,6 @@
     "@standard-schema/spec": "^1.1.0"
   },
   "devDependencies": {
-    "@vitest/coverage-v8": "catalog:",
     "playwright": "catalog:",
     "typescript": "catalog:",
     "vite-plus": "catalog:",

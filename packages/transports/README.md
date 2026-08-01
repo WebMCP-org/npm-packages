@@ -249,13 +249,12 @@ iframe.addEventListener('load', async () => {
 - `iframe` (required): Reference to the HTMLIFrameElement
 - `targetOrigin` (required): Expected origin of the iframe (for security)
 - `channelId`: Override the default channel identifier (default: `mcp-iframe`)
-- `checkReadyRetryMs`: Interval to retry the ready handshake if iframe isn't ready yet (default: 250ms)
+- `checkReadyRetryMs`: Retry interval while `iframe.contentWindow` is unavailable (default: 250ms)
 
 #### IframeChildTransport Options
 
 - `allowedOrigins` (required): Whitelist of parent origins allowed to connect (for security)
 - `channelId`: Override the default channel identifier (default: `mcp-iframe`)
-- `serverReadyRetryMs`: Interval to retry broadcasting ready signal to parent (default: 250ms)
 
 ### Cross-Origin Support
 
@@ -264,7 +263,7 @@ Iframe transports are designed for cross-origin communication:
 - Parent and iframe can be on different domains
 - Origin validation is performed on both sides
 - Uses secure `postMessage` API
-- Retry mechanisms handle iframe loading timing issues
+- The parent retries its ready check until the iframe window is available
 
 ## Extension Transport Examples
 
@@ -532,11 +531,10 @@ const result = await client.callTool({
 
 ## Key Features
 
-- **Automatic Server Discovery**: Tab clients can discover available servers
-- **Cross-Origin Support**: Configure CORS for tab transports
+- **Ready Handshake**: Tab and iframe clients wait for their server before sending
+- **Origin Controls**: Restrict incoming and outgoing `postMessage` origins
 - **Cross-Extension Communication**: Extensions can expose APIs to other extensions
 - **Tool Namespacing**: Extension hub prefixes tools to avoid conflicts
-- **Connection Management**: Automatic cleanup when tabs close
 - **Type Safety**: Full TypeScript support with proper typing
 
 ## Security Considerations

@@ -341,7 +341,7 @@
         );
       else {
         let i = await n.text(),
-          a = `<script>window.__WEBMCP_RELAY_CONFIG=${JSON.stringify(Object.fromEntries(t))};<\/script>`,
+          a = `<script>window.__WEBMCP_RELAY_CONFIG=${JSON.stringify(Object.fromEntries(t))};</script>`,
           o = new Blob([i.replace(`</head>`, `${a}</head>`)], { type: `text/html` });
         ((r = URL.createObjectURL(o)), (e.widgetOrigin = window.location.origin));
       }

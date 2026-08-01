@@ -19,7 +19,7 @@ resource and prompt extensions from `@mcp-b/global` when the iframe exposes
 those capabilities. The deprecated `navigator.modelContext` surface is used
 only as a fallback for older runtimes.
 
-## Usage
+## Use the default element
 
 ```html
 <mcp-iframe src="./child-app.html" id="my-app"></mcp-iframe>
@@ -35,32 +35,41 @@ only as a fallback for older runtimes.
 </script>
 ```
 
-Tools registered inside the iframe (e.g. `calculate`) appear on the parent as `my-app_calculate`.
+Importing the package root auto-registers `<mcp-iframe>`. Tools registered inside the iframe
+(for example, `calculate`) appear on the parent as `my-app_calculate`.
+
+To register a custom tag without registering the default tag, use the side-effect-free entry point:
+
+```typescript
+import { registerMCPIframeElement } from '@mcp-b/mcp-iframe/element';
+
+registerMCPIframeElement('my-mcp-frame');
+```
 
 ## Attributes
 
-| Attribute          | Description                                      |
-| ------------------ | ------------------------------------------------ |
-| `src`              | URL of the iframe page                           |
-| `id`               | Used as the tool name prefix                     |
-| `target-origin`    | Override the postMessage target origin           |
-| `channel`          | Channel ID for transport (default: `mcp-iframe`) |
-| `call-timeout`     | Timeout in ms for tool calls (default: `30000`)  |
-| `prefix-separator` | Separator between prefix and name (default: `_`) |
+| Attribute          | Description                                                                                                |
+| ------------------ | ---------------------------------------------------------------------------------------------------------- |
+| `src`              | URL of the iframe page                                                                                     |
+| `id`               | Used as the tool and prompt name prefix                                                                    |
+| `target-origin`    | Override the inferred `postMessage` target origin. Opaque origins require `*`                              |
+| `channel`          | Channel ID for transport (default: `mcp-iframe`)                                                           |
+| `call-timeout`     | Timeout in ms for tool calls, resource reads, and prompt gets (default: `30000`; invalid values fall back) |
+| `prefix-separator` | Separator between prefix and name (default: `_`; allows letters, numbers, `_`, `.`, and `-`)               |
 
 Standard iframe attributes (`sandbox`, `allow`, `width`, `height`, etc.) are also mirrored.
 
 ## Events
 
-| Event                      | Detail                                                    |
-| -------------------------- | --------------------------------------------------------- |
-| `mcp-iframe-ready`         | `{ tools, resources, prompts }` - Fired when connected    |
-| `mcp-iframe-error`         | `{ error }` - Fired on connection failure                 |
-| `mcp-iframe-tools-changed` | `{ tools, resources, prompts }` - Fired after `refresh()` |
+| Event                      | Detail                                                                                    |
+| -------------------------- | ----------------------------------------------------------------------------------------- |
+| `mcp-iframe-ready`         | `{ tools, resources, prompts }` - Fired when connected                                    |
+| `mcp-iframe-error`         | `{ error }` - Fired on connection or registration refresh failure                         |
+| `mcp-iframe-items-changed` | `{ tools, resources, prompts }` - Fired after an advertised list change or manual refresh |
 
 ## Related Packages
 
-- [`@mcp-b/global`](https://docs.mcp-b.ai/packages/global/reference) - Full MCP-B browser runtime (required in the iframe)
+- [`@mcp-b/global`](https://docs.mcp-b.ai/packages/global/reference) - Full MCP-B browser runtime; any compatible `document.modelContext` implementation works in the iframe
 - [`@mcp-b/transports`](https://docs.mcp-b.ai/packages/transports/reference) - Transport layer used internally
 
 ## License

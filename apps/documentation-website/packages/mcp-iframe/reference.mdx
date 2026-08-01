@@ -28,38 +28,29 @@ The iframe page must have `@mcp-b/global` (or any `document.modelContext` implem
 
 <Snippet file="snippets/packages/mcp-iframe-quickstart.html" />
 
-## Usage
+## Entry points
 
-```html
-<mcp-iframe src="./child-app.html" id="my-app"></mcp-iframe>
-
-<script type="module">
-  import '@mcp-b/mcp-iframe';
-
-  const el = document.querySelector('mcp-iframe');
-  el.addEventListener('mcp-iframe-ready', (e) => {
-    console.log('Exposed tools:', e.detail.tools);
-    // e.g. ["my-app_calculate", "my-app_get_data"]
-  });
-</script>
-```
-
-Importing `@mcp-b/mcp-iframe` auto-registers the `<mcp-iframe>` custom element. No additional setup is required.
+| Entry point                 | Behavior                                                                                             |
+| --------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `@mcp-b/mcp-iframe`         | Exports the element and event types, then auto-registers `<mcp-iframe>`.                             |
+| `@mcp-b/mcp-iframe/element` | Exports the element, event types, and `registerMCPIframeElement()` with no registration side effect. |
 
 ---
 
 ## Attributes
 
-| Attribute          | Type     | Default             | Description                                                                                       |
-| ------------------ | -------- | ------------------- | ------------------------------------------------------------------------------------------------- |
-| `src`              | `string` | --                  | URL of the iframe page.                                                                           |
-| `id`               | `string` | `"iframe"`          | Used as the tool and prompt name prefix. Sanitized to match `[a-zA-Z0-9_.-]`.                     |
-| `target-origin`    | `string` | Inferred from `src` | Override the `postMessage` target origin. If omitted, the origin is extracted from the `src` URL. |
-| `channel`          | `string` | `"mcp-iframe"`      | Channel ID for the underlying `IframeParentTransport`.                                            |
-| `call-timeout`     | `number` | `30000`             | Timeout in milliseconds for tool calls, resource reads, and prompt gets.                          |
-| `prefix-separator` | `string` | `"_"`               | Separator between the prefix and the item name. Must contain only `[a-zA-Z0-9_.-]` characters.    |
+| Attribute          | Type     | Default             | Description                                                                                                               |
+| ------------------ | -------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `src`              | `string` | --                  | URL of the iframe page.                                                                                                   |
+| `id`               | `string` | `"iframe"`          | Used as the tool and prompt name prefix. Sanitized to match `[a-zA-Z0-9_.-]`.                                             |
+| `target-origin`    | `string` | Inferred from `src` | Override the `postMessage` target origin. Opaque iframe origins require `"*"`.                                            |
+| `channel`          | `string` | `"mcp-iframe"`      | Channel ID for the underlying `IframeParentTransport`.                                                                    |
+| `call-timeout`     | `number` | `30000`             | Positive integer timeout in milliseconds for tool calls, resource reads, and prompt gets. Invalid values use the default. |
+| `prefix-separator` | `string` | `"_"`               | Separator between the prefix and the item name. Must contain only `[a-zA-Z0-9_.-]` characters.                            |
 
 Standard iframe attributes (`sandbox`, `allow`, `width`, `height`, `loading`, `referrerpolicy`, `name`, `srcdoc`, `allowfullscreen`, `credentialless`) are mirrored to the internal `<iframe>` element.
+
+Sandboxed iframes without `allow-same-origin`, and sources whose URL origin is `null`, have opaque origins. Set `target-origin="*"` for those sources. Other sources use the explicit attribute or the origin inferred from `src`.
 
 ---
 
@@ -68,8 +59,8 @@ Standard iframe attributes (`sandbox`, `allow`, `width`, `height`, `loading`, `r
 | Event                      | Detail type                                                   | Fired when                                                                             |
 | -------------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | `mcp-iframe-ready`         | `{ tools: string[], resources: string[], prompts: string[] }` | The element connects to the iframe's MCP server and registers all items on the parent. |
-| `mcp-iframe-error`         | `{ error: unknown }`                                          | Connection to the iframe's MCP server fails.                                           |
-| `mcp-iframe-tools-changed` | `{ tools: string[], resources: string[], prompts: string[] }` | The child reports a supported list change, or `refresh()` completes.                   |
+| `mcp-iframe-error`         | `{ error: unknown }`                                          | The connection or a registration refresh fails.                                        |
+| `mcp-iframe-items-changed` | `{ tools: string[], resources: string[], prompts: string[] }` | The child reports a supported list change, or `refresh()` completes.                   |
 
 The `tools` and `prompts` arrays contain parent-side names. The `resources` array contains parent-side wrapper URIs for static resources and resource templates.
 
@@ -85,7 +76,7 @@ Tools and prompts from the iframe are registered on the parent as `{id}{separato
 | `get_data`       | `billing`    | `_`           | `billing_get_data` |
 | `help`           | `assistant`  | `-`           | `assistant-help`   |
 
-The parent model context performs final tool-name validation. Rejected tool registrations are logged to the console.
+The parent model context performs final tool-name validation. A rejected registration emits `mcp-iframe-error` and disconnects the element without leaving a partial registration set.
 
 Bridged tools retain their `title` and strict WebMCP `readOnlyHint` annotation.
 
@@ -102,14 +93,10 @@ Resource templates use the same wrapper. Template expressions remain expressions
 | Property           | Type                        | Description                                                  |
 | ------------------ | --------------------------- | ------------------------------------------------------------ |
 | `iframe`           | `HTMLIFrameElement \| null` | The wrapped iframe element.                                  |
-| `client`           | `Client \| null`            | The MCP client connected to the iframe's server.             |
 | `ready`            | `boolean`                   | Whether the element is connected to the iframe's MCP server. |
 | `exposedTools`     | `string[]`                  | Prefixed tool names registered on the parent.                |
 | `exposedResources` | `string[]`                  | Wrapper resource URIs registered on the parent.              |
 | `exposedPrompts`   | `string[]`                  | Prefixed prompt names registered on the parent.              |
-| `mcpTools`         | `Tool[]`                    | Raw tools from the iframe (without prefix).                  |
-| `mcpResources`     | `Resource[]`                | Raw resources from the iframe (without prefix).              |
-| `mcpPrompts`       | `Prompt[]`                  | Raw prompts from the iframe (without prefix).                |
 | `itemPrefix`       | `string`                    | The computed prefix string (`{id}{separator}`).              |
 
 ---
@@ -118,7 +105,9 @@ Resource templates use the same wrapper. Template expressions remain expressions
 
 | Method      | Returns         | Description                                                                                                                                                |
 | ----------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `refresh()` | `Promise<void>` | Re-fetches all tools, resources, resource templates, and prompts from the iframe, replaces the parent registrations, and fires `mcp-iframe-tools-changed`. |
+| `refresh()` | `Promise<void>` | Re-fetches all tools, resources, resource templates, and prompts from the iframe, replaces the parent registrations, and fires `mcp-iframe-items-changed`. |
+
+If fetching or parent registration fails, `refresh()` rejects after emitting `mcp-iframe-error` and disconnecting the element. It also rejects if the iframe connection changes before the refresh completes.
 
 ---
 
@@ -127,12 +116,12 @@ Resource templates use the same wrapper. Template expressions remain expressions
 To register the custom element with a different tag name:
 
 ```typescript
-import { registerMCPIframeElement } from '@mcp-b/mcp-iframe';
+import { registerMCPIframeElement } from '@mcp-b/mcp-iframe/element';
 
 registerMCPIframeElement('my-mcp-frame');
 ```
 
-If you import `@mcp-b/mcp-iframe` without calling `registerMCPIframeElement`, the element is auto-registered as `<mcp-iframe>` in browser environments.
+The `/element` entry point does not register `<mcp-iframe>`. The package root does.
 
 ---
 
@@ -143,7 +132,7 @@ If you import `@mcp-b/mcp-iframe` without calling `registerMCPIframeElement`, th
 3. The element subscribes to each `list_changed` notification advertised by the child.
 4. Tools, resources, resource templates, and prompts are fetched without using cached list responses.
 5. Each item is registered on the parent's `document.modelContext`. Tool and prompt names use the element prefix, while resources use wrapper URIs.
-6. The `mcp-iframe-ready` event fires. Later child list changes replace the parent registrations in order and fire `mcp-iframe-tools-changed`.
+6. The `mcp-iframe-ready` event fires. Later child list changes replace the parent registrations in order and fire `mcp-iframe-items-changed`.
 7. On `disconnectedCallback`, notification handlers and registrations are removed, and the client and transport are closed.
 
 Changing `src`, `srcdoc`, `target-origin`, or `channel` while connected triggers a reconnection cycle.

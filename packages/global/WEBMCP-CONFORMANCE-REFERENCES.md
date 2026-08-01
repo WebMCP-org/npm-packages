@@ -89,7 +89,6 @@ Current MCP-B alignment note:
 - `getTools({ fromOrigins })` returns `RegisteredTool` values. Their `inputSchema` fields contain serialized JSON Schema.
 - The polyfill registers an `abort` listener on `options.signal` and removes the tool when the signal aborts; pre-aborted signals reject with `AbortError`.
 - `BrowserMcpServer.registerTool(tool, options?)` accepts the same shape, resolves `undefined`, and forwards `options.signal` to the underlying native context when the caller provides one.
-- `unregisterTool(name)` is preserved in MCP-B compatibility runtimes for existing wrappers, but is `@deprecated` in types and emits a one-time runtime deprecation warning.
 - Chromium's `executeTool(registeredTool, inputArguments, options?)` remains an experimental implementation extension. It is feature-detected and excluded from strict core types.
 - Current Chromium HEAD no longer exposes `navigator.modelContext` or `navigator.modelContextTesting`. MCP-B retains both only as deprecated optional compatibility surfaces.
 - Keep browser-surface tests explicit so experimental Chromium behavior is not mistaken for a WebMCP guarantee.
@@ -114,9 +113,9 @@ Run commands:
 - WebMCP remains experimental and is in an origin trial rather than generally shipped stable.
 - Native conformance discovers tools through `await document.modelContext.getTools()`.
 - Native conformance does not depend on either removed navigator API.
-- Native conformance does not rely on `unregisterTool(name)`, `provideContext()`, or `clearContext()`.
+- Native conformance does not rely on removed preview methods such as `provideContext()` or `clearContext()`.
 - If Chromium exposes `document.modelContext.executeTool(...)`, the suite invokes it with the exact `RegisteredTool` returned by `getTools()`. It does not invoke the extension when absent.
 - Current Chromium source notes that tool input schema enforcement during execution is incomplete.
-- `@mcp-b/webmcp-polyfill` does enforce schema checks in its testing shim path and rejects schema-invalid args.
-- `@mcp-b/webmcp-polyfill` and `BrowserMcpServer` accept `registerTool(tool, { signal })`. They emit a one-time deprecation warning when `unregisterTool(name)` is called.
-- Conformance implication: keep dedicated native vs polyfill validation parity tests and avoid assuming schema-validation parity in native early preview.
+- `@mcp-b/webmcp-polyfill` likewise treats input schemas as advertised metadata during direct and testing-shim execution; it parses the JSON input but does not validate it against the schema.
+- `@mcp-b/webmcp-polyfill` and `BrowserMcpServer` accept `registerTool(tool, { signal })`; aborting the signal owns removal.
+- Conformance implication: do not assert execution-time schema validation in native or polyfill conformance; MCP transport validation belongs to the official MCP server.

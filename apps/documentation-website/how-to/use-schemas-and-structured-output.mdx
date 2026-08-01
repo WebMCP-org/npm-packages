@@ -85,7 +85,8 @@ await document.modelContext.registerTool({
 **Use this when** you want compile-time type safety without adding a runtime schema library.
 
 <Note>
-  Inference works only with literal schemas. If the schema type is widened (for example, loaded from an API at runtime), `args` falls back to `Record<string, unknown>`.
+  Inference works only with literal schemas. If the schema type is widened (for example, loaded from
+  an API at runtime), `args` falls back to an object-or-array WebMCP input.
 </Note>
 
 ### Standard JSON Schema (Zod, Valibot, ArkType)
@@ -129,9 +130,9 @@ await document.modelContext.registerTool({
 Standard JSON Schema-compatible library.
 
 <Note>
-  Validation-only Standard Schema objects are rejected at registration time because WebMCP callers
-  need an advertised `inputSchema`. The runtime attempts Standard JSON Schema conversion with
-  `draft-2020-12` first, then falls back to `draft-07`.
+  The MCP-B schema adapter rejects validation-only Standard Schema objects because WebMCP callers
+  need advertised JSON Schema. It attempts Standard JSON Schema conversion with `draft-2020-12`
+  first, then falls back to `draft-07`.
 </Note>
 
 <Warning>
@@ -160,7 +161,7 @@ function SearchTool() {
     name: 'search',
     description: 'Search indexed docs',
     inputSchema: searchInput,
-    handler: async (input) => {
+    execute: async (input) => {
       const parsed = searchInput.parse(input);
       return { results: await search(parsed.query, parsed.limit) };
     },
@@ -275,7 +276,8 @@ export function CounterTool() {
 
 ### Keep text and structure aligned
 
-Always return both `content` and `structuredContent`. The text in `content` is for display in chat UIs. The `structuredContent` is for programmatic consumption by the AI agent.
+When you construct an MCP response directly, keep `content` and `structuredContent` aligned. Text is
+for chat UIs; structured content is for programmatic consumption.
 
 ```ts
 async execute() {
@@ -287,7 +289,8 @@ async execute() {
 }
 ```
 
-If you omit `content` and return only the structured data, the runtime wraps it in a text content block with pretty-printed JSON.
+With `usewebmcp`, return the raw data instead. The hook creates text content and preserves a
+JSON-compatible value as `structuredContent`.
 
 ### When to use output schemas
 

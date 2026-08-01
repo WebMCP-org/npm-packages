@@ -67,7 +67,7 @@ Relevant files:
 the `@mcp-b/global` test app in ordinary Playwright Chromium and intentionally
 checks:
 
-- MCP-B `listTools()` and by-name `unregisterTool()`
+- MCP-B `listTools()` and signal-owned registration cleanup
 - the deprecated `navigator.modelContextTesting` compatibility shim
 - shim execution, event, and error behavior
 

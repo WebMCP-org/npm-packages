@@ -13,7 +13,7 @@ keywords:
 icon: 'react'
 ---
 
-`@mcp-b/react-webmcp` is the full React surface for MCP-B. It supports tool registration, prompt and resource hooks, client/provider hooks for consuming MCP servers, and legacy request helpers for 2025-era MCP connections.
+`@mcp-b/react-webmcp` is the full React surface for MCP-B. It supports tool registration, prompt and resource hooks, and client/provider hooks for consuming MCP servers.
 
 Provider hooks register against `document.modelContext`. An internal fallback to the deprecated `navigator.modelContext` alias remains only for older preview runtimes; application code should not use it.
 
@@ -25,7 +25,7 @@ pnpm add @mcp-b/global @mcp-b/react-webmcp
 
 Omit `@mcp-b/global` only when the application exclusively uses the client hooks, or when a native
 WebMCP implementation supplies `document.modelContext` and the application only uses the core
-`useWebMCP` tool hook. Prompt, resource, sampling, and elicitation hooks require the MCP-B
+`useWebMCP` tool hook. Prompt and resource hooks require the MCP-B
 extensions installed by `@mcp-b/global`.
 
 For client functionality:
@@ -49,20 +49,14 @@ import { useWebMCP } from '@mcp-b/react-webmcp';
 This package re-exports the same hook implementation and API as
 [`usewebmcp`](/packages/usewebmcp/reference).
 
-| Field                      | Type                                   | Required | Description                             |
-| -------------------------- | -------------------------------------- | -------- | --------------------------------------- |
-| `name`                     | `string`                               | Yes      | Unique tool identifier                  |
-| `description`              | `string`                               | Yes      | Human-readable description              |
-| `inputSchema`              | JSON Schema or Standard JSON Schema v1 | No       | Input parameters                        |
-| `outputSchema`             | JSON Schema                            | No       | MCP-B output helper metadata            |
-| `annotations`              | `ToolAnnotations`                      | No       | Metadata hints                          |
-| `execute(input)`           | `(input) => T \| Promise<T>`           | Yes\*    | Preferred tool implementation function  |
-| `handler(input)`           | `(input) => T \| Promise<T>`           | Yes\*    | Backward-compatible alias for `execute` |
-| `formatOutput(output)`     | `(output) => string`                   | No       | Deprecated. Prefer `outputSchema`.      |
-| `onSuccess(result, input)` | `(result, input) => void`              | No       | Callback after successful execution     |
-| `onError(error, input)`    | `(error, input) => void`               | No       | Callback after failed execution         |
-
-_One of `execute` or `handler` is required. If both are present, `execute` wins._
+| Field            | Type                                   | Required | Description                  |
+| ---------------- | -------------------------------------- | -------- | ---------------------------- |
+| `name`           | `string`                               | Yes      | Unique tool identifier       |
+| `description`    | `string`                               | Yes      | Human-readable description   |
+| `inputSchema`    | JSON Schema or Standard JSON Schema v1 | No       | Input parameters             |
+| `outputSchema`   | JSON Schema                            | No       | MCP-B output helper metadata |
+| `annotations`    | `ToolAnnotations`                      | No       | Metadata hints               |
+| `execute(input)` | `(input) => T \| Promise<T>`           | Yes      | Tool implementation          |
 
 **Returns:** `WebMCPReturn`
 
@@ -114,21 +108,6 @@ Registers an MCP resource on `document.modelContext`.
 | `mimeType`           | `string`                                                           | No       | MIME type of the resource content |
 | `read(uri, params?)` | `(uri: URL, params?) => Promise<{ contents: ResourceContents[] }>` | Yes      | Read handler                      |
 
-### `useElicitation(config)`
-
-Request user input from the connected MCP client.
-
-### `useSampling(config)`
-
-Request LLM completions from the connected MCP client.
-
-<Warning>
-  `useElicitation` and `useSampling` are compatibility hooks for 2025-era MCP connections. SDK v2
-  rejects both on 2026-07-28 connections. This package does not expose the multi-round request
-  context required for modern `input_required` flows. The package also does not export
-  `useElicitationHandler` or `useSamplingHandler` aliases.
-</Warning>
-
 ## Client hooks
 
 ### `McpClientProvider`
@@ -150,12 +129,12 @@ const transport = new TabClientTransport({
 
 Provider component that manages an MCP client connection and shares tools, resources, capabilities, and connection state with descendant components.
 
-| Prop        | Type             | Required | Description                |
-| ----------- | ---------------- | -------- | -------------------------- |
-| `children`  | `ReactNode`      | Yes      | Child components           |
-| `client`    | `Client`         | Yes      | MCP client instance        |
-| `transport` | `Transport`      | Yes      | Transport instance         |
-| `opts`      | `RequestOptions` | No       | Connection request options |
+| Prop        | Type             | Required | Description                                        |
+| ----------- | ---------------- | -------- | -------------------------------------------------- |
+| `children`  | `ReactNode`      | Yes      | Child components                                   |
+| `client`    | `Client`         | Yes      | MCP client instance                                |
+| `transport` | `Transport`      | Yes      | Transport instance                                 |
+| `opts`      | `ConnectOptions` | No       | Connection options, including a cached era verdict |
 
 ### `useMcpClient()`
 

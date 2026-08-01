@@ -14,7 +14,7 @@
 import { normalizeToolResponse } from '@mcp-b/webmcp-polyfill/schema';
 import type {
   ChromeModelContextExtensions,
-  ModelContextCore,
+  ModelContext,
   RegisteredTool,
 } from '@mcp-b/webmcp-types';
 import type { CallToolResult } from '@modelcontextprotocol/server';
@@ -31,11 +31,11 @@ interface RelayToolDescriptor {
   annotations?: RegisteredTool['annotations'];
 }
 
-interface DescriptorToolContext extends ModelContextCore {
+interface DescriptorToolContext extends ModelContext {
   executeTool: NonNullable<ChromeModelContextExtensions['executeTool']>;
 }
 
-interface ElicitationModelContext extends ModelContextCore {
+interface ElicitationModelContext extends ModelContext {
   elicitInput: (
     params: Record<string, unknown>,
     options?: unknown
@@ -66,8 +66,6 @@ const TAB_ID_STORAGE_KEY = '__webmcp_relay_tab_id';
 const TOOL_SYNC_POLL_INTERVAL_MS = 2000;
 const INPUT_REQUIRED_UNSUPPORTED_MESSAGE =
   'The WebMCP local relay cannot forward MCP input_required results. Multi-round tool flows require direct McpServer registration.';
-const FALLBACK_WIDGET_URL =
-  'https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay/dist/browser/widget.html';
 
 let widgetWindow: Window | null = null;
 let config: RelayConfig;
@@ -104,16 +102,10 @@ function readOrCreateTabId(): string {
 }
 
 function resolveWidgetUrl(script: HTMLScriptElement | null): string {
-  if (script?.src) {
-    try {
-      return new URL('widget.html', script.src).href;
-    } catch (err) {
-      debugWarn('Failed to resolve widget URL from script src, falling back to CDN:', err);
-    }
-  } else {
-    debugWarn('Script element has no src attribute, falling back to CDN widget URL.');
+  if (!script?.src) {
+    throw new Error('The relay embed script must be loaded from a URL');
   }
-  return FALLBACK_WIDGET_URL;
+  return new URL('widget.html', script.src).href;
 }
 
 function buildRelayConfig(script: HTMLScriptElement | null): RelayConfig {
@@ -181,7 +173,7 @@ function normalizeSerializedToolResult(serialized: string | null): CallToolResul
 }
 
 function hasDescriptorToolApi(
-  modelContext: ModelContextCore | undefined
+  modelContext: ModelContext | undefined
 ): modelContext is DescriptorToolContext {
   return Boolean(
     modelContext && 'executeTool' in modelContext && typeof modelContext.executeTool === 'function'
@@ -189,11 +181,11 @@ function hasDescriptorToolApi(
 }
 
 function getDocumentDescriptorContext(): DescriptorToolContext | undefined {
-  const modelContext: ModelContextCore | undefined = document.modelContext;
+  const modelContext: ModelContext | undefined = document.modelContext;
   return hasDescriptorToolApi(modelContext) ? modelContext : undefined;
 }
 
-function hasElicitation(modelContext: ModelContextCore): modelContext is ElicitationModelContext {
+function hasElicitation(modelContext: ModelContext): modelContext is ElicitationModelContext {
   return 'elicitInput' in modelContext && typeof modelContext.elicitInput === 'function';
 }
 
@@ -502,30 +494,21 @@ async function injectRelayWidget(cfg: RelayConfig): Promise<void> {
     searchParams.set('requestTimeout', cfg.requestTimeout);
   }
 
-  // Try fetch + blob URL to work around CDNs serving .html as text/plain.
-  let blobUrl: string | null = null;
-  try {
-    const response = await fetch(cfg.widgetUrl);
-    if (!response.ok) {
-      console.warn(
-        `[webmcp-relay-embed] Widget HTML fetch returned ${String(response.status)}; falling back to direct iframe src.`
-      );
-    } else {
-      const html = await response.text();
-      const configScript = `<script>window.__WEBMCP_RELAY_CONFIG=${JSON.stringify(Object.fromEntries(searchParams))};</script>`;
-      const blob = new Blob([html.replace('</head>', `${configScript}</head>`)], {
-        type: 'text/html',
-      });
-      blobUrl = URL.createObjectURL(blob);
-      cfg.widgetOrigin = window.location.origin;
-    }
-  } catch (err) {
-    debugWarn('Failed to fetch widget HTML for blob URL:', err);
+  // The blob inherits the host origin, allowing the relay to verify the
+  // WebSocket Origin header instead of trusting a client-reported value.
+  const response = await fetch(cfg.widgetUrl);
+  if (!response.ok) {
+    throw new Error(`Widget HTML request failed with status ${String(response.status)}`);
   }
+  const html = await response.text();
+  const configScript = `<script>window.__WEBMCP_RELAY_CONFIG=${JSON.stringify(Object.fromEntries(searchParams))};</script>`;
+  const blobUrl = URL.createObjectURL(
+    new Blob([html.replace('</head>', `${configScript}</head>`)], { type: 'text/html' })
+  );
+  cfg.widgetOrigin = window.location.origin;
 
   const iframe = document.createElement('iframe');
-  // Fallback: direct iframe src (works when widget.html is served as text/html).
-  iframe.src = blobUrl ?? `${cfg.widgetUrl}?${searchParams.toString()}`;
+  iframe.src = blobUrl;
   iframe.style.display = 'none';
   iframe.setAttribute('aria-hidden', 'true');
   iframe.setAttribute('data-webmcp-relay', '1');
@@ -534,9 +517,7 @@ async function injectRelayWidget(cfg: RelayConfig): Promise<void> {
   widgetWindow = iframe.contentWindow;
   iframe.addEventListener('load', () => {
     widgetWindow = iframe.contentWindow;
-    if (blobUrl) {
-      URL.revokeObjectURL(blobUrl);
-    }
+    URL.revokeObjectURL(blobUrl);
   });
   iframe.addEventListener('error', () => {
     console.error(
@@ -544,9 +525,7 @@ async function injectRelayWidget(cfg: RelayConfig): Promise<void> {
       iframe.src,
       '-- WebMCP tools will NOT be relayed. Check network connectivity and widget URL.'
     );
-    if (blobUrl) {
-      URL.revokeObjectURL(blobUrl);
-    }
+    URL.revokeObjectURL(blobUrl);
   });
 }
 

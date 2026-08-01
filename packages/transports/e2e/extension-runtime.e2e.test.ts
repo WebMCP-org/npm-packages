@@ -2,47 +2,45 @@ import assert from 'node:assert';
 import { accessSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
-import { after, describe, it } from 'node:test';
+import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-
 import { type BrowserContext, chromium, type Page } from 'playwright';
 
 const PACKAGE_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const EXTENSION_DIR = resolve(PACKAGE_DIR, 'e2e/dist/extension');
-const USER_DATA_DIRS: string[] = [];
 
-function ensureBuiltExtension(): void {
-  accessSync(resolve(EXTENSION_DIR, 'manifest.json'));
-  accessSync(resolve(EXTENSION_DIR, 'background.js'));
-  accessSync(resolve(EXTENSION_DIR, 'client.js'));
-  accessSync(resolve(EXTENSION_DIR, 'client.html'));
-}
-
-async function launchExtensionContext(): Promise<{ context: BrowserContext; extensionId: string }> {
-  ensureBuiltExtension();
+async function launchExtensionContext(): Promise<{
+  context: BrowserContext;
+  extensionId: string;
+  userDataDir: string;
+}> {
+  for (const file of ['manifest.json', 'background.js', 'client.js', 'client.html']) {
+    accessSync(resolve(EXTENSION_DIR, file));
+  }
 
   const userDataDir = mkdtempSync(resolve(tmpdir(), 'webmcp-extension-runtime-'));
-  USER_DATA_DIRS.push(userDataDir);
-  const channel = process.env.PLAYWRIGHT_EXTENSION_CHROMIUM_CHANNEL ?? 'chromium';
-  const headless = process.env.PLAYWRIGHT_EXTENSION_HEADLESS !== 'false';
+  let context: BrowserContext | undefined;
+  try {
+    context = await chromium.launchPersistentContext(userDataDir, {
+      channel: process.env.PLAYWRIGHT_EXTENSION_CHROMIUM_CHANNEL ?? 'chromium',
+      headless: process.env.PLAYWRIGHT_EXTENSION_HEADLESS !== 'false',
+      args: [`--disable-extensions-except=${EXTENSION_DIR}`, `--load-extension=${EXTENSION_DIR}`],
+    });
+    const serviceWorker =
+      context.serviceWorkers()[0] ?? (await context.waitForEvent('serviceworker'));
 
-  const context = await chromium.launchPersistentContext(userDataDir, {
-    channel,
-    headless,
-    args: [`--disable-extensions-except=${EXTENSION_DIR}`, `--load-extension=${EXTENSION_DIR}`],
-  });
-
-  const serviceWorker =
-    context.serviceWorkers()[0] ?? (await context.waitForEvent('serviceworker'));
-  const extensionId = new URL(serviceWorker.url()).host;
-
-  return { context, extensionId };
+    return { context, extensionId: new URL(serviceWorker.url()).host, userDataDir };
+  } catch (error) {
+    await context?.close().catch(() => undefined);
+    rmSync(userDataDir, { recursive: true, force: true });
+    throw error;
+  }
 }
 
 async function openClientPage(context: BrowserContext, extensionId: string): Promise<Page> {
   const page = await context.newPage();
   await page.goto(`chrome-extension://${extensionId}/client.html`);
-  await page.waitForSelector('#client-status[data-status="ready"]', { timeout: 20000 });
+  await page.waitForSelector('#client-status[data-status="ready"]', { timeout: 20_000 });
   return page;
 }
 
@@ -57,14 +55,12 @@ async function callTool(page: Page, name: string, args: Record<string, unknown>)
   return page.evaluate(
     async ({ toolName, toolArgs }) => {
       const result = await window.mcpClient?.callTool(
-        {
-          name: toolName,
-          arguments: toolArgs,
-        },
+        { name: toolName, arguments: toolArgs },
         { timeout: 5000 }
       );
       const content = Array.isArray(result?.content) ? result.content : [];
-      return typeof content[0]?.text === 'string' ? content[0].text : JSON.stringify(result);
+      const first = content[0];
+      return first?.type === 'text' ? first.text : JSON.stringify(result);
     },
     { toolName: name, toolArgs: args }
   );
@@ -84,7 +80,8 @@ async function callToolError(
         });
         if (result?.isError) {
           const content = Array.isArray(result.content) ? result.content : [];
-          return typeof content[0]?.text === 'string' ? content[0].text : JSON.stringify(result);
+          const first = content[0];
+          return first?.type === 'text' ? first.text : JSON.stringify(result);
         }
         return '';
       } catch (error) {
@@ -95,112 +92,88 @@ async function callToolError(
   );
 }
 
-after(() => {
-  for (const userDataDir of USER_DATA_DIRS) {
-    rmSync(userDataDir, { recursive: true, force: true });
-  }
-});
-
 describe('extension runtime contract', () => {
-  it('discovers, calls, mutates, and errors through real extension transports', async () => {
-    const { context, extensionId } = await launchExtensionContext();
-
-    try {
-      const page = await openClientPage(context, extensionId);
-
-      const initialTools = await listTools(page);
-      assert.deepStrictEqual(initialTools, ['always_fail', 'echo', 'sum']);
-
-      await page.evaluate(async () => {
-        await window.__WEBMCP_E2E__?.resetInvocations?.();
-      });
-
-      const sumText = await callTool(page, 'sum', { a: 3, b: 9 });
-      assert.strictEqual(sumText, 'sum:12');
-
-      const invocations = await page.evaluate(async () => {
-        return (await window.__WEBMCP_E2E__?.readInvocations?.()) ?? [];
-      });
-      assert.deepStrictEqual(invocations, [{ name: 'sum', arguments: { a: 3, b: 9 } }]);
-
-      const registerResult = await page.evaluate(async () => {
-        return await window.__WEBMCP_E2E__?.registerDynamicTool?.();
-      });
-      assert.strictEqual(registerResult, true);
-
-      await page.waitForFunction(async () => {
-        const tools = await window.mcpClient?.listTools?.();
-        return tools?.tools.some((tool) => tool.name === 'dynamic_tool') ?? false;
-      });
-
-      const dynamicText = await callTool(page, 'dynamic_tool', { value: 'extension' });
-      assert.strictEqual(dynamicText, 'dynamic:extension');
-
-      const unregisterResult = await page.evaluate(async () => {
-        return await window.__WEBMCP_E2E__?.unregisterDynamicTool?.();
-      });
-      assert.strictEqual(unregisterResult, true);
-
-      await page.waitForFunction(async () => {
-        const tools = await window.mcpClient?.listTools?.();
-        return !(tools?.tools.some((tool) => tool.name === 'dynamic_tool') ?? false);
-      });
-
-      const missingError = await callToolError(page, 'dynamic_tool', { value: 'gone' });
-      assert.ok(missingError.includes('dynamic_tool'));
-
-      const runtimeError = await callToolError(page, 'always_fail', { reason: 'extension' });
-      assert.ok(runtimeError.includes('always_fail:extension'));
-    } finally {
-      await context.close();
-    }
-  });
-
-  it('reconnects from a fresh extension page after the first client disconnects', async () => {
-    const { context, extensionId } = await launchExtensionContext();
+  it('supports tools, mutations, reconnection, and isolated sessions', async () => {
+    const { context, extensionId, userDataDir } = await launchExtensionContext();
 
     try {
       const firstPage = await openClientPage(context, extensionId);
       assert.deepStrictEqual(await listTools(firstPage), ['always_fail', 'echo', 'sum']);
 
+      await firstPage.evaluate(async () => window.__WEBMCP_E2E__?.resetInvocations?.());
+      assert.strictEqual(await callTool(firstPage, 'sum', { a: 3, b: 9 }), 'sum:12');
+      assert.deepStrictEqual(
+        await firstPage.evaluate(async () => {
+          return (await window.__WEBMCP_E2E__?.readInvocations?.()) ?? [];
+        }),
+        [{ name: 'sum', arguments: { a: 3, b: 9 } }]
+      );
+
+      assert.strictEqual(
+        await firstPage.evaluate(async () => {
+          return await window.__WEBMCP_E2E__?.registerDynamicTool?.();
+        }),
+        true
+      );
+      await firstPage.waitForFunction(async () => {
+        return (await window.mcpClient?.listTools?.())?.tools.some(
+          (tool) => tool.name === 'dynamic_tool'
+        );
+      });
+      assert.strictEqual(
+        await callTool(firstPage, 'dynamic_tool', { value: 'extension' }),
+        'dynamic:extension'
+      );
+
+      assert.strictEqual(
+        await firstPage.evaluate(async () => {
+          return await window.__WEBMCP_E2E__?.unregisterDynamicTool?.();
+        }),
+        true
+      );
+      await firstPage.waitForFunction(async () => {
+        return !(await window.mcpClient?.listTools?.())?.tools.some(
+          (tool) => tool.name === 'dynamic_tool'
+        );
+      });
+      assert.ok(
+        (await callToolError(firstPage, 'dynamic_tool', { value: 'gone' })).includes('dynamic_tool')
+      );
+      assert.ok(
+        (await callToolError(firstPage, 'always_fail', { reason: 'extension' })).includes(
+          'always_fail:extension'
+        )
+      );
       await firstPage.close();
 
       const secondPage = await openClientPage(context, extensionId);
-      assert.deepStrictEqual(await listTools(secondPage), ['always_fail', 'echo', 'sum']);
+      assert.strictEqual(
+        await callTool(secondPage, 'echo', { message: 'reconnected' }),
+        'echo:reconnected'
+      );
 
-      const echoText = await callTool(secondPage, 'echo', { message: 'reconnected' });
-      assert.strictEqual(echoText, 'echo:reconnected');
+      const thirdPage = await openClientPage(context, extensionId);
+      assert.deepStrictEqual(await listTools(secondPage), ['always_fail', 'echo', 'sum']);
+      assert.deepStrictEqual(await listTools(thirdPage), ['always_fail', 'echo', 'sum']);
+      assert.deepStrictEqual(
+        await Promise.all([
+          callTool(secondPage, 'echo', { message: 'second' }),
+          callTool(thirdPage, 'echo', { message: 'third' }),
+        ]),
+        ['echo:second', 'echo:third']
+      );
 
       await secondPage.close();
+      assert.strictEqual(
+        await callTool(thirdPage, 'echo', { message: 'still-connected' }),
+        'echo:still-connected'
+      );
     } finally {
-      await context.close();
-    }
-  });
-
-  it('keeps simultaneous extension clients in separate MCP sessions', async () => {
-    const { context, extensionId } = await launchExtensionContext();
-
-    try {
-      const firstPage = await openClientPage(context, extensionId);
-      const secondPage = await openClientPage(context, extensionId);
-
-      assert.deepStrictEqual(await listTools(firstPage), ['always_fail', 'echo', 'sum']);
-      assert.deepStrictEqual(await listTools(secondPage), ['always_fail', 'echo', 'sum']);
-
-      const [firstEcho, secondEcho] = await Promise.all([
-        callTool(firstPage, 'echo', { message: 'first' }),
-        callTool(secondPage, 'echo', { message: 'second' }),
-      ]);
-      assert.strictEqual(firstEcho, 'echo:first');
-      assert.strictEqual(secondEcho, 'echo:second');
-
-      await firstPage.close();
-      const survivingEcho = await callTool(secondPage, 'echo', { message: 'still-connected' });
-      assert.strictEqual(survivingEcho, 'echo:still-connected');
-
-      await secondPage.close();
-    } finally {
-      await context.close();
+      try {
+        await context.close();
+      } finally {
+        rmSync(userDataDir, { recursive: true, force: true });
+      }
     }
   });
 });

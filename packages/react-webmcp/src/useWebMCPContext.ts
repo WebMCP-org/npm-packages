@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { useWebMCP, type WebMCPReturn } from 'usewebmcp';
 
 /**
@@ -9,9 +8,7 @@ import { useWebMCP, type WebMCPReturn } from 'usewebmcp';
  * configures appropriate annotations (read-only, idempotent) and handles value
  * serialization.
  *
- * Note: This hook does not use an output schema, so the result will not include
- * `structuredContent` in the MCP response. Use {@link useWebMCP} directly with
- * `outputSchema` if you need structured output for MCP compliance.
+ * JSON-compatible values are normalized to text plus `structuredContent`.
  *
  * @template T - The type of context data to expose
  *
@@ -71,27 +68,16 @@ export function useWebMCPContext<T>(
   description: string,
   getValue: () => T
 ): WebMCPReturn {
-  const annotations = useMemo(
-    () => ({
+  return useWebMCP({
+    name,
+    description,
+    annotations: {
       title: `Context: ${name}`,
       readOnlyHint: true,
       idempotentHint: true,
       destructiveHint: false,
       openWorldHint: false,
-    }),
-    [name]
-  );
-
-  return useWebMCP({
-    name,
-    description,
-    annotations,
-    execute: async () => getValue(),
-    formatOutput: (output) => {
-      if (typeof output === 'string') {
-        return output;
-      }
-      return JSON.stringify(output, null, 2);
     },
+    execute: getValue,
   });
 }

@@ -491,9 +491,7 @@ async function startWidgetAssetServer(options?: {
     if (url.startsWith('/widget.html')) {
       response.statusCode = 200;
       response.setHeader('content-type', `${mimeType}; charset=utf-8`);
-      if (mimeType === 'text/plain') {
-        response.setHeader('access-control-allow-origin', '*');
-      }
+      response.setHeader('access-control-allow-origin', '*');
       response.end(widgetHtml);
       return;
     }

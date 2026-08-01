@@ -96,7 +96,7 @@ ${properties}
       },
       required: [${required}]
     } as const,
-    handler: async ({ ${paramName} }) => {
+    execute: async ({ ${paramName} }) => {
       return \`Hello, \${${paramName}}!\`;
     }
   });

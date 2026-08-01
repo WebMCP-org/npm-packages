@@ -12,6 +12,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PKG_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 STAGING_DIR="$PKG_DIR/.mcpb-staging"
+RUNTIME_DIR="$STAGING_DIR/runtime"
 
 VERSION=$(node -e "console.log(require('$PKG_DIR/package.json').version)")
 OUTPUT_NAME="webmcp-local-relay-${VERSION}.mcpb"
@@ -28,13 +29,23 @@ echo "[mcpb] Running tsdown build..."
 cd "$PKG_DIR"
 pnpm run build
 
-# ── 3. Copy server files (runtime JS only, no .d.ts or .map) ─────────────────
+# ── 3. Deploy locked production dependencies ─────────────────────────────────
+echo "[mcpb] Deploying production dependencies..."
+pnpm --filter @mcp-b/webmcp-local-relay deploy --legacy --prod --frozen-lockfile "$RUNTIME_DIR"
+mv "$RUNTIME_DIR/node_modules" "$STAGING_DIR/node_modules"
+# Legacy deploy links the workspace package back to the repository. It is not a
+# runtime dependency, and leaving it in the archive makes pack recurse forever.
+rm "$STAGING_DIR/node_modules/.pnpm/node_modules/@mcp-b/webmcp-local-relay"
+rmdir "$STAGING_DIR/node_modules/.pnpm/node_modules/@mcp-b"
+
+# ── 4. Copy server files (runtime JS only, no .d.ts or .map) ─────────────────
 echo "[mcpb] Copying server files..."
 for f in dist/*.mjs; do
   cp "$f" "$STAGING_DIR/server/"
 done
+rm -rf "$RUNTIME_DIR"
 
-# ── 4. Manifest with version from package.json ───────────────────────────────
+# ── 5. Manifest with version from package.json ───────────────────────────────
 echo "[mcpb] Writing manifest..."
 node -e "
   const fs = require('fs');
@@ -43,40 +54,12 @@ node -e "
   fs.writeFileSync('$STAGING_DIR/manifest.json', JSON.stringify(manifest, null, 2) + '\n');
 "
 
-# ── 5. Install production dependencies ────────────────────────────────────────
-echo "[mcpb] Installing production dependencies..."
-
-# Resolve catalog: references to real versions for standalone npm install
-node -e "
-  const fs = require('fs');
-  const pkg = JSON.parse(fs.readFileSync('$PKG_DIR/package.json', 'utf8'));
-  const catalog = {
-    '@modelcontextprotocol/core': '2.0.0',
-    '@modelcontextprotocol/server': '2.0.0',
-    'zod': '4.4.3'
-  };
-  const deps = {};
-  for (const [name, ver] of Object.entries(pkg.dependencies || {})) {
-    deps[name] = ver === 'catalog:' ? (catalog[name] || ver) : ver;
-  }
-  const minimal = {
-    name: 'webmcp-local-relay-mcpb',
-    version: '$VERSION',
-    private: true,
-    type: 'module',
-    dependencies: deps
-  };
-  fs.writeFileSync('$STAGING_DIR/package.json', JSON.stringify(minimal, null, 2) + '\n');
-"
-
-cd "$STAGING_DIR"
-npm install --production --ignore-scripts --no-audit --no-fund 2>&1 | tail -3
-rm -f package-lock.json
-cd "$PKG_DIR"
-
 # ── 6. Pack ───────────────────────────────────────────────────────────────────
+echo "[mcpb] Validating manifest..."
+pnpm exec mcpb validate "$STAGING_DIR/manifest.json"
 echo "[mcpb] Packing .mcpb bundle..."
-npx --yes @anthropic-ai/mcpb@latest pack "$STAGING_DIR" "$PKG_DIR/$OUTPUT_NAME" 2>&1
+pnpm exec mcpb pack "$STAGING_DIR" "$PKG_DIR/$OUTPUT_NAME" 2>&1
+rm -rf "$STAGING_DIR"
 
 # ── 7. Report ─────────────────────────────────────────────────────────────────
 BUNDLE_SIZE=$(du -sh "$PKG_DIR/$OUTPUT_NAME" | cut -f1)

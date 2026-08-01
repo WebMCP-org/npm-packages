@@ -161,7 +161,7 @@ Each framework has its own lifecycle hooks for mount and unmount. Register tools
 
     | Package | Use when |
     |---------|----------|
-    | [**@mcp-b/react-webmcp**](/packages/react-webmcp/reference) | You want the full MCP-B surface: tools, prompts, resources, sampling, elicitation |
+    | [**@mcp-b/react-webmcp**](/packages/react-webmcp/reference) | You want tools, prompts, resources, and MCP client-provider hooks |
     | [**usewebmcp**](/packages/usewebmcp/reference) | You want strict-core `document.modelContext` tools only |
 
     Both handle registration on mount and cleanup on unmount automatically.
@@ -185,7 +185,7 @@ Each framework has its own lifecycle hooks for mount and unmount. Register tools
           readOnlyHint: false,
           idempotentHint: true,
         },
-        handler: async (input) => {
+        execute: async (input) => {
           await api.posts.like(input.postId);
           return { success: true, postId: input.postId };
         },
@@ -354,7 +354,7 @@ Each framework has its own lifecycle hooks for mount and unmount. Register tools
           },
           required: ['startDate', 'endDate'],
         } as const,
-        handler: async ({ startDate, endDate }) => {
+        execute: async ({ startDate, endDate }) => {
           const res = await fetch(`/api/metrics?start=${startDate}&end=${endDate}`);
           return await res.json();
         },

@@ -30,8 +30,6 @@ pnpm --filter mcp-e2e-tests test:runtime-contract
 
 # Runtime API integration lanes (not canonical E2E)
 pnpm --filter mcp-e2e-tests test:integration:runtime-api
-pnpm --filter mcp-e2e-tests test:codemode:webmcp
-pnpm --filter mcp-e2e-tests test:codemode:webmcp:beta
 pnpm --filter mcp-e2e-tests test:integration:frameworks
 
 # Native contract lanes (Chrome 152+ WebMCP config)
@@ -99,20 +97,12 @@ This lane keeps direct runtime and demo validation for:
 
 - `e2e/tests/tab-transport.spec.ts`
 - `e2e/tests/mcp-iframe-element.spec.ts`
-- `e2e/tests/codemode-webmcp.spec.ts`
 - `e2e/tests/chromium-native-api.spec.ts` (historical filename; explicitly
   tests MCP-B extensions and the deprecated `modelContextTesting`
   compatibility shim)
 - `e2e/tests/notification-batching.spec.ts`
 - `e2e/tests/chrome-beta-webmcp.spec.ts`
 - `e2e/playwright-native-showcase.config.ts`
-
-Focused codemode commands:
-
-- `pnpm --filter mcp-e2e-tests test:codemode:webmcp` runs the codemode page flow in Playwright Chromium and reports whether that browser instance resolved to the native or polyfill runtime path.
-- `pnpm --filter mcp-e2e-tests test:codemode:webmcp:beta` runs that same
-  codemode page flow in Chrome 152+ and asserts the captured native
-  `document.modelContext` surface.
 
 ### Framework Integration
 

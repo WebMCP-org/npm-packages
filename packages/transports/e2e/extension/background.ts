@@ -8,27 +8,9 @@ import {
   createRuntimeContractState,
   createRuntimeContractTools,
   DYNAMIC_TOOL_NAME,
-  type RuntimeContractController,
   type RuntimeContractTool,
-  type RuntimeContractTools,
 } from '../../../../e2e/runtime-contract/core.js';
 
-const debugState = {
-  events: [] as string[],
-};
-
-function recordDebugEvent(event: string) {
-  debugState.events.push(event);
-  if (debugState.events.length > 100) {
-    debugState.events.shift();
-  }
-}
-
-recordDebugEvent('background:loaded');
-
-let runtimeContract: RuntimeContractController | null = null;
-let runtimeTools: RuntimeContractTools | null = null;
-let startupError: string | null = null;
 let dynamicToolEnabled = false;
 let runtimeMutationQueue: Promise<void> = Promise.resolve();
 
@@ -63,66 +45,47 @@ async function registerSessionTool(
   }
 }
 
-async function initializeRuntime(): Promise<void> {
-  try {
-    const state = createRuntimeContractState();
-    runtimeTools = createRuntimeContractTools(state, {
-      runtimeLabel: 'extension',
-    });
-    runtimeContract = createRuntimeContractController(
-      state,
-      () =>
-        enqueueRuntimeMutation(async () => {
-          const tools = runtimeTools;
-          if (!tools || dynamicToolEnabled) return false;
+const state = createRuntimeContractState();
+const runtimeTools = createRuntimeContractTools(state, {
+  runtimeLabel: 'extension',
+});
+const runtimeContract = createRuntimeContractController(
+  state,
+  () =>
+    enqueueRuntimeMutation(async () => {
+      if (dynamicToolEnabled) return false;
 
-          const registeredSessions: RuntimeSession[] = [];
-          try {
-            for (const session of sessions) {
-              await registerSessionTool(session, tools.createDynamicTool());
-              registeredSessions.push(session);
-            }
-          } catch (error) {
-            for (const session of registeredSessions) {
-              session.registrations.get(DYNAMIC_TOOL_NAME)?.abort();
-              session.registrations.delete(DYNAMIC_TOOL_NAME);
-            }
-            throw error;
-          }
+      const registeredSessions: RuntimeSession[] = [];
+      try {
+        for (const session of sessions) {
+          await registerSessionTool(session, runtimeTools.createDynamicTool());
+          registeredSessions.push(session);
+        }
+      } catch (error) {
+        for (const session of registeredSessions) {
+          session.registrations.get(DYNAMIC_TOOL_NAME)?.abort();
+          session.registrations.delete(DYNAMIC_TOOL_NAME);
+        }
+        throw error;
+      }
 
-          dynamicToolEnabled = true;
-          return true;
-        }),
-      (name = DYNAMIC_TOOL_NAME) =>
-        enqueueRuntimeMutation(async () => {
-          if (name !== DYNAMIC_TOOL_NAME || !dynamicToolEnabled) return false;
-          dynamicToolEnabled = false;
-          for (const session of sessions) {
-            session.registrations.get(DYNAMIC_TOOL_NAME)?.abort();
-            session.registrations.delete(DYNAMIC_TOOL_NAME);
-          }
-          return true;
-        })
-    );
-    state.ready = true;
-    recordDebugEvent('runtime-contract:installed');
-  } catch (error) {
-    startupError = error instanceof Error ? error.message : String(error);
-    recordDebugEvent(`startup:error:${startupError}`);
-  }
-}
+      dynamicToolEnabled = true;
+      return true;
+    }),
+  (name = DYNAMIC_TOOL_NAME) =>
+    enqueueRuntimeMutation(async () => {
+      if (name !== DYNAMIC_TOOL_NAME || !dynamicToolEnabled) return false;
+      dynamicToolEnabled = false;
+      for (const session of sessions) {
+        session.registrations.get(DYNAMIC_TOOL_NAME)?.abort();
+        session.registrations.delete(DYNAMIC_TOOL_NAME);
+      }
+      return true;
+    })
+);
+state.ready = true;
 
-const startup = initializeRuntime();
-
-function connectRuntimeSession(port: chrome.runtime.Port): Promise<void> {
-  if (startupError) {
-    return Promise.reject(new Error(`Extension runtime startup failed: ${startupError}`));
-  }
-  const tools = runtimeTools;
-  if (!tools) {
-    return Promise.reject(new Error('Extension runtime tools are not available'));
-  }
-
+async function connectRuntimeSession(port: chrome.runtime.Port): Promise<void> {
   const server = new BrowserMcpServer({
     name: 'extension-runtime-contract',
     version: '1.0.0',
@@ -131,54 +94,31 @@ function connectRuntimeSession(port: chrome.runtime.Port): Promise<void> {
     registrations: new Map(),
     server,
   };
-  recordDebugEvent('server:created');
 
   try {
-    // Start every registration before connecting. BrowserMcpServer installs each
-    // handler synchronously, while its returned promise finishes notification work.
-    const registrations = tools.baseTools.map((tool) => registerSessionTool(session, tool));
+    const registrations = runtimeTools.baseTools.map((tool) => registerSessionTool(session, tool));
     if (dynamicToolEnabled) {
-      registrations.push(registerSessionTool(session, tools.createDynamicTool()));
+      registrations.push(registerSessionTool(session, runtimeTools.createDynamicTool()));
     }
 
     const transport = new ExtensionServerTransport(port, {
       keepAliveInterval: 500,
     });
-    transport.onerror = (error) => {
-      recordDebugEvent(`transport:error:${error.message}`);
-    };
     transport.onclose = () => {
-      recordDebugEvent('transport:closed');
       sessions.delete(session);
       queueMicrotask(() => {
         void server.close().catch((error) => {
-          recordDebugEvent(
-            `server:close:error:${error instanceof Error ? error.message : String(error)}`
-          );
+          console.error('[extension-runtime-contract] Failed to close server', error);
         });
       });
     };
 
     sessions.add(session);
-    recordDebugEvent('server:connect:start');
-    const connection = server.connect(transport);
-    return Promise.all([...registrations, connection])
-      .then(() => {
-        recordDebugEvent('server:connect:ready');
-      })
-      .catch(async (error) => {
-        sessions.delete(session);
-        await server.close().catch(() => undefined);
-        throw error;
-      });
+    await Promise.all([...registrations, server.connect(transport)]);
   } catch (error) {
     sessions.delete(session);
-    return server
-      .close()
-      .catch(() => undefined)
-      .then(() => {
-        throw error;
-      });
+    await server.close().catch(() => undefined);
+    throw error;
   }
 }
 
@@ -201,16 +141,6 @@ function isControlMessage(message: unknown): message is ControlMessage {
 }
 
 async function handleControlMessage(message: ControlMessage) {
-  await startup;
-
-  if (startupError) {
-    return { ok: false, error: `Extension runtime startup failed: ${startupError}` };
-  }
-
-  if (!runtimeContract) {
-    return { ok: false, error: 'Extension runtime contract is not available' };
-  }
-
   switch (message.action) {
     case 'isReady':
       return { ok: true, value: runtimeContract.isReady() };
@@ -233,8 +163,6 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
     return false;
   }
 
-  recordDebugEvent(`control:${String(message.action)}`);
-
   void handleControlMessage(message)
     .then((response) => {
       sendResponse(response);
@@ -250,31 +178,10 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
 });
 
 chrome.runtime.onConnect.addListener((port) => {
-  if (port.name !== 'mcp') {
-    recordDebugEvent(`port:ignored:${port.name}`);
-    return;
-  }
+  if (port.name !== 'mcp') return;
 
-  void connectRuntimeSession(port)
-    .then(() => {
-      recordDebugEvent('port:connected');
-    })
-    .catch((error) => {
-      const message = error instanceof Error ? error.message : String(error);
-      recordDebugEvent(`server:connect:error:${message}`);
-      console.error('[extension-runtime-contract] Failed to connect transport', error);
-      port.disconnect();
-    });
-
-  recordDebugEvent('port:accepted');
-  port.onMessage.addListener((message) => {
-    const method =
-      message && typeof message === 'object' && 'method' in message
-        ? String(Reflect.get(message, 'method'))
-        : undefined;
-    recordDebugEvent(`port:message:${method ?? 'unknown'}`);
-  });
-  port.onDisconnect.addListener(() => {
-    recordDebugEvent('port:disconnected');
+  void connectRuntimeSession(port).catch((error) => {
+    console.error('[extension-runtime-contract] Failed to connect transport', error);
+    port.disconnect();
   });
 });

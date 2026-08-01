@@ -1,18 +1,5 @@
 'use client';
 
-/**
- * usewebmcp
- *
- * Standalone React hooks for the Web Model Context Protocol.
- * Registers tools with `document.modelContext` directly.
- *
- * @packageDocumentation
- */
-
-// ============================================
-// Types
-// ============================================
-
 export type {
   InferOutput,
   InferToolInput,
@@ -21,9 +8,4 @@ export type {
   WebMCPConfig,
   WebMCPReturn,
 } from './types.js';
-
-// ============================================
-// Hooks
-// ============================================
-
 export { useWebMCP } from './useWebMCP.js';

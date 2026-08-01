@@ -1,9 +1,13 @@
-import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
+import { Client, type ConnectOptions, InMemoryTransport } from '@modelcontextprotocol/client';
 import { fromJsonSchema, McpServer } from '@modelcontextprotocol/server';
 import { StrictMode, type ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, expectTypeOf, it, vi } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
-import { McpClientProvider, useMcpClient } from './McpClientProvider.js';
+import {
+  McpClientProvider,
+  type McpClientProviderProps,
+  useMcpClient,
+} from './McpClientProvider.js';
 
 interface TestConnection {
   client: Client;
@@ -44,6 +48,10 @@ async function closeConnection(connection: TestConnection): Promise<void> {
 }
 
 describe('McpClientProvider with an MCP v2 in-memory connection', () => {
+  it('accepts every SDK connection option', () => {
+    expectTypeOf<McpClientProviderProps['opts']>().toEqualTypeOf<ConnectOptions | undefined>();
+  });
+
   it('connects under StrictMode when the transport cannot be restarted', async () => {
     const connection = await createConnection((server) => {
       server.registerTool('strict_mode_tool', {}, async () => ({
@@ -206,8 +214,20 @@ describe('McpClientProvider with an MCP v2 in-memory connection', () => {
     const previousOnclose = vi.fn();
     connection.client.onclose = previousOnclose;
     const connect = vi.spyOn(connection.client, 'connect');
+    let requestOptions = { timeout: 1_000 };
+    function Provider({ children }: { children: ReactNode }) {
+      return (
+        <McpClientProvider
+          client={connection.client}
+          transport={connection.transport}
+          opts={requestOptions}
+        >
+          {children}
+        </McpClientProvider>
+      );
+    }
     const hook = await renderHook(() => useMcpClient(), {
-      wrapper: providerFor(connection),
+      wrapper: Provider,
     });
 
     try {
@@ -216,6 +236,8 @@ describe('McpClientProvider with an MCP v2 in-memory connection', () => {
         expect(hook.result.current.tools).toHaveLength(1);
       });
 
+      requestOptions = { timeout: 2_000 };
+      await hook.rerender();
       await connection.server.close();
 
       await vi.waitFor(() => {
@@ -239,6 +261,7 @@ describe('McpClientProvider with an MCP v2 in-memory connection', () => {
         expect(hook.result.current.tools.map(({ name }) => name)).toEqual(['replacement_tool']);
       });
       expect(connect.mock.calls[1]?.[0]).toBe(replacementTransport);
+      expect(connect.mock.calls[1]?.[1]).toBe(requestOptions);
       expect(connect).toHaveBeenCalledTimes(2);
     } finally {
       await hook.unmount();
@@ -294,6 +317,46 @@ describe('McpClientProvider with an MCP v2 in-memory connection', () => {
       expect(listTools).toHaveBeenCalledTimes(2);
     } finally {
       consoleError.mockRestore();
+      await hook.unmount();
+      await closeConnection(connection);
+    }
+  });
+
+  it('keeps the last complete inventory when one list refresh fails', async () => {
+    const connection = await createConnection((server) => {
+      server.registerTool('stable_tool', {}, async () => ({
+        content: [{ type: 'text', text: 'stable' }],
+      }));
+      server.registerResource('stable_resource', 'stable://resource', {}, async (uri) => ({
+        contents: [{ uri: uri.href, text: 'stable' }],
+      }));
+    });
+    vi.spyOn(connection.client, 'getServerCapabilities').mockReturnValue({
+      resources: {},
+      tools: {},
+    });
+    const listResources = vi.spyOn(connection.client, 'listResources');
+    const listTools = vi.spyOn(connection.client, 'listTools');
+    const hook = await renderHook(() => useMcpClient(), {
+      wrapper: providerFor(connection),
+    });
+
+    try {
+      await vi.waitFor(() => {
+        expect(hook.result.current.resources.map(({ uri }) => uri)).toEqual(['stable://resource']);
+        expect(hook.result.current.tools.map(({ name }) => name)).toEqual(['stable_tool']);
+      });
+
+      listResources.mockResolvedValueOnce({
+        resources: [{ uri: 'new://resource', name: 'New resource' }],
+      });
+      listTools.mockRejectedValueOnce(new Error('tool inventory unavailable'));
+      await hook.act(async () => hook.result.current.reconnect());
+
+      expect(hook.result.current.error?.message).toBe('tool inventory unavailable');
+      expect(hook.result.current.resources.map(({ uri }) => uri)).toEqual(['stable://resource']);
+      expect(hook.result.current.tools.map(({ name }) => name)).toEqual(['stable_tool']);
+    } finally {
       await hook.unmount();
       await closeConnection(connection);
     }

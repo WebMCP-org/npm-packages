@@ -6,12 +6,12 @@ import {
 } from '@mcp-b/transports';
 import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
 import { BrowserMcpServer, SERVER_MARKER_PROPERTY } from '@mcp-b/webmcp-ts-sdk';
-import type { ModelContextCore } from '@mcp-b/webmcp-types';
+import type { ModelContext } from '@mcp-b/webmcp-types';
 import type { Transport } from '@modelcontextprotocol/server';
 import type { WebModelContextInitOptions } from './types.js';
 
 interface RuntimeState {
-  native: ModelContextCore;
+  native: ModelContext;
   server: BrowserMcpServer;
   transport: Transport;
   previousDocumentModelContextDescriptor: PropertyDescriptor | undefined;
@@ -24,7 +24,7 @@ function isBrowserEnvironment(): boolean {
   return typeof window !== 'undefined' && typeof window.navigator !== 'undefined';
 }
 
-function readCurrentModelContext(): ModelContextCore | undefined {
+function readCurrentModelContext(): ModelContext | undefined {
   return document.modelContext ?? navigator.modelContext;
 }
 
@@ -147,7 +147,7 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
 
   // 1. Install polyfill (provides modelContext + modelContextTesting)
   initializeWebMCPPolyfill({
-    installTestingShim: options?.installTestingShim ?? 'if-missing',
+    installTestingShim: options?.installTestingShim ?? true,
   });
 
   // 2. Save reference to the polyfill's (or native) context

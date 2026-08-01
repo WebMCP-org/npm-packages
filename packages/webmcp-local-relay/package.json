@@ -27,7 +27,6 @@
     "webmcp-local-relay": "./dist/cli.mjs"
   },
   "files": [
-    ".mcp.json",
     "dist"
   ],
   "type": "module",
@@ -64,13 +63,12 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@anthropic-ai/mcpb": "2.1.2",
     "@mcp-b/webmcp-polyfill": "workspace:*",
     "@mcp-b/webmcp-types": "workspace:*",
     "@modelcontextprotocol/client": "catalog:",
     "@types/node": "catalog:",
     "@types/ws": "^8.5.14",
-    "@vitest/coverage-v8": "catalog:",
-    "msw": "2.12.10",
     "playwright": "catalog:",
     "typescript": "catalog:",
     "vite-plus": "catalog:",

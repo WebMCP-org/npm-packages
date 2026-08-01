@@ -69,7 +69,7 @@
     "publish:npm": "pnpm publish --access public",
     "test": "vp test run",
     "test:watch": "vp test",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.strict-null-checks-false.json --noEmit && vp test run --typecheck --silent",
+    "typecheck": "tsc --noEmit && vp test run --typecheck --silent",
     "version:major": "pnpm version major --no-git-tag-version",
     "version:minor": "pnpm version minor --no-git-tag-version",
     "version:patch": "pnpm version patch --no-git-tag-version"
@@ -79,11 +79,11 @@
     "@mcp-b/webmcp-ts-sdk": "workspace:*",
     "@mcp-b/webmcp-types": "workspace:*",
     "@modelcontextprotocol/client": "catalog:",
-    "@modelcontextprotocol/server": "catalog:",
     "usewebmcp": "workspace:*"
   },
   "devDependencies": {
     "@mcp-b/global": "workspace:*",
+    "@modelcontextprotocol/server": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@vitest/coverage-v8": "catalog:",

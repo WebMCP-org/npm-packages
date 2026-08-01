@@ -14,14 +14,14 @@
 
 ## Why Use @mcp-b/global?
 
-| Feature                      | Benefit                                                                                                                                                                                                                                                     |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **W3C Standard**             | Implements the emerging WebMCP API specification                                                                                                                                                                                                            |
-| **Drop-in IIFE**             | Add AI capabilities with a single `<script>` tag - no build step                                                                                                                                                                                            |
-| **Native Chromium Support**  | Auto-detects and uses native browser implementation when available                                                                                                                                                                                          |
-| **Dual Transport**           | Works with both same-window clients AND parent pages (iframe support)                                                                                                                                                                                       |
-| **Spec-Aware Compatibility** | Tracks the current WebMCP draft (`document.modelContext`, `registerTool(tool, { signal })`, `getTools()`, and `executeTool(...)`). Deprecated `unregisterTool(name)` remains for existing MCP-B integrations and will be removed in the next major version. |
-| **Works with Any AI**        | Claude, ChatGPT, Gemini, Cursor, Copilot, and any MCP client                                                                                                                                                                                                |
+| Feature                      | Benefit                                                                                                                                                              |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **W3C Standard**             | Implements the emerging WebMCP API specification                                                                                                                     |
+| **Drop-in IIFE**             | Add AI capabilities with a single `<script>` tag - no build step                                                                                                     |
+| **Native Chromium Support**  | Auto-detects and uses native browser implementation when available                                                                                                   |
+| **Dual Transport**           | Works with both same-window clients AND parent pages (iframe support)                                                                                                |
+| **Spec-Aware Compatibility** | Tracks the current WebMCP draft (`document.modelContext`, `registerTool(tool, { signal })`, and `getTools()`) plus Chromium's optional `executeTool(...)` extension. |
+| **Works with Any AI**        | Claude, ChatGPT, Gemini, Cursor, Copilot, and any MCP client                                                                                                         |
 
 ## Package Selection
 
@@ -173,14 +173,6 @@ ac.abort();
 
 `registerTool` resolves `undefined`, matching current Chromium and the WebMCP spec. Use `AbortSignal` cleanup for dynamic tools.
 
-#### `unregisterTool(nameOrTool)` (deprecated)
-
-Removes a tool by name. The April 23, 2026 WebMCP draft removed `unregisterTool` from the spec in favor of `AbortSignal` on `registerTool`. `@mcp-b/global` keeps `unregisterTool` functional for compatibility with older native previews and existing MCP-B integrations, and emits a one-time deprecation warning when called. It will be removed in the next major version.
-
-```typescript
-document.modelContext.unregisterTool('add-to-cart');
-```
-
 #### `getTools()`
 
 Returns WebMCP tool descriptors for all registered tools.
@@ -214,18 +206,18 @@ This MCP-B helper exposes MCP metadata. In-page WebMCP consumers should use
 
 ### Tool Descriptor
 
-| Property       | Type                                      | Required | Description                                                                             |
-| -------------- | ----------------------------------------- | -------- | --------------------------------------------------------------------------------------- |
-| `name`         | `string`                                  | Yes      | Unique identifier for the tool                                                          |
-| `description`  | `string`                                  | Yes      | Natural language description of what the tool does                                      |
-| `inputSchema`  | `InputSchema`                             | No       | JSON Schema describing accepted input. Defaults to `{ type: 'object', properties: {} }` |
-| `outputSchema` | `InputSchema`                             | No       | MCP-B helper metadata for output typing and structured MCP responses                    |
-| `annotations`  | `ToolAnnotations`                         | No       | Hints about tool behavior for LLM planners                                              |
-| `execute`      | `(args, client) => Promise<ToolResponse>` | Yes      | Async function implementing the tool logic                                              |
+| Property       | Type                                    | Required | Description                                                                             |
+| -------------- | --------------------------------------- | -------- | --------------------------------------------------------------------------------------- |
+| `name`         | `string`                                | Yes      | Unique identifier for the tool                                                          |
+| `description`  | `string`                                | Yes      | Natural language description of what the tool does                                      |
+| `inputSchema`  | `InputSchema`                           | No       | JSON Schema describing accepted input. Defaults to `{ type: 'object', properties: {} }` |
+| `outputSchema` | `InputSchema`                           | No       | MCP-B helper metadata for output typing and structured MCP responses                    |
+| `annotations`  | `ToolAnnotations`                       | No       | Hints about tool behavior for LLM planners                                              |
+| `execute`      | `(args) => unknown \| Promise<unknown>` | Yes      | Function implementing the tool logic                                                    |
 
 ### Tool Response Format
 
-Tools return a `ToolResponse` object:
+Tools may return an MCP `CallToolResult` object:
 
 ```typescript
 // Success
@@ -248,15 +240,15 @@ Tools return a `ToolResponse` object:
 interface WebModelContextInitOptions {
   transport?: TransportConfiguration;
   autoInitialize?: boolean;
-  installTestingShim?: boolean | 'always' | 'if-missing';
+  installTestingShim?: boolean;
 }
 ```
 
-| Option               | Default        | Description                                                                                            |
-| -------------------- | -------------- | ------------------------------------------------------------------------------------------------------ |
-| `transport`          | Auto-detect    | Transport layer configuration (tab server and/or iframe)                                               |
-| `autoInitialize`     | `true`         | Whether to auto-initialize on import                                                                   |
-| `installTestingShim` | `'if-missing'` | Controls `navigator.modelContextTesting` installation. Only installs when not already present natively |
+| Option               | Default     | Description                                                                     |
+| -------------------- | ----------- | ------------------------------------------------------------------------------- |
+| `transport`          | Auto-detect | Transport layer configuration (tab server and/or iframe)                        |
+| `autoInitialize`     | `true`      | Whether to auto-initialize on import                                            |
+| `installTestingShim` | `true`      | Installs `navigator.modelContextTesting` only when no implementation is present |
 
 ### Transport Configuration
 
@@ -505,24 +497,15 @@ The browser API accepts plain JSON Schema and does not require Zod. Direct MCP S
 registrations accept Standard Schema implementations that emit JSON Schema, including Zod 4.2 or
 newer. Zod 3 is unsupported.
 
-## Type Exports
+## Type exports
 
-All types are re-exported for TypeScript consumers:
+This package exports its initialization options:
 
 ```typescript
-import type {
-  CallToolResult,
-  InputSchema,
-  ModelContext,
-  ModelContextCore,
-  ToolAnnotations,
-  ToolDescriptor,
-  ToolListItem,
-  ToolResponse,
-  TransportConfiguration,
-  WebModelContextInitOptions,
-} from '@mcp-b/global';
+import type { TransportConfiguration, WebModelContextInitOptions } from '@mcp-b/global';
 ```
+
+Import browser contract types from `@mcp-b/webmcp-types`.
 
 ## Tool Routing Contract
 

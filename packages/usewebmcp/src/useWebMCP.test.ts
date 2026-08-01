@@ -1,13 +1,14 @@
 import { initializeWebModelContext } from '@mcp-b/global';
-import type { CallToolResult, ChromeModelContext, ModelContextCore } from '@mcp-b/webmcp-types';
-import { beforeAll, describe, expect, it } from 'vitest';
+import type { CallToolResult, ChromeModelContext, ModelContext } from '@mcp-b/webmcp-types';
+import { StrictMode, Suspense, createElement, useLayoutEffect } from 'react';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
 import { z } from 'zod';
 import { useWebMCP } from './useWebMCP.js';
 
 const TEST_CHANNEL_ID = `usewebmcp-browser-${Date.now()}`;
 
-function hasDescriptorExecution(context: ModelContextCore): context is ChromeModelContext {
+function hasDescriptorExecution(context: ModelContext): context is ChromeModelContext {
   return 'executeTool' in context && typeof context.executeTool === 'function';
 }
 
@@ -52,17 +53,19 @@ describe('useWebMCP in a browser runtime', () => {
   });
 
   it('registers, executes, and unregisters a real WebMCP tool', async () => {
-    const { act, result, unmount } = await renderHook(() =>
-      useWebMCP({
-        name: 'browser_greet',
-        description: 'Greets a person',
-        inputSchema: {
-          type: 'object',
-          properties: { name: { type: 'string' } },
-          required: ['name'],
-        } as const,
-        execute: async ({ name }) => `Hello, ${name}`,
-      })
+    const { act, result, unmount } = await renderHook(
+      () =>
+        useWebMCP({
+          name: 'browser_greet',
+          description: 'Greets a person',
+          inputSchema: {
+            type: 'object',
+            properties: { name: { type: 'string' } },
+            required: ['name'],
+          } as const,
+          execute: async ({ name }) => `Hello, ${name}`,
+        }),
+      { wrapper: ({ children }) => createElement(StrictMode, null, children) }
     );
 
     const tool = await findTool('browser_greet');
@@ -113,9 +116,28 @@ describe('useWebMCP in a browser runtime', () => {
     expect(response?.structuredContent).toEqual({ total: 7 });
   });
 
-  it('tracks manual execution, callbacks, errors, and reset state', async () => {
-    const successes: number[] = [];
-    const failures: string[] = [];
+  it('records non-serializable schema output as an execution error', async () => {
+    const cyclic: { self?: unknown } = {};
+    cyclic.self = cyclic;
+    const { act, result } = await renderHook(() =>
+      useWebMCP({
+        name: 'browser_invalid_output',
+        description: 'Returns invalid structured output',
+        outputSchema: { type: 'object', properties: { ok: { type: 'boolean' } } } as const,
+        execute: async () => cyclic as { ok?: boolean },
+      })
+    );
+
+    let response: CallToolResult | undefined;
+    await act(async () => {
+      response = await executeRegisteredTool('browser_invalid_output');
+    });
+    expect(response?.isError).toBe(true);
+    expect(result.current.state.executionCount).toBe(0);
+    expect(result.current.state.error?.message).toContain('JSON-serializable');
+  });
+
+  it('tracks manual execution, errors, and reset state', async () => {
     const { act, result } = await renderHook(() =>
       useWebMCP({
         name: 'browser_state',
@@ -129,8 +151,6 @@ describe('useWebMCP in a browser runtime', () => {
           if (value < 0) throw new Error('value must be positive');
           return value * 2;
         },
-        onSuccess: (value) => successes.push(value),
-        onError: (error) => failures.push(error.message),
       })
     );
 
@@ -138,13 +158,11 @@ describe('useWebMCP in a browser runtime', () => {
       await result.current.execute({ value: 5 });
     });
     expect(result.current.state.lastResult).toBe(10);
-    expect(successes).toEqual([10]);
 
     await act(async () => {
       await expect(result.current.execute({ value: -1 })).rejects.toThrow('value must be positive');
     });
     expect(result.current.state.error?.message).toBe('value must be positive');
-    expect(failures).toEqual(['value must be positive']);
 
     await act(async () => result.current.reset());
     expect(result.current.state).toEqual({
@@ -155,25 +173,77 @@ describe('useWebMCP in a browser runtime', () => {
     });
   });
 
-  it('uses execute in preference to the legacy handler alias', async () => {
-    const { act } = await renderHook(() =>
+  it('keeps isExecuting true until every overlapping execution settles', async () => {
+    const resolvers = new Map<string, (value: string) => void>();
+    const { act, result } = await renderHook(() =>
       useWebMCP({
-        name: 'browser_execute_precedence',
-        description: 'Checks implementation selection',
-        execute: async () => 'execute',
-        handler: async () => 'handler',
+        name: 'browser_concurrent_state',
+        description: 'Tracks concurrent executions',
+        inputSchema: {
+          type: 'object',
+          properties: { id: { type: 'string' } },
+          required: ['id'],
+        } as const,
+        execute: ({ id }) => new Promise<string>((resolve) => resolvers.set(id, resolve)),
       })
     );
 
-    let response: CallToolResult | undefined;
+    let first!: Promise<unknown>;
+    let second!: Promise<unknown>;
     await act(async () => {
-      response = await executeRegisteredTool('browser_execute_precedence');
+      first = result.current.execute({ id: 'first' });
+      second = result.current.execute({ id: 'second' });
     });
-    expect(response?.content[0]).toMatchObject({ type: 'text', text: 'execute' });
+    expect(result.current.state.isExecuting).toBe(true);
+
+    await act(async () => {
+      resolvers.get('first')?.('first');
+      await first;
+    });
+    expect(result.current.state.isExecuting).toBe(true);
+
+    await act(async () => {
+      resolvers.get('second')?.('second');
+      await second;
+    });
+    expect(result.current.state.isExecuting).toBe(false);
+  });
+
+  it('normalizes raw JSON and passes through existing MCP responses', async () => {
+    const { act } = await renderHook(() => {
+      useWebMCP({
+        name: 'browser_response',
+        description: 'Returns an MCP response',
+        execute: async () => ({
+          content: [{ type: 'text' as const, text: 'ready' }],
+          isError: false,
+        }),
+      });
+      useWebMCP({
+        name: 'browser_raw_json',
+        description: 'Returns raw JSON',
+        execute: async () => ({ ready: true }),
+      });
+    });
+
+    let response: CallToolResult | undefined;
+    let rawResponse: CallToolResult | undefined;
+    await act(async () => {
+      [response, rawResponse] = await Promise.all([
+        executeRegisteredTool('browser_response'),
+        executeRegisteredTool('browser_raw_json'),
+      ]);
+    });
+    expect(response).toEqual({
+      content: [{ type: 'text', text: 'ready' }],
+      isError: false,
+    });
+    expect(rawResponse?.structuredContent).toEqual({ ready: true });
   });
 
   it('uses the latest implementation without re-registering the descriptor', async () => {
-    const { act, rerender } = await renderHook(
+    const registerTool = vi.spyOn(document.modelContext, 'registerTool');
+    const { act, rerender, unmount } = await renderHook(
       ({ version }) =>
         useWebMCP({
           name: 'browser_latest_execute',
@@ -183,40 +253,103 @@ describe('useWebMCP in a browser runtime', () => {
       { initialProps: { version: 'first' } }
     );
 
-    const firstTool = await findTool('browser_latest_execute');
+    const registrationsAfterMount = registerTool.mock.calls.filter(
+      ([tool]) => tool.name === 'browser_latest_execute'
+    ).length;
     await rerender({ version: 'second' });
-    const secondTool = await findTool('browser_latest_execute');
 
     let response: CallToolResult | undefined;
     await act(async () => {
       response = await executeRegisteredTool('browser_latest_execute');
     });
     expect(response?.content[0]).toMatchObject({ type: 'text', text: 'second' });
-    expect(secondTool?.name).toBe(firstTool?.name);
+    expect(
+      registerTool.mock.calls.filter(([tool]) => tool.name === 'browser_latest_execute')
+    ).toHaveLength(registrationsAfterMount);
+    registerTool.mockRestore();
+    unmount();
+  });
+
+  it('publishes the latest implementation before later layout effects', async () => {
+    let observed: string | undefined;
+    const pending = new Promise<never>(() => {});
+    const hook = await renderHook(
+      ({ value }) => {
+        const tool = useWebMCP({
+          name: 'browser_layout_execute',
+          description: 'Publishes at commit',
+          execute: () => {
+            observed = value;
+            return pending;
+          },
+        });
+        useLayoutEffect(() => {
+          void tool.execute({});
+        }, [tool.execute, value]);
+      },
+      { initialProps: { value: 'first' } }
+    );
+
+    expect(observed).toBe('first');
+    await hook.rerender({ value: 'second' });
+    expect(observed).toBe('second');
+  });
+
+  it('does not publish an implementation from a suspended render', async () => {
+    const pending = new Promise<never>(() => {});
+    const hook = await renderHook(
+      ({ value, suspend }: { value: string; suspend?: boolean }) => {
+        const tool = useWebMCP({
+          name: 'browser_committed_execute',
+          description: 'Uses only committed closures',
+          execute: async () => value,
+        });
+        if (suspend) throw pending;
+        return tool;
+      },
+      {
+        initialProps: { value: 'committed' },
+        wrapper: ({ children }) => createElement(Suspense, { fallback: null }, children),
+      }
+    );
+
+    await hook.rerender({ value: 'uncommitted', suspend: true });
+
+    let response: CallToolResult | undefined;
+    await hook.act(async () => {
+      response = await executeRegisteredTool('browser_committed_execute');
+    });
+    expect(response?.content[0]).toMatchObject({ type: 'text', text: 'committed' });
+    await hook.unmount();
   });
 
   it('re-registers metadata only when declared dependencies change', async () => {
     const { rerender } = await renderHook(
-      ({ description, revision }) =>
+      ({ revision }) =>
         useWebMCP(
           {
             name: 'browser_dependency',
-            description,
+            description: 'Uses explicit descriptor dependencies',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                value: { type: 'string', description: `Revision ${revision}` },
+              },
+            } as const,
             execute: async () => revision,
           },
           [revision]
         ),
-      {
-        initialProps: {
-          description: 'Revision one',
-          revision: 1,
-        },
-      }
+      { initialProps: { revision: 1 } }
     );
 
-    expect((await findTool('browser_dependency'))?.description).toBe('Revision one');
-    await rerender({ description: 'Revision two', revision: 2 });
-    expect((await findTool('browser_dependency'))?.description).toBe('Revision two');
+    const getValueDescription = async () => {
+      const schema = JSON.parse((await findTool('browser_dependency'))?.inputSchema ?? '{}');
+      return schema.properties.value.description;
+    };
+    expect(await getValueDescription()).toBe('Revision 1');
+    await rerender({ revision: 2 });
+    expect(await getValueDescription()).toBe('Revision 2');
   });
 
   it('converts a real Zod Standard JSON Schema through the registration path', async () => {

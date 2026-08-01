@@ -1,6 +1,5 @@
 import { initializeWebModelContext } from '@mcp-b/global';
-import { Suspense, createElement } from 'react';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
 import { getBrowserMcpServer } from './model-context.js';
 import { useWebMCPResource } from './useWebMCPResource.js';
@@ -29,7 +28,15 @@ describe('useWebMCPResource in a browser runtime', () => {
     }
   });
 
-  it('registers, reads, and unregisters a resource through the real model context', async () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('registers, reads, and unregisters a resource', async () => {
+    const unregister = vi.fn();
+    const registerResource = vi
+      .spyOn(modelContext(), 'registerResource')
+      .mockReturnValue({ unregister });
     const hook = await renderHook(() =>
       useWebMCPResource({
         uri: 'config://settings',
@@ -49,16 +56,18 @@ describe('useWebMCPResource in a browser runtime', () => {
     );
 
     expect(hook.result.current.isRegistered).toBe(true);
-    expect(modelContext().listResources()).toEqual([
-      {
-        uri: 'config://settings',
-        name: 'Application Settings',
-        description: 'Current application configuration',
-        mimeType: 'application/json',
-      },
-    ]);
+    expect(registerResource).toHaveBeenCalledOnce();
+    const descriptor = registerResource.mock.calls[0]?.[0];
+    if (!descriptor) throw new Error('Resource was not registered');
+    expect(descriptor).toMatchObject({
+      uri: 'config://settings',
+      name: 'Application Settings',
+      description: 'Current application configuration',
+      mimeType: 'application/json',
+      read: expect.any(Function),
+    });
 
-    const response = await modelContext().readResource('config://settings');
+    const response = await descriptor.read(new URL('config://settings'));
     expect(response.contents[0]).toMatchObject({
       uri: 'config://settings',
       mimeType: 'application/json',
@@ -66,10 +75,14 @@ describe('useWebMCPResource in a browser runtime', () => {
     });
 
     await hook.unmount();
-    expect(modelContext().listResources()).toEqual([]);
+    expect(unregister).toHaveBeenCalledOnce();
   });
 
   it('uses the latest reader while re-registering changed descriptor metadata', async () => {
+    const unregister = vi.fn();
+    const registerResource = vi
+      .spyOn(modelContext(), 'registerResource')
+      .mockReturnValue({ unregister });
     const hook = await renderHook(
       ({ name, version }) =>
         useWebMCPResource({
@@ -88,56 +101,33 @@ describe('useWebMCPResource in a browser runtime', () => {
     );
 
     await hook.rerender({
-      name: 'Second name',
+      name: 'First name',
       version: 'second',
     });
 
-    expect(modelContext().listResources()).toEqual([
-      {
-        uri: 'data://latest',
-        name: 'Second name',
-      },
-    ]);
-    const response = await modelContext().readResource('data://latest');
+    expect(registerResource).toHaveBeenCalledOnce();
+    expect(unregister).not.toHaveBeenCalled();
+    const firstDescriptor = registerResource.mock.calls[0]?.[0];
+    if (!firstDescriptor) throw new Error('Resource was not registered');
+    const response = await firstDescriptor.read(new URL('data://latest'));
     expect(response.contents[0]).toMatchObject({
       uri: 'data://latest',
       text: 'second',
     });
 
-    await hook.unmount();
-  });
+    await hook.rerender({
+      name: 'Second name',
+      version: 'second',
+    });
 
-  it('keeps the committed reader while a newer render is suspended', async () => {
-    const pending = new Promise<never>(() => {});
-
-    const hook = await renderHook(
-      ({ version, suspend }: { version: string; suspend?: boolean }) => {
-        useWebMCPResource({
-          uri: 'data://committed',
-          name: 'Committed resource',
-          read: async (uri) => ({
-            contents: [{ uri: uri.href, text: version }],
-          }),
-        });
-
-        if (suspend) {
-          throw pending;
-        }
-      },
-      {
-        initialProps: { version: 'committed' },
-        wrapper: ({ children }) => createElement(Suspense, { fallback: null }, children),
-      }
-    );
-
-    await hook.rerender({ version: 'uncommitted', suspend: true });
-
-    const response = await modelContext().readResource('data://committed');
-    expect(response.contents[0]).toMatchObject({
-      uri: 'data://committed',
-      text: 'committed',
+    expect(registerResource).toHaveBeenCalledTimes(2);
+    expect(unregister).toHaveBeenCalledOnce();
+    expect(registerResource.mock.calls[1]?.[0]).toMatchObject({
+      uri: 'data://latest',
+      name: 'Second name',
     });
 
     await hook.unmount();
+    expect(unregister).toHaveBeenCalledTimes(2);
   });
 });

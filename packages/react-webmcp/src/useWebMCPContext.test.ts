@@ -1,5 +1,5 @@
 import { initializeWebModelContext } from '@mcp-b/global';
-import type { CallToolResult, ChromeModelContext, ModelContextCore } from '@mcp-b/webmcp-types';
+import type { CallToolResult, ChromeModelContext, ModelContext } from '@mcp-b/webmcp-types';
 import { Suspense, createElement } from 'react';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
@@ -7,7 +7,7 @@ import { useWebMCPContext } from './useWebMCPContext.js';
 
 const TEST_CHANNEL_ID = `useWebMCPContext-browser-${Date.now()}`;
 
-function hasDescriptorExecution(context: ModelContextCore): context is ChromeModelContext {
+function hasDescriptorExecution(context: ModelContext): context is ChromeModelContext {
   return 'executeTool' in context && typeof context.executeTool === 'function';
 }
 
@@ -44,7 +44,7 @@ describe('useWebMCPContext in a browser runtime', () => {
     }
   });
 
-  it('registers, executes, formats, and unregisters a context tool', async () => {
+  it('registers, normalizes, and unregisters a context tool', async () => {
     const hook = await renderHook(() =>
       useWebMCPContext('context_user', 'Get the current user', () => ({
         id: 'user-1',
@@ -62,8 +62,9 @@ describe('useWebMCPContext in a browser runtime', () => {
     const response = await executeRegisteredTool('context_user');
     expect(response.content[0]).toMatchObject({
       type: 'text',
-      text: '{\n  "id": "user-1",\n  "role": "admin"\n}',
+      text: '{"id":"user-1","role":"admin"}',
     });
+    expect(response.structuredContent).toEqual({ id: 'user-1', role: 'admin' });
 
     await hook.unmount();
     expect(await document.modelContext.getTools()).toEqual([]);

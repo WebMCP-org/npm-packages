@@ -10,16 +10,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@mcp-b/codemode": "workspace:*",
     "@mcp-b/global": "workspace:*",
     "@mcp-b/mcp-iframe": "workspace:*",
     "@mcp-b/transports": "workspace:*",
     "@mcp-b/webmcp-polyfill": "workspace:*",
     "@mcp-b/webmcp-ts-sdk": "workspace:*",
     "@mcp-b/webmcp-types": "workspace:*",
-    "@modelcontextprotocol/client": "catalog:",
-    "ai": "catalog:",
-    "zod": "catalog:"
+    "@modelcontextprotocol/client": "catalog:"
   },
   "devDependencies": {
     "typescript": "catalog:",

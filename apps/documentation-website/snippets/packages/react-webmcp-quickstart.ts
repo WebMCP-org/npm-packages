@@ -12,7 +12,7 @@ export function PostsPage() {
       },
       required: ['postId'],
     } as const,
-    handler: async (input) => {
+    execute: async (input) => {
       await api.posts.like(input.postId);
       return { success: true };
     },

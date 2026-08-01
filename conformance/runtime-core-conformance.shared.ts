@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import type { ChromeModelContext, InputSchema, ToolDescriptor } from '@mcp-b/webmcp-types';
+import type { ChromeModelContext, InputSchema, ModelContextTool } from '@mcp-b/webmcp-types';
 
 interface RuntimeCoreConformanceOptions {
   suiteName: string;
@@ -40,7 +40,7 @@ async function listToolNames(): Promise<string[]> {
   return (await requireModelContext().getTools()).map((tool) => tool.name);
 }
 
-async function registerAbortableTool(tool: ToolDescriptor): Promise<AbortController> {
+async function registerAbortableTool(tool: ModelContextTool): Promise<AbortController> {
   const controller = new AbortController();
   activeControllers.push(controller);
   await expect(

@@ -1,126 +1,111 @@
 import { expectTypeOf, test } from 'vitest';
-import type { CallToolResult, ContentBlock, InputSchema } from './common.js';
 import type {
+  CallToolResult,
+  ContentBlock,
+  InputSchema,
   MaybePromise,
-  ModelContextClient,
+  ModelContextRegisterToolOptions,
   ModelContextTool,
   ToolAnnotations,
   ToolDescriptor,
-  ToolExecuteResultFromOutputSchema,
   ToolListItem,
   ToolResultFromOutputSchema,
+  WebMcpToolInput,
   WebMcpToolAnnotations,
-} from './tool.js';
-import type { JsonSchemaForInference } from './json-schema.js';
-import type { ModelContextCore, ModelContextRegisterToolOptions } from './model-context.js';
+} from './index.js';
 import type { Tool as McpTool } from '@modelcontextprotocol/server';
 
-test('ToolDescriptor has required fields', () => {
-  expectTypeOf<ToolDescriptor>().toHaveProperty('name');
-  expectTypeOf<ToolDescriptor>().toHaveProperty('description');
-  expectTypeOf<ToolDescriptor>().toHaveProperty('inputSchema');
-  expectTypeOf<ToolDescriptor>().toHaveProperty('execute');
-});
+declare const mcpSchema: McpTool['inputSchema'];
 
-test('ToolDescriptor.execute accepts Record and returns MaybePromise<unknown> by default', () => {
-  expectTypeOf<ToolDescriptor['execute']>().parameter(0).toEqualTypeOf<Record<string, unknown>>();
-  expectTypeOf<ToolDescriptor['execute']>().parameter(1).toEqualTypeOf<ModelContextClient>();
-  expectTypeOf<ToolDescriptor['execute']>().returns.toEqualTypeOf<MaybePromise<unknown>>();
-});
+test('the standard callback accepts synchronous and asynchronous results', () => {
+  const syncTool: ModelContextTool<{ value: number }, number> = {
+    name: 'sync',
+    description: 'Sync tool',
+    execute: ({ value }) => value,
+  };
+  const asyncTool: ModelContextTool<{ value: number }, number> = {
+    name: 'async',
+    description: 'Async tool',
+    execute: async ({ value }) => value,
+  };
 
-test('ModelContextTool uses the standard one-argument promise callback', () => {
-  expectTypeOf<ModelContextTool['execute']>().parameter(0).toEqualTypeOf<Record<string, unknown>>();
+  expectTypeOf(syncTool.execute).returns.toEqualTypeOf<MaybePromise<number>>();
+  expectTypeOf(asyncTool.execute).returns.toEqualTypeOf<MaybePromise<number>>();
   expectTypeOf<Parameters<ModelContextTool['execute']>['length']>().toEqualTypeOf<1>();
-  expectTypeOf<ModelContextTool['execute']>().returns.toEqualTypeOf<Promise<unknown>>();
 });
 
-test('ToolDescriptor supports strongly typed args and result via generics', () => {
-  type SearchArgs = { query: string; limit?: number };
-  type SearchResult = CallToolResult & {
-    structuredContent: {
-      query: string;
-      total: number;
-    };
-  };
-
-  expectTypeOf<ToolDescriptor<SearchArgs, SearchResult>['execute']>()
-    .parameter(0)
-    .toEqualTypeOf<SearchArgs>();
-  expectTypeOf<ToolDescriptor<SearchArgs, SearchResult>['execute']>().returns.toEqualTypeOf<
-    MaybePromise<SearchResult>
-  >();
+test('the MCP-B descriptor keeps the standard callback shape', () => {
+  expectTypeOf<ToolDescriptor['execute']>().parameter(0).toEqualTypeOf<Record<string, unknown>>();
+  expectTypeOf<Parameters<ToolDescriptor['execute']>['length']>().toEqualTypeOf<1>();
+  expectTypeOf<ToolDescriptor['execute']>().returns.toEqualTypeOf<unknown>();
 });
 
-test('ToolDescriptor accepts both sync and async execute implementations', () => {
-  const syncTool: ToolDescriptor<{ message: string }, CallToolResult, 'sync_echo'> = {
-    name: 'sync_echo',
-    description: 'Synchronous echo',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        message: { type: 'string' },
-      },
-      required: ['message'],
-    },
-    execute(args) {
-      return {
-        content: [{ type: 'text', text: args.message }],
-      };
-    },
-  };
+test('tool descriptors preserve explicit input, output, and name types', () => {
+  type SearchResult = CallToolResult & { structuredContent: { total: number } };
+  type SearchTool = ToolDescriptor<{ query: string }, SearchResult, 'search'>;
 
-  const asyncTool: ToolDescriptor<{ message: string }, CallToolResult, 'async_echo'> = {
-    name: 'async_echo',
-    description: 'Asynchronous echo',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        message: { type: 'string' },
-      },
-      required: ['message'],
-    },
-    async execute(args) {
-      return {
-        content: [{ type: 'text', text: args.message }],
-      };
-    },
-  };
-
-  expectTypeOf(syncTool.execute).returns.toEqualTypeOf<MaybePromise<CallToolResult>>();
-  expectTypeOf(asyncTool.execute).returns.toEqualTypeOf<MaybePromise<CallToolResult>>();
+  expectTypeOf<SearchTool['name']>().toEqualTypeOf<'search'>();
+  expectTypeOf<SearchTool['execute']>().parameter(0).toEqualTypeOf<{ query: string }>();
+  expectTypeOf<SearchTool['execute']>().returns.toEqualTypeOf<MaybePromise<SearchResult>>();
 });
 
-test('CallToolResult.content uses MCP v2 content blocks', () => {
-  const strictBlock: ContentBlock = { type: 'text', text: 'ok' };
+test('WebMCP tool inputs can be objects or arrays', () => {
+  expectTypeOf<ModelContextTool<number[]>['execute']>().parameter(0).toEqualTypeOf<number[]>();
+  expectTypeOf<ToolDescriptor<number[]>['execute']>().parameter(0).toEqualTypeOf<number[]>();
+});
 
-  const result: CallToolResult = {
-    content: [strictBlock],
+test('tool callbacks cannot narrow the declared input', () => {
+  const narrow = (input: { query: string }) => input.query;
+  const standard: ModelContextTool<WebMcpToolInput> = {
+    name: 'standard',
+    description: 'Standard tool',
+    // @ts-expect-error the runtime may pass any WebMCP object.
+    execute: narrow,
   };
+  const extended: ToolDescriptor<WebMcpToolInput> = {
+    name: 'extended',
+    description: 'Extended tool',
+    // @ts-expect-error the runtime may pass any WebMCP object.
+    execute: narrow,
+  };
+  void [standard, extended];
+});
 
+test('CallToolResult content uses the upstream MCP union', () => {
+  const content: ContentBlock = { type: 'text', text: 'ok' };
+  const result: CallToolResult = { content: [content] };
   expectTypeOf(result.content).toEqualTypeOf<ContentBlock[]>();
 });
 
-test('ToolDescriptor supports literal tool names via generics', () => {
-  expectTypeOf<
-    ToolDescriptor<Record<string, never>, CallToolResult, 'health'>['name']
-  >().toEqualTypeOf<'health'>();
+test('InputSchema accepts MCP wire schemas and readonly JSON Schema literals', () => {
+  const acceptWebSchema = (_schema: InputSchema) => {};
+  acceptWebSchema(mcpSchema);
+
+  const schema = {
+    type: 'object',
+    properties: { query: { type: 'string' } },
+    required: ['query'],
+  } as const satisfies InputSchema;
+  expectTypeOf(schema.type).toEqualTypeOf<'object'>();
 });
 
-test('ToolDescriptor.inputSchema supports InputSchema', () => {
-  expectTypeOf<ToolDescriptor['inputSchema']>().toEqualTypeOf<InputSchema | undefined>();
+test('standard and extended annotations stay distinct', () => {
+  expectTypeOf<WebMcpToolAnnotations>().toEqualTypeOf<{
+    readOnlyHint?: boolean;
+    untrustedContentHint?: boolean;
+  }>();
+  expectTypeOf<ToolAnnotations>().toMatchTypeOf<{
+    title?: string | undefined;
+    destructiveHint?: boolean | undefined;
+    idempotentHint?: boolean | undefined;
+    openWorldHint?: boolean | undefined;
+    readOnlyHint?: boolean | undefined;
+    untrustedContentHint?: boolean;
+  }>();
 });
 
-test('InputSchema accepts the MCP v2 tool schema at the WebMCP boundary', () => {
-  expectTypeOf<McpTool['inputSchema']>().toExtend<InputSchema>();
-});
-
-test('ToolDescriptor.outputSchema supports inferable JSON Schema', () => {
-  expectTypeOf<ToolDescriptor>().toHaveProperty('outputSchema');
-  expectTypeOf<Required<ToolDescriptor>['outputSchema']>().toEqualTypeOf<JsonSchemaForInference>();
-});
-
-test('ToolResultFromOutputSchema infers structuredContent for object output schemas', () => {
-  type OutputSchema = {
+test('output schemas narrow wrapped structured content', () => {
+  type Result = ToolResultFromOutputSchema<{
     type: 'object';
     properties: {
       total: { type: 'integer' };
@@ -128,192 +113,26 @@ test('ToolResultFromOutputSchema infers structuredContent for object output sche
     };
     required: ['total'];
     additionalProperties: false;
-  };
+  }>;
 
-  type StructuredContent = ToolResultFromOutputSchema<OutputSchema>['structuredContent'];
-  const structuredContent: NonNullable<StructuredContent> = {
-    total: 1,
-    status: 'ok',
-  };
-
-  expectTypeOf(structuredContent.total).toEqualTypeOf<number>();
-  expectTypeOf(structuredContent.status).toEqualTypeOf<'ok' | 'error' | undefined>();
-  expectTypeOf<StructuredContent>().toEqualTypeOf<{
+  expectTypeOf<Result['structuredContent']>().toEqualTypeOf<{
     total: number;
     status?: 'ok' | 'error';
   }>();
+  expectTypeOf<
+    ToolResultFromOutputSchema<{ type: 'array'; items: { type: 'number' } }>['structuredContent']
+  >().toEqualTypeOf<number[]>();
 });
 
-test('ToolDescriptor.annotations is optional ToolAnnotations', () => {
-  expectTypeOf<ToolDescriptor>().toHaveProperty('annotations');
-  expectTypeOf<Required<ToolDescriptor>['annotations']>().toEqualTypeOf<ToolAnnotations>();
-});
-
-test('ToolAnnotations has optional behavioral hints', () => {
-  expectTypeOf<ToolAnnotations>().toMatchTypeOf<{
-    title?: string | undefined;
-    destructiveHint?: boolean | undefined;
-    readOnlyHint?: boolean | undefined;
-    untrustedContentHint?: boolean | undefined;
-    idempotentHint?: boolean | undefined;
-    openWorldHint?: boolean | undefined;
-  }>();
-});
-
-test('WebMcpToolAnnotations only contains standard boolean hints', () => {
-  expectTypeOf<WebMcpToolAnnotations>().toEqualTypeOf<{
-    readOnlyHint?: boolean;
-    untrustedContentHint?: boolean;
-  }>();
-});
-
-test('ToolListItem mirrors ToolDescriptor metadata without execute', () => {
-  expectTypeOf<ToolListItem>().toHaveProperty('name');
-  expectTypeOf<ToolListItem>().toHaveProperty('description');
+test('list items expose metadata without execution', () => {
+  expectTypeOf<ToolListItem<'search'>['name']>().toEqualTypeOf<'search'>();
   expectTypeOf<ToolListItem>().toHaveProperty('inputSchema');
   expectTypeOf<ToolListItem>().not.toHaveProperty('execute');
 });
 
-test('ToolListItem supports literal tool names via generics', () => {
-  expectTypeOf<ToolListItem<'search'>['name']>().toEqualTypeOf<'search'>();
-});
-
-// ============================================================================
-// Non-object outputSchema support
-// ============================================================================
-
-test('ToolResultFromOutputSchema requires string structuredContent for string schema', () => {
-  type StringSchema = { type: 'string' };
-  type Result = ToolResultFromOutputSchema<StringSchema>;
-  expectTypeOf<Result['structuredContent']>().toEqualTypeOf<string>();
-});
-
-test('ToolResultFromOutputSchema requires array structuredContent for array schema', () => {
-  type ArraySchema = { type: 'array'; items: { type: 'number' } };
-  type Result = ToolResultFromOutputSchema<ArraySchema>;
-  expectTypeOf<Result['structuredContent']>().toEqualTypeOf<number[]>();
-});
-
-test('ToolResultFromOutputSchema requires number structuredContent for number schema', () => {
-  type NumberSchema = { type: 'number' };
-  type Result = ToolResultFromOutputSchema<NumberSchema>;
-  expectTypeOf<Result['structuredContent']>().toEqualTypeOf<number>();
-});
-
-test('ToolResultFromOutputSchema requires boolean structuredContent for boolean schema', () => {
-  type BooleanSchema = { type: 'boolean' };
-  type Result = ToolResultFromOutputSchema<BooleanSchema>;
-  expectTypeOf<Result['structuredContent']>().toEqualTypeOf<boolean>();
-});
-
-test('ToolExecuteResultFromOutputSchema allows string return for string schema', () => {
-  type StringSchema = { type: 'string' };
-  type Result = ToolExecuteResultFromOutputSchema<StringSchema>;
-  expectTypeOf<string>().toMatchTypeOf<Result>();
-  expectTypeOf<ToolResultFromOutputSchema<StringSchema>>().toMatchTypeOf<Result>();
-});
-
-test('ToolExecuteResultFromOutputSchema allows number return for number schema', () => {
-  type NumberSchema = { type: 'number' };
-  type Result = ToolExecuteResultFromOutputSchema<NumberSchema>;
-  expectTypeOf<number>().toMatchTypeOf<Result>();
-  expectTypeOf<ToolResultFromOutputSchema<NumberSchema>>().toMatchTypeOf<Result>();
-});
-
-test('ToolExecuteResultFromOutputSchema allows boolean return for boolean schema', () => {
-  type BooleanSchema = { type: 'boolean' };
-  type Result = ToolExecuteResultFromOutputSchema<BooleanSchema>;
-  expectTypeOf<boolean>().toMatchTypeOf<Result>();
-  expectTypeOf<ToolResultFromOutputSchema<BooleanSchema>>().toMatchTypeOf<Result>();
-});
-
-test('ToolExecuteResultFromOutputSchema allows array return for array schema', () => {
-  type ArraySchema = { type: 'array'; items: { type: 'number' } };
-  type Result = ToolExecuteResultFromOutputSchema<ArraySchema>;
-  expectTypeOf<number[]>().toMatchTypeOf<Result>();
-  expectTypeOf<ToolResultFromOutputSchema<ArraySchema>>().toMatchTypeOf<Result>();
-});
-
-test('ToolExecuteResultFromOutputSchema rejects wrapped object results missing structuredContent', () => {
-  type OutputSchema = {
-    type: 'object';
-    properties: {
-      status: { type: 'string'; enum: ['ok', 'error'] };
-      total: { type: 'number' };
-    };
-    required: ['status', 'total'];
-  };
-
-  type Result = ToolExecuteResultFromOutputSchema<OutputSchema>;
-
-  // @ts-expect-error - outputSchema requires structuredContent when returning a wrapped result
-  const wrappedWithoutStructured: Result = { content: [{ type: 'text', text: 'ok' }] };
-  void wrappedWithoutStructured;
-});
-
-test('ToolExecuteResultFromOutputSchema rejects wrapped object results with invalid structuredContent enum', () => {
-  type OutputSchema = {
-    type: 'object';
-    properties: {
-      status: { type: 'string'; enum: ['ok', 'error'] };
-    };
-    required: ['status'];
-  };
-
-  type Result = ToolExecuteResultFromOutputSchema<OutputSchema>;
-
-  // @ts-expect-error - structuredContent.status must satisfy enum
-  const invalidEnum: Result = {
-    content: [{ type: 'text', text: 'bad enum' }],
-    structuredContent: { status: 'pending' },
-  };
-  void invalidEnum;
-});
-
-test('ToolExecuteResultFromOutputSchema rejects wrapped object results with missing required structuredContent keys', () => {
-  type OutputSchema = {
-    type: 'object';
-    properties: {
-      total: { type: 'number' };
-      category: { type: 'string' };
-    };
-    required: ['total'];
-  };
-
-  type Result = ToolExecuteResultFromOutputSchema<OutputSchema>;
-
-  // @ts-expect-error - structuredContent.total is required
-  const missingRequiredKey: Result = {
-    content: [{ type: 'text', text: 'missing key' }],
-    structuredContent: { category: 'news' },
-  };
-  void missingRequiredKey;
-});
-
-test('ToolExecuteResultFromOutputSchema rejects wrapped object results with wrong structuredContent property types', () => {
-  type OutputSchema = {
-    type: 'object';
-    properties: {
-      total: { type: 'number' };
-    };
-    required: ['total'];
-  };
-
-  type Result = ToolExecuteResultFromOutputSchema<OutputSchema>;
-
-  // @ts-expect-error - structuredContent.total must be number
-  const wrongType: Result = {
-    content: [{ type: 'text', text: 'wrong type' }],
-    structuredContent: { total: '1' },
-  };
-  void wrongType;
-});
-
-test('ModelContextRegisterToolOptions accepts an optional AbortSignal', () => {
-  expectTypeOf<ModelContextRegisterToolOptions>().toExtend<{ signal?: AbortSignal }>();
-});
-
-test('ModelContextCore.registerTool accepts an optional options argument', () => {
-  type RegisterTool = ModelContextCore['registerTool'];
-  expectTypeOf<RegisterTool>().parameter(1).toExtend<ModelContextRegisterToolOptions | undefined>();
+test('registration options expose signal and origin controls', () => {
+  expectTypeOf<ModelContextRegisterToolOptions>().toEqualTypeOf<{
+    signal?: AbortSignal;
+    exposedTo?: string[];
+  }>();
 });

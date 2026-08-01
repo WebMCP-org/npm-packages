@@ -1,4 +1,4 @@
-import type { InputSchema } from './common.js';
+import type { InputSchema, WebMcpToolInput } from './common.js';
 import type { JsonSchemaForInference } from './json-schema.js';
 import type {
   ModelContextTool,
@@ -6,34 +6,15 @@ import type {
   ToolDescriptor,
   ToolDescriptorFromSchema,
   ToolListItem,
-  ToolRawResult,
   WebMcpToolAnnotations,
 } from './tool.js';
 
-// ============================================================================
-// Standard discovery
-// ============================================================================
-
-/**
- * Options used to select tools exposed by descendant documents.
- *
- * @see {@link https://webmachinelearning.github.io/webmcp/#dictdef-modelcontextgettooloptions}
- */
+/** Options for tools exposed by descendant documents. */
 export interface ModelContextGetToolOptions {
-  /**
-   * Origins whose exposed tools should be included alongside same-origin tools.
-   */
   fromOrigins?: string[];
 }
 
-/**
- * Tool metadata returned by `document.modelContext.getTools()`.
- *
- * `inputSchema` is the serialized form of the JSON Schema object supplied at
- * registration time.
- *
- * @see {@link https://webmachinelearning.github.io/webmcp/#dictdef-registeredtool}
- */
+/** Tool metadata returned by `document.modelContext.getTools()`. */
 export interface RegisteredTool {
   name: string;
   title?: string;
@@ -44,24 +25,11 @@ export interface RegisteredTool {
   annotations?: WebMcpToolAnnotations;
 }
 
-/**
- * @deprecated Use {@link RegisteredTool}.
- */
-export type ModelContextToolInfo = RegisteredTool;
-
-/**
- * Options supported by Chromium's experimental `executeTool()` extension.
- */
 export interface ChromeModelContextExecuteToolOptions {
   signal?: AbortSignal;
 }
 
-/**
- * Experimental Chromium additions to the WebMCP standard surface.
- *
- * `executeTool` is implemented by current Chromium previews but is not part of
- * the WebMCP Community Group specification. Feature-detect it before use.
- */
+/** Experimental Chromium methods; feature-detect them before use. */
 export interface ChromeModelContextExtensions {
   executeTool?(
     tool: RegisteredTool,
@@ -70,97 +38,40 @@ export interface ChromeModelContextExtensions {
   ): Promise<string | null>;
 }
 
-// ============================================================================
-// Deprecated Chromium testing compatibility
-// ============================================================================
-
-/**
- * Tool info returned by the removed `navigator.modelContextTesting.listTools()`
- * preview API.
- *
- * @deprecated Use {@link RegisteredTool} values from
- * `document.modelContext.getTools()`.
- */
+/** @deprecated Metadata returned by `navigator.modelContextTesting`. */
 export interface ModelContextTestingToolInfo {
   name: string;
   description: string;
   inputSchema?: string;
 }
 
-/**
- * @deprecated Use {@link ChromeModelContextExecuteToolOptions}.
- */
-export type ModelContextTestingExecuteToolOptions = ChromeModelContextExecuteToolOptions;
-
-/**
- * Removed Chromium testing API retained only for older browsers and MCP-B
- * compatibility shims.
- *
- * @deprecated Use `document.modelContext.getTools()` and feature-detect
- * {@link ChromeModelContextExtensions.executeTool}.
- */
+/** @deprecated Compatibility surface for Chromium's removed testing API. */
 export interface ModelContextTesting extends EventTarget {
   listTools(): ModelContextTestingToolInfo[];
   executeTool(
     toolName: string,
     inputArgsJson: string,
-    options?: ModelContextTestingExecuteToolOptions
+    options?: ChromeModelContextExecuteToolOptions
   ): Promise<string | null>;
   getCrossDocumentScriptToolResult?(): Promise<string>;
-  ontoolchange: ((this: ModelContextTesting, ev: Event) => unknown) | null;
-  /**
-   * @deprecated Use `addEventListener('toolchange', ...)` instead.
-   */
-  registerToolsChangedCallback?(callback: () => void): void;
+  ontoolchange: ((this: ModelContextTesting, event: Event) => unknown) | null;
 }
 
-// ============================================================================
-// Type Inference Helpers
-// ============================================================================
-
-/**
- * Tool identity accepted by compatibility unregister flows.
- *
- * MCP-B compatibility runtimes accept a name or the originally registered
- * tool object. Current WebMCP and Chromium do not expose `unregisterTool()`.
- */
-export interface ModelContextToolReference {
-  name: string;
-}
-
-/**
- * @see {@link https://webmachinelearning.github.io/webmcp/#dictdef-modelcontextregistertooloptions}
- */
+/** Options accepted by `ModelContext.registerTool()`. */
 export interface ModelContextRegisterToolOptions {
-  /**
-   * An `AbortSignal` whose abortion unregisters the tool. A pre-aborted signal short-circuits registration.
-   */
   signal?: AbortSignal;
-
-  /**
-   * Origins that can observe this tool from other documents in the same tree.
-   */
   exposedTo?: string[];
 }
 
-// ============================================================================
-// Model Context
-// ============================================================================
+type WidenedSchema<TSchema extends InputSchema> = string extends TSchema['type'] ? unknown : never;
 
 /**
- * Strict WebMCP core interface on document.modelContext.
+ * Standard `document.modelContext` API.
+ * @see https://webmachinelearning.github.io/webmcp/#modelcontext
  */
-export interface ModelContextCore extends EventTarget {
-  // ==================== TOOLS ====================
-
-  /**
-   * Registers a dynamic tool with JSON Schema-driven inference.
-   *
-   * The standard callback is `execute(input)`. Output schemas and the MCP-B
-   * per-call client are available only on {@link ModelContextWithExtensions}.
-   */
+export interface ModelContext extends EventTarget {
   registerTool<
-    TInputSchema extends JsonSchemaForInference,
+    const TInputSchema extends JsonSchemaForInference,
     TResult = unknown,
     TName extends string = string,
   >(
@@ -168,31 +79,20 @@ export interface ModelContextCore extends EventTarget {
     options?: ModelContextRegisterToolOptions
   ): Promise<void>;
 
-  /**
-   * Registers a dynamic tool with explicitly typed args/result.
-   */
   registerTool<
     TInputSchema extends InputSchema,
-    TArgs extends Record<string, unknown> | unknown[] = Record<string, unknown>,
+    TArgs extends WebMcpToolInput = WebMcpToolInput,
     TResult = unknown,
     TName extends string = string,
   >(
     tool: ModelContextTool<TArgs, TResult, TName> & {
       inputSchema: TInputSchema;
-    } & (TInputSchema extends InputSchema
-        ? string extends TInputSchema['type']
-          ? unknown
-          : never
-        : unknown),
+    } & WidenedSchema<TInputSchema>,
     options?: ModelContextRegisterToolOptions
   ): Promise<void>;
 
-  /**
-   * Registers a dynamic tool without an explicit inputSchema.
-   * Runtime defaults this to an empty object schema.
-   */
   registerTool<
-    TArgs extends Record<string, unknown> | unknown[] = Record<string, unknown>,
+    TArgs extends WebMcpToolInput = Record<string, unknown>,
     TResult = unknown,
     TName extends string = string,
   >(
@@ -202,31 +102,15 @@ export interface ModelContextCore extends EventTarget {
     options?: ModelContextRegisterToolOptions
   ): Promise<void>;
 
-  /**
-   * Lists same-origin tools and tools exposed by requested descendant origins.
-   */
   getTools(options?: ModelContextGetToolOptions): Promise<RegisteredTool[]>;
-
-  /**
-   * Handler invoked when the producer tool list changes.
-   */
-  ontoolchange: ((this: ModelContextCore, ev: Event) => unknown) | null;
+  ontoolchange: ((this: ModelContext, event: Event) => unknown) | null;
 }
 
-/**
- * MCPB extension surface layered on top of strict WebMCP core.
- * These members are intentionally non-standard.
- */
+/** Non-standard methods exposed by MCP-B runtimes. */
 export interface ModelContextExtensions {
-  /**
-   * Registers a tool with MCP-B output metadata and per-call client support.
-   *
-   * This overload replaces the strict browser callback on the composed
-   * {@link ModelContextWithExtensions} surface.
-   */
   registerTool<
-    TInputSchema extends JsonSchemaForInference,
-    TOutputSchema extends JsonSchemaForInference | undefined = undefined,
+    const TInputSchema extends JsonSchemaForInference,
+    const TOutputSchema extends JsonSchemaForInference | undefined = undefined,
     TName extends string = string,
   >(
     tool: ToolDescriptorFromSchema<TInputSchema, TOutputSchema, TName>,
@@ -235,79 +119,28 @@ export interface ModelContextExtensions {
 
   registerTool<
     TInputSchema extends InputSchema,
-    TArgs extends Record<string, unknown> = Record<string, unknown>,
+    TArgs extends WebMcpToolInput = WebMcpToolInput,
     TName extends string = string,
   >(
-    tool: ToolDescriptor<TArgs, ToolRawResult, TName> & {
+    tool: ToolDescriptor<TArgs, unknown, TName> & {
       inputSchema: TInputSchema;
-    } & (TInputSchema extends InputSchema
-        ? string extends TInputSchema['type']
-          ? unknown
-          : never
-        : unknown),
+    } & WidenedSchema<TInputSchema>,
     options?: ModelContextRegisterToolOptions
   ): Promise<void>;
 
   registerTool<
-    TArgs extends Record<string, unknown> = Record<string, unknown>,
+    TArgs extends WebMcpToolInput = Record<string, unknown>,
     TName extends string = string,
   >(
-    tool: Omit<ToolDescriptor<TArgs, ToolRawResult, TName>, 'inputSchema'> & {
+    tool: Omit<ToolDescriptor<TArgs, unknown, TName>, 'inputSchema'> & {
       inputSchema?: undefined;
     },
     options?: ModelContextRegisterToolOptions
   ): Promise<void>;
 
-  /**
-   * Unregisters a dynamic tool by name or tool reference.
-   *
-   * @deprecated Removed from the WebMCP spec on April 23, 2026. Use `registerTool(tool, { signal })`. Will be removed in the next major.
-   */
-  unregisterTool(nameOrTool: string | ModelContextToolReference): void;
-
-  /**
-   * Lists currently registered tools.
-   */
   listTools(): ToolListItem[];
-
-  // ==================== EVENTS ====================
-
-  /**
-   * Adds a listener for tool list changes.
-   */
-  addEventListener(
-    type: 'toolchange',
-    listener: () => void,
-    options?: boolean | AddEventListenerOptions
-  ): void;
-
-  /**
-   * Removes a listener for tool list changes.
-   */
-  removeEventListener(
-    type: 'toolchange',
-    listener: () => void,
-    options?: boolean | EventListenerOptions
-  ): void;
-
-  /**
-   * Dispatches an event.
-   */
-  dispatchEvent(event: Event): boolean;
 }
 
-/**
- * Public document.modelContext type (strict core only).
- */
-export type ModelContext = ModelContextCore;
-
-/**
- * Strict WebMCP core with feature-detectable Chromium preview additions.
- */
-export type ChromeModelContext = ModelContextCore & ChromeModelContextExtensions;
-
-/**
- * Full runtime shape including MCPB extensions.
- */
-export type ModelContextWithExtensions = Omit<ModelContextCore, 'registerTool'> &
+export type ChromeModelContext = ModelContext & ChromeModelContextExtensions;
+export type ModelContextWithExtensions = Omit<ModelContext, 'registerTool'> &
   ModelContextExtensions;

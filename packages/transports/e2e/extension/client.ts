@@ -52,13 +52,10 @@ function requireElement<T extends HTMLElement>(selector: string): T {
 }
 
 const statusEl = requireElement<HTMLDivElement>('#client-status');
-const toolListEl = requireElement<HTMLPreElement>('#client-tools');
 
 function setStatus(status: 'booting' | 'ready' | 'error', text: string) {
   statusEl.textContent = text;
   statusEl.dataset.status = status;
-  statusEl.className =
-    status === 'ready' ? 'status ready' : status === 'error' ? 'status error' : 'status';
 }
 
 async function sendControlMessage(action: string, name?: string): Promise<unknown> {
@@ -107,11 +104,6 @@ async function bootstrap() {
   setStatus('booting', 'Connecting extension client...');
   window.__WEBMCP_E2E_READY__ = await sendBooleanControlMessage('isReady');
   await client.connect(transport);
-
-  const tools = await client.listTools();
-  const names = tools.tools.map((tool) => tool.name).sort();
-  toolListEl.textContent = JSON.stringify(names, null, 2);
-  toolListEl.dataset.count = String(names.length);
   setStatus('ready', 'Extension client connected');
 }
 

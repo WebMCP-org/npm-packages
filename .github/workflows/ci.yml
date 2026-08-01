@@ -75,28 +75,6 @@ jobs:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
         run: pnpm typecheck
 
-  types-conformance:
-    name: Types Conformance
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
-
-      - name: Setup Vite+
-        uses: voidzero-dev/setup-vp@v1
-        with:
-          node-version: '24'
-          cache: true
-
-      - name: Install dependencies
-        run: vp install
-
-      - name: Run @mcp-b/webmcp-types conformance checks
-        run: pnpm --filter @mcp-b/webmcp-types test:conformance
-
   build:
     name: Build
     runs-on: ubuntu-latest

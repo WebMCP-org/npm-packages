@@ -64,8 +64,6 @@ export default defineConfig({
       instances: [{ browser: 'chromium' }],
     },
     include: ['conformance/native-runtime.e2e.test.ts'],
-    exclude: ['dist', 'node_modules'],
-    globals: true,
     maxConcurrency: isCI ? 1 : 2,
     fileParallelism: false,
   },

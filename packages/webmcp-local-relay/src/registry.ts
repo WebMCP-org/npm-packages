@@ -1,4 +1,4 @@
-import { buildPublicToolName } from './naming.js';
+import { buildPublicToolName, MAX_MCP_TOOL_NAME_LENGTH } from './naming.js';
 import type { RelayTool } from './protocol.js';
 import type { BrowserHelloMessage } from './schemas.js';
 
@@ -292,25 +292,46 @@ export class RelayRegistry {
     }
 
     this.providersByPublicToolName.clear();
+    const allocations: Array<{ candidate: string; key: string; provider: ToolProvider }> = [];
 
-    for (const [, providers] of byOriginalName) {
+    for (const [originalName, providers] of byOriginalName) {
       const uniqueTabIds = new Set(providers.map((p) => p.tabId));
       const disambiguate = uniqueTabIds.size > 1;
 
       for (const provider of providers) {
-        provider.publicToolName = buildPublicToolName({
-          originalToolName: provider.tool.name,
-          tabId: provider.tabId,
-          disambiguate,
+        allocations.push({
+          candidate: buildPublicToolName({
+            originalToolName: originalName,
+            tabId: provider.tabId,
+            disambiguate,
+          }),
+          key: disambiguate ? `${originalName}\0${provider.tabId}` : originalName,
+          provider,
         });
-
-        const existing = this.providersByPublicToolName.get(provider.publicToolName) ?? [];
-        existing.push(provider);
-        this.providersByPublicToolName.set(
-          provider.publicToolName,
-          this.sortProvidersByRecency(existing)
-        );
       }
+    }
+
+    const nameByKey = new Map<string, string>();
+    const usedNames = new Set<string>();
+    for (const { candidate, key, provider } of allocations.sort((a, b) =>
+      a.key < b.key ? -1 : a.key > b.key ? 1 : 0
+    )) {
+      let publicToolName = nameByKey.get(key);
+      if (!publicToolName) {
+        publicToolName = candidate;
+        for (let index = 2; usedNames.has(publicToolName); index += 1) {
+          const suffix = `_${String(index)}`;
+          publicToolName = `${candidate.slice(0, MAX_MCP_TOOL_NAME_LENGTH - suffix.length)}${suffix}`;
+        }
+        nameByKey.set(key, publicToolName);
+        usedNames.add(publicToolName);
+      }
+
+      provider.publicToolName = publicToolName;
+
+      const existing = this.providersByPublicToolName.get(publicToolName) ?? [];
+      existing.push(provider);
+      this.providersByPublicToolName.set(publicToolName, existing);
     }
   }
 

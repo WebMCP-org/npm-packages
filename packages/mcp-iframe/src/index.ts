@@ -9,8 +9,8 @@
  * // Import to auto-register the <mcp-iframe> element
  * import '@mcp-b/mcp-iframe';
  *
- * // Or import the class for manual registration
- * import { MCPIframeElement, registerMCPIframeElement } from '@mcp-b/mcp-iframe';
+ * // Or use the side-effect-free entry for a custom tag
+ * import { registerMCPIframeElement } from '@mcp-b/mcp-iframe/element';
  * registerMCPIframeElement('custom-mcp-iframe');
  * ```
  *
@@ -22,10 +22,14 @@
  * @packageDocumentation
  */
 
+import { registerMCPIframeElement } from './MCPIframeElement.js';
+
 export {
   MCPIframeElement,
   type MCPIframeErrorEventDetail,
+  type MCPIframeEventMap,
+  type MCPIframeItemsEventDetail,
   type MCPIframeReadyEventDetail,
-  type MCPIframeToolsChangedEventDetail,
-  registerMCPIframeElement,
 } from './MCPIframeElement.js';
+
+registerMCPIframeElement();

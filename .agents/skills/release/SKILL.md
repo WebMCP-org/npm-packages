@@ -47,7 +47,7 @@ for different changes before releasing.
 
 **Fixed versioning note:** Select only packages that actually changed. Changesets
 automatically bumps all packages in the configured fixed group to the same new version.
-`@mcp-b/codemode` and `@mcp-b/smart-dom-reader-server` are versioned independently.
+`@mcp-b/smart-dom-reader-server` is versioned independently.
 
 ### Step 3: Apply Version Bumps
 
@@ -104,12 +104,11 @@ for pkg in webmcp-types webmcp-polyfill webmcp-ts-sdk transports global mcp-ifra
   echo "@mcp-b/$pkg: local=$LOCAL npm=$NPM"
 done
 echo "usewebmcp: local=$(node -p "require('./packages/usewebmcp/package.json').version") npm=$(npm view usewebmcp version 2>/dev/null)"
-echo "@mcp-b/codemode: local=$(node -p "require('./packages/codemode/package.json').version") npm=$(npm view @mcp-b/codemode version 2>/dev/null)"
 echo "@mcp-b/smart-dom-reader-server: local=$(node -p "require('./packages/smart-dom-reader/mcp-server/package.json').version") npm=$(npm view @mcp-b/smart-dom-reader-server version 2>/dev/null)"
 ```
 
-All packages in the fixed group should have the same version. The two independently
-versioned packages may differ.
+All packages in the fixed group should have the same version. The independently
+versioned package may differ.
 
 ### Step 8: Commit and Push
 
@@ -197,13 +196,13 @@ pnpm publish -r --access public --tag canary --no-git-checks
 
 The core browser stack shares one version number through the `"fixed"` group in
 `.changeset/config.json`. When one member changes, all members bump together.
-`@mcp-b/codemode` and `@mcp-b/smart-dom-reader-server` remain independently versioned.
+`@mcp-b/smart-dom-reader-server` remains independently versioned.
 
 Benefits:
 
 - **No stale transitive chains** — every package depends on the same version of its siblings
 - **Instant mismatch detection** — if `global@2.0.5` depends on `transports@2.0.4`, something's wrong
-- **Simple for consumers** — "I'm on WebMCP 2.0.5" instead of juggling 12 different version numbers
+- **Simple for consumers** — "I'm on WebMCP 2.0.5" instead of juggling 11 different version numbers
 
 ## How `pnpm publish -r` Works
 
@@ -219,7 +218,7 @@ Tier 0 (no internal deps):
   @mcp-b/webmcp-local-relay, @mcp-b/smart-dom-reader-server
 
 Tier 1 (← Tier 0):
-  @mcp-b/webmcp-polyfill, @mcp-b/codemode
+  @mcp-b/webmcp-polyfill
 
 Tier 2 (← Tier 1):
   @mcp-b/webmcp-ts-sdk, usewebmcp
@@ -236,7 +235,6 @@ Tier 3 (← Tier 2):
 @mcp-b/smart-dom-reader-server (no internal deps; independently versioned)
 @mcp-b/webmcp-local-relay    (no internal deps)
 @mcp-b/transports            (no internal deps)
-@mcp-b/codemode              → webmcp-types (independently versioned)
 @mcp-b/webmcp-polyfill       → webmcp-types
 @mcp-b/webmcp-ts-sdk         → webmcp-polyfill, webmcp-types
 @mcp-b/mcp-iframe            → transports, webmcp-ts-sdk, webmcp-types

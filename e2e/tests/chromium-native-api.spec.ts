@@ -1,7 +1,6 @@
 import { expect, test } from '@playwright/test';
 
 type CompatibilityModelContext = NonNullable<Document['modelContext']> & {
-  unregisterTool(name: string): void;
   listTools(): Array<{ name: string; description: string; inputSchema?: unknown }>;
 };
 
@@ -30,23 +29,13 @@ function isDirectOrWrappedText(value: unknown, expectedText: string): boolean {
  * is not native Chromium conformance coverage; native coverage lives in the
  * dedicated Chrome and native-showcase configurations.
  *
- * There is no current WebMCP replacement for arbitrary by-name
- * unregistration, whole-context clearing, testing call logs, or mock responses.
+ * There is no current WebMCP replacement for whole-context clearing, testing
+ * call logs, or mock responses.
  */
 test.describe('MCP-B compatibility - ModelContext extensions', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('h1')).toContainText('Web Model Context API E2E Test');
-  });
-
-  test('should have unregisterTool method available', async ({ page }) => {
-    const hasMethod = await page.evaluate(() => {
-      return (
-        typeof (document.modelContext as unknown as CompatibilityModelContext).unregisterTool ===
-        'function'
-      );
-    });
-    expect(hasMethod).toBe(true);
   });
 
   test('should not expose removed clearContext method', async ({ page }) => {
@@ -84,35 +73,6 @@ test.describe('MCP-B compatibility - ModelContext extensions', () => {
     expect(
       logEntries.some((entry) => entry.includes('Tool unregistered via AbortSignal cleanup'))
     ).toBe(true);
-  });
-
-  test('should unregisterTool by name - base tool', async ({ page }) => {
-    // Get initial tool count
-    let toolCount = await page.evaluate(() => {
-      return (document.modelContext as unknown as CompatibilityModelContext).listTools().length;
-    });
-    expect(toolCount).toBe(4); // 4 base tools
-
-    // Unregister a base tool directly
-    await page.evaluate(() => {
-      (document.modelContext as unknown as CompatibilityModelContext).unregisterTool(
-        'incrementCounter'
-      );
-    });
-    await page.waitForTimeout(300);
-
-    // Verify tool removed
-    toolCount = await page.evaluate(() => {
-      return (document.modelContext as unknown as CompatibilityModelContext).listTools().length;
-    });
-    expect(toolCount).toBe(3); // 3 remaining base tools
-
-    // Verify specific tool is gone
-    const hasIncrementTool = await page.evaluate(() => {
-      const tools = (document.modelContext as unknown as CompatibilityModelContext).listTools();
-      return tools.some((tool: { name: string }) => tool.name === 'incrementCounter');
-    });
-    expect(hasIncrementTool).toBe(false);
   });
 
   test('should clear all app-owned registrations', async ({ page }) => {
@@ -163,22 +123,6 @@ test.describe('MCP-B compatibility - ModelContext extensions', () => {
       return (document.modelContext as unknown as CompatibilityModelContext).listTools().length;
     });
     expect(toolCount).toBe(0);
-  });
-
-  test('should handle unregisterTool on non-existent tool gracefully', async ({ page }) => {
-    const result = await page.evaluate(() => {
-      try {
-        (document.modelContext as unknown as CompatibilityModelContext).unregisterTool(
-          'non-existent-tool'
-        );
-        return { success: true, error: null };
-      } catch (error) {
-        return { success: false, error: String(error) };
-      }
-    });
-
-    // Should not throw, just warn (based on implementation)
-    expect(result.success).toBe(true);
   });
 });
 
@@ -334,12 +278,12 @@ test.describe('MCP-B compatibility - deprecated ModelContextTesting shim', () =>
     );
   });
 
-  test('should toolchange event fire on unregisterTool', async ({ page }) => {
+  test('should toolchange event fire on AbortSignal cleanup', async ({ page }) => {
     // First register a tool
     await page.click('#register-dynamic');
     await page.waitForTimeout(500);
 
-    // Setup callback and test unregister
+    // Set up the callback and abort the owned registration.
     await page.click('#chromium-test-callback-unregister');
     await page.waitForTimeout(500);
 
@@ -351,9 +295,9 @@ test.describe('MCP-B compatibility - deprecated ModelContextTesting shim', () =>
     expect(callbackFired).toBe(true);
 
     const logEntries = await page.locator('#log .log-entry').allTextContents();
-    expect(logEntries.some((entry) => entry.includes('Callback fired on unregisterTool!'))).toBe(
-      true
-    );
+    expect(
+      logEntries.some((entry) => entry.includes('toolchange fired on AbortSignal cleanup!'))
+    ).toBe(true);
   });
 
   test('should toolchange event fire on base context replacement', async ({ page }) => {
@@ -570,7 +514,7 @@ test.describe('MCP-B compatibility - integration', () => {
       // Check ModelContext methods
       const contextMethods = [
         'registerTool',
-        'unregisterTool',
+        'getTools',
         'listTools',
         'addEventListener',
         'removeEventListener',

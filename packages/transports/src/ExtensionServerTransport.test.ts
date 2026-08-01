@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ExtensionServerTransport } from './ExtensionServerTransport.js';
 
@@ -10,7 +10,6 @@ function createPort() {
   const port = {
     disconnect: vi.fn(),
     postMessage: vi.fn(),
-    sender: { id: 'test-extension' },
     onMessage: {
       addListener: (listener: Listener<[unknown, chrome.runtime.Port]>) =>
         messageListeners.add(listener),
@@ -31,6 +30,10 @@ function createPort() {
     },
   };
 }
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe('ExtensionServerTransport', () => {
   it('becomes terminal when the client port disconnects', async () => {
@@ -69,5 +72,22 @@ describe('ExtensionServerTransport', () => {
     expect(transport.getConnectionInfo().isConnected).toBe(false);
     expect(connectedPort.port.disconnect).toHaveBeenCalledOnce();
     expect(onclose).toHaveBeenCalledOnce();
+  });
+
+  it('sends the default keep-alive every 25 seconds', async () => {
+    vi.useFakeTimers();
+    const connectedPort = createPort();
+    const transport = new ExtensionServerTransport(connectedPort.port);
+
+    await transport.start();
+    await vi.advanceTimersByTimeAsync(24_999);
+    expect(connectedPort.port.postMessage).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(connectedPort.port.postMessage).toHaveBeenCalledWith({
+      type: 'keep-alive',
+      timestamp: expect.any(Number),
+    });
+    await transport.close();
   });
 });
