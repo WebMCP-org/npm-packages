@@ -609,13 +609,10 @@ async function setupE2EHarness(options: {
     });
 
     const expectedToolName = sanitizeName(TEST_TOOL_NAME);
-    const requiredToolNames = [expectedToolName, sanitizeName('always_fail')];
 
     await waitForValue(async () => {
       const toolList = await client?.listTools();
-      return requiredToolNames.every((name) => toolList?.tools.some((tool) => tool.name === name))
-        ? true
-        : undefined;
+      return toolList?.tools.some((tool) => tool.name === expectedToolName) ? true : undefined;
     }, 20_000);
 
     return {
@@ -828,6 +825,11 @@ describe('relay e2e (real browser assets)', () => {
           widgetOrigin: widgetServer.origin,
           clientName: `webmcp-local-relay-e2e-client-${runtimeCase.mode}-errors`,
         });
+
+        await waitForValue(async () => {
+          const toolList = await harness?.client.listTools();
+          return toolList?.tools.some((tool) => tool.name === 'always_fail') ? true : undefined;
+        }, 20_000);
 
         const errorResult = await harness.client.callTool({
           name: 'always_fail',
