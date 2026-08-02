@@ -9,7 +9,7 @@ import { useMcpRegistration } from './useMcpRegistration.js';
  * React hook for registering Model Context Protocol (MCP) prompts.
  *
  * This hook handles the complete lifecycle of an MCP prompt:
- * - Registers the prompt with `window.document.modelContext`
+ * - Registers the prompt with the installed MCP-B `BrowserMcpServer`
  * - Automatically unregisters on component unmount
  *
  * @template TArgsSchema - Schema defining argument types
@@ -77,7 +77,7 @@ export function useWebMCPPrompt(config: WebMCPPromptConfig): WebMCPPromptReturn 
     const modelContext = getBrowserMcpServer();
     if (!modelContext) {
       console.warn(
-        `[ReactWebMCP] window.document.modelContext is not available. Prompt "${name}" will not be registered.`
+        `[ReactWebMCP] BrowserMcpServer is not available. Prompt "${name}" will not be registered.`
       );
       return;
     }

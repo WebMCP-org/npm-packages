@@ -35,13 +35,6 @@ interface DescriptorToolContext extends ModelContext {
   executeTool: NonNullable<ChromeModelContextExtensions['executeTool']>;
 }
 
-interface ElicitationModelContext extends ModelContext {
-  elicitInput: (
-    params: Record<string, unknown>,
-    options?: unknown
-  ) => Promise<Record<string, unknown>>;
-}
-
 interface WidgetRequestMessage {
   requestId: string;
   type: string;
@@ -183,10 +176,6 @@ function hasDescriptorToolApi(
 function getDocumentDescriptorContext(): DescriptorToolContext | undefined {
   const modelContext: ModelContext | undefined = document.modelContext;
   return hasDescriptorToolApi(modelContext) ? modelContext : undefined;
-}
-
-function hasElicitation(modelContext: ModelContext): modelContext is ElicitationModelContext {
-  return 'elicitInput' in modelContext && typeof modelContext.elicitInput === 'function';
 }
 
 async function listRelayTools(): Promise<RelayToolDescriptor[]> {
@@ -363,78 +352,6 @@ function handleListRequest(request: WidgetRequestMessage, event: MessageEvent): 
     });
 }
 
-/**
- * Monkey-patches the MCP-B model context's `elicitInput` to bridge elicitation
- * requests through the relay widget iframe to the local relay server, which
- * forwards them to the MCP client (e.g. Claude Code).
- *
- * This is the same pattern used by Chrome DevTools MCP for CDP-based
- * elicitation forwarding. The relay widget and server handle the new
- * `elicitation-request` / `elicitation-response` message types.
- */
-let elicitBridgeInstalled = false;
-
-function installElicitBridge(widgetSource: MessageEventSource, widgetOrigin: string): void {
-  if (elicitBridgeInstalled) return;
-
-  const modelContext = document.modelContext;
-  if (!hasElicitation(modelContext)) {
-    debugWarn('Elicitation bridge not installed: elicitInput not available on modelContext');
-    return;
-  }
-
-  modelContext.elicitInput = (
-    params: Record<string, unknown>,
-    _options?: unknown
-  ): Promise<Record<string, unknown>> => {
-    const callId = createElicitCallId();
-    return new Promise<Record<string, unknown>>((resolve) => {
-      const ELICIT_TIMEOUT_MS = 60_000;
-
-      const cleanup = (): void => {
-        window.removeEventListener('message', handler);
-        clearTimeout(timeout);
-      };
-
-      const timeout = setTimeout(() => {
-        cleanup();
-        debugWarn('Elicitation request timed out after 60s');
-        resolve({ action: 'decline', content: null });
-      }, ELICIT_TIMEOUT_MS);
-
-      const handler = (event: MessageEvent): void => {
-        if (event.origin !== widgetOrigin) return;
-        const data: unknown = event.data;
-        if (
-          !isJsonObject(data) ||
-          data.type !== 'webmcp.elicitation.response' ||
-          data.callId !== callId
-        ) {
-          return;
-        }
-        cleanup();
-        resolve(isJsonObject(data.result) ? data.result : { action: 'decline', content: null });
-      };
-      window.addEventListener('message', handler);
-
-      respondToSource(widgetSource, widgetOrigin, {
-        type: 'webmcp.elicitation.request',
-        callId,
-        params,
-      });
-    });
-  };
-
-  elicitBridgeInstalled = true;
-  debugWarn('Elicitation bridge installed');
-}
-
-let elicitCallCounter = 0;
-function createElicitCallId(): string {
-  elicitCallCounter += 1;
-  return `elicit_${String(Date.now())}_${String(elicitCallCounter)}`;
-}
-
 function handleInvokeRequest(request: WidgetRequestMessage, event: MessageEvent): void {
   if (!getDocumentDescriptorContext()) {
     respondToSource(event.source, event.origin, {
@@ -443,12 +360,6 @@ function handleInvokeRequest(request: WidgetRequestMessage, event: MessageEvent)
       error: 'No executable WebMCP runtime found on this page',
     });
     return;
-  }
-
-  // Install elicitation bridge before invoking the tool, so that tool
-  // handlers can call elicitInput() and have it forwarded to the MCP client.
-  if (event.source) {
-    installElicitBridge(event.source, event.origin);
   }
 
   invokeRelayTool(String(request.toolName ?? ''), toInvokeArgs(request.args))

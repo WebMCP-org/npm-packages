@@ -27,19 +27,19 @@ Ask these questions in order:
 
 3. **Do you need the WebMCP standard in browsers that lack native support, and nothing else?** Install `@mcp-b/webmcp-polyfill`.
 
-4. **Do you need MCP bridge transport, `listTools`, prompts, resources, elicitation, or sampling?** Install `@mcp-b/global`.
+4. **Do you need MCP bridge transport, `listTools`, prompts, resources, or direct access to the official MCP server?** Install `@mcp-b/global`.
 
 5. **Do you need React hooks?** Choose `usewebmcp` for strict core, or `@mcp-b/react-webmcp` for the full MCP-B surface.
 
 ## Package comparison
 
-| Package                  | Runtime | Core API                   | MCP extensions                                         | Transport           | React |
-| ------------------------ | ------- | -------------------------- | ------------------------------------------------------ | ------------------- | ----- |
-| `@mcp-b/webmcp-types`    | No      | Types only                 | Types only                                             | No                  | No    |
-| `@mcp-b/webmcp-polyfill` | Yes     | `registerTool`, `getTools` | No                                                     | No                  | No    |
-| `@mcp-b/global`          | Yes     | `registerTool`, `getTools` | `listTools`, prompts, resources, elicitation, sampling | Tab + iframe        | No    |
-| `usewebmcp`              | Yes     | Via hook                   | No                                                     | No                  | Yes   |
-| `@mcp-b/react-webmcp`    | Yes     | Via hook                   | Full MCP-B surface                                     | Via `@mcp-b/global` | Yes   |
+| Package                  | Runtime | Core API                   | MCP extensions                               | Transport           | React |
+| ------------------------ | ------- | -------------------------- | -------------------------------------------- | ------------------- | ----- |
+| `@mcp-b/webmcp-types`    | No      | Types only                 | Types only                                   | No                  | No    |
+| `@mcp-b/webmcp-polyfill` | Yes     | `registerTool`, `getTools` | No                                           | No                  | No    |
+| `@mcp-b/global`          | Yes     | `registerTool`, `getTools` | `listTools`, prompts, resources, `mcpServer` | Tab + iframe        | No    |
+| `usewebmcp`              | Yes     | Via hook                   | No                                           | No                  | Yes   |
+| `@mcp-b/react-webmcp`    | Yes     | Via hook                   | Tool, prompt, resource, and MCP client hooks | Via `@mcp-b/global` | Yes   |
 
 Both runtime packages also expose a Chrome-compatible descriptor-based `executeTool()` method. It is not part of the strict WebMCP core, so consumer code should feature-detect it.
 
@@ -109,7 +109,7 @@ await document.modelContext.registerTool({
 });
 ```
 
-`@mcp-b/global` auto-initializes on import. It installs the polyfill first, then replaces `document.modelContext` with a `BrowserMcpServer` that keeps the core behavior and adds MCP-B-only methods such as `listTools`, prompts, resources, and transport support.
+`@mcp-b/global` auto-initializes on import. It installs the polyfill first, then replaces `document.modelContext` with a `BrowserMcpServer` that keeps the core behavior and adds `listTools`, prompt and resource registration, the composed `mcpServer`, and transport support. Call `initializeWebModelContext()` when you need the typed server value.
 
 If you need to customize before initialization (for example, to restrict allowed origins), set options on `window.__webModelContextOptions` before loading the script:
 

@@ -8,47 +8,6 @@ import type {
 } from './types';
 
 export class DOMTraversal {
-  private static INTERACTIVE_SELECTORS = [
-    'button',
-    'a[href]',
-    'input:not([type="hidden"])',
-    'textarea',
-    'select',
-    '[role="button"]',
-    '[onclick]',
-    '[contenteditable="true"]',
-    'summary',
-    '[tabindex]:not([tabindex="-1"])',
-  ];
-
-  private static SEMANTIC_SELECTORS = [
-    'h1',
-    'h2',
-    'h3',
-    'h4',
-    'h5',
-    'h6',
-    'article',
-    'section',
-    'nav',
-    'aside',
-    'main',
-    'header',
-    'footer',
-    'form',
-    'table',
-    'ul',
-    'ol',
-    'img[alt]',
-    'figure',
-    'video',
-    'audio',
-    '[role="navigation"]',
-    '[role="main"]',
-    '[role="complementary"]',
-    '[role="contentinfo"]',
-  ];
-
   /**
    * Check if element is visible
    */
@@ -63,8 +22,7 @@ export class DOMTraversal {
       rect.height > 0 &&
       style.display !== 'none' &&
       style.visibility !== 'hidden' &&
-      style.opacity !== '0' &&
-      (element as HTMLElement).offsetParent !== null
+      style.opacity !== '0'
     );
   }
 
@@ -408,26 +366,26 @@ export class DOMTraversal {
     const interaction: ElementInteraction = {};
 
     // Only include true values to reduce token usage
-    const hasClickHandler = !!(
+    if (
       htmlElement.onclick ||
       element.getAttribute('onclick') ||
       element.matches('button, a[href], [role="button"], [tabindex]:not([tabindex="-1"])')
-    );
-    if (hasClickHandler) interaction.click = true;
+    )
+      interaction.click = true;
 
-    const hasChangeHandler = !!(
+    if (
       (htmlElement as HTMLInputElement).onchange ||
       element.getAttribute('onchange') ||
       element.matches('input, select, textarea')
-    );
-    if (hasChangeHandler) interaction.change = true;
+    )
+      interaction.change = true;
 
-    const hasSubmitHandler = !!(
+    if (
       (htmlElement as HTMLFormElement).onsubmit ||
       element.getAttribute('onsubmit') ||
       element.matches('form')
-    );
-    if (hasSubmitHandler) interaction.submit = true;
+    )
+      interaction.submit = true;
 
     const triggersNavigation = element.matches('a[href], button[type="submit"]');
     if (triggersNavigation) interaction.nav = true;
@@ -488,64 +446,5 @@ export class DOMTraversal {
         'table, ul, ol, dl, figure, details, dialog, [role="region"], ' +
         '[role="navigation"], [role="main"], [role="complementary"]'
     );
-  }
-
-  /**
-   * Get interactive elements
-   */
-  static getInteractiveElements(
-    container: Element | Document,
-    options: ExtractionOptions
-  ): ExtractedElement[] {
-    const elements: ExtractedElement[] = [];
-    const selector = DOMTraversal.INTERACTIVE_SELECTORS.join(', ');
-    const found = container.querySelectorAll(selector);
-
-    for (const element of Array.from(found)) {
-      const extracted = DOMTraversal.extractElement(element, options);
-      if (extracted) {
-        elements.push(extracted);
-      }
-    }
-
-    // Add custom selectors if provided
-    if (options.customSelectors) {
-      for (const customSelector of options.customSelectors) {
-        try {
-          const customFound = container.querySelectorAll(customSelector);
-          for (const element of Array.from(customFound)) {
-            const extracted = DOMTraversal.extractElement(element, options);
-            if (extracted) {
-              elements.push(extracted);
-            }
-          }
-        } catch {
-          console.warn(`Invalid custom selector: ${customSelector}`);
-        }
-      }
-    }
-
-    return elements;
-  }
-
-  /**
-   * Get semantic elements (for full mode)
-   */
-  static getSemanticElements(
-    container: Element | Document,
-    options: ExtractionOptions
-  ): ExtractedElement[] {
-    const elements: ExtractedElement[] = [];
-    const selector = DOMTraversal.SEMANTIC_SELECTORS.join(', ');
-    const found = container.querySelectorAll(selector);
-
-    for (const element of Array.from(found)) {
-      const extracted = DOMTraversal.extractElement(element, options);
-      if (extracted) {
-        elements.push(extracted);
-      }
-    }
-
-    return elements;
   }
 }

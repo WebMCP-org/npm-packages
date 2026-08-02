@@ -386,8 +386,7 @@ function execute(method, args) {
   // inject `code` into the page (e.g., chrome.userScripts.execute)
 }
 
-// Note: The bundle contains guarded fallbacks (e.g., typeof require === 'function')
-// that are no-ops in the browser; there are no runtime imports.
+// The bundle is self-contained; there are no runtime imports.
 ```
 
 ## Design Philosophy

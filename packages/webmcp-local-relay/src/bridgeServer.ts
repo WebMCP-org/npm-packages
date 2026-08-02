@@ -805,53 +805,6 @@ export class RelayBridgeServer extends EventEmitter {
       case 'pong':
         this.lastPongByConnectionId.set(connectionId, Date.now());
         break;
-
-      case 'elicitation-request':
-        if (
-          !Array.from(this.pendingInvocations.values()).some(
-            (pending) => pending.connectionId === connectionId
-          )
-        ) {
-          process.stderr.write(
-            `[webmcp-local-relay] warn: connection ${connectionId} sent elicitation outside an active invocation, ignoring\n`
-          );
-          break;
-        }
-        this.emit('elicitationRequest', {
-          callId: message.callId,
-          connectionId,
-          params: message.params,
-        });
-        break;
-    }
-  }
-
-  /**
-   * Sends an elicitation response back to the browser source that requested it.
-   */
-  sendElicitationResponse(
-    connectionId: string,
-    callId: string,
-    result: Record<string, unknown>
-  ): void {
-    const socket = this.socketByConnectionId.get(connectionId);
-    if (!socket || socket.readyState !== WebSocket.OPEN) {
-      process.stderr.write(
-        `[webmcp-local-relay] warn: cannot send elicitation response: source ${connectionId} disconnected\n`
-      );
-      return;
-    }
-    const message: RelayToBrowserMessage = {
-      type: 'elicitation-response',
-      callId,
-      result,
-    };
-    try {
-      socket.send(JSON.stringify(message));
-    } catch (err) {
-      process.stderr.write(
-        `[webmcp-local-relay] warn: failed to send elicitation response: ${err instanceof Error ? err.message : String(err)}\n`
-      );
     }
   }
 

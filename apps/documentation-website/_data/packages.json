@@ -36,7 +36,7 @@
     "sourcePackagePath": "packages/global",
     "skill": {
       "name": "mcp-b-global",
-      "description": "Use when writing code that registers AI tools on a webpage using document.modelContext, registerTool, provideContext, or the WebMCP / MCP-B browser runtime. Covers initialization, transport configuration, cleanup, and the full BrowserMcpServer API."
+      "description": "Use when writing code that registers AI tools on a webpage using document.modelContext, registerTool, or the WebMCP / MCP-B browser runtime. Covers initialization, transport configuration, cleanup, and the full BrowserMcpServer API."
     }
   },
   {

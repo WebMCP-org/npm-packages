@@ -11,7 +11,7 @@ Register WebMCP tools in any frontend framework by following its native lifecycl
 
 <Tabs>
   <Tab title="@mcp-b/global (recommended)">
-    The full runtime: polyfill, MCP server, transports, prompts, resources, sampling, and elicitation.
+    The full runtime: polyfill, MCP server, transports, prompts, resources, and direct access to the official MCP server.
 
     <CodeGroup>
 
@@ -40,7 +40,13 @@ Register WebMCP tools in any frontend framework by following its native lifecycl
     npm install @mcp-b/webmcp-polyfill
     ```
 
-    The polyfill checks for a browser environment internally and is SSR-safe. No client guards needed.
+    ```ts "src/main.ts"
+    import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
+
+    initializeWebMCPPolyfill();
+    ```
+
+    The initializer checks for a browser environment internally and is SSR-safe. No client guards needed.
 
     For details on when to use the polyfill vs the full runtime, see [Choose a Runtime](/how-to/choose-runtime).
 
@@ -54,7 +60,7 @@ Register WebMCP tools in any frontend framework by following its native lifecycl
 
 ## Initialize at your entry point
 
-Import `@mcp-b/global` once before any component mounts. The import is a side effect that installs `document.modelContext`.
+Import `@mcp-b/global` once before any component mounts. The import is a side effect that installs `document.modelContext`. Strict-core projects call `initializeWebMCPPolyfill()` once, as shown above.
 
 <Tabs>
   <Tab title="React">

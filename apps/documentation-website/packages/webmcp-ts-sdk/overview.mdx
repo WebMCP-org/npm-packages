@@ -27,18 +27,18 @@ SDK v2 also owns schema conversion and validation. It accepts Standard Schema im
 
 `BrowserMcpServer` retains only the WebMCP boundary:
 
-| Official MCP SDK v2                                    | `BrowserMcpServer`                                  |
-| ------------------------------------------------------ | --------------------------------------------------- |
-| MCP registration handles and list-change notifications | WebMCP `registerTool(tool, options?)`               |
-| Standard Schema, Zod 4.2+, and `fromJsonSchema`        | `document.modelContext` events and tool discovery   |
-| MCP transport, validation, and protocol behavior       | Native Chrome mirroring and backfill                |
-| MCP prompts and resources                              | MCP-B descriptor helpers, sampling, and elicitation |
+| Official MCP SDK v2                                    | `BrowserMcpServer`                                |
+| ------------------------------------------------------ | ------------------------------------------------- |
+| MCP registration handles and list-change notifications | WebMCP `registerTool(tool, options?)`             |
+| Standard Schema, Zod 4.2+, and `fromJsonSchema`        | `document.modelContext` events and tool discovery |
+| MCP transport, validation, and protocol behavior       | Native Chrome mirroring and backfill              |
+| MCP prompts, resources, and client requests            | MCP-B descriptor helpers and `mcpServer` access   |
 
 <Note>
   `BrowserMcpServer.connect(customTransport)` remains on SDK v2's legacy 2025-era route. Installing
   v2 does not make tab, iframe, or other custom transports speak MCP 2026-07-28. Instance-level
-  sampling and elicitation helpers are legacy-only and throw on modern-era v2 instances. See
-  [Supporting protocol revision
+  sampling and elicitation requests live on `browserServer.mcpServer.server`. These SDK APIs are
+  legacy-only and throw on modern-era v2 instances. See [Supporting protocol revision
   2026-07-28](https://ts.sdk.modelcontextprotocol.io/v2/migration/support-2026-07-28).
 </Note>
 

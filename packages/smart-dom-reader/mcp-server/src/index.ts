@@ -678,12 +678,7 @@ class SmartDomReaderServer {
               }
 
               const { selector, options } = args as RegionOperationArgs;
-              const result = ProgressiveExtractor.extractRegion(
-                selector,
-                document,
-                options ?? {},
-                SmartDOMReader
-              );
+              const result = ProgressiveExtractor.extractRegion(selector, document, options ?? {});
               if (!result)
                 return `No matching region for selector ${selector}` as unknown as TResult;
               if (!MarkdownFormatter) throw new Error('MarkdownFormatter export is unavailable.');

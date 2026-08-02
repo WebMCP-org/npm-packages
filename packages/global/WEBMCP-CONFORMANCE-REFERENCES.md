@@ -71,8 +71,6 @@ Goal: keep one place to track standards decisions and implementation details bef
 
 - [ ] Cross-document `getTools({ fromOrigins })` exposure and Permissions Policy behavior
 - [ ] Event conformance for standard `toolchange` dispatch timing
-- [ ] Elicitation conformance for current WebMCP behavior (`elicitInput` form/url modes)
-- [ ] Sampling conformance for `createMessage` request/response handling
 - [ ] Native-vs-polyfill parity matrix (Chromium native + shimmed consumer API)
 - [ ] Optional Chromium `executeTool` behavior without treating it as standard API
 

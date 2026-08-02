@@ -28,6 +28,10 @@ function readCurrentModelContext(): ModelContext | undefined {
   return document.modelContext ?? navigator.modelContext;
 }
 
+function isBrowserMcpServer(context: ModelContext): context is BrowserMcpServer {
+  return SERVER_MARKER_PROPERTY in context && context[SERVER_MARKER_PROPERTY] === true;
+}
+
 function replaceDocumentModelContext(value: unknown): void {
   Object.defineProperty(document, 'modelContext', {
     configurable: true,
@@ -125,24 +129,23 @@ function createTransport(config: WebModelContextInitOptions['transport']): Trans
   });
 }
 
-export function initializeWebModelContext(options?: WebModelContextInitOptions): void {
+/** Initializes the global bridge and returns the active server. */
+export function initializeWebModelContext(
+  options?: WebModelContextInitOptions
+): BrowserMcpServer | undefined {
   if (!isBrowserEnvironment() || globalThis.isSecureContext === false) {
     return;
   }
 
   if (runtime) {
-    return;
+    return runtime.server;
   }
 
   // Cross-bundle guard: if modelContext is already a BrowserMcpServer
   // (set by another bundle in this window), skip initialization.
   const existingContext = readCurrentModelContext();
-  if (
-    existingContext &&
-    SERVER_MARKER_PROPERTY in existingContext &&
-    existingContext[SERVER_MARKER_PROPERTY] === true
-  ) {
-    return;
+  if (existingContext && isBrowserMcpServer(existingContext)) {
+    return existingContext;
   }
 
   // 1. Install polyfill (provides modelContext + modelContextTesting)
@@ -211,6 +214,8 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
       }
     }
   })();
+
+  return server;
 }
 
 export function cleanupWebModelContext(): void {

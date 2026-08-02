@@ -69,35 +69,6 @@ export class LocalRelayMcpServer {
       this.debouncedSyncDynamicTools();
     });
 
-    // Forward elicitation requests from browser tool handlers to the MCP client.
-    this.bridge.on(
-      'elicitationRequest',
-      (request: { callId: string; connectionId: string; params: Record<string, unknown> }) => {
-        void (async () => {
-          try {
-            const result = await this.mcpServer.server.elicitInput(
-              request.params as Parameters<typeof this.mcpServer.server.elicitInput>[0]
-            );
-            this.bridge.sendElicitationResponse(
-              request.connectionId,
-              request.callId,
-              result as Record<string, unknown>
-            );
-          } catch (err) {
-            const message = err instanceof Error ? err.message : String(err);
-            process.stderr.write(
-              `[webmcp-local-relay] warn: elicitation forwarding failed: ${message}\n`
-            );
-            this.bridge.sendElicitationResponse(request.connectionId, request.callId, {
-              action: 'decline',
-              content: null,
-              error: message,
-            });
-          }
-        })();
-      }
-    );
-
     this.registerStaticTools();
   }
 

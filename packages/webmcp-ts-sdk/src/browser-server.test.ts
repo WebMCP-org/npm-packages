@@ -150,6 +150,72 @@ describe('BrowserMcpServer', () => {
     expect(server.listTools().map(({ name }) => name)).toEqual(['accepted']);
   });
 
+  it('allows an aborted pending native tool to be registered again immediately', async () => {
+    const resolveNativeRegistrations: Array<() => void> = [];
+    const native = Object.assign(new EventTarget(), {
+      ontoolchange: null,
+      registerTool() {
+        return new Promise<void>((resolve) => resolveNativeRegistrations.push(resolve));
+      },
+      async getTools() {
+        return [];
+      },
+    });
+    server = new BrowserMcpServer({ name: 'native-abort-test', version: '1.0.0' }, { native });
+    const tool = {
+      name: 'strict_mode_tool',
+      description: 'Registers again during effect replay',
+      async execute() {},
+    };
+    const controller = new AbortController();
+    const reason = { source: 'effect-cleanup' };
+
+    const abandonedRegistration = server.registerTool(tool, { signal: controller.signal });
+    controller.abort(reason);
+    const activeRegistration = server.registerTool(tool);
+
+    resolveNativeRegistrations[1]!();
+    await activeRegistration;
+    resolveNativeRegistrations[0]!();
+    await expect(abandonedRegistration).rejects.toBe(reason);
+    expect(server.listTools().map(({ name }) => name)).toEqual(['strict_mode_tool']);
+  });
+
+  it('backfills an existing native tool after native registration rejects', async () => {
+    const nativeFailure = new DOMException('Tool already registered', 'InvalidStateError');
+    const native = Object.assign(new EventTarget(), {
+      ontoolchange: null,
+      registerTool() {
+        return Promise.reject(nativeFailure);
+      },
+      async getTools() {
+        return [
+          {
+            name: 'native_tool',
+            description: 'Already registered by the browser',
+            origin: window.location.origin,
+            window,
+          },
+        ];
+      },
+      async executeTool() {
+        return '{}';
+      },
+    });
+    server = new BrowserMcpServer({ name: 'native-rejection-test', version: '1.0.0' }, { native });
+
+    await expect(
+      server.registerTool({
+        name: 'native_tool',
+        description: 'Conflicts with the browser registration',
+        async execute() {},
+      })
+    ).rejects.toBe(nativeFailure);
+    await server.syncNativeTools();
+
+    expect(server.listTools().map(({ name }) => name)).toEqual(['native_tool']);
+  });
+
   it('rolls back publication when registration aborts during schema cloning', async () => {
     server = new BrowserMcpServer({ name: 'publication-abort-test', version: '1.0.0' });
     const controller = new AbortController();

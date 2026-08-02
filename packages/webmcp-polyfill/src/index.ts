@@ -403,69 +403,60 @@ export function initializeWebMCPPolyfill(options?: WebMCPPolyfillInitOptions): v
   const doc = typeof document === 'undefined' ? null : document;
   if (!nav || !doc || typeof window === 'undefined') return;
 
-  if (doc?.modelContext) return;
+  if (doc.modelContext) return;
 
-  const navigatorModelContext = nav?.modelContext;
+  const navigatorModelContext = nav.modelContext;
 
   if (installedProperties.length > 0) {
     cleanupWebMCPPolyfill();
   }
 
   if (navigatorModelContext) {
-    if (doc) {
-      installProperty(doc, 'modelContext', {
-        configurable: true,
-        enumerable: true,
-        writable: false,
-        value: navigatorModelContext,
-      });
-    }
+    installProperty(doc, 'modelContext', {
+      configurable: true,
+      enumerable: true,
+      writable: false,
+      value: navigatorModelContext,
+    });
     return;
   }
 
-  const globalWindow = typeof window === 'undefined' ? null : window;
-  if (globalWindow) {
-    const previousDescriptor = Object.getOwnPropertyDescriptor(globalWindow, 'ModelContext');
-    if (previousDescriptor && !previousDescriptor.configurable) {
-      if (!Object.is(Reflect.get(globalWindow, 'ModelContext'), modelContextConstructor)) {
-        throw new TypeError('Cannot install ModelContext over a non-configurable global');
-      }
-    } else {
-      installProperty(globalWindow, 'ModelContext', {
-        configurable: true,
-        enumerable: false,
-        writable: true,
-        value: modelContextConstructor,
-      });
+  const previousDescriptor = Object.getOwnPropertyDescriptor(window, 'ModelContext');
+  if (previousDescriptor && !previousDescriptor.configurable) {
+    if (!Object.is(Reflect.get(window, 'ModelContext'), modelContextConstructor)) {
+      throw new TypeError('Cannot install ModelContext over a non-configurable global');
     }
+  } else {
+    installProperty(window, 'ModelContext', {
+      configurable: true,
+      enumerable: false,
+      writable: true,
+      value: modelContextConstructor,
+    });
   }
 
   const context = new StrictWebMCPContext(doc);
   installedContext = context;
   const modelContext: ModelContext = context;
 
-  if (doc) {
-    installProperty(doc, 'modelContext', {
+  installProperty(doc, 'modelContext', {
+    configurable: true,
+    enumerable: true,
+    writable: false,
+    value: modelContext,
+  });
+
+  // Reset the one-shot warning flag so a fresh install warns again on first access.
+  navigatorModelContextDeprecationWarned = false;
+  defineDeprecatedNavigatorModelContext(nav, modelContext);
+
+  if (options?.installTestingShim && !nav.modelContextTesting) {
+    installProperty(nav, 'modelContextTesting', {
       configurable: true,
       enumerable: true,
       writable: false,
-      value: modelContext,
+      value: context.getTestingShim(),
     });
-  }
-
-  if (nav) {
-    // Reset the one-shot warning flag so a fresh install warns again on first access.
-    navigatorModelContextDeprecationWarned = false;
-    defineDeprecatedNavigatorModelContext(nav, modelContext);
-
-    if (options?.installTestingShim && !nav.modelContextTesting) {
-      installProperty(nav, 'modelContextTesting', {
-        configurable: true,
-        enumerable: true,
-        writable: false,
-        value: context.getTestingShim(),
-      });
-    }
   }
 }
 

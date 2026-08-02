@@ -83,7 +83,7 @@ Convenience wrapper around `useWebMCP` for read-only context tools. It automatic
 import { useWebMCPPrompt } from '@mcp-b/react-webmcp';
 ```
 
-Registers an MCP prompt on `document.modelContext`.
+Registers an MCP prompt through the `BrowserMcpServer` installed by `@mcp-b/global`. It does not register against a native strict-only context.
 
 | Config field  | Type                                      | Required | Description                |
 | ------------- | ----------------------------------------- | -------- | -------------------------- |
@@ -98,7 +98,7 @@ Registers an MCP prompt on `document.modelContext`.
 import { useWebMCPResource } from '@mcp-b/react-webmcp';
 ```
 
-Registers an MCP resource on `document.modelContext`.
+Registers an MCP resource through the `BrowserMcpServer` installed by `@mcp-b/global`. It does not register against a native strict-only context.
 
 | Config field         | Type                                                               | Required | Description                       |
 | -------------------- | ------------------------------------------------------------------ | -------- | --------------------------------- |

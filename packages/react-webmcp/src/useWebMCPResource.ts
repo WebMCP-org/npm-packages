@@ -8,7 +8,7 @@ import { useMcpRegistration } from './useMcpRegistration.js';
  * React hook for registering Model Context Protocol (MCP) resources.
  *
  * This hook handles the complete lifecycle of an MCP resource:
- * - Registers the resource with `window.document.modelContext`
+ * - Registers the resource with the installed MCP-B `BrowserMcpServer`
  * - Supports both static URIs and URI templates with parameters
  * - Automatically unregisters on component unmount
  *
@@ -72,7 +72,7 @@ export function useWebMCPResource(config: WebMCPResourceConfig): WebMCPResourceR
     const modelContext = getBrowserMcpServer();
     if (!modelContext) {
       console.warn(
-        `[ReactWebMCP] window.document.modelContext is not available. Resource "${uri}" will not be registered.`
+        `[ReactWebMCP] BrowserMcpServer is not available. Resource "${uri}" will not be registered.`
       );
       return;
     }

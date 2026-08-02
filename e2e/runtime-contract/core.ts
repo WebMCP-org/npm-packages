@@ -1,6 +1,6 @@
 import type { CallToolResult, InputSchema, JsonObject, TextContent } from '@mcp-b/webmcp-types';
 
-export const BASE_TOOL_NAMES = ['echo', 'sum', 'always_fail'] as const;
+const BASE_TOOL_NAMES = ['echo', 'sum', 'always_fail'] as const;
 export const DYNAMIC_TOOL_NAME = 'dynamic_tool';
 
 export interface RuntimeInvocationRecord {

@@ -186,7 +186,11 @@ An `outputSchema` describes the shape of the structured data your tool returns. 
 ### Add an output schema
 
 ```ts title="output-schema-tool.ts"
+import { initializeWebModelContext } from '@mcp-b/global';
 import type { JsonSchemaForInference } from '@mcp-b/webmcp-types';
+
+const server = initializeWebModelContext();
+if (!server) throw new Error('WebMCP requires a secure browser context');
 
 const outputSchema = {
   type: 'object',
@@ -197,7 +201,7 @@ const outputSchema = {
   required: ['counter', 'timestamp'],
 } as const satisfies JsonSchemaForInference;
 
-await document.modelContext.registerTool({
+await server.registerTool({
   name: 'counter_get',
   description: 'Get counter value',
   inputSchema: { type: 'object', properties: {} },
@@ -212,21 +216,25 @@ await document.modelContext.registerTool({
 });
 ```
 
-When `outputSchema` is a literal schema and you use `@mcp-b/webmcp-types`, `structuredContent` is type-checked against the schema at compile time. MCP-B runtime helpers can use it to shape structured MCP responses. Native Chrome WebMCP does not yet define or enforce `outputSchema`; the current W3C and Chrome tool dictionary defines `inputSchema` only. MCP [SEP-2106](https://modelcontextprotocol.io/seps/2106-json-schema-2020-12) applies to MCP tool output schemas and structured content.
+When `outputSchema` is a literal schema, the typed `BrowserMcpServer` checks `structuredContent` against it at compile time. MCP-B runtime helpers can use it to shape structured MCP responses. Native Chrome WebMCP does not yet define or enforce `outputSchema`; the current W3C and Chrome tool dictionary defines `inputSchema` only. MCP [SEP-2106](https://modelcontextprotocol.io/seps/2106-json-schema-2020-12) applies to MCP tool output schemas and structured content.
 
 ### Non-object output schemas
 
 Use array or primitive output schemas when the natural result is not an object:
 
 ```ts title="array-output-tool.ts"
+import { initializeWebModelContext } from '@mcp-b/global';
 import type { JsonSchemaForInference } from '@mcp-b/webmcp-types';
+
+const server = initializeWebModelContext();
+if (!server) throw new Error('WebMCP requires a secure browser context');
 
 const outputSchema = {
   type: 'array',
   items: { type: 'string' },
 } as const satisfies JsonSchemaForInference;
 
-await document.modelContext.registerTool({
+await server.registerTool({
   name: 'tags_list',
   description: 'List tags on the current document',
   inputSchema: { type: 'object', properties: {} },

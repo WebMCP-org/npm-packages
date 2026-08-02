@@ -54,6 +54,8 @@ test('the Chromium testing shim retains its observable contract', () => {
   expectTypeOf<ModelContextTesting['executeTool']>().returns.toEqualTypeOf<
     Promise<string | null>
   >();
+  // @ts-expect-error Fake cross-document results are not part of the compatibility surface.
+  expectTypeOf<ModelContextTesting['getCrossDocumentScriptToolResult']>().toBeNever();
 });
 
 test('global declarations use the document-first API', () => {

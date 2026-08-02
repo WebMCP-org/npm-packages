@@ -35,7 +35,7 @@ Chrome preview extension
 └── .executeTool(tool, inputJson)    Execute a discovered tool
 ```
 
-MCP-b **polyfills** that API for all browsers today, and **bridges** it to the full [Model Context Protocol](https://modelcontextprotocol.io/) — turning that tool source into a complete MCP server with prompts, resources, sampling, and transports.
+MCP-b **polyfills** that API for all browsers today, and **bridges** it to the full [Model Context Protocol](https://modelcontextprotocol.io/) — turning that tool source into a complete MCP server with prompts, resources, and browser transports.
 
 > Built by [MCP-b](https://docs.mcp-b.ai). Not an official W3C or MCP project.
 
@@ -96,7 +96,7 @@ function PageTitle() {
 
 ### 3. Full MCP server
 
-Need the full [Model Context Protocol](https://modelcontextprotocol.io/) — prompts, resources, sampling, transports, interop with Claude Desktop / Cursor / any MCP client? Use `@mcp-b/global`:
+Need the full [Model Context Protocol](https://modelcontextprotocol.io/) — prompts, resources, transports, and interop with Claude Desktop, Cursor, or another MCP client? Use `@mcp-b/global`:
 
 ```ts
 import '@mcp-b/global'; // pnpm add @mcp-b/global
@@ -252,12 +252,12 @@ pnpm add @mcp-b/smart-dom-reader
 
 ### Core
 
-| Package                                              | Version                                                                                                             | Description                                                         |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| [@mcp-b/webmcp-polyfill](./packages/webmcp-polyfill) | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-polyfill)](https://www.npmjs.com/package/@mcp-b/webmcp-polyfill) | `document.modelContext` polyfill, with a deprecated navigator alias |
-| [@mcp-b/webmcp-types](./packages/webmcp-types)       | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-types)](https://www.npmjs.com/package/@mcp-b/webmcp-types)       | TypeScript definitions for the WebMCP core API                      |
-| [@mcp-b/global](./packages/global)                   | [![npm](https://img.shields.io/npm/v/@mcp-b/global)](https://www.npmjs.com/package/@mcp-b/global)                   | Full runtime — polyfill + MCP bridge (prompts, resources, sampling) |
-| [@mcp-b/webmcp-ts-sdk](./packages/webmcp-ts-sdk)     | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-ts-sdk)](https://www.npmjs.com/package/@mcp-b/webmcp-ts-sdk)     | Browser-adapted MCP TypeScript SDK with dynamic tool registration   |
+| Package                                              | Version                                                                                                             | Description                                                          |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| [@mcp-b/webmcp-polyfill](./packages/webmcp-polyfill) | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-polyfill)](https://www.npmjs.com/package/@mcp-b/webmcp-polyfill) | `document.modelContext` polyfill, with a deprecated navigator alias  |
+| [@mcp-b/webmcp-types](./packages/webmcp-types)       | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-types)](https://www.npmjs.com/package/@mcp-b/webmcp-types)       | TypeScript definitions for the WebMCP core API                       |
+| [@mcp-b/global](./packages/global)                   | [![npm](https://img.shields.io/npm/v/@mcp-b/global)](https://www.npmjs.com/package/@mcp-b/global)                   | Full runtime — polyfill + MCP bridge (prompts, resources, transport) |
+| [@mcp-b/webmcp-ts-sdk](./packages/webmcp-ts-sdk)     | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-ts-sdk)](https://www.npmjs.com/package/@mcp-b/webmcp-ts-sdk)     | Browser-adapted MCP TypeScript SDK with dynamic tool registration    |
 
 ### Transports & Composition
 
@@ -298,7 +298,7 @@ pnpm add @mcp-b/smart-dom-reader
 │  Your web app                                            │
 │  document.modelContext.registerTool({ ... })              │
 ├────────────── @mcp-b/global ─────────────────────────────┤
-│  MCP bridge: prompts, resources, sampling, elicitation   │
+│  MCP bridge: prompts, resources, browser transports      │
 ├────────────── @mcp-b/webmcp-ts-sdk ──────────────────────┤
 │  BrowserMcpServer — wraps native/polyfill context        │
 ├────────────── @mcp-b/webmcp-polyfill ────────────────────┤
@@ -342,7 +342,7 @@ pnpm build
 | --------------------------- | --------------------------------- |
 | `pnpm build`                | Build all packages                |
 | `pnpm typecheck`            | Type-check all packages           |
-| `pnpm check`                | Lint + format (Biome)             |
+| `pnpm check`                | Lint + format (Oxlint + Oxfmt)    |
 | `pnpm test:unit`            | Unit tests                        |
 | `pnpm test:e2e`             | E2E tests (Playwright)            |
 | `pnpm test`                 | All tests                         |

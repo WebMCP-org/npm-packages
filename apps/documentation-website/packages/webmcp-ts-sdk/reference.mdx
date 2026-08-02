@@ -48,6 +48,8 @@ readonly mcpServer: McpServer
 
 The composed official server. Use it for upstream registration APIs and other MCP SDK v2 features that `BrowserMcpServer` does not wrap.
 
+Protocol-owned sampling and elicitation APIs are not direct `BrowserMcpServer` methods. Legacy push-style calls live on `browserServer.mcpServer.server` and depend on the negotiated protocol revision.
+
 WebMCP descriptor callbacks are single-round over MCP. An `input_required` result becomes a tool error. Register multi-round tools directly with `browserServer.mcpServer.registerTool()` so the official handler context owns the interaction.
 
 ## WebMCP tool surface

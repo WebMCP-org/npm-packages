@@ -7,7 +7,7 @@
 //
 // URL mode (pass a URL as arg or --url=...):
 // - Navigates to the remote page
-// - Injects the bundled library using a CSP-friendly blob import
+// - Injects the bundled library as an inline module script
 // - Runs a generic extraction summary for any site
 //
 // Usage examples:
@@ -145,14 +145,14 @@ const PAGES = {
     <script>
       const host1 = document.getElementById('shadow-host-1');
       const shadow1 = host1.attachShadow({ mode: 'open' });
-      shadow1.innerHTML = ${`
+      shadow1.innerHTML = \`
         <style>button{background:blue;color:#fff;padding:6px;border:0}</style>
         <div>
           <h3>Shadow DOM Content 1</h3>
           <button id="shadow-btn">Shadow Button</button>
           <input type="text" placeholder="Shadow Input">
         </div>
-      `};
+      \`;
       const host2 = document.getElementById('shadow-host-2');
       const shadow2 = host2.attachShadow({ mode: 'open' });
       shadow2.innerHTML = '<form><input type="text" name="shadow-field"><button type="submit">Shadow Submit</button></form>';
@@ -160,44 +160,29 @@ const PAGES = {
   </body></html>`,
 };
 
-// Inject library in a CSP-friendly way by importing from a blob: URL inside page.evaluate
+// Playwright inserts the module independently of the page's application scripts.
 async function injectLibrary(page) {
-  const code = getBundleCode();
-  await page.evaluate(
-    async ({ code }) => {
-      const blob = new Blob([code], { type: 'text/javascript' });
-      const url = URL.createObjectURL(blob);
-      try {
-        const mod = await import(/* webpackIgnore: true */ url);
-        const SmartDOMReader = mod.SmartDOMReader ?? mod.default;
-        const { ProgressiveExtractor, MarkdownFormatter, SelectorGenerator } = mod;
-        // Attach to window for subsequent evaluations
-        // @ts-expect-error
-        window.SmartDOMReader = SmartDOMReader;
-        // @ts-expect-error
-        window.ProgressiveExtractor = ProgressiveExtractor;
-        // @ts-expect-error
-        window.MarkdownFormatter = MarkdownFormatter;
-        // @ts-expect-error
-        window.SelectorGenerator = SelectorGenerator;
-      } finally {
-        URL.revokeObjectURL(url);
-      }
-    },
-    { code }
-  );
+  await page.addScriptTag({
+    type: 'module',
+    content: `${getBundleCode()}\nObject.assign(window, { SmartDOMReader, ProgressiveExtractor, MarkdownFormatter, SelectorGenerator });`,
+  });
+  await page.waitForFunction(() => typeof window.SmartDOMReader === 'function');
 }
 
 async function runBasicInteractiveTest(page) {
   const results = await page.evaluate(() => {
     const res = window.SmartDOMReader.extractInteractive(document, {});
     const findButton = (text) => res.interactive.buttons.find((b) => (b.text || '').includes(text));
+    const roleAriaSel = res.interactive.buttons.find(
+      (button) => button.attributes?.['aria-label'] === 'Delete Item'
+    )?.selector?.css;
     return {
       idSel: findButton('Primary Action')?.selector?.css,
       testIdSel: findButton('Secondary Action')?.selector?.css,
-      roleAriaSel: res.interactive.buttons.find(
-        (b) => b.attributes?.['aria-label'] === 'Delete Item'
-      )?.selector?.css,
+      roleAriaSel,
+      roleAriaMatches:
+        roleAriaSel &&
+        document.querySelector(roleAriaSel)?.getAttribute('aria-label') === 'Delete Item',
       usernameSel: res.interactive.inputs.find((i) => i.attributes?.name === 'username')?.selector
         ?.css,
     };
@@ -216,7 +201,7 @@ async function runBasicInteractiveTest(page) {
   });
   assertions.push({
     name: 'role+aria selector',
-    ok: /\[role="button"\]\[aria-label="Delete Item"\]/.test(results.roleAriaSel || ''),
+    ok: results.roleAriaMatches,
     got: results.roleAriaSel,
   });
   assertions.push({
@@ -251,11 +236,15 @@ async function runShadowTest(page) {
     const res = window.SmartDOMReader.extractInteractive(document, {});
     const shadowBtn = res.interactive.buttons.find((b) => (b.text || '').includes('Shadow Button'));
     const regBtn = res.interactive.buttons.find((b) => (b.text || '').includes('Regular Button'));
-    return { shadowBtn: !!shadowBtn, regBtn: !!regBtn };
+    return {
+      shadowBtn: !!shadowBtn,
+      regBtn: !!regBtn,
+      buttons: res.interactive.buttons.map((button) => button.text),
+    };
   });
   return [
-    { name: 'Shadow button detected', ok: results.shadowBtn, got: results },
-    { name: 'Regular button detected', ok: results.regBtn, got: results },
+    { name: 'Shadow button detected', ok: results.shadowBtn, got: JSON.stringify(results) },
+    { name: 'Regular button detected', ok: results.regBtn, got: JSON.stringify(results) },
   ];
 }
 

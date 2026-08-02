@@ -101,9 +101,9 @@ Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 ├─────────────────────────────────────────────────────┤
 │  @mcp-b/webmcp-ts-sdk (BrowserMcpServer)            │
 │  Wraps the underlying modelContext. Extends it with  │
-│  MCP capabilities: registerPrompt, registerResource, │
-│  elicitation, sampling. Mirrors core tool ops down   │
-│  to the native/polyfill context.                     │
+│  listTools, prompt/resource helpers, and a composed  │
+│  MCP server. Mirrors core tool ops down to the       │
+│  native/polyfill context.                            │
 ├─────────────────────────────────────────────────────┤
 │  @mcp-b/webmcp-polyfill                             │
 │  Provides document.modelContext when the browser     │
@@ -139,8 +139,8 @@ Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 ### Key Type Interfaces (`@mcp-b/webmcp-types`)
 
 - `ModelContext` — the strict web standard surface (`registerTool`, `getTools`, `ontoolchange`)
-- `ModelContextExtensions` — MCPB extensions (listTools and events)
-- `ModelContextWithExtensions` = `ModelContext & ModelContextExtensions`
+- `ModelContextExtensions` — schema-aware MCP-B `registerTool` overloads plus `listTools`
+- `ModelContextWithExtensions` = `Omit<ModelContext, 'registerTool'> & ModelContextExtensions`
 
 ## Reference Repos (`.reference/`)
 

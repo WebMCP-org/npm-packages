@@ -56,7 +56,7 @@ export interface ExtractionError {
 
 export type ExtractionResult = string | ExtractionError;
 
-export interface SmartDOMReaderBundle {
+interface SmartDOMReaderBundle {
   executeExtraction<M extends ExtractionMethod>(
     method: M,
     args: ExtractionArgs[M]

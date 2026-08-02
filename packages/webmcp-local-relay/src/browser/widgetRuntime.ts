@@ -172,8 +172,8 @@ export function parseHostMessage(value: unknown): HostMessage | null {
     return null;
   }
   return {
-    requestId: value.requestId as string,
-    type: value.type as string,
+    requestId: value.requestId,
+    type: value.type,
     tools: value.tools,
     result: value.result,
     error: value.error,
@@ -422,7 +422,7 @@ async function probeRelayEndpoint(candidate: {
   });
 }
 
-export function runWidget(cfg: WidgetConfig): void {
+function runWidget(cfg: WidgetConfig): void {
   const pendingRequests = new Map<string, PendingRequest>();
   let activeEndpoint: RelayEndpoint | null = null;
   let activeSocket: WebSocket | null = null;
@@ -558,21 +558,6 @@ export function runWidget(cfg: WidgetConfig): void {
 
       if (relayMessage.type === 'reload') {
         window.parent.postMessage({ type: 'webmcp.reload' }, cfg.hostOrigin);
-        return;
-      }
-
-      // Forward elicitation responses from relay back to embed.ts in the host page.
-      if (relayMessage.type === 'elicitation-response') {
-        window.parent.postMessage(
-          {
-            type: 'webmcp.elicitation.response',
-            callId: relayMessage.callId,
-            result: isJsonObject(relayMessage.result)
-              ? relayMessage.result
-              : { action: 'decline', content: null },
-          },
-          cfg.hostOrigin
-        );
         return;
       }
 
@@ -895,21 +880,6 @@ export function runWidget(cfg: WidgetConfig): void {
         wakeFromDormant();
       } else if (!activeSocket && phase !== 'discovering') {
         void discoverRelay();
-      }
-      return;
-    }
-
-    // Forward elicitation requests from embed.ts to the relay WebSocket.
-    if (isJsonObject(data) && data.type === 'webmcp.elicitation.request') {
-      if (activeSocket && activeSocket.readyState === WebSocket.OPEN) {
-        safeSend(
-          activeSocket,
-          JSON.stringify({
-            type: 'elicitation-request',
-            callId: data.callId,
-            params: isJsonObject(data.params) ? data.params : {},
-          })
-        );
       }
       return;
     }

@@ -3,7 +3,8 @@
 A browser polyfill for the current core WebMCP API on `document.modelContext`.
 It implements tool registration, discovery, lifecycle events, and Chromium's
 optional `executeTool()` extension. MCP features such as prompts, resources,
-sampling, and elicitation belong to `@mcp-b/global`.
+browser transport, and a composed MCP server belong to the MCP-B runtime built
+by `@mcp-b/global`.
 
 The current WebMCP draft is published at
 [webmachinelearning.github.io/webmcp](https://webmachinelearning.github.io/webmcp/).

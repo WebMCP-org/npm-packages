@@ -126,10 +126,6 @@ describe('browser to relay wire contract', () => {
     ['tools/changed', { type: 'tools/changed', tools: [TOOL] }],
     ['result', { type: 'result', callId: 'call-1', result: null }],
     ['pong', { type: 'pong' }],
-    [
-      'elicitation-request',
-      { type: 'elicitation-request', callId: 'call-1', params: { message: 'Continue?' } },
-    ],
   ])('accepts %s', (_type, message) => {
     expect(BrowserToRelayMessageSchema.safeParse(message).success).toBe(true);
   });
@@ -144,7 +140,6 @@ describe('browser to relay wire contract', () => {
       { type: 'tools/list', tools: [{ name: 'search', annotations: { readOnlyHint: 'yes' } }] },
     ],
     ['empty result call ID', { type: 'result', callId: '', result: {} }],
-    ['invalid elicitation params', { type: 'elicitation-request', callId: 'call-1', params: [] }],
   ])('rejects %s', (_case, message) => {
     expect(BrowserToRelayMessageSchema.safeParse(message).success).toBe(false);
   });
@@ -161,10 +156,6 @@ describe('relay to browser wire contract', () => {
     ['invoke', { type: 'invoke', callId: 'call-1', toolName: 'search', args: { query: 'MCP' } }],
     ['ping', { type: 'ping' }],
     ['reload', { type: 'reload' }],
-    [
-      'elicitation-response',
-      { type: 'elicitation-response', callId: 'call-1', result: { action: 'accept' } },
-    ],
   ])('accepts %s', (_type, message) => {
     expect(RelayToBrowserMessageSchema.safeParse(message).success).toBe(true);
   });
@@ -176,7 +167,6 @@ describe('relay to browser wire contract', () => {
     ['empty rejection reason', { type: 'hello/rejected', reason: '', message: 'Denied.' }],
     ['empty invoke call ID', { type: 'invoke', callId: '', toolName: 'search' }],
     ['empty invoke tool name', { type: 'invoke', callId: 'call-1', toolName: '' }],
-    ['invalid elicitation result', { type: 'elicitation-response', callId: 'call-1', result: [] }],
   ])('rejects %s', (_case, message) => {
     expect(RelayToBrowserMessageSchema.safeParse(message).success).toBe(false);
   });

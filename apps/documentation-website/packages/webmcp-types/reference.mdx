@@ -177,7 +177,6 @@ That fallback applies to widened `InputSchema`, unknown compositions, and scalar
 | ---------------------------------------- | ------------------------------- |
 | `listTools()`                            | `ModelContextTestingToolInfo[]` |
 | `executeTool(name, inputJson, options?)` | `Promise<string \| null>`       |
-| `getCrossDocumentScriptToolResult?()`    | `Promise<string>`               |
 | `ontoolchange`                           | Event handler or `null`         |
 
 New native integrations use `document.modelContext.getTools()` and feature-detect Chromium `executeTool()`.

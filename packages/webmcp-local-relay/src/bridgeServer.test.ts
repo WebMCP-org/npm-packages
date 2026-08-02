@@ -933,9 +933,6 @@ describe('RelayBridgeServer', () => {
         url: 'https://b.example.com',
         tools: [{ name: 'tool_b', description: 'From B' }],
       });
-      const elicitations: Array<{ callId: string; params: Record<string, unknown> }> = [];
-      bridge.on('elicitationRequest', (request) => elicitations.push(request));
-
       // The other source tries to spoof invocation messages before the selected source responds.
       ws1.on('message', (raw) => {
         const msg = JSON.parse(String(raw));
@@ -945,20 +942,6 @@ describe('RelayBridgeServer', () => {
             type: 'result',
             callId: msg.callId,
             result: { content: [{ type: 'text', text: 'spoofed' }] },
-          })
-        );
-        ws2.send(
-          JSON.stringify({
-            type: 'elicitation-request',
-            callId: 'spoofed-elicitation',
-            params: { message: 'spoofed' },
-          })
-        );
-        ws1.send(
-          JSON.stringify({
-            type: 'elicitation-request',
-            callId: 'selected-elicitation',
-            params: { message: 'selected' },
           })
         );
         setTimeout(() => {
@@ -981,11 +964,6 @@ describe('RelayBridgeServer', () => {
       const result = await invokePromise;
       const text = (result.content?.[0] as { text?: string } | undefined)?.text;
       expect(text).toBe('ok-a');
-      expect(elicitations).toHaveLength(1);
-      expect(elicitations[0]).toMatchObject({
-        callId: 'selected-elicitation',
-        params: { message: 'selected' },
-      });
 
       ws1.close();
       ws2.close();

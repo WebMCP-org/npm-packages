@@ -34,11 +34,11 @@ Use when you want:
 
 - a strict core runtime implementation without MCP-B bridge features
 
-### 3) `@mcp-b/global` (MCP-B Runtime + Extension Types)
+### 3) `@mcp-b/global` (MCP-B Runtime Entry Point)
 
-- MCP-B runtime that layers extension behavior on top of core WebMCP.
-- Provides bridge semantics so tools can be exposed via both native WebMCP patterns and MCP flows.
-- Exports extension-aware types used by MCP-B integrations (resources/prompts/sampling/elicitation/testing helpers).
+- Orchestrates the polyfill, `BrowserMcpServer`, and browser transport.
+- Returns the active `BrowserMcpServer` for typed extension access.
+- Exports initialization and transport configuration types. The browser adapter and its extension types belong to `@mcp-b/webmcp-ts-sdk`.
 
 Use when you want:
 
@@ -46,11 +46,10 @@ Use when you want:
 - extension APIs beyond strict core WebMCP
 - runtime features that integrate broader MCP protocol behavior in-page
 
-### 4) `@mcp-b/react-webmcp` (React for MCP-B Runtime)
+### 4) `@mcp-b/react-webmcp` (React for MCP-B Integrations)
 
-- React hooks for the full MCP-B runtime surface.
-- Should type against MCP-B extension exports from `@mcp-b/global`.
-- Includes provider/client patterns and richer extension workflows.
+- React hooks for tools, prompts, resources, and MCP client providers.
+- Pairs with `@mcp-b/global` at runtime and imports contracts from their owning packages.
 
 Use when you want:
 
@@ -79,8 +78,8 @@ Core layering:
 ## Contribution Rules for This Boundary
 
 1. Do not broaden `@mcp-b/webmcp-types` global `document.modelContext` to MCP-B-only extensions.
-2. Put MCP-B extension typings and extension runtime behavior in `@mcp-b/global`.
-3. Keep `@mcp-b/react-webmcp` aligned with MCP-B extension types from `@mcp-b/global`.
+2. Put the browser adapter and its extension types in `@mcp-b/webmcp-ts-sdk`; keep runtime orchestration in `@mcp-b/global`.
+3. Keep `@mcp-b/react-webmcp` aligned with the packages that own each contract. Do not use `@mcp-b/global` as a type barrel.
 4. Keep `usewebmcp` aligned with strict core types from `@mcp-b/webmcp-types`.
 5. If a shared type crosses packages, move it to the correct canonical layer rather than duplicating.
 

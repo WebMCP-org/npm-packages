@@ -87,7 +87,6 @@
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
-    "vite-plugin-monkey": "catalog:",
     "vite-plus": "catalog:"
   }
 }

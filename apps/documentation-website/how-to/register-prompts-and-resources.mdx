@@ -1,5 +1,5 @@
 ---
-title: 'Register Prompts and Resources'
+title: 'Register prompts and resources'
 description: 'Use MCP-B extension APIs to register prompts and resources from JavaScript or React.'
 keywords:
   [
@@ -12,21 +12,25 @@ keywords:
 icon: 'layer-plus'
 ---
 
-Prompts and resources are MCP-B extension features, not part of the strict WebMCP core. They require [`@mcp-b/global`](/packages/global/reference) (which installs `BrowserMcpServer` as `document.modelContext`). For background on this distinction, see [Strict Core vs MCP-B Extensions](/explanation/strict-core-vs-mcp-b-extensions).
+Prompts and resources are MCP-B extension features, not part of the strict WebMCP core. They require [`@mcp-b/global`](/packages/global/reference), which returns the active `BrowserMcpServer` for typed extension access. For background on this distinction, see [Strict core vs MCP-B extensions](/explanation/strict-core-vs-mcp-b-extensions).
+
+## Initialize the runtime
+
+```typescript "main.ts"
+import { initializeWebModelContext } from '@mcp-b/global';
+
+const server = initializeWebModelContext();
+if (!server) throw new Error('WebMCP requires a secure browser context');
+```
 
 ## Register a prompt
 
 A prompt is a reusable message template that AI clients can discover and invoke with arguments.
 
 <Steps>
-  <Step title="Import @mcp-b/global">
-    ```typescript
-    import '@mcp-b/global';
-    ```
-  </Step>
   <Step title="Register the prompt">
     ```typescript
-    const { unregister } = document.modelContext.registerPrompt({
+    const { unregister } = server.registerPrompt({
       name: 'greeting',
       description: 'Generate a greeting message',
       argsSchema: {
@@ -92,14 +96,9 @@ function CodeReviewPrompt() {
 A resource exposes readable data (configuration, documents, state) to AI clients.
 
 <Steps>
-  <Step title="Import @mcp-b/global">
-    ```typescript
-    import '@mcp-b/global';
-    ```
-  </Step>
   <Step title="Register the resource">
     ```typescript
-    const { unregister } = document.modelContext.registerResource({
+    const { unregister } = server.registerResource({
       uri: 'app://config',
       name: 'App Configuration',
       description: 'Current application configuration',

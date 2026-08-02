@@ -98,12 +98,18 @@ The polyfill has not loaded, or it loaded after your code ran.
 
 <Steps>
   <Step title="Verify the import exists">
-    Confirm your entry point includes `import '@mcp-b/global'` or `import {initializeWebMCPPolyfill}{' '}
-    from '@mcp-b/webmcp-polyfill'`.
+    Confirm your entry point imports `@mcp-b/global`, or explicitly initializes the strict polyfill:
+
+    ```ts
+    import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
+
+    initializeWebMCPPolyfill();
+    ```
+
   </Step>
   <Step title="Check import order">
-    The polyfill import must run before any code that calls `document.modelContext`. Move it to the
-    top of your entry file.
+    Runtime initialization must finish before code calls `document.modelContext`. Keep it at the top
+    of your entry file.
   </Step>
   <Step title="For script tags, check load order">
     Place the `@mcp-b/global` script tag before any script that registers tools.

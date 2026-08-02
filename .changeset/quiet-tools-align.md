@@ -21,6 +21,8 @@ Remove deprecated name-based tool execution, legacy native and userscript
 transports, Zod 3-specific schema handling, and duplicated React/runtime
 contracts. Remove the retired extension-tools package and local Chrome DevTools
 MCP fork; consumers should use the upstream Chrome DevTools MCP package.
+Remove `@mcp-b/codemode`; its browser implementation now lives upstream in
+Cloudflare's `@cloudflare/codemode/browser` entry point.
 Remove the legacy React sampling and elicitation hooks, which cannot represent
 MCP 2026 multi-round input flows. The MCP client provider now accepts the full
 SDK `ConnectOptions`, including cached protocol-era verdicts.
@@ -78,3 +80,17 @@ advanced MCP escape hatch. Removed compatibility aliases include
 `unregisterTool`, direct resource/prompt list and read helpers, and the
 single-request sampling and elicitation shortcuts. Tool lifetimes use
 `AbortSignal`; multi-round handlers register directly on `mcpServer`.
+Aborted registrations release their tool name immediately and cannot tear down a
+replacement registration, including during React Strict Mode effect replay.
+
+`@mcp-b/global` now returns its initialized `BrowserMcpServer`, so applications
+can register MCP-B prompts, resources, and advanced MCP handlers without casting
+the strict `document.modelContext` standard surface.
+
+`@mcp-b/webmcp-local-relay` removes the direct `elicitInput` mutation and relay
+messages that bypassed MCP's multi-round elicitation protocol.
+
+`@mcp-b/smart-dom-reader` now traverses open shadow roots as documented and
+resolves regional extraction through its module-owned reader. The undocumented
+fourth constructor-injection argument to `ProgressiveExtractor.extractRegion()`
+has been removed.

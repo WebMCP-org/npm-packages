@@ -43,12 +43,6 @@ const BrowserPongMessageSchema = z.object({
   type: z.literal('pong'),
 });
 
-const BrowserElicitationRequestSchema = z.object({
-  type: z.literal('elicitation-request'),
-  callId: z.string().min(1),
-  params: z.record(z.string(), z.unknown()),
-});
-
 /**
  * Union schema for all browser-to-relay protocol messages.
  */
@@ -58,7 +52,6 @@ export const BrowserToRelayMessageSchema = z.discriminatedUnion('type', [
   BrowserToolsChangedMessageSchema,
   BrowserToolResultMessageSchema,
   BrowserPongMessageSchema,
-  BrowserElicitationRequestSchema,
 ]);
 
 /**
@@ -144,12 +137,6 @@ const RelayReloadMessageSchema = z.object({
   type: z.literal('reload'),
 });
 
-const RelayElicitationResponseSchema = z.object({
-  type: z.literal('elicitation-response'),
-  callId: z.string().min(1),
-  result: z.record(z.string(), z.unknown()),
-});
-
 /**
  * Union schema for all relay-to-browser protocol messages.
  */
@@ -160,7 +147,6 @@ export const RelayToBrowserMessageSchema = z.discriminatedUnion('type', [
   RelayInvokeMessageSchema,
   RelayPingMessageSchema,
   RelayReloadMessageSchema,
-  RelayElicitationResponseSchema,
 ]);
 
 /**

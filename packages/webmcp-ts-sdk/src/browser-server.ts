@@ -153,7 +153,7 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
   private readonly registrations = new Set<McpRegistration>();
   private readonly nativeToolAbortControllers = new Map<string, AbortController>();
   private readonly nativeBackfilledTools = new Map<string, NativeBackfilledTool>();
-  private readonly pendingNativeTools = new Set<string>();
+  private readonly pendingTools = new Map<string, AbortController>();
   private readonly removingNativeTools = new Set<string>();
   private nativeSyncQueue: Promise<void> = Promise.resolve();
   private nativeToolChangeListener: EventListener | undefined;
@@ -231,51 +231,52 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
     tool: ToolDescriptor<WebMcpToolInput>,
     normalized: NormalizedInputSchema,
     options: ModelContextRegisterToolOptions,
-    execute: RegisteredWebMcpTool['execute']
+    execute: RegisteredWebMcpTool['execute'],
+    controller: AbortController
   ): Promise<void> {
     if (!this.native) return;
 
     const nativeRegister = this.native.registerTool as unknown as NativeRegisterToolFn;
-    const controller = new AbortController();
     const signal = options.signal
       ? AbortSignal.any([options.signal, controller.signal])
       : controller.signal;
 
+    const nativeInputSchema =
+      normalized.registeredInputSchema === undefined
+        ? undefined
+        : (JSON.parse(normalized.registeredInputSchema) as InputSchema);
+    this.nativeToolAbortControllers.set(tool.name, controller);
     try {
-      const nativeInputSchema =
-        normalized.registeredInputSchema === undefined
-          ? undefined
-          : (JSON.parse(normalized.registeredInputSchema) as InputSchema);
-      this.nativeToolAbortControllers.set(tool.name, controller);
-      const registration = nativeRegister.call(
+      await nativeRegister.call(
         this.native,
         toNativeTool(tool, nativeInputSchema, (input) => execute(input)),
         { ...options, signal }
       );
-      await registration;
-      this.removingNativeTools.delete(tool.name);
     } catch (error) {
       controller.abort();
       if (this.nativeToolAbortControllers.get(tool.name) === controller) {
         this.nativeToolAbortControllers.delete(tool.name);
       }
-      options.signal?.throwIfAborted();
       throw error;
+    }
+    if (this.nativeToolAbortControllers.get(tool.name) === controller) {
+      this.removingNativeTools.delete(tool.name);
     }
   }
 
-  private abortNativeToolMirror(name: string): void {
-    const controller = this.nativeToolAbortControllers.get(name);
-    if (controller) {
-      this.removingNativeTools.add(name);
-      controller.abort();
-    }
+  private abortNativeToolMirror(
+    name: string,
+    controller = this.nativeToolAbortControllers.get(name)
+  ): void {
+    if (!controller || this.nativeToolAbortControllers.get(name) !== controller) return;
+    this.removingNativeTools.add(name);
+    controller.abort();
     this.nativeToolAbortControllers.delete(name);
   }
 
   private validateToolDescriptor(tool: ToolDescriptor<WebMcpToolInput>): NormalizedInputSchema {
     validateWebMcpToolDescriptor(tool);
-    if (this.tools.has(tool.name) || this.pendingNativeTools.has(tool.name)) {
+    if (this.tools.has(tool.name) || this.pendingTools.has(tool.name)) {
       throw createInvalidStateError(`Tool ${tool.name} is already registered`);
     }
     return normalizeInputSchema(tool.inputSchema);
@@ -368,18 +369,22 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
         signal
       );
     };
+    const controller = new AbortController();
     let registered: RegisteredWebMcpTool | undefined;
     const abort = () => {
+      if (this.pendingTools.get(tool.name) === controller) {
+        this.pendingTools.delete(tool.name);
+      }
       if (registered && this.tools.get(tool.name) === registered) {
         this.removeTool(tool.name);
       } else {
-        this.abortNativeToolMirror(tool.name);
+        this.abortNativeToolMirror(tool.name, controller);
       }
     };
     options.signal?.addEventListener('abort', abort, { once: true });
-    if (this.native) this.pendingNativeTools.add(tool.name);
+    this.pendingTools.set(tool.name, controller);
     try {
-      await this.registerNativeToolMirror(tool, normalized, options, execute);
+      await this.registerNativeToolMirror(tool, normalized, options, execute, controller);
       if (this.closed) throw createInvalidStateError('BrowserMcpServer is closed');
       options.signal?.throwIfAborted();
       registered = this.registerToolInMcp(tool, normalized, execute);
@@ -389,11 +394,14 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
         options.signal.throwIfAborted();
       }
     } catch (error) {
-      this.abortNativeToolMirror(tool.name);
+      this.abortNativeToolMirror(tool.name, controller);
       options.signal?.removeEventListener('abort', abort);
+      options.signal?.throwIfAborted();
       throw error;
     } finally {
-      this.pendingNativeTools.delete(tool.name);
+      if (this.pendingTools.get(tool.name) === controller) {
+        this.pendingTools.delete(tool.name);
+      }
     }
     if (options.signal) {
       registered.abortSignal = options.signal;
@@ -453,7 +461,7 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
       // Add origin-qualified aliases if MCP gains scoped tool identity.
       if (
         nextTools.has(tool.name) ||
-        this.pendingNativeTools.has(tool.name) ||
+        this.pendingTools.has(tool.name) ||
         this.removingNativeTools.has(tool.name)
       ) {
         continue;

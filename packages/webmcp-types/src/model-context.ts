@@ -53,7 +53,6 @@ export interface ModelContextTesting extends EventTarget {
     inputArgsJson: string,
     options?: ChromeModelContextExecuteToolOptions
   ): Promise<string | null>;
-  getCrossDocumentScriptToolResult?(): Promise<string>;
   ontoolchange: ((this: ModelContextTesting, event: Event) => unknown) | null;
 }
 

@@ -185,10 +185,6 @@ The relay allows `65000` ms by default. If the page timeout is higher, start the
 
 The embed script fetches the sibling `widget.html`, injects configuration, and loads it as a hidden blob iframe that inherits the host page origin. The iframe opens a WebSocket to the relay on `localhost`. Self-hosted copies must serve both `embed.js` and `widget.html`; cross-origin hosts must allow the widget fetch with CORS. The relay fails closed if that fetch fails. Page code registers tools on `document.modelContext`. The embed supports current native Chrome discovery through asynchronous `getTools()` and executes the exact returned descriptor through Chrome's feature-detected `executeTool()` extension.
 
-### Elicitation support
-
-When the page's model context exposes `document.modelContext.elicitInput`, the embed installs an elicitation bridge. Elicitation requests from browser tool handlers are forwarded through the relay widget iframe to the local relay server, which then forwards them to the connected MCP client (for example, Claude Code). Responses travel the same path back to the originating tool. The bridge is installed automatically before each tool invocation and only when `elicitInput` is present.
-
 ## Reconnection and client mode
 
 After a disconnect, the widget retries the last endpoint once after about `500ms`, then rescans the relay range after `10s`, `20s`, and `30s`. If no relay responds, it enters a dormant state and probes the configured or cached endpoint every two minutes. Returning to the tab or sending `webmcp.connect` triggers immediate rediscovery.

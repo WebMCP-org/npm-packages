@@ -47,9 +47,7 @@
     return !!e && typeof e == `object` && !Array.isArray(e);
   }
   function c() {
-    return typeof crypto < `u` && typeof crypto.randomUUID == `function`
-      ? crypto.randomUUID()
-      : `${String(Date.now())}_${String(Math.random()).slice(2, 10)}`;
+    return crypto.randomUUID();
   }
   let l = `[data-webmcp-relay]`,
     u = `__webmcp_relay_tab_id`,
@@ -79,14 +77,8 @@
     return e;
   }
   function v(e) {
-    if (e?.src)
-      try {
-        return new URL(`widget.html`, e.src).href;
-      } catch (e) {
-        g(`Failed to resolve widget URL from script src, falling back to CDN:`, e);
-      }
-    else g(`Script element has no src attribute, falling back to CDN widget URL.`);
-    return `https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay/dist/browser/widget.html`;
+    if (!e?.src) throw Error(`The relay embed script must be loaded from a URL`);
+    return new URL(`widget.html`, e.src).href;
   }
   function y(e) {
     let t = v(e),
@@ -148,72 +140,69 @@
     let e = document.modelContext;
     return C(e) ? e : void 0;
   }
-  function T(e) {
-    return `elicitInput` in e && typeof e.elicitInput == `function`;
-  }
-  async function E() {
+  async function T() {
     let e = w();
     return e ? (await e.getTools()).map(x) : [];
   }
-  async function D(e, t) {
+  async function E(e, t) {
     let n = w();
     if (!n) throw Error(`No executable WebMCP runtime found on this page`);
     let r = (await n.getTools()).find((t) => t.name === e);
     if (!r) throw Error(`Tool not found: ${e}`);
     return S(await n.executeTool(r, JSON.stringify(t)));
   }
-  let O = !1,
-    k = 0,
-    A = null,
-    j = ``;
-  function M(e) {
+  let D = !1,
+    O = 0,
+    k = null,
+    A = ``;
+  function j(e) {
     if (typeof e != `object` || !e) return JSON.stringify(e) ?? `undefined`;
-    if (Array.isArray(e)) return `[${e.map(M).join(`,`)}]`;
+    if (Array.isArray(e)) return `[${e.map(j).join(`,`)}]`;
     let t = e;
     return `{${Object.keys(t)
       .sort()
-      .map((e) => `${JSON.stringify(e)}:${M(t[e])}`)
+      .map((e) => `${JSON.stringify(e)}:${j(t[e])}`)
       .join(`,`)}}`;
   }
-  function N(e) {
-    return e.map(M).sort().join(`
+  function M(e) {
+    return e.map(j).sort().join(`
 `);
   }
-  function P() {
-    O = !1;
-    let e = k;
-    E()
+  function N() {
+    D = !1;
+    let e = O;
+    T()
       .then((t) => {
-        if (e !== k) return;
-        let n = N(t);
-        n === j ||
+        if (e !== O) return;
+        let n = M(t);
+        n === A ||
           !d ||
-          ((j = n), d.postMessage({ type: `webmcp.tools.changed`, tools: t }, f.widgetOrigin));
+          ((A = n), d.postMessage({ type: `webmcp.tools.changed`, tools: t }, f.widgetOrigin));
       })
       .catch((e) => {
         g(`Failed to sync tool changes:`, e);
       });
   }
+  function P() {
+    (O++, !D && ((D = !0), setTimeout(N, 0)));
+  }
   function F() {
-    (k++, !O && ((O = !0), setTimeout(P, 0)));
+    k || (k = setInterval(P, 2e3));
   }
   function I() {
-    A || (A = setInterval(F, 2e3));
-  }
-  function L() {
     try {
-      return (document.modelContext.addEventListener(`toolchange`, F), !0);
+      return (document.modelContext.addEventListener(`toolchange`, P), !0);
     } catch (e) {
       return (g(`addEventListener on modelContext threw:`, e), !1);
     }
   }
-  function R() {
-    if ((I(), F(), L())) return;
+  function L() {
+    if ((F(), P(), I())) return;
     let e = 0,
       t = 100,
       n = () => {
         setTimeout(() => {
-          if ((e++, !L())) {
+          if ((e++, !I())) {
             if (e >= 40) {
               g(
                 `Could not subscribe to tool changes after 40 retries. Dynamic tool updates will rely on polling.`
@@ -226,18 +215,18 @@
       };
     n();
   }
-  function z(e, t, n) {
+  function R(e, t, n) {
     !e || typeof e != `object` || !(`postMessage` in e) || e.postMessage(n, t);
   }
-  function B(e) {
+  function z(e) {
     return !s(e) || typeof e.requestId != `string` || typeof e.type != `string`
       ? null
       : { requestId: e.requestId, type: e.type, toolName: e.toolName, args: e.args };
   }
-  function V(e, t) {
-    E()
+  function B(e, t) {
+    T()
       .then((n) => {
-        z(t.source, t.origin, {
+        R(t.source, t.origin, {
           type: `webmcp.tools.list.response`,
           requestId: e.requestId,
           tools: n,
@@ -245,7 +234,7 @@
       })
       .catch((n) => {
         (g(`Failed to list tools:`, n),
-          z(t.source, t.origin, {
+          R(t.source, t.origin, {
             type: `webmcp.tools.list.response`,
             requestId: e.requestId,
             tools: [],
@@ -253,71 +242,32 @@
           }));
       });
   }
-  let H = !1;
-  function U(e, t) {
-    if (H) return;
-    let n = document.modelContext;
-    if (!T(n)) {
-      g(`Elicitation bridge not installed: elicitInput not available on modelContext`);
-      return;
-    }
-    ((n.elicitInput = (n, r) => {
-      let i = G();
-      return new Promise((r) => {
-        let a = () => {
-            (window.removeEventListener(`message`, c), clearTimeout(o));
-          },
-          o = setTimeout(() => {
-            (a(),
-              g(`Elicitation request timed out after 60s`),
-              r({ action: `decline`, content: null }));
-          }, 6e4),
-          c = (e) => {
-            if (e.origin !== t) return;
-            let n = e.data;
-            !s(n) ||
-              n.type !== `webmcp.elicitation.response` ||
-              n.callId !== i ||
-              (a(), r(s(n.result) ? n.result : { action: `decline`, content: null }));
-          };
-        (window.addEventListener(`message`, c),
-          z(e, t, { type: `webmcp.elicitation.request`, callId: i, params: n }));
-      });
-    }),
-      (H = !0),
-      g(`Elicitation bridge installed`));
-  }
-  let W = 0;
-  function G() {
-    return ((W += 1), `elicit_${String(Date.now())}_${String(W)}`);
-  }
-  function K(e, t) {
+  function V(e, t) {
     if (!w()) {
-      z(t.source, t.origin, {
+      R(t.source, t.origin, {
         type: `webmcp.tools.invoke.error`,
         requestId: e.requestId,
         error: `No executable WebMCP runtime found on this page`,
       });
       return;
     }
-    (t.source && U(t.source, t.origin),
-      D(String(e.toolName ?? ``), b(e.args))
-        .then((n) => {
-          z(t.source, t.origin, {
-            type: `webmcp.tools.invoke.response`,
-            requestId: e.requestId,
-            result: s(n) ? n : {},
-          });
-        })
-        .catch((n) => {
-          z(t.source, t.origin, {
-            type: `webmcp.tools.invoke.error`,
-            requestId: e.requestId,
-            error: String(n instanceof Error ? n.message : n),
-          });
-        }));
+    E(String(e.toolName ?? ``), b(e.args))
+      .then((n) => {
+        R(t.source, t.origin, {
+          type: `webmcp.tools.invoke.response`,
+          requestId: e.requestId,
+          result: s(n) ? n : {},
+        });
+      })
+      .catch((n) => {
+        R(t.source, t.origin, {
+          type: `webmcp.tools.invoke.error`,
+          requestId: e.requestId,
+          error: String(n instanceof Error ? n.message : n),
+        });
+      });
   }
-  async function q(e) {
+  async function H(e) {
     if (document.querySelector(l)) return;
     let t = new URLSearchParams();
     (t.set(`tabId`, e.tabId), t.set(`hostOrigin`, window.location.origin));
@@ -332,40 +282,32 @@
       e.relayId && t.set(`relayId`, e.relayId),
       e.relayWorkspace && t.set(`relayWorkspace`, e.relayWorkspace),
       e.requestTimeout && t.set(`requestTimeout`, e.requestTimeout));
-    let r = null;
-    try {
-      let n = await fetch(e.widgetUrl);
-      if (!n.ok)
-        console.warn(
-          `[webmcp-relay-embed] Widget HTML fetch returned ${String(n.status)}; falling back to direct iframe src.`
-        );
-      else {
-        let i = await n.text(),
-          a = `<script>window.__WEBMCP_RELAY_CONFIG=${JSON.stringify(Object.fromEntries(t))};</script>`,
-          o = new Blob([i.replace(`</head>`, `${a}</head>`)], { type: `text/html` });
-        ((r = URL.createObjectURL(o)), (e.widgetOrigin = window.location.origin));
-      }
-    } catch (e) {
-      g(`Failed to fetch widget HTML for blob URL:`, e);
-    }
-    let i = document.createElement(`iframe`);
-    ((i.src = r ?? `${e.widgetUrl}?${t.toString()}`),
-      (i.style.display = `none`),
-      i.setAttribute(`aria-hidden`, `true`),
-      i.setAttribute(`data-webmcp-relay`, `1`),
-      i.setAttribute(`allow`, `loopback-network; local-network; local-network-access`),
-      document.body.appendChild(i),
-      (d = i.contentWindow),
-      i.addEventListener(`load`, () => {
-        ((d = i.contentWindow), r && URL.revokeObjectURL(r));
+    let r = await fetch(e.widgetUrl);
+    if (!r.ok) throw Error(`Widget HTML request failed with status ${String(r.status)}`);
+    let i = await r.text(),
+      a = `<script>window.__WEBMCP_RELAY_CONFIG=${JSON.stringify(Object.fromEntries(t))};<\/script>`,
+      o = URL.createObjectURL(
+        new Blob([i.replace(`</head>`, `${a}</head>`)], { type: `text/html` })
+      );
+    e.widgetOrigin = window.location.origin;
+    let s = document.createElement(`iframe`);
+    ((s.src = o),
+      (s.style.display = `none`),
+      s.setAttribute(`aria-hidden`, `true`),
+      s.setAttribute(`data-webmcp-relay`, `1`),
+      s.setAttribute(`allow`, `loopback-network; local-network; local-network-access`),
+      document.body.appendChild(s),
+      (d = s.contentWindow),
+      s.addEventListener(`load`, () => {
+        ((d = s.contentWindow), URL.revokeObjectURL(o));
       }),
-      i.addEventListener(`error`, () => {
+      s.addEventListener(`error`, () => {
         (console.error(
           `[webmcp-relay-embed] Failed to load relay widget iframe from:`,
-          i.src,
+          s.src,
           `-- WebMCP tools will NOT be relayed. Check network connectivity and widget URL.`
         ),
-          r && URL.revokeObjectURL(r));
+          URL.revokeObjectURL(o));
       }));
   }
   if (!document.querySelector(l)) {
@@ -381,22 +323,22 @@
         window.location.reload();
         return;
       }
-      let n = B(e.data);
+      let n = z(e.data);
       if (n) {
         if (n.type === `webmcp.tools.list.request`) {
-          V(n, e);
+          B(n, e);
           return;
         }
-        n.type === `webmcp.tools.invoke.request` && K(n, e);
+        n.type === `webmcp.tools.invoke.request` && V(n, e);
       }
     });
     let e = () => {
-      q(f).catch((e) => {
+      H(f).catch((e) => {
         console.error(`[webmcp-relay-embed] Failed to inject relay widget:`, e);
       });
     };
     (document.body ? e() : document.addEventListener(`DOMContentLoaded`, e, { once: !0 }),
-      R(),
+      L(),
       document.addEventListener(`visibilitychange`, () => {
         document.visibilityState === `visible` &&
           d &&

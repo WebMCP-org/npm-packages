@@ -100,19 +100,23 @@ await document.modelContext.registerTool({
 Initializes the global adapter. Replaces `document.modelContext` with a `BrowserMcpServer` instance that bridges WebMCP tools to the MCP protocol layer.
 
 ```typescript
-import { initializeWebModelContext } from '@mcp-b/global';
+window.__webModelContextOptions = { autoInitialize: false };
 
-initializeWebModelContext({
+const { initializeWebModelContext } = await import('@mcp-b/global');
+
+const server = initializeWebModelContext({
   transport: {
     tabServer: { allowedOrigins: ['https://example.com'] },
   },
 });
+if (!server) throw new Error('WebMCP is unavailable');
 ```
 
 **Behavior:**
 
 - Only operates in browser environments
-- Idempotent - calling multiple times is a no-op after first initialization
+- Returns the active typed `BrowserMcpServer`, or `undefined` when WebMCP is unavailable
+- Idempotent - repeated calls return the same server
 - Wraps the native context when present; otherwise installs and wraps the polyfill
 - Cleanup restores the captured native or polyfilled context
 - Auto-called on import unless `window.__webModelContextOptions.autoInitialize` is `false`
@@ -182,16 +186,26 @@ const tools = await document.modelContext.getTools();
 // [{ name: 'search-products', inputSchema: '{"type":"object",...}', ... }, ...]
 ```
 
+### `BrowserMcpServer` Extensions
+
+Use the server returned by `initializeWebModelContext()` for MCP-B methods that
+are intentionally absent from the strict `document.modelContext` type.
+
 #### `executeTool(tool, inputArgsJson)`
 
 Executes a tool descriptor returned from `getTools()`.
 
 ```typescript
-const tools = await document.modelContext.getTools();
+import { initializeWebModelContext } from '@mcp-b/global';
+
+const server = initializeWebModelContext();
+if (!server) throw new Error('WebMCP is unavailable');
+
+const tools = await server.getTools();
 const searchTool = tools.find((tool) => tool.name === 'search-products');
 if (!searchTool) throw new Error('search-products is not available');
 
-const resultJson = await document.modelContext.executeTool(
+const resultJson = await server.executeTool(
   searchTool,
   JSON.stringify({ query: 'laptop', limit: 5 })
 );
@@ -204,7 +218,14 @@ const result = resultJson === null ? null : JSON.parse(resultJson);
 This MCP-B helper exposes MCP metadata. In-page WebMCP consumers should use
 `getTools()` and feature-detect `executeTool(tool, inputArgsJson)`.
 
-### Tool Descriptor
+Prompt and resource helpers are also available on the returned server. Lower-level
+MCP SDK capabilities, including sampling and elicitation, live on `server.mcpServer.server`;
+they are not `document.modelContext` methods.
+
+### `BrowserMcpServer` Tool Descriptor
+
+The returned server's `registerTool()` overload accepts this MCP-B descriptor.
+The strict `document.modelContext` dictionary does not define `outputSchema`.
 
 | Property       | Type                                    | Required | Description                                                                             |
 | -------------- | --------------------------------------- | -------- | --------------------------------------------------------------------------------------- |
@@ -266,20 +287,19 @@ interface TransportConfiguration {
 - Set either to `false` to disable it
 
 ```typescript
-// Restrict to specific origins
-initializeWebModelContext({
+window.__webModelContextOptions = { autoInitialize: false };
+
+const { initializeWebModelContext } = await import('@mcp-b/global');
+const server = initializeWebModelContext({
   transport: {
     tabServer: { allowedOrigins: ['https://myapp.com'] },
   },
 });
 
-// Disable tab transport (iframe only)
-initializeWebModelContext({
-  transport: {
-    tabServer: false,
-  },
-});
+if (!server) throw new Error('WebMCP is unavailable');
 ```
+
+Inside an iframe, pass `transport: { tabServer: false }` to require the iframe transport.
 
 ### Auto-Initialization
 
@@ -306,7 +326,7 @@ To prevent auto-initialization:
 <script src="https://unpkg.com/@mcp-b/global@latest/dist/index.iife.js"></script>
 <script>
   // Initialize manually later
-  MCPB.initializeWebModelContext();
+  WebMCP.initializeWebModelContext();
 </script>
 ```
 

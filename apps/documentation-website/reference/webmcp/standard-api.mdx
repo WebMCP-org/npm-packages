@@ -67,8 +67,9 @@ array string, and optional abort options. It resolves to a JSON string or
   exposes `document.modelContext` only.
 - `navigator.modelContextTesting` is a removed Chromium preview API retained
   only by older runtimes and MCP-B/polyfill compatibility shims.
-- `listTools()`, prompts, resources, sampling, elicitation, and transports are
-  MCP-B extensions.
+- `listTools()`, prompt and resource registration, `mcpServer`, and transports
+  belong to MCP-B runtimes. Sampling and elicitation remain protocol-specific
+  APIs on the composed official MCP server, not `document.modelContext` methods.
 - `outputSchema` is not part of the current W3C/Chrome WebMCP tool
   dictionary. MCP-B packages expose it as helper metadata for type inference,
   structured MCP responses, and polyfill/runtime adapters.

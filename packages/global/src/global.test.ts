@@ -80,16 +80,18 @@ describe('global adapter', () => {
     const nativeContext = createNativeModelContextStub();
     setDocumentModelContext(nativeContext);
 
-    initializeWebModelContext();
+    const server = initializeWebModelContext();
     // Server wraps native, adding registerPrompt/registerResource/etc.
-    expect(document.modelContext).not.toBe(nativeContext);
+    expect(server).toBeInstanceOf(BrowserMcpServer);
+    expect(initializeWebModelContext()).toBe(server);
+    expect(document.modelContext).toBe(server);
 
     cleanupWebModelContext();
     expect(document.modelContext).toBe(nativeContext);
 
-    initializeWebModelContext();
-    expect(document.modelContext).not.toBe(nativeContext);
-    expect(typeof getModelContext().listTools).toBe('function');
+    const reinitializedServer = initializeWebModelContext();
+    expect(document.modelContext).toBe(reinitializedServer);
+    expect(typeof reinitializedServer?.listTools).toBe('function');
   });
 
   it('leaves the native surface untouched when transport selection fails', () => {
@@ -1477,18 +1479,15 @@ describe('cross-bundle duplicate prevention (e2e)', () => {
     // Place server on document.modelContext (as initializeWebModelContext would)
     setDocumentModelContext(server);
 
-    // Verify marker is present (BrowserMcpServer sets it automatically)
-    const ctx = document.modelContext as unknown as Record<string, unknown>;
-    expect(ctx.__isBrowserMcpServer).toBe(true);
-
     // --- Bundle B: calls initializeWebModelContext() ---
     // Module-level `runtime` is null (no prior init in this test).
     // The ONLY thing preventing a second server+transport is the marker on modelContext.
-    initializeWebModelContext({
+    const initializedServer = initializeWebModelContext({
       transport: { tabServer: { allowedOrigins: ['*'], channelId }, iframeServer: false },
     });
 
     // modelContext should still be Bundle A's server — not replaced
+    expect(initializedServer).toBe(server);
     expect(document.modelContext).toBe(server);
 
     // --- Verify: full MCP roundtrip invokes tool exactly once ---
