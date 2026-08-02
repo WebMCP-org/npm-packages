@@ -27,6 +27,10 @@ packages/usewebmcp:
   - changed-files:
       - any-glob-to-any-file: 'packages/usewebmcp/**'
 
+packages/webmcp-extension:
+  - changed-files:
+      - any-glob-to-any-file: 'packages/webmcp-extension/**'
+
 # Category labels
 documentation:
   - changed-files:

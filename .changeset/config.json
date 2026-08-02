@@ -13,6 +13,7 @@
       "@mcp-b/global",
       "@mcp-b/react-webmcp",
       "usewebmcp",
+      "@mcp-b/webmcp-extension",
       "@mcp-b/webmcp-local-relay"
     ]
   ],

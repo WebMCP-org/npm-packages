@@ -78,7 +78,7 @@ the Diataxis framework.
 
 ### Commit Scopes
 
-Package scopes: `global`, `mcp-iframe`, `react-webmcp`, `smart-dom-reader`, `transports`, `usewebmcp`, `webmcp-local-relay`, `webmcp-polyfill`, `webmcp-ts-sdk`, `webmcp-types`
+Package scopes: `global`, `mcp-iframe`, `react-webmcp`, `smart-dom-reader`, `transports`, `usewebmcp`, `webmcp-extension`, `webmcp-local-relay`, `webmcp-polyfill`, `webmcp-ts-sdk`, `webmcp-types`
 
 Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 
@@ -135,6 +135,13 @@ Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 | `registerPrompt()`   |      -       |    -     |           Y           |
 | `registerResource()` |      -       |    -     |           Y           |
 | `listTools()`        |      -       |    -     |           Y           |
+
+### Extension Integration (`@mcp-b/webmcp-extension`)
+
+- A MAIN-world content script imports `@mcp-b/global`; page code still uses `document.modelContext` normally.
+- The isolated content script calls `connectWebMCPClient()` and receives the official MCP `Client`.
+- Keep privileged extension APIs and secrets out of the MAIN-world bundle.
+- The template is top-frame only. Do not add `all_frames` while `@mcp-b/global` selects the iframe-child transport in child frames.
 
 ### Key Type Interfaces (`@mcp-b/webmcp-types`)
 

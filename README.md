@@ -215,6 +215,7 @@ Any website running `@mcp-b/global` becomes callable from your desktop AI agent.
 | Add tools to my site (simplest)  | [`@mcp-b/global`](./packages/global)                                           |
 | Just the polyfill, no MCP bridge | [`@mcp-b/webmcp-polyfill`](./packages/webmcp-polyfill)                         |
 | Register tools from React        | [`@mcp-b/react-webmcp`](./packages/react-webmcp)                               |
+| Add WebMCP from an extension     | [`@mcp-b/webmcp-extension`](./packages/webmcp-extension)                       |
 | Forward tools to local AI agents | [`@mcp-b/webmcp-local-relay`](./packages/webmcp-local-relay)                   |
 | Control Chrome from an AI agent  | [`chrome-devtools-mcp`](https://github.com/ChromeDevTools/chrome-devtools-mcp) |
 | Just the TypeScript types        | [`@mcp-b/webmcp-types`](./packages/webmcp-types)                               |
@@ -244,6 +245,9 @@ pnpm add usewebmcp
 # Transport layer (custom integrations)
 pnpm add @mcp-b/transports
 
+# Chromium extension template and content-script client
+pnpm add @mcp-b/global @mcp-b/webmcp-extension
+
 # DOM extraction for AI
 pnpm add @mcp-b/smart-dom-reader
 ```
@@ -264,6 +268,7 @@ pnpm add @mcp-b/smart-dom-reader
 | Package                                                    | Version                                                                                                                   | Description                                                              |
 | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
 | [@mcp-b/transports](./packages/transports)                 | [![npm](https://img.shields.io/npm/v/@mcp-b/transports)](https://www.npmjs.com/package/@mcp-b/transports)                 | `postMessage`, iframe, and Chrome extension transports                   |
+| [@mcp-b/webmcp-extension](./packages/webmcp-extension)     | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-extension)](https://www.npmjs.com/package/@mcp-b/webmcp-extension)     | MV3 template and isolated content-script client for page tools           |
 | [@mcp-b/mcp-iframe](./packages/mcp-iframe)                 | [![npm](https://img.shields.io/npm/v/@mcp-b/mcp-iframe)](https://www.npmjs.com/package/@mcp-b/mcp-iframe)                 | Web component for exposing iframe tools, resources, and prompts          |
 | [@mcp-b/webmcp-local-relay](./packages/webmcp-local-relay) | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-local-relay)](https://www.npmjs.com/package/@mcp-b/webmcp-local-relay) | Localhost relay — forwards website tools to Claude Desktop, Cursor, etc. |
 
@@ -324,7 +329,8 @@ webmcp-types          (canonical type definitions)
     │   └── react-webmcp (also uses usewebmcp; pair with global at app level)
     └── usewebmcp     (React hooks for strict core)
 
-transports            (browser transports used by global and mcp-iframe)
+transports            (browser transports shared by integrations)
+└── webmcp-extension  (MV3 template and isolated content-script client)
 ```
 
 Standalone packages: `smart-dom-reader`, `webmcp-local-relay`.

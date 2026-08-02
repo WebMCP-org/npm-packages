@@ -11,6 +11,7 @@
 /packages/smart-dom-reader/ @WebMCP-org/core-devs
 /packages/transports/ @WebMCP-org/core-devs
 /packages/usewebmcp/ @WebMCP-org/core-devs
+/packages/webmcp-extension/ @WebMCP-org/core-devs
 /packages/webmcp-ts-sdk/ @WebMCP-org/core-devs
 
 # CI/CD and infrastructure

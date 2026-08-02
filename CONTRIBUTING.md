@@ -55,7 +55,7 @@ pnpm audit:ci:critical  # required pass gate (prod deps)
 ```
 
 For changes touching browser runtime behavior (`@mcp-b/global`, `@mcp-b/webmcp-polyfill`,
-`@mcp-b/webmcp-ts-sdk`, `@mcp-b/transports`, or e2e runtime apps), also run:
+`@mcp-b/webmcp-ts-sdk`, `@mcp-b/transports`, `@mcp-b/webmcp-extension`, or e2e runtime apps), also run:
 
 ```bash
 pnpm --filter mcp-e2e-tests test:native-parity
@@ -155,6 +155,7 @@ Package scopes (all in `packages/` directory):
 - `smart-dom-reader` - @mcp-b/smart-dom-reader
 - `transports` - @mcp-b/transports
 - `usewebmcp` - usewebmcp (strict core WebMCP React hooks)
+- `webmcp-extension` - @mcp-b/webmcp-extension
 - `webmcp-local-relay` - @mcp-b/webmcp-local-relay
 - `webmcp-polyfill` - @mcp-b/webmcp-polyfill
 - `webmcp-ts-sdk` - @mcp-b/webmcp-ts-sdk
@@ -221,6 +222,7 @@ npm-packages/
 │   ├── react-webmcp/            # React hooks for MCP-B runtime
 │   ├── smart-dom-reader/        # DOM extraction for AI
 │   ├── transports/              # Core transport implementations
+│   ├── webmcp-extension/         # MV3 extension template and content-script client
 │   ├── webmcp-polyfill/         # Strict core WebMCP runtime polyfill
 │   ├── webmcp-types/            # Strict core WebMCP type definitions
 │   ├── usewebmcp/               # React hooks for strict core WebMCP API
@@ -253,6 +255,12 @@ When contributing to a specific package:
 - Test in multiple browser environments
 - Handle connection lifecycle properly
 - Support both Tab and Extension transports
+
+### @mcp-b/webmcp-extension
+
+- Keep the MAIN-world entry limited to installing `@mcp-b/global`
+- Return the official MCP client instead of adding a second tool API
+- Test changes with a real unpacked extension in Chromium
 
 ### @mcp-b/react-webmcp
 

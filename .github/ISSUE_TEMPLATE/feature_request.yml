@@ -17,6 +17,7 @@ body:
         - '@mcp-b/global'
         - '@mcp-b/react-webmcp'
         - '@mcp-b/webmcp-ts-sdk'
+        - '@mcp-b/webmcp-extension'
         - '@mcp-b/mcp-iframe'
         - '@mcp-b/smart-dom-reader'
         - '@webmcp/helpers'

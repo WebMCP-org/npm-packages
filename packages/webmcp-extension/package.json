@@ -1,0 +1,73 @@
+{
+  "name": "@mcp-b/webmcp-extension",
+  "version": "4.0.0",
+  "description": "Inject WebMCP from a Chromium extension and call page tools from an isolated content script",
+  "keywords": [
+    "browser-extension",
+    "chrome-extension",
+    "content-script",
+    "manifest-v3",
+    "mcp",
+    "model-context-protocol",
+    "polyfill",
+    "webmcp"
+  ],
+  "homepage": "https://github.com/WebMCP-org/npm-packages/tree/main/packages/webmcp-extension#readme",
+  "bugs": {
+    "url": "https://github.com/WebMCP-org/npm-packages/issues"
+  },
+  "license": "MIT",
+  "author": "Alex Nahas",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WebMCP-org/npm-packages.git",
+    "directory": "packages/webmcp-extension"
+  },
+  "files": [
+    "dist",
+    "template/README.md",
+    "template/manifest.json",
+    "template/package.json",
+    "template/src",
+    "template/tsconfig.json",
+    "template/vite.config.ts"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./content-script": {
+      "types": "./dist/content-script.d.ts",
+      "import": "./dist/content-script.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "build": "vp pack --filter package",
+    "check": "vp check --fix",
+    "clean": "rm -rf dist e2e/dist template/dist",
+    "format": "vp fmt --write",
+    "lint": "vp lint --fix",
+    "prepublishOnly": "node ../../scripts/validate-publish.js && pnpm run build",
+    "publish:dry": "pnpm publish --access public --dry-run",
+    "publish:npm": "pnpm publish --access public",
+    "test:e2e": "pnpm --filter @mcp-b/webmcp-extension... run build && node e2e/build-template.mjs && vp pack --filter e2e-content-script && node e2e/verify-extension.mjs && node --experimental-strip-types --test e2e/extension-runtime.e2e.test.ts",
+    "typecheck": "tsc -p tsconfig.check.json --noEmit"
+  },
+  "dependencies": {
+    "@mcp-b/transports": "workspace:*",
+    "@modelcontextprotocol/client": "catalog:"
+  },
+  "devDependencies": {
+    "@mcp-b/global": "workspace:*",
+    "@types/node": "catalog:",
+    "playwright": "catalog:",
+    "typescript": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

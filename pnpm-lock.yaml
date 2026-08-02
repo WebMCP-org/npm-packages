@@ -821,6 +821,31 @@ importers:
         specifier: 'catalog:'
         version: 4.4.3
 
+  packages/webmcp-extension:
+    dependencies:
+      '@mcp-b/transports':
+        specifier: workspace:*
+        version: link:../transports
+      '@modelcontextprotocol/client':
+        specifier: 'catalog:'
+        version: 2.0.0
+    devDependencies:
+      '@mcp-b/global':
+        specifier: workspace:*
+        version: link:../global
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.17.2
+      playwright:
+        specifier: 'catalog:'
+        version: 1.60.0
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vite-plus:
+        specifier: 'catalog:'
+        version: 0.1.22(@opentelemetry/api@1.9.1)(@types/node@22.17.2)(esbuild@0.27.7)(happy-dom@20.8.9)(jiti@2.7.0)(sass@1.97.1)(tsx@4.21.0)(typescript@5.9.3)(vite@8.0.14(@types/node@22.17.2)(esbuild@0.27.7)(jiti@2.7.0)(sass@1.97.1)(tsx@4.21.0)(yaml@2.8.3))(yaml@2.8.3)
+
   packages/webmcp-local-relay:
     dependencies:
       '@modelcontextprotocol/core':

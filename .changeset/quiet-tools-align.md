@@ -4,6 +4,7 @@
 '@mcp-b/react-webmcp': major
 '@mcp-b/smart-dom-reader': major
 '@mcp-b/transports': major
+'@mcp-b/webmcp-extension': major
 '@mcp-b/webmcp-local-relay': major
 '@mcp-b/webmcp-polyfill': major
 '@mcp-b/webmcp-ts-sdk': major
@@ -23,6 +24,9 @@ contracts. Remove the retired extension-tools package and local Chrome DevTools
 MCP fork; consumers should use the upstream Chrome DevTools MCP package.
 Remove `@mcp-b/codemode`; its browser implementation now lives upstream in
 Cloudflare's `@cloudflare/codemode/browser` entry point.
+Add `@mcp-b/webmcp-extension`, which pairs an MV3 template that installs the page
+runtime with an isolated-world client, without replacing the standard
+`document.modelContext` authoring model.
 Remove the legacy React sampling and elicitation hooks, which cannot represent
 MCP 2026 multi-round input flows. The MCP client provider now accepts the full
 SDK `ConnectOptions`, including cached protocol-era verdicts.

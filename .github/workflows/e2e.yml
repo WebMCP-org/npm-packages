@@ -113,10 +113,10 @@ jobs:
       - name: Install dependencies
         run: vp install
 
-      - name: Run extension transport E2E tests
+      - name: Run extension E2E tests
         env:
           PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
-        run: pnpm --filter @mcp-b/transports test:e2e
+        run: pnpm --filter @mcp-b/transports test:e2e && pnpm --filter @mcp-b/webmcp-extension test:e2e
 
   native-parity:
     name: Native API Parity (chrome-canary)
