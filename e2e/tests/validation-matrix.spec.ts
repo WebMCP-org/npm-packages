@@ -79,7 +79,7 @@ for (const app of apps) {
           });
 
           expect(validCall.isError).toBe(false);
-          expect(validCall.text).toContain('"counter": 2');
+          expect(JSON.parse(validCall.text)).toEqual({ counter: 2, incremented: 2 });
           await expect(page.locator('[data-testid="counter-display"]')).toContainText('2');
 
           const invalidCall = await page.evaluate(async () => {
