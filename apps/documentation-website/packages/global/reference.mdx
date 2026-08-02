@@ -18,22 +18,6 @@ icon: 'globe'
 
 After initialization, application code continues through the [strict `document.modelContext` surface](/reference/webmcp/standard-api). The installed runtime object also supports [MCP-B extensions](/packages/webmcp-ts-sdk/reference), but the global TypeScript declaration stays strict. Narrow `document.modelContext` explicitly when you opt into those extensions.
 
-```
-npm install @mcp-b/global
-```
-
-## Package selection
-
-| Package                  | Use When                                                                          |
-| ------------------------ | --------------------------------------------------------------------------------- |
-| `@mcp-b/webmcp-types`    | You need compile-time types only                                                  |
-| `@mcp-b/webmcp-polyfill` | You want the WebMCP standard path without extensions                              |
-| **`@mcp-b/global`**      | You want the MCP-B runtime with transport, prompts, resources, and extension APIs |
-
-For the reasoning behind this split, see [Strict Core vs. MCP-B Extensions](/explanation/strict-core-vs-mcp-b-extensions).
-
----
-
 ## Installation
 
 <CodeGroup>
@@ -46,11 +30,11 @@ npm install @mcp-b/global
 pnpm add @mcp-b/global
 ```
 
-```html "Script Tag (IIFE)"
+```html title="Script tag (IIFE)"
 <script src="https://unpkg.com/@mcp-b/global@latest/dist/index.iife.js"></script>
 ```
 
-```html "ES Module"
+```html title="ES module"
 <script type="module">
   import '@mcp-b/global';
 </script>
@@ -62,18 +46,13 @@ pnpm add @mcp-b/global
 
 <Snippet file="snippets/packages/global-quickstart.ts" />
 
-| Format | Size            | Dependencies                   |
-| ------ | --------------- | ------------------------------ |
-| IIFE   | ~285KB minified | All bundled                    |
-| ESM    | ~16KB           | External dependencies required |
-
 ---
 
 ## Auto-initialization
 
 Importing `@mcp-b/global` in a browser environment auto-initializes `document.modelContext`. This behavior is controlled by `window.__webModelContextOptions`.
 
-```html
+```html title="Configure before the IIFE"
 <script>
   window.__webModelContextOptions = {
     autoInitialize: true,
@@ -87,7 +66,7 @@ Importing `@mcp-b/global` in a browser environment auto-initializes `document.mo
 
 To prevent auto-initialization:
 
-```html
+```html title="Disable auto-initialization"
 <script>
   window.__webModelContextOptions = { autoInitialize: false };
 </script>
@@ -105,18 +84,14 @@ To prevent auto-initialization:
 
 Initializes the global adapter and installs it on `document.modelContext`.
 
-```ts "Initializer signature"
+```ts title="Initializer signature"
 initializeWebModelContext(options?: WebModelContextInitOptions): void
 ```
 
-```ts
+```ts title="Manual initialization"
 import { initializeWebModelContext } from '@mcp-b/global';
 
 initializeWebModelContext();
-
-await document.modelContext.registerTool({
-  /* your tool */
-});
 ```
 
 **Behavior:**
@@ -124,21 +99,21 @@ await document.modelContext.registerTool({
 - Returns nothing in every environment.
 - Does nothing outside a secure browser environment (SSR safe).
 - Repeated calls and calls after another bundle initialized the runtime are no-ops.
+- Returns before native-tool synchronization and transport connection finish.
+- Continues to transport connection when initial native-tool synchronization fails.
+- Logs a transport connection failure, starts closing the adapter, and restores the previous context.
 
-**Initialization sequence:**
-
-1. Calls `initializeWebMCPPolyfill()`. When no native context exists, the polyfill installs `document.modelContext`, the deprecated navigator alias, and—when enabled—the MCP-B compatibility testing shim.
-2. Saves a reference to the current document-first context as `native`.
-3. Resolves the tab or iframe transport before mutating either browser surface.
-4. Creates a `BrowserMcpServer` with `{ native }` so registrations mirror to the underlying context.
-5. Replaces `document.modelContext` and the deprecated navigator alias with the server instance.
-6. Starts native-tool reconciliation and connects the transport asynchronously.
+Initialization captures the current document context, wraps it with a
+`BrowserMcpServer`, replaces `document.modelContext`, then starts native-tool
+reconciliation and transport connection asynchronously. See [Runtime
+layering](/explanation/architecture/runtime-layering) for why the wrapper is
+installed without changing application usage.
 
 ### `cleanupWebModelContext()`
 
-Tears down the adapter, closes transport, and restores the native or polyfilled context that the adapter wrapped.
+Restores the native or polyfilled context immediately and starts closing the adapter and transport. It does not uninstall `@mcp-b/webmcp-polyfill`; the polyfill owns its lifecycle separately.
 
-```ts
+```ts title="Cleanup"
 import { cleanupWebModelContext } from '@mcp-b/global';
 
 cleanupWebModelContext();
@@ -172,7 +147,9 @@ Transport is auto-selected based on context:
 | Inside an iframe | `IframeChildTransport` |
 | Main window      | `TabServerTransport`   |
 
-```ts
+When omitted, `allowedOrigins` defaults to `['*']` on the selected transport. Disabling both eligible transports makes initialization throw before `document.modelContext` is replaced.
+
+```ts title="Manual transport configuration"
 window.__webModelContextOptions = { autoInitialize: false };
 
 const { initializeWebModelContext } = await import('@mcp-b/global');
@@ -216,7 +193,7 @@ After initialization, use `document.modelContext` for standard WebMCP registrati
 
 TypeScript users can narrow the canonical surface without widening the global declaration:
 
-```ts
+```ts title="Narrow MCP-B extensions"
 import '@mcp-b/global';
 import { isBrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
 
@@ -225,9 +202,7 @@ if (!isBrowserMcpServer(modelContext)) {
   throw new Error('MCP-B extensions are unavailable');
 }
 
-modelContext.registerPrompt({
-  /* your prompt */
-});
+const mcpTools = modelContext.listTools();
 ```
 
 Add `@mcp-b/webmcp-ts-sdk` as a direct dependency when importing its guard or extension types.
@@ -246,7 +221,7 @@ For the MCP-B-only server members, see [`@mcp-b/webmcp-ts-sdk` reference](/packa
 
 ## Type exports
 
-```ts
+```ts title="Type imports"
 import type { TransportConfiguration, WebModelContextInitOptions } from '@mcp-b/global';
 ```
 

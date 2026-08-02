@@ -17,9 +17,23 @@ review or confirmation. Tool metadata, page content, and tool output must be
 treated as untrusted language-model input because each can carry prompt
 injection.
 
+The standard annotations are behavioral hints, not access controls.
+`readOnlyHint` describes tools that do not modify state, while
+`untrustedContentHint` marks output that may contain untrusted content. Browsers
+and agents can use those hints when deciding how to mediate a call, but WebMCP
+does not guarantee a confirmation prompt for every invocation.
+
+`exposedTo` controls which origins in the current document tree may discover a
+registered tool. The `tools` Permissions Policy defaults to `self`, so
+cross-origin access also requires explicit policy delegation. Neither mechanism
+replaces application-level authorization.
+
 Iframe, tab, extension, and localhost bridges add transport-level boundaries.
 Their origin, connection identity, permissions, and exposure controls must be
 validated separately.
 
-The upstream [security and privacy considerations](https://github.com/webmachinelearning/webmcp/blob/main/docs/security-privacy-considerations.md)
-define the standards threat model.
+The Community Group draft's
+[security and privacy considerations](https://webmachinelearning.github.io/webmcp/#security-and-privacy-considerations)
+define the standards threat model. Chrome's
+[secure tools guidance](https://developer.chrome.com/docs/ai/webmcp/secure-tools)
+describes implementation-specific defenses.

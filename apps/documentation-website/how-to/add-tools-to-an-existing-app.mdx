@@ -153,7 +153,7 @@ function onLogout() {
 
 Use `registerTool` and an `AbortController` to add or remove individual tools:
 
-```ts
+```ts title="registration-lifetime.ts"
 const controller = new AbortController();
 await document.modelContext.registerTool(adminTool, { signal: controller.signal });
 
@@ -166,6 +166,15 @@ controller.abort();
 Tools can read from and write to the DOM. This is useful for form-filling, page navigation, or surfacing visible content.
 
 ```ts title="form-tools.ts"
+const nameInput = document.querySelector<HTMLInputElement>('#name');
+const emailInput = document.querySelector<HTMLInputElement>('#email');
+const messageInput = document.querySelector<HTMLInputElement>('#message');
+const contactForm = document.querySelector<HTMLFormElement>('#contact-form');
+
+if (!nameInput || !emailInput || !messageInput || !contactForm) {
+  throw new Error('Contact form is incomplete');
+}
+
 await document.modelContext.registerTool({
   name: 'fill-contact-form',
   description: 'Fill the contact form with provided details',
@@ -179,9 +188,9 @@ await document.modelContext.registerTool({
     required: ['name', 'email', 'message'],
   },
   async execute(args) {
-    document.querySelector('#name').value = args.name;
-    document.querySelector('#email').value = args.email;
-    document.querySelector('#message').value = args.message;
+    nameInput.value = args.name;
+    emailInput.value = args.email;
+    messageInput.value = args.message;
     return { content: [{ type: 'text', text: 'Form filled' }] };
   },
 });
@@ -191,7 +200,7 @@ await document.modelContext.registerTool({
   description: 'Submit the contact form',
   inputSchema: { type: 'object', properties: {} },
   async execute() {
-    document.querySelector('#contact-form').submit();
+    contactForm.requestSubmit();
     return { content: [{ type: 'text', text: 'Form submitted' }] };
   },
 });
@@ -201,14 +210,15 @@ await document.modelContext.registerTool({
 
 If a tool execution fails, return an error response instead of throwing. This gives the AI agent a structured signal to retry or adjust its approach.
 
-```ts
+```ts title="tool-errors.ts"
 async execute(args) {
   try {
     const result = await riskyOperation(args);
     return { content: [{ type: 'text', text: JSON.stringify(result) }] };
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     return {
-      content: [{ type: 'text', text: `Operation failed: ${error.message}` }],
+      content: [{ type: 'text', text: `Operation failed: ${message}` }],
       isError: true,
     };
   }
@@ -219,14 +229,15 @@ async execute(args) {
 
 Tool annotations give the AI agent hints about side effects. They do not change execution behavior, but help the agent decide when and how to call the tool.
 
-```ts
+```ts title="Read-only tool annotations"
 await document.modelContext.registerTool({
   name: 'get-cart',
+  title: 'Get shopping cart',
   description: 'Get the current shopping cart contents',
   inputSchema: { type: 'object', properties: {} },
   annotations: {
     readOnlyHint: true,
-    idempotentHint: true,
+    untrustedContentHint: true,
   },
   async execute() {
     return { content: [{ type: 'text', text: JSON.stringify(getCart()) }] };
@@ -234,7 +245,10 @@ await document.modelContext.registerTool({
 });
 ```
 
-Available annotation fields: `title`, `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`. See the [`@mcp-b/webmcp-types` reference](/packages/webmcp-types/reference) for the full `ToolAnnotations` interface.
+The WebMCP draft standardizes `readOnlyHint` and `untrustedContentHint`.
+`title` is a top-level tool field. MCP-B runtimes also accept the MCP-specific
+`destructiveHint`, `idempotentHint`, and `openWorldHint` annotations for MCP
+clients. Annotations are planning hints, not authorization checks.
 
 ## Verify tools are registered
 

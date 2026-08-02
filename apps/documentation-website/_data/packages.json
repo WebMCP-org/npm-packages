@@ -69,13 +69,13 @@
     "packageName": "@mcp-b/mcp-iframe",
     "sidebarLabel": "mcp-iframe",
     "category": "Core runtime",
-    "summary": "Custom element that exposes tools, prompts, and resources from an iframe to its parent page.",
+    "summary": "Custom element that connects to an iframe MCP server and mirrors its tools, prompts, and resources onto the parent context.",
     "installCommand": "npm install @mcp-b/mcp-iframe",
     "overviewPath": "/packages/mcp-iframe/overview",
     "referencePath": "/packages/mcp-iframe/reference",
     "quickstartSnippet": "packages/mcp-iframe-quickstart.html",
     "sourcePackagePath": "packages/mcp-iframe",
-    "note": "The iframe content must already expose document.modelContext through @mcp-b/global or another compatible implementation.",
+    "note": "The iframe must run an MCP server over IframeChildTransport. @mcp-b/global supplies the child server and transport automatically; configure iframeServer.allowedOrigins for the parent.",
     "skill": {
       "name": "mcp-iframe",
       "description": "Use when bridging MCP tools, prompts, or resources from an iframe to its parent page using the <mcp-iframe> custom element. Covers attributes, events, name prefixing, lifecycle, and programmatic registration."

@@ -124,7 +124,7 @@ syncNativeTools(): Promise<void>
 
 Reconciles the adapter with tools already visible through `native.getTools()`. Backfill requires the native context's optional descriptor-based `executeTool()` extension. Later native `toolchange` events reconcile additions, metadata changes, and removals.
 
-Use Chrome's [Model Context Tool Inspector](https://chromewebstore.google.com/detail/model-context-tool-inspec/gbpdfapgefenggkahomfgkhfehlcenpd) to inspect native and mirrored tools.
+Use the [Model Context Tool Inspector](https://chromewebstore.google.com/detail/webmcp-model-context-tool/gbpdfapgefenggkahomfgkhfehlcenpd) recommended by Chrome's WebMCP documentation to inspect native and mirrored tools.
 
 ### `registerResource(descriptor)`
 
@@ -134,6 +134,16 @@ registerResource(descriptor: ResourceDescriptor): RegistrationHandle
 
 Registers a fixed URI or URI template with the composed `McpServer`. The returned handle removes the registration through `unregister()`.
 
+| Field         | Type                                                            | Required |
+| ------------- | --------------------------------------------------------------- | -------- |
+| `uri`         | `string`                                                        | Yes      |
+| `name`        | `string`                                                        | Yes      |
+| `description` | `string`                                                        | No       |
+| `mimeType`    | `string`                                                        | No       |
+| `read`        | `(uri: URL, params?: Variables) => Promise<ReadResourceResult>` | Yes      |
+
+A URI containing `{` registers a `ResourceTemplate`; its variables are passed to `read` as `params`. Other URIs register fixed resources.
+
 ### `registerPrompt(descriptor)`
 
 ```ts "Register prompt signature"
@@ -141,6 +151,13 @@ registerPrompt(descriptor: PromptDescriptor): RegistrationHandle
 ```
 
 Registers a prompt with the composed `McpServer`. The returned handle removes the registration through `unregister()`.
+
+| Field         | Type                                                         | Required |
+| ------------- | ------------------------------------------------------------ | -------- |
+| `name`        | `string`                                                     | Yes      |
+| `description` | `string`                                                     | No       |
+| `argsSchema`  | `InputSchema`                                                | No       |
+| `get`         | `(args: Record<string, string>) => Promise<GetPromptResult>` | Yes      |
 
 Prompt and resource discovery and invocation use MCP. Connect an MCP client; `BrowserMcpServer` does not duplicate the official list, read, or get methods. See [Register prompts and resources](/how-to/register-prompts-and-resources) for usage.
 
@@ -164,7 +181,7 @@ Stops native reconciliation, aborts native mirrors, removes registrations, and c
 
 ## Schema boundary
 
-The browser-facing API accepts JSON Schema and Standard Schema inputs. The adapter converts them to the MCP v2 schema contract, while `McpServer` owns MCP-call validation. Direct upstream registrations support Zod 4.2 or newer and the official `fromJsonSchema` helper; Zod 3 is unsupported.
+The browser-facing tool API accepts JSON Schema and Standard Schema inputs. The adapter converts tool input schemas to the MCP v2 contract, while `McpServer` owns MCP-call validation. `PromptDescriptor.argsSchema` accepts `InputSchema`. Direct upstream registrations support Zod 4.2 or newer and the official `fromJsonSchema` helper; Zod 3 is unsupported.
 
 MCP requires object-root tool input schemas. An array-root WebMCP tool remains available through WebMCP but is omitted from MCP discovery with a warning.
 

@@ -1,6 +1,6 @@
 ---
 title: 'Bridge tools across iframes'
-description: 'Surface child-frame WebMCP tools in a parent page using the mcp-iframe custom element with automatic namespacing and routing.'
+description: 'Connect a child-frame MCP server to its parent with the mcp-iframe custom element.'
 keywords:
   [
     'mcp-iframe',
@@ -14,157 +14,145 @@ keywords:
 icon: 'object-group'
 ---
 
-This guide shows you how to expose tools, resources, and prompts registered inside an iframe to the parent page's `document.modelContext` using the `<mcp-iframe>` custom element.
+This guide uses `<mcp-iframe>` to connect a parent-side MCP client to an MCP
+server in a child frame. The element republishes the child's tools on the
+parent's `document.modelContext` and, when the parent provides MCP-B extensions,
+also republishes prompts and resources.
+
+<Note>
+  Native cross-document discovery is a separate browser mechanism. The parent delegates the
+  `tools` feature with `<iframe allow="tools">`, the child registers a tool with
+  `exposedTo`, and the parent discovers it with `getTools({ fromOrigins })`. That path does not use
+  MCP transports, add MCP-B name prefixes, or bridge prompts and resources.
+</Note>
 
 ## Prerequisites
 
-- The parent page must expose `document.modelContext`. Bridging resources or prompts requires the MCP-B extensions from `@mcp-b/global`.
-- The iframe page must expose its MCP server and register items on `document.modelContext`.
+- You control the parent and child applications.
+- The parent exposes `document.modelContext`. Use `@mcp-b/global` when you also
+  need prompts and resources.
+- The child runs an MCP server connected to `IframeChildTransport`.
+  `@mcp-b/global` supplies both pieces automatically when it runs inside an
+  iframe. A standalone `document.modelContext` implementation is not enough for
+  the MCP-B bridge.
 
-## Install the package
+## Install the packages
 
-```bash
-npm install @mcp-b/mcp-iframe
+Install `@mcp-b/global` in the child application. Install both packages in the
+parent application:
+
+```bash title="Install iframe bridge packages"
+npm install @mcp-b/global @mcp-b/mcp-iframe
 ```
 
-## Add the custom element to the parent page
+<Steps>
 
-Replace a standard `<iframe>` with `<mcp-iframe>`. Set the `id` attribute to control the tool name prefix.
+<Step title="Configure the child MCP server">
 
-```html
-<mcp-iframe src="./child-app.html" id="my-app"></mcp-iframe>
+Configure the parent origin before importing `@mcp-b/global` in the child page:
 
+```html title="child-app.html"
 <script type="module">
-  import '@mcp-b/mcp-iframe';
+  window.__webModelContextOptions = {
+    transport: {
+      iframeServer: {
+        allowedOrigins: ['https://parent.example'],
+      },
+    },
+  };
 
-  const el = document.querySelector('mcp-iframe');
-  el.addEventListener('mcp-iframe-ready', (e) => {
-    console.log('Exposed tools:', e.detail.tools);
-    // e.g. ["my-app_calculate", "my-app_get_data"]
+  await import('@mcp-b/global');
+
+  await document.modelContext.registerTool({
+    name: 'calculate',
+    description: 'Add two numbers',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        a: { type: 'number' },
+        b: { type: 'number' },
+      },
+      required: ['a', 'b'],
+    },
+    execute: ({ a, b }) => ({
+      content: [{ type: 'text', text: String(a + b) }],
+    }),
   });
 </script>
 ```
 
-A tool named `calculate` in the iframe appears on the parent as `my-app_calculate`. This namespacing prevents collisions when multiple iframes register tools with the same name.
+Inside an iframe, `@mcp-b/global` creates an MCP server, connects it through
+`IframeChildTransport`, and continues to let application code use
+`document.modelContext` normally. Set `allowedOrigins` to the exact parent
+origins. Its convenience default is `['*']`, which accepts every parent origin.
 
-Importing `@mcp-b/mcp-iframe` auto-registers the default `<mcp-iframe>` tag.
+</Step>
 
-## Register a custom tag
+<Step title="Add the bridge to the parent">
 
-To use another tag name without registering `<mcp-iframe>`, import the side-effect-free entry point:
+Use the same child origin for `src` and `target-origin`. The `id` becomes the
+parent-side item prefix:
 
-```typescript
-import { registerMCPIframeElement } from '@mcp-b/mcp-iframe/element';
-
-registerMCPIframeElement('partner-tools-frame');
-```
-
-## Understand namespacing
-
-The prefix is built from the element's `id` (or `name` attribute, or `"iframe"` as fallback) plus a separator character.
-
-| Child tool name | Element `id` | Parent tool name   |
-| --------------- | ------------ | ------------------ |
-| `calculate`     | `my-app`     | `my-app_calculate` |
-| `search`        | `widget`     | `widget_search`    |
-| `greet`         | (none)       | `iframe_greet`     |
-
-The element preserves letters, numbers, underscores, dots, and hyphens in the prefix. It replaces other characters in the `id`, `name`, or separator with underscores.
-
-To change the separator character, set the `prefix-separator` attribute:
-
-```html
-<mcp-iframe src="./child.html" id="app" prefix-separator="-"></mcp-iframe>
-<!-- Child tool "search" becomes "app-search" -->
-```
-
-## Configure the element
-
-| Attribute          | Description                                                   | Default             |
-| ------------------ | ------------------------------------------------------------- | ------------------- |
-| `src`              | URL of the iframe page (omit when using `srcdoc`)             | —                   |
-| `id`               | Used as the tool and prompt name prefix                       | `"iframe"`          |
-| `target-origin`    | Override the `postMessage` target origin                      | Inferred from `src` |
-| `channel`          | Channel ID for the transport                                  | `mcp-iframe`        |
-| `call-timeout`     | Timeout in ms for tool calls, resource reads, and prompt gets | `30000`             |
-| `prefix-separator` | Separator between the prefix and item name                    | `_`                 |
-
-Standard iframe attributes (`sandbox`, `allow`, `width`, `height`) are mirrored to the internal iframe.
-
-`call-timeout` accepts a positive integer. Invalid values fall back to `30000`.
-
-## Listen for events
-
-| Event                      | Detail                          | When                                           |
-| -------------------------- | ------------------------------- | ---------------------------------------------- |
-| `mcp-iframe-ready`         | `{ tools, resources, prompts }` | Connected to the iframe's MCP server           |
-| `mcp-iframe-error`         | `{ error }`                     | Connection or item refresh failed              |
-| `mcp-iframe-items-changed` | `{ tools, resources, prompts }` | After an advertised list change or `refresh()` |
-
-## Refresh items manually
-
-The element automatically mirrors list changes advertised by the child MCP server. If the child changes its items without sending a supported `list_changed` notification, call `refresh()`:
-
-```javascript
-const el = document.querySelector('mcp-iframe');
-await el.refresh();
-// Fires "mcp-iframe-items-changed" with the updated item lists
-```
-
-## Bridge multiple iframes
-
-Use a distinct `id` for each `<mcp-iframe>` to keep tool names unique:
-
-```html
-<mcp-iframe src="./calculator.html" id="calc"></mcp-iframe>
-<mcp-iframe src="./search.html" id="search"></mcp-iframe>
-```
-
-The parent page now sees tools like `calc_add`, `calc_multiply`, `search_query`, and `search_filter`.
-
-## Verify tools surface in the parent
-
-Use the browser console to inspect registered tools:
-
-```javascript
-const el = document.querySelector('mcp-iframe');
-console.log('Ready:', el.ready);
-console.log('Exposed tools:', el.exposedTools);
-console.log('Exposed resources:', el.exposedResources);
-console.log('Exposed prompts:', el.exposedPrompts);
-```
-
-If you have `@mcp-b/global` installed on the parent, you can also list tools through the standard API:
-
-```javascript
-const tools = await document.modelContext.getTools();
-console.log(tools);
-```
-
-## Handle cross-origin iframes
-
-For iframes served from a different domain, set `target-origin` explicitly:
-
-```html
+```html title="parent.html"
 <mcp-iframe
-  src="https://external-app.com/widget"
-  id="external"
-  target-origin="https://external-app.com"
+  src="https://child.example/app"
+  id="calculator"
+  target-origin="https://child.example"
+  allow="tools"
 ></mcp-iframe>
+
+<script type="module">
+  window.__webModelContextOptions = {
+    transport: {
+      tabServer: { allowedOrigins: [window.location.origin] },
+    },
+  };
+
+  await import('@mcp-b/global');
+  await import('@mcp-b/mcp-iframe');
+
+  const frame = document.querySelector('mcp-iframe');
+  frame.addEventListener('mcp-iframe-ready', (event) => {
+    console.log('Bridged tools:', event.detail.tools);
+  });
+</script>
 ```
 
-The iframe page must also allow the parent's origin in its transport configuration. If you control the iframe app, ensure `@mcp-b/global` is loaded with appropriate origin settings.
+The child tool `calculate` is registered on the parent as
+`calculator_calculate`. `target-origin` restricts messages sent by the parent;
+the child's `allowedOrigins` independently restricts messages it accepts.
 
-If `sandbox` omits `allow-same-origin`, or the iframe source otherwise has an opaque origin, set `target-origin="*"`:
+The `allow="tools"` attribute delegates the native WebMCP feature to a
+cross-origin child. It does not create or authorize the MCP-B transport.
 
-```html
-<mcp-iframe src="./child-app.html" sandbox="allow-scripts" target-origin="*"></mcp-iframe>
+</Step>
+
+<Step title="Verify the parent tool">
+
+After `mcp-iframe-ready` fires, inspect the parent context:
+
+```javascript title="List parent tools"
+const tools = await document.modelContext.getTools();
+console.log(tools.find((tool) => tool.name === 'calculator_calculate'));
 ```
 
-Use `"*"` only for opaque origins because it disables target-origin validation for messages sent to the iframe.
+Use a different `id` for every `<mcp-iframe>` so bridged names remain unique.
+The element refreshes its registrations when the child advertises supported
+`list_changed` notifications.
+
+</Step>
+
+</Steps>
+
+<Warning>
+  Opaque iframe origins require `target-origin="*"`. That disables parent-side origin validation, so
+  prefer a non-opaque iframe and exact origins. Do not use a wildcard merely to work around an
+  origin mismatch.
+</Warning>
 
 ## Related pages
 
-- [mcp-iframe Reference](/packages/mcp-iframe/reference) for the full API surface
-- [Transports Reference](/packages/transports/reference) for the underlying `IframeParentTransport` and `IframeChildTransport`
-- [Transports and Bridges](/explanation/architecture/transports-and-bridges) for how iframe bridging fits into the architecture
+- [mcp-iframe reference](/packages/mcp-iframe/reference) for attributes, events, lifecycle, and programmatic registration
+- [Transports reference](/packages/transports/reference) for `IframeParentTransport` and `IframeChildTransport`
+- [WebMCP standard API](/reference/webmcp/standard-api) for native `exposedTo` and `fromOrigins`
+- [Transports and bridges](/explanation/architecture/transports-and-bridges) for the architectural boundary

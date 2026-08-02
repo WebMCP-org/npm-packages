@@ -77,13 +77,20 @@ Activation adds these globals:
 | `ontoolchange`                 | Event handler or `null`      |
 | EventTarget methods            | Inherited from `EventTarget` |
 
-`ModelContextRegisterToolOptions` contains optional `signal` and `exposedTo` fields. Aborting `signal` removes that registration.
+| Option type                            | Field         | Type           | Meaning                                      |
+| -------------------------------------- | ------------- | -------------- | -------------------------------------------- |
+| `ModelContextRegisterToolOptions`      | `signal`      | `AbortSignal?` | Owns the registration lifetime               |
+| `ModelContextRegisterToolOptions`      | `exposedTo`   | `string[]?`    | Requests exposure to descendant origins      |
+| `ModelContextGetToolOptions`           | `fromOrigins` | `string[]?`    | Requests tools exposed by descendant origins |
+| `ChromeModelContextExecuteToolOptions` | `signal`      | `AbortSignal?` | Aborts a Chromium descriptor execution       |
+
+Aborting the registration signal removes that registration.
 
 `RegisteredTool` contains `name`, optional `title`, `description`, optional serialized `inputSchema`, `window`, `origin`, and optional standard annotations.
 
 ### `ChromeModelContext`
 
-`ChromeModelContext` combines `ModelContext` with the optional Chromium `executeTool()` extension. Feature-detect that method before calling it.
+`ChromeModelContextExtensions` declares the optional Chromium `executeTool()` method. `ChromeModelContext` combines that extension with `ModelContext`. Feature-detect the method before calling it.
 
 ```ts "execute-chrome-tool.ts"
 import type { ChromeModelContext } from '@mcp-b/webmcp-types';
@@ -125,12 +132,17 @@ The MCP-B descriptor adds `outputSchema` and MCP annotations.
 | -------------- | ---------------------------------------- | -------- |
 | `name`         | `TName`                                  | Yes      |
 | `description`  | `string`                                 | Yes      |
+| `title`        | `string`                                 | No       |
 | `inputSchema`  | `InputSchema`                            | No       |
 | `outputSchema` | `JsonSchemaForInference`                 | No       |
 | `annotations`  | `ToolAnnotations`                        | No       |
 | `execute`      | `(args: TArgs) => MaybePromise<TResult>` | Yes      |
 
 `ToolDescriptorFromSchema<TInput, TOutput, TName>` infers callback input and output from literal schemas. `ToolListItem<TName>` describes the metadata returned by `listTools()`.
+
+### Annotation types
+
+`WebMcpToolAnnotations` contains the standard `readOnlyHint` and `untrustedContentHint` fields. `ToolAnnotations` combines those fields with the annotation contract from `@modelcontextprotocol/server` for MCP-B descriptors.
 
 ### Result types
 
@@ -180,6 +192,8 @@ That fallback applies to widened `InputSchema`, unknown compositions, and scalar
 | `ontoolchange`                           | Event handler or `null`         |
 
 New native integrations use `document.modelContext.getTools()` and feature-detect Chromium `executeTool()`.
+
+`ModelContextTestingToolInfo` contains `name`, `description`, and an optional serialized `inputSchema`.
 
 ## Public utility types
 

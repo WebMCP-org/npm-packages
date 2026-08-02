@@ -47,7 +47,7 @@ npm install @mcp-b/webmcp-polyfill usewebmcp
 
 Open `src/main.tsx` and add the polyfill initialization before `createRoot`:
 
-```tsx src/main.tsx
+```tsx title="src/main.tsx"
 import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -120,7 +120,7 @@ npm run dev
 
 Open `http://localhost:5173` in your browser. You should see:
 
-```
+```text title="Expected page"
 My First React WebMCP Tool
 Tool "say_hello" registered.
 Executions: 0
@@ -133,7 +133,7 @@ Last result: none
 
 Click the **Run Tool Locally** button. Notice the page updates:
 
-```
+```text title="Expected result"
 Executions: 1
 Last result: {"content":[{"type":"text","text":"Hello React!"}]}
 ```
@@ -180,64 +180,6 @@ Notice that the execution count in the UI also incremented, because the same und
 </Step>
 
 </Steps>
-
-## The complete files
-
-<CodeGroup>
-```tsx src/main.tsx
-import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
-import { StrictMode } from 'react';
-import { createRoot } from 'react-dom/client';
-import { App } from './App';
-
-initializeWebMCPPolyfill();
-
-createRoot(document.getElementById('root')!).render(
-
-<StrictMode>
-  <App />
-</StrictMode>
-); ```
-
-```tsx src/App.tsx
-import { useWebMCP } from 'usewebmcp';
-
-const INPUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    name: { type: 'string' },
-  },
-} as const;
-
-export function App() {
-  const helloTool = useWebMCP({
-    name: 'say_hello',
-    description: 'Returns a hello message',
-    inputSchema: INPUT_SCHEMA,
-    execute: async (args) => ({
-      content: [{ type: 'text', text: `Hello ${args?.name ?? 'world'}!` }],
-    }),
-  });
-
-  return (
-    <div>
-      <h1>My First React WebMCP Tool</h1>
-      <p>Tool "say_hello" registered.</p>
-      <p>Executions: {helloTool.state.executionCount}</p>
-      <p>
-        Last result:{' '}
-        {helloTool.state.lastResult ? JSON.stringify(helloTool.state.lastResult) : 'none'}
-      </p>
-      {helloTool.state.error && (
-        <p style={{ color: 'red' }}>Error: {helloTool.state.error.message}</p>
-      )}
-      <button onClick={() => helloTool.execute({ name: 'React' })}>Run Tool Locally</button>
-    </div>
-  );
-}
-```
-
-</CodeGroup>
 
 ## What you learned
 

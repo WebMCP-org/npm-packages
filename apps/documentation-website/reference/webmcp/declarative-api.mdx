@@ -8,23 +8,31 @@ icon: 'file-code'
 The declarative API explores how HTML workflows, especially forms, can become
 agent-readable tools while preserving browser validation and user review.
 
-```html
+```html title="Agent-readable search form"
 <form toolname="search_catalog" tooldescription="Search the product catalog">
   <label>
     Query
-    <input name="query" required />
+    <input name="query" toolparamdescription="Words to match in the catalog" required />
   </label>
   <button type="submit">Search</button>
 </form>
 ```
 
+| Surface                                 | Behavior                                                                             |
+| --------------------------------------- | ------------------------------------------------------------------------------------ |
+| Form without `toolautosubmit`           | The browser fills the form and waits for the user to submit it                       |
+| Form with `toolautosubmit`              | The browser submits the form when the agent invokes the tool                         |
+| `SubmitEvent.agentInvoked`              | Reports whether an agent initiated the submission                                    |
+| `SubmitEvent.respondWith(promise)`      | Returns the resolved value as tool output after the handler calls `preventDefault()` |
+| `toolactivated` and `toolcancel` events | Report when an agent operation is activated or canceled                              |
+
 The attribute names, schema synthesis rules, constraint mapping, submission
 behavior, and iframe model are still evolving. Use Chrome's
 [Declarative API docs](https://developer.chrome.com/docs/ai/webmcp/declarative-api),
-the [official explainer](https://github.com/webmachinelearning/webmcp/blob/main/docs/explainer.md),
-and the [declarative draft](https://github.com/webmachinelearning/webmcp/blob/main/docs/declarative.md)
+the [WebMCP proposal overview](https://github.com/webmachinelearning/webmcp/blob/main/README.md),
+and the [declarative explainer](https://github.com/webmachinelearning/webmcp/blob/main/declarative-api-explainer.md)
 as the current authorities. Do not treat this example as a stable compatibility
 contract.
 
-For production JavaScript integrations, use
+For imperative JavaScript registration, use
 [`document.modelContext.registerTool()`](/reference/webmcp/standard-api).

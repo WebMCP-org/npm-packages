@@ -16,11 +16,11 @@ Prompts and resources are MCP-B extension features, not part of the strict WebMC
 
 ## Initialize the runtime
 
-```bash
-npm install @mcp-b/global @mcp-b/webmcp-ts-sdk
+```bash title="Install packages"
+npm install @mcp-b/global @mcp-b/react-webmcp @mcp-b/webmcp-ts-sdk
 ```
 
-```typescript "main.ts"
+```typescript title="main.ts"
 import '@mcp-b/global';
 import { isBrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
 
@@ -36,8 +36,8 @@ A prompt is a reusable message template that AI clients can discover and invoke 
 
 <Steps>
   <Step title="Register the prompt">
-    ```typescript
-    const { unregister } = modelContext.registerPrompt({
+    ```typescript title="main.ts"
+    const promptRegistration = modelContext.registerPrompt({
       name: 'greeting',
       description: 'Generate a greeting message',
       argsSchema: {
@@ -56,8 +56,8 @@ A prompt is a reusable message template that AI clients can discover and invoke 
     ```
   </Step>
   <Step title="Unregister when done">
-    ```typescript
-    unregister();
+    ```typescript title="main.ts"
+    promptRegistration.unregister();
     ```
   </Step>
 </Steps>
@@ -66,7 +66,7 @@ A prompt is a reusable message template that AI clients can discover and invoke 
 
 Use the `useWebMCPPrompt` hook from `@mcp-b/react-webmcp`. It handles registration and cleanup on unmount.
 
-```tsx
+```tsx title="CodeReviewPrompt.tsx"
 import { useWebMCPPrompt } from '@mcp-b/react-webmcp';
 
 function CodeReviewPrompt() {
@@ -104,8 +104,10 @@ A resource exposes readable data (configuration, documents, state) to AI clients
 
 <Steps>
   <Step title="Register the resource">
-    ```typescript
-    const { unregister } = modelContext.registerResource({
+    ```typescript title="main.ts"
+    const appConfig = { theme: 'dark', language: 'en' };
+
+    const resourceRegistration = modelContext.registerResource({
       uri: 'app://config',
       name: 'App Configuration',
       description: 'Current application configuration',
@@ -115,10 +117,11 @@ A resource exposes readable data (configuration, documents, state) to AI clients
       })
     });
     ```
+
   </Step>
   <Step title="Unregister when done">
-    ```typescript
-    unregister();
+    ```typescript title="main.ts"
+    resourceRegistration.unregister();
     ```
   </Step>
 </Steps>
@@ -127,7 +130,7 @@ A resource exposes readable data (configuration, documents, state) to AI clients
 
 Use the `useWebMCPResource` hook from `@mcp-b/react-webmcp`.
 
-```tsx
+```tsx title="AppSettingsResource.tsx"
 import { useWebMCPResource } from '@mcp-b/react-webmcp';
 
 function AppSettingsResource() {

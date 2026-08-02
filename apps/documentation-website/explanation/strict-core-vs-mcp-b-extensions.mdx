@@ -6,9 +6,11 @@ icon: 'diagram-venn'
 ---
 
 The standards-owned WebMCP core publishes tools through
-`document.modelContext`. Keeping that core small makes it portable across
-native browser implementations, strict polyfills, and libraries that only need
-to expose tools.
+`document.modelContext`: `registerTool()`, `getTools()`, and `ontoolchange`.
+Keeping that core small makes it portable across native browser
+implementations, strict polyfills, and libraries that only need to expose
+tools. Chrome's optional `executeTool()` method is an implementation extension,
+not part of this core.
 
 `@mcp-b/webmcp-types`, `@mcp-b/webmcp-polyfill`, and `usewebmcp` stay close to
 this portable surface.
@@ -18,13 +20,15 @@ and a composed official MCP server. `BrowserMcpServer`, `@mcp-b/global`, and
 related packages own these additions. They are not standard WebMCP methods.
 
 The composed server is available through `BrowserMcpServer.mcpServer`.
-Protocol-version-specific SDK features, including legacy sampling and
-elicitation requests, stay behind that boundary. They are not methods on
+Protocol-version-specific SDK features, including elicitation and deprecated
+sampling, stay behind that boundary. They are not methods on
 `document.modelContext` or direct `BrowserMcpServer` helpers.
 
 Libraries and sites that only publish tools should target the strict core.
-Applications that require iframe, extension, relay, desktop-client, prompt, or
-resource integration require the MCP-B extension layer.
+The standard can expose tools across a document tree with permissions and
+origin controls. Applications that also need namespaced iframe routing,
+prompts, resources, relays, desktop clients, or full MCP transport use the MCP-B
+extension layer.
 This boundary preserves runtime portability.
 
 Use [Choose a runtime](/how-to/choose-runtime) for package selection.

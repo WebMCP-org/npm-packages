@@ -21,24 +21,32 @@ Use `chrome-devtools-mcp@latest` directly; the WebMCP changes from the former fo
 
 Add the server to your MCP client configuration and enable its experimental WebMCP category:
 
-```json
+```json title="MCP client configuration"
 {
   "mcpServers": {
     "chrome-devtools": {
       "command": "npx",
-      "args": ["-y", "chrome-devtools-mcp@latest", "--category-experimental-webmcp"]
+      "args": [
+        "-y",
+        "chrome-devtools-mcp@latest",
+        "--category-experimental-webmcp",
+        "--chrome-arg=--enable-features=WebMCP"
+      ]
     }
   }
 }
 ```
 
-The upstream WebMCP category currently requires Chrome 149 or newer. When the server launches Chrome, it enables the required WebMCP testing and DevTools features. The server launches Chrome when the agent first uses a browser tool; connecting to the MCP server alone does not start it.
+The upstream WebMCP category currently requires Chrome 150 or newer with the
+`WebMCP` feature enabled. The configuration above passes the required browser
+flag. The server launches Chrome when the agent first uses a browser tool;
+connecting to the MCP server alone does not start it.
 
 ## Test the connection
 
 Enter this prompt in your MCP client:
 
-```
+```text title="Prompt"
 Navigate to https://webmcp.sh and take a screenshot
 ```
 
@@ -46,14 +54,17 @@ Your agent should open Chrome, navigate to the page, and return a screenshot. Th
 
 ## Discover WebMCP tools on a page
 
-When a webpage has `@mcp-b/global` installed, the server detects its tools through the Chrome DevTools Protocol. The upstream server exposes two WebMCP tools:
+The server detects Chrome's native WebMCP registry through the Chrome DevTools
+Protocol. MCP-B tools appear when `@mcp-b/global` adopts and mirrors that native
+context; a standalone JavaScript polyfill is not a DevTools discovery source.
+The upstream server exposes two WebMCP tools:
 
 - `list_webmcp_tools` lists the tools exposed by the current page.
 - `execute_webmcp_tool` executes one listed tool with JSON-stringified input.
 
 Ask your agent:
 
-```
+```text title="Prompt"
 Navigate to https://webmcp.sh, call list_webmcp_tools, and show me the available tools.
 ```
 
@@ -66,7 +77,7 @@ Navigate to https://webmcp.sh, call list_webmcp_tools, and show me the available
 
 Then ask it to execute a listed tool:
 
-```
+```text title="Prompt"
 Use execute_webmcp_tool to call sql_query with this query:
 SELECT name, category, importance_score
 FROM memory_entities
@@ -94,44 +105,20 @@ The most powerful use case is building WebMCP tools with your AI agent in a tigh
 
 <Steps>
   <Step title="Ask your agent to create a tool">
-    ```
-    Create a WebMCP tool called "search_products" that searches our product catalog
+    ```text title="Prompt"
+    Wrap our existing product-search function in a WebMCP tool named "search_products"
     ```
   </Step>
-  <Step title="The agent writes the code in your app">
-    ```typescript
-    import '@mcp-b/global';
-
-    await document.modelContext.registerTool({
-      name: 'search_products',
-      description: 'Search for products by name or category',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          query: { type: 'string' },
-          category: { type: 'string' }
-        },
-        required: ['query']
-      },
-      async execute({ query, category }) {
-        const results = await searchProducts(query, category);
-        return {
-          content: [{ type: 'text', text: JSON.stringify(results) }]
-        };
-      }
-    });
-    ```
-
-  </Step>
-  <Step title="Your dev server hot-reloads the change">
+  <Step title="Let the dev server reload the change">
+    Wait for the app's normal hot reload to finish.
   </Step>
   <Step title="The agent discovers the new tool">
-    ```
+    ```text title="Prompt"
     Navigate to http://localhost:3000 and call list_webmcp_tools
     ```
   </Step>
   <Step title="The agent tests the tool">
-    ```
+    ```text title="Prompt"
     Call execute_webmcp_tool with toolName=search_products and input={"query":"headphones"}
     ```
   </Step>
@@ -144,7 +131,8 @@ The most powerful use case is building WebMCP tools with your AI agent in a tigh
 
 By default, the server launches its own Chrome with a dedicated profile. This is the simplest way to use the experimental WebMCP category because the server supplies the required feature flags.
 
-If you attach to an existing Chrome session, launch that browser with `--enable-features=WebMCPTesting,DevToolsWebMCPSupport` first.
+If you attach to an existing Chrome session, launch that browser with
+`--enable-features=WebMCP` first.
 
 ### Auto-connect (Chrome 144+)
 
@@ -153,7 +141,7 @@ If you attach to an existing Chrome session, launch that browser with `--enable-
     Navigate to `chrome://inspect/#remote-debugging` and follow the dialog to allow debugging connections.
   </Step>
   <Step title="Use the autoConnect flag">
-    ```json
+    ```json title="MCP client configuration"
     {
       "mcpServers": {
         "chrome-devtools": {
@@ -175,7 +163,7 @@ If you attach to an existing Chrome session, launch that browser with `--enable-
 
 <Steps>
   <Step title="Configure the MCP server with a browser URL">
-    ```json
+    ```json title="MCP client configuration"
     {
       "mcpServers": {
         "chrome-devtools": {
@@ -196,20 +184,20 @@ If you attach to an existing Chrome session, launch that browser with `--enable-
     ```bash "macOS"
     /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
       --remote-debugging-port=9222 \
-      --enable-features=WebMCPTesting,DevToolsWebMCPSupport \
+      --enable-features=WebMCP \
       --user-data-dir=/tmp/chrome-profile-stable
     ```
 
     ```bash "Linux"
     google-chrome --remote-debugging-port=9222 \
-      --enable-features=WebMCPTesting,DevToolsWebMCPSupport \
+      --enable-features=WebMCP \
       --user-data-dir=/tmp/chrome-profile-stable
     ```
 
     ```bash "Windows"
     "C:\Program Files\Google\Chrome\Application\chrome.exe" ^
       --remote-debugging-port=9222 ^
-      --enable-features=WebMCPTesting,DevToolsWebMCPSupport ^
+      --enable-features=WebMCP ^
       --user-data-dir="%TEMP%\chrome-profile-stable"
     ```
     </CodeGroup>
@@ -225,7 +213,7 @@ If you attach to an existing Chrome session, launch that browser with `--enable-
 
 Pass options through the `args` array in your MCP client config:
 
-```json
+```json title="MCP client configuration"
 {
   "mcpServers": {
     "chrome-devtools": {
@@ -234,6 +222,7 @@ Pass options through the `args` array in your MCP client config:
         "-y",
         "chrome-devtools-mcp@latest",
         "--category-experimental-webmcp",
+        "--chrome-arg=--enable-features=WebMCP",
         "--channel=canary",
         "--headless=true",
         "--isolated=true"
@@ -243,29 +232,30 @@ Pass options through the `args` array in your MCP client config:
 }
 ```
 
-| Option                           | What it does                                      |
-| -------------------------------- | ------------------------------------------------- |
-| `--category-experimental-webmcp` | Enable upstream WebMCP discovery and execution    |
-| `--channel`                      | Chrome channel: `stable`, `canary`, `beta`, `dev` |
-| `--headless`                     | Run without a visible browser window              |
-| `--isolated`                     | Use a temporary profile, cleaned up on close      |
-| `--viewport`                     | Initial viewport size (e.g. `1280x720`)           |
-| `--executablePath`               | Path to a custom Chrome binary                    |
+| Option                           | What it does                                                         |
+| -------------------------------- | -------------------------------------------------------------------- |
+| `--category-experimental-webmcp` | Enable upstream WebMCP discovery and execution                       |
+| `--chrome-arg`                   | Pass a feature or launch argument to a browser started by the server |
+| `--channel`                      | Chrome channel: `stable`, `canary`, `beta`, `dev`                    |
+| `--headless`                     | Run without a visible browser window                                 |
+| `--isolated`                     | Use a temporary profile, cleaned up on close                         |
+| `--viewport`                     | Initial viewport size (e.g. `1280x720`)                              |
+| `--executablePath`               | Path to a custom Chrome binary                                       |
 
 For the full list of options, see the upstream [Chrome DevTools MCP repository](https://github.com/ChromeDevTools/chrome-devtools-mcp).
 
 ## Troubleshoot common issues
 
-| Problem                           | Fix                                                                                                                                      |
-| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| WebMCP tools are unavailable      | Add `--category-experimental-webmcp` and use Chrome 149 or newer                                                                         |
-| "WebMCP not detected"             | Confirm the page exposes `document.modelContext` and has registered at least one tool                                                    |
-| Tool call fails                   | Check the schema from `list_webmcp_tools`; pass JSON-stringified input to `execute_webmcp_tool`                                          |
-| Tools missing after navigation    | Call `list_webmcp_tools` again for the current page                                                                                      |
-| Browser does not start in sandbox | Some MCP clients sandbox the server process. Disable sandboxing for this server, or use `--browser-url` to connect to an external Chrome |
+| Problem                           | Fix                                                                                                                                       |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| WebMCP tools are unavailable      | Add the WebMCP category and `--chrome-arg=--enable-features=WebMCP`, or enable `WebMCP` when attaching to an existing Chrome 150+ browser |
+| "WebMCP not detected"             | Confirm the page exposes `document.modelContext` and has registered at least one tool                                                     |
+| Tool call fails                   | Check the schema from `list_webmcp_tools`; pass JSON-stringified input to `execute_webmcp_tool`                                           |
+| Tools missing after navigation    | Call `list_webmcp_tools` again for the current page                                                                                       |
+| Browser does not start in sandbox | Some MCP clients sandbox the server process. Disable sandboxing for this server, or use `--browser-url` to connect to an external Chrome  |
 
 ## Related pages
 
 - [ChromeDevTools/chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp) for the full upstream tool list and CLI options
-- [Connect Desktop Agents with the Local Relay](/how-to/connect-desktop-agents-with-local-relay) for an alternative approach that works with any website
+- [Connect desktop agents with the local relay](/how-to/connect-desktop-agents-with-local-relay) for an explicit page-to-desktop bridge
 - [Debug and Troubleshoot](/how-to/debug-and-troubleshoot) for general debugging strategies

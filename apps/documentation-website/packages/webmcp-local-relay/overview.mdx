@@ -20,7 +20,9 @@ icon: 'satellite-dish'
 
 ## Where it sits in the package graph
 
-This package is adjacent to the runtime stack rather than inside it. Pages still need to expose WebMCP tools, usually through [`@mcp-b/global`](/packages/global/overview) or the embed script, and the relay forwards those tools to desktop clients.
+This package is adjacent to the runtime stack rather than inside it. Pages need a WebMCP runtime,
+usually [`@mcp-b/global`](/packages/global/overview), to expose tools on `document.modelContext`. They
+load `embed.js` separately to bridge those existing tools to the relay.
 
 ## First step
 

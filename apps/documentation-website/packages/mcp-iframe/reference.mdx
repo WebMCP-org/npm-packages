@@ -14,15 +14,51 @@ keywords:
 icon: 'frame'
 ---
 
-A Web Component that wraps an iframe and bridges its MCP tools, resources, and prompts to the parent page's `document.modelContext`. Tool and prompt names include the element's `id`. Resource URIs use an `mcp-iframe:` wrapper URI.
+A Web Component that connects to an MCP server inside an iframe and republishes
+its tools on the parent page's `document.modelContext`. With MCP-B extensions on
+the parent, it also republishes resources and prompts. Tool and prompt names
+include the element's `id`; resource URIs use an `mcp-iframe:` wrapper URI.
 
 ## Installation
 
-```bash
+```bash title="Install mcp-iframe"
 pnpm add @mcp-b/mcp-iframe
 ```
 
-The iframe page must have `@mcp-b/global` (or any `document.modelContext` implementation) installed.
+## Child server requirement
+
+The iframe must run an MCP server connected to `IframeChildTransport`. Merely
+installing a `document.modelContext` implementation in the child does not expose
+an MCP endpoint to the parent element.
+
+`@mcp-b/global` supplies the server and selects `IframeChildTransport`
+automatically when it runs in an iframe. Configure the parent origins before
+importing it:
+
+```html title="Child runtime configuration"
+<script type="module">
+  window.__webModelContextOptions = {
+    transport: {
+      iframeServer: {
+        allowedOrigins: ['https://parent.example'],
+      },
+    },
+  };
+
+  await import('@mcp-b/global');
+</script>
+```
+
+`IframeChildTransport` requires a non-empty `allowedOrigins` list. The global
+runtime defaults it to `['*']` when omitted; use exact parent origins in
+production. A manually created MCP server can instead connect to
+`IframeChildTransport` directly.
+
+<Note>
+  Native cross-document WebMCP does not require this package. It uses iframe `allow="tools"`,
+  child-side `exposedTo`, and parent-side `getTools({fromOrigins})`. Those browser controls are
+  independent of the MCP transport's `target-origin` and `allowedOrigins`.
+</Note>
 
 ## Minimal example
 
@@ -49,6 +85,10 @@ The iframe page must have `@mcp-b/global` (or any `document.modelContext` implem
 | `prefix-separator` | `string` | `"_"`               | Separator between the prefix and the item name. Must contain only `[a-zA-Z0-9_.-]` characters.                            |
 
 Standard iframe attributes (`sandbox`, `allow`, `width`, `height`, `loading`, `referrerpolicy`, `name`, `srcdoc`, `allowfullscreen`, `credentialless`) are mirrored to the internal `<iframe>` element.
+
+For cross-origin children that use the native WebMCP API, set `allow="tools"`
+to delegate that browser feature. The attribute does not establish or authorize
+the MCP-B bridge.
 
 Sandboxed iframes without `allow-same-origin`, and sources whose URL origin is `null`, have opaque origins. Set `target-origin="*"` for those sources. Other sources use the explicit attribute or the origin inferred from `src`.
 
@@ -115,7 +155,7 @@ If fetching or parent registration fails, `refresh()` rejects after emitting `mc
 
 To register the custom element with a different tag name:
 
-```typescript
+```typescript title="Register a custom element name"
 import { registerMCPIframeElement } from '@mcp-b/mcp-iframe/element';
 
 registerMCPIframeElement('my-mcp-frame');
@@ -143,4 +183,6 @@ Changing `src`, `srcdoc`, `target-origin`, or `channel` while connected triggers
 
 - [Bridge tools across iframes](/how-to/bridge-tools-across-iframes) for a step-by-step guide
 - [@mcp-b/transports](/packages/transports/reference) for the underlying `IframeParentTransport` and `IframeChildTransport`
+- [@mcp-b/global](/packages/global/reference) for child transport configuration
+- [WebMCP standard API](/reference/webmcp/standard-api) for native cross-document discovery
 - [Transports and bridges](/explanation/architecture/transports-and-bridges) for the architectural context

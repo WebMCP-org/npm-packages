@@ -17,7 +17,7 @@ icon: 'plug'
 
 In this tutorial, we will set up a web page with a WebMCP tool, run the local relay, and connect a desktop MCP client so the AI agent can discover and call the tool. By the end, you will have a working pipeline from a browser tab to Claude Desktop (or any MCP client).
 
-```
+```text title="Relay path"
  Browser Tab                          Local Machine
 +-----------------------+            +-----------------------+
 |                       |  WebSocket |                       |
@@ -90,12 +90,7 @@ Create a file called `relay-demo.html`:
 </html>
 ```
 
-The first script tag loads `@mcp-b/global`, which sets up `document.modelContext`. The tool registration is the same pattern from the [first tool tutorial](/tutorials/first-tool). The last script tag loads `embed.js`, which creates a hidden iframe that connects the page's tools to the local relay via WebSocket.
-
-<Note>
-  The `embed.js` script must appear after your tools are registered, so the relay can discover them
-  on connection.
-</Note>
+The first script tag loads `@mcp-b/global`, which sets up `document.modelContext`. The tool registration is the same pattern from the [first tool tutorial](/tutorials/first-tool). The last script tag loads `embed.js`, which creates a hidden iframe that connects the page's tools to the local relay via WebSocket. The embed also detects tools registered later, so the script order is not a discovery requirement.
 
 </Step>
 
@@ -144,13 +139,21 @@ Add the relay to your MCP client's configuration. The exact location depends on 
   </Tab>
 </Tabs>
 
-When the MCP client starts, it launches the relay process. The relay listens for WebSocket connections from browser pages on `ws://127.0.0.1:9333`.
+When the MCP client starts, it launches the relay process. The relay prefers
+`ws://127.0.0.1:9333` and can discover another relay port automatically if that port is occupied.
 
 </Step>
 
-<Step title="Open the page">
+<Step title="Serve and open the page">
 
-Open `relay-demo.html` in your browser. You can open the file directly, or serve it from a local server if you prefer.
+From the directory containing `relay-demo.html`, start a local server:
+
+```bash
+npx --yes serve . --listen 3000
+```
+
+Open `http://localhost:3000/relay-demo.html` in your browser.
+Serving the page over localhost gives it a non-opaque origin that the WebMCP execution path can use.
 
 The page registers the tool and the `embed.js` script connects to the relay via WebSocket (see [Transports and Bridges](/explanation/architecture/transports-and-bridges) for details). The relay now knows about the `get_page_title` tool on this tab.
 
@@ -164,16 +167,22 @@ In your MCP client, the relay exposes management tools. Ask the agent:
 
 The agent calls `webmcp_list_sources`, which returns something like:
 
-```json
-[
-  {
-    "tabId": "abc123",
-    "origin": "file://",
-    "url": "file:///path/to/relay-demo.html",
-    "title": "Relay Demo Page",
-    "toolCount": 1
-  }
-]
+```json title="Source inventory"
+{
+  "count": 1,
+  "sources": [
+    {
+      "sourceId": "abc123",
+      "tabId": "relay-demo",
+      "origin": "http://localhost:3000",
+      "url": "http://localhost:3000/relay-demo.html",
+      "title": "Relay Demo Page",
+      "connectedAt": 1785686400000,
+      "lastSeenAt": 1785686401000,
+      "toolCount": 1
+    }
+  ]
+}
 ```
 
 Your browser tab is connected.
@@ -188,7 +197,7 @@ Ask the agent:
 
 The agent calls the `get_page_title` tool and returns:
 
-```
+```text title="Expected response"
 Relay Demo Page
 ```
 

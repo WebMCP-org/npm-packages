@@ -14,11 +14,15 @@ keywords:
 icon: 'network-wired'
 ---
 
-Browser transport implementations for the Model Context Protocol. Each transport class implements the MCP `Transport` interface and handles JSON-RPC 2.0 message serialization, origin validation, and connection lifecycle.
+Browser transport implementations for the Model Context Protocol. Each class
+implements the MCP `Transport` interface and handles JSON-RPC message parsing
+and connection lifecycle. The `postMessage` transports validate configured
+origins; extension transports operate on Chrome `runtime.Port` objects accepted
+by application code.
 
 ## Installation
 
-```bash
+```bash title="Install transports"
 pnpm add @mcp-b/transports @modelcontextprotocol/server
 ```
 
@@ -30,24 +34,25 @@ Install `@modelcontextprotocol/client` when you use a client transport.
 
 ## Which transport to use
 
-| Scenario                | Server                                         | Client                                          |
-| ----------------------- | ---------------------------------------------- | ----------------------------------------------- |
-| Same-page communication | `TabServerTransport`                           | `TabClientTransport`                            |
-| Parent page to iframe   | `IframeChildTransport` (in iframe)             | `IframeParentTransport` (in parent)             |
-| Extension to webpage    | `ExtensionServerTransport` (in background)     | `ExtensionClientTransport` (in sidebar/popup)   |
-| Extension to extension  | `ExtensionServerTransport` (in host extension) | `ExtensionClientTransport` (in guest extension) |
+| Scenario                           | Server                                           | Client                                                |
+| ---------------------------------- | ------------------------------------------------ | ----------------------------------------------------- |
+| Same-window communication          | `TabServerTransport`                             | `TabClientTransport`                                  |
+| Parent page to iframe              | `IframeChildTransport` in the iframe             | `IframeParentTransport` in the parent                 |
+| Extension component to background  | `ExtensionServerTransport` in the receiver       | `ExtensionClientTransport` in the initiating context  |
+| External extension or allowed page | `ExtensionServerTransport` in the host extension | `ExtensionClientTransport` with the host extension ID |
 
 ---
 
 ## Tab transports
 
-In-page communication via `window.postMessage`. Both server and client run in the same browser tab.
+In-page communication via `window.postMessage`. Both server and client run in
+the same `Window`; these classes do not discover or connect to another tab.
 
 ### TabServerTransport
 
 Listens for MCP messages on the current window. Broadcasts a `mcp-server-ready` signal on start.
 
-```typescript
+```typescript title="Tab server transport"
 import { TabServerTransport } from '@mcp-b/transports';
 
 const transport = new TabServerTransport({
@@ -72,7 +77,7 @@ await server.connect(transport);
 
 Connects to a `TabServerTransport` in the same window. Waits for a server-ready handshake before sending messages.
 
-```typescript
+```typescript title="Tab client transport"
 import { TabClientTransport } from '@mcp-b/transports';
 
 const transport = new TabClientTransport({
@@ -102,13 +107,15 @@ await client.connect(transport);
 
 ## Iframe transports
 
-Cross-origin communication between a parent page and an iframe. Uses `window.postMessage` with a ready handshake to handle iframe loading timing.
+Same-origin or cross-origin communication between a parent page and an iframe.
+It uses `window.postMessage` with a ready handshake to handle iframe loading
+timing.
 
 ### IframeParentTransport
 
 Client-side transport for the parent page. Sends messages into the iframe's `contentWindow`.
 
-```typescript
+```typescript title="Iframe parent transport"
 import { IframeParentTransport } from '@mcp-b/transports';
 
 const iframe = document.querySelector('iframe');
@@ -138,7 +145,7 @@ await client.connect(transport);
 
 Server-side transport for code running inside an iframe. Sends messages to `window.parent`.
 
-```typescript
+```typescript title="Iframe child transport"
 import { IframeChildTransport } from '@mcp-b/transports';
 
 const transport = new IframeChildTransport({
@@ -158,13 +165,21 @@ await server.connect(transport);
 
 ## Extension transports
 
-Communication between Chrome extension components using `chrome.runtime.Port`. Used for connecting content scripts, sidebars, and popups to the extension's background service worker.
+Communication over Chrome `runtime.Port` objects. Same-extension content
+scripts, sidebars, and popups can initiate a connection to a receiving extension
+context. Another extension or a web page allowed by `externally_connectable` can
+initiate an external connection by supplying the host extension ID. These
+transports do not let an extension initiate a connection into an ordinary web
+page, and they are not generic user-script transports. See Chrome's
+[message passing documentation](https://developer.chrome.com/docs/extensions/develop/concepts/messaging).
 
 ### ExtensionServerTransport
 
-Wraps a `chrome.runtime.Port` to handle a single client connection. Runs in the background service worker.
+Wraps one accepted `chrome.runtime.Port` and therefore handles one MCP client
+session. It commonly runs in the extension's background service worker, but the
+class itself accepts a port from any receiving extension context.
 
-```typescript
+```typescript title="Accept same-extension connections"
 import { ExtensionServerTransport } from '@mcp-b/transports';
 import { McpServer } from '@modelcontextprotocol/server';
 
@@ -189,18 +204,22 @@ chrome.runtime.onConnect.addListener((port) => {
 An MCP server owns one protocol session. Create a fresh server for every port; keep shared
 application state outside `createServer()` when clients need to see the same data.
 
+For external connections, listen with `chrome.runtime.onConnectExternal`, check
+`port.sender.id` or `port.sender.url`, and construct the transport only after the
+sender passes your allowlist.
+
 #### Constructor
 
-```typescript
+```typescript title="Extension server transport constructor"
 new ExtensionServerTransport(port: chrome.runtime.Port, options?: ExtensionServerTransportOptions)
 ```
 
 #### ExtensionServerTransportOptions
 
-| Option              | Type      | Required | Default | Description                                                        |
-| ------------------- | --------- | -------- | ------- | ------------------------------------------------------------------ |
-| `keepAlive`         | `boolean` | No       | `true`  | Send periodic keep-alive pings to prevent service worker shutdown. |
-| `keepAliveInterval` | `number`  | No       | `25000` | Keep-alive interval in milliseconds.                               |
+| Option              | Type      | Required | Default | Description                                      |
+| ------------------- | --------- | -------- | ------- | ------------------------------------------------ |
+| `keepAlive`         | `boolean` | No       | `true`  | Send periodic keep-alive messages over the port. |
+| `keepAliveInterval` | `number`  | No       | `25000` | Keep-alive interval in milliseconds.             |
 
 #### Methods
 
@@ -210,11 +229,13 @@ new ExtensionServerTransport(port: chrome.runtime.Port, options?: ExtensionServe
 
 ### ExtensionClientTransport
 
-Connects to the extension's background service worker via `chrome.runtime.connect`. A port
-disconnect closes the MCP connection. Create a new transport and call `client.connect()` again so
-the new server session completes MCP initialization.
+Calls `chrome.runtime.connect` to open a port. Omit `extensionId` for another
+context in the same extension; provide it for an external host extension. The
+caller must have access to the Chrome runtime messaging API. A port disconnect
+closes the MCP connection; create a new transport and reconnect the client to
+start a new server session.
 
-```typescript
+```typescript title="Extension client transport"
 import { ExtensionClientTransport } from '@mcp-b/transports';
 
 const transport = new ExtensionClientTransport({
@@ -225,23 +246,28 @@ await client.connect(transport);
 
 #### ExtensionClientTransportOptions
 
-| Option        | Type     | Required | Default | Description                                                                                                                                                        |
-| ------------- | -------- | -------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `extensionId` | `string` | No       | --      | Extension ID to connect to. Omit for same-extension connections. When provided, uses `chrome.runtime.connect(extensionId, ...)` for cross-extension communication. |
-| `portName`    | `string` | No       | `"mcp"` | Port name for the connection.                                                                                                                                      |
+| Option        | Type     | Required | Default | Description                                                                                                            |
+| ------------- | -------- | -------- | ------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `extensionId` | `string` | No       | --      | Host extension ID. Omit for same-extension connections; provide it for external extension or allowed-page connections. |
+| `portName`    | `string` | No       | `"mcp"` | Port name for the connection.                                                                                          |
 
 ---
 
 ## Security
 
-All transports enforce origin or connection validation:
+Security is split between the transport and the code that creates it:
 
-| Transport type     | Security mechanism                                                                                                                |
-| ------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| Tab                | `allowedOrigins` on server, `targetOrigin` on client. Messages from non-matching origins are silently dropped.                    |
-| Iframe             | Same as tab transports. Cross-origin `postMessage` with origin checks on both sides.                                              |
-| Extension          | Chrome's port-based messaging API. Only code within the extension (or extensions listed in `externally_connectable`) can connect. |
-| Extension External | Requires `externally_connectable` in `manifest.json`. Server should validate `port.sender.id` before accepting connections.       |
+| Transport type      | Security mechanism                                                                                                                     |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Tab                 | Server `allowedOrigins`, client `targetOrigin`, channel ID, and same-window source checks                                              |
+| Iframe              | Child `allowedOrigins`, parent `targetOrigin`, channel ID, and parent/child window source checks                                       |
+| Same-extension port | Chrome runtime routing plus the receiving code's port-name and sender validation                                                       |
+| External port       | `externally_connectable` policy when configured, `onConnectExternal`, and receiver validation of `port.sender.id` or `port.sender.url` |
+
+`ExtensionServerTransport` does not maintain its own sender allowlist. Validate
+an incoming port before passing it to the constructor. Chrome permits external
+extensions by default when `externally_connectable` is absent, while ordinary
+web pages require an explicit `matches` entry.
 
 <Warning>
   Setting `allowedOrigins` to `["*"]` or `targetOrigin` to `"*"` disables origin validation. Use
@@ -267,3 +293,5 @@ Every transport class implements the MCP `Transport` interface:
 - [Bridge tools across iframes](/how-to/bridge-tools-across-iframes) for a step-by-step iframe bridging guide
 - [Connect desktop agents with local relay](/how-to/connect-desktop-agents-with-local-relay) for stdio-to-browser bridging
 - [@mcp-b/mcp-iframe](/packages/mcp-iframe/reference) for the high-level `<mcp-iframe>` custom element that wraps iframe transports
+- [WebMCP standard API](/reference/webmcp/standard-api) for native cross-document discovery without an MCP transport
+- [Chrome extension message passing](https://developer.chrome.com/docs/extensions/develop/concepts/messaging) for runtime port ownership and external connections

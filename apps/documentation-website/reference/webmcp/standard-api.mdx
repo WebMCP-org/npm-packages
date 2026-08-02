@@ -6,7 +6,7 @@ icon: 'brackets-curly'
 ---
 
 The authoritative API definition is the
-[W3C WebMCP specification](https://webmachinelearning.github.io/webmcp/).
+[WebMCP Community Group draft](https://webmachinelearning.github.io/webmcp/).
 Chrome's current implementation notes live in the
 [Chrome WebMCP imperative API docs](https://developer.chrome.com/docs/ai/webmcp/imperative-api).
 
@@ -14,13 +14,13 @@ Chrome's current implementation notes live in the
 
 New code uses `document.modelContext`.
 
-| Member                           | Purpose                                                          |
-| -------------------------------- | ---------------------------------------------------------------- |
-| `registerTool(tool, { signal })` | Publish a tool and bind its lifetime to an optional abort signal |
-| `getTools(options?)`             | Discover registered tool objects                                 |
-| `toolchange`                     | Notify consumers that available tools changed                    |
+| Member                         | Purpose                                                           |
+| ------------------------------ | ----------------------------------------------------------------- |
+| `registerTool(tool, options?)` | Register a tool with the current document                         |
+| `getTools(options?)`           | Discover registered tools                                         |
+| `ontoolchange`                 | Handle the `toolchange` event when the available tool set changes |
 
-```ts
+```ts title="Register a tool with abort cleanup"
 const controller = new AbortController();
 
 await document.modelContext.registerTool(tool, {
@@ -35,13 +35,37 @@ optional `AbortSignal` passed at registration time. Invalid descriptors and
 duplicate names reject the returned promise, so await registration or handle
 its rejection.
 
+`ModelContextTool` has the following fields:
+
+| Field         | Required | Purpose                                                  |
+| ------------- | :------: | -------------------------------------------------------- |
+| `name`        |   Yes    | Unique tool identifier                                   |
+| `description` |   Yes    | Natural-language description of the tool                 |
+| `execute`     |   Yes    | Callback invoked with the tool input                     |
+| `title`       |    No    | Localizable label for browser UI                         |
+| `inputSchema` |    No    | JSON Schema describing the input                         |
+| `annotations` |    No    | `readOnlyHint` and `untrustedContentHint` behavior hints |
+
+Registration options are `signal`, which unregisters the tool when aborted,
+and `exposedTo`, an array of origins in the current document tree to which the
+tool may be exposed. `getTools()` accepts `fromOrigins` to include tools from
+specified origins; without it, discovery is same-origin.
+
+`getTools()` returns `RegisteredTool` values. They contain `name`, optional
+`title`, `description`, serialized `inputSchema`, `window`, `origin`, and
+optional annotations. They do not expose the original `execute` callback.
+
+The API is available only in secure contexts. The `tools` Permissions Policy
+defaults to `self`; cross-origin discovery still requires explicit exposure and
+policy delegation.
+
 ## Chrome execution extension
 
 Chrome's current preview adds `executeTool(tool, inputJson, options?)`. It is
-not part of the strict WebMCP Community Group specification, so feature-detect
+not part of the strict WebMCP Community Group draft, so feature-detect
 it:
 
-```ts
+```ts title="Execute a discovered tool in Chrome"
 import type { ChromeModelContext } from '@mcp-b/webmcp-types';
 
 const modelContext = document.modelContext as ChromeModelContext;

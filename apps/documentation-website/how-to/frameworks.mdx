@@ -29,7 +29,8 @@ Register WebMCP tools in any frontend framework by following its native lifecycl
 
     </CodeGroup>
 
-    `@mcp-b/global` accesses browser APIs on import. If you use SSR, see [Handle SSR](#handle-ssr) for required guards.
+    `@mcp-b/global` checks for `window` and `document` before auto-initializing, so the import is
+    SSR-safe. Tool registration still belongs in client-side lifecycle code.
 
   </Tab>
   <Tab title="@mcp-b/webmcp-polyfill (strict core)">
@@ -55,7 +56,7 @@ Register WebMCP tools in any frontend framework by following its native lifecycl
 
 <Note>
   React users also need a hook package. Install `@mcp-b/react-webmcp` (recommended) or `usewebmcp`
-  alongside your chosen runtime. See [Choose a hook package](#choose-a-react-hook-package) below.
+  alongside your chosen runtime. See [Register a tool](#register-a-tool) below.
 </Note>
 
 ## Initialize at your entry point
@@ -86,9 +87,10 @@ Import `@mcp-b/global` once before any component mounts. The import is a side ef
   <Tab title="Svelte">
     ```typescript "src/main.ts"
     import '@mcp-b/global';
+    import { mount } from 'svelte';
     import App from './App.svelte';
 
-    const app = new App({ target: document.getElementById('app')! });
+    const app = mount(App, { target: document.getElementById('app')! });
     export default app;
     ```
 
@@ -119,7 +121,8 @@ Import `@mcp-b/global` once before any component mounts. The import is a side ef
     The polyfill is idempotent. If tools live in multiple sections, import it in each feature layout.
 
     <Warning>
-    Do not make your root layout a Client Component. This disables SSR for your entire application.
+    Keep the root layout as a Server Component. Marking it as a Client Component expands the client
+    boundary and prevents Server Component-only features below it.
     </Warning>
 
   </Tab>
@@ -136,7 +139,7 @@ Import `@mcp-b/global` once before any component mounts. The import is a side ef
 
     ```astro "src/layouts/Layout.astro"
     <head>
-      <script src="https://unpkg.com/@mcp-b/global@latest/dist/index.iife.js"></script>
+      <script is:inline src="https://unpkg.com/@mcp-b/global@latest/dist/index.iife.js"></script>
     </head>
     ```
 
@@ -161,8 +164,6 @@ Each framework has its own lifecycle hooks for mount and unmount. Register tools
 
 <Tabs>
   <Tab title="React">
-    <a id="choose-a-react-hook-package"></a>
-
     Two hook packages are available:
 
     | Package | Use when |
@@ -187,9 +188,7 @@ Each framework has its own lifecycle hooks for mount and unmount. Register tools
           required: ['postId'],
         } as const,
         annotations: {
-          title: 'Like Post',
           readOnlyHint: false,
-          idempotentHint: true,
         },
         execute: async (input) => {
           await api.posts.like(input.postId);
@@ -436,161 +435,19 @@ Each framework has its own lifecycle hooks for mount and unmount. Register tools
   </Tab>
 </Tabs>
 
-## Create a reusable abstraction
-
-React already has dedicated hook packages (`@mcp-b/react-webmcp` and `usewebmcp`), so no custom abstraction is needed. For other frameworks, extract the register/abort lifecycle into a reusable pattern.
-
-<Tabs>
-  <Tab title="Vue composable">
-    ```typescript "src/composables/useWebMCPTool.ts"
-    import { onMounted, onUnmounted } from 'vue';
-
-    export function useWebMCPTool(
-      tool: Parameters<typeof document.modelContext.registerTool>[0]
-    ) {
-      let controller: AbortController | undefined;
-
-      onMounted(async () => {
-        controller = new AbortController();
-        await document.modelContext.registerTool(tool, { signal: controller.signal });
-      });
-
-      onUnmounted(() => {
-        controller?.abort();
-      });
-    }
-    ```
-
-    ```vue "src/components/GreetingTool.vue"
-    <script setup lang="ts">
-    import { useWebMCPTool } from '@/composables/useWebMCPTool';
-
-    useWebMCPTool({
-      name: 'get_greeting',
-      description: 'Get a greeting message',
-      inputSchema: { type: 'object', properties: {} },
-      async execute() {
-        return { content: [{ type: 'text', text: 'Hello from Vue!' }] };
-      },
-    });
-    </script>
-    ```
-
-  </Tab>
-  <Tab title="Svelte action">
-    ```typescript "src/lib/actions/webmcp.ts"
-    export function webmcpTool(
-      node: HTMLElement,
-      tool: Parameters<typeof document.modelContext.registerTool>[0]
-    ) {
-      const controller = new AbortController();
-      void document.modelContext
-        .registerTool(tool, { signal: controller.signal })
-        .catch(console.error);
-
-      return {
-        destroy() {
-          controller.abort();
-        },
-      };
-    }
-    ```
-
-    ```svelte "src/routes/+page.svelte"
-    <script lang="ts">
-      import { webmcpTool } from '$lib/actions/webmcp';
-    </script>
-
-    <div use:webmcpTool={{
-      name: 'get_greeting',
-      description: 'Get a greeting message',
-      inputSchema: { type: 'object', properties: {} },
-      execute: async () => ({
-        content: [{ type: 'text', text: 'Hello from Svelte!' }],
-      }),
-    }}>
-      Content here
-    </div>
-    ```
-
-  </Tab>
-  <Tab title="Angular service">
-    ```typescript "src/app/webmcp.service.ts"
-    import { Injectable, OnDestroy } from '@angular/core';
-    import '@mcp-b/global';
-
-    @Injectable({ providedIn: 'root' })
-    export class WebMCPService implements OnDestroy {
-      private controllers = new Map<string, AbortController>();
-
-      async registerTool(
-        tool: Parameters<typeof document.modelContext.registerTool>[0]
-      ): Promise<void> {
-        if (!('modelContext' in document)) return;
-
-        this.controllers.get(tool.name)?.abort();
-
-        const controller = new AbortController();
-        this.controllers.set(tool.name, controller);
-        await document.modelContext.registerTool(tool, { signal: controller.signal });
-      }
-
-      removeTool(name: string) {
-        this.controllers.get(name)?.abort();
-        this.controllers.delete(name);
-      }
-
-      ngOnDestroy() {
-        for (const controller of this.controllers.values()) {
-          controller.abort();
-        }
-        this.controllers.clear();
-      }
-    }
-    ```
-
-    ```typescript "src/app/greeting.component.ts"
-    import { Component, OnInit, OnDestroy } from '@angular/core';
-    import { WebMCPService } from './webmcp.service';
-
-    @Component({
-      selector: 'app-greeting',
-      template: `<p>Greeting tool registered</p>`,
-    })
-    export class GreetingComponent implements OnInit, OnDestroy {
-      constructor(private webmcp: WebMCPService) {}
-
-      ngOnInit() {
-        void this.webmcp
-          .registerTool({
-            name: 'get_greeting',
-            description: 'Get a greeting message',
-            inputSchema: { type: 'object', properties: {} },
-            execute: async () => ({
-              content: [{ type: 'text', text: 'Hello from Angular!' }],
-            }),
-          })
-          .catch(console.error);
-      }
-
-      ngOnDestroy() {
-        this.webmcp.removeTool('get_greeting');
-      }
-    }
-    ```
-
-  </Tab>
-</Tabs>
-
 ## Handle SSR
 
-`@mcp-b/global` accesses browser APIs on import, so SSR frameworks need client-side guards. If you use `@mcp-b/webmcp-polyfill` instead, it is SSR-safe out of the box and these guards are not needed.
+Both `@mcp-b/global` and `initializeWebMCPPolyfill()` are SSR-safe: they no-op when browser globals
+are unavailable. Components that call `document.modelContext` or read page state still need to do so
+in client-side lifecycle code.
 
 <Tabs>
   <Tab title="Next.js">
     Mark components with `'use client'`. For components that access `window` or `document` directly, use dynamic imports:
 
-    ```tsx
+    ```tsx title="BrowserOnly.tsx"
+    'use client';
+
     import dynamic from 'next/dynamic';
     const BrowserOnly = dynamic(() => import('./BrowserOnly'), { ssr: false });
     ```

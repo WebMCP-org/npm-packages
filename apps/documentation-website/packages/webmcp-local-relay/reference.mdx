@@ -17,7 +17,7 @@ icon: 'satellite-dish'
 
 `@mcp-b/webmcp-local-relay` connects WebMCP tools running in browser tabs to desktop MCP clients (Claude Desktop, Cursor, Claude Code, Windsurf) via a localhost WebSocket relay and stdio transport.
 
-```
+```text title="Package metadata"
 npm: @mcp-b/webmcp-local-relay
 license: MIT
 node: >= 22
@@ -149,7 +149,8 @@ Add a script tag to expose a page's WebMCP tools to the relay:
 <script src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@latest/dist/browser/embed.js"></script>
 ```
 
-If the page already registers tools on `document.modelContext`, they are picked up automatically.
+Tools registered on `document.modelContext` are picked up automatically, including tools registered
+after the embed loads. The embed listens for `toolchange` and polls every two seconds as a fallback.
 
 ### Embed attributes
 
@@ -211,6 +212,9 @@ The browser embed always uses document-first discovery and executes the current
 descriptor returned by `getTools()`. It does not depend on the removed
 name-based compatibility APIs.
 
+`file:` pages report an opaque `null` origin, which the polyfill's descriptor execution path rejects.
+Local integrations therefore need a non-opaque origin such as `http://localhost`.
+
 ## Security
 
 - Binds to `127.0.0.1` by default (loopback only).
@@ -263,6 +267,49 @@ The package exports the following for programmatic use:
 | `workspace`         | `string`   | _(none)_                     |
 | `relayId`           | `string`   | Generated relay `instanceId` |
 
+### `LocalRelayMcpServer` members
+
+| Member                              | Returns               | Description                                                      |
+| ----------------------------------- | --------------------- | ---------------------------------------------------------------- |
+| `new LocalRelayMcpServer(options?)` | `LocalRelayMcpServer` | Creates a server with an owned or supplied bridge                |
+| `bridge`                            | `RelayBridgeServer`   | Underlying browser bridge                                        |
+| `start()`                           | `Promise<void>`       | Starts the bridge and synchronizes dynamic tools                 |
+| `connect(transport)`                | `Promise<void>`       | Connects one MCP transport; callable once per instance lifecycle |
+| `startStdio()`                      | `Promise<void>`       | Connects the MCP server through stdio                            |
+| `stop()`                            | `Promise<void>`       | Closes the MCP transport and bridge                              |
+| `listDynamicToolNames()`            | `string[]`            | Returns sorted dynamic tool names                                |
+
+### `RelayBridgeServer` members
+
+| Member                                       | Returns                        | Description                                                |
+| -------------------------------------------- | ------------------------------ | ---------------------------------------------------------- |
+| `new RelayBridgeServer(options?, registry?)` | `RelayBridgeServer`            | Creates a bridge with an optional supplied registry        |
+| `registry`                                   | `RelayRegistry`                | Registry used by server mode                               |
+| `mode`                                       | `'server' \| 'client'`         | Current operating mode                                     |
+| `port`                                       | `number`                       | Bound server port or upstream relay port                   |
+| `listToolsFromRelay()`                       | `RelayTool[]`                  | Upstream tools in client mode; empty in server mode        |
+| `listSourcesFromRelay()`                     | `RelaySourceInfo[]`            | Upstream sources in client mode; empty in server mode      |
+| `getToolSourceMapFromRelay()`                | `Record<string, string[]>`     | Upstream public-tool-to-source mapping                     |
+| `start()`                                    | `Promise<void>`                | Starts with the configured port strategy                   |
+| `stop()`                                     | `Promise<void>`                | Stops server, client, timers, and pending invocations      |
+| `reloadSource(connectionId)`                 | `void`                         | Reloads a connected source; server mode only               |
+| `invokeTool(toolName, args, options?)`       | `Promise<RelayCallToolResult>` | Routes an invocation locally or through the upstream relay |
+
+### `RelayRegistry` members
+
+| Member                               | Returns                      | Description                                                  |
+| ------------------------------------ | ---------------------------- | ------------------------------------------------------------ |
+| `new RelayRegistry(now?)`            | `RelayRegistry`              | Creates an in-memory registry with an optional time provider |
+| `upsertSource(connectionId, hello)`  | `void`                       | Creates or updates source metadata                           |
+| `registerTools(connectionId, tools)` | `void`                       | Replaces a source's complete tool set                        |
+| `removeConnection(connectionId)`     | `void`                       | Removes a source and its tools                               |
+| `touchConnection(connectionId)`      | `void`                       | Updates the source's last-seen time                          |
+| `listSources()`                      | `SourceInfo[]`               | Lists active sources that publish tools                      |
+| `listTools()`                        | `AggregatedTool[]`           | Lists aggregated tools by public name                        |
+| `resolveInvocation(options)`         | `ResolvedInvocation \| null` | Selects a provider by source, tab, or recency                |
+
+`HelloRequiredError` exposes the rejected source's read-only `connectionId`.
+
 **Tool definition utilities exported at the package root:**
 
 | Export                        | Kind       | Description                                  |
@@ -300,9 +347,9 @@ The package exports the following for programmatic use:
 | Problem                  | Fix                                                                                                                                                 |
 | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `No sources connected`   | Ensure the page loaded `embed.js` and the relay process is running                                                                                  |
-| `No tools listed`        | Ensure tools are registered on the page's WebMCP runtime. If tools register after load, confirm your runtime emits `toolchange`.                    |
+| `No tools listed`        | Ensure tools are registered on the page. The embed listens for changes and polls every two seconds, so load order does not matter.                  |
 | `Tool not found`         | Tab reloaded or disconnected — call `webmcp_list_tools` again to refresh                                                                            |
-| Connection blocked       | Verify `--widget-origin` matches your host page's origin (e.g., `https://myapp.com`), and relay port matches `data-relay-port`                      |
+| Connection blocked       | Verify `--widget-origin` matches the WebSocket origin (for example, `https://myapp.com`) and the relay port matches `data-relay-port`               |
 | `Host response timeout:` | The host page took longer than the per-request timeout (default 60s) to respond. Increase via `data-request-timeout="<ms>"` on the embed script tag |
 
 ## Related

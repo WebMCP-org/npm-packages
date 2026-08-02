@@ -5,11 +5,15 @@ keywords: ['@mcp-b/transports', 'overview', 'postMessage', 'iframe', 'extension'
 icon: 'network-wired'
 ---
 
-`@mcp-b/transports` provides the transport classes that move MCP messages through browser boundaries such as tabs, iframes, extensions, and user scripts. It is the package you use when you need to choose or control the message path directly.
+`@mcp-b/transports` provides transport classes for explicit MCP client/server
+connections over same-window `postMessage`, parent-child iframe messaging, and
+Chrome runtime ports. Use it when you need to choose or control the message path
+directly.
 
 ## When to use this package
 
-- You are connecting an MCP server or client across `postMessage`, iframe, or extension boundaries.
+- You are connecting an MCP server and client over `postMessage`, an iframe, or
+  a Chrome runtime port.
 - You need direct access to transport options such as allowed origins or connection IDs.
 - You are building on top of the lower-level browser transport primitives.
 
@@ -20,7 +24,20 @@ icon: 'network-wired'
 
 ## Where it sits in the package graph
 
-The transport classes sit beside the SDK layer and under several higher-level packages. `@mcp-b/global`, `@mcp-b/react-webmcp`, and `@mcp-b/mcp-iframe` all depend on transport behavior.
+The transport classes sit beside the SDK layer and below higher-level packages.
+`@mcp-b/global` selects a server transport automatically, while
+`@mcp-b/mcp-iframe` creates the parent-side iframe client transport. React MCP
+clients can also accept a transport supplied by the application.
+
+## What this package does not provide
+
+These classes do not install `document.modelContext` or perform native
+cross-document WebMCP discovery. Native iframe discovery uses `allow="tools"`,
+`exposedTo`, and `getTools({ fromOrigins })` without an MCP transport.
+
+There is no user-script transport. Extension transports require
+`chrome.runtime.Port`; ordinary page scripts and user-script managers do not
+gain that API from this package.
 
 ## First step
 
@@ -48,5 +65,8 @@ Choose the transport pair that matches your boundary, then connect it to a serve
   </Card>
   <Card title="mcp-iframe overview" icon="frame" href="/packages/mcp-iframe/overview">
     The higher-level wrapper built on the iframe transports.
+  </Card>
+  <Card title="WebMCP standard API" icon="brackets-curly" href="/reference/webmcp/standard-api">
+    Compare MCP transports with native browser discovery.
   </Card>
 </CardGroup>

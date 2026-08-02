@@ -21,6 +21,15 @@ MCP server; use [`@mcp-b/global`](/packages/global/reference) for that bridge.
 | `@mcp-b/webmcp-polyfill/iife`   | Standalone script that initializes on load |
 | `@mcp-b/webmcp-polyfill/schema` | Shared MCP-B schema and response adapters  |
 
+The IIFE reads `window.__webMCPPolyfillOptions` before initialization and exposes the package exports on `window.WebMCPPolyfill`.
+
+```html "Configure the IIFE"
+<script>
+  window.__webMCPPolyfillOptions = { installTestingShim: true };
+</script>
+<script src="https://unpkg.com/@mcp-b/webmcp-polyfill@latest/dist/index.iife.js"></script>
+```
+
 ## `initializeWebMCPPolyfill(options?)`
 
 ```ts
@@ -32,6 +41,8 @@ initializeWebMCPPolyfill();
 The ESM entry does not initialize as an import side effect. The function returns
 without changing anything outside a secure browser context or when
 `document.modelContext` already exists.
+
+When only the deprecated `navigator.modelContext` exists, initialization exposes that same context on `document.modelContext`. It does not install a testing shim in this adoption path.
 
 ### Options
 
@@ -148,6 +159,18 @@ Schema and Standard Schema v1 implementations that expose
 `~standard.jsonSchema.input()`. MCP-B runtimes use the converted JSON Schema for
 browser metadata and preserve `~standard.validate()` for the MCP SDK when it is
 available.
+
+The public schema entry exports these low-level adapter groups:
+
+| Group               | Exports                                                                                                                                      |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Schema types        | `ToolInputSchema`, `NormalizedInputSchema`                                                                                                   |
+| Schema conversion   | `normalizeInputSchema`, `serializeInputSchema`                                                                                               |
+| Descriptor handling | `coerceWebMcpToolDescriptor`, `validateWebMcpToolDescriptor`, `normalizeToolResponse`, `toWebMcpAnnotations`                                 |
+| Chrome wire format  | `parseChromeToolInput`, `serializeChromeToolResult`                                                                                          |
+| Access and aborts   | `validatePotentiallyTrustworthyOrigins`, `validateExecutableOrigin`, `validateWebMcpAccess`, `validateOriginAgentCluster`, `withAbortSignal` |
+| Error construction  | `createUnknownError`, `createToolInvocationFailedError`, `createInvalidStateError`                                                           |
+| Object detection    | `isPlainObject`                                                                                                                              |
 
 The strict `document.modelContext.registerTool()` boundary does not perform this
 conversion or validate invocation arguments. It follows WebMCP and serializes the

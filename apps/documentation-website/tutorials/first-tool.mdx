@@ -1,5 +1,5 @@
 ---
-title: 'Build Your First Tool'
+title: 'Build your first tool'
 description: 'Create a single WebMCP tool on a plain HTML page and verify it works, with no build step or framework.'
 keywords:
   [
@@ -15,14 +15,16 @@ keywords:
 icon: 'wrench'
 ---
 
-In this tutorial, we will create a plain HTML page that registers one WebMCP tool and then verify that the tool works by calling it from the browser console. By the end, you will have a working page with a tool that any AI agent can discover and call.
+In this tutorial, we will create a plain HTML page that registers one WebMCP tool and then verify that the tool works by calling it from the browser console. By the end, you will have a working page with a tool that browser-side WebMCP consumers can discover and call. Desktop agents need a bridge such as the local relay.
 
 ## Prerequisites
 
 - A text editor
 - A modern web browser (Chrome, Edge, Firefox, or Safari)
+- A local static server, such as Python's built-in HTTP server
 
-No build tools, no Node.js, no framework.
+No build step or framework is required. Serve the page from `localhost` because
+WebMCP rejects tool execution from opaque `file:` origins.
 
 ## What we will build
 
@@ -38,7 +40,7 @@ A single HTML page that:
 
 Create a new file called `index.html` and paste in this starting point:
 
-```html index.html
+```html title="index.html"
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -65,7 +67,7 @@ The `<script>` tag in the `<head>` loads `@mcp-b/webmcp-polyfill`, which install
 
 Replace the empty `<script>` block at the bottom of the page with:
 
-```html index.html
+```html title="index.html"
 <script>
   void document.modelContext
     .registerTool({
@@ -91,11 +93,17 @@ This registers a single tool on `document.modelContext`. The tool returns the cu
 
 </Step>
 
-<Step title="Open the page in your browser">
+<Step title="Serve the page on localhost">
 
-Open `index.html` directly in your browser (double-click the file, or drag it into a browser window). You should see:
+From the directory containing `index.html`, start a static server:
 
+```bash title="Terminal"
+python3 -m http.server 8000
 ```
+
+Open `http://localhost:8000` in your browser. You should see:
+
+```text title="Expected page"
 My First WebMCP Tool
 Tool "get-page-title" registered.
 ```
@@ -108,7 +116,7 @@ If the status still says "Loading...", open the browser console (F12) and check 
 
 Open the browser console (F12, then click the Console tab). Type the following:
 
-```javascript
+```javascript title="Browser console"
 const modelContext = document.modelContext;
 const tools = await modelContext.getTools();
 console.log(tools);
@@ -116,13 +124,13 @@ console.log(tools);
 
 You should see an array containing your tool:
 
-```javascript
+```javascript title="Browser console"
 [{ name: 'get-page-title', description: 'Get the current page title', inputSchema: '...' }];
 ```
 
 Now call the tool:
 
-```javascript
+```javascript title="Browser console"
 const tool = tools.find((candidate) => candidate.name === 'get-page-title');
 if (!tool) throw new Error('get-page-title is not registered');
 
@@ -137,10 +145,9 @@ console.log(result === null ? null : JSON.parse(result));
 
 The output should be an object containing your tool's response:
 
-```json
+```json title="Tool result"
 {
-  "content": [{ "type": "text", "text": "My First WebMCP Tool" }],
-  "isError": false
+  "content": [{ "type": "text", "text": "My First WebMCP Tool" }]
 }
 ```
 
@@ -152,7 +159,7 @@ You have registered a WebMCP tool, discovered it through the standard API, and e
 
 Back in your editor, change the tool so it returns a fixed message instead of `document.title`:
 
-```javascript
+```javascript title="Tool implementation"
 async execute() {
   return {
     content: [{ type: "text", text: "Tool is working" }]
@@ -170,7 +177,7 @@ Refresh the browser and run the `executeTool` call again from the console. Notic
 
 Here is the full `index.html` for reference:
 
-```html index.html
+```html title="index.html"
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -210,7 +217,7 @@ Here is the full `index.html` for reference:
 - `@mcp-b/webmcp-polyfill` installs the strict WebMCP surface when loaded via a script tag
 - `registerTool()` returns a promise that resolves after registering a tool with a name, description, input schema, and execute function
 - `document.modelContext.getTools()` discovers registered tools; execution requires a feature-detected Chrome-compatible `executeTool()` extension
-- Tools return a `content` array with `{ type: "text", text: "..." }` objects
+- A WebMCP callback can return any serializable value; this example returns an MCP-shaped `content` array
 
 ## Next steps
 

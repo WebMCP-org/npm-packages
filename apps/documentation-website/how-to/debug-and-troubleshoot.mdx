@@ -1,5 +1,5 @@
 ---
-title: 'Debug and Troubleshoot'
+title: 'Debug and troubleshoot'
 description: 'Inspect tool registration, execute tools manually, and resolve common runtime failures around flags, schemas, transports, and discovery.'
 keywords:
   [
@@ -18,13 +18,13 @@ icon: 'bug'
 
 Open the browser console and check whether `document.modelContext` is available:
 
-```js
+```js title="Browser console"
 console.log('modelContext:', typeof document.modelContext);
 ```
 
 If it returns `"object"`, the runtime is loaded. List registered tools:
 
-```js
+```js title="Browser console"
 const tools = await document.modelContext.getTools();
 console.log(
   'Registered tools:',
@@ -36,7 +36,7 @@ console.log(
 
 Call any registered tool from the console to verify it works in isolation:
 
-```js
+```js title="Browser console"
 const modelContext = document.modelContext;
 const tools = await modelContext.getTools();
 const tool = tools.find((candidate) => candidate.name === 'my_tool');
@@ -51,7 +51,12 @@ const result = await executeTool.call(modelContext, tool, '{"query": "test"}');
 console.log('Result:', result);
 ```
 
-`executeTool()` is a Chrome extension rather than part of the strict WebMCP core, so always feature-detect it. If it is unavailable, use the Model Context Tool Inspector or an MCP client connected through your runtime. If the direct call returns an error, the problem is in the tool's `execute` function, not in the transport or agent connection.
+`executeTool()` is a Chrome extension rather than part of the strict WebMCP
+core, so always feature-detect it. If it is unavailable, use the Model Context
+Tool Inspector or an MCP client connected through your runtime. A direct call
+removes the MCP transport from the path, but invalid input, a stale descriptor,
+an aborted registration, access checks, navigation, or the handler itself can
+still reject.
 
 ## Use Chrome DevTools MCP for debugging
 
@@ -59,7 +64,7 @@ The upstream `chrome-devtools-mcp` package can inspect the page, list WebMCP too
 
 Once configured, ask your MCP client:
 
-```
+```text title="Prompt"
 Navigate to http://localhost:3000, call list_webmcp_tools, and report any browser console errors.
 ```
 
@@ -67,7 +72,7 @@ The agent can then call `execute_webmcp_tool` with a listed tool name and JSON-s
 
 ## Use the Model Context Tool Inspector
 
-The Chrome team publishes a [Model Context Tool Inspector](https://chromewebstore.google.com/detail/model-context-tool-inspec/gbpdfapgefenggkahomfgkhfehlcenpd) extension. Install it from the Chrome Web Store, then open its side panel on any page to see registered tools and execute them with JSON input.
+Chrome's WebMCP documentation recommends the [Model Context Tool Inspector](https://chromewebstore.google.com/detail/webmcp-model-context-tool/gbpdfapgefenggkahomfgkhfehlcenpd) extension. Install it from the Chrome Web Store, then open its side panel on any page to see registered tools and execute them with JSON input. It is a community tool, not an officially supported Google product.
 
 <Note>
   Use a current Chrome channel that exposes "WebMCP for testing" in `chrome://flags`. The inspector
@@ -78,15 +83,18 @@ The Chrome team publishes a [Model Context Tool Inspector](https://chromewebstor
 
 Determine which implementation is active:
 
-```js
+```js title="Browser console"
 if (!document.modelContext) {
-  console.log('No modelContext — polyfill not loaded');
+  console.log('No modelContext: polyfill not loaded');
 } else if (document.modelContext.__isWebMCPPolyfill === true) {
   console.log('Polyfill detected');
 } else {
   console.log('Native API');
 }
 ```
+
+`__isWebMCPPolyfill` is an MCP-B diagnostic marker, not a standard API. Do not
+use it to choose application behavior.
 
 ---
 
@@ -120,13 +128,9 @@ The polyfill has not loaded, or it loaded after your code ran.
 
 If you are testing the native browser API without the polyfill, enable the experimental flag.
 
-Navigate to `chrome://flags`, search for "Experimental Web Platform features", set it to **Enabled**, and relaunch Chrome. Alternatively, launch from the command line:
-
-```bash
-google-chrome --enable-experimental-web-platform-features http://localhost:3000
-```
-
-See [Browser Support and Flags](/tutorials/first-native-preview) for platform-specific commands.
+Navigate to `chrome://flags/#enable-webmcp-testing`, set **WebMCP for testing**
+to **Enabled**, and relaunch Chrome. See [Try the native Chrome
+preview](/tutorials/first-native-preview) for the complete manual setup.
 
 ### Tools not appearing in the agent
 
@@ -140,9 +144,8 @@ See [Browser Support and Flags](/tutorials/first-native-preview) for platform-sp
     local relay, run `webmcp_list_sources` from your MCP client.
   </Step>
   <Step title="Check registration timing">
-    Tools must be registered before the client queries them. If your tools register asynchronously
-    (after a fetch or user action), the client may have already queried and found nothing. Register
-    tools as early as possible.
+    If tools register after the client queries them, re-run discovery or observe the `toolchange`
+    event. MCP-B bridges subscribe to changes, but a custom one-shot consumer must query again.
   </Step>
 </Steps>
 
@@ -150,7 +153,7 @@ See [Browser Support and Flags](/tutorials/first-native-preview) for platform-sp
 
 The `inputSchema` must be JSON-serializable JSON Schema. Object and array roots are both supported:
 
-```js
+```js title="Schema examples"
 // Object input
 inputSchema: {
   type: 'object',
@@ -176,12 +179,12 @@ first, then await the new registration. Use unique, descriptive names like
 
 ### Local relay not discovered
 
-| Symptom                | Fix                                                                                                                                                                       |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `No sources connected` | Confirm the page loaded `embed.js` and the relay process is running on the expected port (default: 9333).                                                                 |
-| `No tools listed`      | Confirm tools are registered on `document.modelContext` before `embed.js` queries them. If tools register after page load, verify your runtime emits `toolchange` events. |
-| `Tool not found`       | The tab may have reloaded or disconnected. Call `webmcp_list_tools` again to refresh.                                                                                     |
-| Connection blocked     | Verify `--widget-origin` matches your host page origin, and the relay port matches the `data-relay-port` attribute on the embed script.                                   |
+| Symptom                | Fix                                                                                                                                        |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `No sources connected` | Confirm the page loaded `embed.js` and the relay process is running on the expected port (default: 9333).                                  |
+| `No tools listed`      | Confirm tools are registered on `document.modelContext` and that discovery sees them. The embed subscribes to `toolchange` and also polls. |
+| `Tool not found`       | The tab may have reloaded or disconnected. Call `webmcp_list_tools` again to refresh.                                                      |
+| Connection blocked     | Verify `--widget-origin` matches your host page origin, and the relay port matches the `data-relay-port` attribute on the embed script.    |
 
 See [Connect Desktop Agents with Local Relay](/how-to/connect-desktop-agents-with-local-relay) for full setup instructions.
 
@@ -195,11 +198,15 @@ See [Transports and Bridges](/explanation/architecture/transports-and-bridges) f
 
 ### WebMCP not detected (Chrome DevTools MCP)
 
-The `list_webmcp_tools` tool returns "WebMCP not detected" when the current page has not loaded `@mcp-b/global` or has no tools registered.
+The `list_webmcp_tools` tool returns "WebMCP not detected" when Chrome's native
+WebMCP registry is unavailable or empty. MCP-B tools appear when
+`@mcp-b/global` adopts and mirrors that native context; the standalone
+JavaScript polyfill is not a Chrome DevTools discovery source.
 
 <Steps>
-  <Step title="Confirm the page uses @mcp-b/global">
-    Check the page source or network tab for the `@mcp-b/global` import.
+  <Step title="Confirm the page exposes WebMCP">
+    In the page console, inspect `document.modelContext` and run `await
+    document.modelContext?.getTools()`.
   </Step>
   <Step title="Navigate and re-check">
     After navigating to a page with tools, call `list_webmcp_tools` again.
