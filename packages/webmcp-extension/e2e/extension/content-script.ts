@@ -72,6 +72,15 @@ async function run(): Promise<void> {
   });
   document.documentElement.dataset.webmcpExtensionResult = readText(result, 'extension_echo');
 
+  const declarativeResult = await client.callTool({
+    name: 'extension_declarative',
+    arguments: { value: window.location.pathname },
+  });
+  document.documentElement.dataset.webmcpExtensionDeclarativeResult = readText(
+    declarativeResult,
+    'extension_declarative'
+  );
+
   const failure = await client.callTool({ name: 'extension_fail', arguments: {} });
   if (!failure.isError) throw new Error('extension_fail unexpectedly succeeded');
   document.documentElement.dataset.webmcpExtensionFailure = readText(failure, 'extension_fail');

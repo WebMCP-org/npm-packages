@@ -24,6 +24,11 @@ import {
   validateWebMcpToolDescriptor,
   withAbortSignal,
 } from './schema.js';
+import {
+  installDeclarativeForms,
+  isAgentInvokedSubmitEvent,
+  respondWithAgentSubmitEvent,
+} from './declarative-forms.js';
 
 const POLYFILL_MARKER_PROPERTY = '__isWebMCPPolyfill' as const;
 const REGISTERED_INPUT_SCHEMA_SYMBOL = Symbol('registeredInputSchema');
@@ -45,6 +50,7 @@ interface InstalledProperty {
 
 const installedProperties: InstalledProperty[] = [];
 let installedContext: StrictWebMCPContext | null = null;
+let cleanupDeclarativeForms: (() => void) | null = null;
 
 function installProperty(target: object, key: PropertyKey, descriptor: PropertyDescriptor): void {
   const previous = Object.getOwnPropertyDescriptor(target, key);
@@ -397,6 +403,29 @@ function defineDeprecatedNavigatorModelContext(target: Navigator, value: ModelCo
   });
 }
 
+function installSubmitEventPolyfill(): void {
+  const prototype = SubmitEvent.prototype;
+  if (!('agentInvoked' in prototype)) {
+    installProperty(prototype, 'agentInvoked', {
+      configurable: true,
+      enumerable: true,
+      get(this: SubmitEvent) {
+        return isAgentInvokedSubmitEvent(this);
+      },
+    });
+  }
+  if (!('respondWith' in prototype)) {
+    installProperty(prototype, 'respondWith', {
+      configurable: true,
+      enumerable: true,
+      writable: true,
+      value(this: SubmitEvent, agentResponse: Promise<unknown>) {
+        respondWithAgentSubmitEvent(this, agentResponse);
+      },
+    });
+  }
+}
+
 export function initializeWebMCPPolyfill(options?: WebMCPPolyfillInitOptions): void {
   if (globalThis.isSecureContext === false) return;
   const nav = typeof navigator === 'undefined' ? null : navigator;
@@ -449,6 +478,7 @@ export function initializeWebMCPPolyfill(options?: WebMCPPolyfillInitOptions): v
   // Reset the one-shot warning flag so a fresh install warns again on first access.
   navigatorModelContextDeprecationWarned = false;
   defineDeprecatedNavigatorModelContext(nav, modelContext);
+  installSubmitEventPolyfill();
 
   if (options?.installTestingShim && !nav.modelContextTesting) {
     installProperty(nav, 'modelContextTesting', {
@@ -458,9 +488,13 @@ export function initializeWebMCPPolyfill(options?: WebMCPPolyfillInitOptions): v
       value: context.getTestingShim(),
     });
   }
+
+  cleanupDeclarativeForms = installDeclarativeForms(doc, context);
 }
 
 export function cleanupWebMCPPolyfill(): void {
+  cleanupDeclarativeForms?.();
+  cleanupDeclarativeForms = null;
   installedContext?.dispose();
   installedContext = null;
   for (const { target, key, previous } of [...installedProperties].reverse()) {

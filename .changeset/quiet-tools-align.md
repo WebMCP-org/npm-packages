@@ -78,6 +78,13 @@ callbacks or fake cross-document results. The strict runtime removes
 `unregisterTool()`, rejects cross-document options it cannot enforce, and
 checks document lifetime and detectable Permissions Policy before every
 registry or execution operation.
+When the polyfill owns `document.modelContext`, Chromium-compatible declarative
+form attributes now synthesize tools from the document and open shadow roots,
+stay synchronized with DOM changes, fill controls transactionally, and preserve
+manual-review or autosubmit behavior. The same browser suite runs against the
+polyfill, the global runtime, and native Chrome; the extension template proves
+those tools remain callable from its isolated content script. React consumers
+also receive narrowly scoped JSX declarations for the declarative attributes.
 
 `@mcp-b/webmcp-ts-sdk` now exposes the official high-level `mcpServer` as its
 advanced MCP escape hatch. Removed compatibility aliases include

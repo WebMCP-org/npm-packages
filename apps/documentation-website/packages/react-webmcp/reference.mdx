@@ -38,6 +38,30 @@ pnpm add @mcp-b/transports @modelcontextprotocol/client
 
 <Snippet file="snippets/packages/react-webmcp-quickstart.ts" />
 
+## Declarative form attributes
+
+Importing this package adds React JSX declarations for `toolname`, `tooltitle`,
+`tooldescription`, `toolautosubmit`, and `toolparamdescription`.
+
+```tsx title="Declare a form tool in React"
+import '@mcp-b/global';
+import type {} from '@mcp-b/react-webmcp';
+
+export function SearchForm() {
+  return (
+    <form toolname="search_catalog" tooldescription="Search the product catalog" toolautosubmit="">
+      <input name="query" toolparamdescription="Words to match" required />
+      <button type="submit">Search</button>
+    </form>
+  );
+}
+```
+
+Use `toolautosubmit=""`. React drops an unknown attribute whose value is the
+boolean `true`, so JSX shorthand (`toolautosubmit`) does not reach the DOM.
+See the [declarative API reference](/reference/webmcp/declarative-api) for the
+runtime behavior.
+
 ## Provider hooks
 
 ### `useWebMCP(config, deps?)`

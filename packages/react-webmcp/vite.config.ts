@@ -19,6 +19,9 @@ export default defineConfig({
     tsconfig: './tsconfig.json',
   },
   test: {
+    typecheck: {
+      include: ['src/**/*.test-d.{ts,tsx}'],
+    },
     // Use browser mode for real DOM, React rendering, and navigator testing
     browser: {
       enabled: true,

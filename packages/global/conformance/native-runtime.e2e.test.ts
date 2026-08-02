@@ -4,6 +4,7 @@ import type {
   ModelContextTool,
   RegisteredTool,
 } from '@mcp-b/webmcp-types';
+import { runDeclarativeFormConformanceSuite } from '../../../conformance/declarative-forms-conformance.shared.js';
 import { afterEach, describe, expect, it } from 'vitest';
 
 type NativeRegisterTool = (
@@ -185,4 +186,8 @@ describe('Native WebMCP conformance', () => {
     expect(serialized).toEqual(expect.any(String));
     expect(serialized).toContain('value:7');
   });
+});
+
+runDeclarativeFormConformanceSuite({
+  suiteName: 'Native declarative form conformance (Chrome)',
 });

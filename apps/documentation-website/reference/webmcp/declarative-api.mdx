@@ -5,8 +5,10 @@ keywords: ['declarative webmcp', 'html forms', 'toolname', 'toolautosubmit']
 icon: 'file-code'
 ---
 
-The declarative API explores how HTML workflows, especially forms, can become
-agent-readable tools while preserving browser validation and user review.
+The declarative proposal turns annotated HTML forms into agent-readable tools
+while preserving browser validation and user review. The Community Group
+draft's declarative section is still an explicit TODO, so Chrome's current
+implementation defines the practical compatibility target.
 
 ```html title="Agent-readable search form"
 <form toolname="search_catalog" tooldescription="Search the product catalog">
@@ -18,21 +20,27 @@ agent-readable tools while preserving browser validation and user review.
 </form>
 ```
 
-| Surface                                 | Behavior                                                                             |
-| --------------------------------------- | ------------------------------------------------------------------------------------ |
-| Form without `toolautosubmit`           | The browser fills the form and waits for the user to submit it                       |
-| Form with `toolautosubmit`              | The browser submits the form when the agent invokes the tool                         |
-| `SubmitEvent.agentInvoked`              | Reports whether an agent initiated the submission                                    |
-| `SubmitEvent.respondWith(promise)`      | Returns the resolved value as tool output after the handler calls `preventDefault()` |
-| `toolactivated` and `toolcancel` events | Report when an agent operation is activated or canceled                              |
+| Surface                                 | Behavior                                                                                    |
+| --------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Form without `toolautosubmit`           | The browser fills the form and waits for the user to submit it                              |
+| Form with `toolautosubmit`              | The browser submits the form when the agent invokes the tool                                |
+| `SubmitEvent.agentInvoked`              | Reports whether an agent initiated the submission                                           |
+| `SubmitEvent.respondWith(promise)`      | Associates the resolved value with the tool call after the handler calls `preventDefault()` |
+| `toolactivated` and `toolcancel` events | Report when an agent operation is activated or canceled                                     |
 
 The attribute names, schema synthesis rules, constraint mapping, submission
 behavior, and iframe model are still evolving. Use Chrome's
-[Declarative API docs](https://developer.chrome.com/docs/ai/webmcp/declarative-api),
-the [WebMCP proposal overview](https://github.com/webmachinelearning/webmcp/blob/main/README.md),
-and the [declarative explainer](https://github.com/webmachinelearning/webmcp/blob/main/declarative-api-explainer.md)
-as the current authorities. Do not treat this example as a stable compatibility
+[Declarative API docs](https://developer.chrome.com/docs/ai/webmcp/declarative-api)
+for current browser behavior. Track the Community Group
+[declarative draft section](https://webmachinelearning.github.io/webmcp/#declarative-webmcp)
+and [declarative explainer](https://github.com/webmachinelearning/webmcp/blob/main/declarative-api-explainer.md)
+for proposal status. Do not treat this example as a stable compatibility
 contract.
+
+[`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/reference#declarative-forms)
+implements the tested local-document subset and documents its native-only gaps.
+React users can write these attributes directly after importing
+[`@mcp-b/react-webmcp`](/packages/react-webmcp/reference#declarative-form-attributes).
 
 For imperative JavaScript registration, use
 [`document.modelContext.registerTool()`](/reference/webmcp/standard-api).

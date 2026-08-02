@@ -1,4 +1,5 @@
 import { runRuntimeCoreConformanceSuite } from '../../../conformance/runtime-core-conformance.shared.js';
+import { runDeclarativeFormConformanceSuite } from '../../../conformance/declarative-forms-conformance.shared.js';
 import { afterEach, beforeEach, vi } from 'vitest';
 import { cleanupWebMCPPolyfill, initializeWebMCPPolyfill } from '../src/index.js';
 
@@ -12,6 +13,16 @@ runRuntimeCoreConformanceSuite({
     if (Reflect.get(document.modelContext, '__isWebMCPPolyfill') !== true) {
       throw new Error('Expected @mcp-b/webmcp-polyfill to install document.modelContext');
     }
+  },
+  cleanup() {
+    cleanupWebMCPPolyfill();
+  },
+});
+
+runDeclarativeFormConformanceSuite({
+  suiteName: 'Declarative form conformance (@mcp-b/webmcp-polyfill)',
+  install() {
+    initializeWebMCPPolyfill({ installTestingShim: true });
   },
   cleanup() {
     cleanupWebMCPPolyfill();

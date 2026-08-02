@@ -58,4 +58,12 @@ declare global {
     /** @deprecated Compatibility surface for older Chromium previews. */
     modelContextTesting?: ModelContextTesting;
   }
+
+  interface SubmitEvent {
+    /** True when a declarative WebMCP tool initiated this submission. */
+    readonly agentInvoked: boolean;
+
+    /** Associates an intercepted form submission result with the invoking agent. */
+    respondWith(agentResponse: Promise<unknown>): void;
+  }
 }

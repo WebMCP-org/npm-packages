@@ -1,4 +1,5 @@
 import { runRuntimeCoreConformanceSuite } from '../../../conformance/runtime-core-conformance.shared.js';
+import { runDeclarativeFormConformanceSuite } from '../../../conformance/declarative-forms-conformance.shared.js';
 import { cleanupWebModelContext, initializeWebModelContext } from '../src/global.js';
 import type { WebModelContextInitOptions } from '../src/types.js';
 
@@ -15,6 +16,14 @@ function resetGlobals(): void {
   delete (window as unknown as { __webModelContext?: unknown }).__webModelContext;
 }
 
+function cleanupRuntime(): void {
+  try {
+    cleanupWebModelContext();
+  } finally {
+    resetGlobals();
+  }
+}
+
 runRuntimeCoreConformanceSuite({
   suiteName: 'Runtime core conformance (@mcp-b/global)',
   install() {
@@ -22,10 +31,17 @@ runRuntimeCoreConformanceSuite({
     initializeWebModelContext(TEST_INIT_OPTIONS);
   },
   cleanup() {
-    try {
-      cleanupWebModelContext();
-    } finally {
-      resetGlobals();
-    }
+    cleanupRuntime();
+  },
+});
+
+runDeclarativeFormConformanceSuite({
+  suiteName: 'Declarative form conformance (@mcp-b/global)',
+  install() {
+    resetGlobals();
+    initializeWebModelContext(TEST_INIT_OPTIONS);
+  },
+  cleanup() {
+    cleanupRuntime();
   },
 });

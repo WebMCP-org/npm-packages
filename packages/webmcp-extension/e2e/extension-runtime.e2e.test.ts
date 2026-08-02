@@ -71,6 +71,19 @@ const pageHtml = `<!doctype html>
             return { content: [{ type: 'text', text: enabled ? 'enabled' : 'disabled' }] };
           }
         });
+        document.addEventListener('submit', (event) => {
+          const form = event.target;
+          if (
+            !(form instanceof HTMLFormElement) ||
+            form.getAttribute('toolname') !== 'extension_declarative'
+          ) {
+            return;
+          }
+          event.preventDefault();
+          const value = String(new FormData(form).get('value'));
+          document.documentElement.dataset.webmcpDeclarativeInvoked = value;
+          event.respondWith(Promise.resolve('submitted:' + value));
+        });
         document.documentElement.dataset.webmcpPageReady = 'true';
       }).catch((error) => {
         document.documentElement.dataset.webmcpPageError = String(error?.message ?? error);
@@ -79,6 +92,14 @@ const pageHtml = `<!doctype html>
   </head>
   <body>
     WebMCP extension fixture
+    <form
+      toolname="extension_declarative"
+      tooldescription="Submit a value through an annotated form."
+      toolautosubmit
+    >
+      <input name="value" toolparamdescription="Value to submit" required>
+      <button type="submit">Submit</button>
+    </form>
     <iframe src="/child" title="Uninjected child frame"></iframe>
   </body>
 </html>`;
@@ -166,6 +187,8 @@ describe('WebMCP extension template', () => {
           assert.deepStrictEqual(
             {
               contentError: outcome.webmcpExtensionError,
+              declarativeInvocation: outcome.webmcpDeclarativeInvoked,
+              declarativeResult: outcome.webmcpExtensionDeclarativeResult,
               dynamicResult: outcome.webmcpExtensionDynamicResult,
               failure: outcome.webmcpExtensionFailure,
               invocation: outcome.webmcpInvoked,
@@ -180,6 +203,8 @@ describe('WebMCP extension template', () => {
             },
             {
               contentError: undefined,
+              declarativeInvocation: pathname,
+              declarativeResult: `submitted:${pathname}`,
               dynamicResult: `dynamic:${pathname}`,
               failure: 'expected extension failure',
               invocation: pathname,
@@ -190,7 +215,7 @@ describe('WebMCP extension template', () => {
               result: `echo:${pathname}`,
               sawDynamic: 'true',
               sawDynamicRemoval: 'true',
-              tools: 'extension_echo,extension_fail,extension_set_dynamic',
+              tools: 'extension_declarative,extension_echo,extension_fail,extension_set_dynamic',
             }
           );
 

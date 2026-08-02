@@ -26,3 +26,28 @@ export type {
 export { useWebMCPContext } from './useWebMCPContext.js';
 export { useWebMCPPrompt } from './useWebMCPPrompt.js';
 export { useWebMCPResource } from './useWebMCPResource.js';
+
+declare module 'react' {
+  interface FormHTMLAttributes<T> {
+    toolname?: string;
+    tooltitle?: string;
+    tooldescription?: string;
+    toolautosubmit?: '' | 'toolautosubmit';
+  }
+
+  interface FieldsetHTMLAttributes<T> {
+    toolparamdescription?: string;
+  }
+
+  interface InputHTMLAttributes<T> {
+    toolparamdescription?: string;
+  }
+
+  interface SelectHTMLAttributes<T> {
+    toolparamdescription?: string;
+  }
+
+  interface TextareaHTMLAttributes<T> {
+    toolparamdescription?: string;
+  }
+}

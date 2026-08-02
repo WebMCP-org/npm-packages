@@ -40,6 +40,41 @@ deprecated Chromium testing surface:
 </script>
 ```
 
+## Declare a form tool
+
+When the polyfill owns `document.modelContext`, it observes annotated forms in
+the document and its open shadow roots and registers them as tools. It derives
+input schemas from native named controls and keeps registrations synchronized
+with DOM changes.
+
+```html
+<form toolname="search_catalog" tooldescription="Search the product catalog" toolautosubmit>
+  <input name="query" required toolparamdescription="Words to match" />
+  <button type="submit">Search</button>
+</form>
+
+<script>
+  document.querySelector('form').addEventListener('submit', (event) => {
+    if (!event.agentInvoked) return;
+
+    event.preventDefault();
+    event.respondWith(Promise.resolve({ matches: [] }));
+  });
+</script>
+```
+
+Without `toolautosubmit`, invocation fills the form and waits for the user to
+submit it. With `toolautosubmit`, the polyfill validates the form and calls
+`requestSubmit()`. Agent submissions expose `SubmitEvent.agentInvoked` and
+`SubmitEvent.respondWith()`.
+
+The implementation tracks the subset of current Chromium behavior covered by
+the package's browser conformance suite. See Chrome's
+[declarative API documentation](https://developer.chrome.com/docs/ai/webmcp/declarative-api)
+for the evolving API. The Community Group draft's
+[declarative section](https://webmachinelearning.github.io/webmcp/#declarative-webmcp)
+is still incomplete.
+
 ## Register a tool
 
 ```ts
@@ -139,6 +174,10 @@ object-or-array input.
 - Tool lifetime is owned by the `AbortSignal` passed to `registerTool()`.
 - `unregisterTool()`, `provideContext()`, and `clearContext()` are not exposed.
 - Importing the ESM entry has no initialization side effect.
+- Declarative forms do not emulate native CSS tool-state pseudo-classes,
+  `toolcancel`, cross-navigation responses, file inputs, or custom
+  form-associated elements.
+- Closed shadow roots cannot be inspected.
 
 ## License
 

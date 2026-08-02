@@ -136,6 +136,53 @@ const result = tool && context.executeTool ? await context.executeTool(tool, '{}
 Invalid JSON, unknown tools, detached documents, disallowed Permissions Policy,
 and aborted calls reject instead of invoking the handler.
 
+## Declarative forms
+
+When this package creates `document.modelContext`, it observes the current
+document and its open shadow roots for forms with `toolname` and
+`tooldescription`. It registers each form as a tool and derives its input schema
+from native named controls. Changes that affect the generated tool update the
+registration.
+`tooltitle` supplies an optional display title. `toolparamdescription` overrides
+the description derived from a control's label or `aria-description`.
+
+```html "Declarative form"
+<form toolname="search_catalog" tooldescription="Search the product catalog" toolautosubmit>
+  <label>
+    Query
+    <input name="query" required toolparamdescription="Words to match" />
+  </label>
+  <button type="submit">Search</button>
+</form>
+
+<script>
+  document.querySelector('form').addEventListener('submit', (event) => {
+    if (!event.agentInvoked) return;
+
+    event.preventDefault();
+    event.respondWith(Promise.resolve({ matches: [] }));
+  });
+</script>
+```
+
+Invocations fill controls and dispatch `input` and `change` events. Without
+`toolautosubmit`, the polyfill focuses the first enabled submit button and waits
+for the user to submit. With `toolautosubmit`, it applies native constraint
+validation and calls `requestSubmit()`. Agent-triggered submit events expose
+`SubmitEvent.agentInvoked` and `SubmitEvent.respondWith()`; `toolactivated`
+fires on `window` after the controls are filled.
+
+Removing a declarative form unregisters its tool. Changes that alter its
+generated tool replace the registration. Resetting, removing, or replacing a
+registration cancels a pending invocation. Tool names must be unique; duplicate
+names expose one form.
+
+Chrome's [declarative API documentation](https://developer.chrome.com/docs/ai/webmcp/declarative-api)
+defines the current compatibility target. This package covers the tested subset
+described above. The Community Group draft's
+[declarative section](https://webmachinelearning.github.io/webmcp/#declarative-webmcp)
+is still incomplete.
+
 ## Compatibility surfaces
 
 `document.modelContext` is canonical. The polyfill also installs the repository's
@@ -179,6 +226,14 @@ registered JSON Schema metadata.
 ## Runtime limits
 
 - Cross-document exposure and discovery require native WebMCP.
+- Declarative forms run only when this package installs the context. An existing
+  native context keeps ownership of its declarative behavior.
+- The polyfill does not emulate the native `:tool-form-active` or
+  `:tool-submit-active` CSS pseudo-classes, the `toolcancel` event, or
+  cross-navigation response extraction.
+- Closed shadow roots cannot be inspected.
+- File inputs and custom form-associated elements are omitted from synthesized
+  declarative schemas.
 - The polyfill enforces the `tools` Permissions Policy where the browser exposes
   that feature. Cross-origin frames fail closed when it does not.
 - `navigator.modelContextTesting` is opt-in and testing-only.
