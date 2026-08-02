@@ -34,6 +34,7 @@ export function parseCliOptions(argv: string[]): CliOptions {
     options: {
       help: { type: 'boolean', short: 'h' },
       host: { type: 'string', short: 'H' },
+      'allowed-origin': { type: 'string' },
       'invoke-timeout': { type: 'string' },
       label: { type: 'string' },
       'max-payload': { type: 'string' },
@@ -41,6 +42,7 @@ export function parseCliOptions(argv: string[]): CliOptions {
       'relay-id': { type: 'string' },
       'widget-origin': { type: 'string' },
       workspace: { type: 'string' },
+      'ws-origin': { type: 'string' },
     },
     strict: true,
   });
@@ -53,7 +55,11 @@ export function parseCliOptions(argv: string[]): CliOptions {
   const invokeTimeoutMs = parsePositiveInteger('invoke-timeout', values['invoke-timeout']);
   const maxPayloadBytes = parsePositiveInteger('max-payload', values['max-payload']);
 
-  const allowedOrigins = values['widget-origin']
+  const allowedOrigins = (
+    values['widget-origin'] ??
+    values['allowed-origin'] ??
+    values['ws-origin']
+  )
     ?.split(',')
     .map((origin) => origin.trim())
     .filter(Boolean) ?? ['*'];
@@ -90,6 +96,8 @@ export function printHelp(): void {
       '  --host, -H               Bind host for local websocket relay (default: 127.0.0.1)',
       '  --port, -p               Preferred root port for the local relay cluster (default: 9333)',
       '  --widget-origin          Allowed host page origin(s), comma-separated (default: *)',
+      '  --allowed-origin         Deprecated alias for --widget-origin',
+      '  --ws-origin              Deprecated alias for --widget-origin',
       '  --label                  Human-readable relay label reported during discovery',
       '  --workspace              Optional workspace name reported during discovery',
       '  --relay-id               Stable relay identifier reported during discovery',

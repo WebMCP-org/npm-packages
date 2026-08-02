@@ -104,7 +104,7 @@ the `120000` ms page setting above.
 Tool registration references:
 
 - [`@mcp-b/global` quick start and `registerTool`](https://docs.mcp-b.ai/packages/global/reference)
-- [WebMCP proposal examples for `registerTool`](https://github.com/webmachinelearning/webmcp/blob/main/docs/proposal.md)
+- [WebMCP specification for `registerTool`](https://webmachinelearning.github.io/webmcp/)
 
 ---
 
@@ -114,7 +114,7 @@ Tool registration references:
 
 The JSON config above works for most clients. Here are additional options:
 
-**Claude Desktop (MCPB bundle)** — download the `.mcpb` file from [GitHub Releases](https://github.com/WebMCP-org/npm-packages/releases) and double-click to install. The installer prompts for the port, allowed origins, and tool timeout and passes those settings to the relay. No terminal is needed.
+**Claude Desktop (MCPB bundle)** — download the `.mcpb` file from [GitHub Releases](https://github.com/WebMCP-org/npm-packages/releases) and double-click to install. It starts with the zero-configuration defaults: loopback, automatic port discovery, and all page origins allowed. No terminal is needed.
 
 **Direct CLI** — run the relay standalone:
 
@@ -147,6 +147,8 @@ webmcp-local-relay [options]
   --host, -H               Bind host for local websocket relay (default: 127.0.0.1)
   --port, -p               Preferred root port for the local relay cluster (default: 9333)
   --widget-origin          Allowed host page origin(s), comma-separated (default: *)
+  --allowed-origin         Deprecated alias for --widget-origin
+  --ws-origin              Deprecated alias for --widget-origin
   --label                  Human-readable relay label reported during discovery
   --workspace              Optional workspace name reported during discovery
   --relay-id               Stable relay identifier reported during discovery
@@ -184,6 +186,7 @@ npx @mcp-b/webmcp-local-relay --widget-origin https://myapp.com
   ```
 
 - `--widget-origin` is not local-process authentication. An Origin-less browser-protocol client falls back to its claimed `hello.origin`, while the internal relay-to-relay protocol is outside this browser-origin check. Keep the relay bound to loopback unless you add a separate trusted boundary.
+- [Chrome 147 and later](https://developer.chrome.com/release-notes/147) can ask a public site for Local Network Access permission before it opens the loopback WebSocket. This browser permission is separate from relay configuration.
 
 ### Architecture
 
@@ -243,7 +246,7 @@ WebMCP is an emerging web platform proposal. This relay works with the current n
 
 - [W3C WebML CG draft](https://webmachinelearning.github.io/webmcp/)
 - [Proposal repository](https://github.com/webmachinelearning/webmcp)
-- [Proposal details (`document.modelContext`, `registerTool`, etc.)](https://github.com/webmachinelearning/webmcp/blob/main/docs/proposal.md)
+- [WebMCP specification (`document.modelContext`, `registerTool`, etc.)](https://webmachinelearning.github.io/webmcp/)
 
 For Chromium/Chrome Canary native preview testing:
 

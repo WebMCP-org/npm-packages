@@ -1,5 +1,18 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { parseCliOptions } from './cli-utils.js';
+
+const manifest = JSON.parse(readFileSync(new URL('../manifest.json', import.meta.url), 'utf8')) as {
+  server: { mcp_config: { args: string[] } };
+  user_config?: unknown;
+};
+
+describe('MCPB manifest', () => {
+  it('preserves single-click zero-configuration startup', () => {
+    expect(manifest.server.mcp_config.args).toEqual(['${__dirname}/server/cli.mjs']);
+    expect(manifest).not.toHaveProperty('user_config');
+  });
+});
 
 describe('parseCliOptions', () => {
   it('returns development defaults', () => {
@@ -47,6 +60,12 @@ describe('parseCliOptions', () => {
       relayId: 'desktop-main',
       workspace: 'default',
     });
+  });
+
+  it.each(['--allowed-origin', '--ws-origin'])('accepts the legacy %s alias', (flag) => {
+    expect(parseCliOptions([flag, 'https://legacy.example.com']).allowedOrigins).toEqual([
+      'https://legacy.example.com',
+    ]);
   });
 
   it.each(['abc', '99999', '0', '-1', '1.5', '123junk'])('rejects invalid port %s', (value) => {

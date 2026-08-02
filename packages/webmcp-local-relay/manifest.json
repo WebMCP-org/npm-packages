@@ -21,15 +21,7 @@
     "entry_point": "server/cli.mjs",
     "mcp_config": {
       "command": "node",
-      "args": [
-        "${__dirname}/server/cli.mjs",
-        "--port",
-        "${user_config.port}",
-        "--widget-origin",
-        "${user_config.allowed_origins}",
-        "--invoke-timeout",
-        "${user_config.invoke_timeout}"
-      ],
+      "args": ["${__dirname}/server/cli.mjs"],
       "env": {}
     }
   },
@@ -50,32 +42,6 @@
   "tools_generated": true,
   "keywords": ["webmcp", "mcp", "relay", "browser", "tools", "model-context-protocol", "ai-agents"],
   "license": "MIT",
-  "user_config": {
-    "port": {
-      "type": "number",
-      "title": "WebSocket Port",
-      "description": "Local port for the WebSocket bridge that browser tabs connect to",
-      "default": 9333,
-      "min": 1024,
-      "max": 65535,
-      "required": false
-    },
-    "allowed_origins": {
-      "type": "string",
-      "title": "Allowed Origins",
-      "description": "Comma-separated list of allowed browser origins, or * to allow all",
-      "default": "*",
-      "required": false
-    },
-    "invoke_timeout": {
-      "type": "number",
-      "title": "Tool Invocation Timeout",
-      "description": "Maximum browser tool execution time in milliseconds",
-      "default": 65000,
-      "min": 1,
-      "required": false
-    }
-  },
   "compatibility": {
     "claude_desktop": ">=1.0.0",
     "platforms": ["darwin", "win32", "linux"],

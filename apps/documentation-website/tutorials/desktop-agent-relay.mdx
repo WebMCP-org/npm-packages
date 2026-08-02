@@ -142,6 +142,11 @@ Add the relay to your MCP client's configuration. The exact location depends on 
 When the MCP client starts, it launches the relay process. The relay prefers
 `ws://127.0.0.1:9333` and can discover another relay port automatically if that port is occupied.
 
+<Warning>
+  The no-argument setup allows tools from every page origin. To limit this tutorial to its local
+  page, add `--widget-origin http://localhost:3000` to the relay command.
+</Warning>
+
 </Step>
 
 <Step title="Serve and open the page">
