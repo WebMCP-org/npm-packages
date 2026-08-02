@@ -90,9 +90,9 @@ MCP requires an object-root tool input schema. An array-root WebMCP tool remains
 
 - `BrowserMcpServer`
 - `BrowserMcpServerOptions`
+- `isBrowserMcpServer`
 - `PromptDescriptor`
 - `ResourceDescriptor`
-- `SERVER_MARKER_PROPERTY`
 
 Import MCP clients, servers, schemas, transports, and validators from the official `@modelcontextprotocol/*` packages.
 

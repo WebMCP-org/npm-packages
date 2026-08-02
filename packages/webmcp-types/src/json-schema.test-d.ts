@@ -205,6 +205,18 @@ test('extension registration infers and enforces structured output', () => {
   });
 });
 
+test('typed extension descriptors remain compatible with the standard document surface', () => {
+  const descriptor = {
+    name: 'search_summary',
+    description: 'Search with summary',
+    inputSchema: closedSchema,
+    outputSchema,
+    execute: ({ query }) => ({ total: 1, items: [query] }),
+  } satisfies ToolDescriptorFromSchema<typeof closedSchema, typeof outputSchema>;
+
+  registerStandardTool(descriptor);
+});
+
 test('explicit descriptors remain available when inference is not enough', () => {
   const descriptor: ToolDescriptor<{ id: string }, CallToolResult, 'lookup'> = {
     name: 'lookup',

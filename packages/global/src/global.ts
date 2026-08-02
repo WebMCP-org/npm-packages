@@ -5,7 +5,7 @@ import {
   type TabServerTransportOptions,
 } from '@mcp-b/transports';
 import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
-import { BrowserMcpServer, SERVER_MARKER_PROPERTY } from '@mcp-b/webmcp-ts-sdk';
+import { BrowserMcpServer, isBrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
 import type { ModelContext } from '@mcp-b/webmcp-types';
 import type { Transport } from '@modelcontextprotocol/server';
 import type { WebModelContextInitOptions } from './types.js';
@@ -26,10 +26,6 @@ function isBrowserEnvironment(): boolean {
 
 function readCurrentModelContext(): ModelContext | undefined {
   return document.modelContext ?? navigator.modelContext;
-}
-
-function isBrowserMcpServer(context: ModelContext): context is BrowserMcpServer {
-  return SERVER_MARKER_PROPERTY in context && context[SERVER_MARKER_PROPERTY] === true;
 }
 
 function replaceDocumentModelContext(value: unknown): void {
@@ -129,23 +125,21 @@ function createTransport(config: WebModelContextInitOptions['transport']): Trans
   });
 }
 
-/** Initializes the global bridge and returns the active server. */
-export function initializeWebModelContext(
-  options?: WebModelContextInitOptions
-): BrowserMcpServer | undefined {
+/** Installs the global bridge on `document.modelContext`. */
+export function initializeWebModelContext(options?: WebModelContextInitOptions): void {
   if (!isBrowserEnvironment() || globalThis.isSecureContext === false) {
     return;
   }
 
   if (runtime) {
-    return runtime.server;
+    return;
   }
 
   // Cross-bundle guard: if modelContext is already a BrowserMcpServer
   // (set by another bundle in this window), skip initialization.
   const existingContext = readCurrentModelContext();
   if (existingContext && isBrowserMcpServer(existingContext)) {
-    return existingContext;
+    return;
   }
 
   // 1. Install polyfill (provides modelContext + modelContextTesting)
@@ -214,8 +208,6 @@ export function initializeWebModelContext(
       }
     }
   })();
-
-  return server;
 }
 
 export function cleanupWebModelContext(): void {

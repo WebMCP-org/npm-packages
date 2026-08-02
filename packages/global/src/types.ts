@@ -1,3 +1,5 @@
+/// <reference types="@mcp-b/webmcp-types" preserve="true" />
+
 import type { IframeChildTransportOptions, TabServerTransportOptions } from '@mcp-b/transports';
 
 export interface TransportConfiguration {

@@ -100,6 +100,14 @@ Executes a descriptor returned by `getTools()`. This optional [Chrome imperative
 
 ## MCP-B extensions
 
+### `isBrowserMcpServer(context)`
+
+```ts "Type guard signature"
+isBrowserMcpServer(context: unknown): context is BrowserMcpServer
+```
+
+Narrows an installed `document.modelContext` without changing the strict global declaration or creating a second runtime handle.
+
 ### `listTools()`
 
 ```ts "List tools signature"
@@ -166,9 +174,9 @@ The package exports only its adapter surface:
 
 - `BrowserMcpServer`
 - `BrowserMcpServerOptions`
+- `isBrowserMcpServer`
 - `PromptDescriptor`
 - `ResourceDescriptor`
-- `SERVER_MARKER_PROPERTY`
 
 Import MCP clients, protocol schemas, transports, validators, and upstream server types from their official `@modelcontextprotocol/*` packages.
 

@@ -49,7 +49,7 @@ export type ModelContextToolFromSchema<
   inputSchema: TInputSchema;
 };
 
-/** MCP-B tool dictionary with output metadata and a per-call client. */
+/** MCP-B tool dictionary with output metadata. */
 export type ToolDescriptor<
   TArgs extends WebMcpToolInput = Record<string, unknown>,
   TResult = unknown,

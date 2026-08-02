@@ -104,19 +104,22 @@ window.__webModelContextOptions = { autoInitialize: false };
 
 const { initializeWebModelContext } = await import('@mcp-b/global');
 
-const server = initializeWebModelContext({
+initializeWebModelContext({
   transport: {
     tabServer: { allowedOrigins: ['https://example.com'] },
   },
 });
-if (!server) throw new Error('WebMCP is unavailable');
+
+await document.modelContext.registerTool({
+  /* your tool */
+});
 ```
 
 **Behavior:**
 
 - Only operates in browser environments
-- Returns the active typed `BrowserMcpServer`, or `undefined` when WebMCP is unavailable
-- Idempotent - repeated calls return the same server
+- Returns nothing; use `document.modelContext` after initialization
+- Idempotent - repeated and cross-bundle calls are no-ops
 - Wraps the native context when present; otherwise installs and wraps the polyfill
 - Cleanup restores the captured native or polyfilled context
 - Auto-called on import unless `window.__webModelContextOptions.autoInitialize` is `false`
@@ -186,26 +189,29 @@ const tools = await document.modelContext.getTools();
 // [{ name: 'search-products', inputSchema: '{"type":"object",...}', ... }, ...]
 ```
 
-### `BrowserMcpServer` Extensions
-
-Use the server returned by `initializeWebModelContext()` for MCP-B methods that
-are intentionally absent from the strict `document.modelContext` type.
-
 #### `executeTool(tool, inputArgsJson)`
 
-Executes a tool descriptor returned from `getTools()`.
+Chromium exposes an optional descriptor-based execution method. Feature-detect it
+on the canonical document surface.
+
+```bash
+npm install --save-dev @mcp-b/webmcp-types
+```
 
 ```typescript
-import { initializeWebModelContext } from '@mcp-b/global';
+import '@mcp-b/global';
+import type { ChromeModelContext } from '@mcp-b/webmcp-types';
 
-const server = initializeWebModelContext();
-if (!server) throw new Error('WebMCP is unavailable');
+const modelContext = document.modelContext as ChromeModelContext;
+if (typeof modelContext.executeTool !== 'function') {
+  throw new Error('Tool execution is unavailable');
+}
 
-const tools = await server.getTools();
+const tools = await modelContext.getTools();
 const searchTool = tools.find((tool) => tool.name === 'search-products');
 if (!searchTool) throw new Error('search-products is not available');
 
-const resultJson = await server.executeTool(
+const resultJson = await modelContext.executeTool(
   searchTool,
   JSON.stringify({ query: 'laptop', limit: 5 })
 );
@@ -218,14 +224,16 @@ const result = resultJson === null ? null : JSON.parse(resultJson);
 This MCP-B helper exposes MCP metadata. In-page WebMCP consumers should use
 `getTools()` and feature-detect `executeTool(tool, inputArgsJson)`.
 
-Prompt and resource helpers are also available on the returned server. Lower-level
-MCP SDK capabilities, including sampling and elicitation, live on `server.mcpServer.server`;
-they are not `document.modelContext` methods.
+Prompt, resource, and lower-level MCP helpers are MCP-B extensions. Narrow
+`document.modelContext` with `isBrowserMcpServer()` from
+`@mcp-b/webmcp-ts-sdk` before using them. Install that package directly when
+importing the guard; do not add extensions to the standard global type.
 
 ### `BrowserMcpServer` Tool Descriptor
 
-The returned server's `registerTool()` overload accepts this MCP-B descriptor.
-The strict `document.modelContext` dictionary does not define `outputSchema`.
+The MCP-B runtime consumes `outputSchema` when a separately typed descriptor is
+passed to `document.modelContext.registerTool()`. Native and strict polyfill
+runtimes ignore the extra field.
 
 | Property       | Type                                    | Required | Description                                                                             |
 | -------------- | --------------------------------------- | -------- | --------------------------------------------------------------------------------------- |
@@ -290,13 +298,11 @@ interface TransportConfiguration {
 window.__webModelContextOptions = { autoInitialize: false };
 
 const { initializeWebModelContext } = await import('@mcp-b/global');
-const server = initializeWebModelContext({
+initializeWebModelContext({
   transport: {
     tabServer: { allowedOrigins: ['https://myapp.com'] },
   },
 });
-
-if (!server) throw new Error('WebMCP is unavailable');
 ```
 
 Inside an iframe, pass `transport: { tabServer: false }` to require the iframe transport.

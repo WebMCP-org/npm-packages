@@ -1,7 +1,7 @@
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { inputRequired } from '@modelcontextprotocol/server';
 import { afterEach, describe, expect, it } from 'vitest';
-import { BrowserMcpServer } from './browser-server.js';
+import { BrowserMcpServer, isBrowserMcpServer } from './browser-server.js';
 
 let server: BrowserMcpServer | undefined;
 let client: Client | undefined;
@@ -14,6 +14,12 @@ afterEach(async () => {
 });
 
 describe('BrowserMcpServer', () => {
+  it('narrows branded model contexts', () => {
+    server = new BrowserMcpServer({ name: 'guard-test', version: '1.0.0' });
+    expect(isBrowserMcpServer(server)).toBe(true);
+    expect(isBrowserMcpServer(undefined)).toBe(false);
+  });
+
   it('uses Web IDL callback semantics and preserves execution errors', async () => {
     server = new BrowserMcpServer({ name: 'execution-test', version: '1.0.0' });
     await server.registerTool({

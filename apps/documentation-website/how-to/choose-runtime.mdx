@@ -109,7 +109,7 @@ await document.modelContext.registerTool({
 });
 ```
 
-`@mcp-b/global` auto-initializes on import. It installs the polyfill first, then replaces `document.modelContext` with a `BrowserMcpServer` that keeps the core behavior and adds `listTools`, prompt and resource registration, the composed `mcpServer`, and transport support. Call `initializeWebModelContext()` when you need the typed server value.
+`@mcp-b/global` auto-initializes on import. It installs the polyfill first, then replaces `document.modelContext` with a `BrowserMcpServer` that keeps the core behavior and adds `listTools`, prompt and resource registration, the composed `mcpServer`, and transport support. Application code still uses `document.modelContext`. For manual initialization, set `autoInitialize: false` before the package loads, then import and call `initializeWebModelContext()` as shown in the [global reference](/packages/global/reference#configuration).
 
 If you need to customize before initialization (for example, to restrict allowed origins), set options on `window.__webModelContextOptions` before loading the script:
 

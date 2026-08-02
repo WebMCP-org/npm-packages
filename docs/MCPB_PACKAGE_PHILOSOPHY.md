@@ -37,7 +37,7 @@ Use when you want:
 ### 3) `@mcp-b/global` (MCP-B Runtime Entry Point)
 
 - Orchestrates the polyfill, `BrowserMcpServer`, and browser transport.
-- Returns the active `BrowserMcpServer` for typed extension access.
+- Installs the runtime behind the canonical `document.modelContext` surface.
 - Exports initialization and transport configuration types. The browser adapter and its extension types belong to `@mcp-b/webmcp-ts-sdk`.
 
 Use when you want:

@@ -102,13 +102,15 @@ import { LiveLandingTool } from '/snippets-jsx/live-landing-tool.jsx';
 
           <div className="docs-landing-code-card">
             <p className="docs-landing-code-label">Resource registration (MCP-B)</p>
-            ```typescript resource.ts
-            import { initializeWebModelContext } from '@mcp-b/global';
+            ```javascript resource.js
+            import '@mcp-b/global';
 
-            const server = initializeWebModelContext();
-            if (!server) throw new Error('WebMCP requires a secure browser context');
+            const modelContext = document.modelContext;
+            if (typeof modelContext?.registerResource !== 'function') {
+              throw new Error('MCP-B extensions are unavailable');
+            }
 
-            server.registerResource({
+            modelContext.registerResource({
               uri: 'app://config',
               name: 'App Configuration',
               mimeType: 'application/json',

@@ -80,12 +80,16 @@ advanced MCP escape hatch. Removed compatibility aliases include
 `unregisterTool`, direct resource/prompt list and read helpers, and the
 single-request sampling and elicitation shortcuts. Tool lifetimes use
 `AbortSignal`; multi-round handlers register directly on `mcpServer`.
+The `isBrowserMcpServer()` guard replaces the raw server-marker export and
+narrows the canonical document surface for explicit MCP-B extension access
+without introducing a second runtime handle.
 Aborted registrations release their tool name immediately and cannot tear down a
 replacement registration, including during React Strict Mode effect replay.
 
-`@mcp-b/global` now returns its initialized `BrowserMcpServer`, so applications
-can register MCP-B prompts, resources, and advanced MCP handlers without casting
-the strict `document.modelContext` standard surface.
+`@mcp-b/global` keeps initialization side-effect-only. Applications use the
+strict `document.modelContext` surface normally and explicitly narrow that
+surface before calling MCP-B-only extensions. Its emitted declarations retain
+the strict WebMCP global types for package-only TypeScript consumers.
 
 `@mcp-b/webmcp-local-relay` removes the direct `elicitInput` mutation and relay
 messages that bypassed MCP's multi-round elicitation protocol.

@@ -1,7 +1,7 @@
 export {
   BrowserMcpServer,
   type BrowserMcpServerOptions,
+  isBrowserMcpServer,
   type PromptDescriptor,
   type ResourceDescriptor,
-  SERVER_MARKER_PROPERTY,
 } from './browser-server.js';

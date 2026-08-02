@@ -12,15 +12,22 @@ keywords:
 icon: 'layer-plus'
 ---
 
-Prompts and resources are MCP-B extension features, not part of the strict WebMCP core. They require [`@mcp-b/global`](/packages/global/reference), which returns the active `BrowserMcpServer` for typed extension access. For background on this distinction, see [Strict core vs MCP-B extensions](/explanation/strict-core-vs-mcp-b-extensions).
+Prompts and resources are MCP-B extension features, not part of the strict WebMCP core. Install [`@mcp-b/global`](/packages/global/reference), then explicitly narrow `document.modelContext` before using them. For background on this distinction, see [Strict core vs MCP-B extensions](/explanation/strict-core-vs-mcp-b-extensions).
 
 ## Initialize the runtime
 
-```typescript "main.ts"
-import { initializeWebModelContext } from '@mcp-b/global';
+```bash
+npm install @mcp-b/global @mcp-b/webmcp-ts-sdk
+```
 
-const server = initializeWebModelContext();
-if (!server) throw new Error('WebMCP requires a secure browser context');
+```typescript "main.ts"
+import '@mcp-b/global';
+import { isBrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
+
+const modelContext = document.modelContext;
+if (!isBrowserMcpServer(modelContext)) {
+  throw new Error('MCP-B extensions are unavailable');
+}
 ```
 
 ## Register a prompt
@@ -30,7 +37,7 @@ A prompt is a reusable message template that AI clients can discover and invoke 
 <Steps>
   <Step title="Register the prompt">
     ```typescript
-    const { unregister } = server.registerPrompt({
+    const { unregister } = modelContext.registerPrompt({
       name: 'greeting',
       description: 'Generate a greeting message',
       argsSchema: {
@@ -98,7 +105,7 @@ A resource exposes readable data (configuration, documents, state) to AI clients
 <Steps>
   <Step title="Register the resource">
     ```typescript
-    const { unregister } = server.registerResource({
+    const { unregister } = modelContext.registerResource({
       uri: 'app://config',
       name: 'App Configuration',
       description: 'Current application configuration',

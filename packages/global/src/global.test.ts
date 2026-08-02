@@ -80,18 +80,18 @@ describe('global adapter', () => {
     const nativeContext = createNativeModelContextStub();
     setDocumentModelContext(nativeContext);
 
-    const server = initializeWebModelContext();
-    // Server wraps native, adding registerPrompt/registerResource/etc.
+    expect(initializeWebModelContext()).toBeUndefined();
+    const server = getModelContext();
     expect(server).toBeInstanceOf(BrowserMcpServer);
-    expect(initializeWebModelContext()).toBe(server);
+    expect(initializeWebModelContext()).toBeUndefined();
     expect(document.modelContext).toBe(server);
 
     cleanupWebModelContext();
     expect(document.modelContext).toBe(nativeContext);
 
-    const reinitializedServer = initializeWebModelContext();
-    expect(document.modelContext).toBe(reinitializedServer);
-    expect(typeof reinitializedServer?.listTools).toBe('function');
+    expect(initializeWebModelContext()).toBeUndefined();
+    expect(document.modelContext).not.toBe(nativeContext);
+    expect(typeof getModelContext().listTools).toBe('function');
   });
 
   it('leaves the native surface untouched when transport selection fails', () => {
@@ -1482,12 +1482,13 @@ describe('cross-bundle duplicate prevention (e2e)', () => {
     // --- Bundle B: calls initializeWebModelContext() ---
     // Module-level `runtime` is null (no prior init in this test).
     // The ONLY thing preventing a second server+transport is the marker on modelContext.
-    const initializedServer = initializeWebModelContext({
-      transport: { tabServer: { allowedOrigins: ['*'], channelId }, iframeServer: false },
-    });
+    expect(
+      initializeWebModelContext({
+        transport: { tabServer: { allowedOrigins: ['*'], channelId }, iframeServer: false },
+      })
+    ).toBeUndefined();
 
     // modelContext should still be Bundle A's server — not replaced
-    expect(initializedServer).toBe(server);
     expect(document.modelContext).toBe(server);
 
     // --- Verify: full MCP roundtrip invokes tool exactly once ---

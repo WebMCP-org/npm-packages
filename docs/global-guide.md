@@ -71,26 +71,29 @@ Abort the registration signal to remove a tool. There is no name-based
 
 ## Discover and execute tools
 
-The typed adapter execution path is:
+Discovery stays on the document surface. Chromium's execution method is
+optional, so feature-detect it there as well:
 
 ```ts
-import { initializeWebModelContext } from '@mcp-b/global';
+import type { ChromeModelContext } from '@mcp-b/webmcp-types';
 
-const server = initializeWebModelContext();
-if (!server) throw new Error('WebMCP requires a secure browser context');
+const modelContext = document.modelContext as ChromeModelContext;
+if (typeof modelContext.executeTool !== 'function') {
+  throw new Error('Tool execution is unavailable');
+}
 
-const tools = await server.getTools();
+const tools = await modelContext.getTools();
 const tool = tools.find((item) => item.name === 'counter_get');
 
 if (!tool) {
   throw new Error('counter_get is not registered');
 }
 
-const resultJson = await server.executeTool(tool, '{}');
+const resultJson = await modelContext.executeTool(tool, '{}');
 const result = resultJson === null ? null : JSON.parse(resultJson);
 ```
 
-`executeTool()` is a `BrowserMcpServer` extension, not a strict WebMCP member.
+`executeTool()` is a Chromium-compatible extension, not a strict WebMCP member.
 `listTools()` is an MCP-B metadata helper. MCP clients that connect through the
 MCP SDK use the client's `listTools()` and `callTool(...)` protocol APIs.
 
@@ -101,14 +104,12 @@ window.__webModelContextOptions = { autoInitialize: false };
 
 const { initializeWebModelContext } = await import('@mcp-b/global');
 
-const server = initializeWebModelContext({
+initializeWebModelContext({
   transport: {
     tabServer: { allowedOrigins: ['https://app.example'] },
   },
   installTestingShim: true,
 });
-
-if (!server) throw new Error('WebMCP requires a secure browser context');
 ```
 
 Set `autoInitialize` before the package loads. A static import runs package
@@ -123,8 +124,8 @@ Useful options:
 | `transport.iframeServer` | auto    | Configure or disable iframe transport                                 |
 | `installTestingShim`     | `true`  | Install `navigator.modelContextTesting` when no implementation exists |
 
-The initializer returns the active `BrowserMcpServer`, including on repeated or
-cross-bundle calls. It returns `undefined` outside a secure browser context.
+The initializer is side-effect-only. Repeated and cross-bundle calls are no-ops;
+application code continues through `document.modelContext`.
 
 ## Runtime layering
 

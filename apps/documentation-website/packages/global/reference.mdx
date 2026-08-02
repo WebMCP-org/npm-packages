@@ -16,7 +16,7 @@ icon: 'globe'
 
 `@mcp-b/global` is the MCP-B runtime entry point layered on top of WebMCP. It orchestrates the polyfill, creates a `BrowserMcpServer`, sets up transport, and replaces `document.modelContext` with the server instance.
 
-After initialization, `document.modelContext` still supports the [strict WebMCP surface](/reference/webmcp/standard-api). The installed runtime object also supports [MCP-B extensions](/packages/webmcp-ts-sdk/reference), but the global TypeScript declaration stays strict. Use the initializer's return value for typed access to prompts, resources, `listTools()`, and the composed MCP server.
+After initialization, application code continues through the [strict `document.modelContext` surface](/reference/webmcp/standard-api). The installed runtime object also supports [MCP-B extensions](/packages/webmcp-ts-sdk/reference), but the global TypeScript declaration stays strict. Narrow `document.modelContext` explicitly when you opt into those extensions.
 
 ```
 npm install @mcp-b/global
@@ -103,25 +103,27 @@ To prevent auto-initialization:
 
 ### `initializeWebModelContext(options?)`
 
-Initializes the global adapter, replaces `document.modelContext` with a `BrowserMcpServer`, and returns the active server.
+Initializes the global adapter and installs it on `document.modelContext`.
 
 ```ts "Initializer signature"
-initializeWebModelContext(options?: WebModelContextInitOptions): BrowserMcpServer | undefined
+initializeWebModelContext(options?: WebModelContextInitOptions): void
 ```
 
 ```ts
 import { initializeWebModelContext } from '@mcp-b/global';
 
-const server = initializeWebModelContext();
+initializeWebModelContext();
 
-if (!server) throw new Error('WebMCP requires a secure browser context');
+await document.modelContext.registerTool({
+  /* your tool */
+});
 ```
 
 **Behavior:**
 
-- Returns `undefined` outside a secure browser environment (SSR safe).
-- Returns the active server on repeated calls.
-- Returns an existing `BrowserMcpServer` installed by another bundle.
+- Returns nothing in every environment.
+- Does nothing outside a secure browser environment (SSR safe).
+- Repeated calls and calls after another bundle initialized the runtime are no-ops.
 
 **Initialization sequence:**
 
@@ -174,32 +176,28 @@ Transport is auto-selected based on context:
 window.__webModelContextOptions = { autoInitialize: false };
 
 const { initializeWebModelContext } = await import('@mcp-b/global');
-const server = initializeWebModelContext({
+initializeWebModelContext({
   transport: {
     tabServer: { allowedOrigins: ['https://myapp.com'] },
   },
 });
-
-if (!server) throw new Error('WebMCP requires a secure browser context');
 ```
 
 Set `autoInitialize` before importing the package. Static imports run package initialization before the importing module's body.
 
 ---
 
-## Runtime server surface
+## Canonical document surface
 
-After initialization, the runtime installs a `BrowserMcpServer` on `document.modelContext`. Capture the initializer's return value, as shown above, to call extensions without broadening the strict global type.
-
-The server exposes:
+After initialization, use `document.modelContext` for standard WebMCP registration, discovery, and events. The installed runtime exposes:
 
 **Strict WebMCP members** (mirrored to native/polyfill):
 
-| Member                         | Description                                 |
-| ------------------------------ | ------------------------------------------- |
-| `registerTool(tool, options?)` | Add a tool and return `Promise<void>`       |
-| `getTools(options?)`           | Resolve registered producer descriptors     |
-| `toolchange`                   | Notify consumers that the tool list changed |
+| Member                         | Description                                |
+| ------------------------------ | ------------------------------------------ |
+| `registerTool(tool, options?)` | Add a tool and return `Promise<void>`      |
+| `getTools(options?)`           | Resolve registered producer descriptors    |
+| `ontoolchange`                 | Observe changes to the available tool list |
 
 **Chrome-compatible execution extension** (not part of strict WebMCP):
 
@@ -216,9 +214,25 @@ The server exposes:
 | `registerPrompt(descriptor)`   | Register an MCP prompt                           |
 | `mcpServer`                    | Access the official high-level MCP server object |
 
-Sampling and elicitation are not direct `BrowserMcpServer` methods. Legacy
-push-style SDK APIs live on `server.mcpServer.server` and are sensitive to the
-negotiated protocol revision.
+TypeScript users can narrow the canonical surface without widening the global declaration:
+
+```ts
+import '@mcp-b/global';
+import { isBrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
+
+const modelContext = document.modelContext;
+if (!isBrowserMcpServer(modelContext)) {
+  throw new Error('MCP-B extensions are unavailable');
+}
+
+modelContext.registerPrompt({
+  /* your prompt */
+});
+```
+
+Add `@mcp-b/webmcp-ts-sdk` as a direct dependency when importing its guard or extension types.
+
+Sampling and elicitation are not direct `BrowserMcpServer` methods. Legacy push-style SDK APIs live on `modelContext.mcpServer.server` after narrowing. They remain sensitive to the negotiated protocol revision.
 
 For the MCP-B-only server members, see [`@mcp-b/webmcp-ts-sdk` reference](/packages/webmcp-ts-sdk/reference). For the standard-owned browser surface, see [WebMCP standard API](/reference/webmcp/standard-api).
 

@@ -53,7 +53,16 @@ import {
 } from '@modelcontextprotocol/server';
 
 const DEFAULT_INPUT_SCHEMA = normalizeInputSchema(undefined).inputSchema;
-export const SERVER_MARKER_PROPERTY = '__isBrowserMcpServer' as const;
+const SERVER_MARKER_PROPERTY = '__isBrowserMcpServer' as const;
+
+export function isBrowserMcpServer(context: unknown): context is BrowserMcpServer {
+  return (
+    typeof context === 'object' &&
+    context !== null &&
+    SERVER_MARKER_PROPERTY in context &&
+    context[SERVER_MARKER_PROPERTY] === true
+  );
+}
 
 interface RegisteredWebMcpTool {
   item: ToolListItem;
